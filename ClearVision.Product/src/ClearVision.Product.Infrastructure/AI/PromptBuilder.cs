@@ -479,6 +479,7 @@ public class PromptBuilder
                 requires_lifecycle_disclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
                     m.Lifecycle,
                     m.ImageInputContracts),
+                quality_state = m.QualityState,
                 image_contract = ImageContractPresentationBuilder.Summarize(m.ImageInputContracts)
             });
 
@@ -502,6 +503,7 @@ public class PromptBuilder
             requires_lifecycle_disclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
                 m.Lifecycle,
                 m.ImageInputContracts),
+            quality_state = m.QualityState,
             keywords = m.Keywords ?? Array.Empty<string>(),
             inputs = m.InputPorts.Select(p => new
             {

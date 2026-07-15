@@ -50,6 +50,11 @@ if ($exitCode -eq 0 -and $Profile -eq "acceptance") {
         "Anomaly/OnnxManifestPreprocess" = @{ P95 = 0.20; Allocation = 20000 }
         "AnomalyPreprocess/ManifestDeclaredRgbFloat01" = @{ P95 = 0.20; Allocation = 20000 }
     }
+    if ($Label -eq "after") {
+        $metricBudgets["Caliper/ProductionGaussianDerivative"] = @{ P95 = 0.10; Allocation = 10000 }
+        $metricBudgets["Circle/ProductionOrthogonalWelsch"] = @{ P95 = 1.00; Allocation = 500000 }
+        $metricBudgets["Line/ProductionWelsch"] = @{ P95 = 0.50; Allocation = 300000 }
+    }
 
     foreach ($entry in $metricBudgets.GetEnumerator()) {
         $parts = $entry.Key.Split('/')
@@ -85,6 +90,33 @@ if ($exitCode -eq 0 -and $Profile -eq "acceptance") {
     $preprocessMetric = $result.metrics | Where-Object { $_.domain -eq "AnomalyPreprocess" -and $_.algorithm -eq "ManifestDeclaredRgbFloat01" }
     if ([double]$preprocessMetric.rmse -gt 0.000001) {
         throw "ONNX manifest preprocessing reference RMSE exceeded: $($preprocessMetric.rmse)."
+    }
+
+    if ($Label -eq "after") {
+        $productionPairs = @(
+            @{ Domain = "Circle"; Candidate = "OrthogonalWelsch"; Production = "ProductionOrthogonalWelsch"; Mode = "Exact" },
+            @{ Domain = "Line"; Candidate = "Welsch"; Production = "ProductionWelsch"; Mode = "Exact" },
+            @{ Domain = "Caliper"; Candidate = "GaussianDerivative"; Production = "ProductionGaussianDerivative"; Mode = "NoDegradation" }
+        )
+        foreach ($pair in $productionPairs) {
+            $candidate = $result.metrics | Where-Object { $_.domain -eq $pair.Domain -and $_.algorithm -eq $pair.Candidate }
+            $production = $result.metrics | Where-Object { $_.domain -eq $pair.Domain -and $_.algorithm -eq $pair.Production }
+            if ($null -eq $candidate -or $null -eq $production) {
+                throw "Missing production conformance pair for $($pair.Domain)."
+            }
+            if ($pair.Mode -eq "Exact") {
+                foreach ($field in @("bias", "rmse", "p95Error", "failureRate", "ambiguityRate", "outlierRate")) {
+                    if ([Math]::Abs([double]$candidate.$field - [double]$production.$field) -gt 0.000000001) {
+                        throw "Production conformance drift for $($pair.Domain)/$($field): candidate=$($candidate.$field), production=$($production.$field)."
+                    }
+                }
+            } elseif ([double]$production.rmse -gt [double]$candidate.rmse -or
+                      [double]$production.p95Error -gt [double]$candidate.p95Error -or
+                      [double]$production.failureRate -gt [double]$candidate.failureRate -or
+                      [double]$production.ambiguityRate -gt [double]$candidate.ambiguityRate) {
+                throw "Production conformance regressed for $($pair.Domain)."
+            }
+        }
     }
 }
 

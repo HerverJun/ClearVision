@@ -24,7 +24,7 @@ namespace ClearVision.Product.Tests.Services;
 [TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public sealed class OperatorProductMetadataGovernanceTests
 {
-    private const string ExpectedIdentityHash = "59D631D17759B2E684FCDC4F7EDC64FC8CFC45C2A3483B9271A64C78A7F935F8";
+    private const string ExpectedIdentityHash = "52AE7A29C97AFC3F9DB413890E5C44C650618FBBE13FBE32CDBE5372108B7FA3";
     private static readonly string RepoRoot = ResolveRepoRoot();
 
     private static readonly IReadOnlyDictionary<OperatorCategoryId, int> ExpectedCategoryCounts =
@@ -129,6 +129,7 @@ public sealed class OperatorProductMetadataGovernanceTests
             source.CategoryId.Should().Be(metadata.CategoryId, type.ToString());
             source.Category.Should().Be(metadata.Category, type.ToString());
             source.Lifecycle.Should().Be(metadata.Lifecycle, type.ToString());
+            source.QualityState.Should().BeEquivalentTo(metadata.QualityState, type.ToString());
 
             var dto = application[type];
             dto.DisplayName.Should().Be(metadata.DisplayName, type.ToString());
@@ -136,6 +137,7 @@ public sealed class OperatorProductMetadataGovernanceTests
             dto.CategoryOrder.Should().Be(OperatorCategoryCatalog.GetOrder(metadata.CategoryId), type.ToString());
             dto.Category.Should().Be(metadata.Category, type.ToString());
             dto.Lifecycle.Should().Be(metadata.Lifecycle.ToString(), type.ToString());
+            dto.QualityState.Should().BeEquivalentTo(metadata.QualityState, type.ToString());
             dto.DefaultHidden.Should().Be(metadata.DefaultHidden, type.ToString());
             dto.Inputs.Select(item => item.Name).Should().Equal(metadata.InputPorts.Select(item => item.Name));
             dto.Outputs.Select(item => item.Name).Should().Equal(metadata.OutputPorts.Select(item => item.Name));
@@ -151,6 +153,7 @@ public sealed class OperatorProductMetadataGovernanceTests
             ai.CategoryOrder.Should().Be(OperatorCategoryCatalog.GetOrder(metadata.CategoryId), type.ToString());
             ai.Category.Should().Be(metadata.Category, type.ToString());
             ai.Lifecycle.Should().Be(metadata.Lifecycle, type.ToString());
+            ai.QualityState.Should().BeEquivalentTo(metadata.QualityState, type.ToString());
             ai.DefaultHidden.Should().Be(metadata.DefaultHidden, type.ToString());
             ai.DefaultAiRecommendation.Should().Be(
                 ImageContractPresentationBuilder.IsDefaultAiRecommendation(
@@ -173,6 +176,7 @@ public sealed class OperatorProductMetadataGovernanceTests
             schema.Metadata.Type.Should().Be(metadata.Type);
             schema.CategoryId.Should().Be(metadata.CategoryId);
             schema.Lifecycle.Should().Be(metadata.Lifecycle);
+            schema.QualityState.Should().BeEquivalentTo(metadata.QualityState, type.ToString());
             schema.InputPorts.Should().Equal(metadata.InputPorts.Select(item => item.Name));
             schema.OutputPorts.Should().Equal(metadata.OutputPorts.Select(item => item.Name));
             schema.Parameters.Select(item => item.Name).Should().Equal(metadata.Parameters.Select(item => item.Name));
@@ -491,6 +495,39 @@ public sealed class OperatorProductMetadataGovernanceTests
         helperChanged.Should().NotBe(baseline);
         sourceChanged.Should().NotBe(baseline);
         metadataChanged.Should().NotBe(baseline);
+    }
+
+    [Fact]
+    public void FourAxisQualityState_ShouldRemainEvidenceBoundAndConservative()
+    {
+        var metadata = new OperatorFactory().GetAllMetadata().ToDictionary(item => item.Type);
+
+        metadata.Values.Should().OnlyContain(item =>
+            item.QualityState.Execution == OperatorExecutionQuality.Implemented &&
+            item.QualityState.FieldValidation == OperatorFieldValidation.NotValidated);
+        metadata.Values.Should().NotContain(item =>
+            item.QualityState.ProductionReadiness.Equals("ReleaseReady", StringComparison.OrdinalIgnoreCase) ||
+            item.QualityState.FieldValidation.Equals("FieldVerified", StringComparison.OrdinalIgnoreCase));
+
+        foreach (var type in new[] { OperatorType.CaliperTool, OperatorType.CircleMeasurement, OperatorType.LineMeasurement })
+        {
+            var state = metadata[type].QualityState;
+            state.AlgorithmQuality.Should().Be(OperatorAlgorithmQuality.SyntheticBenchmarkValidated);
+            state.ProductionReadiness.Should().Be(OperatorProductionReadiness.Unknown);
+            state.EvidenceRefs.Should().Contain("quality/evals/reports/operator-precision-after-acceptance.json");
+            state.EvidenceRefs.Should().Contain("docs/operator-quality/operator-quality-phase5-closeout.md");
+        }
+
+        metadata[OperatorType.AnomalyDetection].QualityState.AlgorithmQuality
+            .Should().Be(OperatorAlgorithmQuality.PublicDatasetEvidence);
+        metadata[OperatorType.AnomalyDetection].QualityState.ProductionReadiness
+            .Should().Be(OperatorProductionReadiness.Experimental);
+        metadata[OperatorType.Morphology].QualityState.ProductionReadiness
+            .Should().Be(OperatorProductionReadiness.CompatibilityOnly);
+
+        metadata.Values
+            .Where(item => item.Type is not (OperatorType.CaliperTool or OperatorType.CircleMeasurement or OperatorType.LineMeasurement or OperatorType.AnomalyDetection))
+            .Should().OnlyContain(item => item.QualityState.AlgorithmQuality == OperatorAlgorithmQuality.Unknown);
     }
 
     [Fact]

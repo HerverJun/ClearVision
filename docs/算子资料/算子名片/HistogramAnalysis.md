@@ -14,7 +14,12 @@
 | 默认隐藏 (Default Hidden) | No |
 | AI 默认推荐 (Default AI Recommendation) | Yes |
 | AI 必须披露状态 (Requires Disclosure) | No |
-| 标签 (Tags) | `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Stable`, `算法类型:自研` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `Unknown` |
+| ProductionReadiness | `Unknown` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs |  |
+| 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于统计指定通道的直方图及灰度/强度分布指标。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -104,7 +109,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`E30614EC00BBCC3BD545D1BCD3ED227766801F9641A43647F1C12D992326F334`
+- 组合指纹 (Generation Fingerprint)：`CBB6DAABA04DEC1E9BF6C86F9E539EF2E8A4DC0DE4C7FE045E5087E0E2DBBA21`
 - `type:ClearVision.Product.Infrastructure.Operators.HistogramImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs

@@ -50,6 +50,7 @@ public static class CoreTypeAdapters
             InputPorts = source.InputPorts.Select(ToModel).Cast<IOperatorPort>().ToArray(),
             OutputPorts = source.OutputPorts.Select(ToModel).Cast<IOperatorPort>().ToArray(),
             Parameters = source.Parameters.Select(ToModel).Cast<IOperatorParameter>().ToArray(),
+            QualityState = source.QualityState,
             ImageInputContracts = source.ImageInputContracts.ToArray()
         };
     }

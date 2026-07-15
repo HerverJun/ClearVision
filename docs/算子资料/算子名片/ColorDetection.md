@@ -12,9 +12,14 @@
 | 生命周期 (Lifecycle) | 实验 `Experimental` |
 | 生命周期说明 (Lifecycle Note) | 颜色检查多模式仍处于工业化验证阶段，阈值和白平衡策略需按现场样本确认。 |
 | 默认隐藏 (Default Hidden) | No |
-| AI 默认推荐 (Default AI Recommendation) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
-| 标签 (Tags) | `color-inspection`, `experimental`, `industrial-remediation`, `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Experimental`, `算法类型:自研` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `Unknown` |
+| ProductionReadiness | `Experimental` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs |  |
+| 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Experimental`, `color-inspection`, `experimental`, `industrial-remediation`, `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Experimental`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于对图像执行平均色、主色和范围分析，并支持 HSV 区间检查与 Lab DeltaE 色差分析。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -95,12 +100,13 @@
 ## 图像输入域合同 / Image Input Domain Contracts
 | 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Allowed:0, Rejected:0, Unknown:28 | Unknown — no verified executable image support is registered. |  |  |  | Unverified image depth domain; Unknown is not support. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | Unknown | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Image` | Allowed:3, Rejected:0, Unknown:0 | Verified production support is present. | CV_8U | CV_8U | 1, 3, 4 | ColorDetection executes only on verified 8-bit C1/C3/C4 inputs. | C1/C4 are converted to BGR without depth scaling. | Image output is CV_8UC3; coverage and color metrics are scalar outputs. | HSV/Lab inspection thresholds are defined in the 8-bit intensity domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
 ### 精确运行变体 / Exact Runtime Variants
 | 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
 |------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Default | CV_8UC1, CV_8UC2, CV_8UC3, CV_8UC4, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
+| `Image` | Default | CV_8UC3 | Verified 8-bit grayscale, BGR, and BGRA color-analysis inputs. | `Allowed` | `VerifiedSupport` | C1 -> BGR and C4 -> BGR before HSV/Lab analysis; no depth scaling. | Image output is CV_8UC3; scalar color metrics are double precision. | HSV thresholds and rendered diagnostics use the legacy 0..255 intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
+| `Image` | Default | CV_8UC1, CV_8UC4 | Verified 8-bit grayscale, BGR, and BGRA color-analysis inputs. | `Allowed` | `VerifiedConversion` | C1 -> BGR and C4 -> BGR before HSV/Lab analysis; no depth scaling. | Image output is CV_8UC3; scalar color metrics are double precision. | HSV thresholds and rendered diagnostics use the legacy 0..255 intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -108,8 +114,8 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`0E04626E9216D72BA031E1E6536C26D20634C1F1BADF4A3127DB79719873750E`
-- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+- 组合指纹 (Generation Fingerprint)：`7FC15AEA6072ED2E8E4B972492A39FA48688B2F8FC45DD2FF6A941FBBBC54EC7`
+- `type:ClearVision.Product.Infrastructure.Operators.ColorDetectionImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |

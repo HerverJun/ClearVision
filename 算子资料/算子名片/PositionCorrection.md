@@ -14,7 +14,12 @@
 | 默认隐藏 (Default Hidden) | No |
 | AI 默认推荐 (Default AI Recommendation) | Yes |
 | AI 必须披露状态 (Requires Disclosure) | No |
-| 标签 (Tags) | `分类:MatchingAndLocalization`, `分类显示:匹配与定位`, `生命周期:Stable`, `算法类型:自研` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `Unknown` |
+| ProductionReadiness | `Unknown` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs |  |
+| 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:MatchingAndLocalization`, `分类显示:匹配与定位`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于根据参考点与基准点的像素偏差，对 ROI 坐标执行平移或平移旋转补偿并输出变换信息；作为物理世界补偿使用前需先完成标定。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。

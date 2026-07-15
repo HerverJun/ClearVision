@@ -14,7 +14,12 @@
 | 默认隐藏 (Default Hidden) | No |
 | AI 默认推荐 (Default AI Recommendation) | Yes |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
-| 标签 (Tags) | `experimental`, `industrial-remediation`, `surface-defect`, `分类:DefectDetection`, `分类显示:缺陷检测`, `生命周期:Experimental`, `算法类型:自研` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `Unknown` |
+| ProductionReadiness | `Experimental` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs |  |
+| 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Experimental`, `experimental`, `industrial-remediation`, `surface-defect`, `分类:DefectDetection`, `分类显示:缺陷检测`, `生命周期:Experimental`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于使用梯度、配准后的参考差分或局部对比度检测表面缺陷。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -100,16 +105,18 @@
 ## 图像输入域合同 / Image Input Domain Contracts
 | 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Allowed:3, Rejected:0, Unknown:0 | Verified production support is present. | CV_8U | CV_8U | 1, 3, 4 | 8U C1/C3/C4 execution for the verified defect modes. | C3/C4 -> Gray for analysis; no depth scaling. | Image output is CV_8UC3; masks and responses remain 8-bit. | Legacy 0..255 intensity domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
-| `Reference` | Allowed:3, Rejected:0, Unknown:0 | Verified production support is present. | CV_8U | CV_8U | 1, 3, 4 | Optional 8U reference image for ReferenceDiff. | C3/C4 -> Gray for analysis; no depth scaling. | Image output is CV_8UC3; masks and responses remain 8-bit. | Legacy 0..255 intensity domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Image` | Allowed:3, Rejected:1, Unknown:0 | Verified production support is present. | CV_8U | CV_8U | 1, 3, 4 | 8U C1/C3/C4 execution for the verified defect modes. | C3/C4 -> Gray for analysis; no depth scaling. | Image output is CV_8UC3; masks and responses remain 8-bit. | Legacy 0..255 intensity domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Reference` | Allowed:3, Rejected:1, Unknown:0 | Verified production support is present. | CV_8U | CV_8U | 1, 3, 4 | Optional 8U reference image for ReferenceDiff. | C3/C4 -> Gray for analysis; no depth scaling. | Image output is CV_8UC3; masks and responses remain 8-bit. | Legacy 0..255 intensity domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
 ### 精确运行变体 / Exact Runtime Variants
 | 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
 |------|------|------|------|------|------|------|------|------|------|------|------|
 | `Image` | Default | CV_8UC1 | GradientMagnitude/LocalContrast/ReferenceDiff legacy 8U paths. | `Allowed` | `VerifiedSupport` | C3/C4 -> Gray for analysis; no depth scaling. | CV_8U outputs. | Legacy 8-bit intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
 | `Image` | Default | CV_8UC3, CV_8UC4 | GradientMagnitude/LocalContrast/ReferenceDiff legacy 8U paths. | `Allowed` | `VerifiedConversion` | C3/C4 -> Gray for analysis; no depth scaling. | CV_8U outputs. | Legacy 8-bit intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
+| `Image` | Default | CV_8UC2 | Unsupported image channel count. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
 | `Reference` | Default | CV_8UC1 | Reference is consumed only by ReferenceDiff. | `Allowed` | `VerifiedSupport` | C3/C4 -> Gray for analysis; no depth scaling. | CV_8U outputs. | Legacy 8-bit intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
 | `Reference` | Default | CV_8UC3, CV_8UC4 | Reference is consumed only by ReferenceDiff. | `Allowed` | `VerifiedConversion` | C3/C4 -> Gray for analysis; no depth scaling. | CV_8U outputs. | Legacy 8-bit intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
+| `Reference` | Default | CV_8UC2 | Unsupported image channel count. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_OPERATOR_AND_PACKAGE_TESTS` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -117,7 +124,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`D1DE15020EF335BF7A6142FB71121B76A2761A9BFAD30C363C9E076C73347FBE`
+- 组合指纹 (Generation Fingerprint)：`35AA01E44E55FFC253C89DBC8E40761F74DB34CD0253020344316A7044F617B5`
 - `type:ClearVision.Product.Infrastructure.Operators.SurfaceDefectDetectionImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs

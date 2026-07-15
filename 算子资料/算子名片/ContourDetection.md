@@ -14,7 +14,12 @@
 | 默认隐藏 (Default Hidden) | No |
 | AI 默认推荐 (Default AI Recommendation) | No |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
-| 标签 (Tags) | `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Stable`, `算法类型:自研` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `Unknown` |
+| ProductionReadiness | `Unknown` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs |  |
+| 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于查找图像轮廓，提取边缘点集和层次关系，供后续测量和拟合使用。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。

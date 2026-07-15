@@ -248,7 +248,7 @@ public class CircleMeasurementCaliperFitV2OperatorTests
     {
         var metadata = new OperatorMetadataScanner().Scan().Single(item => item.Type == OperatorType.CircleMeasurement);
 
-        metadata.Version.Should().Be("1.1.2");
+        metadata.Version.Should().Be("1.2.0");
         metadata.OutputPorts.Select(port => port.Name).Should().Contain(new[]
         {
             "CaliperFitV2Result",

@@ -14,7 +14,12 @@
 | 默认隐藏 (Default Hidden) | No |
 | AI 默认推荐 (Default AI Recommendation) | Yes |
 | AI 必须披露状态 (Requires Disclosure) | No |
-| 标签 (Tags) | `分类:ImagePreprocessing`, `分类显示:图像预处理`, `生命周期:Stable`, `算法类型:基于OpenCV` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `Unknown` |
+| ProductionReadiness | `Unknown` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs |  |
+| 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:ImagePreprocessing`, `分类显示:图像预处理`, `生命周期:Stable`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于在浮点域保留拉普拉斯响应符号，并按 dst = src - strength × laplacian 锐化。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -92,7 +97,7 @@
 | `SharpenStrength` | - | `LAPLACIAN_SHARPEN_OUTPUT` |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`3B9A71B0CB2175491916E0AB3FC86E9AFC3308EF44C34777961343BD7968A84F`
+- 组合指纹 (Generation Fingerprint)：`5FEA5C648C6BBA2E5A2697EC32535C0C1911926620CA771CBEE53726A8AA2E71`
 - `type:ClearVision.Product.Infrastructure.Operators.LaplacianSharpenImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs

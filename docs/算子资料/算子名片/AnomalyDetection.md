@@ -8,13 +8,18 @@
 | 分类 ID (CategoryId) | `AiInference` |
 | 分类 (Category) | AI推理 |
 | 分类顺序 (CategoryOrder) | 9 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 实验 `Experimental` |
 | 生命周期说明 (Lifecycle Note) | 简化 PatchCore 风格实现，部署前必须使用现场数据验证特征库、阈值和稳定性。 |
 | 默认隐藏 (Default Hidden) | No |
-| AI 默认推荐 (Default AI Recommendation) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
-| 标签 (Tags) | `anomaly-detection`, `experimental`, `industrial-remediation`, `分类:AiInference`, `分类显示:AI推理`, `生命周期:Experimental`, `算法类型:基于OpenCV` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `PublicDatasetEvidence` |
+| ProductionReadiness | `Experimental` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs | quality/evals/reports/operator-precision-after-acceptance.json<br>quality/evals/reports/AnomalyDetection_mvtec_baseline.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
+| 标签 (Tags) | `AlgorithmQuality:PublicDatasetEvidence`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Experimental`, `anomaly-detection`, `experimental`, `industrial-remediation`, `分类:AiInference`, `分类显示:AI推理`, `生命周期:Experimental`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于运行简化版 PatchCore 异常检测器，支持训练/推理模式和特征库持久化。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -24,7 +29,7 @@
 ## 实现策略 / Implementation Strategy
 - 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
 - 可选输入用于覆盖或补充参数配置：`Image`、`NormalImages`。
-- 参数解析覆盖 16 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 17 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
@@ -50,6 +55,7 @@
 | `FeatureExtractorId` | 特征提取器 ID | `string` | lab_gradient_stats | - | No | - |
 | `EmbeddingModelId` | 嵌入模型 ID | `string` | "" | - | No | - |
 | `EmbeddingModelPath` | 嵌入模型路径 | `file` | "" | - | No | - |
+| `EmbeddingManifestPath` | Embedding Manifest Path | `file` | "" | - | No | - |
 | `PatchSize` | 补丁大小 | `int` | 32 | [4, 256] | Yes | - |
 | `PatchStride` | 补丁步长 | `int` | 16 | [1, 256] | Yes | - |
 | `CoresetRatio` | 核心集比例 | `double` | 0.2 | [0.01, 1] | Yes | - |
@@ -81,6 +87,7 @@
 ### 参数条件 / Parameter Conditions
 | 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |
 |------|------|------|------|------|------|------|------|
+| `EmbeddingManifestPath` | required; ALL(FeatureExtractorId == onnx_embedding) | visible: -; hidden: ALL(FeatureExtractorId != onnx_embedding) | enabled: -; disabled: ALL(FeatureExtractorId != onnx_embedding) | ALL(FeatureExtractorId != onnx_embedding) | model_resource | - | `ANOMALY_EMBEDDING_MANIFEST_REQUIRED` |
 | `EmbeddingModelId` | required; ALL(Mode == train && FeatureExtractorId == onnx_embedding) | visible: -; hidden: ALL(FeatureExtractorId != onnx_embedding) | enabled: -; disabled: ALL(FeatureExtractorId != onnx_embedding) | ALL(FeatureExtractorId != onnx_embedding) | model_resource | - | `ANOMALY_TRAINING_EMBEDDING_MODEL_REQUIRED` |
 | `EmbeddingModelPath` | required; ALL(Mode == train && FeatureExtractorId == onnx_embedding) | visible: -; hidden: ALL(FeatureExtractorId != onnx_embedding) | enabled: -; disabled: ALL(FeatureExtractorId != onnx_embedding) | ALL(FeatureExtractorId != onnx_embedding) | model_resource | - | `ANOMALY_TRAINING_EMBEDDING_MODEL_REQUIRED` |
 | `FeatureBankPath` | metadata; ALL(Mode == inference) | visible: -; hidden: - | enabled: -; disabled: - | - | feature_bank | - | `ANOMALY_FEATURE_BANK_SOURCE_REQUIRED` |
@@ -91,12 +98,13 @@
 ## 图像输入域合同 / Image Input Domain Contracts
 | 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Allowed:0, Rejected:0, Unknown:28 | Unknown — no verified executable image support is registered. |  |  |  | Unverified image depth domain; Unknown is not support. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | Unknown | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Image` | Allowed:1, Rejected:3, Unknown:0 | Verified production support is present. | CV_8U | CV_8U, CV_32F | 3 | Verified 8-bit BGR anomaly-detection input domain. | No depth scaling before PatchCore; ONNX preprocessing normalizes explicitly. | Float score map with 8-bit mask and visualization evidence. | Legacy 0..255 BGR intensity domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
 ### 精确运行变体 / Exact Runtime Variants
 | 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
 |------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Default | CV_8UC1, CV_8UC2, CV_8UC3, CV_8UC4, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
+| `Image` | Default | CV_8UC1, CV_8UC2, CV_8UC4 | Anomaly detection requires an 8-bit BGR image. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_NIGHTLY_MODEL_TESTS` |
+| `Image` | Default | CV_8UC3 | Simplified PatchCore and ONNX embedding evidence is verified for 8-bit BGR images. | `Allowed` | `VerifiedSupport` | BGR is consumed directly by the PatchCore feature path and normalized by ONNX preprocessing. | Score maps are CV_32FC1 and masks/visualizations are 8-bit. | Legacy 0..255 BGR intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_NIGHTLY_MODEL_TESTS` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -104,8 +112,8 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`4690F5AC1900175F5F82ABA57CDA324CA232AB799A45593913067D35E9C4ABB1`
-- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+- 组合指纹 (Generation Fingerprint)：`D16582B2F872342D214D241378A66FEFD3A289B434F810DD7A840F675FA205F9`
+- `type:ClearVision.Product.Infrastructure.Operators.AnomalyDetectionImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -113,12 +121,15 @@
 | `CandidateProfileApplied` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `CandidateProfileEnabled` | `Boolean` | 源码通过输出字典索引赋值写入。 |
 | `CandidateProfileFallbackReason` | `String` | 源码通过输出字典索引赋值写入。 |
+| `EmbeddingModelSha256` | `String` | 源码通过输出字典索引赋值写入。 |
 | `EmbeddingSource` | `String` | 源码通过输出字典索引赋值写入。 |
 | `FeatureBankCatalogPath` | `String` | 源码通过输出字典索引赋值写入。 |
+| `FeatureBankIdentitySha256` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `FeatureBankModelId` | `String` | 源码通过输出字典索引赋值写入。 |
 | `FeatureBankSource` | `String` | 源码通过输出字典索引赋值写入。 |
 | `FeatureSchemaVersion` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `MeanNearestDistance` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `PreprocessFingerprint` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `RequestedThreshold` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `ResolvedEmbeddingPath` | `String` | 源码通过输出字典索引赋值写入。 |
 | `ResolvedFeatureBankPath` | `String` | 源码通过输出字典索引赋值写入。 |
@@ -136,7 +147,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 13 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 16 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：模型、标签和阈值已完成现场校准，需要把推理结果接入视觉流程的场景。
@@ -154,4 +165,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

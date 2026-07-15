@@ -67,6 +67,7 @@ public class OperatorService : IOperatorService
             CategoryOrder = OperatorCategoryCatalog.GetOrder(metadata.CategoryId),
             Lifecycle = metadata.Lifecycle.ToString(),
             LifecycleNote = metadata.LifecycleNote,
+            QualityState = metadata.QualityState,
             DefaultHidden = metadata.DefaultHidden,
             Icon = metadata.IconName ?? string.Empty,
             Description = metadata.Description,
@@ -309,6 +310,7 @@ public class OperatorService : IOperatorService
             CategoryOrder = m.CategoryOrder,
             Lifecycle = m.Lifecycle,
             LifecycleNote = m.LifecycleNote,
+            QualityState = m.QualityState,
             DefaultHidden = m.DefaultHidden,
             Icon = m.Icon
         });

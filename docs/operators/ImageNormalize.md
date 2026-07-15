@@ -14,7 +14,12 @@
 | 默认隐藏 (Default Hidden) | No |
 | AI 默认推荐 (Default AI Recommendation) | Yes |
 | AI 必须披露状态 (Requires Disclosure) | No |
-| 标签 (Tags) | `分类:ImagePreprocessing`, `分类显示:图像预处理`, `生命周期:Stable`, `算法类型:基于OpenCV` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `Unknown` |
+| ProductionReadiness | `Unknown` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs |  |
+| 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:ImagePreprocessing`, `分类显示:图像预处理`, `生命周期:Stable`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于MinMax 映射像素范围；ZScore 返回均值约 0、总体标准差约 1 的浮点标准分。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -118,7 +123,7 @@
 | `SigmaDegenerate` | - | `IMAGE_NORMALIZE_OUTPUT` |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`F76410BF26206E59C4061C01FD677C18040D65346BF2FBE3412604C891E63ACD`
+- 组合指纹 (Generation Fingerprint)：`D635DBB61BF6852AA83436EA8D1AD28DE790F8370A3204CFF8C60B329365CCBE`
 - `type:ClearVision.Product.Infrastructure.Operators.ImageNormalizeImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs

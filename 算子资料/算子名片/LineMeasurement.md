@@ -8,13 +8,18 @@
 | 分类 ID (CategoryId) | `Measurement` |
 | 分类 (Category) | 测量 |
 | 分类顺序 (CategoryOrder) | 7 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
 | AI 默认推荐 (Default AI Recommendation) | No |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
-| 标签 (Tags) | `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `SyntheticBenchmarkValidated` |
+| ProductionReadiness | `Unknown` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs | quality/evals/reports/operator-precision-after-acceptance.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
+| 标签 (Tags) | `AlgorithmQuality:SyntheticBenchmarkValidated`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于检测直线特征，输出方向、跨度和拟合质量诊断。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -22,7 +27,7 @@
 
 ## 实现策略 / Implementation Strategy
 - 先校验必填输入：`Image`；缺失时通常返回失败结果。
-- 参数解析覆盖 4 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 5 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
 
@@ -34,13 +39,13 @@
 - `Cv2.Line`
 - `Cv2.HoughLinesP`
 - `Cv2.FitLine`
+- `Convert.ToDouble`
+- `Convert.ToInt32`
 - `Math.PI`
 - `Math.Round`
 - `Math.Max`
 - `Math.Atan2`
 - `Math.Clamp`
-- `Math.Ceiling`
-- `Math.Cos`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
@@ -49,6 +54,7 @@
 | `Threshold` | 累加阈值 | `int` | 100 | >= 1 | Yes | - |
 | `MinLength` | 最小长度 | `double` | 50 | >= 0 | Yes | - |
 | `MaxGap` | 最大间隙 | `double` | 10 | >= 0 | Yes | - |
+| `FitLoss` | 拟合损失 | `enum` | L2 | L2/L2 兼容；Huber；Welsch | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -64,6 +70,7 @@
 | `Length` | 长度 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `Line` | 直线数据 | `LineData` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `LineCount` | 直线数量 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `MeasurementEvidence` | 测量证据 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 
 ## 模式与资源契约 / Mode & Resource Contracts
 ### 参数条件 / Parameter Conditions
@@ -88,22 +95,34 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`482B52D14198906DA69394EE416E58F6EE0BE73F457864D75330B45490431F2C`
+- 组合指纹 (Generation Fingerprint)：`2864B65050C130B846BB8F0229B378EDDE29C63C68A3C151882C30D5E1B9141D`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
 | `Confidence` | `Float` | 源码输出字典初始化中可见字段。 |
+| `Covariance` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `CovarianceCalibrated` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `EndX` | `Any` | 源码输出字典初始化中可见字段。 |
 | `EndY` | `Any` | 源码输出字典初始化中可见字段。 |
-| `FitPointCount` | `Integer` | 源码输出字典初始化中可见字段。 |
+| `FitPointCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
 | `Lines` | `Any` | 源码输出字典初始化中可见字段。 |
+| `OutlierCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `RefineAlgorithm` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `RefineConverged` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `RefineFailure` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `RefineIterations` | `Float` | 源码通过输出字典索引赋值写入。 |
 | `RefinedPointCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
-| `ResidualMax` | `Float` | 源码输出字典初始化中可见字段。 |
-| `ResidualMean` | `Float` | 源码输出字典初始化中可见字段。 |
+| `ResidualMax` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `ResidualMean` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `ResidualRmse` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Rho` | `Any` | 源码输出字典初始化中可见字段。 |
+| `RobustScale` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `SeedAlgorithm` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `SigmaAngleDegrees` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `SigmaOffsetPx` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `StartX` | `Any` | 源码输出字典初始化中可见字段。 |
 | `StartY` | `Any` | 源码输出字典初始化中可见字段。 |
 | `StatusCode` | `Any` | 源码输出字典初始化中可见字段。 |
@@ -123,7 +142,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
@@ -137,4 +156,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

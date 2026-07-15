@@ -76,6 +76,7 @@ var versionTracking = GenerateVersionTrackingArtifacts(operators, docsRoot, gene
 SyncRootCatalogArtifacts(operators, docsRoot, operatorDocsRoot, generatedAt);
 SyncLegacyOperatorsArtifacts(operators, docsRoot, legacyOperatorsRoot, repoRoot, generatedAt);
 SyncLegacyMirrorArtifacts(operatorDocsRoot, docsRoot, legacyMirrorRoot);
+GenerateFourAxisQualityReport(operators, repoRoot, generatedAt);
 
 Console.WriteLine($"repoRoot={repoRoot} operatorDocsRoot={operatorDocsRoot} cardsRoot={docsRoot} operators={candidates.Count} generated={generated} skipped={skipped} overwrite={overwrite}");
 Console.WriteLine($"catalogJson={Path.Combine(operatorDocsRoot, "算子目录.json")} catalogMarkdown={Path.Combine(operatorDocsRoot, "算子目录.md")}");
@@ -255,6 +256,65 @@ static DateTimeOffset ResolveGeneratedAt(string catalogPath, string generationFi
     }
 
     return DateTimeOffset.Now;
+}
+
+static void GenerateFourAxisQualityReport(IReadOnlyList<CatalogOperator> operators, string repoRoot, DateTimeOffset generatedAt)
+{
+    var reportDirectory = Path.Combine(repoRoot, "quality", "evals", "reports");
+    Directory.CreateDirectory(reportDirectory);
+    var rows = operators
+        .OrderBy(item => item.Id, StringComparer.Ordinal)
+        .Select(item => new
+        {
+            operatorType = item.Id,
+            item.DisplayName,
+            item.Lifecycle,
+            item.QualityState.Execution,
+            item.QualityState.AlgorithmQuality,
+            item.QualityState.ProductionReadiness,
+            item.QualityState.FieldValidation,
+            evidenceRefs = item.QualityState.EvidenceRefs
+        })
+        .ToArray();
+    var document = new
+    {
+        schemaVersion = "2026-07-15.operator-quality-four-axis.v1",
+        generatedAtUtc = generatedAt.ToString("o", CultureInfo.InvariantCulture),
+        claimBoundary = "Four independent evidence axes. Unknown, compatibility-only and synthetic/public-dataset evidence never imply Release Ready or Field Verified.",
+        summary = new
+        {
+            total = rows.Length,
+            execution = rows.GroupBy(row => row.Execution).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal),
+            algorithmQuality = rows.GroupBy(row => row.AlgorithmQuality).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal),
+            productionReadiness = rows.GroupBy(row => row.ProductionReadiness).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal),
+            fieldValidation = rows.GroupBy(row => row.FieldValidation).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal)
+        },
+        operators = rows
+    };
+    var jsonOptions = new JsonSerializerOptions
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        WriteIndented = true
+    };
+    File.WriteAllText(
+        Path.Combine(reportDirectory, "operator_quality_four_axis.json"),
+        JsonSerializer.Serialize(document, jsonOptions) + Environment.NewLine,
+        new UTF8Encoding(false));
+
+    var markdown = new StringBuilder();
+    markdown.AppendLine("# Operator Quality Four-Axis State");
+    markdown.AppendLine();
+    markdown.AppendLine($"GeneratedAtUtc: `{generatedAt:o}`");
+    markdown.AppendLine();
+    markdown.AppendLine("> Execution, AlgorithmQuality, ProductionReadiness and FieldValidation are independent. Synthetic/public-dataset evidence is not Release Ready or Field Verified evidence.");
+    markdown.AppendLine();
+    markdown.AppendLine("| Operator | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | Evidence |");
+    markdown.AppendLine("|---|---|---|---|---|---|");
+    foreach (var row in rows)
+    {
+        markdown.AppendLine($"| `{row.operatorType}` | `{row.Execution}` | `{row.AlgorithmQuality}` | `{row.ProductionReadiness}` | `{row.FieldValidation}` | {EscapeCell(string.Join("<br>", row.evidenceRefs))} |");
+    }
+    File.WriteAllText(Path.Combine(reportDirectory, "operator_quality_four_axis.md"), markdown.ToString(), new UTF8Encoding(false));
 }
 
 static IReadOnlyDictionary<OperatorType, DateTimeOffset> ResolveOperatorChangelogDates(
@@ -564,6 +624,11 @@ static string BuildDocument(
     sb.AppendLine($"| 默认隐藏 (Default Hidden) | {BoolToMark(metadata.DefaultHidden)} |");
     sb.AppendLine($"| AI 默认推荐 (Default AI Recommendation) | {BoolToMark(ImageContractPresentationBuilder.IsDefaultAiRecommendation(metadata.Lifecycle, metadata.ImageInputContracts))} |");
     sb.AppendLine($"| AI 必须披露状态 (Requires Disclosure) | {BoolToMark(ImageContractPresentationBuilder.RequiresAiDisclosure(metadata.Lifecycle, metadata.ImageInputContracts))} |");
+    sb.AppendLine($"| Execution | `{metadata.QualityState.Execution}` |");
+    sb.AppendLine($"| AlgorithmQuality | `{metadata.QualityState.AlgorithmQuality}` |");
+    sb.AppendLine($"| ProductionReadiness | `{metadata.QualityState.ProductionReadiness}` |");
+    sb.AppendLine($"| FieldValidation | `{metadata.QualityState.FieldValidation}` |");
+    sb.AppendLine($"| Quality Evidence Refs | {EscapeCell(string.Join("<br>", metadata.QualityState.EvidenceRefs))} |");
     sb.AppendLine($"| 标签 (Tags) | {EscapeCell(string.Join(", ", tags.Select(tag => $"`{tag}`")))} |");
 
     sb.AppendLine();
@@ -1562,6 +1627,7 @@ static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext q
         RequiresLifecycleDisclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
             metadata.Lifecycle,
             metadata.ImageInputContracts),
+        QualityState = metadata.QualityState,
         Version = NormalizeSemVersion(metadata.Version),
         Keywords = (metadata.Keywords ?? Array.Empty<string>())
             .Where(item => !string.IsNullOrWhiteSpace(item))
@@ -1656,6 +1722,10 @@ static List<string> BuildOperatorTags(OperatorDocModel item)
     tags.Add($"分类:{metadata.CategoryId}");
     tags.Add($"分类显示:{metadata.Category}");
     tags.Add($"生命周期:{metadata.Lifecycle}");
+    tags.Add($"Execution:{metadata.QualityState.Execution}");
+    tags.Add($"AlgorithmQuality:{metadata.QualityState.AlgorithmQuality}");
+    tags.Add($"ProductionReadiness:{metadata.QualityState.ProductionReadiness}");
+    tags.Add($"FieldValidation:{metadata.QualityState.FieldValidation}");
     tags.Add($"算法类型:{ResolveAlgorithmTag(item)}");
 
     return tags
@@ -2446,6 +2516,8 @@ internal sealed class CatalogOperator
     public bool DefaultAiRecommendation { get; set; }
 
     public bool RequiresLifecycleDisclosure { get; set; }
+
+    public OperatorQualityState QualityState { get; set; } = OperatorQualityState.Unknown;
 
     public string Version { get; set; } = "1.0.0";
 

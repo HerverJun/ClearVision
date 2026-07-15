@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Infrastructure.AI.Anomaly;
+using ClearVision.Product.Infrastructure.Operators;
 using OpenCvSharp;
 
 var options = BenchmarkOptions.Parse(args);
@@ -67,6 +68,13 @@ internal sealed class OperatorPrecisionBenchmark
         metrics.Add(Evaluate("Line", "L2", "angle_deg", lineCases, item => GeometryAlgorithms.LineFit(item, RobustLoss.L2)));
         metrics.Add(Evaluate("Line", "Huber", "angle_deg", lineCases, item => GeometryAlgorithms.LineFit(item, RobustLoss.Huber)));
         metrics.Add(Evaluate("Line", "Welsch", "angle_deg", lineCases, item => GeometryAlgorithms.LineFit(item, RobustLoss.Welsch)));
+
+        if (_options.Label.Equals("after", StringComparison.OrdinalIgnoreCase))
+        {
+            metrics.Add(Evaluate("Caliper", "ProductionGaussianDerivative", "width_px", caliperCases, ProductionAlgorithms.CaliperGaussianDerivative));
+            metrics.Add(Evaluate("Circle", "ProductionOrthogonalWelsch", "radius_px", circleCases, GeometryAlgorithms.CircleProductionWelsch));
+            metrics.Add(Evaluate("Line", "ProductionWelsch", "angle_deg", lineCases, GeometryAlgorithms.LineProductionWelsch));
+        }
 
         metrics.Add(EvaluateUncertainty("MeasurementUncertainty", "ResidualHeuristic", circleCases, lineCases, covariance: false));
         metrics.Add(EvaluateUncertainty("MeasurementUncertainty", "Covariance", circleCases, lineCases, covariance: true));
@@ -626,6 +634,30 @@ internal sealed class OperatorPrecisionBenchmark
     }
 }
 
+internal static class ProductionAlgorithms
+{
+    public static EvaluationSample CaliperGaussianDerivative(CaliperCase item)
+    {
+        var firstPolarity = item.Inverted ? "LightToDark" : "DarkToLight";
+        var secondPolarity = item.Inverted ? "DarkToLight" : "LightToDark";
+        var first = CaliperEdgeModelKernel.FitGaussianDerivative(item.Profile, Math.Round(item.FirstEdge), firstPolarity, 1.0);
+        var second = CaliperEdgeModelKernel.FitGaussianDerivative(item.Profile, Math.Round(item.SecondEdge), secondPolarity, 1.0);
+        if (!first.Success || !second.Success || second.Position <= first.Position)
+        {
+            return EvaluationSample.Failure;
+        }
+
+        var error = (second.Position - first.Position) - item.TrueWidth;
+        return new EvaluationSample(
+            error,
+            false,
+            first.Ambiguous || second.Ambiguous,
+            Math.Abs(error) > 1.0 ? 1.0 : 0.0,
+            Math.Max(0.02, (first.SigmaSamples + second.SigmaSamples) / Math.Sqrt(2.0)),
+            Math.Max(first.ResidualRmse, second.ResidualRmse));
+    }
+}
+
 internal static class CaliperAlgorithms
 {
     public static EvaluationSample LegacyGradientCentroid(CaliperCase item) => Evaluate(item, EdgeFitModel.Centroid);
@@ -810,6 +842,54 @@ internal static class CaliperAlgorithms
 
 internal static class GeometryAlgorithms
 {
+    public static EvaluationSample CircleProductionWelsch(CircleCase item)
+    {
+        var seed = FitCircleAlgebraic(item.Points, null);
+        if (!seed.Success)
+        {
+            return EvaluationSample.Failure;
+        }
+
+        var result = GeometryRefinementKernel.RefineCircle(
+            item.Points.Select(point => new Point2d(point.X, point.Y)).ToArray(),
+            seed.CenterX,
+            seed.CenterY,
+            seed.Radius,
+            GeometryRefinementLoss.Welsch);
+        if (!result.Success || result.Degenerate)
+        {
+            return EvaluationSample.Failure;
+        }
+
+        var sigma = result.Covariance.Count == 9 ? Math.Sqrt(Math.Max(result.Covariance[8], 1e-12)) : result.RobustScale;
+        return new EvaluationSample(
+            result.Radius - item.Radius,
+            false,
+            !result.Converged || item.CoverageDegrees < 70 || result.RobustScale > 2.0,
+            result.Weights.Count(weight => weight < 0.25) / (double)result.Weights.Count,
+            sigma,
+            result.RobustScale);
+    }
+
+    public static EvaluationSample LineProductionWelsch(LineCase item)
+    {
+        var result = GeometryRefinementKernel.RefineLine(
+            item.Points.Select(point => new Point2d(point.X, point.Y)).ToArray(),
+            GeometryRefinementLoss.Welsch);
+        if (!result.Success || result.Degenerate)
+        {
+            return EvaluationSample.Failure;
+        }
+
+        return new EvaluationSample(
+            SignedAngleDifference(result.AngleDegrees, item.AngleDegrees),
+            false,
+            !result.Converged || result.RobustScale > 2.0,
+            result.Weights.Count(weight => weight < 0.25) / (double)result.Weights.Count,
+            result.SigmaAngleDegrees,
+            result.RobustScale);
+    }
+
     public static EvaluationSample CircleAlgebraic(CircleCase item)
     {
         var fit = FitCircleAlgebraic(item.Points, null);

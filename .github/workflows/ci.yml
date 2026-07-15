@@ -692,6 +692,41 @@ jobs:
           if-no-files-found: error
           path: TestResults/nightly/**
 
+  operator-precision-benchmark:
+    name: Operator Precision Benchmark (Nightly / Manual)
+    runs-on: windows-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore Benchmark Runner
+        run: dotnet restore quality/tools/OperatorPrecisionBenchmarkRunner/OperatorPrecisionBenchmarkRunner.csproj
+
+      - name: Run Acceptance Benchmark
+        shell: pwsh
+        run: |
+          & "./scripts/run-operator-precision-benchmark.ps1" `
+            -Profile acceptance `
+            -Label after `
+            -ResultsDirectory "TestResults/operator-precision"
+
+      - name: Upload Operator Precision Evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: operator-precision-benchmark
+          if-no-files-found: error
+          path: TestResults/operator-precision/**
+
   industrial-gate:
     name: Release / Manual Quality Lane
     runs-on: windows-latest

@@ -14,7 +14,12 @@
 | 默认隐藏 (Default Hidden) | No |
 | AI 默认推荐 (Default AI Recommendation) | Yes |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
-| 标签 (Tags) | `experimental`, `industrial-remediation`, `sequence-judge`, `分类:DefectDetection`, `分类显示:缺陷检测`, `生命周期:Experimental`, `算法类型:自研` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `Unknown` |
+| ProductionReadiness | `Experimental` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs |  |
+| 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Experimental`, `experimental`, `industrial-remediation`, `sequence-judge`, `分类:DefectDetection`, `分类显示:缺陷检测`, `生命周期:Experimental`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于对检测结果排序，并与期望标签序列进行比对。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。

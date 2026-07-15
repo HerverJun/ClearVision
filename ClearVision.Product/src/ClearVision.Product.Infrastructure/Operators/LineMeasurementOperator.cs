@@ -13,7 +13,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "检测直线特征，输出方向、跨度和拟合质量诊断。",
     CategoryId = OperatorCategoryId.Measurement,
     IconName = "line-measure",
-    Keywords = new[] { "直线", "线段", "角度", "霍夫", "Line", "Hough", "FitLine" }
+    Keywords = new[] { "直线", "线段", "角度", "霍夫", "Line", "Hough", "FitLine" },
+    Version = "1.1.0"
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "结果图像", PortDataType.Image)]

@@ -8,13 +8,18 @@
 | 分类 ID (CategoryId) | `Measurement` |
 | 分类 (Category) | 测量 |
 | 分类顺序 (CategoryOrder) | 7 |
-| 版本 (Version) | `1.1.2` |
+| 版本 (Version) | `1.2.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
 | AI 默认推荐 (Default AI Recommendation) | No |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
-| 标签 (Tags) | `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `SyntheticBenchmarkValidated` |
+| ProductionReadiness | `Unknown` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs | quality/evals/reports/operator-precision-after-acceptance.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
+| 标签 (Tags) | `AlgorithmQuality:SyntheticBenchmarkValidated`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -22,7 +27,7 @@
 
 ## 实现策略 / Implementation Strategy
 - 先校验必填输入：`Image`；缺失时通常返回失败结果。
-- 参数解析覆盖 25 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 26 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
@@ -68,6 +73,7 @@
 | `MinCoverageRatio` | V2 最小覆盖率 | `double` | 0.35 | [0, 1] | Yes | - |
 | `MinAngularCoverageDegrees` | V2 最小角覆盖 | `double` | 180 | [0, 360] | Yes | - |
 | `OutlierMode` | V2 离群模式 | `enum` | Mad | None/关闭；Mad/MAD；Huber | Yes | - |
+| `RefinementLoss` | V2 正交精化损失 | `enum` | Legacy | Legacy/兼容路径；Huber；Welsch | Yes | - |
 | `OutlierThreshold` | V2 离群阈值 | `double` | 3.5 | [0.1, 20] | Yes | - |
 | `MaxOutlierIterations` | V2 最大离群迭代 | `int` | 3 | [0, 20] | Yes | - |
 | `MaxResidualRmse` | V2 最大残差 RMSE | `double` | 2 | [0.01, 128] | Yes | - |
@@ -94,6 +100,7 @@
 | `OutlierPoints` | V2 离群点 | `PointList` | 点集结果，可连接几何测量、定位或标定相关节点。 |
 | `CaliperDiagnostics` | V2 诊断 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `CaliperProfileEvidence` | V2 profile evidence | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `MeasurementEvidence` | 测量证据 | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 
 ## 模式与资源契约 / Mode & Resource Contracts
 ### 参数条件 / Parameter Conditions
@@ -118,7 +125,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`FAE310F1643D0FBF65E653451BDBEE6A000011B02C28367773E84098527099D7`
+- 组合指纹 (Generation Fingerprint)：`BB568917FD41D9D4F3244B31FFD8AE2DBE2EB230588BCE8DFBCC97D7776CDA8B`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -167,4 +174,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.2 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.2.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

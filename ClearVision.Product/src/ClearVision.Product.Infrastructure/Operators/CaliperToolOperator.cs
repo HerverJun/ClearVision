@@ -21,7 +21,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "沿扫描线检测边缘对并输出宽度。",
     CategoryId = OperatorCategoryId.Measurement,
     IconName = "caliper",
-    Keywords = new[] { "caliper", "edge pair", "width", "distance", "edge" }
+    Keywords = new[] { "caliper", "edge pair", "width", "distance", "edge" },
+    Version = "1.1.0"
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [InputPort("SearchRegion", "Search Region", PortDataType.Rectangle, IsRequired = false)]

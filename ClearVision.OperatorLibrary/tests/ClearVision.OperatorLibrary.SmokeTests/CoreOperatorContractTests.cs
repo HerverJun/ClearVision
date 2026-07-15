@@ -14,6 +14,12 @@ using ImageContractVerification = ClearVision.Product.Core.Services.ImageContrac
 using ImageInputContract = ClearVision.Product.Core.Services.ImageInputContract;
 using OutputPortAttribute = ClearVision.Product.Core.Attributes.OutputPortAttribute;
 using OperatorImageContractResolver = ClearVision.Product.Core.Services.OperatorImageContractResolver;
+using OperatorAlgorithmQuality = ClearVision.Product.Core.Services.OperatorAlgorithmQuality;
+using OperatorExecutionQuality = ClearVision.Product.Core.Services.OperatorExecutionQuality;
+using OperatorFieldValidation = ClearVision.Product.Core.Services.OperatorFieldValidation;
+using OperatorMetadata = ClearVision.Product.Core.Services.OperatorMetadata;
+using OperatorProductionReadiness = ClearVision.Product.Core.Services.OperatorProductionReadiness;
+using OperatorQualityState = ClearVision.Product.Core.Services.OperatorQualityState;
 
 namespace ClearVision.OperatorLibrary.SmokeTests;
 
@@ -108,6 +114,28 @@ public class CoreOperatorContractTests
         Assert.True(model.ShouldShortCircuitFlow);
         Assert.Equal(12, model.ExecutionTimeMs);
         Assert.Equal("EmptyFrame", model.OutputData?["Reason"]);
+    }
+
+    [Fact]
+    public void OperatorDescriptorAdapter_ShouldPreserveFourAxisQualityState()
+    {
+        var qualityState = new OperatorQualityState(
+            OperatorExecutionQuality.Implemented,
+            OperatorAlgorithmQuality.SyntheticBenchmarkValidated,
+            OperatorProductionReadiness.Unknown,
+            OperatorFieldValidation.NotValidated,
+            ["quality/evals/reports/operator-precision-after-acceptance.json"]);
+        var source = new OperatorMetadata
+        {
+            Type = OperatorType.CaliperTool,
+            DisplayName = "Caliper",
+            QualityState = qualityState
+        };
+
+        var descriptor = source.ToModel();
+
+        Assert.Equal(qualityState, descriptor.QualityState);
+        Assert.Equal(OperatorFieldValidation.NotValidated, descriptor.QualityState.FieldValidation);
     }
 
     [Fact]

@@ -119,6 +119,7 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
                 RequiresLifecycleDisclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
                     item.Lifecycle,
                     item.ImageInputContracts),
+                QualityState = item.QualityState,
                 Aliases = aliases,
                 IntentTags = BuildIntentTags(item),
                 ScenarioTags = BuildScenarioTags(item),
@@ -529,6 +530,16 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
         if (evidence.FieldReplay.Contains("Not yet evidenced", StringComparison.OrdinalIgnoreCase))
         {
             limitations.Add("缺少现场回放证据");
+        }
+
+        if (metadata.QualityState.ProductionReadiness == OperatorProductionReadiness.Unknown)
+        {
+            limitations.Add("ProductionReadiness=Unknown，不得据此宣称 Release Ready");
+        }
+
+        if (metadata.QualityState.FieldValidation == OperatorFieldValidation.NotValidated)
+        {
+            limitations.Add("FieldValidation=NotValidated，不得据此宣称 Field Verified");
         }
 
         return limitations;

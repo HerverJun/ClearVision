@@ -77,6 +77,7 @@ public class OperatorMetadataDto
     public int CategoryOrder { get; set; }
     public string Lifecycle { get; set; } = string.Empty;
     public string? LifecycleNote { get; set; }
+    public OperatorQualityState QualityState { get; set; } = OperatorQualityState.Unknown;
     public bool DefaultHidden { get; set; }
     public string Icon { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
@@ -139,6 +140,7 @@ public class OperatorTypeInfoDto
     public int CategoryOrder { get; set; }
     public string Lifecycle { get; set; } = string.Empty;
     public string? LifecycleNote { get; set; }
+    public OperatorQualityState QualityState { get; set; } = OperatorQualityState.Unknown;
     public bool DefaultHidden { get; set; }
     public string Icon { get; set; } = string.Empty;
 }

@@ -78,6 +78,8 @@
              Link="AI\Anomaly\SimplePatchCoreDetector.cs" />
     <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\AI\Anomaly\OnnxPatchEmbeddingExtractor.cs"
              Link="AI\Anomaly\OnnxPatchEmbeddingExtractor.cs" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\AI\Anomaly\AnomalyEmbeddingManifest.cs"
+             Link="AI\Anomaly\AnomalyEmbeddingManifest.cs" />
     <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\AI\Runtime\ModelCatalog.cs"
              Link="AI\Runtime\ModelCatalog.cs" />
     <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Memory\MatPool.cs"

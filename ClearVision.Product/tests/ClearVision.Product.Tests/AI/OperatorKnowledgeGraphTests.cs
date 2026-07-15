@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
@@ -25,6 +26,7 @@ public class OperatorKnowledgeGraphTests
             graph.Cards.Should().HaveCount(metadataCount);
             graph.Cards.Should().OnlyContain(card => !string.IsNullOrWhiteSpace(card.OperatorType));
             graph.Cards.Should().OnlyContain(card => !string.IsNullOrWhiteSpace(card.DisplayName));
+            graph.Cards.Should().OnlyContain(card => card.QualityState.FieldValidation == OperatorFieldValidation.NotValidated);
 
             graph.Edges.Should().Contain(edge => edge.RelationType == "PRODUCES");
             graph.Edges.Should().Contain(edge => edge.RelationType == "CONSUMES");
@@ -39,6 +41,12 @@ public class OperatorKnowledgeGraphTests
                 ["目标检测", "图像分类", "分类推理", "语义分割", "像素级分割"]);
             deepLearning.IntentTags.Should().Contain(
                 ["object_detection", "image_classification", "semantic_segmentation"]);
+            deepLearning.QualityState.AlgorithmQuality.Should().Be(OperatorAlgorithmQuality.Unknown);
+
+            var caliper = graph.Cards.Single(card => card.OperatorType == nameof(OperatorType.CaliperTool));
+            caliper.QualityState.AlgorithmQuality.Should().Be(OperatorAlgorithmQuality.SyntheticBenchmarkValidated);
+            caliper.QualityState.ProductionReadiness.Should().Be(OperatorProductionReadiness.Unknown);
+            caliper.QualityState.FieldValidation.Should().Be(OperatorFieldValidation.NotValidated);
         }
         finally
         {
@@ -192,6 +200,9 @@ public class OperatorKnowledgeGraphTests
             cardParameterNames.Should().BeEquivalentTo(
                 metadataParameterNames,
                 $"parameters should align for {card.OperatorType}");
+            card.QualityState.Should().BeEquivalentTo(
+                metadata.QualityState,
+                $"four-axis quality state should align for {card.OperatorType}");
         }
     }
 

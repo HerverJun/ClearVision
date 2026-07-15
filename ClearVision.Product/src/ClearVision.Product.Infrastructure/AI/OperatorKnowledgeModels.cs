@@ -49,6 +49,7 @@ public sealed class OperatorKnowledgeCard
     public bool DefaultHidden { get; set; }
     public bool DefaultAiRecommendation { get; set; }
     public bool RequiresLifecycleDisclosure { get; set; }
+    public OperatorQualityState QualityState { get; set; } = OperatorQualityState.Unknown;
     public List<string> Aliases { get; set; } = new();
     public List<string> IntentTags { get; set; } = new();
     public List<string> ScenarioTags { get; set; } = new();

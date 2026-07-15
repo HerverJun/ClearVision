@@ -12,9 +12,14 @@
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
-| AI 默认推荐 (Default AI Recommendation) | No |
-| AI 必须披露状态 (Requires Disclosure) | Yes |
-| 标签 (Tags) | `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
+| Execution | `Implemented` |
+| AlgorithmQuality | `Unknown` |
+| ProductionReadiness | `Unknown` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs |  |
+| 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于对二维包裹相位图执行 Itoh、质量引导或洪泛式解缠绕，并输出解缠相位与不连续区域。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -75,16 +80,20 @@
 ## 图像输入域合同 / Image Input Domain Contracts
 | 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `PhaseImage` | Allowed:3, Rejected:0, Unknown:25 | Legacy 8U compatibility allowance — unverified | CV_8U | CV_8U | 1, 3, 4 | Legacy 8U compatibility allowance — unverified. Higher-depth and undeclared combinations remain Unknown and fail closed. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit native numeric domain; no implicit MinMax conversion. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
-| `QualityMap` | Allowed:3, Rejected:0, Unknown:25 | Legacy 8U compatibility allowance — unverified | CV_8U | CV_8U | 1, 3, 4 | Legacy 8U compatibility allowance — unverified. Higher-depth and undeclared combinations remain Unknown and fail closed. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit native numeric domain; no implicit MinMax conversion. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `PhaseImage` | Allowed:8, Rejected:8, Unknown:0 | Verified production support is present. | CV_8U, CV_16U, CV_32F, CV_64F | CV_32F | 1, 3 | Verified phase-unwrapping input domain. | Normalize to single-channel CV_32F with depth-specific phase scaling. | CV_32FC1 business output with CV_8UC3 visualization. | Reject non-finite floating values; preserve floating phase units. | RejectNaNAndInfinityForFloatingVariants | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `QualityMap` | Allowed:8, Rejected:8, Unknown:0 | Verified production support is present. | CV_8U, CV_16U, CV_32F, CV_64F | CV_32F | 1, 3 | Verified phase-unwrapping input domain. | Normalize to single-channel CV_32F with depth-specific phase scaling. | CV_32FC1 business output with CV_8UC3 visualization. | Reject non-finite floating values; preserve floating phase units. | RejectNaNAndInfinityForFloatingVariants | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
 ### 精确运行变体 / Exact Runtime Variants
 | 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
 |------|------|------|------|------|------|------|------|------|------|------|------|
-| `PhaseImage` | Default | CV_8UC1, CV_8UC3, CV_8UC4 | Legacy 8U execution path retained for compatibility; no per-operator E2 evidence. | `Allowed` | `LegacyCompatibilityAllowance` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit legacy numeric domain. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E0_SOURCE_AUDIT` |
-| `PhaseImage` | Default | CV_8UC2, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
-| `QualityMap` | Default | CV_8UC1, CV_8UC3, CV_8UC4 | Legacy 8U execution path retained for compatibility; no per-operator E2 evidence. | `Allowed` | `LegacyCompatibilityAllowance` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit legacy numeric domain. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E0_SOURCE_AUDIT` |
-| `QualityMap` | Default | CV_8UC2, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
+| `PhaseImage` | Default | CV_32FC1 | Phase and optional quality inputs are normalized to single-channel CV_32F. | `Allowed` | `VerifiedSupport` | C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion. | UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3. | Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE12_REGRESSION` |
+| `PhaseImage` | Default | CV_8UC1, CV_8UC3, CV_16UC1, CV_16UC3 | Phase and optional quality inputs are normalized to single-channel CV_32F. | `Allowed` | `VerifiedConversion` | C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion. | UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3. | Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE12_REGRESSION` |
+| `PhaseImage` | Default | CV_32FC3, CV_64FC1, CV_64FC3 | Phase and optional quality inputs are normalized to single-channel CV_32F. | `Allowed` | `VerifiedConversion` | C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion. | UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3. | Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE12_REGRESSION` |
+| `PhaseImage` | Default | CV_8UC2, CV_8UC4, CV_16UC2, CV_16UC4, CV_32FC2, CV_32FC4, CV_64FC2, CV_64FC4 | Unsupported image channel count for phase unwrapping. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_STAGE12_REGRESSION` |
+| `QualityMap` | Default | CV_32FC1 | Phase and optional quality inputs are normalized to single-channel CV_32F. | `Allowed` | `VerifiedSupport` | C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion. | UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3. | Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE12_REGRESSION` |
+| `QualityMap` | Default | CV_8UC1, CV_8UC3, CV_16UC1, CV_16UC3 | Phase and optional quality inputs are normalized to single-channel CV_32F. | `Allowed` | `VerifiedConversion` | C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion. | UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3. | Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE12_REGRESSION` |
+| `QualityMap` | Default | CV_32FC3, CV_64FC1, CV_64FC3 | Phase and optional quality inputs are normalized to single-channel CV_32F. | `Allowed` | `VerifiedConversion` | C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion. | UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3. | Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE12_REGRESSION` |
+| `QualityMap` | Default | CV_8UC2, CV_8UC4, CV_16UC2, CV_16UC4, CV_32FC2, CV_32FC4, CV_64FC2, CV_64FC4 | Unsupported image channel count for phase unwrapping. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_STAGE12_REGRESSION` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -92,8 +101,8 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`800C7AA92FF056A912B274431F3CB224F19BBCBCDF12CA5410F20B4AB3BC4649`
-- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+- 组合指纹 (Generation Fingerprint)：`6B0C1E1A6E8FFB406254D2271721CCEF80C19F90854A16FED0A2FF8599608521`
+- `type:ClearVision.Product.Infrastructure.Operators.PhaseClosureImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |

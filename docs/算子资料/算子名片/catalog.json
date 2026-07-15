@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-15T23:08:03.2424341+08:00",
-  "generationFingerprint": "4BAB09EDF8264030982C2B2E59B2E82DB871D1EBF861BCE0250A72F0023B4DD1",
+  "generatedAt": "2026-07-15T23:49:28.6486899+08:00",
+  "generationFingerprint": "4FCFCA834BBC9A47F65EFC500E8079EB9C24CEB406E6D76D44A919CCA86D2DA4",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -288,6 +288,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Acquire",
@@ -302,6 +309,10 @@
         "采集"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Acquisition",
         "分类显示:采集",
         "生命周期:Stable",
@@ -872,6 +883,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "affine",
@@ -881,6 +899,10 @@
         "warp"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -1121,6 +1143,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.0",
       "keywords": [
         "Bilateral",
@@ -1132,6 +1161,10 @@
         "边缘保留"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -1309,9 +1342,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -1531,6 +1575,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Color",
@@ -1544,6 +1595,10 @@
         "颜色"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -1717,6 +1772,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "border",
@@ -1724,6 +1786,10 @@
         "pad"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -1933,6 +1999,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "DFT",
@@ -1944,6 +2017,10 @@
         "一维FFT"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -2021,6 +2098,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.2.0",
       "keywords": [
         "bilateral",
@@ -2036,6 +2120,10 @@
         "滤波处理"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -2889,6 +2977,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "averaging",
@@ -2897,6 +2992,10 @@
         "multi-frame"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -3060,6 +3159,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "BandPass",
@@ -3070,6 +3176,10 @@
         "LowPass"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -3159,6 +3269,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "clahe",
@@ -3167,6 +3284,10 @@
         "histogram"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -3346,12 +3467,23 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Image Add",
         "图像叠加"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -3638,9 +3770,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -3877,6 +4020,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "compose",
@@ -3886,6 +4036,10 @@
         "图像合成"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -4293,6 +4447,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Crop",
@@ -4303,6 +4464,10 @@
         "裁剪"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -4473,6 +4638,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.3",
       "keywords": [
         "equalize",
@@ -4482,6 +4654,10 @@
         "zscore"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -5134,6 +5310,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Resize",
@@ -5145,6 +5328,10 @@
         "缩放"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -5343,6 +5530,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Angle",
@@ -5354,6 +5548,10 @@
         "角度"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -5535,6 +5733,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "merge image",
@@ -5542,6 +5747,10 @@
         "stitch"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -5802,9 +6011,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -6037,6 +6257,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "grid",
@@ -6044,6 +6271,10 @@
         "tile"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -6235,6 +6466,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Fourier",
@@ -6246,6 +6484,10 @@
         "一维逆FFT"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -6323,6 +6565,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.3",
       "keywords": [
         "edge enhancement",
@@ -6331,6 +6580,10 @@
         "signed response"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -6627,6 +6880,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.0",
       "keywords": [
         "box blur",
@@ -6636,6 +6896,10 @@
         "smooth"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -6795,6 +7059,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.0",
       "keywords": [
         "Filter",
@@ -6806,6 +7077,10 @@
         "滤波"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -7033,6 +7308,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Perspective",
@@ -7045,6 +7327,10 @@
         "透视"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -7403,6 +7689,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "annular",
@@ -7411,6 +7704,10 @@
         "unwrap"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -7631,6 +7928,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Area of interest",
@@ -7646,6 +7950,10 @@
         "选区"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -7916,6 +8224,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.2",
       "keywords": [
         "background",
@@ -7924,6 +8239,10 @@
         "shading"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:ImagePreprocessing",
         "分类显示:图像预处理",
         "生命周期:Stable",
@@ -8602,6 +8921,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "adaptive",
@@ -8611,6 +8937,10 @@
         "threshold"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -8810,6 +9140,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.0",
       "keywords": [
         "binary",
@@ -8822,6 +9159,10 @@
         "掩膜"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -9002,6 +9343,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.2.1",
       "keywords": [
         "Blob",
@@ -9015,6 +9363,10 @@
         "面积提取"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -9714,6 +10066,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "Chamfer",
@@ -9724,6 +10083,10 @@
         "Transform"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -9966,9 +10329,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -10214,6 +10588,13 @@
       "defaultHidden": true,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "CompatibilityOnly",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Legacy",
@@ -10226,6 +10607,10 @@
         "闭运算"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:CompatibilityOnly",
         "compatibility",
         "deprecated",
         "image-only",
@@ -10422,6 +10807,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "caliper",
@@ -10431,6 +10823,10 @@
         "矩形区域"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -10522,6 +10918,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.2",
       "keywords": [
         "Closing",
@@ -10531,6 +10934,10 @@
         "Region"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -10721,6 +11128,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.2",
       "keywords": [
         "Background",
@@ -10729,6 +11143,10 @@
         "Region"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -10884,6 +11302,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.2",
       "keywords": [
         "Boolean",
@@ -10892,6 +11317,10 @@
         "Subtract"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -10963,6 +11392,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.2",
       "keywords": [
         "Dilation",
@@ -10973,6 +11409,10 @@
         "RLE"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -11174,6 +11614,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.2",
       "keywords": [
         "Erosion",
@@ -11183,6 +11630,10 @@
         "Shrink"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -11384,6 +11835,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.2",
       "keywords": [
         "Boolean",
@@ -11392,6 +11850,10 @@
         "Region"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -11463,6 +11925,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.2",
       "keywords": [
         "Morphology",
@@ -11472,6 +11941,10 @@
         "Smooth"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -11662,6 +12135,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.2",
       "keywords": [
         "Region",
@@ -11671,6 +12151,10 @@
         "ZhangSuen"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -11849,6 +12333,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.2",
       "keywords": [
         "Boolean",
@@ -11858,6 +12349,10 @@
         "Union"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -11929,6 +12424,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.0",
       "keywords": [
         "binarize",
@@ -11941,6 +12443,10 @@
         "阈值分割"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:SegmentationAndRegion",
         "分类显示:分割与区域",
         "生命周期:Stable",
@@ -12303,6 +12809,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "blob",
@@ -12311,6 +12824,10 @@
         "连通域标注"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FeatureExtraction",
         "分类显示:特征提取",
         "生命周期:Stable",
@@ -12505,6 +13022,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Barcode",
@@ -12518,6 +13042,10 @@
         "读取"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FeatureExtraction",
         "分类显示:特征提取",
         "生命周期:Stable",
@@ -12709,6 +13237,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Experimental",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "2.0.1",
       "keywords": [
         "analysis",
@@ -12719,6 +13254,10 @@
         "颜色检测"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Experimental",
         "color-inspection",
         "experimental",
         "industrial-remediation",
@@ -13122,6 +13661,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Boundary",
@@ -13134,6 +13680,10 @@
         "边缘点"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FeatureExtraction",
         "分类显示:特征提取",
         "生命周期:Stable",
@@ -13445,6 +13995,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "corner",
@@ -13453,6 +14010,10 @@
         "vertex"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FeatureExtraction",
         "分类显示:特征提取",
         "生命周期:Stable",
@@ -13655,6 +14216,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Canny",
@@ -13664,6 +14232,10 @@
         "Threshold"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FeatureExtraction",
         "分类显示:特征提取",
         "生命周期:Stable",
@@ -14211,6 +14783,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.2",
       "keywords": [
         "Contrast",
@@ -14221,6 +14800,10 @@
         "Texture"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FeatureExtraction",
         "分类显示:特征提取",
         "生命周期:Stable",
@@ -14473,6 +15056,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.0",
       "keywords": [
         "distribution",
@@ -14481,6 +15071,10 @@
         "peak"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FeatureExtraction",
         "分类显示:特征提取",
         "生命周期:Stable",
@@ -14924,6 +15518,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "absolute difference",
@@ -14932,6 +15533,10 @@
         "图像对比"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FeatureExtraction",
         "分类显示:特征提取",
         "生命周期:Stable",
@@ -15140,6 +15745,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "Energy",
@@ -15149,6 +15761,10 @@
         "Texture"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FeatureExtraction",
         "分类显示:特征提取",
         "生命周期:Stable",
@@ -15355,6 +15971,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "mean",
@@ -15364,6 +15987,10 @@
         "stddev"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FeatureExtraction",
         "分类显示:特征提取",
         "生命周期:Stable",
@@ -15739,6 +16366,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.0",
       "keywords": [
         "blur",
@@ -15748,6 +16382,10 @@
         "tenengrad"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FeatureExtraction",
         "分类显示:特征提取",
         "生命周期:Stable",
@@ -17422,9 +18060,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Reference",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Reference",
         "experimental",
         "non-industrial-reference",
         "subpixel-edge",
@@ -17628,9 +18277,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -18082,6 +18742,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "Boundary",
@@ -18091,6 +18758,10 @@
         "Min"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -18186,6 +18857,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "cross point",
@@ -18193,6 +18871,10 @@
         "line angle"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -18291,9 +18973,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -18659,6 +19352,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Experimental",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.1",
       "keywords": [
         "Deformable",
@@ -18670,6 +19370,10 @@
         "Occlusion"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Experimental",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Experimental",
@@ -19050,9 +19754,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -19537,6 +20252,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "dual edge",
@@ -19544,6 +20266,10 @@
         "rails"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -19744,6 +20470,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.3",
       "keywords": [
         "AKAZE",
@@ -19757,6 +20490,10 @@
         "透视匹配"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -20301,6 +21038,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.4",
       "keywords": [
         "alignment",
@@ -20310,6 +21054,10 @@
         "点位对齐"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -20413,6 +21161,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.4",
       "keywords": [
         "compensation",
@@ -20422,6 +21177,10 @@
         "点位修正"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -20580,6 +21339,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.3",
       "keywords": [
         "position correction",
@@ -20589,6 +21355,10 @@
         "位置修正"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -20757,9 +21527,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -21174,6 +21955,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "polygon",
@@ -21181,6 +21969,10 @@
         "trapezoid"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -21381,6 +22173,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "box",
@@ -21389,6 +22188,10 @@
         "rectangle"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -21613,6 +22416,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.2",
       "keywords": [
         "match",
@@ -21624,6 +22434,10 @@
         "transform"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -21695,11 +22509,22 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.2.0",
       "keywords": [
         "Shape Matching"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -22065,6 +22890,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.2.0",
       "keywords": [
         "Locate",
@@ -22076,6 +22908,10 @@
         "模板匹配"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:MatchingAndLocalization",
         "分类显示:匹配与定位",
         "生命周期:Stable",
@@ -23353,6 +24189,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Experimental",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "connector",
@@ -23372,6 +24215,10 @@
         "顺序"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Experimental",
         "experimental",
         "industrial-remediation",
         "sequence-judge",
@@ -23725,9 +24572,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DefectDetection",
         "分类显示:缺陷检测",
         "生命周期:Stable",
@@ -23887,6 +24745,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "bump",
@@ -23896,6 +24761,10 @@
         "边缘对缺陷"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DefectDetection",
         "分类显示:缺陷检测",
         "生命周期:Stable",
@@ -24105,6 +24974,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Experimental",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "2.0.1",
       "keywords": [
         "scratch",
@@ -24114,6 +24990,10 @@
         "traditional detection"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Experimental",
         "experimental",
         "industrial-remediation",
         "surface-defect",
@@ -24712,6 +25592,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Angle",
@@ -24721,6 +25608,10 @@
         "ThreePoint"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -24975,6 +25866,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "Arc",
@@ -24984,6 +25882,10 @@
         "Measurement"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -25151,7 +26053,17 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
-      "version": "1.0.0",
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "SyntheticBenchmarkValidated",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": [
+          "quality/evals/reports/operator-precision-after-acceptance.json",
+          "docs/operator-quality/operator-quality-phase5-closeout.md"
+        ]
+      },
+      "version": "1.1.0",
       "keywords": [
         "caliper",
         "distance",
@@ -25160,6 +26072,10 @@
         "width"
       ],
       "tags": [
+        "AlgorithmQuality:SyntheticBenchmarkValidated",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -25221,6 +26137,18 @@
           "name": "DistanceStdDev",
           "displayName": "Distance StdDev",
           "dataType": "Float",
+          "isRequired": false
+        },
+        {
+          "name": "MeasurementEvidence",
+          "displayName": "Measurement Evidence",
+          "dataType": "Any",
+          "isRequired": false
+        },
+        {
+          "name": "EdgeDiagnostics",
+          "displayName": "Edge Diagnostics",
+          "dataType": "Any",
           "isRequired": false
         }
       ],
@@ -25380,6 +26308,37 @@
               "label": "zernike (legacy alias)"
             }
           ]
+        },
+        {
+          "name": "EdgeModel",
+          "displayName": "Edge Model",
+          "dataType": "enum",
+          "description": "",
+          "defaultValue": "Legacy",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Legacy",
+              "label": "Legacy"
+            },
+            {
+              "value": "GaussianDerivative",
+              "label": "Gaussian Derivative"
+            }
+          ]
+        },
+        {
+          "name": "EdgeModelSigma",
+          "displayName": "Edge Model Sigma",
+          "dataType": "double",
+          "description": "",
+          "defaultValue": "1",
+          "min": "0.2",
+          "max": "4",
+          "isRequired": true,
+          "options": null
         }
       ],
       "parameterConditions": [],
@@ -25459,7 +26418,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "19F42DCF9E24B8AFCAD21FC6DE39EB6FA972E9F6B87077C817B9F3DFC5621006",
+      "generationFingerprint": "B6BE6A23584947E3D8E720536678BB6D8FA0BC7CE686BA7F67BD3F999C1ECF70",
       "quality": {
         "totalScore": 96,
         "level": "A",
@@ -25484,7 +26443,17 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
-      "version": "1.1.2",
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "SyntheticBenchmarkValidated",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": [
+          "quality/evals/reports/operator-precision-after-acceptance.json",
+          "docs/operator-quality/operator-quality-phase5-closeout.md"
+        ]
+      },
+      "version": "1.2.0",
       "keywords": [
         "CaliperFitV2",
         "Circle",
@@ -25499,6 +26468,10 @@
         "霍夫"
       ],
       "tags": [
+        "AlgorithmQuality:SyntheticBenchmarkValidated",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -25589,6 +26562,12 @@
         {
           "name": "CaliperProfileEvidence",
           "displayName": "V2 profile evidence",
+          "dataType": "Any",
+          "isRequired": false
+        },
+        {
+          "name": "MeasurementEvidence",
+          "displayName": "测量证据",
           "dataType": "Any",
           "isRequired": false
         }
@@ -25885,6 +26864,30 @@
           ]
         },
         {
+          "name": "RefinementLoss",
+          "displayName": "V2 正交精化损失",
+          "dataType": "enum",
+          "description": "",
+          "defaultValue": "Legacy",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Legacy",
+              "label": "兼容路径"
+            },
+            {
+              "value": "Huber",
+              "label": "Huber"
+            },
+            {
+              "value": "Welsch",
+              "label": "Welsch"
+            }
+          ]
+        },
+        {
           "name": "OutlierThreshold",
           "displayName": "V2 离群阈值",
           "dataType": "double",
@@ -25995,7 +26998,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "D4674DF2C9FDE822EAC338F7F68DD3E6B146998CA4BD86E29ABC5E4F2BDD61FE",
+      "generationFingerprint": "BB568917FD41D9D4F3244B31FFD8AE2DBE2EB230588BCE8DFBCC97D7776CDA8B",
       "quality": {
         "totalScore": 100,
         "level": "A",
@@ -26020,6 +27023,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "2.0.0",
       "keywords": [
         "color",
@@ -26028,6 +27038,10 @@
         "lab"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -26319,6 +27333,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Area",
@@ -26328,6 +27349,10 @@
         "Shape"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -26525,6 +27550,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "distance",
@@ -26533,6 +27565,10 @@
         "spacing"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -26814,6 +27850,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "circle-circle",
@@ -26823,6 +27866,10 @@
         "几何距离测量"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -26983,6 +28030,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "circle fit",
@@ -26992,6 +28046,10 @@
         "ransac"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -27243,6 +28301,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "Datum",
@@ -27256,6 +28321,10 @@
         "平行度"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -27527,6 +28596,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "angle",
@@ -27535,6 +28611,10 @@
         "segment"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -27666,7 +28746,17 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
-      "version": "1.0.0",
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "SyntheticBenchmarkValidated",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": [
+          "quality/evals/reports/operator-precision-after-acceptance.json",
+          "docs/operator-quality/operator-quality-phase5-closeout.md"
+        ]
+      },
+      "version": "1.1.0",
       "keywords": [
         "FitLine",
         "Hough",
@@ -27677,6 +28767,10 @@
         "霍夫"
       ],
       "tags": [
+        "AlgorithmQuality:SyntheticBenchmarkValidated",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -27720,6 +28814,12 @@
           "name": "LineCount",
           "displayName": "直线数量",
           "dataType": "Integer",
+          "isRequired": false
+        },
+        {
+          "name": "MeasurementEvidence",
+          "displayName": "测量证据",
+          "dataType": "Any",
           "isRequired": false
         }
       ],
@@ -27780,6 +28880,30 @@
           "max": null,
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "FitLoss",
+          "displayName": "拟合损失",
+          "dataType": "enum",
+          "description": "",
+          "defaultValue": "L2",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "L2",
+              "label": "L2 兼容"
+            },
+            {
+              "value": "Huber",
+              "label": "Huber"
+            },
+            {
+              "value": "Welsch",
+              "label": "Welsch"
+            }
+          ]
         }
       ],
       "parameterConditions": [],
@@ -27859,15 +28983,15 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "8854E9BC6026678980563445D0E8EEC5618770C55D36E73E45266CFCBFF18B90",
+      "generationFingerprint": "2864B65050C130B846BB8F0229B378EDDE29C63C68A3C151882C30D5E1B9141D",
       "quality": {
-        "totalScore": 96,
+        "totalScore": 86,
         "level": "A",
-        "documentationScore": 100,
+        "documentationScore": 60,
         "testCoverageScore": 100,
         "parameterValidationScore": 100,
         "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=85"
       },
       "docPath": "算子资料/算子名片/LineMeasurement.md"
     },
@@ -27884,6 +29008,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.0",
       "keywords": [
         "Angle",
@@ -27899,6 +29030,10 @@
         "距离"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -28957,6 +30092,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "ArcFit",
@@ -28967,6 +30109,10 @@
         "SmallestCircle"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -29251,6 +30397,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "Closure",
@@ -29262,6 +30415,10 @@
         "相位闭合"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -29528,6 +30685,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "distance",
@@ -29537,6 +30701,10 @@
         "segment"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -29639,6 +30807,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "distance",
@@ -29647,6 +30822,10 @@
         "width"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Measurement",
         "分类显示:测量",
         "生命周期:Stable",
@@ -29933,6 +31112,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "bundle",
@@ -29941,6 +31127,10 @@
         "v2"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:CalibrationAndCoordinates",
         "分类显示:标定与坐标",
         "生命周期:Stable",
@@ -30011,6 +31201,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Calibration",
@@ -30019,6 +31216,10 @@
         "Intrinsic"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:CalibrationAndCoordinates",
         "分类显示:标定与坐标",
         "生命周期:Stable",
@@ -30246,6 +31447,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "calibration",
@@ -30257,6 +31465,10 @@
         "坐标转换"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:CalibrationAndCoordinates",
         "分类显示:标定与坐标",
         "生命周期:Stable",
@@ -30435,6 +31647,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Calibration",
@@ -30443,6 +31662,10 @@
         "Kannala-Brandt"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:CalibrationAndCoordinates",
         "分类显示:标定与坐标",
         "生命周期:Stable",
@@ -30692,6 +31915,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Distortion",
@@ -30701,6 +31931,10 @@
         "Undistort"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:CalibrationAndCoordinates",
         "分类显示:标定与坐标",
         "生命周期:Stable",
@@ -30883,6 +32117,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "AX=XB",
@@ -30891,6 +32132,10 @@
         "robot"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:CalibrationAndCoordinates",
         "分类显示:标定与坐标",
         "生命周期:Stable",
@@ -31061,6 +32306,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "calibration report",
@@ -31068,6 +32320,10 @@
         "validation"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:CalibrationAndCoordinates",
         "分类显示:标定与坐标",
         "生命周期:Stable",
@@ -31196,6 +32452,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "affine",
@@ -31205,6 +32468,10 @@
         "ransac"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:CalibrationAndCoordinates",
         "分类显示:标定与坐标",
         "生命周期:Stable",
@@ -31498,6 +32765,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "calibration",
@@ -31508,6 +32782,10 @@
         "world"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:CalibrationAndCoordinates",
         "分类显示:标定与坐标",
         "生命周期:Stable",
@@ -31830,6 +33108,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Binocular",
@@ -31839,6 +33124,10 @@
         "Stereo"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:CalibrationAndCoordinates",
         "分类显示:标定与坐标",
         "生命周期:Stable",
@@ -32211,6 +33500,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.1",
       "keywords": [
         "calibration",
@@ -32222,6 +33518,10 @@
         "translation"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:CalibrationAndCoordinates",
         "分类显示:标定与坐标",
         "生命周期:Stable",
@@ -32548,6 +33848,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Calibration",
@@ -32555,6 +33862,10 @@
         "Undistort"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:CalibrationAndCoordinates",
         "分类显示:标定与坐标",
         "生命周期:Stable",
@@ -32686,7 +33997,18 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": true,
-      "version": "1.0.0",
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "PublicDatasetEvidence",
+        "productionReadiness": "Experimental",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": [
+          "quality/evals/reports/operator-precision-after-acceptance.json",
+          "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+          "docs/operator-quality/operator-quality-phase5-closeout.md"
+        ]
+      },
+      "version": "1.1.0",
       "keywords": [
         "anomaly",
         "feature bank",
@@ -32694,6 +34016,10 @@
         "异常检测"
       ],
       "tags": [
+        "AlgorithmQuality:PublicDatasetEvidence",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Experimental",
         "anomaly-detection",
         "experimental",
         "industrial-remediation",
@@ -32877,6 +34203,17 @@
           "options": null
         },
         {
+          "name": "EmbeddingManifestPath",
+          "displayName": "Embedding Manifest Path",
+          "dataType": "file",
+          "description": "",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": false,
+          "options": null
+        },
+        {
           "name": "PatchSize",
           "displayName": "补丁大小",
           "dataType": "int",
@@ -32973,6 +34310,59 @@
         }
       ],
       "parameterConditions": [
+        {
+          "parameter": "EmbeddingManifestPath",
+          "requiredPolicy": "required",
+          "requiredWhen": {
+            "all": [
+              {
+                "parameter": "FeatureExtractorId",
+                "comparison": "equals",
+                "value": "onnx_embedding"
+              }
+            ],
+            "any": null
+          },
+          "enabledWhen": null,
+          "disabledWhen": {
+            "all": [
+              {
+                "parameter": "FeatureExtractorId",
+                "comparison": "not-equals",
+                "value": "onnx_embedding"
+              }
+            ],
+            "any": null
+          },
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": "model_resource",
+          "reasonCode": "ANOMALY_EMBEDDING_MANIFEST_REQUIRED",
+          "visibleWhen": null,
+          "hiddenWhen": {
+            "all": [
+              {
+                "parameter": "FeatureExtractorId",
+                "comparison": "not-equals",
+                "value": "onnx_embedding"
+              }
+            ],
+            "any": null
+          },
+          "ignoredWhen": {
+            "all": [
+              {
+                "parameter": "FeatureExtractorId",
+                "comparison": "not-equals",
+                "value": "onnx_embedding"
+              }
+            ],
+            "any": null
+          },
+          "satisfiedByInputPorts": null
+        },
         {
           "parameter": "EmbeddingModelId",
           "requiredPolicy": "required",
@@ -33269,6 +34659,23 @@
       ],
       "resourceRequirements": [
         {
+          "parameter": "EmbeddingManifestPath",
+          "resourceKind": "model_resource",
+          "reasonCode": "ANOMALY_EMBEDDING_MANIFEST_REQUIRED",
+          "atLeastOneGroup": null,
+          "requiredWhen": {
+            "all": [
+              {
+                "parameter": "FeatureExtractorId",
+                "comparison": "equals",
+                "value": "onnx_embedding"
+              }
+            ],
+            "any": null
+          },
+          "satisfiedByInputPorts": []
+        },
+        {
           "parameter": "EmbeddingModelId",
           "resourceKind": "model_resource",
           "reasonCode": "ANOMALY_TRAINING_EMBEDDING_MODEL_REQUIRED",
@@ -33366,7 +34773,7 @@
       "generationDependencies": [
         "type:ClearVision.Product.Infrastructure.Operators.AnomalyDetectionImageContractProvider"
       ],
-      "generationFingerprint": "63FA11AB5F580A7D313B4CDF2FB5A3C181EC7D7794BAF902014428D5C63A6300",
+      "generationFingerprint": "D16582B2F872342D214D241378A66FEFD3A289B434F810DD7A840F675FA205F9",
       "quality": {
         "totalScore": 100,
         "level": "A",
@@ -33391,6 +34798,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.0",
       "keywords": [
         "AI",
@@ -33408,6 +34822,10 @@
         "语义分割"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:AiInference",
         "分类显示:AI推理",
         "生命周期:Stable",
@@ -35695,9 +37113,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:AiInference",
         "分类显示:AI推理",
         "生命周期:Stable",
@@ -35829,6 +37258,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "mask",
@@ -35838,6 +37274,10 @@
         "语义分割"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:AiInference",
         "分类显示:AI推理",
         "生命周期:Stable",
@@ -36271,6 +37711,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.1.0",
       "keywords": [
         "3D",
@@ -36279,6 +37726,10 @@
         "Segmentation"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:PointCloud3D",
         "分类显示:3D点云",
         "生命周期:Stable",
@@ -36389,6 +37840,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "3D",
@@ -36397,6 +37855,10 @@
         "PPF"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:PointCloud3D",
         "分类显示:3D点云",
         "生命周期:Stable",
@@ -36496,6 +37958,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.5",
       "keywords": [
         "3D",
@@ -36506,6 +37975,10 @@
         "PPF表面匹配"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:PointCloud3D",
         "分类显示:3D点云",
         "生命周期:Stable",
@@ -36766,6 +38239,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "3D",
@@ -36775,6 +38255,10 @@
         "Segmentation"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:PointCloud3D",
         "分类显示:3D点云",
         "生命周期:Stable",
@@ -36915,6 +38399,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "3D",
@@ -36925,6 +38416,10 @@
         "统计滤波"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:PointCloud3D",
         "分类显示:3D点云",
         "生命周期:Stable",
@@ -37013,6 +38508,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "3D",
@@ -37021,6 +38523,10 @@
         "Voxel"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:PointCloud3D",
         "分类显示:3D点云",
         "生命周期:Stable",
@@ -37092,6 +38598,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Aggregate",
@@ -37108,6 +38621,10 @@
         "聚合"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -37232,11 +38749,22 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "数组索引"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -37361,6 +38889,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "area filter",
@@ -37370,6 +38905,10 @@
         "score"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -37630,6 +39169,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "box",
@@ -37638,6 +39184,10 @@
         "suppression"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -37927,6 +39477,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Compare",
@@ -37943,6 +39500,10 @@
         "阈值判定"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -38093,11 +39654,22 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "JSON提取"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -38202,9 +39774,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -38301,6 +39884,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Add",
@@ -38318,6 +39908,10 @@
         "运算"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -38440,6 +40034,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "bounding rect",
@@ -38448,6 +40049,10 @@
         "sort points"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -38626,6 +40231,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "code",
@@ -38636,6 +40248,10 @@
         "Script Operator"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -38756,9 +40372,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -38904,9 +40531,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -38978,6 +40616,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "ct",
@@ -38987,6 +40632,10 @@
         "timer"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -39112,9 +40761,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -39238,6 +40898,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "inch",
@@ -39247,6 +40914,10 @@
         "unit convert"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -39391,9 +41062,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -39568,9 +41250,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -39845,9 +41538,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:DataProcessing",
         "分类显示:数据处理",
         "生命周期:Stable",
@@ -40145,6 +41849,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Branch",
@@ -40158,6 +41869,10 @@
         "条件"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FlowControl",
         "分类显示:流程控制",
         "生命周期:Stable",
@@ -40451,9 +42166,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FlowControl",
         "分类显示:流程控制",
         "生命周期:Stable",
@@ -40560,6 +42286,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Delay",
@@ -40573,6 +42306,10 @@
         "等待"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FlowControl",
         "分类显示:流程控制",
         "生命周期:Stable",
@@ -40644,11 +42381,22 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "循环处理"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FlowControl",
         "分类显示:流程控制",
         "生命周期:Stable",
@@ -40756,6 +42504,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "arrival",
@@ -40773,6 +42528,10 @@
         "连续采集"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FlowControl",
         "分类显示:流程控制",
         "生命周期:Stable",
@@ -41212,6 +42971,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "condition",
@@ -41222,6 +42988,10 @@
         "threshold"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FlowControl",
         "分类显示:流程控制",
         "生命周期:Stable",
@@ -41423,6 +43193,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "external signal",
@@ -41431,6 +43208,10 @@
         "trigger"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FlowControl",
         "分类显示:流程控制",
         "生命周期:Stable",
@@ -41543,6 +43324,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "branch",
@@ -41553,6 +43341,10 @@
         "异常捕获"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:FlowControl",
         "分类显示:流程控制",
         "生命周期:Stable",
@@ -41658,12 +43450,23 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "HTTP Request",
         "HTTP请求"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Communication",
         "分类显示:通信",
         "生命周期:Stable",
@@ -41819,6 +43622,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "MC",
@@ -41828,6 +43638,10 @@
         "Write"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Communication",
         "分类显示:通信",
         "生命周期:Stable",
@@ -42567,6 +44381,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Communication",
@@ -42580,6 +44401,10 @@
         "TCP"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Communication",
         "分类显示:通信",
         "生命周期:Stable",
@@ -42949,6 +44774,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Reference",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "0.1.0",
       "keywords": [
         "Communication",
@@ -42959,6 +44791,10 @@
         "Publish"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Reference",
         "experimental",
         "integration:mqtt",
         "maturity:placeholder-disabled",
@@ -43088,9 +44924,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Communication",
         "分类显示:通信",
         "生命周期:Stable",
@@ -43830,9 +45677,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Communication",
         "分类显示:通信",
         "生命周期:Stable",
@@ -44046,11 +45904,22 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "西门子S7"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Communication",
         "分类显示:通信",
         "生命周期:Stable",
@@ -44801,6 +46670,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "Communication",
@@ -44814,6 +46690,10 @@
         "通信"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:Communication",
         "分类显示:通信",
         "生命周期:Stable",
@@ -46624,6 +48504,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "Annotation",
@@ -46636,6 +48523,10 @@
         "说明"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:OutputAndAuxiliary",
         "分类显示:输出与辅助",
         "生命周期:Stable",
@@ -46707,6 +48598,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "MySQL",
@@ -46719,6 +48617,10 @@
         "数据库"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:OutputAndAuxiliary",
         "分类显示:输出与辅助",
         "生命周期:Stable",
@@ -46831,9 +48733,20 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:OutputAndAuxiliary",
         "分类显示:输出与辅助",
         "生命周期:Stable",
@@ -47119,6 +49032,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.1",
       "keywords": [
         "Display",
@@ -47132,6 +49052,10 @@
         "输出"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:OutputAndAuxiliary",
         "分类显示:输出与辅助",
         "生命周期:Stable",
@@ -47379,6 +49303,13 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
+      "qualityState": {
+        "execution": "Implemented",
+        "algorithmQuality": "Unknown",
+        "productionReadiness": "Unknown",
+        "fieldValidation": "NotValidated",
+        "evidenceRefs": []
+      },
       "version": "1.0.0",
       "keywords": [
         "export csv",
@@ -47387,6 +49318,10 @@
         "save text"
       ],
       "tags": [
+        "AlgorithmQuality:Unknown",
+        "Execution:Implemented",
+        "FieldValidation:NotValidated",
+        "ProductionReadiness:Unknown",
         "分类:OutputAndAuxiliary",
         "分类显示:输出与辅助",
         "生命周期:Stable",

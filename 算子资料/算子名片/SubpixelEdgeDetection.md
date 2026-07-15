@@ -14,10 +14,15 @@
 | 默认隐藏 (Default Hidden) | No |
 | AI 默认推荐 (Default AI Recommendation) | No |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
-| 标签 (Tags) | `experimental`, `non-industrial-reference`, `subpixel-edge`, `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Reference`, `算法类型:自研` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `Unknown` |
+| ProductionReadiness | `Reference` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs |  |
+| 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Reference`, `experimental`, `non-industrial-reference`, `subpixel-edge`, `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Reference`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子用于非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级验证。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于Non-industrial reference / 非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级验证。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
@@ -86,7 +91,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`C6115E1C6466CEF07DA424F23D85C36DEF99D61FB970A33E90583653F6D23761`
+- 组合指纹 (Generation Fingerprint)：`D5995266624DDCEBC584210D2437264B20F5364053B83411A0D0286E0237225E`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs

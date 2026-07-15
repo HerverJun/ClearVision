@@ -1,16 +1,16 @@
 # Operator Knowledge Graph Report
 
-GeneratedAtUtc: `2026-07-15T13:48:45.5121857Z`
+GeneratedAtUtc: `2026-07-15T15:49:40.9530459Z`
 SchemaVersion: `2026-07.operator-knowledge-graph.v4`
 Source: `OperatorMetadata + FlowTemplate + operator_quality_evidence_manifest`
-GenerationFingerprint: `4D00E5ABBA76239610A0219EC7C952EF7C51CF232933007036B6A0988B619165`
+GenerationFingerprint: `4FCFCA834BBC9A47F65EFC500E8079EB9C24CEB406E6D76D44A919CCA86D2DA4`
 
 ## Summary
 
 | Metric | Value |
 | --- | ---: |
 | Cards | 158 |
-| Edges | 1980 |
+| Edges | 1982 |
 
 ## Edge Types
 
@@ -21,8 +21,8 @@ GenerationFingerprint: `4D00E5ABBA76239610A0219EC7C952EF7C51CF232933007036B6A098
 | COMMONLY_PRECEDES | 52 |
 | CONSUMES | 208 |
 | HAS_EVIDENCE | 158 |
-| PRODUCES | 432 |
-| REQUIRES_RESOURCE | 39 |
+| PRODUCES | 433 |
+| REQUIRES_RESOURCE | 40 |
 | USED_IN_TEMPLATE | 86 |
 
 ## Top Operators By Downstream Degree

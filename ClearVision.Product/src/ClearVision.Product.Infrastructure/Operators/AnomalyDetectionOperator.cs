@@ -16,7 +16,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     LifecycleNote = "简化 PatchCore 风格实现，部署前必须使用现场数据验证特征库、阈值和稳定性。",
     IconName = "anomaly-detection",
     Keywords = new[] { "anomaly", "patchcore", "feature bank", "异常检测" },
-    Version = "1.0.0",
+    Version = "1.1.0",
     Tags = new[] { "experimental", "industrial-remediation", "anomaly-detection" }
 )]
 [OperatorImageContractProvider(typeof(AnomalyDetectionImageContractProvider))]

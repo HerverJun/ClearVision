@@ -33,6 +33,8 @@ public sealed class OperatorDescriptorModel : IOperatorDescriptor
 
     public IReadOnlyList<IOperatorParameter> Parameters { get; init; } = [];
 
+    public OperatorQualityState QualityState { get; init; } = OperatorQualityState.Unknown;
+
     public IReadOnlyList<ImageInputContract> ImageInputContracts { get; init; } = [];
 }
 

@@ -106,6 +106,11 @@ public class OperatorMetadata
     public string Version { get; set; } = "1.0.0";
 
     /// <summary>
+    /// Four independent evidence axes. Lifecycle and this state must not be collapsed into one maturity claim.
+    /// </summary>
+    public OperatorQualityState QualityState { get; set; } = OperatorQualityState.Unknown;
+
+    /// <summary>
     /// 输入端口定义
     /// </summary>
     public List<PortDefinition> InputPorts { get; set; } = new();

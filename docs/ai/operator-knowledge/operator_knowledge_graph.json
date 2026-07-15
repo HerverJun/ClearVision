@@ -1,8 +1,8 @@
 {
   "SchemaVersion": "2026-07.operator-knowledge-graph.v4",
-  "GeneratedAtUtc": "2026-07-15T13:48:45.5121857Z",
+  "GeneratedAtUtc": "2026-07-15T15:49:40.9530459Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
-  "GenerationFingerprint": "4D00E5ABBA76239610A0219EC7C952EF7C51CF232933007036B6A0988B619165",
+  "GenerationFingerprint": "4FCFCA834BBC9A47F65EFC500E8079EB9C24CEB406E6D76D44A919CCA86D2DA4",
   "Cards": [
     {
       "SchemaVersion": "2026-07.operator-knowledge-card.v2",
@@ -16,6 +16,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u81EA\u9002\u5E94\u9608\u503C",
         "AdaptiveThreshold",
@@ -199,7 +206,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -223,6 +232,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u4EFF\u5C04\u53D8\u6362",
         "AffineTransform",
@@ -453,7 +469,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -477,6 +495,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6570\u636E\u805A\u5408",
         "Aggregator",
@@ -597,7 +622,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -621,6 +648,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "AKAZE\u7279\u5F81\u5339\u914D",
         "AkazeFeatureMatch"
@@ -1060,7 +1094,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (22 cases)",
@@ -1084,6 +1120,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u89D2\u5EA6\u6D4B\u91CF",
         "AngleMeasurement",
@@ -1335,7 +1378,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -1359,6 +1404,17 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "PublicDatasetEvidence",
+        "ProductionReadiness": "Experimental",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": [
+          "quality/evals/reports/operator-precision-after-acceptance.json",
+          "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+          "docs/operator-quality/operator-quality-phase5-closeout.md"
+        ]
+      },
       "Aliases": [
         "\u5F02\u5E38\u68C0\u6D4B",
         "AnomalyDetection",
@@ -1545,6 +1601,17 @@
         {
           "Name": "EmbeddingModelPath",
           "DisplayName": "\u5D4C\u5165\u6A21\u578B\u8DEF\u5F84",
+          "DataType": "file",
+          "Description": "",
+          "DefaultValue": "",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": false,
+          "AllowedValues": []
+        },
+        {
+          "Name": "EmbeddingManifestPath",
+          "DisplayName": "Embedding Manifest Path",
           "DataType": "file",
           "Description": "",
           "DefaultValue": "",
@@ -1880,6 +1947,59 @@
             "Any": null
           },
           "SatisfiedByInputPorts": null
+        },
+        {
+          "Parameter": "EmbeddingManifestPath",
+          "RequiredPolicy": "required",
+          "RequiredWhen": {
+            "All": [
+              {
+                "Parameter": "FeatureExtractorId",
+                "Comparison": "equals",
+                "Value": "onnx_embedding"
+              }
+            ],
+            "Any": null
+          },
+          "EnabledWhen": null,
+          "DisabledWhen": {
+            "All": [
+              {
+                "Parameter": "FeatureExtractorId",
+                "Comparison": "not-equals",
+                "Value": "onnx_embedding"
+              }
+            ],
+            "Any": null
+          },
+          "AtLeastOneGroup": null,
+          "MutuallyExclusiveGroup": null,
+          "AliasFor": null,
+          "Deprecated": false,
+          "ResourceKind": "model_resource",
+          "ReasonCode": "ANOMALY_EMBEDDING_MANIFEST_REQUIRED",
+          "VisibleWhen": null,
+          "HiddenWhen": {
+            "All": [
+              {
+                "Parameter": "FeatureExtractorId",
+                "Comparison": "not-equals",
+                "Value": "onnx_embedding"
+              }
+            ],
+            "Any": null
+          },
+          "IgnoredWhen": {
+            "All": [
+              {
+                "Parameter": "FeatureExtractorId",
+                "Comparison": "not-equals",
+                "Value": "onnx_embedding"
+              }
+            ],
+            "Any": null
+          },
+          "SatisfiedByInputPorts": null
         }
       ],
       "OutputConditions": [],
@@ -2020,19 +2140,36 @@
             ],
             "Any": null
           }
+        },
+        {
+          "Parameter": "EmbeddingManifestPath",
+          "ResourceKind": "model_resource",
+          "ReasonCode": "ANOMALY_EMBEDDING_MANIFEST_REQUIRED",
+          "AtLeastOneGroup": null,
+          "RequiredWhen": {
+            "All": [
+              {
+                "Parameter": "FeatureExtractorId",
+                "Comparison": "equals",
+                "Value": "onnx_embedding"
+              }
+            ],
+            "Any": null
+          }
         }
       ],
       "GenerationDependencies": [
         "type:ClearVision.Product.Infrastructure.Operators.AnomalyDetectionImageContractProvider"
       ],
-      "GenerationFingerprint": "68B18DB0656B6EF186354C2FB9C793E6EFC9D379A7E0AF83CFDE8AEA1295101C",
+      "GenerationFingerprint": "D16582B2F872342D214D241378A66FEFD3A289B434F810DD7A840F675FA205F9",
       "RequiredResources": [
         "AnomalyDetection.FeatureBankPath",
         "AnomalyDetection.ModelId",
         "AnomalyDetection.SaveFeatureBankPath",
         "AnomalyDetection.ModelCatalogPath",
         "AnomalyDetection.EmbeddingModelPath",
-        "AnomalyDetection.EmbeddingModelId"
+        "AnomalyDetection.EmbeddingModelId",
+        "AnomalyDetection.EmbeddingManifestPath"
       ],
       "TypicalUpstream": [],
       "TypicalDownstream": [],
@@ -2040,7 +2177,8 @@
       "KnownLimitations": [
         "\u751F\u547D\u5468\u671F\u72B6\u6001\uFF1AExperimental\uFF1B\u7B80\u5316 PatchCore \u98CE\u683C\u5B9E\u73B0\uFF0C\u90E8\u7F72\u524D\u5FC5\u987B\u4F7F\u7528\u73B0\u573A\u6570\u636E\u9A8C\u8BC1\u7279\u5F81\u5E93\u3001\u9608\u503C\u548C\u7A33\u5B9A\u6027\u3002",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -2064,6 +2202,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5706\u5F27\u5361\u5C3A",
         "ArcCaliper",
@@ -2233,7 +2378,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -2257,6 +2404,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6570\u7EC4\u7D22\u5F15\u5668",
         "ArrayIndexer",
@@ -2355,7 +2509,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -2379,6 +2535,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u53CC\u8FB9\u6EE4\u6CE2",
         "BilateralFilter",
@@ -2552,7 +2715,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -2576,6 +2741,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u4E8C\u503C\u56FE\u8F6C\u533A\u57DF",
         "BinaryImageToRegion",
@@ -2750,7 +2922,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -2774,6 +2948,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "Blob\u5206\u6790",
         "BlobAnalysis",
@@ -3476,7 +3657,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -3500,6 +3683,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "Blob\u5206\u7C7B\u6807\u6CE8",
         "BlobLabeling",
@@ -3679,7 +3869,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -3703,6 +3895,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5019\u9009\u6846\u7B5B\u9009",
         "BoxFilter",
@@ -3957,7 +4156,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -3981,6 +4182,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5019\u9009\u6846\u6291\u5236",
         "BoxNms",
@@ -4272,7 +4480,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -4296,6 +4506,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6807\u5B9A\u52A0\u8F7D",
         "CalibrationLoader",
@@ -4361,7 +4578,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (24 cases)",
@@ -4385,6 +4604,16 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "SyntheticBenchmarkValidated",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": [
+          "quality/evals/reports/operator-precision-after-acceptance.json",
+          "docs/operator-quality/operator-quality-phase5-closeout.md"
+        ]
+      },
       "Aliases": [
         "\u5361\u5C3A\u5DE5\u5177",
         "CaliperTool",
@@ -4464,6 +4693,20 @@
           "Name": "DistanceStdDev",
           "DisplayName": "Distance StdDev",
           "DataType": "Float",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "MeasurementEvidence",
+          "DisplayName": "Measurement Evidence",
+          "DataType": "Any",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "EdgeDiagnostics",
+          "DisplayName": "Edge Diagnostics",
+          "DataType": "Any",
           "IsRequired": false,
           "Description": ""
         }
@@ -4585,6 +4828,31 @@
             "gradient_moment",
             "zernike (legacy alias)"
           ]
+        },
+        {
+          "Name": "EdgeModel",
+          "DisplayName": "Edge Model",
+          "DataType": "enum",
+          "Description": "",
+          "DefaultValue": "Legacy",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "Legacy",
+            "Gaussian Derivative"
+          ]
+        },
+        {
+          "Name": "EdgeModelSigma",
+          "DisplayName": "Edge Model Sigma",
+          "DataType": "double",
+          "Description": "",
+          "DefaultValue": "1",
+          "MinValue": "0.2",
+          "MaxValue": "4",
+          "IsRequired": true,
+          "AllowedValues": []
         }
       ],
       "ParameterConditions": [],
@@ -4664,7 +4932,7 @@
       ],
       "ResourceRequirements": [],
       "GenerationDependencies": [],
-      "GenerationFingerprint": "A4BC37D12A8790F8E01756209E4E550C700B8F8467477886B39BFFB5411C677A",
+      "GenerationFingerprint": "B6BE6A23584947E3D8E720536678BB6D8FA0BC7CE686BA7F67BD3F999C1ECF70",
       "RequiredResources": [],
       "TypicalUpstream": [
         "Filtering"
@@ -4676,7 +4944,9 @@
       "AntiPatterns": [],
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
-        "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
+        "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -4700,6 +4970,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u76F8\u673A\u6807\u5B9A",
         "CameraCalibration",
@@ -4909,7 +5186,9 @@
       "AntiPatterns": [],
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
-        "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
+        "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -4933,6 +5212,16 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "SyntheticBenchmarkValidated",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": [
+          "quality/evals/reports/operator-precision-after-acceptance.json",
+          "docs/operator-quality/operator-quality-phase5-closeout.md"
+        ]
+      },
       "Aliases": [
         "\u5706\u6D4B\u91CF",
         "CircleMeasurement",
@@ -5052,6 +5341,13 @@
         {
           "Name": "CaliperProfileEvidence",
           "DisplayName": "V2 profile evidence",
+          "DataType": "Any",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "MeasurementEvidence",
+          "DisplayName": "\u6D4B\u91CF\u8BC1\u636E",
           "DataType": "Any",
           "IsRequired": false,
           "Description": ""
@@ -5316,6 +5612,21 @@
           ]
         },
         {
+          "Name": "RefinementLoss",
+          "DisplayName": "V2 \u6B63\u4EA4\u7CBE\u5316\u635F\u5931",
+          "DataType": "enum",
+          "Description": "",
+          "DefaultValue": "Legacy",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "\u517C\u5BB9\u8DEF\u5F84",
+            "Huber",
+            "Welsch"
+          ]
+        },
+        {
           "Name": "OutlierThreshold",
           "DisplayName": "V2 \u79BB\u7FA4\u9608\u503C",
           "DataType": "double",
@@ -5426,7 +5737,7 @@
       ],
       "ResourceRequirements": [],
       "GenerationDependencies": [],
-      "GenerationFingerprint": "FAE310F1643D0FBF65E653451BDBEE6A000011B02C28367773E84098527099D7",
+      "GenerationFingerprint": "BB568917FD41D9D4F3244B31FFD8AE2DBE2EB230588BCE8DFBCC97D7776CDA8B",
       "RequiredResources": [],
       "TypicalUpstream": [
         "Filtering"
@@ -5439,7 +5750,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -5463,6 +5776,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "CLAHE\u589E\u5F3A",
         "ClaheEnhancement"
@@ -5645,7 +5965,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -5669,6 +5991,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6761\u7801\u8BC6\u522B",
         "CodeRecognition",
@@ -5849,7 +6178,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -5873,6 +6204,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u989C\u8272\u7A7A\u95F4\u8F6C\u6362",
         "ColorConversion",
@@ -6027,7 +6365,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -6051,6 +6391,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Experimental",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u989C\u8272\u5206\u6790",
         "ColorDetection",
@@ -6433,7 +6780,8 @@
         "\u751F\u547D\u5468\u671F\u72B6\u6001\uFF1AExperimental\uFF1B\u989C\u8272\u68C0\u67E5\u591A\u6A21\u5F0F\u4ECD\u5904\u4E8E\u5DE5\u4E1A\u5316\u9A8C\u8BC1\u9636\u6BB5\uFF0C\u9608\u503C\u548C\u767D\u5E73\u8861\u7B56\u7565\u9700\u6309\u73B0\u573A\u6837\u672C\u786E\u8BA4\u3002",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -6457,6 +6805,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u989C\u8272\u6D4B\u91CF",
         "ColorMeasurement",
@@ -6744,7 +7099,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -6768,6 +7125,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6CE8\u91CA",
         "Comment",
@@ -6836,7 +7200,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (22 cases)",
@@ -6860,6 +7226,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6570\u503C\u6BD4\u8F83",
         "Comparator",
@@ -6992,7 +7365,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (22 cases)",
@@ -7016,6 +7391,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6761\u4EF6\u5206\u652F",
         "ConditionalBranch",
@@ -7255,7 +7637,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -7279,6 +7663,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u8F6E\u5ED3\u68C0\u6D4B",
         "ContourDetection",
@@ -7553,7 +7944,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -7577,6 +7970,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u8F6E\u5ED3\u6781\u503C",
         "ContourExtrema",
@@ -7674,7 +8074,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (22 cases)",
@@ -7698,6 +8100,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u8F6E\u5ED3\u6D4B\u91CF",
         "ContourMeasurement",
@@ -7888,7 +8297,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -7912,6 +8323,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u50CF\u7D20\u5230\u7269\u7406\u5750\u6807\uFF08\u5355\u70B9\uFF09",
         "CoordinateTransform",
@@ -8093,7 +8511,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -8117,6 +8537,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u8FB9\u754C\u586B\u5145",
         "CopyMakeBorder",
@@ -8307,7 +8734,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -8331,6 +8760,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u89D2\u70B9\u68C0\u6D4B",
         "CornerDetection",
@@ -8523,7 +8959,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -8547,6 +8985,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5FAA\u73AF\u8BA1\u6570\u5668",
         "CycleCounter"
@@ -8636,7 +9081,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -8660,6 +9107,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6570\u636E\u5E93\u5199\u5165",
         "DatabaseWrite",
@@ -8763,7 +9217,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -8787,6 +9243,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6DF1\u5EA6\u5B66\u4E60",
         "DeepLearning",
@@ -11056,7 +11519,9 @@
       "AntiPatterns": [],
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
-        "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
+        "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (50 cases)",
@@ -11080,6 +11545,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5EF6\u65F6",
         "Delay",
@@ -11148,7 +11620,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -11172,6 +11646,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Experimental",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u68C0\u6D4B\u987A\u5E8F\u5224\u5B9A",
         "DetectionSequenceJudge",
@@ -11506,7 +11987,8 @@
         "\u751F\u547D\u5468\u671F\u72B6\u6001\uFF1AExperimental\uFF1B\u987A\u5E8F\u3001\u884C\u805A\u7C7B\u548C\u69FD\u4F4D\u5206\u914D\u7B56\u7565\u9700\u9488\u5BF9\u73B0\u573A\u5E03\u5C40\u53CA\u906E\u6321\u60C5\u51B5\u9A8C\u8BC1\u3002",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (24 cases)",
@@ -11530,6 +12012,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u8DDD\u79BB\u53D8\u6362",
         "DistanceTransform",
@@ -11757,7 +12246,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -11781,6 +12272,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u53CC\u6A21\u6001\u6295\u7968",
         "DualModalVoting"
@@ -11918,7 +12416,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (31 cases)",
@@ -11942,6 +12442,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u8FB9\u7F18\u68C0\u6D4B",
         "EdgeDetection",
@@ -12462,7 +12969,9 @@
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -12486,6 +12995,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u8FB9\u7EBF\u4EA4\u70B9",
         "EdgeIntersection",
@@ -12575,7 +13091,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -12599,6 +13117,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u8FB9\u7F18\u95F4\u8DDD\u7F3A\u9677\u68C0\u6D4B",
         "EdgePairDefect",
@@ -12804,7 +13329,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (27 cases)",
@@ -12828,6 +13355,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6B27\u6C0F\u805A\u7C7B\u5206\u5272",
         "EuclideanClusterExtraction",
@@ -12934,7 +13468,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -12958,6 +13494,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u4FE1\u53F7/\u56FE\u50CF\u5085\u91CC\u53F6\u53D8\u6362\uFF08FFT\uFF09",
         "FFT1D",
@@ -13035,7 +13578,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -13059,6 +13604,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6EE4\u6CE2",
         "Filtering",
@@ -13891,7 +14443,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -13915,6 +14469,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u9C7C\u773C\u6807\u5B9A",
         "FisheyeCalibration",
@@ -14148,7 +14709,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -14172,6 +14735,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u9C7C\u773C\u53BB\u7578\u53D8",
         "FisheyeUndistort",
@@ -14352,7 +14922,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -14376,6 +14948,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "ForEach \u5FAA\u73AF",
         "ForEach",
@@ -14467,7 +15046,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -14491,6 +15072,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5E27\u5E73\u5747",
         "FrameAveraging",
@@ -14643,7 +15231,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -14667,6 +15257,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5E27\u53D8\u5316\u89E6\u53D1",
         "FrameChangeTrigger",
@@ -15095,7 +15692,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -15119,6 +15718,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u9891\u57DF\u6EE4\u6CE2",
         "FrequencyFilter",
@@ -15209,7 +15815,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -15233,6 +15841,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u95F4\u9699\u6D4B\u91CF",
         "GapMeasurement",
@@ -15516,7 +16131,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -15540,6 +16157,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u51E0\u4F55\u6D4B\u91CF",
         "GeoMeasurement",
@@ -15670,7 +16294,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -15694,6 +16320,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u51E0\u4F55\u62DF\u5408",
         "GeometricFitting",
@@ -15920,7 +16553,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -15944,6 +16579,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u4E8C\u7EF4\u51E0\u4F55\u516C\u5DEE\u5224\u5B9A",
         "GeometricTolerance",
@@ -16204,7 +16846,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -16228,6 +16872,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "GLCM\u7EB9\u7406\u7279\u5F81",
         "GlcmTexture",
@@ -16480,7 +17131,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -16504,6 +17157,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D",
         "GradientShapeMatch"
@@ -16870,7 +17530,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -16894,6 +17556,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u624B\u773C\u6807\u5B9A",
         "HandEyeCalibration",
@@ -17044,7 +17713,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -17068,6 +17739,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u624B\u773C\u6807\u5B9A\u9A8C\u8BC1",
         "HandEyeCalibrationValidator",
@@ -17192,7 +17870,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (24 cases)",
@@ -17216,6 +17896,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u76F4\u65B9\u56FE\u5206\u6790",
         "HistogramAnalysis",
@@ -17650,7 +18337,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -17674,6 +18363,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u76F4\u65B9\u56FE\u5747\u8861\u5316",
         "HistogramEqualization",
@@ -17841,7 +18537,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -17865,6 +18563,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "HTTP \u8BF7\u6C42",
         "HttpRequest",
@@ -18003,7 +18708,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -18027,6 +18734,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u91C7\u96C6",
         "ImageAcquisition",
@@ -18592,7 +19306,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -18616,6 +19332,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u52A0\u6CD5",
         "ImageAdd",
@@ -18883,7 +19606,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -18907,6 +19632,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u878D\u5408",
         "ImageBlend"
@@ -19134,7 +19866,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -19158,6 +19892,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u7EC4\u5408",
         "ImageCompose",
@@ -19551,7 +20292,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -19575,6 +20318,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u88C1\u526A",
         "ImageCrop",
@@ -19741,7 +20491,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -19765,6 +20517,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u5DEE\u5F02\u7387\u5206\u6790",
         "ImageDiff",
@@ -19969,7 +20728,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -19993,6 +20754,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u5F52\u4E00\u5316",
         "ImageNormalize",
@@ -20629,7 +21397,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -20653,6 +21423,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u7F29\u653E",
         "ImageResize",
@@ -20841,7 +21618,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -20865,6 +21644,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u65CB\u8F6C",
         "ImageRotate",
@@ -21043,7 +21829,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -21067,6 +21855,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u4FDD\u5B58",
         "ImageSave"
@@ -21345,7 +22140,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -21369,6 +22166,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u62FC\u63A5",
         "ImageStitching",
@@ -21612,7 +22416,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -21636,6 +22442,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u51CF\u6CD5",
         "ImageSubtract"
@@ -21862,7 +22675,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -21886,6 +22701,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56FE\u50CF\u5207\u7247",
         "ImageTiling",
@@ -22066,7 +22888,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -22090,6 +22914,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u4FE1\u53F7/\u56FE\u50CF\u9006\u5085\u91CC\u53F6\u53D8\u6362\uFF08IFFT\uFF09",
         "InverseFFT1D",
@@ -22167,7 +22998,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -22191,6 +23024,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "JSON \u63D0\u53D6\u5668",
         "JsonExtractor",
@@ -22286,7 +23126,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -22310,6 +23152,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u62C9\u666E\u62C9\u65AF\u9510\u5316",
         "LaplacianSharpen",
@@ -22604,7 +23453,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -22628,6 +23479,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "Laws\u7EB9\u7406\u6EE4\u6CE2",
         "LawsTextureFilter",
@@ -22822,7 +23680,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -22846,6 +23706,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u7EBF\u7EBF\u8DDD\u79BB",
         "LineLineDistance",
@@ -22967,7 +23834,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -22991,6 +23860,16 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "SyntheticBenchmarkValidated",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": [
+          "quality/evals/reports/operator-precision-after-acceptance.json",
+          "docs/operator-quality/operator-quality-phase5-closeout.md"
+        ]
+      },
       "Aliases": [
         "\u76F4\u7EBF\u6D4B\u91CF",
         "LineMeasurement",
@@ -23053,6 +23932,13 @@
           "DataType": "Integer",
           "IsRequired": false,
           "Description": ""
+        },
+        {
+          "Name": "MeasurementEvidence",
+          "DisplayName": "\u6D4B\u91CF\u8BC1\u636E",
+          "DataType": "Any",
+          "IsRequired": false,
+          "Description": ""
         }
       ],
       "Parameters": [
@@ -23103,6 +23989,21 @@
           "MaxValue": null,
           "IsRequired": true,
           "AllowedValues": []
+        },
+        {
+          "Name": "FitLoss",
+          "DisplayName": "\u62DF\u5408\u635F\u5931",
+          "DataType": "enum",
+          "Description": "",
+          "DefaultValue": "L2",
+          "MinValue": null,
+          "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": [
+            "L2 \u517C\u5BB9",
+            "Huber",
+            "Welsch"
+          ]
         }
       ],
       "ParameterConditions": [],
@@ -23182,7 +24083,7 @@
       ],
       "ResourceRequirements": [],
       "GenerationDependencies": [],
-      "GenerationFingerprint": "482B52D14198906DA69394EE416E58F6EE0BE73F457864D75330B45490431F2C",
+      "GenerationFingerprint": "2864B65050C130B846BB8F0229B378EDDE29C63C68A3C151882C30D5E1B9141D",
       "RequiredResources": [],
       "TypicalUpstream": [],
       "TypicalDownstream": [],
@@ -23190,7 +24091,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -23214,6 +24117,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Experimental",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5C40\u90E8\u53EF\u53D8\u5F62\u5339\u914D",
         "LocalDeformableMatching",
@@ -23597,7 +24507,8 @@
       "KnownLimitations": [
         "\u751F\u547D\u5468\u671F\u72B6\u6001\uFF1AExperimental\uFF1BTPS \u5C40\u90E8\u5F62\u53D8\u4E0E\u591A\u5019\u9009\u641C\u7D22\u4E3A\u5B9E\u9A8C\u80FD\u529B\uFF0C\u5C1A\u9700\u76EE\u6807\u57DF\u6570\u636E\u9A8C\u8BC1\u9C81\u68D2\u6027\u548C\u6027\u80FD\u3002",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (24 cases)",
@@ -23621,6 +24532,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u903B\u8F91\u95E8",
         "LogicGate"
@@ -23689,7 +24607,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -23713,6 +24633,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6570\u503C\u8BA1\u7B97",
         "MathOperation",
@@ -23806,7 +24733,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -23830,6 +24759,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5747\u503C\u6EE4\u6CE2",
         "MeanFilter",
@@ -23968,7 +24904,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -23992,6 +24930,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6D4B\u91CF",
         "Measurement",
@@ -25041,7 +25986,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -25065,6 +26012,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u4E2D\u503C\u6EE4\u6CE2",
         "MedianBlur",
@@ -25288,7 +26242,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -25312,6 +26268,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6700\u5C0F\u5916\u63A5\u51E0\u4F55\u4F53",
         "MinEnclosingGeometry",
@@ -25564,7 +26527,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -25588,6 +26553,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u4E09\u83F1MC\u901A\u4FE1",
         "MitsubishiMcCommunication",
@@ -26273,7 +27245,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -26297,6 +27271,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "Modbus TCP\u901A\u4FE1",
         "ModbusCommunication",
@@ -26649,7 +27630,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -26673,6 +27656,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5F62\u6001\u5B66\u64CD\u4F5C",
         "MorphologicalOperation"
@@ -26883,7 +27873,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -26907,6 +27899,13 @@
       "DefaultHidden": true,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "CompatibilityOnly",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5F62\u6001\u5B66\uFF08\u65E7\u7248\uFF09",
         "Morphology",
@@ -27102,7 +28101,8 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -27126,6 +28126,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Reference",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "MQTT \u53D1\u5E03",
         "MqttPublish",
@@ -27253,7 +28260,8 @@
         "\u751F\u547D\u5468\u671F\u72B6\u6001\uFF1AReference\uFF1B\u5F53\u524D\u5305\u672A\u542F\u7528 MQTT \u53D1\u5E03\u96C6\u6210\uFF0C\u6267\u884C\u8FD4\u56DE MQTT_PUBLISH_DISABLED\uFF0C\u4EC5\u7528\u4E8E\u517C\u5BB9\u548C\u53C2\u8003\u3002",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -27277,6 +28285,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "N\u70B9\u6807\u5B9A",
         "NPointCalibration",
@@ -27568,7 +28583,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (24 cases)",
@@ -27592,6 +28609,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "OCR \u8BC6\u522B",
         "OcrRecognition"
@@ -27714,7 +28738,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -27738,6 +28764,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6B27\u59C6\u9F99FINS\u901A\u4FE1",
         "OmronFinsCommunication"
@@ -28418,7 +29451,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -28442,6 +29477,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "ORB\u7279\u5F81\u5339\u914D",
         "OrbFeatureMatch"
@@ -28914,7 +29956,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (22 cases)",
@@ -28938,6 +29982,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5E73\u884C\u7EBF\u67E5\u627E",
         "ParallelLineFind",
@@ -29137,7 +30188,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -29161,6 +30214,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u900F\u89C6\u53D8\u6362",
         "PerspectiveTransform",
@@ -29519,7 +30579,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -29543,6 +30605,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u76F8\u4F4D\u89E3\u7F20\u7ED5",
         "PhaseClosure",
@@ -29812,7 +30881,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (22 cases)",
@@ -29836,6 +30907,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u50CF\u7D20\u7EDF\u8BA1",
         "PixelStatistics",
@@ -30204,7 +31282,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -30228,6 +31308,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u50CF\u7D20\u4E16\u754C\u6620\u5C04",
         "PixelToWorldTransform",
@@ -30515,7 +31602,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -30539,6 +31628,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5E73\u9762\u7279\u5F81\u5339\u914D",
         "PlanarMatching",
@@ -31097,7 +32193,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (24 cases)",
@@ -31121,6 +32219,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u70B9\u4F4D\u504F\u5DEE\u8BA1\u7B97",
         "PointAlignment",
@@ -31216,7 +32321,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -31240,6 +32347,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u70B9\u4F4D\u521A\u6027\u8865\u507F",
         "PointCorrection",
@@ -31388,7 +32502,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -31412,6 +32528,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u70B9\u7EBF\u8DDD\u79BB",
         "PointLineDistance",
@@ -31502,7 +32625,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -31526,6 +32651,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u70B9\u96C6\u5DE5\u5177",
         "PointSetTool",
@@ -31677,7 +32809,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -31701,6 +32835,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6781\u5750\u6807\u5C55\u5F00",
         "PolarUnwrap",
@@ -31916,7 +33057,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -31940,6 +33083,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "ROI\u4F4D\u59FF\u8865\u507F\uFF08\u50CF\u7D20\uFF09",
         "PositionCorrection",
@@ -32109,7 +33259,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -32133,6 +33285,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "PPF\u70B9\u5BF9\u7279\u5F81",
         "PPFEstimation",
@@ -32228,7 +33387,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -32252,6 +33413,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "PPF\u70B9\u4E91\u7C97\u5339\u914D",
         "PPFMatch",
@@ -32524,7 +33692,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -32548,6 +33718,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u91D1\u5B57\u5854\u5F62\u72B6\u5339\u914D",
         "PyramidShapeMatch"
@@ -32942,7 +34119,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (24 cases)",
@@ -32966,6 +34145,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u56DB\u8FB9\u5F62\u67E5\u627E",
         "QuadrilateralFind",
@@ -33165,7 +34351,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -33189,6 +34377,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "RANSAC\u5E73\u9762\u5206\u5272",
         "RansacPlaneSegmentation",
@@ -33331,7 +34526,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -33355,6 +34552,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u77E9\u5F62\u68C0\u6D4B",
         "RectangleDetection",
@@ -33583,7 +34787,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -33607,6 +34813,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u77E9\u5F62\u6846\u5B9A\u4E49",
         "RectangleRegion",
@@ -33692,7 +34905,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -33716,6 +34931,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u533A\u57DF\u95ED\u8FD0\u7B97",
         "RegionClosing",
@@ -33896,7 +35118,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -33920,6 +35144,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u533A\u57DF\u8865\u96C6",
         "RegionComplement",
@@ -34075,7 +35306,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -34099,6 +35332,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u533A\u57DF\u5DEE\u96C6",
         "RegionDifference",
@@ -34167,7 +35407,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -34191,6 +35433,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u533A\u57DF\u81A8\u80C0",
         "RegionDilation",
@@ -34383,7 +35632,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -34407,6 +35658,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u533A\u57DF\u8150\u8680",
         "RegionErosion",
@@ -34598,7 +35856,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -34622,6 +35882,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u533A\u57DF\u4EA4\u96C6",
         "RegionIntersection",
@@ -34690,7 +35957,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -34714,6 +35983,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u533A\u57DF\u5F00\u8FD0\u7B97",
         "RegionOpening",
@@ -34894,7 +36170,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -34918,6 +36196,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u533A\u57DF\u9AA8\u67B6\u5316",
         "RegionSkeleton",
@@ -35097,7 +36382,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -35121,6 +36408,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u533A\u57DF\u5E76\u96C6",
         "RegionUnion",
@@ -35190,7 +36484,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -35214,6 +36510,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u7ED3\u679C\u5224\u5B9A",
         "ResultJudgment",
@@ -35412,7 +36715,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (22 cases)",
@@ -35436,6 +36741,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u7ED3\u679C\u8F93\u51FA",
         "ResultOutput",
@@ -35700,7 +37012,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -35724,6 +37038,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "ROI\u88C1\u526A\u4E0E\u63A9\u819C",
         "RoiManager",
@@ -35982,7 +37303,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -36006,6 +37329,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "ROI\u4F4D\u59FF\u53D8\u6362",
         "RoiTransform",
@@ -36075,7 +37405,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -36099,6 +37431,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u811A\u672C\u7B97\u5B50",
         "ScriptOperator",
@@ -36212,7 +37551,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -36236,6 +37577,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u8BED\u4E49\u5206\u5272",
         "SemanticSegmentation",
@@ -36663,7 +38011,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (27 cases)",
@@ -36687,6 +38037,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u4E32\u53E3\u901A\u4FE1",
         "SerialCommunication"
@@ -36848,7 +38205,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -36872,6 +38231,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5149\u7167\u6821\u6B63",
         "ShadingCorrection",
@@ -37535,7 +38901,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -37559,6 +38927,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u65CB\u8F6C\u5C3A\u5EA6\u6A21\u677F\u5339\u914D",
         "ShapeMatching",
@@ -37908,7 +39283,9 @@
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (24 cases)",
@@ -37932,6 +39309,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6E05\u6670\u5EA6\u8BC4\u4F30",
         "SharpnessEvaluation",
@@ -39581,7 +40965,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -39605,6 +40991,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u897F\u95E8\u5B50S7\u901A\u4FE1",
         "SiemensS7Communication",
@@ -40273,7 +41666,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -40297,6 +41692,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u70B9\u4E91\u7EDF\u8BA1\u79BB\u7FA4\u70B9\u53BB\u9664\uFF08SOR\uFF09",
         "StatisticalOutlierRemoval",
@@ -40383,7 +41785,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -40407,6 +41811,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u7EDF\u8BA1\u5206\u6790",
         "Statistics"
@@ -40547,7 +41958,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -40571,6 +41984,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u53CC\u76EE\u6807\u5B9A",
         "StereoCalibration",
@@ -40933,7 +42353,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -40957,6 +42379,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5B57\u7B26\u4E32\u683C\u5F0F\u5316",
         "StringFormat"
@@ -41018,7 +42447,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -41042,6 +42473,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Reference",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u4E9A\u50CF\u7D20\u8FB9\u7F18",
         "SubpixelEdgeDetection"
@@ -41228,7 +42666,8 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -41252,6 +42691,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Experimental",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u8868\u9762\u7F3A\u9677\u68C0\u6D4B",
         "SurfaceDefectDetection",
@@ -41788,7 +43234,8 @@
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u751F\u547D\u5468\u671F\u72B6\u6001\uFF1AExperimental\uFF1B\u57FA\u4E8E\u68AF\u5EA6\u3001\u53C2\u8003\u5DEE\u5206\u548C\u5C40\u90E8\u5BF9\u6BD4\u5EA6\u7684\u4F20\u7EDF\u7F3A\u9677\u5019\u9009\uFF0C\u9700\u8981\u73B0\u573A\u6837\u672C\u8C03\u53C2\u4E0E\u8BEF\u68C0\u9A8C\u8BC1\u3002",
-        "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
+        "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (24 cases)",
@@ -41812,6 +43259,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "TCP\u901A\u4FE1",
         "TcpCommunication",
@@ -43573,7 +45027,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -43597,6 +45053,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6A21\u677F\u5339\u914D",
         "TemplateMatching",
@@ -44857,7 +46320,9 @@
       "AntiPatterns": [],
       "KnownLimitations": [
         "Legacy 8U compatibility allowance \u2014 unverified",
-        "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
+        "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -44881,6 +46346,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u6587\u672C\u4FDD\u5B58",
         "TextSave",
@@ -45033,7 +46505,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -45057,6 +46531,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5168\u5C40\u9608\u503C\u5904\u7406",
         "Thresholding",
@@ -45399,7 +46880,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -45423,6 +46906,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u8BA1\u65F6\u7EDF\u8BA1",
         "TimerStatistics",
@@ -45539,7 +47029,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (22 cases)",
@@ -45563,6 +47055,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5E73\u79FB\u65CB\u8F6C\u6807\u5B9A",
         "TranslationRotationCalibration",
@@ -45887,7 +47386,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (24 cases)",
@@ -45911,6 +47412,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u89E6\u53D1\u6A21\u5757",
         "TriggerModule",
@@ -46009,7 +47517,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -46033,6 +47543,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "Try\u5206\u652F\u900F\u4F20",
         "TryCatch",
@@ -46136,7 +47653,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -46160,6 +47679,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u7C7B\u578B\u8F6C\u6362",
         "TypeConvert"
@@ -46265,7 +47791,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -46289,6 +47817,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u7578\u53D8\u6821\u6B63",
         "Undistort",
@@ -46414,7 +47949,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -46438,6 +47975,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5355\u4F4D\u6362\u7B97",
         "UnitConvert",
@@ -46554,7 +48098,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -46578,6 +48124,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u53D8\u91CF\u9012\u589E",
         "VariableIncrement"
@@ -46726,7 +48279,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -46750,6 +48305,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u53D8\u91CF\u8BFB\u53D6",
         "VariableRead"
@@ -46987,7 +48549,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -47011,6 +48575,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u53D8\u91CF\u5199\u5165",
         "VariableWrite"
@@ -47271,7 +48842,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (20 cases)",
@@ -47295,6 +48868,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": true,
       "RequiresLifecycleDisclosure": false,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u4F53\u7D20\u4E0B\u91C7\u6837",
         "VoxelDownsample",
@@ -47361,7 +48941,9 @@
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Contract evidenced (21 cases)",
@@ -47385,6 +48967,13 @@
       "DefaultHidden": false,
       "DefaultAiRecommendation": false,
       "RequiresLifecycleDisclosure": true,
+      "QualityState": {
+        "Execution": "Implemented",
+        "AlgorithmQuality": "Unknown",
+        "ProductionReadiness": "Unknown",
+        "FieldValidation": "NotValidated",
+        "EvidenceRefs": []
+      },
       "Aliases": [
         "\u5BBD\u5EA6\u6D4B\u91CF",
         "WidthMeasurement",
@@ -47663,7 +49252,9 @@
         "Legacy 8U compatibility allowance \u2014 unverified",
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
         "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
-        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
+        "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E",
+        "ProductionReadiness=Unknown\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Release Ready",
+        "FieldValidation=NotValidated\uFF0C\u4E0D\u5F97\u636E\u6B64\u5BA3\u79F0 Field Verified"
       ],
       "Evidence": {
         "Contract": "Not yet evidenced",
@@ -60435,6 +62026,15 @@
     {
       "RelationType": "PRODUCES",
       "Source": "LineMeasurement",
+      "Target": "Any",
+      "Weight": 1,
+      "Metadata": {
+        "port": "MeasurementEvidence"
+      }
+    },
+    {
+      "RelationType": "PRODUCES",
+      "Source": "LineMeasurement",
       "Target": "Float",
       "Weight": 1,
       "Metadata": {
@@ -62357,6 +63957,13 @@
       "Metadata": {
         "port": "Image"
       }
+    },
+    {
+      "RelationType": "REQUIRES_RESOURCE",
+      "Source": "AnomalyDetection",
+      "Target": "AnomalyDetection.EmbeddingManifestPath",
+      "Weight": 1,
+      "Metadata": {}
     },
     {
       "RelationType": "REQUIRES_RESOURCE",

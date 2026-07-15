@@ -14,7 +14,12 @@
 | 默认隐藏 (Default Hidden) | No |
 | AI 默认推荐 (Default AI Recommendation) | No |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
-| 标签 (Tags) | `experimental`, `integration:mqtt`, `maturity:placeholder-disabled`, `分类:Communication`, `分类显示:通信`, `生命周期:Reference`, `算法类型:自研` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `Unknown` |
+| ProductionReadiness | `Reference` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs |  |
+| 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Reference`, `experimental`, `integration:mqtt`, `maturity:placeholder-disabled`, `分类:Communication`, `分类显示:通信`, `生命周期:Reference`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于在启用可选 MQTT 集成时发布检测数据。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。

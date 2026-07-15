@@ -29,6 +29,8 @@ public interface IOperatorDescriptor
 
     IReadOnlyList<IOperatorParameter> Parameters { get; }
 
+    OperatorQualityState QualityState => OperatorQualityState.Unknown;
+
     IReadOnlyList<ImageInputContract> ImageInputContracts { get; }
 }
 

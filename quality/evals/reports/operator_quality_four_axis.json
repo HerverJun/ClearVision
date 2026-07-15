@@ -1,0 +1,1620 @@
+{
+  "schemaVersion": "2026-07-15.operator-quality-four-axis.v1",
+  "generatedAtUtc": "2026-07-15T23:49:28.6486899+08:00",
+  "claimBoundary": "Four independent evidence axes. Unknown, compatibility-only and synthetic/public-dataset evidence never imply Release Ready or Field Verified.",
+  "summary": {
+    "total": 158,
+    "execution": {
+      "Implemented": 158
+    },
+    "algorithmQuality": {
+      "Unknown": 154,
+      "PublicDatasetEvidence": 1,
+      "SyntheticBenchmarkValidated": 3
+    },
+    "productionReadiness": {
+      "Unknown": 150,
+      "Experimental": 5,
+      "CompatibilityOnly": 1,
+      "Reference": 2
+    },
+    "fieldValidation": {
+      "NotValidated": 158
+    }
+  },
+  "operators": [
+    {
+      "operatorType": "AdaptiveThreshold",
+      "DisplayName": "自适应阈值",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "AffineTransform",
+      "DisplayName": "仿射变换",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "Aggregator",
+      "DisplayName": "数据聚合",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "AkazeFeatureMatch",
+      "DisplayName": "AKAZE特征匹配",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "AngleMeasurement",
+      "DisplayName": "角度测量",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "AnomalyDetection",
+      "DisplayName": "异常检测",
+      "Lifecycle": "Experimental",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "PublicDatasetEvidence",
+      "ProductionReadiness": "Experimental",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": [
+        "quality/evals/reports/operator-precision-after-acceptance.json",
+        "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+        "docs/operator-quality/operator-quality-phase5-closeout.md"
+      ]
+    },
+    {
+      "operatorType": "ArcCaliper",
+      "DisplayName": "圆弧卡尺",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ArrayIndexer",
+      "DisplayName": "数组索引器",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "BilateralFilter",
+      "DisplayName": "双边滤波",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "BinaryImageToRegion",
+      "DisplayName": "二值图转区域",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "BlobAnalysis",
+      "DisplayName": "Blob分析",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "BlobLabeling",
+      "DisplayName": "Blob分类标注",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "BoxFilter",
+      "DisplayName": "候选框筛选",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "BoxNms",
+      "DisplayName": "候选框抑制",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "CalibrationLoader",
+      "DisplayName": "标定加载",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "CaliperTool",
+      "DisplayName": "卡尺工具",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "SyntheticBenchmarkValidated",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": [
+        "quality/evals/reports/operator-precision-after-acceptance.json",
+        "docs/operator-quality/operator-quality-phase5-closeout.md"
+      ]
+    },
+    {
+      "operatorType": "CameraCalibration",
+      "DisplayName": "相机标定",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "CircleMeasurement",
+      "DisplayName": "圆测量",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "SyntheticBenchmarkValidated",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": [
+        "quality/evals/reports/operator-precision-after-acceptance.json",
+        "docs/operator-quality/operator-quality-phase5-closeout.md"
+      ]
+    },
+    {
+      "operatorType": "ClaheEnhancement",
+      "DisplayName": "CLAHE增强",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "CodeRecognition",
+      "DisplayName": "条码识别",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ColorConversion",
+      "DisplayName": "颜色空间转换",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ColorDetection",
+      "DisplayName": "颜色分析",
+      "Lifecycle": "Experimental",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Experimental",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ColorMeasurement",
+      "DisplayName": "颜色测量",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "Comment",
+      "DisplayName": "注释",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "Comparator",
+      "DisplayName": "数值比较",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ConditionalBranch",
+      "DisplayName": "条件分支",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ContourDetection",
+      "DisplayName": "轮廓检测",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ContourExtrema",
+      "DisplayName": "轮廓极值",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ContourMeasurement",
+      "DisplayName": "轮廓测量",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "CoordinateTransform",
+      "DisplayName": "像素到物理坐标（单点）",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "CopyMakeBorder",
+      "DisplayName": "边界填充",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "CornerDetection",
+      "DisplayName": "角点检测",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "CycleCounter",
+      "DisplayName": "循环计数器",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "DatabaseWrite",
+      "DisplayName": "数据库写入",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "DeepLearning",
+      "DisplayName": "深度学习",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "Delay",
+      "DisplayName": "延时",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "DetectionSequenceJudge",
+      "DisplayName": "检测顺序判定",
+      "Lifecycle": "Experimental",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Experimental",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "DistanceTransform",
+      "DisplayName": "距离变换",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "DualModalVoting",
+      "DisplayName": "双模态投票",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "EdgeDetection",
+      "DisplayName": "边缘检测",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "EdgeIntersection",
+      "DisplayName": "边线交点",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "EdgePairDefect",
+      "DisplayName": "边缘间距缺陷检测",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "EuclideanClusterExtraction",
+      "DisplayName": "欧氏聚类分割",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "FFT1D",
+      "DisplayName": "信号/图像傅里叶变换（FFT）",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "Filtering",
+      "DisplayName": "滤波",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "FisheyeCalibration",
+      "DisplayName": "鱼眼标定",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "FisheyeUndistort",
+      "DisplayName": "鱼眼去畸变",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ForEach",
+      "DisplayName": "ForEach 循环",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "FrameAveraging",
+      "DisplayName": "帧平均",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "FrameChangeTrigger",
+      "DisplayName": "帧变化触发",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "FrequencyFilter",
+      "DisplayName": "频域滤波",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "GapMeasurement",
+      "DisplayName": "间隙测量",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "GeoMeasurement",
+      "DisplayName": "几何测量",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "GeometricFitting",
+      "DisplayName": "几何拟合",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "GeometricTolerance",
+      "DisplayName": "二维几何公差判定",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "GlcmTexture",
+      "DisplayName": "GLCM纹理特征",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "GradientShapeMatch",
+      "DisplayName": "梯度形状匹配",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "HandEyeCalibration",
+      "DisplayName": "手眼标定",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "HandEyeCalibrationValidator",
+      "DisplayName": "手眼标定验证",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "HistogramAnalysis",
+      "DisplayName": "直方图分析",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "HistogramEqualization",
+      "DisplayName": "直方图均衡化",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "HttpRequest",
+      "DisplayName": "HTTP 请求",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageAcquisition",
+      "DisplayName": "图像采集",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageAdd",
+      "DisplayName": "图像加法",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageBlend",
+      "DisplayName": "图像融合",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageCompose",
+      "DisplayName": "图像组合",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageCrop",
+      "DisplayName": "图像裁剪",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageDiff",
+      "DisplayName": "图像差异率分析",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageNormalize",
+      "DisplayName": "图像归一化",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageResize",
+      "DisplayName": "图像缩放",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageRotate",
+      "DisplayName": "图像旋转",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageSave",
+      "DisplayName": "图像保存",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageStitching",
+      "DisplayName": "图像拼接",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageSubtract",
+      "DisplayName": "图像减法",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ImageTiling",
+      "DisplayName": "图像切片",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "InverseFFT1D",
+      "DisplayName": "信号/图像逆傅里叶变换（IFFT）",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "JsonExtractor",
+      "DisplayName": "JSON 提取器",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "LaplacianSharpen",
+      "DisplayName": "拉普拉斯锐化",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "LawsTextureFilter",
+      "DisplayName": "Laws纹理滤波",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "LineLineDistance",
+      "DisplayName": "线线距离",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "LineMeasurement",
+      "DisplayName": "直线测量",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "SyntheticBenchmarkValidated",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": [
+        "quality/evals/reports/operator-precision-after-acceptance.json",
+        "docs/operator-quality/operator-quality-phase5-closeout.md"
+      ]
+    },
+    {
+      "operatorType": "LocalDeformableMatching",
+      "DisplayName": "局部可变形匹配",
+      "Lifecycle": "Experimental",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Experimental",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "LogicGate",
+      "DisplayName": "逻辑门",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "MathOperation",
+      "DisplayName": "数值计算",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "MeanFilter",
+      "DisplayName": "均值滤波",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "Measurement",
+      "DisplayName": "测量",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "MedianBlur",
+      "DisplayName": "中值滤波",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "MinEnclosingGeometry",
+      "DisplayName": "最小外接几何体",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "MitsubishiMcCommunication",
+      "DisplayName": "三菱MC通信",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ModbusCommunication",
+      "DisplayName": "Modbus TCP通信",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "MorphologicalOperation",
+      "DisplayName": "形态学操作",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "Morphology",
+      "DisplayName": "形态学（旧版）",
+      "Lifecycle": "Legacy",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "CompatibilityOnly",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "MqttPublish",
+      "DisplayName": "MQTT 发布",
+      "Lifecycle": "Reference",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Reference",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "NPointCalibration",
+      "DisplayName": "N点标定",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "OcrRecognition",
+      "DisplayName": "OCR 识别",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "OmronFinsCommunication",
+      "DisplayName": "欧姆龙FINS通信",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "OrbFeatureMatch",
+      "DisplayName": "ORB特征匹配",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PPFEstimation",
+      "DisplayName": "PPF点对特征",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PPFMatch",
+      "DisplayName": "PPF点云粗匹配",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ParallelLineFind",
+      "DisplayName": "平行线查找",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PerspectiveTransform",
+      "DisplayName": "透视变换",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PhaseClosure",
+      "DisplayName": "相位解缠绕",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PixelStatistics",
+      "DisplayName": "像素统计",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PixelToWorldTransform",
+      "DisplayName": "像素世界映射",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PlanarMatching",
+      "DisplayName": "平面特征匹配",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PointAlignment",
+      "DisplayName": "点位偏差计算",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PointCorrection",
+      "DisplayName": "点位刚性补偿",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PointLineDistance",
+      "DisplayName": "点线距离",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PointSetTool",
+      "DisplayName": "点集工具",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PolarUnwrap",
+      "DisplayName": "极坐标展开",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PositionCorrection",
+      "DisplayName": "ROI位姿补偿（像素）",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "PyramidShapeMatch",
+      "DisplayName": "金字塔形状匹配",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "QuadrilateralFind",
+      "DisplayName": "四边形查找",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RansacPlaneSegmentation",
+      "DisplayName": "RANSAC平面分割",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RectangleDetection",
+      "DisplayName": "矩形检测",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RectangleRegion",
+      "DisplayName": "矩形框定义",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RegionClosing",
+      "DisplayName": "区域闭运算",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RegionComplement",
+      "DisplayName": "区域补集",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RegionDifference",
+      "DisplayName": "区域差集",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RegionDilation",
+      "DisplayName": "区域膨胀",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RegionErosion",
+      "DisplayName": "区域腐蚀",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RegionIntersection",
+      "DisplayName": "区域交集",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RegionOpening",
+      "DisplayName": "区域开运算",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RegionSkeleton",
+      "DisplayName": "区域骨架化",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RegionUnion",
+      "DisplayName": "区域并集",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ResultJudgment",
+      "DisplayName": "结果判定",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ResultOutput",
+      "DisplayName": "结果输出",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RoiManager",
+      "DisplayName": "ROI裁剪与掩膜",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "RoiTransform",
+      "DisplayName": "ROI位姿变换",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ScriptOperator",
+      "DisplayName": "脚本算子",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "SemanticSegmentation",
+      "DisplayName": "语义分割",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "SerialCommunication",
+      "DisplayName": "串口通信",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ShadingCorrection",
+      "DisplayName": "光照校正",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "ShapeMatching",
+      "DisplayName": "旋转尺度模板匹配",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "SharpnessEvaluation",
+      "DisplayName": "清晰度评估",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "SiemensS7Communication",
+      "DisplayName": "西门子S7通信",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "StatisticalOutlierRemoval",
+      "DisplayName": "点云统计离群点去除（SOR）",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "Statistics",
+      "DisplayName": "统计分析",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "StereoCalibration",
+      "DisplayName": "双目标定",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "StringFormat",
+      "DisplayName": "字符串格式化",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "SubpixelEdgeDetection",
+      "DisplayName": "亚像素边缘",
+      "Lifecycle": "Reference",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Reference",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "SurfaceDefectDetection",
+      "DisplayName": "表面缺陷检测",
+      "Lifecycle": "Experimental",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Experimental",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "TcpCommunication",
+      "DisplayName": "TCP通信",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "TemplateMatching",
+      "DisplayName": "模板匹配",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "TextSave",
+      "DisplayName": "文本保存",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "Thresholding",
+      "DisplayName": "全局阈值处理",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "TimerStatistics",
+      "DisplayName": "计时统计",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "TranslationRotationCalibration",
+      "DisplayName": "平移旋转标定",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "TriggerModule",
+      "DisplayName": "触发模块",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "TryCatch",
+      "DisplayName": "Try分支透传",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "TypeConvert",
+      "DisplayName": "类型转换",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "Undistort",
+      "DisplayName": "畸变校正",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "UnitConvert",
+      "DisplayName": "单位换算",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "VariableIncrement",
+      "DisplayName": "变量递增",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "VariableRead",
+      "DisplayName": "变量读取",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "VariableWrite",
+      "DisplayName": "变量写入",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "VoxelDownsample",
+      "DisplayName": "体素下采样",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    },
+    {
+      "operatorType": "WidthMeasurement",
+      "DisplayName": "宽度测量",
+      "Lifecycle": "Stable",
+      "Execution": "Implemented",
+      "AlgorithmQuality": "Unknown",
+      "ProductionReadiness": "Unknown",
+      "FieldValidation": "NotValidated",
+      "evidenceRefs": []
+    }
+  ]
+}

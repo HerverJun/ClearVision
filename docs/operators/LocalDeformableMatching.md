@@ -12,9 +12,14 @@
 | 生命周期 (Lifecycle) | 实验 `Experimental` |
 | 生命周期说明 (Lifecycle Note) | TPS 局部形变与多候选搜索为实验能力，尚需目标域数据验证鲁棒性和性能。 |
 | 默认隐藏 (Default Hidden) | No |
-| AI 默认推荐 (Default AI Recommendation) | No |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
-| 标签 (Tags) | `分类:MatchingAndLocalization`, `分类显示:匹配与定位`, `生命周期:Experimental`, `算法类型:基于OpenCV` |
+| Execution | `Implemented` |
+| AlgorithmQuality | `Unknown` |
+| ProductionReadiness | `Experimental` |
+| FieldValidation | `NotValidated` |
+| Quality Evidence Refs |  |
+| 标签 (Tags) | `AlgorithmQuality:Unknown`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Experimental`, `分类:MatchingAndLocalization`, `分类显示:匹配与定位`, `生命周期:Experimental`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于实验性局部可变形匹配，基于移动最小二乘形变估计，并提供刚性匹配校验回退。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -90,14 +95,18 @@
 ## 图像输入域合同 / Image Input Domain Contracts
 | 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Allowed:0, Rejected:0, Unknown:28 | Unknown — no verified executable image support is registered. |  |  |  | Unverified image depth domain; Unknown is not support. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | Unknown | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
-| `Template` | Allowed:0, Rejected:0, Unknown:28 | Unknown — no verified executable image support is registered. |  |  |  | Unverified image depth domain; Unknown is not support. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | Unknown | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Image` | Allowed:2, Rejected:2, Unknown:0 | Verified production support is present. | CV_8U | CV_8U | 1, 3 | Verified local deformable matching input domain. | BGR inputs are converted to grayscale for ORB and template scoring. | 8-bit visualization, deformation, and occlusion evidence. | Legacy 0..255 intensity domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Template` | Allowed:2, Rejected:2, Unknown:0 | Verified production support is present. | CV_8U | CV_8U | 1, 3 | Verified local deformable matching input domain. | BGR inputs are converted to grayscale for ORB and template scoring. | 8-bit visualization, deformation, and occlusion evidence. | Legacy 0..255 intensity domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
 ### 精确运行变体 / Exact Runtime Variants
 | 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
 |------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Default | CV_8UC1, CV_8UC2, CV_8UC3, CV_8UC4, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
-| `Template` | Default | CV_8UC1, CV_8UC2, CV_8UC3, CV_8UC4, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
+| `Image` | Default | CV_8UC1 | ORB/template/warp paths are verified for 8-bit grayscale and BGR inputs. | `Allowed` | `VerifiedSupport` | C3 -> Gray for feature and score computation; no depth scaling. | Visualization and occlusion outputs remain 8-bit. | Legacy 0..255 matching intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE12_REGRESSION` |
+| `Image` | Default | CV_8UC3 | ORB/template/warp paths are verified for 8-bit grayscale and BGR inputs. | `Allowed` | `VerifiedConversion` | C3 -> Gray for feature and score computation; no depth scaling. | Visualization and occlusion outputs remain 8-bit. | Legacy 0..255 matching intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE12_REGRESSION` |
+| `Image` | Default | CV_8UC2, CV_8UC4 | Unsupported image channel count for local deformable matching. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_STAGE12_REGRESSION` |
+| `Template` | Default | CV_8UC1 | ORB/template/warp paths are verified for 8-bit grayscale and BGR inputs. | `Allowed` | `VerifiedSupport` | C3 -> Gray for feature and score computation; no depth scaling. | Visualization and occlusion outputs remain 8-bit. | Legacy 0..255 matching intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE12_REGRESSION` |
+| `Template` | Default | CV_8UC3 | ORB/template/warp paths are verified for 8-bit grayscale and BGR inputs. | `Allowed` | `VerifiedConversion` | C3 -> Gray for feature and score computation; no depth scaling. | Visualization and occlusion outputs remain 8-bit. | Legacy 0..255 matching intensity domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_STAGE12_REGRESSION` |
+| `Template` | Default | CV_8UC2, CV_8UC4 | Unsupported image channel count for local deformable matching. | `Rejected` | `VerifiedRejection` | None | No output; rejected before the native image call. | Not applicable. | `Any` | `IMAGE_CHANNELS_UNSUPPORTED` | `E2_STAGE12_REGRESSION` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -105,8 +114,8 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`520C64505DB2FFA953E7D838F17C3E0F20D20185D488C600953F9D8421C8CBFF`
-- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+- 组合指纹 (Generation Fingerprint)：`70B3157E202F7B7CA0CC97B0EF8BE03F6005BDF9ED1E4BAEA8CAA03012994F8A`
+- `type:ClearVision.Product.Infrastructure.Operators.LocalDeformableMatchingImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |

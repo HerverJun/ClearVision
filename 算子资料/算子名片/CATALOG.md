@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-07-15 23:08:03 +08:00`
+> 生成时间 / Generated At: `2026-07-15 23:49:28 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
@@ -22,7 +22,7 @@
 | `OutputAndAuxiliary` | 输出与辅助 | 5 | 3.2% |
 
 ## 质量评分 / Quality Score
-- 平均分 / Average: **95.4**
+- 平均分 / Average: **95.3**
 | 等级 (Level) | 数量 (Count) |
 |------|------:|
 | A | 153 |
@@ -139,8 +139,8 @@
 |------|------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.AngleMeasurement` | 角度测量 | `Stable` | 6 | 3 | 7 | 96 (A) | `1.0.0` | 该算子用于通过三点或两线计算角度，兼容亚像素级输入。运行时从声明输入端口读取数据，按… | [AngleMeasurement](./AngleMeasurement.md) |
 | `OperatorType.ArcCaliper` | 圆弧卡尺 | `Stable` | 7 | 2 | 0 | 81 (B) | `1.0.1` | Radial band-profile arc edge scan | [ArcCaliper](./ArcCaliper.md) |
-| `OperatorType.CaliperTool` | 卡尺工具 | `Stable` | 2 | 7 | 9 | 96 (A) | `1.0.0` | 该算子用于沿扫描线检测边缘对并输出宽度。运行时从声明输入端口读取数据，按参数表解析配… | [CaliperTool](./CaliperTool.md) |
-| `OperatorType.CircleMeasurement` | 圆测量 | `Stable` | 1 | 13 | 25 | 100 (A) | `1.1.2` | 该算子用于霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位。运行时从声… | [CircleMeasurement](./CircleMeasurement.md) |
+| `OperatorType.CaliperTool` | 卡尺工具 | `Stable` | 2 | 9 | 11 | 96 (A) | `1.1.0` | 该算子用于沿扫描线检测边缘对并输出宽度。运行时从声明输入端口读取数据，按参数表解析配… | [CaliperTool](./CaliperTool.md) |
+| `OperatorType.CircleMeasurement` | 圆测量 | `Stable` | 1 | 14 | 26 | 100 (A) | `1.2.0` | 该算子用于霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位。运行时从声… | [CircleMeasurement](./CircleMeasurement.md) |
 | `OperatorType.ColorMeasurement` | 颜色测量 | `Stable` | 2 | 8 | 9 | 96 (A) | `2.0.0` | 该算子用于在选定 ROI 内统计 Lab 色差或 HSV 颜色特征。运行时从声明输入… | [ColorMeasurement](./ColorMeasurement.md) |
 | `OperatorType.ContourMeasurement` | 轮廓测量 | `Stable` | 1 | 4 | 4 | 94 (A) | `1.0.0` | 该算子用于计算轮廓面积、周长和质心，并支持按灰度权重估算面积。运行时从声明输入端口读… | [ContourMeasurement](./ContourMeasurement.md) |
 | `OperatorType.GapMeasurement` | 间隙测量 | `Stable` | 2 | 9 | 8 | 96 (A) | `1.0.0` | 该算子用于通过点或图像投影方式测量间距。运行时从声明输入端口读取数据，按参数表解析配… | [GapMeasurement](./GapMeasurement.md) |
@@ -148,7 +148,7 @@
 | `OperatorType.GeometricFitting` | 几何拟合 | `Stable` | 1 | 2 | 8 | 100 (A) | `1.0.0` | 该算子用于根据轮廓点拟合直线、圆或椭圆。运行时从声明输入端口读取数据，按参数表解析配… | [GeometricFitting](./GeometricFitting.md) |
 | `OperatorType.GeometricTolerance` | 二维几何公差判定 | `Stable` | 5 | 7 | 5 | 96 (A) | `1.0.1` | 该算子用于基于特征与基准评估平行度、垂直度、位置度、同心度等受限二维公差带并输出判定… | [GeometricTolerance](./GeometricTolerance.md) |
 | `OperatorType.LineLineDistance` | 线线距离 | `Stable` | 2 | 5 | 3 | 96 (A) | `1.0.0` | 该算子用于计算两条直线或线段之间的距离与夹角。运行时从声明输入端口读取数据，按参数表… | [LineLineDistance](./LineLineDistance.md) |
-| `OperatorType.LineMeasurement` | 直线测量 | `Stable` | 1 | 5 | 4 | 96 (A) | `1.0.0` | 该算子用于检测直线特征，输出方向、跨度和拟合质量诊断。运行时从声明输入端口读取数据，… | [LineMeasurement](./LineMeasurement.md) |
+| `OperatorType.LineMeasurement` | 直线测量 | `Stable` | 1 | 6 | 5 | 86 (A) | `1.1.0` | 该算子用于检测直线特征，输出方向、跨度和拟合质量诊断。运行时从声明输入端口读取数据，… | [LineMeasurement](./LineMeasurement.md) |
 | `OperatorType.Measurement` | 测量 | `Stable` | 6 | 17 | 8 | 96 (A) | `1.1.0` | 该算子用于统一基础二维几何测量入口，支持点点距离、点线距离、线线距离/夹角和三点角度… | [Measurement](./Measurement.md) |
 | `OperatorType.MinEnclosingGeometry` | 最小外接几何体 | `Stable` | 1 | 2 | 10 | 100 (A) | `1.0.1` | Contour-derived enclosing geometry and robust fitting | [MinEnclosingGeometry](./MinEnclosingGeometry.md) |
 | `OperatorType.PhaseClosure` | 相位解缠绕 | `Stable` | 4 | 4 | 0 | 89 (A) | `1.0.1` | Itoh/quality-guided phase unwrapping | [PhaseClosure](./PhaseClosure.md) |
@@ -174,7 +174,7 @@
 ### AI推理 / `AiInference` (4)
 | 枚举 (Enum) | 显示名 (DisplayName) | 生命周期 | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.AnomalyDetection` | 异常检测 | `Experimental` | 2 | 8 | 16 | 100 (A) | `1.0.0` | Simplified PatchCore | [AnomalyDetection](./AnomalyDetection.md) |
+| `OperatorType.AnomalyDetection` | 异常检测 | `Experimental` | 2 | 8 | 17 | 100 (A) | `1.1.0` | Simplified PatchCore | [AnomalyDetection](./AnomalyDetection.md) |
 | `OperatorType.DeepLearning` | 深度学习 | `Stable` | 1 | 31 | 27 | 100 (A) | `1.1.0` | 该算子用于统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保… | [DeepLearning](./DeepLearning.md) |
 | `OperatorType.OcrRecognition` | OCR 识别 | `Stable` | 1 | 2 | 0 | 100 (A) | `1.0.0` | 该算子用于识别图像中的文本内容。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [OcrRecognition](./OcrRecognition.md) |
 | `OperatorType.SemanticSegmentation` | 语义分割 | `Stable` | 1 | 12 | 12 | 100 (A) | `1.0.0` | 该算子用于运行 ONNX 语义分割模型，输出类别图、着色可视化结果和各类别掩码。运行… | [SemanticSegmentation](./SemanticSegmentation.md) |

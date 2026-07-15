@@ -56,7 +56,7 @@ public class AIPromptBuilder
                         .ToArray()))
                 .ToArray();
             var contractSummary = ImageContractPresentationBuilder.Summarize(metadata.ImageInputContracts);
-            var lifecycleNote = ImageContractPresentationBuilder.RequiresAiDisclosure(
+            var lifecycleDisclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
                 metadata.Lifecycle,
                 metadata.ImageInputContracts)
                 ? string.Join(" ", new[]
@@ -65,6 +65,8 @@ public class AIPromptBuilder
                     contractSummary.ContractCount > 0 ? contractSummary.EvidenceSummary : string.Empty
                 }.Where(item => !string.IsNullOrWhiteSpace(item)))
                 : string.Empty;
+            var qualityNote = $"质量轴: Execution={metadata.QualityState.Execution}; AlgorithmQuality={metadata.QualityState.AlgorithmQuality}; ProductionReadiness={metadata.QualityState.ProductionReadiness}; FieldValidation={metadata.QualityState.FieldValidation}.";
+            var lifecycleNote = string.Join(" ", new[] { lifecycleDisclosure, qualityNote }.Where(item => !string.IsNullOrWhiteSpace(item)));
 
             _operators.Add(new PromptOperatorInfo(
                 metadata.Type,
