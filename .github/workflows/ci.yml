@@ -35,9 +35,11 @@ env:
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
 jobs:
-  build-and-test:
-    name: Build & Test
+
+  guard-and-catalog:
+    name: Guard & Operator Catalog
     runs-on: windows-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout Code
@@ -94,15 +96,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - name: Restore Dependencies
-        shell: pwsh
-        run: |
-          dotnet restore $env:SOLUTION_PATH --locked-mode
-          dotnet restore $env:PRODUCT_TEST_PROJECT --locked-mode
-          dotnet restore $env:DESKTOP_TEST_PROJECT --locked-mode
-
       - name: Generate Operator Catalog
         run: dotnet run --project scripts/OperatorDocGenerator/OperatorDocGenerator.csproj -- .
+
+      - name: Assert Operator Catalog Artifacts
+        shell: pwsh
+        run: |
+          foreach ($path in @("./算子资料/算子目录.json", "./算子资料/算子目录.md")) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Operator catalog output is missing: $path"
+            }
+          }
 
       - name: Audit Operator Library Read-Only (Report Only)
         shell: pwsh
@@ -145,7 +149,7 @@ jobs:
         if: always()
         with:
           name: operator-audit
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
             artifacts/operator-audit/operator-audit.json
             artifacts/operator-audit/operator-audit.md
@@ -156,19 +160,29 @@ jobs:
         if: always()
         with:
           name: operator-catalog
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
             ./算子资料/算子目录.json
             ./算子资料/算子目录.md
+
+  studio-ui:
+    name: StudioUI Quality Gates
+    runs-on: windows-latest
+    needs: guard-and-catalog
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: |
-            ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
-            ClearVision.Product/src/ClearVision.Product.Desktop/StudioUI/package-lock.json
+          cache-dependency-path: ${{ env.STUDIO_UI_DIR }}/package-lock.json
 
       - name: Install StudioUI Dependencies
         working-directory: ${{ env.STUDIO_UI_DIR }}
@@ -180,6 +194,47 @@ jobs:
           npm run lint
           npm run typecheck
           npm run test:unit
+
+  product:
+    name: Product Tests
+    runs-on: windows-latest
+    needs: guard-and-catalog
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ env.STUDIO_UI_DIR }}/package-lock.json
+
+      - name: Install StudioUI Dependencies
+        working-directory: ${{ env.STUDIO_UI_DIR }}
+        run: npm ci
+
+      - name: Restore Product Dependencies
+        run: |
+          dotnet restore ${{ env.SOLUTION_PATH }} --locked-mode
+          dotnet restore ${{ env.PRODUCT_TEST_PROJECT }} --locked-mode
 
       - name: Build (Debug)
         run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore -p:SkipStudioUiInstall=true
@@ -214,6 +269,117 @@ jobs:
             -MinimumPassedTests 10 `
             -Filter "Category=PerformanceBudget"
 
+      - name: Upload Product Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: product-test-results
+          if-no-files-found: ignore
+          path: TestResults/
+
+  desktop:
+    name: Desktop Tests
+    runs-on: windows-latest
+    needs: guard-and-catalog
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ env.STUDIO_UI_DIR }}/package-lock.json
+
+      - name: Install StudioUI Dependencies
+        working-directory: ${{ env.STUDIO_UI_DIR }}
+        run: npm ci
+
+      - name: Restore Desktop Test Dependencies
+        run: dotnet restore ${{ env.DESKTOP_TEST_PROJECT }} --locked-mode
+
+      - name: Run Desktop Tests with Coverage
+        shell: pwsh
+        run: |
+          & "./scripts/run-dotnet-test-serial.ps1" `
+            -Project $env:DESKTOP_TEST_PROJECT `
+            -Configuration Debug `
+            -NoRestore `
+            -Verbosity normal `
+            -ResultsDirectory TestResults/desktop `
+            -LogFileName desktop.trx `
+            -MinimumTotalTests 500 `
+            -MinimumPassedTests 500 `
+            -Collect "XPlat Code Coverage"
+
+      - name: Upload Desktop Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-test-results
+          if-no-files-found: ignore
+          path: TestResults/desktop/
+
+  detection-measurement-data:
+    name: Detection / Measurement / Data
+    runs-on: windows-latest
+    needs: guard-and-catalog
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ env.STUDIO_UI_DIR }}/package-lock.json
+
+      - name: Install StudioUI Dependencies
+        working-directory: ${{ env.STUDIO_UI_DIR }}
+        run: npm ci
+
+      - name: Restore Dependencies
+        run: dotnet restore ${{ env.SOLUTION_PATH }} --locked-mode
+
+      - name: Build Detection Test Dependencies
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore -p:SkipStudioUiInstall=true
+
       - name: Validate Measurement Performance Report
         shell: pwsh
         run: |
@@ -233,51 +399,6 @@ jobs:
             -ResultsDirectory TestResults/data-processing-remediation `
             -LogFileName data-processing-remediation.trx `
             -MinimumTotalTests 150
-
-      - name: Run Desktop Tests with Coverage
-        shell: pwsh
-        run: |
-          & "./scripts/run-dotnet-test-serial.ps1" `
-            -Project $env:DESKTOP_TEST_PROJECT `
-            -Configuration Debug `
-            -NoRestore `
-            -Verbosity normal `
-            -ResultsDirectory TestResults/desktop `
-            -LogFileName desktop.trx `
-            -MinimumTotalTests 500 `
-            -MinimumPassedTests 500 `
-            -Collect "XPlat Code Coverage"
-
-      - name: Write Coverage Summary
-        shell: pwsh
-        if: always()
-        run: |
-          $requiredCoverageRoots = @("TestResults/product", "TestResults/desktop")
-          foreach ($root in $requiredCoverageRoots) {
-            $rootFiles = Get-ChildItem -Path $root -Filter coverage.cobertura.xml -Recurse -File -ErrorAction SilentlyContinue
-            if ($rootFiles.Count -eq 0) {
-              throw "Expected at least one Cobertura coverage file under $root."
-            }
-          }
-
-          $files = Get-ChildItem -Path TestResults -Filter coverage.cobertura.xml -Recurse -File -ErrorAction SilentlyContinue
-          $lines = @("# Coverage Summary", "")
-          $lines += "| File | Line rate | Branch rate |"
-          $lines += "| --- | ---: | ---: |"
-          foreach ($file in $files) {
-            [xml]$xml = Get-Content -LiteralPath $file.FullName
-            if ($null -eq $xml.coverage -or $null -eq $xml.coverage.'line-rate' -or $null -eq $xml.coverage.'branch-rate') {
-              throw "Cobertura coverage file is missing line-rate or branch-rate: $($file.FullName)"
-            }
-
-            $lineRate = [double]$xml.coverage.'line-rate'
-            $branchRate = [double]$xml.coverage.'branch-rate'
-            $relative = Resolve-Path -LiteralPath $file.FullName -Relative
-            $lines += "| $relative | $([Math]::Round($lineRate * 100, 2))% | $([Math]::Round($branchRate * 100, 2))% |"
-          }
-          New-Item -ItemType Directory -Force -Path TestResults | Out-Null
-          $lines | Set-Content -Path TestResults/coverage-summary.md -Encoding UTF8
-          $lines | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding UTF8
 
       - name: Run Detection Regression Gate
         shell: pwsh
@@ -331,7 +452,7 @@ jobs:
         if: always()
         with:
           name: detection-performance-report
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
             ClearVision.Product/test_results/detection_performance_budget_report.md
             ClearVision.Product/test_results/detection_performance_budget_report.json
@@ -342,21 +463,47 @@ jobs:
         if: always()
         with:
           name: measurement-performance-report
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
             ClearVision.Product/test_results/measurement_performance_budget_report.md
             ClearVision.Product/test_results/measurement_performance_budget_report.json
 
-      - name: Upload Test Results
+      - name: Upload Detection Measurement Data Results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results
-          if-no-files-found: error
+          name: detection-measurement-data-results
+          if-no-files-found: ignore
           path: |
             TestResults/**/*.trx
-            TestResults/**/coverage.cobertura.xml
-            TestResults/coverage-summary.md
+            .tmp/test_results/**/*.trx
+            ClearVision.Product/test_results/**/*.json
+            ClearVision.Product/test_results/**/*.md
+
+  operator-library:
+    name: OperatorLibrary Package & Benchmark
+    runs-on: windows-latest
+    needs: guard-and-catalog
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore OperatorLibrary Package Project
         run: dotnet restore ${{ env.OPERATOR_PROJECT }} --locked-mode
@@ -400,12 +547,25 @@ jobs:
             -Collect "Code Coverage" `
             -DotNetTestArguments "-p:ClearVisionOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION"
 
+      - name: Assert OperatorLibrary Package Artifacts
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem -Path $env:OPERATOR_PACKAGE_DIR -Filter "ClearVision.OperatorLibrary.*.nupkg" -File -ErrorAction SilentlyContinue)
+          if ($packages.Count -eq 0) {
+            throw "OperatorLibrary package artifact was not produced."
+          }
+          foreach ($path in @("ClearVision.OperatorLibrary/SBOM.md", "ClearVision.OperatorLibrary/SBOM.spdx.json", "ClearVision.OperatorLibrary/THIRD-PARTY-NOTICES.md")) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "OperatorLibrary compliance artifact is missing: $path"
+            }
+          }
+
       - name: Upload OperatorLibrary Package Artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: operator-library-package
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
             ${{ env.OPERATOR_PACKAGE_DIR }}/ClearVision.OperatorLibrary.*.nupkg
             ${{ env.OPERATOR_PACKAGE_DIR }}/ClearVision.OperatorLibrary.*.snupkg
@@ -454,21 +614,70 @@ jobs:
         if: always()
         with:
           name: operator-performance-benchmark
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
             artifacts/operator-performance-benchmark.json
             artifacts/operator-performance-benchmark.md
 
+  contracts-agent:
+    name: Contracts & Vision Agent
+    runs-on: windows-latest
+    needs: guard-and-catalog
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+
       - name: Run Quick Contract Quality Suite
         shell: pwsh
         run: python quality/tools/run_quality_suite.py --suite quick_contract_suite --run
+
+      - name: Assert Quick Contract Quality Reports
+        shell: pwsh
+        run: |
+          $requiredPaths = @(
+            "quality/evals/reports/P3CoreContracts_baseline.json",
+            "quality/evals/reports/P3CoreContracts_baseline.md",
+            "quality/evals/reports/G1P3ContractBatch1_baseline.json",
+            "quality/evals/reports/G1P3ContractBatch1_baseline.md",
+            "quality/evals/reports/G1P3ContractBatch2_baseline.json",
+            "quality/evals/reports/G1P3ContractBatch2_baseline.md"
+          )
+          foreach ($path in $requiredPaths) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Quick contract quality report is missing: $path"
+            }
+          }
 
       - name: Upload Quick Contract Quality Reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: quick-contract-quality-suite
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
             quality/evals/reports/*_contract_baseline.json
             quality/evals/reports/*_contract_baseline.md
@@ -504,7 +713,7 @@ jobs:
         if: always()
         with:
           name: vision-agent-quality-suite
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
             quality/evals/reports/VisionAgent_business_benchmark_baseline.json
             quality/evals/reports/VisionAgent_business_benchmark_baseline.md
@@ -577,6 +786,31 @@ jobs:
             test_results/agent_engineering_harness/**/*.trx
             test_results/agent_engineering_harness/agent_ui_contract_output.txt
 
+  ui-browser:
+    name: Legacy UI & StudioUI Browser
+    runs-on: windows-latest
+    needs: guard-and-catalog
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+
+      - name: Install UI Test Dependencies
+        working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
       - name: Run Legacy UI Tests
         working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
         run: |
@@ -591,21 +825,89 @@ jobs:
           CV_UI_PORT: 5177
         run: npx playwright test
 
+      - name: Assert UI Test Artifacts
+        shell: pwsh
+        run: |
+          $reportIndex = "ClearVision.Product/tests/ClearVision.Product.UI.Tests/playwright-report/index.html"
+          if (-not (Test-Path -LiteralPath $reportIndex -PathType Leaf)) {
+            throw "UI test report was not produced: $reportIndex"
+          }
+
       - name: Upload UI Test Results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ui-test-results
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
             ClearVision.Product/tests/ClearVision.Product.UI.Tests/playwright-report/
             ClearVision.Product/tests/ClearVision.Product.UI.Tests/test-results/
 
+  coverage-summary:
+    name: Coverage Summary
+    runs-on: windows-latest
+    needs: [product, desktop]
+    timeout-minutes: 10
+
+    steps:
+      - name: Download Product Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: product-test-results
+          path: TestResults
+
+      - name: Download Desktop Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-test-results
+          path: TestResults/desktop
+
+      - name: Write Coverage Summary
+        shell: pwsh
+        run: |
+          $requiredCoverageRoots = @("TestResults/product", "TestResults/desktop")
+          foreach ($root in $requiredCoverageRoots) {
+            $rootFiles = Get-ChildItem -Path $root -Filter coverage.cobertura.xml -Recurse -File -ErrorAction SilentlyContinue
+            if ($rootFiles.Count -eq 0) {
+              throw "Expected at least one Cobertura coverage file under $root."
+            }
+          }
+
+          $files = Get-ChildItem -Path TestResults -Filter coverage.cobertura.xml -Recurse -File -ErrorAction SilentlyContinue
+          $lines = @("# Coverage Summary", "")
+          $lines += "| File | Line rate | Branch rate |"
+          $lines += "| --- | ---: | ---: |"
+          foreach ($file in $files) {
+            [xml]$xml = Get-Content -LiteralPath $file.FullName
+            if ($null -eq $xml.coverage -or $null -eq $xml.coverage.'line-rate' -or $null -eq $xml.coverage.'branch-rate') {
+              throw "Cobertura coverage file is missing line-rate or branch-rate: $($file.FullName)"
+            }
+
+            $lineRate = [double]$xml.coverage.'line-rate'
+            $branchRate = [double]$xml.coverage.'branch-rate'
+            $relative = Resolve-Path -LiteralPath $file.FullName -Relative
+            $lines += "| $relative | $([Math]::Round($lineRate * 100, 2))% | $([Math]::Round($branchRate * 100, 2))% |"
+          }
+          New-Item -ItemType Directory -Force -Path TestResults | Out-Null
+          $lines | Set-Content -Path TestResults/coverage-summary.md -Encoding UTF8
+          $lines | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding UTF8
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          if-no-files-found: error
+          path: |
+            TestResults/**/*.trx
+            TestResults/**/coverage.cobertura.xml
+            TestResults/coverage-summary.md
+
   industrial-gate:
     name: Operator Industrial Gate
     runs-on: windows-latest
-    needs: build-and-test
+    needs: guard-and-catalog
     if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 60
 
     steps:
       - name: Checkout Code
@@ -625,6 +927,19 @@ jobs:
           key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config', '**/packages.lock.json') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+            ClearVision.Product/src/ClearVision.Product.Desktop/StudioUI/package-lock.json
+
+      - name: Install StudioUI Dependencies
+        working-directory: ${{ env.STUDIO_UI_DIR }}
+        run: npm ci
 
       - name: Restore Dependencies
         run: dotnet restore ${{ env.SOLUTION_PATH }} --locked-mode
@@ -666,12 +981,21 @@ jobs:
             -NoRestore `
             -Verbosity minimal
 
+      - name: Assert Industrial Gate Artifacts
+        shell: pwsh
+        run: |
+          $summaryJson = @(Get-ChildItem -Path "test_results/operator-library-industrial-gate" -Filter summary.json -Recurse -File -ErrorAction SilentlyContinue)
+          $summaryMarkdown = @(Get-ChildItem -Path "test_results/operator-library-industrial-gate" -Filter summary.md -Recurse -File -ErrorAction SilentlyContinue)
+          if ($summaryJson.Count -eq 0 -or $summaryMarkdown.Count -eq 0) {
+            throw "Operator industrial gate summary artifacts were not produced."
+          }
+
       - name: Upload Industrial Gate Artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: operator-industrial-gate
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: |
             test_results/operator-library-industrial-gate/**/summary.json
             test_results/operator-library-industrial-gate/**/summary.md
@@ -681,8 +1005,18 @@ jobs:
   release-build:
     name: Release Build
     runs-on: windows-latest
-    needs: build-and-test
+    needs:
+      - guard-and-catalog
+      - studio-ui
+      - product
+      - desktop
+      - detection-measurement-data
+      - operator-library
+      - contracts-agent
+      - ui-browser
+      - coverage-summary
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    timeout-minutes: 60
 
     steps:
       - name: Checkout Code
@@ -771,6 +1105,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: release-build
     if: startsWith(github.ref, 'refs/tags/v')
+    timeout-minutes: 15
 
     steps:
       - name: Download Build Artifact
@@ -792,6 +1127,7 @@ jobs:
     name: Code Quality
     runs-on: windows-latest
     if: github.event_name == 'pull_request'
+    timeout-minutes: 60
 
     steps:
       - name: Checkout Code
@@ -826,6 +1162,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ env.STUDIO_UI_DIR }}/package-lock.json
+
+      - name: Install StudioUI Dependencies
+        working-directory: ${{ env.STUDIO_UI_DIR }}
+        run: npm ci
+
       - name: Restore Dependencies
         run: dotnet restore ${{ env.SOLUTION_PATH }} --locked-mode
 
@@ -841,3 +1188,76 @@ jobs:
 
       - name: Run Static Analysis
         run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore -warnaserror
+
+  final-gate:
+    name: Final Gate
+    runs-on: ubuntu-latest
+    needs:
+      - guard-and-catalog
+      - studio-ui
+      - product
+      - desktop
+      - detection-measurement-data
+      - operator-library
+      - contracts-agent
+      - ui-browser
+      - coverage-summary
+      - industrial-gate
+      - release-build
+      - create-release
+      - code-quality
+    if: always()
+    timeout-minutes: 5
+    env:
+      RUN_EVENT: ${{ github.event_name }}
+      RUN_REF: ${{ github.ref }}
+      NEEDS_JSON: ${{ toJson(needs) }}
+
+    steps:
+      - name: Verify Required Job Results
+        shell: pwsh
+        run: |
+          $needs = $env:NEEDS_JSON | ConvertFrom-Json -AsHashtable
+          $failures = [System.Collections.Generic.List[string]]::new()
+
+          $requiredJobs = @(
+            "guard-and-catalog",
+            "studio-ui",
+            "product",
+            "desktop",
+            "detection-measurement-data",
+            "operator-library",
+            "contracts-agent",
+            "ui-browser",
+            "coverage-summary"
+          )
+
+          foreach ($job in $requiredJobs) {
+            $result = [string]$needs[$job].result
+            Write-Host "$job=$result"
+            if ($result -ne "success") {
+              $failures.Add("$job expected success but was $result")
+            }
+          }
+
+          $conditionalJobs = @{
+            "industrial-gate" = ($env:RUN_EVENT -eq "workflow_dispatch")
+            "release-build" = ($env:RUN_EVENT -eq "push" -and ($env:RUN_REF -eq "refs/heads/main" -or $env:RUN_REF.StartsWith("refs/tags/v")))
+            "create-release" = $env:RUN_REF.StartsWith("refs/tags/v")
+            "code-quality" = ($env:RUN_EVENT -eq "pull_request")
+          }
+
+          foreach ($job in $conditionalJobs.Keys) {
+            $result = [string]$needs[$job].result
+            $expected = if ($conditionalJobs[$job]) { "success" } else { "skipped" }
+            Write-Host "$job=$result (expected $expected)"
+            if ($result -ne $expected) {
+              $failures.Add("$job expected $expected but was $result")
+            }
+          }
+
+          if ($failures.Count -gt 0) {
+            throw "Final gate failed: $($failures -join '; ')"
+          }
+
+          Write-Host "All required and applicable CI jobs completed successfully."
