@@ -108,6 +108,187 @@ public class ShadingCorrectionOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithThirtyTwoBitColorInputInLumaOnlyMode_ShouldPreserveThirtyTwoBitColorImage()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["Method"] = "GaussianModel",
+            ["KernelSize"] = 31,
+            ["ColorMode"] = "LumaOnly"
+        });
+        using var image = new ImageWrapper(new Mat(32, 48, MatType.CV_32FC3, new Scalar(0.2, 0.4, 0.6)));
+
+        var result = await CreateSut().ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        using var output = Assert.IsType<ImageWrapper>(result.OutputData!["Image"]);
+        Assert.Equal(MatType.CV_32FC3, output.GetMat().Type());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithSixtyFourBitColorInputInLumaOnlyMode_ShouldRejectBeforeNativeColorConversion()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["Method"] = "GaussianModel",
+            ["KernelSize"] = 31,
+            ["ColorMode"] = "LumaOnly"
+        });
+        using var image = new ImageWrapper(new Mat(32, 48, MatType.CV_64FC3, new Scalar(0.2, 0.4, 0.6)));
+
+        var result = await CreateSut().ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        Assert.False(result.IsSuccess);
+        Assert.StartsWith("IMAGE_MODE_DEPTH_UNSUPPORTED", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenCVException", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Assertion failed", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("(-215:", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithSixtyFourBitColorInputInPerChannelMode_ShouldPreserveSixtyFourBitColorImage()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["Method"] = "GaussianModel",
+            ["KernelSize"] = 31,
+            ["ColorMode"] = "PerChannel"
+        });
+        using var image = new ImageWrapper(new Mat(32, 48, MatType.CV_64FC3, new Scalar(0.2, 0.4, 0.6)));
+
+        var result = await CreateSut().ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        using var output = Assert.IsType<ImageWrapper>(result.OutputData!["Image"]);
+        Assert.Equal(MatType.CV_64FC3, output.GetMat().Type());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithSixtyFourBitGrayInput_ShouldPreserveSixtyFourBitSingleChannelImage()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["Method"] = "GaussianModel",
+            ["KernelSize"] = 31,
+            ["ColorMode"] = "LumaOnly"
+        });
+        using var image = new ImageWrapper(new Mat(32, 48, MatType.CV_64FC1, Scalar.All(0.4)));
+
+        var result = await CreateSut().ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        using var output = Assert.IsType<ImageWrapper>(result.OutputData!["Image"]);
+        Assert.Equal(MatType.CV_64FC1, output.GetMat().Type());
+        Assert.Equal("Gray", result.OutputData["ColorMode"]);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DivideByBackgroundWithCompatibleSharedGrayBackground_ShouldSucceed()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["Method"] = "DivideByBackground",
+            ["ColorMode"] = "PerChannel"
+        });
+        using var image = new ImageWrapper(new Mat(32, 48, MatType.CV_16UC3, Scalar.All(4000)));
+        using var background = new ImageWrapper(new Mat(32, 48, MatType.CV_16UC1, Scalar.All(2000)));
+
+        var result = await CreateSut().ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = image,
+            ["Background"] = background
+        });
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        using var output = Assert.IsType<ImageWrapper>(result.OutputData!["Image"]);
+        Assert.Equal(MatType.CV_16UC3, output.GetMat().Type());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DivideByBackgroundWithMismatchedSize_ShouldFailClosed()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["Method"] = "DivideByBackground",
+            ["ColorMode"] = "PerChannel"
+        });
+        using var image = new ImageWrapper(new Mat(32, 48, MatType.CV_8UC3, Scalar.All(40)));
+        using var background = new ImageWrapper(new Mat(16, 48, MatType.CV_8UC3, Scalar.All(20)));
+
+        var result = await CreateSut().ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = image,
+            ["Background"] = background
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.StartsWith("IMAGE_BACKGROUND_SIZE_MISMATCH", result.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DivideByBackgroundWithMismatchedDepth_ShouldFailClosed()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["Method"] = "DivideByBackground",
+            ["ColorMode"] = "PerChannel"
+        });
+        using var image = new ImageWrapper(new Mat(32, 48, MatType.CV_16UC3, Scalar.All(4000)));
+        using var background = new ImageWrapper(new Mat(32, 48, MatType.CV_32FC3, Scalar.All(20)));
+
+        var result = await CreateSut().ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = image,
+            ["Background"] = background
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.StartsWith("IMAGE_BACKGROUND_DEPTH_MISMATCH", result.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DivideByBackgroundForGrayInputWithColorBackground_ShouldFailClosed()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["Method"] = "DivideByBackground",
+            ["ColorMode"] = "LumaOnly"
+        });
+        using var image = new ImageWrapper(new Mat(32, 48, MatType.CV_8UC1, Scalar.All(40)));
+        using var background = new ImageWrapper(new Mat(32, 48, MatType.CV_8UC3, Scalar.All(20)));
+
+        var result = await CreateSut().ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = image,
+            ["Background"] = background
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.StartsWith("IMAGE_BACKGROUND_CHANNEL_MISMATCH", result.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BackgroundProvidedForGaussianModel_ShouldRejectUnusedMode()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            ["Method"] = "GaussianModel",
+            ["ColorMode"] = "PerChannel"
+        });
+        using var image = new ImageWrapper(new Mat(32, 48, MatType.CV_8UC3, Scalar.All(40)));
+        using var background = new ImageWrapper(new Mat(32, 48, MatType.CV_8UC3, Scalar.All(20)));
+
+        var result = await CreateSut().ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Image"] = image,
+            ["Background"] = background
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.StartsWith("IMAGE_BACKGROUND_MODE_UNSUPPORTED", result.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_DivideByBackgroundWithoutBackground_ShouldReturnFailure()
     {
         var sut = CreateSut();

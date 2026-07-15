@@ -5,6 +5,7 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Calibration;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
@@ -57,6 +58,39 @@ public class TranslationRotationCalibrationOperatorTests
         var validation = sut.ValidateParameters(op);
 
         Assert.False(validation.IsValid);
+    }
+
+    [Fact]
+    public async Task RobustPublicOutputs_ShouldBeDeclaredByMetadataWithStableTypes()
+    {
+        var metadata = new OperatorFactory().GetMetadata(OperatorType.TranslationRotationCalibration)!;
+        var expected = new Dictionary<string, PortDataType>(StringComparer.Ordinal)
+        {
+            ["AllPointCalibrationError"] = PortDataType.Float,
+            ["AllPointMaxCalibrationError"] = PortDataType.Float,
+            ["InlierIndices"] = PortDataType.Any,
+            ["OutlierIndices"] = PortDataType.Any
+        };
+
+        Assert.Equal(
+            new[]
+            {
+                "CalibrationData", "CalibrationError", "MaxCalibrationError", "Accepted",
+                "TransformModel", "RotationDeg", "AngleConstraintApplied", "RobustMode",
+                "InlierCount", "OutlierCount", "Residuals", "Diagnostics"
+            },
+            metadata.OutputPorts.Take(12).Select(port => port.Name));
+
+        foreach (var (name, type) in expected)
+        {
+            Assert.Contains(metadata.OutputPorts, port => port.Name == name && port.DataType == type);
+        }
+
+        var result = await Execute(BuildKnownTransformPoints(20), "Ransac");
+        foreach (var name in expected.Keys)
+        {
+            Assert.True(result.OutputData!.ContainsKey(name));
+        }
     }
 
     [Fact]

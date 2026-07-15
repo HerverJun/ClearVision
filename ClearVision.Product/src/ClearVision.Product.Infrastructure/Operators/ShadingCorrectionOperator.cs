@@ -16,9 +16,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "shading",
     Keywords = new[] { "shading", "flat field", "illumination", "background" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
-[OperatorImageContractProvider(typeof(ShadingCorrectionImageContractProvider))]
+[OperatorImageContractProvider(typeof(ShadingCorrectionExactImageContractProvider))]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [InputPort("Background", "Background", PortDataType.Image, IsRequired = false)]
 [OutputPort("Image", "Image", PortDataType.Image)]
@@ -58,19 +58,55 @@ public class ShadingCorrectionOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("Only 1-channel and 3-channel images are supported"));
         }
 
+        if (src.Channels() == 3 &&
+            src.Depth() == MatType.CV_64F &&
+            colorMode.Equals("LumaOnly", StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(
+                "IMAGE_MODE_DEPTH_UNSUPPORTED: CV_64FC3 is not supported in LumaOnly mode; use PerChannel or an admitted color depth."));
+        }
+
         var requiresBackground = method.Equals("DivideByBackground", StringComparison.OrdinalIgnoreCase);
         Mat? background = null;
+        var hasBackground = TryGetInputImage(inputs, "Background", out var backgroundWrapper) && backgroundWrapper != null;
+        if (!requiresBackground && hasBackground)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(
+                $"IMAGE_BACKGROUND_MODE_UNSUPPORTED: Background is not consumed when Method={method}."));
+        }
+
         if (requiresBackground)
         {
-            if (!TryGetInputImage(inputs, "Background", out var backgroundWrapper) || backgroundWrapper == null)
+            if (!hasBackground)
             {
-                return Task.FromResult(OperatorExecutionOutput.Failure("Background input is required for DivideByBackground mode"));
+                return Task.FromResult(OperatorExecutionOutput.Failure(
+                    "IMAGE_BACKGROUND_REQUIRED: Background input is required for DivideByBackground mode."));
             }
 
-            background = backgroundWrapper.GetMat();
+            background = backgroundWrapper!.GetMat();
             if (background.Empty())
             {
-                return Task.FromResult(OperatorExecutionOutput.Failure("Background image is invalid"));
+                return Task.FromResult(OperatorExecutionOutput.Failure("IMAGE_BACKGROUND_INVALID: Background image is empty."));
+            }
+            if (background.Size() != src.Size())
+            {
+                return Task.FromResult(OperatorExecutionOutput.Failure(
+                    $"IMAGE_BACKGROUND_SIZE_MISMATCH: Image={src.Width}x{src.Height}; Background={background.Width}x{background.Height}."));
+            }
+            if (background.Depth() != src.Depth())
+            {
+                return Task.FromResult(OperatorExecutionOutput.Failure(
+                    $"IMAGE_BACKGROUND_DEPTH_MISMATCH: Image={src.Depth()}; Background={background.Depth()}."));
+            }
+            if (src.Channels() == 1 && background.Channels() != 1)
+            {
+                return Task.FromResult(OperatorExecutionOutput.Failure(
+                    $"IMAGE_BACKGROUND_CHANNEL_MISMATCH: C1 Image requires C1 Background; received C{background.Channels()}."));
+            }
+            if (src.Channels() == 3 && background.Channels() is not 1 and not 3)
+            {
+                return Task.FromResult(OperatorExecutionOutput.Failure(
+                    $"IMAGE_BACKGROUND_CHANNEL_MISMATCH: C3 Image accepts C1 or C3 Background; received C{background.Channels()}."));
             }
         }
 
@@ -143,24 +179,7 @@ public class ShadingCorrectionOperator : OperatorBase
     {
         using var extractedBackground = background.Channels() == 1 ? null : ExtractGray(background);
         var backgroundChannel = extractedBackground ?? background;
-
-        Mat? resizedBg = null;
-        var backgroundForCorrection = backgroundChannel;
-        if (backgroundChannel.Size() != gray.Size())
-        {
-            resizedBg = new Mat();
-            Cv2.Resize(backgroundChannel, resizedBg, gray.Size());
-            backgroundForCorrection = resizedBg;
-        }
-
-        try
-        {
-            return DivideByIlluminationModel(gray, backgroundForCorrection);
-        }
-        finally
-        {
-            resizedBg?.Dispose();
-        }
+        return DivideByIlluminationModel(gray, backgroundChannel);
     }
 
     private static Mat ApplyPerChannel(Mat src, Mat? background, Func<Mat, Mat?, Mat> processor)

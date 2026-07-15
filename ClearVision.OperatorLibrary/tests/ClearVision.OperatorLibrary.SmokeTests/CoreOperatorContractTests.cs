@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Reflection;
 using ClearVision.OperatorLibrary.Abstractions.Adapters;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -11,6 +12,7 @@ using ImageContractAdmission = ClearVision.Product.Core.Services.ImageContractAd
 using ImageContractStatus = ClearVision.Product.Core.Services.ImageContractStatus;
 using ImageContractVerification = ClearVision.Product.Core.Services.ImageContractVerification;
 using ImageInputContract = ClearVision.Product.Core.Services.ImageInputContract;
+using OutputPortAttribute = ClearVision.Product.Core.Attributes.OutputPortAttribute;
 using OperatorImageContractResolver = ClearVision.Product.Core.Services.OperatorImageContractResolver;
 
 namespace ClearVision.OperatorLibrary.SmokeTests;
@@ -18,6 +20,34 @@ namespace ClearVision.OperatorLibrary.SmokeTests;
 [TestClassification(TestDomain.OperatorLibrary, TestPurpose.Smoke, TestLane.Pr, TestEvidenceType.PackageSmoke, TestOracleType.Contract, TestResourceRequirement.PackageFeed, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-library", Suites = "OperatorLibrarySmoke")]
 public class CoreOperatorContractTests
 {
+    [Fact]
+    public void Stage4ClosureContracts_ShouldMatchPackagedMetadataAndExactShadingModes()
+    {
+        var calibrationOutputs = typeof(TranslationRotationCalibrationOperator)
+            .GetCustomAttributes<OutputPortAttribute>(inherit: false)
+            .ToDictionary(port => port.Name, port => port.DataType, StringComparer.Ordinal);
+
+        Assert.Equal(PortDataType.Float, calibrationOutputs["AllPointCalibrationError"]);
+        Assert.Equal(PortDataType.Float, calibrationOutputs["AllPointMaxCalibrationError"]);
+        Assert.Equal(PortDataType.Any, calibrationOutputs["InlierIndices"]);
+        Assert.Equal(PortDataType.Any, calibrationOutputs["OutlierIndices"]);
+
+        var shading = new ShadingCorrectionExactImageContractProvider()
+            .GetContracts(OperatorType.ShadingCorrection, ["Image", "Background"], OperatorLifecycle.Stable)
+            .Single(contract => contract.InputPort == "Image");
+        Assert.Contains(shading.Variants, variant =>
+            variant.Mode == "GaussianModel:LumaOnly" &&
+            variant.Depth == "CV_64F" &&
+            variant.Channels == 3 &&
+            variant.Admission == ImageContractAdmission.Rejected &&
+            variant.Verification == ImageContractVerification.VerifiedRejection);
+        Assert.Contains(shading.Variants, variant =>
+            variant.Mode == "GaussianModel:PerChannel" &&
+            variant.Depth == "CV_64F" &&
+            variant.Channels == 3 &&
+            variant.Admission == ImageContractAdmission.Allowed);
+    }
+
     [Fact]
     public void ImageContractPresentation_PreservesExactPairsEvidenceAndLegacyApi()
     {

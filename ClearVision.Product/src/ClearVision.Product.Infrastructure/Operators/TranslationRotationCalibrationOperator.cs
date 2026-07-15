@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "calibration",
     Keywords = new[] { "calibration", "translation", "rotation", "svd", "similarity", "ransac", "huber" },
-    Version = "1.1.0"
+    Version = "1.1.1"
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = false)]
 [OutputPort("CalibrationData", "Calibration Data", PortDataType.String)]
@@ -32,6 +32,10 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("OutlierCount", "Outlier Count", PortDataType.Integer)]
 [OutputPort("Residuals", "Per-point Residuals", PortDataType.Any)]
 [OutputPort("Diagnostics", "Fit Diagnostics", PortDataType.Any)]
+[OutputPort("AllPointCalibrationError", "All-point Calibration Error", PortDataType.Float)]
+[OutputPort("AllPointMaxCalibrationError", "All-point Max Calibration Error", PortDataType.Float)]
+[OutputPort("InlierIndices", "Inlier Indices", PortDataType.Any)]
+[OutputPort("OutlierIndices", "Outlier Indices", PortDataType.Any)]
 [OperatorParam("CalibrationPoints", "Calibration Points", "string", DefaultValue = "[]")]
 [OperatorParam("Method", "Method", "enum", DefaultValue = "LeastSquares", Options = new[] { "LeastSquares|LeastSquares", "SVD|SVD" })]
 [OperatorParam("RobustMode", "Robust Mode", "enum", DefaultValue = "None", Options = new[] { "None|None", "Ransac|RANSAC", "Huber|Huber" })]

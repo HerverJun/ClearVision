@@ -9,6 +9,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Exceptions;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
@@ -104,6 +105,119 @@ public class ProjectServiceTests
         logger.Entries.Should().Contain(entry =>
             entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning &&
             entry.Message.Contains("Failed to deserialize flow JSON"));
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_LegacyPixelStatisticsPortsAndDecisionBinding_ShouldMigrateWithoutBreakingIdsOrFractionalResults()
+    {
+        var project = new Project("legacy-pixel-statistics");
+        var pixelOperatorId = Guid.NewGuid();
+        var minPortId = Guid.NewGuid();
+        var maxPortId = Guid.NewGuid();
+        var medianPortId = Guid.NewGuid();
+        var nonZeroPortId = Guid.NewGuid();
+        var targetOperatorId = Guid.NewGuid();
+        var targetInputId = Guid.NewGuid();
+        var legacy = new OperatorFlowDto
+        {
+            Name = "legacy-pixel-statistics-flow",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = pixelOperatorId,
+                    Name = "Pixel Statistics",
+                    Type = OperatorType.PixelStatistics,
+                    OutputPorts =
+                    [
+                        Port(Guid.NewGuid(), "Mean", PortDirection.Output, PortDataType.Float),
+                        Port(Guid.NewGuid(), "StdDev", PortDirection.Output, PortDataType.Float),
+                        Port(minPortId, "Min", PortDirection.Output, PortDataType.Integer),
+                        Port(maxPortId, "Max", PortDirection.Output, PortDataType.Integer),
+                        Port(medianPortId, "Median", PortDirection.Output, PortDataType.Integer),
+                        Port(nonZeroPortId, "NonZeroCount", PortDirection.Output, PortDataType.Integer)
+                    ]
+                },
+                new OperatorDto
+                {
+                    Id = targetOperatorId,
+                    Name = "Legacy Branch",
+                    Type = OperatorType.ConditionalBranch,
+                    InputPorts = [Port(targetInputId, "Value", PortDirection.Input, PortDataType.Any)]
+                }
+            ],
+            Connections =
+            [
+                new OperatorConnectionDto
+                {
+                    Id = Guid.NewGuid(),
+                    SourceOperatorId = pixelOperatorId,
+                    SourcePortId = minPortId,
+                    TargetOperatorId = targetOperatorId,
+                    TargetPortId = targetInputId
+                }
+            ],
+            DecisionConfiguration = new DecisionConfiguration
+            {
+                FinalDecisionBinding = new FinalDecisionBinding
+                {
+                    SourceOperatorId = pixelOperatorId,
+                    SourceOutputPortId = minPortId,
+                    SourceOutputName = "Min",
+                    DataType = DecisionValueType.Integer,
+                    Rule = DecisionInterpretationRule.NumericComparison,
+                    Comparator = DecisionComparator.LessThan,
+                    Threshold = 0.5
+                }
+            }
+        };
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(JsonSerializer.Serialize(legacy)));
+        var service = new ProjectService(repository, storage, new OperatorFactory());
+
+        var loaded = await service.GetByIdAsync(project.Id);
+
+        var migratedPixel = loaded!.Flow!.Operators.Single(op => op.Id == pixelOperatorId);
+        migratedPixel.OutputPorts.Single(port => port.Name == "Min").Should().Match<PortDto>(port => port.Id == minPortId && port.DataType == PortDataType.Float);
+        migratedPixel.OutputPorts.Single(port => port.Name == "Max").Should().Match<PortDto>(port => port.Id == maxPortId && port.DataType == PortDataType.Float);
+        migratedPixel.OutputPorts.Single(port => port.Name == "Median").Should().Match<PortDto>(port => port.Id == medianPortId && port.DataType == PortDataType.Float);
+        migratedPixel.OutputPorts.Single(port => port.Name == "NonZeroCount").Should().Match<PortDto>(port => port.Id == nonZeroPortId && port.DataType == PortDataType.Integer);
+        loaded.Flow.Connections.Should().ContainSingle(connection => connection.SourcePortId == minPortId && connection.TargetPortId == targetInputId);
+        loaded.Flow.DecisionConfiguration!.FinalDecisionBinding!.DataType.Should().Be(DecisionValueType.Float);
+
+        var savedJson = JsonSerializer.Serialize(loaded.Flow);
+        var reloadedFlow = JsonSerializer.Deserialize<OperatorFlowDto>(savedJson)!.ToEntity();
+        var reloadedPixel = reloadedFlow.Operators.Single(op => op.Id == pixelOperatorId);
+        reloadedPixel.OutputPorts.Single(port => port.Name == "Min").Id.Should().Be(minPortId);
+        reloadedFlow.Connections.Should().ContainSingle(connection => connection.SourcePortId == minPortId);
+        FinalDecisionResolver.Validate(reloadedFlow).Should().BeEmpty();
+
+        using var image = new ImageWrapper(new Mat(2, 2, MatType.CV_32FC1));
+        image.GetMat().Set(0, 0, 0.25f);
+        image.GetMat().Set(0, 1, 1.25f);
+        image.GetMat().Set(1, 0, 2.50f);
+        image.GetMat().Set(1, 1, 3.75f);
+        var execution = await new PixelStatisticsOperator(Substitute.For<ILogger<PixelStatisticsOperator>>())
+            .ExecuteAsync(reloadedPixel, TestHelpers.CreateImageInputs(image));
+        execution.IsSuccess.Should().BeTrue(execution.ErrorMessage);
+        Convert.ToDouble(execution.OutputData!["Min"]).Should().Be(0.25);
+
+        var decision = FinalDecisionResolver.Resolve(reloadedFlow, new FlowExecutionResult
+        {
+            IsSuccess = true,
+            OperatorResults =
+            [
+                new OperatorExecutionResult
+                {
+                    OperatorId = pixelOperatorId,
+                    IsSuccess = true,
+                    OutputData = execution.OutputData
+                }
+            ]
+        });
+        decision.Decision.Should().Be(DecisionOutcome.Ok);
     }
 
     [Fact]
@@ -1603,6 +1717,15 @@ public class ProjectServiceTests
             return Task.CompletedTask;
         }
     }
+
+    private static PortDto Port(Guid id, string name, PortDirection direction, PortDataType dataType) => new()
+    {
+        Id = id,
+        Name = name,
+        Direction = direction,
+        DataType = dataType,
+        IsRequired = false
+    };
 
     private sealed class RegistryScope : IDisposable
     {

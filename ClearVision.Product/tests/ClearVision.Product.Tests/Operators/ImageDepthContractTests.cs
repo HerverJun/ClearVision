@@ -153,6 +153,45 @@ public sealed class ImageDepthContractTests
     }
 
     [Fact]
+    public void ShadingCorrectionContracts_ShouldResolveMethodColorModeAndExactInputType()
+    {
+        var metadata = new OperatorFactory().GetMetadata(OperatorType.ShadingCorrection)!;
+        var image = metadata.ImageInputContracts.Single(contract => contract.InputPort == "Image");
+        var background = metadata.ImageInputContracts.Single(contract => contract.InputPort == "Background");
+
+        image.Variants.Select(variant => variant.Mode).Distinct().Should().BeEquivalentTo(
+            "DivideByBackground:LumaOnly",
+            "DivideByBackground:PerChannel",
+            "GaussianModel:LumaOnly",
+            "GaussianModel:PerChannel",
+            "MorphologicalTopHat:LumaOnly",
+            "MorphologicalTopHat:PerChannel");
+        image.Variants.Should().ContainSingle(variant =>
+            variant.Mode == "GaussianModel:LumaOnly" &&
+            variant.Depth == "CV_64F" &&
+            variant.Channels == 3 &&
+            variant.Admission == ImageContractAdmission.Rejected &&
+            variant.Verification == ImageContractVerification.VerifiedRejection);
+        image.Variants.Should().ContainSingle(variant =>
+            variant.Mode == "GaussianModel:PerChannel" &&
+            variant.Depth == "CV_64F" &&
+            variant.Channels == 3 &&
+            variant.Admission == ImageContractAdmission.Allowed &&
+            variant.OutputDepthPolicy.Contains("CV_64F", StringComparison.Ordinal));
+
+        background.Variants.Should().ContainSingle(variant =>
+            variant.Mode == "GaussianModel:LumaOnly" &&
+            variant.Depth == "CV_8U" &&
+            variant.Channels == 3 &&
+            variant.Admission == ImageContractAdmission.Rejected);
+        background.Variants.Should().ContainSingle(variant =>
+            variant.Mode == "DivideByBackground:PerChannel" &&
+            variant.Depth == "CV_64F" &&
+            variant.Channels == 3 &&
+            variant.Admission == ImageContractAdmission.Allowed);
+    }
+
+    [Fact]
     public void CompactPresentation_ShouldPreserveExactPairsAndEvidenceSemantics()
     {
         var metadata = new OperatorFactory().GetAllMetadata().ToDictionary(item => item.Type);

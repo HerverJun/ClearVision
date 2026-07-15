@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-15T20:30:44.7937318+08:00",
-  "generationFingerprint": "48E94D505787FCAE8D6CA5B56F84A248E8E5A1ECE8BD72978C0C64B9FAF9F0CA",
+  "generatedAt": "2026-07-15T21:48:42.7530282+08:00",
+  "generationFingerprint": "4D00E5ABBA76239610A0219EC7C952EF7C51CF232933007036B6A0988B619165",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -7916,7 +7916,7 @@
       "defaultHidden": false,
       "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": false,
-      "version": "1.0.1",
+      "version": "1.0.2",
       "keywords": [
         "background",
         "flat field",
@@ -8015,78 +8015,202 @@
         {
           "inputPort": "Background",
           "contractVersion": "2.1",
-          "allowedVariantCount": 8,
-          "verifiedSupportVariantCount": 4,
+          "allowedVariantCount": 16,
+          "verifiedSupportVariantCount": 12,
           "verifiedConversionVariantCount": 4,
           "legacyCompatibilityVariantCount": 0,
-          "verifiedRejectionVariantCount": 0,
+          "verifiedRejectionVariantCount": 32,
           "unknownVariantCount": 0,
           "hasProductionSupport": true,
           "compatibilityOnly": false,
           "evidenceSummary": "Verified production support is present.",
           "exactVariantGroups": [
             {
-              "mode": "Default",
-              "condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+              "mode": "DivideByBackground:LumaOnly",
+              "condition": "Background is admitted only for DivideByBackground and must match the primary image size/depth; C1 primary images require C1 background, while C3 accepts C1 or C3.",
               "admission": "Allowed",
               "verification": "VerifiedSupport",
               "exactInputTypes": [
                 "CV_8UC1",
                 "CV_16UC1"
               ],
-              "conversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
-              "outputDepthPolicy": "Preserve input depth and channel count.",
-              "dynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
+              "conversionPolicy": "C3 background -> gray luma; C1 is used directly.",
+              "outputDepthPolicy": "Output follows the primary Image depth/channel contract.",
+              "dynamicRangePolicy": "Background and primary Image must use the same admitted depth and size.",
               "inputValuePolicy": "Any",
               "failureCode": "IMAGE_NONFINITE_INPUT",
               "evidenceLevel": "E2_EXECUTABLE_PROBE"
             },
             {
-              "mode": "Default",
-              "condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+              "mode": "DivideByBackground:LumaOnly",
+              "condition": "Background is admitted only for DivideByBackground and must match the primary image size/depth; C1 primary images require C1 background, while C3 accepts C1 or C3.",
               "admission": "Allowed",
               "verification": "VerifiedSupport",
               "exactInputTypes": [
                 "CV_32FC1",
                 "CV_64FC1"
               ],
-              "conversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
-              "outputDepthPolicy": "Preserve input depth and channel count.",
-              "dynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
+              "conversionPolicy": "C3 background -> gray luma; C1 is used directly.",
+              "outputDepthPolicy": "Output follows the primary Image depth/channel contract.",
+              "dynamicRangePolicy": "Background and primary Image must use the same admitted depth and size.",
               "inputValuePolicy": "RejectNonFinite",
               "failureCode": "IMAGE_NONFINITE_INPUT",
               "evidenceLevel": "E2_EXECUTABLE_PROBE"
             },
             {
-              "mode": "Default",
-              "condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+              "mode": "DivideByBackground:LumaOnly",
+              "condition": "Background is admitted only for DivideByBackground and must match the primary image size/depth; C1 primary images require C1 background, while C3 accepts C1 or C3.",
               "admission": "Allowed",
               "verification": "VerifiedConversion",
               "exactInputTypes": [
                 "CV_8UC3",
                 "CV_16UC3"
               ],
-              "conversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
-              "outputDepthPolicy": "Preserve input depth and channel count.",
-              "dynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
+              "conversionPolicy": "C3 background -> gray luma; C1 is used directly.",
+              "outputDepthPolicy": "Output follows the primary Image depth/channel contract.",
+              "dynamicRangePolicy": "Background and primary Image must use the same admitted depth and size.",
               "inputValuePolicy": "Any",
               "failureCode": "IMAGE_NONFINITE_INPUT",
               "evidenceLevel": "E2_EXECUTABLE_PROBE"
             },
             {
-              "mode": "Default",
-              "condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+              "mode": "DivideByBackground:LumaOnly",
+              "condition": "Background is admitted only for DivideByBackground and must match the primary image size/depth; C1 primary images require C1 background, while C3 accepts C1 or C3.",
               "admission": "Allowed",
               "verification": "VerifiedConversion",
               "exactInputTypes": [
                 "CV_32FC3",
                 "CV_64FC3"
               ],
-              "conversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
-              "outputDepthPolicy": "Preserve input depth and channel count.",
-              "dynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
+              "conversionPolicy": "C3 background -> gray luma; C1 is used directly.",
+              "outputDepthPolicy": "Output follows the primary Image depth/channel contract.",
+              "dynamicRangePolicy": "Background and primary Image must use the same admitted depth and size.",
               "inputValuePolicy": "RejectNonFinite",
               "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "DivideByBackground:PerChannel",
+              "condition": "Background is admitted only for DivideByBackground and must match the primary image size/depth; C1 primary images require C1 background, while C3 accepts C1 or C3.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_8UC1",
+                "CV_8UC3",
+                "CV_16UC1",
+                "CV_16UC3"
+              ],
+              "conversionPolicy": "C3 background is split per channel; C1 is shared across channels.",
+              "outputDepthPolicy": "Output follows the primary Image depth/channel contract.",
+              "dynamicRangePolicy": "Background and primary Image must use the same admitted depth and size.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "DivideByBackground:PerChannel",
+              "condition": "Background is admitted only for DivideByBackground and must match the primary image size/depth; C1 primary images require C1 background, while C3 accepts C1 or C3.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_32FC1",
+                "CV_32FC3",
+                "CV_64FC1",
+                "CV_64FC3"
+              ],
+              "conversionPolicy": "C3 background is split per channel; C1 is shared across channels.",
+              "outputDepthPolicy": "Output follows the primary Image depth/channel contract.",
+              "dynamicRangePolicy": "Background and primary Image must use the same admitted depth and size.",
+              "inputValuePolicy": "RejectNonFinite",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "GaussianModel:LumaOnly",
+              "condition": "Background is not consumed when Method=GaussianModel.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
+              "exactInputTypes": [
+                "CV_8UC1",
+                "CV_8UC3",
+                "CV_16UC1",
+                "CV_16UC3",
+                "CV_32FC1",
+                "CV_32FC3",
+                "CV_64FC1",
+                "CV_64FC3"
+              ],
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_BACKGROUND_MODE_UNSUPPORTED",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "GaussianModel:PerChannel",
+              "condition": "Background is not consumed when Method=GaussianModel.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
+              "exactInputTypes": [
+                "CV_8UC1",
+                "CV_8UC3",
+                "CV_16UC1",
+                "CV_16UC3",
+                "CV_32FC1",
+                "CV_32FC3",
+                "CV_64FC1",
+                "CV_64FC3"
+              ],
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_BACKGROUND_MODE_UNSUPPORTED",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "MorphologicalTopHat:LumaOnly",
+              "condition": "Background is not consumed when Method=MorphologicalTopHat.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
+              "exactInputTypes": [
+                "CV_8UC1",
+                "CV_8UC3",
+                "CV_16UC1",
+                "CV_16UC3",
+                "CV_32FC1",
+                "CV_32FC3",
+                "CV_64FC1",
+                "CV_64FC3"
+              ],
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_BACKGROUND_MODE_UNSUPPORTED",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "MorphologicalTopHat:PerChannel",
+              "condition": "Background is not consumed when Method=MorphologicalTopHat.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
+              "exactInputTypes": [
+                "CV_8UC1",
+                "CV_8UC3",
+                "CV_16UC1",
+                "CV_16UC3",
+                "CV_32FC1",
+                "CV_32FC3",
+                "CV_64FC1",
+                "CV_64FC3"
+              ],
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_BACKGROUND_MODE_UNSUPPORTED",
               "evidenceLevel": "E2_EXECUTABLE_PROBE"
             }
           ]
@@ -8094,76 +8218,354 @@
         {
           "inputPort": "Image",
           "contractVersion": "2.1",
-          "allowedVariantCount": 8,
-          "verifiedSupportVariantCount": 4,
-          "verifiedConversionVariantCount": 4,
+          "allowedVariantCount": 45,
+          "verifiedSupportVariantCount": 36,
+          "verifiedConversionVariantCount": 9,
           "legacyCompatibilityVariantCount": 0,
-          "verifiedRejectionVariantCount": 0,
+          "verifiedRejectionVariantCount": 3,
           "unknownVariantCount": 0,
           "hasProductionSupport": true,
           "compatibilityOnly": false,
           "evidenceSummary": "Verified production support is present.",
           "exactVariantGroups": [
             {
-              "mode": "Default",
-              "condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+              "mode": "DivideByBackground:LumaOnly",
+              "condition": "Method=DivideByBackground; ColorMode=LumaOnly; single-channel input bypasses color conversion.",
               "admission": "Allowed",
               "verification": "VerifiedSupport",
               "exactInputTypes": [
                 "CV_8UC1",
                 "CV_16UC1"
               ],
-              "conversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
-              "outputDepthPolicy": "Preserve input depth and channel count.",
-              "dynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "Preserve input depth; output C1.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
               "inputValuePolicy": "Any",
               "failureCode": "IMAGE_NONFINITE_INPUT",
               "evidenceLevel": "E2_EXECUTABLE_PROBE"
             },
             {
-              "mode": "Default",
-              "condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+              "mode": "DivideByBackground:LumaOnly",
+              "condition": "Method=DivideByBackground; ColorMode=LumaOnly; single-channel input bypasses color conversion.",
               "admission": "Allowed",
               "verification": "VerifiedSupport",
               "exactInputTypes": [
                 "CV_32FC1",
                 "CV_64FC1"
               ],
-              "conversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
-              "outputDepthPolicy": "Preserve input depth and channel count.",
-              "dynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "Preserve input depth; output C1.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
               "inputValuePolicy": "RejectNonFinite",
               "failureCode": "IMAGE_NONFINITE_INPUT",
               "evidenceLevel": "E2_EXECUTABLE_PROBE"
             },
             {
-              "mode": "Default",
-              "condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+              "mode": "DivideByBackground:LumaOnly",
+              "condition": "Method=DivideByBackground; ColorMode=LumaOnly; the installed BGR/YUV path admits 8U, 16U and 32F color images.",
               "admission": "Allowed",
               "verification": "VerifiedConversion",
               "exactInputTypes": [
                 "CV_8UC3",
                 "CV_16UC3"
               ],
-              "conversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
-              "outputDepthPolicy": "Preserve input depth and channel count.",
-              "dynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
+              "conversionPolicy": "BGR -> YUV, correct Y, then YUV -> BGR without depth scaling.",
+              "outputDepthPolicy": "Preserve admitted input depth; output C3.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
               "inputValuePolicy": "Any",
               "failureCode": "IMAGE_NONFINITE_INPUT",
               "evidenceLevel": "E2_EXECUTABLE_PROBE"
             },
             {
-              "mode": "Default",
-              "condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+              "mode": "DivideByBackground:LumaOnly",
+              "condition": "Method=DivideByBackground; ColorMode=LumaOnly; the installed BGR/YUV path admits 8U, 16U and 32F color images.",
               "admission": "Allowed",
               "verification": "VerifiedConversion",
               "exactInputTypes": [
-                "CV_32FC3",
+                "CV_32FC3"
+              ],
+              "conversionPolicy": "BGR -> YUV, correct Y, then YUV -> BGR without depth scaling.",
+              "outputDepthPolicy": "Preserve admitted input depth; output C3.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "RejectNonFinite",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "DivideByBackground:LumaOnly",
+              "condition": "The installed OpenCV color-conversion path does not admit CV_64FC3; reject before the first native color call.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
+              "exactInputTypes": [
                 "CV_64FC3"
               ],
-              "conversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
-              "outputDepthPolicy": "Preserve input depth and channel count.",
-              "dynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_MODE_DEPTH_UNSUPPORTED",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "DivideByBackground:PerChannel",
+              "condition": "Method=DivideByBackground; ColorMode=PerChannel; C3 is split, corrected per channel and merged.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_8UC1",
+                "CV_8UC3",
+                "CV_16UC1",
+                "CV_16UC3"
+              ],
+              "conversionPolicy": "C3 split/merge only; no depth scaling. C1 is corrected directly.",
+              "outputDepthPolicy": "Preserve input depth and channel count, including CV_64F.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "DivideByBackground:PerChannel",
+              "condition": "Method=DivideByBackground; ColorMode=PerChannel; C3 is split, corrected per channel and merged.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_32FC1",
+                "CV_32FC3",
+                "CV_64FC1",
+                "CV_64FC3"
+              ],
+              "conversionPolicy": "C3 split/merge only; no depth scaling. C1 is corrected directly.",
+              "outputDepthPolicy": "Preserve input depth and channel count, including CV_64F.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "RejectNonFinite",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "GaussianModel:LumaOnly",
+              "condition": "Method=GaussianModel; ColorMode=LumaOnly; single-channel input bypasses color conversion.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_8UC1",
+                "CV_16UC1"
+              ],
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "Preserve input depth; output C1.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "GaussianModel:LumaOnly",
+              "condition": "Method=GaussianModel; ColorMode=LumaOnly; single-channel input bypasses color conversion.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_32FC1",
+                "CV_64FC1"
+              ],
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "Preserve input depth; output C1.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "RejectNonFinite",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "GaussianModel:LumaOnly",
+              "condition": "Method=GaussianModel; ColorMode=LumaOnly; the installed BGR/YUV path admits 8U, 16U and 32F color images.",
+              "admission": "Allowed",
+              "verification": "VerifiedConversion",
+              "exactInputTypes": [
+                "CV_8UC3",
+                "CV_16UC3"
+              ],
+              "conversionPolicy": "BGR -> YUV, correct Y, then YUV -> BGR without depth scaling.",
+              "outputDepthPolicy": "Preserve admitted input depth; output C3.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "GaussianModel:LumaOnly",
+              "condition": "Method=GaussianModel; ColorMode=LumaOnly; the installed BGR/YUV path admits 8U, 16U and 32F color images.",
+              "admission": "Allowed",
+              "verification": "VerifiedConversion",
+              "exactInputTypes": [
+                "CV_32FC3"
+              ],
+              "conversionPolicy": "BGR -> YUV, correct Y, then YUV -> BGR without depth scaling.",
+              "outputDepthPolicy": "Preserve admitted input depth; output C3.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "RejectNonFinite",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "GaussianModel:LumaOnly",
+              "condition": "The installed OpenCV color-conversion path does not admit CV_64FC3; reject before the first native color call.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
+              "exactInputTypes": [
+                "CV_64FC3"
+              ],
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_MODE_DEPTH_UNSUPPORTED",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "GaussianModel:PerChannel",
+              "condition": "Method=GaussianModel; ColorMode=PerChannel; C3 is split, corrected per channel and merged.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_8UC1",
+                "CV_8UC3",
+                "CV_16UC1",
+                "CV_16UC3"
+              ],
+              "conversionPolicy": "C3 split/merge only; no depth scaling. C1 is corrected directly.",
+              "outputDepthPolicy": "Preserve input depth and channel count, including CV_64F.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "GaussianModel:PerChannel",
+              "condition": "Method=GaussianModel; ColorMode=PerChannel; C3 is split, corrected per channel and merged.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_32FC1",
+                "CV_32FC3",
+                "CV_64FC1",
+                "CV_64FC3"
+              ],
+              "conversionPolicy": "C3 split/merge only; no depth scaling. C1 is corrected directly.",
+              "outputDepthPolicy": "Preserve input depth and channel count, including CV_64F.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "RejectNonFinite",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "MorphologicalTopHat:LumaOnly",
+              "condition": "Method=MorphologicalTopHat; ColorMode=LumaOnly; single-channel input bypasses color conversion.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_8UC1",
+                "CV_16UC1"
+              ],
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "Preserve input depth; output C1.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "MorphologicalTopHat:LumaOnly",
+              "condition": "Method=MorphologicalTopHat; ColorMode=LumaOnly; single-channel input bypasses color conversion.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_32FC1",
+                "CV_64FC1"
+              ],
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "Preserve input depth; output C1.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "RejectNonFinite",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "MorphologicalTopHat:LumaOnly",
+              "condition": "Method=MorphologicalTopHat; ColorMode=LumaOnly; the installed BGR/YUV path admits 8U, 16U and 32F color images.",
+              "admission": "Allowed",
+              "verification": "VerifiedConversion",
+              "exactInputTypes": [
+                "CV_8UC3",
+                "CV_16UC3"
+              ],
+              "conversionPolicy": "BGR -> YUV, correct Y, then YUV -> BGR without depth scaling.",
+              "outputDepthPolicy": "Preserve admitted input depth; output C3.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "MorphologicalTopHat:LumaOnly",
+              "condition": "Method=MorphologicalTopHat; ColorMode=LumaOnly; the installed BGR/YUV path admits 8U, 16U and 32F color images.",
+              "admission": "Allowed",
+              "verification": "VerifiedConversion",
+              "exactInputTypes": [
+                "CV_32FC3"
+              ],
+              "conversionPolicy": "BGR -> YUV, correct Y, then YUV -> BGR without depth scaling.",
+              "outputDepthPolicy": "Preserve admitted input depth; output C3.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "RejectNonFinite",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "MorphologicalTopHat:LumaOnly",
+              "condition": "The installed OpenCV color-conversion path does not admit CV_64FC3; reject before the first native color call.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
+              "exactInputTypes": [
+                "CV_64FC3"
+              ],
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_MODE_DEPTH_UNSUPPORTED",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "MorphologicalTopHat:PerChannel",
+              "condition": "Method=MorphologicalTopHat; ColorMode=PerChannel; C3 is split, corrected per channel and merged.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_8UC1",
+                "CV_8UC3",
+                "CV_16UC1",
+                "CV_16UC3"
+              ],
+              "conversionPolicy": "C3 split/merge only; no depth scaling. C1 is corrected directly.",
+              "outputDepthPolicy": "Preserve input depth and channel count, including CV_64F.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_EXECUTABLE_PROBE"
+            },
+            {
+              "mode": "MorphologicalTopHat:PerChannel",
+              "condition": "Method=MorphologicalTopHat; ColorMode=PerChannel; C3 is split, corrected per channel and merged.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_32FC1",
+                "CV_32FC3",
+                "CV_64FC1",
+                "CV_64FC3"
+              ],
+              "conversionPolicy": "C3 split/merge only; no depth scaling. C1 is corrected directly.",
+              "outputDepthPolicy": "Preserve input depth and channel count, including CV_64F.",
+              "dynamicRangePolicy": "Preserve the admitted source numeric domain.",
               "inputValuePolicy": "RejectNonFinite",
               "failureCode": "IMAGE_NONFINITE_INPUT",
               "evidenceLevel": "E2_EXECUTABLE_PROBE"
@@ -8173,9 +8575,9 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [
-        "type:ClearVision.Product.Infrastructure.Operators.ShadingCorrectionImageContractProvider"
+        "type:ClearVision.Product.Infrastructure.Operators.ShadingCorrectionExactImageContractProvider"
       ],
-      "generationFingerprint": "74B8461693AE82FBDDADF48F5D329353CD71A6E573F4A2AFA88F3E1174EC8F31",
+      "generationFingerprint": "5011419F487D053A8ADF0A5E858AA8B2F6F271432D7853270C6BF6BBBF341C38",
       "quality": {
         "totalScore": 96,
         "level": "A",
@@ -31809,7 +32211,7 @@
       "defaultHidden": false,
       "defaultAiRecommendation": false,
       "requiresLifecycleDisclosure": true,
-      "version": "1.1.0",
+      "version": "1.1.1",
       "keywords": [
         "calibration",
         "huber",
@@ -31904,6 +32306,30 @@
         {
           "name": "Diagnostics",
           "displayName": "Fit Diagnostics",
+          "dataType": "Any",
+          "isRequired": false
+        },
+        {
+          "name": "AllPointCalibrationError",
+          "displayName": "All-point Calibration Error",
+          "dataType": "Float",
+          "isRequired": false
+        },
+        {
+          "name": "AllPointMaxCalibrationError",
+          "displayName": "All-point Max Calibration Error",
+          "dataType": "Float",
+          "isRequired": false
+        },
+        {
+          "name": "InlierIndices",
+          "displayName": "Inlier Indices",
+          "dataType": "Any",
+          "isRequired": false
+        },
+        {
+          "name": "OutlierIndices",
+          "displayName": "Outlier Indices",
           "dataType": "Any",
           "isRequired": false
         }
@@ -32097,7 +32523,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "95E997FA412BCF141CE13FAD1C41DC414B91BF0FF691B6AE544B8414E95115DF",
+      "generationFingerprint": "8EBD8DB80A8D348C4A69C07F8D485FE602276DF21C27BD01DE1DB999F58334A2",
       "quality": {
         "totalScore": 100,
         "level": "A",

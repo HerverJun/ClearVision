@@ -206,6 +206,8 @@ internal static class ImageInputRuntimeContractEvaluator
                 return TryResolveSharpnessMode(@operator, out mode, out error);
             case OperatorType.ImageNormalize:
                 return TryResolveImageNormalizeMode(@operator, inputChannels, out mode, out error);
+            case OperatorType.ShadingCorrection:
+                return TryResolveShadingCorrectionMode(@operator, out mode, out error);
             default:
                 return true;
         }
@@ -399,6 +401,32 @@ internal static class ImageInputRuntimeContractEvaluator
         }
 
         mode = inputChannels == 1 ? $"{method}:Gray" : $"{method}:{colorMode}";
+        error = string.Empty;
+        return true;
+    }
+
+    private static bool TryResolveShadingCorrectionMode(
+        Operator @operator,
+        out string mode,
+        out string error)
+    {
+        var method = Canonical(
+            GetString(@operator, "Method", "GaussianModel"),
+            "DivideByBackground",
+            "GaussianModel",
+            "MorphologicalTopHat");
+        var colorMode = Canonical(
+            GetString(@operator, "ColorMode", "LumaOnly"),
+            "LumaOnly",
+            "PerChannel");
+        if (method is null || colorMode is null)
+        {
+            mode = string.Empty;
+            error = "Method or ColorMode is invalid.";
+            return false;
+        }
+
+        mode = $"{method}:{colorMode}";
         error = string.Empty;
         return true;
     }

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-15T20:30:44.7937318\u002B08:00",
+  "generatedAt": "2026-07-15T21:48:42.7530282\u002B08:00",
   "operators": [
     {
       "id": "AdaptiveThreshold",
@@ -11851,6 +11851,12 @@
           "sourceHash": "74B8461693AE82FBDDADF48F5D329353CD71A6E573F4A2AFA88F3E1174EC8F31",
           "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
           "recordedAt": "2026-07-15T20:30:44.7937318\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "5011419F487D053A8ADF0A5E858AA8B2F6F271432D7853270C6BF6BBBF341C38",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T21:48:42.7530282\u002B08:00"
         }
       ]
     },
@@ -13276,6 +13282,12 @@
           "sourceHash": "95E997FA412BCF141CE13FAD1C41DC414B91BF0FF691B6AE544B8414E95115DF",
           "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
           "recordedAt": "2026-07-15T20:16:21.3617917\u002B08:00"
+        },
+        {
+          "version": "1.1.1",
+          "sourceHash": "8EBD8DB80A8D348C4A69C07F8D485FE602276DF21C27BD01DE1DB999F58334A2",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T21:48:42.7530282\u002B08:00"
         }
       ]
     },

@@ -4,6 +4,7 @@
 
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Exceptions;
@@ -824,12 +825,121 @@ public class ProjectService
             }
 
             changed |= NormalizePorts(opDto.InputPorts, metadata.InputPorts, PortDirection.Input);
-            changed |= NormalizePorts(opDto.OutputPorts, metadata.OutputPorts, PortDirection.Output);
+            changed |= opDto.Type == OperatorType.PixelStatistics
+                ? NormalizePixelStatisticsOutputPorts(opDto.OutputPorts, metadata.OutputPorts)
+                : NormalizePorts(opDto.OutputPorts, metadata.OutputPorts, PortDirection.Output);
             changed |= CanonicalizeParameterAliases(opDto, metadata);
             changed |= NormalizeParameters(opDto.Parameters, metadata.Parameters);
         }
 
+        changed |= MigratePixelStatisticsDecisionBinding(flowDto);
+
         return changed;
+    }
+
+    private static bool NormalizePixelStatisticsOutputPorts(
+        List<PortDto> ports,
+        List<PortDefinition> metadataPorts)
+    {
+        var used = new HashSet<PortDto>();
+        var normalized = new List<PortDto>(Math.Max(ports.Count, metadataPorts.Count));
+        var changed = false;
+        foreach (var definition in metadataPorts)
+        {
+            var port = ports.FirstOrDefault(candidate =>
+                !used.Contains(candidate) &&
+                candidate.Name.Equals(definition.Name, StringComparison.OrdinalIgnoreCase));
+            if (port == null)
+            {
+                port = new PortDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = definition.Name,
+                    Direction = PortDirection.Output,
+                    DataType = definition.DataType,
+                    IsRequired = false
+                };
+                changed = true;
+            }
+            else
+            {
+                used.Add(port);
+                if (port.Id == Guid.Empty)
+                {
+                    port.Id = Guid.NewGuid();
+                    changed = true;
+                }
+                if (!port.Name.Equals(definition.Name, StringComparison.Ordinal))
+                {
+                    port.Name = definition.Name;
+                    changed = true;
+                }
+                if (port.DataType != definition.DataType)
+                {
+                    port.DataType = definition.DataType;
+                    changed = true;
+                }
+                if (port.Direction != PortDirection.Output)
+                {
+                    port.Direction = PortDirection.Output;
+                    changed = true;
+                }
+                if (port.IsRequired)
+                {
+                    port.IsRequired = false;
+                    changed = true;
+                }
+            }
+
+            normalized.Add(port);
+        }
+
+        foreach (var port in ports.Where(port => !used.Contains(port)))
+        {
+            normalized.Add(port);
+        }
+
+        if (!ports.SequenceEqual(normalized))
+        {
+            changed = true;
+        }
+        if (changed)
+        {
+            ports.Clear();
+            ports.AddRange(normalized);
+        }
+
+        return changed;
+    }
+
+    private static bool MigratePixelStatisticsDecisionBinding(OperatorFlowDto flowDto)
+    {
+        var binding = flowDto.DecisionConfiguration?.FinalDecisionBinding;
+        if (binding == null || binding.DataType != DecisionValueType.Integer)
+        {
+            return false;
+        }
+
+        var source = flowDto.Operators.FirstOrDefault(op =>
+            op.Id == binding.SourceOperatorId && op.Type == OperatorType.PixelStatistics);
+        if (source == null)
+        {
+            return false;
+        }
+
+        var outputName = binding.SourceOutputPortId is { } outputPortId && outputPortId != Guid.Empty
+            ? source.OutputPorts.FirstOrDefault(port => port.Id == outputPortId)?.Name
+            : !string.IsNullOrWhiteSpace(binding.SourceOutputName)
+                ? binding.SourceOutputName.Trim()
+                : null;
+        if (outputName is null ||
+            !new[] { "Min", "Max", "Median" }.Contains(outputName, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        binding.DataType = DecisionValueType.Float;
+        return true;
     }
 
     private bool CanonicalizeParameterAliases(OperatorDto opDto, OperatorMetadata metadata)

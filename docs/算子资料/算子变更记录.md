@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-07-15 20:30:44 +08:00`
+> 生成时间 / Generated At: `2026-07-15 21:48:42 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 当前版本快照 / Current Snapshot
@@ -34,7 +34,7 @@
 | `OperatorType.PerspectiveTransform` | 透视变换 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.PolarUnwrap` | 极坐标展开 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.RoiManager` | ROI裁剪与掩膜 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
-| `OperatorType.ShadingCorrection` | 光照校正 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.1` |
+| `OperatorType.ShadingCorrection` | 光照校正 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.2` |
 | `OperatorType.AdaptiveThreshold` | 自适应阈值 | `SegmentationAndRegion` | 分割与区域 | `Stable` | `1.0.0` |
 | `OperatorType.BinaryImageToRegion` | 二值图转区域 | `SegmentationAndRegion` | 分割与区域 | `Stable` | `1.1.0` |
 | `OperatorType.BlobAnalysis` | Blob分析 | `SegmentationAndRegion` | 分割与区域 | `Stable` | `1.2.1` |
@@ -113,7 +113,7 @@
 | `OperatorType.NPointCalibration` | N点标定 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.0.0` |
 | `OperatorType.PixelToWorldTransform` | 像素世界映射 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.0.1` |
 | `OperatorType.StereoCalibration` | 双目标定 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.0.0` |
-| `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.1.0` |
+| `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.1.1` |
 | `OperatorType.Undistort` | 畸变校正 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.0.0` |
 | `OperatorType.AnomalyDetection` | 异常检测 | `AiInference` | AI推理 | `Experimental` | `1.0.0` |
 | `OperatorType.DeepLearning` | 深度学习 | `AiInference` | AI推理 | `Stable` | `1.1.0` |
@@ -2458,6 +2458,7 @@
 ### OperatorType.ShadingCorrection / 光照校正
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.2` | `2026-07-15T21:48:42.7530282+08:00` | `5011419F487D` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.1` | `2026-07-15T20:30:44.7937318+08:00` | `74B8461693AE` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.1` | `2026-07-15T20:16:21.3617917+08:00` | `1946F4045201` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `BF63DFD419DF` | `operator-runtime-metadata-v2:image-contract-v2.1` |
@@ -2735,6 +2736,7 @@
 ### OperatorType.TranslationRotationCalibration / 平移旋转标定
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.1` | `2026-07-15T21:48:42.7530282+08:00` | `8EBD8DB80A8D` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.0` | `2026-07-15T20:16:21.3617917+08:00` | `95E997FA412B` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `E854175C98D2` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `86F4BE760343` | `operator-runtime-metadata-v2` |

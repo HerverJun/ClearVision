@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-07-15 20:30:44 +08:00`
+> 生成时间 / Generated At: `2026-07-15 21:48:42 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
@@ -65,7 +65,7 @@
 | `OperatorType.PerspectiveTransform` | 透视变换 | `Stable` | 3 | 1 | 20 | 100 (A) | `1.0.0` | 该算子用于四边形透视校正。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结… | [PerspectiveTransform](./operators/PerspectiveTransform.md) |
 | `OperatorType.PolarUnwrap` | 极坐标展开 | `Stable` | 2 | 1 | 8 | 100 (A) | `1.0.0` | 该算子用于将环形图像区域展开为矩形视图。运行时从声明输入端口读取数据，按参数表解析配… | [PolarUnwrap](./operators/PolarUnwrap.md) |
 | `OperatorType.RoiManager` | ROI裁剪与掩膜 | `Stable` | 1 | 3 | 10 | 100 (A) | `1.0.0` | 该算子用于按矩形、圆形或多边形 ROI 裁剪图像或应用掩膜，并输出空间上下文。运行时… | [RoiManager](./operators/RoiManager.md) |
-| `OperatorType.ShadingCorrection` | 光照校正 | `Stable` | 2 | 1 | 3 | 96 (A) | `1.0.1` | 该算子用于通过背景法或模型法校正光照不均。运行时从声明输入端口读取数据，按参数表解析… | [ShadingCorrection](./operators/ShadingCorrection.md) |
+| `OperatorType.ShadingCorrection` | 光照校正 | `Stable` | 2 | 1 | 3 | 96 (A) | `1.0.2` | 该算子用于通过背景法或模型法校正光照不均。运行时从声明输入端口读取数据，按参数表解析… | [ShadingCorrection](./operators/ShadingCorrection.md) |
 
 ### 分割与区域 / `SegmentationAndRegion` (17)
 | 枚举 (Enum) | 显示名 (DisplayName) | 生命周期 | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -168,7 +168,7 @@
 | `OperatorType.NPointCalibration` | N点标定 | `Stable` | 1 | 9 | 10 | 100 (A) | `1.0.0` | 该算子用于基于全部点对鲁棒估计仿射或单应性标定模型。运行时从声明输入端口读取数据，按… | [NPointCalibration](./operators/NPointCalibration.md) |
 | `OperatorType.PixelToWorldTransform` | 像素世界映射 | `Stable` | 3 | 3 | 11 | 100 (A) | `1.0.1` | 该算子用于通过 CalibrationBundleV2 执行坐标转换，可使用 Tra… | [PixelToWorldTransform](./operators/PixelToWorldTransform.md) |
 | `OperatorType.StereoCalibration` | 双目标定 | `Stable` | 2 | 6 | 11 | 100 (A) | `1.0.0` | 该算子用于标定双目相机并生成极线校正映射。运行时从声明输入端口读取数据，按参数表解析… | [StereoCalibration](./operators/StereoCalibration.md) |
-| `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | `Stable` | 1 | 12 | 8 | 100 (A) | `1.1.0` | 该算子用于从图像/机器人点对拟合二维刚性或相似变换，支持可选的 RANSAC 与 H… | [TranslationRotationCalibration](./operators/TranslationRotationCalibration.md) |
+| `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | `Stable` | 1 | 16 | 8 | 100 (A) | `1.1.1` | 该算子用于从图像/机器人点对拟合二维刚性或相似变换，支持可选的 RANSAC 与 H… | [TranslationRotationCalibration](./operators/TranslationRotationCalibration.md) |
 | `OperatorType.Undistort` | 畸变校正 | `Stable` | 2 | 1 | 0 | 91 (A) | `1.0.0` | 该算子用于使用标定数据校正镜头畸变。运行时从声明输入端口读取数据，按参数表解析配置，… | [Undistort](./operators/Undistort.md) |
 
 ### AI推理 / `AiInference` (4)

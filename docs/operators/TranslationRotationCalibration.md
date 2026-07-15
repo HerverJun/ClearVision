@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `CalibrationAndCoordinates` |
 | 分类 (Category) | 标定与坐标 |
 | 分类顺序 (CategoryOrder) | 8 |
-| 版本 (Version) | `1.1.0` |
+| 版本 (Version) | `1.1.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -77,6 +77,10 @@
 | `OutlierCount` | Outlier Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `Residuals` | Per-point Residuals | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 | `Diagnostics` | Fit Diagnostics | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `AllPointCalibrationError` | All-point Calibration Error | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `AllPointMaxCalibrationError` | All-point Max Calibration Error | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `InlierIndices` | Inlier Indices | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `OutlierIndices` | Outlier Indices | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 
 ## 模式与资源契约 / Mode & Resource Contracts
 ### 参数条件 / Parameter Conditions
@@ -101,17 +105,13 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`95E997FA412BCF141CE13FAD1C41DC414B91BF0FF691B6AE544B8414E95115DF`
+- 组合指纹 (Generation Fingerprint)：`8EBD8DB80A8D348C4A69C07F8D485FE602276DF21C27BD01DE1DB999F58334A2`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
-| `AllPointCalibrationError` | `Float` | 源码通过输出字典索引赋值写入。 |
-| `AllPointMaxCalibrationError` | `Float` | 源码通过输出字典索引赋值写入。 |
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
-| `InlierIndices` | `Any` | 源码通过输出字典索引赋值写入。 |
-| `OutlierIndices` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
 ## 性能特征 / Performance
@@ -140,4 +140,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.1 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
