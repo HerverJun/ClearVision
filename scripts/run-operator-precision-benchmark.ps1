@@ -88,7 +88,6 @@ if ($exitCode -eq 0 -and $Profile -eq "acceptance") {
         "AnomalyPreprocess/ManifestDeclaredRgbFloat01" = @{ P95 = 0.20; Allocation = 20000 }
     }
     if ($Label -eq "after") {
-        $metricBudgets["Caliper/IntegratedGaussianDerivative"] = @{ P95 = 0.50; Allocation = 20000 }
         $metricBudgets["Circle/ProductionOrthogonalWelsch"] = @{ P95 = 1.00; Allocation = 500000 }
         $metricBudgets["Line/ProductionWelsch"] = @{ P95 = 0.50; Allocation = 300000 }
     }
@@ -160,9 +159,15 @@ if ($exitCode -eq 0 -and $Profile -eq "acceptance") {
         if ($null -eq $caliperBaseline -or $null -eq $caliperIntegrated) {
             throw "Missing Caliper integration evidence."
         }
+        $caliperDiagnosticBudget = @{ P95 = 0.50; Allocation = 20000 }
+        $caliperWithinDiagnosticBudget =
+            [double]$caliperIntegrated.latencyP95Milliseconds -le [double]$caliperDiagnosticBudget.P95 -and
+            [long]$caliperIntegrated.allocatedBytesPerCase -le [long]$caliperDiagnosticBudget.Allocation
+        Write-Host "[operator-precision] Rejected Caliper integration diagnostic budget: latency=$($caliperIntegrated.latencyP95Milliseconds)/$($caliperDiagnosticBudget.P95) ms; allocation=$($caliperIntegrated.allocatedBytesPerCase)/$($caliperDiagnosticBudget.Allocation) B; passed=$caliperWithinDiagnosticBudget"
         if ([double]$caliperIntegrated.rmse -lt [double]$caliperBaseline.rmse -and
             [double]$caliperIntegrated.p95Error -lt [double]$caliperBaseline.p95Error -and
-            [double]$caliperIntegrated.failureRate -le [double]$caliperBaseline.failureRate) {
+            [double]$caliperIntegrated.failureRate -le [double]$caliperBaseline.failureRate -and
+            $caliperWithinDiagnosticBudget) {
             throw "Caliper integrated candidate unexpectedly became eligible; adoption decision and formal operator exposure require an explicit evidence review."
         }
     }

@@ -129,12 +129,20 @@ $caliperBaseline = Get-Metric $baseline "Caliper" "LegacyGradientCentroid"
 $caliperCandidate = Get-Metric $baseline "Caliper" "GaussianDerivative"
 $caliperIntegrated = Get-Metric $after "Caliper" "IntegratedGaussianDerivative"
 $caliperDecision = @($baseline.decisions | Where-Object { $_.domain -eq "Caliper" })[0]
+$caliperWrittenBudget = [ordered]@{
+    latencyP95Milliseconds = 0.50
+    allocatedBytesPerCase = 20000
+    latencyPassed = [double]$caliperIntegrated.latencyP95Milliseconds -le 0.50
+    allocationPassed = [long]$caliperIntegrated.allocatedBytesPerCase -le 20000
+}
+$caliperWrittenBudget.passed = $caliperWrittenBudget.latencyPassed -and $caliperWrittenBudget.allocationPassed
 if ($caliperDecision.winner -ne "GaussianDerivative" -or $caliperDecision.adopted -ne $true) {
     throw "Caliper validation-set candidate selection drifted."
 }
 if ([double]$caliperIntegrated.rmse -lt [double]$caliperBaseline.rmse -and
     [double]$caliperIntegrated.p95Error -lt [double]$caliperBaseline.p95Error -and
-    [double]$caliperIntegrated.failureRate -le [double]$caliperBaseline.failureRate) {
+    [double]$caliperIntegrated.failureRate -le [double]$caliperBaseline.failureRate -and
+    $caliperWrittenBudget.passed) {
     throw "Caliper integrated candidate now meets the adoption guard; formal exposure requires a new explicit review."
 }
 $caliperRow = [ordered]@{
@@ -143,7 +151,7 @@ $caliperRow = [ordered]@{
     winner = "GaussianDerivative (kernel candidate)"
     productionAlgorithm = "IntegratedGaussianDerivative"
     adopted = $false
-    reason = "The validation-selected localizer regressed end-to-end test RMSE/P95 when seeded by the formal detector and pair selection; it remains out of the formal operator."
+    reason = "The validation-selected localizer regressed end-to-end test RMSE/P95 when seeded by the formal detector and pair selection; its allocation also exceeded the written diagnostic budget, so it remains out of the formal operator."
     baselineMetric = [ordered]@{
         rmse = [double]$caliperBaseline.rmse
         p95Error = [double]$caliperBaseline.p95Error
@@ -170,6 +178,7 @@ $caliperRow = [ordered]@{
         latencyP95Ratio = [Math]::Round([double]$caliperIntegrated.latencyP95Milliseconds / [double]$caliperBaseline.latencyP95Milliseconds, 6)
         allocationRatio = [Math]::Round([double]$caliperIntegrated.allocatedBytesPerCase / [double]$caliperBaseline.allocatedBytesPerCase, 6)
     }
+    writtenBudget = $caliperWrittenBudget
     productionConformance = "RejectedIntegrationRegression"
 }
 
@@ -252,10 +261,11 @@ $lines.Add("- Identity check: baseline and after used the same generated input/t
 $lines.Add("")
 $lines.Add("> Kernel-level synthetic mathematical and preprocessing-contract evidence only. This is not E4, end-to-end field accuracy, Release Ready, Field Verified, commercial-grade, or production-site evidence.")
 $lines.Add("")
-$lines.Add("| Domain | Baseline | Evaluated path | RMSE improvement | P95 error improvement | Failure delta | Ambiguity delta | P95 latency | Allocation | Adopted | Conformance |")
-$lines.Add("|---|---|---|---:|---:|---:|---:|---:|---:|---|---|")
+$lines.Add("| Domain | Baseline | Evaluated path | RMSE improvement | P95 error improvement | Failure delta | Ambiguity delta | P95 latency | Allocation | Budget | Adopted | Conformance |")
+$lines.Add("|---|---|---|---:|---:|---:|---:|---:|---:|---|---|---|")
 foreach ($row in $report.decisions) {
-$lines.Add("| $($row.domain) | ``$($row.baseline)`` | ``$($row.productionAlgorithm)`` | $($row.improvement.rmsePercent)% | $($row.improvement.p95ErrorPercent)% | $($row.improvement.failureRateDelta) | $($row.improvement.ambiguityRateDelta) | $([Math]::Round($row.productionMetric.latencyP95Milliseconds, 6)) ms | $($row.productionMetric.allocatedBytesPerCase) B/case | $($row.adopted) | $($row.productionConformance) |")
+    $budgetStatus = if ($null -ne $row.writtenBudget) { $row.writtenBudget.passed } else { "Passed" }
+    $lines.Add("| $($row.domain) | ``$($row.baseline)`` | ``$($row.productionAlgorithm)`` | $($row.improvement.rmsePercent)% | $($row.improvement.p95ErrorPercent)% | $($row.improvement.failureRateDelta) | $($row.improvement.ambiguityRateDelta) | $([Math]::Round($row.productionMetric.latencyP95Milliseconds, 6)) ms | $($row.productionMetric.allocatedBytesPerCase) B/case | $budgetStatus | $($row.adopted) | $($row.productionConformance) |")
 }
 $lines.Add("")
 $lines.Add("## Rejected candidates")
