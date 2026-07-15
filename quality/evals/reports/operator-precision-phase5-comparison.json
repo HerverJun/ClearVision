@@ -1,133 +1,158 @@
 {
-    "schemaVersion":  "2026-07-15.operator-precision-phase5-comparison.v1",
-    "generatedAtUtc":  "2026-07-15T15:22:50.0794907Z",
+    "schemaVersion":  "2026-07-16.operator-precision-phase5-comparison.v2",
+    "generatedAtUtc":  "2026-07-15T17:28:21.8857758Z",
     "baselineSourceSha":  "ce266626e0bec0a8cd4a68c11b176df95e8cb482",
-    "afterSourceSha":  "97d25440bf540b3543ddbd687377daa7cdab2685",
+    "afterSourceSha":  "9df0fa73db4b2a94a748f377147ded3511162746",
     "immutableInputs":  {
                             "datasetId":  "clearvision-operator-precision-synthetic-v1",
                             "datasetVersion":  "1.0.0",
-                            "datasetSha256":  "32495a03d7706969d9e33b18ef609d837844da6678bff9d08a5debbe02f379f5",
+                            "manifestSha256":  "ec29b22e0bbda301a0fef4b23375413d7a569240f8c4abf06d45318493938920",
+                            "generatedDataSha256":  "85389261aa17bb99ecd70c51dfcb18545a0a417417b0b16ef33f07c42174ae72",
                             "seed":  20260715,
                             "modelSha256":  "5ee8135365428e700eba8c3eb3cd66b0d6e697f9f5df9d23fcb931655378fc90",
-                            "preprocessFingerprint":  "d4bf2ecf122f0e5b95c255812f7cea809cb333ad6fe7d37d1b5853c80fa4bde2",
+                            "preprocessFingerprint":  "c9e4e703eb2bdeab37496422a47243afc424d84769fa2ecb7dd75787361c86a8",
                             "environment":  {
                                                 "framework":  ".NET 8.0.19",
                                                 "os":  "Microsoft Windows 10.0.22000",
                                                 "architecture":  "X64",
                                                 "processorCount":  20,
-                                                "runtimeVersion":  "8.0.19"
+                                                "runtimeVersion":  "8.0.19",
+                                                "processorDescription":  "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel",
+                                                "sdkVersion":  "9.0.304",
+                                                "openCvVersion":  "4.9.0",
+                                                "serverGc":  false,
+                                                "gcLatencyMode":  "Interactive"
                                             },
+                            "harness":  {
+                                            "commitSha":  "9df0fa73db4b2a94a748f377147ded3511162746",
+                                            "programSha256":  "58a1fba586e60e33a822b29175d3069423c956d62d9855f6c037870a36e6120e",
+                                            "projectSha256":  "d50131b05af4ab3efa1dd477f3000f09b4ab225cf99f3f4931adce93a41e273a",
+                                            "runScriptSha256":  "2e38238e5029bbee1687ac04cfd305c402641cc757bf5549398ab9232909b6f7",
+                                            "repositoryDirty":  false
+                                        },
                             "identicalAcrossReports":  true
                         },
     "claimBoundary":  "Synthetic mathematical and preprocessing-contract evidence only; public MVTec evidence remains separate. This report does not establish E4, Release Ready, Field Verified, commercial-grade, or production-site accuracy.",
-    "adoptedDecisions":  [
-                             {
-                                 "domain":  "Caliper",
-                                 "baseline":  "LegacyGradientCentroid",
-                                 "winner":  "GaussianDerivative",
-                                 "productionAlgorithm":  "ProductionGaussianDerivative",
-                                 "adopted":  true,
-                                 "reason":  "Candidate reduced combined RMSE/P95 without material failure-rate regression.",
-                                 "baselineMetric":  {
-                                                        "rmse":  3.3887797256430248,
-                                                        "p95Error":  13.55799352156091,
-                                                        "failureRate":  0,
-                                                        "ambiguityRate":  0.05,
-                                                        "latencyP95Milliseconds":  0.0069690833333333323,
-                                                        "allocatedBytesPerCase":  1312
-                                                    },
-                                 "productionMetric":  {
-                                                          "rmse":  0.17686603720700342,
-                                                          "p95Error":  0.39125096844441704,
-                                                          "failureRate":  0,
-                                                          "ambiguityRate":  0,
-                                                          "latencyP95Milliseconds":  0.050117729166666666,
-                                                          "allocatedBytesPerCase":  5904
-                                                      },
-                                 "improvement":  {
-                                                     "rmsePercent":  94.780834,
-                                                     "p95ErrorPercent":  97.114241,
-                                                     "failureRateDelta":  0,
-                                                     "ambiguityRateDelta":  -0.05
-                                                 },
-                                 "cost":  {
-                                              "latencyP95Ratio":  7.191438,
-                                              "allocationRatio":  4.5
+    "decisions":  [
+                      {
+                          "domain":  "Caliper",
+                          "baseline":  "LegacyGradientCentroid",
+                          "winner":  "GaussianDerivative (kernel candidate)",
+                          "productionAlgorithm":  "IntegratedGaussianDerivative",
+                          "adopted":  false,
+                          "reason":  "The validation-selected localizer regressed end-to-end test RMSE/P95 when seeded by the formal detector and pair selection; its allocation also exceeded the written diagnostic budget, so it remains out of the formal operator.",
+                          "baselineMetric":  {
+                                                 "rmse":  3.6054588866687158,
+                                                 "p95Error":  13.560419716815565,
+                                                 "failureRate":  0,
+                                                 "ambiguityRate":  0.029629629629629631,
+                                                 "latencyP95Milliseconds":  0.0073793703703703686,
+                                                 "allocatedBytesPerCase":  1312
+                                             },
+                          "productionMetric":  {
+                                                   "rmse":  17.288111170690385,
+                                                   "p95Error":  50.827452364872805,
+                                                   "failureRate":  0,
+                                                   "ambiguityRate":  0,
+                                                   "latencyP95Milliseconds":  0.043705407407407408,
+                                                   "allocatedBytesPerCase":  27013
+                                               },
+                          "improvement":  {
+                                              "rmsePercent":  -379.49822,
+                                              "p95ErrorPercent":  -274.822118,
+                                              "failureRateDelta":  0,
+                                              "ambiguityRateDelta":  -0.029629629629629631
                                           },
-                                 "productionConformance":  "NoDegradation"
-                             },
-                             {
-                                 "domain":  "Circle",
-                                 "baseline":  "AlgebraicL2",
-                                 "winner":  "OrthogonalWelsch",
-                                 "productionAlgorithm":  "ProductionOrthogonalWelsch",
-                                 "adopted":  true,
-                                 "reason":  "Candidate reduced combined RMSE/P95 without material failure-rate regression.",
-                                 "baselineMetric":  {
-                                                        "rmse":  2.2334929114421831,
-                                                        "p95Error":  5.0816217520675773,
-                                                        "failureRate":  0,
-                                                        "ambiguityRate":  0.4,
-                                                        "latencyP95Milliseconds":  0.015176145833333331,
-                                                        "allocatedBytesPerCase":  6192
-                                                    },
-                                 "productionMetric":  {
-                                                          "rmse":  1.3021913252280917,
-                                                          "p95Error":  2.1129347306927411,
-                                                          "failureRate":  0,
-                                                          "ambiguityRate":  0.12083333333333332,
-                                                          "latencyP95Milliseconds":  0.28348002083333335,
-                                                          "allocatedBytesPerCase":  195938
-                                                      },
-                                 "improvement":  {
-                                                     "rmsePercent":  41.697092,
-                                                     "p95ErrorPercent":  58.420071,
-                                                     "failureRateDelta":  0,
-                                                     "ambiguityRateDelta":  -0.27916666666666667
-                                                 },
-                                 "cost":  {
-                                              "latencyP95Ratio":  18.679316,
-                                              "allocationRatio":  31.643734
+                          "cost":  {
+                                       "latencyP95Ratio":  5.922647,
+                                       "allocationRatio":  20.589177
+                                   },
+                          "writtenBudget":  {
+                                                "latencyP95Milliseconds":  0.5,
+                                                "allocatedBytesPerCase":  20000,
+                                                "latencyPassed":  true,
+                                                "allocationPassed":  false,
+                                                "passed":  false
+                                            },
+                          "productionConformance":  "RejectedIntegrationRegression"
+                      },
+                      {
+                          "domain":  "Circle",
+                          "baseline":  "AlgebraicL2",
+                          "winner":  "OrthogonalWelsch",
+                          "productionAlgorithm":  "ProductionOrthogonalWelsch",
+                          "adopted":  true,
+                          "reason":  "Candidate reduced combined RMSE/P95 without material failure-rate regression.",
+                          "baselineMetric":  {
+                                                 "rmse":  1.9946116221604331,
+                                                 "p95Error":  3.9223962858461112,
+                                                 "failureRate":  0,
+                                                 "ambiguityRate":  0.3928571428571429,
+                                                 "latencyP95Milliseconds":  0.014930464285714285,
+                                                 "allocatedBytesPerCase":  6192
+                                             },
+                          "productionMetric":  {
+                                                   "rmse":  1.2071390036775924,
+                                                   "p95Error":  1.2567422780387341,
+                                                   "failureRate":  0,
+                                                   "ambiguityRate":  0.11428571428571428,
+                                                   "latencyP95Milliseconds":  0.30291321428571433,
+                                                   "allocatedBytesPerCase":  198270
+                                               },
+                          "improvement":  {
+                                              "rmsePercent":  39.479997,
+                                              "p95ErrorPercent":  67.959834,
+                                              "failureRateDelta":  0,
+                                              "ambiguityRateDelta":  -0.27857142857142864
                                           },
-                                 "productionConformance":  "ExactAccuracy"
-                             },
-                             {
-                                 "domain":  "Line",
-                                 "baseline":  "L2",
-                                 "winner":  "Welsch",
-                                 "productionAlgorithm":  "ProductionWelsch",
-                                 "adopted":  true,
-                                 "reason":  "Candidate reduced combined RMSE/P95 without material failure-rate regression.",
-                                 "baselineMetric":  {
-                                                        "rmse":  0.641760204418149,
-                                                        "p95Error":  1.5385046859341167,
-                                                        "failureRate":  0,
-                                                        "ambiguityRate":  0.4,
-                                                        "latencyP95Milliseconds":  0.026886208333333331,
-                                                        "allocatedBytesPerCase":  2744
-                                                    },
-                                 "productionMetric":  {
-                                                          "rmse":  0.075822901687276331,
-                                                          "p95Error":  0.15041946809228618,
-                                                          "failureRate":  0,
-                                                          "ambiguityRate":  0,
-                                                          "latencyP95Milliseconds":  0.15807458333333332,
-                                                          "allocatedBytesPerCase":  115465
-                                                      },
-                                 "improvement":  {
-                                                     "rmsePercent":  88.185166,
-                                                     "p95ErrorPercent":  90.223009,
-                                                     "failureRateDelta":  0,
-                                                     "ambiguityRateDelta":  -0.4
-                                                 },
-                                 "cost":  {
-                                              "latencyP95Ratio":  5.879393,
-                                              "allocationRatio":  42.079082
+                          "cost":  {
+                                       "latencyP95Ratio":  20.288265,
+                                       "allocationRatio":  32.020349
+                                   },
+                          "productionConformance":  "ExactAccuracy"
+                      },
+                      {
+                          "domain":  "Line",
+                          "baseline":  "L2",
+                          "winner":  "Welsch",
+                          "productionAlgorithm":  "ProductionWelsch",
+                          "adopted":  true,
+                          "reason":  "Candidate reduced combined RMSE/P95 without material failure-rate regression.",
+                          "baselineMetric":  {
+                                                 "rmse":  0.62169605287735041,
+                                                 "p95Error":  1.4574634848412384,
+                                                 "failureRate":  0,
+                                                 "ambiguityRate":  0.4,
+                                                 "latencyP95Milliseconds":  0.027731821428571422,
+                                                 "allocatedBytesPerCase":  2744
+                                             },
+                          "productionMetric":  {
+                                                   "rmse":  0.081724507419747822,
+                                                   "p95Error":  0.17809677317018421,
+                                                   "failureRate":  0,
+                                                   "ambiguityRate":  0,
+                                                   "latencyP95Milliseconds":  0.17371910714285715,
+                                                   "allocatedBytesPerCase":  115850
+                                               },
+                          "improvement":  {
+                                              "rmsePercent":  86.854588,
+                                              "p95ErrorPercent":  87.780361,
+                                              "failureRateDelta":  0,
+                                              "ambiguityRateDelta":  -0.4
                                           },
-                                 "productionConformance":  "ExactAccuracy"
-                             }
-                         ],
+                          "cost":  {
+                                       "latencyP95Ratio":  6.264252,
+                                       "allocationRatio":  42.219388
+                                   },
+                          "productionConformance":  "ExactAccuracy"
+                      }
+                  ],
     "rejectedCandidates":  [
+                               {
+                                   "domain":  "Caliper",
+                                   "candidate":  "GaussianDerivative formal integration",
+                                   "reason":  "The validation-selected localizer regressed end-to-end test RMSE/P95 when seeded by the formal detector and pair selection; its allocation also exceeded the written diagnostic budget, so it remains out of the formal operator."
+                               },
                                {
                                    "domain":  "Caliper",
                                    "candidate":  "Quadratic",
@@ -151,17 +176,17 @@
                            ],
     "uncertaintyCoverage":  {
                                 "adopted":  false,
-                                "heuristicCoverage68":  0.89166666666666672,
-                                "heuristicCoverage95":  0.95416666666666683,
-                                "covarianceCoverage68":  0.56666666666666665,
-                                "covarianceCoverage95":  0.79166666666666663,
+                                "heuristicCoverage68":  0.89642857142857146,
+                                "heuristicCoverage95":  0.95357142857142863,
+                                "covarianceCoverage68":  0.55,
+                                "covarianceCoverage95":  0.7857142857142857,
                                 "conclusion":  "Covariance is uncalibrated and must not be presented as a statistical confidence interval."
                             },
     "anomalyIdentity":  {
                             "traditionalDefaultAccuracy":  1,
                             "onnxManifestAccuracy":  1,
                             "preprocessReferenceRmse":  0,
-                            "mismatchFingerprintDifferent":  1,
+                            "mismatchRejectedFailClosed":  1,
                             "conclusion":  "Complete preprocessing manifest and model/preprocess/feature-bank identity are mandatory; mismatch fails closed."
                         },
     "acceptance":  {
