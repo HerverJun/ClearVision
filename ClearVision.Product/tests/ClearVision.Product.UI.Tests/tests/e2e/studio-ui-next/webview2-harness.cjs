@@ -1,4 +1,5 @@
 const childProcess = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('@playwright/test');
@@ -183,6 +184,19 @@ function writeJsonEvidence(evidenceDirectory, fileName, value) {
   return outputPath;
 }
 
+function writePngEvidence(evidenceDirectory, fileName, buffer) {
+  assert(Buffer.isBuffer(buffer), 'Screenshot evidence must be a PNG buffer.');
+  fs.mkdirSync(evidenceDirectory, { recursive: true });
+  const outputPath = path.join(evidenceDirectory, safeFileName(fileName));
+  fs.writeFileSync(outputPath, buffer);
+  return {
+    path: outputPath,
+    sha256: crypto.createHash('sha256').update(buffer).digest('hex'),
+    pixels: parsePngDimensions(buffer),
+    byteLength: buffer.length
+  };
+}
+
 module.exports = {
   assert,
   captureRuntimeErrors,
@@ -195,5 +209,6 @@ module.exports = {
   safeFileName,
   seedAuthenticatedSession,
   waitForDoubleAnimationFrame,
-  writeJsonEvidence
+  writeJsonEvidence,
+  writePngEvidence
 };

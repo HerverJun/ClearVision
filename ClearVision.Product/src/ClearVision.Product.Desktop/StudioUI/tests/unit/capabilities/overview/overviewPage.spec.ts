@@ -82,9 +82,9 @@ describe('Overview page', () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Healthy');
+    expect(wrapper.text()).toContain('健康');
     expect(wrapper.text()).toContain('operator-a');
-    expect(wrapper.text()).toContain('Operator');
+    expect(wrapper.text()).toContain('操作员');
     expect(wrapper.text()).toContain('最近工程');
     expect(requestedPaths).toEqual(['projects/recent?count=5']);
     expect(requestedPaths).not.toContain('/health');
@@ -115,7 +115,7 @@ describe('Overview page', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('暂无最近工程');
-    expect(wrapper.text()).toContain('lastOpenedAt');
+    expect(wrapper.text()).toContain('最近打开记录');
 
     wrapper.unmount();
     runtime.queries.dispose();

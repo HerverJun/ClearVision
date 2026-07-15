@@ -2,7 +2,15 @@
 import { computed } from 'vue';
 import { useProductRuntime } from '@/app/productRuntime';
 import { useStudioPlatform } from '@/app/studioPlatform';
-import { CvButton, CvStatusBadge } from '@/design-system/primitives';
+import {
+  CvButton,
+  CvDescriptionList,
+  CvInlineAlert,
+  CvPageHeader,
+  CvPanel,
+  CvStatusBadge,
+  type CvDescriptionItem
+} from '@/design-system';
 import { studioUiBuildMetadata } from '@/platform/diagnostics/buildMetadata';
 
 const platform = useStudioPlatform();
@@ -16,6 +24,37 @@ const healthProbeState = computed(() => systemStatus.phase === 'online' ? 'ok' :
 const sessionProbeState = computed(() =>
   session.phase === 'authenticated' || session.phase === 'stale' ? 'ok' : 'error'
 );
+const startupItems = computed<readonly CvDescriptionItem[]>(() => [
+  { key: 'build', label: '构建', value: `${studioUiBuildMetadata.name} ${studioUiBuildMetadata.version}` },
+  { key: 'schema', label: '启动协议版本', value: platform.startup.schemaVersion },
+  { key: 'ui-kind', label: '界面类型', value: platform.startup.uiKind },
+  { key: 'host-kind', label: '宿主类型', value: platform.startup.hostKind },
+  { key: 'base', label: '界面基础路径', value: platform.startup.studioUiBasePath },
+  { key: 'api-origin', label: '接口来源', value: apiOrigin },
+  { key: 'host-channel', label: '宿主通道', value: hostDiagnostics.channel },
+  { key: 'token', label: '会话令牌', value: platform.hasToken() ? '已提供' : '未提供' }
+]);
+const ownerItems = computed<readonly CvDescriptionItem[]>(() => [
+  { key: 'generation', label: '会话代次', value: queryDiagnostics.value.sessionGeneration },
+  { key: 'owners', label: '活动查询所有者', value: queryDiagnostics.value.activeOwnerCount },
+  { key: 'requests', label: '活动请求', value: queryDiagnostics.value.activeRequestCount },
+  { key: 'cache', label: '缓存条目', value: queryDiagnostics.value.cacheEntryCount },
+  { key: 'protected-cache', label: '受保护缓存', value: queryDiagnostics.value.protectedCacheEntryCount },
+  { key: 'port', label: '系统端口', value: systemStatus.health?.port ?? '不可用' },
+  { key: 'user', label: '会话用户', value: session.user?.username ?? '未认证' },
+  { key: 'role', label: '会话角色', value: formatRole(session.user?.role) }
+]);
+
+function formatRole(value: string | undefined): string {
+  if (!value) return '无';
+  const labels: Readonly<Record<string, string>> = Object.freeze({
+    admin: '管理员',
+    engineer: '工程师',
+    operator: '操作员',
+    viewer: '查看者'
+  });
+  return labels[value.toLocaleLowerCase()] ?? value;
+}
 
 async function refreshSharedOwners(): Promise<void> {
   await Promise.all([
@@ -26,99 +65,88 @@ async function refreshSharedOwners(): Promise<void> {
 </script>
 
 <template>
-  <article
+  <main
     class="diagnostics-page"
     data-studio-page="diagnostics"
   >
-    <header class="diagnostics-page__header">
-      <div>
-        <p>运行诊断</p>
-        <h1>StudioUI 诊断</h1>
-        <span>只消费唯一 session、system status 与 query owner 的共享投影。</span>
+    <CvPageHeader
+      eyebrow="运行诊断"
+      title="StudioUI 诊断"
+      description="查看统一会话、系统状态与只读查询服务的共享状态。"
+    >
+      <template #actions>
+        <CvButton
+          size="sm"
+          @click="refreshSharedOwners"
+        >
+          刷新共享状态
+        </CvButton>
+      </template>
+    </CvPageHeader>
+
+    <CvPanel
+      title="共享状态"
+      description="系统状态与会话状态由全应用唯一所有者提供。"
+    >
+      <div class="diagnostics-page__summary">
+        <div>
+          <span>本地服务</span>
+          <CvStatusBadge
+            :tone="systemStatus.phase === 'online' ? 'ok' : systemStatus.phase === 'stale' ? 'warning' : 'ng'"
+            :label="systemStatus.message"
+            :data-probe-state="healthProbeState"
+          />
+        </div>
+        <div>
+          <span>当前会话</span>
+          <CvStatusBadge
+            :tone="session.phase === 'authenticated' ? 'ok' : session.phase === 'stale' ? 'warning' : 'ng'"
+            :label="session.message"
+            :data-probe-state="sessionProbeState"
+          />
+        </div>
       </div>
-      <CvButton
-        variant="secondary"
-        @click="refreshSharedOwners"
+    </CvPanel>
+
+    <div class="diagnostics-page__details">
+      <CvPanel
+        title="启动与宿主"
+        description="当前页面使用的启动配置与宿主适配信息。"
       >
-        刷新共享状态
-      </CvButton>
-    </header>
-
-    <section class="diagnostics-page__summary">
-      <div>
-        <span>本地服务</span>
-        <CvStatusBadge
-          :tone="systemStatus.phase === 'online' ? 'ok' : systemStatus.phase === 'stale' ? 'warning' : 'ng'"
-          :label="systemStatus.message"
-          :data-probe-state="healthProbeState"
+        <CvDescriptionList
+          :items="startupItems"
+          label="启动与宿主诊断"
         />
-      </div>
-      <div>
-        <span>当前会话</span>
-        <CvStatusBadge
-          :tone="session.phase === 'authenticated' ? 'ok' : session.phase === 'stale' ? 'warning' : 'ng'"
-          :label="session.message"
-          :data-probe-state="sessionProbeState"
+      </CvPanel>
+
+      <CvPanel
+        title="统一查询状态"
+        description="用于确认活动请求、缓存与会话代次没有出现第二套所有者。"
+      >
+        <CvDescriptionList
+          :items="ownerItems"
+          label="统一查询状态"
         />
-      </div>
-    </section>
+      </CvPanel>
+    </div>
 
-    <section class="diagnostics-page__section">
-      <h2>启动与宿主</h2>
-      <dl>
-        <div><dt>构建</dt><dd>{{ studioUiBuildMetadata.name }} {{ studioUiBuildMetadata.version }}</dd></div>
-        <div><dt>schemaVersion</dt><dd>{{ platform.startup.schemaVersion }}</dd></div>
-        <div><dt>uiKind</dt><dd>{{ platform.startup.uiKind }}</dd></div>
-        <div><dt>hostKind</dt><dd>{{ platform.startup.hostKind }}</dd></div>
-        <div><dt>StudioUI base</dt><dd>{{ platform.startup.studioUiBasePath }}</dd></div>
-        <div><dt>API origin</dt><dd>{{ apiOrigin }}</dd></div>
-        <div><dt>Host channel</dt><dd>{{ hostDiagnostics.channel }}</dd></div>
-        <div><dt>Token present</dt><dd>{{ platform.hasToken() ? '是' : '否' }}</dd></div>
-      </dl>
-    </section>
-
-    <section class="diagnostics-page__section">
-      <h2>唯一 owner 状态</h2>
-      <dl>
-        <div><dt>Session generation</dt><dd>{{ queryDiagnostics.sessionGeneration }}</dd></div>
-        <div><dt>Query owner</dt><dd>{{ queryDiagnostics.activeOwnerCount }}</dd></div>
-        <div><dt>Active request</dt><dd>{{ queryDiagnostics.activeRequestCount }}</dd></div>
-        <div><dt>Cache entry</dt><dd>{{ queryDiagnostics.cacheEntryCount }}</dd></div>
-        <div><dt>Protected cache</dt><dd>{{ queryDiagnostics.protectedCacheEntryCount }}</dd></div>
-        <div><dt>System port</dt><dd>{{ systemStatus.health?.port ?? '不可用' }}</dd></div>
-        <div><dt>Session user</dt><dd>{{ session.user?.username ?? '未认证' }}</dd></div>
-        <div><dt>Session role</dt><dd>{{ session.user?.role ?? '无' }}</dd></div>
-      </dl>
-    </section>
-
-    <aside class="diagnostics-page__scope">
-      <strong>证据范围</strong>
-      <span>当前阶段是预置会话的 authenticated preview，不代表真实登录 handoff、默认入口切换或现场执行链路已经迁移。</span>
-    </aside>
-  </article>
+    <CvInlineAlert
+      tone="info"
+      title="证据范围"
+    >
+      当前阶段使用预置会话进行认证预览，不代表真实登录交接、默认入口切换或现场执行链路已经迁移。
+    </CvInlineAlert>
+  </main>
 </template>
 
 <style scoped>
-.diagnostics-page { max-width: 980px; display: grid; gap: var(--cv-space-4); }
-.diagnostics-page__header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--cv-space-4); }
-.diagnostics-page__header p { margin: 0; color: var(--cv-color-brand-text); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
-.diagnostics-page__header h1 { margin: var(--cv-space-1) 0; font-size: var(--cv-font-size-2xl); }
-.diagnostics-page__header span { color: var(--cv-text-secondary); }
+.diagnostics-page { max-width: 1120px; display: grid; min-width: 0; gap: var(--cv-space-5); }
 .diagnostics-page__summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-3); }
-.diagnostics-page__summary > div,
-.diagnostics-page__section { padding: var(--cv-space-4); border: 1px solid var(--cv-border-default); border-radius: var(--cv-radius-md); background: var(--cv-surface-1); }
-.diagnostics-page__summary > div { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
+.diagnostics-page__summary > div { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); background: var(--cv-surface-2); }
 .diagnostics-page__summary > div > span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }
-.diagnostics-page__section h2 { margin: 0 0 var(--cv-space-3); font-size: var(--cv-font-size-lg); }
-.diagnostics-page__section dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--cv-border-subtle); }
-.diagnostics-page__section dl div { min-width: 0; padding: var(--cv-space-2) var(--cv-space-3); display: grid; grid-template-columns: minmax(120px, .7fr) minmax(0, 1.3fr); background: var(--cv-surface-1); }
-.diagnostics-page__section dt { color: var(--cv-text-secondary); }
-.diagnostics-page__section dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.diagnostics-page__scope { padding: var(--cv-space-3) var(--cv-space-4); display: grid; gap: var(--cv-space-1); border-left: 3px solid var(--cv-color-status-info); background: var(--cv-color-status-info-soft); }
-.diagnostics-page__scope span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-relaxed); }
+.diagnostics-page__details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-4); align-items: start; }
 @media (max-width: 760px) {
   .diagnostics-page__summary,
-  .diagnostics-page__section dl { grid-template-columns: 1fr; }
-  .diagnostics-page__header { align-items: flex-start; flex-direction: column; }
+  .diagnostics-page__details { grid-template-columns: 1fr; }
 }
 </style>

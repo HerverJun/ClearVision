@@ -143,7 +143,7 @@ const outcomeOptions: readonly CvSelectOption[] = Object.freeze([
 ]);
 
 const columns: readonly CvDataTableColumn<StationStatus>[] = Object.freeze([
-  { key: 'station', label: 'Station', width: '21%' },
+  { key: 'station', label: '工作站', width: '21%' },
   { key: 'onlineState', label: '连接', width: '11%' },
   { key: 'runtimeState', label: '运行状态', width: '12%' },
   { key: 'packageName', label: '运行包', width: '17%' },
@@ -156,7 +156,7 @@ const summaryCounters = computed(() => {
   const summary = summaryState.value.data;
   if (!summary) return [];
   return [
-    ['Station 总数', summary.totalStations],
+    ['工作站总数', summary.totalStations],
     ['在线', summary.onlineStations],
     ['离线', summary.offlineStations],
     ['运行中', summary.runningStations],
@@ -239,8 +239,8 @@ onBeforeUnmount(() => {
   >
     <CvPageHeader
       eyebrow="现场监控"
-      title="Station"
-      description="只读查看 Station 连接、运行、结果与健康投影。页面不提供命令、部署或身份修改。"
+      title="工作站"
+      description="只读查看现场工作站的连接、运行、结果与健康状态。页面不提供命令、部署或身份修改。"
     >
       <template #actions>
         <CvButton
@@ -256,7 +256,7 @@ onBeforeUnmount(() => {
 
     <CvPanel
       title="运行摘要"
-      description="来自 /stations/summary 的只读聚合；页面可见时每 15 秒保守刷新。"
+      description="来自工作站摘要接口的只读聚合；页面可见时每 15 秒保守刷新。"
     >
       <CvInlineAlert
         v-if="(summaryState.phase === 'stale' || summaryState.phase === 'partial-failure') && summaryState.data"
@@ -311,16 +311,16 @@ onBeforeUnmount(() => {
     </CvPanel>
 
     <CvPanel
-      title="Station 列表"
-      description="普通详情完全由该列表项构建；管理员详情仅作为独立增强区域。"
+      title="工作站列表"
+      description="普通详情完全由列表项构建；管理员详情仅作为独立增强区域。"
     >
-      <CvToolbar label="Station 列表筛选">
+      <CvToolbar label="工作站列表筛选">
         <CvSearchField
           v-model="searchDraft"
           class="stations-page__search"
-          label="搜索 Station"
+          label="搜索工作站"
           placeholder="名称、ID、产线、运行包或诊断码"
-          clear-label="清除 Station 搜索"
+          clear-label="清除工作站搜索"
           :hide-label="false"
           @search="submitSearch"
           @clear="clearSearch"
@@ -400,7 +400,7 @@ onBeforeUnmount(() => {
         :rows="visibleStations"
         :columns="columns"
         row-key="stationId"
-        caption="Station 只读列表"
+        caption="工作站只读列表"
         :busy="listState.isRefreshing"
       >
         <template #cell-station="{ row }">
@@ -444,7 +444,7 @@ onBeforeUnmount(() => {
 
     <CvPanel
       title="结果统计"
-      description="九类 canonical outcome 分别呈现，不将未判定、无效或执行失败折叠为 NG。"
+      description="九类标准结果分别呈现，不将未判定、无效或执行失败折叠为 NG。"
     >
       <CvToolbar label="Station 结果统计筛选">
         <CvSelect
@@ -538,15 +538,27 @@ onBeforeUnmount(() => {
 <style scoped>
 .stations-page { display: grid; min-width: 0; gap: var(--cv-space-5); }
 .stations-page__search { flex: 1 1 320px; }
-.stations-page__metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--cv-space-3); margin: 0; }
-.stations-page__metrics div { display: grid; gap: var(--cv-space-1); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); background: var(--cv-surface-2); }
+.stations-page__metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; margin: 0; overflow: hidden; border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); }
+.stations-page__metrics div { display: grid; gap: var(--cv-space-1); padding: var(--cv-space-3); border-right: 1px solid var(--cv-border-subtle); background: var(--cv-surface-2); }
+.stations-page__metrics div:last-child { border-right: 0; }
 .stations-page__metrics dt { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .stations-page__metrics dd { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-xl); font-weight: var(--cv-font-weight-semibold); }
 .stations-page__station-name { display: grid; gap: var(--cv-space-1); }
 .stations-page__station-name span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-.stations-page__outcomes { display: grid; grid-template-columns: repeat(9, minmax(96px, 1fr)); gap: var(--cv-space-2); overflow-x: auto; }
+.stations-page__outcomes { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: var(--cv-space-2); }
 .stations-page__outcomes article { display: grid; justify-items: start; gap: var(--cv-space-2); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); background: var(--cv-surface-2); }
 .stations-page__outcomes strong { font-size: var(--cv-font-size-lg); }
-@media (max-width: 980px) { .stations-page__metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 620px) { .stations-page__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 980px) {
+  .stations-page__metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stations-page__metrics div { border-bottom: 1px solid var(--cv-border-subtle); }
+  .stations-page__metrics div:nth-child(3n) { border-right: 0; }
+  .stations-page__metrics div:nth-last-child(-n + 3) { border-bottom: 0; }
+}
+@media (max-width: 620px) {
+  .stations-page__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stations-page__metrics div,
+  .stations-page__metrics div:nth-child(3n) { border-right: 1px solid var(--cv-border-subtle); border-bottom: 1px solid var(--cv-border-subtle); }
+  .stations-page__metrics div:nth-child(2n) { border-right: 0; }
+  .stations-page__metrics div:nth-last-child(-n + 2) { border-bottom: 0; }
+}
 </style>

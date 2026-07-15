@@ -135,7 +135,7 @@ const selectedStationResult = computed(() => {
 
 const sourceOptions: readonly CvSelectOption[] = Object.freeze([
   { value: 'local', label: '本机结果' },
-  { value: 'station', label: 'Station 上报' }
+  { value: 'station', label: '工作站上报' }
 ]);
 const outcomeOptions: readonly CvSelectOption[] = Object.freeze([
   { value: '', label: '全部结果' },
@@ -171,8 +171,8 @@ const projectOptions = computed<readonly CvSelectOption[]>(() => [
 const localColumns: readonly CvDataTableColumn<LocalInspectionResultSummary>[] = Object.freeze([
   { key: 'inspectionTime', label: '完成时间', width: '17%' },
   { key: 'outcome', label: '结果', width: '12%' },
-  { key: 'execution', label: 'Execution', width: '12%' },
-  { key: 'decision', label: 'Decision', width: '12%' },
+  { key: 'execution', label: '执行状态', width: '12%' },
+  { key: 'decision', label: '判定结果', width: '12%' },
   { key: 'diagnosticCode', label: '诊断码', width: '15%' },
   { key: 'defectCount', label: '缺陷', align: 'end', width: '8%' },
   { key: 'processingTimeMs', label: '耗时', align: 'end', width: '10%' },
@@ -180,10 +180,10 @@ const localColumns: readonly CvDataTableColumn<LocalInspectionResultSummary>[] =
 ]);
 const stationColumns: readonly CvDataTableColumn<StationInspectionResultSummary>[] = Object.freeze([
   { key: 'completedAtUtc', label: '完成时间', width: '16%' },
-  { key: 'stationId', label: 'Station', width: '13%' },
+  { key: 'stationId', label: '工作站', width: '13%' },
   { key: 'outcome', label: '结果', width: '11%' },
-  { key: 'execution', label: 'Execution', width: '11%' },
-  { key: 'decision', label: 'Decision', width: '12%' },
+  { key: 'execution', label: '执行状态', width: '11%' },
+  { key: 'decision', label: '判定结果', width: '12%' },
   { key: 'diagnosticCode', label: '诊断码', width: '14%' },
   { key: 'executionTimeMs', label: '耗时', align: 'end', width: '9%' },
   { key: 'actions', label: '操作', align: 'end', width: '14%' }
@@ -349,7 +349,7 @@ function formatDuration(value: number): string {
 function localDetailItems(detail: LocalInspectionResultDetail): readonly CvDescriptionItem[] {
   const formatted = formatInspectionOutcome(detail.outcome);
   return Object.freeze([
-    { key: 'result', label: 'Canonical 结果', value: formatted.label },
+    { key: 'result', label: '标准结果', value: formatted.label },
     { key: 'execution', label: 'Execution', value: formatted.executionLabel },
     { key: 'decision', label: 'Decision', value: formatted.decisionLabel },
     { key: 'inspectionTime', label: '完成时间', value: formatDateTime(detail.inspectionTime) },
@@ -367,10 +367,10 @@ function localDetailItems(detail: LocalInspectionResultDetail): readonly CvDescr
 function stationDetailItems(detail: StationInspectionResultSummary): readonly CvDescriptionItem[] {
   const formatted = formatInspectionOutcome(detail.outcome);
   return Object.freeze([
-    { key: 'result', label: 'Canonical 结果', value: formatted.label },
+    { key: 'result', label: '标准结果', value: formatted.label },
     { key: 'execution', label: 'Execution', value: formatted.executionLabel },
     { key: 'decision', label: 'Decision', value: formatted.decisionLabel },
-    { key: 'stationId', label: 'Station', value: detail.stationId },
+    { key: 'stationId', label: '工作站', value: detail.stationId },
     { key: 'lineName', label: '产线', value: detail.lineName },
     { key: 'completedAtUtc', label: '完成时间', value: formatDateTime(detail.completedAtUtc) },
     { key: 'executionTimeMs', label: '执行耗时', value: formatDuration(detail.executionTimeMs) },
@@ -447,7 +447,7 @@ onBeforeUnmount(() => {
     <CvPageHeader
       eyebrow="质量追溯"
       title="检测结果"
-      description="只读浏览本机检测历史与 Station 上报摘要；Execution 与 Decision 双轴始终分别展示。"
+      description="只读浏览本机检测历史与工作站上报摘要；执行状态与判定结果双轴始终分别展示。"
     >
       <template #actions>
         <CvButton
@@ -463,7 +463,7 @@ onBeforeUnmount(() => {
 
     <CvPanel
       title="筛选"
-      description="筛选条件保存在 URL query，便于恢复当前只读视图。"
+      description="筛选条件保存在地址栏参数中，便于恢复当前只读视图。"
     >
       <CvToolbar label="结果筛选工具栏">
         <CvSelect
@@ -483,7 +483,7 @@ onBeforeUnmount(() => {
         <CvSelect
           v-model="outcomeModel"
           class="results-page__outcome"
-          label="Canonical 结果"
+          label="标准结果"
           :options="outcomeOptions"
         />
         <CvField
@@ -520,7 +520,7 @@ onBeforeUnmount(() => {
       tone="info"
       title="本机诊断码为当前页过滤"
     >
-      当前本机 history endpoint 没有 diagnosticCode 参数；此条件只过滤当前页已读取结果，不代表后端全量结果计数。
+      当前本机历史接口没有诊断码参数；此条件只过滤当前页已读取结果，不代表后端全量结果计数。
     </CvInlineAlert>
 
     <CvInlineAlert
@@ -537,7 +537,7 @@ onBeforeUnmount(() => {
     >
       <CvPanel
         title="本机结果"
-        description="列表由工程检测历史 endpoint 提供；canonical outcome 以九类分别保留。"
+        description="列表由工程检测历史只读接口提供；九类标准结果分别保留。"
       >
         <CvInlineAlert
           v-if="projectsState.phase === 'stale' || projectsState.phase === 'partial-failure'"
@@ -552,7 +552,7 @@ onBeforeUnmount(() => {
           tone="warning"
           title="结果列表刷新失败"
         >
-          当前显示上次成功读取的数据（Stale）。
+          当前显示上次成功读取的旧数据（Stale）。
         </CvInlineAlert>
         <CvInlineAlert
           v-if="localListState.phase === 'aborted'"
@@ -673,7 +673,7 @@ onBeforeUnmount(() => {
 
       <CvPanel
         title="本机结果详情"
-        description="只显示标量、诊断、缺陷摘要和 traceability；图片、ROI、compare、export 与重跑均未提供。"
+        description="只显示标量、诊断、缺陷摘要和追溯信息；不提供图片、感兴趣区域、对比、导出或重跑。"
       >
         <CvInlineAlert
           v-if="localDetailState.phase === 'stale' || localDetailState.phase === 'partial-failure'"
@@ -681,7 +681,7 @@ onBeforeUnmount(() => {
           tone="warning"
           title="详情刷新失败"
         >
-          当前显示上次成功读取的数据（Stale）。
+          当前显示上次成功读取的旧数据（Stale）。
         </CvInlineAlert>
         <CvInlineAlert
           v-if="localDetailState.phase === 'aborted'"
@@ -763,22 +763,22 @@ onBeforeUnmount(() => {
       class="results-page__layout"
     >
       <CvPanel
-        title="Station 上报结果"
-        description="结果由 Studio 的 Station results endpoint 提供；旧 payload 只做后端同构的读取时映射。"
+        title="工作站上报结果"
+        description="结果由 Studio 的工作站结果只读接口提供；旧格式数据仅做与后端一致的读取时映射。"
       >
         <CvInlineAlert
           v-if="stationListState.phase === 'stale' || stationListState.phase === 'partial-failure'"
           class="results-page__notice"
           tone="warning"
-          title="Station 结果刷新失败"
+          title="工作站结果刷新失败"
         >
-          当前显示上次成功读取的数据（Stale）。
+          当前显示上次成功读取的旧数据（Stale）。
         </CvInlineAlert>
         <CvInlineAlert
           v-if="stationListState.phase === 'aborted'"
           class="results-page__notice"
           tone="warning"
-          title="Station 结果请求已取消"
+          title="工作站结果请求已取消"
         />
         <CvPageState
           v-if="hasInvalidDate"
@@ -788,7 +788,7 @@ onBeforeUnmount(() => {
         <CvPageState
           v-else-if="stationListState.phase === 'loading' && !stationListState.data"
           kind="loading"
-          title="正在读取 Station 结果"
+          title="正在读取工作站结果"
         />
         <CvPageState
           v-else-if="stationListState.phase === 'unauthorized'"
@@ -798,12 +798,12 @@ onBeforeUnmount(() => {
         <CvPageState
           v-else-if="stationListState.phase === 'forbidden'"
           kind="forbidden"
-          title="无权读取 Station 结果"
+          title="无权读取工作站结果"
         />
         <CvPageState
           v-else-if="stationListState.phase === 'error' || stationListState.phase === 'not-found'"
           kind="error"
-          title="Station 结果读取失败"
+          title="工作站结果读取失败"
           :description="stationListState.failure?.message"
         >
           <template #actions>
@@ -818,7 +818,7 @@ onBeforeUnmount(() => {
         <CvPageState
           v-else-if="stationListState.phase === 'empty'"
           kind="empty"
-          title="暂无 Station 上报结果"
+          title="暂无工作站上报结果"
         />
 
         <CvDataTable
@@ -826,7 +826,7 @@ onBeforeUnmount(() => {
           :rows="stationListState.data.items"
           :columns="stationColumns"
           row-key="messageId"
-          caption="Station 上报结果列表"
+          caption="工作站上报结果列表"
           :busy="stationListState.isRefreshing"
         >
           <template #cell-completedAtUtc="{ row }">
@@ -837,7 +837,7 @@ onBeforeUnmount(() => {
               <CvStatusBadge :tone="formatInspectionOutcome(row.outcome).tone">
                 {{ formatInspectionOutcome(row.outcome).label }}
               </CvStatusBadge>
-              <small v-if="row.legacyProjection">legacy projection</small>
+              <small v-if="row.legacyProjection">兼容投影（旧版结果映射）</small>
             </span>
           </template>
           <template #cell-execution="{ row }">
@@ -868,25 +868,25 @@ onBeforeUnmount(() => {
           v-model:page="pageModel"
           :page-size="stationListState.data.pageSize"
           :total-items="stationListState.data.totalCount"
-          label="Station 结果分页"
+          label="工作站结果分页"
         />
       </CvPanel>
 
       <CvPanel
-        title="Station 结果详情"
-        description="详情来自当前页的只读 Station 上报摘要，不请求命令、部署、图片或重跑 endpoint。"
+        title="工作站结果详情"
+        description="详情来自当前页的只读工作站上报摘要，不请求命令、部署、图片或重跑接口。"
       >
         <CvPageState
           v-if="!resultId"
           compact
           kind="empty"
-          title="请选择一条 Station 结果"
+          title="请选择一条工作站结果"
         />
         <CvPageState
           v-else-if="!selectedStationResult"
           compact
           kind="not-found"
-          title="当前页未找到该 Station 结果"
+          title="当前页未找到该工作站结果"
           description="请返回包含该结果的分页后重新选择。"
         />
         <template v-else>
@@ -894,13 +894,13 @@ onBeforeUnmount(() => {
             v-if="selectedStationResult.legacyProjection"
             class="results-page__notice"
             tone="warning"
-            title="Legacy Station outcome projection"
+            title="兼容投影（旧版工作站结果映射）"
           >
-            此 payload 缺少 canonical 双轴；当前结果仅按后端 StationCanonicalOutcomeProjection 的固定读取时映射展示，未从诊断文案推断。
+            此旧格式数据缺少标准双轴；当前结果仅按后端固定映射展示，不从诊断文案推断。
           </CvInlineAlert>
           <CvDescriptionList
             :items="stationDetailItems(selectedStationResult)"
-            label="Station 结果详情"
+            label="工作站结果详情"
           />
         </template>
       </CvPanel>
@@ -924,6 +924,6 @@ onBeforeUnmount(() => {
 .results-page__defects { display: grid; gap: var(--cv-space-2); margin: 0; padding: 0; list-style: none; }
 .results-page__defects li { display: grid; grid-template-columns: minmax(100px, 0.7fr) minmax(120px, 0.7fr) minmax(0, 1fr); gap: var(--cv-space-3); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .results-page__defects strong { color: var(--cv-text-primary); }
-@media (max-width: 1120px) { .results-page__layout { grid-template-columns: 1fr; } }
+@media (max-width: 1440px) { .results-page__layout { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .results-page__defects li { grid-template-columns: 1fr; } }
 </style>

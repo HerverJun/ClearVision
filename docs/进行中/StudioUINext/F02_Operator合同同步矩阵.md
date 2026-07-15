@@ -74,6 +74,32 @@ STABLE_LINE_OPERATOR_SYNC=PASS
 OPERATOR_METADATA_FIELDS_AUTHORITATIVE=PASS
 ```
 
+## 2.2 Goal 3 稳定线增量审计
+
+Goal 3 入口执行 `git fetch origin --prune` 后，稳定线从本矩阵原审计头
+`f1efcfc11a8b31f389f3dcfef321763f84ff3a2b` 前进到
+`6e490665665161d4658fc9c8ea6cf580993cdb1b`。目标分支与稳定线仍从
+`e1bad492fecb6dff2c0a8f848db9ebfa18acf093` 分叉，不能把该范围当作线性 fast-forward 或整批 cherry-pick。
+
+```text
+GOAL3_STABLE_LINE_FETCHED_SHA=6e490665665161d4658fc9c8ea6cf580993cdb1b
+GOAL3_STABLE_LINE_INCREMENTAL_COMMITS=4
+GOAL3_STABLE_LINE_INCREMENTAL_SYNC=DEFERRED_WITH_REASON
+OPERATOR_CONTRACT_GATE=PASS
+F02_OPERATOR_CONTRACT_SCOPE=CATALOG_IDENTITY_AND_CURRENT_BRANCH_RUNTIME_METADATA
+```
+
+| Source SHA | Subject | 分类 | Goal 3 结论 |
+|---|---|---|---|
+| `ce266626e0bec0a8cd4a68c11b176df95e8cb482` | `fix(operators): close stage4 contract compatibility gaps` | `CONFLICT_RISK` + `DEFER_OUT_OF_SCOPE` | 同时修改 image-depth Runtime admission、ShadingCorrection/TranslationRotationCalibration 执行合同以及 `ProjectService` 的 PixelStatistics Flow/decision 兼容迁移。它不是独立的 F02 Catalog identity 修复，且触及本 Goal 明确禁止扩展的 Flow、Project 与 Runtime 边界。 |
+| `0a827d78cb0a9f8ef345ee2c1b9f6eb2391e38f3` | `test(benchmark): establish operator precision baselines` | `DEFER_OUT_OF_SCOPE` | 新增 operator precision 数据集、benchmark runner 与质量证据，不改变 F02 GET-only 页面所冻结的 identity 投影；不引入第二性能路线。 |
+| `97d25440bf540b3543ddbd687377daa7cdab2685` | `feat(operators): adopt benchmark-proven precision upgrades` | `CONFLICT_RISK` + `DEFER_OUT_OF_SCOPE` | 修改测量/AI 算法实现、端口、参数与输出，并新增 `MeasurementEvidence`。这些字段与真实执行语义绑定，不能只同步声明或让 F02 页面提前展示。 |
+| `6e490665665161d4658fc9c8ea6cf580993cdb1b` | `docs(governance): close operator quality evidence` | `CONFLICT_RISK` | 将 Operator quality/readiness 状态贯穿 Core、Application、OperatorLibrary、AI、scanner、生成文档与 CI。F02 当前已冻结 `OPERATOR_SIDE_EFFECT_METADATA=NOT_AVAILABLE`、`OPERATOR_READINESS_METADATA=NOT_AVAILABLE`；整提交同步会越过 identity-only gate，并改变 CI applicability/质量语义。 |
+
+以上四项都不是可以脱离其 Runtime、算法、Project、OperatorLibrary、AI 或 CI 依赖的安全 identity hunk，
+因此 Goal 3 不机械合并、不复制生成物，也不改变已通过的 scoped Operator gate。后续若要接入 quality、
+readiness 或 `MeasurementEvidence`，必须由 F03 之后的独立合同冻结重新决定 payload、decoder、执行语义和门禁范围。
+
 ## 3. 分类定义
 
 | 分类 | 含义 |

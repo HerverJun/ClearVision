@@ -1,9 +1,13 @@
 import { expect, Page, Route, test } from '@playwright/test';
 import {
   auditF02Request,
+  captureF02VisualEvidence,
+  createF02RuntimeErrorAudit,
   expectGetOnly,
   fulfillF02Json,
+  hasF02VisualEvidenceTarget,
   installF02BrowserStartup,
+  installF02VisualPreferences,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
 
@@ -126,3 +130,26 @@ test('Projects surfaces malformed list and missing detail as localized product s
   await page.goto(`/studio/index.html#/projects/${missingProjectId}`);
   await expect(page.getByText('工程不存在')).toBeVisible();
 });
+
+for (const visual of [
+  { id: 'projects-light-compact', width: 1366, height: 768 },
+  { id: 'projects-short-light-compact', width: 1366, height: 600 }
+] as const) {
+  test(`captures ${visual.id} Browser fixture evidence`, async ({ page }) => {
+    test.skip(!hasF02VisualEvidenceTarget(), 'F02 visual evidence output was not requested.');
+    await page.setViewportSize({ width: visual.width, height: visual.height });
+    await installF02VisualPreferences(page, 'light', 'compact');
+    const runtimeErrors = createF02RuntimeErrorAudit(page);
+    const audit = await bootProjects(page);
+    await captureF02VisualEvidence(page, {
+      scenario: visual.id,
+      viewport: { width: visual.width, height: visual.height },
+      theme: 'light',
+      density: 'compact',
+      requests: audit,
+      runtimeErrors
+    });
+    expect(expectGetOnly(audit)).toBe(true);
+    expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  });
+}

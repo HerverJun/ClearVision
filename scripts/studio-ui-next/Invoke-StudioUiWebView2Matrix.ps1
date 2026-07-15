@@ -8,8 +8,12 @@ param(
     [string]$PublishDirectory,
     [ValidateSet("f01", "f02")]
     [string]$EvidencePhase = "f01",
+    [ValidateSet("full", "publish-only")]
+    [string]$RunScope = "full",
     [int]$BaseWebPort = 5300,
     [int]$BaseCdpPort = 9623,
+    [int]$WindowWidth = 1600,
+    [int]$WindowHeight = 1000,
     [int]$PerformanceGroups = 1,
     [switch]$SkipDebugBuild,
     [switch]$SkipPublish,
@@ -41,6 +45,16 @@ $debugExe = if ([string]::IsNullOrWhiteSpace($DebugDesktopExecutablePath)) {
         "net8.0-windows/win-x64/ClearVision.Product.Desktop.exe")
 } else {
     [System.IO.Path]::GetFullPath($DebugDesktopExecutablePath)
+}
+$sourceSha = (& git -C $repoRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($sourceSha)) {
+    throw "Could not resolve the source SHA for the WebView2 matrix."
+}
+if ($sourceSha -notmatch '^[0-9a-fA-F]{40}$') {
+    throw "The WebView2 matrix source SHA is not a 40-character commit SHA."
+}
+if ($RunScope -eq "publish-only" -and $SkipPublish) {
+    throw "RunScope=publish-only cannot be combined with SkipPublish."
 }
 
 if ([string]::IsNullOrWhiteSpace($RunName)) {
@@ -121,6 +135,11 @@ if ([string]::Equals(
 }
 $missingAssetsRoot = Join-Path (Split-Path -Parent $publishRoot) "missing-assets-publish"
 $publishArtifactsRoot = Join-Path (Split-Path -Parent $publishRoot) "artifacts"
+$publishProductRoutes = if ($EvidencePhase -eq "f02") {
+    @("/overview", "/projects", "/operators", "/stations", "/results")
+} else {
+    @("/overview")
+}
 New-Item -ItemType Directory -Force -Path $evidenceRoot | Out-Null
 
 function Assert-TemporaryPath {
@@ -141,8 +160,27 @@ function Remove-VerifiedTemporaryDirectory {
     param([string]$Path, [string]$AllowedRoot)
 
     $resolved = Assert-TemporaryPath -Path $Path -AllowedRoot $AllowedRoot
-    if (Test-Path -LiteralPath $resolved) {
-        Remove-Item -LiteralPath $resolved -Recurse -Force
+    for ($attempt = 1; $attempt -le 20; $attempt++) {
+        if (-not (Test-Path -LiteralPath $resolved)) {
+            return
+        }
+        $extendedPath = if ($resolved.StartsWith('\\')) {
+            '\\?\UNC\' + $resolved.TrimStart('\')
+        } else {
+            '\\?\' + $resolved
+        }
+        try {
+            [System.IO.Directory]::Delete($extendedPath, $true)
+            if (-not (Test-Path -LiteralPath $resolved)) {
+                return
+            }
+            throw "Directory deletion completed without removing '$resolved'."
+        } catch {
+            if ($attempt -eq 20) {
+                throw
+            }
+            Start-Sleep -Milliseconds 250
+        }
     }
 }
 
@@ -181,6 +219,8 @@ function Invoke-MatrixRun {
         Scale = $Scale
         SanitizeDesktopPath = $true
         RuntimeDirectory = Join-Path $runtimeDirectoryRoot "runs/$Name"
+        WindowWidth = $WindowWidth
+        WindowHeight = $WindowHeight
     }
     if (-not [string]::IsNullOrWhiteSpace($Route)) {
         $parameters["Route"] = $Route
@@ -231,58 +271,68 @@ $matrixError = $null
 $dpiStatus = "NOT_RUN"
 $noNodeStatus = "NOT_RUN"
 $performanceStatus = "NOT_RUN"
+$releaseBuildStatus = "NOT_RUN"
+$publishStatus = "NOT_RUN"
+$publishStaticAuditStatus = "NOT_RUN"
+$publishedProductRuntimeStatus = "NOT_RUN"
+$viewportScreenshotIndex = @()
 try {
-    Invoke-MatrixRun `
-        -Name "debug-legacy" `
-        -Expectation "legacy" `
-        -Configuration "Debug" `
-        -RuntimeKind "debug" `
-        -ExecutablePath $debugExe `
-        -Scale 1.0 `
-        -Route "" `
-        -DeepCanvas $false `
-        -NoBuild $debugBuilt
-    $debugBuilt = $true
-
-    Invoke-MatrixRun -Name "debug-diagnostics" -Expectation "studio-diagnostics" `
-        -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
-        -Scale 1.0 -Route "/diagnostics" -DeepCanvas $false -NoBuild $true
-    Invoke-MatrixRun -Name "debug-overview" -Expectation "studio-product" `
-        -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
-        -Scale 1.0 -Route "/overview" -DeepCanvas $false -NoBuild $true
-    Invoke-MatrixRun -Name "debug-projects" -Expectation "studio-product" `
-        -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
-        -Scale 1.0 -Route "/projects" -DeepCanvas $false -NoBuild $true
-    Invoke-MatrixRun -Name "debug-design" -Expectation "studio-design" `
-        -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
-        -Scale 1.0 -Route "/labs/design" -DeepCanvas $false -NoBuild $true
-
-    foreach ($scale in @(1.0, 1.25, 1.5, 2.0)) {
-        $scaleName = ([string]$scale).Replace('.', '-')
-        Invoke-MatrixRun -Name "debug-canvas-dpi-$scaleName" -Expectation "studio-canvas" `
-            -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
-            -Scale $scale -Route "/labs/canvas" -DeepCanvas ($scale -eq 1.0) -NoBuild $true
-    }
-
-    if (-not $SkipPerformance) {
-        & $performanceRun `
+    if ($RunScope -eq "full") {
+        Invoke-MatrixRun `
+            -Name "debug-legacy" `
+            -Expectation "legacy" `
             -Configuration "Debug" `
             -RuntimeKind "debug" `
-            -EvidencePhase $EvidencePhase `
-            -DesktopExecutablePath $debugExe `
-            -NodeExecutablePath $nodeExe `
-            -RunName "$RunName-performance" `
-            -EvidenceDirectory "$relativeEvidenceRoot/performance" `
-            -RuntimeDirectory (Join-Path $runtimeDirectoryRoot "performance") `
-            -GroupCount $PerformanceGroups `
-            -BaseWebPort ($BaseWebPort + 100) `
-            -BaseCdpPort ($BaseCdpPort + 100) `
-            -SanitizeDesktopPath `
-            -NoBuild
-        $performanceSummary = Get-Content -Raw -LiteralPath (
-            Join-Path $evidenceRoot "performance/studio-ui-canvas-performance-summary.json") |
-            ConvertFrom-Json
-        $performanceStatus = [string]$performanceSummary.decision
+            -ExecutablePath $debugExe `
+            -Scale 1.0 `
+            -Route "" `
+            -DeepCanvas $false `
+            -NoBuild $debugBuilt
+        $debugBuilt = $true
+
+        Invoke-MatrixRun -Name "debug-diagnostics" -Expectation "studio-diagnostics" `
+            -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
+            -Scale 1.0 -Route "/diagnostics" -DeepCanvas $false -NoBuild $true
+        Invoke-MatrixRun -Name "debug-overview" -Expectation "studio-product" `
+            -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
+            -Scale 1.0 -Route "/overview" -DeepCanvas $false -NoBuild $true
+        Invoke-MatrixRun -Name "debug-projects" -Expectation "studio-product" `
+            -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
+            -Scale 1.0 -Route "/projects" -DeepCanvas $false -NoBuild $true
+        Invoke-MatrixRun -Name "debug-design" -Expectation "studio-design" `
+            -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
+            -Scale 1.0 -Route "/labs/design" -DeepCanvas $false -NoBuild $true
+
+        foreach ($scale in @(1.0, 1.25, 1.5, 2.0)) {
+            $scaleName = ([string]$scale).Replace('.', '-')
+            Invoke-MatrixRun -Name "debug-canvas-dpi-$scaleName" -Expectation "studio-canvas" `
+                -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
+                -Scale $scale -Route "/labs/canvas" -DeepCanvas ($scale -eq 1.0) -NoBuild $true
+        }
+
+        if (-not $SkipPerformance) {
+            & $performanceRun `
+                -Configuration "Debug" `
+                -RuntimeKind "debug" `
+                -EvidencePhase $EvidencePhase `
+                -DesktopExecutablePath $debugExe `
+                -NodeExecutablePath $nodeExe `
+                -RunName "$RunName-performance" `
+                -EvidenceDirectory "$relativeEvidenceRoot/performance" `
+                -RuntimeDirectory (Join-Path $runtimeDirectoryRoot "performance") `
+                -GroupCount $PerformanceGroups `
+                -BaseWebPort ($BaseWebPort + 100) `
+                -BaseCdpPort ($BaseCdpPort + 100) `
+                -SanitizeDesktopPath `
+                -NoBuild
+            $performanceSummary = Get-Content -Raw -LiteralPath (
+                Join-Path $evidenceRoot "performance/studio-ui-canvas-performance-summary.json") |
+                ConvertFrom-Json
+            $performanceStatus = [string]$performanceSummary.decision
+        }
+    } else {
+        $performanceStatus = "NOT_APPLICABLE_PUBLISH_ONLY"
+        $dpiStatus = "NOT_APPLICABLE_PUBLISH_ONLY"
     }
 
     if (-not $SkipPublish) {
@@ -290,26 +340,50 @@ try {
             throw "Temporary publish root already exists: $publishRoot"
         }
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $publishRoot) | Out-Null
+        if ($RunScope -eq "publish-only") {
+            & $dotnetRunner -ReturnExitCode build $desktopProject `
+                -c Release `
+                --runtime win-x64 `
+                --self-contained true `
+                -p:RestorePackagesWithLockFile=false `
+                --artifacts-path $publishArtifactsRoot
+            $releaseBuildExitCode = $LASTEXITCODE
+            if ($releaseBuildExitCode -ne 0) {
+                throw "StudioUI/Desktop Release build failed with exit code $releaseBuildExitCode."
+            }
+            $releaseBuildStatus = "PASS"
+        } else {
+            $releaseBuildStatus = "PASS_VIA_PUBLISH_BUILD_TARGET"
+        }
         & $dotnetRunner -ReturnExitCode publish $desktopProject `
             -c Release `
             --runtime win-x64 `
             --self-contained true `
+            -p:RestorePackagesWithLockFile=false `
             --output $publishRoot `
             --artifacts-path $publishArtifactsRoot
         $publishExitCode = $LASTEXITCODE
         if ($publishExitCode -ne 0) {
             throw "Release self-contained publish failed with exit code $publishExitCode."
         }
+        $publishStatus = "PASS"
         $releaseExe = Join-Path $publishRoot "ClearVision.Product.Desktop.exe"
-        Invoke-MatrixRun -Name "publish-diagnostics" -Expectation "studio-diagnostics" `
-            -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
-            -Scale 1.0 -Route "/diagnostics" -DeepCanvas $false -NoBuild $true
-        Invoke-MatrixRun -Name "publish-overview" -Expectation "studio-product" `
-            -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
-            -Scale 1.0 -Route "/overview" -DeepCanvas $false -NoBuild $true
-        Invoke-MatrixRun -Name "publish-canvas" -Expectation "studio-canvas" `
-            -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
-            -Scale 1.0 -Route "/labs/canvas" -DeepCanvas $false -NoBuild $true
+        if ($RunScope -eq "full") {
+            Invoke-MatrixRun -Name "publish-diagnostics" -Expectation "studio-diagnostics" `
+                -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
+                -Scale 1.0 -Route "/diagnostics" -DeepCanvas $false -NoBuild $true
+        }
+        foreach ($productRoute in $publishProductRoutes) {
+            $routeName = $productRoute.Trim('/').Replace('/', '-')
+            Invoke-MatrixRun -Name "publish-$routeName" -Expectation "studio-product" `
+                -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
+                -Scale 1.0 -Route $productRoute -DeepCanvas $false -NoBuild $true
+        }
+        if ($RunScope -eq "full") {
+            Invoke-MatrixRun -Name "publish-canvas" -Expectation "studio-canvas" `
+                -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
+                -Scale 1.0 -Route "/labs/canvas" -DeepCanvas $false -NoBuild $true
+        }
 
         $verifiedMissingRoot = Assert-TemporaryPath `
             -Path $missingAssetsRoot `
@@ -331,16 +405,48 @@ try {
             -Scale 1.0 -Route "" -DeepCanvas $false -NoBuild $true
     }
 
-    & $dpiAudit `
-        -RuntimeEvidenceDirectory $evidenceRoot `
-        -OutputPath (Join-Path $evidenceRoot "studio-ui-dpi-evidence.json")
-    $dpiStatus = "PASS"
+    if ($RunScope -eq "full") {
+        & $dpiAudit `
+            -RuntimeEvidenceDirectory $evidenceRoot `
+            -OutputPath (Join-Path $evidenceRoot "studio-ui-dpi-evidence.json")
+        $dpiStatus = "PASS"
+    }
 
     if (-not $SkipPublish) {
-        & $noNodeAudit `
-            -PublishDirectory $publishRoot `
-            -RuntimeEvidenceDirectory $evidenceRoot `
-            -OutputPath (Join-Path $evidenceRoot "studio-ui-no-node-evidence.json")
+        $noNodeParameters = @{
+            PublishDirectory = $publishRoot
+            RuntimeEvidenceDirectory = $evidenceRoot
+            OutputPath = Join-Path $evidenceRoot "studio-ui-no-node-evidence.json"
+        }
+        if ($EvidencePhase -eq "f02") {
+            $noNodeParameters["RequiredProductRoutes"] = $publishProductRoutes
+            $noNodeParameters["ExpectedEvidencePhase"] = $EvidencePhase
+            $noNodeParameters["ExpectedSourceSha"] = $sourceSha
+        }
+        & $noNodeAudit @noNodeParameters
+        $noNodeDocument = Get-Content -Raw -Encoding UTF8 -LiteralPath (
+            $noNodeParameters.OutputPath) | ConvertFrom-Json
+        $publishStaticAuditStatus = [string]$noNodeDocument.publishStaticScan.status
+        $publishedProductRuntimeStatus = [string]$noNodeDocument.publishedProductRuntime.status
+        $viewportScreenshotIndex = @($noNodeDocument.publishedProductRuntime.checks |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.screenshotPath) } |
+            ForEach-Object {
+                [pscustomobject]@{
+                    route = [string]$_.route
+                    path = [string]$_.screenshotPath
+                    sha256 = [string]$_.screenshotSha256
+                    sourceSha = [string]$_.sourceSha
+                    scenes = @($_.screenshotScenes)
+                    dataSource = [string]$_.screenshotDataSource
+                    authSource = [string]$_.screenshotAuthSource
+                    theme = [string]$_.screenshotTheme
+                    density = [string]$_.screenshotDensity
+                    nativeWindow = $_.screenshotNativeWindow
+                    browserViewport = $_.screenshotBrowserViewport
+                    dprType = [string]$_.screenshotDprType
+                    dpiType = [string]$_.screenshotDpiType
+                }
+            })
         $noNodeStatus = "PASS"
     }
 } catch {
@@ -359,15 +465,37 @@ try {
 $manifest = [pscustomobject]@{
     schemaVersion = 1
     evidencePhase = $EvidencePhase
+    sourceSha = $sourceSha
     runName = $RunName
+    runScope = $RunScope
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
     status = if ($matrixError) { "FAIL" } else { "PASS" }
     error = if ($matrixError) { $matrixError.Exception.Message } else { $null }
     evidenceDirectory = $evidenceRoot
     publishDirectoryRetained = [bool]$KeepTemporaryPublish
     publishDirectory = $publishRoot
+    releaseBuild = $releaseBuildStatus
+    releasePublish = $publishStatus
+    publishStaticAudit = $publishStaticAuditStatus
+    publishedProductRuntime = $publishedProductRuntimeStatus
+    requiredPublishedProductRoutes = $publishProductRoutes
+    viewportScreenshots = $viewportScreenshotIndex
+    window = [pscustomobject]@{
+        width = $WindowWidth
+        height = $WindowHeight
+    }
+    portRange = [pscustomobject]@{
+        baseWebPort = $BaseWebPort
+        baseCdpPort = $BaseCdpPort
+        count = $nextPortOffset
+    }
     runtimeDirectory = $runtimeDirectoryRoot
     runtimeDirectoryRemoved = -not (Test-Path -LiteralPath $runtimeDirectoryRoot)
+    publishCleanup = [pscustomobject]@{
+        publishDirectoryRemoved = -not (Test-Path -LiteralPath $publishRoot)
+        missingAssetsDirectoryRemoved = -not (Test-Path -LiteralPath $missingAssetsRoot)
+        buildArtifactsDirectoryRemoved = -not (Test-Path -LiteralPath $publishArtifactsRoot)
+    }
     runs = @($runRecords)
     performance = $performanceStatus
     dpiAuthority = $dpiStatus

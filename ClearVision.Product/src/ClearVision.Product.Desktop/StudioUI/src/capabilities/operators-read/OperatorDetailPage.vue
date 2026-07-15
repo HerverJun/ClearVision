@@ -30,9 +30,9 @@ const activeOperatorType = computed(() => props.operatorType ?? String(route.par
 const detailQuery = createOperatorDetailQuery(runtime.queries, () => activeOperatorType.value);
 const state = computed(() => detailQuery.state.value);
 const summary = computed<readonly CvDescriptionItem[]>(() => state.value.data ? [
-  { key: 'type', label: 'OperatorType', value: state.value.data.operatorType },
+  { key: 'type', label: '算子类型标识', value: state.value.data.operatorType },
   { key: 'category', label: '分类', value: operatorCategoryLabels[state.value.data.categoryId] },
-  { key: 'version', label: '当前分支版本', value: state.value.data.version },
+  { key: 'version', label: '当前版本', value: state.value.data.version },
   { key: 'hidden', label: '默认隐藏', value: state.value.data.defaultHidden ? '是' : '否' },
   { key: 'icon', label: '图标标识', value: state.value.data.iconName },
   { key: 'lifecycle-note', label: '生命周期说明', value: state.value.data.lifecycleNote, span: 2 },
@@ -81,7 +81,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
   >
     <CvPageHeader
       :title="state.data?.displayName ?? '算子详情'"
-      description="详情只读取当前分支 /api/operators/{type}/metadata，不调用预览、执行或参数推荐。"
+      description="详情只读取当前分支的算子元数据，不调用预览、执行或参数推荐。"
     >
       <template #breadcrumbs>
         <RouterLink to="/operators">
@@ -162,7 +162,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
       class="operator-detail__grid"
     >
       <CvPanel
-        title="Identity 与生命周期"
+        title="身份与生命周期"
         :description="state.data.description"
       >
         <div class="operator-detail__lifecycle">
@@ -172,13 +172,13 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
         </div>
         <CvDescriptionList
           :items="summary"
-          label="算子 identity"
+          label="算子身份"
         />
       </CvPanel>
 
       <CvPanel
         title="输入端口"
-        description="当前分支 Runtime metadata。"
+        description="当前分支运行时元数据。"
       >
         <CvPageState
           v-if="state.data.inputPorts.length === 0"
@@ -204,7 +204,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
 
       <CvPanel
         title="输出端口"
-        description="只展示当前 endpoint 返回的正式输出端口，不推断 conditional outputs。"
+        description="只展示当前接口返回的正式输出端口，不推断条件输出。"
       >
         <CvPageState
           v-if="state.data.outputPorts.length === 0"
@@ -230,7 +230,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
 
       <CvPanel
         title="参数"
-        description="展示当前分支 metadata；页面不会生成、写入或推荐参数。"
+        description="展示当前分支元数据；页面不会生成、写入或推荐参数。"
       >
         <CvPageState
           v-if="state.data.parameters.length === 0"
@@ -243,7 +243,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
           :rows="state.data.parameters"
           :columns="parameterColumns"
           row-key="name"
-          caption="算子参数 metadata"
+          caption="算子参数元数据"
         >
           <template #cell-isRequired="{ row }">
             {{ row.isRequired ? '是' : '否' }}

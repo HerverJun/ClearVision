@@ -201,8 +201,8 @@ describe('Results page', () => {
       })
     );
 
-    expect(mounted.wrapper.text()).toContain('legacy projection');
-    expect(mounted.wrapper.text()).toContain('Legacy Station outcome projection');
+    expect(mounted.wrapper.text()).toContain('旧版结果映射');
+    expect(mounted.wrapper.text()).toContain('旧版工作站结果映射');
     expect(mounted.wrapper.text()).toContain('执行失败');
     expect(mounted.wrapper.text()).toContain('未判定');
     expect(mounted.wrapper.findAll('[data-status-tone="ng"]')).toHaveLength(1);
@@ -261,7 +261,7 @@ describe('Results page', () => {
     }));
     await stale.wrapper.get('button').trigger('click');
     await flushPromises();
-    expect(stale.wrapper.text()).toContain('Station 结果刷新失败');
+    expect(stale.wrapper.text()).toContain('工作站结果刷新失败');
     expect(stale.wrapper.text()).toContain('Stale');
     stale.wrapper.unmount();
     stale.queries.dispose();
@@ -269,7 +269,7 @@ describe('Results page', () => {
     const aborted = await mountResults('/results?source=station', apiWith(async path => {
       throw new ApiAbortError(path);
     }));
-    expect(aborted.wrapper.text()).toContain('Station 结果请求已取消');
+    expect(aborted.wrapper.text()).toContain('工作站结果请求已取消');
     aborted.wrapper.unmount();
     aborted.queries.dispose();
   });

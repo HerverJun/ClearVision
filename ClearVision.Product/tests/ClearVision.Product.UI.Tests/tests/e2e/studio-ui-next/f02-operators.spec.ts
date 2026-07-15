@@ -1,11 +1,15 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import {
   auditF02Request,
+  captureF02VisualEvidence,
+  createF02RuntimeErrorAudit,
   expectGetOnly,
   f02BrowserFixture,
   f02OperatorPerformanceFixtureCount,
   fulfillF02Json,
+  hasF02VisualEvidenceTarget,
   installF02BrowserStartup,
+  installF02VisualPreferences,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
 
@@ -164,3 +168,30 @@ test('Operator surfaces malformed catalog and missing detail as frozen product s
   await page.goto('/studio/index.html#/operators/999999');
   await expect(page.getByText('算子不存在（404）')).toBeVisible();
 });
+
+for (const visual of [
+  { id: 'operators-light-compact', width: 1366, height: 768, theme: 'light' },
+  { id: 'operators-dark-compact', width: 1366, height: 768, theme: 'dark' },
+  { id: 'operators-short-light-compact', width: 1366, height: 600, theme: 'light' }
+] as const) {
+  test(`captures ${visual.id} Browser fixture evidence`, async ({ page }) => {
+    test.skip(!hasF02VisualEvidenceTarget(), 'F02 visual evidence output was not requested.');
+    await page.setViewportSize({ width: visual.width, height: visual.height });
+    await installF02VisualPreferences(page, visual.theme, 'compact');
+    const runtimeErrors = createF02RuntimeErrorAudit(page);
+    const audit = await bootOperators(page);
+    await page.goto('/studio/index.html#/operators');
+    await expect(page.locator('[data-capability="operators-read"]')).toBeVisible();
+    await expect(page.locator('tbody tr')).toHaveCount(25);
+    await captureF02VisualEvidence(page, {
+      scenario: visual.id,
+      viewport: { width: visual.width, height: visual.height },
+      theme: visual.theme,
+      density: 'compact',
+      requests: audit,
+      runtimeErrors
+    });
+    expect(expectGetOnly(audit)).toBe(true);
+    expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  });
+}

@@ -57,6 +57,13 @@ $desktopExe = if ([string]::IsNullOrWhiteSpace($DesktopExecutablePath)) {
 } else {
     [System.IO.Path]::GetFullPath($DesktopExecutablePath)
 }
+$sourceSha = (& git -C $repoRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($sourceSha)) {
+    throw "Could not resolve the source SHA for WebView2 evidence."
+}
+if ($sourceSha -notmatch '^[0-9a-fA-F]{40}$') {
+    throw "The WebView2 evidence source SHA is not a 40-character commit SHA."
+}
 
 function ConvertTo-SafeRunName {
     param([string]$Value)
@@ -184,6 +191,7 @@ $customEnvironment = [ordered]@{
     "CV_STUDIO_UI_RUNTIME_KIND" = $RuntimeKind
     "CV_STUDIO_UI_CONFIGURATION" = $Configuration
     "CV_STUDIO_UI_EVIDENCE_PHASE" = $EvidencePhase
+    "CV_STUDIO_UI_SOURCE_SHA" = $sourceSha
     "CV_STUDIO_UI_SANITIZED_PATH" = if ($SanitizeDesktopPath) { "true" } else { "false" }
     "CV_STUDIO_UI_DEEP_CANVAS" = if ($DeepCanvas) { "true" } else { "false" }
     "CV_NATIVE_DPI_PROBE" = Join-Path $scriptRoot "Get-DesktopRuntimeProbe.ps1"
@@ -267,6 +275,25 @@ function Get-MatchingDesktopProcesses {
         })
 }
 
+function Test-TcpPortAvailable {
+    param([int]$Port)
+
+    $listener = $null
+    try {
+        $listener = [System.Net.Sockets.TcpListener]::new(
+            [System.Net.IPAddress]::Loopback,
+            $Port)
+        $listener.Start()
+        return $true
+    } catch {
+        return $false
+    } finally {
+        if ($listener) {
+            $listener.Stop()
+        }
+    }
+}
+
 $runnerParameters = @{
     Configuration = $Configuration
     EvidenceDirectory = $relativeEvidence
@@ -337,6 +364,8 @@ if ($webView2UserDataRemoved -and
     }
 }
 $runtimeRootRemoved = -not (Test-Path -LiteralPath $runtimeRoot)
+$webPortReleased = Test-TcpPortAvailable -Port $WebPort
+$cdpPortReleased = Test-TcpPortAvailable -Port $CdpPort
 $cleanup = [pscustomobject]@{
     schemaVersion = 1
     runName = $RunName
@@ -359,6 +388,13 @@ $cleanup = [pscustomobject]@{
         passed = $matchingProcesses.Count -eq 0
         remaining = $matchingProcesses
     }
+    portCleanup = [pscustomobject]@{
+        webPort = $WebPort
+        webPortReleased = $webPortReleased
+        cdpPort = $CdpPort
+        cdpPortReleased = $cdpPortReleased
+        passed = $webPortReleased -and $cdpPortReleased
+    }
     runtimeCleanup = [pscustomobject]@{
         root = $runtimeRoot
         webView2UserDataRemoved = $webView2UserDataRemoved
@@ -371,6 +407,7 @@ $cleanup = [pscustomobject]@{
     environmentRestored = Test-EnvironmentRestored
 }
 $cleanupPassed = $cleanup.processCleanup.passed -and
+    $cleanup.portCleanup.passed -and
     $cleanup.runtimeCleanup.webView2UserDataRemoved -and
     $cleanup.runtimeCleanup.conversationStoreRemoved -and
     $cleanup.runtimeCleanup.agentRunStoreRemoved -and

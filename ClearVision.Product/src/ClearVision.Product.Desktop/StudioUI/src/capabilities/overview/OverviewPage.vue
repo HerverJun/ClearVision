@@ -31,9 +31,30 @@ const systemItems = computed<readonly CvDescriptionItem[]>(() => [
   { key: 'message', label: '状态说明', value: systemStatus.value.message, span: 2 }
 ]);
 const sessionItems = computed<readonly CvDescriptionItem[]>(() => [
-  { key: 'role', label: '角色', value: session.value.user?.role ?? null },
+  { key: 'role', label: '角色', value: formatRole(session.value.user?.role) },
   { key: 'message', label: '状态说明', value: session.value.message, span: 2 }
 ]);
+
+function formatHealthStatus(value: string | undefined): string {
+  if (!value) return '状态不可用';
+  const labels: Readonly<Record<string, string>> = Object.freeze({
+    healthy: '健康',
+    degraded: '降级',
+    unhealthy: '异常'
+  });
+  return labels[value.toLocaleLowerCase()] ?? value;
+}
+
+function formatRole(value: string | undefined): string | null {
+  if (!value) return null;
+  const labels: Readonly<Record<string, string>> = Object.freeze({
+    admin: '管理员',
+    engineer: '工程师',
+    operator: '操作员',
+    viewer: '查看者'
+  });
+  return labels[value.toLocaleLowerCase()] ?? value;
+}
 
 function refreshSharedProjections(): void {
   void runtime.session.refresh();
@@ -56,7 +77,7 @@ onBeforeUnmount(() => {
     data-capability="overview"
   >
     <CvPageHeader
-      eyebrow="ClearVision Studio"
+      eyebrow="工作台"
       title="概览"
       description="查看本地服务、当前会话和最近工程的只读状态。"
     >
@@ -76,7 +97,7 @@ onBeforeUnmount(() => {
     >
       <CvPanel
         title="本地服务"
-        description="来自全应用唯一 systemStatusOwner。"
+        description="由全应用统一的系统状态服务提供。"
         :level="2"
       >
         <div class="overview-page__status-row">
@@ -84,7 +105,7 @@ onBeforeUnmount(() => {
             :tone="systemStatus.phase === 'online' ? 'ok' : systemStatus.phase === 'stale' ? 'warning' : systemStatus.phase === 'loading' ? 'info' : 'ng'"
             :label="systemStatus.phase === 'online' ? '在线' : systemStatus.phase === 'loading' ? '连接中' : systemStatus.phase === 'stale' ? '状态过期' : '离线'"
           />
-          <strong>{{ systemStatus.health?.status ?? '状态不可用' }}</strong>
+          <strong>{{ formatHealthStatus(systemStatus.health?.status) }}</strong>
         </div>
         <CvDescriptionList
           :items="systemItems"
@@ -95,7 +116,7 @@ onBeforeUnmount(() => {
 
       <CvPanel
         title="当前会话"
-        description="来自全应用唯一 sessionProjectionOwner。"
+        description="由全应用统一的会话状态服务提供。"
         :level="2"
       >
         <div class="overview-page__status-row">
@@ -116,7 +137,7 @@ onBeforeUnmount(() => {
     <section class="overview-page__content-grid">
       <CvPanel
         title="最近工程"
-        description="只消费 projects-read 的公开 recent query。"
+        description="显示服务端记录的最近打开工程。"
       >
         <template #actions>
           <RouterLink to="/projects">
@@ -151,7 +172,7 @@ onBeforeUnmount(() => {
           compact
           kind="empty"
           title="暂无最近工程"
-          description="服务端当前没有返回带 lastOpenedAt 的工程。"
+          description="服务端当前没有最近打开记录。"
         />
         <CvPageState
           v-else-if="recentProjectsState.phase === 'unauthorized'"
@@ -204,7 +225,7 @@ onBeforeUnmount(() => {
 
       <CvPanel
         title="快速入口"
-        description="只展示 F02 已迁移的只读产品页面。"
+        description="前往当前可用的只读产品页面。"
         :level="2"
       >
         <nav

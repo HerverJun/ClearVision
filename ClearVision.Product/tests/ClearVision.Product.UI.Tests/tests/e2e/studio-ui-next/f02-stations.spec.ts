@@ -1,10 +1,14 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import {
   auditF02Request,
+  captureF02VisualEvidence,
+  createF02RuntimeErrorAudit,
   expectGetOnly,
   f02BrowserFixture,
   fulfillF02Json,
+  hasF02VisualEvidenceTarget,
   installF02BrowserStartup,
+  installF02VisualPreferences,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
 
@@ -248,3 +252,28 @@ test('Station list surfaces frozen-contract malformed and empty responses', asyn
   await page.reload();
   await expect(page.getByText('暂无 Station')).toBeVisible();
 });
+
+for (const visual of [
+  { id: 'stations-light-compact', width: 1366, height: 768 },
+  { id: 'stations-short-light-compact', width: 1366, height: 600 }
+] as const) {
+  test(`captures ${visual.id} Browser fixture evidence`, async ({ page }) => {
+    test.skip(!hasF02VisualEvidenceTarget(), 'F02 visual evidence output was not requested.');
+    await page.setViewportSize({ width: visual.width, height: visual.height });
+    await installF02VisualPreferences(page, 'light', 'compact');
+    const runtimeErrors = createF02RuntimeErrorAudit(page);
+    const audit = await bootStations(page);
+    await page.goto('/studio/index.html#/stations');
+    await expect(page.locator('[data-capability="stations-read"]')).toBeVisible();
+    await captureF02VisualEvidence(page, {
+      scenario: visual.id,
+      viewport: { width: visual.width, height: visual.height },
+      theme: 'light',
+      density: 'compact',
+      requests: audit,
+      runtimeErrors
+    });
+    expect(expectGetOnly(audit)).toBe(true);
+    expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  });
+}

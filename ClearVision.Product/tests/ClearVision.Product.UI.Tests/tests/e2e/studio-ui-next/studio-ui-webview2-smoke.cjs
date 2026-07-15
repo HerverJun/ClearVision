@@ -12,7 +12,8 @@ const {
   safeFileName,
   seedAuthenticatedSession,
   waitForDoubleAnimationFrame,
-  writeJsonEvidence
+  writeJsonEvidence,
+  writePngEvidence
 } = require('./webview2-harness.cjs');
 const {
   createCanvasFixtureDescriptor
@@ -263,6 +264,40 @@ async function verifyProductPage(page, route, runtimeErrors) {
   });
   const writeRequests = productRequests.filter(item => item.method !== 'GET');
 
+  const preferenceRequestStart = runtimeErrors.requests.length;
+  const setPreference = async (groupName, buttonName, attribute, expectedValue) => {
+    const group = page.getByRole('group', { name: groupName });
+    const button = group.getByRole('button', { name: buttonName, exact: true });
+    await button.click();
+    await page.waitForFunction(
+      ({ attributeName, value }) => document.documentElement.getAttribute(attributeName) === value,
+      { attributeName: attribute, value: expectedValue }
+    );
+    return page.evaluate(({ attributeName, groupLabel }) => ({
+      attributeValue: document.documentElement.getAttribute(attributeName),
+      pressed: document.querySelector(
+        `[role="group"][aria-label="${groupLabel}"] button[aria-pressed="true"]`
+      )?.textContent?.trim() || null
+    }), { attributeName: attribute, groupLabel: groupName });
+  };
+  const preferenceCycle = {
+    initial: { theme: projection.theme, density: projection.density },
+    dark: await setPreference('主题', '深色', 'data-theme', 'dark'),
+    comfortable: await setPreference('界面密度', '舒适', 'data-density', 'comfortable'),
+    light: await setPreference('主题', '浅色', 'data-theme', 'light'),
+    compact: await setPreference('界面密度', '紧凑', 'data-density', 'compact'),
+    final: await page.evaluate(() => ({
+      theme: document.documentElement.dataset.theme || null,
+      density: document.documentElement.dataset.density || null,
+      stored: JSON.parse(localStorage.getItem('clearvision.studio-ui.preferences.v1') || 'null')
+    }))
+  };
+  const preferenceRequests = runtimeErrors.requests.slice(preferenceRequestStart).filter(item => {
+    const url = new URL(item.url);
+    return url.origin === origin && (url.pathname === '/health' || url.pathname.startsWith('/api/'));
+  });
+  const preferenceWriteRequests = preferenceRequests.filter(item => item.method !== 'GET');
+
   assert(projection.shellCount === 1, 'Product route did not mount exactly one ProductLayout.');
   assert(projection.internalLabCount === 0, 'Product route mounted the InternalLabLayout.');
   assert(projection.labNavigationCount === 0, 'Labs leaked into formal product navigation.');
@@ -279,7 +314,24 @@ async function verifyProductPage(page, route, runtimeErrors) {
   assert(productRequests.length > 0, 'Product route emitted no observable GET requests.');
   assert(writeRequests.length === 0,
     `Product route emitted write requests: ${JSON.stringify(writeRequests)}`);
-  return { ...projection, productRequests, writeRequests };
+  assert(preferenceCycle.dark.attributeValue === 'dark', 'Dark theme projection was not applied.');
+  assert(preferenceCycle.comfortable.attributeValue === 'comfortable',
+    'Comfortable density projection was not applied.');
+  assert(preferenceCycle.final.theme === 'light' && preferenceCycle.final.density === 'compact',
+    'Theme/density preference cycle did not restore the formal product defaults.');
+  assert(preferenceCycle.final.stored?.theme === 'light' &&
+    preferenceCycle.final.stored?.density === 'compact',
+    'Theme/density preference cycle was not persisted as a disposable UI projection.');
+  assert(preferenceWriteRequests.length === 0,
+    `Theme/density controls emitted write requests: ${JSON.stringify(preferenceWriteRequests)}`);
+  return {
+    ...projection,
+    productRequests,
+    writeRequests,
+    preferenceCycle,
+    preferenceRequests,
+    preferenceWriteRequests
+  };
 }
 
 async function verifyDesignPage(page) {
@@ -536,6 +588,7 @@ async function main() {
     sanitizedDesktopPath,
     deepCanvas,
     route,
+    sourceSha: String(process.env.CV_STUDIO_UI_SOURCE_SHA || 'unknown').trim(),
     capturedAtUtc: new Date().toISOString(),
     externalDriver: {
       processId: process.pid,
@@ -546,6 +599,10 @@ async function main() {
       insideDesktopProcessTree: false
     }
   };
+  if (expectation === 'studio-product') {
+    assert(/^[0-9a-f]{40}$/i.test(evidence.sourceSha),
+      'CV_STUDIO_UI_SOURCE_SHA must contain the frozen 40-character candidate SHA.');
+  }
   const outputName = `studio-ui-webview2-${safeFileName(runName)}.json`;
   let browser;
   let runtimeErrors;
@@ -588,6 +645,32 @@ async function main() {
 
     evidence.browserDpi = await readBrowserDpiEvidence(page, context);
     evidence.nativeRuntime = runDesktopRuntimeProbe(executablePath);
+    if (expectation === 'studio-product') {
+      const routeName = safeFileName(route.replace(/^\//, '') || 'overview');
+      const screenshotBuffer = await page.screenshot({ type: 'png' });
+      const artifact = writePngEvidence(
+        evidenceDirectory,
+        `real-webview2-${routeName}-${safeFileName(runName)}.png`,
+        screenshotBuffer
+      );
+      evidence.viewportScreenshot = {
+        ...artifact,
+        sourceSha: evidence.sourceSha,
+        scenes: route === '/overview' ? ['app-shell', 'overview'] : [routeName],
+        route,
+        DATA_SOURCE: 'REAL_WEBVIEW2_EMPTY_AUTHORITY',
+        AUTH_SOURCE: 'HARNESS_SEEDED_SESSION',
+        theme: evidence.productPage.preferenceCycle.final.theme,
+        density: evidence.productPage.preferenceCycle.final.density,
+        nativeWindow: evidence.nativeRuntime.nativeWindow,
+        browserViewport: evidence.browserDpi.js,
+        DPR_TYPE: 'WEBVIEW2_FORCE_DEVICE_SCALE_FACTOR',
+        requestedDprScale: scale,
+        observedDevicePixelRatio: evidence.browserDpi.js.devicePixelRatio,
+        DPI_TYPE: 'NATIVE_WINDOW_DPI_OBSERVED',
+        observedNativeWindowDpi: evidence.nativeRuntime.nativeWindow.dpi
+      };
+    }
     evidence.runtimeErrors = runtimeErrors;
     evidence.meaningfulRequestFailures = meaningfulRequestFailures(runtimeErrors.requestFailures);
 

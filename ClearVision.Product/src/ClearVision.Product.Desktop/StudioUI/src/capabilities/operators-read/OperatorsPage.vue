@@ -141,7 +141,7 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
     <CvPageHeader
       eyebrow="资源目录"
       title="算子库"
-      description="只读浏览算子 identity 与当前分支 Runtime metadata；不提供拖拽、预览、执行或参数生成。"
+      description="只读浏览算子标识与当前分支运行时元数据；不提供拖拽、预览、执行或参数生成。"
     >
       <template #actions>
         <CvButton
@@ -157,7 +157,7 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
 
     <CvPanel
       title="算子目录"
-      description="筛选在本次只读目录响应内执行，全部条件保存在 URL query。"
+      description="筛选在当前只读目录内执行，全部条件保存在地址栏参数中。"
     >
       <CvToolbar label="算子目录筛选">
         <CvSearchField
@@ -253,7 +253,7 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
         v-else-if="state.phase === 'empty'"
         kind="empty"
         title="暂无算子"
-        description="当前后端没有返回可浏览的算子 metadata。"
+        description="当前服务端没有返回可浏览的算子元数据。"
       />
       <CvPageState
         v-else-if="state.data && pageSlice.totalCount === 0"

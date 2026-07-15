@@ -120,7 +120,7 @@ const takeModel = computed({
 const resultColumns: readonly CvDataTableColumn<StationResult>[] = Object.freeze([
   { key: 'completedAtUtc', label: '完成时间', width: '20%' },
   { key: 'outcome', label: '结果', width: '13%' },
-  { key: 'axes', label: 'Execution / Decision', width: '20%' },
+  { key: 'axes', label: '执行状态 / 判定结果', width: '20%' },
   { key: 'packageName', label: '运行包', width: '17%' },
   { key: 'diagnosticCode', label: '诊断码', width: '15%' },
   { key: 'executionTimeMs', label: '耗时', align: 'end', width: '15%' }
@@ -209,15 +209,15 @@ onBeforeUnmount(() => {
     data-capability="stations-read-detail"
   >
     <CvPageHeader
-      :title="station ? stationDisplayName(station) : 'Station 详情'"
-      description="普通详情来自 /stations 列表；结果、health 与管理员增强信息分别保持独立权限和失败边界。"
+      :title="station ? stationDisplayName(station) : '工作站详情'"
+      description="普通详情来自工作站列表；结果、健康快照与管理员增强信息分别保持独立权限和失败边界。"
     >
       <template #breadcrumbs>
         <RouterLink
           class="station-detail__back"
           to="/stations"
         >
-          ← 返回 Station 列表
+          ← 返回工作站列表
         </RouterLink>
       </template>
       <template #actions>
@@ -280,7 +280,7 @@ onBeforeUnmount(() => {
     >
       <CvPanel
         title="普通详情"
-        description="完全由普通 /stations 列表项构建。"
+        description="完全由普通工作站列表项构建。"
       >
         <div class="station-detail__status-row">
           <CvStatusBadge :tone="stationOnlineTone(station.onlineState)">
@@ -304,7 +304,7 @@ onBeforeUnmount(() => {
 
       <CvPanel
         title="管理员增强信息"
-        description="可选 GET 增强区；403 仅降级本区域。"
+        description="可选只读增强区；权限不足时仅降级本区域。"
       >
         <CvInlineAlert
           v-if="(adminState.phase === 'stale' || adminState.phase === 'partial-failure') && adminState.data"
@@ -324,7 +324,7 @@ onBeforeUnmount(() => {
           compact
           kind="forbidden"
           title="管理员增强信息不可用"
-          description="当前账号没有 StationAdmin 权限；普通详情、结果与 health 仍可继续使用。"
+          description="当前账号没有 StationAdmin 权限；普通详情、结果与健康快照仍可继续使用。"
         />
         <CvPageState
           v-else-if="adminState.phase === 'unauthorized'"
@@ -355,7 +355,7 @@ onBeforeUnmount(() => {
 
     <CvPanel
       title="最近结果"
-      description="严格保留 Execution / Decision 双轴；legacy payload 仅按当前后端映射读取。"
+      description="严格保留执行状态与判定结果双轴；旧格式数据仅按当前后端映射读取。"
     >
       <CvInlineAlert
         v-if="resultsState.isRefreshing && resultsState.data"
@@ -417,7 +417,7 @@ onBeforeUnmount(() => {
             <CvStatusBadge :tone="resultPresentation(row).tone">
               {{ resultPresentation(row).label }}
             </CvStatusBadge>
-            <span v-if="row.legacyOutcomeProjection">legacy projection</span>
+            <span v-if="row.legacyOutcomeProjection">兼容投影</span>
           </div>
         </template>
         <template #cell-axes="{ row }">
@@ -436,21 +436,21 @@ onBeforeUnmount(() => {
     </CvPanel>
 
     <CvPanel
-      title="Health"
-      description="低频健康快照；不读取日志、命令或 SSE。"
+      title="健康快照"
+      description="低频健康快照；不读取日志、命令或实时事件流。"
     >
       <CvInlineAlert
         v-if="healthState.isRefreshing && healthState.data"
         tone="info"
       >
-        正在刷新 health，暂时显示上次读取的数据。
+        正在刷新健康快照，暂时显示上次读取的数据。
       </CvInlineAlert>
       <CvInlineAlert
         v-if="(healthState.phase === 'stale' || healthState.phase === 'partial-failure') && healthState.data"
         tone="warning"
-        title="Health 刷新未完成"
+        title="健康快照刷新未完成"
       >
-        当前显示上次成功读取的 health 快照。
+        当前显示上次成功读取的健康快照。
       </CvInlineAlert>
       <CvPageState
         v-if="healthState.phase === 'loading' && !healthState.data"
@@ -462,7 +462,7 @@ onBeforeUnmount(() => {
         v-else-if="healthState.phase === 'empty'"
         compact
         kind="empty"
-        title="暂无 health 快照"
+        title="暂无健康快照"
       />
       <CvPageState
         v-else-if="healthState.phase === 'unauthorized'"
@@ -474,13 +474,13 @@ onBeforeUnmount(() => {
         v-else-if="healthState.phase === 'forbidden'"
         compact
         kind="forbidden"
-        title="无权读取 Station health"
+        title="无权读取 Station 健康快照"
       />
       <CvPageState
         v-else-if="healthState.phase === 'error' || healthState.phase === 'not-found'"
         compact
         kind="error"
-        title="Station health 读取失败"
+        title="Station 健康快照读取失败"
         :description="healthState.failure?.message"
       />
       <CvDataTable
@@ -488,7 +488,7 @@ onBeforeUnmount(() => {
         :rows="healthState.data"
         :columns="healthColumns"
         :row-key="row => `${row.stationId}:${row.sequenceId}:${row.messageId}`"
-        caption="Station health 快照"
+        caption="Station 健康快照"
         :busy="healthState.isRefreshing"
       >
         <template #cell-createdAtUtc="{ row }">

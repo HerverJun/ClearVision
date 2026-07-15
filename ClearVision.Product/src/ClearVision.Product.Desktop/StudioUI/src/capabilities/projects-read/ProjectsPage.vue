@@ -103,7 +103,7 @@ onBeforeUnmount(() => {
     <CvPageHeader
       eyebrow="工程管理"
       title="工程"
-      description="浏览后端权威工程摘要。此页面不提供创建、保存、删除或编辑入口。"
+      description="浏览服务端工程摘要。此页面不提供创建、保存、删除或编辑入口。"
     >
       <template #actions>
         <CvButton
@@ -120,7 +120,7 @@ onBeforeUnmount(() => {
     <div class="projects-page__layout">
       <CvPanel
         title="全部工程"
-        description="列表仅显示稳定摘要字段，不从列表响应推断流程事实。"
+        description="列表仅显示稳定摘要字段，不从列表数据推断流程信息。"
       >
         <CvToolbar label="工程列表工具栏">
           <CvSearchField
@@ -246,7 +246,7 @@ onBeforeUnmount(() => {
 
       <CvPanel
         title="最近工程"
-        description="只显示服务端已有的 lastOpenedAt 投影。"
+        description="按服务端记录的最近打开时间排列。"
         :level="2"
       >
         <CvPageState

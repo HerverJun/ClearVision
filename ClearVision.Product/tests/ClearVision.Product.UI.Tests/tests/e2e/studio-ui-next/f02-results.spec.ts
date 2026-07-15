@@ -1,10 +1,14 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 import {
   auditF02Request,
+  captureF02VisualEvidence,
+  createF02RuntimeErrorAudit,
   expectGetOnly,
   f02ResultsPerformanceFixtureCount,
   fulfillF02Json,
+  hasF02VisualEvidenceTarget,
   installF02BrowserStartup,
+  installF02VisualPreferences,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
 
@@ -204,7 +208,7 @@ test('Results local view keeps query filters, dual axes, detail 404 and GET-only
   await expect(page.getByRole('cell', { name: '不适用', exact: true }).first()).toBeVisible();
   await expect(page.getByRole('cell', { name: '执行成功', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: '不适用', exact: true }).nth(1)).toBeVisible();
-  await page.getByLabel('Canonical 结果').selectOption('Invalid');
+  await page.getByLabel('标准结果').selectOption('Invalid');
   await expect.poll(() => audit.some(entry => entry.path.includes('status=Invalid'))).toBe(true);
   await page.getByLabel('诊断码').fill('FIXTURE_INVALID');
   await expect(page.getByText('本机诊断码为当前页过滤')).toBeVisible();
@@ -219,8 +223,8 @@ test('Results local view keeps query filters, dual axes, detail 404 and GET-only
 
 test('Results Station view paginates the frozen 500-result fixture and marks legacy projection', async ({ page }) => {
   const audit = await bootResults(page, '/results?source=station&pageSize=200&resultId=fixture-result-0001');
-  await expect(page.getByText('Legacy Station outcome projection')).toBeVisible();
-  const detail = page.getByLabel('Station 结果详情');
+  await expect(page.getByText('旧版工作站结果映射')).toBeVisible();
+  const detail = page.getByLabel('工作站结果详情');
   await expect(detail.getByText('执行失败', { exact: true }).first()).toBeVisible();
   await expect(detail.getByText('未判定', { exact: true })).toBeVisible();
   await expect(page.getByText('第 1–200 项，共 500 项')).toBeVisible();
@@ -228,7 +232,7 @@ test('Results Station view paginates the frozen 500-result fixture and marks leg
   await expect(page.getByText('第 401–500 项，共 500 项')).toBeVisible();
   await expect.poll(() => audit.some(entry => entry.path.includes('pageIndex=2&pageSize=200'))).toBe(true);
 
-  await page.getByLabel('Canonical 结果').selectOption('TimedOut');
+  await page.getByLabel('标准结果').selectOption('TimedOut');
   await page.getByLabel('诊断码').fill('FIXTURE_TIMEDOUT');
   await expect.poll(() => audit.some(entry =>
     entry.path.includes('status=TimedOut') && entry.path.includes('diagnosticCode=FIXTURE_TIMEDOUT')
@@ -236,3 +240,27 @@ test('Results Station view paginates the frozen 500-result fixture and marks leg
   expect(stationFixtures).toHaveLength(f02ResultsPerformanceFixtureCount);
   expect(expectGetOnly(audit)).toBe(true);
 });
+
+for (const visual of [
+  { id: 'results-light-compact', width: 1366, height: 768 },
+  { id: 'results-short-light-compact', width: 1366, height: 600 }
+] as const) {
+  test(`captures ${visual.id} Browser fixture evidence`, async ({ page }) => {
+    test.skip(!hasF02VisualEvidenceTarget(), 'F02 visual evidence output was not requested.');
+    await page.setViewportSize({ width: visual.width, height: visual.height });
+    await installF02VisualPreferences(page, 'light', 'compact');
+    const runtimeErrors = createF02RuntimeErrorAudit(page);
+    const audit = await bootResults(page, '/results?source=station&pageSize=200&resultId=fixture-result-0001');
+    await expect(page.getByText('第 1–200 项，共 500 项')).toBeVisible();
+    await captureF02VisualEvidence(page, {
+      scenario: visual.id,
+      viewport: { width: visual.width, height: visual.height },
+      theme: 'light',
+      density: 'compact',
+      requests: audit,
+      runtimeErrors
+    });
+    expect(expectGetOnly(audit)).toBe(true);
+    expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  });
+}

@@ -76,7 +76,7 @@ onBeforeUnmount(() => {
   >
     <CvPageHeader
       :title="state.data?.name ?? '工程详情'"
-      description="详情统计只来自当前工程的正式详情 GET，不复用列表 Flow 投影。"
+      description="详情统计只来自当前工程的只读详情接口，不复用列表中的流程信息。"
     >
       <template #breadcrumbs>
         <RouterLink
@@ -163,7 +163,7 @@ onBeforeUnmount(() => {
     >
       <CvPanel
         title="工程摘要"
-        description="后端工程权威的只读投影。"
+        description="服务端工程数据的只读摘要。"
       >
         <CvDescriptionList
           :items="summaryItems"
@@ -190,7 +190,7 @@ onBeforeUnmount(() => {
 
       <CvPanel
         title="正式资源摘要"
-        description="仅统计详情响应中的正式 Project assets。"
+        description="仅统计详情响应中的正式工程资源。"
       >
         <CvDescriptionList
           :items="assetItems"

@@ -30,6 +30,13 @@ const statusLabel = computed(() => {
   if (systemStatus.phase === 'stale') return '状态已过期';
   return '本地服务不可用';
 });
+const roleLabel = computed(() => {
+  const role = session.user?.role;
+  if (role === 'Admin') return '管理员';
+  if (role === 'Engineer') return '工程师';
+  if (role === 'Operator') return '操作员';
+  return role ?? '预置会话不可用';
+});
 
 onMounted(() => runtime.preferences.apply());
 </script>
@@ -69,8 +76,8 @@ onMounted(() => runtime.preferences.apply());
       </nav>
 
       <div class="product-layout__sidebar-note">
-        <strong>只读预览</strong>
-        <span>正式保存、执行与现场控制仍由既有后端和 Legacy 链路负责。</span>
+        <strong>只读工作区</strong>
+        <span>正式保存、执行与现场控制继续由现有后端权威链路负责。</span>
       </div>
     </aside>
 
@@ -150,7 +157,7 @@ onMounted(() => runtime.preferences.apply());
           </div>
           <div class="product-layout__user">
             <strong>{{ session.user?.username ?? '未认证' }}</strong>
-            <small>{{ session.user?.role ?? '预置会话不可用' }}</small>
+            <small>{{ roleLabel }}</small>
           </div>
         </div>
       </header>
@@ -163,7 +170,7 @@ onMounted(() => runtime.preferences.apply());
           title="需要预置会话"
           data-product-state="unauthorized"
         >
-          {{ session.message }} F02 不提供新的登录跳转或首次启动闭环。
+          {{ session.message }} 当前只支持宿主预置会话，不提供新的登录跳转或首次启动流程。
           <template #actions>
             <CvButton
               size="sm"
