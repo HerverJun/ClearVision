@@ -26,7 +26,11 @@ body {
 }
 
 a {
-  color: var(--cv-color-brand-600);
+  color: var(--cv-color-link);
+}
+
+a:hover {
+  color: var(--cv-color-link-hover);
 }
 
 button,

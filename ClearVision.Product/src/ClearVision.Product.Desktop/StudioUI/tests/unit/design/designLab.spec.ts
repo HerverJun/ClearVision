@@ -73,6 +73,8 @@ describe('Design Foundation Lab', () => {
       'toast',
       'splitter'
     ]));
+    expect(wrapper.text()).toContain('Cinnabar brand intent');
+    expect(wrapper.text()).not.toContain('Brand blue');
     wrapper.unmount();
   });
 });

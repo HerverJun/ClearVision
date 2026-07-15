@@ -123,7 +123,7 @@ function updateValue(event: Event): void {
   transition: border-color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard), box-shadow var(--cv-motion-duration-fast) var(--cv-motion-ease-standard);
 }
 .cv-select__control:hover:not(:disabled) { border-color: var(--cv-border-strong); }
-.cv-select__control:focus-visible { border-color: var(--cv-color-brand-500); outline: none; box-shadow: var(--cv-focus-ring); }
+.cv-select__control:focus-visible { border-color: var(--cv-focus-ring-color); outline: none; box-shadow: var(--cv-focus-ring); }
 .cv-select--error .cv-select__control { border-color: var(--cv-color-status-ng); }
 .cv-select--disabled { opacity: 0.58; }
 .cv-select__chevron { position: absolute; right: var(--cv-space-3); top: 50%; width: 16px; height: 16px; transform: translateY(-50%); color: var(--cv-text-muted); pointer-events: none; }

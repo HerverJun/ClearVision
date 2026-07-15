@@ -124,7 +124,7 @@ onUnmounted(() => finishDrag(false));
 <style scoped>
 .cv-splitter { position: relative; display: grid; flex: 0 0 auto; place-items: center; touch-action: none; color: var(--cv-border-strong); }
 .cv-splitter::before { position: absolute; content: ''; border-radius: var(--cv-radius-pill); background: transparent; transition: background var(--cv-motion-duration-fast) var(--cv-motion-ease-standard); }
-.cv-splitter:hover::before, .cv-splitter:focus-visible::before { background: var(--cv-color-brand-soft); }
+.cv-splitter:hover::before, .cv-splitter:focus-visible::before { background: color-mix(in srgb, var(--cv-focus-ring-color) 12%, transparent); }
 .cv-splitter--vertical { width: 8px; cursor: col-resize; }
 .cv-splitter--vertical::before { inset: 0 -2px; }
 .cv-splitter--horizontal { height: 8px; cursor: row-resize; }
@@ -132,6 +132,6 @@ onUnmounted(() => finishDrag(false));
 .cv-splitter__grip { position: relative; z-index: 1; border-radius: var(--cv-radius-pill); background: currentColor; }
 .cv-splitter--vertical .cv-splitter__grip { width: 2px; height: 32px; }
 .cv-splitter--horizontal .cv-splitter__grip { width: 32px; height: 2px; }
-.cv-splitter:focus-visible { outline-offset: 1px; color: var(--cv-color-brand-500); }
+.cv-splitter:focus-visible { outline-offset: 1px; color: var(--cv-focus-ring-color); }
 .cv-splitter--disabled { cursor: not-allowed; opacity: 0.42; }
 </style>

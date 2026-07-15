@@ -386,7 +386,7 @@ onUnmounted(() => {
 
       <CvPanel
         title="Industrial status language"
-        description="Brand blue never doubles as an inspection outcome."
+        description="Cinnabar brand intent never doubles as an inspection outcome."
       >
         <div
           class="design-lab__status-grid"

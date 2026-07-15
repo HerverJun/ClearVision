@@ -71,7 +71,7 @@ const isDisabled = computed(() => props.disabled || props.loading);
 }
 
 .cv-icon-button--secondary { border-color: var(--cv-border-default); background: var(--cv-surface-1); }
-.cv-icon-button:hover:not(:disabled) { background: var(--cv-interactive-hover); color: var(--cv-color-brand-600); transform: translateY(-1px); }
+.cv-icon-button:hover:not(:disabled) { background: var(--cv-interactive-hover); color: var(--cv-color-link); transform: translateY(-1px); }
 .cv-icon-button:active:not(:disabled) { background: var(--cv-interactive-active); transform: translateY(0); }
 .cv-icon-button:disabled { cursor: not-allowed; opacity: 0.48; }
 .cv-icon-button__icon { display: inline-flex; }

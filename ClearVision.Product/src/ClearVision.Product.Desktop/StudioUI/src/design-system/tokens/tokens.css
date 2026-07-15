@@ -1,17 +1,25 @@
 :root {
   color-scheme: light;
 
-  /* Color and brand: the brand blue is intentionally distinct from every
-     industrial result color. */
-  --cv-color-brand-50: #eef5ff;
-  --cv-color-brand-100: #dbeafe;
-  --cv-color-brand-200: #bfd8ff;
-  --cv-color-brand-500: #2f6fed;
-  --cv-color-brand-600: #245dcc;
-  --cv-color-brand-700: #1f4da8;
+  /* ClearVision cinnabar brand. Industrial outcomes and technical blues stay
+     on their own semantic tokens. */
+  --cv-color-brand-50: #fcf4f3;
+  --cv-color-brand-100: #fae8e6;
+  --cv-color-brand-200: #f2cbc7;
+  --cv-color-brand-300: #e7a39d;
+  --cv-color-brand-400: #d4746b;
+  --cv-color-brand-500: #b6453c;
+  --cv-color-brand-600: #9f3932;
+  --cv-color-brand-700: #84312b;
+  --cv-color-brand-800: #6d2a26;
+  --cv-color-brand-900: #5a2623;
   --cv-color-on-brand: #ffffff;
-  --cv-color-brand-soft: rgba(47, 111, 237, 0.1);
-  --cv-color-brand-border: rgba(47, 111, 237, 0.28);
+  --cv-color-brand-text: #9f3932;
+  --cv-color-brand-soft: rgba(182, 69, 60, 0.1);
+  --cv-color-brand-border: rgba(182, 69, 60, 0.3);
+
+  --cv-color-link: #2f6fed;
+  --cv-color-link-hover: #245dcc;
 
   --cv-color-status-ok: #16866f;
   --cv-color-status-ok-strong: #0f6f5c;
@@ -150,14 +158,23 @@
 
 html[data-theme="dark"] {
   color-scheme: dark;
-  --cv-color-brand-50: #17243c;
-  --cv-color-brand-100: #1b3157;
-  --cv-color-brand-200: #244b83;
-  --cv-color-brand-500: #6da0ff;
-  --cv-color-brand-600: #82adff;
-  --cv-color-brand-700: #a5c4ff;
-  --cv-color-brand-soft: rgba(109, 160, 255, 0.13);
-  --cv-color-brand-border: rgba(109, 160, 255, 0.34);
+  --cv-color-brand-50: #fcf4f3;
+  --cv-color-brand-100: #fae8e6;
+  --cv-color-brand-200: #f2cbc7;
+  --cv-color-brand-300: #e7a39d;
+  --cv-color-brand-400: #d4746b;
+  --cv-color-brand-500: #b6453c;
+  --cv-color-brand-600: #9f3932;
+  --cv-color-brand-700: #84312b;
+  --cv-color-brand-800: #6d2a26;
+  --cv-color-brand-900: #5a2623;
+  --cv-color-on-brand: #ffffff;
+  --cv-color-brand-text: #f0a69f;
+  --cv-color-brand-soft: rgba(182, 69, 60, 0.18);
+  --cv-color-brand-border: rgba(182, 69, 60, 0.42);
+
+  --cv-color-link: #82adff;
+  --cv-color-link-hover: #a5c4ff;
 
   --cv-color-status-ok: #55b59d;
   --cv-color-status-ok-strong: #78cbb5;

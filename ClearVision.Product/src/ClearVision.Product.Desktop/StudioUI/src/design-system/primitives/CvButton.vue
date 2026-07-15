@@ -113,7 +113,7 @@ const isDisabled = computed(() => props.disabled || props.loading);
 
 .cv-button--quiet {
   background: transparent;
-  color: var(--cv-color-brand-600);
+  color: var(--cv-color-brand-text);
 }
 
 .cv-button--quiet:hover:not(:disabled) { background: var(--cv-color-brand-soft); }

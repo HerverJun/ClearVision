@@ -116,7 +116,7 @@ function updateValue(event: Event): void {
   transition: border-color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard), box-shadow var(--cv-motion-duration-fast) var(--cv-motion-ease-standard);
 }
 .cv-field__control:hover:not(:disabled):not(:read-only) { border-color: var(--cv-border-strong); }
-.cv-field__control:focus-visible { border-color: var(--cv-color-brand-500); outline: none; box-shadow: var(--cv-focus-ring); }
+.cv-field__control:focus-visible { border-color: var(--cv-focus-ring-color); outline: none; box-shadow: var(--cv-focus-ring); }
 .cv-field__control::placeholder { color: var(--cv-text-muted); }
 .cv-field--error .cv-field__control { border-color: var(--cv-color-status-ng); }
 .cv-field--disabled { opacity: 0.58; }
