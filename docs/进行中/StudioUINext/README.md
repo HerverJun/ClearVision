@@ -49,8 +49,10 @@ F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision
 - F01：`DONE`。Final SHA `f6d4d98a53914bac088cd62cda261b2c08a11670` 的
   workflow_dispatch Run `29411190713` 已成功；FrontendV2 退役、StudioUI build/Host/Design
   Foundation/canonical FlowCanvas/WebView2/DPI/publish/no-Node 地基已完成。
-- F02 Goal 1：`IN_PROGRESS`。入口、认证方案 B、API/permission contract 与 Initial 性能基线已冻结；
-  当前范围只建立正式 Shell、共享只读 query platform、Overview、Projects Read、Diagnostics 与 About。
+- F02：产品代码、Browser fixture、四档 DPR 性能、真实 Release WebView2、publish/no-Node 与 Tier 3
+  已收口；当前唯一未闭合的产品门禁是用户视觉确认，状态为
+  `F02_STATE=AWAITING_PRODUCT_VISUAL_CONFIRMATION`。Final SHA workflow_dispatch 的实际结论由不再修改
+  该 SHA 的交付回报记录。
 - `Studio:StudioUiEnabled=false` 保持不变；legacy 仍是默认入口。
 
 ## 阶段门禁
@@ -73,5 +75,9 @@ F01 执行期间以本目录链接的计划为唯一权威；仓库外来源文�
 - [F02 架构决策记录](./F02_架构决策记录.md)
 - [F02 API 与权限合同冻结](./F02_API与权限合同冻结.md)
 - [F02 Initial 性能与生命周期基线](./F02_Initial性能与生命周期基线.md)
+- [F02 Operator 合同同步矩阵](./F02_Operator合同同步矩阵.md)
+- [F02 产品视觉证据索引](./F02_视觉证据索引.md)
+- [F02 完成报告](./F02_完成报告.md)
+- [F03 输入与迁移边界（未实施 F03）](./F03_输入与迁移边界.md)
 - [仓库级协作规则](../../../AGENTS.md)
 - [旧 Studio2 历史入口](../Studio2/README.md)（历史取证，不是新计划）
