@@ -14,15 +14,16 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.PointCloud3D,
     IconName = "cluster",
     Keywords = new[] { "PointCloud", "Cluster", "Segmentation", "3D" },
-    Version = "1.0.0"
+    Version = "1.1.0"
 )]
 [InputPort("PointCloud", "Point Cloud", PortDataType.Any, IsRequired = true)]
 [OutputPort("Clusters", "Clusters", PortDataType.Any)]
 [OutputPort("ClusterCount", "Cluster Count", PortDataType.Integer)]
 [OutputPort("ClusterPointClouds", "Cluster Point Clouds", PortDataType.Any)]
-[OperatorParam("ClusterTolerance", "Cluster Tolerance", "double", DefaultValue = 0.02, Min = 1e-6)]
+[OperatorParam("ClusterTolerance", "Cluster Tolerance", "double", DefaultValue = 0.02, Min = 1e-6, Max = 1000)]
 [OperatorParam("MinClusterSize", "Min Cluster Size", "int", DefaultValue = 100, Min = 1, Max = 10000000)]
 [OperatorParam("MaxClusterSize", "Max Cluster Size", "int", DefaultValue = 1000000, Min = 1, Max = 10000000)]
+[OperatorParam("MaterializePointClouds", "Materialize Point Clouds", "bool", Description = "为 false 时仅返回聚类索引，不分配 PointCloud 输出。", DefaultValue = true)]
 public sealed class EuclideanClusterExtractionOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.EuclideanClusterExtraction;
@@ -54,6 +55,7 @@ public sealed class EuclideanClusterExtractionOperator : OperatorBase
         var tol = (float)GetDoubleParam(@operator, "ClusterTolerance", 0.02, min: 1e-6, max: 1000);
         var minSize = GetIntParam(@operator, "MinClusterSize", 100, min: 1, max: 10_000_000);
         var maxSize = GetIntParam(@operator, "MaxClusterSize", 1_000_000, min: 1, max: 10_000_000);
+        var materializePointClouds = GetBoolParam(@operator, "MaterializePointClouds", true);
 
         if (minSize > maxSize)
         {
@@ -66,13 +68,20 @@ public sealed class EuclideanClusterExtractionOperator : OperatorBase
 
         try
         {
-            clusters = await RunCpuBoundWork(
-                () => extractor.Extract(cloud, clusterTolerance: tol, minClusterSize: minSize, maxClusterSize: maxSize),
-                cancellationToken);
-
-            clusterClouds = await RunCpuBoundWork(
-                () => extractor.ExtractPointClouds(cloud, clusterTolerance: tol, minClusterSize: minSize, maxClusterSize: maxSize),
-                cancellationToken);
+            var extraction = await RunCpuBoundWork(() =>
+            {
+                var indices = extractor.Extract(cloud, tol, minSize, maxSize, cancellationToken);
+                var pointClouds = materializePointClouds
+                    ? extractor.MaterializePointClouds(cloud, indices, cancellationToken)
+                    : new List<PointCloudModel>();
+                return (Indices: indices, PointClouds: pointClouds);
+            }, cancellationToken);
+            clusters = extraction.Indices;
+            clusterClouds = extraction.PointClouds;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -84,7 +93,9 @@ public sealed class EuclideanClusterExtractionOperator : OperatorBase
         {
             ["Clusters"] = clusters,
             ["ClusterCount"] = clusters.Count,
-            ["ClusterPointClouds"] = clusterClouds
+            ["ClusterPointClouds"] = clusterClouds,
+            ["PointCloudsMaterialized"] = materializePointClouds,
+            ["CoreInvocationCount"] = extractor.CoreInvocationCount
         });
     }
 

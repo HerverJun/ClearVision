@@ -14,8 +14,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "texture",
     Keywords = new[] { "Texture", "GLCM", "Contrast", "Correlation", "Energy", "Entropy" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
+[OperatorImageContractProvider(typeof(GlcmTextureImageContractProvider))]
 [AlgorithmInfo(
     Name = "Quantized gray-level co-occurrence matrix",
     CoreApi = "ROI -> GlcmTexture.Compute -> quantize gray image -> per-direction GLCM -> averaged Haralick features",

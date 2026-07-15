@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `CalibrationAndCoordinates` |
 | 分类 (Category) | 标定与坐标 |
 | 分类顺序 (CategoryOrder) | 8 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -17,13 +17,13 @@
 | 标签 (Tags) | `分类:CalibrationAndCoordinates`, `分类显示:标定与坐标`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
-该算子用于从图像-机器人点对鲁棒拟合二维刚性或相似变换。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
+该算子用于从图像/机器人点对拟合二维刚性或相似变换，支持可选的 RANSAC 与 Huber 稳健模式。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
 源码中包含 OpenCV 调用，核心处理通常围绕图像矩阵、ROI、阈值、几何计算或可视化结果图展开。
 
 ## 实现策略 / Implementation Strategy
 - 输入端口均为可选或该算子不依赖外部输入，执行时会优先读取可用输入并使用参数默认值兜底。
 - 可选输入用于覆盖或补充参数配置：`Image`。
-- 参数解析覆盖 3 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 8 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
@@ -39,17 +39,22 @@
 - `Path.GetDirectoryName`
 - `Directory.CreateDirectory`
 - `File.WriteAllText`
+- `JsonSerializer.Serialize`
 - `JsonDocument.Parse`
+- `Enumerable.Range`
 - `Math.Atan2`
-- `Math.PI`
-- `Math.Cos`
 
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
 | `CalibrationPoints` | 标定点 | `string` | [] | - | Yes | - |
 | `Method` | 方法 | `enum` | LeastSquares | LeastSquares/最小二乘；SVD | Yes | - |
-| `SavePath` | 保存路径 | `file` | "" | - | Yes | - |
+| `RobustMode` | Robust Mode | `enum` | None | None/无；Ransac/RANSAC；Huber | Yes | - |
+| `RobustResidualThreshold` | Robust Residual Threshold | `double` | 0.3 | [1E-12, 1000000000000] | Yes | - |
+| `RobustMaxIterations` | Robust Max Iterations | `int` | 256 | [1, 10000] | Yes | - |
+| `RobustMinInlierRatio` | Robust Minimum Inlier Ratio | `double` | 0.5 | [0.1, 1] | Yes | - |
+| `HuberDelta` | Huber Delta | `double` | 0.15 | [1E-12, 1000000000000] | Yes | - |
+| `SavePath` | 保存路径 | `file` | "" | - | No | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -63,6 +68,15 @@
 | `CalibrationData` | Calibration Data | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
 | `CalibrationError` | Calibration Error | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `MaxCalibrationError` | Max Calibration Error | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Accepted` | Accepted | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `TransformModel` | Transform Model | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `RotationDeg` | Rotation (deg) | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `AngleConstraintApplied` | Angle Constraint Applied | `Boolean` | 布尔判定结果，适合连接条件分支、结果判定或通信写入。 |
+| `RobustMode` | Robust Mode | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `InlierCount` | Inlier Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `OutlierCount` | Outlier Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Residuals` | Per-point Residuals | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `Diagnostics` | Fit Diagnostics | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 
 ## 模式与资源契约 / Mode & Resource Contracts
 ### 参数条件 / Parameter Conditions
@@ -87,17 +101,17 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`E854175C98D2FD2B4C916089FFE6E925AE7A7A25A0AE0CDAC7A79681CC33C9A7`
+- 组合指纹 (Generation Fingerprint)：`95E997FA412BCF141CE13FAD1C41DC414B91BF0FF691B6AE544B8414E95115DF`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
-| `Accepted` | `Boolean` | 源码通过输出字典索引赋值写入。 |
-| `AngleConstraintApplied` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `AllPointCalibrationError` | `Float` | 源码通过输出字典索引赋值写入。 |
+| `AllPointMaxCalibrationError` | `Float` | 源码通过输出字典索引赋值写入。 |
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
-| `RotationDeg` | `Any` | 源码通过输出字典索引赋值写入。 |
-| `TransformModel` | `String` | 源码通过输出字典索引赋值写入。 |
+| `InlierIndices` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `OutlierIndices` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |
 
 ## 性能特征 / Performance
@@ -111,7 +125,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 6 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：需要把视觉流程与文件、HTTP、数据库、PLC、MQTT 或串口等外部系统连接的场景。
@@ -126,4 +140,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

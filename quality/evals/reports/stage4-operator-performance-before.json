@@ -1,0 +1,69 @@
+{
+  "environment": {
+    "label": "before",
+    "sourceSha": "6c0fa1f029362239c6c5f252152bec44b3fb773c",
+    "generatedAtUtc": "2026-07-15T11:45:27.9939825+00:00",
+    "machineName": "DESKTOP-TRGEMQT",
+    "operatingSystem": "Microsoft Windows NT 10.0.22000.0",
+    "frameworkVersion": "8.0.19",
+    "processorCount": 20,
+    "is64BitProcess": true,
+    "serverGc": false,
+    "warmupIterations": 5,
+    "iterations": 50,
+    "method": "Inputs are created before timing. Each case is warmed up, then measured sequentially. P50/P95 use nearest-rank sorted samples. Allocations use process-wide GC.GetTotalAllocatedBytes(true). Memory is sampled before output disposal."
+  },
+  "cases": [
+    {
+      "caseId": "translation_rotation_none_40_points",
+      "operatorName": "TranslationRotationCalibration",
+      "scenario": "40 point similarity transform; RobustMode=None",
+      "inputScale": "40 point pairs",
+      "passed": true,
+      "iterations": 50,
+      "p50Milliseconds": 0.5834,
+      "p95Milliseconds": 0.6667,
+      "meanMilliseconds": 0.5937,
+      "totalAllocatedBytes": 4617184,
+      "allocatedBytesPerIteration": 92343,
+      "managedHeapStartBytes": 794288,
+      "managedHeapPeakBytes": 5598792,
+      "managedHeapPeakDeltaBytes": 4804504,
+      "workingSetStartBytes": 37277696,
+      "workingSetPeakBytes": 43024384,
+      "workingSetPeakDeltaBytes": 5746688,
+      "coreInvocationCount": 1,
+      "coreInvocationEvidence": "source-observed-legacy-path",
+      "outputSignals": {
+        "CalibrationError": 9.664426065637203E-15,
+        "MaxCalibrationError": 2.842170943040401E-14
+      },
+      "errorMessage": null
+    },
+    {
+      "caseId": "euclidean_cluster_6000_materialized",
+      "operatorName": "EuclideanClusterExtraction",
+      "scenario": "three deterministic clusters; indices and PointCloud outputs materialized",
+      "inputScale": "6000 XYZRGB points; 3 x 2000",
+      "passed": true,
+      "iterations": 50,
+      "p50Milliseconds": 31.4114,
+      "p95Milliseconds": 45.7601,
+      "meanMilliseconds": 34.3064,
+      "totalAllocatedBytes": 1540139992,
+      "allocatedBytesPerIteration": 30802799,
+      "managedHeapStartBytes": 1007256,
+      "managedHeapPeakBytes": 15967352,
+      "managedHeapPeakDeltaBytes": 14960096,
+      "workingSetStartBytes": 62464000,
+      "workingSetPeakBytes": 72372224,
+      "workingSetPeakDeltaBytes": 9908224,
+      "coreInvocationCount": 2,
+      "coreInvocationEvidence": "source-observed-legacy-path",
+      "outputSignals": {
+        "ClusterCount": 3
+      },
+      "errorMessage": null
+    }
+  ]
+}

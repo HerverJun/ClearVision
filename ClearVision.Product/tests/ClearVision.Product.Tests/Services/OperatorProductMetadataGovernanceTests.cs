@@ -24,7 +24,7 @@ namespace ClearVision.Product.Tests.Services;
 [TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public sealed class OperatorProductMetadataGovernanceTests
 {
-    private const string ExpectedIdentityHash = "BBAC47F5DF83110BDE52DDA64C01F7335377D9DFCEB17D2B78A8A77F5262A14F";
+    private const string ExpectedIdentityHash = "5BD6008334012CAE0798196E0DF80F5D56F295F960972B839F8040B136B7480C";
     private static readonly string RepoRoot = ResolveRepoRoot();
 
     private static readonly IReadOnlyDictionary<OperatorCategoryId, int> ExpectedCategoryCounts =

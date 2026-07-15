@@ -8,6 +8,9 @@ namespace ClearVision.Product.Infrastructure.PointCloud.Segmentation;
 public sealed class EuclideanClusterExtraction
 {
     private readonly MatPool _pool;
+    private int _coreInvocationCount;
+
+    public int CoreInvocationCount => Volatile.Read(ref _coreInvocationCount);
 
     public EuclideanClusterExtraction(MatPool? pool = null)
     {
@@ -21,7 +24,15 @@ public sealed class EuclideanClusterExtraction
         PointCloud cloud,
         float clusterTolerance = 0.02f,
         int minClusterSize = 100,
-        int maxClusterSize = 1_000_000)
+        int maxClusterSize = 1_000_000) =>
+        Extract(cloud, clusterTolerance, minClusterSize, maxClusterSize, CancellationToken.None);
+
+    public List<int[]> Extract(
+        PointCloud cloud,
+        float clusterTolerance,
+        int minClusterSize,
+        int maxClusterSize,
+        CancellationToken cancellationToken)
     {
         if (cloud == null)
             throw new ArgumentNullException(nameof(cloud));
@@ -37,6 +48,9 @@ public sealed class EuclideanClusterExtraction
         {
             throw new ArgumentOutOfRangeException(nameof(minClusterSize), "minClusterSize must be <= maxClusterSize.");
         }
+
+        Interlocked.Increment(ref _coreInvocationCount);
+        cancellationToken.ThrowIfCancellationRequested();
 
         int n = cloud.Count;
         if (n == 0)
@@ -54,6 +68,11 @@ public sealed class EuclideanClusterExtraction
 
         for (int i = 0; i < n; i++)
         {
+            if ((i & 255) == 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             var x = pIdx[i, 0];
             var y = pIdx[i, 1];
             var z = pIdx[i, 2];
@@ -79,6 +98,11 @@ public sealed class EuclideanClusterExtraction
 
         for (int i = 0; i < n; i++)
         {
+            if ((i & 255) == 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             if (visited[i])
             {
                 continue;
@@ -93,6 +117,10 @@ public sealed class EuclideanClusterExtraction
             {
                 var current = queue.Dequeue();
                 scratch.Add(current);
+                if ((scratch.Count & 255) == 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
 
                 var cx = pIdx[current, 0];
                 var cy = pIdx[current, 1];
@@ -117,6 +145,11 @@ public sealed class EuclideanClusterExtraction
 
                             for (int c = 0; c < candidates.Count; c++)
                             {
+                                if ((c & 1023) == 0)
+                                {
+                                    cancellationToken.ThrowIfCancellationRequested();
+                                }
+
                                 var j = candidates[c];
                                 if (visited[j])
                                 {
@@ -157,6 +190,16 @@ public sealed class EuclideanClusterExtraction
         int maxClusterSize = 1_000_000)
     {
         var clusters = Extract(input, clusterTolerance, minClusterSize, maxClusterSize);
+        return MaterializePointClouds(input, clusters, CancellationToken.None);
+    }
+
+    public List<PointCloud> MaterializePointClouds(
+        PointCloud input,
+        IReadOnlyList<int[]> clusters,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(clusters);
         var clouds = new List<PointCloud>(clusters.Count);
 
         var hasColors = input.Colors != null;
@@ -166,43 +209,78 @@ public sealed class EuclideanClusterExtraction
         var srcC = input.Colors?.GetGenericIndexer<byte>();
         var srcN = input.Normals?.GetGenericIndexer<float>();
 
-        for (int ci = 0; ci < clusters.Count; ci++)
+        try
         {
-            var indices = clusters[ci];
-            var outPoints = _pool.Rent(width: 3, height: indices.Length, type: MatType.CV_32FC1);
-            var outColors = hasColors ? _pool.Rent(width: 3, height: indices.Length, type: MatType.CV_8UC1) : null;
-            var outNormals = hasNormals ? _pool.Rent(width: 3, height: indices.Length, type: MatType.CV_32FC1) : null;
-
-            var dstP = outPoints.GetGenericIndexer<float>();
-            var dstC = outColors?.GetGenericIndexer<byte>();
-            var dstN = outNormals?.GetGenericIndexer<float>();
-
-            for (int r = 0; r < indices.Length; r++)
+            for (int ci = 0; ci < clusters.Count; ci++)
             {
-                var i = indices[r];
-                dstP[r, 0] = srcP[i, 0];
-                dstP[r, 1] = srcP[i, 1];
-                dstP[r, 2] = srcP[i, 2];
-
-                if (dstC != null && srcC != null)
+                cancellationToken.ThrowIfCancellationRequested();
+                var indices = clusters[ci] ?? throw new ArgumentException($"Cluster {ci} indices cannot be null.", nameof(clusters));
+                var outPoints = _pool.Rent(width: 3, height: indices.Length, type: MatType.CV_32FC1);
+                var outColors = hasColors ? _pool.Rent(width: 3, height: indices.Length, type: MatType.CV_8UC1) : null;
+                var outNormals = hasNormals ? _pool.Rent(width: 3, height: indices.Length, type: MatType.CV_32FC1) : null;
+                var added = false;
+                try
                 {
-                    dstC[r, 0] = srcC[i, 0];
-                    dstC[r, 1] = srcC[i, 1];
-                    dstC[r, 2] = srcC[i, 2];
+                    var dstP = outPoints.GetGenericIndexer<float>();
+                    var dstC = outColors?.GetGenericIndexer<byte>();
+                    var dstN = outNormals?.GetGenericIndexer<float>();
+
+                    for (int r = 0; r < indices.Length; r++)
+                    {
+                        if ((r & 255) == 0)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
+
+                        var i = indices[r];
+                        if ((uint)i >= (uint)input.Count)
+                        {
+                            throw new ArgumentOutOfRangeException(nameof(clusters), $"Cluster {ci} contains out-of-range point index {i}.");
+                        }
+
+                        dstP[r, 0] = srcP[i, 0];
+                        dstP[r, 1] = srcP[i, 1];
+                        dstP[r, 2] = srcP[i, 2];
+
+                        if (dstC != null && srcC != null)
+                        {
+                            dstC[r, 0] = srcC[i, 0];
+                            dstC[r, 1] = srcC[i, 1];
+                            dstC[r, 2] = srcC[i, 2];
+                        }
+
+                        if (dstN != null && srcN != null)
+                        {
+                            dstN[r, 0] = srcN[i, 0];
+                            dstN[r, 1] = srcN[i, 1];
+                            dstN[r, 2] = srcN[i, 2];
+                        }
+                    }
+
+                    clouds.Add(new PointCloud(outPoints, outColors, outNormals, isOrganized: false, pool: _pool));
+                    added = true;
                 }
-
-                if (dstN != null && srcN != null)
+                finally
                 {
-                    dstN[r, 0] = srcN[i, 0];
-                    dstN[r, 1] = srcN[i, 1];
-                    dstN[r, 2] = srcN[i, 2];
+                    if (!added)
+                    {
+                        _pool.Return(outPoints);
+                        if (outColors != null) _pool.Return(outColors);
+                        if (outNormals != null) _pool.Return(outNormals);
+                    }
                 }
             }
 
-            clouds.Add(new PointCloud(outPoints, outColors, outNormals, isOrganized: false, pool: _pool));
+            return clouds;
         }
-
-        return clouds;
+        catch
+        {
+            foreach (var cloud in clouds)
+            {
+                cloud.Dispose();
+            }
+            throw;
+        }
     }
 
     private readonly record struct CellKey(int X, int Y, int Z)

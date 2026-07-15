@@ -148,6 +148,16 @@ if (-not (Stop-AfterFailure $governance)) {
                 })
             }
         }
+
+        if (-not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
+            [void](Invoke-LaneStep -Name "stage4-operator-performance-smoke" -Action {
+                & (Join-Path $scriptRoot "run-stage4-operator-benchmark.ps1") `
+                    -Profile smoke `
+                    -ResultsDirectory (Join-Path $performanceReportDirectory "stage4-smoke") `
+                    -Label "pr-smoke" `
+                    -ReturnExitCode
+            })
+        }
     }
 
     if ($Lane -eq "Nightly" -and -not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
@@ -188,6 +198,17 @@ if (-not (Stop-AfterFailure $governance)) {
         if (-not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
             [void](Invoke-LaneStep -Name "product-nightly-performance-other" -Action { Invoke-ClassifiedGate -GateName "product-nightly-performance-other" })
         }
+
+
+        if (-not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
+            [void](Invoke-LaneStep -Name "stage4-operator-performance-standard" -Action {
+                & (Join-Path $scriptRoot "run-stage4-operator-benchmark.ps1") `
+                    -Profile standard `
+                    -ResultsDirectory (Join-Path $performanceReportDirectory "stage4-standard") `
+                    -Label "nightly-standard" `
+                    -ReturnExitCode
+            })
+        }
     }
 
     if ($Lane -eq "ReleaseManual" -and -not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
@@ -201,6 +222,17 @@ if (-not (Stop-AfterFailure $governance)) {
         if (-not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
             [void](Invoke-LaneStep -Name "product-release-manual" -Action {
                 Invoke-ClassifiedGate -GateName "product-release-manual"
+            })
+        }
+
+
+        if (-not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
+            [void](Invoke-LaneStep -Name "stage4-operator-performance-acceptance" -Action {
+                & (Join-Path $scriptRoot "run-stage4-operator-benchmark.ps1") `
+                    -Profile acceptance `
+                    -ResultsDirectory (Join-Path $performanceReportDirectory "stage4-acceptance") `
+                    -Label "release-manual-acceptance" `
+                    -ReturnExitCode
             })
         }
 

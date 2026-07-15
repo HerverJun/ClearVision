@@ -53,6 +53,33 @@ public sealed class EuclideanClusterExtractionOperatorTests
         result.OutputData.Should().ContainKey("ClusterPointClouds");
 
         Convert.ToInt32(result.OutputData!["ClusterCount"]).Should().Be(2);
+        Convert.ToInt32(result.OutputData["CoreInvocationCount"]).Should().Be(1);
+        result.OutputData["PointCloudsMaterialized"].Should().Be(true);
+        foreach (var clusterCloud in result.OutputData["ClusterPointClouds"].Should().BeAssignableTo<List<ClearVision.Product.Infrastructure.PointCloud.PointCloud>>().Subject)
+        {
+            clusterCloud.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenMaterializationDisabled_ShouldReturnIndicesWithoutPointCloudAllocations()
+    {
+        var sut = new EuclideanClusterExtractionOperator(Substitute.For<ILogger<EuclideanClusterExtractionOperator>>());
+        var op = new Operator("cluster", OperatorType.EuclideanClusterExtraction, 0, 0);
+        op.AddParameter(new Parameter(Guid.NewGuid(), "ClusterTolerance", "ClusterTolerance", string.Empty, "double", 0.03));
+        op.AddParameter(new Parameter(Guid.NewGuid(), "MinClusterSize", "MinClusterSize", string.Empty, "int", 100));
+        op.AddParameter(new Parameter(Guid.NewGuid(), "MaxClusterSize", "MaxClusterSize", string.Empty, "int", 100000));
+        op.AddParameter(new Parameter(Guid.NewGuid(), "MaterializePointClouds", "MaterializePointClouds", string.Empty, "bool", false));
+        var gen = new SyntheticPointCloudGenerator(seed: 122);
+        using var cloud = gen.GenerateSphere(Vector3.Zero, 0.06f, 900, 0.0004f, true, false, 0);
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object> { ["PointCloud"] = cloud });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToInt32(result.OutputData!["CoreInvocationCount"]).Should().Be(1);
+        result.OutputData["PointCloudsMaterialized"].Should().Be(false);
+        result.OutputData["ClusterPointClouds"].Should().BeAssignableTo<List<ClearVision.Product.Infrastructure.PointCloud.PointCloud>>().Which.Should().BeEmpty();
+        result.OutputData["Clusters"].Should().BeAssignableTo<List<int[]>>().Which.Should().ContainSingle();
     }
 
     private static ClearVision.Product.Infrastructure.PointCloud.PointCloud MergeTwo(

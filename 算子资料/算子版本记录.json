@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-15T17:25:56.0119276\u002B08:00",
+  "generatedAt": "2026-07-15T20:30:44.7937318\u002B08:00",
   "operators": [
     {
       "id": "AdaptiveThreshold",
@@ -3865,6 +3865,18 @@
           "sourceHash": "91C9F015F7A931D670745699DB0BA0768F024332DE41ED12DDD6E69BF65E2AAD",
           "fingerprintVersion": "operator-runtime-metadata-v2",
           "recordedAt": "2026-07-14T15:07:23.3198726\u002B08:00"
+        },
+        {
+          "version": "1.1.0",
+          "sourceHash": "C14FD1BA20AA0227CC062039562F7E74B635AC800041859B5C457F1E7E28A8E6",
+          "fingerprintVersion": "operator-runtime-metadata-v2",
+          "recordedAt": "2026-07-15T20:16:21.3617917\u002B08:00"
+        },
+        {
+          "version": "1.1.0",
+          "sourceHash": "75C259C936486339F724ECE3031DE4F91001D28E17FBC20EEC921D3B337DB0FA",
+          "fingerprintVersion": "operator-runtime-metadata-v2",
+          "recordedAt": "2026-07-15T20:30:44.7937318\u002B08:00"
         }
       ]
     },
@@ -5026,6 +5038,18 @@
           "sourceHash": "1A1A4D0DA3C2CCB07578CB4FD293C7AD4B9A22F5820C67068B28EB3862535E18",
           "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
           "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "ED8ADF7959034DEC5E57632132E706FFB0D7AE0A66F56E6C972E22AA2801624B",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T20:16:21.3617917\u002B08:00"
+        },
+        {
+          "version": "1.0.2",
+          "sourceHash": "BB1DD1681A4A91CA18CC57A46C3CF25B2891F9A612481FDCF242B56D363CDFA9",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T20:30:44.7937318\u002B08:00"
         }
       ]
     },
@@ -8989,6 +9013,18 @@
           "sourceHash": "A0DE399710B0F6D459399664794EE68518FA2473AC4951A7A5379C414883E2EA",
           "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
           "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
+        },
+        {
+          "version": "1.0.1",
+          "sourceHash": "5672DBF54B24FC7DDA59C379AFC29E16D149273C8024107C3C996E4FF38F21ED",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T20:16:21.3617917\u002B08:00"
+        },
+        {
+          "version": "1.0.1",
+          "sourceHash": "7D84BF747A71B517E404E47917B5A51877365C79DA3C86A297784C89A557FBCD",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T20:30:44.7937318\u002B08:00"
         }
       ]
     },
@@ -11803,6 +11839,18 @@
           "sourceHash": "BF63DFD419DFEE681C25426A0C2384437B39C898A98BD9D562764D5B68EA1E6C",
           "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
           "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
+        },
+        {
+          "version": "1.0.1",
+          "sourceHash": "1946F40452012CD2920DFB038AAE9ABEBC2D355EBA879521BC226D1EF1C85C37",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T20:16:21.3617917\u002B08:00"
+        },
+        {
+          "version": "1.0.1",
+          "sourceHash": "74B8461693AE82FBDDADF48F5D329353CD71A6E573F4A2AFA88F3E1174EC8F31",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T20:30:44.7937318\u002B08:00"
         }
       ]
     },
@@ -13222,6 +13270,12 @@
           "sourceHash": "E854175C98D2FD2B4C916089FFE6E925AE7A7A25A0AE0CDAC7A79681CC33C9A7",
           "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
           "recordedAt": "2026-07-15T11:26:25.6098568\u002B08:00"
+        },
+        {
+          "version": "1.1.0",
+          "sourceHash": "95E997FA412BCF141CE13FAD1C41DC414B91BF0FF691B6AE544B8414E95115DF",
+          "fingerprintVersion": "operator-runtime-metadata-v2:image-contract-v2.1",
+          "recordedAt": "2026-07-15T20:16:21.3617917\u002B08:00"
         }
       ]
     },

@@ -8,12 +8,12 @@
 | 分类 ID (CategoryId) | `ImagePreprocessing` |
 | 分类 (Category) | 图像预处理 |
 | 分类顺序 (CategoryOrder) | 2 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
-| AI 默认推荐 (Default AI Recommendation) | No |
-| AI 必须披露状态 (Requires Disclosure) | Yes |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
 | 标签 (Tags) | `分类:ImagePreprocessing`, `分类显示:图像预处理`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
@@ -71,16 +71,20 @@
 ## 图像输入域合同 / Image Input Domain Contracts
 | 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Background` | Allowed:3, Rejected:0, Unknown:25 | Legacy 8U compatibility allowance — unverified | CV_8U | CV_8U | 1, 3, 4 | Legacy 8U compatibility allowance — unverified. Higher-depth and undeclared combinations remain Unknown and fail closed. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit native numeric domain; no implicit MinMax conversion. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
-| `Image` | Allowed:3, Rejected:0, Unknown:25 | Legacy 8U compatibility allowance — unverified | CV_8U | CV_8U | 1, 3, 4 | Legacy 8U compatibility allowance — unverified. Higher-depth and undeclared combinations remain Unknown and fail closed. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit native numeric domain; no implicit MinMax conversion. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Background` | Allowed:8, Rejected:0, Unknown:0 | Verified production support is present. | CV_8U, CV_16U, CV_32F, CV_64F | CV_8U, CV_16U, CV_32F, CV_64F | 1, 3 | Exact support is declared for one- and three-channel shading correction inputs. | Only the documented luma/color processing conversions are applied. | Preserve input depth and channel count. | No hidden generic normalization outside the documented luma conversion path. | RejectNaNAndInfinityForFloatingVariants | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Image` | Allowed:8, Rejected:0, Unknown:0 | Verified production support is present. | CV_8U, CV_16U, CV_32F, CV_64F | CV_8U, CV_16U, CV_32F, CV_64F | 1, 3 | Exact support is declared for one- and three-channel shading correction inputs. | Only the documented luma/color processing conversions are applied. | Preserve input depth and channel count. | No hidden generic normalization outside the documented luma conversion path. | RejectNaNAndInfinityForFloatingVariants | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
 ### 精确运行变体 / Exact Runtime Variants
 | 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
 |------|------|------|------|------|------|------|------|------|------|------|------|
-| `Background` | Default | CV_8UC1, CV_8UC3, CV_8UC4 | Legacy 8U execution path retained for compatibility; no per-operator E2 evidence. | `Allowed` | `LegacyCompatibilityAllowance` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit legacy numeric domain. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E0_SOURCE_AUDIT` |
-| `Background` | Default | CV_8UC2, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
-| `Image` | Default | CV_8UC1, CV_8UC3, CV_8UC4 | Legacy 8U execution path retained for compatibility; no per-operator E2 evidence. | `Allowed` | `LegacyCompatibilityAllowance` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit legacy numeric domain. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E0_SOURCE_AUDIT` |
-| `Image` | Default | CV_8UC2, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
+| `Background` | Default | CV_8UC1, CV_16UC1 | Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing. | `Allowed` | `VerifiedSupport` | C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth. | Preserve input depth and channel count. | Integer inputs retain their native output range; floating inputs retain their floating depth. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Background` | Default | CV_32FC1, CV_64FC1 | Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing. | `Allowed` | `VerifiedSupport` | C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth. | Preserve input depth and channel count. | Integer inputs retain their native output range; floating inputs retain their floating depth. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Background` | Default | CV_8UC3, CV_16UC3 | Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing. | `Allowed` | `VerifiedConversion` | C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth. | Preserve input depth and channel count. | Integer inputs retain their native output range; floating inputs retain their floating depth. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Background` | Default | CV_32FC3, CV_64FC3 | Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing. | `Allowed` | `VerifiedConversion` | C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth. | Preserve input depth and channel count. | Integer inputs retain their native output range; floating inputs retain their floating depth. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Default | CV_8UC1, CV_16UC1 | Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing. | `Allowed` | `VerifiedSupport` | C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth. | Preserve input depth and channel count. | Integer inputs retain their native output range; floating inputs retain their floating depth. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Default | CV_32FC1, CV_64FC1 | Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing. | `Allowed` | `VerifiedSupport` | C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth. | Preserve input depth and channel count. | Integer inputs retain their native output range; floating inputs retain their floating depth. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Default | CV_8UC3, CV_16UC3 | Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing. | `Allowed` | `VerifiedConversion` | C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth. | Preserve input depth and channel count. | Integer inputs retain their native output range; floating inputs retain their floating depth. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Default | CV_32FC3, CV_64FC3 | Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing. | `Allowed` | `VerifiedConversion` | C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth. | Preserve input depth and channel count. | Integer inputs retain their native output range; floating inputs retain their floating depth. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -88,8 +92,8 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`BF63DFD419DFEE681C25426A0C2384437B39C898A98BD9D562764D5B68EA1E6C`
-- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+- 组合指纹 (Generation Fingerprint)：`74B8461693AE82FBDDADF48F5D329353CD71A6E573F4A2AFA88F3E1174EC8F31`
+- `type:ClearVision.Product.Infrastructure.Operators.ShadingCorrectionImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
@@ -123,4 +127,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.1 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

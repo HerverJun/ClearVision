@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `PointCloud3D` |
 | 分类 (Category) | 3D点云 |
 | 分类顺序 (CategoryOrder) | 10 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.1.0` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -22,7 +22,7 @@
 
 ## 实现策略 / Implementation Strategy
 - 先校验必填输入：`PointCloud`；缺失时通常返回失败结果。
-- 参数解析覆盖 3 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 4 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 源码包含异常捕获路径，外部依赖或运行时异常会被转为失败输出或诊断信息。
 - 非图像输出直接以 `Dictionary<string, object>` 返回，字段名称以输出端口和运行时附加输出表为准。
@@ -35,9 +35,10 @@
 ## 参数说明 / Parameters
 | 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |
 |--------|------|------|--------|------|------|------|
-| `ClusterTolerance` | 聚类容差 | `double` | 0.02 | >= 1E-06 | Yes | - |
+| `ClusterTolerance` | 聚类容差 | `double` | 0.02 | [1E-06, 1000] | Yes | - |
 | `MinClusterSize` | 最小聚类大小 | `int` | 100 | [1, 10000000] | Yes | - |
 | `MaxClusterSize` | 最大聚类大小 | `int` | 1000000 | [1, 10000000] | Yes | - |
+| `MaterializePointClouds` | Materialize Point Clouds | `bool` | true | - | Yes | 为 false 时仅返回聚类索引，不分配 PointCloud 输出。 |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -64,11 +65,14 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`91C9F015F7A931D670745699DB0BA0768F024332DE41ED12DDD6E69BF65E2AAD`
+- 组合指纹 (Generation Fingerprint)：`75C259C936486339F724ECE3031DE4F91001D28E17FBC20EEC921D3B337DB0FA`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
-- 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
+| 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
+|------|------|------|
+| `CoreInvocationCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `PointCloudsMaterialized` | `Any` | 源码通过输出字典索引赋值写入。 |
 
 ## 性能特征 / Performance
 | 指标 (Metric) | 值 (Value) |
@@ -90,8 +94,9 @@
 ## 已知限制 / Known Limitations
 1. 必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。
 2. 参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。
+3. 运行时附加输出字段来自源码输出字典，部分字段未声明为可连线端口，下游稳定连线应优先使用输出端口表。
 
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-14 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.1.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

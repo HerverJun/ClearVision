@@ -8,12 +8,12 @@
 | 分类 ID (CategoryId) | `FeatureExtraction` |
 | 分类 (Category) | 特征提取 |
 | 分类顺序 (CategoryOrder) | 4 |
-| 版本 (Version) | `1.0.0` |
+| 版本 (Version) | `1.0.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
-| AI 默认推荐 (Default AI Recommendation) | No |
-| AI 必须披露状态 (Requires Disclosure) | Yes |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
 | 标签 (Tags) | `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
@@ -62,10 +62,18 @@
 |------|------|------|------|
 | `Mean` | 均值 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `StdDev` | StdDev | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `Min` | Min | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `Max` | Max | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
-| `Median` | 中值 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Min` | Min | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Max` | Max | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Median` | 中值 | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `Range` | Range | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `MedianAbsoluteDeviation` | Median Absolute Deviation | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `StdError` | Standard Error | `Float` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
 | `NonZeroCount` | NonZero Count | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `SampleCount` | 采样数 | `Integer` | 数值结果，可用于测量、阈值判定、统计或报表输出。 |
+| `SelectedChannel` | Selected Channel | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ChannelsAnalyzed` | Channels Analyzed | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
+| `AggregationMode` | Aggregation Mode | `String` | 文本结果，可用于显示、日志、保存或外部接口传输。 |
+| `ChannelStats` | Per-channel Statistics | `Any` | 业务输出字段，具体结构以源码输出和运行时结果为准。 |
 
 ## 模式与资源契约 / Mode & Resource Contracts
 ### 参数条件 / Parameter Conditions
@@ -76,16 +84,20 @@
 ## 图像输入域合同 / Image Input Domain Contracts
 | 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Allowed:3, Rejected:0, Unknown:25 | Legacy 8U compatibility allowance — unverified | CV_8U | CV_8U | 1, 3, 4 | Legacy 8U compatibility allowance — unverified. Higher-depth and undeclared combinations remain Unknown and fail closed. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit native numeric domain; no implicit MinMax conversion. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
-| `Mask` | Allowed:3, Rejected:0, Unknown:25 | Legacy 8U compatibility allowance — unverified | CV_8U | CV_8U | 1, 3, 4 | Legacy 8U compatibility allowance — unverified. Higher-depth and undeclared combinations remain Unknown and fail closed. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit native numeric domain; no implicit MinMax conversion. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Image` | Allowed:13, Rejected:0, Unknown:0 | Verified production support is present. | CV_8U, CV_8S, CV_16U, CV_16S, CV_32S, CV_32F, CV_64F | CV_8U, CV_8S, CV_16U, CV_16S, CV_32S, CV_32F, CV_64F | 1, 3, 4 | Exact support is declared per depth/channel pair. | No implicit depth normalization; explicit channel selection only. | No image output. | Statistics retain the admitted input numeric domain. | RejectNaNAndInfinityForFloatingVariants | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Mask` | Allowed:3, Rejected:0, Unknown:0 | Verified production support is present. | CV_8U | CV_8U | 1, 3, 4 | Mask is an 8-bit selection image. | Optional color-to-gray conversion followed by binary thresholding. | No image output. | Non-zero mask domain. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
 ### 精确运行变体 / Exact Runtime Variants
 | 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
 |------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Default | CV_8UC1, CV_8UC3, CV_8UC4 | Legacy 8U execution path retained for compatibility; no per-operator E2 evidence. | `Allowed` | `LegacyCompatibilityAllowance` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit legacy numeric domain. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E0_SOURCE_AUDIT` |
-| `Image` | Default | CV_8UC2, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
-| `Mask` | Default | CV_8UC1, CV_8UC3, CV_8UC4 | Legacy 8U execution path retained for compatibility; no per-operator E2 evidence. | `Allowed` | `LegacyCompatibilityAllowance` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit legacy numeric domain. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E0_SOURCE_AUDIT` |
-| `Mask` | Default | CV_8UC2, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
+| `Image` | Default | CV_8SC1, CV_16SC1, CV_32SC1 | Single-channel statistics use typed scalar reads without depth conversion. | `Allowed` | `VerifiedSupport` | None. | No image output. | Exact source numeric values are accumulated as double. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Default | CV_64FC1 | Single-channel statistics use typed scalar reads without depth conversion. | `Allowed` | `VerifiedSupport` | None. | No image output. | Exact source numeric values are accumulated as double. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Image` | Default | CV_8UC1, CV_16UC1 | Statistics are computed in the admitted input numeric domain; Channel selects Gray/R/G/B/All at runtime. | `Allowed` | `VerifiedSupport` | Channel split or supported color-to-gray conversion; no depth scaling. | No image output. | Exact source numeric values are accumulated as double. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Default | CV_32FC1 | Statistics are computed in the admitted input numeric domain; Channel selects Gray/R/G/B/All at runtime. | `Allowed` | `VerifiedSupport` | Channel split or supported color-to-gray conversion; no depth scaling. | No image output. | Exact source numeric values are accumulated as double. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Default | CV_8UC3, CV_8UC4, CV_16UC3, CV_16UC4 | Statistics are computed in the admitted input numeric domain; Channel selects Gray/R/G/B/All at runtime. | `Allowed` | `VerifiedConversion` | Channel split or supported color-to-gray conversion; no depth scaling. | No image output. | Exact source numeric values are accumulated as double. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Default | CV_32FC3, CV_32FC4 | Statistics are computed in the admitted input numeric domain; Channel selects Gray/R/G/B/All at runtime. | `Allowed` | `VerifiedConversion` | Channel split or supported color-to-gray conversion; no depth scaling. | No image output. | Exact source numeric values are accumulated as double. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_NUMERICAL_ORACLE` |
+| `Mask` | Default | CV_8UC1 | Mask is converted to single-channel binary 8U before sampling. | `Allowed` | `VerifiedSupport` | C3/C4 mask -> Gray -> binary 8U; C1 is thresholded directly. | No image output. | Non-zero mask values select samples. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
+| `Mask` | Default | CV_8UC3, CV_8UC4 | Mask is converted to single-channel binary 8U before sampling. | `Allowed` | `VerifiedConversion` | C3/C4 mask -> Gray -> binary 8U; C1 is thresholded directly. | No image output. | Non-zero mask values select samples. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_EXECUTABLE_PROBE` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -93,23 +105,15 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`A0DE399710B0F6D459399664794EE68518FA2473AC4951A7A5379C414883E2EA`
-- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+- 组合指纹 (Generation Fingerprint)：`7D84BF747A71B517E404E47917B5A51877365C79DA3C86A297784C89A557FBCD`
+- `type:ClearVision.Product.Infrastructure.Operators.PixelStatisticsImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
-| `AggregationMode` | `String` | 源码通过输出字典索引赋值写入。 |
-| `ChannelStats` | `Any` | 源码通过输出字典索引赋值写入。 |
-| `ChannelsAnalyzed` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Confidence` | `Float` | 源码通过输出字典索引赋值写入。 |
-| `MedianAbsoluteDeviation` | `Any` | 源码输出字典初始化中可见字段。 |
-| `Range` | `Any` | 源码输出字典初始化中可见字段。 |
-| `SampleCount` | `Integer` | 源码输出字典初始化中可见字段。 |
-| `SelectedChannel` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `StatusCode` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `StatusMessage` | `String` | 源码通过输出字典索引赋值写入。 |
-| `StdError` | `Float` | 源码输出字典初始化中可见字段。 |
 | `UncertaintyPx` | `Any` | 源码通过输出字典索引赋值写入。 |
 
 ## 性能特征 / Performance
@@ -137,4 +141,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.1 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

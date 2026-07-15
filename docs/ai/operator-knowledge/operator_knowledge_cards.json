@@ -12878,7 +12878,7 @@
         "Description": "",
         "DefaultValue": "0.02",
         "MinValue": "1E-06",
-        "MaxValue": null,
+        "MaxValue": "1000",
         "IsRequired": true,
         "AllowedValues": []
       },
@@ -12903,6 +12903,17 @@
         "MaxValue": "10000000",
         "IsRequired": true,
         "AllowedValues": []
+      },
+      {
+        "Name": "MaterializePointClouds",
+        "DisplayName": "Materialize Point Clouds",
+        "DataType": "bool",
+        "Description": "\u4E3A false \u65F6\u4EC5\u8FD4\u56DE\u805A\u7C7B\u7D22\u5F15\uFF0C\u4E0D\u5206\u914D PointCloud \u8F93\u51FA\u3002",
+        "DefaultValue": "True",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
       }
     ],
     "ParameterConditions": [],
@@ -12910,7 +12921,7 @@
     "ImageInputContracts": [],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "91C9F015F7A931D670745699DB0BA0768F024332DE41ED12DDD6E69BF65E2AAD",
+    "GenerationFingerprint": "75C259C936486339F724ECE3031DE4F91001D28E17FBC20EEC921D3B337DB0FA",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
@@ -16210,8 +16221,8 @@
     "Lifecycle": "Stable",
     "LifecycleNote": null,
     "DefaultHidden": false,
-    "DefaultAiRecommendation": false,
-    "RequiresLifecycleDisclosure": true,
+    "DefaultAiRecommendation": true,
+    "RequiresLifecycleDisclosure": false,
     "Aliases": [
       "GLCM\u7EB9\u7406\u7279\u5F81",
       "GlcmTexture",
@@ -16388,84 +16399,80 @@
       {
         "InputPort": "Image",
         "ContractVersion": "2.1",
-        "AllowedVariantCount": 3,
-        "VerifiedSupportVariantCount": 0,
-        "VerifiedConversionVariantCount": 0,
-        "LegacyCompatibilityVariantCount": 3,
+        "AllowedVariantCount": 9,
+        "VerifiedSupportVariantCount": 1,
+        "VerifiedConversionVariantCount": 8,
+        "LegacyCompatibilityVariantCount": 0,
         "VerifiedRejectionVariantCount": 0,
-        "UnknownVariantCount": 25,
-        "HasProductionSupport": false,
-        "CompatibilityOnly": true,
-        "EvidenceSummary": "Legacy 8U compatibility allowance \u2014 unverified",
+        "UnknownVariantCount": 0,
+        "HasProductionSupport": true,
+        "CompatibilityOnly": false,
+        "EvidenceSummary": "Verified production support is present.",
         "ExactVariantGroups": [
           {
             "Mode": "Default",
-            "Condition": "Legacy 8U execution path retained for compatibility; no per-operator E2 evidence.",
+            "Condition": "The selected ROI is converted to gray and explicitly quantized to an 8-bit affine range domain before GLCM construction.",
             "Admission": "Allowed",
-            "Verification": "LegacyCompatibilityAllowance",
+            "Verification": "VerifiedSupport",
             "ExactInputTypes": [
-              "CV_8UC1",
-              "CV_8UC3",
-              "CV_8UC4"
+              "CV_8UC1"
             ],
-            "ConversionPolicy": "None",
-            "OutputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-            "DynamicRangePolicy": "8-bit legacy numeric domain.",
+            "ConversionPolicy": "C3/C4 -\u003E Gray; non-8U gray -\u003E CV_32F -\u003E per-ROI affine range mapping -\u003E CV_8U.",
+            "OutputDepthPolicy": "No image output.",
+            "DynamicRangePolicy": "Texture features are computed in the explicit per-ROI 8-bit quantization domain.",
             "InputValuePolicy": "Any",
-            "FailureCode": "IMAGE_DEPTH_UNSUPPORTED",
-            "EvidenceLevel": "E0_SOURCE_AUDIT"
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_NUMERICAL_ORACLE"
           },
           {
             "Mode": "Default",
-            "Condition": "No operator-specific executable evidence is registered.",
-            "Admission": "Unknown",
-            "Verification": "Unknown",
+            "Condition": "The selected ROI is converted to gray and explicitly quantized to an 8-bit affine range domain before GLCM construction.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedConversion",
             "ExactInputTypes": [
-              "CV_8UC2",
-              "CV_8SC1",
-              "CV_8SC2",
-              "CV_8SC3",
-              "CV_8SC4",
+              "CV_8UC3",
+              "CV_8UC4",
               "CV_16UC1",
-              "CV_16UC2",
               "CV_16UC3",
-              "CV_16UC4",
-              "CV_16SC1",
-              "CV_16SC2",
-              "CV_16SC3",
-              "CV_16SC4",
-              "CV_32SC1",
-              "CV_32SC2",
-              "CV_32SC3",
-              "CV_32SC4",
-              "CV_32FC1",
-              "CV_32FC2",
-              "CV_32FC3",
-              "CV_32FC4",
-              "CV_64FC1",
-              "CV_64FC2",
-              "CV_64FC3",
-              "CV_64FC4"
+              "CV_16UC4"
             ],
-            "ConversionPolicy": "None",
-            "OutputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-            "DynamicRangePolicy": "Undefined until verified.",
+            "ConversionPolicy": "C3/C4 -\u003E Gray; non-8U gray -\u003E CV_32F -\u003E per-ROI affine range mapping -\u003E CV_8U.",
+            "OutputDepthPolicy": "No image output.",
+            "DynamicRangePolicy": "Texture features are computed in the explicit per-ROI 8-bit quantization domain.",
             "InputValuePolicy": "Any",
-            "FailureCode": "IMAGE_CONTRACT_UNKNOWN",
-            "EvidenceLevel": "Unknown"
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_NUMERICAL_ORACLE"
+          },
+          {
+            "Mode": "Default",
+            "Condition": "The selected ROI is converted to gray and explicitly quantized to an 8-bit affine range domain before GLCM construction.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedConversion",
+            "ExactInputTypes": [
+              "CV_32FC1",
+              "CV_32FC3",
+              "CV_32FC4"
+            ],
+            "ConversionPolicy": "C3/C4 -\u003E Gray; non-8U gray -\u003E CV_32F -\u003E per-ROI affine range mapping -\u003E CV_8U.",
+            "OutputDepthPolicy": "No image output.",
+            "DynamicRangePolicy": "Texture features are computed in the explicit per-ROI 8-bit quantization domain.",
+            "InputValuePolicy": "RejectNonFinite",
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_NUMERICAL_ORACLE"
           }
         ]
       }
     ],
     "ResourceRequirements": [],
-    "GenerationDependencies": [],
-    "GenerationFingerprint": "1A1A4D0DA3C2CCB07578CB4FD293C7AD4B9A22F5820C67068B28EB3862535E18",
+    "GenerationDependencies": [
+      "type:ClearVision.Product.Infrastructure.Operators.GlcmTextureImageContractProvider"
+    ],
+    "GenerationFingerprint": "BB1DD1681A4A91CA18CC57A46C3CF25B2891F9A612481FDCF242B56D363CDFA9",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
     "AntiPatterns": [],
     "KnownLimitations": [
-      "Legacy 8U compatibility allowance \u2014 unverified",
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
       "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
       "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
@@ -29822,8 +29829,8 @@
     "Lifecycle": "Stable",
     "LifecycleNote": null,
     "DefaultHidden": false,
-    "DefaultAiRecommendation": false,
-    "RequiresLifecycleDisclosure": true,
+    "DefaultAiRecommendation": true,
+    "RequiresLifecycleDisclosure": false,
     "Aliases": [
       "\u50CF\u7D20\u7EDF\u8BA1",
       "PixelStatistics",
@@ -29873,21 +29880,42 @@
       {
         "Name": "Min",
         "DisplayName": "Min",
-        "DataType": "Integer",
+        "DataType": "Float",
         "IsRequired": false,
         "Description": ""
       },
       {
         "Name": "Max",
         "DisplayName": "Max",
-        "DataType": "Integer",
+        "DataType": "Float",
         "IsRequired": false,
         "Description": ""
       },
       {
         "Name": "Median",
         "DisplayName": "\u4E2D\u503C",
-        "DataType": "Integer",
+        "DataType": "Float",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "Range",
+        "DisplayName": "Range",
+        "DataType": "Float",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "MedianAbsoluteDeviation",
+        "DisplayName": "Median Absolute Deviation",
+        "DataType": "Float",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "StdError",
+        "DisplayName": "Standard Error",
+        "DataType": "Float",
         "IsRequired": false,
         "Description": ""
       },
@@ -29895,6 +29923,41 @@
         "Name": "NonZeroCount",
         "DisplayName": "NonZero Count",
         "DataType": "Integer",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "SampleCount",
+        "DisplayName": "\u91C7\u6837\u6570",
+        "DataType": "Integer",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "SelectedChannel",
+        "DisplayName": "Selected Channel",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "ChannelsAnalyzed",
+        "DisplayName": "Channels Analyzed",
+        "DataType": "Any",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "AggregationMode",
+        "DisplayName": "Aggregation Mode",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "ChannelStats",
+        "DisplayName": "Per-channel Statistics",
+        "DataType": "Any",
         "IsRequired": false,
         "Description": ""
       }
@@ -29968,71 +30031,112 @@
       {
         "InputPort": "Image",
         "ContractVersion": "2.1",
-        "AllowedVariantCount": 3,
-        "VerifiedSupportVariantCount": 0,
-        "VerifiedConversionVariantCount": 0,
-        "LegacyCompatibilityVariantCount": 3,
+        "AllowedVariantCount": 13,
+        "VerifiedSupportVariantCount": 7,
+        "VerifiedConversionVariantCount": 6,
+        "LegacyCompatibilityVariantCount": 0,
         "VerifiedRejectionVariantCount": 0,
-        "UnknownVariantCount": 25,
-        "HasProductionSupport": false,
-        "CompatibilityOnly": true,
-        "EvidenceSummary": "Legacy 8U compatibility allowance \u2014 unverified",
+        "UnknownVariantCount": 0,
+        "HasProductionSupport": true,
+        "CompatibilityOnly": false,
+        "EvidenceSummary": "Verified production support is present.",
         "ExactVariantGroups": [
           {
             "Mode": "Default",
-            "Condition": "Legacy 8U execution path retained for compatibility; no per-operator E2 evidence.",
+            "Condition": "Single-channel statistics use typed scalar reads without depth conversion.",
             "Admission": "Allowed",
-            "Verification": "LegacyCompatibilityAllowance",
+            "Verification": "VerifiedSupport",
             "ExactInputTypes": [
-              "CV_8UC1",
-              "CV_8UC3",
-              "CV_8UC4"
+              "CV_8SC1",
+              "CV_16SC1",
+              "CV_32SC1"
             ],
-            "ConversionPolicy": "None",
-            "OutputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-            "DynamicRangePolicy": "8-bit legacy numeric domain.",
+            "ConversionPolicy": "None.",
+            "OutputDepthPolicy": "No image output.",
+            "DynamicRangePolicy": "Exact source numeric values are accumulated as double.",
             "InputValuePolicy": "Any",
-            "FailureCode": "IMAGE_DEPTH_UNSUPPORTED",
-            "EvidenceLevel": "E0_SOURCE_AUDIT"
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_EXECUTABLE_PROBE"
           },
           {
             "Mode": "Default",
-            "Condition": "No operator-specific executable evidence is registered.",
-            "Admission": "Unknown",
-            "Verification": "Unknown",
+            "Condition": "Single-channel statistics use typed scalar reads without depth conversion.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedSupport",
             "ExactInputTypes": [
-              "CV_8UC2",
-              "CV_8SC1",
-              "CV_8SC2",
-              "CV_8SC3",
-              "CV_8SC4",
-              "CV_16UC1",
-              "CV_16UC2",
-              "CV_16UC3",
-              "CV_16UC4",
-              "CV_16SC1",
-              "CV_16SC2",
-              "CV_16SC3",
-              "CV_16SC4",
-              "CV_32SC1",
-              "CV_32SC2",
-              "CV_32SC3",
-              "CV_32SC4",
-              "CV_32FC1",
-              "CV_32FC2",
-              "CV_32FC3",
-              "CV_32FC4",
-              "CV_64FC1",
-              "CV_64FC2",
-              "CV_64FC3",
-              "CV_64FC4"
+              "CV_64FC1"
             ],
-            "ConversionPolicy": "None",
-            "OutputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-            "DynamicRangePolicy": "Undefined until verified.",
+            "ConversionPolicy": "None.",
+            "OutputDepthPolicy": "No image output.",
+            "DynamicRangePolicy": "Exact source numeric values are accumulated as double.",
+            "InputValuePolicy": "RejectNonFinite",
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_EXECUTABLE_PROBE"
+          },
+          {
+            "Mode": "Default",
+            "Condition": "Statistics are computed in the admitted input numeric domain; Channel selects Gray/R/G/B/All at runtime.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedSupport",
+            "ExactInputTypes": [
+              "CV_8UC1",
+              "CV_16UC1"
+            ],
+            "ConversionPolicy": "Channel split or supported color-to-gray conversion; no depth scaling.",
+            "OutputDepthPolicy": "No image output.",
+            "DynamicRangePolicy": "Exact source numeric values are accumulated as double.",
             "InputValuePolicy": "Any",
-            "FailureCode": "IMAGE_CONTRACT_UNKNOWN",
-            "EvidenceLevel": "Unknown"
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_NUMERICAL_ORACLE"
+          },
+          {
+            "Mode": "Default",
+            "Condition": "Statistics are computed in the admitted input numeric domain; Channel selects Gray/R/G/B/All at runtime.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedSupport",
+            "ExactInputTypes": [
+              "CV_32FC1"
+            ],
+            "ConversionPolicy": "Channel split or supported color-to-gray conversion; no depth scaling.",
+            "OutputDepthPolicy": "No image output.",
+            "DynamicRangePolicy": "Exact source numeric values are accumulated as double.",
+            "InputValuePolicy": "RejectNonFinite",
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_NUMERICAL_ORACLE"
+          },
+          {
+            "Mode": "Default",
+            "Condition": "Statistics are computed in the admitted input numeric domain; Channel selects Gray/R/G/B/All at runtime.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedConversion",
+            "ExactInputTypes": [
+              "CV_8UC3",
+              "CV_8UC4",
+              "CV_16UC3",
+              "CV_16UC4"
+            ],
+            "ConversionPolicy": "Channel split or supported color-to-gray conversion; no depth scaling.",
+            "OutputDepthPolicy": "No image output.",
+            "DynamicRangePolicy": "Exact source numeric values are accumulated as double.",
+            "InputValuePolicy": "Any",
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_NUMERICAL_ORACLE"
+          },
+          {
+            "Mode": "Default",
+            "Condition": "Statistics are computed in the admitted input numeric domain; Channel selects Gray/R/G/B/All at runtime.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedConversion",
+            "ExactInputTypes": [
+              "CV_32FC3",
+              "CV_32FC4"
+            ],
+            "ConversionPolicy": "Channel split or supported color-to-gray conversion; no depth scaling.",
+            "OutputDepthPolicy": "No image output.",
+            "DynamicRangePolicy": "Exact source numeric values are accumulated as double.",
+            "InputValuePolicy": "RejectNonFinite",
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_NUMERICAL_ORACLE"
           }
         ]
       },
@@ -30040,83 +30144,59 @@
         "InputPort": "Mask",
         "ContractVersion": "2.1",
         "AllowedVariantCount": 3,
-        "VerifiedSupportVariantCount": 0,
-        "VerifiedConversionVariantCount": 0,
-        "LegacyCompatibilityVariantCount": 3,
+        "VerifiedSupportVariantCount": 1,
+        "VerifiedConversionVariantCount": 2,
+        "LegacyCompatibilityVariantCount": 0,
         "VerifiedRejectionVariantCount": 0,
-        "UnknownVariantCount": 25,
-        "HasProductionSupport": false,
-        "CompatibilityOnly": true,
-        "EvidenceSummary": "Legacy 8U compatibility allowance \u2014 unverified",
+        "UnknownVariantCount": 0,
+        "HasProductionSupport": true,
+        "CompatibilityOnly": false,
+        "EvidenceSummary": "Verified production support is present.",
         "ExactVariantGroups": [
           {
             "Mode": "Default",
-            "Condition": "Legacy 8U execution path retained for compatibility; no per-operator E2 evidence.",
+            "Condition": "Mask is converted to single-channel binary 8U before sampling.",
             "Admission": "Allowed",
-            "Verification": "LegacyCompatibilityAllowance",
+            "Verification": "VerifiedSupport",
             "ExactInputTypes": [
-              "CV_8UC1",
-              "CV_8UC3",
-              "CV_8UC4"
+              "CV_8UC1"
             ],
-            "ConversionPolicy": "None",
-            "OutputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-            "DynamicRangePolicy": "8-bit legacy numeric domain.",
+            "ConversionPolicy": "C3/C4 mask -\u003E Gray -\u003E binary 8U; C1 is thresholded directly.",
+            "OutputDepthPolicy": "No image output.",
+            "DynamicRangePolicy": "Non-zero mask values select samples.",
             "InputValuePolicy": "Any",
-            "FailureCode": "IMAGE_DEPTH_UNSUPPORTED",
-            "EvidenceLevel": "E0_SOURCE_AUDIT"
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_EXECUTABLE_PROBE"
           },
           {
             "Mode": "Default",
-            "Condition": "No operator-specific executable evidence is registered.",
-            "Admission": "Unknown",
-            "Verification": "Unknown",
+            "Condition": "Mask is converted to single-channel binary 8U before sampling.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedConversion",
             "ExactInputTypes": [
-              "CV_8UC2",
-              "CV_8SC1",
-              "CV_8SC2",
-              "CV_8SC3",
-              "CV_8SC4",
-              "CV_16UC1",
-              "CV_16UC2",
-              "CV_16UC3",
-              "CV_16UC4",
-              "CV_16SC1",
-              "CV_16SC2",
-              "CV_16SC3",
-              "CV_16SC4",
-              "CV_32SC1",
-              "CV_32SC2",
-              "CV_32SC3",
-              "CV_32SC4",
-              "CV_32FC1",
-              "CV_32FC2",
-              "CV_32FC3",
-              "CV_32FC4",
-              "CV_64FC1",
-              "CV_64FC2",
-              "CV_64FC3",
-              "CV_64FC4"
+              "CV_8UC3",
+              "CV_8UC4"
             ],
-            "ConversionPolicy": "None",
-            "OutputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-            "DynamicRangePolicy": "Undefined until verified.",
+            "ConversionPolicy": "C3/C4 mask -\u003E Gray -\u003E binary 8U; C1 is thresholded directly.",
+            "OutputDepthPolicy": "No image output.",
+            "DynamicRangePolicy": "Non-zero mask values select samples.",
             "InputValuePolicy": "Any",
-            "FailureCode": "IMAGE_CONTRACT_UNKNOWN",
-            "EvidenceLevel": "Unknown"
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_EXECUTABLE_PROBE"
           }
         ]
       }
     ],
     "ResourceRequirements": [],
-    "GenerationDependencies": [],
-    "GenerationFingerprint": "A0DE399710B0F6D459399664794EE68518FA2473AC4951A7A5379C414883E2EA",
+    "GenerationDependencies": [
+      "type:ClearVision.Product.Infrastructure.Operators.PixelStatisticsImageContractProvider"
+    ],
+    "GenerationFingerprint": "7D84BF747A71B517E404E47917B5A51877365C79DA3C86A297784C89A557FBCD",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],
     "AntiPatterns": [],
     "KnownLimitations": [
-      "Legacy 8U compatibility allowance \u2014 unverified",
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
       "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
       "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
@@ -36785,8 +36865,8 @@
     "Lifecycle": "Stable",
     "LifecycleNote": null,
     "DefaultHidden": false,
-    "DefaultAiRecommendation": false,
-    "RequiresLifecycleDisclosure": true,
+    "DefaultAiRecommendation": true,
+    "RequiresLifecycleDisclosure": false,
     "Aliases": [
       "\u5149\u7167\u6821\u6B63",
       "ShadingCorrection",
@@ -36874,149 +36954,167 @@
       {
         "InputPort": "Image",
         "ContractVersion": "2.1",
-        "AllowedVariantCount": 3,
-        "VerifiedSupportVariantCount": 0,
-        "VerifiedConversionVariantCount": 0,
-        "LegacyCompatibilityVariantCount": 3,
+        "AllowedVariantCount": 8,
+        "VerifiedSupportVariantCount": 4,
+        "VerifiedConversionVariantCount": 4,
+        "LegacyCompatibilityVariantCount": 0,
         "VerifiedRejectionVariantCount": 0,
-        "UnknownVariantCount": 25,
-        "HasProductionSupport": false,
-        "CompatibilityOnly": true,
-        "EvidenceSummary": "Legacy 8U compatibility allowance \u2014 unverified",
+        "UnknownVariantCount": 0,
+        "HasProductionSupport": true,
+        "CompatibilityOnly": false,
+        "EvidenceSummary": "Verified production support is present.",
         "ExactVariantGroups": [
           {
             "Mode": "Default",
-            "Condition": "Legacy 8U execution path retained for compatibility; no per-operator E2 evidence.",
+            "Condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
             "Admission": "Allowed",
-            "Verification": "LegacyCompatibilityAllowance",
+            "Verification": "VerifiedSupport",
             "ExactInputTypes": [
               "CV_8UC1",
-              "CV_8UC3",
-              "CV_8UC4"
+              "CV_16UC1"
             ],
-            "ConversionPolicy": "None",
-            "OutputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-            "DynamicRangePolicy": "8-bit legacy numeric domain.",
+            "ConversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
+            "OutputDepthPolicy": "Preserve input depth and channel count.",
+            "DynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
             "InputValuePolicy": "Any",
-            "FailureCode": "IMAGE_DEPTH_UNSUPPORTED",
-            "EvidenceLevel": "E0_SOURCE_AUDIT"
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_EXECUTABLE_PROBE"
           },
           {
             "Mode": "Default",
-            "Condition": "No operator-specific executable evidence is registered.",
-            "Admission": "Unknown",
-            "Verification": "Unknown",
+            "Condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedSupport",
             "ExactInputTypes": [
-              "CV_8UC2",
-              "CV_8SC1",
-              "CV_8SC2",
-              "CV_8SC3",
-              "CV_8SC4",
-              "CV_16UC1",
-              "CV_16UC2",
-              "CV_16UC3",
-              "CV_16UC4",
-              "CV_16SC1",
-              "CV_16SC2",
-              "CV_16SC3",
-              "CV_16SC4",
-              "CV_32SC1",
-              "CV_32SC2",
-              "CV_32SC3",
-              "CV_32SC4",
               "CV_32FC1",
-              "CV_32FC2",
-              "CV_32FC3",
-              "CV_32FC4",
-              "CV_64FC1",
-              "CV_64FC2",
-              "CV_64FC3",
-              "CV_64FC4"
+              "CV_64FC1"
             ],
-            "ConversionPolicy": "None",
-            "OutputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-            "DynamicRangePolicy": "Undefined until verified.",
+            "ConversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
+            "OutputDepthPolicy": "Preserve input depth and channel count.",
+            "DynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
+            "InputValuePolicy": "RejectNonFinite",
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_EXECUTABLE_PROBE"
+          },
+          {
+            "Mode": "Default",
+            "Condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedConversion",
+            "ExactInputTypes": [
+              "CV_8UC3",
+              "CV_16UC3"
+            ],
+            "ConversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
+            "OutputDepthPolicy": "Preserve input depth and channel count.",
+            "DynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
             "InputValuePolicy": "Any",
-            "FailureCode": "IMAGE_CONTRACT_UNKNOWN",
-            "EvidenceLevel": "Unknown"
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_EXECUTABLE_PROBE"
+          },
+          {
+            "Mode": "Default",
+            "Condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedConversion",
+            "ExactInputTypes": [
+              "CV_32FC3",
+              "CV_64FC3"
+            ],
+            "ConversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
+            "OutputDepthPolicy": "Preserve input depth and channel count.",
+            "DynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
+            "InputValuePolicy": "RejectNonFinite",
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_EXECUTABLE_PROBE"
           }
         ]
       },
       {
         "InputPort": "Background",
         "ContractVersion": "2.1",
-        "AllowedVariantCount": 3,
-        "VerifiedSupportVariantCount": 0,
-        "VerifiedConversionVariantCount": 0,
-        "LegacyCompatibilityVariantCount": 3,
+        "AllowedVariantCount": 8,
+        "VerifiedSupportVariantCount": 4,
+        "VerifiedConversionVariantCount": 4,
+        "LegacyCompatibilityVariantCount": 0,
         "VerifiedRejectionVariantCount": 0,
-        "UnknownVariantCount": 25,
-        "HasProductionSupport": false,
-        "CompatibilityOnly": true,
-        "EvidenceSummary": "Legacy 8U compatibility allowance \u2014 unverified",
+        "UnknownVariantCount": 0,
+        "HasProductionSupport": true,
+        "CompatibilityOnly": false,
+        "EvidenceSummary": "Verified production support is present.",
         "ExactVariantGroups": [
           {
             "Mode": "Default",
-            "Condition": "Legacy 8U execution path retained for compatibility; no per-operator E2 evidence.",
+            "Condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
             "Admission": "Allowed",
-            "Verification": "LegacyCompatibilityAllowance",
+            "Verification": "VerifiedSupport",
             "ExactInputTypes": [
               "CV_8UC1",
-              "CV_8UC3",
-              "CV_8UC4"
+              "CV_16UC1"
             ],
-            "ConversionPolicy": "None",
-            "OutputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-            "DynamicRangePolicy": "8-bit legacy numeric domain.",
+            "ConversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
+            "OutputDepthPolicy": "Preserve input depth and channel count.",
+            "DynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
             "InputValuePolicy": "Any",
-            "FailureCode": "IMAGE_DEPTH_UNSUPPORTED",
-            "EvidenceLevel": "E0_SOURCE_AUDIT"
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_EXECUTABLE_PROBE"
           },
           {
             "Mode": "Default",
-            "Condition": "No operator-specific executable evidence is registered.",
-            "Admission": "Unknown",
-            "Verification": "Unknown",
+            "Condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedSupport",
             "ExactInputTypes": [
-              "CV_8UC2",
-              "CV_8SC1",
-              "CV_8SC2",
-              "CV_8SC3",
-              "CV_8SC4",
-              "CV_16UC1",
-              "CV_16UC2",
-              "CV_16UC3",
-              "CV_16UC4",
-              "CV_16SC1",
-              "CV_16SC2",
-              "CV_16SC3",
-              "CV_16SC4",
-              "CV_32SC1",
-              "CV_32SC2",
-              "CV_32SC3",
-              "CV_32SC4",
               "CV_32FC1",
-              "CV_32FC2",
-              "CV_32FC3",
-              "CV_32FC4",
-              "CV_64FC1",
-              "CV_64FC2",
-              "CV_64FC3",
-              "CV_64FC4"
+              "CV_64FC1"
             ],
-            "ConversionPolicy": "None",
-            "OutputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-            "DynamicRangePolicy": "Undefined until verified.",
+            "ConversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
+            "OutputDepthPolicy": "Preserve input depth and channel count.",
+            "DynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
+            "InputValuePolicy": "RejectNonFinite",
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_EXECUTABLE_PROBE"
+          },
+          {
+            "Mode": "Default",
+            "Condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedConversion",
+            "ExactInputTypes": [
+              "CV_8UC3",
+              "CV_16UC3"
+            ],
+            "ConversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
+            "OutputDepthPolicy": "Preserve input depth and channel count.",
+            "DynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
             "InputValuePolicy": "Any",
-            "FailureCode": "IMAGE_CONTRACT_UNKNOWN",
-            "EvidenceLevel": "Unknown"
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_EXECUTABLE_PROBE"
+          },
+          {
+            "Mode": "Default",
+            "Condition": "Gaussian, top-hat and explicit background correction preserve the admitted source depth; ColorMode controls luma-only versus per-channel processing.",
+            "Admission": "Allowed",
+            "Verification": "VerifiedConversion",
+            "ExactInputTypes": [
+              "CV_32FC3",
+              "CV_64FC3"
+            ],
+            "ConversionPolicy": "C3 luma path uses an explicit byte-compatible color conversion; per-channel path preserves channel depth.",
+            "OutputDepthPolicy": "Preserve input depth and channel count.",
+            "DynamicRangePolicy": "Integer inputs retain their native output range; floating inputs retain their floating depth.",
+            "InputValuePolicy": "RejectNonFinite",
+            "FailureCode": "IMAGE_NONFINITE_INPUT",
+            "EvidenceLevel": "E2_EXECUTABLE_PROBE"
           }
         ]
       }
     ],
     "ResourceRequirements": [],
-    "GenerationDependencies": [],
-    "GenerationFingerprint": "BF63DFD419DFEE681C25426A0C2384437B39C898A98BD9D562764D5B68EA1E6C",
+    "GenerationDependencies": [
+      "type:ClearVision.Product.Infrastructure.Operators.ShadingCorrectionImageContractProvider"
+    ],
+    "GenerationFingerprint": "74B8461693AE82FBDDADF48F5D329353CD71A6E573F4A2AFA88F3E1174EC8F31",
     "RequiredResources": [],
     "TypicalUpstream": [
       "ImageAcquisition"
@@ -37028,7 +37126,6 @@
     ],
     "AntiPatterns": [],
     "KnownLimitations": [
-      "Legacy 8U compatibility allowance \u2014 unverified",
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
       "\u7F3A\u5C11\u6570\u636E\u96C6\u5C42\u8BC1\u636E",
       "\u7F3A\u5C11\u73B0\u573A\u56DE\u653E\u8BC1\u636E"
@@ -45066,7 +45163,9 @@
       "translation",
       "rotation",
       "svd",
-      "similarity"
+      "similarity",
+      "ransac",
+      "huber"
     ],
     "IntentTags": [
       "calibration",
@@ -45105,6 +45204,69 @@
         "DataType": "Float",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "Accepted",
+        "DisplayName": "Accepted",
+        "DataType": "Boolean",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "TransformModel",
+        "DisplayName": "Transform Model",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "RotationDeg",
+        "DisplayName": "Rotation (deg)",
+        "DataType": "Float",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "AngleConstraintApplied",
+        "DisplayName": "Angle Constraint Applied",
+        "DataType": "Boolean",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "RobustMode",
+        "DisplayName": "Robust Mode",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "InlierCount",
+        "DisplayName": "Inlier Count",
+        "DataType": "Integer",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "OutlierCount",
+        "DisplayName": "Outlier Count",
+        "DataType": "Integer",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "Residuals",
+        "DisplayName": "Per-point Residuals",
+        "DataType": "Any",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "Diagnostics",
+        "DisplayName": "Fit Diagnostics",
+        "DataType": "Any",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [
@@ -45134,6 +45296,65 @@
         ]
       },
       {
+        "Name": "RobustMode",
+        "DisplayName": "Robust Mode",
+        "DataType": "enum",
+        "Description": "",
+        "DefaultValue": "None",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": [
+          "\u65E0",
+          "RANSAC",
+          "Huber"
+        ]
+      },
+      {
+        "Name": "RobustResidualThreshold",
+        "DisplayName": "Robust Residual Threshold",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "0.3",
+        "MinValue": "1E-12",
+        "MaxValue": "1000000000000",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "RobustMaxIterations",
+        "DisplayName": "Robust Max Iterations",
+        "DataType": "int",
+        "Description": "",
+        "DefaultValue": "256",
+        "MinValue": "1",
+        "MaxValue": "10000",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "RobustMinInlierRatio",
+        "DisplayName": "Robust Minimum Inlier Ratio",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "0.5",
+        "MinValue": "0.1",
+        "MaxValue": "1",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "HuberDelta",
+        "DisplayName": "Huber Delta",
+        "DataType": "double",
+        "Description": "",
+        "DefaultValue": "0.15",
+        "MinValue": "1E-12",
+        "MaxValue": "1000000000000",
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
         "Name": "SavePath",
         "DisplayName": "\u4FDD\u5B58\u8DEF\u5F84",
         "DataType": "file",
@@ -45141,7 +45362,7 @@
         "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
-        "IsRequired": true,
+        "IsRequired": false,
         "AllowedValues": []
       }
     ],
@@ -45222,7 +45443,7 @@
     ],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "E854175C98D2FD2B4C916089FFE6E925AE7A7A25A0AE0CDAC7A79681CC33C9A7",
+    "GenerationFingerprint": "95E997FA412BCF141CE13FAD1C41DC414B91BF0FF691B6AE544B8414E95115DF",
     "RequiredResources": [],
     "TypicalUpstream": [],
     "TypicalDownstream": [],

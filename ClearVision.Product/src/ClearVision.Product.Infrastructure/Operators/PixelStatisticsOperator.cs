@@ -17,16 +17,26 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "计算 ROI 或掩码区域内的像素级统计信息。",
     CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "pixel-stats",
-    Keywords = new[] { "pixel statistics", "mean", "stddev", "min max", "non-zero" }
+    Keywords = new[] { "pixel statistics", "mean", "stddev", "min max", "non-zero" },
+    Version = "1.0.1"
 )]
+[OperatorImageContractProvider(typeof(PixelStatisticsImageContractProvider))]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [InputPort("Mask", "Mask", PortDataType.Image, IsRequired = false)]
 [OutputPort("Mean", "Mean", PortDataType.Float)]
 [OutputPort("StdDev", "StdDev", PortDataType.Float)]
-[OutputPort("Min", "Min", PortDataType.Integer)]
-[OutputPort("Max", "Max", PortDataType.Integer)]
-[OutputPort("Median", "Median", PortDataType.Integer)]
+[OutputPort("Min", "Min", PortDataType.Float)]
+[OutputPort("Max", "Max", PortDataType.Float)]
+[OutputPort("Median", "Median", PortDataType.Float)]
+[OutputPort("Range", "Range", PortDataType.Float)]
+[OutputPort("MedianAbsoluteDeviation", "Median Absolute Deviation", PortDataType.Float)]
+[OutputPort("StdError", "Standard Error", PortDataType.Float)]
 [OutputPort("NonZeroCount", "NonZero Count", PortDataType.Integer)]
+[OutputPort("SampleCount", "Sample Count", PortDataType.Integer)]
+[OutputPort("SelectedChannel", "Selected Channel", PortDataType.String)]
+[OutputPort("ChannelsAnalyzed", "Channels Analyzed", PortDataType.Any)]
+[OutputPort("AggregationMode", "Aggregation Mode", PortDataType.String)]
+[OutputPort("ChannelStats", "Per-channel Statistics", PortDataType.Any)]
 [OperatorParam("RoiX", "ROI X", "int", DefaultValue = 0, Min = 0)]
 [OperatorParam("RoiY", "ROI Y", "int", DefaultValue = 0, Min = 0)]
 [OperatorParam("RoiW", "ROI W", "int", DefaultValue = 0, Min = 0)]

@@ -172,8 +172,10 @@ public static class FinalDecisionConfigurationCatalog
         Add(contracts, OperatorType.LineMeasurement, PortDataType.Integer, "LineCount");
         Add(contracts, OperatorType.LineMeasurement, PortDataType.Float, "Angle", "Length");
         Add(contracts, OperatorType.Measurement, PortDataType.Float, "Distance");
-        Add(contracts, OperatorType.PixelStatistics, PortDataType.Integer, "Min", "Max", "Median", "NonZeroCount");
-        Add(contracts, OperatorType.PixelStatistics, PortDataType.Float, "Mean", "StdDev");
+        Add(contracts, OperatorType.PixelStatistics, PortDataType.Integer, "NonZeroCount", "SampleCount");
+        Add(contracts, OperatorType.PixelStatistics, PortDataType.Float,
+            "Mean", "StdDev", "Min", "Max", "Median",
+            "Range", "MedianAbsoluteDeviation", "StdError");
         Add(contracts, OperatorType.WidthMeasurement, PortDataType.Float, "Width", "MeanWidth", "MinWidth", "MaxWidth", "P95Width", "StdDev", "ValidSampleRate");
 
         AddBoolean(contracts, OperatorType.TemplateMatching, true, "IsMatch");

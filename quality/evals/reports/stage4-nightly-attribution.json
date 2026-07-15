@@ -1,0 +1,222 @@
+﻿{
+    "schemaVersion":  "2026-07-15.stage4-nightly-attribution.v1",
+    "baselineSha":  "6c0fa1f029362239c6c5f252152bec44b3fb773c",
+    "gate":  "product-nightly",
+    "filter":  "Lane=Nightly\u0026Purpose!=Performance",
+    "before":  {
+                   "total":  1551,
+                   "passed":  1527,
+                   "failed":  24,
+                   "skipped":  0
+               },
+    "afterScopeFix":  {
+                          "total":  1551,
+                          "passed":  1532,
+                          "failed":  19,
+                          "skipped":  0,
+                          "note":  "All five Stage 4 scope failures are closed; the remaining 19 failures exactly match the deferred unrelated list."
+                      },
+    "expectedFinal":  {
+                          "failed":  19,
+                          "fixedScope":  5,
+                          "deferredUnrelated":  19
+                      },
+    "reproduction":  [
+                         "\u0026 \"./scripts/run-classified-test-gate.ps1\" -Gate product-nightly -Configuration Debug -NoBuild -NoRestore -ResultsDirectory \".tmp/stage4-baseline/nightly\" -LogFileName \"product-nightly-before.trx\" -ReturnExitCode",
+                         "\u0026 \"./scripts/run-classified-test-gate.ps1\" -Gate product-nightly -Configuration Debug -NoBuild -NoRestore -ResultsDirectory \".tmp/stage4-after/nightly-final\" -LogFileName \"product-nightly-after-final.trx\" -ReturnExitCode"
+                     ],
+    "items":  [
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.AgentEvaluation.VisionAgentIndustrialScenarioEvaluationTests.Scenario eval: hole distance measurement should keep calibration scale pending",
+                      "className":  "ClearVision.Product.Tests.AI.AgentEvaluation.VisionAgentIndustrialScenarioEvaluationTests",
+                      "testName":  "Scenario eval: hole distance measurement should keep calibration scale pending",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.AgentEvaluation.VisionAgentIndustrialScenarioEvaluationTests.Scenario eval: metal scratch detection should use real surface defect schema",
+                      "className":  "ClearVision.Product.Tests.AI.AgentEvaluation.VisionAgentIndustrialScenarioEvaluationTests",
+                      "testName":  "Scenario eval: metal scratch detection should use real surface defect schema",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.AgentEvaluation.VisionAgentIndustrialScenarioEvaluationTests.Scenario eval: modify existing flow should append defect detection and preserve old nodes",
+                      "className":  "ClearVision.Product.Tests.AI.AgentEvaluation.VisionAgentIndustrialScenarioEvaluationTests",
+                      "testName":  "Scenario eval: modify existing flow should append defect detection and preserve old nodes",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.BuildFromPlanEntryParityTests.LegacyContractWithoutHash_ShouldSucceedWithExplicitWarningThroughRunService",
+                      "className":  "ClearVision.Product.Tests.AI.BuildFromPlanEntryParityTests",
+                      "testName":  "ClearVision.Product.Tests.AI.BuildFromPlanEntryParityTests.LegacyContractWithoutHash_ShouldSucceedWithExplicitWarningThroughRunService",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.BuildFromPlanEntryParityTests.ToolLoopMode_ShouldMatchAcrossAgentRunWebMessageAndInternalEntries",
+                      "className":  "ClearVision.Product.Tests.AI.BuildFromPlanEntryParityTests",
+                      "testName":  "ClearVision.Product.Tests.AI.BuildFromPlanEntryParityTests.ToolLoopMode_ShouldMatchAcrossAgentRunWebMessageAndInternalEntries",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.VisionAgentBuildOrchestratorTests.VisionAgentBuildOrchestratorTests.Black-box scenario: hole distance measurement Build quality",
+                      "className":  "ClearVision.Product.Tests.AI.VisionAgentBuildOrchestratorTests.VisionAgentBuildOrchestratorTests",
+                      "testName":  "Black-box scenario: hole distance measurement Build quality",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.VisionAgentBuildOrchestratorTests.VisionAgentBuildOrchestratorTests.BuildReadiness preview should keep station camera resource pending in strict and draft",
+                      "className":  "ClearVision.Product.Tests.AI.VisionAgentBuildOrchestratorTests.VisionAgentBuildOrchestratorTests",
+                      "testName":  "BuildReadiness preview should keep station camera resource pending in strict and draft",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.VisionAgentBuildOrchestratorTests.VisionAgentBuildOrchestratorTests.BuildReadiness preview should share strict/draft defer semantics with BuildFromPlan",
+                      "className":  "ClearVision.Product.Tests.AI.VisionAgentBuildOrchestratorTests.VisionAgentBuildOrchestratorTests",
+                      "testName":  "BuildReadiness preview should share strict/draft defer semantics with BuildFromPlan",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.VisionAgentBuildOrchestratorTests.VisionAgentBuildOrchestratorTests.End-to-end mature strawberry Plan repair and Build should create editable classification draft",
+                      "className":  "ClearVision.Product.Tests.AI.VisionAgentBuildOrchestratorTests.VisionAgentBuildOrchestratorTests",
+                      "testName":  "End-to-end mature strawberry Plan repair and Build should create editable classification draft",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.VisionAgentConsolidationTests.CompleteLesionFlow",
+                      "className":  "ClearVision.Product.Tests.AI.VisionAgentConsolidationTests",
+                      "testName":  "ClearVision.Product.Tests.AI.VisionAgentConsolidationTests.CompleteLesionFlow",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.VisionAgentGenerateFlow.VisionAgentGenerateFlowTests.BuildFromPlan controlled blocker should not fall back to legacy RequirementBriefExtractor",
+                      "className":  "ClearVision.Product.Tests.AI.VisionAgentGenerateFlow.VisionAgentGenerateFlowTests",
+                      "testName":  "BuildFromPlan controlled blocker should not fall back to legacy RequirementBriefExtractor",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.VisionAgentGenerateFlow.VisionAgentGenerateFlowTests.BuildFromPlan GenerateFlow should use dedicated Build pipeline even when use flag is false",
+                      "className":  "ClearVision.Product.Tests.AI.VisionAgentGenerateFlow.VisionAgentGenerateFlowTests",
+                      "testName":  "BuildFromPlan GenerateFlow should use dedicated Build pipeline even when use flag is false",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.VisionAgentGenerateFlow.VisionAgentGenerateFlowTests.BuildFromPlan service chain should build confirmed plan without legacy RequirementBrief",
+                      "className":  "ClearVision.Product.Tests.AI.VisionAgentGenerateFlow.VisionAgentGenerateFlowTests",
+                      "testName":  "BuildFromPlan service chain should build confirmed plan without legacy RequirementBrief",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.AI.VisionAgentGenerateFlow.VisionAgentGenerateFlowTests.BuildFromPlan system exception should return controlled new-pipeline failure without legacy fallback",
+                      "className":  "ClearVision.Product.Tests.AI.VisionAgentGenerateFlow.VisionAgentGenerateFlowTests",
+                      "testName":  "BuildFromPlan system exception should return controlled new-pipeline failure without legacy fallback",
+                      "category":  "Deferred unrelated / AI",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Canonical resource/readiness/clarification/tool-loop behavior and legacy oracle drift."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.Integration.ResultAnalysisServiceIntegrationTests.ExportToCsvAsync_ShouldGenerateCorrectFormat",
+                      "className":  "ClearVision.Product.Tests.Integration.ResultAnalysisServiceIntegrationTests",
+                      "testName":  "ClearVision.Product.Tests.Integration.ResultAnalysisServiceIntegrationTests.ExportToCsvAsync_ShouldGenerateCorrectFormat",
+                      "category":  "Deferred unrelated / ResultAnalysis",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Existing canonical outcome statistics and CSV schema drift from legacy test fixtures."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.Integration.ResultAnalysisServiceIntegrationTests.GetStatisticsAsync_WithResults_ShouldReturnCorrectStatistics",
+                      "className":  "ClearVision.Product.Tests.Integration.ResultAnalysisServiceIntegrationTests",
+                      "testName":  "ClearVision.Product.Tests.Integration.ResultAnalysisServiceIntegrationTests.GetStatisticsAsync_WithResults_ShouldReturnCorrectStatistics",
+                      "category":  "Deferred unrelated / ResultAnalysis",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Existing canonical outcome statistics and CSV schema drift from legacy test fixtures."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.Integration.Week11_TextureColorFlowIntegrationTests.Flow_Laws_Glcm_ShouldDifferentiateConstantAndCheckerboard",
+                      "className":  "ClearVision.Product.Tests.Integration.Week11_TextureColorFlowIntegrationTests",
+                      "testName":  "ClearVision.Product.Tests.Integration.Week11_TextureColorFlowIntegrationTests.Flow_Laws_Glcm_ShouldDifferentiateConstantAndCheckerboard",
+                      "category":  "Previous-stage regression / Stage 4 scope",
+                      "status":  "fixed",
+                      "rootCause":  "Stage 2 fail-closed image admission lacked operator-specific E2 contracts despite verified runtime support."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.Operators.DeepLearningMultiTaskOperatorTests.ClassificationExplicitTask_ShouldRunRealOnnxInference",
+                      "className":  "ClearVision.Product.Tests.Operators.DeepLearningMultiTaskOperatorTests",
+                      "testName":  "ClearVision.Product.Tests.Operators.DeepLearningMultiTaskOperatorTests.ClassificationExplicitTask_ShouldRunRealOnnxInference",
+                      "category":  "Deferred unrelated / Model output",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Existing classification output contract does not provide DetectionList expected by the test."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.Operators.PixelStatisticsOperatorTests.ExecuteAsync_FloatChannelAll_ShouldFlattenChannelsWithExactRobustStats",
+                      "className":  "ClearVision.Product.Tests.Operators.PixelStatisticsOperatorTests",
+                      "testName":  "ClearVision.Product.Tests.Operators.PixelStatisticsOperatorTests.ExecuteAsync_FloatChannelAll_ShouldFlattenChannelsWithExactRobustStats",
+                      "category":  "Previous-stage regression / Stage 4 scope",
+                      "status":  "fixed",
+                      "rootCause":  "Stage 2 fail-closed image admission lacked operator-specific E2 contracts despite verified runtime support."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.Operators.PixelStatisticsOperatorTests.ExecuteAsync_FloatImage_ShouldComputeExactMedian",
+                      "className":  "ClearVision.Product.Tests.Operators.PixelStatisticsOperatorTests",
+                      "testName":  "ClearVision.Product.Tests.Operators.PixelStatisticsOperatorTests.ExecuteAsync_FloatImage_ShouldComputeExactMedian",
+                      "category":  "Previous-stage regression / Stage 4 scope",
+                      "status":  "fixed",
+                      "rootCause":  "Stage 2 fail-closed image admission lacked operator-specific E2 contracts despite verified runtime support."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.Operators.PixelStatisticsOperatorTests.ExecuteAsync_WithMask_ShouldReturnAnalyticStatsAndUncertainty",
+                      "className":  "ClearVision.Product.Tests.Operators.PixelStatisticsOperatorTests",
+                      "testName":  "ClearVision.Product.Tests.Operators.PixelStatisticsOperatorTests.ExecuteAsync_WithMask_ShouldReturnAnalyticStatsAndUncertainty",
+                      "category":  "Previous-stage regression / Stage 4 scope",
+                      "status":  "fixed",
+                      "rootCause":  "Stage 2 fail-closed image admission lacked operator-specific E2 contracts despite verified runtime support."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.Operators.ShadingCorrectionOperatorTests.ExecuteAsync_WithSixteenBitColorInputInLumaOnlyMode_ShouldPreserveSixteenBitColorImage",
+                      "className":  "ClearVision.Product.Tests.Operators.ShadingCorrectionOperatorTests",
+                      "testName":  "ClearVision.Product.Tests.Operators.ShadingCorrectionOperatorTests.ExecuteAsync_WithSixteenBitColorInputInLumaOnlyMode_ShouldPreserveSixteenBitColorImage",
+                      "category":  "Previous-stage regression / Stage 4 scope",
+                      "status":  "fixed",
+                      "rootCause":  "Stage 2 fail-closed image admission lacked operator-specific E2 contracts despite verified runtime support."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.Runtime.RuntimeMvpTests.RuntimeHost_EventSubscribers_WhenOneThrows_ShouldContinuePublishing",
+                      "className":  "ClearVision.Product.Tests.Runtime.RuntimeMvpTests",
+                      "testName":  "ClearVision.Product.Tests.Runtime.RuntimeMvpTests.RuntimeHost_EventSubscribers_WhenOneThrows_ShouldContinuePublishing",
+                      "category":  "Deferred unrelated / Runtime",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Existing package-configured source conflicts with the older conditional ImageAcquisition FilePath contract."
+                  },
+                  {
+                      "fqn":  "ClearVision.Product.Tests.Runtime.RuntimeMvpTests.RuntimeHost_RunPackageConfiguredSingleAsync_ShouldUsePackageConfiguredInputs",
+                      "className":  "ClearVision.Product.Tests.Runtime.RuntimeMvpTests",
+                      "testName":  "ClearVision.Product.Tests.Runtime.RuntimeMvpTests.RuntimeHost_RunPackageConfiguredSingleAsync_ShouldUsePackageConfiguredInputs",
+                      "category":  "Deferred unrelated / Runtime",
+                      "status":  "remaining_blocker",
+                      "rootCause":  "Existing package-configured source conflicts with the older conditional ImageAcquisition FilePath contract."
+                  }
+              ]
+}

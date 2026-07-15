@@ -8,12 +8,12 @@
 | 分类 ID (CategoryId) | `FeatureExtraction` |
 | 分类 (Category) | 特征提取 |
 | 分类顺序 (CategoryOrder) | 4 |
-| 版本 (Version) | `1.0.1` |
+| 版本 (Version) | `1.0.2` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
-| AI 默认推荐 (Default AI Recommendation) | No |
-| AI 必须披露状态 (Requires Disclosure) | Yes |
+| AI 默认推荐 (Default AI Recommendation) | Yes |
+| AI 必须披露状态 (Requires Disclosure) | No |
 | 标签 (Tags) | `分类:FeatureExtraction`, `分类显示:特征提取`, `生命周期:Stable`, `算法类型:基于OpenCV` |
 
 ## 算法原理 / Algorithm Principle
@@ -73,13 +73,14 @@
 ## 图像输入域合同 / Image Input Domain Contracts
 | 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |
 |------|------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Allowed:3, Rejected:0, Unknown:25 | Legacy 8U compatibility allowance — unverified | CV_8U | CV_8U | 1, 3, 4 | Legacy 8U compatibility allowance — unverified. Higher-depth and undeclared combinations remain Unknown and fail closed. | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit native numeric domain; no implicit MinMax conversion. | NotApplicableFor8U | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
+| `Image` | Allowed:9, Rejected:0, Unknown:0 | Verified production support is present. | CV_8U, CV_16U, CV_32F | CV_8U | 1, 3, 4 | Exact support is declared for the verified gray conversion and quantization path. | Explicit color-to-gray conversion followed by per-ROI affine range mapping to CV_8U. | No image output. | Per-ROI 8-bit quantization domain. | RejectNaNAndInfinityForFloatingVariants | `IMAGE_DEPTH_UNSUPPORTED` | `2.1` |
 
 ### 精确运行变体 / Exact Runtime Variants
 | 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |
 |------|------|------|------|------|------|------|------|------|------|------|------|
-| `Image` | Default | CV_8UC1, CV_8UC3, CV_8UC4 | Legacy 8U execution path retained for compatibility; no per-operator E2 evidence. | `Allowed` | `LegacyCompatibilityAllowance` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | 8-bit legacy numeric domain. | `Any` | `IMAGE_DEPTH_UNSUPPORTED` | `E0_SOURCE_AUDIT` |
-| `Image` | Default | CV_8UC2, CV_8SC1, CV_8SC2, CV_8SC3, CV_8SC4, CV_16UC1, CV_16UC2, CV_16UC3, CV_16UC4, CV_16SC1, CV_16SC2, CV_16SC3, CV_16SC4, CV_32SC1, CV_32SC2, CV_32SC3, CV_32SC4, CV_32FC1, CV_32FC2, CV_32FC3, CV_32FC4, CV_64FC1, CV_64FC2, CV_64FC3, CV_64FC4 | No operator-specific executable evidence is registered. | `Unknown` | `Unknown` | None | Operator-specific legacy output policy; no Stage 2 depth widening. | Undefined until verified. | `Any` | `IMAGE_CONTRACT_UNKNOWN` | `Unknown` |
+| `Image` | Default | CV_8UC1 | The selected ROI is converted to gray and explicitly quantized to an 8-bit affine range domain before GLCM construction. | `Allowed` | `VerifiedSupport` | C3/C4 -> Gray; non-8U gray -> CV_32F -> per-ROI affine range mapping -> CV_8U. | No image output. | Texture features are computed in the explicit per-ROI 8-bit quantization domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Default | CV_8UC3, CV_8UC4, CV_16UC1, CV_16UC3, CV_16UC4 | The selected ROI is converted to gray and explicitly quantized to an 8-bit affine range domain before GLCM construction. | `Allowed` | `VerifiedConversion` | C3/C4 -> Gray; non-8U gray -> CV_32F -> per-ROI affine range mapping -> CV_8U. | No image output. | Texture features are computed in the explicit per-ROI 8-bit quantization domain. | `Any` | `IMAGE_NONFINITE_INPUT` | `E2_NUMERICAL_ORACLE` |
+| `Image` | Default | CV_32FC1, CV_32FC3, CV_32FC4 | The selected ROI is converted to gray and explicitly quantized to an 8-bit affine range domain before GLCM construction. | `Allowed` | `VerifiedConversion` | C3/C4 -> Gray; non-8U gray -> CV_32F -> per-ROI affine range mapping -> CV_8U. | No image output. | Texture features are computed in the explicit per-ROI 8-bit quantization domain. | `RejectNonFinite` | `IMAGE_NONFINITE_INPUT` | `E2_NUMERICAL_ORACLE` |
 
 ### 输出条件 / Output Conditions
 | 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |
@@ -87,8 +88,8 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`1A1A4D0DA3C2CCB07578CB4FD293C7AD4B9A22F5820C67068B28EB3862535E18`
-- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
+- 组合指纹 (Generation Fingerprint)：`BB1DD1681A4A91CA18CC57A46C3CF25B2891F9A612481FDCF242B56D363CDFA9`
+- `type:ClearVision.Product.Infrastructure.Operators.GlcmTextureImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
 - 未在源码中发现除声明输出端口外的稳定附加输出字段；下游连线以输出端口表为准。
@@ -121,4 +122,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.0.1 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.0.2 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

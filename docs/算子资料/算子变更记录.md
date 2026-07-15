@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-07-15 17:25:56 +08:00`
+> 生成时间 / Generated At: `2026-07-15 20:30:44 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 当前版本快照 / Current Snapshot
@@ -34,7 +34,7 @@
 | `OperatorType.PerspectiveTransform` | 透视变换 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.PolarUnwrap` | 极坐标展开 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
 | `OperatorType.RoiManager` | ROI裁剪与掩膜 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
-| `OperatorType.ShadingCorrection` | 光照校正 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.0` |
+| `OperatorType.ShadingCorrection` | 光照校正 | `ImagePreprocessing` | 图像预处理 | `Stable` | `1.0.1` |
 | `OperatorType.AdaptiveThreshold` | 自适应阈值 | `SegmentationAndRegion` | 分割与区域 | `Stable` | `1.0.0` |
 | `OperatorType.BinaryImageToRegion` | 二值图转区域 | `SegmentationAndRegion` | 分割与区域 | `Stable` | `1.1.0` |
 | `OperatorType.BlobAnalysis` | Blob分析 | `SegmentationAndRegion` | 分割与区域 | `Stable` | `1.2.1` |
@@ -58,11 +58,11 @@
 | `OperatorType.ContourDetection` | 轮廓检测 | `FeatureExtraction` | 特征提取 | `Stable` | `1.0.0` |
 | `OperatorType.CornerDetection` | 角点检测 | `FeatureExtraction` | 特征提取 | `Stable` | `1.0.0` |
 | `OperatorType.EdgeDetection` | 边缘检测 | `FeatureExtraction` | 特征提取 | `Stable` | `1.0.0` |
-| `OperatorType.GlcmTexture` | GLCM纹理特征 | `FeatureExtraction` | 特征提取 | `Stable` | `1.0.1` |
+| `OperatorType.GlcmTexture` | GLCM纹理特征 | `FeatureExtraction` | 特征提取 | `Stable` | `1.0.2` |
 | `OperatorType.HistogramAnalysis` | 直方图分析 | `FeatureExtraction` | 特征提取 | `Stable` | `1.1.0` |
 | `OperatorType.ImageDiff` | 图像差异率分析 | `FeatureExtraction` | 特征提取 | `Stable` | `1.0.1` |
 | `OperatorType.LawsTextureFilter` | Laws纹理滤波 | `FeatureExtraction` | 特征提取 | `Stable` | `1.0.1` |
-| `OperatorType.PixelStatistics` | 像素统计 | `FeatureExtraction` | 特征提取 | `Stable` | `1.0.0` |
+| `OperatorType.PixelStatistics` | 像素统计 | `FeatureExtraction` | 特征提取 | `Stable` | `1.0.1` |
 | `OperatorType.SharpnessEvaluation` | 清晰度评估 | `FeatureExtraction` | 特征提取 | `Stable` | `1.1.0` |
 | `OperatorType.SubpixelEdgeDetection` | 亚像素边缘 | `FeatureExtraction` | 特征提取 | `Reference` | `1.0.0` |
 | `OperatorType.AkazeFeatureMatch` | AKAZE特征匹配 | `MatchingAndLocalization` | 匹配与定位 | `Stable` | `1.0.0` |
@@ -113,13 +113,13 @@
 | `OperatorType.NPointCalibration` | N点标定 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.0.0` |
 | `OperatorType.PixelToWorldTransform` | 像素世界映射 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.0.1` |
 | `OperatorType.StereoCalibration` | 双目标定 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.0.0` |
-| `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.0.0` |
+| `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.1.0` |
 | `OperatorType.Undistort` | 畸变校正 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.0.0` |
 | `OperatorType.AnomalyDetection` | 异常检测 | `AiInference` | AI推理 | `Experimental` | `1.0.0` |
 | `OperatorType.DeepLearning` | 深度学习 | `AiInference` | AI推理 | `Stable` | `1.1.0` |
 | `OperatorType.OcrRecognition` | OCR 识别 | `AiInference` | AI推理 | `Stable` | `1.0.0` |
 | `OperatorType.SemanticSegmentation` | 语义分割 | `AiInference` | AI推理 | `Stable` | `1.0.0` |
-| `OperatorType.EuclideanClusterExtraction` | 欧氏聚类分割 | `PointCloud3D` | 3D点云 | `Stable` | `1.0.0` |
+| `OperatorType.EuclideanClusterExtraction` | 欧氏聚类分割 | `PointCloud3D` | 3D点云 | `Stable` | `1.1.0` |
 | `OperatorType.PPFEstimation` | PPF点对特征 | `PointCloud3D` | 3D点云 | `Stable` | `1.0.0` |
 | `OperatorType.PPFMatch` | PPF点云粗匹配 | `PointCloud3D` | 3D点云 | `Stable` | `1.0.5` |
 | `OperatorType.RansacPlaneSegmentation` | RANSAC平面分割 | `PointCloud3D` | 3D点云 | `Stable` | `1.0.0` |
@@ -912,6 +912,8 @@
 ### OperatorType.EuclideanClusterExtraction / 欧氏聚类分割
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.0` | `2026-07-15T20:30:44.7937318+08:00` | `75C259C93648` | `operator-runtime-metadata-v2` |
+| `1.1.0` | `2026-07-15T20:16:21.3617917+08:00` | `C14FD1BA20AA` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `91C9F015F7A9` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `98D5F5461D09` | `legacy-source-only` |
 | `1.0.0` | `2026-07-05T18:24:06.3177828+08:00` | `E3B0C44298FC` | `legacy-source-only` |
@@ -1133,6 +1135,8 @@
 ### OperatorType.GlcmTexture / GLCM纹理特征
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.2` | `2026-07-15T20:30:44.7937318+08:00` | `BB1DD1681A4A` | `operator-runtime-metadata-v2:image-contract-v2.1` |
+| `1.0.2` | `2026-07-15T20:16:21.3617917+08:00` | `ED8ADF795903` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.1` | `2026-07-15T11:26:25.6098568+08:00` | `1A1A4D0DA3C2` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.1` | `2026-07-14T15:07:23.3198726+08:00` | `2AE85451CABD` | `operator-runtime-metadata-v2` |
 | `1.0.1` | `2026-07-06T21:35:46.7699945+08:00` | `2F99D67BB6CA` | `legacy-source-only` |
@@ -1902,6 +1906,8 @@
 ### OperatorType.PixelStatistics / 像素统计
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.1` | `2026-07-15T20:30:44.7937318+08:00` | `7D84BF747A71` | `operator-runtime-metadata-v2:image-contract-v2.1` |
+| `1.0.1` | `2026-07-15T20:16:21.3617917+08:00` | `5672DBF54B24` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `A0DE399710B0` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `B50999A3C27D` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `71F99B0EF139` | `legacy-source-only` |
@@ -2452,6 +2458,8 @@
 ### OperatorType.ShadingCorrection / 光照校正
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.1` | `2026-07-15T20:30:44.7937318+08:00` | `74B8461693AE` | `operator-runtime-metadata-v2:image-contract-v2.1` |
+| `1.0.1` | `2026-07-15T20:16:21.3617917+08:00` | `1946F4045201` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `BF63DFD419DF` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `F039A652D2BD` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `9006925E6778` | `legacy-source-only` |
@@ -2727,6 +2735,7 @@
 ### OperatorType.TranslationRotationCalibration / 平移旋转标定
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.0` | `2026-07-15T20:16:21.3617917+08:00` | `95E997FA412B` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `E854175C98D2` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `86F4BE760343` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `F6672401E42E` | `legacy-source-only` |

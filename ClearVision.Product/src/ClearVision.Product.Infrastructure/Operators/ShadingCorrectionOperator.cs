@@ -15,8 +15,10 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "通过背景法或模型法校正光照不均。",
     CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "shading",
-    Keywords = new[] { "shading", "flat field", "illumination", "background" }
+    Keywords = new[] { "shading", "flat field", "illumination", "background" },
+    Version = "1.0.1"
 )]
+[OperatorImageContractProvider(typeof(ShadingCorrectionImageContractProvider))]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [InputPort("Background", "Background", PortDataType.Image, IsRequired = false)]
 [OutputPort("Image", "Image", PortDataType.Image)]
@@ -110,9 +112,9 @@ public class ShadingCorrectionOperator : OperatorBase
         }
 
         var kernel = GetIntParam(@operator, "KernelSize", 51);
-        if (kernel < 3)
+        if (kernel < 3 || kernel > 501)
         {
-            return ValidationResult.Invalid("KernelSize must be >= 3");
+            return ValidationResult.Invalid("KernelSize must be between 3 and 501");
         }
 
         var colorMode = GetStringParam(@operator, "ColorMode", "LumaOnly");

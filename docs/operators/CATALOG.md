@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-07-15 17:25:56 +08:00`
+> 生成时间 / Generated At: `2026-07-15 20:30:44 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
@@ -65,7 +65,7 @@
 | `OperatorType.PerspectiveTransform` | 透视变换 | `Stable` | 3 | 1 | 20 | 100 (A) | `1.0.0` | 该算子用于四边形透视校正。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结… | [PerspectiveTransform](./PerspectiveTransform.md) |
 | `OperatorType.PolarUnwrap` | 极坐标展开 | `Stable` | 2 | 1 | 8 | 100 (A) | `1.0.0` | 该算子用于将环形图像区域展开为矩形视图。运行时从声明输入端口读取数据，按参数表解析配… | [PolarUnwrap](./PolarUnwrap.md) |
 | `OperatorType.RoiManager` | ROI裁剪与掩膜 | `Stable` | 1 | 3 | 10 | 100 (A) | `1.0.0` | 该算子用于按矩形、圆形或多边形 ROI 裁剪图像或应用掩膜，并输出空间上下文。运行时… | [RoiManager](./RoiManager.md) |
-| `OperatorType.ShadingCorrection` | 光照校正 | `Stable` | 2 | 1 | 3 | 96 (A) | `1.0.0` | 该算子用于通过背景法或模型法校正光照不均。运行时从声明输入端口读取数据，按参数表解析… | [ShadingCorrection](./ShadingCorrection.md) |
+| `OperatorType.ShadingCorrection` | 光照校正 | `Stable` | 2 | 1 | 3 | 96 (A) | `1.0.1` | 该算子用于通过背景法或模型法校正光照不均。运行时从声明输入端口读取数据，按参数表解析… | [ShadingCorrection](./ShadingCorrection.md) |
 
 ### 分割与区域 / `SegmentationAndRegion` (17)
 | 枚举 (Enum) | 显示名 (DisplayName) | 生命周期 | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -97,11 +97,11 @@
 | `OperatorType.ContourDetection` | 轮廓检测 | `Stable` | 1 | 3 | 11 | 94 (A) | `1.0.0` | 该算子用于查找图像轮廓，提取边缘点集和层次关系，供后续测量和拟合使用。运行时从声明输… | [ContourDetection](./ContourDetection.md) |
 | `OperatorType.CornerDetection` | 角点检测 | `Stable` | 1 | 3 | 5 | 94 (A) | `1.0.0` | 该算子用于使用 Harris 或 Shi-Tomasi 检测角点。运行时从声明输入端… | [CornerDetection](./CornerDetection.md) |
 | `OperatorType.EdgeDetection` | 边缘检测 | `Stable` | 1 | 2 | 14 | 100 (A) | `1.0.0` | 该算子用于使用 Canny 进行边缘检测，并可选自动阈值。运行时从声明输入端口读取数… | [EdgeDetection](./EdgeDetection.md) |
-| `OperatorType.GlcmTexture` | GLCM纹理特征 | `Stable` | 1 | 6 | 9 | 100 (A) | `1.0.1` | Quantized gray-level co-occurrence matrix | [GlcmTexture](./GlcmTexture.md) |
+| `OperatorType.GlcmTexture` | GLCM纹理特征 | `Stable` | 1 | 6 | 9 | 100 (A) | `1.0.2` | Quantized gray-level co-occurrence matrix | [GlcmTexture](./GlcmTexture.md) |
 | `OperatorType.HistogramAnalysis` | 直方图分析 | `Stable` | 1 | 11 | 6 | 96 (A) | `1.1.0` | 该算子用于统计指定通道的直方图及灰度/强度分布指标。运行时从声明输入端口读取数据，按… | [HistogramAnalysis](./HistogramAnalysis.md) |
 | `OperatorType.ImageDiff` | 图像差异率分析 | `Stable` | 2 | 2 | 0 | 89 (A) | `1.0.1` | 该算子用于计算两幅同尺寸图像的绝对差异图，并输出非零差异像素占比。运行时从声明输入端… | [ImageDiff](./ImageDiff.md) |
 | `OperatorType.LawsTextureFilter` | Laws纹理滤波 | `Stable` | 1 | 3 | 5 | 100 (A) | `1.0.1` | Laws 5x5 texture energy filtering | [LawsTextureFilter](./LawsTextureFilter.md) |
-| `OperatorType.PixelStatistics` | 像素统计 | `Stable` | 2 | 6 | 5 | 96 (A) | `1.0.0` | 该算子用于计算 ROI 或掩码区域内的像素级统计信息。运行时从声明输入端口读取数据，… | [PixelStatistics](./PixelStatistics.md) |
+| `OperatorType.PixelStatistics` | 像素统计 | `Stable` | 2 | 14 | 5 | 96 (A) | `1.0.1` | 该算子用于计算 ROI 或掩码区域内的像素级统计信息。运行时从声明输入端口读取数据，… | [PixelStatistics](./PixelStatistics.md) |
 | `OperatorType.SharpnessEvaluation` | 清晰度评估 | `Stable` | 1 | 3 | 8 | 96 (A) | `1.1.0` | 该算子用于评估图像的对焦清晰度。运行时从声明输入端口读取数据，按参数表解析配置，并把… | [SharpnessEvaluation](./SharpnessEvaluation.md) |
 | `OperatorType.SubpixelEdgeDetection` | 亚像素边缘 | `Reference` | 1 | 2 | 5 | 94 (A) | `1.0.0` | 该算子用于Non-industrial reference / 非工业定型的亚像素边… | [SubpixelEdgeDetection](./SubpixelEdgeDetection.md) |
 
@@ -168,7 +168,7 @@
 | `OperatorType.NPointCalibration` | N点标定 | `Stable` | 1 | 9 | 10 | 100 (A) | `1.0.0` | 该算子用于基于全部点对鲁棒估计仿射或单应性标定模型。运行时从声明输入端口读取数据，按… | [NPointCalibration](./NPointCalibration.md) |
 | `OperatorType.PixelToWorldTransform` | 像素世界映射 | `Stable` | 3 | 3 | 11 | 100 (A) | `1.0.1` | 该算子用于通过 CalibrationBundleV2 执行坐标转换，可使用 Tra… | [PixelToWorldTransform](./PixelToWorldTransform.md) |
 | `OperatorType.StereoCalibration` | 双目标定 | `Stable` | 2 | 6 | 11 | 100 (A) | `1.0.0` | 该算子用于标定双目相机并生成极线校正映射。运行时从声明输入端口读取数据，按参数表解析… | [StereoCalibration](./StereoCalibration.md) |
-| `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | `Stable` | 1 | 3 | 3 | 100 (A) | `1.0.0` | 该算子用于从图像-机器人点对鲁棒拟合二维刚性或相似变换。运行时从声明输入端口读取数据… | [TranslationRotationCalibration](./TranslationRotationCalibration.md) |
+| `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | `Stable` | 1 | 12 | 8 | 100 (A) | `1.1.0` | 该算子用于从图像/机器人点对拟合二维刚性或相似变换，支持可选的 RANSAC 与 H… | [TranslationRotationCalibration](./TranslationRotationCalibration.md) |
 | `OperatorType.Undistort` | 畸变校正 | `Stable` | 2 | 1 | 0 | 91 (A) | `1.0.0` | 该算子用于使用标定数据校正镜头畸变。运行时从声明输入端口读取数据，按参数表解析配置，… | [Undistort](./Undistort.md) |
 
 ### AI推理 / `AiInference` (4)
@@ -182,7 +182,7 @@
 ### 3D点云 / `PointCloud3D` (6)
 | 枚举 (Enum) | 显示名 (DisplayName) | 生命周期 | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.EuclideanClusterExtraction` | 欧氏聚类分割 | `Stable` | 1 | 3 | 3 | 100 (A) | `1.0.0` | 该算子用于对点云执行欧式聚类提取（按距离划分三维连通分量）。运行时从声明输入端口读取… | [EuclideanClusterExtraction](./EuclideanClusterExtraction.md) |
+| `OperatorType.EuclideanClusterExtraction` | 欧氏聚类分割 | `Stable` | 1 | 3 | 4 | 100 (A) | `1.1.0` | 该算子用于对点云执行欧式聚类提取（按距离划分三维连通分量）。运行时从声明输入端口读取… | [EuclideanClusterExtraction](./EuclideanClusterExtraction.md) |
 | `OperatorType.PPFEstimation` | PPF点对特征 | `Stable` | 1 | 3 | 3 | 95 (A) | `1.0.0` | 该算子用于为点云计算点对特征（PPF）并构建逐点特征图。运行时从声明输入端口读取数据… | [PPFEstimation](./PPFEstimation.md) |
 | `OperatorType.PPFMatch` | PPF点云粗匹配 | `Stable` | 2 | 16 | 10 | 95 (A) | `1.0.5` | 该算子用于基于 PPF 对模型点云与场景点云执行三维粗匹配，输出候选位姿、内点与稳定… | [PPFMatch](./PPFMatch.md) |
 | `OperatorType.RansacPlaneSegmentation` | RANSAC平面分割 | `Stable` | 1 | 8 | 4 | 95 (A) | `1.0.0` | 该算子用于对点云执行 RANSAC 平面分割，输出平面系数和内点。运行时从声明输入端… | [RansacPlaneSegmentation](./RansacPlaneSegmentation.md) |

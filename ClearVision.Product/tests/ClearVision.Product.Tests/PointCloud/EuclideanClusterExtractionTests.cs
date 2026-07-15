@@ -76,6 +76,60 @@ public sealed class EuclideanClusterExtractionTests
         clusters[0].Length.Should().BeGreaterThanOrEqualTo(1000);
     }
 
+    [Fact]
+    public void Extract_EmptyCloud_ShouldReturnEmptyAndCountSingleInvocation()
+    {
+        var pool = MatPool.Shared;
+        using var cloud = new PointCloudModel(new Mat(0, 3, MatType.CV_32FC1), pool: pool);
+        var extractor = new EuclideanClusterExtraction();
+
+        var clusters = extractor.Extract(cloud, 0.02f, 1, 10);
+
+        clusters.Should().BeEmpty();
+        extractor.CoreInvocationCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void MaterializePointClouds_ShouldUseExistingIndicesWithoutRepeatingClustering()
+    {
+        var gen = new SyntheticPointCloudGenerator(seed: 114);
+        using var cloud = gen.GenerateCube(Vector3.Zero, 0.1f, 500, 0.0001f, true, true, 0);
+        var extractor = new EuclideanClusterExtraction();
+        var clusters = extractor.Extract(cloud, 0.03f, 100, 1000);
+
+        var materialized = extractor.MaterializePointClouds(cloud, clusters);
+        try
+        {
+            extractor.CoreInvocationCount.Should().Be(1);
+            materialized.Should().HaveCount(clusters.Count);
+            materialized[0].Count.Should().Be(clusters[0].Length);
+            var source = cloud.Points.GetGenericIndexer<float>();
+            var target = materialized[0].Points.GetGenericIndexer<float>();
+            target[0, 0].Should().Be(source[clusters[0][0], 0]);
+            target[0, 1].Should().Be(source[clusters[0][0], 1]);
+            target[0, 2].Should().Be(source[clusters[0][0], 2]);
+        }
+        finally
+        {
+            materialized.ForEach(item => item.Dispose());
+        }
+    }
+
+    [Fact]
+    public void Extract_PreCanceled_ShouldThrowAndRemainStable()
+    {
+        var gen = new SyntheticPointCloudGenerator(seed: 115);
+        using var cloud = gen.GenerateCube(Vector3.Zero, 0.1f, 500, 0, false, false, 0);
+        var extractor = new EuclideanClusterExtraction();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var action = () => extractor.Extract(cloud, 0.03f, 10, 1000, cancellation.Token);
+
+        action.Should().Throw<OperationCanceledException>();
+        extractor.CoreInvocationCount.Should().Be(1);
+    }
+
     private static PointCloudModel MergeTwo(PointCloudModel a, PointCloudModel b)
     {
         var pool = MatPool.Shared;
