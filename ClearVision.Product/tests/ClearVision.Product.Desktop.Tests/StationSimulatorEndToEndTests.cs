@@ -85,8 +85,8 @@ public sealed class StationSimulatorEndToEndTests
             HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         await using var stream = await response.Content.ReadAsStreamAsync();
-        var initialState = await ReadUntilContainsAsync(stream, "event: initialState", TimeSpan.FromSeconds(2));
-        initialState.Should().Contain("\"stationId\":\"sim-1\"");
+        var initialState = await ReadUntilContainsAsync(stream, "\"stationId\":\"sim-1\"", TimeSpan.FromSeconds(2));
+        initialState.Should().Contain("event: initialState");
 
         var station = host.Registry.GetStation("sim-1")!;
         station.LastSequenceId.Should().Be(20);
