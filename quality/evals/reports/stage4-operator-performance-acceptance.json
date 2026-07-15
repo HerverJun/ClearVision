@@ -1,0 +1,186 @@
+{
+  "environment": {
+    "label": "after-acceptance",
+    "sourceSha": "5667bfbe75bebe491f1d4c533e93faf78f0f43c7",
+    "generatedAtUtc": "2026-07-15T12:44:40.3673297+00:00",
+    "machineName": "DESKTOP-TRGEMQT",
+    "operatingSystem": "Microsoft Windows NT 10.0.22000.0",
+    "frameworkVersion": "8.0.19",
+    "processorCount": 20,
+    "is64BitProcess": true,
+    "serverGc": false,
+    "warmupIterations": 10,
+    "iterations": 100,
+    "method": "Inputs are created before timing. Each case is warmed up, then measured sequentially. P50/P95 use nearest-rank sorted samples. Allocations use process-wide GC.GetTotalAllocatedBytes(true). Memory is sampled before output disposal."
+  },
+  "cases": [
+    {
+      "caseId": "translation_rotation_none_40_points",
+      "operatorName": "TranslationRotationCalibration",
+      "scenario": "40 point similarity transform; RobustMode=None",
+      "inputScale": "40 point pairs",
+      "passed": true,
+      "iterations": 100,
+      "p50Milliseconds": 0.6972,
+      "p95Milliseconds": 0.871,
+      "meanMilliseconds": 0.7018,
+      "totalAllocatedBytes": 9708288,
+      "allocatedBytesPerIteration": 97082,
+      "managedHeapStartBytes": 903888,
+      "managedHeapPeakBytes": 11392680,
+      "managedHeapPeakDeltaBytes": 10488792,
+      "workingSetStartBytes": 38612992,
+      "workingSetPeakBytes": 51167232,
+      "workingSetPeakDeltaBytes": 12554240,
+      "coreInvocationCount": 1,
+      "coreInvocationEvidence": "source-observed-legacy-path",
+      "outputSignals": {
+        "CalibrationError": 1.0441291926842378E-14,
+        "MaxCalibrationError": 2.842170943040401E-14,
+        "RobustMode": "None"
+      },
+      "errorMessage": null
+    },
+    {
+      "caseId": "euclidean_cluster_6000_materialized",
+      "operatorName": "EuclideanClusterExtraction",
+      "scenario": "three deterministic clusters; indices and PointCloud outputs materialized",
+      "inputScale": "6000 XYZRGB points; 3 x 2000",
+      "passed": true,
+      "iterations": 100,
+      "p50Milliseconds": 15.7485,
+      "p95Milliseconds": 23.6856,
+      "meanMilliseconds": 17.468,
+      "totalAllocatedBytes": 1626916456,
+      "allocatedBytesPerIteration": 16269164,
+      "managedHeapStartBytes": 987104,
+      "managedHeapPeakBytes": 15746984,
+      "managedHeapPeakDeltaBytes": 14759880,
+      "workingSetStartBytes": 64688128,
+      "workingSetPeakBytes": 71315456,
+      "workingSetPeakDeltaBytes": 6627328,
+      "coreInvocationCount": 1,
+      "coreInvocationEvidence": "runtime-output",
+      "outputSignals": {
+        "ClusterCount": 3,
+        "PointCloudsMaterialized": true
+      },
+      "errorMessage": null
+    },
+    {
+      "caseId": "euclidean_cluster_6000_indices_only",
+      "operatorName": "EuclideanClusterExtraction",
+      "scenario": "three deterministic clusters; indices only",
+      "inputScale": "6000 XYZRGB points; 3 x 2000",
+      "passed": true,
+      "iterations": 100,
+      "p50Milliseconds": 14.1049,
+      "p95Milliseconds": 16.3487,
+      "meanMilliseconds": 14.4474,
+      "totalAllocatedBytes": 1453901016,
+      "allocatedBytesPerIteration": 14539010,
+      "managedHeapStartBytes": 1036576,
+      "managedHeapPeakBytes": 16158584,
+      "managedHeapPeakDeltaBytes": 15122008,
+      "workingSetStartBytes": 70438912,
+      "workingSetPeakBytes": 77279232,
+      "workingSetPeakDeltaBytes": 6840320,
+      "coreInvocationCount": 1,
+      "coreInvocationEvidence": "runtime-output",
+      "outputSignals": {
+        "ClusterCount": 3,
+        "PointCloudsMaterialized": false
+      },
+      "errorMessage": null
+    }
+  ],
+  "calibrationRobustness": [
+    {
+      "scenario": "no_noise",
+      "modes": [
+        {
+          "mode": "None",
+          "passed": true,
+          "transformError": 3.5528356494511764E-15,
+          "inlierRmsError": 3.3232593448441795E-15,
+          "outlierCount": 0,
+          "errorMessage": null
+        },
+        {
+          "mode": "Ransac",
+          "passed": true,
+          "transformError": 3.5528356494511764E-15,
+          "inlierRmsError": 3.3232593448441795E-15,
+          "outlierCount": 0,
+          "errorMessage": null
+        },
+        {
+          "mode": "Huber",
+          "passed": true,
+          "transformError": 3.5528356494511764E-15,
+          "inlierRmsError": 3.3232593448441795E-15,
+          "outlierCount": 0,
+          "errorMessage": null
+        }
+      ]
+    },
+    {
+      "scenario": "single_outlier",
+      "modes": [
+        {
+          "mode": "None",
+          "passed": true,
+          "transformError": 5.480327357624509,
+          "inlierRmsError": 11.120414560219428,
+          "outlierCount": 0,
+          "errorMessage": null
+        },
+        {
+          "mode": "Ransac",
+          "passed": true,
+          "transformError": 3.5528356494511764E-15,
+          "inlierRmsError": 3.40959214617482E-15,
+          "outlierCount": 1,
+          "errorMessage": null
+        },
+        {
+          "mode": "Huber",
+          "passed": true,
+          "transformError": 0.018340318725132067,
+          "inlierRmsError": 0.013319245357240406,
+          "outlierCount": 1,
+          "errorMessage": null
+        }
+      ]
+    },
+    {
+      "scenario": "multiple_outliers",
+      "modes": [
+        {
+          "mode": "None",
+          "passed": true,
+          "transformError": 10.502424103746236,
+          "inlierRmsError": 31.250739123003875,
+          "outlierCount": 0,
+          "errorMessage": null
+        },
+        {
+          "mode": "Ransac",
+          "passed": true,
+          "transformError": 1.464827949453654E-14,
+          "inlierRmsError": 1.2359079452258525E-14,
+          "outlierCount": 3,
+          "errorMessage": null
+        },
+        {
+          "mode": "Huber",
+          "passed": true,
+          "transformError": 0.017103068706382625,
+          "inlierRmsError": 0.008964739953329666,
+          "outlierCount": 3,
+          "errorMessage": null
+        }
+      ]
+    }
+  ]
+}

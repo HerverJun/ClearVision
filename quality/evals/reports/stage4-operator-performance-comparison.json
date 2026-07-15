@@ -1,0 +1,187 @@
+{
+    "schemaVersion":  "2026-07-15.stage4-performance-comparison.v1",
+    "baselineSha":  "6c0fa1f029362239c6c5f252152bec44b3fb773c",
+    "protocol":  {
+                     "label":  "after",
+                     "sourceSha":  "5667bfbe75bebe491f1d4c533e93faf78f0f43c7",
+                     "generatedAtUtc":  "2026-07-15T12:44:20.092546+00:00",
+                     "machineName":  "DESKTOP-TRGEMQT",
+                     "operatingSystem":  "Microsoft Windows NT 10.0.22000.0",
+                     "frameworkVersion":  "8.0.19",
+                     "processorCount":  20,
+                     "is64BitProcess":  true,
+                     "serverGc":  false,
+                     "warmupIterations":  5,
+                     "iterations":  50,
+                     "method":  "Inputs are created before timing. Each case is warmed up, then measured sequentially. P50/P95 use nearest-rank sorted samples. Allocations use process-wide GC.GetTotalAllocatedBytes(true). Memory is sampled before output disposal."
+                 },
+    "comparisons":  [
+                        {
+                            "caseId":  "translation_rotation_none_40_points",
+                            "inputScale":  "40 point pairs",
+                            "before":  {
+                                           "p50Ms":  0.5834,
+                                           "p95Ms":  0.6667,
+                                           "allocationBytes":  92343,
+                                           "managedPeakDeltaBytes":  4804504,
+                                           "workingSetPeakDeltaBytes":  5746688,
+                                           "coreInvocationCount":  1
+                                       },
+                            "after":  {
+                                          "p50Ms":  0.5945,
+                                          "p95Ms":  0.6853,
+                                          "allocationBytes":  97102,
+                                          "managedPeakDeltaBytes":  5238312,
+                                          "workingSetPeakDeltaBytes":  5595136,
+                                          "coreInvocationCount":  1
+                                      },
+                            "changePercent":  {
+                                                  "p50":  -1.9,
+                                                  "p95":  -2.79,
+                                                  "allocation":  -5.15
+                                              }
+                        },
+                        {
+                            "caseId":  "euclidean_cluster_6000_materialized",
+                            "inputScale":  "6000 XYZRGB points; 3 x 2000",
+                            "before":  {
+                                           "p50Ms":  31.4114,
+                                           "p95Ms":  45.7601,
+                                           "allocationBytes":  30802799,
+                                           "managedPeakDeltaBytes":  14960096,
+                                           "workingSetPeakDeltaBytes":  9908224,
+                                           "coreInvocationCount":  2
+                                       },
+                            "after":  {
+                                          "p50Ms":  23.0928,
+                                          "p95Ms":  28.7586,
+                                          "allocationBytes":  16268534,
+                                          "managedPeakDeltaBytes":  14433320,
+                                          "workingSetPeakDeltaBytes":  5881856,
+                                          "coreInvocationCount":  1
+                                      },
+                            "changePercent":  {
+                                                  "p50":  26.48,
+                                                  "p95":  37.15,
+                                                  "allocation":  47.18
+                                              }
+                        }
+                    ],
+    "afterOnly":  [
+                      {
+                          "caseId":  "euclidean_cluster_6000_indices_only",
+                          "operatorName":  "EuclideanClusterExtraction",
+                          "scenario":  "three deterministic clusters; indices only",
+                          "inputScale":  "6000 XYZRGB points; 3 x 2000",
+                          "passed":  true,
+                          "iterations":  50,
+                          "p50Milliseconds":  14.4536,
+                          "p95Milliseconds":  16.394,
+                          "meanMilliseconds":  14.72,
+                          "totalAllocatedBytes":  726949704,
+                          "allocatedBytesPerIteration":  14538994,
+                          "managedHeapStartBytes":  986096,
+                          "managedHeapPeakBytes":  16132376,
+                          "managedHeapPeakDeltaBytes":  15146280,
+                          "workingSetStartBytes":  66068480,
+                          "workingSetPeakBytes":  73916416,
+                          "workingSetPeakDeltaBytes":  7847936,
+                          "coreInvocationCount":  1,
+                          "coreInvocationEvidence":  "runtime-output",
+                          "outputSignals":  {
+                                                "ClusterCount":  3,
+                                                "PointCloudsMaterialized":  false
+                                            },
+                          "errorMessage":  null
+                      }
+                  ],
+    "calibrationRobustness":  [
+                                  {
+                                      "scenario":  "no_noise",
+                                      "modes":  [
+                                                    {
+                                                        "mode":  "None",
+                                                        "passed":  true,
+                                                        "transformError":  3.5528356494511764E-15,
+                                                        "inlierRmsError":  3.3232593448441795E-15,
+                                                        "outlierCount":  0,
+                                                        "errorMessage":  null
+                                                    },
+                                                    {
+                                                        "mode":  "Ransac",
+                                                        "passed":  true,
+                                                        "transformError":  3.5528356494511764E-15,
+                                                        "inlierRmsError":  3.3232593448441795E-15,
+                                                        "outlierCount":  0,
+                                                        "errorMessage":  null
+                                                    },
+                                                    {
+                                                        "mode":  "Huber",
+                                                        "passed":  true,
+                                                        "transformError":  3.5528356494511764E-15,
+                                                        "inlierRmsError":  3.3232593448441795E-15,
+                                                        "outlierCount":  0,
+                                                        "errorMessage":  null
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "scenario":  "single_outlier",
+                                      "modes":  [
+                                                    {
+                                                        "mode":  "None",
+                                                        "passed":  true,
+                                                        "transformError":  5.480327357624509,
+                                                        "inlierRmsError":  11.120414560219428,
+                                                        "outlierCount":  0,
+                                                        "errorMessage":  null
+                                                    },
+                                                    {
+                                                        "mode":  "Ransac",
+                                                        "passed":  true,
+                                                        "transformError":  3.5528356494511764E-15,
+                                                        "inlierRmsError":  3.40959214617482E-15,
+                                                        "outlierCount":  1,
+                                                        "errorMessage":  null
+                                                    },
+                                                    {
+                                                        "mode":  "Huber",
+                                                        "passed":  true,
+                                                        "transformError":  0.018340318725132067,
+                                                        "inlierRmsError":  0.013319245357240406,
+                                                        "outlierCount":  1,
+                                                        "errorMessage":  null
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "scenario":  "multiple_outliers",
+                                      "modes":  [
+                                                    {
+                                                        "mode":  "None",
+                                                        "passed":  true,
+                                                        "transformError":  10.502424103746236,
+                                                        "inlierRmsError":  31.250739123003875,
+                                                        "outlierCount":  0,
+                                                        "errorMessage":  null
+                                                    },
+                                                    {
+                                                        "mode":  "Ransac",
+                                                        "passed":  true,
+                                                        "transformError":  1.4648279494536539E-14,
+                                                        "inlierRmsError":  1.2359079452258525E-14,
+                                                        "outlierCount":  3,
+                                                        "errorMessage":  null
+                                                    },
+                                                    {
+                                                        "mode":  "Huber",
+                                                        "passed":  true,
+                                                        "transformError":  0.017103068706382625,
+                                                        "inlierRmsError":  0.008964739953329666,
+                                                        "outlierCount":  3,
+                                                        "errorMessage":  null
+                                                    }
+                                                ]
+                                  }
+                              ]
+}
