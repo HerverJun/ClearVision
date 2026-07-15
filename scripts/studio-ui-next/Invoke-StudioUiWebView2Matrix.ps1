@@ -347,7 +347,7 @@ try {
                 "-c", "Release",
                 "--runtime", "win-x64",
                 "--self-contained", "true",
-                "-p:RestorePackagesWithLockFile=false",
+                "-p:RestorePackagesWithLockFile=true",
                 "--artifacts-path", $publishArtifactsRoot)
             & $dotnetRunner -ReturnExitCode -Arguments $releaseBuildArguments
             $releaseBuildExitCode = $LASTEXITCODE
@@ -364,7 +364,7 @@ try {
             "-c", "Release",
             "--runtime", "win-x64",
             "--self-contained", "true",
-            "-p:RestorePackagesWithLockFile=false",
+            "-p:RestorePackagesWithLockFile=true",
             "--output", $publishRoot,
             "--artifacts-path", $publishArtifactsRoot)
         & $dotnetRunner -ReturnExitCode -Arguments $publishArguments
