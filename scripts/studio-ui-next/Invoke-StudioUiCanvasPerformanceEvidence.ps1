@@ -4,6 +4,8 @@ param(
     [string]$Configuration = "Debug",
     [ValidateSet("debug", "publish")]
     [string]$RuntimeKind = "debug",
+    [ValidateSet("f01", "f02")]
+    [string]$EvidencePhase = "f01",
     [string]$DesktopExecutablePath,
     [string]$NodeExecutablePath,
     [string]$RunName,
@@ -53,7 +55,7 @@ if ([string]::IsNullOrWhiteSpace($RunName)) {
 }
 
 $relativeRoot = if ([string]::IsNullOrWhiteSpace($EvidenceDirectory)) {
-    ".tmp/studio-ui-next/f01/performance/$RunName"
+    ".tmp/studio-ui-next/$EvidencePhase/performance/$RunName"
 } else {
     $EvidenceDirectory.Replace('\', '/')
 }
@@ -73,7 +75,7 @@ if (Test-Path -LiteralPath $evidenceRoot) {
 }
 
 $runtimeRoot = if ([string]::IsNullOrWhiteSpace($RuntimeDirectory)) {
-    Join-Path $repoRoot ".tmp/studio-ui-next/f01/runtime/$RunName"
+    Join-Path $repoRoot ".tmp/studio-ui-next/$EvidencePhase/runtime/$RunName"
 } else {
     [System.IO.Path]::GetFullPath($RuntimeDirectory)
 }
@@ -142,6 +144,7 @@ try {
         $portOffset = ($groupIndex - 1) * 4
         $legacyParameters = @{
             Expectation = "legacy"
+            EvidencePhase = $EvidencePhase
             Configuration = $Configuration
             RuntimeKind = $RuntimeKind
             NodeExecutablePath = $nodeExe
@@ -155,6 +158,7 @@ try {
         }
         $studioParameters = @{
             Expectation = "studio-canvas"
+            EvidencePhase = $EvidencePhase
             Configuration = $Configuration
             RuntimeKind = $RuntimeKind
             NodeExecutablePath = $nodeExe

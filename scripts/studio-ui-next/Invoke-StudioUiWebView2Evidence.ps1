@@ -12,6 +12,8 @@ param(
     [string]$Configuration = "Debug",
     [ValidateSet("debug", "publish", "missing-assets")]
     [string]$RuntimeKind = "debug",
+    [ValidateSet("f01", "f02")]
+    [string]$EvidencePhase = "f01",
     [string]$DesktopExecutablePath,
     [string]$NodeExecutablePath,
     [string]$NodeScenarioPath,
@@ -93,7 +95,7 @@ if (-not (Test-Path -LiteralPath $nodeExe -PathType Leaf)) {
     throw "The absolute Node driver was not found: $nodeExe"
 }
 
-$defaultEvidenceDirectory = ".tmp/studio-ui-next/f01/$RunName/evidence"
+$defaultEvidenceDirectory = ".tmp/studio-ui-next/$EvidencePhase/$RunName/evidence"
 $relativeEvidence = if ([string]::IsNullOrWhiteSpace($EvidenceDirectory)) {
     $defaultEvidenceDirectory
 } else {
@@ -178,6 +180,7 @@ $customEnvironment = [ordered]@{
     "CV_STUDIO_UI_RUN_NAME" = $RunName
     "CV_STUDIO_UI_RUNTIME_KIND" = $RuntimeKind
     "CV_STUDIO_UI_CONFIGURATION" = $Configuration
+    "CV_STUDIO_UI_EVIDENCE_PHASE" = $EvidencePhase
     "CV_STUDIO_UI_SANITIZED_PATH" = if ($SanitizeDesktopPath) { "true" } else { "false" }
     "CV_STUDIO_UI_DEEP_CANVAS" = if ($DeepCanvas) { "true" } else { "false" }
     "CV_NATIVE_DPI_PROBE" = Join-Path $scriptRoot "Get-DesktopRuntimeProbe.ps1"
@@ -270,7 +273,7 @@ $runnerParameters = @{
     WebPort = $WebPort
     CdpPort = $CdpPort
     Scale = $Scale
-    Phase = $Expectation
+    Phase = $EvidencePhase
     RunName = $RunName
     HostLogDirectory = $hostLogs
     WebView2UserDataDirectory = $webView2UserData
@@ -335,6 +338,7 @@ $cleanup = [pscustomobject]@{
     schemaVersion = 1
     runName = $RunName
     expectation = $Expectation
+    evidencePhase = $EvidencePhase
     startedAtUtc = $startedAtUtc.ToString("O")
     capturedAtUtc = [DateTime]::UtcNow.ToString("O")
     runnerSucceeded = $runnerSucceeded
@@ -389,6 +393,7 @@ if (-not $cleanupPassed) {
     Succeeded = $true
     RunName = $RunName
     Expectation = $Expectation
+    EvidencePhase = $EvidencePhase
     EvidenceDirectory = $evidencePath
     CleanupEvidence = $cleanupPath
     CompletedAtUtc = [DateTime]::UtcNow.ToString("O")

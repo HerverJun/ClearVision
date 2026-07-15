@@ -46,11 +46,12 @@ F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision
 
 ## 当前进度
 
-- Prompt 1：`COMPLETE`。FrontendV2 已退役，StudioUI 独立 build/publish 地基和 legacy 回退基线已验证。
-- Prompt 2：`COMPLETE`。Desktop 已具备默认关闭的 `/studio` 启动选择、fail-closed 资产诊断、StudioStartupConfigV1、唯一 startup reader/WebView2 adapter/GET transport、Platform composition 和 `.csproj PerMonitorV2` DPI 代码权威。
-- Prompt 3：`NOT_STARTED`，但 `PROMPT_3_READY=YES`。
-
-Prompt 2 保持以下停止边界：没有实现 Design tokens/primitives、Design Foundation Lab、FlowCanvas、ImageCanvas、正式 App Shell、登录迁移、SSE/EventSource 或业务 capability。真实 WebView2、实际进程 DPI 查询、GitHub Actions 与干净 no-Node 目标机均如实记录为 `NOT RUN`。
+- F01：`DONE`。Final SHA `f6d4d98a53914bac088cd62cda261b2c08a11670` 的
+  workflow_dispatch Run `29411190713` 已成功；FrontendV2 退役、StudioUI build/Host/Design
+  Foundation/canonical FlowCanvas/WebView2/DPI/publish/no-Node 地基已完成。
+- F02 Goal 1：`IN_PROGRESS`。入口、认证方案 B、API/permission contract 与 Initial 性能基线已冻结；
+  当前范围只建立正式 Shell、共享只读 query platform、Overview、Projects Read、Diagnostics 与 About。
+- `Studio:StudioUiEnabled=false` 保持不变；legacy 仍是默认入口。
 
 ## 阶段门禁
 
@@ -69,5 +70,8 @@ F01 执行期间以本目录链接的计划为唯一权威；仓库外来源文�
 - [F01 完整开发计划（正式执行权威）](./Studio_UI_Next_F01_完整开发计划.md)
 - [F01 架构决策记录](./F01_架构决策记录.md)
 - [F01 五轮执行卡](./F01_五轮执行卡.md)
+- [F02 架构决策记录](./F02_架构决策记录.md)
+- [F02 API 与权限合同冻结](./F02_API与权限合同冻结.md)
+- [F02 Initial 性能与生命周期基线](./F02_Initial性能与生命周期基线.md)
 - [仓库级协作规则](../../../AGENTS.md)
 - [旧 Studio2 历史入口](../Studio2/README.md)（历史取证，不是新计划）

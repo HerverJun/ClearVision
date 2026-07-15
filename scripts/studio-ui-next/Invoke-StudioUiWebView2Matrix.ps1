@@ -6,6 +6,8 @@ param(
     [string]$EvidenceDirectory,
     [string]$RuntimeDirectory,
     [string]$PublishDirectory,
+    [ValidateSet("f01", "f02")]
+    [string]$EvidencePhase = "f01",
     [int]$BaseWebPort = 5300,
     [int]$BaseCdpPort = 9623,
     [int]$PerformanceGroups = 1,
@@ -50,7 +52,7 @@ if ([string]::IsNullOrWhiteSpace($RunName)) {
 }
 
 $relativeEvidenceRoot = if ([string]::IsNullOrWhiteSpace($EvidenceDirectory)) {
-    ".tmp/studio-ui-next/f01/matrix/$RunName"
+    ".tmp/studio-ui-next/$EvidencePhase/matrix/$RunName"
 } else {
     $EvidenceDirectory.Replace('\', '/')
 }
@@ -72,7 +74,7 @@ if (Test-Path -LiteralPath $evidenceRoot) {
 }
 
 $runtimeDirectoryRoot = if ([string]::IsNullOrWhiteSpace($RuntimeDirectory)) {
-    Join-Path $repoRoot ".tmp/studio-ui-next/f01/runtime/$RunName"
+    Join-Path $repoRoot ".tmp/studio-ui-next/$EvidencePhase/runtime/$RunName"
 } else {
     [System.IO.Path]::GetFullPath($RuntimeDirectory)
 }
@@ -101,7 +103,7 @@ if (-not $runtimeDirectoryRoot.StartsWith(
 }
 
 $publishRoot = if ([string]::IsNullOrWhiteSpace($PublishDirectory)) {
-    Join-Path $repoRoot ".tmp/publish-check/studio-ui-next-f01/$RunName/publish"
+    Join-Path $repoRoot ".tmp/publish-check/studio-ui-next-$EvidencePhase/$RunName/publish"
 } else {
     [System.IO.Path]::GetFullPath($PublishDirectory)
 }
@@ -167,6 +169,7 @@ function Invoke-MatrixRun {
     $relativeEvidence = "$relativeEvidenceRoot/runs/$Name/evidence"
     $parameters = @{
         Expectation = $Expectation
+        EvidencePhase = $EvidencePhase
         Configuration = $Configuration
         RuntimeKind = $RuntimeKind
         DesktopExecutablePath = $ExecutablePath
@@ -259,6 +262,7 @@ try {
         & $performanceRun `
             -Configuration "Debug" `
             -RuntimeKind "debug" `
+            -EvidencePhase $EvidencePhase `
             -DesktopExecutablePath $debugExe `
             -NodeExecutablePath $nodeExe `
             -RunName "$RunName-performance" `
@@ -345,6 +349,7 @@ try {
 
 $manifest = [pscustomobject]@{
     schemaVersion = 1
+    evidencePhase = $EvidencePhase
     runName = $RunName
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
     status = if ($matrixError) { "FAIL" } else { "PASS" }
