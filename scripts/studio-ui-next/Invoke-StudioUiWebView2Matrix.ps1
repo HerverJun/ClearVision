@@ -135,6 +135,7 @@ if ([string]::Equals(
 }
 $missingAssetsRoot = Join-Path (Split-Path -Parent $publishRoot) "missing-assets-publish"
 $publishArtifactsRoot = Join-Path (Split-Path -Parent $publishRoot) "artifacts"
+$publishLockFilePath = Join-Path $publishArtifactsRoot 'locks\restore-disabled.packages.lock.json'
 $publishProductRoutes = if ($EvidencePhase -eq "f02") {
     @("/overview", "/projects", "/operators", "/stations", "/results")
 } else {
@@ -347,7 +348,8 @@ try {
                 "-c", "Release",
                 "--runtime", "win-x64",
                 "--self-contained", "true",
-                "-p:RestorePackagesWithLockFile=true",
+                "-p:RestorePackagesWithLockFile=false",
+                "-p:NuGetLockFilePath=$publishLockFilePath",
                 "--artifacts-path", $publishArtifactsRoot)
             & $dotnetRunner -ReturnExitCode -Arguments $releaseBuildArguments
             $releaseBuildExitCode = $LASTEXITCODE
@@ -364,7 +366,8 @@ try {
             "-c", "Release",
             "--runtime", "win-x64",
             "--self-contained", "true",
-            "-p:RestorePackagesWithLockFile=true",
+            "-p:RestorePackagesWithLockFile=false",
+            "-p:NuGetLockFilePath=$publishLockFilePath",
             "--output", $publishRoot,
             "--artifacts-path", $publishArtifactsRoot)
         & $dotnetRunner -ReturnExitCode -Arguments $publishArguments

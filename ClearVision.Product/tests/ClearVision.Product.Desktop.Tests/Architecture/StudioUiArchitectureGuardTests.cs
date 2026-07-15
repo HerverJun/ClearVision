@@ -266,6 +266,9 @@ public sealed class StudioUiArchitectureGuardTests
         matrix.Should().Contain("Invoke-StudioUiCanvasPerformanceEvidence.ps1");
         matrix.Should().Contain("scripts/dotnet.ps1");
         matrix.Should().Contain("--artifacts-path");
+        matrix.Should().Contain("RestorePackagesWithLockFile=false");
+        matrix.Should().Contain("NuGetLockFilePath");
+        matrix.Should().Contain("restore-disabled.packages.lock.json");
         matrix.Should().NotContain("Start-Process");
     }
 
