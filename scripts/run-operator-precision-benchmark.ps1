@@ -31,15 +31,39 @@ $settings = switch ($Profile) {
     "acceptance" { @{ Warmup = 5; Iterations = 40 } }
 }
 
-$harnessCommitSha = (& git -C $repoRoot rev-parse HEAD).Trim()
-$sourceSha = if ([string]::IsNullOrWhiteSpace($SourceShaOverride)) { $harnessCommitSha } else { $SourceShaOverride.Trim() }
-$repositoryDirty = @(& git -C $repoRoot status --porcelain=v1).Count -gt 0
-if ($repositoryDirty -and -not $AllowDirty) {
-    throw "Operator precision evidence requires a clean repository. Use -AllowDirty only for local exploratory runs."
-}
-$sdkVersion = (& dotnet --version).Trim()
 $outputPath = Join-Path $resultsRoot "operator-precision-$Label-$Profile.json"
 $reportPath = Join-Path $resultsRoot "operator-precision-$Label-$Profile.md"
+$allowedEvidencePaths = @(
+    (Join-Path $resultsRoot "operator-precision-baseline-$Profile.json"),
+    (Join-Path $resultsRoot "operator-precision-baseline-$Profile.md"),
+    (Join-Path $resultsRoot "operator-precision-after-$Profile.json"),
+    (Join-Path $resultsRoot "operator-precision-after-$Profile.md"),
+    (Join-Path $resultsRoot "operator-precision-phase5-comparison.json"),
+    (Join-Path $resultsRoot "operator-precision-phase5-comparison.md")
+) | ForEach-Object { [IO.Path]::GetFullPath($_) }
+
+$harnessCommitSha = (& git -C $repoRoot rev-parse HEAD).Trim()
+$sourceSha = if ([string]::IsNullOrWhiteSpace($SourceShaOverride)) { $harnessCommitSha } else { $SourceShaOverride.Trim() }
+$changedPaths = @(& git -C $repoRoot diff --name-only) +
+    @(& git -C $repoRoot diff --cached --name-only) +
+    @(& git -C $repoRoot ls-files --others --exclude-standard)
+$changedPaths = $changedPaths |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+    ForEach-Object { [IO.Path]::GetFullPath((Join-Path $repoRoot $_)) } |
+    Sort-Object -Unique
+$unexpectedDirtyPaths = @($changedPaths | Where-Object { $allowedEvidencePaths -notcontains $_ })
+$repositoryDirty = $unexpectedDirtyPaths.Count -gt 0
+if ($repositoryDirty -and -not $AllowDirty) {
+    $relativeDirtyPaths = $unexpectedDirtyPaths | ForEach-Object {
+        if ($_.StartsWith($repoRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            $_.Substring($repoRoot.Length).TrimStart([char[]]@('\', '/'))
+        } else {
+            $_
+        }
+    }
+    throw "Operator precision evidence requires a clean source tree; unexpected changes: $($relativeDirtyPaths -join ', '). Use -AllowDirty only for local exploratory runs."
+}
+$sdkVersion = (& dotnet --version).Trim()
 
 & dotnet run --project $project --configuration Release -- `
     --manifest $manifest `
