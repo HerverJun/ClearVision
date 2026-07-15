@@ -341,12 +341,15 @@ try {
         }
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $publishRoot) | Out-Null
         if ($RunScope -eq "publish-only") {
-            & $dotnetRunner -ReturnExitCode build $desktopProject `
-                -c Release `
-                --runtime win-x64 `
-                --self-contained true `
-                -p:RestorePackagesWithLockFile=false `
-                --artifacts-path $publishArtifactsRoot
+            $releaseBuildArguments = @(
+                "build",
+                $desktopProject,
+                "-c", "Release",
+                "--runtime", "win-x64",
+                "--self-contained", "true",
+                "-p:RestorePackagesWithLockFile=false",
+                "--artifacts-path", $publishArtifactsRoot)
+            & $dotnetRunner -ReturnExitCode -Arguments $releaseBuildArguments
             $releaseBuildExitCode = $LASTEXITCODE
             if ($releaseBuildExitCode -ne 0) {
                 throw "StudioUI/Desktop Release build failed with exit code $releaseBuildExitCode."
@@ -355,13 +358,16 @@ try {
         } else {
             $releaseBuildStatus = "PASS_VIA_PUBLISH_BUILD_TARGET"
         }
-        & $dotnetRunner -ReturnExitCode publish $desktopProject `
-            -c Release `
-            --runtime win-x64 `
-            --self-contained true `
-            -p:RestorePackagesWithLockFile=false `
-            --output $publishRoot `
-            --artifacts-path $publishArtifactsRoot
+        $publishArguments = @(
+            "publish",
+            $desktopProject,
+            "-c", "Release",
+            "--runtime", "win-x64",
+            "--self-contained", "true",
+            "-p:RestorePackagesWithLockFile=false",
+            "--output", $publishRoot,
+            "--artifacts-path", $publishArtifactsRoot)
+        & $dotnetRunner -ReturnExitCode -Arguments $publishArguments
         $publishExitCode = $LASTEXITCODE
         if ($publishExitCode -ne 0) {
             throw "Release self-contained publish failed with exit code $publishExitCode."
