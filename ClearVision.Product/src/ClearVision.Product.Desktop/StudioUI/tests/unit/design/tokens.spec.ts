@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const tokensSource = readFileSync(
   resolve(process.cwd(), 'src/design-system/tokens/tokens.css'),
   'utf8'
-);
+).replace(/\r\n?/g, '\n');
 
 function readTokenBlock(start: string, end: string): ReadonlyMap<string, string> {
   const startIndex = tokensSource.indexOf(start);
@@ -42,6 +42,12 @@ describe('Design Foundation color tokens', () => {
   const light = readTokenBlock(':root {', '\n}\n\nhtml[data-theme="dark"]');
   const dark = readTokenBlock('html[data-theme="dark"] {', '\n}\n\nhtml[data-density="compact"]');
   const brandScale = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
+
+  it('normalizes an equivalent CRLF token fixture before block parsing', () => {
+    const normalizedCrlfSource = tokensSource.replace(/\n/g, '\r\n').replace(/\r\n?/g, '\n');
+    expect(normalizedCrlfSource).toContain('\n}\n\nhtml[data-theme="dark"]');
+    expect(normalizedCrlfSource).toContain('\n}\n\nhtml[data-density="compact"]');
+  });
 
   it.each([
     ['light', light],
