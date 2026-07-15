@@ -5,6 +5,13 @@ import {
   type Router,
   type RouterHistory
 } from 'vue-router';
+import ProductLayout from '@/app/layouts/ProductLayout.vue';
+import InternalLabLayout from '@/app/layouts/InternalLabLayout.vue';
+import NotFoundPage from '@/app/pages/NotFoundPage.vue';
+import AboutPage from '@/capabilities/about/AboutPage.vue';
+import OverviewPage from '@/capabilities/overview/OverviewPage.vue';
+import ProjectDetailPage from '@/capabilities/projects-read/ProjectDetailPage.vue';
+import ProjectsPage from '@/capabilities/projects-read/ProjectsPage.vue';
 import CanvasLabPlaceholder from '@/labs/canvas/CanvasLabPlaceholder.vue';
 import DesignLabPlaceholder from '@/labs/design/DesignLabPlaceholder.vue';
 import DiagnosticsPage from '@/platform/diagnostics/DiagnosticsPage.vue';
@@ -12,34 +19,80 @@ import DiagnosticsPage from '@/platform/diagnostics/DiagnosticsPage.vue';
 export const studioRoutes: readonly RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/diagnostics'
+    component: ProductLayout,
+    meta: { title: 'ClearVision Studio', breadcrumb: 'Studio', requiresSession: true },
+    children: [
+      { path: '', redirect: '/overview' },
+      {
+        path: 'overview',
+        name: 'overview',
+        component: OverviewPage,
+        meta: { title: '概览', breadcrumb: '概览', requiresSession: true }
+      },
+      {
+        path: 'projects',
+        name: 'projects',
+        component: ProjectsPage,
+        meta: { title: '工程', breadcrumb: '工程', requiresSession: true }
+      },
+      {
+        path: 'projects/:id',
+        name: 'project-detail',
+        component: ProjectDetailPage,
+        meta: { title: '工程详情', breadcrumb: '工程详情', requiresSession: true }
+      },
+      {
+        path: 'diagnostics',
+        name: 'diagnostics',
+        component: DiagnosticsPage,
+        meta: { title: '诊断', breadcrumb: '诊断', requiresSession: true }
+      },
+      {
+        path: 'about',
+        name: 'about',
+        component: AboutPage,
+        meta: { title: '关于', breadcrumb: '关于', requiresSession: true }
+      },
+      {
+        path: ':pathMatch(.*)*',
+        name: 'not-found',
+        component: NotFoundPage,
+        meta: { title: '页面未找到', breadcrumb: '404', requiresSession: true }
+      }
+    ]
   },
   {
-    path: '/diagnostics',
-    name: 'diagnostics',
-    component: DiagnosticsPage
-  },
-  {
-    path: '/labs/design',
-    name: 'design-lab-placeholder',
-    component: DesignLabPlaceholder
-  },
-  {
-    path: '/labs/canvas',
-    name: 'canvas-lab-placeholder',
-    component: CanvasLabPlaceholder
-  },
-  {
-    path: '/:pathMatch(.*)*',
-    redirect: '/diagnostics'
+    path: '/labs',
+    component: InternalLabLayout,
+    meta: { title: '内部实验室', breadcrumb: '实验室', internal: true },
+    children: [
+      {
+        path: 'design',
+        name: 'design-lab-placeholder',
+        component: DesignLabPlaceholder,
+        meta: { title: 'Design Lab', breadcrumb: 'Design Lab', internal: true }
+      },
+      {
+        path: 'canvas',
+        name: 'canvas-lab-placeholder',
+        component: CanvasLabPlaceholder,
+        meta: { title: 'Canvas Lab', breadcrumb: 'Canvas Lab', internal: true }
+      }
+    ]
   }
 ];
 
 export function createStudioRouter(
   history: RouterHistory = createWebHashHistory(import.meta.env.BASE_URL)
 ): Router {
-  return createRouter({
+  const router = createRouter({
     history,
     routes: [...studioRoutes]
   });
+  router.afterEach(to => {
+    if (typeof document !== 'undefined') {
+      document.title = `${to.meta.title ?? 'ClearVision Studio'} · ClearVision`;
+    }
+  });
+  return router;
 }

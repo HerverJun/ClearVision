@@ -90,7 +90,22 @@ async function installStudioStartup(page: Page): Promise<string[]> {
     }
   });
 
+  await page.route('**/health', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    headers: { 'x-clearvision-data-source': 'BROWSER_FIXTURE' },
+    body: JSON.stringify({ status: 'Healthy', port: 5177 })
+  }));
+  await page.route('**/api/auth/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    headers: { 'x-clearvision-data-source': 'BROWSER_FIXTURE' },
+    body: JSON.stringify({ userId: 'canvas-lab-user', username: 'canvas-lab', role: 'Engineer' })
+  }));
+
   await page.addInitScript(() => {
+    sessionStorage.setItem('cv_auth_token', 'canvas-lab-browser-fixture-token');
+    sessionStorage.setItem('cv_current_user', 'canvas-lab-user');
     const startup = Object.freeze({
       schemaVersion: 1,
       uiKind: 'studio-ui',

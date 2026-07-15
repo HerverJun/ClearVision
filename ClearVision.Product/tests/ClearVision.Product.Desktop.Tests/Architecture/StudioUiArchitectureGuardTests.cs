@@ -64,7 +64,7 @@ public sealed class StudioUiArchitectureGuardTests
     }
 
     [Fact]
-    public void StudioUiProductionSource_ShouldRespectPromptTwoAuthorityBoundaries()
+    public void StudioUiProductionSource_ShouldRespectF02AuthorityBoundaries()
     {
         var sourceFiles = GetStudioUiProductionFiles();
         var forbiddenTokens = new[]
@@ -92,7 +92,7 @@ public sealed class StudioUiArchitectureGuardTests
             var relativePath = StudioUiRelativePath(file);
             foreach (var token in forbiddenTokens)
             {
-                text.Should().NotContain(token, $"{relativePath} must stay inside the Prompt 2 boundary");
+                text.Should().NotContain(token, $"{relativePath} must stay inside the F02 authority boundary");
             }
 
             text.Should().NotMatchRegex(
@@ -129,7 +129,11 @@ public sealed class StudioUiArchitectureGuardTests
             .Where(file => File.ReadAllText(file).Contains("new AbortController", StringComparison.Ordinal))
             .Select(StudioUiRelativePath)
             .ToList();
-        abortControllerOwners.Should().Equal("src/platform/diagnostics/runtimeDiagnostics.ts");
+        abortControllerOwners.Should().BeEquivalentTo(new[]
+        {
+            "src/platform/diagnostics/runtimeDiagnostics.ts",
+            "src/platform/query/readQuery.ts"
+        });
 
         var piniaStores = sourceFiles
             .Where(file => File.ReadAllText(file).Contains("defineStore(", StringComparison.Ordinal))
@@ -311,18 +315,58 @@ public sealed class StudioUiArchitectureGuardTests
     }
 
     [Fact]
-    public void StudioUiRouter_ShouldContainOnlyTheReservedF01TechnicalRoutes()
+    public void StudioUiF02Composition_ShouldKeepOneProductShellAndSharedReadOwners()
+    {
+        var sourceFiles = GetStudioUiProductionFiles();
+
+        sourceFiles.Count(file => Path.GetFileName(file) == "ProductLayout.vue").Should().Be(1);
+        sourceFiles.Count(file => Path.GetFileName(file) == "InternalLabLayout.vue").Should().Be(1);
+        sourceFiles.Count(file => Path.GetFileName(file) == "sessionProjectionOwner.ts").Should().Be(1);
+        sourceFiles.Count(file => Path.GetFileName(file) == "systemStatusOwner.ts").Should().Be(1);
+        sourceFiles.Count(file => Path.GetFileName(file) == "readQuery.ts").Should().Be(1);
+
+        var productSource = sourceFiles
+            .Where(file => !StudioUiRelativePath(file).StartsWith("src/labs/", StringComparison.Ordinal))
+            .Select(File.ReadAllText)
+            .ToList();
+        productSource.Should().OnlyContain(text =>
+            !Regex.IsMatch(
+                text,
+                "method\\s*:\\s*['\\\"](?:POST|PUT|PATCH|DELETE)['\\\"]",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
+        productSource.Should().OnlyContain(text =>
+            !text.Contains("new EventSource", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void StudioUiRouter_ShouldFreezeF02ProductAndInternalLabRoutes()
     {
         var router = File.ReadAllText(Path.Combine(RepoPath(StudioUiRoot), "src", "app", "router.ts"));
+        var navigation = File.ReadAllText(Path.Combine(RepoPath(StudioUiRoot), "src", "app", "navigation.ts"));
+
         router.Should().Contain("createWebHashHistory(import.meta.env.BASE_URL)");
-        router.Should().Contain("path: '/diagnostics'");
-        router.Should().Contain("path: '/labs/design'");
-        router.Should().Contain("path: '/labs/canvas'");
-        router.Should().NotContain("/projects");
+        router.Should().Contain("component: ProductLayout");
+        router.Should().Contain("component: InternalLabLayout");
+        router.Should().Contain("redirect: '/overview'");
+        router.Should().Contain("path: 'overview'");
+        router.Should().Contain("path: 'projects'");
+        router.Should().Contain("path: 'projects/:id'");
+        router.Should().Contain("path: 'diagnostics'");
+        router.Should().Contain("path: 'about'");
+        router.Should().Contain("path: ':pathMatch(.*)*'");
+        router.Should().Contain("path: '/labs'");
+        router.Should().Contain("path: 'design'");
+        router.Should().Contain("path: 'canvas'");
         router.Should().NotContain("/inspection");
         router.Should().NotContain("/results");
         router.Should().NotContain("/settings");
         router.Should().NotContain("/ai");
+
+        navigation.Should().Contain("to: '/overview'");
+        navigation.Should().Contain("to: '/projects'");
+        navigation.Should().Contain("to: '/diagnostics'");
+        navigation.Should().Contain("to: '/about'");
+        navigation.Should().NotContain("/labs");
     }
 
     private static string RepoPath(string relativePath) =>

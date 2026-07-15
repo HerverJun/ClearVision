@@ -2,6 +2,11 @@ import { createPinia } from 'pinia';
 import { createApp, type App as VueApp } from 'vue';
 import type { Router } from 'vue-router';
 import App from '@/app/App.vue';
+import {
+  createProductRuntime,
+  productRuntimeKey,
+  type ProductRuntime
+} from '@/app/productRuntime';
 import { createStudioRouter } from '@/app/router';
 import {
   createDesktopStudioPlatform,
@@ -13,6 +18,7 @@ import {
 
 export interface MountStudioAppOptions {
   readonly platform: StudioPlatform;
+  readonly productRuntime?: ProductRuntime;
   router?: Router;
 }
 
@@ -25,6 +31,7 @@ export interface MountedStudioApp {
   readonly app: VueApp<Element>;
   readonly router: Router;
   readonly platform: StudioPlatform;
+  readonly productRuntime: ProductRuntime;
   unmount(): void;
 }
 
@@ -43,16 +50,25 @@ export async function mountStudioApp(
 
   const app = createApp(App);
   const router = options.router ?? createStudioRouter();
-  app.use(createPinia());
-  app.use(router);
-  app.provide(studioPlatformKey, options.platform);
+  let productRuntime: ProductRuntime | undefined;
 
   try {
+    productRuntime = options.productRuntime ?? createProductRuntime(options.platform);
+    app.use(createPinia());
+    app.use(router);
+    app.provide(studioPlatformKey, options.platform);
+    app.provide(productRuntimeKey, productRuntime);
     await router.isReady();
     app.mount(mountTarget);
   } catch (error) {
+    productRuntime?.dispose();
     options.platform.dispose();
     throw error;
+  }
+
+  if (!productRuntime) {
+    options.platform.dispose();
+    throw new Error('ProductRuntime was not created.');
   }
 
   let mounted = true;
@@ -60,6 +76,7 @@ export async function mountStudioApp(
     app,
     router,
     platform: options.platform,
+    productRuntime,
     unmount() {
       if (!mounted) {
         return;
@@ -69,7 +86,11 @@ export async function mountStudioApp(
       try {
         app.unmount();
       } finally {
-        options.platform.dispose();
+        try {
+          productRuntime.dispose();
+        } finally {
+          options.platform.dispose();
+        }
       }
     }
   };
