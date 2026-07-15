@@ -10,7 +10,22 @@ async function bootDesignLab(page: Page): Promise<string[]> {
     if (message.type() === 'error') runtimeErrors.push(message.text());
   });
 
+  await page.route('**/health', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    headers: { 'x-clearvision-data-source': 'BROWSER_FIXTURE' },
+    body: JSON.stringify({ status: 'Healthy', port: 5177 })
+  }));
+  await page.route('**/api/auth/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    headers: { 'x-clearvision-data-source': 'BROWSER_FIXTURE' },
+    body: JSON.stringify({ userId: 'design-lab-user', username: 'design-lab', role: 'Engineer' })
+  }));
+
   await page.addInitScript(() => {
+    sessionStorage.setItem('cv_auth_token', 'design-lab-browser-fixture-token');
+    sessionStorage.setItem('cv_current_user', 'design-lab-user');
     const startup = Object.freeze({
       schemaVersion: 1,
       uiKind: 'studio-ui',
@@ -82,7 +97,7 @@ test('Modal traps keyboard focus, closes with Escape and restores its trigger', 
 
   const dialog = page.getByRole('dialog', { name: 'Confirm visual foundation' });
   const initial = page.getByRole('button', { name: 'Accept direction' });
-  const close = page.getByRole('button', { name: 'Close dialog' });
+  const close = page.getByRole('button', { name: '关闭对话框' });
   await expect(dialog).toBeVisible();
   await expect(initial).toBeFocused();
 

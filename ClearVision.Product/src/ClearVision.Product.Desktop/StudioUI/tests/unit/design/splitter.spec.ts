@@ -29,6 +29,7 @@ describe('CvSplitter', () => {
       }
     });
     const separator = wrapper.get('[role="separator"]');
+    expect(separator.attributes('aria-label')).toBe('调整面板大小');
 
     separator.element.dispatchEvent(pointerEvent('pointerdown', { pointerId: 7, clientX: 100 }));
     window.dispatchEvent(pointerEvent('pointermove', { pointerId: 7, clientX: 140 }));

@@ -16,7 +16,7 @@ const props = withDefaults(defineProps<{
   type: 'button',
   disabled: false,
   loading: false,
-  loadingLabel: 'Loading',
+  loadingLabel: '加载中',
   block: false
 });
 

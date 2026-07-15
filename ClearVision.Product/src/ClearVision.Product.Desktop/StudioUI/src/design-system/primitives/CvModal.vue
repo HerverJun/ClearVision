@@ -10,7 +10,7 @@ const props = withDefaults(defineProps<{
   size?: 'sm' | 'md' | 'lg';
 }>(), {
   description: undefined,
-  closeLabel: 'Close dialog',
+  closeLabel: '关闭对话框',
   closeOnBackdrop: true,
   size: 'md'
 });

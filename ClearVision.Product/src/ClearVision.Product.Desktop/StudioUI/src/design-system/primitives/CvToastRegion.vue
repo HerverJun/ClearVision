@@ -8,7 +8,7 @@ const props = withDefaults(defineProps<{
   label?: string;
 }>(), {
   defaultDurationMs: 4500,
-  label: 'Notifications'
+  label: '通知'
 });
 
 const emit = defineEmits<{
@@ -101,7 +101,7 @@ onUnmounted(() => {
         <button
           type="button"
           class="cv-toast__close"
-          :aria-label="`Dismiss ${toast.title}`"
+          :aria-label="`关闭通知：${toast.title}`"
           @click="emit('dismiss', toast.id)"
         >
           ×

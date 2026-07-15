@@ -7,11 +7,13 @@ withDefaults(defineProps<{
   description?: string | undefined;
   level?: 1 | 2;
   padded?: boolean;
+  elevated?: boolean;
 }>(), {
   as: 'section',
   description: undefined,
   level: 1,
-  padded: true
+  padded: true,
+  elevated: false
 });
 
 const generatedId = useId();
@@ -22,7 +24,10 @@ const titleId = computed(() => `cv-panel-${generatedId}`);
   <component
     :is="as"
     class="cv-panel"
-    :class="[`cv-panel--level-${level}`, { 'cv-panel--padded': padded }]"
+    :class="[
+      `cv-panel--level-${level}`,
+      { 'cv-panel--padded': padded, 'cv-panel--elevated': elevated }
+    ]"
     :aria-labelledby="titleId"
     data-design-primitive="panel"
   >
@@ -67,9 +72,9 @@ const titleId = computed(() => `cv-panel-${generatedId}`);
   border: 1px solid var(--cv-border-subtle);
   border-radius: var(--cv-radius-lg);
   background: var(--cv-surface-1);
-  box-shadow: var(--cv-elevation-1);
 }
 .cv-panel--level-2 { background: var(--cv-surface-2); box-shadow: none; }
+.cv-panel--elevated { box-shadow: var(--cv-elevation-1); }
 .cv-panel__header { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: var(--cv-space-4); padding: var(--cv-density-panel-padding); border-bottom: 1px solid var(--cv-border-subtle); }
 .cv-panel__heading { min-width: 0; }
 .cv-panel__title { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-lg); font-weight: var(--cv-font-weight-semibold); line-height: var(--cv-line-height-tight); }

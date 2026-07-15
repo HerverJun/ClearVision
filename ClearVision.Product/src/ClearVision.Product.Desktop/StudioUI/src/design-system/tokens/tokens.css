@@ -101,14 +101,14 @@
   --cv-z-tooltip: 500;
   --cv-z-modal: 1000;
 
-  /* Density: comfortable is the default. */
-  --cv-density-control-height: 36px;
-  --cv-density-control-height-sm: 30px;
-  --cv-density-row-height: 38px;
-  --cv-density-panel-padding: 18px;
-  --cv-density-field-gap: 8px;
-  --cv-density-content-gap: 16px;
-  --cv-density-icon-size: 18px;
+  /* Density: compact is the formal product default. */
+  --cv-density-control-height: 30px;
+  --cv-density-control-height-sm: 26px;
+  --cv-density-row-height: 32px;
+  --cv-density-panel-padding: 14px;
+  --cv-density-field-gap: 6px;
+  --cv-density-content-gap: 12px;
+  --cv-density-icon-size: 16px;
 
   /* Light surfaces */
   --cv-surface-app: #edf2f8;

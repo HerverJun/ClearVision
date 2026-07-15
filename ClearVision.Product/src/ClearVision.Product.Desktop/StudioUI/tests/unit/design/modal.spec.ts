@@ -26,7 +26,7 @@ describe('CvModal', () => {
     await nextTick();
     const first = document.querySelector<HTMLElement>('#first');
     const last = document.querySelector<HTMLElement>('#last');
-    const close = document.querySelector<HTMLElement>('[aria-label="Close dialog"]');
+    const close = document.querySelector<HTMLElement>('[aria-label="关闭对话框"]');
     expect(document.activeElement).toBe(first);
 
     last?.focus();

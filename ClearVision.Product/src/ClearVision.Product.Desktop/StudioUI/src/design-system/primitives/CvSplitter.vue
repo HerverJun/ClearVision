@@ -14,7 +14,7 @@ const props = withDefaults(defineProps<{
   max: 560,
   step: 8,
   orientation: 'vertical',
-  label: 'Resize panel',
+  label: '调整面板大小',
   disabled: false
 });
 

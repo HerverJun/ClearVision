@@ -18,6 +18,9 @@ describe('CvToastRegion', () => {
       }
     });
 
+    expect(wrapper.get('aside').attributes('aria-label')).toBe('通知');
+    expect(wrapper.get('button').attributes('aria-label')).toBe('关闭通知：Saved');
+
     vi.advanceTimersByTime(1000);
     expect(wrapper.emitted('dismiss')).toEqual([['one']]);
     expect(onDismiss).toHaveBeenCalledTimes(1);
