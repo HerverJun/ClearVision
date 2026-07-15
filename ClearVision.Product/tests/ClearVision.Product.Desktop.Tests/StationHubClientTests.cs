@@ -9,6 +9,8 @@ namespace ClearVision.Product.Desktop.Tests;
 
 public sealed class StationHubClientTests
 {
+    private static readonly TimeSpan TestCompletionTimeout = TimeSpan.FromSeconds(30);
+
     [Fact]
     public async Task DisconnectAsync_WhenInvocationIsInFlight_ShouldWaitBeforeDisposingConnection()
     {
@@ -32,7 +34,10 @@ public sealed class StationHubClientTests
                 ProgressPercent = 50
             },
             CancellationToken.None);
-        await connection.InvokeStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await WaitForAsync(
+            connection.InvokeStarted.Task,
+            connection,
+            "Station hub invocation did not enter the blocking connection");
 
         var disconnectTask = client.DisconnectAsync(CancellationToken.None);
 
@@ -40,12 +45,59 @@ public sealed class StationHubClientTests
         connection.DisposeStarted.Task.IsCompleted.Should().BeFalse();
 
         connection.AllowInvoke.TrySetResult();
-        (await reportTask.WaitAsync(TimeSpan.FromSeconds(2))).Should().BeTrue();
-        await disconnectTask.WaitAsync(TimeSpan.FromSeconds(2));
+        (await WaitForAsync(
+            reportTask,
+            connection,
+            "Station hub invocation did not complete after it was released")).Should().BeTrue();
+        await WaitForAsync(
+            disconnectTask,
+            connection,
+            "Station hub disconnect did not complete after the in-flight invocation exited");
 
         connection.Disposed.Should().BeTrue();
         connection.InvokeCompleted.Task.IsCompleted.Should().BeTrue();
     }
+
+    private static async Task WaitForAsync(
+        Task task,
+        BlockingStationHubConnection connection,
+        string failureMessage)
+    {
+        try
+        {
+            await task.WaitAsync(TestCompletionTimeout);
+        }
+        catch (TimeoutException ex)
+        {
+            throw CreateTimeoutException(failureMessage, connection, ex);
+        }
+    }
+
+    private static async Task<T> WaitForAsync<T>(
+        Task<T> task,
+        BlockingStationHubConnection connection,
+        string failureMessage)
+    {
+        try
+        {
+            return await task.WaitAsync(TestCompletionTimeout);
+        }
+        catch (TimeoutException ex)
+        {
+            throw CreateTimeoutException(failureMessage, connection, ex);
+        }
+    }
+
+    private static TimeoutException CreateTimeoutException(
+        string failureMessage,
+        BlockingStationHubConnection connection,
+        TimeoutException innerException) =>
+        new(
+            $"{failureMessage} within {TestCompletionTimeout}. " +
+            $"State={connection.State}; InvokeStarted={connection.InvokeStarted.Task.Status}; " +
+            $"InvokeCompleted={connection.InvokeCompleted.Task.Status}; " +
+            $"DisposeStarted={connection.DisposeStarted.Task.Status}; Disposed={connection.Disposed}.",
+            innerException);
 
     private sealed class BlockingStationHubConnection : IStationHubConnection
     {

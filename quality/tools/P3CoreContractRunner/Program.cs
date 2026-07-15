@@ -4,6 +4,7 @@ using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
@@ -1160,11 +1161,14 @@ internal static class ContractRunner
             RequireFailure(result);
         });
 
-        Add(cases, "ImageAcquisition", "image_input_without_file_path_fails", "SourceType contract", async () =>
+        Add(cases, "ImageAcquisition", "image_input_without_file_path_succeeds", "Runtime image input contract", async () =>
         {
             var bytes = CreatePngBytes(8, 6);
             var result = await op.ExecuteAsync(CreateOperator(OperatorType.ImageAcquisition), Inputs(("Image", bytes)));
-            RequireFailure(result);
+            RequireSuccess(result);
+            RequireValue(result, "Width", 8);
+            RequireValue(result, "Height", 6);
+            RequireValue(result, "Source", "provided-image");
         });
 
         for (var i = 0; i < 4; i++)
@@ -1763,6 +1767,11 @@ internal sealed class SingleServiceProvider(IFlowExecutionService flowExecutionS
             return flowExecutionService;
         }
 
+        if (serviceType == typeof(IFlowExecutionEngine))
+        {
+            return flowExecutionService;
+        }
+
         if (serviceType == typeof(IServiceScopeFactory))
         {
             return this;
@@ -1777,7 +1786,7 @@ internal sealed class SingleServiceProvider(IFlowExecutionService flowExecutionS
 }
 
 internal sealed class StubFlowExecutionService(
-    Func<Dictionary<string, object>?, FlowExecutionResult>? execute = null) : IFlowExecutionService
+    Func<Dictionary<string, object>?, FlowExecutionResult>? execute = null) : IFlowExecutionService, IFlowExecutionEngine
 {
     private readonly Func<Dictionary<string, object>?, FlowExecutionResult> _execute =
         execute ?? (_ => new FlowExecutionResult
@@ -1785,6 +1794,51 @@ internal sealed class StubFlowExecutionService(
             IsSuccess = true,
             OutputData = new Dictionary<string, object> { ["Result"] = true }
         });
+
+    public Task<FlowExecutionResult> ExecuteWithSnapshotAsync(
+        ExecutionSnapshot snapshot,
+        Dictionary<string, object>? inputData = null,
+        bool enableParallel = false,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_execute(inputData));
+    }
+
+    public Task<FlowExecutionResult> ExecuteWithSnapshotAsync(
+        ExecutionSnapshot snapshot,
+        Dictionary<string, object>? inputData,
+        ProjectVariableExecutionContext projectVariables,
+        bool enableParallel = false,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_execute(inputData));
+    }
+
+    public Task<FlowDebugExecutionResult> ExecuteDebugWithSnapshotAsync(
+        ExecutionSnapshot snapshot,
+        DebugOptions options,
+        Dictionary<string, object>? inputData = null,
+        ProjectVariableExecutionContext? projectVariables = null,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("Debug execution is outside the P3 contract baseline.");
+    }
+
+    public Task<OperatorExecutionResult> ExecuteOperatorAsync(
+        GovernedOperatorExecutionContext context,
+        Operator @operator,
+        Dictionary<string, object>? inputs = null,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("P3 contract runner only exercises ForEach subgraph execution.");
+    }
+
+    public FlowValidationResult ValidateSnapshot(ExecutionSnapshot snapshot)
+    {
+        return new FlowValidationResult { IsValid = true };
+    }
 
     public Task<FlowExecutionResult> ExecuteFlowAsync(
         OperatorFlow flow,
@@ -1796,8 +1850,12 @@ internal sealed class StubFlowExecutionService(
         return Task.FromResult(_execute(inputData));
     }
 
-    public Task<OperatorExecutionResult> ExecuteOperatorAsync(Operator @operator, Dictionary<string, object>? inputs = null)
+    public Task<OperatorExecutionResult> ExecuteOperatorAsync(
+        Operator @operator,
+        Dictionary<string, object>? inputs = null,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         throw new NotSupportedException("P3 contract runner only exercises ForEach subgraph execution.");
     }
 

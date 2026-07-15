@@ -649,7 +649,13 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+          cache-dependency-path: |
+            ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+            ClearVision.Product/src/ClearVision.Product.Desktop/StudioUI/package-lock.json
+
+      - name: Install StudioUI Dependencies
+        working-directory: ${{ env.STUDIO_UI_DIR }}
+        run: npm ci
 
       - name: Run Quick Contract Quality Suite
         shell: pwsh
@@ -803,7 +809,13 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+          cache-dependency-path: |
+            ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+            ClearVision.Product/src/ClearVision.Product.Desktop/StudioUI/package-lock.json
+
+      - name: Install StudioUI Dependencies
+        working-directory: ${{ env.STUDIO_UI_DIR }}
+        run: npm ci
 
       - name: Install UI Test Dependencies
         working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests

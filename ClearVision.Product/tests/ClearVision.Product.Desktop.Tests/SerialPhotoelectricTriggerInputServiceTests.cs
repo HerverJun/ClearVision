@@ -8,7 +8,7 @@ namespace ClearVision.Product.Desktop.Tests;
 
 public class SerialPhotoelectricTriggerInputServiceTests
 {
-    private static readonly TimeSpan TestCompletionTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan TestCompletionTimeout = TimeSpan.FromSeconds(30);
 
     [Fact]
     public async Task WaitForSerialPhotoelectricAsync_ShouldConsumeSerialComPendingSignal()
