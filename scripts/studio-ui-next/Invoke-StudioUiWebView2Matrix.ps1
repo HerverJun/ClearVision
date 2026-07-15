@@ -247,6 +247,12 @@ try {
     Invoke-MatrixRun -Name "debug-diagnostics" -Expectation "studio-diagnostics" `
         -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
         -Scale 1.0 -Route "/diagnostics" -DeepCanvas $false -NoBuild $true
+    Invoke-MatrixRun -Name "debug-overview" -Expectation "studio-product" `
+        -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
+        -Scale 1.0 -Route "/overview" -DeepCanvas $false -NoBuild $true
+    Invoke-MatrixRun -Name "debug-projects" -Expectation "studio-product" `
+        -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
+        -Scale 1.0 -Route "/projects" -DeepCanvas $false -NoBuild $true
     Invoke-MatrixRun -Name "debug-design" -Expectation "studio-design" `
         -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
         -Scale 1.0 -Route "/labs/design" -DeepCanvas $false -NoBuild $true
@@ -298,6 +304,9 @@ try {
         Invoke-MatrixRun -Name "publish-diagnostics" -Expectation "studio-diagnostics" `
             -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
             -Scale 1.0 -Route "/diagnostics" -DeepCanvas $false -NoBuild $true
+        Invoke-MatrixRun -Name "publish-overview" -Expectation "studio-product" `
+            -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
+            -Scale 1.0 -Route "/overview" -DeepCanvas $false -NoBuild $true
         Invoke-MatrixRun -Name "publish-canvas" -Expectation "studio-canvas" `
             -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
             -Scale 1.0 -Route "/labs/canvas" -DeepCanvas $false -NoBuild $true

@@ -36,10 +36,14 @@ function captureRuntimeErrors(page) {
   const consoleErrors = [];
   const pageErrors = [];
   const requestFailures = [];
+  const requests = [];
   page.on('console', message => {
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
   page.on('pageerror', error => pageErrors.push(error?.stack || error?.message || String(error)));
+  page.on('request', request => {
+    requests.push({ url: request.url(), method: request.method() });
+  });
   page.on('requestfailed', request => {
     requestFailures.push({
       url: request.url(),
@@ -47,7 +51,7 @@ function captureRuntimeErrors(page) {
       errorText: request.failure()?.errorText || 'unknown'
     });
   });
-  return { consoleErrors, pageErrors, requestFailures };
+  return { consoleErrors, pageErrors, requestFailures, requests };
 }
 
 async function seedAuthenticatedSession(page, webPort, token, user) {

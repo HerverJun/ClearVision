@@ -835,6 +835,7 @@ jobs:
         env:
           CV_UI_SCENARIO: studio-ui-next
           CV_UI_PORT: 5177
+          CV_STUDIO_UI_EVIDENCE_PHASE: f02
         run: npx playwright test
 
       - name: Assert UI Test Artifacts

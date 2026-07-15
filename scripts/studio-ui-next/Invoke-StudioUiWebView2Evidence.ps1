@@ -4,6 +4,7 @@ param(
     [ValidateSet(
         "legacy",
         "studio-diagnostics",
+        "studio-product",
         "studio-design",
         "studio-canvas",
         "missing-assets")]
@@ -164,6 +165,8 @@ New-Item -ItemType Directory -Force -Path $evidencePath | Out-Null
 $studioUiEnabled = $Expectation -ne "legacy"
 $resolvedRoute = if (-not [string]::IsNullOrWhiteSpace($Route)) {
     $Route
+} elseif ($Expectation -eq "studio-product") {
+    "/overview"
 } elseif ($Expectation -eq "studio-design") {
     "/labs/design"
 } elseif ($Expectation -eq "studio-canvas") {

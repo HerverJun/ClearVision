@@ -21,6 +21,7 @@ const {
 const expectations = new Set([
   'legacy',
   'studio-diagnostics',
+  'studio-product',
   'studio-design',
   'studio-canvas',
   'missing-assets'
@@ -44,6 +45,7 @@ function normalizeStudioRoute(value) {
 
 function routeForExpectation(expectation) {
   switch (expectation) {
+    case 'studio-product': return '/overview';
     case 'studio-design': return '/labs/design';
     case 'studio-canvas': return '/labs/canvas';
     default: return '/diagnostics';
@@ -168,7 +170,8 @@ async function verifyStudioFoundation(page, webPort, route) {
       url: location.href,
       path: location.pathname,
       hash: location.hash,
-      studioPage: document.querySelector('[data-studio-page]')?.getAttribute('data-studio-page') || null,
+      studioPage: document.querySelector('[data-studio-page]')?.getAttribute('data-studio-page') ||
+        document.querySelector('[data-capability]')?.getAttribute('data-capability') || null,
       legacyNavigationCount: document.querySelectorAll('.nav-btn[data-view]').length,
       legacyMainCount: document.querySelectorAll('#main-content').length,
       legacyFlowCanvasType: typeof window.flowCanvas,
@@ -221,6 +224,51 @@ async function verifyDiagnosticsPage(page) {
       .map(element => element.getAttribute('data-probe-state')),
     bodyText: document.querySelector('[data-studio-page="diagnostics"]')?.textContent?.trim() || ''
   }));
+}
+
+async function verifyProductPage(page, route, runtimeErrors) {
+  await page.waitForSelector('[data-product-shell="ready"]', { state: 'visible', timeout: 30_000 });
+  const selector = route.startsWith('/projects')
+    ? '[data-capability="projects-read"]'
+    : '[data-capability="overview"]';
+  await page.waitForSelector(selector, { state: 'visible', timeout: 30_000 });
+  await page.waitForLoadState('networkidle');
+  await page.waitForFunction(() => {
+    const user = document.querySelector('.product-layout__user strong')?.textContent?.trim();
+    return Boolean(user && user !== '未认证');
+  }, null, { timeout: 30_000 });
+
+  const projection = await page.evaluate(() => ({
+    shellCount: document.querySelectorAll('[data-product-shell]').length,
+    internalLabCount: document.querySelectorAll('[data-internal-lab-layout]').length,
+    capability: document.querySelector('[data-capability]')?.getAttribute('data-capability') || null,
+    formalNavigation: [...document.querySelectorAll('[data-product-nav]')]
+      .map(node => node.getAttribute('data-product-nav')),
+    labNavigationCount: document.querySelectorAll('[data-product-nav^="/labs"]').length,
+    theme: document.documentElement.dataset.theme || null,
+    density: document.documentElement.dataset.density || null,
+    horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    dataSource: 'REAL_WEBVIEW2_EMPTY_AUTHORITY',
+    authSource: 'HARNESS_SEEDED_SESSION'
+  }));
+  const origin = new URL(page.url()).origin;
+  const productRequests = runtimeErrors.requests.filter(item => {
+    const url = new URL(item.url);
+    return url.origin === origin && (url.pathname === '/health' || url.pathname.startsWith('/api/'));
+  });
+  const writeRequests = productRequests.filter(item => item.method !== 'GET');
+
+  assert(projection.shellCount === 1, 'Product route did not mount exactly one ProductLayout.');
+  assert(projection.internalLabCount === 0, 'Product route mounted the InternalLabLayout.');
+  assert(projection.labNavigationCount === 0, 'Labs leaked into formal product navigation.');
+  assert(projection.formalNavigation.includes('/overview') && projection.formalNavigation.includes('/projects'),
+    'Formal product navigation is incomplete.');
+  assert(projection.density === 'compact', 'Formal product did not default to compact density.');
+  assert(projection.horizontalOverflow <= 1, 'Formal product route has global horizontal overflow.');
+  assert(productRequests.length > 0, 'Product route emitted no observable GET requests.');
+  assert(writeRequests.length === 0,
+    `Product route emitted write requests: ${JSON.stringify(writeRequests)}`);
+  return { ...projection, productRequests, writeRequests };
 }
 
 async function verifyDesignPage(page) {
@@ -517,6 +565,8 @@ async function main() {
         evidence.studio = await verifyStudioFoundation(page, webPort, route);
         if (expectation === 'studio-diagnostics') {
           evidence.diagnosticsPage = await verifyDiagnosticsPage(page);
+        } else if (expectation === 'studio-product') {
+          evidence.productPage = await verifyProductPage(page, route, runtimeErrors);
         } else if (expectation === 'studio-design') {
           evidence.designPage = await verifyDesignPage(page);
         } else if (expectation === 'studio-canvas') {
