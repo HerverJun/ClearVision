@@ -16,6 +16,7 @@ using PointCloudModel = ClearVision.Product.Infrastructure.PointCloud.PointCloud
 
 namespace ClearVision.Product.Tests.Integration;
 
+[TestClassification(TestDomain.PointCloud, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "operator-quality")]
 [Collection(PointCloudMatchingTestCollections.PointCloudMatching)]
 public sealed class Week11_PointCloudFlowIntegrationTests
 {

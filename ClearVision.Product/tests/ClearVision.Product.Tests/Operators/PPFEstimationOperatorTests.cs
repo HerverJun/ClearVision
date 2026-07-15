@@ -11,6 +11,7 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.PointCloud, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public sealed class PPFEstimationOperatorTests
 {
     [Fact]
@@ -49,4 +50,3 @@ public sealed class PPFEstimationOperatorTests
         cloudWithNormals.Count.Should().Be(cloud.Count);
     }
 }
-

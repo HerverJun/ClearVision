@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop")]
 public sealed class StationCommunicationSettingsStoreTests : IDisposable
 {
     private readonly string _root = Path.Combine(

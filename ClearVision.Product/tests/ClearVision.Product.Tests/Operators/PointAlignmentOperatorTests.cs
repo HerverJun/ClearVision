@@ -10,6 +10,7 @@ using Xunit;
 namespace ClearVision.Product.Tests.Operators;
 
 [Trait("Category", "Sprint5_Phase2")]
+[TestClassification(TestDomain.Data, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "data-platform", Suites = "DataProcessingPhase1;DataProcessingPhase2")]
 public class PointAlignmentOperatorTests
 {
     [Fact]

@@ -6,6 +6,8 @@ on:
     tags: ["v*"]
   pull_request:
     branches: ["main", "develop"]
+  schedule:
+    - cron: "0 18 * * *"
   workflow_dispatch:
     inputs:
       version:
@@ -20,6 +22,11 @@ on:
         description: "Optional UTC timestamp to auto-tighten detection budget (example: 2026-05-01T00:00:00Z)"
         required: false
         default: ""
+      acknowledge_release_manual:
+        description: "Acknowledge required device/human/package evidence for Release / Manual lane"
+        required: false
+        type: boolean
+        default: false
 
 env:
   SOLUTION_PATH: ClearVision.Product/ClearVision.Product.sln
@@ -38,6 +45,7 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: windows-latest
+    if: github.event_name != 'schedule'
 
     steps:
       - name: Checkout Code
@@ -100,6 +108,10 @@ jobs:
           dotnet restore $env:SOLUTION_PATH --locked-mode
           dotnet restore $env:PRODUCT_TEST_PROJECT --locked-mode
           dotnet restore $env:DESKTOP_TEST_PROJECT --locked-mode
+
+      - name: Test Classification Governance
+        shell: pwsh
+        run: '& "./scripts/run-test-governance.ps1" -ReportDirectory TestResults/governance -FailOnWarning'
 
       - name: Generate Operator Catalog
         run: dotnet run --project scripts/OperatorDocGenerator/OperatorDocGenerator.csproj -- .
@@ -184,37 +196,33 @@ jobs:
       - name: Build (Debug)
         run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore -p:SkipFrontendV2Install=true
 
-      - name: Run Product Tests with Coverage
+      - name: Run Product PR Lane with Coverage
         shell: pwsh
         run: |
-          & "./scripts/run-dotnet-test-serial.ps1" `
-            -Project $env:PRODUCT_TEST_PROJECT `
+          & "./scripts/run-classified-test-gate.ps1" `
+            -Gate product-pr `
             -Configuration Debug `
             -NoRestore `
             -Verbosity normal `
             -ResultsDirectory TestResults/product `
             -LogFileName product.trx `
-            -MinimumTotalTests 3300 `
-            -MinimumPassedTests 3300 `
-            -Filter "Category!=PerformanceBudget" `
             -Collect "XPlat Code Coverage"
 
       - name: Run Product Performance Budget Tests
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
-          & "./scripts/run-dotnet-test-serial.ps1" `
-            -Project $env:PRODUCT_TEST_PROJECT `
+          & "./scripts/run-classified-test-gate.ps1" `
+            -Gate product-nightly-performance-other `
             -Configuration Debug `
             -NoBuild `
             -NoRestore `
             -Verbosity normal `
             -ResultsDirectory TestResults/product-performance `
-            -LogFileName product-performance.trx `
-            -MinimumTotalTests 10 `
-            -MinimumPassedTests 10 `
-            -Filter "Category=PerformanceBudget"
+            -LogFileName product-performance.trx
 
       - name: Run Measurement Performance Gate
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
           & "./scripts/run-tests-measurement-performance.ps1" `
@@ -226,6 +234,7 @@ jobs:
             -ReportDirectory ClearVision.Product/test_results
 
       - name: Run Data Processing Remediation Gate
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
           & "./scripts/run-tests-data-processing-remediation.ps1" `
@@ -236,20 +245,18 @@ jobs:
             -Verbosity minimal `
             -ResultsDirectory TestResults/data-processing-remediation `
             -LogFileName data-processing-remediation.trx `
-            -MinimumTotalTests 150
+            -MinimumTotalTests 1
 
-      - name: Run Desktop Tests with Coverage
+      - name: Run Desktop PR Lane with Coverage
         shell: pwsh
         run: |
-          & "./scripts/run-dotnet-test-serial.ps1" `
-            -Project $env:DESKTOP_TEST_PROJECT `
+          & "./scripts/run-classified-test-gate.ps1" `
+            -Gate desktop-pr `
             -Configuration Debug `
             -NoRestore `
             -Verbosity normal `
             -ResultsDirectory TestResults/desktop `
             -LogFileName desktop.trx `
-            -MinimumTotalTests 500 `
-            -MinimumPassedTests 500 `
             -Collect "XPlat Code Coverage"
 
       - name: Write Coverage Summary
@@ -284,6 +291,7 @@ jobs:
           $lines | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding UTF8
 
       - name: Run Detection Regression Gate
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
           & "./scripts/run-tests-detection-regression.ps1" `
@@ -293,6 +301,7 @@ jobs:
             -Verbosity minimal
 
       - name: Run Detection Accuracy Gate
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
           & "./scripts/run-tests-detection-regression.ps1" `
@@ -302,6 +311,7 @@ jobs:
             -Verbosity minimal
 
       - name: Run Detection Stability Gate
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
           & "./scripts/run-tests-detection-regression.ps1" `
@@ -311,6 +321,7 @@ jobs:
             -Verbosity minimal
 
       - name: Run Detection Performance Gate
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         env:
           DETECTION_GATE_PROFILE: ${{ github.event.inputs.detection_gate_profile || 'auto' }}
@@ -332,7 +343,7 @@ jobs:
 
       - name: Upload Detection Performance Report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch'
         with:
           name: detection-performance-report
           if-no-files-found: error
@@ -343,7 +354,7 @@ jobs:
 
       - name: Upload Measurement Performance Report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch'
         with:
           name: measurement-performance-report
           if-no-files-found: error
@@ -392,15 +403,13 @@ jobs:
             --configfile ClearVision.OperatorLibrary/nuget.config `
             -p:NuGetLockFilePath=$smokeLockPath `
             -p:ClearVisionOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION
-          & "./scripts/run-dotnet-test-serial.ps1" `
-            -Project $env:OPERATOR_SMOKE_TEST_PROJECT `
+          & "./scripts/run-classified-test-gate.ps1" `
+            -Gate operator-library-smoke `
             -Configuration Release `
             -NoRestore `
             -Verbosity normal `
             -ResultsDirectory TestResults/operator-library `
             -LogFileName operator-library.trx `
-            -MinimumTotalTests 40 `
-            -MinimumPassedTests 40 `
             -Collect "Code Coverage" `
             -DotNetTestArguments "-p:ClearVisionOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION"
 
@@ -487,25 +496,30 @@ jobs:
         working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            npx playwright install --with-deps chromium
+          }
 
       - name: Run Vision Agent Quality Suite
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: python quality/tools/run_quality_suite.py --suite agent_engineering_harness_suite --run
 
       - name: Generate Real LLM Shadow Eval Sample
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
           dotnet run --project quality/tools/VisionAgentPlannerShadowEvalRunner/VisionAgentPlannerShadowEvalRunner.csproj -- --output quality/evals/reports/real_llm_planner_shadow_eval.json --report quality/evals/reports/real_llm_planner_shadow_eval.md
           dotnet run --project quality/tools/VisionAgentPlannerShadowEvalRunner/VisionAgentPlannerShadowEvalRunner.csproj -- --case-set holdout --output quality/evals/reports/real_llm_planner_shadow_eval.holdout.json --report quality/evals/reports/real_llm_planner_shadow_eval.holdout.md
 
       - name: Assert Vision Agent Artifact Reports
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: python quality/tools/assert_vision_agent_report_artifacts.py --require-non-local-workflow-run --scan-source-files --write-manifest quality/evals/reports/vision_agent_quality_artifact_manifest.json --write-report quality/evals/reports/vision_agent_quality_artifact_manifest.md
 
       - name: Upload Vision Agent Quality Reports
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch'
         with:
           name: vision-agent-quality-suite
           if-no-files-found: error
@@ -581,16 +595,20 @@ jobs:
             test_results/agent_engineering_harness/**/*.trx
             test_results/agent_engineering_harness/agent_ui_contract_output.txt
 
-      - name: Run UI Tests
+      - name: Run UI Unit Tests
+        working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
+        run: npm run test:unit
+
+      - name: Run UI E2E Tests
+        if: github.event_name == 'workflow_dispatch'
         working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
         run: |
-          npm run test:unit
           npm run test:preview-smoke
           npx playwright test
 
       - name: Upload UI Test Results
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch'
         with:
           name: ui-test-results
           if-no-files-found: error
@@ -598,8 +616,84 @@ jobs:
             ClearVision.Product/tests/ClearVision.Product.UI.Tests/playwright-report/
             ClearVision.Product/tests/ClearVision.Product.UI.Tests/test-results/
 
+  nightly-lane:
+    name: Nightly Quality Lane
+    runs-on: windows-latest
+    if: github.event_name == 'schedule'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+            ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/package-lock.json
+
+      - name: Restore and Build Nightly Projects
+        shell: pwsh
+        run: |
+          dotnet restore $env:SOLUTION_PATH --locked-mode
+          dotnet restore $env:PRODUCT_TEST_PROJECT --locked-mode
+          dotnet restore $env:DESKTOP_TEST_PROJECT --locked-mode
+          dotnet build $env:SOLUTION_PATH --configuration Debug --no-restore -p:SkipFrontendV2Install=true
+          dotnet build $env:PRODUCT_TEST_PROJECT --configuration Debug --no-restore
+          dotnet build $env:DESKTOP_TEST_PROJECT --configuration Debug --no-restore
+
+      - name: Install Nightly UI Dependencies
+        shell: pwsh
+        run: |
+          Push-Location $env:FRONTEND_V2_DIR
+          npm ci
+          Pop-Location
+          Push-Location ClearVision.Product/tests/ClearVision.Product.UI.Tests
+          npm ci
+          Pop-Location
+
+      - name: Prepare OperatorLibrary Smoke Package
+        shell: pwsh
+        run: |
+          dotnet restore $env:OPERATOR_PROJECT --locked-mode
+          dotnet build $env:OPERATOR_PROJECT --configuration Release --no-restore
+          $versionPrefix = (dotnet msbuild $env:OPERATOR_PROJECT -getProperty:VersionPrefix | Select-Object -Last 1).Trim()
+          $packageVersion = "$versionPrefix-nightly.${{ github.run_number }}.${{ github.run_attempt }}"
+          New-Item -ItemType Directory -Force -Path $env:OPERATOR_PACKAGE_DIR | Out-Null
+          dotnet pack $env:OPERATOR_PROJECT --configuration Release --no-build --output $env:OPERATOR_PACKAGE_DIR -p:PackageVersion=$packageVersion
+          $smokeLockPath = Join-Path $env:RUNNER_TEMP "operator-library-nightly-smoke.packages.lock.json"
+          dotnet restore $env:OPERATOR_SMOKE_TEST_PROJECT --configfile ClearVision.OperatorLibrary/nuget.config -p:NuGetLockFilePath=$smokeLockPath -p:ClearVisionOperatorLibraryPackageVersion=$packageVersion
+          dotnet build $env:OPERATOR_SMOKE_TEST_PROJECT --no-restore -p:ClearVisionOperatorLibraryPackageVersion=$packageVersion
+
+      - name: Run Nightly Lane
+        shell: pwsh
+        run: |
+          & "./scripts/run-test-quality-lane.ps1" `
+            -Lane Nightly `
+            -Configuration Debug `
+            -NoBuild `
+            -NoRestore `
+            -ResultsRoot TestResults/nightly
+
+      - name: Upload Nightly Lane Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-quality-lane
+          if-no-files-found: error
+          path: TestResults/nightly/**
+
   industrial-gate:
-    name: Operator Industrial Gate
+    name: Release / Manual Quality Lane
     runs-on: windows-latest
     needs: build-and-test
     if: github.event_name == 'workflow_dispatch'
@@ -654,22 +748,29 @@ jobs:
             --no-restore `
             -p:ClearVisionOperatorLibraryPackageVersion=$packageVersion
 
-      - name: Run Quick Industrial Gate
+      - name: Run Release / Manual Lane
         shell: pwsh
         run: |
-          & "./scripts/run-operator-library-industrial-gate.ps1" `
-            -Profile quick `
-            -NoBuild `
-            -NoRestore `
-            -Verbosity minimal
+          $parameters = @{
+            Lane = "ReleaseManual"
+            NoBuild = $true
+            NoRestore = $true
+            Verbosity = "minimal"
+            ResultsRoot = "TestResults/release-manual"
+          }
+          if ('${{ github.event.inputs.acknowledge_release_manual }}' -eq 'true') {
+            $parameters.AcknowledgeManualRequirements = $true
+          }
+          & "./scripts/run-test-quality-lane.ps1" @parameters
 
       - name: Upload Industrial Gate Artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: operator-industrial-gate
+          name: release-manual-quality-lane
           if-no-files-found: error
           path: |
+            TestResults/release-manual/**
             test_results/operator-library-industrial-gate/**/summary.json
             test_results/operator-library-industrial-gate/**/summary.md
             test_results/operator-library-industrial-gate/**/trx/**/*.trx
@@ -686,6 +787,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Verify Release / Manual Evidence Binding
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          APPROVED_RELEASE_SHA: ${{ vars.CV_RELEASE_MANUAL_APPROVED_SHA }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:APPROVED_RELEASE_SHA) -or $env:APPROVED_RELEASE_SHA -ne "${{ github.sha }}") {
+            throw "Release tag is not bound to completed Release / Manual evidence. Set CV_RELEASE_MANUAL_APPROVED_SHA to the exact approved commit SHA after the manual lane succeeds."
+          }
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

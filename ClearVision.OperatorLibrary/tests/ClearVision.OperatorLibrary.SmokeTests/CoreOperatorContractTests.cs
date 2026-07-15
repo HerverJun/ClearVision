@@ -15,6 +15,7 @@ using OperatorImageContractResolver = ClearVision.Product.Core.Services.Operator
 
 namespace ClearVision.OperatorLibrary.SmokeTests;
 
+[TestClassification(TestDomain.OperatorLibrary, TestPurpose.Smoke, TestLane.Pr, TestEvidenceType.PackageSmoke, TestOracleType.Contract, TestResourceRequirement.PackageFeed, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-library", Suites = "OperatorLibrarySmoke")]
 public class CoreOperatorContractTests
 {
     [Fact]

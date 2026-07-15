@@ -16,6 +16,7 @@ using NSubstitute;
 namespace ClearVision.Product.Tests.Integration;
 
 [Trait("Category", "DatabaseIntegration")]
+[TestClassification(TestDomain.Data, TestPurpose.Integration, TestLane.ReleaseManual, TestEvidenceType.IntegrationEvidence, TestOracleType.ExternalSystem, TestResourceRequirement.Database, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "data-platform", Suites = "DataProcessingPhase1;DataProcessingPhase2")]
 public sealed class DatabaseWriteOperatorMultiDbIntegrationTests : IAsyncLifetime
 {
     private const string SqlServerPassword = "StrongPassw0rd!";

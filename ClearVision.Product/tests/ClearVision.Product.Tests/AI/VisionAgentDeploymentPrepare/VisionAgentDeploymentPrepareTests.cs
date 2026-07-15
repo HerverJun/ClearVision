@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentDeploymentPrepare;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentDeploymentPrepareTests
 {
     [Fact(DisplayName = "runtime_package_precheck should allow workflow draft when resources are missing")]

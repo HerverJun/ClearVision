@@ -9,6 +9,7 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Preprocessing, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "operator-quality")]
 [Trait("Category", "Sprint5_Phase2")]
 public class ShadingCorrectionOperatorTests
 {

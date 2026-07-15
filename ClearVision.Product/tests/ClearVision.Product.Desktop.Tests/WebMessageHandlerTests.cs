@@ -20,6 +20,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop")]
 [Collection(ProjectSaveCoordinatorTestCollections.ProjectSaveCoordinatorState)]
 public class WebMessageHandlerTests
 {

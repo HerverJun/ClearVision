@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public sealed class GeneralizedOperatorCapabilityContractTests
 {
     [Fact]

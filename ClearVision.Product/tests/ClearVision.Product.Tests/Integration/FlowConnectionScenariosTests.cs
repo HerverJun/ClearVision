@@ -15,6 +15,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Integration;
 
+[TestClassification(TestDomain.General, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "product")]
 public class FlowConnectionScenariosTests
 {
     [Fact]

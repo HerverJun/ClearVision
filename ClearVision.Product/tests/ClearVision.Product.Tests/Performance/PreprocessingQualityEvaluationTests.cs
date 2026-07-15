@@ -11,6 +11,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Performance;
 
+[TestClassification(TestDomain.Preprocessing, TestPurpose.Robustness, TestLane.Nightly, TestEvidenceType.StatisticalDistribution, TestOracleType.Metamorphic, TestResourceRequirement.RepositoryAsset, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "operator-quality")]
 [Trait("Category", "Sprint7_Benchmark")]
 public class PreprocessingQualityEvaluationTests
 {

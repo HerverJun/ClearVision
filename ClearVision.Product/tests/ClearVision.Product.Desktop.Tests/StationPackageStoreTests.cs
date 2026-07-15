@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Data;
 using ClearVision.Product.Desktop.Station;
 using ClearVision.Product.Infrastructure.Data;
@@ -17,6 +18,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop")]
 public sealed class StationPackageStoreTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -216,9 +218,10 @@ public sealed class StationPackageStoreTests
                 }
             ],
             Connections = []
-        };
+        }.WithStringDecisionBinding();
         var flowBytes = JsonSerializer.SerializeToUtf8Bytes(flow, JsonOptions);
-        var flowHash = $"sha256:{Convert.ToHexString(SHA256.HashData(flowBytes)).ToLowerInvariant()}";
+        var flowEntity = flow.ToEntity();
+        var flowHash = ExecutionFlowIdentity.ComputeFlowHash(flowEntity);
         var manifest = new RuntimePackageManifest
         {
             PackageId = packageId,
@@ -229,6 +232,8 @@ public sealed class StationPackageStoreTests
             CreatedBy = "ClearVision Studio",
             EntryFlow = "flow.json",
             FlowHash = flowHash,
+            DecisionConfigurationHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(
+                flowEntity.DecisionConfiguration),
             OperatorCatalogVersion = "unit-test",
             ExportAllowed = true,
             FieldExtensions = new RuntimeFieldExtensions

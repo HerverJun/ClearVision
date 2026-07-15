@@ -6,6 +6,7 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.PointCloud;
 
+[TestClassification(TestDomain.PointCloud, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public sealed class PPFEstimationTests
 {
     [Fact]
@@ -181,4 +182,3 @@ public sealed class PPFEstimationTests
         return flipped;
     }
 }
-

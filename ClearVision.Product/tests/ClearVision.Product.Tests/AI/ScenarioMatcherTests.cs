@@ -3,6 +3,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.AI;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class ScenarioMatcherTests
 {
     [Theory(DisplayName = "ScenarioMatcher should route golden prompts to the expected template")]

@@ -13,6 +13,7 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Integration;
 
+[TestClassification(TestDomain.Matching, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "operator-quality")]
 [Collection(PointCloudMatchingTestCollections.PointCloudMatching)]
 public sealed class MatchingIndustrialAcceptanceTests
 {

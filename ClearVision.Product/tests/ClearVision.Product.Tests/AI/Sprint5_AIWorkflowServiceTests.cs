@@ -18,6 +18,7 @@ namespace ClearVision.Product.Tests.AI;
 /// 这些测试覆盖旧链行为，避免被误认为当前主链（AiFlowGenerationService + PromptBuilder）的回归入口。
 /// </summary>
 [Trait("Category", "LegacyAICompatibility")]
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "vision-agent", Suites = "DataProcessingPhase1;DataProcessingPhase2")]
 public class Sprint5_AIWorkflowServiceTests
 {
     private readonly FlowLinter _linter;

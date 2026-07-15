@@ -1,4 +1,4 @@
-using ClearVision.Product.Core.Entities;
+﻿using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.ImageProcessing;
@@ -10,10 +10,11 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Integration;
 
-public sealed class MeasurementStabilityIntegrationTests
+[TestClassification(TestDomain.Measurement, TestPurpose.Determinism, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Metamorphic, TestResourceRequirement.None, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "operator-quality", SeedControl = "NotApplicable: fixed mathematical and image inputs; covered operators have no randomized parameter")]
+public sealed class MeasurementDeterminismIntegrationTests
 {
     [Fact]
-    public async Task WidthMeasurement_Repeat100_ShouldRemainStable()
+    public async Task WidthMeasurement_Repeat100_ShouldBeDeterministic()
     {
         var exec = new WidthMeasurementOperator(NullLogger<WidthMeasurementOperator>.Instance);
         var op = new Operator("width", OperatorType.WidthMeasurement, 0, 0);
@@ -38,11 +39,11 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(widths).Should().BeLessThan(0.2);
+        AssertBitwiseDeterministic(widths);
     }
 
     [Fact]
-    public async Task ColorMeasurement_HsvStats_Repeat100_ShouldRemainStable()
+    public async Task ColorMeasurement_HsvStats_Repeat100_ShouldBeDeterministic()
     {
         var exec = new ColorMeasurementOperator(NullLogger<ColorMeasurementOperator>.Instance);
         var op = new Operator("color", OperatorType.ColorMeasurement, 0, 0);
@@ -58,11 +59,11 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(hues).Should().BeLessThan(1e-6);
+        AssertBitwiseDeterministic(hues);
     }
 
     [Fact]
-    public async Task CaliperTool_Subpixel_Repeat100_ShouldRemainStable()
+    public async Task CaliperTool_Subpixel_Repeat100_ShouldBeDeterministic()
     {
         var exec = new CaliperToolOperator(NullLogger<CaliperToolOperator>.Instance);
         var op = new Operator("caliper", OperatorType.CaliperTool, 0, 0);
@@ -88,11 +89,11 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(widths).Should().BeLessThan(0.02);
+        AssertBitwiseDeterministic(widths);
     }
 
     [Fact]
-    public async Task GapMeasurement_Repeat100_ShouldRemainStable()
+    public async Task GapMeasurement_Repeat100_ShouldBeDeterministic()
     {
         var exec = new GapMeasurementOperator(NullLogger<GapMeasurementOperator>.Instance);
         var op = new Operator("gap", OperatorType.GapMeasurement, 0, 0);
@@ -120,11 +121,11 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(means).Should().BeLessThan(0.02);
+        AssertBitwiseDeterministic(means);
     }
 
     [Fact]
-    public async Task LineMeasurement_Repeat50_ShouldRemainStable()
+    public async Task LineMeasurement_Repeat50_ShouldBeDeterministic()
     {
         var exec = new LineMeasurementOperator(NullLogger<LineMeasurementOperator>.Instance);
         var op = new Operator("line", OperatorType.LineMeasurement, 0, 0);
@@ -148,11 +149,11 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(angles).Should().BeLessThan(0.01);
+        AssertBitwiseDeterministic(angles);
     }
 
     [Fact]
-    public async Task PixelToWorld_PlanarRepeat100_ShouldRemainStable()
+    public async Task PixelToWorld_PlanarRepeat100_ShouldBeDeterministic()
     {
         var exec = new PixelToWorldTransformOperator(NullLogger<PixelToWorldTransformOperator>.Instance);
         var op = new Operator("p2w", OperatorType.PixelToWorldTransform, 0, 0);
@@ -176,11 +177,11 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(worlds).Should().BeLessThan(1e-9);
+        AssertBitwiseDeterministic(worlds);
     }
 
     [Fact]
-    public async Task MeasureDistance_SubpixelRepeat100_ShouldRemainStable()
+    public async Task MeasureDistance_SubpixelRepeat100_ShouldBeDeterministic()
     {
         var exec = new MeasureDistanceOperator(NullLogger<MeasureDistanceOperator>.Instance);
         var op = new Operator("measure", OperatorType.Measurement, 0, 0);
@@ -201,11 +202,11 @@ public sealed class MeasurementStabilityIntegrationTests
             distances.Add(Convert.ToDouble(result.OutputData!["Distance"]));
         }
 
-        ComputeStdDev(distances).Should().BeLessThan(1e-9);
+        AssertBitwiseDeterministic(distances);
     }
 
     [Fact]
-    public async Task ContourMeasurement_Repeat100_ShouldRemainStable()
+    public async Task ContourMeasurement_Repeat100_ShouldBeDeterministic()
     {
         var exec = new ContourMeasurementOperator(NullLogger<ContourMeasurementOperator>.Instance);
         var op = new Operator("contour", OperatorType.ContourMeasurement, 0, 0);
@@ -229,11 +230,11 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(areas).Should().BeLessThan(0.05);
+        AssertBitwiseDeterministic(areas);
     }
 
     [Fact]
-    public async Task AngleMeasurement_Repeat100_ShouldRemainStable()
+    public async Task AngleMeasurement_Repeat100_ShouldBeDeterministic()
     {
         var exec = new AngleMeasurementOperator(NullLogger<AngleMeasurementOperator>.Instance);
         var op = new Operator("angle", OperatorType.AngleMeasurement, 0, 0);
@@ -255,11 +256,11 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(angles).Should().BeLessThan(1e-9);
+        AssertBitwiseDeterministic(angles);
     }
 
     [Fact]
-    public async Task CircleMeasurement_Repeat100_ShouldRemainStable()
+    public async Task CircleMeasurement_Repeat100_ShouldBeDeterministic()
     {
         var exec = new CircleMeasurementOperator(NullLogger<CircleMeasurementOperator>.Instance);
         var op = new Operator("circle", OperatorType.CircleMeasurement, 0, 0);
@@ -283,11 +284,11 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(radii).Should().BeLessThan(0.05);
+        AssertBitwiseDeterministic(radii);
     }
 
     [Fact]
-    public async Task GeometricTolerance_PositionRepeat100_ShouldRemainStable()
+    public async Task GeometricTolerance_PositionRepeat100_ShouldBeDeterministic()
     {
         var exec = new GeometricToleranceOperator(NullLogger<GeometricToleranceOperator>.Instance);
         var op = new Operator("gtol", OperatorType.GeometricTolerance, 0, 0);
@@ -311,11 +312,11 @@ public sealed class MeasurementStabilityIntegrationTests
             deviations.Add(Convert.ToDouble(result.OutputData!["ZoneDeviation"]));
         }
 
-        ComputeStdDev(deviations).Should().BeLessThan(1e-12);
+        AssertBitwiseDeterministic(deviations);
     }
 
     [Fact]
-    public async Task GeometricFitting_CircleRepeat50_ShouldRemainStable()
+    public async Task GeometricFitting_CircleRepeat50_ShouldBeDeterministic()
     {
         var exec = new GeometricFittingOperator(NullLogger<GeometricFittingOperator>.Instance);
         var op = new Operator("geofit", OperatorType.GeometricFitting, 0, 0);
@@ -334,11 +335,11 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(radii).Should().BeLessThan(1e-9);
+        AssertBitwiseDeterministic(radii);
     }
 
     [Fact]
-    public async Task SharpnessEvaluation_LaplacianRepeat100_ShouldRemainStable()
+    public async Task SharpnessEvaluation_LaplacianRepeat100_ShouldBeDeterministic()
     {
         var exec = new SharpnessEvaluationOperator(NullLogger<SharpnessEvaluationOperator>.Instance);
         var op = new Operator("sharp", OperatorType.SharpnessEvaluation, 0, 0);
@@ -356,11 +357,11 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(scores).Should().BeLessThan(1e-9);
+        AssertBitwiseDeterministic(scores);
     }
 
     [Fact]
-    public async Task HistogramAnalysis_Repeat100_ShouldRemainStable()
+    public async Task HistogramAnalysis_Repeat100_ShouldBeDeterministic()
     {
         var exec = new HistogramAnalysisOperator(NullLogger<HistogramAnalysisOperator>.Instance);
         var op = new Operator("hist", OperatorType.HistogramAnalysis, 0, 0);
@@ -377,11 +378,11 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(means).Should().BeLessThan(1e-9);
+        AssertBitwiseDeterministic(means);
     }
 
     [Fact]
-    public async Task PixelStatistics_Repeat100_ShouldRemainStable()
+    public async Task PixelStatistics_Repeat100_ShouldBeDeterministic()
     {
         var exec = new PixelStatisticsOperator(NullLogger<PixelStatisticsOperator>.Instance);
         var op = new Operator("pixelstats", OperatorType.PixelStatistics, 0, 0);
@@ -396,11 +397,11 @@ public sealed class MeasurementStabilityIntegrationTests
             means.Add(Convert.ToDouble(result.OutputData!["Mean"]));
         }
 
-        ComputeStdDev(means).Should().BeLessThan(1e-9);
+        AssertBitwiseDeterministic(means);
     }
 
     [Fact]
-    public async Task ColorMeasurement_LabDeltaERepeat100_ShouldRemainStable()
+    public async Task ColorMeasurement_LabDeltaERepeat100_ShouldBeDeterministic()
     {
         var exec = new ColorMeasurementOperator(NullLogger<ColorMeasurementOperator>.Instance);
         var referenceLab = CieLabConverter.BgrToLab(20, 40, 180);
@@ -426,19 +427,14 @@ public sealed class MeasurementStabilityIntegrationTests
             (result.OutputData["Image"] as ImageWrapper)?.Dispose();
         }
 
-        ComputeStdDev(deltaEs).Should().BeLessThan(1e-9);
+        AssertBitwiseDeterministic(deltaEs);
     }
 
-    private static double ComputeStdDev(IReadOnlyList<double> values)
+    private static void AssertBitwiseDeterministic(IReadOnlyList<double> values)
     {
-        if (values.Count <= 1)
-        {
-            return 0.0;
-        }
-
-        var mean = values.Average();
-        var variance = values.Sum(value => (value - mean) * (value - mean)) / (values.Count - 1);
-        return Math.Sqrt(Math.Max(variance, 0.0));
+        values.Should().NotBeEmpty();
+        var expectedBits = BitConverter.DoubleToInt64Bits(values[0]);
+        values.Should().OnlyContain(value => BitConverter.DoubleToInt64Bits(value) == expectedBits);
     }
 
     private static ImageWrapper CreateWidthImage()

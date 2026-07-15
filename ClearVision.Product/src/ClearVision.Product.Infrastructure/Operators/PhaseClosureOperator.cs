@@ -18,6 +18,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Keywords = new[] { "Phase", "Unwrap", "Interferometry", "Closure", "Wavelength", "Phase Closure", "相位闭合" },
     Version = "1.0.1"
 )]
+[OperatorImageContractProvider(typeof(PhaseClosureImageContractProvider))]
 [AlgorithmInfo(
     Name = "Itoh/quality-guided phase unwrapping",
     CoreApi = "ImageWrapper -> wrapped CV_32F phase -> Itoh/quality/floodfill unwrap -> discontinuity map",

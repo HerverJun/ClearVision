@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentIntentRouter;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentIntentRouterTests
 {
     [Fact(DisplayName = "Intent Router should keep casual chat out of Plan")]

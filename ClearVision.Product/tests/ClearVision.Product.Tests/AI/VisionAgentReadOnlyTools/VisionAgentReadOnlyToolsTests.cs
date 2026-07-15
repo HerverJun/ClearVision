@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentReadOnlyTools;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentReadOnlyToolsTests
 {
     [Fact(DisplayName = "VisionAgentToolRegistry should list registered tools")]

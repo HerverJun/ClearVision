@@ -3,6 +3,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.PlcComm;
 
+[TestClassification(TestDomain.Plc, TestPurpose.Integration, TestLane.ReleaseManual, TestEvidenceType.IntegrationEvidence, TestOracleType.ExternalSystem, TestResourceRequirement.VirtualPlc, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "plc", Suites = "PlcRegression")]
 [Trait("Category", "VirtualPLC")]
 public class VirtualMcFinsPlcConnectionTests
 {

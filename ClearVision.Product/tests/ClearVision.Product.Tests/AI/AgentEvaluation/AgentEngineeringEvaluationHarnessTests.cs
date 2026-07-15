@@ -3,6 +3,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.AI.AgentEvaluation;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class AgentEngineeringEvaluationHarnessTests
 {
     public static IEnumerable<object[]> Cases =>

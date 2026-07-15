@@ -3,6 +3,7 @@ using ClearVision.Product.Core.Enums;
 
 namespace ClearVision.OperatorLibrary.SmokeTests;
 
+[TestClassification(TestDomain.OperatorLibrary, TestPurpose.Smoke, TestLane.Pr, TestEvidenceType.PackageSmoke, TestOracleType.Contract, TestResourceRequirement.PackageFeed, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-library", Suites = "OperatorLibrarySmoke")]
 public class ModuleNamespaceIndexTests
 {
     private static readonly IReadOnlyList<(OperatorModule Module, IReadOnlyList<OperatorType> Types)> ModuleNamespaceIndexes =

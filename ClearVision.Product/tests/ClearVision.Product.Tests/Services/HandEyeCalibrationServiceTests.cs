@@ -3,6 +3,7 @@ using ClearVision.Product.Infrastructure.Services;
 
 namespace ClearVision.Product.Tests.Services;
 
+[TestClassification(TestDomain.Calibration, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality", Suites = "ServicesRegression")]
 public class PlanarScaleOffsetCalibrationServiceTests
 {
     [Fact]

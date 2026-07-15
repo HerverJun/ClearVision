@@ -19,6 +19,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Version = "1.0.0",
     Tags = new[] { "experimental", "industrial-remediation", "anomaly-detection" }
 )]
+[OperatorImageContractProvider(typeof(AnomalyDetectionImageContractProvider))]
 [OperatorParameterRule("FeatureBankPath", RequiredWhenAll = new[] { "Mode==inference" },
     AtLeastOneGroup = "anomaly-feature-bank-source", MutuallyExclusiveGroup = "anomaly-feature-bank-source",
     ResourceKind = OperatorResourceKind.FeatureBank, ReasonCode = "ANOMALY_FEATURE_BANK_SOURCE_REQUIRED")]

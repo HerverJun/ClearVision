@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Tests.Services;
 
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public sealed class JsonConfigurationServiceTests
 {
     [Fact]

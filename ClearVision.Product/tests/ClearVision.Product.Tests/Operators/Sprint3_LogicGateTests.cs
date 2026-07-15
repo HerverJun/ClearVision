@@ -15,6 +15,7 @@ namespace ClearVision.Product.Tests.Operators;
 /// <summary>
 /// Sprint 3 Task 3.2: LogicGate 算子单元测试
 /// </summary>
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class Sprint3_LogicGateTests
 {
     private readonly ILogger<LogicGateOperator> _loggerMock;

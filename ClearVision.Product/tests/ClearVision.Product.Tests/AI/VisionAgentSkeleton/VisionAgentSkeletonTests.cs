@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentSkeleton;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentSkeletonTests
 {
     [Fact(DisplayName = "VisionAgentProtocolParser should parse final answer")]

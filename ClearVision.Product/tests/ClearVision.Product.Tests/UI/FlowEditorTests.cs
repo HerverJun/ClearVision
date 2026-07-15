@@ -11,6 +11,7 @@ namespace ClearVision.Product.Tests.UI;
 /// 流程编辑器 UI 测试
 /// Sprint 5: S5-007 实现
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class FlowEditorTests : UITestBase
 {
     [Fact(Skip = "owner=ui; expires=2026-08-31; reason=需要迁移到 Playwright/可启动 host 的 UI gate")]

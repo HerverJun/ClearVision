@@ -150,64 +150,43 @@ function Start-VirtualPlcProcesses {
     $env:CLEARVISION_VIRTUAL_FINS_PORT = "$FinsPort"
 }
 
-$parameters = @{
-    Project = $project
-    Filter = "FullyQualifiedName~PlcComm&Category!=VirtualPLC"
-    Verbosity = $Verbosity
-}
-
-$defaultMinimumTotalTests = 70
-
+$classifiedRunner = Join-Path $scriptRoot "run-classified-test-gate.ps1"
+$gateNames = @("plc-regression")
 if ($Virtual) {
     Start-VirtualPlcProcesses
-    $parameters.Filter = "FullyQualifiedName~PlcComm|FullyQualifiedName~ModbusCommunicationOperatorVirtualPlcTests"
-    $defaultMinimumTotalTests = 80
-
-    if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
-        $ResultsDirectory = Join-Path $repoRoot (".tmp\plc-regression\{0:yyyyMMdd-HHmmss}" -f (Get-Date))
-    }
+    $gateNames += "plc-release-manual"
 }
 
 if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
-    $ResultsDirectory = Join-Path $repoRoot ".tmp\test_results\plc-regression"
+    $ResultsDirectory = if ($Virtual) {
+        Join-Path $repoRoot (".tmp\plc-regression\{0:yyyyMMdd-HHmmss}" -f (Get-Date))
+    }
+    else {
+        Join-Path $repoRoot ".tmp\test_results\plc-regression"
+    }
 }
-
-if ([string]::IsNullOrWhiteSpace($LogFileName)) {
-    $LogFileName = if ($Virtual) { "plc-regression-virtual.trx" } else { "plc-regression.trx" }
-}
-
-$effectiveMinimumTotalTests = [Math]::Max($MinimumTotalTests, $defaultMinimumTotalTests)
-
-if (-not [string]::IsNullOrWhiteSpace($ResultsDirectory)) {
-    $parameters.ResultsDirectory = $ResultsDirectory
-}
-
-if (-not [string]::IsNullOrWhiteSpace($LogFileName)) {
-    $parameters.LogFileName = $LogFileName
-}
-
-if ($effectiveMinimumTotalTests -gt 0) {
-    $parameters.MinimumTotalTests = $effectiveMinimumTotalTests
-}
-
-if (-not [string]::IsNullOrWhiteSpace($Configuration)) {
-    $parameters.Configuration = $Configuration
-}
-
-if ($NoBuild) {
-    $parameters.NoBuild = $true
-}
-
-if ($NoRestore) {
-    $parameters.NoRestore = $true
-}
-
-$parameters.ReturnExitCode = $true
 
 $testExitCode = 0
 try {
-    & $runner @parameters
-    $testExitCode = $LASTEXITCODE
+    foreach ($gateName in $gateNames) {
+        $parameters = @{
+            Gate = $gateName
+            Verbosity = $Verbosity
+            ResultsDirectory = $ResultsDirectory
+            LogFileName = if ([string]::IsNullOrWhiteSpace($LogFileName)) { "$gateName.trx" } elseif ($gateNames.Count -eq 1) { $LogFileName } else { "{0}-{1}{2}" -f [IO.Path]::GetFileNameWithoutExtension($LogFileName), $gateName, [IO.Path]::GetExtension($LogFileName) }
+            ReturnExitCode = $true
+        }
+        if ($MinimumTotalTests -gt 0 -and $gateNames.Count -eq 1) { $parameters.MinimumTotalTests = $MinimumTotalTests }
+        if (-not [string]::IsNullOrWhiteSpace($Configuration)) { $parameters.Configuration = $Configuration }
+        if ($NoBuild) { $parameters.NoBuild = $true }
+        if ($NoRestore) { $parameters.NoRestore = $true }
+
+        & $classifiedRunner @parameters
+        if ($LASTEXITCODE -ne 0) {
+            $testExitCode = [int]$LASTEXITCODE
+            break
+        }
+    }
 }
 finally {
     foreach ($process in $startedProcesses) {

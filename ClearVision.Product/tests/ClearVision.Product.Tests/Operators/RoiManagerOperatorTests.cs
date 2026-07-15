@@ -13,6 +13,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class RoiManagerOperatorTests
 {
     private readonly RoiManagerOperator _operator;

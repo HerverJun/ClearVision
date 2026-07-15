@@ -839,6 +839,12 @@
           "ClearVision.Product.Core": "[1.0.0, )"
         }
       },
+      "clearvision.testing": {
+        "type": "Project",
+        "dependencies": {
+          "xunit.extensibility.core": "[2.7.0, )"
+        }
+      },
       "operatorlibraryreadonlyauditrunner": {
         "type": "Project",
         "dependencies": {

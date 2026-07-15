@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-07-15 11:26:25 +08:00`
+> 生成时间 / Generated At: `2026-07-15 17:25:56 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 当前版本快照 / Current Snapshot
@@ -259,6 +259,7 @@
 ### OperatorType.AnomalyDetection / 异常检测
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.0` | `2026-07-15T17:25:56.0119276+08:00` | `68B18DB0656B` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `4690F5AC1900` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `9FA2E91555A8` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `A8E26CC9B275` | `legacy-source-only` |
@@ -312,6 +313,7 @@
 ### OperatorType.BilateralFilter / 双边滤波
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.0` | `2026-07-15T17:25:56.0119276+08:00` | `2AC2FE2007E4` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.0` | `2026-07-15T11:26:25.6098568+08:00` | `7659FA8D8DD6` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `9582471509EB` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-13T19:08:24.4997898+08:00` | `5B8CECBAF5D9` | `legacy-source-only` |
@@ -540,6 +542,7 @@
 ### OperatorType.ColorDetection / 颜色分析
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `2.0.1` | `2026-07-15T17:25:56.0119276+08:00` | `7FC15AEA6072` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `2.0.1` | `2026-07-15T11:26:25.6098568+08:00` | `0E04626E9216` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `2.0.1` | `2026-07-14T15:07:23.3198726+08:00` | `282E0EEEE835` | `operator-runtime-metadata-v2` |
 | `2.0.1` | `2026-07-13T15:25:22.2877465+08:00` | `B2E5AF92FD59` | `legacy-source-only` |
@@ -851,6 +854,7 @@
 ### OperatorType.EdgeDetection / 边缘检测
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.0` | `2026-07-15T17:25:56.0119276+08:00` | `7E0C2BA77CA2` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `6B83C5AE650D` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `B08931DAA048` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-13T15:25:22.2877465+08:00` | `A0F0D4878898` | `legacy-source-only` |
@@ -933,6 +937,7 @@
 ### OperatorType.Filtering / 滤波
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.2.0` | `2026-07-15T17:25:56.0119276+08:00` | `D956D7CDABEF` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.2.0` | `2026-07-15T11:26:25.6098568+08:00` | `DC2DDAD5E612` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.0` | `2026-07-14T15:07:23.3198726+08:00` | `FB53FB9D9164` | `operator-runtime-metadata-v2` |
 | `1.1.0` | `2026-07-14T06:44:39.4853382+08:00` | `5A179D86EA18` | `legacy-source-only` |
@@ -1197,6 +1202,7 @@
 ### OperatorType.HistogramAnalysis / 直方图分析
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.0` | `2026-07-15T17:25:56.0119276+08:00` | `CBB6DAABA04D` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.0` | `2026-07-15T11:26:25.6098568+08:00` | `E30614EC00BB` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `758C84C0893C` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `759457FB33A8` | `legacy-source-only` |
@@ -1333,6 +1339,7 @@
 ### OperatorType.ImageNormalize / 图像归一化
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.3` | `2026-07-15T17:25:56.0119276+08:00` | `D635DBB61BF6` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.3` | `2026-07-15T11:26:25.6098568+08:00` | `F76410BF2620` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.2` | `2026-07-14T20:53:26.4350488+08:00` | `D369FB9E53E7` | `operator-runtime-metadata-v2` |
 | `1.0.1` | `2026-07-14T19:30:44.4677421+08:00` | `48E61F15938A` | `operator-runtime-metadata-v2` |
@@ -1474,6 +1481,7 @@
 ### OperatorType.LaplacianSharpen / 拉普拉斯锐化
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.3` | `2026-07-15T17:25:56.0119276+08:00` | `5FEA5C648C6B` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.3` | `2026-07-15T11:26:25.6098568+08:00` | `3B9A71B0CB21` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.2` | `2026-07-14T19:47:48.6428823+08:00` | `013E6A13462C` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `8FE92DA15405` | `operator-runtime-metadata-v2` |
@@ -1536,6 +1544,7 @@
 ### OperatorType.LocalDeformableMatching / 局部可变形匹配
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.1` | `2026-07-15T17:25:56.0119276+08:00` | `70B3157E202F` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.1` | `2026-07-15T11:26:25.6098568+08:00` | `520C64505DB2` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.1` | `2026-07-14T15:07:23.3198726+08:00` | `0106A4D36DD3` | `operator-runtime-metadata-v2` |
 | `1.1.1` | `2026-07-06T21:35:46.7699945+08:00` | `2B2EB6371AA4` | `legacy-source-only` |
@@ -1583,6 +1592,7 @@
 ### OperatorType.MeanFilter / 均值滤波
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.0` | `2026-07-15T17:25:56.0119276+08:00` | `AD6FC35D40C9` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.0` | `2026-07-15T11:26:25.6098568+08:00` | `C28DDAA64F11` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `80898427BC64` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-13T19:08:24.4997898+08:00` | `7AEFDE1FD3AC` | `legacy-source-only` |
@@ -1620,6 +1630,7 @@
 ### OperatorType.MedianBlur / 中值滤波
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.0` | `2026-07-15T17:25:56.0119276+08:00` | `466C4AA2FC57` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.0` | `2026-07-15T11:26:25.6098568+08:00` | `A6FD5F7191FE` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `7BA2CF90B1DF` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-13T19:08:24.4997898+08:00` | `0584E7F41C4F` | `legacy-source-only` |
@@ -1871,6 +1882,7 @@
 ### OperatorType.PhaseClosure / 相位解缠绕
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.1` | `2026-07-15T17:25:56.0119276+08:00` | `6B0C1E1A6E8F` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.1` | `2026-07-15T11:26:25.6098568+08:00` | `800C7AA92FF0` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.1` | `2026-07-14T15:07:23.3198726+08:00` | `957A43F50F4A` | `operator-runtime-metadata-v2` |
 | `1.0.1` | `2026-07-13T19:08:24.4997898+08:00` | `8E9923CE7B6B` | `legacy-source-only` |
@@ -2481,6 +2493,7 @@
 ### OperatorType.SharpnessEvaluation / 清晰度评估
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.0` | `2026-07-15T17:25:56.0119276+08:00` | `0FE236CADF8A` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.0` | `2026-07-15T11:26:25.6098568+08:00` | `94B51F326C98` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `335D1F6100C9` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `08B6A34318F2` | `legacy-source-only` |
@@ -2578,6 +2591,7 @@
 ### OperatorType.SubpixelEdgeDetection / 亚像素边缘
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.0` | `2026-07-15T17:25:56.0119276+08:00` | `D5995266624D` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `C6115E1C6466` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `23070B2BE296` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `5398A2F71BE3` | `legacy-source-only` |
@@ -2598,6 +2612,7 @@
 ### OperatorType.SurfaceDefectDetection / 表面缺陷检测
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `2.0.1` | `2026-07-15T17:25:56.0119276+08:00` | `35AA01E44E55` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `2.0.1` | `2026-07-15T11:26:25.6098568+08:00` | `D1DE15020EF3` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `2.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `9719B597A678` | `operator-runtime-metadata-v2` |
 | `2.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `B956D3DC061A` | `legacy-source-only` |
@@ -2676,6 +2691,7 @@
 ### OperatorType.Thresholding / 全局阈值处理
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.0` | `2026-07-15T17:25:56.0119276+08:00` | `467D29990384` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.0` | `2026-07-15T11:26:25.6098568+08:00` | `E0109AFA718C` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `104596319967` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-13T19:08:24.4997898+08:00` | `5CB05C0001C9` | `legacy-source-only` |

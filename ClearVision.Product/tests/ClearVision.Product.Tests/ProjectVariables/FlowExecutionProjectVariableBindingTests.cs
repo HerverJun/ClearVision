@@ -14,6 +14,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.ProjectVariables;
 
+[TestClassification(TestDomain.Data, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "data-platform")]
 public sealed class FlowExecutionProjectVariableBindingTests
 {
     [Fact]

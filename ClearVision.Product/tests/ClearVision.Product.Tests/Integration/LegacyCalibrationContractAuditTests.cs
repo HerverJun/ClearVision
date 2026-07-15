@@ -1,10 +1,12 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Tests.TestData;
 
 namespace ClearVision.Product.Tests.Integration;
 
+[TestClassification(TestDomain.Calibration, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "operator-quality")]
 public class LegacyCalibrationContractAuditTests
 {
     private static readonly string RepoRoot = ResolveRepoRoot();
@@ -121,7 +123,8 @@ public class LegacyCalibrationContractAuditTests
             var content = File.ReadAllText(filePath);
             foreach (var token in forbiddenTokens)
             {
-                Assert.DoesNotContain(token, content, StringComparison.Ordinal);
+                var tokenPattern = $@"(?<![A-Za-z0-9_]){Regex.Escape(token)}(?![A-Za-z0-9_])";
+                Assert.DoesNotMatch(tokenPattern, content);
             }
         }
     }

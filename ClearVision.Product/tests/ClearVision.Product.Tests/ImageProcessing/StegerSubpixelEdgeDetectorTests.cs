@@ -5,6 +5,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Infrastructure.ImageProcessing.Tests;
 
+[TestClassification(TestDomain.Preprocessing, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public class StegerSubpixelEdgeDetectorTests
 {
     [Fact]

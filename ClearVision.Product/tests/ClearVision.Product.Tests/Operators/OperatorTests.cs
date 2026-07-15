@@ -11,6 +11,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class ImageAcquisitionOperatorTests
 {
     private readonly ImageAcquisitionOperator _operator;
@@ -419,6 +420,7 @@ public class ImageAcquisitionOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class GaussianBlurOperatorTests
 {
     private readonly GaussianBlurOperator _operator;
@@ -477,6 +479,7 @@ public class GaussianBlurOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class CannyEdgeOperatorTests
 {
     private readonly CannyEdgeOperator _operator;
@@ -630,6 +633,7 @@ public class CannyEdgeOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class ThresholdOperatorTests
 {
     private readonly ThresholdOperator _operator;

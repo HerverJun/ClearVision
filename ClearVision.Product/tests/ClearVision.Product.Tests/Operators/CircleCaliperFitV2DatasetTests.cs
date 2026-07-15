@@ -10,6 +10,7 @@ namespace ClearVision.Product.Tests.Operators;
 public class CircleCaliperFitV2DatasetTests
 {
     [Fact]
+    [TestClassification(TestDomain.Measurement, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.GoldenDataset, TestOracleType.GoldenFile, TestResourceRequirement.RepositoryAsset, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
     public void Manifest_ShouldHaveStableIdentityVersionAndHash()
     {
         var manifestPath = DatasetPath("manifest.json");
@@ -28,6 +29,7 @@ public class CircleCaliperFitV2DatasetTests
     }
 
     [Fact]
+    [TestClassification(TestDomain.Measurement, TestPurpose.Accuracy, TestLane.Nightly, TestEvidenceType.GoldenDataset, TestOracleType.GoldenFile, TestResourceRequirement.RepositoryAsset, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "operator-quality")]
     public void ManifestCases_ShouldExecuteAgainstRealGeneratedPixels()
     {
         using var document = JsonDocument.Parse(File.ReadAllBytes(DatasetPath("manifest.json")));

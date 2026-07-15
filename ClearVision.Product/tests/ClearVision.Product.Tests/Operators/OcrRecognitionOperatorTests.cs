@@ -18,6 +18,8 @@ using Xunit.Abstractions;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Detection, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality", Suites = "RecognitionRegression")]
+
 public class OcrRecognitionOperatorTests : IDisposable
 {
     private readonly OcrEngineProvider _ocrEngineProvider;

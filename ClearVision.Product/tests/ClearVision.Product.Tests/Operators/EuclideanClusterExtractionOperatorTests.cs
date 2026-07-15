@@ -11,6 +11,7 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.PointCloud, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public sealed class EuclideanClusterExtractionOperatorTests
 {
     [Fact]
@@ -77,4 +78,3 @@ public sealed class EuclideanClusterExtractionOperatorTests
         return new ClearVision.Product.Infrastructure.PointCloud.PointCloud(points, colors, normals: null, isOrganized: false, pool: pool);
     }
 }
-

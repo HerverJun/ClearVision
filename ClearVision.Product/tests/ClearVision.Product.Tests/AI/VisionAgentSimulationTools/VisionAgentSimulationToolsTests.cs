@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentSimulationTools;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentSimulationToolsTests
 {
     [Fact(DisplayName = "VisionAgentToolRegistry should expose ReadOnly and Simulation tools only")]

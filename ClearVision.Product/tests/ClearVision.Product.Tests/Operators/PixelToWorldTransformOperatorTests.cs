@@ -12,6 +12,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Calibration, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality", Suites = "Stage12Regression")]
 public class PixelToWorldTransformOperatorTests
 {
     private readonly PixelToWorldTransformOperator _operator;

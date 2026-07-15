@@ -24,6 +24,8 @@ using Microsoft.Extensions.Hosting;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop", Suites = "DesktopEndpoints")]
+
 public sealed class AgentRunEndpointsTests
 {
     [Fact(DisplayName = "POST AgentRun creates run and returns started plus brief events")]
@@ -191,11 +193,20 @@ public sealed class AgentRunEndpointsTests
             .Contain("q_fallback_inspection_object")
             .And.NotContain("defect_definition");
         wire.GetProperty("clarificationQuestions").EnumerateArray()
+            .Where(question => question.GetProperty("id").GetString()!.StartsWith("q_fallback_", StringComparison.Ordinal))
             .Should()
             .OnlyContain(question => question.GetProperty("options").EnumerateArray()
                 .Any(option =>
                     option.GetProperty("recommended").GetBoolean() &&
                     option.GetProperty("value").GetString()!.EndsWith("_pending", StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(option.GetProperty("label").GetString()) &&
+                    !string.IsNullOrWhiteSpace(option.GetProperty("description").GetString()) &&
+                    !string.IsNullOrWhiteSpace(option.GetProperty("impact").GetString())));
+        wire.GetProperty("clarificationQuestions").EnumerateArray()
+            .Should()
+            .OnlyContain(question => question.GetProperty("options").EnumerateArray()
+                .Any(option =>
+                    option.GetProperty("recommended").GetBoolean() &&
                     !string.IsNullOrWhiteSpace(option.GetProperty("label").GetString()) &&
                     !string.IsNullOrWhiteSpace(option.GetProperty("description").GetString()) &&
                     !string.IsNullOrWhiteSpace(option.GetProperty("impact").GetString())));

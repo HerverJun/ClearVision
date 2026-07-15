@@ -12,6 +12,8 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Detection, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality", Suites = "RecognitionRegression")]
+
 public class CodeRecognitionOperatorTests
 {
     private readonly CodeRecognitionOperator _operator;

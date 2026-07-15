@@ -1,4 +1,5 @@
 {
+  "oracleProvenance": "Independent synthetic-scene geometry; expected values are derived from declared scene coordinates, not from operator output.",
   "circleBaseline": {
     "imageWidth": 220,
     "imageHeight": 220,
@@ -9,9 +10,6 @@
     "sceneCenterY": 88.5,
     "sceneRadius": 86.0,
     "supersample": 16,
-    "expectedCenterX": 92.5,
-    "expectedCenterY": 88.5,
-    "expectedRadius": 86.0,
     "centerTolerance": 8.0,
     "radiusTolerance": 8.0
   },
@@ -28,7 +26,6 @@
     "sceneEndY": 32.3,
     "sceneThicknessPx": 6.0,
     "supersample": 16,
-    "expectedAngle": -5.0,
     "angleTolerance": 1.5,
     "expectedMinLength": 400.0,
     "expectedMaxLength": 450.0,

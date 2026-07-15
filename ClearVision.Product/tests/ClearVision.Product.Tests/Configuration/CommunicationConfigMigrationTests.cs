@@ -4,6 +4,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.Configuration;
 
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class CommunicationConfigMigrationTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()

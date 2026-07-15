@@ -10,6 +10,7 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Calibration, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public class NPointCalibrationOperatorTests
 {
     private readonly NPointCalibrationOperator _operator;

@@ -20,6 +20,7 @@ namespace ClearVision.Product.Tests.Integration;
 /// FlowExecutionService 集成测试
 /// Sprint 5: S5-002 实现
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "product")]
 public class FlowExecutionServiceIntegrationTests
 {
     private readonly IFlowExecutionEngine _flowExecutionService;
@@ -782,5 +783,3 @@ public class FlowExecutionServiceIntegrationTests
 
     #endregion
 }
-
-

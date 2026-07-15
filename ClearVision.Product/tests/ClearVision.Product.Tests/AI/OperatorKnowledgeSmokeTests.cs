@@ -4,6 +4,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.AI;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public class OperatorKnowledgeSmokeTests
 {
     [Fact(DisplayName = "OperatorKnowledgeGraphService should include DeepLearning evidence and topology hints")]

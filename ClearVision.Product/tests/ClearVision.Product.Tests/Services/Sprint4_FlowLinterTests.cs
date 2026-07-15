@@ -14,6 +14,7 @@ namespace ClearVision.Product.Tests.Services;
 /// <summary>
 /// Sprint 4 Task 4.1: FlowLinter 静态检查器单元测试
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public class Sprint4_FlowLinterTests
 {
     private readonly FlowLinter _linter;

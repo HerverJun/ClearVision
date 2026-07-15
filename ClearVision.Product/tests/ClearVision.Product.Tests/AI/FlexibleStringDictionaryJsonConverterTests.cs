@@ -5,6 +5,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.AI;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public class FlexibleStringDictionaryJsonConverterTests
 {
     [Fact(DisplayName = "FlexibleStringDictionaryJsonConverter should coerce scalar parameter values to strings")]

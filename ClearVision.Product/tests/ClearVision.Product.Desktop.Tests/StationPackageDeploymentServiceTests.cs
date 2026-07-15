@@ -15,6 +15,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop")]
 public sealed class StationPackageDeploymentServiceTests
 {
     [Fact]
@@ -216,7 +217,7 @@ public sealed class StationPackageDeploymentServiceTests
                             }
                         ]
                     }
-                }
+                }.WithStringDecisionBinding()
             });
 
             var loader = new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance);
@@ -381,7 +382,7 @@ public sealed class StationPackageDeploymentServiceTests
                     }
                 ]
             }
-        };
+        }.WithStringDecisionBinding();
     }
 
     private static JsonElement CreateCalibrationPayload(string bundleId) =>

@@ -21,6 +21,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     IconName = "edge",
     Keywords = new[] { "Edge", "Canny", "Contour", "Threshold" }
 )]
+[OperatorImageContractProvider(typeof(EdgeDetectionImageContractProvider))]
 [OperatorParameterRule("EdgeModelPath", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
     RequiredWhenAll = new[] { "Method==OnnxEdge" }, DisabledWhenAll = new[] { "Method!=OnnxEdge" },
     HiddenWhenAll = new[] { "Method!=OnnxEdge" }, IgnoredWhenAll = new[] { "Method!=OnnxEdge" },

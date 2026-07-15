@@ -9,6 +9,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Detection, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.ModelAsset, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "operator-quality")]
 public sealed class AnomalyDetectionOperatorTests
 {
     [Fact]

@@ -12,6 +12,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentRuntimePreview;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentRuntimePreviewTests
 {
     [Fact(DisplayName = "Default GenerateFlow request should not allow RuntimePreview")]

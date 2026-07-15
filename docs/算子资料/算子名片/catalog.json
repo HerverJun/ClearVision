@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-15T11:26:25.6098568+08:00",
-  "generationFingerprint": "7B8A5C5F8B84DD5B70BFB4A346BAEB7917FAB8885E3911F6DC407A970FAC46F5",
+  "generatedAt": "2026-07-15T17:25:56.0119276+08:00",
+  "generationFingerprint": "282660C1123FA488B4C3E4B730B1832E57BB685162AFA5835164F59082950AD2",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -1284,7 +1284,7 @@
         "type:ClearVision.Product.Infrastructure.Operators.SpatialFilterImageContractProvider",
         "type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel"
       ],
-      "generationFingerprint": "7659FA8D8DD6EFA25AB113D4150B2A5DA94E565ABBDAD8866EC09A5A3C56988B",
+      "generationFingerprint": "2AC2FE2007E49C44D2538AE2D3D9E2BD37B757BE5B6835114148D147527CD539",
       "quality": {
         "totalScore": 100,
         "level": "A",
@@ -2864,7 +2864,7 @@
         "type:ClearVision.Product.Infrastructure.Operators.SpatialFilterImageContractProvider",
         "type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel"
       ],
-      "generationFingerprint": "DC2DDAD5E61261B2949E1A3856F0BE29C5D2FBFFBE9DAF8FBE5BC1CB7316AB23",
+      "generationFingerprint": "D956D7CDABEF6B2435D5026C69B66AE9E69AEC78F9960B97BC0DB6F56F7A0CEE",
       "quality": {
         "totalScore": 100,
         "level": "A",
@@ -5109,7 +5109,7 @@
       "generationDependencies": [
         "type:ClearVision.Product.Infrastructure.Operators.ImageNormalizeImageContractProvider"
       ],
-      "generationFingerprint": "F76410BF26206E59C4061C01FD677C18040D65346BF2FBE3412604C891E63ACD",
+      "generationFingerprint": "D635DBB61BF6852AA83436EA8D1AD28DE790F8370A3204CFF8C60B329365CCBE",
       "quality": {
         "totalScore": 100,
         "level": "A",
@@ -6602,7 +6602,7 @@
       "generationDependencies": [
         "type:ClearVision.Product.Infrastructure.Operators.LaplacianSharpenImageContractProvider"
       ],
-      "generationFingerprint": "3B9A71B0CB2175491916E0AB3FC86E9AFC3308EF44C34777961343BD7968A84F",
+      "generationFingerprint": "5FEA5C648C6BBA2E5A2697EC32535C0C1911926620CA771CBEE53726A8AA2E71",
       "quality": {
         "totalScore": 96,
         "level": "A",
@@ -6770,7 +6770,7 @@
         "type:ClearVision.Product.Infrastructure.Operators.SpatialFilterImageContractProvider",
         "type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel"
       ],
-      "generationFingerprint": "C28DDAA64F11A2BC8E56CCBF1D382AC2F5F056C322EABCA5A5D36A545531A871",
+      "generationFingerprint": "AD6FC35D40C922B26CB444F5FDDAC8092252C33D2DAA1D12ED1A4C59CDC278B1",
       "quality": {
         "totalScore": 100,
         "level": "A",
@@ -7008,7 +7008,7 @@
         "type:ClearVision.Product.Infrastructure.Operators.SpatialFilterImageContractProvider",
         "type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel"
       ],
-      "generationFingerprint": "A6FD5F7191FE55448FC594E97221997250E02766A3E1637852F746D5DD102EF0",
+      "generationFingerprint": "466C4AA2FC57D22F9E4101BB985C7A1C1CAEC569BB4965A650A55DDEC92AA593",
       "quality": {
         "totalScore": 100,
         "level": "A",
@@ -11858,7 +11858,7 @@
       "generationDependencies": [
         "type:ClearVision.Product.Infrastructure.Operators.ThresholdImageContractProvider"
       ],
-      "generationFingerprint": "E0109AFA718CA6057AD4A80D655FA5F1779DE9F6DE054F32B1727FABE06215B3",
+      "generationFingerprint": "467D2999038418BD09F5BDB6D12670AB0A1DAB33E123EA4F528ED04CB6C6EAFE",
       "quality": {
         "totalScore": 96,
         "level": "A",
@@ -12287,7 +12287,7 @@
       "lifecycle": "Experimental",
       "lifecycleNote": "颜色检查多模式仍处于工业化验证阶段，阈值和白平衡策略需按现场样本确认。",
       "defaultHidden": false,
-      "defaultAiRecommendation": false,
+      "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": true,
       "version": "2.0.1",
       "keywords": [
@@ -12629,64 +12629,55 @@
         {
           "inputPort": "Image",
           "contractVersion": "2.1",
-          "allowedVariantCount": 0,
-          "verifiedSupportVariantCount": 0,
-          "verifiedConversionVariantCount": 0,
+          "allowedVariantCount": 3,
+          "verifiedSupportVariantCount": 1,
+          "verifiedConversionVariantCount": 2,
           "legacyCompatibilityVariantCount": 0,
           "verifiedRejectionVariantCount": 0,
-          "unknownVariantCount": 28,
-          "hasProductionSupport": false,
+          "unknownVariantCount": 0,
+          "hasProductionSupport": true,
           "compatibilityOnly": false,
-          "evidenceSummary": "Unknown — no verified executable image support is registered.",
+          "evidenceSummary": "Verified production support is present.",
           "exactVariantGroups": [
             {
               "mode": "Default",
-              "condition": "No operator-specific executable evidence is registered.",
-              "admission": "Unknown",
-              "verification": "Unknown",
+              "condition": "Verified 8-bit grayscale, BGR, and BGRA color-analysis inputs.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_8UC3"
+              ],
+              "conversionPolicy": "C1 -> BGR and C4 -> BGR before HSV/Lab analysis; no depth scaling.",
+              "outputDepthPolicy": "Image output is CV_8UC3; scalar color metrics are double precision.",
+              "dynamicRangePolicy": "HSV thresholds and rendered diagnostics use the legacy 0..255 intensity domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_OPERATOR_AND_PACKAGE_TESTS"
+            },
+            {
+              "mode": "Default",
+              "condition": "Verified 8-bit grayscale, BGR, and BGRA color-analysis inputs.",
+              "admission": "Allowed",
+              "verification": "VerifiedConversion",
               "exactInputTypes": [
                 "CV_8UC1",
-                "CV_8UC2",
-                "CV_8UC3",
-                "CV_8UC4",
-                "CV_8SC1",
-                "CV_8SC2",
-                "CV_8SC3",
-                "CV_8SC4",
-                "CV_16UC1",
-                "CV_16UC2",
-                "CV_16UC3",
-                "CV_16UC4",
-                "CV_16SC1",
-                "CV_16SC2",
-                "CV_16SC3",
-                "CV_16SC4",
-                "CV_32SC1",
-                "CV_32SC2",
-                "CV_32SC3",
-                "CV_32SC4",
-                "CV_32FC1",
-                "CV_32FC2",
-                "CV_32FC3",
-                "CV_32FC4",
-                "CV_64FC1",
-                "CV_64FC2",
-                "CV_64FC3",
-                "CV_64FC4"
+                "CV_8UC4"
               ],
-              "conversionPolicy": "None",
-              "outputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-              "dynamicRangePolicy": "Undefined until verified.",
+              "conversionPolicy": "C1 -> BGR and C4 -> BGR before HSV/Lab analysis; no depth scaling.",
+              "outputDepthPolicy": "Image output is CV_8UC3; scalar color metrics are double precision.",
+              "dynamicRangePolicy": "HSV thresholds and rendered diagnostics use the legacy 0..255 intensity domain.",
               "inputValuePolicy": "Any",
-              "failureCode": "IMAGE_CONTRACT_UNKNOWN",
-              "evidenceLevel": "Unknown"
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_OPERATOR_AND_PACKAGE_TESTS"
             }
           ]
         }
       ],
       "resourceRequirements": [],
-      "generationDependencies": [],
-      "generationFingerprint": "0E04626E9216D72BA031E1E6536C26D20634C1F1BADF4A3127DB79719873750E",
+      "generationDependencies": [
+        "type:ClearVision.Product.Infrastructure.Operators.ColorDetectionImageContractProvider"
+      ],
+      "generationFingerprint": "7FC15AEA6072ED2E8E4B972492A39FA48688B2F8FC45DD2FF6A941FBBBC54EC7",
       "quality": {
         "totalScore": 96,
         "level": "A",
@@ -13242,8 +13233,8 @@
       "lifecycle": "Stable",
       "lifecycleNote": null,
       "defaultHidden": false,
-      "defaultAiRecommendation": false,
-      "requiresLifecycleDisclosure": true,
+      "defaultAiRecommendation": true,
+      "requiresLifecycleDisclosure": false,
       "version": "1.0.0",
       "keywords": [
         "Canny",
@@ -13670,70 +13661,60 @@
           "inputPort": "Image",
           "contractVersion": "2.1",
           "allowedVariantCount": 3,
-          "verifiedSupportVariantCount": 0,
-          "verifiedConversionVariantCount": 0,
-          "legacyCompatibilityVariantCount": 3,
-          "verifiedRejectionVariantCount": 0,
-          "unknownVariantCount": 25,
-          "hasProductionSupport": false,
-          "compatibilityOnly": true,
-          "evidenceSummary": "Legacy 8U compatibility allowance — unverified",
+          "verifiedSupportVariantCount": 1,
+          "verifiedConversionVariantCount": 2,
+          "legacyCompatibilityVariantCount": 0,
+          "verifiedRejectionVariantCount": 1,
+          "unknownVariantCount": 0,
+          "hasProductionSupport": true,
+          "compatibilityOnly": false,
+          "evidenceSummary": "Verified production support is present.",
           "exactVariantGroups": [
             {
               "mode": "Default",
-              "condition": "Legacy 8U execution path retained for compatibility; no per-operator E2 evidence.",
+              "condition": "Canny and ONNX preprocessing accept verified 8-bit C1/C3/C4 images.",
               "admission": "Allowed",
-              "verification": "LegacyCompatibilityAllowance",
+              "verification": "VerifiedSupport",
               "exactInputTypes": [
-                "CV_8UC1",
-                "CV_8UC3",
-                "CV_8UC4"
+                "CV_8UC1"
               ],
-              "conversionPolicy": "None",
-              "outputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-              "dynamicRangePolicy": "8-bit legacy numeric domain.",
+              "conversionPolicy": "C3/C4 -> Gray for Canny; model preprocessing normalizes to three channels.",
+              "outputDepthPolicy": "Edge mask is CV_8UC1 and visualization follows the operator output contract.",
+              "dynamicRangePolicy": "Legacy 0..255 threshold domain.",
               "inputValuePolicy": "Any",
-              "failureCode": "IMAGE_DEPTH_UNSUPPORTED",
-              "evidenceLevel": "E0_SOURCE_AUDIT"
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_OPERATOR_AND_PACKAGE_TESTS"
             },
             {
               "mode": "Default",
-              "condition": "No operator-specific executable evidence is registered.",
-              "admission": "Unknown",
-              "verification": "Unknown",
+              "condition": "Canny and ONNX preprocessing accept verified 8-bit C1/C3/C4 images.",
+              "admission": "Allowed",
+              "verification": "VerifiedConversion",
               "exactInputTypes": [
-                "CV_8UC2",
-                "CV_8SC1",
-                "CV_8SC2",
-                "CV_8SC3",
-                "CV_8SC4",
-                "CV_16UC1",
-                "CV_16UC2",
-                "CV_16UC3",
-                "CV_16UC4",
-                "CV_16SC1",
-                "CV_16SC2",
-                "CV_16SC3",
-                "CV_16SC4",
-                "CV_32SC1",
-                "CV_32SC2",
-                "CV_32SC3",
-                "CV_32SC4",
-                "CV_32FC1",
-                "CV_32FC2",
-                "CV_32FC3",
-                "CV_32FC4",
-                "CV_64FC1",
-                "CV_64FC2",
-                "CV_64FC3",
-                "CV_64FC4"
+                "CV_8UC3",
+                "CV_8UC4"
+              ],
+              "conversionPolicy": "C3/C4 -> Gray for Canny; model preprocessing normalizes to three channels.",
+              "outputDepthPolicy": "Edge mask is CV_8UC1 and visualization follows the operator output contract.",
+              "dynamicRangePolicy": "Legacy 0..255 threshold domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_OPERATOR_AND_PACKAGE_TESTS"
+            },
+            {
+              "mode": "Default",
+              "condition": "Unsupported image channel count.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
+              "exactInputTypes": [
+                "CV_8UC2"
               ],
               "conversionPolicy": "None",
-              "outputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-              "dynamicRangePolicy": "Undefined until verified.",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
               "inputValuePolicy": "Any",
-              "failureCode": "IMAGE_CONTRACT_UNKNOWN",
-              "evidenceLevel": "Unknown"
+              "failureCode": "IMAGE_CHANNELS_UNSUPPORTED",
+              "evidenceLevel": "E2_OPERATOR_AND_PACKAGE_TESTS"
             }
           ]
         }
@@ -13782,8 +13763,10 @@
           "satisfiedByInputPorts": []
         }
       ],
-      "generationDependencies": [],
-      "generationFingerprint": "6B83C5AE650DB69B98D664B49BF98A60209AAF388A96EF1CEFAC6AE663EDC20B",
+      "generationDependencies": [
+        "type:ClearVision.Product.Infrastructure.Operators.EdgeDetectionImageContractProvider"
+      ],
+      "generationFingerprint": "7E0C2BA77CA2CB51AFB92141AE3CDDA821418CB5C70039572357B41D5E5218C7",
       "quality": {
         "totalScore": 100,
         "level": "A",
@@ -14499,7 +14482,7 @@
       "generationDependencies": [
         "type:ClearVision.Product.Infrastructure.Operators.HistogramImageContractProvider"
       ],
-      "generationFingerprint": "E30614EC00BBCC3BD545D1BCD3ED227766801F9641A43647F1C12D992326F334",
+      "generationFingerprint": "CBB6DAABA04DEC1E9BF6C86F9E539EF2E8A4DC0DE4C7FE045E5087E0E2DBBA21",
       "quality": {
         "totalScore": 96,
         "level": "A",
@@ -16931,7 +16914,7 @@
       "generationDependencies": [
         "type:ClearVision.Product.Infrastructure.Operators.SharpnessImageContractProvider"
       ],
-      "generationFingerprint": "94B51F326C988D3838012F712843B4B8A00517245CA4911848EB1CF29DED1B5C",
+      "generationFingerprint": "0FE236CADF8A6072A6617596CB03CB84BB56BDA1C3496F87EB73B69E19757F19",
       "quality": {
         "totalScore": 96,
         "level": "A",
@@ -16947,7 +16930,7 @@
       "id": "SubpixelEdgeDetection",
       "type": 44,
       "displayName": "亚像素边缘",
-      "description": "非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级验证。",
+      "description": "Non-industrial reference / 非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级验证。",
       "categoryId": "FeatureExtraction",
       "categoryOrder": 4,
       "category": "特征提取",
@@ -16967,7 +16950,7 @@
         "生命周期:Reference",
         "算法类型:自研"
       ],
-      "algorithm": "该算子用于非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级验证。运行时从声明…",
+      "algorithm": "该算子用于Non-industrial reference / 非工业定型的亚像素边…",
       "inputPorts": [
         {
           "name": "Image",
@@ -17137,7 +17120,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "C6115E1C6466CEF07DA424F23D85C36DEF99D61FB970A33E90583653F6D23761",
+      "generationFingerprint": "D5995266624DDCEBC584210D2437264B20F5364053B83411A0D0286E0237225E",
       "quality": {
         "totalScore": 94,
         "level": "A",
@@ -18191,7 +18174,7 @@
       "lifecycle": "Experimental",
       "lifecycleNote": "TPS 局部形变与多候选搜索为实验能力，尚需目标域数据验证鲁棒性和性能。",
       "defaultHidden": false,
-      "defaultAiRecommendation": false,
+      "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": true,
       "version": "1.1.1",
       "keywords": [
@@ -18435,121 +18418,131 @@
         {
           "inputPort": "Image",
           "contractVersion": "2.1",
-          "allowedVariantCount": 0,
-          "verifiedSupportVariantCount": 0,
-          "verifiedConversionVariantCount": 0,
+          "allowedVariantCount": 2,
+          "verifiedSupportVariantCount": 1,
+          "verifiedConversionVariantCount": 1,
           "legacyCompatibilityVariantCount": 0,
-          "verifiedRejectionVariantCount": 0,
-          "unknownVariantCount": 28,
-          "hasProductionSupport": false,
+          "verifiedRejectionVariantCount": 2,
+          "unknownVariantCount": 0,
+          "hasProductionSupport": true,
           "compatibilityOnly": false,
-          "evidenceSummary": "Unknown — no verified executable image support is registered.",
+          "evidenceSummary": "Verified production support is present.",
           "exactVariantGroups": [
             {
               "mode": "Default",
-              "condition": "No operator-specific executable evidence is registered.",
-              "admission": "Unknown",
-              "verification": "Unknown",
+              "condition": "ORB/template/warp paths are verified for 8-bit grayscale and BGR inputs.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
               "exactInputTypes": [
-                "CV_8UC1",
+                "CV_8UC1"
+              ],
+              "conversionPolicy": "C3 -> Gray for feature and score computation; no depth scaling.",
+              "outputDepthPolicy": "Visualization and occlusion outputs remain 8-bit.",
+              "dynamicRangePolicy": "Legacy 0..255 matching intensity domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
+            },
+            {
+              "mode": "Default",
+              "condition": "ORB/template/warp paths are verified for 8-bit grayscale and BGR inputs.",
+              "admission": "Allowed",
+              "verification": "VerifiedConversion",
+              "exactInputTypes": [
+                "CV_8UC3"
+              ],
+              "conversionPolicy": "C3 -> Gray for feature and score computation; no depth scaling.",
+              "outputDepthPolicy": "Visualization and occlusion outputs remain 8-bit.",
+              "dynamicRangePolicy": "Legacy 0..255 matching intensity domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
+            },
+            {
+              "mode": "Default",
+              "condition": "Unsupported image channel count for local deformable matching.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
+              "exactInputTypes": [
                 "CV_8UC2",
-                "CV_8UC3",
-                "CV_8UC4",
-                "CV_8SC1",
-                "CV_8SC2",
-                "CV_8SC3",
-                "CV_8SC4",
-                "CV_16UC1",
-                "CV_16UC2",
-                "CV_16UC3",
-                "CV_16UC4",
-                "CV_16SC1",
-                "CV_16SC2",
-                "CV_16SC3",
-                "CV_16SC4",
-                "CV_32SC1",
-                "CV_32SC2",
-                "CV_32SC3",
-                "CV_32SC4",
-                "CV_32FC1",
-                "CV_32FC2",
-                "CV_32FC3",
-                "CV_32FC4",
-                "CV_64FC1",
-                "CV_64FC2",
-                "CV_64FC3",
-                "CV_64FC4"
+                "CV_8UC4"
               ],
               "conversionPolicy": "None",
-              "outputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-              "dynamicRangePolicy": "Undefined until verified.",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
               "inputValuePolicy": "Any",
-              "failureCode": "IMAGE_CONTRACT_UNKNOWN",
-              "evidenceLevel": "Unknown"
+              "failureCode": "IMAGE_CHANNELS_UNSUPPORTED",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
             }
           ]
         },
         {
           "inputPort": "Template",
           "contractVersion": "2.1",
-          "allowedVariantCount": 0,
-          "verifiedSupportVariantCount": 0,
-          "verifiedConversionVariantCount": 0,
+          "allowedVariantCount": 2,
+          "verifiedSupportVariantCount": 1,
+          "verifiedConversionVariantCount": 1,
           "legacyCompatibilityVariantCount": 0,
-          "verifiedRejectionVariantCount": 0,
-          "unknownVariantCount": 28,
-          "hasProductionSupport": false,
+          "verifiedRejectionVariantCount": 2,
+          "unknownVariantCount": 0,
+          "hasProductionSupport": true,
           "compatibilityOnly": false,
-          "evidenceSummary": "Unknown — no verified executable image support is registered.",
+          "evidenceSummary": "Verified production support is present.",
           "exactVariantGroups": [
             {
               "mode": "Default",
-              "condition": "No operator-specific executable evidence is registered.",
-              "admission": "Unknown",
-              "verification": "Unknown",
+              "condition": "ORB/template/warp paths are verified for 8-bit grayscale and BGR inputs.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
               "exactInputTypes": [
-                "CV_8UC1",
+                "CV_8UC1"
+              ],
+              "conversionPolicy": "C3 -> Gray for feature and score computation; no depth scaling.",
+              "outputDepthPolicy": "Visualization and occlusion outputs remain 8-bit.",
+              "dynamicRangePolicy": "Legacy 0..255 matching intensity domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
+            },
+            {
+              "mode": "Default",
+              "condition": "ORB/template/warp paths are verified for 8-bit grayscale and BGR inputs.",
+              "admission": "Allowed",
+              "verification": "VerifiedConversion",
+              "exactInputTypes": [
+                "CV_8UC3"
+              ],
+              "conversionPolicy": "C3 -> Gray for feature and score computation; no depth scaling.",
+              "outputDepthPolicy": "Visualization and occlusion outputs remain 8-bit.",
+              "dynamicRangePolicy": "Legacy 0..255 matching intensity domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
+            },
+            {
+              "mode": "Default",
+              "condition": "Unsupported image channel count for local deformable matching.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
+              "exactInputTypes": [
                 "CV_8UC2",
-                "CV_8UC3",
-                "CV_8UC4",
-                "CV_8SC1",
-                "CV_8SC2",
-                "CV_8SC3",
-                "CV_8SC4",
-                "CV_16UC1",
-                "CV_16UC2",
-                "CV_16UC3",
-                "CV_16UC4",
-                "CV_16SC1",
-                "CV_16SC2",
-                "CV_16SC3",
-                "CV_16SC4",
-                "CV_32SC1",
-                "CV_32SC2",
-                "CV_32SC3",
-                "CV_32SC4",
-                "CV_32FC1",
-                "CV_32FC2",
-                "CV_32FC3",
-                "CV_32FC4",
-                "CV_64FC1",
-                "CV_64FC2",
-                "CV_64FC3",
-                "CV_64FC4"
+                "CV_8UC4"
               ],
               "conversionPolicy": "None",
-              "outputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-              "dynamicRangePolicy": "Undefined until verified.",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
               "inputValuePolicy": "Any",
-              "failureCode": "IMAGE_CONTRACT_UNKNOWN",
-              "evidenceLevel": "Unknown"
+              "failureCode": "IMAGE_CHANNELS_UNSUPPORTED",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
             }
           ]
         }
       ],
       "resourceRequirements": [],
-      "generationDependencies": [],
-      "generationFingerprint": "520C64505DB2FFA953E7D838F17C3E0F20D20185D488C600953F9D8421C8CBFF",
+      "generationDependencies": [
+        "type:ClearVision.Product.Infrastructure.Operators.LocalDeformableMatchingImageContractProvider"
+      ],
+      "generationFingerprint": "70B3157E202F7B7CA0CC97B0EF8BE03F6005BDF9ED1E4BAEA8CAA03012994F8A",
       "quality": {
         "totalScore": 100,
         "level": "A",
@@ -24091,7 +24084,7 @@
           "verifiedSupportVariantCount": 1,
           "verifiedConversionVariantCount": 2,
           "legacyCompatibilityVariantCount": 0,
-          "verifiedRejectionVariantCount": 0,
+          "verifiedRejectionVariantCount": 1,
           "unknownVariantCount": 0,
           "hasProductionSupport": true,
           "compatibilityOnly": false,
@@ -24126,6 +24119,21 @@
               "dynamicRangePolicy": "Legacy 8-bit intensity domain.",
               "inputValuePolicy": "Any",
               "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_OPERATOR_AND_PACKAGE_TESTS"
+            },
+            {
+              "mode": "Default",
+              "condition": "Unsupported image channel count.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
+              "exactInputTypes": [
+                "CV_8UC2"
+              ],
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_CHANNELS_UNSUPPORTED",
               "evidenceLevel": "E2_OPERATOR_AND_PACKAGE_TESTS"
             }
           ]
@@ -24137,7 +24145,7 @@
           "verifiedSupportVariantCount": 1,
           "verifiedConversionVariantCount": 2,
           "legacyCompatibilityVariantCount": 0,
-          "verifiedRejectionVariantCount": 0,
+          "verifiedRejectionVariantCount": 1,
           "unknownVariantCount": 0,
           "hasProductionSupport": true,
           "compatibilityOnly": false,
@@ -24173,6 +24181,21 @@
               "inputValuePolicy": "Any",
               "failureCode": "IMAGE_NONFINITE_INPUT",
               "evidenceLevel": "E2_OPERATOR_AND_PACKAGE_TESTS"
+            },
+            {
+              "mode": "Default",
+              "condition": "Unsupported image channel count.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
+              "exactInputTypes": [
+                "CV_8UC2"
+              ],
+              "conversionPolicy": "None",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_CHANNELS_UNSUPPORTED",
+              "evidenceLevel": "E2_OPERATOR_AND_PACKAGE_TESTS"
             }
           ]
         }
@@ -24181,7 +24204,7 @@
       "generationDependencies": [
         "type:ClearVision.Product.Infrastructure.Operators.SurfaceDefectDetectionImageContractProvider"
       ],
-      "generationFingerprint": "D1DE15020EF335BF7A6142FB71121B76A2761A9BFAD30C363C9E076C73347FBE",
+      "generationFingerprint": "35AA01E44E55FFC253C89DBC8E40761F74DB34CD0253020344316A7044F617B5",
       "quality": {
         "totalScore": 100,
         "level": "A",
@@ -28743,8 +28766,8 @@
       "lifecycle": "Stable",
       "lifecycleNote": null,
       "defaultHidden": false,
-      "defaultAiRecommendation": false,
-      "requiresLifecycleDisclosure": true,
+      "defaultAiRecommendation": true,
+      "requiresLifecycleDisclosure": false,
       "version": "1.0.1",
       "keywords": [
         "Closure",
@@ -28821,149 +28844,183 @@
         {
           "inputPort": "PhaseImage",
           "contractVersion": "2.1",
-          "allowedVariantCount": 3,
-          "verifiedSupportVariantCount": 0,
-          "verifiedConversionVariantCount": 0,
-          "legacyCompatibilityVariantCount": 3,
-          "verifiedRejectionVariantCount": 0,
-          "unknownVariantCount": 25,
-          "hasProductionSupport": false,
-          "compatibilityOnly": true,
-          "evidenceSummary": "Legacy 8U compatibility allowance — unverified",
+          "allowedVariantCount": 8,
+          "verifiedSupportVariantCount": 1,
+          "verifiedConversionVariantCount": 7,
+          "legacyCompatibilityVariantCount": 0,
+          "verifiedRejectionVariantCount": 8,
+          "unknownVariantCount": 0,
+          "hasProductionSupport": true,
+          "compatibilityOnly": false,
+          "evidenceSummary": "Verified production support is present.",
           "exactVariantGroups": [
             {
               "mode": "Default",
-              "condition": "Legacy 8U execution path retained for compatibility; no per-operator E2 evidence.",
+              "condition": "Phase and optional quality inputs are normalized to single-channel CV_32F.",
               "admission": "Allowed",
-              "verification": "LegacyCompatibilityAllowance",
+              "verification": "VerifiedSupport",
               "exactInputTypes": [
-                "CV_8UC1",
-                "CV_8UC3",
-                "CV_8UC4"
+                "CV_32FC1"
               ],
-              "conversionPolicy": "None",
-              "outputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-              "dynamicRangePolicy": "8-bit legacy numeric domain.",
-              "inputValuePolicy": "Any",
-              "failureCode": "IMAGE_DEPTH_UNSUPPORTED",
-              "evidenceLevel": "E0_SOURCE_AUDIT"
+              "conversionPolicy": "C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion.",
+              "outputDepthPolicy": "UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3.",
+              "dynamicRangePolicy": "Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain.",
+              "inputValuePolicy": "RejectNonFinite",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
             },
             {
               "mode": "Default",
-              "condition": "No operator-specific executable evidence is registered.",
-              "admission": "Unknown",
-              "verification": "Unknown",
+              "condition": "Phase and optional quality inputs are normalized to single-channel CV_32F.",
+              "admission": "Allowed",
+              "verification": "VerifiedConversion",
+              "exactInputTypes": [
+                "CV_8UC1",
+                "CV_8UC3",
+                "CV_16UC1",
+                "CV_16UC3"
+              ],
+              "conversionPolicy": "C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion.",
+              "outputDepthPolicy": "UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3.",
+              "dynamicRangePolicy": "Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
+            },
+            {
+              "mode": "Default",
+              "condition": "Phase and optional quality inputs are normalized to single-channel CV_32F.",
+              "admission": "Allowed",
+              "verification": "VerifiedConversion",
+              "exactInputTypes": [
+                "CV_32FC3",
+                "CV_64FC1",
+                "CV_64FC3"
+              ],
+              "conversionPolicy": "C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion.",
+              "outputDepthPolicy": "UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3.",
+              "dynamicRangePolicy": "Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain.",
+              "inputValuePolicy": "RejectNonFinite",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
+            },
+            {
+              "mode": "Default",
+              "condition": "Unsupported image channel count for phase unwrapping.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
               "exactInputTypes": [
                 "CV_8UC2",
-                "CV_8SC1",
-                "CV_8SC2",
-                "CV_8SC3",
-                "CV_8SC4",
-                "CV_16UC1",
+                "CV_8UC4",
                 "CV_16UC2",
-                "CV_16UC3",
                 "CV_16UC4",
-                "CV_16SC1",
-                "CV_16SC2",
-                "CV_16SC3",
-                "CV_16SC4",
-                "CV_32SC1",
-                "CV_32SC2",
-                "CV_32SC3",
-                "CV_32SC4",
-                "CV_32FC1",
                 "CV_32FC2",
-                "CV_32FC3",
                 "CV_32FC4",
-                "CV_64FC1",
                 "CV_64FC2",
-                "CV_64FC3",
                 "CV_64FC4"
               ],
               "conversionPolicy": "None",
-              "outputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-              "dynamicRangePolicy": "Undefined until verified.",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
               "inputValuePolicy": "Any",
-              "failureCode": "IMAGE_CONTRACT_UNKNOWN",
-              "evidenceLevel": "Unknown"
+              "failureCode": "IMAGE_CHANNELS_UNSUPPORTED",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
             }
           ]
         },
         {
           "inputPort": "QualityMap",
           "contractVersion": "2.1",
-          "allowedVariantCount": 3,
-          "verifiedSupportVariantCount": 0,
-          "verifiedConversionVariantCount": 0,
-          "legacyCompatibilityVariantCount": 3,
-          "verifiedRejectionVariantCount": 0,
-          "unknownVariantCount": 25,
-          "hasProductionSupport": false,
-          "compatibilityOnly": true,
-          "evidenceSummary": "Legacy 8U compatibility allowance — unverified",
+          "allowedVariantCount": 8,
+          "verifiedSupportVariantCount": 1,
+          "verifiedConversionVariantCount": 7,
+          "legacyCompatibilityVariantCount": 0,
+          "verifiedRejectionVariantCount": 8,
+          "unknownVariantCount": 0,
+          "hasProductionSupport": true,
+          "compatibilityOnly": false,
+          "evidenceSummary": "Verified production support is present.",
           "exactVariantGroups": [
             {
               "mode": "Default",
-              "condition": "Legacy 8U execution path retained for compatibility; no per-operator E2 evidence.",
+              "condition": "Phase and optional quality inputs are normalized to single-channel CV_32F.",
               "admission": "Allowed",
-              "verification": "LegacyCompatibilityAllowance",
+              "verification": "VerifiedSupport",
               "exactInputTypes": [
-                "CV_8UC1",
-                "CV_8UC3",
-                "CV_8UC4"
+                "CV_32FC1"
               ],
-              "conversionPolicy": "None",
-              "outputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-              "dynamicRangePolicy": "8-bit legacy numeric domain.",
-              "inputValuePolicy": "Any",
-              "failureCode": "IMAGE_DEPTH_UNSUPPORTED",
-              "evidenceLevel": "E0_SOURCE_AUDIT"
+              "conversionPolicy": "C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion.",
+              "outputDepthPolicy": "UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3.",
+              "dynamicRangePolicy": "Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain.",
+              "inputValuePolicy": "RejectNonFinite",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
             },
             {
               "mode": "Default",
-              "condition": "No operator-specific executable evidence is registered.",
-              "admission": "Unknown",
-              "verification": "Unknown",
+              "condition": "Phase and optional quality inputs are normalized to single-channel CV_32F.",
+              "admission": "Allowed",
+              "verification": "VerifiedConversion",
+              "exactInputTypes": [
+                "CV_8UC1",
+                "CV_8UC3",
+                "CV_16UC1",
+                "CV_16UC3"
+              ],
+              "conversionPolicy": "C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion.",
+              "outputDepthPolicy": "UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3.",
+              "dynamicRangePolicy": "Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
+            },
+            {
+              "mode": "Default",
+              "condition": "Phase and optional quality inputs are normalized to single-channel CV_32F.",
+              "admission": "Allowed",
+              "verification": "VerifiedConversion",
+              "exactInputTypes": [
+                "CV_32FC3",
+                "CV_64FC1",
+                "CV_64FC3"
+              ],
+              "conversionPolicy": "C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion.",
+              "outputDepthPolicy": "UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3.",
+              "dynamicRangePolicy": "Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain.",
+              "inputValuePolicy": "RejectNonFinite",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
+            },
+            {
+              "mode": "Default",
+              "condition": "Unsupported image channel count for phase unwrapping.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
               "exactInputTypes": [
                 "CV_8UC2",
-                "CV_8SC1",
-                "CV_8SC2",
-                "CV_8SC3",
-                "CV_8SC4",
-                "CV_16UC1",
+                "CV_8UC4",
                 "CV_16UC2",
-                "CV_16UC3",
                 "CV_16UC4",
-                "CV_16SC1",
-                "CV_16SC2",
-                "CV_16SC3",
-                "CV_16SC4",
-                "CV_32SC1",
-                "CV_32SC2",
-                "CV_32SC3",
-                "CV_32SC4",
-                "CV_32FC1",
                 "CV_32FC2",
-                "CV_32FC3",
                 "CV_32FC4",
-                "CV_64FC1",
                 "CV_64FC2",
-                "CV_64FC3",
                 "CV_64FC4"
               ],
               "conversionPolicy": "None",
-              "outputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-              "dynamicRangePolicy": "Undefined until verified.",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
               "inputValuePolicy": "Any",
-              "failureCode": "IMAGE_CONTRACT_UNKNOWN",
-              "evidenceLevel": "Unknown"
+              "failureCode": "IMAGE_CHANNELS_UNSUPPORTED",
+              "evidenceLevel": "E2_STAGE12_REGRESSION"
             }
           ]
         }
       ],
       "resourceRequirements": [],
-      "generationDependencies": [],
-      "generationFingerprint": "800C7AA92FF056A912B274431F3CB224F19BBCBCDF12CA5410F20B4AB3BC4649",
+      "generationDependencies": [
+        "type:ClearVision.Product.Infrastructure.Operators.PhaseClosureImageContractProvider"
+      ],
+      "generationFingerprint": "6B0C1E1A6E8FFB406254D2271721CCEF80C19F90854A16FED0A2FF8599608521",
       "quality": {
         "totalScore": 89,
         "level": "A",
@@ -31996,7 +32053,7 @@
       "lifecycle": "Experimental",
       "lifecycleNote": "简化 PatchCore 风格实现，部署前必须使用现场数据验证特征库、阈值和稳定性。",
       "defaultHidden": false,
-      "defaultAiRecommendation": false,
+      "defaultAiRecommendation": true,
       "requiresLifecycleDisclosure": true,
       "version": "1.0.0",
       "keywords": [
@@ -32534,57 +32591,47 @@
         {
           "inputPort": "Image",
           "contractVersion": "2.1",
-          "allowedVariantCount": 0,
-          "verifiedSupportVariantCount": 0,
+          "allowedVariantCount": 1,
+          "verifiedSupportVariantCount": 1,
           "verifiedConversionVariantCount": 0,
           "legacyCompatibilityVariantCount": 0,
-          "verifiedRejectionVariantCount": 0,
-          "unknownVariantCount": 28,
-          "hasProductionSupport": false,
+          "verifiedRejectionVariantCount": 3,
+          "unknownVariantCount": 0,
+          "hasProductionSupport": true,
           "compatibilityOnly": false,
-          "evidenceSummary": "Unknown — no verified executable image support is registered.",
+          "evidenceSummary": "Verified production support is present.",
           "exactVariantGroups": [
             {
               "mode": "Default",
-              "condition": "No operator-specific executable evidence is registered.",
-              "admission": "Unknown",
-              "verification": "Unknown",
+              "condition": "Anomaly detection requires an 8-bit BGR image.",
+              "admission": "Rejected",
+              "verification": "VerifiedRejection",
               "exactInputTypes": [
                 "CV_8UC1",
                 "CV_8UC2",
-                "CV_8UC3",
-                "CV_8UC4",
-                "CV_8SC1",
-                "CV_8SC2",
-                "CV_8SC3",
-                "CV_8SC4",
-                "CV_16UC1",
-                "CV_16UC2",
-                "CV_16UC3",
-                "CV_16UC4",
-                "CV_16SC1",
-                "CV_16SC2",
-                "CV_16SC3",
-                "CV_16SC4",
-                "CV_32SC1",
-                "CV_32SC2",
-                "CV_32SC3",
-                "CV_32SC4",
-                "CV_32FC1",
-                "CV_32FC2",
-                "CV_32FC3",
-                "CV_32FC4",
-                "CV_64FC1",
-                "CV_64FC2",
-                "CV_64FC3",
-                "CV_64FC4"
+                "CV_8UC4"
               ],
               "conversionPolicy": "None",
-              "outputDepthPolicy": "Operator-specific legacy output policy; no Stage 2 depth widening.",
-              "dynamicRangePolicy": "Undefined until verified.",
+              "outputDepthPolicy": "No output; rejected before the native image call.",
+              "dynamicRangePolicy": "Not applicable.",
               "inputValuePolicy": "Any",
-              "failureCode": "IMAGE_CONTRACT_UNKNOWN",
-              "evidenceLevel": "Unknown"
+              "failureCode": "IMAGE_CHANNELS_UNSUPPORTED",
+              "evidenceLevel": "E2_NIGHTLY_MODEL_TESTS"
+            },
+            {
+              "mode": "Default",
+              "condition": "Simplified PatchCore and ONNX embedding evidence is verified for 8-bit BGR images.",
+              "admission": "Allowed",
+              "verification": "VerifiedSupport",
+              "exactInputTypes": [
+                "CV_8UC3"
+              ],
+              "conversionPolicy": "BGR is consumed directly by the PatchCore feature path and normalized by ONNX preprocessing.",
+              "outputDepthPolicy": "Score maps are CV_32FC1 and masks/visualizations are 8-bit.",
+              "dynamicRangePolicy": "Legacy 0..255 BGR intensity domain.",
+              "inputValuePolicy": "Any",
+              "failureCode": "IMAGE_NONFINITE_INPUT",
+              "evidenceLevel": "E2_NIGHTLY_MODEL_TESTS"
             }
           ]
         }
@@ -32685,8 +32732,10 @@
           "satisfiedByInputPorts": []
         }
       ],
-      "generationDependencies": [],
-      "generationFingerprint": "4690F5AC1900175F5F82ABA57CDA324CA232AB799A45593913067D35E9C4ABB1",
+      "generationDependencies": [
+        "type:ClearVision.Product.Infrastructure.Operators.AnomalyDetectionImageContractProvider"
+      ],
+      "generationFingerprint": "68B18DB0656B6EF186354C2FB9C793E6EFC9D379A7E0AF83CFDE8AEA1295101C",
       "quality": {
         "totalScore": 100,
         "level": "A",

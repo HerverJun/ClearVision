@@ -455,6 +455,12 @@
           "xunit.extensibility.core": "[2.7.0]"
         }
       },
+      "clearvision.testing": {
+        "type": "Project",
+        "dependencies": {
+          "xunit.extensibility.core": "[2.7.0, )"
+        }
+      },
       "HslCommunication": {
         "type": "CentralTransitive",
         "requested": "[12.7.0, )",

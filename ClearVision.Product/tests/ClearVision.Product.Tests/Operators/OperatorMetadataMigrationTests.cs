@@ -5,6 +5,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "Stage12Regression")]
 [Trait("Category", "Sprint7_AiEvolution")]
 public class OperatorMetadataMigrationTests
 {
@@ -69,13 +70,13 @@ public class OperatorMetadataMigrationTests
         var metadataByType = factory.GetAllMetadata().ToDictionary(m => m.Type, m => m);
 
         Assert.Equal("滤波", metadataByType[OperatorType.Filtering].DisplayName);
-        Assert.Equal("预处理", metadataByType[OperatorType.Filtering].Category);
+        Assert.Equal("图像预处理", metadataByType[OperatorType.Filtering].Category);
 
         Assert.Equal("边缘检测", metadataByType[OperatorType.EdgeDetection].DisplayName);
         Assert.Equal("特征提取", metadataByType[OperatorType.EdgeDetection].Category);
 
         Assert.Equal("深度学习", metadataByType[OperatorType.DeepLearning].DisplayName);
-        Assert.Equal("AI检测", metadataByType[OperatorType.DeepLearning].Category);
+        Assert.Equal("AI推理", metadataByType[OperatorType.DeepLearning].Category);
     }
 
     [Fact]
@@ -217,45 +218,18 @@ public class OperatorMetadataMigrationTests
     [Fact]
     public void MetadataCatalog_ShouldUseSupportedOperatorLibraryCategories()
     {
-        var supportedCategories = new HashSet<string>
-        {
-            "3D",
-            "几何",
-            "AI检测",
-            "变量",
-            "标定",
-            "采集",
-            "测量",
-            "拆分组合",
-            "定位",
-            "辅助",
-            "检测",
-            "控制",
-            "流程控制",
-            "逻辑工具",
-            "匹配定位",
-            "频域",
-            "区域处理",
-            "识别",
-            "输出",
-            "数据",
-            "数据处理",
-            "特征提取",
-            "通信",
-            "通用",
-            "图像处理",
-            "纹理",
-            "颜色处理",
-            "预处理"
-        };
+        var supportedCategories = OperatorCategoryCatalog.All
+            .ToDictionary(category => category.Id);
 
         var metadataByType = new OperatorFactory()
             .GetAllMetadata()
             .ToDictionary(m => m.Type, m => m);
 
         var unsupported = metadataByType.Values
-            .Where(metadata => !supportedCategories.Contains(metadata.Category))
-            .Select(metadata => $"{metadata.Type}:{metadata.Category}")
+            .Where(metadata =>
+                !supportedCategories.TryGetValue(metadata.CategoryId, out var category) ||
+                !string.Equals(metadata.Category, category.DisplayName, StringComparison.Ordinal))
+            .Select(metadata => $"{metadata.Type}:{metadata.CategoryId}:{metadata.Category}")
             .OrderBy(item => item)
             .ToList();
 
@@ -263,11 +237,12 @@ public class OperatorMetadataMigrationTests
             unsupported.Count == 0,
             $"Unsupported operator library categories: {string.Join(", ", unsupported)}");
 
-        Assert.Equal("逻辑工具", metadataByType[OperatorType.Comparator].Category);
+        Assert.Equal(OperatorCategoryId.DataProcessing, metadataByType[OperatorType.Comparator].CategoryId);
+        Assert.Equal("数据处理", metadataByType[OperatorType.Comparator].Category);
         Assert.Equal("特征提取", metadataByType[OperatorType.SubpixelEdgeDetection].Category);
-        Assert.Equal("标定", metadataByType[OperatorType.HandEyeCalibration].Category);
+        Assert.Equal("标定与坐标", metadataByType[OperatorType.HandEyeCalibration].Category);
         Assert.Equal("手眼标定", metadataByType[OperatorType.HandEyeCalibration].DisplayName);
-        Assert.Equal("标定", metadataByType[OperatorType.HandEyeCalibrationValidator].Category);
+        Assert.Equal("标定与坐标", metadataByType[OperatorType.HandEyeCalibrationValidator].Category);
         Assert.Equal("手眼标定验证", metadataByType[OperatorType.HandEyeCalibrationValidator].DisplayName);
     }
 

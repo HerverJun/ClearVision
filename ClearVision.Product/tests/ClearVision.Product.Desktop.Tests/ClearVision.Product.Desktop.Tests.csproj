@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\src\ClearVision.Product.Core\ClearVision.Product.Core.csproj" />
     <ProjectReference Include="..\..\src\ClearVision.Product.Infrastructure\ClearVision.Product.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\ClearVision.Product.Desktop\ClearVision.Product.Desktop.csproj" />
+    <ProjectReference Include="..\..\..\quality\testing\ClearVision.Testing\ClearVision.Testing.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -47,6 +48,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="ClearVision.Testing" />
     <Using Include="Xunit" />
   </ItemGroup>
 

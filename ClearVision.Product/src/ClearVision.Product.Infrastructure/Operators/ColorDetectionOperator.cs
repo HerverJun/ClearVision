@@ -19,6 +19,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Tags = new[] { "experimental", "industrial-remediation", "color-inspection" },
     Version = "2.0.1"
 )]
+[OperatorImageContractProvider(typeof(ColorDetectionImageContractProvider))]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [InputPort("ReferenceColor", "Reference Color", PortDataType.Any, IsRequired = false)]
 [OutputPort("Image", "结果图像", PortDataType.Image)]

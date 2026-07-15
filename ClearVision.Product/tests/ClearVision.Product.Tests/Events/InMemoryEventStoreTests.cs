@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Tests.Events;
 
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class InMemoryEventStoreTests
 {
     [Fact]

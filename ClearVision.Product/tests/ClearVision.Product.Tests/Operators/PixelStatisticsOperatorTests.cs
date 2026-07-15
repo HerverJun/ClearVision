@@ -9,6 +9,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Measurement, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "operator-quality")]
 [Trait("Category", "Sprint6_Phase3")]
 public class PixelStatisticsOperatorTests
 {

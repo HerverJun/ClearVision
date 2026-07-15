@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Tests.Integration;
 
+[TestClassification(TestDomain.Calibration, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "operator-quality")]
 public class CalibrationV2IntegrationTests
 {
     [Fact]

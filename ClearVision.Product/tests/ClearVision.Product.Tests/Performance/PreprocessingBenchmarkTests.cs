@@ -12,6 +12,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Performance;
 
+[TestClassification(TestDomain.Quality, TestPurpose.Performance, TestLane.Nightly, TestEvidenceType.PerformanceProfile, TestOracleType.PerformanceBudget, TestResourceRequirement.CpuProfile, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "product", PerformanceProfile = "standard: documented warmup, scale and percentile budget")]
 [Trait("Category", "Sprint7_Benchmark")]
 public class PreprocessingBenchmarkTests
 {

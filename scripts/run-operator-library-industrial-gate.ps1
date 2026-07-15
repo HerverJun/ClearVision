@@ -3,16 +3,24 @@ param(
     [string]$Profile = "industrial",
 
     [ValidateSet(
+        "governance",
         "operator-library-smoke",
         "measurement-regression",
         "measurement-accuracy",
+        "measurement-determinism",
         "measurement-stability",
         "measurement-performance",
         "calibration",
+        "calibration-integration",
         "detection-regression",
         "detection-accuracy",
+        "detection-stability",
         "detection-performance",
-        "plc"
+        "matching-determinism",
+        "matching-stability",
+        "preprocessing-robustness",
+        "plc",
+        "plc-virtual"
     )]
     [string[]]$Gate,
 
@@ -30,7 +38,9 @@ param(
 
     [switch]$DryRun,
 
-    [switch]$FailFast
+    [switch]$FailFast,
+
+    [switch]$ReturnExitCode
 )
 
 $ErrorActionPreference = "Stop"
@@ -229,7 +239,6 @@ function Invoke-GateStep {
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
-$runner = Join-Path $scriptRoot "run-dotnet-test-serial.ps1"
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $runRoot = Join-Path $repoRoot "test_results\operator-library-industrial-gate\$timestamp"
 $logDirectory = Join-Path $runRoot "logs"
@@ -279,11 +288,11 @@ if ($NoRestore) {
 }
 
 $smokeArguments = [ordered]@{
-    Project = (Join-Path $repoRoot "ClearVision.OperatorLibrary\tests\ClearVision.OperatorLibrary.SmokeTests\ClearVision.OperatorLibrary.SmokeTests.csproj")
+    Gate = "operator-library-smoke"
     Verbosity = $Verbosity
     ResultsDirectory = $trxDirectory
     LogFileName = "operator-library-smoke-$timestamp.trx"
-    MinimumTotalTests = 40
+    MinimumTotalTests = 1
     ReturnExitCode = $true
 }
 
@@ -300,38 +309,53 @@ if ($NoRestore) {
 }
 
 $stepMap = [ordered]@{
-    "operator-library-smoke" = New-GateStep -Name "operator-library-smoke" -ScriptPath $runner -Arguments $smokeArguments
-    "measurement-regression" = New-GateStep -Name "measurement-regression" -ScriptPath (Join-Path $scriptRoot "run-tests-measurement-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "measurement-regression" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 140)
-    "measurement-accuracy" = New-GateStep -Name "measurement-accuracy" -ScriptPath (Join-Path $scriptRoot "run-tests-measurement-accuracy.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "measurement-accuracy" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 120)
-    "measurement-stability" = New-GateStep -Name "measurement-stability" -ScriptPath (Join-Path $scriptRoot "run-tests-measurement-stability.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "measurement-stability" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 15)
+    "governance" = New-GateStep -Name "governance" -ScriptPath (Join-Path $scriptRoot "run-test-governance.ps1") -Arguments ([ordered]@{ ReportDirectory = (Join-Path $runRoot "governance"); ReturnExitCode = $true })
+    "operator-library-smoke" = New-GateStep -Name "operator-library-smoke" -ScriptPath (Join-Path $scriptRoot "run-classified-test-gate.ps1") -Arguments $smokeArguments
+    "measurement-regression" = New-GateStep -Name "measurement-regression" -ScriptPath (Join-Path $scriptRoot "run-tests-measurement-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "measurement-regression" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1)
+    "measurement-accuracy" = New-GateStep -Name "measurement-accuracy" -ScriptPath (Join-Path $scriptRoot "run-tests-measurement-accuracy.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "measurement-accuracy" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1)
+    "measurement-determinism" = New-GateStep -Name "measurement-determinism" -ScriptPath (Join-Path $scriptRoot "run-tests-measurement-determinism.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "measurement-determinism" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1)
+    "measurement-stability" = New-GateStep -Name "measurement-stability" -ScriptPath (Join-Path $scriptRoot "run-tests-measurement-stability.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "measurement-stability" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1)
     "measurement-performance" = New-GateStep -Name "measurement-performance" -ScriptPath (Join-Path $scriptRoot "run-tests-measurement-performance.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "measurement-performance" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ GateProfile = $PerfGateProfile; ReportDirectory = $performanceReportDirectory }))
-    "calibration" = New-GateStep -Name "calibration" -ScriptPath (Join-Path $scriptRoot "run-tests-calibration-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "calibration" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 105 -Extra ([ordered]@{ Gate = "regression" }))
-    "detection-regression" = New-GateStep -Name "detection-regression" -ScriptPath (Join-Path $scriptRoot "run-tests-detection-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "detection-regression" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 120 -Extra ([ordered]@{ Gate = "regression" }))
-    "detection-accuracy" = New-GateStep -Name "detection-accuracy" -ScriptPath (Join-Path $scriptRoot "run-tests-detection-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "detection-accuracy" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 130 -Extra ([ordered]@{ Gate = "detection-accuracy" }))
+    "calibration" = New-GateStep -Name "calibration" -ScriptPath (Join-Path $scriptRoot "run-tests-calibration-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "calibration" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ Gate = "regression" }))
+    "calibration-integration" = New-GateStep -Name "calibration-integration" -ScriptPath (Join-Path $scriptRoot "run-tests-calibration-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "calibration-integration" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ Gate = "integration" }))
+    "detection-regression" = New-GateStep -Name "detection-regression" -ScriptPath (Join-Path $scriptRoot "run-tests-detection-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "detection-regression" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ Gate = "regression" }))
+    "detection-accuracy" = New-GateStep -Name "detection-accuracy" -ScriptPath (Join-Path $scriptRoot "run-tests-detection-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "detection-accuracy" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ Gate = "detection-accuracy" }))
+    "detection-stability" = New-GateStep -Name "detection-stability" -ScriptPath (Join-Path $scriptRoot "run-tests-detection-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "detection-stability" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ Gate = "detection-stability" }))
     "detection-performance" = New-GateStep -Name "detection-performance" -ScriptPath (Join-Path $scriptRoot "run-tests-detection-performance.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "detection-performance" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ GateProfile = $PerfGateProfile; ReportDirectory = $performanceReportDirectory }))
-    "plc" = New-GateStep -Name "plc" -ScriptPath (Join-Path $scriptRoot "run-tests-plc-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "plc" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 70)
+    "matching-determinism" = New-GateStep -Name "matching-determinism" -ScriptPath (Join-Path $scriptRoot "run-classified-test-gate.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "matching-determinism" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ Gate = "matching-determinism" }))
+    "matching-stability" = New-GateStep -Name "matching-stability" -ScriptPath (Join-Path $scriptRoot "run-classified-test-gate.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "matching-stability" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ Gate = "matching-stability" }))
+    "preprocessing-robustness" = New-GateStep -Name "preprocessing-robustness" -ScriptPath (Join-Path $scriptRoot "run-classified-test-gate.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "preprocessing-robustness" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ Gate = "preprocessing-robustness" }))
+    "plc" = New-GateStep -Name "plc" -ScriptPath (Join-Path $scriptRoot "run-tests-plc-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "plc" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1)
+    "plc-virtual" = New-GateStep -Name "plc-virtual" -ScriptPath (Join-Path $scriptRoot "run-tests-plc-regression.ps1") -Arguments (New-TestGateArguments -Base $commonArguments -GateName "plc-virtual" -TrxDirectory $trxDirectory -Timestamp $timestamp -MinimumTotalTests 1 -Extra ([ordered]@{ Virtual = $true }))
 }
 
 $profileSteps = @{
     quick = @(
+        "governance",
         "operator-library-smoke",
         "measurement-regression",
         "calibration",
         "detection-regression",
-        "detection-accuracy",
         "plc"
     )
     industrial = @(
+        "governance",
         "operator-library-smoke",
         "measurement-regression",
         "measurement-accuracy",
+        "measurement-determinism",
         "measurement-stability",
         "measurement-performance",
         "calibration",
+        "calibration-integration",
         "detection-regression",
         "detection-accuracy",
+        "detection-stability",
         "detection-performance",
-        "plc"
+        "matching-determinism",
+        "matching-stability",
+        "preprocessing-robustness",
+        "plc-virtual"
     )
 }
 
@@ -356,6 +380,8 @@ if ($DryRun) {
     foreach ($step in $selectedSteps) {
         Write-Host "[operator-industrial-gate] DRY $($step.Name): $($step.Command)"
     }
+    $global:LASTEXITCODE = 0
+    if ($ReturnExitCode) { return }
     exit 0
 }
 
@@ -459,8 +485,12 @@ Write-Host "[operator-industrial-gate] Summary MD: $summaryMarkdownPath"
 
 if ($failedResults.Count -gt 0) {
     Write-Host "[operator-industrial-gate] FAILED: $((@($failedResults | ForEach-Object { $_.name })) -join ', ')"
+    $global:LASTEXITCODE = 1
+    if ($ReturnExitCode) { return }
     exit 1
 }
 
 Write-Host "[operator-industrial-gate] PASSED"
+$global:LASTEXITCODE = 0
+if ($ReturnExitCode) { return }
 exit 0

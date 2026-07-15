@@ -37,6 +37,7 @@
     <ProjectReference Include="..\..\src\ClearVision.Product.Runtime.Abstractions\ClearVision.Product.Runtime.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\ClearVision.Product.Runtime\ClearVision.Product.Runtime.csproj" />
     <ProjectReference Include="..\..\..\quality\tools\OperatorLibraryReadOnlyAuditRunner\OperatorLibraryReadOnlyAuditRunner.csproj" />
+    <ProjectReference Include="..\..\..\quality\testing\ClearVision.Testing\ClearVision.Testing.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -48,6 +49,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="ClearVision.Testing" />
     <Using Include="Xunit" />
   </ItemGroup>
 

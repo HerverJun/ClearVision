@@ -263,13 +263,22 @@ try {
     Write-Host "[dotnet-test] $preview"
 
     if ($ReturnExitCode) {
-        & $dotnetPath @arguments 2>&1 | ForEach-Object { Write-Host $_ }
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            & $dotnetPath @arguments 2>&1 | ForEach-Object { Write-Host $_ }
+            $processExitCode = $LASTEXITCODE
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
     }
     else {
         & $dotnetPath @arguments
+        $processExitCode = $LASTEXITCODE
     }
 
-    $exitCode = $LASTEXITCODE
+    $exitCode = $processExitCode
 
     if ($exitCode -eq 0 -and ($MinimumTotalTests -gt 0 -or $MinimumPassedTests -gt 0)) {
         $requiredPassed = if ($MinimumPassedTests -gt 0) { $MinimumPassedTests } else { $MinimumTotalTests }

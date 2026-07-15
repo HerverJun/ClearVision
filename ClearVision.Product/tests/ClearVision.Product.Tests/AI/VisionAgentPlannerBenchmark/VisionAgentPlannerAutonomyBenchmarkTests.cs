@@ -3,6 +3,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentPlannerBenchmark;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Performance, TestLane.Nightly, TestEvidenceType.PerformanceProfile, TestOracleType.PerformanceBudget, TestResourceRequirement.CpuProfile, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "vision-agent", PerformanceProfile = "standard: documented warmup, scale and percentile budget")]
 public sealed class VisionAgentPlannerAutonomyBenchmarkTests
 {
     [Fact(DisplayName = "planner autonomy benchmark report should expose required execution fields")]

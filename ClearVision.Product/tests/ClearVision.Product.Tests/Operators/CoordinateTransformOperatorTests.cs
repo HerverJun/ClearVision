@@ -12,6 +12,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Calibration, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public class CoordinateTransformOperatorTests
 {
     private readonly CoordinateTransformOperator _operator;

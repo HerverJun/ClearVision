@@ -488,7 +488,12 @@ public sealed class SurfaceDefectDetectionImageContractProvider : IOperatorImage
                 "C3/C4 -> Gray for analysis; no depth scaling.",
                 "CV_8U outputs.",
                 "Legacy 8-bit intensity domain.",
-                "E2_OPERATOR_AND_PACKAGE_TESTS").ToArray();
+                "E2_OPERATOR_AND_PACKAGE_TESTS").ToList();
+            variants.AddRange(ImageContractVariantFactory.Rejected(
+                "Default", ["CV_8U"], [2],
+                "Unsupported image channel count.",
+                "IMAGE_CHANNELS_UNSUPPORTED",
+                "E2_OPERATOR_AND_PACKAGE_TESTS"));
             return new ImageInputContract(
                 port, ["CV_8U"], [1, 3, 4], ["CV_8U"],
                 port == "Reference"
@@ -497,6 +502,210 @@ public sealed class SurfaceDefectDetectionImageContractProvider : IOperatorImage
                 "C3/C4 -> Gray for analysis; no depth scaling.",
                 "Image output is CV_8UC3; masks and responses remain 8-bit.",
                 "Legacy 0..255 intensity domain.",
+                variants,
+                "NotApplicableFor8U",
+                "IMAGE_DEPTH_UNSUPPORTED",
+                OperatorImageContractResolver.ContractVersion);
+        }).ToArray();
+    }
+}
+
+public sealed class ColorDetectionImageContractProvider : IOperatorImageContractProvider
+{
+    public IReadOnlyList<ImageInputContract> GetContracts(
+        OperatorType operatorType,
+        IReadOnlyList<string> imageInputPorts,
+        OperatorLifecycle lifecycle)
+    {
+        return imageInputPorts.Select(port =>
+        {
+            var variants = ImageContractVariantFactory.Allowed(
+                "Default", ["CV_8U"], [1, 3, 4],
+                "Verified 8-bit grayscale, BGR, and BGRA color-analysis inputs.",
+                (_, channels) => channels == 3
+                    ? ImageContractVerification.VerifiedSupport
+                    : ImageContractVerification.VerifiedConversion,
+                "C1 -> BGR and C4 -> BGR before HSV/Lab analysis; no depth scaling.",
+                "Image output is CV_8UC3; scalar color metrics are double precision.",
+                "HSV thresholds and rendered diagnostics use the legacy 0..255 intensity domain.",
+                "E2_OPERATOR_AND_PACKAGE_TESTS").ToArray();
+
+            return new ImageInputContract(
+                port,
+                ["CV_8U"],
+                [1, 3, 4],
+                ["CV_8U"],
+                "ColorDetection executes only on verified 8-bit C1/C3/C4 inputs.",
+                "C1/C4 are converted to BGR without depth scaling.",
+                "Image output is CV_8UC3; coverage and color metrics are scalar outputs.",
+                "HSV/Lab inspection thresholds are defined in the 8-bit intensity domain.",
+                variants,
+                "NotApplicableFor8U",
+                "IMAGE_DEPTH_UNSUPPORTED",
+                OperatorImageContractResolver.ContractVersion);
+        }).ToArray();
+    }
+}
+
+public sealed class PhaseClosureImageContractProvider : IOperatorImageContractProvider
+{
+    public IReadOnlyList<ImageInputContract> GetContracts(
+        OperatorType operatorType,
+        IReadOnlyList<string> imageInputPorts,
+        OperatorLifecycle lifecycle)
+    {
+        var depths = new[] { "CV_8U", "CV_16U", "CV_32F", "CV_64F" };
+        return imageInputPorts.Select(port =>
+        {
+            var variants = ImageContractVariantFactory.Allowed(
+                "Default", depths, [1, 3],
+                "Phase and optional quality inputs are normalized to single-channel CV_32F.",
+                (depth, channels) => depth == "CV_32F" && channels == 1
+                    ? ImageContractVerification.VerifiedSupport
+                    : ImageContractVerification.VerifiedConversion,
+                "C3 -> Gray; CV_8U/CV_16U scale to 0..2pi; CV_32F/CV_64F preserve phase values before CV_32F conversion.",
+                "UnwrappedPhase is CV_32FC1 and visualization is CV_8UC3.",
+                "Integer phase inputs use full-range scaling; floating inputs stay in their native phase domain.",
+                "E2_STAGE12_REGRESSION").ToList();
+            variants.AddRange(ImageContractVariantFactory.Rejected(
+                "Default", depths, [2, 4],
+                "Unsupported image channel count for phase unwrapping.",
+                "IMAGE_CHANNELS_UNSUPPORTED",
+                "E2_STAGE12_REGRESSION"));
+
+            return new ImageInputContract(
+                port,
+                depths,
+                [1, 3],
+                ["CV_32F"],
+                "Verified phase-unwrapping input domain.",
+                "Normalize to single-channel CV_32F with depth-specific phase scaling.",
+                "CV_32FC1 business output with CV_8UC3 visualization.",
+                "Reject non-finite floating values; preserve floating phase units.",
+                variants,
+                "RejectNaNAndInfinityForFloatingVariants",
+                "IMAGE_DEPTH_UNSUPPORTED",
+                OperatorImageContractResolver.ContractVersion);
+        }).ToArray();
+    }
+}
+
+public sealed class LocalDeformableMatchingImageContractProvider : IOperatorImageContractProvider
+{
+    public IReadOnlyList<ImageInputContract> GetContracts(
+        OperatorType operatorType,
+        IReadOnlyList<string> imageInputPorts,
+        OperatorLifecycle lifecycle)
+    {
+        return imageInputPorts.Select(port =>
+        {
+            var variants = ImageContractVariantFactory.Allowed(
+                "Default", ["CV_8U"], [1, 3],
+                "ORB/template/warp paths are verified for 8-bit grayscale and BGR inputs.",
+                (_, channels) => channels == 1
+                    ? ImageContractVerification.VerifiedSupport
+                    : ImageContractVerification.VerifiedConversion,
+                "C3 -> Gray for feature and score computation; no depth scaling.",
+                "Visualization and occlusion outputs remain 8-bit.",
+                "Legacy 0..255 matching intensity domain.",
+                "E2_STAGE12_REGRESSION").ToList();
+            variants.AddRange(ImageContractVariantFactory.Rejected(
+                "Default", ["CV_8U"], [2, 4],
+                "Unsupported image channel count for local deformable matching.",
+                "IMAGE_CHANNELS_UNSUPPORTED",
+                "E2_STAGE12_REGRESSION"));
+
+            return new ImageInputContract(
+                port,
+                ["CV_8U"],
+                [1, 3],
+                ["CV_8U"],
+                "Verified local deformable matching input domain.",
+                "BGR inputs are converted to grayscale for ORB and template scoring.",
+                "8-bit visualization, deformation, and occlusion evidence.",
+                "Legacy 0..255 intensity domain.",
+                variants,
+                "NotApplicableFor8U",
+                "IMAGE_DEPTH_UNSUPPORTED",
+                OperatorImageContractResolver.ContractVersion);
+        }).ToArray();
+    }
+}
+
+public sealed class EdgeDetectionImageContractProvider : IOperatorImageContractProvider
+{
+    public IReadOnlyList<ImageInputContract> GetContracts(
+        OperatorType operatorType,
+        IReadOnlyList<string> imageInputPorts,
+        OperatorLifecycle lifecycle)
+    {
+        return imageInputPorts.Select(port =>
+        {
+            var variants = ImageContractVariantFactory.Allowed(
+                "Default", ["CV_8U"], [1, 3, 4],
+                "Canny and ONNX preprocessing accept verified 8-bit C1/C3/C4 images.",
+                (_, channels) => channels == 1
+                    ? ImageContractVerification.VerifiedSupport
+                    : ImageContractVerification.VerifiedConversion,
+                "C3/C4 -> Gray for Canny; model preprocessing normalizes to three channels.",
+                "Edge mask is CV_8UC1 and visualization follows the operator output contract.",
+                "Legacy 0..255 threshold domain.",
+                "E2_OPERATOR_AND_PACKAGE_TESTS").ToList();
+            variants.AddRange(ImageContractVariantFactory.Rejected(
+                "Default", ["CV_8U"], [2],
+                "Unsupported image channel count.",
+                "IMAGE_CHANNELS_UNSUPPORTED",
+                "E2_OPERATOR_AND_PACKAGE_TESTS"));
+
+            return new ImageInputContract(
+                port,
+                ["CV_8U"],
+                [1, 3, 4],
+                ["CV_8U"],
+                "Verified 8-bit edge-detection inputs.",
+                "Convert to grayscale or model RGB without depth scaling.",
+                "8-bit edge and visualization outputs.",
+                "Thresholds use the 0..255 intensity domain.",
+                variants,
+                "NotApplicableFor8U",
+                "IMAGE_DEPTH_UNSUPPORTED",
+                OperatorImageContractResolver.ContractVersion);
+        }).ToArray();
+    }
+}
+
+public sealed class AnomalyDetectionImageContractProvider : IOperatorImageContractProvider
+{
+    public IReadOnlyList<ImageInputContract> GetContracts(
+        OperatorType operatorType,
+        IReadOnlyList<string> imageInputPorts,
+        OperatorLifecycle lifecycle)
+    {
+        return imageInputPorts.Select(port =>
+        {
+            var variants = ImageContractVariantFactory.Allowed(
+                "Default", ["CV_8U"], [3],
+                "Simplified PatchCore and ONNX embedding evidence is verified for 8-bit BGR images.",
+                (_, _) => ImageContractVerification.VerifiedSupport,
+                "BGR is consumed directly by the PatchCore feature path and normalized by ONNX preprocessing.",
+                "Score maps are CV_32FC1 and masks/visualizations are 8-bit.",
+                "Legacy 0..255 BGR intensity domain.",
+                "E2_NIGHTLY_MODEL_TESTS").ToList();
+            variants.AddRange(ImageContractVariantFactory.Rejected(
+                "Default", ["CV_8U"], [1, 2, 4],
+                "Anomaly detection requires an 8-bit BGR image.",
+                "IMAGE_CHANNELS_UNSUPPORTED",
+                "E2_NIGHTLY_MODEL_TESTS"));
+
+            return new ImageInputContract(
+                port,
+                ["CV_8U"],
+                [3],
+                ["CV_8U", "CV_32F"],
+                "Verified 8-bit BGR anomaly-detection input domain.",
+                "No depth scaling before PatchCore; ONNX preprocessing normalizes explicitly.",
+                "Float score map with 8-bit mask and visualization evidence.",
+                "Legacy 0..255 BGR intensity domain.",
                 variants,
                 "NotApplicableFor8U",
                 "IMAGE_DEPTH_UNSUPPORTED",

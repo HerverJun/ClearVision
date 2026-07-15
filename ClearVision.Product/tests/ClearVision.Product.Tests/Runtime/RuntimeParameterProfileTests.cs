@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Tests.Runtime;
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class RuntimeParameterContractsTests
 {
     [Fact]
@@ -38,6 +39,7 @@ public sealed class RuntimeParameterContractsTests
     }
 }
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class RuntimePackageExporterTests
 {
     [Fact]
@@ -320,6 +322,7 @@ public sealed class RuntimePackageExporterTests
     }
 }
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class RuntimePackageLoaderTests
 {
     [Fact]
@@ -356,6 +359,7 @@ public sealed class RuntimePackageLoaderTests
     }
 }
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class RuntimeParameterValidatorTests
 {
     [Fact]
@@ -448,6 +452,7 @@ public sealed class RuntimeParameterValidatorTests
     }
 }
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class RuntimeParameterOverrideApplierTests
 {
     [Fact]
@@ -470,6 +475,7 @@ public sealed class RuntimeParameterOverrideApplierTests
     }
 }
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class StationSiteProfileStoreTests
 {
     [Fact]

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Tests.AI;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.ModelAsset, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "vision-agent")]
 public class LLMConnectorSmokeTests
 {
     [Fact]

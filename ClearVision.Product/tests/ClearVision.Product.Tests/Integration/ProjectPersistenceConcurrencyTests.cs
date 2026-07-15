@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClearVision.Product.Tests.Integration;
 
+[TestClassification(TestDomain.General, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "product")]
 [Collection(ProjectSaveCoordinatorTestCollections.ProjectSaveCoordinatorState)]
 public sealed class ProjectPersistenceConcurrencyTests : IDisposable
 {

@@ -16,6 +16,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentPlannerCompletion;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentPlannerCompletionTests
 {
     [Fact(DisplayName = "Default DI registers LLM planner completion and enables Agent GenerateFlow")]

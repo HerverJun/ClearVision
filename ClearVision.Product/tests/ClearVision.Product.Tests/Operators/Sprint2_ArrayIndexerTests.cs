@@ -8,6 +8,8 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Data, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "data-platform", Suites = "DataProcessingPhase2")]
+
 public class Sprint2_ArrayIndexerTests
 {
     private readonly ILogger<ArrayIndexerOperator> _loggerMock;

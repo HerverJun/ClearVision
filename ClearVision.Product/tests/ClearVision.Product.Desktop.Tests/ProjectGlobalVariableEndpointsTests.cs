@@ -29,6 +29,7 @@ using NSubstitute;
 namespace ClearVision.Product.Desktop.Tests;
 
 [Collection(ProjectSaveCoordinatorTestCollections.ProjectSaveCoordinatorState)]
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop", Suites = "DesktopEndpoints")]
 public sealed class ProjectGlobalVariableEndpointsTests
 {
     [Fact]
@@ -576,7 +577,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
         var assetStorage = new MutableProjectAssetStorage();
         await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
             CreateSchema(variableId, 1, manualWriteAllowed: true),
-            storedFlowJson: CreateResultOnlyFlowJson(),
+            storedFlowJson: CreateDecisionBoundFlowJson(),
             assetStorage: assetStorage);
         assetStorage.Assets = CreateProjectAssets("endpoint-calibration", host.Project.PersistenceRevision);
         assetStorage.Metadata = new ProjectAssetStorageMetadata(
@@ -888,7 +889,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             },
             ProjectAssetJson.Options);
 
-    private static string CreateResultOnlyFlowJson() =>
+    private static string CreateDecisionBoundFlowJson() =>
         SerializeFlow(
             new OperatorFlowDto
             {
@@ -905,7 +906,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
                         Y = 0
                     }
                 ]
-            });
+            }.WithStringDecisionBinding());
 
     private static string SerializeFlow(OperatorFlowDto flow) =>
         JsonSerializer.Serialize(flow, new JsonSerializerOptions

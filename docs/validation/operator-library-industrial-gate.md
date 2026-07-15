@@ -1,111 +1,93 @@
 # Operator Library Industrial Gate
 
-This document defines the one-command validation gate for the operator library industrial-readiness push. The gate is intentionally serial: every .NET test step goes through the repository runner so the same `.csproj` is not tested by concurrent `dotnet test` processes.
+The industrial gate remains the Release / Manual automated core. It is serial, reuses the repository test runner, and selects tests only through the authoritative `TestClassification` Traits defined by `quality/test-gates.json`.
 
 ## Commands
 
-Run the full industrial profile from the repository root:
+Run the full profile:
 
 ```powershell
-& ".\scripts\run-operator-library-industrial-gate.ps1"
+& ".\scripts\run-operator-library-industrial-gate.ps1" -Profile industrial
 ```
 
-The default `industrial` profile runs these gates in order:
+The industrial profile runs, in order:
 
-- `operator-library-smoke`
-- `measurement-regression`
-- `measurement-accuracy`
-- `measurement-stability`
-- `measurement-performance`
-- `calibration`
-- `detection-regression`
-- `detection-performance`
-- `plc`
+- classification governance;
+- OperatorLibrary package smoke;
+- measurement Regression, Accuracy, Determinism, Stability, and acceptance Performance;
+- calibration Regression and Integration;
+- detection Regression, Accuracy, Stability, and acceptance Performance;
+- matching Determinism and Stability;
+- preprocessing Robustness;
+- virtual PLC Release / Manual evidence.
 
-The `calibration` and `detection-regression` steps intentionally run their regression subsets. Broader integration or stability sweeps should be launched explicitly after their external prerequisites are available.
+The `quick` profile is a fast industrial diagnostic containing governance, package smoke, regression, and PR-safe PLC coverage. It is not a Release / Manual substitute.
 
-Run the faster smoke profile:
-
-```powershell
-& ".\scripts\run-operator-library-industrial-gate.ps1" -Profile quick
-```
-
-Run selected gates only:
+Run selected gates:
 
 ```powershell
 & ".\scripts\run-operator-library-industrial-gate.ps1" `
-  -Gate operator-library-smoke,measurement-regression
+  -Gate governance,measurement-accuracy,matching-stability
 ```
 
-Preview commands without executing tests:
+Preview without execution:
 
 ```powershell
 & ".\scripts\run-operator-library-industrial-gate.ps1" -Profile industrial -DryRun
 ```
 
+The preferred release entry, including the explicit manual boundary, is:
+
+```powershell
+& ".\scripts\run-test-quality-lane.ps1" `
+  -Lane ReleaseManual `
+  -AcknowledgeManualRequirements
+```
+
+That entry runs the industrial profile first and then the authoritative `product-release-manual` aggregate gate, so Release / Manual reports include every classified external-resource test rather than only the industrial subset.
+
 ## Outputs
 
-Each real run writes a timestamped directory under:
+Each industrial run writes:
 
 ```text
 test_results/operator-library-industrial-gate/<yyyyMMdd-HHmmss>/
 ```
 
-The run directory contains:
+with:
 
-- `logs/*.log`: complete console output for each gate.
-- `trx/*.trx`: one TRX file per selected .NET gate.
-- `performance-reports/*`: measurement and detection performance budget reports generated during this run.
-- `summary.json`: machine-readable gate summary.
-- `summary.md`: human-readable gate summary.
+- `logs/*.log`;
+- `trx/*.trx`;
+- `performance-reports/*`;
+- `governance/test-governance.json` and `.md`;
+- `summary.json` and `summary.md`.
 
-If any selected gate returns a non-zero exit code, the top-level script exits non-zero. By default it continues after failures so the summary captures all selected gates. Use `-FailFast` to stop after the first failed gate. The summary also lists every collected TRX and performance report path.
-
-## Dependencies
-
-- Use the current PowerShell shell. Do not wrap `run-dotnet-test-serial.ps1` with `powershell.exe -File`.
-- The .NET SDK is selected by the repository `global.json`.
-- Existing environment variables are respected. If unset and available, the script uses repository-local `.dotnet-home` and `.dotnet/.nuget/packages`.
-- Performance gates honor existing `CV_MEASUREMENT_PERF_*` and `CV_DETECTION_PERF_*` variables. The top-level script can also set `-PerfGateProfile standard|acceptance|auto`.
-- Performance reports can be redirected with `-ReportDirectory` on the performance child scripts, `CV_MEASUREMENT_PERF_REPORT_DIR`, `CV_DETECTION_PERF_REPORT_DIR`, or generic `CV_PERF_REPORT_DIR`. The top-level industrial gate sets this to its timestamped `performance-reports` directory so it does not overwrite the tracked `ClearVision.Product/test_results/*_performance_budget_report.*` baseline files.
-- The PLC gate delegates to `run-tests-plc-regression.ps1` and still depends on the communication simulators or test environment expected by those tests.
-
-## NoBuild And NoRestore
-
-For the first full validation run, omit `-NoBuild` and `-NoRestore` so every project can restore and build normally.
-
-This is the default behavior for the top-level gate. A plain `run-operator-library-industrial-gate.ps1` invocation restores and builds before testing, so it validates the current worktree rather than reusing stale binaries.
-
-After the same project has built successfully in the current session, follow-up runs may use:
-
-```powershell
-& ".\scripts\run-operator-library-industrial-gate.ps1" `
-  -Gate operator-library-smoke `
-  -NoBuild `
-  -NoRestore
-```
-
-Do not use `-NoBuild` after changing source, project files, package references, `global.json`, or generated compile inputs. Do not use `-NoRestore` after dependency or NuGet cache changes.
+Each classified child gate also writes a `*.gate.json` beside its TRX. The top-level summary records every command, duration, exit code, TRX, and performance report.
 
 ## Result Validation
 
-The serial test runner supports minimum result validation with `-ResultsDirectory`, `-LogFileName`, and `-MinimumTotalTests`. The industrial gate passes these for every selected gate. After `dotnet test` succeeds, the runner parses the expected TRX and fails the step if:
+Every gate uses a minimum existence check of one test. This only prevents empty filters and missing/renamed gate memberships; fixed test counts are not treated as quality evidence. Test quality is enforced by the classification governance rules and the declared oracle/evidence types.
 
-- the TRX file is missing or malformed;
-- total or executed tests are below the gate minimum;
-- passed tests are below the required minimum;
-- TRX counters report failed, error, timed out, or aborted tests.
+The run fails when:
 
-The minimums are intentionally conservative: performance and PLC gates require at least one executed/passed test, while class-filtered regression gates require at least the number of selected test classes. This blocks empty-filter or stale-output false positives without overfitting the exact number of test methods.
+- governance detects missing or invalid classification;
+- a Trait filter resolves to no test;
+- any TRX is missing, malformed, or contains failed/error/timeout/aborted results;
+- a performance report is missing, stale, incomplete, or over budget;
+- virtual PLC prerequisites cannot start or the declared PLC tests fail.
+
+## Dependencies
+
+- Invoke scripts from the current PowerShell shell; do not use `powershell.exe -File` around the serial runner.
+- The first run should build and restore current sources. Use `-NoBuild -NoRestore` only after the same projects and package smoke assembly were built successfully.
+- OperatorLibrary smoke consumes the packed package rather than a project reference to the product implementation.
+- Virtual PLC execution starts isolated Modbus and MC/FINS simulators and declares the `VirtualPlc` resource requirement.
+- Physical PLC, camera, device, package/source identity, model/assets, SBOM/delivery evidence, and human approval remain outside the automated industrial profile and must be acknowledged by the Release / Manual lane.
 
 ## Failure Triage
 
-1. Open the run `summary.md` and identify the failed gate and exit code.
-2. Inspect `logs/<gate>.log`; every log includes the command preview and serial runner output.
-3. If the failure is from `dotnet test`, inspect the corresponding TRX in the run root and rerun the failed gate through the same serial runner path.
-4. If a performance gate fails, check the `CV_MEASUREMENT_PERF_*` or `CV_DETECTION_PERF_*` environment variables and compare the generated performance budget report under the run root to the historical baseline.
-5. If the PLC gate fails, verify the expected simulator, serial port, network, or PLC communication prerequisites before rerunning.
-
-## AGENTS Constraints
-
-The top-level gate and child gates use `run-dotnet-test-serial.ps1` for .NET test execution. The top-level gate passes `-ReturnExitCode` to child scripts so one child runner cannot terminate the whole orchestration before the summary is written. Running the existing child scripts directly without `-ReturnExitCode` preserves their previous command-line behavior.
+1. Open `summary.md` and locate the first failed gate.
+2. Inspect `logs/<gate>.log` and the corresponding TRX/`*.gate.json`.
+3. For a governance failure, inspect `governance/test-governance.md`; do not weaken an oracle or change a lane just to make it green.
+4. For performance, compare the fresh report and declared profile variables.
+5. For PLC, verify simulator ports and external resource declarations before rerunning.

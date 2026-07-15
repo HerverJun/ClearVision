@@ -18,6 +18,7 @@ namespace ClearVision.Product.Tests.Operators;
 /// <summary>
 /// Sprint 2 Task 2.1: ForEach 算子单元测试
 /// </summary>
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class Sprint2_ForEachTests
 {
     private readonly ILogger<ForEachOperator> _loggerMock;

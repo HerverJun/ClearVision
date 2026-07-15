@@ -29,6 +29,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Keywords = new[] { "Deformable", "Local", "Matching", "MLS", "Occlusion", "MultiTarget", "NMS" },
     Version = "1.1.1"
 )]
+[OperatorImageContractProvider(typeof(LocalDeformableMatchingImageContractProvider))]
 [AlgorithmInfo(
     Name = "Coarse-to-fine local deformable matching",
     CoreApi = "candidate windows -> ORB pyramid matching -> homography seed -> MLS/TPS-style warp -> occlusion verification -> NMS",

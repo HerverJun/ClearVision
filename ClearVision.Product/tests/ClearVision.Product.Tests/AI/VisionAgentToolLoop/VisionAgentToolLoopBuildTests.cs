@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentToolLoop;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentToolLoopBuildTests
 {
     [Fact(DisplayName = "BuildFromPlan tool_loop should run VisionAgentLoop and complete through stable BuildOrchestrator")]

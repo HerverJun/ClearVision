@@ -11,6 +11,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class ComparatorOperatorTests
 {
     private readonly ComparatorOperator _operator = new(Substitute.For<ILogger<ComparatorOperator>>());
@@ -63,6 +64,7 @@ public class ComparatorOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class DelayOperatorTests
 {
     private readonly DelayOperator _operator = new(Substitute.For<ILogger<DelayOperator>>());
@@ -121,6 +123,7 @@ public class DelayOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class VariableReadOperatorTests
 {
     public static IEnumerable<object[]> RunIntegerConversionCases()
@@ -402,6 +405,7 @@ public class VariableReadOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class VariableWriteOperatorTests
 {
     [Fact]
@@ -923,6 +927,7 @@ public class VariableWriteOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class VariableIncrementOperatorTests
 {
     [Fact]
@@ -1007,6 +1012,7 @@ public class VariableIncrementOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class CycleCounterOperatorTests
 {
     [Fact]
@@ -1092,6 +1098,7 @@ public class CycleCounterOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class StringFormatOperatorTests
 {
     private readonly StringFormatOperator _operator = new(Substitute.For<ILogger<StringFormatOperator>>());
@@ -1113,6 +1120,7 @@ public class StringFormatOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class CommentOperatorTests
 {
     private readonly CommentOperator _operator = new(Substitute.For<ILogger<CommentOperator>>());

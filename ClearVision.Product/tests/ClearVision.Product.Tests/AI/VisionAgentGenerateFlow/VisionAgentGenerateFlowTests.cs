@@ -21,6 +21,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentGenerateFlow;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentGenerateFlowTests
 {
     [Fact(DisplayName = "Default GenerateFlow should not trigger VisionAgentLoop")]

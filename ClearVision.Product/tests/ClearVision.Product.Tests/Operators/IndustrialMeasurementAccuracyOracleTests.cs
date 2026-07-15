@@ -10,19 +10,20 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Operators;
 
-public class IndustrialMeasurementBenchmarkTests
+[TestClassification(TestDomain.Measurement, TestPurpose.Accuracy, TestLane.Nightly, TestEvidenceType.IndependentOracle, TestOracleType.Mathematical, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "operator-quality")]
+public class IndustrialMeasurementAccuracyOracleTests
 {
     private readonly CircleMeasurementOperator _circleOperator;
     private readonly LineMeasurementOperator _lineOperator;
 
-    public IndustrialMeasurementBenchmarkTests()
+    public IndustrialMeasurementAccuracyOracleTests()
     {
         _circleOperator = new CircleMeasurementOperator(Substitute.For<ILogger<CircleMeasurementOperator>>());
         _lineOperator = new LineMeasurementOperator(Substitute.For<ILogger<LineMeasurementOperator>>());
     }
 
     [Fact]
-    public async Task CircleMeasurement_DeterministicIndustrialScene_ShouldStayWithinBaseline()
+    public async Task CircleMeasurement_SyntheticScene_ShouldMatchIndependentGeometryOracle()
     {
         var baseline = LoadBaseline().CircleBaseline;
 
@@ -37,13 +38,13 @@ public class IndustrialMeasurementBenchmarkTests
 
         var center = result.OutputData!["Center"].Should().BeOfType<Position>().Subject;
         var radius = Convert.ToDouble(result.OutputData["Radius"]);
-        center.X.Should().BeApproximately(baseline.ExpectedCenterX, baseline.CenterTolerance);
-        center.Y.Should().BeApproximately(baseline.ExpectedCenterY, baseline.CenterTolerance);
-        radius.Should().BeApproximately(baseline.ExpectedRadius, baseline.RadiusTolerance);
+        center.X.Should().BeApproximately(baseline.SceneCenterX, baseline.CenterTolerance);
+        center.Y.Should().BeApproximately(baseline.SceneCenterY, baseline.CenterTolerance);
+        radius.Should().BeApproximately(baseline.SceneRadius, baseline.RadiusTolerance);
     }
 
     [Fact]
-    public async Task LineMeasurement_DeterministicIndustrialScene_ShouldStayWithinBaseline()
+    public async Task LineMeasurement_SyntheticScene_ShouldMatchIndependentGeometryOracle()
     {
         var baseline = LoadBaseline().LineBaseline;
 
@@ -61,8 +62,18 @@ public class IndustrialMeasurementBenchmarkTests
         var length = Convert.ToDouble(result.OutputData["Length"]);
         var residualMean = Convert.ToDouble(result.OutputData["ResidualMean"]);
 
-        angle.Should().BeApproximately(baseline.ExpectedAngle, baseline.AngleTolerance);
-        length.Should().BeInRange(baseline.ExpectedMinLength, baseline.ExpectedMaxLength);
+        var expectedAngle = Math.Atan2(
+            baseline.SceneEndY - baseline.SceneStartY,
+            baseline.SceneEndX - baseline.SceneStartX) * 180.0 / Math.PI;
+        var expectedLength = Math.Sqrt(
+            Math.Pow(baseline.SceneEndX - baseline.SceneStartX, 2) +
+            Math.Pow(baseline.SceneEndY - baseline.SceneStartY, 2));
+        var lengthTolerance = Math.Max(
+            Math.Abs(expectedLength - baseline.ExpectedMinLength),
+            Math.Abs(baseline.ExpectedMaxLength - expectedLength));
+
+        angle.Should().BeApproximately(expectedAngle, baseline.AngleTolerance);
+        length.Should().BeApproximately(expectedLength, lengthTolerance);
         residualMean.Should().BeLessThan(baseline.MaxResidualMean);
     }
 
@@ -132,9 +143,6 @@ public class IndustrialMeasurementBenchmarkTests
         public double SceneCenterY { get; set; }
         public double SceneRadius { get; set; }
         public int Supersample { get; set; } = 16;
-        public double ExpectedCenterX { get; set; }
-        public double ExpectedCenterY { get; set; }
-        public double ExpectedRadius { get; set; }
         public double CenterTolerance { get; set; }
         public double RadiusTolerance { get; set; }
     }
@@ -153,7 +161,6 @@ public class IndustrialMeasurementBenchmarkTests
         public double SceneEndY { get; set; }
         public double SceneThicknessPx { get; set; } = 6.0;
         public int Supersample { get; set; } = 16;
-        public double ExpectedAngle { get; set; }
         public double AngleTolerance { get; set; }
         public double ExpectedMinLength { get; set; }
         public double ExpectedMaxLength { get; set; }

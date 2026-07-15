@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Tests.Runtime;
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class RuntimeDependencyBoundaryTests
 {
     [Fact]

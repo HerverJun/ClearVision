@@ -3,6 +3,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.Calibration;
 
+[TestClassification(TestDomain.Calibration, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public sealed class CalibrationBundleV2JsonTests
 {
     [Fact]

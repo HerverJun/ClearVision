@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Http;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop", Suites = "DesktopEndpoints")]
+
 public sealed class ApiEndpointsImageUploadTests
 {
     [Fact]
