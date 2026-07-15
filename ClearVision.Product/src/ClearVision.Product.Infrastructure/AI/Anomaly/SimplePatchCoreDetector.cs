@@ -482,6 +482,27 @@ public static class SimplePatchCoreDetector
         {
             throw new InvalidOperationException("ONNX anomaly options must bind the model path, manifest path, model SHA, preprocessing fingerprint and complete preprocessing specification.");
         }
+
+        var identity = AnomalyEmbeddingManifest.LoadAndValidate(options.EmbeddingManifestPath, options.EmbeddingModelPath);
+        if (!string.Equals(identity.ModelSha256, options.EmbeddingModelSha256, StringComparison.Ordinal) ||
+            !string.Equals(identity.PreprocessFingerprint, options.PreprocessFingerprint, StringComparison.Ordinal) ||
+            !PreprocessMatches(identity.Preprocess, options.EmbeddingPreprocess))
+        {
+            throw new InvalidOperationException("ONNX anomaly options do not match the validated model manifest identity.");
+        }
+    }
+
+    private static bool PreprocessMatches(AnomalyEmbeddingPreprocessSpec expected, AnomalyEmbeddingPreprocessSpec actual)
+    {
+        return expected.ResizeMode.Equals(actual.ResizeMode, StringComparison.OrdinalIgnoreCase) &&
+               expected.Interpolation.Equals(actual.Interpolation, StringComparison.OrdinalIgnoreCase) &&
+               expected.ColorOrder.Equals(actual.ColorOrder, StringComparison.OrdinalIgnoreCase) &&
+               expected.Scale.Equals(actual.Scale) &&
+               expected.Mean.SequenceEqual(actual.Mean) &&
+               expected.Std.SequenceEqual(actual.Std) &&
+               expected.TensorLayout.Equals(actual.TensorLayout, StringComparison.OrdinalIgnoreCase) &&
+               expected.InputDataType.Equals(actual.InputDataType, StringComparison.OrdinalIgnoreCase) &&
+               expected.OutputNormalization.Equals(actual.OutputNormalization, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void ValidateFeatureBankIdentity(SimplePatchCoreFeatureBank bank, SimplePatchCoreOptions options)

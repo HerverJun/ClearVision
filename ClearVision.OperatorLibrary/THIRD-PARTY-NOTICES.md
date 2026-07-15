@@ -2,7 +2,7 @@
 
 This package is a redistribution wrapper for ClearVision operator code and the NuGet dependencies declared by `ClearVision.OperatorLibrary.csproj`.
 
-Release owners must verify third-party notices against the exact `.nupkg` contents before external publication. This file records the package-intent baseline for `ClearVision.OperatorLibrary` `1.0.2`.
+Release owners must verify third-party notices against the exact `.nupkg` contents before external publication. This file records the package-intent baseline for `ClearVision.OperatorLibrary` `1.0.3`.
 
 ## Direct NuGet Dependencies
 

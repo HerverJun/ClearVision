@@ -344,7 +344,7 @@ public sealed class AnomalyDetectionOperatorTests
 
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
         Convert.ToBoolean(result.OutputData!["IsAnomaly"]).Should().BeTrue();
-        result.OutputData["Diagnostics"].Should().BeOfType<Dictionary<string, object>>().Subject["EmbeddingSource"].Should().Be("FeatureBankMetadataPath");
+        result.OutputData["Diagnostics"].Should().BeOfType<Dictionary<string, object>>().Subject["EmbeddingSource"].Should().Be("ModelCatalog");
 
         DisposeOutputs(trainResult.OutputData);
         DisposeOutputs(result.OutputData);

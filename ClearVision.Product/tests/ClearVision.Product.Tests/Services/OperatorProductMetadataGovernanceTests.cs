@@ -24,7 +24,7 @@ namespace ClearVision.Product.Tests.Services;
 [TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public sealed class OperatorProductMetadataGovernanceTests
 {
-    private const string ExpectedIdentityHash = "52AE7A29C97AFC3F9DB413890E5C44C650618FBBE13FBE32CDBE5372108B7FA3";
+    private const string ExpectedIdentityHash = "A3FEACCDF3D84FF9ABCEDCE4AC636E8EC2BE252E884521BBC14A4F0270C3F055";
     private static readonly string RepoRoot = ResolveRepoRoot();
 
     private static readonly IReadOnlyDictionary<OperatorCategoryId, int> ExpectedCategoryCounts =
@@ -509,7 +509,10 @@ public sealed class OperatorProductMetadataGovernanceTests
             item.QualityState.ProductionReadiness.Equals("ReleaseReady", StringComparison.OrdinalIgnoreCase) ||
             item.QualityState.FieldValidation.Equals("FieldVerified", StringComparison.OrdinalIgnoreCase));
 
-        foreach (var type in new[] { OperatorType.CaliperTool, OperatorType.CircleMeasurement, OperatorType.LineMeasurement })
+        metadata[OperatorType.CaliperTool].QualityState.AlgorithmQuality
+            .Should().Be(OperatorAlgorithmQuality.SyntheticBenchmarkEvidence);
+
+        foreach (var type in new[] { OperatorType.CircleMeasurement, OperatorType.LineMeasurement })
         {
             var state = metadata[type].QualityState;
             state.AlgorithmQuality.Should().Be(OperatorAlgorithmQuality.SyntheticBenchmarkValidated);

@@ -8,18 +8,18 @@
 | 分类 ID (CategoryId) | `Measurement` |
 | 分类 (Category) | 测量 |
 | 分类顺序 (CategoryOrder) | 7 |
-| 版本 (Version) | `1.1.0` |
+| 版本 (Version) | `1.2.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
 | AI 默认推荐 (Default AI Recommendation) | No |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
 | Execution | `Implemented` |
-| AlgorithmQuality | `SyntheticBenchmarkValidated` |
+| AlgorithmQuality | `SyntheticBenchmarkEvidence` |
 | ProductionReadiness | `Unknown` |
 | FieldValidation | `NotValidated` |
 | Quality Evidence Refs | quality/evals/reports/operator-precision-after-acceptance.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
-| 标签 (Tags) | `AlgorithmQuality:SyntheticBenchmarkValidated`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
+| 标签 (Tags) | `AlgorithmQuality:SyntheticBenchmarkEvidence`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于沿扫描线检测边缘对并输出宽度。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。
@@ -28,7 +28,7 @@
 ## 实现策略 / Implementation Strategy
 - 先校验必填输入：`Image`；缺失时通常返回失败结果。
 - 可选输入用于覆盖或补充参数配置：`SearchRegion`。
-- 参数解析覆盖 11 个当前元数据字段，默认值、范围和枚举项以参数表为准。
+- 参数解析覆盖 9 个当前元数据字段，默认值、范围和枚举项以参数表为准。
 - `ValidateParameters` 已提供参数合法性检查，部分越界或非法组合会在运行前被拦截。
 - 图像类输出通过 `ImageWrapper`/`CreateImageOutput` 封装，通常会合并图像尺寸和业务附加字段。
 
@@ -60,8 +60,6 @@
 | `PairDirection` | 配对方向 | `enum` | any | positive_to_negative/正到负；negative_to_positive/负到正；any/任意 | Yes | - |
 | `SubpixelAccuracy` | 亚像素精度 | `bool` | false | - | Yes | - |
 | `SubPixelMode` | 亚像素模式 | `enum` | gradient_centroid | gradient_centroid；gradient_moment；zernike/zernike (legacy alias) | Yes | - |
-| `EdgeModel` | Edge Model | `enum` | Legacy | Legacy；GaussianDerivative/Gaussian Derivative | Yes | - |
-| `EdgeModelSigma` | Edge Model Sigma | `double` | 1 | [0.2, 4] | Yes | - |
 
 ## 输入/输出端口 / Input/Output Ports
 ### 输入 / Inputs
@@ -106,17 +104,18 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`B6BE6A23584947E3D8E720536678BB6D8FA0BC7CE686BA7F67BD3F999C1ECF70`
+- 组合指纹 (Generation Fingerprint)：`A85552FEF127ADFAAB69D0F3E1222CD6061474CD11195B14FCEDFAA66D61E0F5`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
 | `AmbiguityCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
-| `AmbiguityDiagnostics` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `AmbiguityRate` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Ambiguous` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Confidence` | `Float` | 源码输出字典初始化中可见字段。 |
+| `DetectedEdgeCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
+| `EdgeModel` | `String` | 源码通过输出字典索引赋值写入。 |
 | `FitResidual` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
 | `Index` | `Integer` | 源码通过输出字典索引赋值写入。 |
@@ -142,7 +141,7 @@
 - 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
-- 执行失败契约：源码中发现 5 条 `OperatorExecutionOutput.Failure(...)` 路径。
+- 执行失败契约：源码中发现 4 条 `OperatorExecutionOutput.Failure(...)` 路径。
 
 ## 适用场景 / Use Cases
 - 适合 (Suitable)：输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。
@@ -156,4 +155,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.2.1 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

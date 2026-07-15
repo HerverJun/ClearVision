@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <ClearVisionOperatorLibraryPackageVersion Condition="'$(ClearVisionOperatorLibraryPackageVersion)' == ''">1.0.2</ClearVisionOperatorLibraryPackageVersion>
+    <ClearVisionOperatorLibraryPackageVersion Condition="'$(ClearVisionOperatorLibraryPackageVersion)' == ''">1.0.3</ClearVisionOperatorLibraryPackageVersion>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 

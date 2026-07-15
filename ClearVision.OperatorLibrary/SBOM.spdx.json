@@ -2,10 +2,10 @@
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
-  "name": "ClearVision.OperatorLibrary-1.0.2",
-  "documentNamespace": "https://clearvision.local/spdx/ClearVision.OperatorLibrary-1.0.2-20260509",
+  "name": "ClearVision.OperatorLibrary-1.0.3",
+  "documentNamespace": "https://clearvision.local/spdx/ClearVision.OperatorLibrary-1.0.3-20260716",
   "creationInfo": {
-    "created": "2026-05-09T00:00:00Z",
+    "created": "2026-07-16T00:00:00Z",
     "creators": [
       "Organization: ClearVision",
       "Tool: manual-lockfile-baseline"
@@ -15,7 +15,7 @@
     {
       "name": "ClearVision.OperatorLibrary",
       "SPDXID": "SPDXRef-Package-ClearVision-OperatorLibrary",
-      "versionInfo": "1.0.2",
+      "versionInfo": "1.0.3",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": false,
       "licenseConcluded": "MIT",

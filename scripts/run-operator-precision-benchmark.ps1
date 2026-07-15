@@ -7,6 +7,10 @@ param(
 
     [string]$ResultsDirectory = ".tmp/operator-precision",
 
+    [string]$SourceShaOverride = "",
+
+    [switch]$AllowDirty,
+
     [switch]$ReturnExitCode
 )
 
@@ -27,7 +31,13 @@ $settings = switch ($Profile) {
     "acceptance" { @{ Warmup = 5; Iterations = 40 } }
 }
 
-$sourceSha = (& git -C $repoRoot rev-parse HEAD).Trim()
+$harnessCommitSha = (& git -C $repoRoot rev-parse HEAD).Trim()
+$sourceSha = if ([string]::IsNullOrWhiteSpace($SourceShaOverride)) { $harnessCommitSha } else { $SourceShaOverride.Trim() }
+$repositoryDirty = @(& git -C $repoRoot status --porcelain=v1).Count -gt 0
+if ($repositoryDirty -and -not $AllowDirty) {
+    throw "Operator precision evidence requires a clean repository. Use -AllowDirty only for local exploratory runs."
+}
+$sdkVersion = (& dotnet --version).Trim()
 $outputPath = Join-Path $resultsRoot "operator-precision-$Label-$Profile.json"
 $reportPath = Join-Path $resultsRoot "operator-precision-$Label-$Profile.md"
 
@@ -35,6 +45,9 @@ $reportPath = Join-Path $resultsRoot "operator-precision-$Label-$Profile.md"
     --manifest $manifest `
     --label $Label `
     --source-sha $sourceSha `
+    --harness-commit-sha $harnessCommitSha `
+    --sdk-version $sdkVersion `
+    --repository-dirty $repositoryDirty `
     --warmup $settings.Warmup `
     --iterations $settings.Iterations `
     --output $outputPath `
@@ -51,14 +64,15 @@ if ($exitCode -eq 0 -and $Profile -eq "acceptance") {
         "AnomalyPreprocess/ManifestDeclaredRgbFloat01" = @{ P95 = 0.20; Allocation = 20000 }
     }
     if ($Label -eq "after") {
-        $metricBudgets["Caliper/ProductionGaussianDerivative"] = @{ P95 = 0.10; Allocation = 10000 }
+        $metricBudgets["Caliper/IntegratedGaussianDerivative"] = @{ P95 = 0.50; Allocation = 20000 }
         $metricBudgets["Circle/ProductionOrthogonalWelsch"] = @{ P95 = 1.00; Allocation = 500000 }
         $metricBudgets["Line/ProductionWelsch"] = @{ P95 = 0.50; Allocation = 300000 }
     }
 
     foreach ($entry in $metricBudgets.GetEnumerator()) {
         $parts = $entry.Key.Split('/')
-        $metric = $result.metrics | Where-Object { $_.domain -eq $parts[0] -and $_.algorithm -eq $parts[1] }
+        $expectedSplit = if ($parts[0] -eq "AnomalyPreprocess") { "contract" } else { "test" }
+        $metric = $result.metrics | Where-Object { $_.domain -eq $parts[0] -and $_.algorithm -eq $parts[1] -and $_.split -eq $expectedSplit }
         if ($null -eq $metric) {
             throw "Missing acceptance metric '$($entry.Key)'."
         }
@@ -95,12 +109,11 @@ if ($exitCode -eq 0 -and $Profile -eq "acceptance") {
     if ($Label -eq "after") {
         $productionPairs = @(
             @{ Domain = "Circle"; Candidate = "OrthogonalWelsch"; Production = "ProductionOrthogonalWelsch"; Mode = "Exact" },
-            @{ Domain = "Line"; Candidate = "Welsch"; Production = "ProductionWelsch"; Mode = "Exact" },
-            @{ Domain = "Caliper"; Candidate = "GaussianDerivative"; Production = "ProductionGaussianDerivative"; Mode = "NoDegradation" }
+            @{ Domain = "Line"; Candidate = "Welsch"; Production = "ProductionWelsch"; Mode = "Exact" }
         )
         foreach ($pair in $productionPairs) {
-            $candidate = $result.metrics | Where-Object { $_.domain -eq $pair.Domain -and $_.algorithm -eq $pair.Candidate }
-            $production = $result.metrics | Where-Object { $_.domain -eq $pair.Domain -and $_.algorithm -eq $pair.Production }
+            $candidate = $result.metrics | Where-Object { $_.domain -eq $pair.Domain -and $_.algorithm -eq $pair.Candidate -and $_.split -eq "test" }
+            $production = $result.metrics | Where-Object { $_.domain -eq $pair.Domain -and $_.algorithm -eq $pair.Production -and $_.split -eq "test" }
             if ($null -eq $candidate -or $null -eq $production) {
                 throw "Missing production conformance pair for $($pair.Domain)."
             }
@@ -117,6 +130,23 @@ if ($exitCode -eq 0 -and $Profile -eq "acceptance") {
                 throw "Production conformance regressed for $($pair.Domain)."
             }
         }
+
+        $caliperBaseline = $result.metrics | Where-Object { $_.domain -eq "Caliper" -and $_.algorithm -eq "LegacyGradientCentroid" -and $_.split -eq "test" }
+        $caliperIntegrated = $result.metrics | Where-Object { $_.domain -eq "Caliper" -and $_.algorithm -eq "IntegratedGaussianDerivative" -and $_.split -eq "test" }
+        if ($null -eq $caliperBaseline -or $null -eq $caliperIntegrated) {
+            throw "Missing Caliper integration evidence."
+        }
+        if ([double]$caliperIntegrated.rmse -lt [double]$caliperBaseline.rmse -and
+            [double]$caliperIntegrated.p95Error -lt [double]$caliperBaseline.p95Error -and
+            [double]$caliperIntegrated.failureRate -le [double]$caliperBaseline.failureRate) {
+            throw "Caliper integrated candidate unexpectedly became eligible; adoption decision and formal operator exposure require an explicit evidence review."
+        }
+    }
+
+
+    $identityMetric = $result.metrics | Where-Object { $_.domain -eq "AnomalyPreprocess" -and $_.algorithm -eq "ManifestDeclaredRgbFloat01" -and $_.split -eq "contract" }
+    if ([double]$identityMetric.extra.mismatchRejectedFailClosed -ne 1.0) {
+        throw "ONNX feature-bank mismatch was not exercised fail-closed."
     }
 }
 

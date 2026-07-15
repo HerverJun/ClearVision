@@ -44,7 +44,7 @@ public class OperatorKnowledgeGraphTests
             deepLearning.QualityState.AlgorithmQuality.Should().Be(OperatorAlgorithmQuality.Unknown);
 
             var caliper = graph.Cards.Single(card => card.OperatorType == nameof(OperatorType.CaliperTool));
-            caliper.QualityState.AlgorithmQuality.Should().Be(OperatorAlgorithmQuality.SyntheticBenchmarkValidated);
+            caliper.QualityState.AlgorithmQuality.Should().Be(OperatorAlgorithmQuality.SyntheticBenchmarkEvidence);
             caliper.QualityState.ProductionReadiness.Should().Be(OperatorProductionReadiness.Unknown);
             caliper.QualityState.FieldValidation.Should().Be(OperatorFieldValidation.NotValidated);
         }

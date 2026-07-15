@@ -254,8 +254,7 @@
         "Dataset": { "type": "string" },
         "FieldReplay": { "type": "string" },
         "PrecisionClaim": { "type": "string" },
-        "IndustrialStatus": { "type": "string" },
-        "QScore": { "type": ["string", "null"] }
+        "IndustrialStatus": { "type": "string" }
       }
     }
   }

@@ -98,7 +98,7 @@
                           "golden":  "Golden evidenced (117 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 117 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -110,7 +110,7 @@
                           "golden":  "Golden evidenced (117 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 117 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -122,7 +122,7 @@
                           "golden":  "Golden evidenced (117 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 117 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -134,7 +134,7 @@
                           "golden":  "Golden evidenced (100 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -146,7 +146,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Dataset evidenced (22 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 22 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -158,7 +158,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Dataset evidenced (22 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 22 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -170,7 +170,7 @@
                           "golden":  "Golden evidenced (48 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 48 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -182,7 +182,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 31 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -194,7 +194,7 @@
                           "golden":  "Golden evidenced (117 cases)",
                           "dataset":  "Dataset evidenced (117 cases)",
                           "fieldReplay":  "Field replay evidenced (20 cases)",
-                          "precisionClaim":  "Field replay precision claim supported by 20 replay cases; real-site sign-off not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "Field replay substitute evidenced (20 cases); 功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -206,7 +206,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 27 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -218,7 +218,7 @@
                           "golden":  "Golden evidenced (48 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 48 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -230,7 +230,7 @@
                           "golden":  "Golden evidenced (117 cases)",
                           "dataset":  "Dataset evidenced (48 cases)",
                           "fieldReplay":  "Field replay evidenced (20 cases)",
-                          "precisionClaim":  "Field replay precision claim supported by 20 replay cases; real-site sign-off not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "Field replay substitute evidenced (20 cases); 功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -242,7 +242,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Dataset evidenced (240 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 240 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -254,7 +254,7 @@
                           "golden":  "Golden evidenced (24 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 24 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -266,7 +266,7 @@
                           "golden":  "Golden evidenced (48 cases)",
                           "dataset":  "Dataset partially evidenced (2 cases)",
                           "fieldReplay":  "Field replay evidenced (20 cases)",
-                          "precisionClaim":  "Field replay precision claim supported by 20 replay cases; real-site sign-off not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "Field replay substitute evidenced (20 cases); 功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -278,7 +278,7 @@
                           "golden":  "Golden evidenced (48 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 48 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -290,7 +290,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Dataset evidenced (72 cases)",
                           "fieldReplay":  "Field replay evidenced (20 cases)",
-                          "precisionClaim":  "Field replay precision claim supported by 20 replay cases; real-site sign-off not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "Field replay substitute evidenced (20 cases); 功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -302,7 +302,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 24 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -314,7 +314,7 @@
                           "golden":  "Golden evidenced (24 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 24 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -326,7 +326,7 @@
                           "golden":  "Golden evidenced (117 cases)",
                           "dataset":  "Dataset evidenced (117 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 117 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -338,7 +338,7 @@
                           "golden":  "Golden evidenced (48 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 48 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -350,7 +350,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 24 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -362,7 +362,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Dataset evidenced (24 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 24 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -374,7 +374,7 @@
                           "golden":  "Golden evidenced (24 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 24 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -386,7 +386,7 @@
                           "golden":  "Golden evidenced (48 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 48 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -398,7 +398,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Dataset evidenced (24 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 24 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -410,7 +410,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Dataset evidenced (24 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 24 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -422,7 +422,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Dataset evidenced (72 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 72 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -434,7 +434,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Dataset evidenced (72 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 72 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -446,7 +446,7 @@
                           "golden":  "Golden evidenced (48 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 48 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -458,7 +458,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Dataset evidenced (1028 cases)",
                           "fieldReplay":  "Field replay evidenced (20 cases)",
-                          "precisionClaim":  "Field replay precision claim supported by 20 replay cases; real-site sign-off not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "Field replay substitute evidenced (20 cases); 功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -470,7 +470,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 24 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -482,7 +482,7 @@
                           "golden":  "Golden evidenced (100 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -494,7 +494,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 22 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -506,7 +506,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 22 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -518,7 +518,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -530,7 +530,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -542,7 +542,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 22 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -554,7 +554,7 @@
                           "golden":  "Golden evidenced (100 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -566,7 +566,7 @@
                           "golden":  "Golden evidenced (100 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -578,7 +578,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -590,7 +590,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 22 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -602,7 +602,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -614,7 +614,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -626,7 +626,7 @@
                           "golden":  "Golden evidenced (100 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -638,7 +638,7 @@
                           "golden":  "Golden evidenced (100 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -650,7 +650,7 @@
                           "golden":  "Golden evidenced (100 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -662,7 +662,7 @@
                           "golden":  "Golden evidenced (100 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -674,7 +674,7 @@
                           "golden":  "Golden evidenced (100 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -686,7 +686,7 @@
                           "golden":  "Golden evidenced (29 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 29 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -698,7 +698,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -710,7 +710,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -722,7 +722,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -734,7 +734,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -746,7 +746,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -758,7 +758,7 @@
                           "golden":  "Golden evidenced (31 cases)",
                           "dataset":  "Dataset evidenced (31 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 31 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -770,7 +770,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -782,7 +782,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -794,7 +794,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -806,7 +806,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -818,7 +818,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -830,7 +830,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -842,7 +842,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -854,7 +854,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Dataset evidenced (20 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 20 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -866,7 +866,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -878,7 +878,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -890,7 +890,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -902,7 +902,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -914,7 +914,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Dataset evidenced (272 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 272 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -926,7 +926,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -938,7 +938,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -950,7 +950,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -962,7 +962,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -974,7 +974,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -986,7 +986,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -998,7 +998,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1010,7 +1010,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1022,7 +1022,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1034,7 +1034,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1046,7 +1046,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1058,7 +1058,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1070,7 +1070,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1082,7 +1082,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1094,7 +1094,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1106,7 +1106,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1118,7 +1118,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1130,7 +1130,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1142,7 +1142,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1154,7 +1154,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1166,7 +1166,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1178,7 +1178,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1190,7 +1190,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1202,7 +1202,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1214,7 +1214,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1226,7 +1226,7 @@
                           "golden":  "Golden evidenced (23 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 23 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1238,7 +1238,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1250,7 +1250,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1262,7 +1262,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1274,7 +1274,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1286,7 +1286,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1298,7 +1298,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1310,7 +1310,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1322,7 +1322,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1334,7 +1334,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1346,7 +1346,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1358,7 +1358,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1370,7 +1370,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1382,7 +1382,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1394,7 +1394,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1406,7 +1406,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1418,7 +1418,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1430,7 +1430,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Dataset evidenced (20 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 20 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1442,7 +1442,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1454,7 +1454,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1466,7 +1466,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1478,7 +1478,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1490,7 +1490,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1502,7 +1502,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1514,7 +1514,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1526,7 +1526,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1538,7 +1538,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1550,7 +1550,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1562,7 +1562,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1574,7 +1574,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1586,7 +1586,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1598,7 +1598,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1610,7 +1610,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1622,7 +1622,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Dataset evidenced (20 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 20 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1634,7 +1634,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1646,7 +1646,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Dataset evidenced (20 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 20 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1658,7 +1658,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1670,7 +1670,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1682,7 +1682,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1694,7 +1694,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1706,7 +1706,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1718,7 +1718,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Dataset evidenced (20 cases)",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Dataset precision claim supported by 20 dataset cases; field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1730,7 +1730,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1742,7 +1742,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1754,7 +1754,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1766,7 +1766,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1778,7 +1778,7 @@
                           "golden":  "Golden evidenced (22 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 22 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1790,7 +1790,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1802,7 +1802,7 @@
                           "golden":  "Golden evidenced (27 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 27 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1814,7 +1814,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1826,7 +1826,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1838,7 +1838,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1850,7 +1850,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1862,7 +1862,7 @@
                           "golden":  "Golden evidenced (20 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1874,7 +1874,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1886,7 +1886,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1898,7 +1898,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1910,7 +1910,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1922,7 +1922,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1934,7 +1934,7 @@
                           "golden":  "Not yet evidenced",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       },
@@ -1946,7 +1946,7 @@
                           "golden":  "Golden evidenced (23 cases)",
                           "dataset":  "Not yet evidenced",
                           "fieldReplay":  "Not yet evidenced",
-                          "precisionClaim":  "Golden regression precision claim supported by 23 oracle cases; dataset and field replay not yet evidenced",
+                          "precisionClaim":  "Test-count and regression evidence only; it does not establish algorithm precision, production readiness, or field validation.",
                           "industrialStatus":  "功能可用但未完成现场工业验证",
                           "nextAction":  "Maintain regression baseline"
                       }

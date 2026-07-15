@@ -22,7 +22,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.Measurement,
     IconName = "caliper",
     Keywords = new[] { "caliper", "edge pair", "width", "distance", "edge" },
-    Version = "1.1.0"
+    Version = "1.2.1"
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [InputPort("SearchRegion", "Search Region", PortDataType.Rectangle, IsRequired = false)]
@@ -44,8 +44,6 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("PairDirection", "Pair Direction", "enum", DefaultValue = "any", Options = new[] { "positive_to_negative|positive_to_negative", "negative_to_positive|negative_to_positive", "any|any" })]
 [OperatorParam("SubpixelAccuracy", "Subpixel Accuracy", "bool", DefaultValue = false)]
 [OperatorParam("SubPixelMode", "Sub Pixel Mode", "enum", DefaultValue = "gradient_centroid", Options = new[] { "gradient_centroid|gradient_centroid", "gradient_moment|gradient_moment", "zernike|zernike (legacy alias)" })]
-[OperatorParam("EdgeModel", "Edge Model", "enum", DefaultValue = "Legacy", Options = new[] { "Legacy|Legacy", "GaussianDerivative|Gaussian Derivative" })]
-[OperatorParam("EdgeModelSigma", "Edge Model Sigma", "double", DefaultValue = 1.0, Min = 0.2, Max = 4.0)]
 public class CaliperToolOperator : OperatorBase
 {
     public override OperatorType OperatorType => OperatorType.CaliperTool;
@@ -77,9 +75,7 @@ public class CaliperToolOperator : OperatorBase
         var expectedCount = GetIntParam(@operator, "ExpectedCount", 1, 1, 100);
         var measureMode = GetStringParam(@operator, "MeasureMode", "edge_pairs");
         var pairDirection = GetStringParam(@operator, "PairDirection", "any");
-        var edgeModel = GetStringParam(@operator, "EdgeModel", "Legacy").Trim();
-        var edgeModelSigma = GetDoubleParam(@operator, "EdgeModelSigma", 1.0, 0.2, 4.0);
-        var subpixel = GetBoolParam(@operator, "SubpixelAccuracy", false) || !edgeModel.Equals("Legacy", StringComparison.OrdinalIgnoreCase);
+        var subpixel = GetBoolParam(@operator, "SubpixelAccuracy", false);
         var requestedSubPixelMode = GetStringParam(@operator, "SubPixelMode", "gradient_centroid");
         var subPixelMode = NormalizeSubPixelMode(requestedSubPixelMode);
         if (!measureMode.Equals("edge_pairs", StringComparison.OrdinalIgnoreCase))
@@ -110,32 +106,7 @@ public class CaliperToolOperator : OperatorBase
         foreach (var edge in kernelEdges)
         {
             var profilePosition = edge.Position;
-            var modelResidual = double.NaN;
-            var modelAmbiguous = false;
-            var modelSigmaSamples = double.NaN;
-            if (edgeModel.Equals("GaussianDerivative", StringComparison.OrdinalIgnoreCase))
-            {
-                var modelResult = CaliperEdgeModelKernel.FitGaussianDerivative(profile, edge.Position, edge.Polarity.ToString(), edgeModelSigma);
-                if (!modelResult.Success)
-                {
-                    var failure = OperatorExecutionOutput.Failure($"[EdgeModelFailure] GaussianDerivative failed: {modelResult.FailureReason}");
-                    failure.OutputData = new Dictionary<string, object>
-                    {
-                        ["EdgeModel"] = "GaussianDerivative",
-                        ["FitResidual"] = double.NaN,
-                        ["UncertaintyPx"] = double.NaN,
-                        ["AmbiguityDiagnostics"] = modelResult.FailureReason,
-                        ["StatusCode"] = "EdgeModelFailure"
-                    };
-                    return Task.FromResult(failure);
-                }
-
-                profilePosition = modelResult.Position;
-                modelResidual = modelResult.ResidualRmse;
-                modelAmbiguous = modelResult.Ambiguous;
-                modelSigmaSamples = modelResult.SigmaSamples;
-            }
-            else if (subpixel)
+            if (subpixel)
             {
                 var polarityName = edge.Polarity == IndustrialCaliperPolarity.DarkToLight
                     ? "DarkToLight"
@@ -157,18 +128,15 @@ public class CaliperToolOperator : OperatorBase
             }
 
             var point = IndustrialCaliperKernel.InterpolatePosition(scan.Start, scan.End, profilePosition, sampleCount);
-            var localizationPitchPx = scan.Length / Math.Max(sampleCount - 1, 1);
-            var localizationSigmaPx = double.IsFinite(modelSigmaSamples)
-                ? Math.Max(modelSigmaSamples * localizationPitchPx, localizationPitchPx * 0.05)
-                : EstimateLocalizationSigmaPx(profile, profilePosition, sampleCount, scan.Length);
+            var localizationSigmaPx = EstimateLocalizationSigmaPx(profile, profilePosition, sampleCount, scan.Length);
             detectedEdges.Add(new DetectedEdge(
                 (int)Math.Round(profilePosition),
                 edge.Polarity == IndustrialCaliperPolarity.DarkToLight ? EdgePolarity.DarkToLight : EdgePolarity.LightToDark,
                 point,
                 localizationSigmaPx,
-                modelResidual,
-                modelAmbiguous,
-                edgeModel));
+                double.NaN,
+                false,
+                "Legacy"));
         }
 
         var pairs = BuildEdgePairs(detectedEdges, pairDirection, expectedCount);
@@ -225,7 +193,20 @@ public class CaliperToolOperator : OperatorBase
 
         if (pairCount < expectedCount)
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure($"[NoFeature] Expected at least {expectedCount} edge pair(s), got {pairCount}"));
+            var failure = OperatorExecutionOutput.Failure($"[NoFeature] Expected at least {expectedCount} edge pair(s), got {pairCount}");
+            failure.OutputData = new Dictionary<string, object>
+            {
+                ["EdgeModel"] = "Legacy",
+                ["FitResidual"] = fitResidual,
+                ["UncertaintyPx"] = reportedUncertaintyPx,
+                ["AmbiguityCount"] = ambiguityCount,
+                ["AmbiguityRate"] = detectedEdges.Count > 0 ? ambiguityCount / (double)detectedEdges.Count : 0.0,
+                ["EdgeDiagnostics"] = edgeDiagnostics,
+                ["DetectedEdgeCount"] = detectedEdges.Count,
+                ["PairCount"] = pairCount,
+                ["StatusCode"] = "NoFeature"
+            };
+            return Task.FromResult(failure);
         }
 
         var output = CreateImageOutput(resultImage, new Dictionary<string, object>
@@ -246,7 +227,7 @@ public class CaliperToolOperator : OperatorBase
         });
         output["RequestedSubPixelMode"] = requestedSubPixelMode;
         output["SubPixelMode"] = subPixelMode;
-        output["EdgeModel"] = edgeModel;
+        output["EdgeModel"] = "Legacy";
         output["FitResidual"] = fitResidual;
         output["AmbiguityCount"] = ambiguityCount;
         output["AmbiguityRate"] = detectedEdges.Count > 0 ? ambiguityCount / (double)detectedEdges.Count : 0.0;
@@ -259,8 +240,8 @@ public class CaliperToolOperator : OperatorBase
             reportedUncertaintyPx,
             null,
             MeasurementEvidenceProvenance.Heuristic,
-            edgeModel.Equals("Legacy", StringComparison.OrdinalIgnoreCase) ? $"Legacy/{subPixelMode}" : edgeModel,
-            new[] { "HeuristicUncertainty" }.Concat(ambiguityCount > 0 ? new[] { "Ambiguous" } : Array.Empty<string>()).Concat(edgeModel.Equals("Legacy", StringComparison.OrdinalIgnoreCase) ? new[] { "LegacyCompatibility" } : Array.Empty<string>()));
+            $"Legacy/{subPixelMode}",
+            new[] { "HeuristicUncertainty", "LegacyCompatibility" }.Concat(ambiguityCount > 0 ? new[] { "Ambiguous" } : Array.Empty<string>()));
         // Override image width key with measured width to match operator output contract.
         output["Width"] = widthValue;
 
@@ -301,19 +282,6 @@ public class CaliperToolOperator : OperatorBase
         if (!validModes.Contains(subPixelMode, StringComparer.OrdinalIgnoreCase))
         {
             return ValidationResult.Invalid("SubPixelMode must be gradient_centroid, gradient_moment, or legacy zernike");
-        }
-
-        var edgeModel = GetStringParam(@operator, "EdgeModel", "Legacy").Trim();
-        if (!edgeModel.Equals("Legacy", StringComparison.OrdinalIgnoreCase) &&
-            !edgeModel.Equals("GaussianDerivative", StringComparison.OrdinalIgnoreCase))
-        {
-            return ValidationResult.Invalid("EdgeModel must be Legacy or GaussianDerivative; Quadratic and Erf were not adopted by the phase-5 benchmark.");
-        }
-
-        var edgeModelSigma = GetDoubleParam(@operator, "EdgeModelSigma", 1.0);
-        if (!double.IsFinite(edgeModelSigma) || edgeModelSigma < 0.2 || edgeModelSigma > 4.0)
-        {
-            return ValidationResult.Invalid("EdgeModelSigma must be finite and within [0.2, 4.0]");
         }
 
         return ValidationResult.Valid();

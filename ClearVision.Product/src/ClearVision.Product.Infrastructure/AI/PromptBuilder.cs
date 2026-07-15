@@ -450,8 +450,7 @@ public class PromptBuilder
                         dataset = card.Evidence.Dataset,
                         fieldReplay = card.Evidence.FieldReplay,
                         precisionClaim = card.Evidence.PrecisionClaim,
-                        industrialStatus = card.Evidence.IndustrialStatus,
-                        qScore = card.Evidence.QScore
+                        industrialStatus = card.Evidence.IndustrialStatus
                     }
                 })
                 .ToList()

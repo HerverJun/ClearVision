@@ -11,6 +11,7 @@ public static class OperatorExecutionQuality
 public static class OperatorAlgorithmQuality
 {
     public const string Unknown = "Unknown";
+    public const string SyntheticBenchmarkEvidence = "SyntheticBenchmarkEvidence";
     public const string SyntheticBenchmarkValidated = "SyntheticBenchmarkValidated";
     public const string PublicDatasetEvidence = "PublicDatasetEvidence";
 }
@@ -49,23 +50,36 @@ public static class OperatorQualityStateCatalog
     private const string Phase5Benchmark = "quality/evals/reports/operator-precision-after-acceptance.json";
     private const string Phase5Governance = "docs/operator-quality/operator-quality-phase5-closeout.md";
 
+    private static readonly IReadOnlyDictionary<OperatorType, AlgorithmEvidence> AlgorithmEvidenceByType =
+        new Dictionary<OperatorType, AlgorithmEvidence>
+        {
+            [OperatorType.CaliperTool] = new(
+                OperatorAlgorithmQuality.SyntheticBenchmarkEvidence,
+                new[] { Phase5Benchmark, Phase5Governance },
+                "clearvision-operator-precision-synthetic-v1@1.0.0",
+                "Caliper candidate measured; formal integration rejected"),
+            [OperatorType.CircleMeasurement] = new(
+                OperatorAlgorithmQuality.SyntheticBenchmarkValidated,
+                new[] { Phase5Benchmark, Phase5Governance },
+                "clearvision-operator-precision-synthetic-v1@1.0.0",
+                "OrthogonalWelsch opt-in path accepted"),
+            [OperatorType.LineMeasurement] = new(
+                OperatorAlgorithmQuality.SyntheticBenchmarkValidated,
+                new[] { Phase5Benchmark, Phase5Governance },
+                "clearvision-operator-precision-synthetic-v1@1.0.0",
+                "Welsch opt-in path accepted"),
+            [OperatorType.AnomalyDetection] = new(
+                OperatorAlgorithmQuality.PublicDatasetEvidence,
+                new[] { Phase5Benchmark, "quality/evals/reports/AnomalyDetection_mvtec_baseline.json", Phase5Governance },
+                "MVTec-public-baseline + manifest-contract",
+                "Traditional default retained; ONNX identity is fail-closed")
+        };
+
     public static OperatorQualityState Resolve(OperatorType type, OperatorLifecycle lifecycle)
     {
-        var algorithmQuality = type switch
-        {
-            OperatorType.CaliperTool or OperatorType.CircleMeasurement or OperatorType.LineMeasurement =>
-                OperatorAlgorithmQuality.SyntheticBenchmarkValidated,
-            OperatorType.AnomalyDetection => OperatorAlgorithmQuality.PublicDatasetEvidence,
-            _ => OperatorAlgorithmQuality.Unknown
-        };
-        var evidence = type switch
-        {
-            OperatorType.CaliperTool or OperatorType.CircleMeasurement or OperatorType.LineMeasurement =>
-                new[] { Phase5Benchmark, Phase5Governance },
-            OperatorType.AnomalyDetection =>
-                new[] { Phase5Benchmark, "quality/evals/reports/AnomalyDetection_mvtec_baseline.json", Phase5Governance },
-            _ => Array.Empty<string>()
-        };
+        var registeredEvidence = AlgorithmEvidenceByType.GetValueOrDefault(type);
+        var algorithmQuality = registeredEvidence?.AlgorithmQuality ?? OperatorAlgorithmQuality.Unknown;
+        var evidence = registeredEvidence?.EvidenceRefs ?? Array.Empty<string>();
         var productionReadiness = lifecycle switch
         {
             OperatorLifecycle.Experimental => OperatorProductionReadiness.Experimental,
@@ -82,4 +96,10 @@ public static class OperatorQualityStateCatalog
             OperatorFieldValidation.NotValidated,
             evidence);
     }
+
+    private sealed record AlgorithmEvidence(
+        string AlgorithmQuality,
+        IReadOnlyList<string> EvidenceRefs,
+        string EvidenceIdentity,
+        string Verdict);
 }

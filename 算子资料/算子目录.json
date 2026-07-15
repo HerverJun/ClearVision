@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-15T23:49:28.6486899+08:00",
-  "generationFingerprint": "4FCFCA834BBC9A47F65EFC500E8079EB9C24CEB406E6D76D44A919CCA86D2DA4",
+  "generatedAt": "2026-07-16T01:07:27.7681703+08:00",
+  "generationFingerprint": "E0B7FE8FAF4CEDA40CFC3559FADEF26B7748BD0791618831FF8E4CF417A21BB5",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -859,15 +859,6 @@
       ],
       "generationDependencies": [],
       "generationFingerprint": "A71333E3777265EDC5D7B98D0A62BCC14C84A9A92E8D0C9622D9595EE48EAA8C",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/ImageAcquisition.md"
     },
     {
@@ -1119,15 +1110,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "4888FB5B00DE5FF2EA7146C273BD31C545C4434B052D8FD011D73D7F5B701E05",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/AffineTransform.md"
     },
     {
@@ -1318,15 +1300,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel"
       ],
       "generationFingerprint": "2AC2FE2007E49C44D2538AE2D3D9E2BD37B757BE5B6835114148D147527CD539",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/BilateralFilter.md"
     },
     {
@@ -1551,15 +1524,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "8FE0EEE5EDF16DE9AF8F05EEBEEBCE29F91AEDA990E0718BD979E7F9FCEB151F",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ClaheEnhancement.md"
     },
     {
@@ -1748,15 +1712,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "2FE4E29B3E3B65FC35391517EB336AC39F29CE15F1593452BB9E81CBE717E9C4",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ColorConversion.md"
     },
     {
@@ -1975,15 +1930,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "9E8042AFC582813F25B669C102AE9B88E11D3059B7D004271788499779EC0F84",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/CopyMakeBorder.md"
     },
     {
@@ -2074,15 +2020,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "72F7D0AAA92F526190649B11DF913816724D0711E7CA88104FC0D95FE72B2519",
-      "quality": {
-        "totalScore": 89,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/FFT1D.md"
     },
     {
@@ -2953,15 +2890,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel"
       ],
       "generationFingerprint": "D956D7CDABEF6B2435D5026C69B66AE9E69AEC78F9960B97BC0DB6F56F7A0CEE",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/Filtering.md"
     },
     {
@@ -3135,15 +3063,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "E3A544B34FB8905D343641E85039E91B740CC9C360DA2EA6335B2DA19573330E",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/FrameAveraging.md"
     },
     {
@@ -3245,15 +3164,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "52A0030491EE19452768E854D58336B68736D1DCFAD56D2ADC50CAFA8FCA716D",
-      "quality": {
-        "totalScore": 81,
-        "level": "B",
-        "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 85,
-        "summary": "Doc=60, Test=100, Validation=80, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/FrequencyFilter.md"
     },
     {
@@ -3443,15 +3353,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "58C571870EA498C0AFD3E6600A38CD232B871A105FC81BBE5AE46C654D813954",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/HistogramEqualization.md"
     },
     {
@@ -3746,15 +3647,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "F5F9DF63BB57BA70C42AB64BEF9AA6D13B98E32557C3F0BB022F028498F0DBA9",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/ImageAdd.md"
     },
     {
@@ -3996,15 +3888,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "64DC1EE1FA525BD856FE3047B5B35149695D04100529A15205D2E48FBB89C9EA",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ImageBlend.md"
     },
     {
@@ -4423,15 +4306,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "1FDE0B669EC38092A0B5BCA4161456EBA280AEA94CE86A3A52DBE401ECA7757A",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ImageCompose.md"
     },
     {
@@ -4614,15 +4488,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "47402FEBCC97861438AC0CF53E7DCFB7EFEBE598C9CE593F8B2190F0098DE66E",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ImageCrop.md"
     },
     {
@@ -5286,15 +5151,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.ImageNormalizeImageContractProvider"
       ],
       "generationFingerprint": "D635DBB61BF6852AA83436EA8D1AD28DE790F8370A3204CFF8C60B329365CCBE",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/ImageNormalize.md"
     },
     {
@@ -5506,15 +5362,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "226A0498FC6B034DC78A8902B96020D0EE70F68C0E13C937FE518F62C8552B87",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ImageResize.md"
     },
     {
@@ -5709,15 +5556,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "C4AF5D397F39E5BBD3F767EC158F998AC429E20C8C9C03767EBD4BB87F28FC30",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ImageRotate.md"
     },
     {
@@ -5987,15 +5825,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "A51B1D1AD26FA79086E4F714B938AEC82CACA68A9B5D7323757D56EE36F92D8F",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ImageStitching.md"
     },
     {
@@ -6233,15 +6062,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "9794085B1D726C0D42FFC4C8E0324684A5E91667E67BF7AB26A7570E139D472F",
-      "quality": {
-        "totalScore": 89,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ImageSubtract.md"
     },
     {
@@ -6442,15 +6262,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "D96F87D16F84EB69B93D652ACBBC8766B2743F912F95249442C707B35DDF49A7",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ImageTiling.md"
     },
     {
@@ -6541,15 +6352,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "D51743C9C49BC4413E50CFC65644AD3AE7BC0D65698DE5CD7D0FCB232E6E8D68",
-      "quality": {
-        "totalScore": 89,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/InverseFFT1D.md"
     },
     {
@@ -6856,15 +6658,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.LaplacianSharpenImageContractProvider"
       ],
       "generationFingerprint": "5FEA5C648C6BBA2E5A2697EC32535C0C1911926620CA771CBEE53726A8AA2E71",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/LaplacianSharpen.md"
     },
     {
@@ -7035,15 +6828,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel"
       ],
       "generationFingerprint": "AD6FC35D40C922B26CB444F5FDDAC8092252C33D2DAA1D12ED1A4C59CDC278B1",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/MeanFilter.md"
     },
     {
@@ -7284,15 +7068,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.SpatialFilterKernel"
       ],
       "generationFingerprint": "466C4AA2FC57D22F9E4101BB985C7A1C1CAEC569BB4965A650A55DDEC92AA593",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/MedianBlur.md"
     },
     {
@@ -7665,15 +7440,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "2B877F2C6FDE1161F474CB72C67B8E96F4C6BC09369F2C2BD26B87D1EEB99738",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/PerspectiveTransform.md"
     },
     {
@@ -7904,15 +7670,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "9E7C1802E2AB4941E2BCB232057F2ED714BC5AEF376C6694D26AB353B259BA0E",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/PolarUnwrap.md"
     },
     {
@@ -8200,15 +7957,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "1E5FEA43F5BB1B3AA48320BCA821ED90DD47399EA3D551A49043F450AD128693",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/RoiManager.md"
     },
     {
@@ -8897,15 +8645,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.ShadingCorrectionExactImageContractProvider"
       ],
       "generationFingerprint": "5011419F487D053A8ADF0A5E858AA8B2F6F271432D7853270C6BF6BBBF341C38",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/ShadingCorrection.md"
     },
     {
@@ -9116,15 +8855,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "FF75218065374CD71798E0BA8365EFB92B794220120812709C51CD87E98223B6",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/AdaptiveThreshold.md"
     },
     {
@@ -9319,15 +9049,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "8E9649AADED7F9F1505E43DF410BC2E88E01DE365C4A11055FCB8B8B1A946BE2",
-      "quality": {
-        "totalScore": 76,
-        "level": "B",
-        "documentationScore": 100,
-        "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/BinaryImageToRegion.md"
     },
     {
@@ -10042,15 +9763,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "896918CF9B07260F53FF2B19704EB5445C688CD7682AA9F2BADAA9AD1010962D",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/BlobAnalysis.md"
     },
     {
@@ -10305,15 +10017,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "3F1534F8BA3D43425CAC37B4D5CEC54FF0E7EDF2028BDF1FDEEEA6D19A90CBE3",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/DistanceTransform.md"
     },
     {
@@ -10564,15 +10267,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "749575BD09E18010C45912DD55DD9460DEEAC420F5A6A1F2C2C3B21D301D29FA",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/MorphologicalOperation.md"
     },
     {
@@ -10783,15 +10477,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "8BCC72D1E70D90D67E112547E44B347D1131F19A00B1D73A35AA461D6260F391",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/Morphology.md"
     },
     {
@@ -10894,15 +10579,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "B0C81EEEAFB8BB1178453115CD4975BFFC33AD4FADFBC08F6588D2EF16BB220E",
-      "quality": {
-        "totalScore": 84,
-        "level": "B",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 35,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=35"
-      },
       "docPath": "算子资料/算子名片/RectangleRegion.md"
     },
     {
@@ -11104,15 +10780,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "E66B115CC6468DE86DCB617A9809FB6F86B6A6CB02827956584DC87AEE5974E1",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/RegionClosing.md"
     },
     {
@@ -11278,15 +10945,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "ED7BA8434610266C5FA8278802918F5CA7B7BEFDF07F172E3600079ECCBDF309",
-      "quality": {
-        "totalScore": 85,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/RegionComplement.md"
     },
     {
@@ -11368,15 +11026,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "718BCA61798413DD47C76F7771289D3877241567D51ABF5BB47B8F7C299084D8",
-      "quality": {
-        "totalScore": 89,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/RegionDifference.md"
     },
     {
@@ -11590,15 +11239,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "F31025EB47D0D5491DED93D5784F2391AD415CCDCA8C24F1BD62A0630BDD735E",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/RegionDilation.md"
     },
     {
@@ -11811,15 +11451,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "22190DF1942BBE6A61B9B17F8A39A885C3FA7CD1038ED52AB17128454C35B61F",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/RegionErosion.md"
     },
     {
@@ -11901,15 +11532,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "C63D9895C11A5DDFB2B720D62831F6F0CA9A537192AE3E620BEDB687CC93EE18",
-      "quality": {
-        "totalScore": 89,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/RegionIntersection.md"
     },
     {
@@ -12111,15 +11733,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "64768EB2EC896243B77D089B743B14F09E259B25D2FA7984936A03379E1C9879",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/RegionOpening.md"
     },
     {
@@ -12309,15 +11922,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "DBAE8FC2DA3DAFA502712695198B187C62CBD4C51EE0AB096C62D1735A48CAD2",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/RegionSkeleton.md"
     },
     {
@@ -12400,15 +12004,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "CB26C72974A46A08B536BDE170B9DC76D27768FCD7E4F26A463E177F0F1E8F93",
-      "quality": {
-        "totalScore": 89,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/RegionUnion.md"
     },
     {
@@ -12785,15 +12380,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.ThresholdImageContractProvider"
       ],
       "generationFingerprint": "467D2999038418BD09F5BDB6D12670AB0A1DAB33E123EA4F528ED04CB6C6EAFE",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/Thresholding.md"
     },
     {
@@ -12998,15 +12584,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "FE849935D52A45C263D03B072708204D98C225C948B01BAC06AB9D5D17B35156",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/BlobLabeling.md"
     },
     {
@@ -13213,15 +12790,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "7D711DD769875E54453FCE741A0F0A5BE153412FDBAE72613E0BFA9CE705B85C",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/CodeRecognition.md"
     },
     {
@@ -13637,15 +13205,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.ColorDetectionImageContractProvider"
       ],
       "generationFingerprint": "7FC15AEA6072ED2E8E4B972492A39FA48688B2F8FC45DD2FF6A941FBBBC54EC7",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/ColorDetection.md"
     },
     {
@@ -13971,15 +13530,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "8415835802F23A150C74ED407529EF52549071668BB602F6E5D93B10090EB1D0",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ContourDetection.md"
     },
     {
@@ -14192,15 +13742,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "186EBA4B1F5E58E54A1FF3301DDF725AA843B55642C575FA6B8BDED3A041A924",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/CornerDetection.md"
     },
     {
@@ -14759,15 +14300,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.EdgeDetectionImageContractProvider"
       ],
       "generationFingerprint": "7E0C2BA77CA2CB51AFB92141AE3CDDA821418CB5C70039572357B41D5E5218C7",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/EdgeDetection.md"
     },
     {
@@ -15032,15 +14564,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.GlcmTextureImageContractProvider"
       ],
       "generationFingerprint": "BB1DD1681A4A91CA18CC57A46C3CF25B2891F9A612481FDCF242B56D363CDFA9",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/GlcmTexture.md"
     },
     {
@@ -15494,15 +15017,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.HistogramImageContractProvider"
       ],
       "generationFingerprint": "CBB6DAABA04DEC1E9BF6C86F9E539EF2E8A4DC0DE4C7FE045E5087E0E2DBBA21",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/HistogramAnalysis.md"
     },
     {
@@ -15721,15 +15235,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "33FBFBD54D70A4F042F43324E4A070DBE8812D8AEE24C2D1999F7AFD858BC0A2",
-      "quality": {
-        "totalScore": 89,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ImageDiff.md"
     },
     {
@@ -15947,15 +15452,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "F78650EEAF36226DEE42966C37D74A14308AD622BE4F9258142D02A1600BD1DC",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/LawsTextureFilter.md"
     },
     {
@@ -16342,15 +15838,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.PixelStatisticsImageContractProvider"
       ],
       "generationFingerprint": "7D84BF747A71B517E404E47917B5A51877365C79DA3C86A297784C89A557FBCD",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/PixelStatistics.md"
     },
     {
@@ -18036,15 +17523,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.SharpnessImageContractProvider"
       ],
       "generationFingerprint": "0FE236CADF8A6072A6617596CB03CB84BB56BDA1C3496F87EB73B69E19757F19",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/SharpnessEvaluation.md"
     },
     {
@@ -18253,15 +17731,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "D5995266624DDCEBC584210D2437264B20F5364053B83411A0D0286E0237225E",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/SubpixelEdgeDetection.md"
     },
     {
@@ -18718,15 +18187,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "81A958291FEA9DF861AC2F4562C8D920DD581A73D79D500735080ED9CD49F561",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/AkazeFeatureMatch.md"
     },
     {
@@ -18833,15 +18293,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "13CE457707AC16CEF5A760A37358AE198FC95CBB7115154DD93BCB7090A6F23D",
-      "quality": {
-        "totalScore": 89,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ContourExtrema.md"
     },
     {
@@ -18949,15 +18400,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "9CCBC23B4EF47D98AD518D6D7AFFA3B1096B285DE1497AA0D06A8F6B60431B41",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/EdgeIntersection.md"
     },
     {
@@ -19328,15 +18770,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "1733B12CC72F5E7C7F3A0B3E64410D147542DF1D85A5776483CACCC1EE36B08B",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/GradientShapeMatch.md"
     },
     {
@@ -19730,15 +19163,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.LocalDeformableMatchingImageContractProvider"
       ],
       "generationFingerprint": "70B3157E202F7B7CA0CC97B0EF8BE03F6005BDF9ED1E4BAEA8CAA03012994F8A",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/LocalDeformableMatching.md"
     },
     {
@@ -20228,15 +19652,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "7DE1535831EAC487A960D464749A37D5945DA5C2BC1BED1C66FFACFA13F073B1",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/OrbFeatureMatch.md"
     },
     {
@@ -20446,15 +19861,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "A1AD663C8E00D926A5A48051BB0C91BFEEE9D65075FF9CC518E4AC885786A97D",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ParallelLineFind.md"
     },
     {
@@ -21014,15 +20420,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "3C07D1FA48076A0F74C25FC655BECFAE5341A9E47AA407C04B45F2D074B0BDC8",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/PlanarMatching.md"
     },
     {
@@ -21137,15 +20534,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "82EAB47A9674C349C9FCD49686035B85D16A088C34F4AA0696E766D22E7F9880",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/PointAlignment.md"
     },
     {
@@ -21315,15 +20703,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "6D2D29704E5A0F25542D595814E8BB0BAF66FA8DCFC82F90DF5E9ED306F1DE50",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/PointCorrection.md"
     },
     {
@@ -21503,15 +20882,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "0EE01A4E9F45107787DC5A363FE8D500F44AE93BD4D4FDFBC5AA878A03245347",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/PositionCorrection.md"
     },
     {
@@ -21931,15 +21301,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "E45766A3B443EEF67F850EF888D9DAB04D242E15BC03B668EC0C20B7DCB082B1",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/PyramidShapeMatch.md"
     },
     {
@@ -22149,15 +21510,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "086E5FB139C6DFA7DA205E778CC8698C894CDD6672AB7FA5CF8B09CC80DAB029",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/QuadrilateralFind.md"
     },
     {
@@ -22392,15 +21744,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "5D312E5A2967045BFEC131A6A8267B8EB180EC7D5157D544477A8D54CE72A537",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/RectangleDetection.md"
     },
     {
@@ -22485,15 +21828,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "23C60C75C7FBFB86D22BE9E2111918454D5622061DCC90DFEF972639CC5042FE",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/RoiTransform.md"
     },
     {
@@ -22866,15 +22200,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "2CA30374003AAB69D27E9A9A84B400767B38A88086321899701BA56D68618EB1",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/ShapeMatching.md"
     },
     {
@@ -24165,15 +23490,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "0D64DE48699914570EFCA22DF364504365782D74140DE4F2BA66C6E3CE20C4EE",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/TemplateMatching.md"
     },
     {
@@ -24548,15 +23864,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "93D6CC25A3CD00BC6C56B7FBAB982BCBD08416750DD8B4AEFF91B8D15E1791B1",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/DetectionSequenceJudge.md"
     },
     {
@@ -24721,15 +24028,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "59EE5795D682E71A2E45648247E0726E3123A1EC214D9C1AB7D685CBDC325BF4",
-      "quality": {
-        "totalScore": 84,
-        "level": "B",
-        "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/DualModalVoting.md"
     },
     {
@@ -24950,15 +24248,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "F562034673B407D01639433C946E3D6D45139A5CBC6074553567811FD913DFC5",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/EdgePairDefect.md"
     },
     {
@@ -25568,15 +24857,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.SurfaceDefectDetectionImageContractProvider"
       ],
       "generationFingerprint": "35AA01E44E55FFC253C89DBC8E40761F74DB34CD0253020344316A7044F617B5",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/SurfaceDefectDetection.md"
     },
     {
@@ -25842,15 +25122,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "21FF978562E87C61B6B34C7F8BEDF33E9009A1F57A771EFAD853704130F5FA75",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/AngleMeasurement.md"
     },
     {
@@ -26029,15 +25300,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "AFD3C81A2B7C6DC0E4F9B7EB581A9B99142236861AB43BECFBF4545E8B8B86FE",
-      "quality": {
-        "totalScore": 81,
-        "level": "B",
-        "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 85,
-        "summary": "Doc=60, Test=100, Validation=80, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/ArcCaliper.md"
     },
     {
@@ -26055,7 +25317,7 @@
       "requiresLifecycleDisclosure": true,
       "qualityState": {
         "execution": "Implemented",
-        "algorithmQuality": "SyntheticBenchmarkValidated",
+        "algorithmQuality": "SyntheticBenchmarkEvidence",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
         "evidenceRefs": [
@@ -26063,7 +25325,7 @@
           "docs/operator-quality/operator-quality-phase5-closeout.md"
         ]
       },
-      "version": "1.1.0",
+      "version": "1.2.1",
       "keywords": [
         "caliper",
         "distance",
@@ -26072,7 +25334,7 @@
         "width"
       ],
       "tags": [
-        "AlgorithmQuality:SyntheticBenchmarkValidated",
+        "AlgorithmQuality:SyntheticBenchmarkEvidence",
         "Execution:Implemented",
         "FieldValidation:NotValidated",
         "ProductionReadiness:Unknown",
@@ -26308,37 +25570,6 @@
               "label": "zernike (legacy alias)"
             }
           ]
-        },
-        {
-          "name": "EdgeModel",
-          "displayName": "Edge Model",
-          "dataType": "enum",
-          "description": "",
-          "defaultValue": "Legacy",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "Legacy",
-              "label": "Legacy"
-            },
-            {
-              "value": "GaussianDerivative",
-              "label": "Gaussian Derivative"
-            }
-          ]
-        },
-        {
-          "name": "EdgeModelSigma",
-          "displayName": "Edge Model Sigma",
-          "dataType": "double",
-          "description": "",
-          "defaultValue": "1",
-          "min": "0.2",
-          "max": "4",
-          "isRequired": true,
-          "options": null
         }
       ],
       "parameterConditions": [],
@@ -26418,16 +25649,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "B6BE6A23584947E3D8E720536678BB6D8FA0BC7CE686BA7F67BD3F999C1ECF70",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
+      "generationFingerprint": "A85552FEF127ADFAAB69D0F3E1222CD6061474CD11195B14FCEDFAA66D61E0F5",
       "docPath": "算子资料/算子名片/CaliperTool.md"
     },
     {
@@ -26999,15 +26221,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "BB568917FD41D9D4F3244B31FFD8AE2DBE2EB230588BCE8DFBCC97D7776CDA8B",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/CircleMeasurement.md"
     },
     {
@@ -27309,15 +26522,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "C2E255FDE8642355411954D20AA3024D103FA13175B2885C9747E971C828C162",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/ColorMeasurement.md"
     },
     {
@@ -27526,15 +26730,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "4936B3B59F92D316F6DBE9CB44367A35E2D0BDAEDED1B3A240F53F8B301AF03C",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/ContourMeasurement.md"
     },
     {
@@ -27826,15 +27021,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "DF0DA993EE66D2A4C67723EAD4F9403C8DC601FC82A8ED867716D3096AA16710",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/GapMeasurement.md"
     },
     {
@@ -28006,15 +27192,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "1C5CC7256DC5B9118139E6D2D17CFC0BDD9C3E49CF4F2D637AC6609F3611953C",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/GeoMeasurement.md"
     },
     {
@@ -28277,15 +27454,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "B460CD780BA28D006122CBEB9B5118DF1DEBFAF7AA1A0782F111113741E51D15",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/GeometricFitting.md"
     },
     {
@@ -28572,15 +27740,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "818495EA9C4B17CB17AD464C165AE16C68C8AC232AD87FDD59DED58FED591FA1",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/GeometricTolerance.md"
     },
     {
@@ -28722,15 +27881,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "249BEE4DFDAC818F78A786773C8AF120FDA6AD9141B23BE2742F0B2A63755CFB",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/LineLineDistance.md"
     },
     {
@@ -28756,7 +27906,7 @@
           "docs/operator-quality/operator-quality-phase5-closeout.md"
         ]
       },
-      "version": "1.1.0",
+      "version": "1.2.1",
       "keywords": [
         "FitLine",
         "Hough",
@@ -28983,16 +28133,7 @@
       ],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "2864B65050C130B846BB8F0229B378EDDE29C63C68A3C151882C30D5E1B9141D",
-      "quality": {
-        "totalScore": 86,
-        "level": "A",
-        "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=85"
-      },
+      "generationFingerprint": "49DA9D751D7373D509AEAF26D49ABC295CAC0868AEE2332ACFA03D49D56C61BA",
       "docPath": "算子资料/算子名片/LineMeasurement.md"
     },
     {
@@ -30068,15 +29209,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.MeasurementGeometryHelper"
       ],
       "generationFingerprint": "636C65F419283A5408BC375DDDA88251AE3BF6185D8082F8ABD9392CC4BCE209",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/Measurement.md"
     },
     {
@@ -30373,15 +29505,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "5B1D43A4379040CE39667F5AD29137B4432AF2B34E6A0E8C2F9CBBEDB59C92A4",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/MinEnclosingGeometry.md"
     },
     {
@@ -30661,15 +29784,6 @@
         "type:ClearVision.Product.Infrastructure.Operators.PhaseClosureImageContractProvider"
       ],
       "generationFingerprint": "6B0C1E1A6E8FFB406254D2271721CCEF80C19F90854A16FED0A2FF8599608521",
-      "quality": {
-        "totalScore": 89,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/PhaseClosure.md"
     },
     {
@@ -30783,15 +29897,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "76C29D87909B72963FD9AD3D9FE9F11C6DDAF7C4625FE8315643C619CF5B02D9",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/PointLineDistance.md"
     },
     {
@@ -31088,15 +30193,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "0A08E53EE19114735FAFDFFE3DD8C8B6223F4EB1FA447D757C09508B6063C9AD",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/WidthMeasurement.md"
     },
     {
@@ -31177,15 +30273,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "E8896936329EC1949E20FF0C5B1710BD985499979FE30B977369B86558313306",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/CalibrationLoader.md"
     },
     {
@@ -31423,15 +30510,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "C4EF240DCDB5763491CF77CCC9CBFBD6DB0FDEB671EA2C4E671031E3038E2CD8",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/CameraCalibration.md"
     },
     {
@@ -31623,15 +30701,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "A42A7A6B0B58C0793438F4673EF7B45959F62251804A7E9BE7D9DA86E24350BB",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/CoordinateTransform.md"
     },
     {
@@ -31891,15 +30960,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "147BA40A3D44704B0CD81A7C7EC27780A68E86C161C5AD682FFF1EDDB9C6BC99",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/FisheyeCalibration.md"
     },
     {
@@ -32093,15 +31153,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "C1CD23B2ABC0ADC9E4583CAE66243585CA12AC92053A1414325ABFCC2BDAF9CF",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/FisheyeUndistort.md"
     },
     {
@@ -32282,15 +31333,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "CB4D33407E47D93FBA7918B42B5F24CC74F5B1E536970E14E5889ACEF0C8D7E6",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/HandEyeCalibration.md"
     },
     {
@@ -32428,15 +31470,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "5C8B734D7A25AEBAB6CAAB3516CE397184BC828B39A119844EFC805A4AB305C4",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/HandEyeCalibrationValidator.md"
     },
     {
@@ -32741,15 +31774,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "5AA2FA9BB23C2793C51EE3DC6C16709DE45DD641D4EEA00611E2DEA891283D18",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/NPointCalibration.md"
     },
     {
@@ -33084,15 +32108,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "33D735CF78CAAF7B3DDE04EBC87924D518AC52A7D10A540D2BA0D07946E0D9C0",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/PixelToWorldTransform.md"
     },
     {
@@ -33476,15 +32491,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "4B95BFC3A92A8F7406A1DA318C63AFD76C25CF27DE8F1FCA3C66031E0FBDA9AE",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/StereoCalibration.md"
     },
     {
@@ -33824,15 +32830,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "8EBD8DB80A8D348C4A69C07F8D485FE602276DF21C27BD01DE1DB999F58334A2",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/TranslationRotationCalibration.md"
     },
     {
@@ -33973,15 +32970,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "ACE830793818CD03349655F0319C1CC12B43BC0F9254A06DB3C73BCDE813F273",
-      "quality": {
-        "totalScore": 91,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/Undistort.md"
     },
     {
@@ -34008,7 +32996,7 @@
           "docs/operator-quality/operator-quality-phase5-closeout.md"
         ]
       },
-      "version": "1.1.0",
+      "version": "1.2.0",
       "keywords": [
         "anomaly",
         "feature bank",
@@ -34773,16 +33761,7 @@
       "generationDependencies": [
         "type:ClearVision.Product.Infrastructure.Operators.AnomalyDetectionImageContractProvider"
       ],
-      "generationFingerprint": "D16582B2F872342D214D241378A66FEFD3A289B434F810DD7A840F675FA205F9",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
+      "generationFingerprint": "4FE4975A26FAF14BF71530409CA4EDC4B80E234DD682E7BDD36139A19A32B00E",
       "docPath": "算子资料/算子名片/AnomalyDetection.md"
     },
     {
@@ -37089,15 +36068,6 @@
         "type:ClearVision.Product.Infrastructure.Services.DeepLearningLabelResolver"
       ],
       "generationFingerprint": "C438192588112353D92F31927FBA32A49E0955DACE787A203ACBDC3B7523F42B",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/DeepLearning.md"
     },
     {
@@ -37234,15 +36204,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "53D8EEF9DD4323AF3D845E1630C251935717551869BFE175D949BC6E368C9940",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/OcrRecognition.md"
     },
     {
@@ -37687,15 +36648,6 @@
       ],
       "generationDependencies": [],
       "generationFingerprint": "55C1A04F54B1D0E1516441CE3924C246C807FFE2103E3DC188F4FBD80BDC8CEB",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/SemanticSegmentation.md"
     },
     {
@@ -37816,15 +36768,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "75C259C936486339F724ECE3031DE4F91001D28E17FBC20EEC921D3B337DB0FA",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/EuclideanClusterExtraction.md"
     },
     {
@@ -37934,15 +36877,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "8C2698E9B4243DB8A26645E60337DB20BE83350A1A4BC60A8A8DF1A102F21BE1",
-      "quality": {
-        "totalScore": 95,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/PPFEstimation.md"
     },
     {
@@ -38215,15 +37149,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "4E2D8AF6A1CC8A0E0A1F3583671AEEF59FBE5A0674DE3049A8CD236D2AD461B5",
-      "quality": {
-        "totalScore": 95,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/PPFMatch.md"
     },
     {
@@ -38375,15 +37300,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "A6A453B4C35AA01B6F604335E86E83F15011DDBD9EC601FDDB082D8B0FDDF039",
-      "quality": {
-        "totalScore": 95,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/RansacPlaneSegmentation.md"
     },
     {
@@ -38484,15 +37400,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "B24ACC6EB806DF26585DBDD20D1BB7EABBA06E63A54E2E60FF8ACA16E0171762",
-      "quality": {
-        "totalScore": 95,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/StatisticalOutlierRemoval.md"
     },
     {
@@ -38574,15 +37481,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "43713255CDABA388E6034872BAA0C2A828C9D44F8A953DB11EA8306ABD748830",
-      "quality": {
-        "totalScore": 95,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/VoxelDownsample.md"
     },
     {
@@ -38725,15 +37623,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "FF854B092E0E4E0DB05BA6DC33F5727E234606D5B2FDC97183E5D8364FC61188",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/Aggregator.md"
     },
     {
@@ -38865,15 +37754,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "B3BB274D288EDAB76422A67205BB5423BF82E65840BFC4B982A1DF65FA696DA1",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/ArrayIndexer.md"
     },
     {
@@ -39145,15 +38025,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "94FB73CD440D15E6F80FF67AED0138DCBDD5A4DAEA30068143942F54AF75CF91",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/BoxFilter.md"
     },
     {
@@ -39453,15 +38324,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "79F956B20D31992C433603B495614A76B7039DD2348EB97CCC3AEF1AE26E6585",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/BoxNms.md"
     },
     {
@@ -39630,15 +38492,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "30EF6DB530842A540E722F8E34E85C78C0D5CB0DD9BCAA931084CD4F0E866FD9",
-      "quality": {
-        "totalScore": 89,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/Comparator.md"
     },
     {
@@ -39750,15 +38603,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "88265F6416E4EFF2E6326B7E38B9F8D05AC9D7E4789F360E0DABD1580671FDCB",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/JsonExtractor.md"
     },
     {
@@ -39860,15 +38704,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "EBC0DC57AB5412071675B744364B49216EAC6AD4385FB04FCE8FD9A55FFAD693",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/LogicGate.md"
     },
     {
@@ -40010,15 +38845,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "7199E66A395CF785F5E0436AC7CEA2D67F2A132FA18B4F02AFB85DD11FE03460",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/MathOperation.md"
     },
     {
@@ -40207,15 +39033,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "FB08128EEF7D6169261D342A45FEF736233041B85A24C0A6979FC449F50C703F",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/PointSetTool.md"
     },
     {
@@ -40348,15 +39165,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "50289B6A4670C54F7C4012DEAEFD1D95909A11E7A6A6C17FA845CE55BD0E16BB",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/ScriptOperator.md"
     },
     {
@@ -40507,15 +39315,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "D003B6EEB0D00379DD2993A528B258E9A37E11078660BBAC7C5E564716759304",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/Statistics.md"
     },
     {
@@ -40592,15 +39391,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "149B3B790FF62C6E7DA8113AED8CA7CA3CCDA31C4A3A68FB1EBC885DBB67F6EA",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/StringFormat.md"
     },
     {
@@ -40737,15 +39527,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "133D64456744069DB0C4F12F8A1AB3E1A405E1C3F0A76928C4EDC29CA7449109",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/TimerStatistics.md"
     },
     {
@@ -40874,15 +39655,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "DD7EB17C6F3198EE12DE6FAC84FECC6F0867A351E61E61A2E6D626F0B50E2AE7",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/TypeConvert.md"
     },
     {
@@ -41038,15 +39810,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "DEAF0E82CACF51A84A3136C3141B1388C687C73368AE852BFD794A9666A27095",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/UnitConvert.md"
     },
     {
@@ -41226,15 +39989,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "E926ED16A6C9F3AD18C977B9D8A7E213AE087D64785B01D273B8F072221BAC6A",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/VariableIncrement.md"
     },
     {
@@ -41514,15 +40268,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "32855968C1EF71D2B1ADCE8D2C365358C9FEAB3280F308B1E227FADC4780C7E1",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/VariableRead.md"
     },
     {
@@ -41825,15 +40570,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "803372859ACF95235385DDA48BF85759FE419E6150FC3E0CC2BEF862134AFE2F",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/VariableWrite.md"
     },
     {
@@ -42142,15 +40878,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "ACE45EF2B7687552341D4549780571B23D1032D1076FDF856369668F8C9ADFBE",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/ConditionalBranch.md"
     },
     {
@@ -42262,15 +40989,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "A2754CE732F531508FBFA22FE61DC2AA7EC6396ADEDF0BC70412AE83981B5001",
-      "quality": {
-        "totalScore": 96,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
-      },
       "docPath": "算子资料/算子名片/CycleCounter.md"
     },
     {
@@ -42357,15 +41075,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "58DF057665DDF148A95AA26CC489D24DC94204AD2CE6DC95ADD46B3CB2494CF2",
-      "quality": {
-        "totalScore": 94,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
-      },
       "docPath": "算子资料/算子名片/Delay.md"
     },
     {
@@ -42480,15 +41189,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "92685762FCE936CB5ACB028AB1265367870C95E4E8CB2625F63349EEC6B81B83",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/ForEach.md"
     },
     {
@@ -42947,15 +41647,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "8B9104464950DF51722C25599B7357D485F4F08C52A7FC3FE41DD205C88A8B01",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/FrameChangeTrigger.md"
     },
     {
@@ -43169,15 +41860,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "7333F779253445A60AE8E15A9A9E2A76D962FE2A568320FA96C2C102CC4CCDEF",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/ResultJudgment.md"
     },
     {
@@ -43300,15 +41982,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "D13BAD545E6930D13C5F82CB232FAD61B046864ED2E69E041EED877BC16C6B7A",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/TriggerModule.md"
     },
     {
@@ -43426,15 +42099,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "DFF8F58801CC6A5CB155F6BA06FE27657FF06E5120D406FFBBC0D173FBC2DAD4",
-      "quality": {
-        "totalScore": 93,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=90"
-      },
       "docPath": "算子资料/算子名片/TryCatch.md"
     },
     {
@@ -43598,15 +42262,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "5D37FA5972A94464C387770A58B327971EB575BA8D70B260FD15D93CBA1C7D8D",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/HttpRequest.md"
     },
     {
@@ -44357,15 +43012,6 @@
       ],
       "generationDependencies": [],
       "generationFingerprint": "A392A906BB0040C501FD4CD50108F7061A13E33205E8540DAF11E93393950E5E",
-      "quality": {
-        "totalScore": 98,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
-      },
       "docPath": "算子资料/算子名片/MitsubishiMcCommunication.md"
     },
     {
@@ -44750,15 +43396,6 @@
       ],
       "generationDependencies": [],
       "generationFingerprint": "F44B9E02DAF4601B2B2D01922F1F62E7C6141FA1B4CF3DB7239783EC0BF9A468",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/ModbusCommunication.md"
     },
     {
@@ -44900,15 +43537,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "4F56C778A447E277256FA20DD36262B3AFFEFB829B8116D892D0A5F2E5590B61",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/MqttPublish.md"
     },
     {
@@ -45653,15 +44281,6 @@
       ],
       "generationDependencies": [],
       "generationFingerprint": "636ED45E60676562F4571C76E52DDB0CF6DC4E3BB464227445B0C6D1B9D7A99F",
-      "quality": {
-        "totalScore": 98,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
-      },
       "docPath": "算子资料/算子名片/OmronFinsCommunication.md"
     },
     {
@@ -45880,15 +44499,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "53B241AD2E2435FAB993500C5BF935ECB16C7E7AF6469CC7432A5B681126478E",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/SerialCommunication.md"
     },
     {
@@ -46646,15 +45256,6 @@
       ],
       "generationDependencies": [],
       "generationFingerprint": "CB6E01785B9123A83BF3FD069471D13B7444A8FDC3DF37FDBF600395225908E9",
-      "quality": {
-        "totalScore": 98,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
-      },
       "docPath": "算子资料/算子名片/SiemensS7Communication.md"
     },
     {
@@ -48480,15 +47081,6 @@
       ],
       "generationDependencies": [],
       "generationFingerprint": "EE7310E9731A7EAB3B10E80D16F8D3D80E321D6FD8FEAF6A23E0D688BC3CEF16",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/TcpCommunication.md"
     },
     {
@@ -48574,15 +47166,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "AB1512D967592A6EE1F73AF0A922C101A0279577D0F18CF4AB0FEA1684D32957",
-      "quality": {
-        "totalScore": 90,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
-      },
       "docPath": "算子资料/算子名片/Comment.md"
     },
     {
@@ -48709,15 +47292,6 @@
       "resourceRequirements": [],
       "generationDependencies": [],
       "generationFingerprint": "399D8D35CF0F76E5BDD2D6E3417F6516D24EA084B35EB2E90D91C92556AA42C8",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/DatabaseWrite.md"
     },
     {
@@ -49008,15 +47582,6 @@
       ],
       "generationDependencies": [],
       "generationFingerprint": "1AC3405B713EF371C26CA697D3AB83C84503B103488B92331F0E327F0BAB1DE5",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/ImageSave.md"
     },
     {
@@ -49279,15 +47844,6 @@
       ],
       "generationDependencies": [],
       "generationFingerprint": "0B158C24D2FFDD41D1EC343609E1F4FF10D6A344C2EC70F464D69E88CC4C9D15",
-      "quality": {
-        "totalScore": 98,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
-      },
       "docPath": "算子资料/算子名片/ResultOutput.md"
     },
     {
@@ -49468,15 +48024,6 @@
       ],
       "generationDependencies": [],
       "generationFingerprint": "BE9E2F907C853A4C4896B6412916DFD5311E2A66D9E2F6A72CC9659C3BB2920F",
-      "quality": {
-        "totalScore": 100,
-        "level": "A",
-        "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
-      },
       "docPath": "算子资料/算子名片/TextSave.md"
     }
   ]

@@ -33,7 +33,6 @@ public sealed class OperatorKnowledgeEvidence
     public string FieldReplay { get; set; } = string.Empty;
     public string PrecisionClaim { get; set; } = string.Empty;
     public string IndustrialStatus { get; set; } = string.Empty;
-    public string? QScore { get; set; }
 }
 
 public sealed class OperatorKnowledgeCard

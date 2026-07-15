@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `Measurement` |
 | 分类 (Category) | 测量 |
 | 分类顺序 (CategoryOrder) | 7 |
-| 版本 (Version) | `1.1.0` |
+| 版本 (Version) | `1.2.1` |
 | 生命周期 (Lifecycle) | 稳定 `Stable` |
 | 生命周期说明 (Lifecycle Note) | - |
 | 默认隐藏 (Default Hidden) | No |
@@ -35,10 +35,10 @@
 - `OperatorBase.Get*Param(...)`
 - `Cv2.CvtColor`
 - `Cv2.Canny`
+- `Cv2.FitLine`
 - `Cv2.HoughLines`
 - `Cv2.Line`
 - `Cv2.HoughLinesP`
-- `Cv2.FitLine`
 - `Convert.ToDouble`
 - `Convert.ToInt32`
 - `Math.PI`
@@ -95,7 +95,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`2864B65050C130B846BB8F0229B378EDDE29C63C68A3C151882C30D5E1B9141D`
+- 组合指纹 (Generation Fingerprint)：`49DA9D751D7373D509AEAF26D49ABC295CAC0868AEE2332ACFA03D49D56C61BA`
 - 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -104,6 +104,7 @@
 | `Confidence` | `Float` | 源码输出字典初始化中可见字段。 |
 | `Covariance` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `CovarianceCalibrated` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `DiagnosticsAvailable` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `EndX` | `Any` | 源码输出字典初始化中可见字段。 |
 | `EndY` | `Any` | 源码输出字典初始化中可见字段。 |
 | `FitPointCount` | `Integer` | 源码通过输出字典索引赋值写入。 |
@@ -125,7 +126,7 @@
 | `SigmaOffsetPx` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `StartX` | `Any` | 源码输出字典初始化中可见字段。 |
 | `StartY` | `Any` | 源码输出字典初始化中可见字段。 |
-| `StatusCode` | `Any` | 源码输出字典初始化中可见字段。 |
+| `StatusCode` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `StatusMessage` | `String` | 源码输出字典初始化中可见字段。 |
 | `Theta` | `Any` | 源码输出字典初始化中可见字段。 |
 | `UncertaintyPx` | `Any` | 源码输出字典初始化中可见字段。 |
@@ -156,4 +157,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.2.1 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

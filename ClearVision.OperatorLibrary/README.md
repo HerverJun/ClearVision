@@ -20,7 +20,7 @@ Industrial Vision Operator Library for ClearVision.
 
 2. Generated package output (default):
 
-- `./nupkg/ClearVision.OperatorLibrary.1.0.2.nupkg`
+- `./nupkg/ClearVision.OperatorLibrary.1.0.3.nupkg`
 
 3. Add local source in another project:
 
@@ -33,7 +33,7 @@ Industrial Vision Operator Library for ClearVision.
 4. Reference package:
 
 ```xml
-<PackageReference Include="ClearVision.OperatorLibrary" Version="1.0.2" />
+<PackageReference Include="ClearVision.OperatorLibrary" Version="1.0.3" />
 ```
 
 5. Inspect a module index from package code:
@@ -93,8 +93,8 @@ Acceptance criteria: each representative operator must cover at least one normal
 
 The package no longer uses the fixed `*-local` version strategy.
 
-- Default local version: `VersionPrefix` (`1.0.2` currently)
-- CI version injection: pass `PackageVersion` (for example `1.0.2-ci.20260419.1`)
+- Default local version: `VersionPrefix` (`1.0.3` currently)
+- CI version injection: pass `PackageVersion` (for example `1.0.3-ci.20260716.1`)
 - Reproducibility metadata: `SourceRevisionId`, `RepositoryCommit`, `RepositoryBranch`, `PublishRepositoryUrl`, deterministic/CI build flags
 - NuGet lock-file mode: the project sets `RestorePackagesWithLockFile=true`; `packages.lock.json` is checked in and CI/release restores use `--locked-mode`.
 - Local package smoke restores use a temporary lock file under `.tmp/nuget-packages/operator-library-smoke` so fixed-version `.nupkg` hash changes do not rewrite the checked-in smoke-test lock file.
@@ -105,7 +105,7 @@ The package no longer uses the fixed `*-local` version strategy.
 
 ```powershell
 ./pack.ps1 `
-  -PackageVersion "1.0.2-ci.20260419.1" `
+  -PackageVersion "1.0.3-ci.20260716.1" `
   -SourceRevisionId "a1b2c3d4" `
   -RepositoryBranch "main" `
   -RepositoryCommit "a1b2c3d4" `

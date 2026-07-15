@@ -32,8 +32,7 @@ public class PromptBuilderKnowledgeSliceTests
                         Dataset = "Partial",
                         FieldReplay = "No",
                         PrecisionClaim = "P95",
-                        IndustrialStatus = "功能可用但未完成现场工业验证",
-                        QScore = "Q2"
+                        IndustrialStatus = "功能可用但未完成现场工业验证"
                     };
                 }),
                 CreateValidatedCard(factory, "ResultOutput", card =>
@@ -62,7 +61,11 @@ public class PromptBuilderKnowledgeSliceTests
         prompt.Should().Contain("DeepLearning.ModelPath");
         prompt.Should().Contain("ModelPath=todo");
         prompt.Should().Contain("功能可用但未完成现场工业验证");
-        prompt.Should().Contain("Q2");
+        prompt.Should().Contain("\"precisionClaim\"");
+        prompt.Should().Contain("P95");
+        prompt.Should().Contain("\"industrialStatus\"");
+        prompt.Should().NotContain("qScore");
+        prompt.Should().NotContain("Q2");
     }
 
     [Fact(DisplayName = "PromptBuilder should filter out knowledge cards that fail metadata validation")]

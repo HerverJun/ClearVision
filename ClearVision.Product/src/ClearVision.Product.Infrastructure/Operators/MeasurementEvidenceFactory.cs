@@ -19,18 +19,49 @@ internal static class MeasurementEvidenceFactory
         string algorithm,
         IEnumerable<string>? qualityFlags = null)
     {
+        var flags = qualityFlags?
+            .Where(flag => !string.IsNullOrWhiteSpace(flag))
+            .ToHashSet(StringComparer.Ordinal)
+            ?? new HashSet<string>(StringComparer.Ordinal);
+
+        double? normalizedSigma = null;
+        if (sigma is { } sigmaValue)
+        {
+            if (double.IsFinite(sigmaValue) && sigmaValue >= 0)
+            {
+                normalizedSigma = sigmaValue;
+            }
+            else
+            {
+                flags.Add("InvalidSigma");
+            }
+        }
+
+        IReadOnlyList<double>? normalizedCovariance = null;
+        if (covariance is { Count: > 0 })
+        {
+            var dimension = (int)Math.Sqrt(covariance.Count);
+            if (dimension * dimension == covariance.Count && covariance.All(double.IsFinite))
+            {
+                normalizedCovariance = covariance.ToArray();
+            }
+            else
+            {
+                flags.Add("InvalidCovariance");
+            }
+        }
+
         return new MeasurementEvidence(
             value,
             unit,
             coordinateFrame,
-            sigma is { } finiteSigma && double.IsFinite(finiteSigma) ? finiteSigma : null,
-            covariance?.Where(double.IsFinite).ToArray(),
+            normalizedSigma,
+            normalizedCovariance,
             provenance,
             source.Type.ToString(),
             algorithm,
             ComputeParameterFingerprint(source),
-            qualityFlags?.Where(flag => !string.IsNullOrWhiteSpace(flag)).Distinct(StringComparer.Ordinal).OrderBy(flag => flag, StringComparer.Ordinal).ToArray()
-                ?? Array.Empty<string>());
+            flags.OrderBy(flag => flag, StringComparer.Ordinal).ToArray());
     }
 
     public static string ComputeParameterFingerprint(Operator source)

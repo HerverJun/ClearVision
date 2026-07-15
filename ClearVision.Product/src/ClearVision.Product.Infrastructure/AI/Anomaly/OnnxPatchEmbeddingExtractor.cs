@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using OpenCvSharp;
@@ -19,23 +20,20 @@ internal static class OnnxPatchEmbeddingExtractor
         private int _disposed;
         private long _lastAccessTicks;
 
-        public CachedSession(InferenceSession session, long modelLength, DateTime modelLastWriteUtc)
+        public CachedSession(InferenceSession session, string modelSha256)
         {
             Session = session;
-            ModelLength = modelLength;
-            ModelLastWriteUtc = modelLastWriteUtc;
+            ModelSha256 = modelSha256;
             _lastAccessTicks = DateTime.UtcNow.Ticks;
         }
 
         public InferenceSession Session { get; }
-        private long ModelLength { get; }
-        private DateTime ModelLastWriteUtc { get; }
+        private string ModelSha256 { get; }
         public DateTime LastAccessUtc => new(Interlocked.Read(ref _lastAccessTicks), DateTimeKind.Utc);
 
-        public bool Matches(FileInfo modelFile)
+        public bool Matches(string modelSha256)
         {
-            return modelFile.Length == ModelLength &&
-                   modelFile.LastWriteTimeUtc == ModelLastWriteUtc;
+            return string.Equals(modelSha256, ModelSha256, StringComparison.Ordinal);
         }
 
         public bool TryAcquireLease(out SessionLease lease)
@@ -121,7 +119,7 @@ internal static class OnnxPatchEmbeddingExtractor
             throw new InvalidOperationException("EmbeddingModelPath is required when FeatureExtractorId is 'onnx_embedding'.");
         }
 
-        using var lease = GetOrCreateSessionLease(options.EmbeddingModelPath);
+        using var lease = GetOrCreateSessionLease(options.EmbeddingModelPath, options.EmbeddingModelSha256);
         var session = lease.Session;
         var input = session.InputMetadata.First();
         var dimensions = input.Value.Dimensions;
@@ -160,7 +158,7 @@ internal static class OnnxPatchEmbeddingExtractor
             throw new InvalidOperationException("EmbeddingModelPath is required when FeatureExtractorId is 'onnx_embedding'.");
         }
 
-        using var lease = GetOrCreateSessionLease(options.EmbeddingModelPath);
+        using var lease = GetOrCreateSessionLease(options.EmbeddingModelPath, options.EmbeddingModelSha256);
         var session = lease.Session;
         var input = session.InputMetadata.First();
         var dimensions = input.Value.Dimensions;
@@ -189,7 +187,7 @@ internal static class OnnxPatchEmbeddingExtractor
         return embeddings;
     }
 
-    private static CachedSession.SessionLease GetOrCreateSessionLease(string modelPath)
+    private static CachedSession.SessionLease GetOrCreateSessionLease(string modelPath, string expectedModelSha256)
     {
         var resolvedModelPath = Path.GetFullPath(modelPath);
         var modelFile = new FileInfo(resolvedModelPath);
@@ -198,7 +196,13 @@ internal static class OnnxPatchEmbeddingExtractor
             throw new FileNotFoundException("Embedding ONNX model was not found.", resolvedModelPath);
         }
 
-        if (TryGetCurrentCachedSession(resolvedModelPath, modelFile, out var lease))
+        var actualModelSha256 = HashFile(resolvedModelPath);
+        if (!string.Equals(actualModelSha256, expectedModelSha256?.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Embedding model SHA mismatch before inference. Expected={expectedModelSha256}, actual={actualModelSha256}.");
+        }
+
+        if (TryGetCurrentCachedSession(resolvedModelPath, actualModelSha256, out var lease))
         {
             return lease;
         }
@@ -213,7 +217,13 @@ internal static class OnnxPatchEmbeddingExtractor
                 throw new FileNotFoundException("Embedding ONNX model was not found.", resolvedModelPath);
             }
 
-            if (TryGetCurrentCachedSession(resolvedModelPath, modelFile, out lease))
+            actualModelSha256 = HashFile(resolvedModelPath);
+            if (!string.Equals(actualModelSha256, expectedModelSha256?.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Embedding model SHA mismatch before inference. Expected={expectedModelSha256}, actual={actualModelSha256}.");
+            }
+
+            if (TryGetCurrentCachedSession(resolvedModelPath, actualModelSha256, out lease))
             {
                 return lease;
             }
@@ -224,7 +234,7 @@ internal static class OnnxPatchEmbeddingExtractor
             };
 
             var session = new InferenceSession(resolvedModelPath, options);
-            var cachedSession = new CachedSession(session, modelFile.Length, modelFile.LastWriteTimeUtc);
+            var cachedSession = new CachedSession(session, actualModelSha256);
             SessionCache[resolvedModelPath] = cachedSession;
             EnforceSessionCacheLimit(resolvedModelPath);
 
@@ -254,7 +264,7 @@ internal static class OnnxPatchEmbeddingExtractor
 
     private static bool TryGetCurrentCachedSession(
         string resolvedModelPath,
-        FileInfo modelFile,
+        string modelSha256,
         out CachedSession.SessionLease lease)
     {
         lease = null!;
@@ -264,7 +274,7 @@ internal static class OnnxPatchEmbeddingExtractor
             return false;
         }
 
-        if (cached.Matches(modelFile))
+        if (cached.Matches(modelSha256))
         {
             return cached.TryAcquireLease(out lease);
         }
@@ -275,6 +285,12 @@ internal static class OnnxPatchEmbeddingExtractor
         }
 
         return false;
+    }
+
+    private static string HashFile(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
 
     private static void EnforceSessionCacheLimit(string protectedKey)

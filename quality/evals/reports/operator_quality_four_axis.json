@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2026-07-15.operator-quality-four-axis.v1",
-  "generatedAtUtc": "2026-07-15T23:49:28.6486899+08:00",
+  "generatedAtUtc": "2026-07-16T01:07:27.7681703+08:00",
   "claimBoundary": "Four independent evidence axes. Unknown, compatibility-only and synthetic/public-dataset evidence never imply Release Ready or Field Verified.",
   "summary": {
     "total": 158,
@@ -10,7 +10,8 @@
     "algorithmQuality": {
       "Unknown": 154,
       "PublicDatasetEvidence": 1,
-      "SyntheticBenchmarkValidated": 3
+      "SyntheticBenchmarkEvidence": 1,
+      "SyntheticBenchmarkValidated": 2
     },
     "productionReadiness": {
       "Unknown": 150,
@@ -182,7 +183,7 @@
       "DisplayName": "卡尺工具",
       "Lifecycle": "Stable",
       "Execution": "Implemented",
-      "AlgorithmQuality": "SyntheticBenchmarkValidated",
+      "AlgorithmQuality": "SyntheticBenchmarkEvidence",
       "ProductionReadiness": "Unknown",
       "FieldValidation": "NotValidated",
       "evidenceRefs": [

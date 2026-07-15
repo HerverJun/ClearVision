@@ -1,6 +1,6 @@
 # Operator Quality Four-Axis State
 
-GeneratedAtUtc: `2026-07-15T23:49:28.6486899+08:00`
+GeneratedAtUtc: `2026-07-16T01:07:27.7681703+08:00`
 
 > Execution, AlgorithmQuality, ProductionReadiness and FieldValidation are independent. Synthetic/public-dataset evidence is not Release Ready or Field Verified evidence.
 
@@ -21,7 +21,7 @@ GeneratedAtUtc: `2026-07-15T23:49:28.6486899+08:00`
 | `BoxFilter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
 | `BoxNms` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
 | `CalibrationLoader` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `CaliperTool` | `Implemented` | `SyntheticBenchmarkValidated` | `Unknown` | `NotValidated` | quality/evals/reports/operator-precision-after-acceptance.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
+| `CaliperTool` | `Implemented` | `SyntheticBenchmarkEvidence` | `Unknown` | `NotValidated` | quality/evals/reports/operator-precision-after-acceptance.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
 | `CameraCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
 | `CircleMeasurement` | `Implemented` | `SyntheticBenchmarkValidated` | `Unknown` | `NotValidated` | quality/evals/reports/operator-precision-after-acceptance.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
 | `ClaheEnhancement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |

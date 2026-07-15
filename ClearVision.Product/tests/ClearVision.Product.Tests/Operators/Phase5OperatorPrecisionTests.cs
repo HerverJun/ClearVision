@@ -1,6 +1,7 @@
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.AI.Anomaly;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -69,7 +70,7 @@ public class Phase5OperatorPrecisionTests
     }
 
     [Fact]
-    public async Task CaliperTool_GaussianDerivative_ShouldReportSelectedModelResidualAmbiguityAndEvidence()
+    public async Task CaliperTool_UnprovenEdgeModels_ShouldRemainOutOfFormalOperator()
     {
         var sut = new CaliperToolOperator(Substitute.For<ILogger<CaliperToolOperator>>());
         using var mat = new Mat(64, 192, MatType.CV_8UC1, Scalar.Black);
@@ -82,20 +83,19 @@ public class Phase5OperatorPrecisionTests
         Add(op, "EdgeThreshold", 5.0, "double");
         Add(op, "ExpectedCount", 1, "int");
         Add(op, "SubpixelAccuracy", true, "bool");
-        Add(op, "EdgeModel", "GaussianDerivative", "string");
-        Add(op, "EdgeModelSigma", 1.0, "double");
 
         var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
 
         result.IsSuccess.Should().BeTrue(result.ErrorMessage);
-        result.OutputData!["EdgeModel"].Should().Be("GaussianDerivative");
+        result.OutputData!["EdgeModel"].Should().Be("Legacy");
         Convert.ToDouble(result.OutputData["Width"]).Should().BeApproximately(80.0, 0.8);
-        Convert.ToDouble(result.OutputData["FitResidual"]).Should().BeGreaterThanOrEqualTo(0.0);
+        double.IsNaN(Convert.ToDouble(result.OutputData["FitResidual"])).Should().BeTrue();
         result.OutputData["EdgeDiagnostics"].Should().BeAssignableTo<IEnumerable<Dictionary<string, object>>>();
         var evidence = result.OutputData["MeasurementEvidence"].Should().BeOfType<MeasurementEvidence>().Subject;
         evidence.Provenance.Should().Be(MeasurementEvidenceProvenance.Heuristic);
-        evidence.SourceAlgorithm.Should().Be("GaussianDerivative");
+        evidence.SourceAlgorithm.Should().StartWith("Legacy/");
         evidence.QualityFlags.Should().Contain("HeuristicUncertainty");
+        evidence.QualityFlags.Should().Contain("LegacyCompatibility");
         (result.OutputData["Image"] as ImageWrapper)?.Dispose();
     }
 
@@ -124,6 +124,88 @@ public class Phase5OperatorPrecisionTests
         var evidence = result.OutputData["MeasurementEvidence"].Should().BeOfType<MeasurementEvidence>().Subject;
         evidence.QualityFlags.Should().Contain("UncalibratedCovariance");
         (result.OutputData["Image"] as ImageWrapper)?.Dispose();
+    }
+
+    [Fact]
+    public async Task LineMeasurement_L2Evidence_ShouldNotTreatPixelResidualAsDegreeSigma()
+    {
+        var sut = new LineMeasurementOperator(Substitute.For<ILogger<LineMeasurementOperator>>());
+        using var mat = new Mat(192, 192, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Line(mat, new Point(16, 40), new Point(176, 136), Scalar.White, 4, LineTypes.AntiAlias);
+        using var image = new ImageWrapper(mat.Clone());
+        var op = new Operator("line-l2-evidence", OperatorType.LineMeasurement, 0, 0);
+        Add(op, "Method", "FitLine", "string");
+        Add(op, "Threshold", 30, "int");
+        Add(op, "MinLength", 30.0, "double");
+        Add(op, "MaxGap", 8.0, "double");
+        Add(op, "FitLoss", "L2", "string");
+
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        Convert.ToDouble(result.OutputData!["UncertaintyPx"]).Should().BeGreaterThanOrEqualTo(0.0);
+        var evidence = result.OutputData["MeasurementEvidence"].Should().BeOfType<MeasurementEvidence>().Subject;
+        evidence.Unit.Should().Be("deg");
+        evidence.Sigma.Should().BeNull();
+        evidence.QualityFlags.Should().Contain(new[] { "AngleSigmaUnavailable", "ResidualUncertaintyOnly", "LegacyCompatibility" });
+        (result.OutputData["Image"] as ImageWrapper)?.Dispose();
+    }
+
+    [Fact]
+    public void MeasurementEvidence_InvalidSigmaOrCovariance_ShouldFailClosedWithoutChangingMatrixShape()
+    {
+        var op = new Operator("evidence-invalid", OperatorType.LineMeasurement, 0, 0);
+
+        var evidence = MeasurementEvidenceFactory.Create(
+            op,
+            12.0,
+            "deg",
+            "ImagePixel",
+            -0.1,
+            new[] { 1.0, double.NaN, 0.0, 1.0 },
+            MeasurementEvidenceProvenance.Heuristic,
+            "test");
+
+        evidence.Sigma.Should().BeNull();
+        evidence.Covariance.Should().BeNull();
+        evidence.QualityFlags.Should().Contain(new[] { "InvalidSigma", "InvalidCovariance" });
+    }
+
+    [Fact]
+    public void OnnxSessionCache_ShouldRejectSamePathSameLengthModelContentReplacement()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory("anomaly-cache-phase5-");
+        var sourceModelPath = ResolveRepoPath("ClearVision.Product/tests/TestData/model_test_suite/identity_2x2/identity_2x2.onnx");
+        var manifestPath = ResolveRepoPath("ClearVision.Product/tests/TestData/model_test_suite/identity_2x2/embedding_manifest.json");
+        var copiedModelPath = Path.Combine(tempDirectory.FullName, "identity-copy.onnx");
+        File.Copy(sourceModelPath, copiedModelPath);
+        var originalWriteTime = File.GetLastWriteTimeUtc(copiedModelPath);
+        var identity = AnomalyEmbeddingManifest.LoadAndValidate(manifestPath, copiedModelPath);
+        var options = new SimplePatchCoreOptions
+        {
+            PatchSize = 2,
+            PatchStride = 2,
+            CoresetRatio = 1.0,
+            FeatureExtractorId = "onnx_embedding",
+            EmbeddingModelPath = copiedModelPath,
+            EmbeddingManifestPath = manifestPath,
+            EmbeddingModelSha256 = identity.ModelSha256,
+            PreprocessFingerprint = identity.PreprocessFingerprint,
+            EmbeddingPreprocess = identity.Preprocess
+        };
+        using var image = new Mat(2, 2, MatType.CV_8UC3, new Scalar(80, 90, 100));
+
+        _ = OnnxPatchEmbeddingExtractor.ExtractEmbedding(image, options);
+        var bytes = File.ReadAllBytes(copiedModelPath);
+        bytes[^1] ^= 0x01;
+        File.WriteAllBytes(copiedModelPath, bytes);
+        File.SetLastWriteTimeUtc(copiedModelPath, originalWriteTime);
+
+        Action act = () => OnnxPatchEmbeddingExtractor.ExtractEmbedding(image, options);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*SHA mismatch*");
+
+        OnnxPatchEmbeddingExtractor.ClearSessionCache();
+        Directory.Delete(tempDirectory.FullName, recursive: true);
     }
 
     [Fact]

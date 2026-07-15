@@ -1,8 +1,8 @@
 {
   "SchemaVersion": "2026-07.operator-knowledge-graph.v4",
-  "GeneratedAtUtc": "2026-07-15T15:49:40.9530459Z",
+  "GeneratedAtUtc": "2026-07-15T17:07:31.3630862Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
-  "GenerationFingerprint": "4FCFCA834BBC9A47F65EFC500E8079EB9C24CEB406E6D76D44A919CCA86D2DA4",
+  "GenerationFingerprint": "E0B7FE8FAF4CEDA40CFC3559FADEF26B7748BD0791618831FF8E4CF417A21BB5",
   "Cards": [
     {
       "SchemaVersion": "2026-07.operator-knowledge-card.v2",
@@ -215,9 +215,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -478,9 +477,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -631,9 +629,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -1103,9 +1100,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Dataset evidenced (22 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 22 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -1387,9 +1383,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -2161,7 +2156,7 @@
       "GenerationDependencies": [
         "type:ClearVision.Product.Infrastructure.Operators.AnomalyDetectionImageContractProvider"
       ],
-      "GenerationFingerprint": "D16582B2F872342D214D241378A66FEFD3A289B434F810DD7A840F675FA205F9",
+      "GenerationFingerprint": "4FE4975A26FAF14BF71530409CA4EDC4B80E234DD682E7BDD36139A19A32B00E",
       "RequiredResources": [
         "AnomalyDetection.FeatureBankPath",
         "AnomalyDetection.ModelId",
@@ -2185,9 +2180,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Dataset evidenced (240 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 240 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "Public-dataset evidence only; model, preprocessing and feature-bank identity remain deployment-specific and field validation is absent.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -2387,9 +2381,8 @@
         "Golden": "Golden evidenced (31 cases)",
         "Dataset": "Dataset evidenced (31 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 31 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -2518,9 +2511,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -2724,9 +2716,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -2931,9 +2922,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": null
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -3666,9 +3656,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Dataset evidenced (20 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 20 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -3878,9 +3867,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -4165,9 +4153,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -4489,9 +4476,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -4587,9 +4573,8 @@
         "Golden": "Golden evidenced (24 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 24 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -4606,7 +4591,7 @@
       "RequiresLifecycleDisclosure": true,
       "QualityState": {
         "Execution": "Implemented",
-        "AlgorithmQuality": "SyntheticBenchmarkValidated",
+        "AlgorithmQuality": "SyntheticBenchmarkEvidence",
         "ProductionReadiness": "Unknown",
         "FieldValidation": "NotValidated",
         "EvidenceRefs": [
@@ -4828,31 +4813,6 @@
             "gradient_moment",
             "zernike (legacy alias)"
           ]
-        },
-        {
-          "Name": "EdgeModel",
-          "DisplayName": "Edge Model",
-          "DataType": "enum",
-          "Description": "",
-          "DefaultValue": "Legacy",
-          "MinValue": null,
-          "MaxValue": null,
-          "IsRequired": true,
-          "AllowedValues": [
-            "Legacy",
-            "Gaussian Derivative"
-          ]
-        },
-        {
-          "Name": "EdgeModelSigma",
-          "DisplayName": "Edge Model Sigma",
-          "DataType": "double",
-          "Description": "",
-          "DefaultValue": "1",
-          "MinValue": "0.2",
-          "MaxValue": "4",
-          "IsRequired": true,
-          "AllowedValues": []
         }
       ],
       "ParameterConditions": [],
@@ -4932,7 +4892,7 @@
       ],
       "ResourceRequirements": [],
       "GenerationDependencies": [],
-      "GenerationFingerprint": "B6BE6A23584947E3D8E720536678BB6D8FA0BC7CE686BA7F67BD3F999C1ECF70",
+      "GenerationFingerprint": "A85552FEF127ADFAAB69D0F3E1222CD6061474CD11195B14FCEDFAA66D61E0F5",
       "RequiredResources": [],
       "TypicalUpstream": [
         "Filtering"
@@ -4953,9 +4913,8 @@
         "Golden": "Golden evidenced (117 cases)",
         "Dataset": "Dataset evidenced (117 cases)",
         "FieldReplay": "Field replay evidenced (20 cases)",
-        "PrecisionClaim": "Field replay precision claim supported by 20 replay cases; real-site sign-off not yet evidenced",
-        "IndustrialStatus": "Field replay substitute evidenced (20 cases); \u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "Synthetic benchmark evidence only; it does not establish field accuracy, release readiness, or production-site capability.",
+        "IndustrialStatus": "Field replay substitute evidenced (20 cases); \u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -5195,9 +5154,8 @@
         "Golden": "Golden evidenced (48 cases)",
         "Dataset": "Dataset partially evidenced (2 cases)",
         "FieldReplay": "Field replay evidenced (20 cases)",
-        "PrecisionClaim": "Field replay precision claim supported by 20 replay cases; real-site sign-off not yet evidenced",
-        "IndustrialStatus": "Field replay substitute evidenced (20 cases); \u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "Field replay substitute evidenced (20 cases); \u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -5759,9 +5717,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Dataset evidenced (20 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 20 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "Synthetic benchmark evidence only; it does not establish field accuracy, release readiness, or production-site capability.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -5974,9 +5931,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -6187,9 +6143,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -6374,9 +6329,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -6788,9 +6742,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -7108,9 +7061,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -7209,9 +7161,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 22 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -7374,9 +7325,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 22 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -7646,9 +7596,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -7953,9 +7902,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Dataset evidenced (20 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 20 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -8083,9 +8031,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 22 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -8306,9 +8253,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -8520,9 +8466,8 @@
         "Golden": "Golden evidenced (48 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 48 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -8743,9 +8688,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -8968,9 +8912,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -9090,9 +9033,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -9226,9 +9168,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -11528,9 +11469,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Dataset evidenced (72 cases)",
         "FieldReplay": "Field replay evidenced (20 cases)",
-        "PrecisionClaim": "Field replay precision claim supported by 20 replay cases; real-site sign-off not yet evidenced",
-        "IndustrialStatus": "Field replay substitute evidenced (20 cases); \u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "Field replay substitute evidenced (20 cases); \u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -11629,9 +11569,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -11995,9 +11934,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 24 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -12255,9 +12193,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -12425,9 +12362,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 31 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -12978,9 +12914,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Dataset evidenced (272 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 272 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -13100,9 +13035,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -13338,9 +13272,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 27 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -13477,9 +13410,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -13587,9 +13519,8 @@
         "Golden": "Golden evidenced (117 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 117 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -14452,9 +14383,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -14718,9 +14648,8 @@
         "Golden": "Golden evidenced (24 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 24 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -14931,9 +14860,8 @@
         "Golden": "Golden evidenced (48 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 48 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -15055,9 +14983,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -15240,9 +15167,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -15701,9 +15627,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": null
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -15824,9 +15749,8 @@
         "Golden": "Golden evidenced (117 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 117 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -16140,9 +16064,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -16303,9 +16226,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -16562,9 +16484,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Dataset evidenced (20 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 20 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -16855,9 +16776,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -17140,9 +17060,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -17539,9 +17458,8 @@
         "Golden": "Golden evidenced (117 cases)",
         "Dataset": "Dataset evidenced (117 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 117 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -17722,9 +17640,8 @@
         "Golden": "Golden evidenced (48 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 48 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -17879,9 +17796,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 24 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -18346,9 +18262,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -18546,9 +18461,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -18717,9 +18631,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -19315,9 +19228,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -19615,9 +19527,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -19875,9 +19786,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -20301,9 +20211,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -20500,9 +20409,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -20737,9 +20645,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -21406,9 +21313,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -21627,9 +21533,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -21838,9 +21743,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -22149,9 +22053,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -22425,9 +22328,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -22684,9 +22586,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -22897,9 +22798,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -23007,9 +22907,8 @@
         "Golden": "Golden evidenced (117 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 117 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -23135,9 +23034,8 @@
         "Golden": "Golden evidenced (22 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 22 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -23462,9 +23360,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -23689,9 +23586,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -23843,9 +23739,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -24083,7 +23978,7 @@
       ],
       "ResourceRequirements": [],
       "GenerationDependencies": [],
-      "GenerationFingerprint": "2864B65050C130B846BB8F0229B378EDDE29C63C68A3C151882C30D5E1B9141D",
+      "GenerationFingerprint": "49DA9D751D7373D509AEAF26D49ABC295CAC0868AEE2332ACFA03D49D56C61BA",
       "RequiredResources": [],
       "TypicalUpstream": [],
       "TypicalDownstream": [],
@@ -24100,9 +23995,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Dataset evidenced (20 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 20 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "Synthetic benchmark evidence only; it does not establish field accuracy, release readiness, or production-site capability.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -24515,9 +24409,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Dataset evidenced (24 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 24 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -24616,9 +24509,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -24742,9 +24634,8 @@
         "Golden": "Golden evidenced (27 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 27 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -24913,9 +24804,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -25995,9 +25885,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -26251,9 +26140,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -26536,9 +26424,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -27254,9 +27141,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -27639,9 +27525,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -27882,9 +27767,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -28109,9 +27993,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -28268,9 +28151,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -28592,9 +28474,8 @@
         "Golden": "Golden evidenced (24 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 24 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -28747,9 +28628,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -29460,9 +29340,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -29965,9 +29844,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Dataset evidenced (22 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 22 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -30197,9 +30075,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -30588,9 +30465,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -30890,9 +30766,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 22 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -31291,9 +31166,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -31611,9 +31485,8 @@
         "Golden": "Golden evidenced (48 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 48 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -32202,9 +32075,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Dataset evidenced (24 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 24 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -32330,9 +32202,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -32511,9 +32382,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -32634,9 +32504,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -32818,9 +32687,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -33066,9 +32934,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -33268,9 +33135,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -33396,9 +33262,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -33701,9 +33566,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -34128,9 +33992,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Dataset evidenced (24 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 24 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -34360,9 +34223,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -34535,9 +34397,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -34796,9 +34657,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -34914,9 +34774,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": null
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -35127,9 +34986,8 @@
         "Golden": "Golden evidenced (100 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -35315,9 +35173,8 @@
         "Golden": "Golden evidenced (100 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -35416,9 +35273,8 @@
         "Golden": "Golden evidenced (100 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -35641,9 +35497,8 @@
         "Golden": "Golden evidenced (100 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -35865,9 +35720,8 @@
         "Golden": "Golden evidenced (100 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -35966,9 +35820,8 @@
         "Golden": "Golden evidenced (100 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -36179,9 +36032,8 @@
         "Golden": "Golden evidenced (100 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -36391,9 +36243,8 @@
         "Golden": "Golden evidenced (100 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -36493,9 +36344,8 @@
         "Golden": "Golden evidenced (100 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 100 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -36724,9 +36574,8 @@
         "Golden": "Golden evidenced (29 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 29 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -37021,9 +36870,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -37312,9 +37160,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -37414,9 +37261,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -37560,9 +37406,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -38020,9 +37865,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Dataset evidenced (72 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 72 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -38214,9 +38058,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -38910,9 +38753,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -39292,9 +39134,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Dataset evidenced (72 cases)",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Dataset precision claim supported by 72 dataset cases; field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -40974,9 +40815,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -41675,9 +41515,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -41794,9 +41633,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -41967,9 +41805,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -42362,9 +42199,8 @@
         "Golden": "Golden evidenced (48 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 48 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -42456,9 +42292,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -42674,9 +42509,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -43242,9 +43076,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Dataset evidenced (1028 cases)",
         "FieldReplay": "Field replay evidenced (20 cases)",
-        "PrecisionClaim": "Field replay precision claim supported by 20 replay cases; real-site sign-off not yet evidenced",
-        "IndustrialStatus": "Field replay substitute evidenced (20 cases); \u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "Field replay substitute evidenced (20 cases); \u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -45036,9 +44869,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -46329,9 +46161,8 @@
         "Golden": "Golden evidenced (117 cases)",
         "Dataset": "Dataset evidenced (48 cases)",
         "FieldReplay": "Field replay evidenced (20 cases)",
-        "PrecisionClaim": "Field replay precision claim supported by 20 replay cases; real-site sign-off not yet evidenced",
-        "IndustrialStatus": "Field replay substitute evidenced (20 cases); \u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "Field replay substitute evidenced (20 cases); \u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -46514,9 +46345,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -46889,9 +46719,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -47038,9 +46867,8 @@
         "Golden": "Golden evidenced (23 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 23 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -47395,9 +47223,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 24 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -47526,9 +47353,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -47662,9 +47488,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -47800,9 +47625,8 @@
         "Golden": "Golden evidenced (23 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 23 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -47958,9 +47782,8 @@
         "Golden": "Golden evidenced (48 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 48 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P2"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -48107,9 +47930,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -48288,9 +48110,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -48558,9 +48379,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -48851,9 +48671,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 20 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -48950,9 +48769,8 @@
         "Golden": "Not yet evidenced",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Contract behavior evidenced by 21 cases; precision claim not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     },
     {
@@ -49261,9 +49079,8 @@
         "Golden": "Golden evidenced (20 cases)",
         "Dataset": "Not yet evidenced",
         "FieldReplay": "Not yet evidenced",
-        "PrecisionClaim": "Golden regression precision claim supported by 20 oracle cases; dataset and field replay not yet evidenced",
-        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
-        "QScore": "P3"
+        "PrecisionClaim": "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence.",
+        "IndustrialStatus": "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
       }
     }
   ],

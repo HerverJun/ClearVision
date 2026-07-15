@@ -16,7 +16,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     LifecycleNote = "简化 PatchCore 风格实现，部署前必须使用现场数据验证特征库、阈值和稳定性。",
     IconName = "anomaly-detection",
     Keywords = new[] { "anomaly", "patchcore", "feature bank", "异常检测" },
-    Version = "1.1.0",
+    Version = "1.2.0",
     Tags = new[] { "experimental", "industrial-remediation", "anomaly-detection" }
 )]
 [OperatorImageContractProvider(typeof(AnomalyDetectionImageContractProvider))]
@@ -545,33 +545,7 @@ public sealed class AnomalyDetectionOperator : OperatorBase
 
     private EmbeddingModelResolution ResolveInferenceEmbeddingModelTarget(Operator @operator, SimplePatchCoreFeatureBank bank)
     {
-        if (!RequiresOnnxEmbedding(bank.FeatureExtractorId))
-        {
-            return EmbeddingModelResolution.Empty;
-        }
-
-        if (!string.IsNullOrWhiteSpace(bank.EmbeddingModelPath) && File.Exists(bank.EmbeddingModelPath))
-        {
-            return new EmbeddingModelResolution(Path.GetFullPath(bank.EmbeddingModelPath), "FeatureBankMetadataPath", bank.EmbeddingModelId, GetStringParam(@operator, "ModelCatalogPath", string.Empty));
-        }
-
-        if (!string.IsNullOrWhiteSpace(bank.EmbeddingModelId))
-        {
-            var catalogPath = GetStringParam(@operator, "ModelCatalogPath", string.Empty);
-            var resolvedCatalogPath = ModelCatalog.ResolveExplicitOrCatalogPath(
-                explicitPath: null,
-                bank.EmbeddingModelId,
-                catalogPath,
-                SupportedEmbeddingCatalogTypes,
-                out _);
-
-            if (File.Exists(resolvedCatalogPath))
-            {
-                return new EmbeddingModelResolution(Path.GetFullPath(resolvedCatalogPath), "FeatureBankMetadataModelId", bank.EmbeddingModelId, catalogPath);
-            }
-        }
-
-        return EmbeddingModelResolution.Empty;
+        return ResolveEmbeddingModelTarget(@operator, bank, bank.FeatureExtractorId);
     }
 
     private FeatureBankResolution ResolveFeatureBankInputTarget(Operator @operator)

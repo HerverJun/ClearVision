@@ -166,14 +166,25 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
                     Golden = evidence.Golden,
                     Dataset = evidence.Dataset,
                     FieldReplay = evidence.FieldReplay,
-                    PrecisionClaim = evidence.PrecisionClaim,
-                    IndustrialStatus = evidence.IndustrialStatus,
-                    QScore = evidence.Priority
+                    PrecisionClaim = BuildPrecisionClaim(item.QualityState),
+                    IndustrialStatus = evidence.IndustrialStatus
                 }
             });
         }
 
         return cards;
+    }
+
+    private static string BuildPrecisionClaim(OperatorQualityState qualityState)
+    {
+        return qualityState.AlgorithmQuality switch
+        {
+            OperatorAlgorithmQuality.SyntheticBenchmarkEvidence or OperatorAlgorithmQuality.SyntheticBenchmarkValidated =>
+                "Synthetic benchmark evidence only; it does not establish field accuracy, release readiness, or production-site capability.",
+            OperatorAlgorithmQuality.PublicDatasetEvidence =>
+                "Public-dataset evidence only; model, preprocessing and feature-bank identity remain deployment-specific and field validation is absent.",
+            _ => "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence."
+        };
     }
 
     private static List<OperatorKnowledgeEdge> BuildEdges(

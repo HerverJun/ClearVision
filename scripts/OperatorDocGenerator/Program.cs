@@ -384,23 +384,19 @@ static string BuildCatalogMarkdown(IReadOnlyList<CatalogOperator> operators, Dat
         sb.AppendLine($"| `{categoryGroup.Key.CategoryId}` | {EscapeCell(categoryGroup.Key.Category)} | {categoryGroup.Count()} | {ratio.ToString("0.0", CultureInfo.InvariantCulture)}% |");
     }
 
-    var averageQuality = operators.Count == 0
-        ? 0
-        : operators.Average(op => op.Quality.TotalScore);
-
-    var qualityLevelGroups = operators
-        .GroupBy(op => op.Quality.Level)
-        .OrderBy(group => group.Key, StringComparer.Ordinal)
-        .ToList();
-
     sb.AppendLine();
-    sb.AppendLine("## 质量评分 / Quality Score");
-    sb.AppendLine($"- 平均分 / Average: **{averageQuality.ToString("0.0", CultureInfo.InvariantCulture)}**");
-    sb.AppendLine("| 等级 (Level) | 数量 (Count) |");
-    sb.AppendLine("|------|------:|");
-    foreach (var levelGroup in qualityLevelGroups)
+    sb.AppendLine("## 四轴质量状态 / Four-Axis Quality State");
+    sb.AppendLine("> 四个轴必须独立解释；生命周期、测试数量或历史 A/B 分数均不能代表整体成熟度。合成或公开数据证据不会自动提升 ProductionReadiness 或 FieldValidation。");
+    foreach (var axis in new[]
+             {
+                 (Name: "Execution", Select: (Func<CatalogOperator, string>)(op => op.QualityState.Execution)),
+                 (Name: "AlgorithmQuality", Select: (Func<CatalogOperator, string>)(op => op.QualityState.AlgorithmQuality)),
+                 (Name: "ProductionReadiness", Select: (Func<CatalogOperator, string>)(op => op.QualityState.ProductionReadiness)),
+                 (Name: "FieldValidation", Select: (Func<CatalogOperator, string>)(op => op.QualityState.FieldValidation))
+             })
     {
-        sb.AppendLine($"| {EscapeCell(levelGroup.Key)} | {levelGroup.Count()} |");
+        var summary = string.Join(", ", operators.GroupBy(axis.Select).OrderBy(group => group.Key, StringComparer.Ordinal).Select(group => $"{group.Key}={group.Count()}"));
+        sb.AppendLine($"- {axis.Name}: {summary}");
     }
 
     sb.AppendLine();
@@ -409,16 +405,15 @@ static string BuildCatalogMarkdown(IReadOnlyList<CatalogOperator> operators, Dat
     {
         sb.AppendLine();
         sb.AppendLine($"### {categoryGroup.Key.Category} / `{categoryGroup.Key.CategoryId}` ({categoryGroup.Count()})");
-        sb.AppendLine("| 枚举 (Enum) | 显示名 (DisplayName) | 生命周期 | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |");
-        sb.AppendLine("|------|------|------|------:|------:|------:|------|------|------|------|");
+        sb.AppendLine("| 枚举 (Enum) | 显示名 (DisplayName) | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | 输入 | 输出 | 参数 | 版本 (Version) | 算法 (Algorithm) | 文档 |");
+        sb.AppendLine("|------|------|------|------|------|------|------:|------:|------:|------|------|------|");
 
         foreach (var op in categoryGroup.OrderBy(item => item.Id, StringComparer.Ordinal))
         {
             var algorithm = string.IsNullOrWhiteSpace(op.Algorithm) ? "-" : EscapeCell(op.Algorithm!);
             var linkPath = $"{normalizedPrefix}{op.Id}.md";
-            var quality = $"{op.Quality.TotalScore} ({op.Quality.Level})";
             sb.AppendLine(
-                $"| `OperatorType.{op.Id}` | {EscapeCell(op.DisplayName)} | `{op.Lifecycle}` | {op.InputPorts.Count} | {op.OutputPorts.Count} | {op.Parameters.Count} | {quality} | `{op.Version}` | {algorithm} | [{op.Id}]({linkPath}) |");
+                $"| `OperatorType.{op.Id}` | {EscapeCell(op.DisplayName)} | `{op.QualityState.Execution}` | `{op.QualityState.AlgorithmQuality}` | `{op.QualityState.ProductionReadiness}` | `{op.QualityState.FieldValidation}` | {op.InputPorts.Count} | {op.OutputPorts.Count} | {op.Parameters.Count} | `{op.Version}` | {algorithm} | [{op.Id}]({linkPath}) |");
         }
     }
 
@@ -1668,7 +1663,6 @@ static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext q
             .OrderBy(dependency => dependency, StringComparer.Ordinal)
             .ToList(),
         GenerationFingerprint = ComputeOperatorGenerationFingerprint(item, qualityContext),
-        Quality = ComputeQuality(item, qualityContext),
         DocPath = $"算子资料/算子名片/{id}.md"
     };
 }
@@ -2167,157 +2161,6 @@ static void AddGoldenEvidenceFromBaseline(string baselinePath, HashSet<string> i
     }
 }
 
-static CatalogQuality ComputeQuality(OperatorDocModel item, QualityContext qualityContext)
-{
-    var operatorId = item.OperatorType.ToString();
-    var typeName = item.ClrType.Name;
-
-    var documentationScore = EvaluateDocumentationScore(operatorId, qualityContext);
-    var testCoverageScore = EvaluateTestCoverageScore(operatorId, typeName, qualityContext);
-    var parameterValidationScore = EvaluateParameterValidationScore(typeName, qualityContext);
-    var errorHandlingScore = EvaluateErrorHandlingScore(typeName, qualityContext);
-
-    var totalScore = (int)Math.Round(
-        (documentationScore + testCoverageScore + parameterValidationScore + errorHandlingScore) / 4.0,
-        MidpointRounding.AwayFromZero);
-
-    return new CatalogQuality
-    {
-        TotalScore = totalScore,
-        Level = MapQualityLevel(totalScore),
-        DocumentationScore = documentationScore,
-        TestCoverageScore = testCoverageScore,
-        ParameterValidationScore = parameterValidationScore,
-        ErrorHandlingScore = errorHandlingScore,
-        Summary = BuildQualitySummary(documentationScore, testCoverageScore, parameterValidationScore, errorHandlingScore)
-    };
-}
-
-static int EvaluateDocumentationScore(string operatorId, QualityContext qualityContext)
-{
-    var docPath = Path.Combine(qualityContext.DocsRoot, $"{operatorId}.md");
-    if (!File.Exists(docPath))
-    {
-        return 0;
-    }
-
-    var content = File.ReadAllText(docPath);
-    var placeholderTokens = new[]
-    {
-        "TODO",
-        "TBD",
-        "O(?)",
-        "~?ms",
-        "占位符"
-    };
-
-    var hasPlaceholder = placeholderTokens.Any(token =>
-        content.Contains(token, StringComparison.OrdinalIgnoreCase));
-
-    return hasPlaceholder ? 60 : 100;
-}
-
-static int EvaluateTestCoverageScore(string operatorId, string typeName, QualityContext qualityContext)
-{
-    return qualityContext.TestIndex.Contains(typeName) ||
-        qualityContext.TestIndex.Contains(operatorId) ||
-        qualityContext.GoldenEvidenceIndex.Contains(operatorId)
-        ? 100
-        : 30;
-}
-
-static int EvaluateParameterValidationScore(string typeName, QualityContext qualityContext)
-{
-    if (!qualityContext.SourceTextByTypeName.TryGetValue(typeName, out var source))
-    {
-        return 0;
-    }
-
-    if (!source.Contains("ValidateParameters(", StringComparison.Ordinal))
-    {
-        return 0;
-    }
-
-    var hasInvalidBranch =
-        source.Contains("ValidationResult.Invalid", StringComparison.Ordinal) ||
-        source.Contains("Errors", StringComparison.Ordinal);
-
-    if (hasInvalidBranch)
-    {
-        return 100;
-    }
-
-    var hasValid = source.Contains("ValidationResult.Valid", StringComparison.Ordinal);
-    var hasConditional = Regex.IsMatch(source, @"\bif\s*\(", RegexOptions.CultureInvariant);
-
-    if (hasValid && hasConditional)
-    {
-        return 80;
-    }
-
-    if (hasValid)
-    {
-        return 55;
-    }
-
-    return 50;
-}
-
-static int EvaluateErrorHandlingScore(string typeName, QualityContext qualityContext)
-{
-    if (!qualityContext.SourceTextByTypeName.TryGetValue(typeName, out var source))
-    {
-        return 0;
-    }
-
-    var hasTry = source.Contains("try", StringComparison.Ordinal);
-    var hasCatch = source.Contains("catch", StringComparison.Ordinal);
-    var failureCount = Regex.Matches(source, @"OperatorExecutionOutput\.Failure\s*\(", RegexOptions.CultureInvariant).Count;
-
-    if (hasTry && hasCatch && failureCount >= 1)
-    {
-        return 100;
-    }
-
-    if (hasTry && hasCatch)
-    {
-        return 90;
-    }
-
-    if (failureCount >= 4)
-    {
-        return 85;
-    }
-
-    if (failureCount >= 2)
-    {
-        return 75;
-    }
-
-    if (failureCount >= 1)
-    {
-        return 60;
-    }
-
-    return 35;
-}
-
-static string MapQualityLevel(int score)
-{
-    return score switch
-    {
-        >= 85 => "A",
-        >= 70 => "B",
-        >= 55 => "C",
-        _ => "D"
-    };
-}
-
-static string BuildQualitySummary(int documentationScore, int testCoverageScore, int parameterValidationScore, int errorHandlingScore)
-{
-    return $"Doc={documentationScore}, Test={testCoverageScore}, Validation={parameterValidationScore}, ErrorHandling={errorHandlingScore}";
-}
-
 static string? NormalizeParameterValue(object? value)
 {
     if (value == null)
@@ -2545,8 +2388,6 @@ internal sealed class CatalogOperator
 
     public string GenerationFingerprint { get; set; } = string.Empty;
 
-    public CatalogQuality Quality { get; set; } = new();
-
     public string DocPath { get; set; } = string.Empty;
 }
 
@@ -2602,23 +2443,6 @@ internal sealed class CatalogResourceRequirement
     public OperatorParameterConditionSet? RequiredWhen { get; set; }
 
     public List<string> SatisfiedByInputPorts { get; set; } = new();
-}
-
-internal sealed class CatalogQuality
-{
-    public int TotalScore { get; set; }
-
-    public string Level { get; set; } = string.Empty;
-
-    public int DocumentationScore { get; set; }
-
-    public int TestCoverageScore { get; set; }
-
-    public int ParameterValidationScore { get; set; }
-
-    public int ErrorHandlingScore { get; set; }
-
-    public string Summary { get; set; } = string.Empty;
 }
 
 internal sealed class OperatorVersionHistoryDocument

@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-07-15 23:49:28 +08:00`
+> 生成时间 / Generated At: `2026-07-16 01:07:27 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 当前版本快照 / Current Snapshot
@@ -88,7 +88,7 @@
 | `OperatorType.SurfaceDefectDetection` | 表面缺陷检测 | `DefectDetection` | 缺陷检测 | `Experimental` | `2.0.1` |
 | `OperatorType.AngleMeasurement` | 角度测量 | `Measurement` | 测量 | `Stable` | `1.0.0` |
 | `OperatorType.ArcCaliper` | 圆弧卡尺 | `Measurement` | 测量 | `Stable` | `1.0.1` |
-| `OperatorType.CaliperTool` | 卡尺工具 | `Measurement` | 测量 | `Stable` | `1.1.0` |
+| `OperatorType.CaliperTool` | 卡尺工具 | `Measurement` | 测量 | `Stable` | `1.2.1` |
 | `OperatorType.CircleMeasurement` | 圆测量 | `Measurement` | 测量 | `Stable` | `1.2.0` |
 | `OperatorType.ColorMeasurement` | 颜色测量 | `Measurement` | 测量 | `Stable` | `2.0.0` |
 | `OperatorType.ContourMeasurement` | 轮廓测量 | `Measurement` | 测量 | `Stable` | `1.0.0` |
@@ -97,7 +97,7 @@
 | `OperatorType.GeometricFitting` | 几何拟合 | `Measurement` | 测量 | `Stable` | `1.0.0` |
 | `OperatorType.GeometricTolerance` | 二维几何公差判定 | `Measurement` | 测量 | `Stable` | `1.0.1` |
 | `OperatorType.LineLineDistance` | 线线距离 | `Measurement` | 测量 | `Stable` | `1.0.0` |
-| `OperatorType.LineMeasurement` | 直线测量 | `Measurement` | 测量 | `Stable` | `1.1.0` |
+| `OperatorType.LineMeasurement` | 直线测量 | `Measurement` | 测量 | `Stable` | `1.2.1` |
 | `OperatorType.Measurement` | 测量 | `Measurement` | 测量 | `Stable` | `1.1.0` |
 | `OperatorType.MinEnclosingGeometry` | 最小外接几何体 | `Measurement` | 测量 | `Stable` | `1.0.1` |
 | `OperatorType.PhaseClosure` | 相位解缠绕 | `Measurement` | 测量 | `Stable` | `1.0.1` |
@@ -115,7 +115,7 @@
 | `OperatorType.StereoCalibration` | 双目标定 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.0.0` |
 | `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.1.1` |
 | `OperatorType.Undistort` | 畸变校正 | `CalibrationAndCoordinates` | 标定与坐标 | `Stable` | `1.0.0` |
-| `OperatorType.AnomalyDetection` | 异常检测 | `AiInference` | AI推理 | `Experimental` | `1.1.0` |
+| `OperatorType.AnomalyDetection` | 异常检测 | `AiInference` | AI推理 | `Experimental` | `1.2.0` |
 | `OperatorType.DeepLearning` | 深度学习 | `AiInference` | AI推理 | `Stable` | `1.1.0` |
 | `OperatorType.OcrRecognition` | OCR 识别 | `AiInference` | AI推理 | `Stable` | `1.0.0` |
 | `OperatorType.SemanticSegmentation` | 语义分割 | `AiInference` | AI推理 | `Stable` | `1.0.0` |
@@ -259,6 +259,8 @@
 ### OperatorType.AnomalyDetection / 异常检测
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.2.0` | `2026-07-16T00:58:49.9337226+08:00` | `4FE4975A26FA` | `operator-runtime-metadata-v2:image-contract-v2.1` |
+| `1.1.0` | `2026-07-16T00:57:29.1622202+08:00` | `848C8876756F` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.0` | `2026-07-15T23:17:17.3688808+08:00` | `D16582B2F872` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T23:08:03.2424341+08:00` | `63FA11AB5F58` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T17:25:56.0119276+08:00` | `68B18DB0656B` | `operator-runtime-metadata-v2:image-contract-v2.1` |
@@ -435,6 +437,10 @@
 ### OperatorType.CaliperTool / 卡尺工具
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.2.1` | `2026-07-16T01:07:27.7681703+08:00` | `A85552FEF127` | `operator-runtime-metadata-v2:image-contract-v2.1` |
+| `1.2.0` | `2026-07-16T01:06:46.0334378+08:00` | `2DDE27AAF7B3` | `operator-runtime-metadata-v2:image-contract-v2.1` |
+| `1.2.0` | `2026-07-16T00:58:49.9337226+08:00` | `97B7649A3E5C` | `operator-runtime-metadata-v2:image-contract-v2.1` |
+| `1.1.0` | `2026-07-16T00:57:29.1622202+08:00` | `E25FEA79D905` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.0` | `2026-07-15T23:17:17.3688808+08:00` | `B6BE6A235849` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T23:08:03.2424341+08:00` | `19F42DCF9E24` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `A4BC37D12A87` | `operator-runtime-metadata-v2:image-contract-v2.1` |
@@ -1537,6 +1543,10 @@
 ### OperatorType.LineMeasurement / 直线测量
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.2.1` | `2026-07-16T01:07:27.7681703+08:00` | `49DA9D751D73` | `operator-runtime-metadata-v2:image-contract-v2.1` |
+| `1.2.0` | `2026-07-16T01:06:46.0334378+08:00` | `C248D07D58A3` | `operator-runtime-metadata-v2:image-contract-v2.1` |
+| `1.2.0` | `2026-07-16T00:58:49.9337226+08:00` | `1CCEC479C739` | `operator-runtime-metadata-v2:image-contract-v2.1` |
+| `1.1.0` | `2026-07-16T00:57:29.1622202+08:00` | `CDEA017EED13` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.1.0` | `2026-07-15T23:17:17.3688808+08:00` | `2864B65050C1` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T23:08:03.2424341+08:00` | `8854E9BC6026` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `482B52D14198` | `operator-runtime-metadata-v2:image-contract-v2.1` |

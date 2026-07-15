@@ -16,8 +16,8 @@ function Resolve-RepoPath([string]$Path) {
     return [IO.Path]::GetFullPath((Join-Path $repoRoot $Path))
 }
 
-function Get-Metric($Report, [string]$Domain, [string]$Algorithm) {
-    $metric = @($Report.metrics | Where-Object { $_.domain -eq $Domain -and $_.algorithm -eq $Algorithm })
+function Get-Metric($Report, [string]$Domain, [string]$Algorithm, [string]$Split = "test") {
+    $metric = @($Report.metrics | Where-Object { $_.domain -eq $Domain -and $_.algorithm -eq $Algorithm -and $_.split -eq $Split })
     if ($metric.Count -ne 1) {
         throw "Expected one metric for $Domain/$Algorithm; actual=$($metric.Count)."
     }
@@ -54,10 +54,10 @@ if ([string]::IsNullOrWhiteSpace($after.sourceSha)) {
 
 Assert-Equal "dataset" $baseline.dataset $after.dataset
 Assert-Equal "model" $baseline.model $after.model
+Assert-Equal "harness" $baseline.harness $after.harness
 Assert-Equal "environment" $baseline.environment $after.environment
 
 $adoptedSpecs = @(
-    [ordered]@{ Domain = "Caliper"; Baseline = "LegacyGradientCentroid"; Winner = "GaussianDerivative"; Production = "ProductionGaussianDerivative"; Conformance = "NoDegradation" },
     [ordered]@{ Domain = "Circle"; Baseline = "AlgebraicL2"; Winner = "OrthogonalWelsch"; Production = "ProductionOrthogonalWelsch"; Conformance = "ExactAccuracy" },
     [ordered]@{ Domain = "Line"; Baseline = "L2"; Winner = "Welsch"; Production = "ProductionWelsch"; Conformance = "ExactAccuracy" }
 )
@@ -125,30 +125,81 @@ $decisions = foreach ($spec in $adoptedSpecs) {
     }
 }
 
+$caliperBaseline = Get-Metric $baseline "Caliper" "LegacyGradientCentroid"
+$caliperCandidate = Get-Metric $baseline "Caliper" "GaussianDerivative"
+$caliperIntegrated = Get-Metric $after "Caliper" "IntegratedGaussianDerivative"
+$caliperDecision = @($baseline.decisions | Where-Object { $_.domain -eq "Caliper" })[0]
+if ($caliperDecision.winner -ne "GaussianDerivative" -or $caliperDecision.adopted -ne $true) {
+    throw "Caliper validation-set candidate selection drifted."
+}
+if ([double]$caliperIntegrated.rmse -lt [double]$caliperBaseline.rmse -and
+    [double]$caliperIntegrated.p95Error -lt [double]$caliperBaseline.p95Error -and
+    [double]$caliperIntegrated.failureRate -le [double]$caliperBaseline.failureRate) {
+    throw "Caliper integrated candidate now meets the adoption guard; formal exposure requires a new explicit review."
+}
+$caliperRow = [ordered]@{
+    domain = "Caliper"
+    baseline = "LegacyGradientCentroid"
+    winner = "GaussianDerivative (kernel candidate)"
+    productionAlgorithm = "IntegratedGaussianDerivative"
+    adopted = $false
+    reason = "The validation-selected localizer regressed end-to-end test RMSE/P95 when seeded by the formal detector and pair selection; it remains out of the formal operator."
+    baselineMetric = [ordered]@{
+        rmse = [double]$caliperBaseline.rmse
+        p95Error = [double]$caliperBaseline.p95Error
+        failureRate = [double]$caliperBaseline.failureRate
+        ambiguityRate = [double]$caliperBaseline.ambiguityRate
+        latencyP95Milliseconds = [double]$caliperBaseline.latencyP95Milliseconds
+        allocatedBytesPerCase = [long]$caliperBaseline.allocatedBytesPerCase
+    }
+    productionMetric = [ordered]@{
+        rmse = [double]$caliperIntegrated.rmse
+        p95Error = [double]$caliperIntegrated.p95Error
+        failureRate = [double]$caliperIntegrated.failureRate
+        ambiguityRate = [double]$caliperIntegrated.ambiguityRate
+        latencyP95Milliseconds = [double]$caliperIntegrated.latencyP95Milliseconds
+        allocatedBytesPerCase = [long]$caliperIntegrated.allocatedBytesPerCase
+    }
+    improvement = [ordered]@{
+        rmsePercent = Get-PercentImprovement ([double]$caliperBaseline.rmse) ([double]$caliperIntegrated.rmse)
+        p95ErrorPercent = Get-PercentImprovement ([double]$caliperBaseline.p95Error) ([double]$caliperIntegrated.p95Error)
+        failureRateDelta = [double]$caliperIntegrated.failureRate - [double]$caliperBaseline.failureRate
+        ambiguityRateDelta = [double]$caliperIntegrated.ambiguityRate - [double]$caliperBaseline.ambiguityRate
+    }
+    cost = [ordered]@{
+        latencyP95Ratio = [Math]::Round([double]$caliperIntegrated.latencyP95Milliseconds / [double]$caliperBaseline.latencyP95Milliseconds, 6)
+        allocationRatio = [Math]::Round([double]$caliperIntegrated.allocatedBytesPerCase / [double]$caliperBaseline.allocatedBytesPerCase, 6)
+    }
+    productionConformance = "RejectedIntegrationRegression"
+}
+
 $uncertaintyHeuristic = Get-Metric $baseline "MeasurementUncertainty" "ResidualHeuristic"
 $uncertaintyCovariance = Get-Metric $baseline "MeasurementUncertainty" "Covariance"
 $anomalyTraditional = Get-Metric $after "Anomaly" "TraditionalLabGradient"
 $anomalyOnnx = Get-Metric $after "Anomaly" "OnnxManifestPreprocess"
-$anomalyPreprocess = Get-Metric $after "AnomalyPreprocess" "ManifestDeclaredRgbFloat01"
+$anomalyPreprocess = Get-Metric $after "AnomalyPreprocess" "ManifestDeclaredRgbFloat01" "contract"
 
 $report = [ordered]@{
-    schemaVersion = "2026-07-15.operator-precision-phase5-comparison.v1"
+    schemaVersion = "2026-07-16.operator-precision-phase5-comparison.v2"
     generatedAtUtc = $after.generatedAtUtc
     baselineSourceSha = $baseline.sourceSha
     afterSourceSha = $after.sourceSha
     immutableInputs = [ordered]@{
         datasetId = $after.dataset.datasetId
         datasetVersion = $after.dataset.version
-        datasetSha256 = $after.dataset.sha256
+        manifestSha256 = $after.dataset.manifestSha256
+        generatedDataSha256 = $after.dataset.generatedDataSha256
         seed = [int]$after.dataset.seed
         modelSha256 = $after.model.sha256
         preprocessFingerprint = $after.model.preprocessFingerprint
         environment = $after.environment
+        harness = $after.harness
         identicalAcrossReports = $true
     }
     claimBoundary = "Synthetic mathematical and preprocessing-contract evidence only; public MVTec evidence remains separate. This report does not establish E4, Release Ready, Field Verified, commercial-grade, or production-site accuracy."
-    adoptedDecisions = @($decisions)
+    decisions = @($caliperRow) + @($decisions)
     rejectedCandidates = @(
+        [ordered]@{ domain = "Caliper"; candidate = "GaussianDerivative formal integration"; reason = $caliperRow.reason },
         [ordered]@{ domain = "Caliper"; candidate = "Quadratic"; reason = "No repeatable accuracy improvement over the legacy baseline." },
         [ordered]@{ domain = "Caliper"; candidate = "Erf"; reason = "No accuracy improvement and materially higher P95 latency/allocation." },
         [ordered]@{ domain = "MeasurementUncertainty"; candidate = "Covariance as calibrated confidence"; reason = "68%/95% calibration did not improve; retained only as UncalibratedCovariance evidence." },
@@ -166,7 +217,7 @@ $report = [ordered]@{
         traditionalDefaultAccuracy = [double]$anomalyTraditional.extra.accuracy
         onnxManifestAccuracy = [double]$anomalyOnnx.extra.accuracy
         preprocessReferenceRmse = [double]$anomalyPreprocess.rmse
-        mismatchFingerprintDifferent = [double]$anomalyPreprocess.extra.mismatchFingerprintDifferent
+        mismatchRejectedFailClosed = [double]$anomalyPreprocess.extra.mismatchRejectedFailClosed
         conclusion = "Complete preprocessing manifest and model/preprocess/feature-bank identity are mandatory; mismatch fails closed."
     }
     acceptance = [ordered]@{
@@ -191,18 +242,20 @@ $lines.Add("# Operator Precision Phase 5 Comparison")
 $lines.Add("")
 $lines.Add("- Baseline SHA: ``$($baseline.sourceSha)``")
 $lines.Add("- After SHA: ``$($after.sourceSha)``")
-$lines.Add("- Dataset SHA: ``$($after.dataset.sha256)``")
+$lines.Add("- Dataset manifest SHA: ``$($after.dataset.manifestSha256)``")
+$lines.Add("- Generated input/truth SHA: ``$($after.dataset.generatedDataSha256)``")
 $lines.Add("- Seed: ``$($after.dataset.seed)``")
 $lines.Add("- Model SHA: ``$($after.model.sha256)``")
 $lines.Add("- Preprocess fingerprint: ``$($after.model.preprocessFingerprint)``")
-$lines.Add("- Identity check: baseline and after used the same dataset, model, preprocessing identity, seed and runtime environment.")
+$lines.Add("- Harness SHA: ``$($after.harness.programSha256)`` (commit ``$($after.harness.commitSha)``; dirty=$($after.harness.repositoryDirty))")
+$lines.Add("- Identity check: baseline and after used the same generated input/truth, harness, model, preprocessing identity, seed and runtime environment.")
 $lines.Add("")
-$lines.Add("> Synthetic mathematical and preprocessing-contract evidence only. This is not E4, Release Ready, Field Verified, commercial-grade, or production-site accuracy evidence.")
+$lines.Add("> Kernel-level synthetic mathematical and preprocessing-contract evidence only. This is not E4, end-to-end field accuracy, Release Ready, Field Verified, commercial-grade, or production-site evidence.")
 $lines.Add("")
-$lines.Add("| Domain | Baseline | Production winner | RMSE improvement | P95 error improvement | Failure delta | Ambiguity delta | P95 latency | Allocation | Conformance |")
-$lines.Add("|---|---|---|---:|---:|---:|---:|---:|---:|---|")
-foreach ($row in $decisions) {
-    $lines.Add("| $($row.domain) | ``$($row.baseline)`` | ``$($row.productionAlgorithm)`` | $($row.improvement.rmsePercent)% | $($row.improvement.p95ErrorPercent)% | $($row.improvement.failureRateDelta) | $($row.improvement.ambiguityRateDelta) | $([Math]::Round($row.productionMetric.latencyP95Milliseconds, 6)) ms | $($row.productionMetric.allocatedBytesPerCase) B/case | $($row.productionConformance) |")
+$lines.Add("| Domain | Baseline | Evaluated path | RMSE improvement | P95 error improvement | Failure delta | Ambiguity delta | P95 latency | Allocation | Adopted | Conformance |")
+$lines.Add("|---|---|---|---:|---:|---:|---:|---:|---:|---|---|")
+foreach ($row in $report.decisions) {
+$lines.Add("| $($row.domain) | ``$($row.baseline)`` | ``$($row.productionAlgorithm)`` | $($row.improvement.rmsePercent)% | $($row.improvement.p95ErrorPercent)% | $($row.improvement.failureRateDelta) | $($row.improvement.ambiguityRateDelta) | $([Math]::Round($row.productionMetric.latencyP95Milliseconds, 6)) ms | $($row.productionMetric.allocatedBytesPerCase) B/case | $($row.adopted) | $($row.productionConformance) |")
 }
 $lines.Add("")
 $lines.Add("## Rejected candidates")

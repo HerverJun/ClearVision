@@ -8,7 +8,7 @@
 | 分类 ID (CategoryId) | `AiInference` |
 | 分类 (Category) | AI推理 |
 | 分类顺序 (CategoryOrder) | 9 |
-| 版本 (Version) | `1.1.0` |
+| 版本 (Version) | `1.2.0` |
 | 生命周期 (Lifecycle) | 实验 `Experimental` |
 | 生命周期说明 (Lifecycle Note) | 简化 PatchCore 风格实现，部署前必须使用现场数据验证特征库、阈值和稳定性。 |
 | 默认隐藏 (Default Hidden) | No |
@@ -112,7 +112,7 @@
 | - | - | - |
 
 ## 生成依赖 / Generation Dependencies
-- 组合指纹 (Generation Fingerprint)：`D16582B2F872342D214D241378A66FEFD3A289B434F810DD7A840F675FA205F9`
+- 组合指纹 (Generation Fingerprint)：`4FE4975A26FAF14BF71530409CA4EDC4B80E234DD682E7BDD36139A19A32B00E`
 - `type:ClearVision.Product.Infrastructure.Operators.AnomalyDetectionImageContractProvider`
 
 ### 运行时附加输出 / Runtime Additional Outputs
@@ -165,4 +165,4 @@
 ## 变更记录 / Changelog
 | 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |
 |------|------|----------|
-| 1.1.0 | 2026-07-15 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |
+| 1.2.0 | 2026-07-16 | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |

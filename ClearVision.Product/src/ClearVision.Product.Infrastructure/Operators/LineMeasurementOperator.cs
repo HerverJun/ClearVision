@@ -14,7 +14,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.Measurement,
     IconName = "line-measure",
     Keywords = new[] { "直线", "线段", "角度", "霍夫", "Line", "Hough", "FitLine" },
-    Version = "1.1.0"
+    Version = "1.2.1"
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "结果图像", PortDataType.Image)]
@@ -94,9 +94,22 @@ public class LineMeasurementOperator : OperatorBase
 
         if (lineResults.Count == 0)
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure(fitLoss == GeometryRefinementLoss.L2
+            var failure = OperatorExecutionOutput.Failure(fitLoss == GeometryRefinementLoss.L2
                 ? "No valid line found"
-                : $"FitLoss {fitLoss} failed to produce a non-degenerate refined line; no legacy fallback was used."));
+                : $"FitLoss {fitLoss} failed to produce a non-degenerate refined line; no legacy fallback was used.");
+            failure.OutputData = new Dictionary<string, object>
+            {
+                ["Method"] = method,
+                ["FitLoss"] = fitLoss.Value.ToString(),
+                ["SeedAlgorithm"] = method,
+                ["RefineAlgorithm"] = fitLoss == GeometryRefinementLoss.L2 ? "Cv2.FitLine/L2" : $"OrthogonalIRLS/{fitLoss}",
+                ["ResidualMean"] = double.NaN,
+                ["ResidualMax"] = double.NaN,
+                ["OutlierCount"] = 0,
+                ["DiagnosticsAvailable"] = true,
+                ["StatusCode"] = "NoFeature"
+            };
+            return Task.FromResult(failure);
         }
 
         var firstLine = lineResults[0];
@@ -129,6 +142,11 @@ public class LineMeasurementOperator : OperatorBase
             ? covarianceValues
             : Array.Empty<double>();
         var evidenceFlags = new List<string> { "HeuristicUncertainty" };
+        if (!double.IsFinite(sigmaAngle))
+        {
+            evidenceFlags.Add("AngleSigmaUnavailable");
+            evidenceFlags.Add("ResidualUncertaintyOnly");
+        }
         if (covariance.Count > 0)
         {
             evidenceFlags.Add("UncalibratedCovariance");
@@ -146,7 +164,7 @@ public class LineMeasurementOperator : OperatorBase
             firstLine.Angle,
             "deg",
             "ImagePixel",
-            double.IsFinite(sigmaAngle) ? sigmaAngle : firstLine.ResidualMean,
+            double.IsFinite(sigmaAngle) ? sigmaAngle : double.NaN,
             covariance,
             MeasurementEvidenceProvenance.Heuristic,
             $"{method}/{fitLoss}",

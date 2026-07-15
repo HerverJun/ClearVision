@@ -2,11 +2,11 @@
 
 Package: `ClearVision.OperatorLibrary`
 
-Version baseline: `1.0.2`
+Version baseline: `1.0.3`
 
 Target framework: `net8.0`
 
-Generated from: `dotnet list ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj package --include-transitive` and reconciled with `packages.lock.json` on 2026-05-09.
+Generated from: `dotnet list ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj package --include-transitive` and reconciled with `packages.lock.json` on 2026-07-16.
 
 This is a human-readable SBOM baseline for release review. `SBOM.spdx.json` is the machine-readable SPDX seed artifact; release automation should regenerate it from the exact `.nupkg` before external publication.
 

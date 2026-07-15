@@ -4,9 +4,9 @@
     "net8.0": {
       "ClearVision.OperatorLibrary": {
         "type": "Direct",
-        "requested": "[1.0.2, )",
-        "resolved": "1.0.2",
-        "contentHash": "h2CUxf9LEf8/DZ4t+Ljgy1I0Ajl7LWyxa5Do7CSGtvagrbrfO7yaPOtoTrmcNzihfCwdvI3JeBuDNbf+YdEP6A==",
+        "requested": "[1.0.3, )",
+        "resolved": "1.0.3",
+        "contentHash": "jckPwpnVpRW2eN5cJTZd4NaJa89/1+j0OguIQBndWXhAwYz/mdRGsETIjwEy0oTXdi5jvmC1k0ikalvfKtcmRA==",
         "dependencies": {
           "HslCommunication": "12.7.0",
           "Microsoft.Data.SqlClient": "5.2.2",
