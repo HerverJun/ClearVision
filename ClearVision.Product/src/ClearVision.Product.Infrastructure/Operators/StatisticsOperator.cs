@@ -12,9 +12,9 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Statistics",
-    Description = "Computes Mean/StdDev/Cpk statistics over rolling history.",
-    Category = "General",
+    DisplayName = "统计分析",
+    Description = "基于滚动历史计算均值、标准差和 Cpk 统计结果。",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "stats"
 )]
 [InputPort("Value", "Input Value", PortDataType.Float, IsRequired = true)]

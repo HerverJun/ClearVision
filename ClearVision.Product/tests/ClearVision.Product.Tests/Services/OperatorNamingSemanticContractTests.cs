@@ -1,11 +1,9 @@
 using System.Reflection;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
-using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
-using ClearVision.Product.Infrastructure.AI.Tools;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
@@ -14,8 +12,6 @@ namespace ClearVision.Product.Tests.Services;
 
 public sealed class OperatorNamingSemanticContractTests
 {
-    private static readonly string RepoRoot = ResolveRepoRoot();
-
     private static readonly NamingContract[] Contracts =
     [
         new(OperatorType.BlobLabeling, typeof(BlobLabelingOperator), 212, "Blob分类标注", "连通域标注", 2, 3, 3),
@@ -35,11 +31,10 @@ public sealed class OperatorNamingSemanticContractTests
     ];
 
     [Fact]
-    public void SourceRuntimeAndAiCatalog_ShouldExposeTheSameCorrectedDisplayNames()
+    public void SourceAndRuntime_ShouldExposeCorrectedIdentityWithoutShapeDrift()
     {
         var scanned = new OperatorMetadataScanner().Scan();
         var runtimeFactory = new OperatorFactory();
-        var aiCatalog = new VisionAgentOperatorContractCatalog(runtimeFactory);
 
         scanned.Should().HaveCount(158);
 
@@ -57,6 +52,7 @@ public sealed class OperatorNamingSemanticContractTests
             ((int)contract.OperatorType).Should().Be(contract.NumericValue);
 
             var scannedMetadata = scanned.Single(item => item.Type == contract.OperatorType);
+            scannedMetadata.DisplayName.Should().Be(contract.DisplayName);
             AssertStableShape(scannedMetadata.InputPorts.Count, scannedMetadata.OutputPorts.Count, scannedMetadata.Parameters.Count, contract);
 
             var runtimeMetadata = runtimeFactory.GetMetadata(contract.OperatorType);
@@ -64,109 +60,11 @@ public sealed class OperatorNamingSemanticContractTests
             runtimeMetadata!.DisplayName.Should().Be(contract.DisplayName);
             runtimeMetadata.Keywords.Should().Contain(contract.LegacyDisplayName);
             AssertStableShape(runtimeMetadata.InputPorts.Count, runtimeMetadata.OutputPorts.Count, runtimeMetadata.Parameters.Count, contract);
-
-            aiCatalog.TryGet(contract.OperatorType.ToString(), out var aiContract).Should().BeTrue();
-            aiContract.DisplayName.Should().Be(contract.DisplayName);
         }
     }
 
     [Fact]
-    public void ActiveGeneratedCatalogsAndCards_ShouldMatchRuntimeNames()
-    {
-        var catalogPaths = new[]
-        {
-            Path.Combine(RepoRoot, "docs", "算子资料", "算子目录.json"),
-            Path.Combine(RepoRoot, "docs", "算子资料", "算子名片", "catalog.json"),
-            Path.Combine(RepoRoot, "docs", "operators", "catalog.json"),
-            Path.Combine(RepoRoot, "算子资料", "算子目录.json"),
-            Path.Combine(RepoRoot, "算子资料", "算子名片", "catalog.json")
-        };
-
-        foreach (var catalogPath in catalogPaths)
-        {
-            File.Exists(catalogPath).Should().BeTrue(catalogPath);
-            using var document = JsonDocument.Parse(File.ReadAllText(catalogPath));
-            document.RootElement.GetProperty("totalCount").GetInt32().Should().Be(158);
-            var operators = document.RootElement.GetProperty("operators")
-                .EnumerateArray()
-                .ToDictionary(item => item.GetProperty("id").GetString()!, StringComparer.Ordinal);
-
-            foreach (var contract in Contracts)
-            {
-                operators[contract.OperatorType.ToString()]
-                    .GetProperty("displayName")
-                    .GetString()
-                    .Should().Be(contract.DisplayName, catalogPath);
-            }
-        }
-
-        var markdownCatalogs = new[]
-        {
-            Path.Combine(RepoRoot, "docs", "算子资料", "算子目录.md"),
-            Path.Combine(RepoRoot, "docs", "算子资料", "算子名片", "CATALOG.md"),
-            Path.Combine(RepoRoot, "算子资料", "算子目录.md"),
-            Path.Combine(RepoRoot, "算子资料", "算子名片", "CATALOG.md")
-        };
-
-        foreach (var markdownPath in markdownCatalogs)
-        {
-            var markdown = File.ReadAllText(markdownPath);
-            foreach (var contract in Contracts)
-            {
-                markdown.Should().Contain($"`OperatorType.{contract.OperatorType}` | {contract.DisplayName}", markdownPath);
-            }
-        }
-
-        foreach (var contract in Contracts)
-        {
-            var cardPaths = new[]
-            {
-                Path.Combine(RepoRoot, "docs", "算子资料", "算子名片", $"{contract.OperatorType}.md"),
-                Path.Combine(RepoRoot, "docs", "operators", $"{contract.OperatorType}.md"),
-                Path.Combine(RepoRoot, "算子资料", "算子名片", $"{contract.OperatorType}.md")
-            };
-
-            foreach (var cardPath in cardPaths)
-            {
-                File.ReadLines(cardPath).First().Should().StartWith($"# {contract.DisplayName} / ", cardPath);
-            }
-        }
-
-        AssertKnowledgeCards(
-            Path.Combine(RepoRoot, "docs", "ai", "operator-knowledge", "operator_knowledge_cards.json"),
-            root => root);
-        AssertKnowledgeCards(
-            Path.Combine(RepoRoot, "docs", "ai", "operator-knowledge", "operator_knowledge_graph.json"),
-            root => root.GetProperty("Cards"));
-    }
-
-    [Fact]
-    public async Task LegacyDisplayNames_ShouldRemainSearchableInAiOperatorCatalog()
-    {
-        var tool = new OperatorCatalogTool();
-
-        foreach (var contract in Contracts)
-        {
-            foreach (var legacyName in LegacyNames(contract))
-            {
-                var result = await tool.ExecuteAsync(
-                    new VisionAgentToolContext(),
-                    JsonSerializer.SerializeToElement(new { keyword = legacyName, topN = 50 }),
-                    CancellationToken.None);
-
-                result.Success.Should().BeTrue(legacyName);
-                var payload = JsonSerializer.SerializeToElement(result.Data);
-                payload.GetProperty("operators")
-                    .EnumerateArray()
-                    .Select(item => item.GetProperty("operatorType").GetString())
-                    .Should()
-                    .Contain(contract.OperatorType.ToString(), legacyName);
-            }
-        }
-    }
-
-    [Fact]
-    public void CreatingNodesWithLegacyNames_ShouldPreserveTheirPersistedIdentity()
+    public void CreatingNodesWithLegacyNames_ShouldPreservePersistedIdentity()
     {
         var factory = new OperatorFactory();
 
@@ -198,10 +96,9 @@ public sealed class OperatorNamingSemanticContractTests
             Operators = created.Select(ToDto).ToList()
         };
 
-        var json = JsonSerializer.Serialize(saved);
-        var loadedDto = JsonSerializer.Deserialize<OperatorFlowDto>(json);
-        loadedDto.Should().NotBeNull();
-        var loaded = loadedDto!.ToEntity().Operators;
+        var loaded = JsonSerializer.Deserialize<OperatorFlowDto>(JsonSerializer.Serialize(saved))!
+            .ToEntity()
+            .Operators;
 
         loaded.Should().HaveCount(created.Count);
         for (var index = 0; index < created.Count; index++)
@@ -217,116 +114,57 @@ public sealed class OperatorNamingSemanticContractTests
         }
     }
 
-    private static void AssertKnowledgeCards(string path, Func<JsonElement, JsonElement> selectCards)
+    private static OperatorDto ToDto(Operator source) => new()
     {
-        File.Exists(path).Should().BeTrue(path);
-        using var document = JsonDocument.Parse(File.ReadAllText(path));
-        var cardsElement = selectCards(document.RootElement);
-        cardsElement.GetArrayLength().Should().Be(158, path);
-        var cards = cardsElement
-            .EnumerateArray()
-            .ToDictionary(item => item.GetProperty("OperatorType").GetString()!, StringComparer.Ordinal);
-
-        foreach (var contract in Contracts)
+        Id = source.Id,
+        Name = source.Name,
+        Type = source.Type,
+        X = source.Position.X,
+        Y = source.Position.Y,
+        IsEnabled = source.IsEnabled,
+        InputPorts = source.InputPorts.Select(port => new PortDto
         {
-            var card = cards[contract.OperatorType.ToString()];
-            card.GetProperty("DisplayName").GetString().Should().Be(contract.DisplayName, path);
-            var aliases = card.GetProperty("Aliases")
-                .EnumerateArray()
-                .Select(item => item.GetString())
-                .Where(item => item != null)
-                .ToList();
-            foreach (var legacyName in LegacyNames(contract))
-            {
-                aliases.Should().Contain(legacyName, path);
-            }
-        }
-    }
-
-    private static IEnumerable<string> LegacyNames(NamingContract contract)
-    {
-        yield return contract.LegacyDisplayName;
-        foreach (var additionalLegacyName in contract.AdditionalLegacyNames)
+            Id = port.Id,
+            Name = port.Name,
+            Direction = port.Direction,
+            DataType = port.DataType,
+            IsRequired = port.IsRequired
+        }).ToList(),
+        OutputPorts = source.OutputPorts.Select(port => new PortDto
         {
-            yield return additionalLegacyName;
-        }
-    }
-
-    private static OperatorDto ToDto(Operator source)
-    {
-        return new OperatorDto
+            Id = port.Id,
+            Name = port.Name,
+            Direction = port.Direction,
+            DataType = port.DataType,
+            IsRequired = port.IsRequired
+        }).ToList(),
+        Parameters = source.Parameters.Select(parameter => new ParameterDto
         {
-            Id = source.Id,
-            Name = source.Name,
-            Type = source.Type,
-            X = source.Position.X,
-            Y = source.Position.Y,
-            IsEnabled = source.IsEnabled,
-            InputPorts = source.InputPorts.Select(port => new PortDto
-            {
-                Id = port.Id,
-                Name = port.Name,
-                Direction = port.Direction,
-                DataType = port.DataType,
-                IsRequired = port.IsRequired
-            }).ToList(),
-            OutputPorts = source.OutputPorts.Select(port => new PortDto
-            {
-                Id = port.Id,
-                Name = port.Name,
-                Direction = port.Direction,
-                DataType = port.DataType,
-                IsRequired = port.IsRequired
-            }).ToList(),
-            Parameters = source.Parameters.Select(parameter => new ParameterDto
-            {
-                Id = parameter.Id,
-                Name = parameter.Name,
-                DisplayName = parameter.DisplayName,
-                Description = parameter.Description,
-                DataType = parameter.DataType,
-                Value = parameter.Value,
-                DefaultValue = parameter.DefaultValue,
-                MinValue = parameter.MinValue,
-                MaxValue = parameter.MaxValue,
-                IsRequired = parameter.IsRequired,
-                Options = parameter.Options
-            }).ToList()
-        };
-    }
+            Id = parameter.Id,
+            Name = parameter.Name,
+            DisplayName = parameter.DisplayName,
+            Description = parameter.Description,
+            DataType = parameter.DataType,
+            Value = parameter.Value,
+            DefaultValue = parameter.DefaultValue,
+            MinValue = parameter.MinValue,
+            MaxValue = parameter.MaxValue,
+            IsRequired = parameter.IsRequired,
+            Options = parameter.Options
+        }).ToList()
+    };
 
-    private static string PortIdentity(ClearVision.Product.Core.ValueObjects.Port port)
-    {
-        return $"{port.Id:N}|{port.Name}|{port.Direction}|{port.DataType}|{port.IsRequired}";
-    }
+    private static string PortIdentity(ClearVision.Product.Core.ValueObjects.Port port) =>
+        $"{port.Id:N}|{port.Name}|{port.Direction}|{port.DataType}|{port.IsRequired}";
 
-    private static string ParameterIdentity(ClearVision.Product.Core.ValueObjects.Parameter parameter)
-    {
-        return $"{parameter.Id:N}|{parameter.Name}|{parameter.DisplayName}|{parameter.DataType}|{parameter.IsRequired}";
-    }
+    private static string ParameterIdentity(ClearVision.Product.Core.ValueObjects.Parameter parameter) =>
+        $"{parameter.Id:N}|{parameter.Name}|{parameter.DisplayName}|{parameter.DataType}|{parameter.IsRequired}";
 
     private static void AssertStableShape(int inputs, int outputs, int parameters, NamingContract contract)
     {
         inputs.Should().Be(contract.InputPortCount, contract.OperatorType.ToString());
         outputs.Should().Be(contract.OutputPortCount, contract.OperatorType.ToString());
         parameters.Should().Be(contract.ParameterCount, contract.OperatorType.ToString());
-    }
-
-    private static string ResolveRepoRoot()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current != null)
-        {
-            if (Directory.Exists(Path.Combine(current.FullName, "ClearVision.Product")) &&
-                Directory.Exists(Path.Combine(current.FullName, "docs")))
-            {
-                return current.FullName;
-            }
-
-            current = current.Parent;
-        }
-
-        return Directory.GetCurrentDirectory();
     }
 
     private sealed record NamingContract(

@@ -18,8 +18,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// </summary>
 [OperatorMeta(
     DisplayName = "卡尺工具",
-    Description = "Detects edge pairs along a scan line and reports width.",
-    Category = "检测",
+    Description = "沿扫描线检测边缘对并输出宽度。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "caliper",
     Keywords = new[] { "caliper", "edge pair", "width", "distance", "edge" }
 )]

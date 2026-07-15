@@ -15,10 +15,11 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// 算子本身不执行异常捕获，仅输出统一的流程控制契约。
 /// </summary>
 [OperatorMeta(
-    DisplayName = "异常捕获",
-    Description = "Try-Catch 流程控制",
-    Category = "流程控制",
-    IconName = "trycatch"
+    DisplayName = "Try分支透传",
+    Description = "将输入透传到 Try 分支并输出空 Catch/无错误状态；本算子不捕获下游异常。",
+    CategoryId = OperatorCategoryId.FlowControl,
+    IconName = "trycatch",
+    Keywords = new[] { "Try", "Catch", "passthrough", "branch", "异常捕获", "Try-Catch 流程控制" }
 )]
 [InputPort("Input", "输入", PortDataType.Any, IsRequired = false)]
 [OutputPort("Try", "Try分支", PortDataType.Any)]

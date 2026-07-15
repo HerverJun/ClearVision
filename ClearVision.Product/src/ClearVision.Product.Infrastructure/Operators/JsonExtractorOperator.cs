@@ -12,7 +12,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "JSON 提取器",
     Description = "按 JSONPath 从字符串中提取字段",
-    Category = "数据处理",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "json"
 )]
 [InputPort("Json", "JSON字符串", PortDataType.String, IsRequired = true)]

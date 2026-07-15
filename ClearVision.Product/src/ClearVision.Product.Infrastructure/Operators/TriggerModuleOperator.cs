@@ -13,8 +13,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "触发模块",
-    Description = "Generates software, timer, or external triggers.",
-    Category = "逻辑工具",
+    Description = "生成软件、定时或外部触发信号。",
+    CategoryId = OperatorCategoryId.FlowControl,
     IconName = "trigger",
     Keywords = new[] { "trigger", "start", "timer", "external signal" }
 )]

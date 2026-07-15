@@ -9,8 +9,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "CLAHE增强",
-    Description = "Adaptive histogram equalization for local contrast enhancement.",
-    Category = "预处理",
+    Description = "使用自适应直方图均衡提升局部对比度，适合低对比或光照不均的图像。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "clahe"
 )]
 [InputPort("Image", "图像", PortDataType.Image, IsRequired = true)]

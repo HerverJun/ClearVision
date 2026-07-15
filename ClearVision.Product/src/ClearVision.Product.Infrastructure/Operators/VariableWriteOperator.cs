@@ -14,7 +14,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "变量写入",
     Description = "写入单次运行变量或项目全局变量",
-    Category = "变量",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "variable-write")]
 [InputPort("Value", "值", PortDataType.Any, IsRequired = false)]
 [OutputPort("VariableName", "变量名", PortDataType.String)]

@@ -8,9 +8,9 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Result Judgment",
-    Description = "Generic business judgment with numeric/string condition checks.",
-    Category = "Flow Control",
+    DisplayName = "结果判定",
+    Description = "对数值、字符串等结果执行业务判定，输出条件检查结果。",
+    CategoryId = OperatorCategoryId.FlowControl,
     IconName = "result-judgment",
     Keywords = new[] { "judgment", "ok", "ng", "condition", "threshold" },
     Version = "1.0.1"

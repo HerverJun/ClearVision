@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "轮廓检测",
     Description = "查找图像轮廓，提取边缘点集和层次关系，供后续测量和拟合使用",
-    Category = "特征提取",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "contour",
     Keywords = new[] { "轮廓", "边界", "形状", "多边形", "边缘点", "Contour", "Shape", "Boundary" }
 )]

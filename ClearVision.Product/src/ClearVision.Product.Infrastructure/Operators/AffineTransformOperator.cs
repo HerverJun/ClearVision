@@ -14,8 +14,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "仿射变换",
-    Description = "Applies 2D affine transform using 3-point or rotate-scale-translate mode.",
-    Category = "图像处理",
+    Description = "使用三点或旋转-缩放-平移模式执行二维仿射变换。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "affine",
     Keywords = new[] { "affine", "warp", "rotate", "scale", "translate" }
 )]

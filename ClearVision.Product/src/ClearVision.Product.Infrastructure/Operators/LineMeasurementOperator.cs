@@ -10,8 +10,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "直线测量",
-    Description = "Detects line features and reports line direction, span and fitting diagnostics.",
-    Category = "检测",
+    Description = "检测直线特征，输出方向、跨度和拟合质量诊断。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "line-measure",
     Keywords = new[] { "直线", "线段", "角度", "霍夫", "Line", "Hough", "FitLine" }
 )]

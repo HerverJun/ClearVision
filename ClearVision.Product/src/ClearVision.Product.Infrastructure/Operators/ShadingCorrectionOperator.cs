@@ -12,8 +12,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "光照校正",
-    Description = "Corrects uneven illumination by background or model-based methods.",
-    Category = "预处理",
+    Description = "通过背景法或模型法校正光照不均。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "shading",
     Keywords = new[] { "shading", "flat field", "illumination", "background" }
 )]

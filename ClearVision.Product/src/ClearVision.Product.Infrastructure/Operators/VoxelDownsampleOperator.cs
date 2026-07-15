@@ -10,8 +10,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "体素下采样",
-    Description = "Voxel grid downsampling for point clouds (centroid per voxel).",
-    Category = "3D",
+    Description = "对点云执行体素网格下采样（每个体素取质心）。",
+    CategoryId = OperatorCategoryId.PointCloud3D,
     IconName = "voxel",
     Keywords = new[] { "PointCloud", "Voxel", "Downsample", "3D" },
     Version = "1.0.1"

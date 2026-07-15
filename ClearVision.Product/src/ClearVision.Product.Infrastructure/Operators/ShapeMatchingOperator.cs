@@ -14,8 +14,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "旋转尺度模板匹配",
-    Description = "Rotation-scale template matching with pyramid coarse-to-fine search. This is not a generic contour-descriptor matcher.",
-    Category = "Matching",
+    Description = "基于金字塔粗到细搜索的旋转/尺度模板匹配；不是通用轮廓描述子匹配。",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "shape-match",
     Version = "1.2.0"
 )]

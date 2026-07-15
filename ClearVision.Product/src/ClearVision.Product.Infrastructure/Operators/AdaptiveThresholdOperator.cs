@@ -8,9 +8,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Adaptive Threshold",
-    Description = "Local mean or Gaussian adaptive thresholding.",
-    Category = "Preprocessing",
+    DisplayName = "自适应阈值",
+    Description = "根据局部均值或高斯加权均值进行自适应阈值分割，适合光照不均场景。",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "adaptive-threshold",
     Keywords = new[] { "adaptive", "threshold", "local threshold", "mean", "gaussian" }
 )]

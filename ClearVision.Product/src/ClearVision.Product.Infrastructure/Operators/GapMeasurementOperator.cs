@@ -14,8 +14,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "间隙测量",
-    Description = "Measures spacing using points or image projection.",
-    Category = "检测",
+    Description = "通过点或图像投影方式测量间距。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "gap",
     Keywords = new[] { "gap", "spacing", "pitch", "distance" }
 )]

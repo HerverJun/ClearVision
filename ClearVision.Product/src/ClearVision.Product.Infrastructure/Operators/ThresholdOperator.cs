@@ -8,11 +8,11 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Threshold",
-    Description = "Global thresholding with optional Otsu or Triangle auto-thresholding.",
-    Category = "Preprocessing",
+    DisplayName = "全局阈值处理",
+    Description = "执行全局阈值处理，支持二值、反二值、截断、ToZero 以及 Otsu/Triangle 自动阈值。",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "threshold",
-    Keywords = new[] { "threshold", "binarize", "segmentation", "otsu", "triangle" }
+    Keywords = new[] { "threshold", "binarize", "segmentation", "otsu", "triangle", "二值化", "Threshold" }
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Image", PortDataType.Image)]

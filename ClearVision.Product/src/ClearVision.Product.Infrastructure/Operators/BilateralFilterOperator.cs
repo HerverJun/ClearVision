@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "双边滤波",
     Description = "边缘保留的平滑滤波",
-    Category = "预处理",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "filter",
     Keywords = new[] { "双边", "滤波", "边缘保留", "平滑", "纹理", "Bilateral", "Edge-preserving" }
 )]

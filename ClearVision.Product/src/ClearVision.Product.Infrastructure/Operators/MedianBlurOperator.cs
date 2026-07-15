@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "中值滤波",
     Description = "有效去除椒盐噪声同时保留边缘",
-    Category = "预处理",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "filter",
     Keywords = new[] { "中值", "滤波", "椒盐噪声", "去噪", "Median", "Filter", "Salt and pepper" }
 )]

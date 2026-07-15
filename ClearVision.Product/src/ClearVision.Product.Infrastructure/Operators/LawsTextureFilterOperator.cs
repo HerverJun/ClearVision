@@ -9,9 +9,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Laws Texture Filter",
-    Description = "Apply 5x5 Laws texture filtering and compute local energy.",
-    Category = "Texture",
+    DisplayName = "Laws纹理滤波",
+    Description = "应用 5x5 Laws 纹理滤波并计算局部能量。",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "texture",
     Keywords = new[] { "Texture", "Laws", "Energy", "Filter", "GLCM" },
     Version = "1.0.1"

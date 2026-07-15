@@ -11,11 +11,11 @@ using NModbus;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Modbus Communication",
-    Description = "Industrial Modbus TCP communication. RTU is declared but not packaged in this operator.",
-    Category = "Communication",
+    DisplayName = "Modbus TCP通信",
+    Description = "通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modbus RTU 通信。",
+    CategoryId = OperatorCategoryId.Communication,
     IconName = "modbus",
-    Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "RTU", "TCP", "Industrial" }
+    Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "RTU", "TCP", "Industrial", "Modbus通信", "Modbus Communication" }
 )]
 [InputPort("Data", "Data", PortDataType.Any, IsRequired = false)]
 [OutputPort("Response", "Response", PortDataType.String)]

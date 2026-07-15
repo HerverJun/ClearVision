@@ -16,8 +16,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// </summary>
 [OperatorMeta(
     DisplayName = "均值滤波",
-    Description = "Applies mean (box blur) filtering to smooth image noise.",
-    Category = "预处理",
+    Description = "使用均值（方框）滤波平滑图像噪声。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "filter",
     Keywords = new[] { "mean filter", "box blur", "box filter", "smooth", "denoise" }
 )]

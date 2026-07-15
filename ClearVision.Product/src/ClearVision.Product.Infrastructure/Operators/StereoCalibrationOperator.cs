@@ -18,9 +18,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// 对标 Halcon binocular_calibration / gen_binocular_rectification_map
 /// </summary>
 [OperatorMeta(
-    DisplayName = "Stereo Calibration",
-    Description = "Calibrates stereo camera pair and generates rectification maps for epipolar alignment.",
-    Category = "Calibration",
+    DisplayName = "双目标定",
+    Description = "标定双目相机并生成极线校正映射。",
+    CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "stereo-calibration",
     Keywords = new[] { "Stereo", "Binocular", "Calibration", "Rectification", "Epipolar" }
 )]

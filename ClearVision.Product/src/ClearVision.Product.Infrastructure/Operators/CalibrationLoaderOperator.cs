@@ -8,9 +8,9 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Calibration Loader",
-    Description = "Loads CalibrationBundleV2 JSON and exposes typed calibration outputs.",
-    Category = "Calibration",
+    DisplayName = "标定加载",
+    Description = "从 CalibrationBundleV2 JSON 文件加载标定数据并输出强类型结果。",
+    CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "file-open",
     Keywords = new[] { "calibration", "bundle", "json", "v2" }
 )]

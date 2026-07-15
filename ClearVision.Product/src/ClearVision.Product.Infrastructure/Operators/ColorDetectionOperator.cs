@@ -11,7 +11,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "颜色分析",
     Description = "对图像执行平均色、主色和范围分析，并支持 HSV 区间检查与 Lab DeltaE 色差分析。",
-    Category = "颜色处理",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
+    Lifecycle = OperatorLifecycle.Experimental,
+    LifecycleNote = "颜色检查多模式仍处于工业化验证阶段，阈值和白平衡策略需按现场样本确认。",
     IconName = "color",
     Keywords = new[] { "color", "analysis", "HSV", "Lab", "DeltaE", "颜色检测" },
     Tags = new[] { "experimental", "industrial-remediation", "color-inspection" },

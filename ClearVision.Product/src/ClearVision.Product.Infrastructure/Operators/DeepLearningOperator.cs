@@ -63,10 +63,10 @@ public enum DetectionOutputFormat
 /// </summary>
 [OperatorMeta(
     DisplayName = "深度学习",
-    Description = "AI 深度学习推理，支持 YOLOv5/v6/v8/v11 等模型，用于缺陷检测和目标分类",
-    Category = "AI检测",
+    Description = "统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保持历史 YOLO 目标检测行为。",
+    CategoryId = OperatorCategoryId.AiInference,
     IconName = "ai",
-    Keywords = new[] { "深度学习", "AI", "模型", "推理", "缺陷识别", "目标检测", "YOLO", "判断瑕疵", "Deep learning" }
+    Keywords = new[] { "深度学习", "AI", "模型", "推理", "缺陷识别", "目标检测", "图像分类", "语义分割", "ONNX", "YOLO", "Deep learning" }
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "结果图像", PortDataType.Image)]

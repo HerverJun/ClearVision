@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "图像裁剪",
     Description = "ROI区域提取",
-    Category = "预处理",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "crop",
     Keywords = new[] { "裁剪", "切割", "ROI", "区域提取", "Crop", "Region" }
 )]

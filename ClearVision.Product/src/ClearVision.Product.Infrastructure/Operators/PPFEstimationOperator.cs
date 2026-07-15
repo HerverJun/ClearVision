@@ -10,8 +10,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "PPF点对特征",
-    Description = "Compute Point Pair Features (PPF) for a point cloud and build a per-point feature map.",
-    Category = "3D",
+    Description = "为点云计算点对特征（PPF）并构建逐点特征图。",
+    CategoryId = OperatorCategoryId.PointCloud3D,
     IconName = "ppf",
     Keywords = new[] { "PointCloud", "PPF", "Feature", "3D" },
     Version = "1.0.0"

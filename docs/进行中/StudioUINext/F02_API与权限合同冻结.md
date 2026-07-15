@@ -9,8 +9,9 @@ PRODUCT_REQUEST_METHODS=GET_ONLY
 AUTH_ENTRY_DECISION=PRESEEDED_SESSION_PREVIEW_ONLY
 ```
 
-本冻结以 `F02_INITIAL_SHA=f6d4d98a53914bac088cd62cda261b2c08a11670` 当前代码为准。
-未在表中批准的业务 endpoint 不进入 Goal 1 产品 bundle。
+Goal 1 冻结以 `F02_INITIAL_SHA=f6d4d98a53914bac088cd62cda261b2c08a11670` 当前代码为准。
+Goal 2 增量冻结以 `F02_GOAL2_ENTRY_SHA=a23022be48c1e580198a41912c72ad0bbed753fd` 当前代码为准，
+并受本 Goal 批准的 Operator identity-only scoped gate 约束。未在表中批准的业务 endpoint 不进入产品 bundle。
 
 ## 2. Goal 1 endpoint
 
@@ -96,3 +97,99 @@ projects/{id}
 
 公共 health 使用 root-relative `/health`。禁止组件直接 `fetch`、Axios、第二 request core、端口发现、
 第二 token provider、第二 session owner 或第二 health timer。
+
+## 7. Goal 2 Operator endpoint 与权限冻结
+
+```text
+F02_OPERATOR_GATE_AUDIT_SHA=4958ecab5873160d96b8c34efcf5f488257ea4df
+OPERATOR_IDENTITY_METADATA_SYNC=PASS
+OPERATOR_CONTRACT_GATE=PASS
+F02_OPERATOR_CONTRACT_SCOPE=CATALOG_IDENTITY_AND_CURRENT_BRANCH_RUNTIME_METADATA
+STABLE_LINE_FULL_OPERATOR_CONTRACT_SYNC=DEFERRED
+```
+
+`F02_OPERATOR_GATE_AUDIT_SHA` 只表示审计结论，不是最终通过后的 `F02_OPERATOR_CONTRACT_SHA`。
+`F02_OPERATOR_CONTRACT_SHA` 由通过本节全部 Gate 验证后的独立提交 SHA 记录，不能回填为审计提交。
+Operator identity 仅允许同步并验证：
+
+```text
+DisplayName / Description / CategoryId / Lifecycle /
+LifecycleNote / DefaultHidden / IconName / Keywords / Tags
+```
+
+| 用途 | Method/path | 当前安全边界 | Goal 2 投影 |
+| --- | --- | --- | --- |
+| 完整 Catalog 读取 | `GET /api/operators/library?includeCompatibility=true` | 现有认证中间件 | identity 字段、当前分支 `version`、`inputPorts`、`outputPorts`、`parameters`；未知扩展忽略 |
+| 默认 Catalog 读取 | `GET /api/operators/library` | 同上 | 后端排除 `DefaultHidden=true`，按 category order、displayName 稳定排序 |
+| 类型索引验证 | `GET /api/operators/types?includeCompatibility=true` | 同上 | 只用于类型数量、唯一性和 library 对齐验证，不作为显示语义 authority |
+| 算子详情 | `GET /api/operators/{type}/metadata` | 同上；未知 enum/不存在按当前 endpoint 行为 | 与 library 同一 decoder；不生成默认参数，不调用 preview/recommend endpoint |
+
+当前 HTTP JSON 形状中 `OperatorType`、`OperatorCategoryId`、`OperatorLifecycle`、`PortDataType` 为数字 enum；
+decoder 必须按当前分支数值映射读取，不能用稳定线文档中的 enum 名字符串替代真实 payload。
+
+稳定线新增但当前分支尚未同步的 conditional parameter/output rules 与 image-depth contracts 延期；
+不得从稳定线文档、类型名或算法名推断。side-effect/readiness 不展示、不筛选、不推断。
+
+Operator 列表允许搜索、分类、端口、参数、hidden/deprecated 过滤；全部过滤条件进入 URL query，
+但产品请求仍只调用上述 GET。Catalog 不提供拖拽、预览、执行或默认参数生成。
+
+## 8. Goal 2 Station endpoint 与权限冻结
+
+| 用途 | Method/path | 当前安全边界 | Goal 2 投影 |
+| --- | --- | --- | --- |
+| Station 列表 | `GET /api/stations` | 现有认证中间件，无 StationAdmin requirement | 普通列表与普通详情的 authority |
+| 摘要 | `GET /api/stations/summary` | 同上 | 只读摘要与 canonical outcome counters |
+| 统计 | `GET /api/stations/statistics?...` | 同上 | 时间范围、stationId、status、diagnosticCode 过滤；九类结果不折叠 |
+| Station 结果页 | `GET /api/stations/results?...` | 同上 | Station 上报视图与分页 authority |
+| 单 Station 结果 | `GET /api/stations/{stationId}/results?take=...` | 同上 | 详情结果区域 |
+| 单 Station health | `GET /api/stations/{stationId}/health?take=...` | 同上 | 详情 health 区域 |
+| Admin 增强详情 | `GET /api/stations/{stationId}` | `RequireStationAdmin` | 可选增强区；403 只降级该区域，不覆盖普通详情、结果或 health |
+
+当前 HTTP JSON 形状中 `StationOnlineState`、`StationRuntimeState` 与 legacy `RuntimeRunOutcome` 为数字 enum；
+`ExecutionOutcome`、`DecisionOutcome` 自带 string enum converter，仍为字符串。Browser fixture 必须覆盖这种混合形状。
+
+禁止调用 Station SSE、logs、commands、audit、packages、download、identity PATCH、command/deploy POST。
+Station capability 允许手动刷新，并仅在页面可见时以保守间隔轮询；hidden、route unmount 或 owner dispose
+必须停止 timer 和进行中的请求。筛选条件进入 URL query。
+
+## 9. Goal 2 Results endpoint 与权限冻结
+
+| 来源 | Method/path | 当前安全边界 | Goal 2 投影 |
+| --- | --- | --- | --- |
+| 本机工程选择 | `GET /api/projects` | 现有认证中间件 | 只读取 Goal 1 冻结的工程摘要，不读取 Flow/asset authority |
+| 本机结果列表 | `GET /api/inspection/history/{projectId}?startTime=&endTime=&status=&defectType=&pageIndex=&pageSize=&flowVersionHash=` | 现有认证中间件 | 分页摘要；必须读取 `executionOutcome` 与 `decisionOutcome` 双轴 |
+| 本机结果详情 | `GET /api/inspection/history/{projectId}/{resultId}` | 同上；不存在返回 404 | 只读标量详情、diagnostic、defect 摘要与 traceability；图片/ROI/compare/export/replay 延期 |
+| Station 上报结果 | `GET /api/stations/results?...` | 现有认证中间件 | 与 Station capability 共用后端 DTO，但使用 Results 私有 decoder；只共享 canonical outcome formatter |
+
+Results 的 URL query 冻结为 `source`、`projectId`、`resultId`、`outcome`、`diagnosticCode`、
+`from`、`to`、`page`、`pageSize`。`source=local|station`；本机无 projectId 时不发 inspection history 请求。
+本机 history endpoint 当前没有 `diagnosticCode` 参数，因此该条件只能过滤当前已返回页，UI 必须明确标注
+“当前页过滤”，不得伪装为后端全量过滤；Station results 的 `diagnosticCode` 仍由 endpoint authority 过滤。
+
+Execution/Decision 双轴映射严格保留以下九类：
+
+```text
+Ok / Ng / Undetermined / NotApplicable / Invalid /
+Failed / Cancelled / TimedOut / Skipped
+```
+
+只有 `Succeeded + Ng` 是 NG。Undetermined、NotApplicable、Invalid、Failed、Cancelled、TimedOut、Skipped
+不得并入 NG。Station 旧 payload 缺少双轴时，只允许复制当前后端 `StationCanonicalOutcomeProjection` 的读取时兼容映射，
+并明确标记为 legacy projection；不得从 diagnosticCode 或显示文案推断。
+
+## 10. Goal 2 fixture 冻结
+
+Browser fixture 顶层元数据必须包含：
+
+```text
+schemaVersion
+endpoint
+sourceSha
+DATA_SOURCE=BROWSER_FIXTURE
+AUTH_SOURCE=HARNESS_SEEDED_SESSION
+```
+
+Operator fixture 允许生成 200 条（158 条权威项加确定性重复分页样本）；Results fixture 允许生成 500 条，
+用于分页与浏览器性能验证。扩展样本必须保持唯一 fixture id，并保留原始 operator type/result source 标记，
+不得冒充真实后端数量。真实 WebView2 empty-authority 证据必须标记
+`DATA_SOURCE=REAL_WEBVIEW2_EMPTY_AUTHORITY`，不得与 Browser fixture 混报。

@@ -11,7 +11,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "变量递增",
     Description = "递增单次运行变量或项目全局 Int64 变量",
-    Category = "变量",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "counter")]
 [OutputPort("VariableName", "变量名", PortDataType.String)]
 [OutputPort("PreviousValue", "前值", PortDataType.Integer)]

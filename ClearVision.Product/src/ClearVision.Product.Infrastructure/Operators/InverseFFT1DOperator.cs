@@ -13,11 +13,11 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Inverse FFT 1D",
-    Description = "Performs inverse FFT on 1D spectra and reconstructs images from 2D complex spectra.",
-    Category = "Frequency",
+    DisplayName = "信号/图像逆傅里叶变换（IFFT）",
+    Description = "对一维复数频谱执行逆 FFT；二维复数频谱输入执行逆 DFT 并重建图像信号。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "ifft-1d",
-    Keywords = new[] { "IFFT", "InverseFFT", "Fourier", "Reconstruction", "Signal" }
+    Keywords = new[] { "IFFT", "InverseFFT", "Fourier", "Reconstruction", "Signal", "一维逆FFT", "Inverse FFT 1D" }
 )]
 [InputPort("Spectrum", "Input Frequency Spectrum", PortDataType.Any, IsRequired = true)]
 [InputPort("OutputSize", "Desired Output Size", PortDataType.Integer, IsRequired = false)]

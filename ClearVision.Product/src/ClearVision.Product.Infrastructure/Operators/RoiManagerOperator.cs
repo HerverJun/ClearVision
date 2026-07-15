@@ -16,11 +16,11 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// ROI管理器算子 - 矩形/圆形/多边形区域选择
 /// </summary>
 [OperatorMeta(
-    DisplayName = "ROI管理器",
-    Description = "矩形/圆形/多边形区域选择",
-    Category = "辅助",
+    DisplayName = "ROI裁剪与掩膜",
+    Description = "按矩形、圆形或多边形 ROI 裁剪图像或应用掩膜，并输出空间上下文。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "roi",
-    Keywords = new[] { "ROI", "区域", "感兴趣区", "掩膜", "选区", "Region", "Mask", "Area of interest" }
+    Keywords = new[] { "ROI", "区域", "感兴趣区", "掩膜", "选区", "Region", "Mask", "Area of interest", "ROI管理器" }
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "ROI图像", PortDataType.Image)]

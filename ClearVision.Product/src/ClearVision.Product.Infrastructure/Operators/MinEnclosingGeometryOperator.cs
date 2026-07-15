@@ -18,9 +18,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// 对标 Halcon smallest_circle / smallest_rectangle2 / fit_circle_contour_xld
 /// </summary>
 [OperatorMeta(
-    DisplayName = "Min Enclosing Geometry",
-    Description = "Computes minimum enclosing geometry (circle, rectangle, triangle) and robust arc fitting with RANSAC.",
-    Category = "Measurement",
+    DisplayName = "最小外接几何体",
+    Description = "计算最小包围几何（圆、矩形、三角形），并支持基于 RANSAC 的鲁棒圆弧拟合。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "enclosing-geometry",
     Keywords = new[] { "MinEnclosing", "SmallestCircle", "MinAreaRect", "ArcFit", "RANSAC", "Geometry" },
     Version = "1.0.1"

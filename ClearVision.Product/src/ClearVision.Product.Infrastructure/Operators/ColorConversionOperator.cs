@@ -16,7 +16,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "颜色空间转换",
     Description = "BGR/GRAY/HSV/Lab/YUV等颜色空间转换",
-    Category = "预处理",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "color-convert",
     Keywords = new[] { "颜色", "色彩", "灰度", "HSV", "Lab", "转换", "Color", "Convert", "Gray" }
 )]

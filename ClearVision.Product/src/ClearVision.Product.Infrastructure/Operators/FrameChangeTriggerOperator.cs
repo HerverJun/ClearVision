@@ -13,7 +13,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "帧变化触发",
     Description = "通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空帧进入深度学习。",
-    Category = "逻辑工具",
+    CategoryId = OperatorCategoryId.FlowControl,
     IconName = "activity",
     Keywords = new[] { "触发", "到料", "帧差", "视频流", "连续采集", "软触发", "去重", "冷却", "trigger", "arrival", "frame change", "continuous", "video" }
 )]

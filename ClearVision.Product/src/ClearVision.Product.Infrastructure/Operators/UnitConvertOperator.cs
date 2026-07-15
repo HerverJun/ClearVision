@@ -12,8 +12,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "单位换算",
-    Description = "Converts value between pixel, mm, um and inch.",
-    Category = "数据处理",
+    Description = "在像素、mm、um 和英寸之间进行数值换算。",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "unit",
     Keywords = new[] { "unit convert", "pixel to mm", "mm", "um", "inch" }
 )]

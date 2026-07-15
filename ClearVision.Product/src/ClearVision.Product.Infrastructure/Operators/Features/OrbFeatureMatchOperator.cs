@@ -10,8 +10,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "ORB特征匹配",
-    Description = "ORB feature matching with homography verification for fast template localization.",
-    Category = "匹配定位",
+    Description = "使用 ORB 特征和单应性校验进行快速模板定位。",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "orb-match"
 )]
 [InputPort("Image", "搜索图像", PortDataType.Image, IsRequired = true)]

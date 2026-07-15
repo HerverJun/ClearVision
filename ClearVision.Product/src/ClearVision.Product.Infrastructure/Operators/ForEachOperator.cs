@@ -28,7 +28,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "ForEach 循环",
     Description = "对集合中的每个元素执行子图",
-    Category = "流程控制",
+    CategoryId = OperatorCategoryId.FlowControl,
     IconName = "loop"
 )]
 [InputPort("Items", "集合", PortDataType.Any, IsRequired = true)]

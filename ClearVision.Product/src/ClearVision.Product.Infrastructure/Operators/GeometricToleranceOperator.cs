@@ -13,7 +13,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "二维几何公差判定",
     Description = "基于特征与基准评估平行度、垂直度、位置度、同心度等受限二维公差带并输出判定。",
-    Category = "检测",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "geometric-tolerance",
     Keywords = new[]
     {

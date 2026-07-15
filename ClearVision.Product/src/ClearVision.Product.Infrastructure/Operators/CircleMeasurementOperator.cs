@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "圆测量",
     Description = "霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位",
-    Category = "检测",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "circle-measure",
     Keywords = new[] { "圆", "半径", "圆心", "霍夫", "孔", "圆检测", "Circle", "Radius", "Hough", "CaliperFitV2" },
     Version = "1.1.2"

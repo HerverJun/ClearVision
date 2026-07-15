@@ -15,7 +15,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "检测顺序判定",
     Description = "对检测结果排序，并与期望标签序列进行比对。",
-    Category = "AI 检测",
+    CategoryId = OperatorCategoryId.DefectDetection,
+    Lifecycle = OperatorLifecycle.Experimental,
+    LifecycleNote = "顺序、行聚类和槽位分配策略需针对现场布局及遮挡情况验证。",
     IconName = "rule",
     Keywords = new[]
     {

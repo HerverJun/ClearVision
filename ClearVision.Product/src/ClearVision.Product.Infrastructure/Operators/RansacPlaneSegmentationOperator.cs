@@ -10,8 +10,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "RANSAC平面分割",
-    Description = "RANSAC plane segmentation for point clouds. Outputs plane coefficients and inliers.",
-    Category = "3D",
+    Description = "对点云执行 RANSAC 平面分割，输出平面系数和内点。",
+    CategoryId = OperatorCategoryId.PointCloud3D,
     IconName = "plane",
     Keywords = new[] { "PointCloud", "RANSAC", "Plane", "Segmentation", "3D" },
     Version = "1.0.0"

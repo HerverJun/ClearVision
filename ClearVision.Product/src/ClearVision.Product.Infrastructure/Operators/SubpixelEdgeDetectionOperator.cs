@@ -13,9 +13,11 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Subpixel Edge Detection",
-    Description = "Non-industrial reference subpixel edge extraction; requires application validation before metrology use.",
-    Category = "Feature Extraction",
+    DisplayName = "亚像素边缘",
+    Description = "非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级验证。",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
+    Lifecycle = OperatorLifecycle.Reference,
+    LifecycleNote = "非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级精度验证。",
     IconName = "edge-subpixel",
     Tags = new[] { "experimental", "non-industrial-reference", "subpixel-edge" }
 )]

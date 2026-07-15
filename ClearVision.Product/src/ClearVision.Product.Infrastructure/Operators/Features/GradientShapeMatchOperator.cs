@@ -12,7 +12,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "梯度形状匹配",
     Description = "基于梯度方向特征的形状匹配，支持可选 ROI 搜索。",
-    Category = "匹配定位",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "shape-match",
     Version = "1.1.0"
 )]

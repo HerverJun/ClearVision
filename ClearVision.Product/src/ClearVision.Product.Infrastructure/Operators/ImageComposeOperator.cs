@@ -12,8 +12,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "图像组合",
-    Description = "Composes multiple images by concat/grid/channel merge.",
-    Category = "拆分组合",
+    Description = "通过拼接、网格或通道合并方式组合多张图像。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "compose",
     Keywords = new[] { "compose", "concat", "grid", "merge channels" }
 )]

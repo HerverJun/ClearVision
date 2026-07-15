@@ -10,8 +10,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "欧氏聚类分割",
-    Description = "Euclidean Cluster Extraction for point clouds (3D connected components by distance).",
-    Category = "3D",
+    Description = "对点云执行欧式聚类提取（按距离划分三维连通分量）。",
+    CategoryId = OperatorCategoryId.PointCloud3D,
     IconName = "cluster",
     Keywords = new[] { "PointCloud", "Cluster", "Segmentation", "3D" },
     Version = "1.0.0"

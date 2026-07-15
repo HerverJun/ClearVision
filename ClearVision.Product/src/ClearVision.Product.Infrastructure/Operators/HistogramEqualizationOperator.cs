@@ -9,8 +9,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "直方图均衡化",
-    Description = "Supports global histogram equalization and CLAHE.",
-    Category = "预处理",
+    Description = "支持全局直方图均衡与 CLAHE，用于增强图像对比度。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "histogram",
     Keywords = new[] { "histogram", "equalization", "contrast", "clahe" }
 )]

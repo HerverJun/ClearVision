@@ -16,8 +16,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "语义分割",
-    Description = "Runs an ONNX semantic segmentation model and returns class map, colored visualization, and per-class masks.",
-    Category = "AI检测",
+    Description = "运行 ONNX 语义分割模型，输出类别图、着色可视化结果和各类别掩码。",
+    CategoryId = OperatorCategoryId.AiInference,
     IconName = "semantic-segmentation",
     Keywords = new[] { "semantic segmentation", "segmentation", "onnx", "mask", "语义分割" },
     Version = "1.0.0"

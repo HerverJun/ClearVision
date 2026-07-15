@@ -15,9 +15,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Edge Detection",
-    Description = "Detects edges with Canny and optional auto-thresholding.",
-    Category = "Feature Extraction",
+    DisplayName = "边缘检测",
+    Description = "使用 Canny 进行边缘检测，并可选自动阈值。",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "edge",
     Keywords = new[] { "Edge", "Canny", "Contour", "Threshold" }
 )]

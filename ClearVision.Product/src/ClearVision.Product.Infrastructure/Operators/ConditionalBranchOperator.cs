@@ -23,7 +23,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "条件分支",
     Description = "根据数值/字符串/布尔条件执行 True/False 两路分支，常用于 OK/NG 判定路由",
-    Category = "控制",
+    CategoryId = OperatorCategoryId.FlowControl,
     IconName = "branch",
     Keywords = new[] { "条件", "分支", "判断", "如果", "否则", "IF", "Branch", "Condition", "Switch" }
 )]

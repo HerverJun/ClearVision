@@ -70,9 +70,20 @@ public class OperatorMetadata
     public string Description { get; set; } = string.Empty;
 
     /// <summary>
+    /// Stable product category identity declared by the operator class.
+    /// </summary>
+    public OperatorCategoryId CategoryId { get; set; }
+
+    /// <summary>
     /// 类别（用于分组显示）
     /// </summary>
     public string Category { get; set; } = string.Empty;
+
+    public OperatorLifecycle Lifecycle { get; set; } = OperatorLifecycle.Stable;
+
+    public string? LifecycleNote { get; set; }
+
+    public bool DefaultHidden => OperatorLifecyclePolicy.IsHiddenByDefault(Lifecycle);
 
     /// <summary>
     /// 图标名称或路径

@@ -12,9 +12,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Arc Caliper",
-    Description = "Detects edges along an arc path with subpixel accuracy.",
-    Category = "Measurement",
+    DisplayName = "圆弧卡尺",
+    Description = "沿圆弧路径检测边缘，支持亚像素精度。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "arc-caliper",
     Keywords = new[] { "Caliper", "Arc", "Edge", "Measurement", "Circle" },
     Version = "1.0.1"

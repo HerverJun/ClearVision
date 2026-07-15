@@ -103,7 +103,8 @@ internal static class OperatorFactoryMetadataMerge
             metadata[attributeMetadata.Type] = attributeMetadata;
         }
 
-        // Keep UI-facing names/categories aligned with pre-migration Chinese catalog.
+        // Compatibility adapters may add legacy search aliases and localize generic
+        // port/parameter labels, but must not rewrite operator identity metadata.
         OperatorMetadataLocalization.Apply(metadata.Values);
         OperatorMetadataTextLocalization.Apply(metadata.Values);
 
@@ -138,7 +139,10 @@ internal static class OperatorFactoryMetadataMerge
             Type = aliasType,
             DisplayName = source.DisplayName,
             Description = source.Description,
+            CategoryId = source.CategoryId,
             Category = source.Category,
+            Lifecycle = source.Lifecycle,
+            LifecycleNote = source.LifecycleNote,
             IconName = source.IconName,
             Keywords = source.Keywords?.ToArray(),
             Tags = source.Tags?.ToArray(),

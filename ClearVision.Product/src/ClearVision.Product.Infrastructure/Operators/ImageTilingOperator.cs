@@ -12,8 +12,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "图像切片",
-    Description = "Splits an image into tiled regions with optional overlap.",
-    Category = "拆分组合",
+    Description = "将图像切分为可选重叠的分块区域。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "tile",
     Keywords = new[] { "tile", "grid", "split image" }
 )]

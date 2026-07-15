@@ -1009,21 +1009,37 @@ public static class ApiEndpoints
         return state?.Status is RuntimeStatus.Starting or RuntimeStatus.Running or RuntimeStatus.Stopping;
     }
 
+    internal static IReadOnlyList<OperatorMetadata> GetOperatorEndpointMetadata(
+        IEnumerable<OperatorMetadata> metadata,
+        bool includeCompatibility)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+
+        return metadata
+            .Where(item => includeCompatibility || !item.DefaultHidden)
+            .OrderBy(item => OperatorCategoryCatalog.GetOrder(item.CategoryId))
+            .ThenBy(item => item.DisplayName, StringComparer.Ordinal)
+            .ToList();
+    }
+
     private static void MapOperatorEndpoints(IEndpointRouteBuilder app)
     {
         // 获取算子库
-        app.MapGet("/api/operators/library", (IOperatorFactory factory) =>
+        app.MapGet("/api/operators/library", (IOperatorFactory factory, bool? includeCompatibility) =>
         {
-            var metadata = factory
-                .GetAllMetadata()
-                .Where(m => m.Type != OperatorType.Morphology);
+            var metadata = GetOperatorEndpointMetadata(
+                factory.GetAllMetadata(),
+                includeCompatibility == true);
             return Results.Ok(metadata);
         });
 
         // 获取支持的算子类型
-        app.MapGet("/api/operators/types", (IOperatorFactory factory) =>
+        app.MapGet("/api/operators/types", (IOperatorFactory factory, bool? includeCompatibility) =>
         {
-            var types = factory.GetSupportedOperatorTypes();
+            var types = GetOperatorEndpointMetadata(
+                    factory.GetAllMetadata(),
+                    includeCompatibility == true)
+                .Select(item => item.Type);
             return Results.Ok(types);
         });
 

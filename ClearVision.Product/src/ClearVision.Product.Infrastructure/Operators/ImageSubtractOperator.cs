@@ -12,9 +12,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Image Subtract",
-    Description = "Computes subtraction or absolute difference between two images.",
-    Category = "Preprocessing",
+    DisplayName = "图像减法",
+    Description = "计算两张图像的相减结果或绝对差值。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "subtract"
 )]
 [InputPort("Image1", "Image1", PortDataType.Image, IsRequired = true)]

@@ -9,9 +9,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Angle Measurement",
-    Description = "Measures angle from three points or two lines with subpixel-compatible inputs.",
-    Category = "Detection",
+    DisplayName = "角度测量",
+    Description = "通过三点或两线计算角度，兼容亚像素级输入。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "angle-measure",
     Keywords = new[] { "Angle", "ThreePoint", "LineAngle", "Degree", "Radian" }
 )]

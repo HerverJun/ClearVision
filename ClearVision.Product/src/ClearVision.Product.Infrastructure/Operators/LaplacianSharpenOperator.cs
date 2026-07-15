@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "拉普拉斯锐化",
     Description = "基于拉普拉斯算子的边缘增强",
-    Category = "预处理",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "sharpen"
 )]
 [InputPort("Image", "图像", PortDataType.Image, IsRequired = true)]

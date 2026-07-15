@@ -13,9 +13,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "N Point Calibration",
-    Description = "Builds robust affine or homography calibration from all point pairs.",
-    Category = "Calibration",
+    DisplayName = "N点标定",
+    Description = "基于全部点对鲁棒估计仿射或单应性标定模型。",
+    CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "n-point",
     Keywords = new[] { "n-point", "affine", "homography", "calibration", "ransac" }
 )]

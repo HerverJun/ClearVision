@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "图像融合",
     Description = "加权混合/透明叠加",
-    Category = "预处理",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "blend"
 )]
 [InputPort("Background", "背景", PortDataType.Image, IsRequired = true)]

@@ -13,9 +13,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Region Difference",
-    Description = "Computes the difference of two regions (A - B).",
-    Category = "Region",
+    DisplayName = "区域差集",
+    Description = "计算两个区域的差集（A - B）。",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "region-difference",
     Keywords = new[] { "Region", "Difference", "Boolean", "Subtract" },
     Version = "1.0.2"

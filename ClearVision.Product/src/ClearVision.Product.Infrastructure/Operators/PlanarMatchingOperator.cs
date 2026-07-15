@@ -21,7 +21,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "平面特征匹配",
     Description = "基于局部特征匹配和单应性验证定位纹理平面目标，输出投影角点、评分与诊断。",
-    Category = "Matching",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "planar-match",
     Keywords = new[] { "Planar", "Matching", "Homography", "Perspective", "ORB", "AKAZE", "RANSAC", "透视匹配", "Planar Matching" },
     Version = "1.1.3"

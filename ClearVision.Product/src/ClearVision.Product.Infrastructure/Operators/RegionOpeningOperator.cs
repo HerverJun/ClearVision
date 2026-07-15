@@ -14,9 +14,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Region Opening",
-    Description = "Opening operation (erosion followed by dilation) for noise removal and smooth region boundaries.",
-    Category = "Morphology",
+    DisplayName = "区域开运算",
+    Description = "执行开运算（先腐蚀后膨胀），用于去噪并平滑区域边界。",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "region-opening",
     Keywords = new[] { "Region", "Opening", "Morphology", "NoiseRemoval", "Smooth" },
     Version = "1.0.2"

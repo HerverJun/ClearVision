@@ -13,9 +13,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Region Skeleton",
-    Description = "Extracts skeleton using Zhang-Suen thinning algorithm. Preserves topology and connectivity.",
-    Category = "Morphology",
+    DisplayName = "区域骨架化",
+    Description = "使用 Zhang-Suen 细化算法提取骨架，并保持拓扑与连通性。",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "region-skeleton",
     Keywords = new[] { "Region", "Skeleton", "Thinning", "ZhangSuen", "Topology" },
     Version = "1.0.2"

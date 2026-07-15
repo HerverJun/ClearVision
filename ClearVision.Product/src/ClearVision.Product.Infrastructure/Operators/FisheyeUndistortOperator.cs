@@ -9,9 +9,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Fisheye Undistort",
-    Description = "Correct fisheye lens distortion using calibration data with LUT acceleration.",
-    Category = "Calibration",
+    DisplayName = "鱼眼去畸变",
+    Description = "使用标定数据校正鱼眼镜头畸变，并支持 LUT 加速。",
+    CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "fisheye-undistort",
     Keywords = new[] { "Fisheye", "Undistort", "Distortion", "LUT", "Kannala-Brandt" }
 )]

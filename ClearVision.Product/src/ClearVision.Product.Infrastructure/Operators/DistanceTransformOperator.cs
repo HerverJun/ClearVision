@@ -17,9 +17,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// 对标 Halcon distance_transform
 /// </summary>
 [OperatorMeta(
-    DisplayName = "Distance Transform",
-    Description = "Computes the distance from each pixel to the nearest zero pixel. Supports multiple distance metrics and signed distances.",
-    Category = "Analysis",
+    DisplayName = "距离变换",
+    Description = "计算每个像素到最近零像素的距离，支持多种距离度量和有符号距离。",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "distance-transform",
     Keywords = new[] { "Distance", "Transform", "EDT", "Chamfer", "Signed", "Euclidean" },
     Version = "1.0.1"

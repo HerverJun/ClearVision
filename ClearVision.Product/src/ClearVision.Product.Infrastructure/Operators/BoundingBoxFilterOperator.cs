@@ -18,9 +18,9 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// Filters detection boxes by area/class/region/score.
 /// </summary>
 [OperatorMeta(
-    DisplayName = "候选框过滤 (Bounding Box)",
-    Description = "Filters detections by area, class, region, or score.",
-    Category = "数据处理",
+    DisplayName = "候选框筛选",
+    Description = "按面积、类别、区域或分数过滤检测结果。",
+    CategoryId = OperatorCategoryId.DataProcessing,
     IconName = "filter",
     Keywords = new[] { "bounding box filter", "detection filter", "class filter", "area filter", "score" }
 )]

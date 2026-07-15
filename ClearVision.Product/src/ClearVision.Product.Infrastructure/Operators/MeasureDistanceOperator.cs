@@ -11,10 +11,10 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "测量",
-    Description = "两点/水平/垂直距离测量，支持参数坐标与 PointA/PointB 输入。",
-    Category = "检测",
+    Description = "统一基础二维几何测量入口，支持点点距离、点线距离、线线距离/夹角和三点角度；默认保持旧版点点测量行为。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "measure",
-    Keywords = new[] { "测量", "距离", "长度", "Measure", "Distance", "Length" }
+    Keywords = new[] { "测量", "距离", "点线", "线线", "夹角", "三点角度", "Measure", "Distance", "Angle" }
 )]
 [InputPort("Image", "输入图像", PortDataType.Image, IsRequired = false)]
 [InputPort("PointA", "起点", PortDataType.Point, IsRequired = false)]

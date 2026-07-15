@@ -12,8 +12,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "图像归一化",
-    Description = "Normalizes pixel distribution for robust downstream processing.",
-    Category = "预处理",
+    Description = "归一化像素分布，以提升下游处理稳定性。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "normalize",
     Keywords = new[] { "normalize", "minmax", "zscore", "equalize" }
 )]

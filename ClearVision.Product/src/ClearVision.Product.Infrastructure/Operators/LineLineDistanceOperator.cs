@@ -10,8 +10,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "线线距离",
-    Description = "Computes distance and angle between two lines or segments.",
-    Category = "检测",
+    Description = "计算两条直线或线段之间的距离与夹角。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "parallel",
     Keywords = new[] { "line distance", "angle", "parallel", "segment" }
 )]

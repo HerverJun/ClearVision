@@ -15,9 +15,11 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// MQTT client dependency and connection lifecycle are explicitly enabled.
 /// </summary>
 [OperatorMeta(
-    DisplayName = "MQTT Publish",
-    Description = "Publishes inspection data to MQTT when the optional MQTT integration is enabled.",
-    Category = "Communication",
+    DisplayName = "MQTT 发布",
+    Description = "在启用可选 MQTT 集成时发布检测数据。",
+    CategoryId = OperatorCategoryId.Communication,
+    Lifecycle = OperatorLifecycle.Reference,
+    LifecycleNote = "当前包未启用 MQTT 发布集成，执行返回 MQTT_PUBLISH_DISABLED，仅用于兼容和参考。",
     IconName = "mqtt",
     Keywords = new[] { "MQTT", "IoT", "Publish", "Communication" },
     Tags = new[] { "maturity:placeholder-disabled", "integration:mqtt", "experimental" },

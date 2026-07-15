@@ -8,9 +8,9 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Dual Modal Voting",
-    Description = "Combines deep learning and traditional inspection results into a final judgment.",
-    Category = "AI Detection",
+    DisplayName = "双模态投票",
+    Description = "融合深度学习与传统视觉检测结果，输出最终判定。",
+    CategoryId = OperatorCategoryId.DefectDetection,
     IconName = "voting"
 )]
 [InputPort("DLResult", "Deep learning result", PortDataType.Any, IsRequired = true)]

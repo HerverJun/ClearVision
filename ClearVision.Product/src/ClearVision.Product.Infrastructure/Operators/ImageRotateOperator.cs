@@ -16,7 +16,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "图像旋转",
     Description = "任意角度旋转",
-    Category = "预处理",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "rotate",
     Keywords = new[] { "旋转", "角度", "翻转", "校正", "Rotate", "Angle", "Flip" }
 )]

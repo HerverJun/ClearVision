@@ -17,8 +17,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// </summary>
 [OperatorMeta(
     DisplayName = "宽度测量",
-    Description = "Measures width between parallel edges or lines.",
-    Category = "检测",
+    Description = "测量平行边缘或直线之间的宽度。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "ruler",
     Keywords = new[] { "width", "thickness", "gap", "distance" }
 )]

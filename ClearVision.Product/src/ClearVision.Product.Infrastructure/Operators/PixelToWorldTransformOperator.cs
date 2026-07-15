@@ -14,9 +14,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Pixel To World Transform",
-    Description = "Transforms coordinates via CalibrationBundleV2 using either Transform2D or camera ray-plane intersection.",
-    Category = "Calibration",
+    DisplayName = "像素世界映射",
+    Description = "通过 CalibrationBundleV2 执行坐标转换，可使用 Transform2D 或相机射线与平面求交。",
+    CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "coordinate-transform",
     Keywords = new[] { "pixel", "world", "coordinate", "transform", "calibration", "ray-plane" },
     Version = "1.0.1"

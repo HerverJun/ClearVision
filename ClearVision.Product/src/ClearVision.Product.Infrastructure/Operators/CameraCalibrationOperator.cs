@@ -9,9 +9,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Camera Calibration",
-    Description = "Calibrates camera intrinsics from chessboard or circle grid images.",
-    Category = "Calibration",
+    DisplayName = "相机标定",
+    Description = "根据棋盘格或圆点阵图像标定相机内参。",
+    CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "calibration",
     Keywords = new[] { "Calibration", "Chessboard", "Intrinsic", "Distortion" }
 )]

@@ -10,9 +10,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Hand-Eye Calibration",
-    Description = "Solves eye-in-hand or simplified eye-to-hand calibration from robot poses and calibration-board poses.",
-    Category = "Calibration",
+    DisplayName = "手眼标定",
+    Description = "根据机器人位姿和标定板位姿求解手眼或简化眼在手外标定。",
+    CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "hand-eye-calibration",
     Keywords = new[] { "handeye", "robot", "calibration", "AX=XB" },
     Version = "1.0.0"

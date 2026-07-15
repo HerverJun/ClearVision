@@ -11,7 +11,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "金字塔形状匹配",
     Description = "基于 LINEMOD 的金字塔模板匹配。",
-    Category = "匹配定位",
+    CategoryId = OperatorCategoryId.MatchingAndLocalization,
     IconName = "pyramid-match"
 )]
 [InputPort("Image", "搜索图像", PortDataType.Image, IsRequired = true)]

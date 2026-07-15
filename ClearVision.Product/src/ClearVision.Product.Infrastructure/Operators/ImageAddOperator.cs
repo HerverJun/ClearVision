@@ -17,7 +17,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "图像加法",
     Description = "两幅图像叠加/合并",
-    Category = "预处理",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "add"
 )]
 [InputPort("Image1", "图像1", PortDataType.Image, IsRequired = true)]

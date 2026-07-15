@@ -13,8 +13,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "角点检测",
-    Description = "Detects corner points using Harris or Shi-Tomasi.",
-    Category = "定位",
+    Description = "使用 Harris 或 Shi-Tomasi 检测角点。",
+    CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "corner",
     Keywords = new[] { "corner", "vertex", "harris", "shitomasi" }
 )]

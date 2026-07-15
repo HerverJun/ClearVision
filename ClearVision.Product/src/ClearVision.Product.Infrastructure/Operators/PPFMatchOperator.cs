@@ -12,7 +12,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorMeta(
     DisplayName = "PPF点云粗匹配",
     Description = "基于 PPF 对模型点云与场景点云执行三维粗匹配，输出候选位姿、内点与稳定性诊断。",
-    Category = "3D",
+    CategoryId = OperatorCategoryId.PointCloud3D,
     IconName = "match3d",
     Keywords = new[] { "PointCloud", "PPF", "Match", "Pose", "3D", "PPF表面匹配" },
     Version = "1.0.5"

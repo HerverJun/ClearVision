@@ -11,9 +11,9 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Mitsubishi MC Communication",
-    Description = "Mitsubishi MC protocol PLC read/write communication.",
-    Category = "Communication",
+    DisplayName = "三菱MC通信",
+    Description = "三菱 MC 协议 PLC 读写通信。",
+    CategoryId = OperatorCategoryId.Communication,
     IconName = "mc-plc",
     Keywords = new[] { "PLC", "Mitsubishi", "MC", "Read", "Write" }
 )]

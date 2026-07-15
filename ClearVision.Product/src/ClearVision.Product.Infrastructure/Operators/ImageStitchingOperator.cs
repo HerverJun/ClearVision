@@ -12,8 +12,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "图像拼接",
-    Description = "Stitches two images into a larger panorama-like output.",
-    Category = "图像处理",
+    Description = "将两张图像拼接成更大的全景式输出。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "stitch",
     Keywords = new[] { "stitch", "panorama", "merge image" }
 )]

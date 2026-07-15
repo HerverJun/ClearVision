@@ -13,9 +13,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Region Complement",
-    Description = "Computes the complement of a region relative to an image size.",
-    Category = "Region",
+    DisplayName = "区域补集",
+    Description = "相对于图像尺寸计算区域补集。",
+    CategoryId = OperatorCategoryId.SegmentationAndRegion,
     IconName = "region-complement",
     Keywords = new[] { "Region", "Complement", "Invert", "Background" },
     Version = "1.0.2"

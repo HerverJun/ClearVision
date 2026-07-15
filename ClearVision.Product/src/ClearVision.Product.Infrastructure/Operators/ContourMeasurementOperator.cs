@@ -8,9 +8,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Contour Measurement",
-    Description = "Measures contour area, perimeter, and centroid with grayscale-weighted area estimation.",
-    Category = "Detection",
+    DisplayName = "轮廓测量",
+    Description = "计算轮廓面积、周长和质心，并支持按灰度权重估算面积。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "contour-measure",
     Keywords = new[] { "Contour", "Area", "Perimeter", "Shape", "Centroid" }
 )]

@@ -13,9 +13,9 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
-    DisplayName = "Geometric Fitting",
-    Description = "Fits line, circle or ellipse from contour points.",
-    Category = "Measurement",
+    DisplayName = "几何拟合",
+    Description = "根据轮廓点拟合直线、圆或椭圆。",
+    CategoryId = OperatorCategoryId.Measurement,
     IconName = "fit",
     Keywords = new[] { "fit", "line fit", "circle fit", "ellipse fit", "ransac" }
 )]

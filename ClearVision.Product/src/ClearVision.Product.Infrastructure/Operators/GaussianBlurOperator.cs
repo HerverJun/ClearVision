@@ -15,11 +15,11 @@ namespace ClearVision.Product.Infrastructure.Operators;
 /// 高斯模糊算子
 /// </summary>
 [OperatorMeta(
-    DisplayName = "Gaussian Blur",
-    Description = "Apply Gaussian filtering to suppress image noise",
-    Category = "Filtering",
+    DisplayName = "滤波",
+    Description = "统一空间平滑滤波入口，支持高斯、均值/Box、中值和双边滤波；默认保持历史高斯滤波行为。",
+    CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "filter",
-    Keywords = new[] { "gaussian", "blur", "filter", "denoise" }
+    Keywords = new[] { "gaussian", "mean", "box", "median", "bilateral", "blur", "filter", "denoise", "滤波" }
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Image", PortDataType.Image)]
