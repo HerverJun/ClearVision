@@ -27,6 +27,7 @@ const runtime = props.runtime ?? useProductRuntime().workspace;
 const activeProjectId = computed(() => props.projectId ?? String(route.params.id ?? ''));
 const shellState = ref<WorkspaceShellState>('loading');
 const project = shallowRef<WorkspaceProjectV1 | null>(null);
+const activeWorkspaceOwner = shallowRef<WorkspaceOwner | null>(null);
 const message = ref<string | null>(null);
 let lifecycleGeneration = 0;
 let readPort: WorkspaceProjectReadPort | undefined;
@@ -38,6 +39,7 @@ function disposeActive(reason: string): void {
   const previousOwner = workspaceOwner;
   readPort = undefined;
   workspaceOwner = undefined;
+  activeWorkspaceOwner.value = null;
   previousRead?.dispose(reason);
   previousOwner?.dispose(reason);
   project.value = null;
@@ -104,6 +106,7 @@ async function startLifecycle(reason: string): Promise<void> {
   if ((result.phase === 'success' || result.phase === 'empty') && result.data) {
     try {
       workspaceOwner = runtime.mountProject(result.data);
+      activeWorkspaceOwner.value = workspaceOwner;
       project.value = result.data;
       shellState.value = workspaceOwner.projection.phase === 'empty' ? 'empty' : 'ready';
       message.value = null;
@@ -119,6 +122,7 @@ async function startLifecycle(reason: string): Promise<void> {
   if (result.phase === 'partial-failure' && result.data) {
     try {
       workspaceOwner = runtime.mountProject(result.data);
+      activeWorkspaceOwner.value = workspaceOwner;
       project.value = result.data;
       workspaceOwner.setReadonly(result.failure?.message ?? '刷新被后端拒绝。');
       shellState.value = 'readonly';
@@ -164,6 +168,7 @@ onBeforeUnmount(() => {
     :state="shellState"
     :project-id="activeProjectId"
     :project="project"
+    :workspace-owner="activeWorkspaceOwner"
     :message="message"
     :diagnostics="runtime.diagnostics"
     @retry="retry"

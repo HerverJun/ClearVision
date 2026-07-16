@@ -37,10 +37,10 @@ export interface WorkspaceDiagnosticsWindow {
 }
 
 export class WorkspaceOwnerConflictError extends Error {
-  readonly ownerKind: 'workspace' | 'read';
+  readonly ownerKind: 'workspace' | 'read' | 'flow-canvas';
   readonly activeProjectId: string;
 
-  constructor(ownerKind: 'workspace' | 'read', activeProjectId: string) {
+  constructor(ownerKind: 'workspace' | 'read' | 'flow-canvas', activeProjectId: string) {
     super(`A ${ownerKind} owner is already active for project ${activeProjectId}.`);
     this.name = 'WorkspaceOwnerConflictError';
     this.ownerKind = ownerKind;
@@ -60,10 +60,17 @@ export interface WorkspaceOwnerDiagnosticsLease {
   dispose(reason?: string): void;
 }
 
+export interface WorkspaceFlowCanvasDiagnosticsLease {
+  readonly projectId: string;
+  update(resources: WorkspaceResourceSnapshot): void;
+  dispose(reason?: string): void;
+}
+
 export interface WorkspaceLifecycleDiagnosticsOwner {
   readonly diagnostics: WorkspaceLifecycleDiagnostics;
   reserveRead(projectId: string): WorkspaceReadDiagnosticsLease;
   reserveWorkspaceOwner(projectId: string): WorkspaceOwnerDiagnosticsLease;
+  reserveFlowCanvas(projectId: string): WorkspaceFlowCanvasDiagnosticsLease;
   dispose(): void;
 }
 
@@ -151,7 +158,26 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
   };
   let activeReadLease: object | undefined;
   let activeWorkspaceLease: object | undefined;
+  let activeFlowCanvasLease: object | undefined;
+  let readOwnerSubscriptionActive = false;
+  let readRequestActive = false;
+  let flowResources: WorkspaceResourceSnapshot = resourceSnapshot(state);
   let publishedWindow: WorkspaceDiagnosticsWindow | undefined;
+
+  function recomputeResources(): void {
+    state.activeSubscriptions = (readOwnerSubscriptionActive ? 1 : 0) + flowResources.activeSubscriptions;
+    state.activeTimers = flowResources.activeTimers;
+    state.activeAnimationFrames = flowResources.activeAnimationFrames;
+    state.activeObservers = flowResources.activeObservers;
+    state.activeAbortControllers = (readRequestActive ? 1 : 0) + flowResources.activeAbortControllers;
+    state.activeBlobUrls = flowResources.activeBlobUrls;
+    state.activePreviewArtifactIds = flowResources.activePreviewArtifactIds;
+    state.activeHostSubscriptions = flowResources.activeHostSubscriptions;
+    state.inFlightReads = (readRequestActive ? 1 : 0) + flowResources.inFlightReads;
+    state.inFlightWrites = flowResources.inFlightWrites;
+    state.inFlightPreview = flowResources.inFlightPreview;
+    state.inFlightExecute = flowResources.inFlightExecute;
+  }
 
   const diagnostics: WorkspaceLifecycleDiagnostics = Object.freeze({
     get workspaceOwnerCount() { return state.workspaceOwnerCount; },
@@ -220,7 +246,8 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
       const leaseIdentity = {};
       activeReadLease = leaseIdentity;
       state.activeReadProjectId = projectId;
-      state.activeSubscriptions = 1;
+      readOwnerSubscriptionActive = true;
+      recomputeResources();
       state.totalReadMounts += 1;
       let requestSequence = 0;
       let activeRequestToken = 0;
@@ -234,8 +261,8 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
           }
           const requestToken = ++requestSequence;
           activeRequestToken = requestToken;
-          state.activeAbortControllers = 1;
-          state.inFlightReads = 1;
+          readRequestActive = true;
+          recomputeResources();
           return requestToken;
         },
         settleRequest(requestToken: number): void {
@@ -243,8 +270,8 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
             return;
           }
           activeRequestToken = 0;
-          state.activeAbortControllers = 0;
-          state.inFlightReads = 0;
+          readRequestActive = false;
+          recomputeResources();
         },
         dispose(reason = 'read-disposed'): void {
           if (leaseDisposed) return;
@@ -253,10 +280,55 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
           if (activeReadLease === leaseIdentity) {
             activeReadLease = undefined;
             state.activeReadProjectId = null;
-            state.activeSubscriptions = 0;
-            state.activeAbortControllers = 0;
-            state.inFlightReads = 0;
+            readOwnerSubscriptionActive = false;
+            readRequestActive = false;
+            recomputeResources();
             state.totalReadDisposals += 1;
+            state.lastDisposeReason = reason;
+          }
+        }
+      });
+    },
+    reserveFlowCanvas(projectId: string): WorkspaceFlowCanvasDiagnosticsLease {
+      assertActive();
+      assertProjectId(projectId);
+      if (activeFlowCanvasLease) {
+        state.ownerConflictCount += 1;
+        throw new WorkspaceOwnerConflictError('flow-canvas', state.activeProjectId ?? projectId);
+      }
+      const leaseIdentity = {};
+      activeFlowCanvasLease = leaseIdentity;
+      state.flowCanvasOwnerCount = 1;
+      let leaseDisposed = false;
+
+      return Object.freeze({
+        projectId,
+        update(resources: WorkspaceResourceSnapshot): void {
+          if (leaseDisposed || activeFlowCanvasLease !== leaseIdentity || state.disposed) return;
+          flowResources = Object.freeze({ ...resources });
+          recomputeResources();
+        },
+        dispose(reason = 'flow-canvas-disposed'): void {
+          if (leaseDisposed) return;
+          leaseDisposed = true;
+          if (activeFlowCanvasLease === leaseIdentity) {
+            activeFlowCanvasLease = undefined;
+            state.flowCanvasOwnerCount = 0;
+            flowResources = Object.freeze({
+              activeSubscriptions: 0,
+              activeTimers: 0,
+              activeAnimationFrames: 0,
+              activeObservers: 0,
+              activeAbortControllers: 0,
+              activeBlobUrls: 0,
+              activePreviewArtifactIds: 0,
+              activeHostSubscriptions: 0,
+              inFlightReads: 0,
+              inFlightWrites: 0,
+              inFlightPreview: 0,
+              inFlightExecute: 0
+            });
+            recomputeResources();
             state.lastDisposeReason = reason;
           }
         }
@@ -298,6 +370,9 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
       state.disposed = true;
       activeReadLease = undefined;
       activeWorkspaceLease = undefined;
+      activeFlowCanvasLease = undefined;
+      readOwnerSubscriptionActive = false;
+      readRequestActive = false;
       state.workspaceOwnerCount = 0;
       state.flowCanvasOwnerCount = 0;
       state.imageCanvasOwnerCount = 0;

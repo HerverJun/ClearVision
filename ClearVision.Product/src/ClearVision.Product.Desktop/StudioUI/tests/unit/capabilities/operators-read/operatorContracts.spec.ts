@@ -97,4 +97,24 @@ describe('operator contracts', () => {
     expect(() => decodeOperatorCatalog([operator(), operator()]))
       .toThrow(/unique operator identities/);
   });
+
+  it('freezes stable conditional, output and image contract metadata without interpreting G3 editors', () => {
+    const decoded = decodeOperatorCatalogItem(operator({
+      qualityState: { execution: 'Implemented', productionReadiness: 'Experimental' },
+      parameterConstraints: [{ parameter: 'Mode', reasonCode: 'MODE_REQUIRED' }],
+      outputAvailabilityRules: [{ output: 'Region', reasonCode: 'REGION_MODE_ONLY' }],
+      imageInputContracts: [{ inputPort: 'Image', contractVersion: 'v1', variants: [] }],
+      imageInputContractPresentations: [{ inputPort: 'Image', exactVariantGroups: [] }]
+    }));
+
+    expect(decoded.qualityState).toMatchObject({ execution: 'Implemented' });
+    expect(decoded.parameterConstraints[0]).toMatchObject({ reasonCode: 'MODE_REQUIRED' });
+    expect(decoded.outputAvailabilityRules[0]).toMatchObject({ output: 'Region' });
+    expect(decoded.imageInputContracts[0]).toMatchObject({ contractVersion: 'v1' });
+    expect(decoded.imageInputContractPresentations[0]).toMatchObject({ inputPort: 'Image' });
+    expect(Object.isFrozen(decoded.parameterConstraints)).toBe(true);
+
+    expect(() => decodeOperatorCatalogItem(operator({ imageInputContracts: ['invalid'] })))
+      .toThrow(OperatorContractDecodeError);
+  });
 });

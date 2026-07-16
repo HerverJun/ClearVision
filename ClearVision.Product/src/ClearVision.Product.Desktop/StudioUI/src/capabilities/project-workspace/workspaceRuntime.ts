@@ -80,11 +80,12 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
     mountProject(project: WorkspaceProjectV1): WorkspaceOwner {
       assertActive();
       if (!enabled) throw new Error('Workspace capability is disabled by startup configuration.');
-      const inner = createWorkspaceOwner(project, diagnosticsOwner);
+      const inner = createWorkspaceOwner(project, diagnosticsOwner, options.queries);
       let ownerDisposed = false;
       const owner: WorkspaceOwner = Object.freeze({
         projectId: inner.projectId,
         projection: inner.projection,
+        openFlowCanvas: inner.openFlowCanvas,
         setReadonly: inner.setReadonly,
         dispose(reason = 'workspace-owner-disposed'): void {
           if (ownerDisposed) return;

@@ -12,17 +12,21 @@ describe('F03 G1 Workspace lifecycle diagnostics', () => {
     const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
     const read = diagnostics.reserveRead(projectA);
     const owner = diagnostics.reserveWorkspaceOwner(projectA);
+    const flow = diagnostics.reserveFlowCanvas(projectA);
 
     expect(diagnostics.diagnostics).toMatchObject({
       workspaceOwnerCount: 1,
+      flowCanvasOwnerCount: 1,
       activeSubscriptions: 1,
       activeProjectId: projectA,
       activeReadProjectId: projectA
     });
     expect(() => diagnostics.reserveRead(projectB)).toThrow(WorkspaceOwnerConflictError);
     expect(() => diagnostics.reserveWorkspaceOwner(projectB)).toThrow(WorkspaceOwnerConflictError);
-    expect(diagnostics.diagnostics.ownerConflictCount).toBe(2);
+    expect(() => diagnostics.reserveFlowCanvas(projectB)).toThrow(WorkspaceOwnerConflictError);
+    expect(diagnostics.diagnostics.ownerConflictCount).toBe(3);
 
+    flow.dispose('test-flow-dispose');
     read.dispose('test-read-dispose');
     owner.dispose('test-owner-dispose');
     diagnostics.dispose();
@@ -44,9 +48,32 @@ describe('F03 G1 Workspace lifecycle diagnostics', () => {
 
     read.settleRequest(request);
     const owner = diagnostics.reserveWorkspaceOwner(projectA);
+    const flow = diagnostics.reserveFlowCanvas(projectA);
+    flow.update({
+      activeSubscriptions: 5,
+      activeTimers: 1,
+      activeAnimationFrames: 2,
+      activeObservers: 2,
+      activeAbortControllers: 0,
+      activeBlobUrls: 0,
+      activePreviewArtifactIds: 0,
+      activeHostSubscriptions: 0,
+      inFlightReads: 0,
+      inFlightWrites: 0,
+      inFlightPreview: 0,
+      inFlightExecute: 0
+    });
     expect(diagnostics.diagnostics.workspaceOwnerCount).toBe(1);
+    expect(diagnostics.diagnostics).toMatchObject({
+      flowCanvasOwnerCount: 1,
+      activeSubscriptions: 6,
+      activeTimers: 1,
+      activeAnimationFrames: 2,
+      activeObservers: 2
+    });
 
     read.dispose('route-leave');
+    flow.dispose('route-leave');
     owner.dispose('route-leave');
 
     expect(diagnostics.diagnostics).toMatchObject({
@@ -95,10 +122,27 @@ describe('F03 G1 Workspace lifecycle diagnostics', () => {
       const request = read.startRequest();
       read.settleRequest(request);
       const owner = diagnostics.reserveWorkspaceOwner(cycle % 2 === 0 ? projectA : projectB);
+      const flow = diagnostics.reserveFlowCanvas(cycle % 2 === 0 ? projectA : projectB);
+      flow.update({
+        activeSubscriptions: 5,
+        activeTimers: 0,
+        activeAnimationFrames: 1,
+        activeObservers: 2,
+        activeAbortControllers: 0,
+        activeBlobUrls: 0,
+        activePreviewArtifactIds: 0,
+        activeHostSubscriptions: 0,
+        inFlightReads: 0,
+        inFlightWrites: 0,
+        inFlightPreview: 0,
+        inFlightExecute: 0
+      });
       read.dispose(`cycle-${cycle}-read`);
+      flow.dispose(`cycle-${cycle}-flow`);
       owner.dispose(`cycle-${cycle}-owner`);
 
       expect(diagnostics.diagnostics.workspaceOwnerCount, `cycle ${cycle}`).toBe(0);
+      expect(diagnostics.diagnostics.flowCanvasOwnerCount, `cycle ${cycle}`).toBe(0);
       expect(diagnostics.diagnostics.activeSubscriptions, `cycle ${cycle}`).toBe(0);
       expect(diagnostics.diagnostics.activeAbortControllers, `cycle ${cycle}`).toBe(0);
       expect(diagnostics.diagnostics.inFlightReads, `cycle ${cycle}`).toBe(0);

@@ -97,9 +97,14 @@ export interface OperatorCatalogItem {
   readonly keywords: readonly string[];
   readonly tags: readonly string[];
   readonly version: string;
+  readonly qualityState: Readonly<Record<string, unknown>> | null;
   readonly inputPorts: readonly OperatorPort[];
   readonly outputPorts: readonly OperatorPort[];
   readonly parameters: readonly OperatorParameter[];
+  readonly parameterConstraints: readonly Readonly<Record<string, unknown>>[];
+  readonly outputAvailabilityRules: readonly Readonly<Record<string, unknown>>[];
+  readonly imageInputContracts: readonly Readonly<Record<string, unknown>>[];
+  readonly imageInputContractPresentations: readonly Readonly<Record<string, unknown>>[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -161,6 +166,21 @@ function stringArray(value: unknown, path: string): readonly string[] {
   if (value === null || value === undefined) return Object.freeze([]);
   if (!Array.isArray(value)) throw new OperatorContractDecodeError(path, 'an array of strings or null');
   return Object.freeze(value.map((item, index) => string(item, `${path}[${index}]`, true)));
+}
+
+function optionalObject(
+  value: unknown,
+  path: string
+): Readonly<Record<string, unknown>> | null {
+  if (value === null || value === undefined) return null;
+  return Object.freeze({ ...record(value, path) });
+}
+
+function objectArray(value: unknown, path: string): readonly Readonly<Record<string, unknown>>[] {
+  if (value === null || value === undefined) return Object.freeze([]);
+  if (!Array.isArray(value)) throw new OperatorContractDecodeError(path, 'an array of objects or null');
+  return Object.freeze(value.map((entry, index) =>
+    Object.freeze({ ...record(entry, `${path}[${index}]`) })));
 }
 
 function port(value: unknown, path: string): OperatorPort {
@@ -227,9 +247,17 @@ export function decodeOperatorCatalogItem(payload: unknown, path = '$'): Operato
     keywords: stringArray(item.keywords, `${path}.keywords`),
     tags: stringArray(item.tags, `${path}.tags`),
     version: string(item.version, `${path}.version`),
+    qualityState: optionalObject(item.qualityState, `${path}.qualityState`),
     inputPorts: array(item.inputPorts, `${path}.inputPorts`, port),
     outputPorts: array(item.outputPorts, `${path}.outputPorts`, port),
-    parameters: array(item.parameters, `${path}.parameters`, parameter)
+    parameters: array(item.parameters, `${path}.parameters`, parameter),
+    parameterConstraints: objectArray(item.parameterConstraints, `${path}.parameterConstraints`),
+    outputAvailabilityRules: objectArray(item.outputAvailabilityRules, `${path}.outputAvailabilityRules`),
+    imageInputContracts: objectArray(item.imageInputContracts, `${path}.imageInputContracts`),
+    imageInputContractPresentations: objectArray(
+      item.imageInputContractPresentations,
+      `${path}.imageInputContractPresentations`
+    )
   });
 }
 

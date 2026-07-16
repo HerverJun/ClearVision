@@ -18,6 +18,11 @@ import {
 } from '@/platform/api';
 import { createReadQueryClient } from '@/platform/query';
 
+const flowWorkspaceStub = {
+  name: 'FlowWorkspace',
+  template: '<div data-testid="flow-workspace-stub" />'
+};
+
 const projectA = '11111111-1111-4111-8111-111111111111';
 const projectB = '22222222-2222-4222-8222-222222222222';
 const flowId = '33333333-3333-4333-8333-333333333333';
@@ -136,7 +141,7 @@ describe('F03 G1 WorkspacePage', () => {
     const harness = await createHarness({ enabled: false });
     const wrapper = mount(WorkspacePage, {
       props: { projectId: projectA, runtime: harness.runtime },
-      global: { plugins: [harness.router] }
+      global: { plugins: [harness.router], stubs: { FlowWorkspace: flowWorkspaceStub } }
     });
     await flushPromises();
 
@@ -157,7 +162,7 @@ describe('F03 G1 WorkspacePage', () => {
     const harness = await createHarness();
     const wrapper = mount(WorkspacePage, {
       props: { projectId: projectA, runtime: harness.runtime },
-      global: { plugins: [harness.router] }
+      global: { plugins: [harness.router], stubs: { FlowWorkspace: flowWorkspaceStub } }
     });
     await flushPromises();
 
@@ -189,7 +194,7 @@ describe('F03 G1 WorkspacePage', () => {
     const harness = await createHarness();
     const wrapper = mount(WorkspacePage, {
       props: { projectId: projectA, runtime: harness.runtime },
-      global: { plugins: [harness.router] }
+      global: { plugins: [harness.router], stubs: { FlowWorkspace: flowWorkspaceStub } }
     });
     await flushPromises();
     expect(harness.diagnostics.diagnostics.activeProjectId).toBe(projectA);
@@ -231,7 +236,7 @@ describe('F03 G1 WorkspacePage', () => {
     const harness = await createHarness({ get: async () => { throw failure; } });
     const wrapper = mount(WorkspacePage, {
       props: { projectId: projectA, runtime: harness.runtime },
-      global: { plugins: [harness.router] }
+      global: { plugins: [harness.router], stubs: { FlowWorkspace: flowWorkspaceStub } }
     });
     await flushPromises();
 
@@ -253,7 +258,7 @@ describe('F03 G1 WorkspacePage', () => {
     });
     const wrapper = mount(WorkspacePage, {
       props: { projectId: projectA, runtime: harness.runtime },
-      global: { plugins: [harness.router] }
+      global: { plugins: [harness.router], stubs: { FlowWorkspace: flowWorkspaceStub } }
     });
     await flushPromises();
 
@@ -277,7 +282,7 @@ describe('F03 G1 WorkspacePage', () => {
     for (let cycle = 0; cycle < 20; cycle += 1) {
       const wrapper = mount(WorkspacePage, {
         props: { projectId: projectA, runtime: harness.runtime },
-        global: { plugins: [harness.router] }
+        global: { plugins: [harness.router], stubs: { FlowWorkspace: flowWorkspaceStub } }
       });
       await flushPromises();
       expect(harness.diagnostics.diagnostics.workspaceOwnerCount, `mount ${cycle}`).toBe(1);

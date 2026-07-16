@@ -7,6 +7,8 @@ import {
   CvStatusBadge
 } from '@/design-system';
 import type { WorkspaceProjectV1 } from './workspaceContracts';
+import type { WorkspaceOwner } from './workspaceOwner';
+import FlowWorkspace from './flow/FlowWorkspace.vue';
 import type { WorkspaceLifecycleDiagnostics } from './workspaceLifecycleDiagnostics';
 
 export type WorkspaceShellState =
@@ -25,6 +27,7 @@ const props = defineProps<{
   state: WorkspaceShellState;
   projectId: string;
   project: WorkspaceProjectV1 | null;
+  workspaceOwner: WorkspaceOwner | null;
   message: string | null;
   diagnostics: WorkspaceLifecycleDiagnostics;
 }>();
@@ -60,7 +63,7 @@ const stateTitle = computed(() => {
 const stateDescription = computed(() => props.message ?? {
   'flag-off': '启动配置中的 Studio2.Workspace 保持关闭，未创建读取或 Workspace owner。',
   loading: '正在通过唯一只读端口读取正式 Project/Flow persistence envelope。',
-  empty: '工程已成功解码，但流程尚未包含算子。本阶段不提供添加或编辑命令。',
+  empty: '工程已成功解码。可从算子区点击或拖拽创建本地 Flow draft。',
   unauthorized: '当前仅支持宿主或测试环境预置会话，不提供新的登录入口。',
   forbidden: '后端权限是唯一安全边界；未创建 Workspace owner。',
   'not-found': '该工程可能已删除，或当前链接中的工程标识已失效。',
@@ -70,9 +73,9 @@ const stateDescription = computed(() => props.message ?? {
   readonly: ''
 }[props.state]);
 
-const isReadySurface = computed(() => props.state === 'ready' || props.state === 'readonly');
+const isReadySurface = computed(() =>
+  props.state === 'ready' || props.state === 'empty' || props.state === 'readonly');
 const isReadonly = computed(() => props.state === 'forbidden' || props.state === 'readonly');
-const flow = computed(() => props.project?.flow ?? null);
 const saveCompatibilityTone = computed(() => {
   const status = props.project?.saveCompatibility.status;
   if (status === 'blocked') return 'ng';
@@ -128,19 +131,33 @@ const saveCompatibilityLabel = computed(() => {
         />
         <CvStatusBadge
           :tone="isReadonly ? 'warning' : state === 'ready' || state === 'empty' ? 'ok' : 'idle'"
-          :label="isReadonly ? '只读' : 'G1 读取模式'"
+          :label="isReadonly ? '只读' : 'G2 Flow 编辑'"
         />
       </div>
     </header>
 
-    <div class="workspace-shell__work-area">
+    <div
+      v-if="isReadySurface && project && workspaceOwner"
+      class="workspace-shell__work-area"
+    >
+      <FlowWorkspace
+        :key="projectId"
+        :workspace-owner="workspaceOwner"
+        :project="project"
+      />
+    </div>
+
+    <div
+      v-else
+      class="workspace-shell__work-area workspace-shell__work-area--state"
+    >
       <aside
         class="workspace-shell__rail"
         aria-label="算子区占位"
       >
         <div class="workspace-shell__pane-heading">
           <strong>算子区</strong>
-          <small>G2 未启用</small>
+          <small>等待工程</small>
         </div>
         <div
           class="workspace-shell__placeholder-lines"
@@ -151,32 +168,12 @@ const saveCompatibilityLabel = computed(() => {
           <span />
           <span />
         </div>
-        <p>本阶段不读取算子目录，也不提供添加或拖放命令。</p>
+        <p>工程读取成功后加载唯一 Operator catalog owner。</p>
       </aside>
 
       <div class="workspace-shell__center">
         <div class="workspace-shell__canvas-surface">
-          <div
-            v-if="isReadySurface"
-            class="workspace-shell__decoded-flow"
-          >
-            <span
-              class="workspace-shell__decoded-mark"
-              aria-hidden="true"
-            >✓</span>
-            <div>
-              <strong>正式 Flow persistence envelope 已解码</strong>
-              <p>未挂载 FlowCanvas，未根据摘要数量重建节点或连线。</p>
-            </div>
-            <dl v-if="flow">
-              <div><dt>流程</dt><dd>{{ flow.name }}</dd></div>
-              <div><dt>算子</dt><dd>{{ flow.operators.length }}</dd></div>
-              <div><dt>连线</dt><dd>{{ flow.connections.length }}</dd></div>
-            </dl>
-          </div>
-
           <CvPageState
-            v-else
             :kind="pageStateKind"
             :title="stateTitle"
             :description="stateDescription"
@@ -246,7 +243,7 @@ const saveCompatibilityLabel = computed(() => {
       <span>订阅 {{ diagnostics.activeSubscriptions }}</span>
       <span>写入 {{ diagnostics.inFlightWrites }}</span>
       <span class="workspace-shell__statusbar-spacer" />
-      <span>F03 · G1 read foundation</span>
+      <span>F03 · G2 Flow Workspace</span>
     </footer>
   </section>
 </template>
@@ -304,6 +301,8 @@ const saveCompatibilityLabel = computed(() => {
   grid-template-columns: minmax(196px, 232px) minmax(520px, 1fr) minmax(280px, 320px);
   overflow: hidden;
 }
+.workspace-shell__work-area > :deep(.flow-workspace) { grid-column: 1 / -1; }
+.workspace-shell__work-area--state { grid-template-columns: minmax(196px, 232px) minmax(520px, 1fr) minmax(280px, 320px); }
 
 .workspace-shell__rail,
 .workspace-shell__inspector {
