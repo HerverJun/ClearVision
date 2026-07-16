@@ -2,7 +2,6 @@ import {
     buildPreviewSummaryItems,
     isPreviewImageLikePayload
 } from './previewOutputFormatter.mjs';
-import httpClient from '../../core/messaging/httpClient.js';
 import { normalizeAcquisitionSourceType } from '../../shared/parameterDependencyRules.js';
 
 const DEFAULT_DEBOUNCE_MS = 500;
@@ -849,7 +848,10 @@ export function previewObservationMatchesRequest(response, expectedIdentity) {
 }
 
 function isAbortError(error) {
-    return error?.name === 'AbortError';
+    return error?.name === 'AbortError' ||
+        error?.name === 'ApiAbortError' ||
+        error?.code === 'abort' ||
+        error?.previewArtifactResolutionAborted === true;
 }
 
 function isImageArtifact(artifact) {
@@ -866,13 +868,22 @@ function createArtifactUnavailableError(message = '资源已过期或不可用')
 
 export class NodePreviewCoordinator {
     constructor(options = {}) {
+        if (typeof options.previewExecutor !== 'function') {
+            throw new TypeError('NodePreviewCoordinator requires an explicit previewExecutor port.');
+        }
+        if (!options.artifactClient ||
+            typeof options.artifactClient.getPreviewArtifactBlob !== 'function' ||
+            typeof options.artifactClient.deletePreviewArtifact !== 'function') {
+            throw new TypeError('NodePreviewCoordinator requires an explicit artifactClient port.');
+        }
+
         this.getProjectId = options.getProjectId ?? (() => null);
         this.getFlowRevision = options.getFlowRevision ?? (() => 0);
         this.getNodeById = options.getNodeById ?? (() => null);
         this.getOperatorMetadata = options.getOperatorMetadata ?? (() => null);
         this.getInputImageBase64 = options.getInputImageBase64 ?? (() => null);
-        this.previewExecutor = options.previewExecutor ?? (async () => null);
-        this.artifactClient = options.artifactClient ?? httpClient;
+        this.previewExecutor = options.previewExecutor;
+        this.artifactClient = options.artifactClient;
         this.debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
         const maxCacheEntries = Number(options.maxCacheEntries ?? 30);
         this.maxCacheEntries = Number.isFinite(maxCacheEntries)
@@ -894,6 +905,7 @@ export class NodePreviewCoordinator {
         this.debugSessionId = null;
         this.debugSessionScopeKey = null;
         this.activeScopeKey = null;
+        this.destroyed = false;
         this.unsubscribeStructure = typeof options.subscribeStructureState === 'function'
             ? options.subscribeStructureState(() => this.handleStructureChanged())
             : null;
@@ -1235,6 +1247,10 @@ export class NodePreviewCoordinator {
     }
 
     destroy() {
+        if (this.destroyed) {
+            return;
+        }
+        this.destroyed = true;
         this.cancelPendingPreviewRequest({ status: 'destroyed' });
 
         this.requestVersion += 1;
@@ -1245,6 +1261,38 @@ export class NodePreviewCoordinator {
         this.debugSessionId = null;
         this.debugSessionScopeKey = null;
         this.activeScopeKey = null;
+    }
+
+    getResourceDiagnostics() {
+        const artifactIds = new Set();
+        const objectUrls = new Set();
+        const collect = value => {
+            for (const artifactId of value?.previewArtifactIds || []) {
+                if (artifactId) artifactIds.add(artifactId);
+            }
+            for (const objectUrl of value?.previewArtifactObjectUrls || []) {
+                if (objectUrl) objectUrls.add(objectUrl);
+            }
+        };
+        collect(this.state);
+        for (const value of this.cache.values()) collect(value);
+        const client = typeof this.artifactClient.getResourceDiagnostics === 'function'
+            ? this.artifactClient.getResourceDiagnostics()
+            : null;
+
+        return Object.freeze({
+            activeSubscriptions: this.listeners.size + Number(typeof this.unsubscribeStructure === 'function'),
+            activeTimers: Number(this.pendingTimer !== null),
+            activeAbortControllers: Number(this.activeAbortController !== null) +
+                Number(client?.activeAbortControllers || 0),
+            activeBlobUrls: objectUrls.size,
+            activePreviewArtifactIds: artifactIds.size,
+            inFlightPreview: Number(this.activeAbortController !== null) +
+                Number(client?.inFlightPreview || 0),
+            inFlightArtifactReads: Number(client?.inFlightArtifactReads || 0),
+            inFlightArtifactDeletes: Number(client?.inFlightArtifactDeletes || 0),
+            destroyed: this.destroyed
+        });
     }
 
     getState() {

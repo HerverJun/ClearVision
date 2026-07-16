@@ -212,6 +212,7 @@ class ImageCanvas {
 
         // Blob URL 待清理（避免内存泄漏）
         this._imageUrlToRevoke = null;
+        this._pendingImageUrls = new Set();
 
         // 事件处理器引用（用于销毁时移除）
         this._resizeHandler = this.resize.bind(this);
@@ -242,7 +243,12 @@ class ImageCanvas {
         if (typeof window !== 'undefined' && typeof window.ResizeObserver !== 'undefined' && this.canvas.parentElement) {
             this._resizeObserver = new window.ResizeObserver(() => {
                 if (this._resizeRafId) cancelAnimationFrame(this._resizeRafId);
-                this._resizeRafId = requestAnimationFrame(() => this.resize());
+                this._resizeRafId = requestAnimationFrame(() => {
+                    this._resizeRafId = null;
+                    if (!this._destroyed) {
+                        this.resize();
+                    }
+                });
             });
             this._resizeObserver.observe(this.canvas.parentElement);
         } else {
@@ -315,6 +321,7 @@ class ImageCanvas {
 
         // 释放旧的 Blob URL
         this._revokeImageUrl();
+        this._revokePendingImageUrls();
 
         // 释放 ImageBitmap
         if (typeof ImageBitmap !== 'undefined' && this.image instanceof ImageBitmap) {
@@ -371,6 +378,7 @@ class ImageCanvas {
      */
     loadImage(imageSource) {
         const generation = ++this._imageLoadGeneration;
+        this._revokePendingImageUrls();
         this.cancelAndReleaseActiveInteraction('load-image');
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -378,7 +386,7 @@ class ImageCanvas {
 
             img.onload = () => {
                 if (generation !== this._imageLoadGeneration || this._destroyed) {
-                    if (urlToRevoke) {
+                    if (urlToRevoke && this._pendingImageUrls.delete(urlToRevoke)) {
                         URL.revokeObjectURL(urlToRevoke);
                     }
                     resolve(img);
@@ -386,6 +394,9 @@ class ImageCanvas {
                 }
 
                 this._releaseCurrentImage();
+                if (urlToRevoke) {
+                    this._pendingImageUrls.delete(urlToRevoke);
+                }
                 this._imageUrlToRevoke = urlToRevoke;
                 this.image = img;
                 this.resetView();
@@ -394,7 +405,7 @@ class ImageCanvas {
             };
 
             img.onerror = () => {
-                if (urlToRevoke) {
+                if (urlToRevoke && this._pendingImageUrls.delete(urlToRevoke)) {
                     URL.revokeObjectURL(urlToRevoke);
                 }
                 if (generation !== this._imageLoadGeneration || this._destroyed) {
@@ -408,14 +419,17 @@ class ImageCanvas {
                 img.src = imageSource;
             } else if (imageSource instanceof Blob) {
                 urlToRevoke = URL.createObjectURL(imageSource);
+                this._pendingImageUrls.add(urlToRevoke);
                 img.src = urlToRevoke;
             } else if (imageSource instanceof ArrayBuffer) {
                 const blob = new Blob([imageSource]);
                 urlToRevoke = URL.createObjectURL(blob);
+                this._pendingImageUrls.add(urlToRevoke);
                 img.src = urlToRevoke;
             } else if (imageSource instanceof Uint8Array) {
                 const blob = new Blob([imageSource]);
                 urlToRevoke = URL.createObjectURL(blob);
+                this._pendingImageUrls.add(urlToRevoke);
                 img.src = urlToRevoke;
             }
         });
@@ -444,6 +458,17 @@ class ImageCanvas {
         }
     }
 
+    _revokePendingImageUrls() {
+        for (const pendingUrl of this._pendingImageUrls) {
+            try {
+                URL.revokeObjectURL(pendingUrl);
+            } catch {
+                // Best-effort cleanup for a decode that never settled.
+            }
+        }
+        this._pendingImageUrls.clear();
+    }
+
     /**
      * 加载图像数据（字节数组）
      */
@@ -457,6 +482,7 @@ class ImageCanvas {
      */
     loadImageFromBuffer(buffer, width, height) {
         const generation = ++this._imageLoadGeneration;
+        this._revokePendingImageUrls();
         this.cancelAndReleaseActiveInteraction('load-image-buffer');
         try {
             const pixelData = new Uint8ClampedArray(buffer);
@@ -1028,6 +1054,9 @@ class ImageCanvas {
      * 替代原来的无限 render 循环，避免无用帧。
      */
     invalidate() {
+        if (this._destroyed) {
+            return;
+        }
         this._dirty = true;
         if (this._animationFrameId === null) {
             this._animationFrameId = requestAnimationFrame(this._drawFrameBound);
@@ -1334,6 +1363,21 @@ class ImageCanvas {
         };
     }
 
+    getResourceDiagnostics() {
+        return Object.freeze({
+            destroyed: this._destroyed,
+            animationFramePending: this._animationFrameId !== null,
+            resizeFramePending: this._resizeRafId !== null,
+            resizeObserverActive: this._resizeObserver !== null,
+            currentBlobUrlCount: Number(Boolean(this._imageUrlToRevoke)),
+            pendingBlobUrlCount: this._pendingImageUrls.size,
+            imageLoadGeneration: this._imageLoadGeneration,
+            pointerCaptureActive: this.activePointerId !== null,
+            interactionActive: this.interactionState !== null,
+            overlayCount: this.overlays.length
+        });
+    }
+
     /**
      * 设置视图状态
      */
@@ -1348,6 +1392,7 @@ class ImageCanvas {
      */
     clear() {
         this._imageLoadGeneration += 1;
+        this._revokePendingImageUrls();
         this.cancelAndReleaseActiveInteraction('clear');
         this._releaseCurrentImage();
         this.overlays = [];

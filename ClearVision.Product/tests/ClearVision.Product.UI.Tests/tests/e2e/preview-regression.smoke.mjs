@@ -17,6 +17,10 @@ const repoRoot = path.resolve(__dirname, '../../../..');
 
 const PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==';
+const noOpArtifactClient = {
+  async getPreviewArtifactBlob() { return { blob: new Blob() }; },
+  async deletePreviewArtifact() {},
+};
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const minimumSmokeAssertions = parseMinimum('CV_PREVIEW_SMOKE_MIN_ASSERTIONS', 35);
@@ -80,6 +84,7 @@ async function runPreviewCoordinatorChecks() {
     }),
     getOperatorMetadata: () => null,
     getInputImageBase64: () => null,
+    artifactClient: noOpArtifactClient,
     previewExecutor: async () => {
       throw new Error('should not execute preview');
     },
@@ -120,6 +125,7 @@ async function runPreviewCoordinatorChecks() {
     getNodeById: () => cameraNode,
     getOperatorMetadata: () => null,
     getInputImageBase64: () => PNG_BASE64,
+    artifactClient: noOpArtifactClient,
     previewExecutor: async (_nodeId, options) => {
       cameraPreviewCalls += 1;
       cameraPreviewOptions = options;
@@ -161,6 +167,7 @@ async function runPreviewCoordinatorChecks() {
     }),
     getOperatorMetadata: () => null,
     getInputImageBase64: () => PNG_BASE64,
+    artifactClient: noOpArtifactClient,
     previewExecutor: async () => {
       noProjectPreviewCalls += 1;
       return { success: true };
@@ -197,6 +204,7 @@ async function runPreviewCoordinatorChecks() {
     getNodeById: () => abortNode,
     getOperatorMetadata: () => null,
     getInputImageBase64: () => PNG_BASE64,
+    artifactClient: noOpArtifactClient,
     previewExecutor: async (_nodeId, options) => {
       abortPreviewCalls += 1;
       smokeAssert.ok(options.signal, 'preview requests should receive an abort signal');
@@ -248,6 +256,7 @@ async function runPreviewCoordinatorChecks() {
     getNodeById: () => node,
     getOperatorMetadata: () => null,
     getInputImageBase64: () => PNG_BASE64,
+    artifactClient: noOpArtifactClient,
     previewExecutor: async (_nodeId, options) => {
       previewCalls += 1;
       debugSessionIds.push(options.debugSessionId);
@@ -303,6 +312,7 @@ async function runPreviewCoordinatorChecks() {
       outputs: [{ name: 'Image', type: 'Image' }],
     }),
     getOperatorMetadata: () => null,
+    artifactClient: noOpArtifactClient,
     previewExecutor: async () => ({
       success: true,
       outputImageBase64: PNG_BASE64,

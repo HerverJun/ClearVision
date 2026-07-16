@@ -45,7 +45,10 @@ function createCoordinator(options = {}) {
     getNodeById: () => node,
     getInputImageBase64: () => options.inputImageBase64 ?? 'INPUT_IMAGE',
     getOperatorMetadata: () => ({ outputPorts: [{ dataType: 'image' }] }),
-    artifactClient: options.artifactClient,
+    artifactClient: options.artifactClient ?? {
+      async getPreviewArtifactBlob() { return { blob: new Blob() }; },
+      async deletePreviewArtifact() {}
+    },
     previewExecutor: async (nodeId, executorOptions) => {
       executeCount += 1;
       options.onPreviewOptions?.(executorOptions, executeCount, nodeId);
@@ -762,6 +765,7 @@ test('NodePreviewCoordinator releases artifact resources on cache replacement ev
   const { coordinator, node } = createCoordinator({
     maxCacheEntries: 1,
     artifactClient: {
+      async getPreviewArtifactBlob() { return { blob: new Blob() }; },
       async deletePreviewArtifact(artifactId) {
         deletedArtifactIds.push(artifactId);
       }
@@ -913,6 +917,10 @@ test('NodePreviewCoordinator aborts same-node project switch and deletes late ar
     getNodeById: () => node,
     getInputImageBase64: () => 'INPUT_IMAGE',
     getOperatorMetadata: () => ({ outputPorts: [{ dataType: 'image' }] }),
+    artifactClient: {
+      async getPreviewArtifactBlob() { return { blob: new Blob() }; },
+      async deletePreviewArtifact() {}
+    },
     artifactClient,
     previewExecutor: async (nodeId, options) => {
       callCount += 1;
@@ -1013,6 +1021,10 @@ test('NodePreviewCoordinator ignores late observation response without overwriti
     getNodeById: () => node,
     getInputImageBase64: () => 'INPUT_IMAGE',
     getOperatorMetadata: () => ({ outputPorts: [{ dataType: 'image' }] }),
+    artifactClient: {
+      async getPreviewArtifactBlob() { return { blob: new Blob() }; },
+      async deletePreviewArtifact() {}
+    },
     previewExecutor: async (nodeId, options) => {
       callCount += 1;
       if (callCount === 1) {

@@ -22,6 +22,46 @@ const canonicalFlowEditorInteraction = resolve(
   'flow-editor',
   'flowEditorInteraction.js'
 );
+const canonicalPreviewCoordinator = resolve(
+  desktopRoot,
+  'wwwroot',
+  'src',
+  'features',
+  'flow-editor',
+  'previewCoordinator.js'
+);
+const canonicalImageCanvas = resolve(
+  desktopRoot,
+  'wwwroot',
+  'src',
+  'core',
+  'canvas',
+  'imageCanvas.js'
+);
+const canonicalRoiSupport = resolve(
+  desktopRoot,
+  'wwwroot',
+  'src',
+  'features',
+  'flow-editor',
+  'roiEditorSupport.mjs'
+);
+const canonicalRoiGeometry = resolve(
+  desktopRoot,
+  'wwwroot',
+  'src',
+  'features',
+  'flow-editor',
+  'roiGeometry.mjs'
+);
+const canonicalImagePixelProbe = resolve(
+  desktopRoot,
+  'wwwroot',
+  'src',
+  'features',
+  'flow-editor',
+  'imagePixelProbe.mjs'
+);
 
 function resolveOutputDirectory(): string {
   const injectedOutput = process.env.VITE_OUT_DIR?.trim();
@@ -41,7 +81,12 @@ export default defineConfig(({ mode }) => ({
     alias: {
       '@': resolve(studioUiRoot, 'src'),
       '@clearvision/canonical-flow-canvas': canonicalFlowCanvasAdapter,
-      '@clearvision/canonical-flow-interaction': canonicalFlowEditorInteraction
+      '@clearvision/canonical-flow-interaction': canonicalFlowEditorInteraction,
+      '@clearvision/canonical-preview-coordinator': canonicalPreviewCoordinator,
+      '@clearvision/canonical-image-canvas': canonicalImageCanvas,
+      '@clearvision/canonical-roi-support': canonicalRoiSupport,
+      '@clearvision/canonical-roi-geometry': canonicalRoiGeometry,
+      '@clearvision/canonical-image-pixel-probe': canonicalImagePixelProbe
     }
   },
   define: {

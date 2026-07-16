@@ -21,9 +21,25 @@ export interface ApiGetOptions {
   readonly signal?: AbortSignal;
 }
 
+export interface ApiWriteOptions extends ApiGetOptions {
+  readonly headers?: Readonly<Record<string, string>>;
+}
+
+export interface ApiBlobResponse {
+  readonly blob: Blob;
+  readonly contentType: string;
+  readonly contentLength: number;
+  readonly etag: string | null;
+  readonly sha256: string | null;
+  readonly headers: Headers;
+}
+
 export interface ApiTransport {
   readonly apiBaseUrl: string;
   get<T = unknown>(path: string, options?: ApiGetOptions): Promise<T | undefined>;
+  post?<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined>;
+  getBlob?(path: string, options?: ApiGetOptions): Promise<ApiBlobResponse>;
+  delete?(path: string, options?: ApiWriteOptions): Promise<void>;
 }
 
 export interface CreateApiTransportOptions {
@@ -219,68 +235,143 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
   const apiBaseUrl = validateApiBaseUrl(options.apiBaseUrl, options.expectedOrigin);
   const tokenProvider = options.tokenProvider ?? (() => undefined);
 
+  function requestHeaders(
+    accept: string,
+    additions: Readonly<Record<string, string>> = {}
+  ): Record<string, string> {
+    const headers: Record<string, string> = { Accept: accept, ...additions };
+    const token = tokenProvider()?.trim();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return headers;
+  }
+
+  async function send(
+    path: string,
+    method: 'GET' | 'POST' | 'DELETE',
+    requestOptions: ApiGetOptions = {},
+    body?: BodyInit,
+    headers: Readonly<Record<string, string>> = {}
+  ): Promise<Readonly<{ response: Response; url: string }>> {
+    const requestUrl = resolveRequestUrl(apiBaseUrl, path);
+    const url = requestUrl.toString();
+    if (requestOptions.signal?.aborted) {
+      throw new ApiAbortError(url, requestOptions.signal.reason);
+    }
+
+    const requestInit: RequestInit = {
+      method,
+      headers,
+      cache: 'no-store',
+      credentials: 'same-origin',
+      redirect: 'error'
+    };
+    if (requestOptions.signal) requestInit.signal = requestOptions.signal;
+    if (body !== undefined) requestInit.body = body;
+
+    try {
+      return Object.freeze({
+        response: await globalThis.fetch(url, requestInit),
+        url
+      });
+    } catch (error) {
+      if (isAbortFailure(error, requestOptions.signal)) {
+        throw new ApiAbortError(url, error);
+      }
+      throw new ApiNetworkError(url, error);
+    }
+  }
+
+  async function readText(response: Response, url: string, signal?: AbortSignal): Promise<string> {
+    try {
+      return await response.text();
+    } catch (error) {
+      if (isAbortFailure(error, signal)) throw new ApiAbortError(url, error);
+      throw new ApiNetworkError(url, error);
+    }
+  }
+
+  async function readJson<T>(
+    response: Response,
+    url: string,
+    signal?: AbortSignal
+  ): Promise<T | undefined> {
+    const body = await readText(response, url, signal);
+    if (!response.ok) throw createHttpError(response, url, body);
+    if (response.status === 204 || response.status === 205 || !body.trim()) return undefined;
+    try {
+      return JSON.parse(body) as T;
+    } catch (error) {
+      throw new ApiDecodeError(url, response.status, error);
+    }
+  }
+
   return Object.freeze({
     apiBaseUrl: apiBaseUrl.toString().replace(/\/$/, ''),
     async get<T = unknown>(path: string, requestOptions: ApiGetOptions = {}): Promise<T | undefined> {
-      const requestUrl = resolveRequestUrl(apiBaseUrl, path);
-      const url = requestUrl.toString();
-
-      if (requestOptions.signal?.aborted) {
-        throw new ApiAbortError(url, requestOptions.signal.reason);
-      }
-
-      const headers: Record<string, string> = {
-        Accept: 'application/json'
-      };
-      const token = tokenProvider()?.trim();
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-
-      const requestInit: RequestInit = {
-        method: 'GET',
-        headers,
-        cache: 'no-store',
-        credentials: 'same-origin',
-        redirect: 'error'
-      };
-      if (requestOptions.signal) {
-        requestInit.signal = requestOptions.signal;
-      }
-
-      let response: Response;
-      try {
-        response = await globalThis.fetch(url, requestInit);
-      } catch (error) {
-        if (isAbortFailure(error, requestOptions.signal)) {
-          throw new ApiAbortError(url, error);
-        }
-        throw new ApiNetworkError(url, error);
-      }
-
-      let body: string;
-      try {
-        body = await response.text();
-      } catch (error) {
-        if (isAbortFailure(error, requestOptions.signal)) {
-          throw new ApiAbortError(url, error);
-        }
-        throw new ApiNetworkError(url, error);
-      }
-
+      const { response, url } = await send(
+        path,
+        'GET',
+        requestOptions,
+        undefined,
+        requestHeaders('application/json')
+      );
+      return readJson<T>(response, url, requestOptions.signal);
+    },
+    async post<T = unknown>(
+      path: string,
+      body: unknown,
+      requestOptions: ApiWriteOptions = {}
+    ): Promise<T | undefined> {
+      const { response, url } = await send(
+        path,
+        'POST',
+        requestOptions,
+        JSON.stringify(body),
+        requestHeaders('application/json', {
+          'Content-Type': 'application/json',
+          ...requestOptions.headers
+        })
+      );
+      return readJson<T>(response, url, requestOptions.signal);
+    },
+    async getBlob(path: string, requestOptions: ApiGetOptions = {}): Promise<ApiBlobResponse> {
+      const { response, url } = await send(
+        path,
+        'GET',
+        requestOptions,
+        undefined,
+        requestHeaders('application/octet-stream, image/*, application/json')
+      );
       if (!response.ok) {
+        const body = await readText(response, url, requestOptions.signal);
         throw createHttpError(response, url, body);
       }
-
-      if (response.status === 204 || response.status === 205 || !body.trim()) {
-        return undefined;
-      }
-
+      let blob: Blob;
       try {
-        return JSON.parse(body) as T;
+        blob = await response.blob();
       } catch (error) {
-        throw new ApiDecodeError(url, response.status, error);
+        if (isAbortFailure(error, requestOptions.signal)) throw new ApiAbortError(url, error);
+        throw new ApiNetworkError(url, error);
       }
+      return Object.freeze({
+        blob,
+        contentType: response.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase() || blob.type,
+        contentLength: blob.size,
+        etag: response.headers.get('ETag'),
+        sha256: response.headers.get('X-Artifact-Sha256'),
+        headers: response.headers
+      });
+    },
+    async delete(path: string, requestOptions: ApiWriteOptions = {}): Promise<void> {
+      const { response, url } = await send(
+        path,
+        'DELETE',
+        requestOptions,
+        undefined,
+        requestHeaders('application/json', requestOptions.headers)
+      );
+      const body = await readText(response, url, requestOptions.signal);
+      if (!response.ok) throw createHttpError(response, url, body);
     }
   } satisfies ApiTransport);
 }

@@ -102,6 +102,49 @@ describe('createApiTransport', () => {
     await expect(transport.get('second')).resolves.toBeUndefined();
   });
 
+  it('sends JSON Preview commands through the same transport without retrying', async () => {
+    const fetchMock = createFetchMock();
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    }));
+    const transport = createApiTransport({ apiBaseUrl, expectedOrigin, tokenProvider: () => 'preview-token' });
+    const body = { projectId: 'project-1', artifactMode: 'references' };
+
+    await expect(transport.post?.('flows/preview-node', body)).resolves.toEqual({ success: true });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('http://localhost:5000/api/flows/preview-node');
+    expect(init).toMatchObject({ method: 'POST', body: JSON.stringify(body) });
+    const headers = new Headers(init.headers);
+    expect(headers.get('Content-Type')).toBe('application/json');
+    expect(headers.get('Authorization')).toBe('Bearer preview-token');
+  });
+
+  it('reads binary artifacts with content metadata and deletes them through the shared transport', async () => {
+    const fetchMock = createFetchMock();
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    fetchMock
+      .mockResolvedValueOnce(new Response(bytes, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/png',
+          ETag: '"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',
+          'X-Artifact-Sha256': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        }
+      }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const transport = createApiTransport({ apiBaseUrl, expectedOrigin });
+
+    await expect(transport.getBlob?.('preview-artifacts/abc')).resolves.toMatchObject({
+      contentType: 'image/png',
+      contentLength: 4,
+      sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    });
+    await expect(transport.delete?.('preview-artifacts/abc')).resolves.toBeUndefined();
+    expect(fetchMock.mock.calls.map(call => call[1]?.method)).toEqual(['GET', 'DELETE']);
+  });
+
   it('omits Authorization when the token provider has no token', async () => {
     const fetchMock = createFetchMock();
     fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));

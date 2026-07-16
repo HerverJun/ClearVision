@@ -26,6 +26,46 @@ export default defineConfig({
         'features',
         'flow-editor',
         'flowEditorInteraction.js'
+      ),
+      '@clearvision/canonical-preview-coordinator': resolve(
+        desktopRoot,
+        'wwwroot',
+        'src',
+        'features',
+        'flow-editor',
+        'previewCoordinator.js'
+      ),
+      '@clearvision/canonical-image-canvas': resolve(
+        desktopRoot,
+        'wwwroot',
+        'src',
+        'core',
+        'canvas',
+        'imageCanvas.js'
+      ),
+      '@clearvision/canonical-roi-support': resolve(
+        desktopRoot,
+        'wwwroot',
+        'src',
+        'features',
+        'flow-editor',
+        'roiEditorSupport.mjs'
+      ),
+      '@clearvision/canonical-roi-geometry': resolve(
+        desktopRoot,
+        'wwwroot',
+        'src',
+        'features',
+        'flow-editor',
+        'roiGeometry.mjs'
+      ),
+      '@clearvision/canonical-image-pixel-probe': resolve(
+        desktopRoot,
+        'wwwroot',
+        'src',
+        'features',
+        'flow-editor',
+        'imagePixelProbe.mjs'
       )
     }
   },

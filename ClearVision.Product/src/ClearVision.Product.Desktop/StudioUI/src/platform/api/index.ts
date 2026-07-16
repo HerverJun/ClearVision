@@ -1,8 +1,10 @@
 export {
   createApiTransport,
+  type ApiBlobResponse,
   type ApiGetOptions,
   type ApiTokenProvider,
   type ApiTransport,
+  type ApiWriteOptions,
   type CreateApiTransportOptions
 } from './apiTransport';
 export {

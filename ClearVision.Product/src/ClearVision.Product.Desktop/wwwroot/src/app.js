@@ -1283,6 +1283,7 @@ async function initializeNodePreviewExperience() {
             getOperatorMetadata: type => findOperatorDefinition(type),
             getInputImageBase64: () => getLatestInspectionInputImageBase64(),
             previewExecutor: (nodeId, options) => inspectionController.previewNode(nodeId, options),
+            artifactClient: httpClient,
             subscribeStructureState: listener => flowCanvas.subscribeStructureState(listener),
             debounceMs: 500
         });
