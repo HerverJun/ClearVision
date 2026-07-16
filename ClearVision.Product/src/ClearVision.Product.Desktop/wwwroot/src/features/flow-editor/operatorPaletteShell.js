@@ -436,8 +436,10 @@ export class OperatorPaletteShell {
                 <span class="operator-flyout-icon" data-operator-icon="${index}"></span>
                 <span class="operator-flyout-main">
                     <strong>${escapeHtml(title)}</strong>
-                    <em>${escapeHtml(description)}</em>
-                    ${showCategory ? `<span class="operator-flyout-category">${escapeHtml(category)}</span>` : ''}
+                    <span class="operator-flyout-detail">
+                        ${showCategory ? `<span class="operator-flyout-category">${escapeHtml(category)}</span>` : ''}
+                        <em>${escapeHtml(description)}</em>
+                    </span>
                 </span>
                 <span class="operator-flyout-meta">
                     ${escapeHtml(inputCount)} 入 / ${escapeHtml(outputCount)} 出
