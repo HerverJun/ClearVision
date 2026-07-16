@@ -98,6 +98,25 @@ function Kernel-Decision-Semantics($Comparison) {
         }
     })
 }
+function Kernel-Uncertainty-Semantics($Comparison) {
+    return [ordered]@{
+        adopted = [bool]$Comparison.uncertaintyCoverage.adopted
+        heuristicCoverage68 = [double]$Comparison.uncertaintyCoverage.heuristicCoverage68
+        heuristicCoverage95 = [double]$Comparison.uncertaintyCoverage.heuristicCoverage95
+        covarianceCoverage68 = [double]$Comparison.uncertaintyCoverage.covarianceCoverage68
+        covarianceCoverage95 = [double]$Comparison.uncertaintyCoverage.covarianceCoverage95
+        conclusion = $Comparison.uncertaintyCoverage.conclusion
+    }
+}
+function Kernel-Anomaly-Semantics($Comparison) {
+    return [ordered]@{
+        traditionalDefaultAccuracy = [double]$Comparison.anomalyIdentity.traditionalDefaultAccuracy
+        onnxManifestAccuracy = [double]$Comparison.anomalyIdentity.onnxManifestAccuracy
+        preprocessReferenceRmse = [double]$Comparison.anomalyIdentity.preprocessReferenceRmse
+        mismatchRejectedFailClosed = [double]$Comparison.anomalyIdentity.mismatchRejectedFailClosed
+        conclusion = $Comparison.anomalyIdentity.conclusion
+    }
+}
 function Assert-Formal-Decision-Manifest-Binding($Comparison, [string]$Prefix) {
     $decisions = @($Comparison.decisions)
     Assert-True ($decisions.Count -eq 2) "$Prefix must contain exactly Circle and Line formal decisions."
@@ -286,8 +305,8 @@ if (-not [string]::IsNullOrWhiteSpace($FreshEvidenceDirectory)) {
     Assert-Equal "fresh/kernel/comparison/immutable-preprocess" $kernelIdentity.preprocessFingerprint $freshKernelComparison.immutableInputs.preprocessFingerprint
     Assert-Equal "fresh/kernel/decision-semantics" (Kernel-Decision-Semantics $kernelComparison) (Kernel-Decision-Semantics $freshKernelComparison)
     Assert-Equal "fresh/kernel/rejected-candidates" $kernelComparison.rejectedCandidates $freshKernelComparison.rejectedCandidates
-    Assert-Equal "fresh/kernel/uncertainty" $kernelComparison.uncertaintyCoverage $freshKernelComparison.uncertaintyCoverage
-    Assert-Equal "fresh/kernel/anomaly" $kernelComparison.anomalyIdentity $freshKernelComparison.anomalyIdentity
+    Assert-Equal "fresh/kernel/uncertainty" (Kernel-Uncertainty-Semantics $kernelComparison) (Kernel-Uncertainty-Semantics $freshKernelComparison)
+    Assert-Equal "fresh/kernel/anomaly" (Kernel-Anomaly-Semantics $kernelComparison) (Kernel-Anomaly-Semantics $freshKernelComparison)
     Assert-Equal "fresh/kernel/acceptance" $kernelComparison.acceptance $freshKernelComparison.acceptance
     Assert-True (@($freshKernelComparison.decisions | Where-Object { $_.adopted -ne $false }).Count -eq 0) "Fresh supplemental kernel evidence must not make formal adoption decisions."
 
