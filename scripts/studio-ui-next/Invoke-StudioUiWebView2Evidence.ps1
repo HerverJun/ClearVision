@@ -30,6 +30,7 @@ param(
     [switch]$SanitizeDesktopPath,
     [switch]$DeepCanvas,
     [switch]$WorkspaceCapabilityEnabled,
+    [switch]$SeedWorkspace,
     [switch]$NoBuild
 )
 
@@ -171,8 +172,16 @@ $databasePath = Join-Path $runtimeRoot "database/vision.db"
 New-Item -ItemType Directory -Force -Path $evidencePath | Out-Null
 
 $studioUiEnabled = $Expectation -ne "legacy"
+if ($SeedWorkspace -and $Expectation -ne "studio-product") {
+    throw "SeedWorkspace is only valid for the studio-product expectation."
+}
+if ($SeedWorkspace -and -not $WorkspaceCapabilityEnabled) {
+    throw "SeedWorkspace requires WorkspaceCapabilityEnabled."
+}
 $resolvedRoute = if (-not [string]::IsNullOrWhiteSpace($Route)) {
     $Route
+} elseif ($SeedWorkspace) {
+    "/projects/seeded/workspace"
 } elseif ($Expectation -eq "studio-product") {
     "/overview"
 } elseif ($Expectation -eq "studio-design") {
@@ -196,6 +205,7 @@ $customEnvironment = [ordered]@{
     "CV_STUDIO_UI_SOURCE_SHA" = $sourceSha
     "CV_STUDIO_UI_SANITIZED_PATH" = if ($SanitizeDesktopPath) { "true" } else { "false" }
     "CV_STUDIO_UI_DEEP_CANVAS" = if ($DeepCanvas) { "true" } else { "false" }
+    "CV_STUDIO_UI_SEED_WORKSPACE" = if ($SeedWorkspace) { "true" } else { "false" }
     "CV_NATIVE_DPI_PROBE" = Join-Path $scriptRoot "Get-DesktopRuntimeProbe.ps1"
 }
 $previousEnvironment = @{}
@@ -379,6 +389,7 @@ $cleanup = [pscustomobject]@{
     runnerError = if ($runnerError) { [string]$runnerError.Exception.Message } else { $null }
     studioUiEnabled = $studioUiEnabled
     workspaceCapabilityEnabled = [bool]$WorkspaceCapabilityEnabled
+    workspaceSeededByHarness = [bool]$SeedWorkspace
     sanitizedDesktopPath = [bool]$SanitizeDesktopPath
     externalNodeDriver = [pscustomobject]@{
         executablePath = $nodeExe

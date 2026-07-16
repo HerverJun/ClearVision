@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const path = require('node:path');
 const {
   assert,
@@ -34,6 +35,39 @@ function parseBooleanEnvironment(name, fallback = false) {
   if (['1', 'true', 'yes', 'on'].includes(value)) return true;
   if (['0', 'false', 'no', 'off'].includes(value)) return false;
   throw new Error(`${name} must be a boolean value.`);
+}
+
+async function seedWorkspaceProject(webPort, token, runName) {
+  const response = await fetch(`http://127.0.0.1:${webPort}/api/projects`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: `F03 G2 WebView2 ${runName}`,
+      description: 'Harness-seeded authority for formal Workspace interaction evidence.',
+      flow: {
+        id: crypto.randomUUID(),
+        name: 'F03 G2 WebView2 Flow',
+        operators: [],
+        connections: [],
+        decisionConfiguration: null
+      }
+    })
+  });
+  const text = await response.text();
+  assert(response.ok, `Harness project seed returned ${response.status}: ${text.slice(0, 500)}`);
+  const project = JSON.parse(text);
+  assert(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(project.id),
+    'Harness project seed did not return a UUID project id.');
+  return {
+    projectId: project.id,
+    route: `/projects/${project.id}/workspace`,
+    responseStatus: response.status,
+    authority: 'HARNESS_SEEDED_EXISTING_PROJECT_APPLICATION_SERVICE',
+    runtimeAuditStartedAfterSeed: true
+  };
 }
 
 function normalizeStudioRoute(value) {
@@ -249,6 +283,217 @@ async function verifyDiagnosticsPage(page) {
   }));
 }
 
+async function waitForFlowSurfaceNumber(page, attribute, expected) {
+  await page.waitForFunction(({ name, value }) => {
+    const surface = document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]');
+    return Number(surface?.getAttribute(name)) === value;
+  }, { name: attribute, value: expected }, { timeout: 30_000 });
+}
+
+async function readFlowSurface(page) {
+  return page.evaluate(() => {
+    const surface = document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]');
+    return {
+      nodeCount: Number(surface?.getAttribute('data-node-count') || -1),
+      connectionCount: Number(surface?.getAttribute('data-connection-count') || -1),
+      selectedCount: Number(surface?.getAttribute('data-selected-count') || -1),
+      selectedDisabledCount: Number(surface?.getAttribute('data-selected-disabled-count') || -1),
+      flowRevision: Number(surface?.getAttribute('data-flow-revision') || -1),
+      scale: Number(surface?.getAttribute('data-scale') || -1),
+      mutationGate: surface?.getAttribute('data-mutation-gate') || null,
+      feedback: document.querySelector('.flow-canvas-surface__status')?.textContent?.trim() || '',
+      minimapCount: document.querySelectorAll('.flow-minimap').length
+    };
+  });
+}
+
+async function resetOperatorRailFilters(page) {
+  await page.locator('[data-testid="operator-search"]').fill('');
+  await page.locator('.operator-rail__categories button').first().click();
+}
+
+async function readOperatorDefinition(page, typeCandidates) {
+  const candidates = Array.isArray(typeCandidates) ? typeCandidates : [typeCandidates];
+  const selector = candidates.map(type => `.operator-item[data-type="${type}"]`).join(', ');
+  await resetOperatorRailFilters(page);
+  let item = page.locator(selector);
+  if (await item.count() === 0) {
+    const compatibility = page.locator('.operator-rail__compatibility input');
+    if (!(await compatibility.isChecked())) await compatibility.check();
+    item = page.locator(selector);
+  }
+  assert(await item.count() === 1,
+    `Operator Rail did not expose exactly one of: ${candidates.join(', ')}.`);
+  const serialized = await item.getAttribute('data-operator');
+  assert(serialized, `Operator Rail type ${candidates.join('/')} did not expose its drag payload.`);
+  return { item, definition: JSON.parse(serialized) };
+}
+
+function operatorNodeHeight(definition) {
+  const portRows = Math.max(
+    definition.inputPorts?.length || 0,
+    definition.outputPorts?.length || 0,
+    1
+  );
+  return Math.max(60, 24 + 10 + 10 + portRows * 18);
+}
+
+function operatorPortPoint(position, definition, isOutput, portIndex = 0) {
+  const ports = isOutput ? definition.outputPorts || [] : definition.inputPorts || [];
+  assert(ports.length > portIndex, `Operator ${definition.operatorType} is missing the requested port.`);
+  const height = operatorNodeHeight(definition);
+  const top = position.y + 24 + 10;
+  const bottom = position.y + height - 10;
+  const y = ports.length === 1
+    ? (top + bottom) / 2
+    : top + ((bottom - top) * portIndex) / (ports.length - 1);
+  return { x: position.x + (isOutput ? 140 : 0), y };
+}
+
+async function dragOperatorToCanvas(page, typeCandidates, targetPosition) {
+  const operator = await readOperatorDefinition(page, typeCandidates);
+  await operator.item.dragTo(page.locator('[data-testid="flow-canvas"]'), { targetPosition });
+  return operator.definition;
+}
+
+async function dragCanvasPointer(page, from, to) {
+  const box = await page.locator('[data-testid="flow-canvas"]').boundingBox();
+  assert(box, 'Flow Canvas did not expose a browser bounding box.');
+  await page.mouse.move(box.x + from.x, box.y + from.y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + to.x, box.y + to.y, { steps: 8 });
+  await page.mouse.up();
+}
+
+async function verifyWorkspaceG2(page) {
+  await page.waitForSelector('[data-capability="flow-workspace"]', { state: 'visible', timeout: 30_000 });
+  await page.waitForFunction(() =>
+    document.querySelector('[data-evidence-surface="f03-g2-operator-rail"]')
+      ?.getAttribute('data-catalog-phase') === 'success', null, { timeout: 30_000 });
+  await page.waitForFunction(() =>
+    document.querySelector('[data-capability="flow-workspace"]')
+      ?.getAttribute('data-flow-owner-phase') === 'mounted', null, { timeout: 30_000 });
+
+  const canvas = page.locator('[data-testid="flow-canvas"]');
+  const box = await canvas.boundingBox();
+  assert(box && box.width >= 500 && box.height >= 300,
+    `Formal Flow Canvas is undersized: ${JSON.stringify(box)}`);
+  const threshold = await readOperatorDefinition(page, ['Thresholding', '4']);
+  const thresholdName = await threshold.item.getAttribute('data-name');
+  assert(thresholdName, 'Thresholding operator did not expose a display name.');
+  await page.locator('[data-testid="operator-search"]').fill(thresholdName);
+  const searchMatchCount = await page.locator('.operator-item').count();
+  assert(searchMatchCount === 1, `Operator search returned ${searchMatchCount} matches instead of one.`);
+  await threshold.item.click();
+  await waitForFlowSurfaceNumber(page, 'data-node-count', 1);
+  await waitForFlowSurfaceNumber(page, 'data-flow-revision', 1);
+
+  await resetOperatorRailFilters(page);
+  const category = page.locator('.operator-rail__categories [data-category]').first();
+  const categoryId = await category.getAttribute('data-category');
+  await category.click();
+  const categoryMatchCount = await page.locator('.operator-item').count();
+  assert(categoryId && categoryMatchCount > 0, 'Operator category filtering produced no visible operators.');
+  await resetOperatorRailFilters(page);
+
+  const thresholdPosition = { x: box.width / 2, y: box.height / 2 };
+  const sourcePosition = { x: 48, y: 56 };
+  const source = await dragOperatorToCanvas(page, ['ImageAcquisition', '0'], sourcePosition);
+  await waitForFlowSurfaceNumber(page, 'data-node-count', 2);
+  const regionDefinition = await readOperatorDefinition(page, ['RegionErosion', '240']);
+  const regionPosition = {
+    x: Math.min(box.width - 150, thresholdPosition.x),
+    y: Math.min(box.height - operatorNodeHeight(regionDefinition) - 8, thresholdPosition.y + 112)
+  };
+  await regionDefinition.item.dragTo(canvas, { targetPosition: regionPosition });
+  await waitForFlowSurfaceNumber(page, 'data-node-count', 3);
+
+  const sourceOutput = operatorPortPoint(sourcePosition, source, true);
+  const thresholdInput = operatorPortPoint(thresholdPosition, threshold.definition, false);
+  const thresholdOutput = operatorPortPoint(thresholdPosition, threshold.definition, true);
+  const regionInput = operatorPortPoint(regionPosition, regionDefinition.definition, false);
+  await dragCanvasPointer(page, sourceOutput, thresholdInput);
+  await waitForFlowSurfaceNumber(page, 'data-connection-count', 1);
+  const legalConnection = await readFlowSurface(page);
+
+  await dragCanvasPointer(page, thresholdOutput, regionInput);
+  await waitForFlowSurfaceNumber(page, 'data-connection-count', 1);
+  const illegalConnection = await readFlowSurface(page);
+  assert(/Region|不兼容|不匹配/.test(illegalConnection.feedback),
+    `Illegal connection did not expose a stable reason: ${illegalConnection.feedback}`);
+
+  const canvasOrigin = await canvas.boundingBox();
+  assert(canvasOrigin, 'Flow Canvas lost its bounding box before disconnect.');
+  await page.mouse.click(canvasOrigin.x + thresholdInput.x, canvasOrigin.y + thresholdInput.y);
+  await waitForFlowSurfaceNumber(page, 'data-connection-count', 0);
+
+  const thresholdHit = { x: thresholdPosition.x + 44, y: thresholdPosition.y + 16 };
+  const movedThresholdHit = { x: thresholdHit.x + 42, y: thresholdHit.y + 24 };
+  await dragCanvasPointer(page, thresholdHit, movedThresholdHit);
+  const moved = await readFlowSurface(page);
+  assert(moved.selectedCount === 1 && moved.flowRevision >= 6,
+    `Node move did not commit one selected draft mutation: ${JSON.stringify(moved)}`);
+
+  await page.locator('[data-flow-command="toggle-disabled"]').click();
+  await waitForFlowSurfaceNumber(page, 'data-selected-disabled-count', 1);
+  await page.locator('[data-flow-command="toggle-disabled"]').click();
+  await waitForFlowSurfaceNumber(page, 'data-selected-disabled-count', 0);
+
+  await canvas.focus();
+  await page.keyboard.press('Control+c');
+  await page.keyboard.press('Control+v');
+  await waitForFlowSurfaceNumber(page, 'data-node-count', 4);
+  await page.keyboard.press('Control+z');
+  await waitForFlowSurfaceNumber(page, 'data-node-count', 3);
+  await page.keyboard.press('Control+y');
+  await waitForFlowSurfaceNumber(page, 'data-node-count', 4);
+
+  const search = page.locator('[data-testid="operator-search"]');
+  await search.focus();
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Backspace');
+  const afterInputShortcut = await readFlowSurface(page);
+  assert(afterInputShortcut.nodeCount === 4, 'Canvas shortcut escaped into the Operator search input.');
+
+  const selectedPoint = { x: sourcePosition.x + 40, y: sourcePosition.y + 16 };
+  const currentBox = await canvas.boundingBox();
+  assert(currentBox, 'Flow Canvas lost its bounding box before the IME gate check.');
+  await page.mouse.click(currentBox.x + selectedPoint.x, currentBox.y + selectedPoint.y);
+  await waitForFlowSurfaceNumber(page, 'data-selected-count', 1);
+  await canvas.dispatchEvent('keydown', {
+    key: 'Delete',
+    code: 'Delete',
+    isComposing: true,
+    bubbles: true,
+    cancelable: true
+  });
+  assert((await readFlowSurface(page)).nodeCount === 4, 'IME composition triggered a Canvas delete shortcut.');
+  await canvas.focus();
+  await page.keyboard.press('Delete');
+  await waitForFlowSurfaceNumber(page, 'data-node-count', 3);
+
+  const scaleBefore = (await readFlowSurface(page)).scale;
+  const zoomBox = await canvas.boundingBox();
+  assert(zoomBox, 'Flow Canvas lost its bounding box before wheel zoom.');
+  await page.mouse.move(zoomBox.x + zoomBox.width / 2, zoomBox.y + zoomBox.height / 2);
+  await page.mouse.wheel(0, -240);
+  await page.waitForFunction(previous =>
+    Number(document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]')
+      ?.getAttribute('data-scale')) > previous, scaleBefore, { timeout: 30_000 });
+  const final = await readFlowSurface(page);
+  assert(final.minimapCount === 1, 'Formal Flow Canvas did not mount exactly one minimap.');
+
+  return {
+    initial: { nodeCount: 0, connectionCount: 0, flowRevision: 0 },
+    operatorRail: { searchMatchCount, categoryId, categoryMatchCount },
+    legalConnection,
+    illegalConnection,
+    inputShortcutGate: afterInputShortcut,
+    scaleBefore,
+    final
+  };
+}
+
 async function verifyProductPage(page, route, runtimeErrors) {
   await page.waitForSelector('[data-product-shell="ready"]', { state: 'visible', timeout: 30_000 });
   const isWorkspaceRoute = /^\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/workspace$/i
@@ -292,7 +537,11 @@ async function verifyProductPage(page, route, runtimeErrors) {
     mainCount: document.querySelectorAll('main').length,
     workspaceMode: document.querySelector('[data-product-shell]')?.getAttribute('data-workspace-mode') || null,
     workspaceShellCount: document.querySelectorAll('[data-evidence-surface="f03-workspace-shell"]').length,
-    dataSource: 'REAL_WEBVIEW2_EMPTY_AUTHORITY',
+    workspaceState: document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+      ?.getAttribute('data-workspace-state') || null,
+    dataSource: document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+      ? 'REAL_WEBVIEW2_PROJECT_AUTHORITY'
+      : 'REAL_WEBVIEW2_EMPTY_AUTHORITY',
     authSource: 'HARNESS_SEEDED_SESSION'
   }));
   const origin = new URL(page.url()).origin;
@@ -361,6 +610,9 @@ async function verifyProductPage(page, route, runtimeErrors) {
     return url.origin === origin && (url.pathname === '/health' || url.pathname.startsWith('/api/'));
   });
   const preferenceWriteRequests = preferenceRequests.filter(item => item.method !== 'GET');
+  const workspaceG2 = isWorkspaceRoute && ['ready', 'empty'].includes(projection.workspaceState)
+    ? await verifyWorkspaceG2(page)
+    : null;
   let workspaceLifecycle = null;
   if (isWorkspaceRoute) {
     const readWorkspace = () => page.evaluate(() => {
@@ -370,7 +622,11 @@ async function verifyProductPage(page, route, runtimeErrors) {
         state: shell?.getAttribute('data-workspace-state') || null,
         projectId: shell?.getAttribute('data-workspace-project-id') || null,
         ownerCount: Number(shell?.getAttribute('data-workspace-owner-count') || -1),
+        flowCanvasOwnerCount: Number(diagnostics?.flowCanvasOwnerCount ?? -1),
         activeSubscriptions: Number(shell?.getAttribute('data-workspace-active-subscriptions') || -1),
+        activeAnimationFrames: Number(diagnostics?.activeAnimationFrames ?? -1),
+        activeObservers: Number(diagnostics?.activeObservers ?? -1),
+        activeTimers: Number(diagnostics?.activeTimers ?? -1),
         inFlightReads: Number(shell?.getAttribute('data-workspace-in-flight-reads') || -1),
         diagnostics: diagnostics ? { ...diagnostics } : null,
         mainCount: document.querySelectorAll('main').length,
@@ -385,7 +641,11 @@ async function verifyProductPage(page, route, runtimeErrors) {
     await page.waitForFunction(() => {
       const diagnostics = window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
       return diagnostics?.workspaceOwnerCount === 0 &&
+        diagnostics.flowCanvasOwnerCount === 0 &&
         diagnostics.activeSubscriptions === 0 &&
+        diagnostics.activeAnimationFrames === 0 &&
+        diagnostics.activeObservers === 0 &&
+        diagnostics.activeTimers === 0 &&
         diagnostics.activeAbortControllers === 0 &&
         diagnostics.inFlightReads === 0;
     }, null, { timeout: 30_000 });
@@ -411,15 +671,27 @@ async function verifyProductPage(page, route, runtimeErrors) {
       `Workspace did not remain inside the single Product main: ${JSON.stringify(mounted)}`);
     assert(mounted.ownerCount >= 0 && mounted.ownerCount <= 1,
       `Workspace owner count escaped 0/1: ${JSON.stringify(mounted)}`);
+    if (workspaceG2) {
+      assert(mounted.ownerCount === 1 && mounted.flowCanvasOwnerCount === 1,
+        `Formal G2 Workspace did not retain exactly one Canvas owner: ${JSON.stringify(mounted)}`);
+    }
     assert(disposed.shellCount === 0 && disposed.mainCount === 1,
       `Workspace route leave did not unmount its shell: ${JSON.stringify(disposed)}`);
     assert(disposed.diagnostics.workspaceOwnerCount === 0 &&
+      disposed.diagnostics.flowCanvasOwnerCount === 0 &&
       disposed.diagnostics.activeSubscriptions === 0 &&
+      disposed.diagnostics.activeAnimationFrames === 0 &&
+      disposed.diagnostics.activeObservers === 0 &&
+      disposed.diagnostics.activeTimers === 0 &&
       disposed.diagnostics.activeAbortControllers === 0 &&
       disposed.diagnostics.inFlightReads === 0,
     `Workspace resources survived route leave: ${JSON.stringify(disposed)}`);
     assert(remounted.ownerCount >= 0 && remounted.ownerCount <= 1,
       `Workspace remount owner count escaped 0/1: ${JSON.stringify(remounted)}`);
+    if (workspaceG2) {
+      assert(remounted.ownerCount === 1 && remounted.flowCanvasOwnerCount === 1,
+        `Formal G2 Workspace remount did not restore one Canvas owner: ${JSON.stringify(remounted)}`);
+    }
     assert(remounted.horizontalOverflow <= 1 && remounted.verticalOverflow <= 1,
       `Workspace remount overflowed globally: ${JSON.stringify(remounted)}`);
   }
@@ -461,11 +733,13 @@ async function verifyProductPage(page, route, runtimeErrors) {
       const url = new URL(item.url);
       return url.pathname !== '/health' &&
         url.pathname !== '/api/auth/me' &&
+        !(url.pathname === '/api/operators/library' && url.search === '?includeCompatibility=true') &&
+        !/^\/api\/operators\/[^/]+\/metadata$/i.test(url.pathname) &&
         !/^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
           .test(url.pathname);
     });
     assert(unexpectedWorkspaceRequests.length === 0,
-      `Workspace emitted a route outside the G1 GET allowlist: ${JSON.stringify(unexpectedWorkspaceRequests)}`);
+      `Workspace emitted a route outside the G2 GET allowlist: ${JSON.stringify(unexpectedWorkspaceRequests)}`);
     assert(projection.workspaceMode === 'true' && projection.workspaceShellCount === 1,
       `ProductLayout did not enter workspaceMode: ${JSON.stringify(projection)}`);
   }
@@ -483,6 +757,7 @@ async function verifyProductPage(page, route, runtimeErrors) {
     preferenceRequests,
     preferenceWriteRequests,
     resultsFilterLayout,
+    workspaceG2,
     workspaceLifecycle
   };
 }
@@ -720,9 +995,10 @@ async function main() {
   const configuration = String(process.env.CV_STUDIO_UI_CONFIGURATION || 'unknown').trim();
   const sanitizedDesktopPath = parseBooleanEnvironment('CV_STUDIO_UI_SANITIZED_PATH');
   const deepCanvas = parseBooleanEnvironment('CV_STUDIO_UI_DEEP_CANVAS', scale === 1);
-  const route = normalizeStudioRoute(
+  let route = normalizeStudioRoute(
     process.env.CV_STUDIO_UI_ROUTE || routeForExpectation(expectation)
   );
+  const seedWorkspace = parseBooleanEnvironment('CV_STUDIO_UI_SEED_WORKSPACE');
 
   assert(expectations.has(expectation), `Unsupported CV_STUDIO_UI_EXPECTATION: ${expectation}`);
   assert(Number.isInteger(cdpPort) && cdpPort > 0, 'CV_CDP_PORT must be a valid port.');
@@ -740,6 +1016,7 @@ async function main() {
     scale,
     sanitizedDesktopPath,
     deepCanvas,
+    seedWorkspace,
     route,
     sourceSha: String(process.env.CV_STUDIO_UI_SOURCE_SHA || 'unknown').trim(),
     capturedAtUtc: new Date().toISOString(),
@@ -765,6 +1042,14 @@ async function main() {
     browser = connected.browser;
     const { context, page, version } = connected;
     evidence.cdpVersion = version;
+    if (seedWorkspace) {
+      assert(expectation === 'studio-product', 'Workspace seeding requires studio-product evidence.');
+      assert(route === '/projects/seeded/workspace',
+        'Workspace seeding requires the /projects/seeded/workspace route placeholder.');
+      evidence.workspaceSeed = await seedWorkspaceProject(webPort, token, runName);
+      route = evidence.workspaceSeed.route;
+      evidence.route = route;
+    }
     evidence.api = await readApiEvidence(webPort, token);
 
     if (expectation === 'missing-assets') {
@@ -811,7 +1096,7 @@ async function main() {
         sourceSha: evidence.sourceSha,
         scenes: route === '/overview' ? ['app-shell', 'overview'] : [routeName],
         route,
-        DATA_SOURCE: 'REAL_WEBVIEW2_EMPTY_AUTHORITY',
+        DATA_SOURCE: evidence.productPage.dataSource,
         AUTH_SOURCE: 'HARNESS_SEEDED_SESSION',
         theme: evidence.productPage.preferenceCycle.final.theme,
         density: evidence.productPage.preferenceCycle.final.density,

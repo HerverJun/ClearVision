@@ -26,7 +26,7 @@ function studioRelative(path: string): string {
   return relative(studioRoot, path).replaceAll('\\', '/');
 }
 
-describe('F03 G1 architecture guards', () => {
+describe('F03 G1-G2 architecture guards', () => {
   const files = sourceFiles(sourceRoot);
   const workspaceFiles = sourceFiles(workspaceRoot);
 
@@ -59,6 +59,25 @@ describe('F03 G1 architecture guards', () => {
     expect(session).toContain("path: 'auth/me'");
     expect(query).toContain('return `projects/${projectId}`');
     expect(query).not.toMatch(/preview|artifact|admission|execute|results|upload|global-variables/i);
+    expect(read(join(sourceRoot, 'capabilities/operators-read/operatorQueries.ts')))
+      .toContain("operators/library?includeCompatibility=true");
+  });
+
+  it('uses one production canonical facade for Lab and Workspace without raw Canvas exposure', () => {
+    const aliasConsumers = files
+      .filter(path => /from\s+['"]@clearvision\/canonical-flow-(?:canvas|interaction)['"]/.test(read(path)))
+      .map(studioRelative);
+    const productionFacade = read(join(sourceRoot, 'platform/canvas/canonicalFlowCanvas.ts'));
+    const flowOwner = read(join(workspaceRoot, 'flow/flowCanvasOwner.ts'));
+    const labOwner = read(join(sourceRoot, 'labs/canvas/canvasLabOwner.ts'));
+
+    expect(aliasConsumers).toEqual(['src/platform/canvas/canonicalFlowCanvas.ts']);
+    expect(productionFacade).toContain('createHostedFlowCanvasAdapter');
+    expect(productionFacade).toContain('new FlowEditorInteraction');
+    expect(productionFacade).toContain('CanonicalFlowCanvasOwnerConflictError');
+    expect(flowOwner).toContain("from '@/platform/canvas'");
+    expect(labOwner).toContain("from '@/platform/canvas'");
+    expect(flowOwner).not.toMatch(/\.raw\b|window\.|operator-library-hidden-host/);
   });
 
   it('forbids Labs, FrontendV2, raw Canvas and global command bypasses from Workspace production', () => {
@@ -66,7 +85,7 @@ describe('F03 G1 architecture guards', () => {
       const source = read(file);
       expect(source, studioRelative(file)).not.toMatch(/from\s+['"][^'"]*(?:\/labs\/|FrontendV2)/);
       expect(source, studioRelative(file)).not.toMatch(/\bnew\s+(?:FlowCanvas|ImageCanvas)\s*\(/);
-      expect(source, studioRelative(file)).not.toMatch(/from\s+['"][^'"]*(?:flowCanvas|imageCanvas)/i);
+      expect(source, studioRelative(file)).not.toMatch(/from\s+['"]@clearvision\/canonical-flow/i);
       expect(source, studioRelative(file)).not.toContain('window.flowCanvas');
       expect(source, studioRelative(file)).not.toContain('FlowCanvas.serialize()');
       expect(source, studioRelative(file)).not.toMatch(/\b(?:EventBus|ServiceRegistry|EventSource)\b/);
@@ -74,13 +93,18 @@ describe('F03 G1 architecture guards', () => {
     }
   });
 
-  it('keeps F03_IMPLEMENTED=NO while G1 remains the only implemented F03 slice', () => {
+  it('keeps G3-G6 absent while G1 and G2 are the only implemented F03 slices', () => {
     const plan = read(join(
       repositoryRoot,
       'docs/进行中/StudioUINext/Studio_UI_Next_F03_完整开发计划.md'
     ));
     expect(plan).toContain('F03_IMPLEMENTED=NO');
-    expect(existsSync(join(workspaceRoot, 'flow'))).toBe(false);
+    expect(existsSync(join(workspaceRoot, 'flow'))).toBe(true);
+    expect(sourceFiles(join(workspaceRoot, 'flow')).map(studioRelative)).toEqual(expect.arrayContaining([
+      'src/capabilities/project-workspace/flow/flowCanvasOwner.ts',
+      'src/capabilities/project-workspace/flow/OperatorRail.vue',
+      'src/capabilities/project-workspace/flow/FlowCanvasSurface.vue'
+    ]));
     expect(existsSync(join(workspaceRoot, 'inspector'))).toBe(false);
     expect(existsSync(join(workspaceRoot, 'preview'))).toBe(false);
     expect(existsSync(join(workspaceRoot, 'persistence'))).toBe(false);

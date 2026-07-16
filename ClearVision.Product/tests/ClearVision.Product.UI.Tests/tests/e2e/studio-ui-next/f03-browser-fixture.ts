@@ -4,7 +4,7 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import type { Page, Request, Route } from '@playwright/test';
 
 export const f03BrowserFixture = Object.freeze({
-  schemaVersion: 'f03-g1-browser.v1',
+  schemaVersion: 'f03-g2-browser.v1',
   phase: 'f03',
   dataSource: 'BROWSER_FIXTURE',
   authSource: 'HARNESS_SEEDED_SESSION',
@@ -66,12 +66,14 @@ export function auditF03Request(request: Request): F03RequestAuditEntry {
   });
 }
 
-export function isF03G1RequestAllowlist(
+export function isF03G2RequestAllowlist(
   audit: readonly F03RequestAuditEntry[]
 ): boolean {
   return audit.every(entry => {
     if (entry.method !== 'GET') return false;
     return entry.path === '/api/auth/me' ||
+      entry.path === '/api/operators/library?includeCompatibility=true' ||
+      /^\/api\/operators\/(?:\d+|[A-Za-z][A-Za-z0-9_]*)\/metadata$/.test(entry.path) ||
       /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
         .test(entry.path);
   });
@@ -183,8 +185,8 @@ export async function captureF03WorkspaceEvidence(
   if (projection.horizontalOverflow > 1 || projection.verticalOverflow > 1) {
     throw new Error(`F03 Workspace overflowed globally: ${JSON.stringify(projection)}.`);
   }
-  if (!isF03G1RequestAllowlist(options.requests)) {
-    throw new Error(`F03 G1 request allowlist failed: ${JSON.stringify(options.requests)}.`);
+  if (!isF03G2RequestAllowlist(options.requests)) {
+    throw new Error(`F03 G2 request allowlist failed: ${JSON.stringify(options.requests)}.`);
   }
   if (options.runtimeErrors.consoleErrors.length || options.runtimeErrors.pageErrors.length) {
     throw new Error(`F03 Workspace emitted runtime errors: ${JSON.stringify(options.runtimeErrors)}.`);
@@ -192,7 +194,7 @@ export async function captureF03WorkspaceEvidence(
   const screenshot = await page.screenshot({ animations: 'disabled', fullPage: false, type: 'png' });
   await writeFile(screenshotPath, screenshot);
   await writeFile(metadataPath, `${JSON.stringify({
-    schemaVersion: 'f03-g1-browser-evidence.v1',
+    schemaVersion: 'f03-g2-browser-evidence.v1',
     capturedAtUtc: new Date().toISOString(),
     sourceSha,
     stableAuditSha,

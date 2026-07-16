@@ -151,7 +151,7 @@ public sealed class StudioUiArchitectureGuardTests
     }
 
     [Fact]
-    public void StudioUiCanvasLab_ShouldUseOnlyTheApprovedCanonicalCanvasFacade()
+    public void StudioUiCanvasConsumers_ShouldUseOnlyTheApprovedProductionCanonicalCanvasFacade()
     {
         var sourceFiles = GetStudioUiProductionFiles();
         var canonicalCanvasImports = sourceFiles
@@ -169,18 +169,20 @@ public sealed class StudioUiArchitectureGuardTests
             .Select(StudioUiRelativePath)
             .ToList();
 
-        canonicalCanvasImports.Should().Equal("src/labs/canvas/canonicalFlowCanvas.ts");
-        canonicalInteractionImports.Should().Equal("src/labs/canvas/canonicalFlowCanvas.ts");
+        canonicalCanvasImports.Should().Equal("src/platform/canvas/canonicalFlowCanvas.ts");
+        canonicalInteractionImports.Should().Equal("src/platform/canvas/canonicalFlowCanvas.ts");
 
         var canvasIntegration = File.ReadAllText(Path.Combine(
-            RepoPath(StudioUiRoot), "src", "labs", "canvas", "canonicalFlowCanvas.ts"));
+            RepoPath(StudioUiRoot), "src", "platform", "canvas", "canonicalFlowCanvas.ts"));
         canvasIntegration.Should().Contain("createHostedFlowCanvasAdapter");
         canvasIntegration.Should().Contain("FlowEditorInteraction");
         canvasIntegration.Should().NotContain("new FlowCanvas");
         canvasIntegration.Should().NotContain("class FlowCanvas");
+        canvasIntegration.Should().Contain("CanonicalFlowCanvasOwnerConflictError");
 
         var canvasOwner = File.ReadAllText(Path.Combine(
             RepoPath(StudioUiRoot), "src", "labs", "canvas", "canvasLabOwner.ts"));
+        canvasOwner.Should().Contain("from '@/platform/canvas'");
         canvasOwner.Should().Contain("reportCanvasOwnerCountForDiagnostics(1)");
         canvasOwner.Should().Contain("reportCanvasOwnerCountForDiagnostics(0)");
 
@@ -400,7 +402,7 @@ public sealed class StudioUiArchitectureGuardTests
     }
 
     [Fact]
-    public void StudioUiF03G1Workspace_ShouldKeepOneOwnerAndExactReadOnlyBoundary()
+    public void StudioUiF03G2Workspace_ShouldKeepOneOwnerAndExactReadOnlyBoundary()
     {
         var workspaceRoot = Path.Combine(
             RepoPath(StudioUiRoot),
@@ -446,6 +448,16 @@ public sealed class StudioUiArchitectureGuardTests
         query.Should().NotContain("artifact");
         query.Should().NotContain("admission");
         query.Should().NotContain("execute");
+
+        var operatorQuery = File.ReadAllText(Path.Combine(
+            RepoPath(StudioUiRoot), "src", "capabilities", "operators-read", "operatorQueries.ts"));
+        operatorQuery.Should().Contain("operators/library?includeCompatibility=true");
+        operatorQuery.Should().Contain("operators/${encodeURIComponent(operatorType)}/metadata");
+
+        var flowOwner = File.ReadAllText(Path.Combine(workspaceRoot, "flow", "flowCanvasOwner.ts"));
+        flowOwner.Should().Contain("createCanonicalFlowCanvasHost");
+        flowOwner.Should().NotContain(".raw");
+        flowOwner.Should().NotContain("src/labs");
 
         var router = File.ReadAllText(Path.Combine(RepoPath(StudioUiRoot), "src", "app", "router.ts"));
         router.Should().Contain("path: 'projects/:id/workspace'");
