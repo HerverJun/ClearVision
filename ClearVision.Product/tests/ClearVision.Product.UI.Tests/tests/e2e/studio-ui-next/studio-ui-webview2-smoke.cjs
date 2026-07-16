@@ -57,6 +57,28 @@ function meaningfulRequestFailures(requestFailures) {
   return requestFailures.filter(item => !/ERR_ABORTED|NS_BINDING_ABORTED/i.test(item.errorText));
 }
 
+function classifyConsoleErrors(consoleErrors, productPage) {
+  const lifecycle = productPage?.workspaceLifecycle;
+  const expectedNotFoundCount = [lifecycle?.mounted?.state, lifecycle?.remounted?.state]
+    .filter(state => state === 'not-found')
+    .length;
+  const expectedNotFoundMessage = 'Failed to load resource: the server responded with a status of 404 (Not Found)';
+  let remainingExpectedNotFound = expectedNotFoundCount;
+  const ignoredExpected = [];
+  const meaningful = [];
+
+  for (const message of consoleErrors) {
+    if (remainingExpectedNotFound > 0 && message === expectedNotFoundMessage) {
+      remainingExpectedNotFound -= 1;
+      ignoredExpected.push(message);
+    } else {
+      meaningful.push(message);
+    }
+  }
+
+  return { ignoredExpected, meaningful };
+}
+
 async function readApiEvidence(webPort, token) {
   const [health, setupStatus, me, operators, projects] = await Promise.all([
     readApi(webPort, '/health'),
@@ -802,14 +824,20 @@ async function main() {
         observedNativeWindowDpi: evidence.nativeRuntime.nativeWindow.dpi
       };
     }
+    const consoleErrorClassification = classifyConsoleErrors(
+      runtimeErrors.consoleErrors,
+      evidence.productPage
+    );
     evidence.runtimeErrors = runtimeErrors;
+    evidence.ignoredExpectedConsoleErrors = consoleErrorClassification.ignoredExpected;
+    evidence.meaningfulConsoleErrors = consoleErrorClassification.meaningful;
     evidence.meaningfulRequestFailures = meaningfulRequestFailures(runtimeErrors.requestFailures);
 
     assertNativeRuntime(evidence.nativeRuntime);
     assert(evidence.externalDriver.executableIsAbsolute,
       'External CDP driver did not use an absolute Node executable path.');
-    assert(runtimeErrors.consoleErrors.length === 0,
-      `WebView2 console errors: ${runtimeErrors.consoleErrors.join(' | ')}`);
+    assert(evidence.meaningfulConsoleErrors.length === 0,
+      `WebView2 console errors: ${evidence.meaningfulConsoleErrors.join(' | ')}`);
     assert(runtimeErrors.pageErrors.length === 0,
       `WebView2 page errors: ${runtimeErrors.pageErrors.join(' | ')}`);
     assert(evidence.meaningfulRequestFailures.length === 0,
