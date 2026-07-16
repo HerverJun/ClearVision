@@ -238,7 +238,8 @@
     top: var(--content-gap);
     bottom: var(--content-gap);
     left: calc(var(--content-gap) + var(--operator-rail-width) + 8px);
-    width: min(360px, calc(100vw - 120px));
+    width: clamp(380px, 24vw, 440px);
+    max-width: calc(100vw - 120px);
     z-index: calc(var(--z-sidebar) + 5);
     pointer-events: none;
 }
@@ -263,6 +264,10 @@
     gap: 12px;
     padding: 14px;
     border-bottom: 1px solid var(--border-color);
+}
+
+.operator-flyout-header > div {
+    min-width: 0;
 }
 
 .operator-flyout-eyebrow {
@@ -336,6 +341,7 @@
     flex-direction: column;
     gap: 0;
     overflow-y: auto;
+    scrollbar-gutter: stable;
     padding: 6px 10px 10px;
 }
 
@@ -355,6 +361,7 @@
     text-align: left;
     cursor: grab;
     transition: background-color var(--duration-fast);
+    box-sizing: border-box;
 }
 
 .operator-flyout-item:hover,
@@ -365,6 +372,7 @@
 .operator-flyout-item:active { cursor: grabbing; transform: none; }
 .operator-flyout-drag,
 .operator-flyout-meta { color: var(--text-muted); font-size: var(--font-size-xs); }
+.operator-flyout-meta { white-space: nowrap; }
 
 .operator-flyout-icon {
     display: grid;
@@ -380,11 +388,43 @@
 .operator-flyout-svg svg,
 .operator-flyout-svg .operator-icon-img { display: block; width: 18px; height: 18px; }
 
-.operator-flyout-main { min-width: 0; display: grid; gap: 2px; }
+.operator-flyout-main {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+    align-content: center;
+}
+
 .operator-flyout-main strong,
-.operator-flyout-main em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.operator-flyout-main strong { color: var(--text-primary); font-size: var(--font-size-base); font-weight: 600; }
-.operator-flyout-main em { color: var(--text-muted); font-size: var(--font-size-xs); font-style: normal; }
+.operator-flyout-main em {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.operator-flyout-main strong {
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.operator-flyout-detail {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.operator-flyout-main em {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    font-style: normal;
+    line-height: 1.35;
+}
 
 .operator-lifecycle-badge {
     display: inline-flex;
@@ -407,13 +447,15 @@
 .operator-lifecycle-deprecated { color: #c47b7b; border-color: rgba(196, 123, 123, 0.5); }
 
 .operator-flyout-category {
-    max-width: 100%;
-    padding: 2px 6px;
+    flex: 0 1 auto;
+    max-width: 42%;
+    padding: 1px 6px;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     background: var(--bg-subtle);
     color: var(--text-secondary);
     font-size: var(--font-size-xs);
+    line-height: 1.35;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -454,6 +496,7 @@
     .flow-editor-shell { --inspector-pane-width: 232px; }
     .flow-editor-shell .workspace { min-width: 280px; }
     .flow-editor-shell .preview-workbench-pane { width: 300px; flex-basis: 300px; min-width: 288px; }
+    .operator-group-flyout { width: min(380px, calc(100vw - 104px)); }
 }
 
 @media (min-width: 769px) and (max-width: 900px) {

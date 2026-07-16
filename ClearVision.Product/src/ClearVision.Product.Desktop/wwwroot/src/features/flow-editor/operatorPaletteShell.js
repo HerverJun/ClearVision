@@ -496,8 +496,10 @@ export class OperatorPaletteShell {
                     <strong>${escapeHtml(title)}${lifecycle !== 'Stable'
                         ? ` <span class="operator-lifecycle-badge operator-lifecycle-${escapeHtml(lifecycle.toLowerCase())}" title="${escapeHtml(lifecycleNote || getLifecycleLabel(lifecycle))}">${escapeHtml(getLifecycleLabel(lifecycle))}</span>`
                         : ''}</strong>
-                    <em>${escapeHtml(description)}</em>
-                    ${showCategory ? `<span class="operator-flyout-category">${escapeHtml(category)}</span>` : ''}
+                    <span class="operator-flyout-detail">
+                        ${showCategory ? `<span class="operator-flyout-category">${escapeHtml(category)}</span>` : ''}
+                        <em>${escapeHtml(description)}</em>
+                    </span>
                 </span>
                 <span class="operator-flyout-meta">
                     ${escapeHtml(inputCount)} 入 / ${escapeHtml(outputCount)} 出
