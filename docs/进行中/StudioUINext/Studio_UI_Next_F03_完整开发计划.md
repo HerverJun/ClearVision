@@ -1,11 +1,13 @@
-# Studio UI Next F03 完整开发计划（初稿）
+# Studio UI Next F03 完整开发计划
 
-> 文档状态：<strong>DRAFT_FOR_REVIEW</strong>。本文件是基于两棵工作树当前实际代码完成只读审计后形成的计划初稿，不是“已批准的唯一权威计划”，不批准入口切换，也不代表 F03 已经开始实现。
+> 文档状态：<strong>READY_FOR_APPROVAL</strong>。本文件是在代码级审计初稿、独立复核与第二轮评审后形成的最终实施计划；只有获得明确批准后才可开始 G1。本文不批准入口切换，也不代表 F03 已经开始实现。
 
 ~~~text
 F03_DESIGN_BASELINE_SHA=1658216c79b79c5d9371959c83c14a46bbddeccf
 STUDIO_UI_NEXT_AUDIT_SHA=1658216c79b79c5d9371959c83c14a46bbddeccf
 STABLE_LINE_AUDIT_SHA=dfa5ea1ef3d100e700a19cffea5ae64006648881
+PLAN_REVIEW_BASE_SHA=8579fa52f856af484c2ac4b0d3c5565f7fb5dd86
+PLAN_STATUS=READY_FOR_APPROVAL
 DESIGN_SYSTEM_VERSION=V1.1
 Studio:StudioUiEnabled=false
 F03_IMPLEMENTED=NO
@@ -36,19 +38,30 @@ F03 的目标不是重画一个 Vue 工作台，而是在不复制 Project、Flo
 
 1. 稳定线正式工作区仍由 legacy <code>index.html</code>、<code>app.js</code> composition root、单例 <code>FlowCanvas</code>、<code>PropertyPanelCapabilityOwner</code>、<code>PreviewPanelCapabilityOwner</code>、<code>ProjectManager</code> 与 <code>InspectionController</code> 协同承载。路由切换仅隐藏 DOM，并不会卸载这些 owner。
 2. Studio UI Next 已具备唯一 Product Shell、Router、Design System V1.1、单一 <code>apiTransport</code>、<code>readQuery</code>、session/status owner、唯一 Host adapter、canonical FlowCanvas Lab 接入与 WebView2/publish/no-Node 证据地基；但正式 Workspace、完整 Flow decoder、写入能力、ImageCanvas/ROI/Preview owner、特殊参数编辑器与运行 command owner 均不存在。
-3. 工程读取、算子 metadata、Preview、artifact、正式保存、决策校验、单次执行与结果查询均有现有入口；唯一确认的合同缺口是“只做准入、不执行”的薄端点。建议新增 <code>POST /api/inspection/admission</code>，内部只复用既有 <code>IExecutionAdmissionService</code>，不得形成第二执行 authority、reservation 或 Runtime 状态机。其 route、permission 和 trace 字段仍需评审冻结。
-4. 正式保存推荐只选用现有 <code>PUT /api/projects/{id}</code>，一次携带完整 Flow、可选 GlobalVariables 与 <code>expectedPersistenceRevision</code>，继续进入 <code>ProjectService.UpdateAsync()</code> 和 <code>ProjectSaveCoordinator.SaveExistingProjectAsync()</code>。不得照搬 legacy 的“先 PUT Project、再 PUT Flow”两请求序列作为 F03 保存链。
+3. 工程读取、算子 metadata、Preview、artifact、正式保存、决策校验、单次执行与结果查询均有现有入口。当前最主要的新增执行合同是“只做准入、不执行”的薄端点；此外仍需冻结 run permission 策略、snapshot/trace identity、CameraBinding read 与 Host close/reload coordination。候选 <code>POST /api/inspection/admission</code> 只复用既有 <code>IExecutionAdmissionService</code>，不得形成第二执行 authority、reservation 或 Runtime 状态机。
+4. 正式保存只使用现有 <code>PUT /api/projects/{id}</code>，一次携带 Project metadata、完整 Flow、<code>GlobalVariables=null</code> 与 <code>expectedPersistenceRevision</code>，继续进入 <code>ProjectService.UpdateAsync()</code> 和 <code>ProjectSaveCoordinator.SaveExistingProjectAsync()</code>。F03 不迁移 GlobalVariables 管理 UI，因此绝不提交变量差量或完整 schema；后端按 <code>request.GlobalVariables ?? previousGlobalVariables</code> 保留当前权威 schema。
 5. Preview 必须复用现有 <code>POST /api/flows/preview-node</code>、artifact 引用和后端 admission；本地 <code>flowRevision</code> 仅作 latest-request-wins/stale 防护，不能替代 <code>PersistenceRevision</code>。
-6. 推荐拆成 5 个串行 Goal。原因是当前 Next 只有 Canvas Lab，没有正式 Workspace；FlowCanvas、Inspector、Preview/Image/ROI 各自代码量和生命周期风险均足以形成独立验收面，而保存/revision/run 又必须在前三者稳定后做跨域集成。五个 Goal 共享一个 Workspace composition owner，不形成多个并行业务 owner。
+6. 最终拆成 6 个串行 Goal：Workspace Read、Flow、Inspector、Preview/Image/ROI、Persistence、Run/Final Closure。Persistence authority、Execution authority 与最终证据收口不再混入同一个 Goal；六个 Goal 仍共享一个 Workspace composition owner，不形成并行业务 owner。
 
-本初稿的最高优先阻断项为：
+本最终计划的最高优先阻断项为：
 
 - 未冻结完整 Project/Flow decoder，不得把 Project detail 的 operator/connection 数量摘要反向重建为正式 Flow；
 - 未建立唯一 Workspace/FlowCanvas/ImageCanvas/Preview owner 与可自动验证的 dispose 计数，不得挂载正式路由；
-- 未把同一 <code>apiTransport</code> 扩展为受 allowlist 约束的 GET/PUT/POST/binary 能力，不得“先调通 UI”；
+- 未建立按 Goal 渐进开放的 capability transport port 与精确 route/method allowlist，不得在 G1 提前开放任意 PUT/POST/DELETE/binary，也不得“先调通 UI”；
 - 未冻结单次正式保存、409/PSV011 reconcile、in-flight save 与 route-leave 语义，不得开放写入；
+- 未建立 write-capable decoder 对应 encoder、persistence/transient 字段清单与 no-op round-trip golden test，不得开放保存；
 - 未复现 Preview 的高成本、真实取帧、副作用、latest-request-wins 与 artifact 释放策略，不得开放自动预览；
+- canonical Preview coordinator 未移除对 legacy <code>httpClient</code> 的静态 import 前，不得进入 StudioUI production bundle；
 - 未扩展 F03 Browser/WebView2/no-Node/GET-WRITE method evidence runner，不得把 Browser fixture 结论写成真实 WebView2/DPI/Release 结论。
+
+第二轮评审提出的四项计划阻断已在本文关闭：
+
+~~~text
+F03-PLAN-R1-GLOBAL-VARIABLE-CONTRACT      → GlobalVariables 固定为 null
+F03-PLAN-R2-SPLIT-PERSISTENCE-AND-RUN     → G5 Persistence、G6 Run/Final Closure
+F03-PLAN-R3-WRITE-ROUNDTRIP-CONTRACT      → decoder + encoder + 字段清单 + golden test
+F03-PLAN-R4-PREVIEW-LEGACY-HTTP-DEPENDENCY→ 删除静态 legacy HTTP 依赖并加 bundle guard
+~~~
 
 ## 2. 审计 SHA 与代码事实
 
@@ -160,7 +173,7 @@ F03 的目标不是重画一个 Vue 工作台，而是在不复制 Project、Flo
 - operator library/search/category/compatibility、click-add、drag/drop、节点/端口/连线/选择/删除与真实快捷键；
 - metadata/default/validation 驱动的参数控件，含 file picker、CameraBinding、ROI/geometry、Caliper structural model、当前 NPoint point sequence；
 - 自动/手动 Preview、高成本/副作用 admission、latest-request-wins、artifact、pixel probe、ROI statistics；
-- 脏状态、单写入口、<code>PersistenceRevision</code>、409/PSV011 reconcile、readonly/running gate；
+- write-capable Workspace decoder/encoder、persistence/transient 字段清单、no-op round-trip；脏状态、单写入口、<code>GlobalVariables=null</code>、<code>PersistenceRevision</code>、409/PSV011 reconcile、readonly/running gate；
 - final decision validate、薄 execution-admission 合同、单次 inspection execute、成功后 Results deep-link 或失败留在 Workspace；
 - Feature Flag on/off、legacy/new 启动切换、回滚、architecture guard、Browser/WebView2/publish/no-Node/performance evidence 计划。
 
@@ -175,7 +188,7 @@ F03 的目标不是重画一个 Vue 工作台，而是在不复制 Project、Flo
 - legacy 正式退役或删除 legacy bundle；
 - 完整算子 Runtime 合同同步；
 - inactive CalibrationDraftWorkbench 的 solve/正式 calibration asset 保存；
-- local result 图像、ROI、evidence 全量复核合同；当前 Goal 5 只保证现有 Results scalar detail/deep-link；
+- local result 图像、ROI、evidence 全量复核合同；当前 Goal 6 只保证现有 Results scalar detail/deep-link；
 - 用 Browser fixture、静态 Chromium、模拟 DPR 或本地 WebView2 smoke 代替真实 DPI、Release、no-Node、现场硬件结论。
 
 ### 3.3 不变量
@@ -241,12 +254,12 @@ REMOVE_WITH_REASON
 | F03-M031 | 脏状态、标题星号、状态栏保存反馈 | <code>ProjectManager.unsavedChanges</code>、<code>updateTitle()</code>/<code>updateStatusBar()</code> | UI dirty projection；正式状态由 save response | clean/dirty/saving/error/RO/R | Flow structure 250ms debounce 同步 ProjectManager；保存清 dirty | <code>project.spec.ts</code> | <code>workspacePersistenceOwner</code> 投影 dirty/saving/reconcile；Toolbar/Statusbar 消费 | SEMANTICALLY_ADAPT |
 | F03-M032 | 本机 5 分钟草稿备份/恢复 | <code>app.js</code> 的 <code>cv_autosave_backup</code>、<code>AUTO_SAVE_DELAY</code> | 仅可丢弃草稿；当前只按 projectId 匹配 | draft found/invalid/stale/cross-user risk/storage error | localStorage 写完整 flow；formal save 删除匹配 backup | 部分 project/e2e 取证；无用户隔离强证据 | schema-versioned、session/user/project scoped draft；默认不得自动覆盖 server | SEMANTICALLY_ADAPT |
 | F03-M033 | 正式 revision 并发身份与持久化 | DTO <code>PersistenceRevision</code>；<code>ProjectService</code>；<code>ProjectSaveCoordinator</code> | 唯一正式 Project/Flow/Variables/assets authority | success/PSV011 stale/PSV003/006/014/023 recovery conflicts/GV031 running | coordinator 原子保存/recovery；revision 每次正式 save 变化 | <code>ProjectSaveCoordinatorTests.cs</code>；<code>ProjectGlobalVariableEndpointsTests.cs</code> | full decoder 保存 revision；只有 persistence owner 能提交 expected revision | MUST_PRESERVE |
-| F03-M034 | legacy 保存依次 PUT Project 再 PUT Flow | <code>ProjectManager.saveProject():233-305</code> | 两次都进 ProjectService/Coordinator，但 client 编排不是原子 | 第一次成功第二次失败时 current project revision 仍旧；并发 save 可重叠 | 无 in-flight guard；重试可能 PSV011 | endpoint/coordinator tests 未覆盖该前端两请求事务 | F03 只用一次 <code>PUT /api/projects/{id}</code> 携完整 Flow；只允许一个 in-flight mutex，不建客户端 save queue | SEMANTICALLY_ADAPT |
+| F03-M034 | legacy 保存依次 PUT Project 再 PUT Flow | <code>ProjectManager.saveProject():233-305</code> | 两次都进 ProjectService/Coordinator，但 client 编排不是原子 | 第一次成功第二次失败时 current project revision 仍旧；并发 save 可重叠 | 无 in-flight guard；重试可能 PSV011 | endpoint/coordinator tests 未覆盖该前端两请求事务 | F03 只用一次 <code>PUT /api/projects/{id}</code>，携完整 Flow、<code>GlobalVariables=null</code>；只允许一个 in-flight mutex，不建客户端 save queue | SEMANTICALLY_ADAPT |
 | F03-M035 | 409/PSV011 并发冲突用户处理 | endpoint <code>ToProjectUpdateFailure()</code> 返回 409；legacy 仅 generic toast | server revision authority | conflict/reload/keep draft/discard/readonly/running | 不得盲重试或改 expected revision；需 reconcile GET | <code>ProjectSaveCoordinatorTests.cs</code>；endpoint tests | Conflict mode：保留本地 draft、冻结写入、重新 GET、显式 compare/reapply/discard | REDESIGN_ALLOWED |
-| F03-M036 | GlobalVariables 当前正式 owner 与保存链 | <code>GlobalVariablesCapabilityOwner → ProjectManager.saveGlobalVariables()</code>；PUT global-variables | Project global-variable authority / ProjectSaveCoordinator | L/E/Err/401/403/409/R | 独立正式写；当前会清 ProjectManager dirty，存在跨域同步风险 | <code>global-variable-panel.test.mjs</code>；<code>ProjectGlobalVariableEndpointsTests.cs</code> | F03 不迁移 UI，但 workspace save/decoder 不得覆盖或私存 variables | MUST_PRESERVE |
+| F03-M036 | GlobalVariables 当前正式 owner 与保存链 | <code>GlobalVariablesCapabilityOwner → ProjectManager.saveGlobalVariables()</code>；PUT global-variables | Project global-variable authority / ProjectSaveCoordinator | L/E/Err/401/403/409/R | 独立正式写；当前会清 ProjectManager dirty，存在跨域同步风险 | <code>global-variable-panel.test.mjs</code>；<code>ProjectGlobalVariableEndpointsTests.cs</code> | F03 不迁移 UI；Workspace 可读 projection 仅供校验，Project PUT 固定 <code>GlobalVariables=null</code>，不得 round-trip 或覆盖 schema | MUST_PRESERVE |
 | F03-M037 | richer legacy GlobalVariablePanel | capability flag 开启时 inactive | 若复制会形成第二变量 owner/save入口 | duplicate/stale/conflict | 独立 listener/save path | 旧 unit 仅取证 | 不迁移；未来独立 capability 复用同一 authority | REMOVE_WITH_REASON |
 | F03-M038 | Final Decision 配置、eligible outputs 与 validation | <code>finalDecisionPanel.js</code>；POST decision-configuration/validate；decision 写 Flow draft | Flow draft + backend validation/admission | valid/invalid/no candidates/stale response/Err/401 | request id 防旧结果但不 abort；save/run 前生效 | <code>final-decision.spec.ts</code>；<code>final-decision-panel.test.mjs</code> | <code>FinalDecisionEditor</code> + cancellable latest validation command | MUST_PRESERVE |
-| F03-M039 | 点击运行、前端校验、后端 admission、错误反馈 | <code>commandHandlers.js:176</code> → property validate → <code>InspectionController.executeSingle()</code> → POST execute | <code>InspectionService</code>/<code>IInspectionRuntimeCoordinator</code>/Runtime authority | no project/no nodes/invalid params/admission/decision/GV031/401/Err/R | 可执行未保存 inline Flow；当前先切 Inspection view 再发请求；无显式 frontend canRun policy | <code>InspectionServiceSingleRunTests.cs</code>；<code>ExecutionAdmissionServiceTests.cs</code>；<code>final-decision.spec.ts</code> | <code>runCommandOwner</code> 单 flight；先调用薄 admission，再以同一冻结 Flow snapshot 执行；execute 仍须重新权威校验，backend accept 后才导航 | SEMANTICALLY_ADAPT |
+| F03-M039 | 点击运行、前端校验、后端 admission、错误反馈 | <code>commandHandlers.js:176</code> → property validate → <code>InspectionController.executeSingle()</code> → POST execute | <code>InspectionService</code>/<code>IInspectionRuntimeCoordinator</code>/Runtime authority | no project/no nodes/invalid params/admission/decision/GV031/401/Err/R | 可执行未保存 inline Flow；当前先切 Inspection view 再发请求；无显式 frontend canRun policy | <code>InspectionServiceSingleRunTests.cs</code>；<code>ExecutionAdmissionServiceTests.cs</code>；<code>final-decision.spec.ts</code> | G6 <code>runCommandOwner</code> 单 flight；以同一 <code>clientSnapshotId</code> 和冻结 Flow 做 admission/execute；execute 重新计算 canonical hash并权威校验，accept 后才导航 | SEMANTICALLY_ADAPT |
 | F03-M040 | 运行成功后进入结果复核 | execute response；legacy InspectionPanel；Next <code>ResultsPage</code> deep-link | result repository/Inspection backend | running/success/failure/cancel/timeout/not-found | 正式 result 持久化由 backend；导航无写 | <code>inspection-panel-state.test.mjs</code>；Next <code>resultsContracts.spec.ts</code> | <code>/results?source=local&amp;projectId=...&amp;resultId=...</code>；图像 detail defer | SEMANTICALLY_ADAPT |
 | F03-M041 | Inspection realtime SSE 与 WebMessage result projection | fetch SSE GET realtime/{projectId}/events；WebMessage 是 fallback/projection | Inspection runtime/event backend | connecting/reconnect/backoff/overflow/auth/error | stream/timer/reconnect 必须 dispose；Station SSE 是另一合同 | <code>inspection-sse.spec.ts</code>；<code>inspection-sse-client.test.mjs</code>；<code>InspectionEventEndpointsTests.cs</code> | F03 单次 run 不启用新 stream；若未来 live run，独立 ADR/Goal | DEFER |
 | F03-M042 | 正式执行只走 HTTP，阻断 legacy WebMessage 执行 | Desktop <code>WebMessageHandler</code> 拒绝 ExecuteOperator/UpdateFlow/Start/Stop，code <code>ADMISSION_LEGACY_WEBMESSAGE_DISABLED</code> | authenticated HTTP endpoint / Runtime | blocked legacy command/401/backend admission | WebMessage 仅 Host capability；不得绕过 HTTP | <code>WebView2HostTests.cs</code>；相关 handler tests | Host port 不暴露 run/preview；architecture guard 扫描 forbidden messages | MUST_PRESERVE |
@@ -292,7 +305,8 @@ Workspace Vue Component
 ~~~text
 WorkspaceToolbar / Ctrl+S
   → workspacePersistenceOwner.save()
-  → ApiTransport.put("projects/{id}", UpdateProjectRequest)
+  → encodeWorkspaceProjectUpdateV1（完整 Flow；GlobalVariables=null）
+  → ProjectPersistencePort.put("projects/{id}", UpdateProjectRequest)
   → PUT /api/projects/{id}
   → ProjectService.UpdateAsync()
   → ProjectSaveCoordinator.SaveExistingProjectAsync()
@@ -351,7 +365,7 @@ Preview、保存和运行不得走 Host/WebMessage。
 | --- | --- | --- | --- | --- |
 | Project identity/metadata | Project repository + <code>ProjectService</code> | readonly identity、name/description edit draft、loading/error state | 以 Pinia/localStorage 作为 current Project authority | 选定的单次 <code>PUT /api/projects/{id}</code> |
 | Flow | stored Flow + <code>ProjectSaveCoordinator</code> | decoded baseline、Canvas edit draft、selection/view、local flowRevision | Canvas/Pinia/DOM 作为正式 Flow；第二 save endpoint/client/queue | 同一 Project PUT 携完整 Flow |
-| GlobalVariables | Project variable schema/value services + coordinator | 只读保留、校验所需 projection；F03 不迁移 UI | Workspace 私有 variables authority；保存 Flow 时覆盖未知变量 | F03 不单独写；既有 capability 继续现有 endpoint |
+| GlobalVariables | Project variable schema/value services + coordinator | 只读校验所需 projection；F03 不迁移 UI | Workspace 私有 variables authority；把读取 schema round-trip 回 Project PUT；构造变量差量 | F03 Project PUT 固定 <code>GlobalVariables=null</code>；既有 capability 继续现有 endpoint |
 | Project assets | <code>IProjectAssetStorage</code> + coordinator | 只读 identity/引用；Preview artifact 不得混入 | local blob、ROI draft、Preview artifact 冒充 Project asset | F03 不新增 asset 写入 |
 | Preview | <code>IExecutionAdmissionService</code> + <code>IFlowExecutionService</code> | request state、cost policy projection、stale guard、artifact URL | 前端 Preview engine；把成功 Preview 当作 Run admission | 现有 Preview POST；artifact GET/DELETE |
 | Image / ROI draft | canonical ImageCanvas + Flow parameter draft | viewport、pixel、ROI interaction draft | 第二 ImageCanvas；把 Canvas state 私存为正式 asset | 随 Flow 正式保存 |
@@ -482,7 +496,7 @@ Pane size 只能保存在 schema-versioned UI preference，例如 <code>studio-u
 
 ### 7.1 合同状态与总表
 
-本节是计划初稿中的候选冻结清单。只有在第 17 节待评审决策通过、相应 decoder 与测试项目明确后，某项合同才可进入实现。状态值只使用：
+本节是最终计划的合同冻结清单。只有整份计划获得明确批准、相应 Goal 入口门禁满足后，某项合同才可进入实现。状态值只使用：
 
 ~~~text
 EXISTING_AND_REUSABLE
@@ -494,43 +508,46 @@ DEFERRED
 | ID | Method / route | 状态 | Request / response / decoder | Permission | 代码与测试依据 |
 | --- | --- | --- | --- | --- | --- |
 | F03-C01 | <code>GET /api/auth/me</code> | EXISTING_AND_REUSABLE | 复用现有 session decoder/projection；Workspace 不创建第二 session query | authenticated session | Next <code>sessionProjectionOwner.ts</code>、<code>sessionProjectionOwner.spec.ts</code> |
-| F03-C02 | <code>GET /api/projects/{id}</code> | EXISTING_BUT_REQUIRES_ADAPTATION | response 是完整 <code>ProjectDto</code>；新增 <code>decodeWorkspaceProjectV1()</code>，读取完整 Flow、GlobalVariables 保留投影、assets identity 与 <code>PersistenceRevision</code> | authenticated | <code>ApiEndpoints.cs:139</code>；<code>ProjectService.GetByIdAsync()</code>；Next 现有 <code>projectContracts.ts</code> 只读 summary，不足以初始化 Canvas |
+| F03-C02 | <code>GET /api/projects/{id}</code> | EXISTING_BUT_REQUIRES_ADAPTATION | response 是完整 <code>ProjectDto</code>；新增 <code>decodeWorkspaceProjectV1()</code> 与 <code>encodeWorkspaceFlowUpdateV1()</code>，读取/写回完整 persistence envelope；GlobalVariables 只读投影、不进入 encoder | authenticated | <code>ApiEndpoints.cs:139</code>；<code>ProjectService.GetByIdAsync()</code>；Next 现有 <code>projectContracts.ts</code> 只读 summary，不足以初始化 Canvas或安全写回 |
 | F03-C03 | <code>GET /api/operators/library?includeCompatibility=true</code> | EXISTING_BUT_REQUIRES_ADAPTATION | 扩展现有 catalog decoder，冻结 stable metadata、lifecycle、compatibility、parameter/output conditional rule、image contract 字段 | authenticated | <code>OperatorLibraryReadOnlyAuditTests.cs</code>；Next <code>operatorContracts.spec.ts</code>；stable <code>operatorLibrary.js</code>/<code>parameterDependencyRules.js</code> 漂移 |
 | F03-C04 | <code>GET /api/operators/{type}/metadata</code> | EXISTING_BUT_REQUIRES_ADAPTATION | 与 C03 共用 editor-contract decoder；不得让 <code>unknown</code> 直接进入写命令 | authenticated | operator metadata endpoint tests；Next <code>operatorContracts.ts</code> |
 | F03-C05 | <code>GET /api/cameras/bindings</code> | EXISTING_BUT_REQUIRES_ADAPTATION | typed binding list；当前 GET 会调用 <code>EnumerateCamerasAsync()</code>，不得在 Workspace mount 时自动轮询 | <code>CanOperateHardware</code> | <code>SettingsEndpoints.cs:1453</code>；<code>CameraBindingsEndpointTests.cs</code> |
 | F03-C06 | <code>POST /api/inspection/decision-configuration/validate</code> | EXISTING_AND_REUSABLE | request <code>OperatorFlowDto</code>；response <code>{isValid, issues, eligibleOutputs}</code>；新增 strict decoder | authenticated | <code>ApiEndpoints.cs:574</code>；<code>final-decision-panel.test.mjs</code>；<code>final-decision.spec.ts</code> |
-| F03-C07 | <code>PUT /api/projects/{id}</code> | EXISTING_AND_REUSABLE | F03 唯一正式保存：<code>UpdateProjectRequest{name,description,flow,changedGlobalVariables?,expectedPersistenceRevision}</code>；response 完整 <code>ProjectDto</code> | <code>CanEditProject</code> | <code>ApiEndpoints.cs:168</code>；<code>ProjectService.UpdateAsync()</code>；<code>ProjectSaveCoordinatorTests.cs</code> |
+| F03-C07 | <code>PUT /api/projects/{id}</code> | EXISTING_AND_REUSABLE | F03 唯一正式保存：<code>UpdateProjectRequest{name,description,flow,globalVariables:null,expectedPersistenceRevision}</code>；<code>Flow</code> 必须由 reviewed encoder 生成；response 完整 <code>ProjectDto</code> | <code>CanEditProject</code> | <code>ApiEndpoints.cs:168</code>；<code>ProjectService.UpdateAsync():213</code>；<code>ProjectSaveCoordinatorTests.cs</code> |
 | F03-C08 | <code>PUT /api/projects/{id}/flow</code> | DEFERRED | endpoint 存在，但 F03 不调用；与 C07 并行使用会恢复 legacy 两步保存与 partial-success 风险 | <code>CanEditProject</code> | <code>ApiEndpoints.cs:220</code>；<code>ProjectService.UpdateFlowAsync()</code>；legacy <code>ProjectManager.saveProject()</code> |
-| F03-C09 | <code>GET/PUT /api/projects/{id}/global-variables</code> | DEFERRED | F03 不迁移 GlobalVariables 管理 UI；Project decoder 只保留 schema 供参数引用与 round-trip，F03 不单独 PUT | GET authenticated；PUT <code>CanEditProject</code> | <code>ApiEndpoints.cs:256,273</code>；<code>ProjectGlobalVariableEndpointsTests.cs</code> |
-| F03-C10 | <code>POST /api/flows/preview-node</code> | EXISTING_BUT_REQUIRES_ADAPTATION | 复用 request identity、inline Flow、artifact references；新增 strict Preview decoder，并把 transport 注入 canonical coordinator | authenticated | <code>PreviewNodeEndpoints.cs:92</code>；<code>PreviewNodeEndpointsTests.cs</code>；<code>previewCoordinator.js</code> |
+| F03-C09 | <code>GET/PUT /api/projects/{id}/global-variables</code> | DEFERRED | F03 不迁移 GlobalVariables 管理 UI；Project decoder 可提供只读 schema projection 供校验，但 F03 不调用独立 PUT，也不把 schema写回C07 | GET authenticated；PUT <code>CanEditProject</code> | <code>ApiEndpoints.cs:256,273</code>；<code>ProjectGlobalVariableEndpointsTests.cs</code> |
+| F03-C10 | <code>POST /api/flows/preview-node</code> | EXISTING_BUT_REQUIRES_ADAPTATION | 复用 request identity、inline Flow、artifact references；新增 strict Preview decoder；canonical coordinator core 必须删除静态 legacy <code>httpClient</code> import，legacy/Next composition分别显式注入 client port | authenticated | <code>PreviewNodeEndpoints.cs:92</code>；<code>PreviewNodeEndpointsTests.cs</code>；<code>previewCoordinator.js:5,875</code> |
 | F03-C11 | <code>GET /api/preview-artifacts/{artifactId}</code> | EXISTING_AND_REUSABLE | binary/blob response；校验 content type、长度、可选 ETag/<code>X-Artifact-Sha256</code>；创建 object URL 归 Image/Preview owner | authenticated | <code>PreviewArtifactEndpoints.cs:12</code>；<code>PreviewArtifactStoreTests.cs</code> |
 | F03-C12 | <code>DELETE /api/preview-artifacts/{artifactId}</code> | EXISTING_AND_REUSABLE | 无 body；204 成功；404 视为已释放；只由 Preview resource owner 调用 | authenticated | <code>PreviewArtifactEndpoints.cs:34</code>；Preview memory tests |
 | F03-C13 | <code>GET /api/images/{id}</code> | EXISTING_AND_REUSABLE | PNG binary；扩展同一 transport 的 blob decoder、AbortSignal 与 object URL 清理 | authenticated | <code>ApiEndpoints.cs:1604</code>；Image viewer tests |
 | F03-C14 | <code>POST /api/images/upload</code> | DEFERRED | 当前任务链可把用户选择图像作为 Preview/execute inline input；未证明必须开放上传。若未来开放，需 413、内容类型与大小合同 | authenticated | <code>ApiEndpoints.cs:1581</code>；Image payload endpoint tests |
-| F03-C15 | <code>POST /api/inspection/admission</code>（候选 route） | NEW_CONTRACT_REQUIRED | 薄合同：对同一冻结 Flow snapshot 调 <code>IExecutionAdmissionService.ValidateFlowAsync(..., StudioInspectionRun)</code>；返回 allowed/code/message/violations/project revision/flow hash/surface；不创建 reservation | permission 待第 17 节决定；推荐与 execute 共用 <code>CanRunInspection</code> | 现有服务：<code>ExecutionAdmissionService.cs</code>、<code>ExecutionAdmissionServiceTests.cs</code>；当前无 admission-only endpoint |
-| F03-C16 | <code>POST /api/inspection/execute</code> | EXISTING_BUT_REQUIRES_ADAPTATION | request 复用 <code>ExecuteInspectionRequest{projectId,imageBase64?,cameraId?,flowData?}</code>；response decoder 需保留 result id、双轴 outcome，并建议增加 runId、flowVersionHash、projectPersistenceRevision trace | 当前仅 authenticated；显式 run permission 未冻结 | <code>ApiEndpoints.cs:588,1487</code>；<code>InspectionServiceSingleRunTests.cs</code> |
+| F03-C15 | <code>POST /api/inspection/admission</code>（候选 route） | NEW_CONTRACT_REQUIRED | 薄合同：request携 <code>clientSnapshotId</code> 与冻结Flow；服务端canonicalize并返回同id、<code>canonicalFlowHash</code>、allowed/code/violations/revision trace；不创建 reservation | F03默认采用parity：authenticated，与当前execute一致；新增专用permission需独立安全hardening批准 | 现有服务：<code>ExecutionAdmissionService.cs</code>、<code>ExecutionAdmissionServiceTests.cs</code>；当前无 admission-only endpoint |
+| F03-C16 | <code>POST /api/inspection/execute</code> | EXISTING_BUT_REQUIRES_ADAPTATION | 当前request只有project/image/camera/flow；F03 additive request增加 <code>clientSnapshotId</code> 与 expected canonical hash，服务端重新计算并校验；当前response只有result/outcome等，是否增加runId/flowVersionHash/projectRevision由G6合同测试决定 | F03 parity为authenticated；<code>CanRunInspection</code>不默认纳入 | <code>ApiEndpoints.cs:588,1487</code>；<code>InspectionResultDto.cs:210</code>；<code>InspectionServiceSingleRunTests.cs</code> |
 | F03-C17 | <code>GET /api/inspection/history/{projectId}</code> 与 <code>GET /api/inspection/history/{projectId}/{resultId}</code> | EXISTING_AND_REUSABLE | 复用 Next Results scalar decoder/deep-link；不扩展为图像、ROI、evidence authority | authenticated | <code>ApiEndpoints.cs:653,685</code>；Next <code>resultsContracts.spec.ts</code> |
 | F03-C18 | <code>POST /api/inspection/realtime/start|stop</code>、<code>GET /api/inspection/realtime/{projectId}/events</code> | DEFERRED | 不进入 F03 单次运行链；原生 <code>EventSource</code> 不能携 bearer，未来必须独立冻结 authenticated stream | 当前仅 authenticated；新 run permission/stream auth 未定 | <code>InspectionEventEndpoints.cs</code>；<code>InspectionEventEndpointsTests.cs</code>；<code>inspection-sse-client.test.mjs</code> |
 | F03-C19 | N-point draft solve 与 calibration asset save | DEFERRED | active F03 只迁移 point-sequence 参数语义；rich solve/formal asset endpoint 不进入本阶段 | solve authenticated；formal save <code>CanEditProject</code> | <code>CalibrationDraftEndpoints.cs</code>；<code>CalibrationDraftEndpointsTests.cs</code> |
 
 ### 7.2 精确 HTTP method allowlist
 
-F02 的 GET-only guard 不得删除；Goal 1 把它升级为按 capability、method、route 精确匹配的 allowlist：
+F02 的 GET-only guard 不得一次性删除或替换成“任意 method transport”。底层可在 <code>apiTransport.ts</code> 内部复用一个 reviewed request core，但 ProductRuntime 只按 Goal 暴露窄 capability port；Vue 组件永远拿不到通用任意 PUT/POST/DELETE。
 
-| Method | F03 允许 route | 允许 owner | 说明 |
+| Goal | 新开放 method/route | 唯一允许 port/owner | 该 Goal 前保持关闭 |
 | --- | --- | --- | --- |
-| GET | <code>auth/me</code>、<code>projects/{id}</code>、<code>operators/library?includeCompatibility=true</code>、<code>operators/{type}/metadata</code>、按需 <code>cameras/bindings</code>、<code>preview-artifacts/{id}</code>、<code>images/{id}</code>、既有 Results GET | session/readQuery、Workspace query、Preview/Image resource owner、Results capability | GET 仍经唯一 <code>apiTransport</code>；binary route 必须显式 response kind |
-| PUT | <code>projects/{id}</code> | 唯一 <code>workspacePersistenceOwner</code> | 不允许 <code>projects/{id}/flow</code> 或 GlobalVariables 独立 PUT 进入 F03 bundle |
-| POST | <code>inspection/decision-configuration/validate</code>、<code>flows/preview-node</code>、经批准后的 <code>inspection/admission</code>、<code>inspection/execute</code> | FinalDecision、Preview、Run command owner | 每一项单独 decoder；禁止通用任意 POST helper 暴露给组件 |
-| DELETE | <code>preview-artifacts/{id}</code> | Preview resource owner | 只清理 ephemeral artifact；404 作为已释放终态 |
+| G1 Workspace Read | 既有 GET：<code>auth/me</code>、<code>projects/{id}</code> | session/readQuery、<code>workspaceProjectQuery</code> | 全部 write、binary、Host file picker、admission |
+| G2 Flow / Rail | GET：<code>operators/library?includeCompatibility=true</code>、<code>operators/{type}/metadata</code> | 唯一 <code>operatorCatalogOwner</code> | POST/PUT/DELETE/binary |
+| G3 Inspector | 用户打开 CameraBinding editor 时 GET <code>cameras/bindings</code>；POST <code>inspection/decision-configuration/validate</code> | <code>cameraBindingQuery</code>、<code>finalDecisionValidationPort</code> | Preview/Save/Run methods |
+| G4 Preview/Image | POST <code>flows/preview-node</code>；GET blob <code>preview-artifacts/{id}</code>/<code>images/{id}</code>；DELETE <code>preview-artifacts/{id}</code> | <code>previewTransportPort</code>、<code>imageResourcePort</code> | Project PUT、admission、execute |
+| G5 Persistence | PUT <code>projects/{id}</code> | 唯一 <code>projectPersistencePort</code> | Flow-only PUT、GlobalVariables PUT、Run POST |
+| G6 Run / Final | POST <code>inspection/admission</code>、<code>inspection/execute</code>；既有 Results GET | 唯一 <code>runCommandPort</code>、Results capability | realtime/SSE/Station/Runtime command |
 
-以下 route 即使后端存在，也不在 F03 allowlist：Project create/delete、Flow-only PUT、GlobalVariables mutation、image upload、continuous preview、inspection realtime start/stop/SSE、Station、Runtime package、Agent、Settings、PLC/TCP/camera command。Architecture guard 发现任一额外 method/route 即触发 <code>F03-B03-WRITE-GUARD-NOT-FROZEN</code>。
+Architecture tests 每个 Goal 分别断言“当前累计 allowlist”与“尚未开放表面”。以下 route 即使后端存在，也始终不进入 F03：Project create/delete、Flow-only PUT、GlobalVariables mutation、image upload、continuous preview、inspection realtime start/stop/SSE、Station、Runtime package、Agent、Settings、PLC/TCP/camera command。任一额外 method/route 触发 <code>F03-B03-WRITE-GUARD-NOT-FROZEN</code>。
 
-### 7.3 Decoder 冻结
+### 7.3 Decoder、Encoder 与持久化字段冻结
 
 | Decoder | 必须读取 | 必须拒绝或保留 | 不得推断 |
 | --- | --- | --- | --- |
-| <code>decodeWorkspaceProjectV1</code> | Project id/name/description/version/timestamps；整数 <code>persistenceRevision</code>；Flow id/name/decision；operators 的 id/name/type/metadata/x/y/ports/parameters/enabled；connections；GlobalVariables round-trip projection；asset identity | required 字段缺失、非法 GUID/enum/finite number 进入 Decode Error；未知非关键字段可忽略 | 不得从 operatorCount/connectionCount 重建 Flow；不得从 local cache 补正式 revision |
+| <code>decodeWorkspaceProjectV1</code> | Project id/name/description/version/timestamps；整数 <code>persistenceRevision</code>；完整 persistence-relevant Flow；GlobalVariables只读projection；asset identity | required 字段缺失、非法 GUID/enum/finite number进入Decode Error；write-capable层出现未知字段时必须opaque passthrough或标记<code>saveCompatibility=blocked</code>，不得静默忽略 | 不得从operatorCount/connectionCount重建Flow；不得从local cache补正式revision |
+| <code>encodeWorkspaceFlowUpdateV1</code> | 从baseline persistence envelope与typed draft生成完整 <code>OperatorFlowDto</code>；保留Flow/Operator/Port/Parameter/Connection identity、metadata与decision | 只允许剥离明确列入transient strip allowlist的字段；未知未审计字段阻断save | 不得直接把Vue view model或当前 <code>FlowCanvas.serialize()</code> 当正式encoder；后者当前不含Flow id/name并剥离execution字段 |
 | <code>decodeOperatorEditorContractV1</code> | lifecycle/defaultHidden/category/keywords/tags；port identity/type/required；parameter dataType/default/min/max/options/required；Visible/Hidden/Ignored rules；output availability；image contract | enum 需兼容当前真实 numeric/string JSON 形状并有 exhaustive test；未知 editor kind 进入 unsupported state | 不得按算子名称硬编码 TemplateMatching 等规则；不得猜 side-effect/readiness |
 | <code>decodeProjectSaveResponseV1</code> | Project identity、保存后的完整 Flow/GlobalVariables、<code>PersistenceRevision</code> | id 不匹配、revision 非整数或回退、缺 Flow 时进入 reconcile，不得清 dirty | 不得自行 <code>revision + 1</code>；不得用提交前 draft 覆盖 server canonical response |
 | <code>decodePreviewNodeResponseV1</code> | success/project/node/debug session、Observation identity、output data/image、artifacts、execution time、failed operator、metrics/diagnostics | identity 不一致一律 stale 丢弃并释放 artifact；过大 payload 进入 bounded warning | Preview success 不得推断 Run allowed；local flowRevision 不得转为 PersistenceRevision |
@@ -539,21 +556,53 @@ F02 的 GET-only guard 不得删除；Goal 1 把它升级为按 capability、met
 | <code>decodeBinaryArtifactV1</code> | status/content type/length/blob；artifact 可选 SHA/ETag | 404、abort、content-type mismatch、oversize 明确分类 | 不得把 blob URL 持久化为 Project asset |
 | <code>decodeApiProblemV1</code> | HTTP status、server <code>Code</code>/<code>Error</code>/<code>Detail</code>/<code>Violations</code> | 未知 code 保留原值，UI 使用安全 fallback | 不得为通过 UI 测试吞掉 401/403/409 或改成 generic success |
 
+写回字段清单冻结为：
+
+| DTO 层级 | Persistence-relevant allowlist | Transient strip allowlist | 代码依据 |
+| --- | --- | --- | --- |
+| Flow | <code>Id</code>、<code>Name</code>、<code>DecisionConfiguration</code>、<code>Operators</code>、<code>Connections</code> | 无 | <code>OperatorFlowDto.cs:15-37</code>；当前 <code>FlowCanvas.serialize()</code> 未保留 Id/Name，不能直接用于PUT |
+| Operator | <code>Id</code>、<code>Name</code>、<code>Type</code>、<code>Metadata</code>、<code>X</code>、<code>Y</code>、<code>InputPorts</code>、<code>OutputPorts</code>、<code>Parameters</code>、<code>IsEnabled</code> | <code>ExecutionStatus</code>、<code>ExecutionTimeMs</code>、<code>ErrorMessage</code>，但G1必须用backend/legacy regression确认strip不会改变Project authority | <code>OperatorDto.cs:14-78</code>；<code>ProjectService.MapOperatorToDto()</code> |
+| Port | <code>Id</code>、<code>Name</code>、<code>Direction</code>、<code>DataType</code>、<code>IsRequired</code> | 无 | <code>PortDto</code>；连线依赖port ID |
+| Parameter | <code>Id</code>、<code>Name</code>、<code>DisplayName</code>、<code>Description</code>、<code>DataType</code>、<code>Value</code>、<code>DefaultValue</code>、<code>MinValue</code>、<code>MaxValue</code>、<code>IsRequired</code>、<code>Options</code> | 无 | <code>ParameterDto</code>；metadata enrichment/migration会补齐部分字段 |
+| Connection | <code>Id</code>、<code>SourceOperatorId</code>、<code>SourcePortId</code>、<code>TargetOperatorId</code>、<code>TargetPortId</code> | 无 | <code>OperatorConnectionDto</code> |
+
+未知字段策略：
+
+1. 只读页面可以忽略未知展示字段；write-capable Workspace 不可以。
+2. 已批准的扩展点可在 owner 内保存 opaque passthrough JSON，并由 encoder 原样合并；不批准的未知 persistence key 使 Save 禁用并显示 contract drift。
+3. Vue/Canvas 只编辑明确字段；opaque bag 不进入UI authority，也不得被局部重构删除。
+4. 每次 stable contract 前进后重新生成 persistence allowlist 与 golden fixture fingerprint。
+
+G1 必须新增 no-op round-trip golden test：
+
+~~~text
+GET ProjectDto
+→ decodeWorkspaceProjectV1
+→ 不做业务编辑
+→ encodeWorkspaceFlowUpdateV1
+→ PUT /api/projects/{id}（GlobalVariables=null）
+→ GET /api/projects/{id}
+→ 对 persistence-relevant 字段做结构等价比较
+~~~
+
+该测试必须覆盖 Flow Id/Name、Operator Metadata/IsEnabled、全部 port/parameter/connection ID、parameter value/default/range/options、DecisionConfiguration；只允许 transient strip allowlist 差异。若后端migration发生，必须断言其canonical变化与revision语义，而不是把差异静默视为成功。
+
 ### 7.4 Project 读取、保存、revision 与冲突协议
 
 | 项 | 冻结规则 |
 | --- | --- |
 | Read | <code>readQuery</code> 以 <code>workspace-project:{sessionGeneration}:{projectId}</code> 管理 GET；route/project 变化 abort predecessor；latest request 才能创建 owner |
-| Save request | 一次 <code>PUT /api/projects/{id}</code>，携完整 Flow、用户可编辑 Project metadata、确有变化时的 GlobalVariables round-trip，以及当前正式 <code>expectedPersistenceRevision</code> |
+| Save request | 一次 <code>PUT /api/projects/{id}</code>，携 reviewed encoder 生成的完整 Flow、用户可编辑 Project metadata、<code>GlobalVariables=null</code> 与当前正式 <code>expectedPersistenceRevision</code> |
+| No-op guard | 在发PUT前对baseline与encoded persistence envelope做canonical structural compare；无业务变化且无server migration待落盘时不发请求。Golden test仍强制走一次PUT/GET验证无损往返 |
 | Permission | 后端 <code>CanEditProject</code> 是唯一安全边界；前端 role 只优化可见性，403 必须进入 Readonly/Forbidden 投影 |
 | Single flight | 同一 Workspace 只允许一个 in-flight PUT；保存期间按钮禁用。期间继续编辑会增加 dirty generation，但不会创建客户端 save queue，也不会自动发第二次请求 |
-| Success | 只在 projectId 与 submitted generation 都匹配时清 dirty；若保存期间有新编辑，更新 base <code>PersistenceRevision</code>、合并 server canonical response、保留新 draft 与 dirty |
+| Success | 只在projectId与submitted generation匹配时清dirty；以server response重新decode/rebase Canvas、Inspector、Preview baseline。若保存期间有新编辑，更新base revision并把新draft重放到server canonical baseline，保留dirty |
 | 409 <code>PSV011</code> | 进入 Conflict；保留本地 draft；重新 GET server project；显式提供 compare/reapply/discard。不得替换 expected revision 后自动重试 |
 | 409 <code>GV031</code> | 进入 Running/locked；不发第二写；读取 authoritative runtime state 的合同若未冻结，则只呈现 server code 并允许稍后人工刷新 |
 | Network/abort after dispatch | 结果未知。不得盲重试；下次写前必须 GET 并比较 revision/content fingerprint。route leave 可忽略 disposed owner 的回调，但要记录 <code>saveOutcome=unknown</code> 供重新进入时 reconcile |
 | Cancellation | 请求尚未 dispatch 可取消；已发出 PUT 后 AbortSignal 只能终止客户端等待，不能宣称服务端未提交 |
 | Idempotency/retry | 条件 PUT 不是可盲重试操作；transport 不做自动 retry。用户显式 retry 也必须先完成 reconcile |
-| Tests | <code>ProjectSaveCoordinatorTests.cs</code>、<code>ProjectPersistenceConcurrencyTests.cs</code>、<code>ProjectServiceTests.cs</code>、Desktop endpoint tests；Next 新增 decoder/persistence owner/409/unknown-outcome tests |
+| Tests | <code>ProjectSaveCoordinatorTests.cs</code>、<code>ProjectPersistenceConcurrencyTests.cs</code>、<code>ProjectServiceTests.cs</code>、Desktop endpoint tests；Next新增decoder+encoder、persistence allowlist、no-op golden、<code>GlobalVariables=null</code>、409/unknown-outcome/rebase tests |
 
 ### 7.5 Preview、artifact、image 与 ROI 协议
 
@@ -593,8 +642,9 @@ POST /api/inspection/admission
 request = {
   projectId,
   surface: "StudioInspectionRun",
+  clientSnapshotId,            # client生成的UUID；同一次admission/execute保持一致
   flowData,                    # 与随后 execute 完全同一冻结 snapshot
-  basePersistenceRevision,
+  basePersistenceRevision,     # 未保存draft仅作trace，不是snapshot authority
   inputMode: "stored-project" | "current-unsaved-draft"
 }
 
@@ -605,18 +655,21 @@ response = {
   violations,
   projectId,
   surface,
+  clientSnapshotId,
   projectPersistenceRevision,
-  flowVersionHash
+  canonicalFlowHash
 }
 ~~~
 
 约束：
 
 - admission 只做 preflight projection，不返回可绕过执行校验的 token，不建立 reservation，不持有 Runtime 状态；
-- <code>runCommandOwner</code> 在 admission 与 execute 间冻结同一 Flow snapshot。任何编辑都会使 admission 变 stale，并要求重新准入；
-- execute 必须再次调用同一 <code>IExecutionAdmissionService</code>。两次结果不一致时，以 execute 的 server code 为 authority，并触发 <code>F03-B25-PREVIEW-RUN-ADMISSION-DIVERGENCE</code> 的诊断记录；
+- <code>runCommandOwner</code> freeze Flow后生成 <code>clientSnapshotId</code>；admission response必须回显该id并返回server canonical hash。任何编辑都会废弃该snapshot并要求重新准入；
+- execute request携同一Flow、同一 <code>clientSnapshotId</code> 和admission返回的expected canonical hash；服务端重新canonicalize并在hash不一致时返回稳定 <code>ADMISSION_SNAPSHOT_MISMATCH</code>，随后仍调用同一 <code>IExecutionAdmissionService</code>；
+- <code>basePersistenceRevision</code> 对未保存draft只用于trace。它不能代替Flow snapshot identity，也不能被当作运行reservation；
+- admission/execute结果不一致时，以execute的server code为authority，并触发 <code>F03-B25-PREVIEW-RUN-ADMISSION-DIVERGENCE</code> 诊断；
 - 未保存但无 unresolved conflict 的 draft 可以作为候选正式运行模式，UI 必须明确显示“运行当前未保存草稿”；是否最终批准见 D08。Conflict、invalid parameter、missing final decision、active runtime 一律阻断；
-- <code>POST /api/inspection/execute</code> 非幂等，永不自动 retry；请求中断后的结果未知时，从 Results/history 按 project/result trace reconcile；
+- <code>POST /api/inspection/execute</code> 非幂等，永不自动 retry；请求中断后的结果未知时，从 Results/history 按 project/clientSnapshot/result trace reconcile；
 - execute 成功后使用 response <code>id/projectId</code> 导航现有 Results deep-link。完整图像/ROI/evidence 复核继续 DEFER；
 - F03 不创建 EventSource、不启动 inspection realtime，也不接 Station SSE。未来 stream 必须有 authenticated fetch-SSE 或独立 stream token ADR，并复用唯一 stream owner。
 
@@ -628,11 +681,27 @@ response = {
 | Project save | <code>CanEditProject</code> | 复用 | 403 进入 readonly；不得隐藏为网络错误 |
 | Camera binding read | <code>CanOperateHardware</code> 且会枚举设备 | 只在用户打开 CameraBinding editor 时请求，或新增纯配置 read contract；二选一需评审 | <code>F03-B02-OPERATOR-CONTRACT-UNSYNCED</code> / D10 |
 | Preview | authenticated + backend side-effect admission | 复用；不新增 frontend side-effect allowlist authority | blocked code 必须保留 |
-| Admission / execute | execute 当前只有 authenticated，无显式 run permission | 推荐引入并同时应用 <code>CanRunInspection</code>；若不引入，必须有记录理由与 endpoint tests | <code>F03-B04-RUN-PERMISSION-UNDECIDED</code> |
+| Admission / execute | execute 当前只有authenticated，无显式run permission | F03选择A/Parity：admission与execute沿用authenticated边界并补endpoint regression；B/Security hardening（新增<code>CanRunInspection</code>、角色迁移、legacy/API regression）不自动纳入F03，需独立批准 | G6入口记录最终选择；若改选B则先完成独立backend contract commit |
 | Results read | authenticated | 复用 | scalar contract only |
 | Host file picker | Desktop host capability | user gesture、correlation、timeout、decoded response；无业务 permission 替代 | Host port 不暴露 Preview/Save/Run |
 
 <code>AUTH_ENTRY_DECISION=PRESEEDED_SESSION_PREVIEW_ONLY</code> 保持不变；F03 不增加 login/logout/setup-admin 流程。任何 role-based button hiding 都只是提示，不能替代 endpoint 的 401/403。
+
+权限方案明确为：
+
+~~~text
+A. F03 Parity（本计划默认）
+   admission + execute = existing authenticated boundary
+   不修改角色映射，不影响 legacy/API 客户端
+
+B. Security Hardening（独立批准后替代A）
+   新增 CanRunInspection
+   → 角色/默认权限迁移
+   → admission + execute 同时应用
+   → legacy Studio、现有API客户端、管理员/工程师/操作员矩阵回归
+~~~
+
+未明确选择A或B时只阻断G6，不阻断G1–G5。
 
 ## 8. Adapter 与生命周期
 
@@ -643,9 +712,17 @@ response = {
 | FlowCanvas | <code>wwwroot/src/core/canvas/flowCanvas.js</code>、<code>flowCanvasAdapter.js</code>、<code>features/flow-editor/flowEditorInteraction.js</code> | 一个 production facade，暴露 deserialize/serialize/add/remove/connect/patch/select/view/subscribe/diagnostics；Lab 与 Workspace 共用 | <code>flowCanvasOwner</code>，每个 active Workspace 恰好 1 | decoded Flow baseline、operator contracts、theme/DPR、readonly/running gate | structure、selection、view、connection result、command error；映射为 readonly projection | workspace generation + projectId + local flowRevision；disposed owner 的 event 丢弃 | unsubscribe → interaction.destroy → adapter.dispose；清 listener、RAF、ResizeObserver、global mouse handlers、context-menu timer |
 | ImageCanvas | <code>wwwroot/src/core/canvas/imageCanvas.js</code> | <code>imageCanvasAdapter</code>，暴露 load blob/image、fit/actual/zoom/pan、overlay、pixel transform、resource diagnostics | <code>imageCanvasOwner</code>，Preview/ROI 共用同一 active viewport owner，不各建一套 ImageCanvas | active Preview image identity/blob、theme/DPR、viewport mode | image-ready/error、view transform、pointer/pixel coordinate、overlay projection | imageLoadGeneration + preview identity；旧 decode/blob 不提交 | destroy observer/listener/RAF；revoke blob URL；close ImageBitmap；清 overlays/pointer capture |
 | ROI | canonical <code>ImageCanvas</code> ROI mode + <code>roiGeometry.mjs</code>；legacy <code>RoiEditorPanel</code> 仅作行为取证 | <code>roiInteractionAdapter</code> 只暴露 geometry set/edit/undo/redo/validate；不 new 第二 ImageCanvas | <code>roiInteractionOwner</code>，挂在现有 <code>imageCanvasOwner</code> 之上 | selected node/parameter contract、image bounds、current geometry、readonly gate | geometryDraftChanged/committed/cancelled/invalid；转成 typed parameter patch 或 atomic Caliper structural command | selection generation + node id + local flowRevision；node/project 切换取消 draft | detach overlay callback/shortcut/pointer state；清 history；不保留 Project asset 或正式 Flow 副本 |
-| Preview | <code>previewCoordinator.js:NodePreviewCoordinator</code> + Preview endpoint/artifact store | transport-injected canonical coordinator facade；legacy 显式注入 legacy client，Next 只注入唯一 <code>apiTransport</code> | <code>previewOwner</code>，每个 active Workspace 恰好 1 | project/flow/node identity、operator metadata、input image、auto/manual trigger | idle/loading/success/error/auth-error/blocked/cancelled、structured output、artifact refs | requestVersion + client sequence + flowRevision + Observation identity + project/node scope | clear debounce/timeout；abort request/artifact read；unsubscribe structure/listeners；revoke URL/delete artifact/clear cache；destroy |
+| Preview | <code>previewCoordinator.js:NodePreviewCoordinator</code> + Preview endpoint/artifact store；当前文件静态import legacy <code>httpClient</code>并作为默认artifact client | 提炼无HTTP静态依赖的canonical coordinator core；legacy/Next composition分别显式注入窄client port | <code>previewOwner</code>，每个 active Workspace 恰好 1 | project/flow/node identity、operator metadata、input image、auto/manual trigger | idle/loading/success/error/auth-error/blocked/cancelled、structured output、artifact refs | requestVersion + client sequence + flowRevision + Observation identity + project/node scope | clear debounce/timeout；abort request/artifact read；unsubscribe structure/listeners；revoke URL/delete artifact/clear cache；destroy |
 
 Vue 组件只接收 readonly projection 与窄 command；不得把 raw <code>FlowCanvas</code>、<code>ImageCanvas</code>、<code>NodePreviewCoordinator</code>、<code>AbortController</code> 或 Host adapter 存入 ref/Pinia/localStorage。
+
+G4 的 Preview composition 硬门禁：
+
+1. canonical coordinator core 不得静态 import <code>core/messaging/httpClient.js</code>；默认 client fallback删除，缺依赖时构造失败。
+2. legacy <code>app.js</code> composition显式传入 legacy preview/artifact client adapter。
+3. StudioUI composition显式传入基于唯一 <code>apiTransport</code> 的 <code>previewTransportPort</code>。
+4. StudioUI production bundle/import graph architecture test禁止出现 <code>core/messaging/httpClient.js</code>。
+5. 上述拆分只能形成两套composition adapter，不能复制两套 <code>NodePreviewCoordinator</code> 状态机。
 
 ### 8.2 创建、切换与销毁顺序
 
@@ -660,7 +737,8 @@ session ready + Workspace flag on
 → imageCanvasOwner mount
 → roiInteractionOwner attach when editor mode requires
 → previewOwner mount and subscribe selection/structure
-→ persistence/run command owners enable after all gates ready
+→ G5 persistence command owner enable after round-trip/save gates
+→ G6 run command owner enable after snapshot/admission gates
 ~~~
 
 销毁顺序：
@@ -790,56 +868,59 @@ StartupConfig featureFlags["Studio2.Workspace"]=false
 
 ### 10.1 推荐数量与依赖
 
-基于当前真实代码量，推荐 5 个 Goal，不采用 3 或 4 个：
+基于当前真实代码量，推荐 6 个串行 Goal：
 
-- 少于 5 个会把 FlowCanvas、Inspector、Preview/Image/ROI 三个独立命令式 owner 域，以及 save/run 跨域事务压进同一验收面；
-- 多于 5 个则会把同一 Flow draft、selection、parameter、Preview identity 拆成多个并行 owner，增加 authority 分裂和共享文件冲突；
-- 因此 5 个 Goal 串行推进，Goal 内仅并行无共享状态权威、无文件重叠的叶子组件和测试。
+- G1–G4 分别建立 Workspace 读取地基、Flow 命令式域、参数合同域、Preview/Image/ROI 命令式域；这些边界与现有 owner、生命周期和合同边界一致；
+- Persistence authority、Execution authority、Final evidence closure 是三个独立高风险验收面。Persistence 必须先以 no-op round-trip、revision/conflict 和 unknown-outcome reconcile 独立稳定，Run 才能消费已冻结的 snapshot 与 revision；
+- 因此把原合并阶段拆为 G5 Persistence 与 G6 Run/Final Closure。6 个 Goal 仍严格串行，不增加并行 authority；Goal 内只允许无共享状态权威、无文件重叠的叶子组件和测试并行。
 
 ~~~mermaid
 flowchart LR
-    R["Review gate：范围、合同、permission、flag"] --> G1["G1 Workspace/合同/Adapter 地基"]
+    R["Review gate：范围、读取合同、flag"] --> G1["G1 Workspace Read Foundation"]
     G1 --> G2["G2 FlowCanvas/Operator Rail"]
     G2 --> G3["G3 Inspector/参数合同"]
     G3 --> G4["G4 Preview/ImageCanvas/ROI"]
-    G4 --> G5["G5 Save/Revision/Run/Final Evidence"]
+    G4 --> G5["G5 Persistence/Revision/Conflict"]
+    G5 --> G6["G6 Admission/Execute/Results/Final Closure"]
     D["每个 Goal 入口重新审计 origin/codex初稿 漂移"] --> G1
     D --> G2
     D --> G3
     D --> G4
     D --> G5
+    D --> G6
 ~~~
 
 ### 10.2 Goal 交付依赖
 
 | Goal | 必须消费的前置产物 | 产出给下一 Goal 的稳定接口 | 禁止越过 |
 | --- | --- | --- | --- |
-| G1 | 本初稿评审决定、两分支 drift ledger | Workspace route/shell、full decoder、唯一 transport/Host port、owner diagnostics、F03 evidence phase | 未冻结合同不得开始 Canvas UI |
+| G1 | 最终计划评审决定、两分支 drift ledger | Workspace route/shell、full decoder/encoder contract、GET query lifecycle、owner diagnostics、F03 evidence phase | 不开放 write/binary/Host picker/admission；未冻结读取与往返字段合同不得开始 Canvas UI |
 | G2 | G1 owner/transport/route；canonical drift 合并策略 | typed Flow draft facade、selection/structure/view projection、Operator Rail commands | 不实现 Inspector 私有 Flow copy |
 | G3 | G2 Flow facade/selection；stable operator metadata decoder | parameter draft/validation/editor registry、FinalDecision projection、特殊编辑覆盖清单 | 不创建 Preview/ImageCanvas owner |
-| G4 | G2 Flow revision；G3 parameter/geometry contracts | Preview/Image/ROI projection、artifact lifecycle、image-backed editor commands | 不建立正式 save/run authority |
-| G5 | G1–G4 全部 owners 与 typed snapshot | atomic save/reconcile、admission/execute/results handoff、Final SHA evidence | 未通过 final gates 不改入口、不退役 legacy |
+| G4 | G2 Flow revision；G3 parameter/geometry contracts | Preview/Image/ROI projection、artifact lifecycle、image-backed editor commands、无 legacy HTTP 静态依赖的 canonical coordinator | 不建立正式 save/run authority |
+| G5 | G1–G4 全部 owners、typed snapshot 与正式 encoder | atomic Project PUT、canonical rebase、revision/conflict/unknown-outcome/close reconcile | 不实现 admission、execute 或 Results handoff |
+| G6 | G5 已稳定的 persistence baseline、冻结 Flow snapshot 与 revision | admission/execute/results handoff、Final SHA evidence 与 rollback decision package | 未通过 final gates 不改入口、不退役 legacy |
 
 ## 11. Goal 拆分
 
-### 11.1 Goal 1 — Workspace Shell、合同冻结与 adapter/lifecycle 地基
+### 11.1 Goal 1 — Workspace Read Foundation
 
 | 项 | 计划 |
 | --- | --- |
-| 目标 | 建立 <code>/projects/:id/workspace</code>、ProductLayout workspaceMode、完整 Project/Flow decoder、唯一 Workspace owner、同一 <code>apiTransport</code> 的 reviewed JSON write/blob 能力、窄 Host file-picker port、owner/resource diagnostics、F03 runner namespace 与 method allowlist |
-| 非目标 | 不渲染正式 Flow 节点；不实现参数编辑、Preview、保存按钮写入、execute；不把 root flag 设为 true |
-| 入口门禁 | D01–D05 至少完成范围/5 Goal/flag/save/admission route 决策；重新 <code>git fetch origin --prune</code>；记录 Next/stable SHA；完成 <code>F03-CANONICAL-DRIFT-001</code> ledger；保护文件与 stable worktree clean/隔离 |
-| Capability | WorkspacePage/Shell、route lifecycle、loading/error/unauthorized/readonly states、project full query、layout projection、host file picker protocol、lifecycle diagnostics |
-| Endpoint 前置 | 冻结 C01–C19；本 Goal 实际只调用 C01/C02，并实现 transport primitive 与 allowlist，其他 command 保持 feature-disabled |
+| 目标 | 建立 <code>/projects/:id/workspace</code>、ProductLayout workspaceMode、完整 Project/Flow decoder、与 decoder 配对的正式 encoder/持久化字段清单、唯一 Workspace owner、GET query lifecycle、owner/resource diagnostics、F03 runner namespace 与读取 route allowlist |
+| 非目标 | 不渲染正式 Flow 节点；不开放 PUT/POST/DELETE/binary；不接 Host file picker；不实现参数编辑、Preview、保存、admission、execute；不把 root flag 设为 true |
+| 入口门禁 | D01、D02、D05、D14 完成范围/6 Goal/flag/渐进 allowlist/canonical 策略决定；重新 <code>git fetch origin --prune</code>；记录 Next/stable SHA；完成 <code>F03-CANONICAL-DRIFT-001</code> ledger；保护文件未进入 index，stable worktree 保持只读隔离 |
+| Capability | WorkspacePage/Shell、route lifecycle、loading/error/unauthorized/readonly states、project full query、layout projection、decoder/encoder contract、lifecycle diagnostics |
+| Endpoint 前置 | 冻结并仅调用 C01/C02；C03–C19 只登记依赖状态，不要求在 G1 开放或实现。G1 architecture guard 必须证明只有 Project/session GET 可达 |
 | 文件 owner | Workspace Foundation Owner：<code>StudioUI/src/capabilities/project-workspace/{WorkspacePage.vue,WorkspaceShell.vue,workspaceOwner.ts,workspaceContracts.ts,workspaceQueries.ts,workspaceUiProjectionOwner.ts,workspaceLifecycleDiagnostics.ts}</code> |
-| 共享文件协调人 | 主协调唯一修改 <code>router.ts</code>、<code>ProductLayout.vue</code>/CSS、<code>productRuntime.ts</code>、<code>apiTransport.ts</code>、StartupConfig/Host、Vite、Design tokens、evidence scripts、package/lockfile、CI、feature flags、C# endpoint/contracts |
+| 共享文件协调人 | 主协调唯一修改 <code>router.ts</code>、<code>ProductLayout.vue</code>/CSS、<code>productRuntime.ts</code>、<code>apiTransport.ts</code>、StartupConfig、Vite、Design tokens、evidence scripts、package/lockfile、CI、feature flags；G1 不修改业务写 endpoint |
 | 可并行子任务 | 在接口冻结后，Workspace layout leaf、decoder unit tests、lifecycle diagnostics tests 可分开；不得并行修改 router/transport/ProductLayout；不得各自建立 owner/store/client |
-| 测试层级 | TS unit：decoder/transport/route projection/Host correlation；architecture：single fetch、no labs、method allowlist、owner 0/1；Desktop：StartupConfig/flag/resolver；Playwright：Loading/401/404/decode/flag-off shell |
+| 测试层级 | TS unit：decoder/encoder、persistence/transient field classification、opaque passthrough、transport/route projection；golden fixture：GET payload decode→encode 结构等价（不在 G1 实际 PUT）；architecture：single fetch、no labs、GET-only allowlist、owner 0/1；Desktop：StartupConfig/flag/resolver；Playwright：Loading/401/404/decode/flag-off shell |
 | WebView2 / 视觉证据 | 独立启动验证 root flag on + Workspace flag off/on；1366×768、1366×600；light/dark、compact/comfortable；只验证 shell/owner lifecycle，不宣称 Flow 功能 |
 | 性能/生命周期预算 | 20 次 route mount/unmount 后 owner/resource 全 0；普通 Project GET 使用 readQuery abort/latest；Workspace shell 首次 ready 不得相对同机 F02 Product route 连续三组回归 >20%；无全页 overflow |
 | 提交策略 | 先提交合同/architecture guard，再提交 transport/route，再提交 Workspace shell/tests；shared file commit 由主协调完成；evidence 临时产物不提交 |
-| 完成门禁 | C02 full decoder 可拒绝 malformed payload；flag-off owner=0；flag-on project success owner=1；route leave=0；GET/WRITE allowlist 已生效；F03 runner 接受 phase/selector；<code>F03-B03/B08/B09/B16/B18/B28</code> 均关闭 |
-| 下一 Goal 输入 | 稳定的 <code>WorkspaceRuntime</code> narrow ports、decoded Flow baseline、owner slot、layout surfaces、transport/Host ports、F03 evidence namespace |
+| 完成门禁 | C02 full decoder 可拒绝 malformed payload；encoder 保留全部 persistence allowlist 字段并只剥离批准的 transient allowlist；未知持久化字段可 opaque passthrough，否则 write capability 必须保持 disabled；flag-off owner=0；flag-on project success owner=1；route leave=0；GET-only allowlist 生效；F03 runner 接受 phase/selector；<code>F03-B08/B09/B16/B18/B28/B33</code> 均关闭 |
+| 下一 Goal 输入 | 稳定的 <code>WorkspaceRuntime</code> narrow read ports、decoded Flow baseline、正式 encoder contract、owner slot、layout surfaces、F03 evidence namespace |
 
 ### 11.2 Goal 2 — FlowCanvas、Operator Rail、节点/端口/连线
 
@@ -868,7 +949,7 @@ flowchart LR
 | 非目标 | 不创建 ImageCanvas/Preview；不实现 rich calibration asset workbench；不迁移完整 GlobalVariables UI；不正式保存 Project |
 | 入口门禁 | G2 selection/patch/atomic structural command稳定；C03/C04 editor decoder frozen；stable <code>parameterDependencyRules.js</code> 语义已同步；D10 CameraBinding 策略决定 |
 | Capability | Inspector normal/empty/connection/readonly modes；boolean/enum/number/nullable/range/slider/text/textarea/color/file/CameraBinding；validation summary；FinalDecision；ROI/NPoint/Caliper editor contract slots |
-| Endpoint 前置 | C03/C04、按决定的 C05、C06；GlobalVariables 只来自 C02 projection；不调用 C09 PUT |
+| Endpoint 前置 | C03/C04、按决定的 C05、C06；本 Goal 才开放 CameraBinding GET、FinalDecision validation POST 与 Host file-picker port；GlobalVariables 只来自 C02 projection；不调用 C09 PUT |
 | 文件 owner | Inspector Owner：<code>project-workspace/inspector/**</code>、<code>parameterEditors/**</code>、<code>parameterValidationOwner.ts</code>、<code>FinalDecisionEditor.vue</code> |
 | 共享文件协调人 | 主协调唯一修改 shared Design primitives/tokens/icons、Host adapter、operator API contracts、canonical dependency rules、C# metadata contracts |
 | 可并行子任务 | 冻结 editor registry interface 后，不同 leaf editor 与其 unit tests可并行；file picker、CameraBinding、FinalDecision可分包；Inspector owner/validation tree/共享 registry 只有一个 owner |
@@ -887,36 +968,55 @@ flowchart LR
 | --- | --- |
 | 目标 | 复用 canonical NodePreviewCoordinator 与 ImageCanvas；完成自动/手动 Preview、高成本/副作用准入、artifact refs/blob、structured result、pixel probe/locked pixel/world coordinate、ROI stats、图像缩放/pan/fit/1:1、image-backed ROI/NPoint/Caliper editor |
 | 非目标 | 不做 inspection realtime/Station SSE；不做 full result image/evidence review；不做 rich NPoint solve/formal asset；不写 Project |
-| 入口门禁 | G2 local flowRevision/event稳定；G3 editor descriptors/validation稳定；C10–C13 frozen；canonical preview/image diff ledger clean；Preview transport injection不引入 legacy httpClient bundle |
+| 入口门禁 | G2 local flowRevision/event稳定；G3 editor descriptors/validation稳定；C10–C13 frozen；canonical preview/image diff ledger clean；canonical coordinator 已可在不静态 import legacy <code>core/messaging/httpClient.js</code> 的条件下组合 |
 | Capability | previewOwner、PreviewPanel、imageCanvasOwner、ImageViewport、roiInteractionOwner、pixelProbeOwner、artifact resource owner；auto/manual controls与 blocked/timeout/auth/error states |
 | Endpoint 前置 | C10/C11/C12/C13；C14/C18/C19 不开放；Preview side-effect code taxonomy冻结 |
 | 文件 owner | Preview/Image Owner：<code>project-workspace/preview/**</code>、<code>image/**</code>、<code>roi/**</code>；canonical <code>previewCoordinator.js</code>/<code>imageCanvas.js</code>/<code>roiGeometry.mjs</code> 由主协调 |
-| 共享文件协调人 | 主协调唯一修改 apiTransport binary/delete、Vite aliases、canonical JS、evidence runner、shared image/ROI tokens/icons |
+| 共享文件协调人 | 主协调唯一修改 apiTransport Preview POST/blob GET/artifact DELETE 支持、Vite aliases、canonical JS、legacy/Next composition roots、evidence runner、shared image/ROI tokens/icons |
 | 可并行子任务 | Preview presentation、pixel probe pure functions、ROI geometry unit tests可并行；previewOwner/imageCanvasOwner/transport/artifact lifecycle串行；不得各建 ImageCanvas实例 owner |
-| 测试层级 | unit：cost policy、five-part identity、abort/latest、artifact cleanup、image load generation、ROI geometry/undo/redo/Caliper rollback；endpoint：Preview/artifact/admission；Playwright：auto/manual/blocked/timeout/image/ROI/pixel；architecture：one Preview/Image owner |
+| 测试层级 | unit：cost policy、five-part identity、abort/latest、artifact cleanup、image load generation、ROI geometry/undo/redo/Caliper rollback；endpoint：Preview/artifact；Playwright：auto/manual/blocked/timeout/image/ROI/pixel；architecture：one Preview/Image owner，StudioUI production bundle/source graph 禁止 import legacy <code>core/messaging/httpClient.js</code> |
 | WebView2 / 视觉证据 | 真 WebView2 DPR/native DPI separate；wheel/pan/pointer capture、ROI keyboard、blob image、route switch cleanup；1366×600 Preview tab恢复；light/dark image overlay可读性 |
 | 性能/生命周期预算 | 500ms debounce保持；auto最多1个pending+1个active且前者被 supersede；高成本 auto 请求数=0；20次 node/project/route switch 后 artifact/url/bitmap/controller/timer=0；Canvas性能连续三组不得回归 >20% |
 | 提交策略 | transport-injection/canonical cleanup；Preview owner；Image owner；ROI/pixel；integrated tests/evidence分 commit；不提交截图/日志到根目录 |
-| 完成门禁 | stale response提交数=0；副作用/高成本策略与 stable一致；artifact/object URL无残留；ROI只写 Flow draft；Preview success不设置 runAllowed；<code>F03-B08/B09/B10/B22/B25/B27</code> 关闭 |
+| 完成门禁 | canonical coordinator 无 legacy client 默认静态依赖；legacy composition 显式注入 legacy adapter，Next composition 显式注入 Studio transport adapter；forbidden-import gate通过；stale response提交数=0；副作用/高成本策略与 stable一致；artifact/object URL无残留；ROI只写 Flow draft；Preview success不设置 runAllowed；<code>F03-B08/B09/B10/B22/B25/B27/B34</code> 关闭 |
 | 下一 Goal 输入 | 可冻结的完整 Flow snapshot、统一 validation/Preview states、resource-clean owners、image/ROI parameter draft、result-ready projection |
 
-### 11.5 Goal 5 — Atomic save、revision/conflict、运行准入与 Final evidence
+### 11.5 Goal 5 — Persistence、revision 与 conflict
 
 | 项 | 计划 |
 | --- | --- |
-| 目标 | 完成唯一 Project PUT、dirty generation、409/unknown-outcome reconcile、route/close guard、readonly/running lock；实现经批准的 run permission/admission、single execute、Results handoff；收集 Final SHA unit/contract/architecture/Playwright/WebView2/Release/no-Node/performance/flag/rollback证据 |
-| 非目标 | 不切默认入口；不实现 realtime/SSE/Station/现场硬件；不退役 legacy；不扩 full result image/evidence |
-| 入口门禁 | G1–G4 complete；D06–D10 解决 permission/admission/dirty-run/execute trace/Camera policy；C07/C15/C16/C17 frozen；stable drift re-audit无未处理 authority/security修复 |
-| Capability | workspacePersistenceOwner、Conflict/Readonly/Running UX、runCommandOwner、admission/execute decoders、Results navigation、close/reload coordination、final status bar/toolbars |
-| Endpoint 前置 | C07；经批准的 C15；adapted C16；C17。C08/C09/C18/C19 保持不调用 |
-| 文件 owner | Persistence/Run Owner：<code>project-workspace/persistence/**</code>、<code>run/**</code>、Workspace toolbar/status集成；backend permission/endpoint/DTO 与 Results shared files由主协调 |
-| 共享文件协调人 | 主协调唯一修改 <code>ApiEndpoints.cs</code>、permission guards、DTO、ProjectService/Coordinator contracts、Results decoder/router、Host close boundary、feature flags、CI/evidence scripts、package/lockfile/csproj |
-| 可并行子任务 | Conflict presentation unit、Results deep-link tests、readonly status components可并行；Project save owner、run owner、backend endpoint/permission与共享 integration串行；同一 <code>.csproj</code> tests串行 |
-| 测试层级 | save generation/PSV011/GV031/network-unknown/no retry；backend concurrency/permission/admission/execute trace；integrated Playwright full task chain；architecture method audit；legacy regression；flag/rollback；Final SHA CI |
-| WebView2 / 视觉证据 | 真 WebView2 完整链：Projects→Workspace→edit→Preview→save/conflict→admission→execute→Results；1366×768/600、theme/density、DPR/native DPI；separate Release published executable与no-Node process tree |
-| 性能/生命周期预算 | save/execute各仅1 in-flight；无客户端 save queue；route leave后 stale callback=0；full chain无未解释 >50ms long task burst；100/150、300/450 fixtures相对 stable连续三组不超20%；20次 full cycle资源归零 |
-| 提交策略 | atomic persistence；permission/admission backend；execute/results；final integration；evidence/docs分别提交。每次 push前 fetch；不得混入 protected files；Final candidate后不再改代码而复用旧证据 |
-| 完成门禁 | local/tracking/remote Final SHA一致；unit/contract/architecture/Playwright适用项通过；真实 WebView2/Release/no-Node/DPI evidence与Final SHA相同；method allowlist无额外写；flag-off/rollback通过；所有 B01–B32 阻断项关闭或经评审明确 DEFER |
+| 目标 | 完成唯一 Project PUT、dirty generation、server canonical response rebase、PSV011 conflict、GV031 running lock、network/abort unknown-outcome reconcile、route/close settle-or-reconcile 与 readonly 写入阻断 |
+| 非目标 | 不实现 admission、execute、Results handoff 或 Final closure；不迁移 GlobalVariables UI；不创建客户端 save queue；不切默认入口 |
+| 入口门禁 | G1–G4 complete；D03、D09、D11、D16 的 persistence 部分解决；C07 frozen；正式 encoder、persistence/transient allowlist 与 no-op round-trip golden fixture通过；stable drift re-audit无未处理 Project/Flow authority修复 |
+| Capability | workspacePersistenceOwner、dirtyGeneration、Conflict/Readonly/Running UX、unknownOutcomeReconciler、route/close coordination、save toolbar/status projection |
+| Endpoint 前置 | 只开放 C07 <code>PUT /api/projects/{id}</code>；request 携完整 Project metadata/Flow、<code>GlobalVariables=null</code>、server-issued <code>ExpectedPersistenceRevision</code>。C08/C09/C15/C16/C18/C19 保持不调用 |
+| 文件 owner | Persistence Owner：<code>project-workspace/persistence/**</code> 与 Workspace save toolbar/status integration；Project DTO/encoder、Host close boundary、ProjectService/Coordinator contract shared files由主协调 |
+| 共享文件协调人 | 主协调唯一修改 apiTransport Project PUT route support、Project DTO/encoder contracts、Host close boundary、feature flags、C# Project endpoint/Application Service/Coordinator regression、package/lockfile/csproj |
+| 可并行子任务 | Conflict presentation、readonly/running status、golden fixture扩展可在接口冻结后并行；唯一 persistence owner、encoder、Project PUT 与 close/reconcile integration串行；同一 <code>.csproj</code> tests串行 |
+| 测试层级 | decoder/encoder golden：<code>GET → decode → no edit → encode → PUT(GlobalVariables=null) → GET</code>；metadata、port/parameter IDs、DecisionConfiguration 与 opaque persistence字段结构等价；dirty generation；save中继续编辑；PSV011/GV031；network/abort unknown outcome；无自动retry；server canonical response一次性rebase Canvas/Inspector/Preview；legacy Project save regression |
+| WebView2 / 视觉证据 | 真 WebView2 覆盖 edit→save、save中继续编辑、Conflict、Running lock、unknown outcome reopen/reconcile、route/close guard；1366×600 下 save/conflict/readonly状态可见；本 Goal 不宣称运行链通过 |
+| 性能/生命周期预算 | save最多1 in-flight；无客户端 save queue与transport retry；route leave后 stale callback=0；20次 save/conflict/reconcile cycle 后 command owner、controller、listener归零；预算与第13.3节记录的同机 fingerprint绑定 |
+| 提交策略 | encoder/round-trip guard；atomic persistence；conflict/unknown outcome；Host close coordination；integration tests按逻辑分 commit。每次 push前 fetch，不混入 run/backend security改动 |
+| 完成门禁 | no-op round-trip除 transient strip allowlist 外结构等价；未知 persistence字段不会静默丢失；Project PUT始终 <code>GlobalVariables=null</code>；PersistenceRevision只由server response更新；PSV011/GV031/unknown outcome/close-reconcile通过；save后各 projection同 baseline；<code>F03-B11/B20/B21/B24/B30/B33</code> 关闭 |
+| 下一 Goal 输入 | 已稳定并可复核的 server canonical Project/Flow baseline、PersistenceRevision、冻结 snapshot encoder、无 unresolved conflict 的运行候选输入 |
+
+### 11.6 Goal 6 — Admission、execute、Results 与 Final Closure
+
+| 项 | 计划 |
+| --- | --- |
+| 目标 | 完成经批准的 admission-only contract、snapshot identity、single execute、Results scalar deep-link；收集同一 Final SHA 的 unit/contract/architecture/Playwright/真实 WebView2/Release/no-Node/DPI/performance/flag/rollback证据并形成 completion report |
+| 非目标 | 不切默认入口；不实现 realtime/SSE/Station/现场硬件；不退役 legacy；不扩 full result image/ROI/evidence；不把 admission 变成 reservation 或 Runtime authority |
+| 入口门禁 | G5 complete；D04、D06、D07、D08、D13 与 D17 解决；C15/C16/C17 frozen；permission 选择、<code>clientSnapshotId</code>/<code>canonicalFlowHash</code>、未保存 draft 语义与 stable drift审计均有评审记录 |
+| Capability | runCommandOwner、admission/execute decoders、frozenSnapshotIdentity、Results navigation、run toolbar/status、final evidence/rollback coordination |
+| Endpoint 前置 | 开放经批准的 C15 admission POST、C16 execute POST 与 C17 Results GET。两次 POST 使用同一冻结 Flow 与 <code>clientSnapshotId</code>；admission 返回 canonical hash，execute重算并以 <code>ADMISSION_SNAPSHOT_MISMATCH</code> 拒绝不一致。<code>basePersistenceRevision</code> 对未保存 draft 仅作 trace |
+| 文件 owner | Run/Final Closure Owner：<code>project-workspace/run/**</code>、run toolbar/status integration、Results handoff tests/evidence；backend permission/endpoint/DTO、Results shared decoder/router、CI/evidence scripts由主协调 |
+| 共享文件协调人 | 主协调唯一修改 <code>ApiEndpoints.cs</code>、permission guards/role mappings、admission/execute DTO 与 service wiring、Results decoder/router、CI/evidence scripts、package/lockfile/csproj |
+| 可并行子任务 | Results deep-link tests、run status leaf、evidence manifest校验可在合同冻结后并行；run owner、backend endpoint/permission与共享 integration串行；同一 <code>.csproj</code> tests串行 |
+| 测试层级 | permission matrix；admission/execute same-snapshot、edited-between、hash mismatch、service revalidation；execute success/failure/timeout/unknown；Results identity；完整 Playwright task chain；GET/WRITE audit；legacy execute regression；flag/rollback；Final SHA CI |
+| WebView2 / 视觉证据 | 真 WebView2 完整链：Projects→Workspace→edit→Preview→save或明确运行未保存draft→admission→execute→Results；1366×768/600、theme/density、Browser DPR/真实DPI分开；独立 Release published executable与no-Node process tree |
+| 性能/生命周期预算 | admission/execute各最多1 in-flight且latest-request-wins仅适用于可取消的preflight，不自动重试execute；disposed owner回写=0；完整链无未解释long-task burst；100/150、300/450与20-cycle结果绑定同一环境 fingerprint |
+| 提交策略 | permission/admission backend独立 contract commit；snapshot identity/execute；Results handoff；final integration；evidence/docs分别提交。Final candidate后任何代码修复产生新 SHA并重跑受影响证据 |
+| 完成门禁 | permission决定与角色/legacy回归一致；admission不建立reservation且execute总是重验；snapshot mismatch稳定拒绝；local/tracking/remote Final SHA一致；适用 unit/contract/architecture/Playwright、真实 WebView2、Release、no-Node、DPI、performance、method/flag/rollback evidence均指向该 SHA；所有适用 blocker关闭或经评审明确 DEFER |
 | 下一阶段输入 | 评审通过的 F03 completion report、完整 evidence index、已知 deferred contracts；仍保持 <code>StudioUiEnabled=false</code>，入口切换另立 Goal |
 
 ## 12. 文件 owner 与并行规则
@@ -929,7 +1029,8 @@ flowchart LR
 | <code>project-workspace/flow/**</code>、Operator Rail | Flow Workspace Owner | Rail presentation、pure tests | 直接持 raw Canvas、修改 Inspector/Preview/persistence owner |
 | <code>project-workspace/inspector/**</code> | Inspector Owner | 独立 leaf editor/test | 修改 Flow owner、建第二 validation tree/Preview engine |
 | <code>project-workspace/preview/**</code>、<code>image/**</code>、<code>roi/**</code> | Preview/Image Owner | pure formatter/geometry/pixel tests | 第二 ImageCanvas/Preview owner、Project asset 写入 |
-| <code>project-workspace/persistence/**</code>、<code>run/**</code> | Persistence/Run Owner | Conflict/Results leaf tests | 第二 save client/queue、Runtime state machine、WebMessage execute |
+| <code>project-workspace/persistence/**</code> | Persistence Owner | Conflict/readonly leaf tests、golden fixtures | 第二 save client/queue、GlobalVariables patch、run command |
+| <code>project-workspace/run/**</code> | Run/Final Closure Owner | Results/status leaf tests、evidence manifest校验 | Runtime state machine、WebMessage execute、修改 persistence baseline |
 | canonical <code>wwwroot/src/core/canvas/**</code>、<code>features/flow-editor/**</code> 跨分支同步 | 主协调 | 只读审计可并行 | 多人整文件合并、手抄 stable 工作区文件、ours/theirs 粗暴选择 |
 | Router、ProductLayout、navigation、tokens/icons、apiTransport/readQuery、Host/StartupConfig、Vite | 主协调 | 无并行写 | capability owner自行修改共享 root |
 | API DTO/endpoints/Application Service/permission、<code>.csproj</code>、CI、scripts、package/lockfile | 主协调 | 不同测试项目且资源完全隔离时只读/执行可并行 | 多 owner 修改同一 contract；同一 csproj并行 test |
@@ -939,7 +1040,7 @@ flowchart LR
 ### 12.2 并行实施规则
 
 1. 每个 capability 同一时刻只有一个实现 owner，主协调维护文件白名单；越界需求只报告。
-2. Design primitives、纯 formatter/decoder tests、独立 leaf editor 可以并行；FlowCanvas+Inspector+Preview、save+GlobalVariables、bootstrap/router/providers 不拆成多个 owner。
+2. Design primitives、纯 formatter/decoder tests、独立 leaf editor 可以并行；FlowCanvas+Inspector+Preview、save+Project encoder、run+admission、bootstrap/router/providers 不拆成多个 owner。G5 与 G6 串行，不能并行修改同一 snapshot/revision boundary。
 3. 共享 contract 变更先由主协调提交，子任务只消费固定 SHA/interface；不得在各自分支创建临时同名 client/store 后事后合并。
 4. 同一 <code>.csproj</code> 的 <code>dotnet test</code> 串行；推荐用仓库 <code>scripts/run-dotnet-test-serial.ps1</code> 或固定 regression script。已 build 后定向测试用 <code>-NoBuild -NoRestore</code>。
 5. Browser/WebView2 并行运行必须隔离 HTTP/CDP/PLC port、WebView2 user-data、SQLite/test DB、result/evidence/publish目录。
@@ -987,7 +1088,7 @@ StudioUI/src/capabilities/project-workspace/
 | Lifecycle/leak | Canvas Lab owner tests、现有 memory tests、runner instrumentation | Workspace/Flow/Image/ROI/Preview/save/run resource ledger，20次 route/project/full-cycle | owner/resource计数是主要 gate；heap/listener只作趋势并需解释 |
 | DPR | existing Canvas Browser DPR 1/1.25/1.5/2 | Workspace Flow/Image/ROI/pixel matrix与1366×600组合 | 只结论为 browser-emulated DPR |
 | 真实 DPI | WebView2 matrix可记录 native DPI、PerMonitorV2、JS DPR、截图像素 | 至少一组真实 Windows DPI matrix，Flow/Image/ROI坐标一致 | 未记录 native DPI则 <code>NOT PERFORMED</code> |
-| 性能 | canonical 100/150、300/450 fixtures；existing performance runner | 完整 Workspace而非仅Lab；route ready、interaction、Preview、heap/long task、resource cleanup | 2 warmups+5 formal samples；相同 fingerprint比较 |
+| 性能 | canonical 100/150、300/450 fixtures；existing performance runner | 完整 Workspace而非仅Lab；route ready、interaction、Preview、heap/long task、resource cleanup | 2 warmups+5 formal samples；绝对预算与回归判断都绑定相同环境 fingerprint |
 | Release publish | Desktop csproj 已把 Vite dist复制到 published <code>wwwroot/studio</code> | Release publish到 <code>.tmp/publish-check/studio-ui-next-f03/**</code>；验证 assets/hash/startup | Debug/WebView2 smoke不能替代 Release |
 | no-Node | <code>Test-StudioUiNoNodeEvidence.ps1</code> | 接受 f03 phase；扫描 source/node_modules/runtime/source map/Vite signature；运行 published process tree | “clean machine without Node”未做则明确 NOT PERFORMED |
 | Feature Flag / rollback | Startup resolver/Host tests | 四种 flag truth table、独立启动、owner counts、legacy回退、assets-missing diagnostic | CSS hidden或同页双root直接失败 |
@@ -1008,12 +1109,14 @@ Playwright Browser fixture 与真实 WebView2 至少覆盖：
 
 ### 13.3 性能与生命周期预算
 
+所有绝对时间与相对回归门禁都必须绑定 evidence manifest 中的环境 fingerprint：CPU 型号/逻辑核、内存、Windows build、电源模式、GPU/driver、WebView2/Chromium runtime、.NET runtime、build configuration、窗口/viewport、DPR/native DPI、fixture ID 与 source SHA。fingerprint 不同的结果只能作为趋势线索，不能直接据此 PASS/BLOCK；100ms 等绝对目标也必须同时报告该 fingerprint 和样本分布。
+
 | 指标 | Budget / gate |
 | --- | --- |
 | Owner | Workspace/Flow/Image/ROI/Preview 各 0/1；任何时刻 >1 block |
 | Route/project cycles | 20次后 unmounted owner、subscription、timer、RAF、observer、controller、blob、artifact、Host subscription均为0 |
 | Canvas fixtures | 100/150与300/450；2 warmups+5 samples；相对stable同fingerprint >20% 为warning，连续3组 >20% block |
-| Long task | 普通参数输入不产生 >50ms long task；完整Flow validation p95目标≤100ms；超预算先profile，不得删校验 |
+| Long task | 在记录的同机 fingerprint 下，普通参数输入不产生 >50ms long task；完整Flow validation p95目标≤100ms；超预算先profile，不得删校验 |
 | Preview | 500ms debounce；同一owner最多1 active request；高成本auto request=0；stale UI commit=0 |
 | Save/Run | save与execute各最多1 in-flight；无自动retry、无客户端save queue；disposed owner回写=0 |
 | Layout | 1366×600无全页overflow；toolbar/status/Canvas minimum/恢复入口可见 |
@@ -1033,19 +1136,28 @@ PublishRoot=.tmp/publish-check/studio-ui-next-f03/**
 - 截图只使用仓库脚本、Playwright 和 WebView2 runner；禁止 computer-use 操作用户屏幕。
 - 每份 evidence manifest 记录 source SHA、stable audit SHA、configuration、runtime kind、data/auth source、route、window/viewport、DPR/native DPI、expected/observed methods、owner/resource counters。
 - Final candidate 发生任何代码或配置变化后，旧 evidence 立即降级为历史线索；不得“补写”成新 SHA 的 PASS。
-- 本初稿审计阶段所有 build/test/Playwright/WebView2/DPI/Release/no-Node/performance/CI 均为 <strong>NOT RUN / NOT PERFORMED</strong>。
+- 本次计划修订阶段所有 build/test/Playwright/WebView2/DPI/Release/no-Node/performance/CI 均为 <strong>NOT RUN / NOT PERFORMED</strong>；代码级审计与文档机械检查不冒充上述运行证据。
 
 ## 14. 风险、阻断码与门禁
+
+第二轮计划评审的四个修订项已在本计划文本中关闭，关闭的是“计划表达与边界”，不是 F03 实现门禁：
+
+| 修订项 | 计划关闭证据 |
+| --- | --- |
+| F03-PLAN-R1-GLOBAL-VARIABLE-CONTRACT | C07/G5 固定 <code>GlobalVariables=null</code>；删除变量差量/round-trip 假设 |
+| F03-PLAN-R2-SPLIT-PERSISTENCE-AND-RUN | 第10–11节改为6个串行Goal，G5/G6分别验收 persistence 与 run/final closure |
+| F03-PLAN-R3-WRITE-ROUNDTRIP-CONTRACT | 第7.3节、G1/G5加入 encoder、字段清单、opaque passthrough 与 no-op golden chain |
+| F03-PLAN-R4-PREVIEW-LEGACY-HTTP-DEPENDENCY | 第8节与G4要求删除 canonical coordinator 静态 legacy client依赖，并设置 forbidden-import gate |
 
 | 阻断码 | 风险/触发条件 | 可判定检测 | 解除条件 / 行动 |
 | --- | --- | --- | --- |
 | F03-B01-STABLE-BASELINE-DRIFT | Goal入口 stable SHA前进或owner/contract变化未审计 | fetch后 diff/log、canonical ledger | 逐符号分类 authority/security/UI drift；更新矩阵/合同后再开工 |
 | F03-CANONICAL-DRIFT-001 | whole-file同步会丢 stable业务语义或Next lifecycle hardening | 指定 canonical 文件 cross-SHA diff与parity/lifecycle tests | stable authority + Next hardening语义合并；禁止ours/theirs |
 | F03-B02-OPERATOR-CONTRACT-UNSYNCED | metadata decoder缺 visible/hidden/ignored/output/image/lifecycle 字段 | contract fixture与stable payload对比 | decoder freeze、parity tests、unknown字段策略通过 |
-| F03-B03-WRITE-GUARD-NOT-FROZEN | POST/PUT/DELETE route超allowlist或组件直调 | architecture/method audit | 只保留C06/C07/C10/C12/C15/C16 approved routes与唯一transport |
-| F03-B04-RUN-PERMISSION-UNDECIDED | admission/execute权限未决或两者不一致 | endpoint metadata/permission tests | D06批准并双端点一致；或记录明确不新增permission的评审决定 |
-| F03-B05-ADMISSION-CONTRACT-MISSING | UI准备显示runAllowed但无authority-backed preflight | C15 endpoint/decoder tests缺失 | 薄endpoint通过且execute仍重验；否则不显示runAllowed |
-| F03-B06-RUN-REVISION-UNBOUND | execute结果无法关联Flow snapshot/project revision | request/response trace tests | flow hash/project revision/runId合同冻结；dirty模式标签明确 |
+| F03-B03-WRITE-GUARD-NOT-FROZEN | Goal所需方法/route超渐进allowlist或组件直调 | architecture/method audit | 按G1–G6只开放7.2批准route；组件仅持窄capability port与唯一transport |
+| F03-B04-RUN-PERMISSION-UNDECIDED | G6开始前 admission/execute权限政策未决或两者不一致 | endpoint metadata/permission/role tests | D06选择parity或独立security hardening并完成对应回归；只阻断G6 |
+| F03-B05-ADMISSION-CONTRACT-MISSING | G6 UI准备显示runAllowed但无authority-backed preflight | C15 endpoint/decoder tests缺失 | 薄endpoint通过且execute仍重验；否则不显示runAllowed；只阻断G6 |
+| F03-B06-RUN-REVISION-UNBOUND | execute无法关联冻结Flow snapshot或把PersistenceRevision误当snapshot identity | request/response trace/hash tests | <code>clientSnapshotId</code>与server <code>canonicalFlowHash</code>冻结；execute重算校验；revision仅作trace；只阻断G6 |
 | F03-B07-SSE-AUTH-UNUSABLE | 原生EventSource无法携bearer或新增第二stream client | stream auth integration test | F03保持DEFER；未来独立ADR后才解除 |
 | F03-B08-DUPLICATE-OWNER | 任一capability owner count>1或两个写入口 | runtime diagnostics/architecture guard | 冲突即抛错；dispose旧owner后计数≤1 |
 | F03-B09-HIDDEN-NOT-DISPOSED | route/flag/project切换后资源仍活跃 | 20-cycle ledger | 全owner/resource归0；CSS hidden不计通过 |
@@ -1072,23 +1184,25 @@ PublishRoot=.tmp/publish-check/studio-ui-next-f03/**
 | F03-B30-PROTECTED-FILE-TOUCHED | <code>CLAUDE.md</code>或<code>.codex/config.toml</code>进入diff/index | <code>git status</code>/<code>git diff --cached</code> | 立即停止；只让用户处理，F03提交不得包含 |
 | F03-B31-SCOPE-CREEP | 入口切换/auth闭环/Station/Runtime/Agent/Settings/现场硬件被并入 | Goal diff与method audit | 移出F03，记录后续阶段/独立ADR |
 | F03-B32-HOST-BYPASS | WebMessage暴露Preview/Save/Run/Flow mutation | Host message allowlist/handler tests | 只保留文件/窗口宿主能力；正式业务使用authenticated HTTP |
+| F03-B33-PERSISTENCE-ROUNDTRIP-LOSS | decoder/Canvas serialize/encoder静默丢失持久化字段，或未知字段被忽略后写回 | no-op golden chain、field allowlist、GET/PUT/GET结构diff | 除批准transient strip字段外结构等价；未知持久化字段opaque passthrough，否则禁用save |
+| F03-B34-PREVIEW-LEGACY-HTTP-BUNDLED | canonical Preview coordinator静态import legacy <code>httpClient.js</code>，Next注入后仍进入bundle | source graph、production bundle forbidden-import test | core无默认legacy静态依赖；legacy/Next composition分别显式注入各自adapter |
 
 所有 blocker 必须有实际测试或审计记录。不能用“加强测试”“后续关注”关闭；若业务决定接受风险，必须在第 17 节形成明确评审结论和新的边界，而不是静默降级。
 
 ## 15. 提交和 CI 策略
 
-### 15.1 本初稿交付
+### 15.1 本最终计划交付
 
 本轮只允许提交本文：
 
 ~~~text
-docs/进行中/StudioUINext/Studio_UI_Next_F03_完整开发计划_初稿.md
+docs/进行中/StudioUINext/Studio_UI_Next_F03_完整开发计划.md
 ~~~
 
 提交信息固定：
 
 ~~~text
-docs(studio-ui): draft F03 workspace migration plan
+docs(studio-ui): finalize F03 workspace migration plan
 ~~~
 
 提交前：
@@ -1104,7 +1218,7 @@ docs(studio-ui): draft F03 workspace migration plan
 ### 15.2 未来 F03 开发提交
 
 - 每个 Goal 至少分“contract/guard”“capability”“tests/evidence/docs”逻辑提交；canonical stable同步单独提交并记录source SHA。
-- 不把五个 Goal压成一个巨型提交；也不为每个叶子创建平行基础设施后事后合并。
+- 不把六个 Goal压成一个巨型提交；也不为每个叶子创建平行基础设施后事后合并。
 - shared file只由主协调提交；capability owner提交前提供白名单diff。
 - 不提交 <code>.tmp/**</code>、publish、截图、日志、test results、WebView2 user-data、DB或Node依赖。
 - 每个 Goal push前再次fetch；remote前进或分叉时停止并报告，不force push、不rebase共享分支。
@@ -1148,25 +1262,25 @@ F03 完成只表示“核心视觉工程任务链在flag-gated Next Workspace中
 
 本表所有项当前均为 <code>REVIEW_REQUIRED</code>；推荐值不是自动批准。阻断 Goal 表示未决时不得开始相应实现。
 
-| ID | 决策 | 推荐初稿 | 阻断 Goal |
+| ID | 决策 | 推荐方案 | 阻断 Goal |
 | --- | --- | --- | --- |
-| D01 | 是否接受F03范围与5个串行Goal | 接受5 Goal；保持本节非目标 | G1 |
+| D01 | 是否接受F03范围与6个串行Goal | 接受6 Goal；G5独立验收Persistence，G6独立验收Run/Final Closure；保持本节非目标 | G1 |
 | D02 | Workspace route与flag名称 | <code>/projects/:id/workspace</code>；<code>Studio:WorkspaceCapabilityEnabled</code> → <code>Studio2.Workspace</code>，默认false | G1 |
-| D03 | 正式保存入口 | 只用一次 <code>PUT /api/projects/{id}</code> 携完整Flow/changed Variables/expected revision；禁用Flow-only PUT | G1/G5 |
-| D04 | Admission-only route | 新增薄 <code>POST /api/inspection/admission</code>，仅复用现有service，无reservation/authority | G1/G5 |
-| D05 | F03 HTTP method allowlist | 接受7.2清单；其余route全部拒绝 | G1 |
-| D06 | Run permission | 新增 <code>CanRunInspection</code> 并同时应用admission/execute；若不新增需安全评审理由 | G5 |
-| D07 | Run trace fields | admission/execute返回 project revision、flowVersionHash、runId/result identity；additive contract | G5 |
-| D08 | 未保存draft能否正式运行 | 允许无Conflict且通过validation/admission的同一冻结draft；显式标“运行当前未保存草稿” | G5 |
+| D03 | 正式保存入口 | 只用一次 <code>PUT /api/projects/{id}</code>，携完整Project metadata/Flow、<code>GlobalVariables=null</code>、server-issued expected revision；禁用Flow-only PUT；必须先过no-op round-trip gate | G5 |
+| D04 | Admission-only route | 新增薄 <code>POST /api/inspection/admission</code>，仅复用现有service，无reservation/authority；只在G6开放 | G6 |
+| D05 | F03 HTTP method allowlist | 接受7.2渐进清单；G1仅GET，G3/G4/G5/G6按capability逐步开放；其余route全部拒绝 | 各Goal自身 |
+| D06 | Run permission | 默认选择A parity：admission与execute沿用现有authenticated边界；B security hardening须独立backend contract commit新增 <code>CanRunInspection</code>，并完成角色迁移、legacy/API回归后才可采用 | G6 |
+| D07 | Run trace fields | 先以当前execute response缺少runId/flow hash/revision为事实基线；G6合同测试若证明Results handoff/诊断需要，再以additive字段冻结，不预先假定字段已存在 | G6 |
+| D08 | 未保存draft能否正式运行 | 允许无Conflict且通过validation/admission的同一冻结draft；显式标“运行当前未保存草稿”；绑定 <code>clientSnapshotId</code> 与server canonical hash，base revision仅作trace | G6 |
 | D09 | PSV011 Conflict UX | 保留local draft、GET server、compare/reapply/discard；禁止自动retry | G5 |
 | D10 | CameraBinding读取策略 | 首选用户打开editor时调用现有CanOperateHardware GET；若硬件枚举副作用不可接受，再提纯配置read contract | G3 |
 | D11 | 本机draft备份 | 不复制现有跨用户 <code>cv_autosave_backup</code>；若保留，必须session/user/project/schema scoped且默认不覆盖server | G5 |
 | D12 | 特殊编辑器边界 | G3冻结metadata/editor contract；G4实现image-backed ROI/NPoint/Caliper；rich calibration asset仍DEFER | G3/G4 |
-| D13 | Result复核范围 | F03只复用scalar Results deep-link；image/ROI/evidence另立阶段 | G5 |
-| D14 | Canonical facade策略 | Lab与Workspace共用一个production facade；stable authority语义与Next lifecycle hardening逐符号合并 | G1/G2 |
-| D15 | 性能/lifecycle预算 | 接受13.3：20-cycle、100/150和300/450、>20%连续3组block | G1–G5 |
+| D13 | Result复核范围 | F03只复用scalar Results deep-link；image/ROI/evidence另立阶段 | G6 |
+| D14 | Canonical facade策略 | Lab与Workspace共用一个production facade；stable authority语义与Next lifecycle hardening逐符号合并；Preview core移除legacy HTTP静态默认依赖，由legacy/Next composition显式注入 | G1/G2/G4 |
+| D15 | 性能/lifecycle预算 | 接受13.3：20-cycle、100/150和300/450、>20%连续3组block；所有绝对/相对结论绑定完整机器与runtime fingerprint | G1–G6 |
 | D16 | Ctrl+S与Host close | 实现真实Workspace-scoped Ctrl/Cmd+S；去除虚假F5标签；close/reload遵循save settle-or-reconcile | G3/G5 |
-| D17 | stable同步截止与Final证据 | 每Goal入口同步审计；Final candidate后若stable有authority/security变化则重新评估，不带病宣称完成 | G1–G5 |
+| D17 | stable同步截止与Final证据 | 每Goal入口同步审计；Final candidate后若stable有authority/security变化则重新评估，不带病宣称完成 | G1–G6 |
 
 评审通过前保持：
 
@@ -1177,4 +1291,4 @@ AUTH_ENTRY_DECISION=PRESEEDED_SESSION_PREVIEW_ONLY
 STATION_SSE=DEFERRED
 ~~~
 
-本初稿只完成代码级审计与开发计划，不开始 F03 生产实现。
+本最终计划已完成代码级审计、独立复核与评审修订，状态为 <code>READY_FOR_APPROVAL</code>；获得明确批准前不开始 G1，当前没有开始 F03 生产实现。
