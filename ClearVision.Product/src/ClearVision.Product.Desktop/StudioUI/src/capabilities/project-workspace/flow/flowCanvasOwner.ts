@@ -6,6 +6,8 @@ import {
   type CanonicalFlowCommandResult,
   type CanonicalFlowDraft,
   type CanonicalFlowFeedback,
+  type CanonicalNodeParameterPatch,
+  type CanonicalNodePropertiesPatch,
   type CanonicalOperatorDefinition,
   type CanonicalCanvasRuntimeSnapshot,
   type FlowMutationGate
@@ -15,6 +17,7 @@ import {
   createOperatorCatalogQuery
 } from '@/capabilities/operators-read/operatorQueries';
 import type { OperatorCatalogItem } from '@/capabilities/operators-read/operatorContracts';
+import type { OperatorParameter } from '@/capabilities/operators-read/operatorContracts';
 import type {
   WorkspaceFlowV1,
   WorkspaceJsonValue,
@@ -25,6 +28,10 @@ import type {
   WorkspaceLifecycleDiagnosticsOwner,
   WorkspaceResourceSnapshot
 } from '../workspaceLifecycleDiagnostics';
+import {
+  createInspectorOwner,
+  type InspectorOwner
+} from '../inspector';
 
 export type FlowCanvasOwnerPhase = 'idle' | 'mounted' | 'error' | 'disposed';
 
@@ -67,12 +74,28 @@ export interface FlowCanvasCommands {
   redo(): CanonicalFlowCommandResult;
   selectAll(): CanonicalFlowCommandResult;
   clearSelection(): CanonicalFlowCommandResult;
+  selectNode(nodeId: string): CanonicalFlowCommandResult;
   connect(command: CanonicalConnectCommand): CanonicalFlowCommandResult;
   disconnect(connectionId: string): CanonicalFlowCommandResult;
+  patchNodeParameter(command: FlowNodeParameterPatch): CanonicalFlowCommandResult;
+  patchNodeProperties(command: FlowNodePropertiesPatch): CanonicalFlowCommandResult;
   zoomIn(): CanonicalFlowCommandResult;
   zoomOut(): CanonicalFlowCommandResult;
   resetView(): CanonicalFlowCommandResult;
   focus(): void;
+}
+
+export interface FlowNodeParameterPatch {
+  readonly nodeId: string;
+  readonly parameterName: string;
+  readonly value: WorkspaceJsonValue;
+  readonly definition?: OperatorParameter;
+}
+
+export interface FlowNodePropertiesPatch {
+  readonly nodeId: string;
+  readonly name?: string;
+  readonly isEnabled?: boolean;
 }
 
 export interface FlowCanvasOwner {
@@ -80,6 +103,7 @@ export interface FlowCanvasOwner {
   readonly projection: DeepReadonly<FlowCanvasOwnerProjection>;
   readonly commands: FlowCanvasCommands;
   mountCanvas(options: FlowCanvasMountOptions): void;
+  openInspector(): InspectorOwner;
   refreshOperators(force?: boolean): Promise<void>;
   setMutationGate(gate: FlowMutationGate): void;
   dispose(reason?: string): void;
@@ -112,9 +136,11 @@ function toCanvasFlow(flow: WorkspaceFlowV1 | null, projectName: string): Readon
   }
 
   return Object.freeze({
+    ...flow.opaquePassthrough,
     id: flow.id,
     name: flow.name,
     operators: Object.freeze(flow.operators.map(operator => Object.freeze({
+      ...operator.opaquePassthrough,
       id: operator.id,
       name: operator.name,
       type: enumPersistenceValue(operator.type),
@@ -176,7 +202,8 @@ function initialDraft(flow: WorkspaceFlowV1 | null, projectName: string): Canoni
     connections: Array.isArray(canvasFlow.connections)
       ? canvasFlow.connections as readonly Readonly<Record<string, unknown>>[]
       : Object.freeze([]),
-    decisionConfiguration: canvasFlow.decisionConfiguration ?? null
+    decisionConfiguration: canvasFlow.decisionConfiguration ?? null,
+    opaquePassthrough: flow?.opaquePassthrough ?? Object.freeze({})
   });
 }
 
@@ -197,6 +224,20 @@ function operatorDefinition(operator: OperatorCatalogItem): CanonicalOperatorDef
     inputPorts: operator.inputPorts,
     outputPorts: operator.outputPorts,
     parameters: operator.parameters
+  });
+}
+
+function parameterDefinition(parameter: OperatorParameter): CanonicalNodeParameterPatch['definition'] {
+  return Object.freeze({
+    name: parameter.name,
+    displayName: parameter.displayName,
+    description: parameter.description,
+    dataType: parameter.dataType,
+    defaultValue: parameter.defaultValue,
+    minValue: parameter.minValue,
+    maxValue: parameter.maxValue,
+    isRequired: parameter.isRequired,
+    options: parameter.options
   });
 }
 
@@ -246,6 +287,7 @@ export function createFlowCanvasOwner(options: {
   let unsubscribeHost: (() => void) | undefined;
   let disposed = false;
   let commandFeedbackSequence = 0;
+  let inspectorOwner: InspectorOwner | undefined;
 
   function assertActive(): void {
     if (disposed) throw new Error('FlowCanvas owner has been disposed.');
@@ -325,8 +367,30 @@ export function createFlowCanvasOwner(options: {
     redo() { assertActive(); return applyCommandResult(host!.redo()); },
     selectAll() { assertActive(); return applyCommandResult(host!.selectAll()); },
     clearSelection() { assertActive(); return applyCommandResult(host!.clearSelection()); },
+    selectNode(nodeId: string) { assertActive(); return applyCommandResult(host!.selectNode(nodeId)); },
     connect(command: CanonicalConnectCommand) { assertActive(); return applyCommandResult(host!.connect(command)); },
     disconnect(connectionId: string) { assertActive(); return applyCommandResult(host!.disconnect(connectionId)); },
+    patchNodeParameter(command: FlowNodeParameterPatch) {
+      assertActive();
+      const canonical: CanonicalNodeParameterPatch = command.definition
+        ? Object.freeze({
+            nodeId: command.nodeId,
+            parameterName: command.parameterName,
+            value: command.value,
+            definition: parameterDefinition(command.definition)
+          })
+        : Object.freeze({
+            nodeId: command.nodeId,
+            parameterName: command.parameterName,
+            value: command.value
+          });
+      return applyCommandResult(host!.patchNodeParameter(canonical));
+    },
+    patchNodeProperties(command: FlowNodePropertiesPatch) {
+      assertActive();
+      const canonical: CanonicalNodePropertiesPatch = Object.freeze({ ...command });
+      return applyCommandResult(host!.patchNodeProperties(canonical));
+    },
     zoomIn() { assertActive(); return applyCommandResult(host!.zoomBy(1.1)); },
     zoomOut() { assertActive(); return applyCommandResult(host!.zoomBy(0.9)); },
     resetView() { assertActive(); return applyCommandResult(host!.resetView()); },
@@ -335,10 +399,20 @@ export function createFlowCanvasOwner(options: {
 
   void catalogQuery.refresh({ force: true });
 
-  return Object.freeze({
+  const owner: FlowCanvasOwner = Object.freeze({
     projectId: options.project.id,
     projection: readonly(state),
     commands,
+    openInspector(): InspectorOwner {
+      assertActive();
+      if (inspectorOwner) throw new Error(`Inspector owner already exists for project ${options.project.id}.`);
+      inspectorOwner = createInspectorOwner({
+        project: options.project,
+        flowOwner: owner,
+        diagnostics: options.diagnostics
+      });
+      return inspectorOwner;
+    },
     mountCanvas(mountOptions: FlowCanvasMountOptions): void {
       assertActive();
       if (host) throw new FlowCanvasOwnerConflictError(options.project.id);
@@ -387,9 +461,15 @@ export function createFlowCanvasOwner(options: {
       disposed = true;
       let disposalError: unknown;
       try {
-        unsubscribeHost?.();
+        inspectorOwner?.dispose(reason);
       } catch (error) {
         disposalError = error;
+      }
+      inspectorOwner = undefined;
+      try {
+        unsubscribeHost?.();
+      } catch (error) {
+        disposalError ??= error;
       }
       unsubscribeHost = undefined;
       try {
@@ -413,4 +493,5 @@ export function createFlowCanvasOwner(options: {
       if (disposalError !== undefined) throw disposalError;
     }
   });
+  return owner;
 }

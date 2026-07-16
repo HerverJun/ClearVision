@@ -412,6 +412,18 @@ export class FlowEditorInteraction {
                 return;
             }
 
+            const clickedConnection = !clickedNode && typeof this.canvas.getConnectionAt === 'function'
+                ? this.canvas.getConnectionAt(x, y)
+                : null;
+            if (clickedConnection) {
+                this.multiSelectedNodes.clear();
+                this.canvas.selectedNode = null;
+                this.canvas.selectedConnection = clickedConnection;
+                this.updateSelection();
+                this.notifyNodeSelectionChanged('mouse-select-connection');
+                return;
+            }
+
             if (clickedNode) {
                 if (!this.multiSelectedNodes.has(clickedNode.id)) {
                     this.clearSelection({ notify: false });
@@ -1238,6 +1250,7 @@ export class FlowEditorInteraction {
     selectNode(nodeId, { notify = true } = {}) {
         this.multiSelectedNodes.add(nodeId);
         this.canvas.selectedNode = nodeId;
+        this.canvas.selectedConnection = null;
         this.updateSelection();
         if (notify) {
             this.notifyNodeSelectionChanged('select-node');
@@ -1256,6 +1269,7 @@ export class FlowEditorInteraction {
         } else {
             this.multiSelectedNodes.add(nodeId);
             this.canvas.selectedNode = nodeId;
+            this.canvas.selectedConnection = null;
         }
         this.updateSelection();
         if (notify) {
@@ -1269,6 +1283,7 @@ export class FlowEditorInteraction {
     clearSelection({ notify = true } = {}) {
         this.multiSelectedNodes.clear();
         this.canvas.selectedNode = null;
+        this.canvas.selectedConnection = null;
         this.updateSelection();
         if (notify) {
             this.notifyNodeSelectionChanged('clear-selection');
@@ -1280,6 +1295,7 @@ export class FlowEditorInteraction {
      */
     selectAll() {
         this.multiSelectedNodes.clear();
+        this.canvas.selectedConnection = null;
         for (const id of this.canvas.nodes.keys()) {
             this.multiSelectedNodes.add(id);
         }

@@ -25,6 +25,7 @@ vi.mock('@clearvision/canonical-flow-interaction', () => ({
     constructor(canvas: FakeCanvas, options: Readonly<Record<string, unknown>>) {
       this.canvas = canvas;
       this.options = options;
+      this.history = [this.snapshot()];
     }
 
     addOperatorNode(type: string, x: number, y: number, data: Readonly<Record<string, unknown>>) {
@@ -67,16 +68,43 @@ vi.mock('@clearvision/canonical-flow-interaction', () => ({
     pasteNodes() { return false; }
     deleteSelectedItems() { return false; }
     duplicateNodeFromCanvasRequest() { return false; }
-    undo() { return false; }
-    redo() { return false; }
+    undo() {
+      if (this.historyIndex <= 0) return false;
+      this.historyIndex -= 1;
+      this.restore(this.history[this.historyIndex]!);
+      const callback = this.options.onDraftCommitted as (() => void) | undefined;
+      callback?.();
+      return true;
+    }
+    redo() {
+      if (this.historyIndex >= this.history.length - 1) return false;
+      this.historyIndex += 1;
+      this.restore(this.history[this.historyIndex]!);
+      const callback = this.options.onDraftCommitted as (() => void) | undefined;
+      callback?.();
+      return true;
+    }
     resetTransientInteractionAfterRestore() {}
-    resetHistory() { this.history = ['baseline']; this.historyIndex = 0; }
-    getHistoryState() { return { canUndo: this.historyIndex > 0, canRedo: false }; }
+    resetHistory() { this.history = [this.snapshot()]; this.historyIndex = 0; }
+    getHistoryState() { return { canUndo: this.historyIndex > 0, canRedo: this.historyIndex < this.history.length - 1 }; }
     saveState() {
-      this.history.push('commit');
+      this.history = this.history.slice(0, this.historyIndex + 1);
+      this.history.push(this.snapshot());
       this.historyIndex += 1;
       const callback = this.options.onDraftCommitted as (() => void) | undefined;
       callback?.();
+    }
+    private snapshot() {
+      return JSON.stringify({ nodes: [...this.canvas.nodes.entries()], connections: this.canvas.connections });
+    }
+    private restore(snapshot: string) {
+      const value = JSON.parse(snapshot) as {
+        nodes: Array<[string, Record<string, unknown>]>;
+        connections: Array<Record<string, unknown>>;
+      };
+      this.canvas.nodes = new Map(value.nodes);
+      this.canvas.connections = value.connections;
+      emitStructure();
     }
     destroy() {
       if (this.disposed) return;
@@ -202,8 +230,40 @@ function createAdapter() {
     raw,
     disposed: false,
     serialize: () => ({
-      operators: [...raw.nodes.values()],
-      connections: raw.connections,
+      operators: [...raw.nodes.values()].map(node => ({
+        id: node.id,
+        name: node.title ?? node.name,
+        type: node.type,
+        x: node.x,
+        y: node.y,
+        inputPorts: Array.isArray(node.inputs) ? node.inputs.map(port => ({
+          id: port.id, name: port.name, direction: 0, dataType: port.dataType, isRequired: port.isRequired
+        })) : [],
+        outputPorts: Array.isArray(node.outputs) ? node.outputs.map(port => ({
+          id: port.id, name: port.name, direction: 1, dataType: port.dataType, isRequired: port.isRequired
+        })) : [],
+        parameters: Array.isArray(node.parameters) ? node.parameters.map(parameter => ({
+          id: parameter.id,
+          name: parameter.name,
+          displayName: parameter.displayName,
+          description: parameter.description,
+          dataType: parameter.dataType,
+          ...(Object.prototype.hasOwnProperty.call(parameter, 'value') ? { value: parameter.value } : { value: parameter.defaultValue }),
+          defaultValue: parameter.defaultValue,
+          minValue: parameter.minValue,
+          maxValue: parameter.maxValue,
+          isRequired: parameter.isRequired,
+          options: parameter.options
+        })) : [],
+        isEnabled: node.disabled !== true
+      })),
+      connections: raw.connections.map(connection => ({
+        id: connection.id,
+        sourceOperatorId: connection.sourceOperatorId ?? connection.sourceId,
+        sourcePortId: connection.sourcePortId,
+        targetOperatorId: connection.targetOperatorId ?? connection.targetId,
+        targetPortId: connection.targetPortId
+      })),
       decisionConfiguration: null
     }),
     replaceFlow: (flow: Readonly<Record<string, unknown>>) => {
@@ -211,13 +271,70 @@ function createAdapter() {
       raw.nodes = new Map(operators.map((operator, index) => {
         const item = operator as Record<string, unknown>;
         const id = String(item.id ?? `baseline-${index}`);
-        return [id, { ...item, id, inputs: item.inputPorts ?? [], outputs: item.outputPorts ?? [] }];
+        return [id, {
+          ...item,
+          id,
+          title: item.name,
+          inputs: item.inputPorts ?? [],
+          outputs: item.outputPorts ?? [],
+          parameters: item.parameters ?? [],
+          disabled: item.isEnabled === false
+        }];
       }));
       raw.connections = Array.isArray(flow.connections)
         ? flow.connections as Array<Record<string, unknown>>
         : [];
     },
     resize: emitView,
+    selectNode: (nodeId: string | null) => {
+      if (nodeId !== null && !raw.nodes.has(nodeId)) return false;
+      raw.selectedNode = nodeId;
+      raw.selectedConnection = null;
+      emitSelection();
+      return true;
+    },
+    patchNodeParameters: (
+      nodeId: string,
+      patch: Readonly<Record<string, unknown>>
+    ) => {
+      const node = raw.nodes.get(nodeId);
+      if (!node) return { updated: false, reason: 'node_not_found', missingParameters: [] };
+      const parameters = Array.isArray(node.parameters) ? node.parameters : [];
+      let changed = false;
+      const missingParameters: string[] = [];
+      for (const [name, value] of Object.entries(patch)) {
+        const parameter = parameters.find(item => String(item.name).toLowerCase() === name.toLowerCase());
+        if (!parameter) {
+          missingParameters.push(name);
+          continue;
+        }
+        if (!Object.is(parameter.value, value)) {
+          parameter.value = value;
+          changed = true;
+        }
+      }
+      if (missingParameters.length) return { updated: false, reason: 'parameter_not_found', missingParameters };
+      if (changed) emitStructure();
+      return { updated: changed, reason: changed ? 'updated' : 'no_change', missingParameters: [] };
+    },
+    patchNodeProperties: (
+      nodeId: string,
+      patch: Readonly<{ name?: string; isEnabled?: boolean }>
+    ) => {
+      const node = raw.nodes.get(nodeId);
+      if (!node) return { updated: false, reason: 'node_not_found' };
+      let changed = false;
+      if (Object.prototype.hasOwnProperty.call(patch, 'name') && node.title !== patch.name) {
+        node.title = patch.name;
+        changed = true;
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, 'isEnabled') && node.disabled === patch.isEnabled) {
+        node.disabled = patch.isEnabled !== true;
+        changed = true;
+      }
+      if (changed) emitStructure();
+      return { updated: changed, reason: changed ? 'updated' : 'no_change' };
+    },
     subscribeStructureState: (listener: () => void) => {
       structureListeners.add(listener);
       raw.structureStateListeners.add(listener);
@@ -304,6 +421,106 @@ describe('production canonical FlowCanvas facade', () => {
     });
 
     expect(result).toMatchObject({ ok: false, code: 'missing-port' });
+  });
+
+  it('patches parameter and node properties through one history entry and supports undo/redo', () => {
+    mountedHost = createCanonicalFlowCanvasHost('canonical-unit-canvas', {
+      id: 'flow-1',
+      name: '流程',
+      operators: [{
+        id: 'node-1', name: '阈值', type: 20, x: 0, y: 0,
+        inputPorts: [], outputPorts: [],
+        parameters: [{
+          id: 'parameter-1', name: 'Threshold', displayName: '阈值', description: null,
+          dataType: 'int', value: 0, defaultValue: 0, minValue: 0, maxValue: 255,
+          isRequired: true, options: null
+        }],
+        isEnabled: true
+      }],
+      connections: []
+    });
+
+    expect(mountedHost.patchNodeParameter({
+      nodeId: 'node-1', parameterName: 'Threshold', value: 12
+    })).toMatchObject({ ok: true, flowRevision: 1 });
+    expect(mountedHost.getProjection().draft.operators[0]?.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'Threshold', value: 12 })
+    ]));
+    expect(mountedHost.patchNodeProperties({ nodeId: 'node-1', name: '新阈值', isEnabled: false }))
+      .toMatchObject({ ok: true, flowRevision: 2 });
+    expect(mountedHost.patchNodeParameter({
+      nodeId: 'node-1', parameterName: 'Threshold', value: 12
+    })).toMatchObject({ ok: false, code: 'no-change', flowRevision: 2 });
+
+    expect(mountedHost.undo()).toMatchObject({ ok: true, flowRevision: 3 });
+    expect(mountedHost.getProjection().draft.operators[0]).toMatchObject({ name: '阈值', isEnabled: true });
+    expect(mountedHost.undo()).toMatchObject({ ok: true, flowRevision: 4 });
+    expect(mountedHost.getProjection().draft.operators[0]?.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: 0 })
+    ]));
+    expect(mountedHost.redo()).toMatchObject({ ok: true, flowRevision: 5 });
+    expect(mountedHost.getProjection().draft.operators[0]?.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: 12 })
+    ]));
+  });
+
+  it('preserves flow/operator/port/parameter/connection opaque fields after a normal edit', () => {
+    mountedHost = createCanonicalFlowCanvasHost('canonical-unit-canvas', {
+      id: 'flow-opaque',
+      name: 'opaque flow',
+      futureFlowField: { version: 2 },
+      operators: [{
+        id: 'node-1', name: '来源', type: 20, x: 0, y: 0, futureOperatorField: 'keep-operator',
+        inputPorts: [],
+        outputPorts: [{
+          id: 'output-1', name: 'Out', direction: 1, dataType: 1, isRequired: false,
+          futurePortField: 'keep-port'
+        }],
+        parameters: [{
+          id: 'parameter-1', name: 'Value', displayName: '值', description: null,
+          dataType: 'int', value: 0, defaultValue: 0, minValue: 0, maxValue: 10,
+          isRequired: false, options: null, futureParameterField: 'keep-parameter'
+        }],
+        isEnabled: true
+      }, {
+        id: 'node-2', name: '目标', type: 20, x: 100, y: 0,
+        inputPorts: [{ id: 'input-1', name: 'In', direction: 0, dataType: 1, isRequired: true }],
+        outputPorts: [], parameters: [], isEnabled: true
+      }],
+      connections: [{
+        id: 'connection-1', sourceOperatorId: 'node-1', sourcePortId: 'output-1',
+        targetOperatorId: 'node-2', targetPortId: 'input-1', futureConnectionField: 'keep-connection'
+      }],
+      decisionConfiguration: null
+    });
+
+    mountedHost.patchNodeParameter({ nodeId: 'node-1', parameterName: 'Value', value: 5 });
+    const draft = mountedHost.getProjection().draft;
+    expect(draft.opaquePassthrough).toMatchObject({ futureFlowField: { version: 2 } });
+    expect(draft.operators[0]).toMatchObject({ futureOperatorField: 'keep-operator' });
+    expect(draft.operators[0]?.outputPorts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ futurePortField: 'keep-port' })
+    ]));
+    expect(draft.operators[0]?.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ futureParameterField: 'keep-parameter', value: 5 })
+    ]));
+    expect(draft.connections[0]).toMatchObject({ futureConnectionField: 'keep-connection' });
+  });
+
+  it('rejects parameter/property edits in readonly and running modes without revision changes', () => {
+    mountedHost = createCanonicalFlowCanvasHost('canonical-unit-canvas', {
+      id: 'flow-1', name: '流程', operators: [{
+        id: 'node-1', name: '节点', type: 20, x: 0, y: 0, inputPorts: [], outputPorts: [],
+        parameters: [{ id: 'p-1', name: 'Flag', displayName: 'Flag', description: null, dataType: 'bool', value: false, defaultValue: false, minValue: null, maxValue: null, isRequired: false, options: null }],
+        isEnabled: true
+      }], connections: []
+    });
+    mountedHost.setMutationGate('readonly');
+    expect(mountedHost.patchNodeParameter({ nodeId: 'node-1', parameterName: 'Flag', value: true }))
+      .toMatchObject({ ok: false, code: 'readonly', flowRevision: 0 });
+    mountedHost.setMutationGate('running');
+    expect(mountedHost.patchNodeProperties({ nodeId: 'node-1', name: 'blocked' }))
+      .toMatchObject({ ok: false, code: 'running', flowRevision: 0 });
   });
 
   it('enforces one global owner and rejects commands after ordered disposal', () => {

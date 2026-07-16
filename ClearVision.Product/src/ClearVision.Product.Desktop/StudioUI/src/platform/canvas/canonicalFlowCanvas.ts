@@ -51,6 +51,7 @@ export interface CanonicalFlowDraft {
   readonly operators: readonly Readonly<Record<string, unknown>>[];
   readonly connections: readonly Readonly<Record<string, unknown>>[];
   readonly decisionConfiguration: unknown;
+  readonly opaquePassthrough: Readonly<Record<string, unknown>>;
 }
 
 export interface CanonicalPortPoint {
@@ -153,6 +154,20 @@ export interface CanonicalConnectCommand {
   readonly targetPortId: string;
 }
 
+export interface CanonicalNodeParameterPatch {
+  readonly nodeId: string;
+  readonly parameterName: string;
+  readonly value: unknown;
+  readonly allowCreate?: boolean;
+  readonly definition?: CanonicalOperatorParameterDefinition;
+}
+
+export interface CanonicalNodePropertiesPatch {
+  readonly nodeId: string;
+  readonly name?: string;
+  readonly isEnabled?: boolean;
+}
+
 export interface CreateCanonicalFlowCanvasHostOptions {
   readonly canvasId: string;
   readonly initialFlow: unknown;
@@ -178,8 +193,11 @@ export interface CanonicalFlowCanvasHost {
   redo(): CanonicalFlowCommandResult;
   selectAll(): CanonicalFlowCommandResult;
   clearSelection(): CanonicalFlowCommandResult;
+  selectNode(nodeId: string): CanonicalFlowCommandResult;
   connect(command: CanonicalConnectCommand): CanonicalFlowCommandResult;
   disconnect(connectionId: string): CanonicalFlowCommandResult;
+  patchNodeParameter(command: CanonicalNodeParameterPatch): CanonicalFlowCommandResult;
+  patchNodeProperties(command: CanonicalNodePropertiesPatch): CanonicalFlowCommandResult;
   zoomBy(factor: number): CanonicalFlowCommandResult;
   resetView(): CanonicalFlowCommandResult;
   validateConnection(
@@ -220,6 +238,7 @@ interface CanonicalNode {
   readonly disabled?: unknown;
   readonly inputs?: readonly CanonicalPort[];
   readonly outputs?: readonly CanonicalPort[];
+  readonly parameters?: readonly Readonly<Record<string, unknown>>[];
 }
 
 interface CanonicalSelectionState {
@@ -287,6 +306,105 @@ function readArray(value: unknown): readonly Readonly<Record<string, unknown>>[]
   return Array.isArray(value)
     ? Object.freeze(value.map(item => Object.freeze({ ...recordValue(item) })))
     : Object.freeze([]);
+}
+
+function objectIdentity(value: Readonly<Record<string, unknown>>): string {
+  return textValue(value.id ?? value.Id) || textValue(value.name ?? value.Name).toLowerCase();
+}
+
+function mergeByIdentity(
+  currentValue: unknown,
+  baselineValue: unknown,
+  merge: (
+    current: Readonly<Record<string, unknown>>,
+    baseline: Readonly<Record<string, unknown>>
+  ) => Readonly<Record<string, unknown>> = (current, baseline) => Object.freeze({ ...baseline, ...current })
+): readonly Readonly<Record<string, unknown>>[] {
+  const current = readArray(currentValue);
+  const baseline = new Map(readArray(baselineValue).map(item => [objectIdentity(item), item]));
+  return Object.freeze(current.map(item => {
+    const previous = baseline.get(objectIdentity(item));
+    return previous ? merge(item, previous) : item;
+  }));
+}
+
+function mergeOperatorPersistence(
+  current: Readonly<Record<string, unknown>>,
+  baseline: Readonly<Record<string, unknown>>
+): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    ...baseline,
+    ...current,
+    inputPorts: mergeByIdentity(
+      current.inputPorts ?? current.InputPorts,
+      baseline.inputPorts ?? baseline.InputPorts
+    ),
+    outputPorts: mergeByIdentity(
+      current.outputPorts ?? current.OutputPorts,
+      baseline.outputPorts ?? baseline.OutputPorts
+    ),
+    parameters: mergeByIdentity(
+      current.parameters ?? current.Parameters,
+      baseline.parameters ?? baseline.Parameters
+    )
+  });
+}
+
+const flowKnownKeys = new Set([
+  'id', 'Id', 'name', 'Name', 'operators', 'Operators', 'nodes',
+  'connections', 'Connections', 'decisionConfiguration', 'DecisionConfiguration'
+]);
+
+function mergeFlowPersistence(
+  currentValue: unknown,
+  baselineValue: unknown
+): Readonly<Record<string, unknown>> {
+  const current = recordValue(currentValue);
+  const baselineSource = recordValue(baselineValue);
+  const nested = recordValue(baselineSource.flow ?? baselineSource.Flow);
+  const baseline = Object.keys(nested).length > 0 ? nested : baselineSource;
+  return Object.freeze({
+    ...baseline,
+    ...current,
+    operators: mergeByIdentity(
+      current.operators ?? current.Operators,
+      baseline.operators ?? baseline.Operators ?? baseline.nodes,
+      mergeOperatorPersistence
+    ),
+    connections: mergeByIdentity(
+      current.connections ?? current.Connections,
+      baseline.connections ?? baseline.Connections
+    )
+  });
+}
+
+function readFlowOpaque(flow: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  return Object.freeze(Object.fromEntries(
+    Object.entries(flow).filter(([key]) => !flowKnownKeys.has(key))
+  ));
+}
+
+function restoreParameterValuePresence(
+  operators: readonly Readonly<Record<string, unknown>>[],
+  canvas: CanonicalFlowCanvas | undefined
+): readonly Readonly<Record<string, unknown>>[] {
+  if (!canvas) return operators;
+  return Object.freeze(operators.map(operator => {
+    const node = canvas.nodes.get(textValue(operator.id ?? operator.Id));
+    const rawParameters = Array.isArray(node?.parameters) ? node.parameters : [];
+    const rawByIdentity = new Map(rawParameters.map(parameter => [objectIdentity(parameter), parameter]));
+    const parameters = readArray(operator.parameters ?? operator.Parameters).map(parameter => {
+      const raw = rawByIdentity.get(objectIdentity(parameter));
+      if (!raw || Object.prototype.hasOwnProperty.call(raw, 'value') || Object.prototype.hasOwnProperty.call(raw, 'Value')) {
+        return parameter;
+      }
+      const withoutSyntheticValue = { ...parameter };
+      delete withoutSyntheticValue.value;
+      delete withoutSyntheticValue.Value;
+      return Object.freeze(withoutSyntheticValue);
+    });
+    return Object.freeze({ ...operator, parameters: Object.freeze(parameters) });
+  }));
 }
 
 function readFlowIdentity(flow: unknown): Readonly<{ id: string | null; name: string }> {
@@ -365,6 +483,7 @@ export function createCanonicalFlowCanvasHost(
   let suppressEvents = true;
   let mutationGate = options.initialMutationGate ?? 'editable';
   let identity = readFlowIdentity(options.initialFlow);
+  let persistenceBaseline = options.initialFlow;
   let localFlowRevision = 0;
   let feedbackSequence = 0;
   let feedback: CanonicalFlowFeedback | null = null;
@@ -391,13 +510,17 @@ export function createCanonicalFlowCanvasHost(
 
   const serializeDraft = (): CanonicalFlowDraft => {
     if (cachedDraft) return cachedDraft;
-    const serialized = recordValue(adapter?.serialize());
+    const serialized = mergeFlowPersistence(adapter?.serialize(), persistenceBaseline);
     cachedDraft = Object.freeze({
       id: identity.id,
       name: identity.name,
-      operators: readArray(serialized.operators ?? serialized.Operators),
+      operators: restoreParameterValuePresence(
+        readArray(serialized.operators ?? serialized.Operators),
+        adapter?.raw as CanonicalFlowCanvas | undefined
+      ),
       connections: readArray(serialized.connections ?? serialized.Connections),
-      decisionConfiguration: serialized.decisionConfiguration ?? serialized.DecisionConfiguration ?? null
+      decisionConfiguration: serialized.decisionConfiguration ?? serialized.DecisionConfiguration ?? null,
+      opaquePassthrough: readFlowOpaque(serialized)
     });
     return cachedDraft;
   };
@@ -546,6 +669,7 @@ export function createCanonicalFlowCanvasHost(
       suppressEvents = true;
       try {
         identity = readFlowIdentity(flow);
+        persistenceBaseline = flow;
         ownedAdapter.replaceFlow(flow);
         ownedInteraction.resetTransientInteractionAfterRestore();
         ownedInteraction.resetHistory({ notify: false });
@@ -663,6 +787,11 @@ export function createCanonicalFlowCanvasHost(
       canvas.markSelectionChanged?.('clear-selection-command');
       return commandResult(true, 'selection-cleared', '已清除选择。');
     },
+    selectNode(nodeId: string): CanonicalFlowCommandResult {
+      assertActive();
+      const ok = ownedAdapter.selectNode(nodeId);
+      return commandResult(ok, ok ? 'node-selected' : 'node-not-found', ok ? '已选择节点。' : '节点不存在。');
+    },
     connect(command: CanonicalConnectCommand): CanonicalFlowCommandResult {
       assertActive();
       const rejected = rejectMutation('connect');
@@ -694,6 +823,48 @@ export function createCanonicalFlowCanvasHost(
       const ok = canvas.removeConnection?.(connectionId) === true;
       if (ok) ownedInteraction.saveState({ reason: 'disconnect-command' });
       return commandResult(ok, ok ? 'connection-disconnected' : 'connection-not-found', ok ? '连接已断开。' : '连接不存在。');
+    },
+    patchNodeParameter(command: CanonicalNodeParameterPatch): CanonicalFlowCommandResult {
+      assertActive();
+      const rejected = rejectMutation('patch-node-parameter');
+      if (rejected) return rejected;
+      const options = command.definition
+        ? {
+            allowCreateParameters: command.allowCreate === true,
+            parameterDefinitions: [command.definition]
+          }
+        : { allowCreateParameters: command.allowCreate === true };
+      const result = ownedAdapter.patchNodeParameters(
+        command.nodeId,
+        { [command.parameterName]: command.value },
+        options
+      );
+      if (result.updated) {
+        ownedInteraction.saveState({ reason: 'patch-node-parameter' });
+        return commandResult(true, 'node-parameter-patched', '参数已更新。');
+      }
+      const code = result.reason === 'no_change' ? 'no-change' : result.reason;
+      const message = result.reason === 'no_change'
+        ? '参数值未变化。'
+        : result.reason === 'node_not_found'
+          ? '节点不存在。'
+          : '参数不存在。';
+      return commandResult(false, code, message);
+    },
+    patchNodeProperties(command: CanonicalNodePropertiesPatch): CanonicalFlowCommandResult {
+      assertActive();
+      const rejected = rejectMutation('patch-node-properties');
+      if (rejected) return rejected;
+      const patch: { name?: string; isEnabled?: boolean } = {};
+      if (Object.prototype.hasOwnProperty.call(command, 'name')) patch.name = command.name!;
+      if (Object.prototype.hasOwnProperty.call(command, 'isEnabled')) patch.isEnabled = command.isEnabled!;
+      const result = ownedAdapter.patchNodeProperties(command.nodeId, patch);
+      if (result.updated) {
+        ownedInteraction.saveState({ reason: 'patch-node-properties' });
+        return commandResult(true, 'node-properties-patched', '节点属性已更新。');
+      }
+      const code = result.reason === 'no_change' ? 'no-change' : result.reason;
+      return commandResult(false, code, result.reason === 'node_not_found' ? '节点不存在。' : '节点属性未变化。');
     },
     zoomBy(factor: number): CanonicalFlowCommandResult {
       assertActive();

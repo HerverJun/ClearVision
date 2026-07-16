@@ -205,7 +205,11 @@ class FlowCanvasAdapter {
         }
 
         for (const [parameter, value] of resolvedEntries) {
-            const oldValue = parameter.value ?? parameter.Value;
+            const oldValue = hasOwn(parameter, 'value')
+                ? parameter.value
+                : hasOwn(parameter, 'Value')
+                    ? parameter.Value
+                    : undefined;
             if (Object.is(oldValue, value)) {
                 continue;
             }
@@ -231,6 +235,42 @@ class FlowCanvasAdapter {
             updated: changed,
             reason: changed ? 'updated' : 'no_change',
             missingParameters: []
+        };
+    }
+
+    patchNodeProperties(nodeId, propertyPatch = {}) {
+        const node = this.canvas.nodes?.get?.(nodeId);
+        if (!node) {
+            return {
+                updated: false,
+                reason: 'node_not_found'
+            };
+        }
+
+        let changed = false;
+        if (hasOwn(propertyPatch, 'name') && !Object.is(node.title, propertyPatch.name)) {
+            node.title = propertyPatch.name;
+            changed = true;
+        }
+        if (hasOwn(propertyPatch, 'isEnabled')) {
+            const disabled = propertyPatch.isEnabled !== true;
+            if (!Object.is(node.disabled === true, disabled)) {
+                node.disabled = disabled;
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            this.canvas.render();
+            this.markFlowStructureChanged('patchNodeProperties');
+            if (typeof this.canvas.markSelectionChanged === 'function') {
+                this.canvas.markSelectionChanged('patchNodeProperties');
+            }
+        }
+
+        return {
+            updated: changed,
+            reason: changed ? 'updated' : 'no_change'
         };
     }
 

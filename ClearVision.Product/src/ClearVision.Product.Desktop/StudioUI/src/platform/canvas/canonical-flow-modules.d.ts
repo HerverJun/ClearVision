@@ -4,6 +4,16 @@ declare module '@clearvision/canonical-flow-canvas' {
     readonly disposed: boolean;
     serialize(): unknown;
     replaceFlow(flow: unknown): unknown;
+    patchNodeParameters(
+      nodeId: string,
+      parameterPatch: Readonly<Record<string, unknown>>,
+      options?: Readonly<Record<string, unknown>>
+    ): Readonly<{ updated: boolean; reason: string; missingParameters: readonly string[] }>;
+    patchNodeProperties(
+      nodeId: string,
+      propertyPatch: Readonly<{ name?: string; isEnabled?: boolean }>
+    ): Readonly<{ updated: boolean; reason: string }>;
+    selectNode(nodeId: string | null): boolean;
     resize(): unknown;
     render(): unknown;
     subscribeStructureState(listener: (state: unknown) => void): () => void;

@@ -1,3 +1,5 @@
+import { reactive } from 'vue';
+
 export interface WorkspaceResourceSnapshot {
   readonly activeSubscriptions: number;
   readonly activeTimers: number;
@@ -16,6 +18,7 @@ export interface WorkspaceResourceSnapshot {
 export interface WorkspaceLifecycleDiagnostics extends WorkspaceResourceSnapshot {
   readonly workspaceOwnerCount: number;
   readonly flowCanvasOwnerCount: number;
+  readonly inspectorOwnerCount: number;
   readonly imageCanvasOwnerCount: number;
   readonly roiOwnerCount: number;
   readonly previewOwnerCount: number;
@@ -25,6 +28,9 @@ export interface WorkspaceLifecycleDiagnostics extends WorkspaceResourceSnapshot
   readonly totalWorkspaceDisposals: number;
   readonly totalReadMounts: number;
   readonly totalReadDisposals: number;
+  readonly totalInspectorMounts: number;
+  readonly totalInspectorDisposals: number;
+  readonly activeInspectorDrafts: number;
   readonly ownerConflictCount: number;
   readonly lastDisposedProjectId: string | null;
   readonly lastDisposeReason: string | null;
@@ -37,10 +43,10 @@ export interface WorkspaceDiagnosticsWindow {
 }
 
 export class WorkspaceOwnerConflictError extends Error {
-  readonly ownerKind: 'workspace' | 'read' | 'flow-canvas';
+  readonly ownerKind: 'workspace' | 'read' | 'flow-canvas' | 'inspector';
   readonly activeProjectId: string;
 
-  constructor(ownerKind: 'workspace' | 'read' | 'flow-canvas', activeProjectId: string) {
+  constructor(ownerKind: 'workspace' | 'read' | 'flow-canvas' | 'inspector', activeProjectId: string) {
     super(`A ${ownerKind} owner is already active for project ${activeProjectId}.`);
     this.name = 'WorkspaceOwnerConflictError';
     this.ownerKind = ownerKind;
@@ -66,11 +72,18 @@ export interface WorkspaceFlowCanvasDiagnosticsLease {
   dispose(reason?: string): void;
 }
 
+export interface WorkspaceInspectorDiagnosticsLease {
+  readonly projectId: string;
+  updateDraftCount(count: number): void;
+  dispose(reason?: string): void;
+}
+
 export interface WorkspaceLifecycleDiagnosticsOwner {
   readonly diagnostics: WorkspaceLifecycleDiagnostics;
   reserveRead(projectId: string): WorkspaceReadDiagnosticsLease;
   reserveWorkspaceOwner(projectId: string): WorkspaceOwnerDiagnosticsLease;
   reserveFlowCanvas(projectId: string): WorkspaceFlowCanvasDiagnosticsLease;
+  reserveInspector(projectId: string): WorkspaceInspectorDiagnosticsLease;
   dispose(): void;
 }
 
@@ -86,6 +99,7 @@ type MutableWorkspaceResourceSnapshot = {
 interface MutableWorkspaceDiagnosticsState extends MutableWorkspaceResourceSnapshot {
   workspaceOwnerCount: number;
   flowCanvasOwnerCount: number;
+  inspectorOwnerCount: number;
   imageCanvasOwnerCount: number;
   roiOwnerCount: number;
   previewOwnerCount: number;
@@ -95,6 +109,9 @@ interface MutableWorkspaceDiagnosticsState extends MutableWorkspaceResourceSnaps
   totalWorkspaceDisposals: number;
   totalReadMounts: number;
   totalReadDisposals: number;
+  totalInspectorMounts: number;
+  totalInspectorDisposals: number;
+  activeInspectorDrafts: number;
   ownerConflictCount: number;
   lastDisposedProjectId: string | null;
   lastDisposeReason: string | null;
@@ -126,9 +143,10 @@ function assertProjectId(projectId: string): void {
 export function createWorkspaceLifecycleDiagnosticsOwner(
   options: CreateWorkspaceLifecycleDiagnosticsOptions = {}
 ): WorkspaceLifecycleDiagnosticsOwner {
-  const state: MutableWorkspaceDiagnosticsState = {
+  const state = reactive<MutableWorkspaceDiagnosticsState>({
     workspaceOwnerCount: 0,
     flowCanvasOwnerCount: 0,
+    inspectorOwnerCount: 0,
     imageCanvasOwnerCount: 0,
     roiOwnerCount: 0,
     previewOwnerCount: 0,
@@ -150,22 +168,28 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
     totalWorkspaceDisposals: 0,
     totalReadMounts: 0,
     totalReadDisposals: 0,
+    totalInspectorMounts: 0,
+    totalInspectorDisposals: 0,
+    activeInspectorDrafts: 0,
     ownerConflictCount: 0,
     lastDisposedProjectId: null,
     lastDisposeReason: null,
     lastDisposedResources: null,
     disposed: false
-  };
+  });
   let activeReadLease: object | undefined;
   let activeWorkspaceLease: object | undefined;
   let activeFlowCanvasLease: object | undefined;
+  let activeInspectorLease: object | undefined;
   let readOwnerSubscriptionActive = false;
   let readRequestActive = false;
+  let inspectorSubscriptionActive = false;
   let flowResources: WorkspaceResourceSnapshot = resourceSnapshot(state);
   let publishedWindow: WorkspaceDiagnosticsWindow | undefined;
 
   function recomputeResources(): void {
-    state.activeSubscriptions = (readOwnerSubscriptionActive ? 1 : 0) + flowResources.activeSubscriptions;
+    state.activeSubscriptions = (readOwnerSubscriptionActive ? 1 : 0) +
+      (inspectorSubscriptionActive ? 1 : 0) + flowResources.activeSubscriptions;
     state.activeTimers = flowResources.activeTimers;
     state.activeAnimationFrames = flowResources.activeAnimationFrames;
     state.activeObservers = flowResources.activeObservers;
@@ -182,6 +206,7 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
   const diagnostics: WorkspaceLifecycleDiagnostics = Object.freeze({
     get workspaceOwnerCount() { return state.workspaceOwnerCount; },
     get flowCanvasOwnerCount() { return state.flowCanvasOwnerCount; },
+    get inspectorOwnerCount() { return state.inspectorOwnerCount; },
     get imageCanvasOwnerCount() { return state.imageCanvasOwnerCount; },
     get roiOwnerCount() { return state.roiOwnerCount; },
     get previewOwnerCount() { return state.previewOwnerCount; },
@@ -203,6 +228,9 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
     get totalWorkspaceDisposals() { return state.totalWorkspaceDisposals; },
     get totalReadMounts() { return state.totalReadMounts; },
     get totalReadDisposals() { return state.totalReadDisposals; },
+    get totalInspectorMounts() { return state.totalInspectorMounts; },
+    get totalInspectorDisposals() { return state.totalInspectorDisposals; },
+    get activeInspectorDrafts() { return state.activeInspectorDrafts; },
     get ownerConflictCount() { return state.ownerConflictCount; },
     get lastDisposedProjectId() { return state.lastDisposedProjectId; },
     get lastDisposeReason() { return state.lastDisposeReason; },
@@ -334,6 +362,43 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
         }
       });
     },
+    reserveInspector(projectId: string): WorkspaceInspectorDiagnosticsLease {
+      assertActive();
+      assertProjectId(projectId);
+      if (activeInspectorLease) {
+        state.ownerConflictCount += 1;
+        throw new WorkspaceOwnerConflictError('inspector', state.activeProjectId ?? projectId);
+      }
+      const leaseIdentity = {};
+      activeInspectorLease = leaseIdentity;
+      inspectorSubscriptionActive = true;
+      state.inspectorOwnerCount = 1;
+      state.activeInspectorDrafts = 0;
+      state.totalInspectorMounts += 1;
+      recomputeResources();
+      let leaseDisposed = false;
+
+      return Object.freeze({
+        projectId,
+        updateDraftCount(count: number): void {
+          if (leaseDisposed || activeInspectorLease !== leaseIdentity || state.disposed) return;
+          state.activeInspectorDrafts = Number.isSafeInteger(count) && count > 0 ? count : 0;
+        },
+        dispose(reason = 'inspector-disposed'): void {
+          if (leaseDisposed) return;
+          leaseDisposed = true;
+          if (activeInspectorLease === leaseIdentity) {
+            activeInspectorLease = undefined;
+            inspectorSubscriptionActive = false;
+            state.inspectorOwnerCount = 0;
+            state.activeInspectorDrafts = 0;
+            state.totalInspectorDisposals += 1;
+            recomputeResources();
+            state.lastDisposeReason = reason;
+          }
+        }
+      });
+    },
     reserveWorkspaceOwner(projectId: string): WorkspaceOwnerDiagnosticsLease {
       assertActive();
       assertProjectId(projectId);
@@ -371,13 +436,17 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
       activeReadLease = undefined;
       activeWorkspaceLease = undefined;
       activeFlowCanvasLease = undefined;
+      activeInspectorLease = undefined;
       readOwnerSubscriptionActive = false;
       readRequestActive = false;
+      inspectorSubscriptionActive = false;
       state.workspaceOwnerCount = 0;
       state.flowCanvasOwnerCount = 0;
+      state.inspectorOwnerCount = 0;
       state.imageCanvasOwnerCount = 0;
       state.roiOwnerCount = 0;
       state.previewOwnerCount = 0;
+      state.activeInspectorDrafts = 0;
       state.activeProjectId = null;
       state.activeReadProjectId = null;
       state.activeSubscriptions = 0;

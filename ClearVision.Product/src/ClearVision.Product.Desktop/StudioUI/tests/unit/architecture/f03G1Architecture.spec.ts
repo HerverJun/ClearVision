@@ -26,7 +26,7 @@ function studioRelative(path: string): string {
   return relative(studioRoot, path).replaceAll('\\', '/');
 }
 
-describe('F03 G1-G2 architecture guards', () => {
+describe('F03 G1-G3 architecture guards', () => {
   const files = sourceFiles(sourceRoot);
   const workspaceFiles = sourceFiles(workspaceRoot);
 
@@ -78,6 +78,9 @@ describe('F03 G1-G2 architecture guards', () => {
     expect(flowOwner).toContain("from '@/platform/canvas'");
     expect(labOwner).toContain("from '@/platform/canvas'");
     expect(flowOwner).not.toMatch(/\.raw\b|window\.|operator-library-hidden-host/);
+    expect(productionFacade).toContain('patchNodeParameter');
+    expect(productionFacade).toContain('patchNodeProperties');
+    expect(flowOwner).toContain('openInspector');
   });
 
   it('forbids Labs, FrontendV2, raw Canvas and global command bypasses from Workspace production', () => {
@@ -93,7 +96,7 @@ describe('F03 G1-G2 architecture guards', () => {
     }
   });
 
-  it('keeps G3-G6 absent while G1 and G2 are the only implemented F03 slices', () => {
+  it('keeps G4-G6 absent while G1-G3 are the only implemented F03 slices', () => {
     const plan = read(join(
       repositoryRoot,
       'docs/进行中/StudioUINext/Studio_UI_Next_F03_完整开发计划.md'
@@ -105,9 +108,26 @@ describe('F03 G1-G2 architecture guards', () => {
       'src/capabilities/project-workspace/flow/OperatorRail.vue',
       'src/capabilities/project-workspace/flow/FlowCanvasSurface.vue'
     ]));
-    expect(existsSync(join(workspaceRoot, 'inspector'))).toBe(false);
+    expect(existsSync(join(workspaceRoot, 'inspector'))).toBe(true);
+    expect(sourceFiles(join(workspaceRoot, 'inspector')).map(studioRelative)).toEqual(expect.arrayContaining([
+      'src/capabilities/project-workspace/inspector/inspectorOwner.ts',
+      'src/capabilities/project-workspace/inspector/InspectorPanel.vue',
+      'src/capabilities/project-workspace/inspector/ParameterEditor.vue',
+      'src/capabilities/project-workspace/inspector/parameterValidation.ts'
+    ]));
     expect(existsSync(join(workspaceRoot, 'preview'))).toBe(false);
     expect(existsSync(join(workspaceRoot, 'persistence'))).toBe(false);
     expect(existsSync(join(workspaceRoot, 'run'))).toBe(false);
+  });
+
+  it('keeps Inspector on the G2 projection/commands without Host, Preview, save, or raw Canvas authority', () => {
+    const inspectorRoot = join(workspaceRoot, 'inspector');
+    const inspectorSource = sourceFiles(inspectorRoot).map(read).join('\n');
+    expect(inspectorSource).toContain('FlowCanvasOwner');
+    expect(inspectorSource).toContain('patchNodeParameter');
+    expect(inspectorSource).toContain('patchNodeProperties');
+    expect(inspectorSource).toContain('disconnect');
+    expect(inspectorSource).not.toMatch(/FlowCanvas\.serialize|\b(?:flowOwner|canvas)\s*\.\s*raw\b|new\s+FlowCanvas/);
+    expect(inspectorSource).not.toMatch(/HostBridge|FilePickedEvent|CameraBindingQuery|preview-node|api\/projects.*PUT/i);
   });
 });

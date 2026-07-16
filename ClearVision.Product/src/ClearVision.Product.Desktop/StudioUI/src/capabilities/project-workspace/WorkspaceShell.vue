@@ -99,6 +99,8 @@ const saveCompatibilityLabel = computed(() => {
     :data-workspace-project-id="projectId"
     :data-workspace-readonly="isReadonly"
     :data-workspace-owner-count="diagnostics.workspaceOwnerCount"
+    :data-workspace-inspector-owner-count="diagnostics.inspectorOwnerCount"
+    :data-workspace-inspector-draft-count="diagnostics.activeInspectorDrafts"
     :data-workspace-active-subscriptions="diagnostics.activeSubscriptions"
     :data-workspace-in-flight-reads="diagnostics.inFlightReads"
     :data-workspace-save-compatibility="project?.saveCompatibility.status ?? 'unavailable'"
@@ -131,7 +133,7 @@ const saveCompatibilityLabel = computed(() => {
         />
         <CvStatusBadge
           :tone="isReadonly ? 'warning' : state === 'ready' || state === 'empty' ? 'ok' : 'idle'"
-          :label="isReadonly ? '只读' : 'G2 Flow 编辑'"
+          :label="isReadonly ? '只读' : 'G3 Inspector 编辑'"
         />
       </div>
     </header>
@@ -241,9 +243,10 @@ const saveCompatibilityLabel = computed(() => {
       <span>Workspace owner {{ diagnostics.workspaceOwnerCount }}/1</span>
       <span>读取 {{ diagnostics.inFlightReads }}</span>
       <span>订阅 {{ diagnostics.activeSubscriptions }}</span>
+      <span>Inspector {{ diagnostics.inspectorOwnerCount }}/1</span>
       <span>写入 {{ diagnostics.inFlightWrites }}</span>
       <span class="workspace-shell__statusbar-spacer" />
-      <span>F03 · G2 Flow Workspace</span>
+      <span>F03 · G1–G3 Workspace</span>
     </footer>
   </section>
 </template>
