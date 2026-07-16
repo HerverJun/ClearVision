@@ -18,6 +18,19 @@ function Assert-Equal([string]$Name, $Expected, $Actual) {
     $right = $Actual | ConvertTo-Json -Depth 20 -Compress
     if ($left -ne $right) { throw "Evidence mismatch for ${Name}: expected=$left actual=$right" }
 }
+function Get-LfNormalizedSha256([string]$Path) {
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $text = [Text.Encoding]::UTF8.GetString($bytes)
+    $normalized = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+    $normalizedBytes = [Text.UTF8Encoding]::new($false).GetBytes($normalized)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString($sha.ComputeHash($normalizedBytes))).Replace("-", "").ToLowerInvariant()
+    }
+    finally {
+        $sha.Dispose()
+    }
+}
 function Artifact([string]$Id) {
     $match = @($manifest.artifacts | Where-Object { $_.id -eq $Id })
     if ($match.Count -ne 1) { throw "Expected exactly one artifact '$Id'; actual=$($match.Count)." }
@@ -140,9 +153,10 @@ foreach ($report in @($baseline, $after)) {
     Assert-Equal "product/harness/project" $productIdentity.harnessProjectSha256 $report.harness.projectSha256
     Assert-Equal "product/claimBoundary" $manifest.claimBoundary.Contains("Evidence is scoped by operator mode") $true
 }
-foreach ($source in $after.productImplementation.sourceFilesSha256.PSObject.Properties) {
+Assert-True ($null -ne $productIdentity.currentSourceFilesSha256) "Tracked product identity must declare currentSourceFilesSha256."
+foreach ($source in $productIdentity.currentSourceFilesSha256.PSObject.Properties) {
     $sourcePath = Resolve-RepoPath $source.Name
-    Assert-Equal "product/current-source/$($source.Name)" $source.Value ((Get-FileHash -Algorithm SHA256 $sourcePath).Hash.ToLowerInvariant())
+    Assert-Equal "product/current-source/$($source.Name)" $source.Value (Get-LfNormalizedSha256 $sourcePath)
 }
 Assert-Equal "product/comparison/baselineSha" $productIdentity.baselineProductSha $comparison.baselineProductSha
 Assert-Equal "product/comparison/afterSha" $productIdentity.afterProductSha $comparison.afterProductSha
@@ -228,12 +242,12 @@ if (-not [string]::IsNullOrWhiteSpace($FreshEvidenceDirectory)) {
         Assert-Equal "fresh/product/harness/manifest" $productIdentity.datasetManifestSha256 $report.harness.manifestSha256
     }
     Assert-Equal "fresh/product/baseline/source-files" $baseline.productImplementation.sourceFilesSha256 $freshProductBaseline.productImplementation.sourceFilesSha256
-    Assert-Equal "fresh/product/after/source-files" $after.productImplementation.sourceFilesSha256 $freshProductAfter.productImplementation.sourceFilesSha256
+    Assert-Equal "fresh/product/after/source-files" $productIdentity.currentSourceFilesSha256 $freshProductAfter.productImplementation.sourceFilesSha256
     Assert-Equal "fresh/product/baseline/mode-claims" $baseline.modeClaims $freshProductBaseline.modeClaims
     Assert-Equal "fresh/product/after/mode-claims" $after.modeClaims $freshProductAfter.modeClaims
     foreach ($source in $freshProductAfter.productImplementation.sourceFilesSha256.PSObject.Properties) {
         $sourcePath = Resolve-RepoPath $source.Name
-        Assert-Equal "fresh/product/current-source/$($source.Name)" $source.Value ((Get-FileHash -Algorithm SHA256 $sourcePath).Hash.ToLowerInvariant())
+        Assert-Equal "fresh/product/current-source/$($source.Name)" $source.Value (Get-LfNormalizedSha256 $sourcePath)
     }
     Assert-Equal "fresh/product/comparison/schema" "2026-07-16.operator-product-e2e-comparison.v2" $freshProductComparison.schemaVersion
     Assert-Equal "fresh/product/comparison/baseline-source" $productIdentity.baselineProductSha $freshProductComparison.baselineProductSha

@@ -13,7 +13,15 @@
       "afterProductSha": "727414e2ca6bd5785aac3f2dbc68fb5b8badc369",
       "harnessCommitSha": "727414e2ca6bd5785aac3f2dbc68fb5b8badc369",
       "harnessProgramSha256": "572dfc2826d0eb597839442c0b2b2e49040348287fc01174288e18e803a57b9f",
-      "harnessProjectSha256": "ad0a4fa0f2a627e4f18435806053aa765429c921ba9e521158bdb25e03225206"
+      "harnessProjectSha256": "ad0a4fa0f2a627e4f18435806053aa765429c921ba9e521158bdb25e03225206",
+      "currentSourceFilesSha256": {
+        "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/CircleMeasurementOperator.cs": "ccbb6887d7b3bc913143ff05cb574b393773cdc203c8e4564d490201ce962ba2",
+        "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/CircleCaliperFitV2Kernel.cs": "fd7f117ebd92740bf1298fa498eb3652af9e7cd63d6e32446415328b2e9af552",
+        "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/LineMeasurementOperator.cs": "e9f07bff678b2cf522da4fe3bd2b7e0c6e3e110e406958428d367ae162380aad",
+        "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/IndustrialCaliperKernel.cs": "00456d0753397e3941b2261c1f2752755a1909a239fc2713e016a1b64d4218a0",
+        "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/GeometryRefinementKernel.cs": "8a299994487bd95ef3fab3ec0ae3af58ca9bb5aced2c947d88dffa6da7726ca6",
+        "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/OperatorBase.cs": "d84e7f09d81050a627c938860bd67e2bddee9f15f6194b93d59d11dbf626c9fd"
+      }
     },
     "supplementalKernel": {
       "datasetId": "clearvision-operator-precision-v1",

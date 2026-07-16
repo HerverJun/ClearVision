@@ -45,6 +45,8 @@ Circle 正式路径覆盖参数映射、profile sampling、edge selection、歧�
 - 算法模式、默认状态、采用结论、回滚方式和 claim boundary；
 - public-dataset、正式产品 E2E 与补充 kernel evidence 的不同作用域。
 
+所有参与 SHA 身份的 dataset manifest、harness 源文件、当前产品测量源码和 embedded evidence manifest 均通过 `.gitattributes` 固定为 LF checkout；`currentSourceFilesSha256` 使用 LF 规范化文本哈希，从而不把 Windows `core.autocrlf` 差异误判为产品源码漂移。
+
 `OperatorQualityStateCatalog` 从嵌入的该 manifest 生成状态；manifest 缺失、schema/条目非法时 fail-closed 为 `Unknown`。`scripts/verify-operator-quality-evidence.ps1` 对仓库中的报告内容和 SHA 做完整校验，Nightly/Manual 同时重放 baseline、after、comparison 并验证 tracked evidence identity。
 
 整算子四轴汇总：
