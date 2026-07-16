@@ -1,0 +1,189 @@
+{
+  "schemaVersion": "2026-07-16.operator-product-e2e-report.v1",
+  "benchmarkId": "clearvision-operator-product-e2e-v1",
+  "label": "baseline",
+  "generatedAtUtc": "2026-07-16T01:16:01.844282Z",
+  "dataset": {
+    "id": "clearvision-operator-product-e2e-synthetic-v1",
+    "version": "1.0.0",
+    "manifestSha256": "a507e7345388017506dc60f544598721042a0cdaa12dd0f2402cb6236256eaeb",
+    "generatedDataSha256": "5d60098525547bf873b9e4618b3d7b5a08bf202164295dac9c2eff6f99c2507a",
+    "seed": 20260716,
+    "license": "CC0-1.0",
+    "claimBoundary": "Synthetic raster end-to-end product-operator evidence only. It is not E4, commercial-grade, field-accuracy, release-readiness, or production-site validation evidence.",
+    "splitCounts": {
+      "Circle": {
+        "train": 24,
+        "validation": 24,
+        "test": 72
+      },
+      "Line": {
+        "train": 24,
+        "validation": 24,
+        "test": 72
+      }
+    }
+  },
+  "productImplementation": {
+    "repositorySha": "ce266626e0bec0a8cd4a68c11b176df95e8cb482",
+    "repositoryDirty": false,
+    "formalEntrypoints": "CircleMeasurementOperator.ExecuteAsync and LineMeasurementOperator.ExecuteAsync via OperatorBase lifecycle with ImageWrapper raster input",
+    "sourceFilesSha256": {
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/CircleMeasurementOperator.cs": "1a8688cf4dfa0589f4518a05642514d87e113906333324e4c78059e0cdec4aa5",
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/CircleCaliperFitV2Kernel.cs": "678eb4b22b8a39ef5577623dd45335c448bd50c7ff8115d756307c56247d8e0b",
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/LineMeasurementOperator.cs": "2a7872d8748a0279909957ad185c3cc7e023ea4eab3f12e86875ad7e4974668d",
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/IndustrialCaliperKernel.cs": "bd3a04b0f9abf8621028b9e0d9c99d22332644b1a78fdd25ec48a05359f512d3",
+      "ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/OperatorBase.cs": "0aac47345f06b453c030a8a0bc4a698b05d5ed3629f8f13899f533c90d63c746"
+    },
+    "infrastructureAssemblySha256": "9c1e4b708a4c184e1dbf16ac0bbfdb75ae96b94d54acf4c83716ee8f1797c626",
+    "coreAssemblySha256": "da1923e8fcedad2af635026ae7f7d2fd4ef6a35d8fd2c47a8855ac4c3d951d43",
+    "assemblyVersion": "1.0.0.0"
+  },
+  "harness": {
+    "commitSha": "727414e2ca6bd5785aac3f2dbc68fb5b8badc369",
+    "repositoryDirty": false,
+    "programSha256": "572dfc2826d0eb597839442c0b2b2e49040348287fc01174288e18e803a57b9f",
+    "projectSha256": "ad0a4fa0f2a627e4f18435806053aa765429c921ba9e521158bdb25e03225206",
+    "manifestSha256": "a507e7345388017506dc60f544598721042a0cdaa12dd0f2402cb6236256eaeb",
+    "adapterInjectedIntoProductWorktree": true,
+    "buildIsolation": "isolated detached worktree build"
+  },
+  "environment": {
+    "framework": ".NET 8.0.19",
+    "operatingSystem": "Microsoft Windows 10.0.22000",
+    "architecture": "X64",
+    "processorCount": 20,
+    "runtimeVersion": "8.0.19",
+    "processorIdentifier": "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel",
+    "sdkVersion": "9.0.304",
+    "openCvVersion": "4.9.0",
+    "serverGc": false,
+    "gcLatencyMode": "Interactive"
+  },
+  "resourceMeasurement": {
+    "latency": "Elapsed wall-clock time around the complete formal OperatorBase.ExecuteAsync call, including image decode, Canny/profile sampling, candidate selection, overlays and output construction.",
+    "managedAllocation": "GC.GetAllocatedBytesForCurrentThread on the benchmark thread only; it is not full-process allocation or native OpenCV allocation.",
+    "processResources": "Peak working set and private bytes are full benchmark-process observations after all metric rows; they are not per-operator attribution."
+  },
+  "processResources": {
+    "peakWorkingSetBytes": 117391360,
+    "privateBytes": 68894720,
+    "workingSetBytes": 104644608
+  },
+  "warmupIterations": 5,
+  "measurementIterations": 40,
+  "metrics": [
+    {
+      "domain": "Circle",
+      "algorithm": "LegacyDefault",
+      "split": "validation",
+      "unit": "radius_px",
+      "caseCount": 24,
+      "bias": 0.09677424271069175,
+      "rmse": 1.068458992283102,
+      "p95Error": 2.151906143813136,
+      "failureRate": 0,
+      "ambiguityRate": 0,
+      "outlierRate": 0.08029513888888888,
+      "latencyP50Milliseconds": 7.334,
+      "latencyP95Milliseconds": 8.1051,
+      "managedAllocatedBytesPerCase": 1981638.975,
+      "extra": {
+        "secondaryRmse": 1.9024698808218896,
+        "secondaryP95": 4.79561923365748,
+        "residualMean": 0.4291259057984429,
+        "residualP95": 2.1622752199100765,
+        "diagnosticCompletenessRate": 1
+      },
+      "failureTaxonomy": {}
+    },
+    {
+      "domain": "Circle",
+      "algorithm": "LegacyDefault",
+      "split": "test",
+      "unit": "radius_px",
+      "caseCount": 72,
+      "bias": 0.22982981620454032,
+      "rmse": 1.1757449786546716,
+      "p95Error": 2.419451300298938,
+      "failureRate": 0,
+      "ambiguityRate": 0,
+      "outlierRate": 0.03399884259259259,
+      "latencyP50Milliseconds": 7.3079,
+      "latencyP95Milliseconds": 8.1972,
+      "managedAllocatedBytesPerCase": 1980956.6361111111,
+      "extra": {
+        "secondaryRmse": 1.9436228914005735,
+        "secondaryP95": 4.812259214409636,
+        "residualMean": 0.7123909786703576,
+        "residualP95": 3.4115846955682794,
+        "diagnosticCompletenessRate": 1
+      },
+      "failureTaxonomy": {}
+    },
+    {
+      "domain": "Line",
+      "algorithm": "L2Default",
+      "split": "validation",
+      "unit": "angle_deg",
+      "caseCount": 24,
+      "bias": 0.06616390911251409,
+      "rmse": 0.18560985088302814,
+      "p95Error": 0.3180322877339137,
+      "failureRate": 0,
+      "ambiguityRate": 0,
+      "outlierRate": 0,
+      "latencyP50Milliseconds": 1.9205,
+      "latencyP95Milliseconds": 3.619,
+      "managedAllocatedBytesPerCase": 349217.2166666667,
+      "extra": {
+        "secondaryRmse": "NaN",
+        "secondaryP95": "NaN",
+        "residualMean": 1.8674268288266804,
+        "residualP95": 7.556262259633643,
+        "diagnosticCompletenessRate": 1
+      },
+      "failureTaxonomy": {}
+    },
+    {
+      "domain": "Line",
+      "algorithm": "L2Default",
+      "split": "test",
+      "unit": "angle_deg",
+      "caseCount": 72,
+      "bias": 0.05952779204075932,
+      "rmse": 0.49788663548197915,
+      "p95Error": 0.7809936233453527,
+      "failureRate": 0,
+      "ambiguityRate": 0,
+      "outlierRate": 0,
+      "latencyP50Milliseconds": 1.9592,
+      "latencyP95Milliseconds": 3.7171,
+      "managedAllocatedBytesPerCase": 330720.0833333333,
+      "extra": {
+        "secondaryRmse": "NaN",
+        "secondaryP95": "NaN",
+        "residualMean": 1.5099100790255706,
+        "residualP95": 4.579199294910571,
+        "diagnosticCompletenessRate": 1
+      },
+      "failureTaxonomy": {}
+    }
+  ],
+  "modeClaims": [
+    {
+      "operatorType": "CircleMeasurement",
+      "mode": "Method=CaliperFitV2; RefinementLoss=Legacy(default)",
+      "isDefault": true,
+      "isCandidate": false,
+      "claim": "Formal legacy/default product path"
+    },
+    {
+      "operatorType": "LineMeasurement",
+      "mode": "Method=FitLine; FitLoss=L2(default)",
+      "isDefault": true,
+      "isCandidate": false,
+      "claim": "Formal legacy/default product path"
+    }
+  ]
+}

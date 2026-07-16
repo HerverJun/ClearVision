@@ -22,7 +22,9 @@ function Metric($Report, [string]$Domain, [string]$Algorithm, [string]$Split) {
     return $match[0]
 }
 function Improvement([double]$Baseline, [double]$Candidate) {
-    if (-not [double]::IsFinite($Baseline) -or -not [double]::IsFinite($Candidate) -or [Math]::Abs($Baseline) -lt 1e-12) { return [double]::NaN }
+    if ([double]::IsNaN($Baseline) -or [double]::IsInfinity($Baseline) -or
+        [double]::IsNaN($Candidate) -or [double]::IsInfinity($Candidate) -or
+        [Math]::Abs($Baseline) -lt 1e-12) { return [double]::NaN }
     return (($Baseline - $Candidate) / $Baseline) * 100.0
 }
 
@@ -135,7 +137,8 @@ $comparison = [ordered]@{
     claimBoundary = $after.dataset.claimBoundary
 }
 [IO.Directory]::CreateDirectory((Split-Path -Parent $outputFile)) | Out-Null
-$comparison | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $outputFile -Encoding utf8NoBOM
+$utf8 = [Text.UTF8Encoding]::new($false)
+[IO.File]::WriteAllText($outputFile, (($comparison | ConvertTo-Json -Depth 20) + [Environment]::NewLine), $utf8)
 
 $lines = [Collections.Generic.List[string]]::new()
 $lines.Add("# Product Operator E2E Phase 5 Comparison")
@@ -160,6 +163,6 @@ $lines.Add("")
 $lines.Add("## Reproduction")
 $lines.Add("")
 $lines.Add('`& "./scripts/run-operator-product-e2e-evidence.ps1" -Profile acceptance -ResultsDirectory ".tmp/operator-product-e2e"`')
-$lines | Set-Content -LiteralPath $reportFile -Encoding utf8NoBOM
+[IO.File]::WriteAllText($reportFile, (($lines -join [Environment]::NewLine) + [Environment]::NewLine), $utf8)
 
 Write-Host "Product E2E comparison complete: $outputFile"

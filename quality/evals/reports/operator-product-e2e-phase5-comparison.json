@@ -1,0 +1,123 @@
+{
+    "schemaVersion":  "2026-07-16.operator-product-e2e-comparison.v1",
+    "benchmarkId":  "clearvision-operator-product-e2e-v1",
+    "generatedAtUtc":  "2026-07-16T01:18:48.4526503Z",
+    "baselineProductSha":  "ce266626e0bec0a8cd4a68c11b176df95e8cb482",
+    "afterProductSha":  "727414e2ca6bd5785aac3f2dbc68fb5b8badc369",
+    "dataset":  {
+                    "id":  "clearvision-operator-product-e2e-synthetic-v1",
+                    "version":  "1.0.0",
+                    "manifestSha256":  "a507e7345388017506dc60f544598721042a0cdaa12dd0f2402cb6236256eaeb",
+                    "generatedDataSha256":  "5d60098525547bf873b9e4618b3d7b5a08bf202164295dac9c2eff6f99c2507a",
+                    "seed":  20260716,
+                    "license":  "CC0-1.0",
+                    "claimBoundary":  "Synthetic raster end-to-end product-operator evidence only. It is not E4, commercial-grade, field-accuracy, release-readiness, or production-site validation evidence.",
+                    "splitCounts":  {
+                                        "Circle":  {
+                                                       "train":  24,
+                                                       "validation":  24,
+                                                       "test":  72
+                                                   },
+                                        "Line":  {
+                                                     "train":  24,
+                                                     "validation":  24,
+                                                     "test":  72
+                                                 }
+                                    }
+                },
+    "harness":  {
+                    "commitSha":  "727414e2ca6bd5785aac3f2dbc68fb5b8badc369",
+                    "repositoryDirty":  false,
+                    "programSha256":  "572dfc2826d0eb597839442c0b2b2e49040348287fc01174288e18e803a57b9f",
+                    "projectSha256":  "ad0a4fa0f2a627e4f18435806053aa765429c921ba9e521158bdb25e03225206",
+                    "manifestSha256":  "a507e7345388017506dc60f544598721042a0cdaa12dd0f2402cb6236256eaeb",
+                    "adapterInjectedIntoProductWorktree":  false,
+                    "buildIsolation":  "current committed worktree build"
+                },
+    "environment":  {
+                        "framework":  ".NET 8.0.19",
+                        "operatingSystem":  "Microsoft Windows 10.0.22000",
+                        "architecture":  "X64",
+                        "processorCount":  20,
+                        "runtimeVersion":  "8.0.19",
+                        "processorIdentifier":  "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel",
+                        "sdkVersion":  "9.0.304",
+                        "openCvVersion":  "4.9.0",
+                        "serverGc":  false,
+                        "gcLatencyMode":  "Interactive"
+                    },
+    "resourceMeasurement":  {
+                                "latency":  "Elapsed wall-clock time around the complete formal OperatorBase.ExecuteAsync call, including image decode, Canny/profile sampling, candidate selection, overlays and output construction.",
+                                "managedAllocation":  "GC.GetAllocatedBytesForCurrentThread on the benchmark thread only; it is not full-process allocation or native OpenCV allocation.",
+                                "processResources":  "Peak working set and private bytes are full benchmark-process observations after all metric rows; they are not per-operator attribution."
+                            },
+    "baselineReportSha256":  "7b54e656c8bb4e47cebb60d795ddd73eac047899244dda6ccd1d123e71e4370b",
+    "afterReportSha256":  "a83294f7479f3d2894094891ffb1f175d46305adbbaae99fc6b48152ea0b57c3",
+    "oldDefaultConformance":  [
+                                  {
+                                      "domain":  "Circle",
+                                      "split":  "validation",
+                                      "oldAlgorithm":  "LegacyDefault",
+                                      "currentAlgorithm":  "LegacyDefault",
+                                      "exactAccuracyAndDiagnosticConformance":  true
+                                  },
+                                  {
+                                      "domain":  "Circle",
+                                      "split":  "test",
+                                      "oldAlgorithm":  "LegacyDefault",
+                                      "currentAlgorithm":  "LegacyDefault",
+                                      "exactAccuracyAndDiagnosticConformance":  true
+                                  },
+                                  {
+                                      "domain":  "Line",
+                                      "split":  "validation",
+                                      "oldAlgorithm":  "L2Default",
+                                      "currentAlgorithm":  "L2Default",
+                                      "exactAccuracyAndDiagnosticConformance":  true
+                                  },
+                                  {
+                                      "domain":  "Line",
+                                      "split":  "test",
+                                      "oldAlgorithm":  "L2Default",
+                                      "currentAlgorithm":  "L2Default",
+                                      "exactAccuracyAndDiagnosticConformance":  true
+                                  }
+                              ],
+    "decisions":  [
+                      {
+                          "domain":  "Circle",
+                          "baseline":  "LegacyDefault",
+                          "candidate":  "WelschOptIn",
+                          "validationSelected":  false,
+                          "testRmseImprovementPercent":  -8.2040562608092866,
+                          "testP95ImprovementPercent":  -20.513561815258306,
+                          "testFailureRateDelta":  0.013888888888888888,
+                          "testAmbiguityRateDelta":  0,
+                          "testP95LatencyIncreaseMilliseconds":  -1.7502999999999993,
+                          "testManagedAllocationIncreaseBytesPerCase":  173585.18888888904,
+                          "adopted":  false,
+                          "reason":  "RejectedByValidationAccuracyOrReliability",
+                          "enable":  "Method=CaliperFitV2; RefinementLoss=Welsch",
+                          "rollback":  "omit RefinementLoss or set Legacy",
+                          "evidenceScope":  "mode"
+                      },
+                      {
+                          "domain":  "Line",
+                          "baseline":  "L2Default",
+                          "candidate":  "WelschOptIn",
+                          "validationSelected":  true,
+                          "testRmseImprovementPercent":  0.9859959266124485,
+                          "testP95ImprovementPercent":  15.820712998919555,
+                          "testFailureRateDelta":  0,
+                          "testAmbiguityRateDelta":  0,
+                          "testP95LatencyIncreaseMilliseconds":  0.7286999999999999,
+                          "testManagedAllocationIncreaseBytesPerCase":  129262.09444444446,
+                          "adopted":  true,
+                          "reason":  "AcceptedOptInOnFormalProductPath",
+                          "enable":  "Method=FitLine; FitLoss=Welsch",
+                          "rollback":  "omit FitLoss or set L2",
+                          "evidenceScope":  "mode"
+                      }
+                  ],
+    "claimBoundary":  "Synthetic raster end-to-end product-operator evidence only. It is not E4, commercial-grade, field-accuracy, release-readiness, or production-site validation evidence."
+}
