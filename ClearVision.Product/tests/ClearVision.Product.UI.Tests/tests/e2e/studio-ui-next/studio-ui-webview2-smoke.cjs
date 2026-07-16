@@ -365,7 +365,111 @@ async function dragCanvasPointer(page, from, to) {
   await page.mouse.up();
 }
 
-async function verifyWorkspaceG2(page) {
+async function readInspectorSurface(page) {
+  return page.evaluate(() => {
+    const inspector = document.querySelector('[data-evidence-surface="f03-g3-inspector"]');
+    const body = inspector?.querySelector('.inspector-panel__body');
+    return {
+      mode: inspector?.getAttribute('data-inspector-mode') || null,
+      metadataPhase: inspector?.getAttribute('data-metadata-phase') || null,
+      mutationGate: inspector?.getAttribute('data-mutation-gate') || null,
+      flowRevision: Number(inspector?.getAttribute('data-flow-revision') || -1),
+      activeDrafts: Number(inspector?.getAttribute('data-active-drafts') || -1),
+      parameterCount: inspector?.querySelectorAll('[data-parameter-name]').length || 0,
+      scrollTop: body?.scrollTop || 0,
+      scrollHeight: body?.scrollHeight || 0,
+      clientHeight: body?.clientHeight || 0
+    };
+  });
+}
+
+async function verifyWorkspaceInspectorG3(page, expectedName) {
+  await page.waitForFunction(() => {
+    const inspector = document.querySelector('[data-evidence-surface="f03-g3-inspector"]');
+    return inspector?.getAttribute('data-inspector-mode') === 'node' &&
+      inspector.getAttribute('data-metadata-phase') === 'ready';
+  }, null, { timeout: 30_000 });
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  const before = await readInspectorSurface(page);
+  const name = inspector.locator('.inspector-panel__field input');
+  const committedName = `${expectedName} · G3`;
+  await name.fill(committedName);
+  await name.press('Enter');
+  await waitForFlowSurfaceNumber(page, 'data-flow-revision', before.flowRevision + 1);
+
+  const inputRevision = (await readFlowSurface(page)).flowRevision;
+  await name.fill(`${committedName} draft`);
+  await page.keyboard.press('Control+z');
+  assert((await readFlowSurface(page)).flowRevision === inputRevision,
+    'Inspector text focus leaked Ctrl+Z into Canvas history.');
+  await name.press('Escape');
+
+  const editor = inspector.locator(
+    '[data-parameter-name][data-editor-kind="text"], ' +
+    '[data-parameter-name][data-editor-kind="number"], ' +
+    '[data-parameter-name][data-editor-kind="boolean"], ' +
+    '[data-parameter-name][data-editor-kind="enum"], ' +
+    '[data-parameter-name][data-editor-kind="slider"]'
+  ).first();
+  assert(await editor.count() === 1, 'Inspector did not expose an implemented metadata parameter editor.');
+  const kind = await editor.getAttribute('data-editor-kind');
+  const revisionBeforeParameter = (await readFlowSurface(page)).flowRevision;
+  if (kind === 'boolean') {
+    const control = editor.locator('input[type="checkbox"]').last();
+    if (await control.isChecked()) await control.uncheck();
+    else await control.check();
+  } else if (kind === 'enum') {
+    const select = editor.locator('select');
+    const current = await select.inputValue();
+    const options = await select.locator('option').evaluateAll(items =>
+      items.map(item => item.value));
+    const next = options.find(value => value !== current);
+    assert(next !== undefined, 'Inspector enum did not expose an alternate option.');
+    await select.selectOption(next);
+  } else if (kind === 'text') {
+    const control = editor.locator('input[type="text"]');
+    const current = await control.inputValue();
+    await control.fill(`${current}0`);
+    await control.press('Enter');
+  } else {
+    const control = editor.locator('input[type="number"]').first();
+    const current = Number(await control.inputValue());
+    const min = Number(await control.getAttribute('min'));
+    const max = Number(await control.getAttribute('max'));
+    const boundedMin = Number.isFinite(min) ? min : 0;
+    const boundedMax = Number.isFinite(max) ? max : boundedMin + 10;
+    const candidate = current < boundedMax ? Math.min(boundedMax, current + 1) : Math.max(boundedMin, current - 1);
+    await control.fill(String(candidate));
+    await control.press('Enter');
+  }
+  await waitForFlowSurfaceNumber(page, 'data-flow-revision', revisionBeforeParameter + 1);
+  const parameterRevision = (await readFlowSurface(page)).flowRevision;
+  await page.locator('[data-flow-command="undo"]').click();
+  await waitForFlowSurfaceNumber(page, 'data-flow-revision', parameterRevision + 1);
+  await page.locator('[data-flow-command="redo"]').click();
+  await waitForFlowSurfaceNumber(page, 'data-flow-revision', parameterRevision + 2);
+
+  const scaleBeforeScroll = (await readFlowSurface(page)).scale;
+  const body = inspector.locator('.inspector-panel__body');
+  await body.hover();
+  await page.mouse.wheel(0, 420);
+  await waitForDoubleAnimationFrame(page);
+  const afterScroll = await readInspectorSurface(page);
+  assert((await readFlowSurface(page)).scale === scaleBeforeScroll,
+    'Inspector wheel scrolling leaked into Canvas zoom.');
+  if (afterScroll.scrollHeight > afterScroll.clientHeight) {
+    assert(afterScroll.scrollTop > 0, 'Scrollable Inspector did not consume the wheel gesture.');
+  }
+  return {
+    before,
+    committedName,
+    editorKind: kind,
+    revisionAfterRedo: (await readFlowSurface(page)).flowRevision,
+    afterScroll
+  };
+}
+
+async function verifyWorkspaceG3(page) {
   await page.waitForSelector('[data-capability="flow-workspace"]', { state: 'visible', timeout: 30_000 });
   await page.waitForFunction(() =>
     document.querySelector('[data-evidence-surface="f03-g2-operator-rail"]')
@@ -387,6 +491,7 @@ async function verifyWorkspaceG2(page) {
   await threshold.item.click();
   await waitForFlowSurfaceNumber(page, 'data-node-count', 1);
   await waitForFlowSurfaceNumber(page, 'data-flow-revision', 1);
+  const inspectorG3 = await verifyWorkspaceInspectorG3(page, thresholdName);
 
   await resetOperatorRailFilters(page);
   const category = page.locator('.operator-rail__categories [data-category]').first();
@@ -424,7 +529,14 @@ async function verifyWorkspaceG2(page) {
 
   const canvasOrigin = await canvas.boundingBox();
   assert(canvasOrigin, 'Flow Canvas lost its bounding box before disconnect.');
-  await page.mouse.click(canvasOrigin.x + thresholdInput.x, canvasOrigin.y + thresholdInput.y);
+  await page.mouse.click(
+    canvasOrigin.x + (sourceOutput.x + thresholdInput.x) / 2,
+    canvasOrigin.y + (sourceOutput.y + thresholdInput.y) / 2
+  );
+  await page.waitForFunction(() =>
+    document.querySelector('[data-evidence-surface="f03-g3-inspector"]')
+      ?.getAttribute('data-inspector-mode') === 'connection', null, { timeout: 30_000 });
+  await page.locator('.inspector-panel__danger').click();
   await waitForFlowSurfaceNumber(page, 'data-connection-count', 0);
 
   const thresholdHit = { x: thresholdPosition.x + 44, y: thresholdPosition.y + 16 };
@@ -486,6 +598,7 @@ async function verifyWorkspaceG2(page) {
   return {
     initial: { nodeCount: 0, connectionCount: 0, flowRevision: 0 },
     operatorRail: { searchMatchCount, categoryId, categoryMatchCount },
+    inspectorG3,
     legalConnection,
     illegalConnection,
     inputShortcutGate: afterInputShortcut,
@@ -610,8 +723,8 @@ async function verifyProductPage(page, route, runtimeErrors) {
     return url.origin === origin && (url.pathname === '/health' || url.pathname.startsWith('/api/'));
   });
   const preferenceWriteRequests = preferenceRequests.filter(item => item.method !== 'GET');
-  const workspaceG2 = isWorkspaceRoute && ['ready', 'empty'].includes(projection.workspaceState)
-    ? await verifyWorkspaceG2(page)
+  const workspaceG3 = isWorkspaceRoute && ['ready', 'empty'].includes(projection.workspaceState)
+    ? await verifyWorkspaceG3(page)
     : null;
   let workspaceLifecycle = null;
   if (isWorkspaceRoute) {
@@ -623,6 +736,8 @@ async function verifyProductPage(page, route, runtimeErrors) {
         projectId: shell?.getAttribute('data-workspace-project-id') || null,
         ownerCount: Number(shell?.getAttribute('data-workspace-owner-count') || -1),
         flowCanvasOwnerCount: Number(diagnostics?.flowCanvasOwnerCount ?? -1),
+        inspectorOwnerCount: Number(diagnostics?.inspectorOwnerCount ?? -1),
+        activeInspectorDrafts: Number(diagnostics?.activeInspectorDrafts ?? -1),
         activeSubscriptions: Number(shell?.getAttribute('data-workspace-active-subscriptions') || -1),
         activeAnimationFrames: Number(diagnostics?.activeAnimationFrames ?? -1),
         activeObservers: Number(diagnostics?.activeObservers ?? -1),
@@ -636,49 +751,69 @@ async function verifyProductPage(page, route, runtimeErrors) {
       };
     });
     const mounted = await readWorkspace();
-    await page.goto(`${origin}/studio/index.html#/about`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-studio-page="about"]', { state: 'visible', timeout: 30_000 });
-    await page.waitForFunction(() => {
-      const diagnostics = window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
-      return diagnostics?.workspaceOwnerCount === 0 &&
-        diagnostics.flowCanvasOwnerCount === 0 &&
-        diagnostics.activeSubscriptions === 0 &&
-        diagnostics.activeAnimationFrames === 0 &&
-        diagnostics.activeObservers === 0 &&
-        diagnostics.activeTimers === 0 &&
-        diagnostics.activeAbortControllers === 0 &&
-        diagnostics.inFlightReads === 0;
-    }, null, { timeout: 30_000 });
-    const disposed = await page.evaluate(() => ({
-      diagnostics: { ...window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__ },
-      shellCount: document.querySelectorAll('[data-evidence-surface="f03-workspace-shell"]').length,
-      mainCount: document.querySelectorAll('main').length
-    }));
-    await page.goto(`${origin}/studio/index.html#${route}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-evidence-surface="f03-workspace-shell"]', {
-      state: 'visible',
-      timeout: 30_000
-    });
-    await page.waitForFunction(() => {
-      const state = document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
-        ?.getAttribute('data-workspace-state');
-      return Boolean(state && state !== 'loading');
-    }, null, { timeout: 30_000 });
-    const remounted = await readWorkspace();
-    workspaceLifecycle = { mounted, disposed, remounted };
+    const lifecycleCycles = [];
+    let disposed = null;
+    let remounted = null;
+    for (let cycle = 0; cycle < 20; cycle += 1) {
+      await page.goto(`${origin}/studio/index.html#/about`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-studio-page="about"]', { state: 'visible', timeout: 30_000 });
+      await page.waitForFunction(() => {
+        const diagnostics = window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
+        return diagnostics?.workspaceOwnerCount === 0 &&
+          diagnostics.flowCanvasOwnerCount === 0 &&
+          diagnostics.inspectorOwnerCount === 0 &&
+          diagnostics.activeInspectorDrafts === 0 &&
+          diagnostics.activeSubscriptions === 0 &&
+          diagnostics.activeAnimationFrames === 0 &&
+          diagnostics.activeObservers === 0 &&
+          diagnostics.activeTimers === 0 &&
+          diagnostics.activeAbortControllers === 0 &&
+          diagnostics.inFlightReads === 0;
+      }, null, { timeout: 30_000 });
+      disposed = await page.evaluate(() => ({
+        diagnostics: { ...window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__ },
+        shellCount: document.querySelectorAll('[data-evidence-surface="f03-workspace-shell"]').length,
+        mainCount: document.querySelectorAll('main').length
+      }));
+      await page.goto(`${origin}/studio/index.html#${route}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-evidence-surface="f03-workspace-shell"]', {
+        state: 'visible',
+        timeout: 30_000
+      });
+      await page.waitForFunction(() => {
+        const state = document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+          ?.getAttribute('data-workspace-state');
+        const diagnostics = window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
+        return Boolean(state && state !== 'loading') &&
+          diagnostics?.workspaceOwnerCount === 1 &&
+          diagnostics.flowCanvasOwnerCount === 1 &&
+          diagnostics.inspectorOwnerCount === 1;
+      }, null, { timeout: 30_000 });
+      remounted = await readWorkspace();
+      lifecycleCycles.push({
+        cycle,
+        disposedOwnerCount: disposed.diagnostics.workspaceOwnerCount,
+        disposedInspectorCount: disposed.diagnostics.inspectorOwnerCount,
+        remountedOwnerCount: remounted.ownerCount,
+        remountedInspectorCount: remounted.inspectorOwnerCount
+      });
+    }
+    workspaceLifecycle = { mounted, disposed, remounted, cycles: lifecycleCycles };
 
     assert(mounted.mainCount === 1 && mounted.shellCount === 1,
       `Workspace did not remain inside the single Product main: ${JSON.stringify(mounted)}`);
     assert(mounted.ownerCount >= 0 && mounted.ownerCount <= 1,
       `Workspace owner count escaped 0/1: ${JSON.stringify(mounted)}`);
-    if (workspaceG2) {
-      assert(mounted.ownerCount === 1 && mounted.flowCanvasOwnerCount === 1,
-        `Formal G2 Workspace did not retain exactly one Canvas owner: ${JSON.stringify(mounted)}`);
+    if (workspaceG3) {
+      assert(mounted.ownerCount === 1 && mounted.flowCanvasOwnerCount === 1 && mounted.inspectorOwnerCount === 1,
+        `Formal G3 Workspace did not retain exactly one Canvas/Inspector owner: ${JSON.stringify(mounted)}`);
     }
     assert(disposed.shellCount === 0 && disposed.mainCount === 1,
       `Workspace route leave did not unmount its shell: ${JSON.stringify(disposed)}`);
     assert(disposed.diagnostics.workspaceOwnerCount === 0 &&
       disposed.diagnostics.flowCanvasOwnerCount === 0 &&
+      disposed.diagnostics.inspectorOwnerCount === 0 &&
+      disposed.diagnostics.activeInspectorDrafts === 0 &&
       disposed.diagnostics.activeSubscriptions === 0 &&
       disposed.diagnostics.activeAnimationFrames === 0 &&
       disposed.diagnostics.activeObservers === 0 &&
@@ -688,10 +823,14 @@ async function verifyProductPage(page, route, runtimeErrors) {
     `Workspace resources survived route leave: ${JSON.stringify(disposed)}`);
     assert(remounted.ownerCount >= 0 && remounted.ownerCount <= 1,
       `Workspace remount owner count escaped 0/1: ${JSON.stringify(remounted)}`);
-    if (workspaceG2) {
-      assert(remounted.ownerCount === 1 && remounted.flowCanvasOwnerCount === 1,
-        `Formal G2 Workspace remount did not restore one Canvas owner: ${JSON.stringify(remounted)}`);
+    if (workspaceG3) {
+      assert(remounted.ownerCount === 1 && remounted.flowCanvasOwnerCount === 1 && remounted.inspectorOwnerCount === 1,
+        `Formal G3 Workspace remount did not restore one Canvas/Inspector owner: ${JSON.stringify(remounted)}`);
     }
+    assert(lifecycleCycles.length === 20 && lifecycleCycles.every(item =>
+      item.disposedOwnerCount === 0 && item.disposedInspectorCount === 0 &&
+      item.remountedOwnerCount === 1 && item.remountedInspectorCount === 1),
+    `Workspace 20-cycle lifecycle ledger failed: ${JSON.stringify(lifecycleCycles)}`);
     assert(remounted.horizontalOverflow <= 1 && remounted.verticalOverflow <= 1,
       `Workspace remount overflowed globally: ${JSON.stringify(remounted)}`);
   }
@@ -757,7 +896,7 @@ async function verifyProductPage(page, route, runtimeErrors) {
     preferenceRequests,
     preferenceWriteRequests,
     resultsFilterLayout,
-    workspaceG2,
+    workspaceG3,
     workspaceLifecycle
   };
 }

@@ -402,7 +402,7 @@ public sealed class StudioUiArchitectureGuardTests
     }
 
     [Fact]
-    public void StudioUiF03G2Workspace_ShouldKeepOneOwnerAndExactReadOnlyBoundary()
+    public void StudioUiF03G3Workspace_ShouldKeepOneOwnerTypedInspectorAndExactReadOnlyBoundary()
     {
         var workspaceRoot = Path.Combine(
             RepoPath(StudioUiRoot),
@@ -431,7 +431,7 @@ public sealed class StudioUiArchitectureGuardTests
             text.Should().NotContain("ApiTransport", $"{relativePath} must not hold the generic transport");
             text.Should().NotMatchRegex(
                 "method\\s*:\\s*['\\\"](?:POST|PUT|PATCH|DELETE)['\\\"]",
-                $"{relativePath} must remain GET-only in G1");
+                $"{relativePath} must remain GET-only in G1-G3");
             text.Should().NotMatchRegex(
                 "from\\s+['\\\"][^'\\\"]*(?:/labs/|FrontendV2)",
                 $"{relativePath} must not import retired or Lab production code");
@@ -456,8 +456,39 @@ public sealed class StudioUiArchitectureGuardTests
 
         var flowOwner = File.ReadAllText(Path.Combine(workspaceRoot, "flow", "flowCanvasOwner.ts"));
         flowOwner.Should().Contain("createCanonicalFlowCanvasHost");
+        flowOwner.Should().Contain("openInspector");
+        flowOwner.Should().Contain("patchNodeParameter");
+        flowOwner.Should().Contain("patchNodeProperties");
         flowOwner.Should().NotContain(".raw");
         flowOwner.Should().NotContain("src/labs");
+
+        var inspectorRoot = Path.Combine(workspaceRoot, "inspector");
+        Directory.Exists(inspectorRoot).Should().BeTrue();
+        Directory.EnumerateFiles(inspectorRoot, "inspectorOwner.ts", SearchOption.AllDirectories)
+            .Should()
+            .ContainSingle();
+        var inspectorSource = string.Join(
+            Environment.NewLine,
+            Directory.EnumerateFiles(inspectorRoot, "*.*", SearchOption.AllDirectories)
+                .Where(path => path.EndsWith(".ts", StringComparison.OrdinalIgnoreCase) ||
+                               path.EndsWith(".vue", StringComparison.OrdinalIgnoreCase))
+                .Select(File.ReadAllText));
+        inspectorSource.Should().Contain("FlowCanvasOwner");
+        inspectorSource.Should().Contain("patchNodeParameter");
+        inspectorSource.Should().Contain("patchNodeProperties");
+        inspectorSource.Should().Contain("disconnect");
+        inspectorSource.Should().NotContain("FlowCanvas.serialize()");
+        inspectorSource.Should().NotContain("FilePickedEvent");
+        inspectorSource.Should().NotContain("HostBridge");
+        Directory.Exists(Path.Combine(workspaceRoot, "preview")).Should().BeFalse();
+        Directory.Exists(Path.Combine(workspaceRoot, "persistence")).Should().BeFalse();
+        Directory.Exists(Path.Combine(workspaceRoot, "run")).Should().BeFalse();
+
+        var canonical = File.ReadAllText(Path.Combine(
+            RepoPath(StudioUiRoot), "src", "platform", "canvas", "canonicalFlowCanvas.ts"));
+        canonical.Should().Contain("patchNodeParameter");
+        canonical.Should().Contain("patchNodeProperties");
+        canonical.Should().Contain("mergeFlowPersistence");
 
         var router = File.ReadAllText(Path.Combine(RepoPath(StudioUiRoot), "src", "app", "router.ts"));
         router.Should().Contain("path: 'projects/:id/workspace'");

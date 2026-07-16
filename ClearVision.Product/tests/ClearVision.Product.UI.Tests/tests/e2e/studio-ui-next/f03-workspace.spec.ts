@@ -10,7 +10,7 @@ import {
   type F03RequestAuditEntry
 } from './f03-browser-fixture';
 
-const fixtureSchema = 'f03-g2-workspace.v1';
+const fixtureSchema = 'f03-g3-workspace.v1';
 const projectA = '11111111-1111-4111-8111-111111111111';
 const projectB = '22222222-2222-4222-8222-222222222222';
 const flowId = '33333333-3333-4333-8333-333333333333';
@@ -84,7 +84,30 @@ const operatorCatalog = Object.freeze([
     ],
     outputPorts: [{ name: 'Image', displayName: '图像', dataType: 0, isRequired: false, description: null }]
   }),
-  operatorMetadata({ type: 20 }),
+  operatorMetadata({
+    type: 20,
+    parameters: [
+      { name: 'Text', displayName: '文本', description: '字符串参数', dataType: 'string', defaultValue: '', minValue: null, maxValue: null, isRequired: false, options: null },
+      { name: 'Count', displayName: '数量', description: '0 到 10 的整数', dataType: 'int', defaultValue: 0, minValue: 0, maxValue: 10, isRequired: true, options: null },
+      { name: 'Enabled', displayName: '启用输出', description: '布尔参数', dataType: 'bool', defaultValue: false, minValue: null, maxValue: null, isRequired: false, options: null },
+      { name: 'Mode', displayName: '模式', description: '枚举参数', dataType: 'enum', defaultValue: 'Auto', minValue: null, maxValue: null, isRequired: false, options: [{ label: '自动', value: 'Auto' }, { label: '手动', value: 'Manual' }] },
+      { name: 'Gain', displayName: '增益', description: '显式 slider presentation', dataType: 'double', defaultValue: 0, minValue: 0, maxValue: 5, isRequired: false, options: null },
+      { name: 'OptionalCount', displayName: '可空数量', description: '显式 nullable 参数', dataType: 'int', defaultValue: null, minValue: 0, maxValue: 10, isRequired: false, options: null },
+      { name: 'FilePath', displayName: '文件路径', description: '延后到 Host file picker', dataType: 'file', defaultValue: '', minValue: null, maxValue: null, isRequired: false, options: null }
+    ],
+    parameterConstraints: [{
+      parameter: 'Count', requiredPolicy: 'required', requiredWhen: null,
+      enabledWhen: null, disabledWhen: null, visibleWhen: null, hiddenWhen: null,
+      ignoredWhen: null, atLeastOneGroup: null, mutuallyExclusiveGroup: null,
+      aliasFor: null, deprecated: false, resourceKind: null,
+      reasonCode: 'COUNT_REQUIRED', satisfiedByInputPorts: []
+    }],
+    outputAvailabilityRules: [{
+      output: 'Binary',
+      availableWhen: { all: [{ parameter: 'Enabled', comparison: 'equals', value: true }] },
+      reasonCode: 'BINARY_DISABLED'
+    }]
+  }),
   operatorMetadata({
     type: 238,
     displayName: '二值图转区域',
@@ -117,9 +140,10 @@ const operatorCatalog = Object.freeze([
 interface BootOptions {
   readonly workspaceEnabled?: boolean;
   readonly authStatus?: number;
-  readonly projectStatus?: number;
+  readonly projectStatus?: number | (() => number);
   readonly projectBody?: unknown | ((projectId: string) => unknown);
   readonly projectDelayMs?: number;
+  readonly operatorCatalogBody?: unknown;
 }
 
 async function bootWorkspace(page: Page, options: BootOptions = {}) {
@@ -143,7 +167,7 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
       return;
     }
     if (url.pathname === '/api/operators/library' && url.search === '?includeCompatibility=true') {
-      await fulfillF03Json(route, 200, operatorCatalog, fixtureSchema);
+      await fulfillF03Json(route, 200, options.operatorCatalogBody ?? operatorCatalog, fixtureSchema);
       return;
     }
     const operatorMatch = url.pathname.match(/^\/api\/operators\/(\d+|[A-Za-z][A-Za-z0-9_]*)\/metadata$/);
@@ -158,7 +182,9 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
     if (projectMatch) {
       if (options.projectDelayMs) await new Promise(resolve => setTimeout(resolve, options.projectDelayMs));
       const id = projectMatch[1]!;
-      const status = options.projectStatus ?? 200;
+      const status = typeof options.projectStatus === 'function'
+        ? options.projectStatus()
+        : options.projectStatus ?? 200;
       const body = typeof options.projectBody === 'function'
         ? options.projectBody(id)
         : options.projectBody ?? projectPayload(id);
@@ -249,6 +275,103 @@ function performanceFlow(nodeCount: number, connectionCount: number) {
     connections,
     decisionConfiguration: null
   };
+}
+
+function inspectorFlow() {
+  const sourceNodeId = fixtureUuid(40_001);
+  const targetNodeId = fixtureUuid(40_002);
+  const outputPortId = fixtureUuid(40_101);
+  const inputPortId = fixtureUuid(40_102);
+  const parameter = (
+    seed: number,
+    name: string,
+    dataType: string,
+    value: unknown,
+    overrides: Record<string, unknown> = {}
+  ) => ({
+    id: fixtureUuid(seed),
+    name,
+    displayName: name,
+    description: `${name} Browser parameter`,
+    dataType,
+    value,
+    defaultValue: value,
+    minValue: null,
+    maxValue: null,
+    isRequired: false,
+    options: null,
+    ...overrides
+  });
+  const parameters = [
+    parameter(41_001, 'Text', 'string', ''),
+    parameter(41_002, 'Count', 'int', 0, { minValue: 0, maxValue: 10, isRequired: true }),
+    parameter(41_003, 'Enabled', 'bool', false),
+    parameter(41_004, 'Mode', 'enum', 'Auto', {
+      options: [{ label: '自动', value: 'Auto' }, { label: '手动', value: 'Manual' }]
+    }),
+    parameter(41_005, 'Gain', 'double', 0, { minValue: 0, maxValue: 5, showSlider: true }),
+    parameter(41_006, 'OptionalCount', 'int', null, { minValue: 0, maxValue: 10, nullable: true }),
+    parameter(41_007, 'FilePath', 'file', '')
+  ];
+  return {
+    id: flowId,
+    name: 'G3 Inspector flow',
+    futureFlowField: { schema: 3 },
+    operators: [{
+      id: sourceNodeId,
+      name: 'Inspector Source',
+      type: 20,
+      metadata: null,
+      x: 80,
+      y: 100,
+      inputPorts: [],
+      outputPorts: [{
+        id: outputPortId,
+        name: 'Binary',
+        direction: 1,
+        dataType: 0,
+        isRequired: false,
+        futurePortField: 'keep-port'
+      }],
+      parameters,
+      isEnabled: true,
+      executionStatus: 2,
+      executionTimeMs: 9,
+      errorMessage: null,
+      futureOperatorField: 'keep-operator'
+    }, {
+      id: targetNodeId,
+      name: 'Inspector Target',
+      type: 20,
+      metadata: null,
+      x: 360,
+      y: 100,
+      inputPorts: [{ id: inputPortId, name: 'Image', direction: 0, dataType: 0, isRequired: true }],
+      outputPorts: [],
+      parameters: parameters.map((item, index) => ({ ...item, id: fixtureUuid(42_000 + index) })),
+      isEnabled: true,
+      executionStatus: 0,
+      executionTimeMs: null,
+      errorMessage: null
+    }],
+    connections: [{
+      id: fixtureUuid(43_001),
+      sourceOperatorId: sourceNodeId,
+      sourcePortId: outputPortId,
+      targetOperatorId: targetNodeId,
+      targetPortId: inputPortId,
+      futureConnectionField: 'keep-connection'
+    }],
+    decisionConfiguration: null
+  };
+}
+
+async function selectInspectorNode(page: Page, x: number, y: number) {
+  const canvas = page.locator('[data-testid="flow-canvas"]');
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.click(box!.x + x, box!.y + y);
+  return { canvas, box: box! };
 }
 
 test('flag off keeps Workspace owner/resources at zero and skips the Project GET', async ({ page }) => {
@@ -420,8 +543,188 @@ test('pointer wiring creates, rejects and disconnects connections with stable fe
   await expect(surface).toHaveAttribute('data-connection-count', '0');
 });
 
+test('G3 Inspector follows empty, node, multi-node and connection selection from Canvas', async ({ page }) => {
+  await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
+  });
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'empty');
+
+  const { box } = await selectInspectorNode(page, 120, 125);
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'node');
+  await expect(inspector).toHaveAttribute('data-metadata-phase', 'ready');
+  await expect(inspector).toContainText('Inspector Source');
+  await expect(inspector.locator('[data-parameter-name]')).toHaveCount(7);
+
+  await page.keyboard.down('Control');
+  await page.mouse.click(box.x + 400, box.y + 125);
+  await page.keyboard.up('Control');
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'multi-node');
+  await expect(inspector.locator('.inspector-panel__summary-node')).toHaveCount(2);
+
+  await page.mouse.click(box.x + 540, box.y + 300);
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'empty');
+
+  await page.mouse.click(box.x + 290, box.y + 142);
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'connection');
+  await expect(inspector).toContainText('Inspector Source');
+  await expect(inspector).toContainText('Inspector Target');
+});
+
+test('G3 Inspector edits primitive, slider and nullable parameters with validation/history/focus isolation', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 600 });
+  await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
+  });
+  const surface = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  await selectInspectorNode(page, 120, 125);
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'node');
+  await expect(surface).toHaveAttribute('data-flow-revision', '0');
+
+  const textInput = inspector.locator('[data-parameter-name="Text"] input[type="text"]');
+  await textInput.fill('0');
+  await textInput.press('Enter');
+  await expect(surface).toHaveAttribute('data-flow-revision', '1');
+
+  const countInput = inspector.locator('[data-parameter-name="Count"] input[type="number"]');
+  await countInput.fill('11');
+  await countInput.press('Enter');
+  await expect(surface).toHaveAttribute('data-flow-revision', '1');
+  await expect(inspector.locator('.inspector-panel__validation')).toContainText('不能大于 10');
+  await countInput.fill('10');
+  await countInput.press('Enter');
+  await expect(surface).toHaveAttribute('data-flow-revision', '2');
+
+  const booleanInput = inspector.locator('[data-parameter-name="Enabled"] input[type="checkbox"]');
+  await booleanInput.check();
+  await expect(surface).toHaveAttribute('data-flow-revision', '3');
+  await booleanInput.uncheck();
+  await expect(surface).toHaveAttribute('data-flow-revision', '4');
+
+  await inspector.locator('[data-parameter-name="Mode"] select').selectOption('Manual');
+  await expect(surface).toHaveAttribute('data-flow-revision', '5');
+
+  await inspector.locator('[data-parameter-name="Gain"] input[type="range"]').evaluate(element => {
+    const input = element as HTMLInputElement;
+    input.value = '4';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(surface).toHaveAttribute('data-flow-revision', '6');
+
+  const nullable = inspector.locator('[data-parameter-name="OptionalCount"]');
+  await nullable.locator('.parameter-editor__nullable input').uncheck();
+  await nullable.locator('input[type="number"]').fill('0');
+  await nullable.locator('input[type="number"]').press('Enter');
+  await expect(surface).toHaveAttribute('data-flow-revision', '7');
+  await nullable.locator('.parameter-editor__nullable input').check();
+  await expect(surface).toHaveAttribute('data-flow-revision', '8');
+
+  const name = inspector.locator('.inspector-panel__field input');
+  await name.fill('Renamed Source');
+  await name.press('Enter');
+  await expect(surface).toHaveAttribute('data-flow-revision', '9');
+  const enabled = inspector.locator('.inspector-panel__check input');
+  await enabled.uncheck();
+  await expect(surface).toHaveAttribute('data-flow-revision', '10');
+
+  await page.locator('[data-flow-command="undo"]').click();
+  await expect(surface).toHaveAttribute('data-flow-revision', '11');
+  await expect(enabled).toBeChecked();
+  await page.locator('[data-flow-command="redo"]').click();
+  await expect(surface).toHaveAttribute('data-flow-revision', '12');
+  await expect(enabled).not.toBeChecked();
+
+  await textInput.focus();
+  await textInput.fill('draft-only');
+  await page.keyboard.press('Control+z');
+  await expect(surface).toHaveAttribute('data-flow-revision', '12');
+  await expect(surface).toHaveAttribute('data-selected-count', '1');
+
+  const body = inspector.locator('.inspector-panel__body');
+  const scale = await surface.getAttribute('data-scale');
+  await body.hover();
+  await page.mouse.wheel(0, 420);
+  await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await expect(surface).toHaveAttribute('data-scale', scale!);
+
+  const canvas = page.locator('[data-testid="flow-canvas"]');
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await countInput.fill('11');
+  await page.mouse.click(box!.x + 400, box!.y + 125);
+  await expect(inspector).toContainText('Inspector Target');
+  await expect(inspector).toHaveAttribute('data-active-drafts', '0');
+  await expect(inspector.locator('.inspector-panel__validation')).toHaveCount(0);
+});
+
+test('G3 connection Inspector selects endpoints and disconnects through the typed command', async ({ page }) => {
+  await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
+  });
+  const surface = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  const canvas = page.locator('[data-testid="flow-canvas"]');
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.click(box!.x + 290, box!.y + 142);
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'connection');
+  await inspector.locator('.inspector-panel__connection button').first().click();
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'node');
+  await expect(inspector).toContainText('Inspector Source');
+
+  await page.mouse.click(box!.x + 290, box!.y + 142);
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'connection');
+  await inspector.locator('.inspector-panel__danger').click();
+  await expect(surface).toHaveAttribute('data-connection-count', '0');
+  await expect(surface).toHaveAttribute('data-flow-revision', '1');
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'empty');
+});
+
+test('G3 Inspector shows metadata missing without enabling parameter writes', async ({ page }) => {
+  await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    operatorCatalogBody: []
+  });
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  await selectInspectorNode(page, 120, 125);
+  await expect(inspector).toHaveAttribute('data-metadata-phase', 'missing');
+  await expect(inspector.locator('[data-parameter-name="Text"] input')).toBeDisabled();
+});
+
+test('G3 Inspector shows metadata decode failure without enabling parameter writes', async ({ page }) => {
+  await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    operatorCatalogBody: [{ ...operatorCatalog[1], parameters: 'invalid' }]
+  });
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  await selectInspectorNode(page, 120, 125);
+  await expect(inspector).toHaveAttribute('data-metadata-phase', 'error');
+  await expect(inspector.locator('[data-parameter-name="Text"] input')).toBeDisabled();
+});
+
+test('G3 Inspector is fully unmounted when a later Project read is forbidden', async ({ page }) => {
+  let projectStatus = 200;
+  await bootWorkspace(page, {
+    projectStatus: () => projectStatus,
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
+  });
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  await selectInspectorNode(page, 120, 125);
+  projectStatus = 403;
+  await page.goto('/studio/index.html#/about');
+  await page.goto(`/studio/index.html#/projects/${projectA}/workspace`);
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await expect(shell).toHaveAttribute('data-workspace-state', 'forbidden');
+  await expect(shell).toHaveAttribute('data-workspace-inspector-owner-count', '0');
+  await expect(inspector).toHaveCount(0);
+});
+
 test('passes 20 project switches with one owner and a zero final resource ledger', async ({ page }) => {
-  const audit = await bootWorkspace(page);
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
+  });
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
   for (let cycle = 0; cycle < 20; cycle += 1) {
     const projectId = cycle % 2 === 0 ? projectB : projectA;
@@ -430,14 +733,19 @@ test('passes 20 project switches with one owner and a zero final resource ledger
     await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
       workspaceOwnerCount: 1,
       flowCanvasOwnerCount: 1,
+      inspectorOwnerCount: 1,
       activeProjectId: projectId,
       ownerConflictCount: 0
     });
+    await selectInspectorNode(page, 120, 125);
+    await expect(shell).toHaveAttribute('data-workspace-inspector-owner-count', '1');
   }
   await page.goto('/studio/index.html#/about');
   await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
     workspaceOwnerCount: 0,
     flowCanvasOwnerCount: 0,
+    inspectorOwnerCount: 0,
+    activeInspectorDrafts: 0,
     activeSubscriptions: 0,
     activeTimers: 0,
     activeAnimationFrames: 0,
