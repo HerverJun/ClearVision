@@ -72,6 +72,21 @@ const operators = [
     inputPorts: [{ name: 'Image', dataType: 'Image' }],
     outputPorts: [{ name: 'Image', dataType: 'Image' }],
   },
+  {
+    type: 'RoiManager',
+    displayName: 'ROI 管理器',
+    category: '几何',
+    description: '框选并裁剪图像区域',
+    parameters: [
+      { name: 'Shape', displayName: '形状', dataType: 'enum', value: 'Rectangle', options: [{ value: 'Rectangle', label: '矩形' }] },
+      { name: 'X', displayName: 'X', dataType: 'double', value: 0 },
+      { name: 'Y', displayName: 'Y', dataType: 'double', value: 0 },
+      { name: 'Width', displayName: '宽度', dataType: 'double', value: 1 },
+      { name: 'Height', displayName: '高度', dataType: 'double', value: 1 },
+    ],
+    inputPorts: [{ name: 'Image', dataType: 'Image', isRequired: true }],
+    outputPorts: [{ name: 'Image', dataType: 'Image' }],
+  },
 ];
 
 async function installStudio2Flags(page: Page) {
@@ -191,7 +206,27 @@ async function installRoutes(page: Page, previewMode: PreviewMode) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: '[]',
+      body: JSON.stringify([{
+        id: 'cam-1',
+        displayName: '测试相机',
+        serialNumber: 'SN-CAM-001',
+        manufacturer: 'Hikvision',
+        triggerMode: 'Software',
+      }]),
+    });
+  });
+
+  await page.route('**/api/cameras/soft-trigger-capture', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: Buffer.from(PIXEL_PROBE_PNG_BASE64, 'base64'),
+      headers: {
+        'X-Camera-Id': 'cam-1',
+        'X-Trigger-Mode': 'Software',
+        'X-Image-Width': '64',
+        'X-Image-Height': '48',
+      },
     });
   });
 
@@ -579,6 +614,85 @@ test.describe('Flow layout VisionMaster-style shell', () => {
 
     await page.keyboard.press('Escape');
     await expect(page.locator('#operator-group-flyout')).toBeHidden();
+  });
+
+  test('keeps global operator search rows aligned at 1920x1080', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    const searchGroup = page.locator('#operator-rail .operator-rail-item', { hasText: '搜索' });
+    await expect(searchGroup).toBeVisible();
+    await searchGroup.click();
+    await expect(page.locator('#operator-group-flyout')).toBeVisible();
+
+    const metrics = await page.evaluate(() => {
+      const flyout = document.querySelector('.operator-group-flyout') as HTMLElement | null;
+      const panel = document.querySelector('.operator-group-flyout-panel') as HTMLElement | null;
+      const items = Array.from(document.querySelectorAll('.operator-flyout-item')).slice(0, 12) as HTMLElement[];
+      const rows = items.map((item, index) => {
+        const rect = item.getBoundingClientRect();
+        const nextRect = items[index + 1]?.getBoundingClientRect() || null;
+        const detail = item.querySelector('.operator-flyout-detail')?.getBoundingClientRect() || null;
+        const category = item.querySelector('.operator-flyout-category')?.getBoundingClientRect() || null;
+        const description = item.querySelector('.operator-flyout-main em')?.getBoundingClientRect() || null;
+        return {
+          top: rect.top,
+          bottom: rect.bottom,
+          nextTop: nextRect?.top ?? null,
+          detailTop: detail?.top ?? null,
+          detailBottom: detail?.bottom ?? null,
+          categoryTop: category?.top ?? null,
+          categoryBottom: category?.bottom ?? null,
+          categoryWidth: category?.width ?? null,
+          descriptionTop: description?.top ?? null,
+          descriptionBottom: description?.bottom ?? null,
+          width: rect.width,
+        };
+      });
+      const flyoutRect = flyout?.getBoundingClientRect() || null;
+      const panelRect = panel?.getBoundingClientRect() || null;
+
+      return {
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        flyout: flyoutRect ? {
+          left: flyoutRect.left,
+          right: flyoutRect.right,
+          top: flyoutRect.top,
+          bottom: flyoutRect.bottom,
+          width: flyoutRect.width,
+        } : null,
+        panel: panelRect ? {
+          left: panelRect.left,
+          right: panelRect.right,
+          top: panelRect.top,
+          bottom: panelRect.bottom,
+        } : null,
+        rows,
+        overflow: {
+          document: document.documentElement.scrollWidth > window.innerWidth,
+          body: document.body.scrollWidth > window.innerWidth,
+        },
+      };
+    });
+
+    expect(metrics.flyout?.width ?? 0).toBeGreaterThanOrEqual(420);
+    expect(metrics.flyout?.left ?? -1).toBeGreaterThanOrEqual(0);
+    expect(metrics.flyout?.right ?? metrics.viewport.width + 1).toBeLessThanOrEqual(metrics.viewport.width);
+    expect(metrics.panel?.top ?? -1).toBeGreaterThanOrEqual(0);
+    expect(metrics.panel?.bottom ?? metrics.viewport.height + 1).toBeLessThanOrEqual(metrics.viewport.height);
+    expect(metrics.overflow).toEqual({ document: false, body: false });
+    expect(metrics.rows.length).toBeGreaterThan(1);
+
+    for (const row of metrics.rows) {
+      if (row.nextTop !== null) {
+        expect(row.bottom).toBeLessThanOrEqual(row.nextTop + 1);
+      }
+      expect(row.detailTop).not.toBeNull();
+      expect(row.detailBottom ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(row.bottom + 1);
+      if (row.categoryTop !== null && row.descriptionTop !== null) {
+        expect(Math.abs(row.categoryTop - row.descriptionTop)).toBeLessThanOrEqual(3);
+        expect(row.categoryBottom ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(row.bottom + 1);
+        expect(row.categoryWidth ?? row.width).toBeLessThan(row.width * 0.5);
+      }
+    }
   });
 
   test('supports global operator search, scoped category search, drag-add, and rail scroll retention', async ({ page }, testInfo) => {
@@ -1115,12 +1229,12 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     const workbench = page.locator('.preview-workbench-pane');
     const cameraGroup = page.locator('.inspector-pane .form-group[data-parameter-name="CameraId"]');
     const cameraBindingGroup = page.locator('.inspector-pane .form-group[data-parameter-name="CameraBindingId"]');
-    const cameraErrors = page.locator('.inspector-pane .validation-error', { hasText: '请先选择相机或相机绑定' });
-    await expect(cameraErrors).toHaveCount(2);
+    const cameraErrors = page.locator('.inspector-pane .validation-error', { hasText: '请先选择相机' });
+    await expect(cameraErrors).toHaveCount(1);
     await expect(cameraGroup).toHaveClass(/invalid/);
-    await expect(cameraBindingGroup).toHaveClass(/invalid/);
+    await expect(cameraBindingGroup).not.toHaveClass(/invalid/);
     await expect(page.locator('.inspector-pane #param-CameraId')).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.locator('.inspector-pane #param-CameraBindingId')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('.inspector-pane #param-CameraBindingId')).not.toHaveAttribute('aria-invalid', 'true');
     await expect(page.locator('.inspector-pane [data-property-capability-status]')).toContainText('参数校验失败');
     await expect(workbench).toContainText('请先选择相机');
     await expect(workbench).toContainText('缺输入图或采集源');
@@ -1130,8 +1244,7 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await captureFlowLayoutState(page, testInfo, 'camera-missing-camera');
 
     previewMode.requests.length = 0;
-    await page.locator('.inspector-pane #param-CameraBindingId').fill('line-camera-01');
-    await page.locator('.inspector-pane #param-CameraBindingId').blur();
+    await page.locator('.inspector-pane #param-CameraId').selectOption('cam-1');
 
     await expect(page.locator('.inspector-pane .validation-error')).toHaveCount(0);
     await expect(page.locator('.inspector-pane [data-property-capability-status]')).toContainText('参数已更新');
@@ -1148,6 +1261,72 @@ test.describe('Flow layout VisionMaster-style shell', () => {
     await assertLowHeightScrollability(page);
     await captureFlowLayoutState(page, testInfo, '1366x420-low-height-compact');
     await expect(workbench).toContainText('预览完成');
+  });
+
+  test('captures one camera frame into the preview workbench and reuses it in the ROI editor at 1920x1080', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await openInputFlyout(page);
+    await page.locator('#operator-group-flyout .operator-flyout-item[data-operator-type="ImageAcquisition"]').click();
+    await expect(page.locator('#operator-group-flyout')).toBeHidden();
+
+    const inspector = page.locator('.inspector-pane');
+    const workbench = page.locator('.preview-workbench-pane');
+    await inspector.locator('#param-SourceType').selectOption('Camera');
+    await expect(inspector.locator('#param-CameraId option[value="cam-1"]')).toHaveCount(1);
+    await inspector.locator('#param-CameraId').selectOption('cam-1');
+
+    const captureSection = inspector.locator('[data-property-camera-capture-section]');
+    const captureButton = captureSection.locator('[data-property-camera-capture-frame]');
+    await expect(captureSection).toBeVisible();
+    await expect(captureSection).toContainText('测试相机');
+    await expect(captureButton).toBeEnabled();
+
+    const captureRequestPromise = page.waitForRequest(request =>
+      request.url().includes('/api/cameras/soft-trigger-capture') && request.method() === 'POST');
+    await captureButton.click();
+    const captureRequest = await captureRequestPromise;
+    expect(captureRequest.postDataJSON()).toMatchObject({ cameraBindingId: 'cam-1' });
+
+    await expect(workbench.locator('.preview-capability-main-image img')).toBeVisible();
+    await expect(inspector.locator('[data-property-capability-status]')).toContainText('已获取单帧 64×48');
+    await expect(captureSection.locator('[data-property-camera-capture-hint]')).toContainText('后续 ROI 算子可直接使用该图像');
+    await assertNoHorizontalOverflow(page);
+
+    const capturedState = await page.evaluate(async () => {
+      const registry = (await import('/src/core/app/serviceRegistry.js')).default;
+      const frame = registry.get('studioPreviewInputFrame');
+      const preview = registry.get('nodePreviewCoordinator')?.getState?.();
+      return {
+        frameImage: frame?.imageBase64 || null,
+        frameProjectId: frame?.projectId || null,
+        previewStatus: preview?.status || null,
+        previewOutput: preview?.outputImageBase64 || null,
+      };
+    });
+    expect(capturedState).toEqual({
+      frameImage: PIXEL_PROBE_PNG_BASE64,
+      frameProjectId: 'flow-layout-vm',
+      previewStatus: 'success',
+      previewOutput: PIXEL_PROBE_PNG_BASE64,
+    });
+
+    previewMode.value = 'success-image';
+    previewMode.requests.length = 0;
+    const searchGroup = page.locator('#operator-rail .operator-rail-item', { hasText: '搜索' });
+    await searchGroup.click();
+    await page.locator('[data-palette-search="true"]').fill('ROI 管理器');
+    await page.locator('#operator-group-flyout .operator-flyout-item[data-operator-type="RoiManager"]').click();
+    await expect(page.locator('#operator-group-flyout')).toBeHidden();
+
+    const roiPanel = inspector.locator('.roi-editor-panel');
+    await expect(roiPanel).toBeVisible();
+    await expect(roiPanel.locator('.roi-editor-canvas')).toBeVisible();
+    await expect(roiPanel.locator('.roi-editor-empty')).toBeHidden();
+    await expect.poll(() => previewMode.requests.length).toBeGreaterThan(0);
+    const roiPreviewRequest = previewMode.requests.at(-1);
+    expect(roiPreviewRequest.inputImageBase64 || roiPreviewRequest.InputImageBase64)
+      .toBe(PIXEL_PROBE_PNG_BASE64);
+    await assertNoHorizontalOverflow(page);
   });
 
   test('shows blank, no-image and preview-failure states', async ({ page }, testInfo) => {
