@@ -914,12 +914,13 @@ onBeforeUnmount(() => {
 <style scoped>
 .results-page { display: grid; max-width: 1720px; min-width: 0; gap: var(--cv-density-page-gap); }
 .results-page__layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.8fr); gap: var(--cv-space-4); align-items: start; }
-.results-page__source { min-width: 120px; }
-.results-page__project { min-width: 180px; flex: 1 1 200px; }
-.results-page__outcome { min-width: 124px; }
-.results-page__diagnostic { min-width: 144px; }
-.results-page__date { min-width: 160px; }
-.results-page__page-size { min-width: 104px; }
+.results-page :deep(.cv-toolbar__primary) { flex: 1 1 100%; }
+.results-page__source { min-width: 116px; flex: 0 1 116px; }
+.results-page__project { min-width: 164px; flex: 1 1 164px; }
+.results-page__outcome { min-width: 116px; flex: 0 1 116px; }
+.results-page__diagnostic { min-width: 132px; flex: 0 1 132px; }
+.results-page__date { min-width: 152px; flex: 0 1 152px; }
+.results-page__page-size { min-width: 100px; flex: 0 1 100px; }
 .results-page__notice { margin-bottom: var(--cv-space-3); }
 .results-page__outcome-cell { display: grid; justify-items: start; gap: var(--cv-space-1); }
 .results-page__outcome-cell small { color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-2xs); }

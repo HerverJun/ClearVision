@@ -296,6 +296,29 @@ async function verifyProductPage(page, route, runtimeErrors) {
   await page.locator('[data-product-appearance] > summary').click();
   assert(await page.locator('[data-product-appearance]').getAttribute('open') === null,
     'Appearance disclosure did not close after the preference audit.');
+  const resultsFilterLayout = route.startsWith('/results')
+    ? await page.evaluate(() => {
+        const selectors = [
+          '.results-page__source',
+          '.results-page__project',
+          '.results-page__outcome',
+          '.results-page__diagnostic',
+          '.results-page__date',
+          '.results-page__page-size'
+        ];
+        const controls = selectors.flatMap(selector =>
+          [...document.querySelectorAll(selector)].map(element => ({
+            selector,
+            top: Math.round(element.getBoundingClientRect().top * 100) / 100
+          }))
+        );
+        const tops = controls.map(item => item.top);
+        return {
+          controls,
+          maximumTopDelta: tops.length ? Math.max(...tops) - Math.min(...tops) : null
+        };
+      })
+    : null;
   const preferenceRequests = runtimeErrors.requests.slice(preferenceRequestStart).filter(item => {
     const url = new URL(item.url);
     return url.origin === origin && (url.pathname === '/health' || url.pathname.startsWith('/api/'));
@@ -328,13 +351,20 @@ async function verifyProductPage(page, route, runtimeErrors) {
     'Theme/density preference cycle was not persisted as a disposable UI projection.');
   assert(preferenceWriteRequests.length === 0,
     `Theme/density controls emitted write requests: ${JSON.stringify(preferenceWriteRequests)}`);
+  if (resultsFilterLayout) {
+    assert(resultsFilterLayout.controls.length === 7,
+      `Results filter rail did not expose seven controls: ${JSON.stringify(resultsFilterLayout)}`);
+    assert(resultsFilterLayout.maximumTopDelta <= 1,
+      `Results filter rail wrapped in the 1350px WebView2 client: ${JSON.stringify(resultsFilterLayout)}`);
+  }
   return {
     ...projection,
     productRequests,
     writeRequests,
     preferenceCycle,
     preferenceRequests,
-    preferenceWriteRequests
+    preferenceWriteRequests,
+    resultsFilterLayout
   };
 }
 
