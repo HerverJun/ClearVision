@@ -293,6 +293,9 @@ async function verifyProductPage(page, route, runtimeErrors) {
       stored: JSON.parse(localStorage.getItem('clearvision.studio-ui.preferences.v1') || 'null')
     }))
   };
+  await page.locator('[data-product-appearance] > summary').click();
+  assert(await page.locator('[data-product-appearance]').getAttribute('open') === null,
+    'Appearance disclosure did not close after the preference audit.');
   const preferenceRequests = runtimeErrors.requests.slice(preferenceRequestStart).filter(item => {
     const url = new URL(item.url);
     return url.origin === origin && (url.pathname === '/health' || url.pathname.startsWith('/api/'));
