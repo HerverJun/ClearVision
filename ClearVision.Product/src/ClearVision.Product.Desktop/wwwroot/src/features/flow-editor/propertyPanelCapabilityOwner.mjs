@@ -1266,6 +1266,8 @@ export class PropertyPanelCapabilityOwner {
                     requiredMark.remove();
                 }
             });
+        this.syncOutputAvailabilitySummary(values);
+        this.refreshImageAcquisitionCaptureControls();
     }
 
     syncImageAcquisitionSourceControls(options = {}) {
