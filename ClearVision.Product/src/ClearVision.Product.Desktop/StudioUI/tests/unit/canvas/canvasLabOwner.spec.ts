@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const canonicalHostFactory = vi.hoisted(() => vi.fn());
 const lifecycleOwnerCountReporter = vi.hoisted(() => vi.fn());
 
-vi.mock('@/labs/canvas/canonicalFlowCanvas', () => ({
+vi.mock('@/platform/canvas', () => ({
   createCanonicalFlowCanvasHost: canonicalHostFactory
 }));
 vi.mock('@/platform/diagnostics/studioUiLifecycleDiagnostics', () => ({
@@ -19,7 +19,7 @@ import {
 import type {
   CanonicalCanvasRuntimeSnapshot,
   CanonicalFlowCanvasHost
-} from '@/labs/canvas/canonicalFlowCanvas';
+} from '@/platform/canvas';
 import {
   CANONICAL_OPERATOR_FLOW_FIXTURE,
   type OperatorFlowDto
@@ -56,6 +56,7 @@ function createFakeHost(initialFlow: unknown): FakeCanonicalHost {
     flowRevision: 1,
     selectionRevision: 0,
     selectedNodeId: null,
+    selectedNodeIds: Object.freeze([]),
     selectedConnectionId: null,
     multiSelectionCount: 0,
     scale: 1,
@@ -70,6 +71,9 @@ function createFakeHost(initialFlow: unknown): FakeCanonicalHost {
     isDraggingNodes: false,
     isPanning: false,
     isSelecting: false,
+    canUndo: false,
+    canRedo: false,
+    mutationGate: 'editable',
     nodes: Object.freeze([]),
     resources: Object.freeze({
       adapterDisposed,
@@ -84,7 +88,8 @@ function createFakeHost(initialFlow: unknown): FakeCanonicalHost {
       structureListenerCount: listeners.size > 0 ? 1 : 0,
       viewListenerCount: listeners.size > 0 ? 1 : 0,
       selectionListenerCount: listeners.size > 0 ? 1 : 0,
-      interactionCleanupCount: interactionDisposed ? 0 : 6
+      interactionCleanupCount: interactionDisposed ? 0 : 6,
+      facadeListenerCount: listeners.size
     })
   });
 
@@ -131,7 +136,7 @@ function createFakeHost(initialFlow: unknown): FakeCanonicalHost {
       listeners.clear();
       disposalEvents.push('adapter');
     })
-  };
+  } as unknown as FakeCanonicalHost;
 }
 
 function mountTrackedController(): CanvasLabController {

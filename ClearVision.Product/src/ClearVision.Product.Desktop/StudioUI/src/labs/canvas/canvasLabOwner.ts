@@ -2,7 +2,7 @@ import {
   createCanonicalFlowCanvasHost,
   type CanonicalCanvasRuntimeSnapshot,
   type CanonicalFlowCanvasHost
-} from '@/labs/canvas/canonicalFlowCanvas';
+} from '@/platform/canvas';
 import {
   CANVAS_FIXTURE_IDS,
   createFlowIdentityFingerprint,

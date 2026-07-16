@@ -107,6 +107,8 @@ class FlowCanvas {
         this.viewStateListeners = new Set();
         this.structureStateListeners = new Set();
         this.selectionStateListeners = new Set();
+        this.multiSelectedNodes = null;
+        this.keyboardScopeElement = null;
         this.globalVariableSchema = { sourceBindings: [], targetBindings: [] };
 
         // 画布像素尺寸。
@@ -129,6 +131,8 @@ class FlowCanvas {
         this.onSelectionDeleteRequested = null;
         this.onNodeDuplicateRequested = null;
         this.onNodeDisabledToggleRequested = null;
+        this.nodeRunEnabled = true;
+        this.nodeHelpEnabled = true;
 
         // 连线交互状态。
         this.isConnecting = false;
@@ -364,6 +368,8 @@ class FlowCanvas {
         this.viewStateListeners.clear();
         this.structureStateListeners.clear();
         this.selectionStateListeners.clear();
+        this.multiSelectedNodes = null;
+        this.keyboardScopeElement = null;
         this._particleSprite = null;
 
         if (this.minimapCanvas && this._minimapClickHandler) {
@@ -963,7 +969,7 @@ class FlowCanvas {
         const y = (node.y - this.offset.y) * this.scale;
         const w = node.width * this.scale;
         const h = node.height * this.scale;
-        const isSelected = this.selectedNode === node.id;
+        const isSelected = this.selectedNode === node.id || this.multiSelectedNodes?.has?.(node.id) === true;
         const palette = this.themePalette || FLOW_CANVAS_THEME_DEFAULTS;
 
         this.ctx.save();
@@ -2608,10 +2614,17 @@ class FlowCanvas {
      * Encoding cleanup: previous comment text was unreadable.
      */
     handleKeyDown(e) {
-        if (e.target.tagName === 'INPUT' ||
-            e.target.tagName === 'TEXTAREA' ||
-            e.target.tagName === 'SELECT' ||
-            e.target.isContentEditable) {
+        if (e.defaultPrevented || e.isComposing || e.keyCode === 229) {
+            return;
+        }
+
+        const target = e.target instanceof Element ? e.target : null;
+        if (target?.matches?.('input, textarea, select, [contenteditable="true"], [contenteditable=""]') ||
+            target?.closest?.('[contenteditable="true"], [contenteditable=""]')) {
+            return;
+        }
+
+        if (this.keyboardScopeElement && (!target || !this.keyboardScopeElement.contains(target))) {
             return;
         }
 
@@ -2726,11 +2739,15 @@ class FlowCanvas {
         menu.style.animation = 'contextMenuFadeIn 0.15s ease-out';
 
         const menuItems = [
-            { icon: '>', label: '运行到此节点/调试预览', action: () => this.runNode(nodeId) },
+            ...(this.nodeRunEnabled
+                ? [{ icon: '>', label: '运行到此节点/调试预览', action: () => this.runNode(nodeId) }]
+                : []),
             { icon: '+', label: '复制节点', action: () => this.requestNodeDuplicate(nodeId, 'context-menu-node') },
             { icon: 'x', label: '删除节点', action: () => this.requestSelectionDelete('context-menu-node'), danger: true },
             { icon: '!', label: node.disabled ? '启用节点' : '禁用节点', action: () => this.requestNodeDisabledToggle(nodeId, 'context-menu-node') },
-            { icon: '?', label: '查看帮助', action: () => this.showNodeHelp(node) }
+            ...(this.nodeHelpEnabled
+                ? [{ icon: '?', label: '查看帮助', action: () => this.showNodeHelp(node) }]
+                : [])
         ];
 
         menuItems.forEach(item => {
