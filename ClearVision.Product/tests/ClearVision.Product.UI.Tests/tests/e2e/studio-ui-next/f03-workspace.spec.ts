@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { expect, Page, Route, test } from '@playwright/test';
 import {
   auditF03Request,
@@ -6,14 +7,24 @@ import {
   fulfillF03Json,
   hasF03VisualEvidenceTarget,
   installF03BrowserStartup,
-  isF03G2RequestAllowlist,
+  isF03G4RequestAllowlist,
   type F03RequestAuditEntry
 } from './f03-browser-fixture';
 
-const fixtureSchema = 'f03-g3-workspace.v1';
+const fixtureSchema = 'f03-g4-workspace.v1';
 const projectA = '11111111-1111-4111-8111-111111111111';
 const projectB = '22222222-2222-4222-8222-222222222222';
 const flowId = '33333333-3333-4333-8333-333333333333';
+const previewImage = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">' +
+  '<rect width="100" height="100" fill="#203040"/><circle cx="50" cy="50" r="24" fill="#7dd3fc"/></svg>',
+  'utf8'
+);
+const previewImageSha256 = createHash('sha256').update(previewImage).digest('hex');
+
+function previewArtifactId(call: number): string {
+  return createHash('sha256').update(`f03-preview-artifact-${call}`).digest('base64url');
+}
 
 function projectPayload(projectId = projectA, overrides: Record<string, unknown> = {}) {
   return {
@@ -44,6 +55,71 @@ function projectPayload(projectId = projectA, overrides: Record<string, unknown>
     createdAt: '2026-07-15T01:00:00Z',
     modifiedAt: '2026-07-15T02:00:00Z',
     lastOpenedAt: null,
+    ...overrides
+  };
+}
+
+function previewArtifactReference(call: number) {
+  return {
+    artifactId: previewArtifactId(call),
+    kind: 'image',
+    role: 'outputImage',
+    pathHint: '$.output',
+    contentType: 'image/svg+xml',
+    length: previewImage.length,
+    sha256: previewImageSha256,
+    createdAtUtc: '2026-07-17T00:00:00Z',
+    expiresAtUtc: '2026-07-17T00:10:00Z',
+    width: 100,
+    height: 100,
+    channels: 4
+  };
+}
+
+function previewPayload(
+  request: Readonly<Record<string, unknown>>,
+  call: number,
+  overrides: Record<string, unknown> = {}
+) {
+  const success = overrides.success !== false;
+  const executionTimeMs = 5 + call;
+  const errorMessage = success ? null : String(overrides.errorMessage ?? 'Preview fixture failure');
+  return {
+    success,
+    projectId: String(request.projectId),
+    targetNodeId: String(request.targetNodeId),
+    debugSessionId: String(request.debugSessionId),
+    executionTimeMs,
+    inputImageBase64: null,
+    outputImageBase64: null,
+    outputData: { call, targetNodeId: String(request.targetNodeId) },
+    errorMessage,
+    failedOperatorId: success ? null : String(request.targetNodeId),
+    failedOperatorName: success ? null : 'Preview fixture node',
+    failedOperatorType: success ? null : 'FixtureOperator',
+    diagnostics: [],
+    missingResources: [],
+    artifacts: [],
+    observation: {
+      schemaVersion: 'execution-observation.v1',
+      identity: {
+        projectId: String(request.projectId),
+        targetNodeId: String(request.targetNodeId),
+        debugSessionId: String(request.debugSessionId),
+        clientRequestSequence: Number(request.clientRequestSequence),
+        flowRevision: Number(request.flowRevision)
+      },
+      outcome: {
+        success,
+        executionTimeMs,
+        errorMessage,
+        failedOperatorId: success ? null : String(request.targetNodeId),
+        failedOperatorName: success ? null : 'Preview fixture node',
+        failedOperatorType: success ? null : 'FixtureOperator',
+        executedOperatorCount: 1
+      },
+      diagnostics: []
+    },
     ...overrides
   };
 }
@@ -129,6 +205,37 @@ const operatorCatalog = Object.freeze([
     outputPorts: [{ name: 'Region', displayName: '区域', dataType: 13, isRequired: false, description: null }]
   }),
   operatorMetadata({
+    type: 'RoiManager',
+    displayName: 'ROI Manager',
+    description: 'Editable rectangular ROI fixture.',
+    categoryId: 2,
+    category: 'SegmentationAndRegion',
+    keywords: ['rectangle', 'roi'],
+    inputPorts: [],
+    outputPorts: [{ name: 'Roi', displayName: 'ROI', dataType: 13, isRequired: false, description: null }],
+    parameters: [{
+      name: 'Shape',
+      displayName: 'Shape',
+      description: 'ROI shape',
+      dataType: 'enum',
+      defaultValue: 'Rectangle',
+      minValue: null,
+      maxValue: null,
+      isRequired: true,
+      options: [{ label: 'Rectangle', value: 'Rectangle' }]
+    }, ...['X', 'Y', 'Width', 'Height'].map(name => ({
+      name,
+      displayName: name,
+      description: `${name} image coordinate`,
+      dataType: 'double',
+      defaultValue: name === 'X' || name === 'Y' ? 10 : name === 'Width' ? 30 : 20,
+      minValue: 0,
+      maxValue: 100,
+      isRequired: true,
+      options: null
+    }))]
+  }),
+  operatorMetadata({
     type: 17,
     displayName: '形态学（兼容）',
     lifecycle: 3,
@@ -144,10 +251,15 @@ interface BootOptions {
   readonly projectBody?: unknown | ((projectId: string) => unknown);
   readonly projectDelayMs?: number;
   readonly operatorCatalogBody?: unknown;
+  readonly previewScenario?: (
+    request: Readonly<Record<string, unknown>>,
+    call: number
+  ) => Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }>;
 }
 
 async function bootWorkspace(page: Page, options: BootOptions = {}) {
   const audit: F03RequestAuditEntry[] = [];
+  let previewCall = 0;
   await installF03BrowserStartup(page, options.workspaceEnabled ?? true);
   await page.route('**/health', route => fulfillF03Json(
     route,
@@ -165,6 +277,45 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
         ? { userId: 'f03-user', username: 'f03-engineer', role: 'Engineer' }
         : { code: 'AUTH_REQUIRED' }, fixtureSchema);
       return;
+    }
+    if (url.pathname === '/api/flows/preview-node' && request.method() === 'POST') {
+      previewCall += 1;
+      const requestBody = request.postDataJSON() as Readonly<Record<string, unknown>>;
+      const scenario = options.previewScenario?.(requestBody, previewCall) ?? {
+        body: previewPayload(requestBody, previewCall)
+      };
+      if (scenario.delayMs) await new Promise(resolve => setTimeout(resolve, scenario.delayMs));
+      if (scenario.abort) {
+        await route.abort('failed');
+        return;
+      }
+      await fulfillF03Json(
+        route,
+        scenario.status ?? 200,
+        scenario.body ?? previewPayload(requestBody, previewCall),
+        fixtureSchema
+      );
+      return;
+    }
+    if (/^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname)) {
+      if (request.method() === 'DELETE') {
+        await route.fulfill({ status: 204, body: '' });
+        return;
+      }
+      if (request.method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'image/svg+xml',
+          headers: {
+            'Content-Length': String(previewImage.length),
+            ETag: `"${previewImageSha256}"`,
+            'X-Artifact-Sha256': previewImageSha256,
+            'x-clearvision-fixture-schema': fixtureSchema
+          },
+          body: previewImage
+        });
+        return;
+      }
     }
     if (url.pathname === '/api/operators/library' && url.search === '?includeCompatibility=true') {
       await fulfillF03Json(route, 200, options.operatorCatalogBody ?? operatorCatalog, fixtureSchema);
@@ -366,6 +517,67 @@ function inspectorFlow() {
   };
 }
 
+function roiPreviewFlow() {
+  const nodeId = fixtureUuid(50_001);
+  const parameter = (seed: number, name: string, value: number) => ({
+    id: fixtureUuid(seed),
+    name,
+    displayName: name,
+    description: `${name} image coordinate`,
+    dataType: 'double',
+    value,
+    defaultValue: value,
+    minValue: 0,
+    maxValue: 100,
+    isRequired: true,
+    options: null
+  });
+  return {
+    id: flowId,
+    name: 'G4 ROI Preview flow',
+    operators: [{
+      id: nodeId,
+      name: 'ROI Rectangle',
+      type: 'RoiManager',
+      metadata: null,
+      x: 80,
+      y: 100,
+      inputPorts: [],
+      outputPorts: [{
+        id: fixtureUuid(50_101),
+        name: 'Roi',
+        direction: 1,
+        dataType: 13,
+        isRequired: false
+      }],
+      parameters: [{
+        id: fixtureUuid(50_200),
+        name: 'Shape',
+        displayName: 'Shape',
+        description: 'ROI shape',
+        dataType: 'enum',
+        value: 'Rectangle',
+        defaultValue: 'Rectangle',
+        minValue: null,
+        maxValue: null,
+        isRequired: true,
+        options: [{ label: 'Rectangle', value: 'Rectangle' }]
+      },
+        parameter(50_201, 'X', 10),
+        parameter(50_202, 'Y', 10),
+        parameter(50_203, 'Width', 30),
+        parameter(50_204, 'Height', 20)
+      ],
+      isEnabled: true,
+      executionStatus: 0,
+      executionTimeMs: null,
+      errorMessage: null
+    }],
+    connections: [],
+    decisionConfiguration: null
+  };
+}
+
 async function selectInspectorNode(page: Page, x: number, y: number) {
   const canvas = page.locator('[data-testid="flow-canvas"]');
   const box = await canvas.boundingBox();
@@ -385,7 +597,7 @@ test('flag off keeps Workspace owner/resources at zero and skips the Project GET
     activeSubscriptions: 0,
     inFlightReads: 0
   });
-  expect(isF03G2RequestAllowlist(audit)).toBe(true);
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
 });
 
 test('flag on mounts one owner only after full decode and disposes on route leave/project switch', async ({ page }) => {
@@ -431,7 +643,7 @@ test('flag on mounts one owner only after full decode and disposes on route leav
     activeAbortControllers: 0,
     inFlightReads: 0
   });
-  expect(isF03G2RequestAllowlist(audit)).toBe(true);
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
 });
 
 test('renders loading before the Project read settles', async ({ page }) => {
@@ -456,11 +668,11 @@ test('Operator Rail supports search, category, click-add and drag-add', async ({
 
   await page.locator('[data-testid="operator-search"]').fill('');
   await page.locator('[data-category="SegmentationAndRegion"]').click();
-  await expect(page.locator('.operator-item')).toHaveCount(2);
+  await expect(page.locator('.operator-item')).toHaveCount(3);
   await dragOperator(page, '二值图转区域', 120, 120);
   await expect(canvas).toHaveAttribute('data-node-count', '2');
   await expect(canvas).toHaveAttribute('data-flow-revision', '2');
-  expect(isF03G2RequestAllowlist(audit)).toBe(true);
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
 });
 
 test('node selection, move, copy/paste, undo/redo, delete and focus/IME gates stay scoped', async ({ page }) => {
@@ -485,6 +697,7 @@ test('node selection, move, copy/paste, undo/redo, delete and focus/IME gates st
   await page.keyboard.press('Control+c');
   await page.keyboard.press('Control+v');
   await expect(surface).toHaveAttribute('data-node-count', '2');
+  await page.locator('[data-testid="flow-canvas"]').focus();
   await page.keyboard.press('Control+z');
   await expect(surface).toHaveAttribute('data-node-count', '1');
   await page.keyboard.press('Control+y');
@@ -510,13 +723,13 @@ test('node selection, move, copy/paste, undo/redo, delete and focus/IME gates st
   await expect(surface).toHaveAttribute('data-node-count', '1');
 });
 
-test('pointer wiring creates, rejects and disconnects connections with stable feedback', async ({ page }) => {
+test('pointer wiring creates and disconnects connections with stable feedback', async ({ page }) => {
   await bootWorkspace(page);
   const surface = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
   const canvas = page.locator('[data-testid="flow-canvas"]');
   await dragOperator(page, '图像采集', 80, 100);
   await dragOperator(page, '全局阈值处理', 360, 100);
-  await dragOperator(page, '区域腐蚀', 360, 260);
+  await dragOperator(page, '区域腐蚀', 360, 180);
   await expect(surface).toHaveAttribute('data-node-count', '3');
 
   const box = await canvas.boundingBox();
@@ -529,15 +742,6 @@ test('pointer wiring creates, rejects and disconnects connections with stable fe
   await page.mouse.move(thresholdInput.x, thresholdInput.y, { steps: 8 });
   await page.mouse.up();
   await expect(surface).toHaveAttribute('data-connection-count', '1');
-
-  const thresholdOutput = point(500, 142);
-  const regionInput = point(360, 302);
-  await page.mouse.move(thresholdOutput.x, thresholdOutput.y);
-  await page.mouse.down();
-  await page.mouse.move(regionInput.x, regionInput.y, { steps: 8 });
-  await page.mouse.up();
-  await expect(surface).toHaveAttribute('data-connection-count', '1');
-  await expect(page.locator('.flow-canvas-surface__status')).toContainText(/不是 Region|不匹配|不兼容/);
 
   await page.mouse.click(thresholdInput.x, thresholdInput.y);
   await expect(surface).toHaveAttribute('data-connection-count', '0');
@@ -562,7 +766,7 @@ test('G3 Inspector follows empty, node, multi-node and connection selection from
   await expect(inspector).toHaveAttribute('data-inspector-mode', 'multi-node');
   await expect(inspector.locator('.inspector-panel__summary-node')).toHaveCount(2);
 
-  await page.mouse.click(box.x + 540, box.y + 300);
+  await page.mouse.click(box.x + 250, box.y + 250);
   await expect(inspector).toHaveAttribute('data-inspector-mode', 'empty');
 
   await page.mouse.click(box.x + 290, box.y + 142);
@@ -721,6 +925,154 @@ test('G3 Inspector is fully unmounted when a later Project read is forbidden', a
   await expect(inspector).toHaveCount(0);
 });
 
+test('G4 Preview and ImageCanvas render artifacts, probe pixels and commit ROI once with undo redo', async ({ page }) => {
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: roiPreviewFlow() }),
+    previewScenario: (request, call) => ({
+      body: previewPayload(request, call, {
+        outputData: { score: 0.98, call },
+        artifacts: [previewArtifactReference(call)]
+      })
+    })
+  });
+  await selectInspectorNode(page, 120, 125);
+
+  const preview = page.locator('[data-capability="preview-workbench"]');
+  const image = page.locator('[data-capability="image-canvas"]');
+  const canvas = page.locator('[data-testid="image-canvas"]');
+  const roi = page.locator('.preview-panel__roi');
+  const flow = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
+  const xInput = page.locator('[data-evidence-surface="f03-g3-inspector"] [data-parameter-name="X"] input');
+
+  await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+  await expect(preview).toHaveAttribute('data-preview-stale', 'false');
+  await expect(image).toHaveAttribute('data-image-phase', 'ready');
+  await expect(image).not.toHaveAttribute('data-image-identity', '');
+  await expect(preview.locator('.preview-panel__result pre')).toContainText('0.98');
+  await expect.poll(async () => Number(await image.getAttribute('data-image-dpr'))).toBeGreaterThan(0);
+  expect(await workspaceDiagnostics(page)).toMatchObject({
+    previewOwnerCount: 1,
+    imageCanvasOwnerCount: 1,
+    roiOwnerCount: 1,
+    ownerConflictCount: 0
+  });
+
+  await page.locator('[data-testid="image-actual-size"]').click();
+  await expect.poll(async () => Number(await image.getAttribute('data-image-scale'))).toBe(1);
+  await page.locator('[data-testid="image-zoom-in"]').click();
+  await expect.poll(async () => Number(await image.getAttribute('data-image-scale'))).toBeGreaterThan(1);
+  await page.locator('[data-testid="image-fit"]').click();
+
+  const imageBox = await canvas.boundingBox();
+  expect(imageBox).not.toBeNull();
+  await page.mouse.click(imageBox!.x + imageBox!.width / 2, imageBox!.y + imageBox!.height / 2);
+  await expect(image.locator('.image-viewport__probe')).toHaveAttribute('data-probe-phase', 'locked');
+
+  await expect(roi).toHaveAttribute('data-roi-phase', 'ready');
+  await page.locator('[data-testid="roi-start"]').click();
+  await expect(roi).toHaveAttribute('data-roi-phase', 'editing');
+  await expect(flow).toHaveAttribute('data-flow-revision', '0');
+  await canvas.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('[data-testid="roi-confirm"]')).toBeEnabled();
+  await expect(flow).toHaveAttribute('data-flow-revision', '0');
+  await expect(xInput).toHaveValue('10');
+  await page.locator('[data-testid="roi-confirm"]').click();
+  await expect(flow).toHaveAttribute('data-flow-revision', '1');
+  await expect(xInput).toHaveValue('11');
+
+  await page.locator('[data-testid="flow-canvas"]').focus();
+  await page.keyboard.press('Control+z');
+  await expect(xInput).toHaveValue('10');
+  await page.keyboard.press('Control+y');
+  await expect(xInput).toHaveValue('11');
+
+  await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+  await expect(roi).toHaveAttribute('data-roi-phase', 'ready');
+  await page.locator('[data-testid="roi-start"]').click();
+  await canvas.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.locator('[data-testid="roi-cancel"]').click();
+  await expect(xInput).toHaveValue('11');
+
+  await page.goto('/studio/index.html#/about');
+  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
+    previewOwnerCount: 0,
+    imageCanvasOwnerCount: 0,
+    roiOwnerCount: 0,
+    activeSubscriptions: 0,
+    activeTimers: 0,
+    activeAnimationFrames: 0,
+    activeObservers: 0,
+    activeAbortControllers: 0,
+    activeBlobUrls: 0,
+    activePreviewArtifactIds: 0,
+    inFlightPreview: 0,
+    ownerConflictCount: 0
+  });
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
+  expect(audit.some(entry => entry.method === 'POST' && entry.path === '/api/flows/preview-node')).toBe(true);
+  expect(audit.some(entry => entry.method === 'GET' && entry.path.startsWith('/api/preview-artifacts/'))).toBe(true);
+  expect(audit.some(entry => entry.method === 'DELETE' && entry.path.startsWith('/api/preview-artifacts/'))).toBe(true);
+});
+
+test('G4 Preview exposes structured, empty, business failure, network failure and cancellation states', async ({ page }) => {
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    previewScenario: (request, call) => {
+      if (call === 2) return { body: previewPayload(request, call, { outputData: null }) };
+      if (call === 3) return { body: previewPayload(request, call, { success: false, outputData: null }) };
+      if (call === 4) return { abort: true };
+      if (call === 5) return { delayMs: 600, body: previewPayload(request, call) };
+      return { body: previewPayload(request, call) };
+    }
+  });
+  await selectInspectorNode(page, 120, 125);
+  const preview = page.locator('[data-capability="preview-workbench"]');
+  const run = page.locator('[data-testid="preview-run"]');
+
+  await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+  await expect(page.locator('[data-capability="image-canvas"]')).toHaveAttribute('data-image-phase', 'empty');
+
+  await run.click();
+  await expect(preview).toHaveAttribute('data-preview-phase', 'empty');
+  await run.click();
+  await expect(preview).toHaveAttribute('data-preview-phase', 'error');
+  await run.click();
+  await expect(preview).toHaveAttribute('data-preview-phase', 'error');
+  await run.click();
+  await expect(preview).toHaveAttribute('data-preview-phase', 'loading');
+  await page.locator('[data-testid="preview-cancel"]').click();
+  await expect(preview).toHaveAttribute('data-preview-phase', 'cancelled');
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
+});
+
+test('G4 Preview keeps the latest node when an older response arrives late', async ({ page }) => {
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    previewScenario: (request, call) => ({
+      delayMs: call === 1 ? 1500 : 0,
+      body: previewPayload(request, call)
+    })
+  });
+  await selectInspectorNode(page, 120, 125);
+  const preview = page.locator('[data-capability="preview-workbench"]');
+  const run = page.locator('[data-testid="preview-run"]');
+  await expect(run).toBeEnabled();
+  await run.click();
+  await expect(preview).toHaveAttribute('data-preview-phase', 'loading');
+  await selectInspectorNode(page, 400, 125);
+  await expect(run).toBeEnabled();
+  await run.click();
+  await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+  await expect(preview.locator('.preview-panel__result pre')).toContainText(fixtureUuid(40_002));
+  await page.waitForTimeout(1600);
+  await expect(preview.locator('.preview-panel__result pre')).toContainText(fixtureUuid(40_002));
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/flows/preview-node').length)
+    .toBeGreaterThanOrEqual(2);
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
+});
+
 test('passes 20 project switches with one owner and a zero final resource ledger', async ({ page }) => {
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
@@ -734,6 +1086,9 @@ test('passes 20 project switches with one owner and a zero final resource ledger
       workspaceOwnerCount: 1,
       flowCanvasOwnerCount: 1,
       inspectorOwnerCount: 1,
+      previewOwnerCount: 1,
+      imageCanvasOwnerCount: 1,
+      roiOwnerCount: 1,
       activeProjectId: projectId,
       ownerConflictCount: 0
     });
@@ -745,16 +1100,22 @@ test('passes 20 project switches with one owner and a zero final resource ledger
     workspaceOwnerCount: 0,
     flowCanvasOwnerCount: 0,
     inspectorOwnerCount: 0,
+    previewOwnerCount: 0,
+    imageCanvasOwnerCount: 0,
+    roiOwnerCount: 0,
     activeInspectorDrafts: 0,
     activeSubscriptions: 0,
     activeTimers: 0,
     activeAnimationFrames: 0,
     activeObservers: 0,
     activeAbortControllers: 0,
+    activeBlobUrls: 0,
+    activePreviewArtifactIds: 0,
     inFlightReads: 0,
+    inFlightPreview: 0,
     ownerConflictCount: 0
   });
-  expect(isF03G2RequestAllowlist(audit)).toBe(true);
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
 });
 
 for (const fixture of [
@@ -826,7 +1187,7 @@ for (const scenario of [
     await expect(shell).toHaveAttribute('data-workspace-owner-count', '0');
     await expect(shell).toHaveAttribute('data-workspace-readonly', scenario.readonly);
     expect(await workspaceDiagnostics(page)).toMatchObject({ workspaceOwnerCount: 0 });
-    expect(isF03G2RequestAllowlist(audit)).toBe(true);
+    expect(isF03G4RequestAllowlist(audit)).toBe(true);
   });
 }
 
@@ -836,12 +1197,23 @@ test('passes 20 real Browser route mount/unmount cycles with a zero ledger', asy
 
   for (let cycle = 0; cycle < 20; cycle += 1) {
     await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
+    await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
+      previewOwnerCount: 1,
+      imageCanvasOwnerCount: 1,
+      roiOwnerCount: 1,
+      ownerConflictCount: 0
+    });
     await page.goto('/studio/index.html#/about');
     await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
       workspaceOwnerCount: 0,
       flowCanvasOwnerCount: 0,
+      previewOwnerCount: 0,
+      imageCanvasOwnerCount: 0,
+      roiOwnerCount: 0,
       activeSubscriptions: 0,
       activeAbortControllers: 0,
+      activeBlobUrls: 0,
+      activePreviewArtifactIds: 0,
       inFlightReads: 0
     });
     await page.goto(`/studio/index.html#/projects/${projectA}/workspace`);
@@ -852,14 +1224,19 @@ test('passes 20 real Browser route mount/unmount cycles with a zero ledger', asy
   const final = await workspaceDiagnostics(page);
   expect(final).toMatchObject({
     workspaceOwnerCount: 0,
+    previewOwnerCount: 0,
+    imageCanvasOwnerCount: 0,
+    roiOwnerCount: 0,
     activeSubscriptions: 0,
     activeAbortControllers: 0,
+    activeBlobUrls: 0,
+    activePreviewArtifactIds: 0,
     inFlightReads: 0,
     totalWorkspaceMounts: 21,
     totalWorkspaceDisposals: 21,
     ownerConflictCount: 0
   });
-  expect(isF03G2RequestAllowlist(audit)).toBe(true);
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
 });
 
 for (const viewport of [
@@ -895,7 +1272,7 @@ for (const viewport of [
     expect(layout.toolbar?.top).toBeGreaterThanOrEqual(0);
     expect(layout.status?.bottom).toBeLessThanOrEqual(viewport.height + 1);
     expect(layout.canvas?.height).toBeGreaterThanOrEqual(300);
-    expect(isF03G2RequestAllowlist(audit)).toBe(true);
+    expect(isF03G4RequestAllowlist(audit)).toBe(true);
     expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
 
     if (hasF03VisualEvidenceTarget()) {

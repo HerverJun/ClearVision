@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const path = require('node:path');
 const {
   assert,
@@ -37,7 +38,113 @@ function parseBooleanEnvironment(name, fallback = false) {
   throw new Error(`${name} must be a boolean value.`);
 }
 
+function createPreviewPpm(filePath) {
+  const width = 100;
+  const height = 100;
+  const header = Buffer.from(`P6\n${width} ${height}\n255\n`, 'ascii');
+  const pixels = Buffer.alloc(width * height * 3);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 3;
+      pixels[offset] = x < 50 ? 32 : 125;
+      pixels[offset + 1] = y < 50 ? 64 : 211;
+      pixels[offset + 2] = (x - 50) ** 2 + (y - 50) ** 2 < 24 ** 2 ? 252 : 96;
+    }
+  }
+  fs.writeFileSync(filePath, Buffer.concat([header, pixels]));
+  return { filePath, width, height, byteLength: header.length + pixels.length };
+}
+
+async function readAuthorizedJson(webPort, token, requestPath) {
+  const response = await fetch(`http://127.0.0.1:${webPort}${requestPath}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const text = await response.text();
+  assert(response.ok, `GET ${requestPath} returned ${response.status}: ${text.slice(0, 500)}`);
+  return JSON.parse(text);
+}
+
+function metadataField(value, camelName) {
+  return value?.[camelName] ?? value?.[camelName[0].toUpperCase() + camelName.slice(1)];
+}
+
+function instantiateOperator(definition, operatorType, name, x, y, values = {}) {
+  const operatorId = crypto.randomUUID();
+  const ports = (metadataField(definition, 'inputPorts') || []).map(port => ({
+    id: crypto.randomUUID(),
+    name: metadataField(port, 'name'),
+    direction: 0,
+    dataType: metadataField(port, 'dataType'),
+    isRequired: metadataField(port, 'isRequired') === true
+  }));
+  const outputs = (metadataField(definition, 'outputPorts') || []).map(port => ({
+    id: crypto.randomUUID(),
+    name: metadataField(port, 'name'),
+    direction: 1,
+    dataType: metadataField(port, 'dataType'),
+    isRequired: false
+  }));
+  return {
+    id: operatorId,
+    name,
+    type: operatorType,
+    metadata: null,
+    x,
+    y,
+    inputPorts: ports,
+    outputPorts: outputs,
+    parameters: (metadataField(definition, 'parameters') || []).map(parameter => {
+      const parameterName = metadataField(parameter, 'name');
+      const defaultValue = metadataField(parameter, 'defaultValue');
+      return ({
+      id: crypto.randomUUID(),
+      name: parameterName,
+      displayName: metadataField(parameter, 'displayName') || parameterName,
+      description: metadataField(parameter, 'description') || null,
+      dataType: metadataField(parameter, 'dataType'),
+      value: Object.prototype.hasOwnProperty.call(values, parameterName)
+        ? values[parameterName]
+        : defaultValue,
+      defaultValue,
+      minValue: metadataField(parameter, 'minValue') ?? null,
+      maxValue: metadataField(parameter, 'maxValue') ?? null,
+      isRequired: metadataField(parameter, 'isRequired') === true,
+      options: metadataField(parameter, 'options') ?? null
+    });
+    }),
+    isEnabled: true,
+    executionStatus: 0,
+    executionTimeMs: null,
+    errorMessage: null
+  };
+}
+
 async function seedWorkspaceProject(webPort, token, runName) {
+  const evidenceDirectory = path.resolve(requiredEnvironment('CV_EVIDENCE_DIR'));
+  const imageEvidence = createPreviewPpm(path.join(evidenceDirectory, 'g4-preview-input.ppm'));
+  const catalogPayload = await readAuthorizedJson(webPort, token, '/api/operators/library?includeCompatibility=true');
+  const catalog = Array.isArray(catalogPayload) ? catalogPayload : catalogPayload.items || catalogPayload.Items || [];
+  const matchesType = (item, numericType, name) => Number(metadataField(item, 'type')) === numericType ||
+    String(metadataField(item, 'type') || '').toLowerCase() === name.toLowerCase();
+  const imageDefinition = catalog.find(item => matchesType(item, 0, 'ImageAcquisition'));
+  const roiDefinition = catalog.find(item => matchesType(item, 42, 'RoiManager'));
+  assert(imageDefinition && roiDefinition,
+    `The operator catalog did not expose ImageAcquisition and RoiManager: ${JSON.stringify(catalog.slice(0, 3))}`);
+  const image = instantiateOperator(imageDefinition, 0, 'G4 File Image', 60, 80, {
+    SourceType: 'File',
+    FilePath: imageEvidence.filePath
+  });
+  const roi = instantiateOperator(roiDefinition, 42, 'G4 ROI Rectangle', 320, 80, {
+    Shape: 'Rectangle',
+    Operation: 'Crop',
+    X: 10,
+    Y: 10,
+    Width: 40,
+    Height: 30
+  });
+  const imageOutput = image.outputPorts.find(port => port.name === 'Image');
+  const roiInput = roi.inputPorts.find(port => port.name === 'Image');
+  assert(imageOutput && roiInput, 'The G4 seed operators did not expose the expected Image ports.');
   const response = await fetch(`http://127.0.0.1:${webPort}/api/projects`, {
     method: 'POST',
     headers: {
@@ -45,13 +152,19 @@ async function seedWorkspaceProject(webPort, token, runName) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      name: `F03 G2 WebView2 ${runName}`,
-      description: 'Harness-seeded authority for formal Workspace interaction evidence.',
+      name: `F03 G4 WebView2 ${runName}`,
+      description: 'Harness-seeded authority for formal Preview, ImageCanvas and ROI evidence.',
       flow: {
         id: crypto.randomUUID(),
-        name: 'F03 G2 WebView2 Flow',
-        operators: [],
-        connections: [],
+        name: 'F03 G4 WebView2 Flow',
+        operators: [image, roi],
+        connections: [{
+          id: crypto.randomUUID(),
+          sourceOperatorId: image.id,
+          sourcePortId: imageOutput.id,
+          targetOperatorId: roi.id,
+          targetPortId: roiInput.id
+        }],
         decisionConfiguration: null
       }
     })
@@ -66,7 +179,9 @@ async function seedWorkspaceProject(webPort, token, runName) {
     route: `/projects/${project.id}/workspace`,
     responseStatus: response.status,
     authority: 'HARNESS_SEEDED_EXISTING_PROJECT_APPLICATION_SERVICE',
-    runtimeAuditStartedAfterSeed: true
+    runtimeAuditStartedAfterSeed: true,
+    imageEvidence,
+    roiNodeId: roi.id
   };
 }
 
@@ -469,6 +584,127 @@ async function verifyWorkspaceInspectorG3(page, expectedName) {
   };
 }
 
+async function selectSeededRoiNode(page) {
+  const flowCanvas = page.locator('[data-testid="flow-canvas"]');
+  const box = await flowCanvas.boundingBox();
+  assert(box, 'The seeded G4 Flow Canvas did not expose a bounding box.');
+  await page.mouse.click(box.x + 360, box.y + 125);
+  await page.waitForFunction(() =>
+    document.querySelector('[data-evidence-surface="f03-g3-inspector"]')
+      ?.getAttribute('data-inspector-mode') === 'node');
+  return { flowCanvas, box };
+}
+
+async function waitForSeededPreview(page) {
+  await page.waitForFunction(() =>
+    document.querySelector('[data-capability="preview-workbench"]')
+      ?.getAttribute('data-preview-phase') === 'success', null, { timeout: 30_000 });
+  await page.waitForFunction(() =>
+    document.querySelector('[data-capability="image-canvas"]')
+      ?.getAttribute('data-image-phase') === 'ready', null, { timeout: 30_000 });
+  await page.waitForFunction(() =>
+    document.querySelector('.preview-panel__roi')
+      ?.getAttribute('data-roi-phase') === 'ready', null, { timeout: 30_000 });
+}
+
+async function verifyWorkspaceG4(page) {
+  await page.waitForSelector('[data-capability="flow-workspace"]', { state: 'visible', timeout: 30_000 });
+  const { flowCanvas } = await selectSeededRoiNode(page);
+  await waitForSeededPreview(page);
+  const preview = page.locator('[data-capability="preview-workbench"]');
+  const image = page.locator('[data-capability="image-canvas"]');
+  const imageCanvas = page.locator('[data-testid="image-canvas"]');
+  const flowSurface = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
+  const revisionBefore = Number(await flowSurface.getAttribute('data-flow-revision'));
+  const readRoiParameters = () => page.evaluate(() => Object.fromEntries(
+    ['X', 'Y', 'Width', 'Height'].map(name => [
+      name,
+      document.querySelector(`[data-parameter-name="${name}"] input`)?.value || null
+    ])
+  ));
+  const roiBefore = await readRoiParameters();
+  assert(roiBefore.X === '10' && roiBefore.Y === '10' && roiBefore.Width === '40' && roiBefore.Height === '30',
+    `The seeded ROI parameters are unexpected: ${JSON.stringify(roiBefore)}`);
+
+  await page.locator('[data-testid="image-actual-size"]').click();
+  await page.waitForFunction(() => Number(
+    document.querySelector('[data-capability="image-canvas"]')?.getAttribute('data-image-scale')) === 1);
+  await page.locator('[data-testid="image-zoom-in"]').click();
+  await page.waitForFunction(() => Number(
+    document.querySelector('[data-capability="image-canvas"]')?.getAttribute('data-image-scale')) > 1);
+  await page.locator('[data-testid="image-fit"]').click();
+
+  const imageBox = await imageCanvas.boundingBox();
+  assert(imageBox, 'The G4 ImageCanvas did not expose a bounding box.');
+  await page.mouse.click(imageBox.x + imageBox.width / 2, imageBox.y + imageBox.height / 2);
+  await page.waitForFunction(() =>
+    document.querySelector('.image-viewport__probe')?.getAttribute('data-probe-phase') === 'locked');
+
+  await page.locator('[data-testid="roi-start"]').click();
+  await page.waitForFunction(() =>
+    document.querySelector('.preview-panel__roi')?.getAttribute('data-roi-phase') === 'editing');
+  await imageCanvas.focus();
+  await page.keyboard.press('ArrowRight');
+  assert(await page.locator('[data-testid="roi-confirm"]').isEnabled(), 'ROI confirm did not enable after editing.');
+  assert(Number(await flowSurface.getAttribute('data-flow-revision')) === revisionBefore,
+    'ROI draft changed the Flow revision before confirmation.');
+  await page.locator('[data-testid="roi-confirm"]').click();
+  await waitForFlowSurfaceNumber(page, 'data-flow-revision', revisionBefore + 1);
+  await page.waitForFunction(before => {
+    const current = Object.fromEntries(['X', 'Y', 'Width', 'Height'].map(name => [
+      name,
+      document.querySelector(`[data-parameter-name="${name}"] input`)?.value || null
+    ]));
+    return JSON.stringify(current) !== JSON.stringify(before);
+  }, roiBefore);
+  const roiAfter = await readRoiParameters();
+
+  await flowCanvas.focus();
+  await page.keyboard.press('Control+z');
+  await page.waitForFunction(expected => {
+    const current = Object.fromEntries(['X', 'Y', 'Width', 'Height'].map(name => [
+      name,
+      document.querySelector(`[data-parameter-name="${name}"] input`)?.value || null
+    ]));
+    return JSON.stringify(current) === JSON.stringify(expected);
+  }, roiBefore);
+  await page.keyboard.press('Control+y');
+  await page.waitForFunction(expected => {
+    const current = Object.fromEntries(['X', 'Y', 'Width', 'Height'].map(name => [
+      name,
+      document.querySelector(`[data-parameter-name="${name}"] input`)?.value || null
+    ]));
+    return JSON.stringify(current) === JSON.stringify(expected);
+  }, roiAfter);
+  await waitForSeededPreview(page);
+
+  await page.locator('[data-testid="roi-start"]').click();
+  await imageCanvas.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.locator('[data-testid="roi-cancel"]').click();
+  assert(JSON.stringify(await readRoiParameters()) === JSON.stringify(roiAfter),
+    'ROI cancel mutated the Flow draft.');
+
+  return page.evaluate(() => {
+    const diagnostics = window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
+    const previewSurface = document.querySelector('[data-capability="preview-workbench"]');
+    const imageSurface = document.querySelector('[data-capability="image-canvas"]');
+    return {
+      previewPhase: previewSurface?.getAttribute('data-preview-phase') || null,
+      previewStale: previewSurface?.getAttribute('data-preview-stale') || null,
+      imagePhase: imageSurface?.getAttribute('data-image-phase') || null,
+      imageScale: Number(imageSurface?.getAttribute('data-image-scale') || -1),
+      imageDpr: Number(imageSurface?.getAttribute('data-image-dpr') || -1),
+      probePhase: document.querySelector('.image-viewport__probe')?.getAttribute('data-probe-phase') || null,
+      roiPhase: document.querySelector('.preview-panel__roi')?.getAttribute('data-roi-phase') || null,
+      flowRevision: Number(document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]')
+        ?.getAttribute('data-flow-revision') || -1),
+      roiX: document.querySelector('[data-parameter-name="X"] input')?.value || null,
+      diagnostics: diagnostics ? { ...diagnostics } : null
+    };
+  });
+}
+
 async function verifyWorkspaceG3(page) {
   await page.waitForSelector('[data-capability="flow-workspace"]', { state: 'visible', timeout: 30_000 });
   await page.waitForFunction(() =>
@@ -723,9 +959,10 @@ async function verifyProductPage(page, route, runtimeErrors) {
     return url.origin === origin && (url.pathname === '/health' || url.pathname.startsWith('/api/'));
   });
   const preferenceWriteRequests = preferenceRequests.filter(item => item.method !== 'GET');
-  const workspaceG3 = isWorkspaceRoute && ['ready', 'empty'].includes(projection.workspaceState)
-    ? await verifyWorkspaceG3(page)
-    : null;
+  const seededWorkspace = parseBooleanEnvironment('CV_STUDIO_UI_SEED_WORKSPACE');
+  const workspaceReady = isWorkspaceRoute && ['ready', 'empty'].includes(projection.workspaceState);
+  const workspaceG4 = workspaceReady && seededWorkspace ? await verifyWorkspaceG4(page) : null;
+  const workspaceG3 = workspaceReady && !seededWorkspace ? await verifyWorkspaceG3(page) : null;
   let workspaceLifecycle = null;
   if (isWorkspaceRoute) {
     const readWorkspace = () => page.evaluate(() => {
@@ -737,11 +974,17 @@ async function verifyProductPage(page, route, runtimeErrors) {
         ownerCount: Number(shell?.getAttribute('data-workspace-owner-count') || -1),
         flowCanvasOwnerCount: Number(diagnostics?.flowCanvasOwnerCount ?? -1),
         inspectorOwnerCount: Number(diagnostics?.inspectorOwnerCount ?? -1),
+        previewOwnerCount: Number(diagnostics?.previewOwnerCount ?? -1),
+        imageCanvasOwnerCount: Number(diagnostics?.imageCanvasOwnerCount ?? -1),
+        roiOwnerCount: Number(diagnostics?.roiOwnerCount ?? -1),
         activeInspectorDrafts: Number(diagnostics?.activeInspectorDrafts ?? -1),
         activeSubscriptions: Number(shell?.getAttribute('data-workspace-active-subscriptions') || -1),
         activeAnimationFrames: Number(diagnostics?.activeAnimationFrames ?? -1),
         activeObservers: Number(diagnostics?.activeObservers ?? -1),
         activeTimers: Number(diagnostics?.activeTimers ?? -1),
+        activeBlobUrls: Number(diagnostics?.activeBlobUrls ?? -1),
+        activePreviewArtifactIds: Number(diagnostics?.activePreviewArtifactIds ?? -1),
+        inFlightPreview: Number(diagnostics?.inFlightPreview ?? -1),
         inFlightReads: Number(shell?.getAttribute('data-workspace-in-flight-reads') || -1),
         diagnostics: diagnostics ? { ...diagnostics } : null,
         mainCount: document.querySelectorAll('main').length,
@@ -762,12 +1005,18 @@ async function verifyProductPage(page, route, runtimeErrors) {
         return diagnostics?.workspaceOwnerCount === 0 &&
           diagnostics.flowCanvasOwnerCount === 0 &&
           diagnostics.inspectorOwnerCount === 0 &&
+          diagnostics.previewOwnerCount === 0 &&
+          diagnostics.imageCanvasOwnerCount === 0 &&
+          diagnostics.roiOwnerCount === 0 &&
           diagnostics.activeInspectorDrafts === 0 &&
           diagnostics.activeSubscriptions === 0 &&
           diagnostics.activeAnimationFrames === 0 &&
           diagnostics.activeObservers === 0 &&
           diagnostics.activeTimers === 0 &&
           diagnostics.activeAbortControllers === 0 &&
+          diagnostics.activeBlobUrls === 0 &&
+          diagnostics.activePreviewArtifactIds === 0 &&
+          diagnostics.inFlightPreview === 0 &&
           diagnostics.inFlightReads === 0;
       }, null, { timeout: 30_000 });
       disposed = await page.evaluate(() => ({
@@ -787,15 +1036,24 @@ async function verifyProductPage(page, route, runtimeErrors) {
         return Boolean(state && state !== 'loading') &&
           diagnostics?.workspaceOwnerCount === 1 &&
           diagnostics.flowCanvasOwnerCount === 1 &&
-          diagnostics.inspectorOwnerCount === 1;
+          diagnostics.inspectorOwnerCount === 1 &&
+          diagnostics.previewOwnerCount === 1 &&
+          diagnostics.imageCanvasOwnerCount === 1 &&
+          diagnostics.roiOwnerCount === 1;
       }, null, { timeout: 30_000 });
       remounted = await readWorkspace();
       lifecycleCycles.push({
         cycle,
         disposedOwnerCount: disposed.diagnostics.workspaceOwnerCount,
         disposedInspectorCount: disposed.diagnostics.inspectorOwnerCount,
+        disposedPreviewCount: disposed.diagnostics.previewOwnerCount,
+        disposedImageCount: disposed.diagnostics.imageCanvasOwnerCount,
+        disposedRoiCount: disposed.diagnostics.roiOwnerCount,
         remountedOwnerCount: remounted.ownerCount,
-        remountedInspectorCount: remounted.inspectorOwnerCount
+        remountedInspectorCount: remounted.inspectorOwnerCount,
+        remountedPreviewCount: remounted.previewOwnerCount,
+        remountedImageCount: remounted.imageCanvasOwnerCount,
+        remountedRoiCount: remounted.roiOwnerCount
       });
     }
     workspaceLifecycle = { mounted, disposed, remounted, cycles: lifecycleCycles };
@@ -804,38 +1062,58 @@ async function verifyProductPage(page, route, runtimeErrors) {
       `Workspace did not remain inside the single Product main: ${JSON.stringify(mounted)}`);
     assert(mounted.ownerCount >= 0 && mounted.ownerCount <= 1,
       `Workspace owner count escaped 0/1: ${JSON.stringify(mounted)}`);
-    if (workspaceG3) {
-      assert(mounted.ownerCount === 1 && mounted.flowCanvasOwnerCount === 1 && mounted.inspectorOwnerCount === 1,
-        `Formal G3 Workspace did not retain exactly one Canvas/Inspector owner: ${JSON.stringify(mounted)}`);
+    if (workspaceG3 || workspaceG4) {
+      assert(mounted.ownerCount === 1 && mounted.flowCanvasOwnerCount === 1 && mounted.inspectorOwnerCount === 1 &&
+        mounted.previewOwnerCount === 1 && mounted.imageCanvasOwnerCount === 1 && mounted.roiOwnerCount === 1,
+      `Formal G4 Workspace did not retain exactly one owner chain: ${JSON.stringify(mounted)}`);
     }
     assert(disposed.shellCount === 0 && disposed.mainCount === 1,
       `Workspace route leave did not unmount its shell: ${JSON.stringify(disposed)}`);
     assert(disposed.diagnostics.workspaceOwnerCount === 0 &&
       disposed.diagnostics.flowCanvasOwnerCount === 0 &&
       disposed.diagnostics.inspectorOwnerCount === 0 &&
+      disposed.diagnostics.previewOwnerCount === 0 &&
+      disposed.diagnostics.imageCanvasOwnerCount === 0 &&
+      disposed.diagnostics.roiOwnerCount === 0 &&
       disposed.diagnostics.activeInspectorDrafts === 0 &&
       disposed.diagnostics.activeSubscriptions === 0 &&
       disposed.diagnostics.activeAnimationFrames === 0 &&
       disposed.diagnostics.activeObservers === 0 &&
       disposed.diagnostics.activeTimers === 0 &&
       disposed.diagnostics.activeAbortControllers === 0 &&
+      disposed.diagnostics.activeBlobUrls === 0 &&
+      disposed.diagnostics.activePreviewArtifactIds === 0 &&
+      disposed.diagnostics.inFlightPreview === 0 &&
       disposed.diagnostics.inFlightReads === 0,
     `Workspace resources survived route leave: ${JSON.stringify(disposed)}`);
     assert(remounted.ownerCount >= 0 && remounted.ownerCount <= 1,
       `Workspace remount owner count escaped 0/1: ${JSON.stringify(remounted)}`);
-    if (workspaceG3) {
-      assert(remounted.ownerCount === 1 && remounted.flowCanvasOwnerCount === 1 && remounted.inspectorOwnerCount === 1,
-        `Formal G3 Workspace remount did not restore one Canvas/Inspector owner: ${JSON.stringify(remounted)}`);
+    if (workspaceG3 || workspaceG4) {
+      assert(remounted.ownerCount === 1 && remounted.flowCanvasOwnerCount === 1 && remounted.inspectorOwnerCount === 1 &&
+        remounted.previewOwnerCount === 1 && remounted.imageCanvasOwnerCount === 1 && remounted.roiOwnerCount === 1,
+      `Formal G4 Workspace remount did not restore one owner chain: ${JSON.stringify(remounted)}`);
     }
     assert(lifecycleCycles.length === 20 && lifecycleCycles.every(item =>
-      item.disposedOwnerCount === 0 && item.disposedInspectorCount === 0 &&
-      item.remountedOwnerCount === 1 && item.remountedInspectorCount === 1),
+      item.disposedOwnerCount === 0 && item.disposedInspectorCount === 0 && item.disposedPreviewCount === 0 &&
+      item.disposedImageCount === 0 && item.disposedRoiCount === 0 &&
+      item.remountedOwnerCount === 1 && item.remountedInspectorCount === 1 && item.remountedPreviewCount === 1 &&
+      item.remountedImageCount === 1 && item.remountedRoiCount === 1),
     `Workspace 20-cycle lifecycle ledger failed: ${JSON.stringify(lifecycleCycles)}`);
     assert(remounted.horizontalOverflow <= 1 && remounted.verticalOverflow <= 1,
       `Workspace remount overflowed globally: ${JSON.stringify(remounted)}`);
+    if (workspaceG4) {
+      await selectSeededRoiNode(page);
+      await waitForSeededPreview(page);
+    }
   }
   const productRequests = runtimeErrors.requests.filter(isProductRequest);
   const writeRequests = productRequests.filter(item => item.method !== 'GET');
+  const unexpectedWriteRequests = writeRequests.filter(item => {
+    if (!isWorkspaceRoute) return true;
+    const url = new URL(item.url);
+    return !(item.method === 'POST' && url.pathname === '/api/flows/preview-node') &&
+      !(item.method === 'DELETE' && /^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname));
+  });
 
   assert(projection.shellCount === 1, 'Product route did not mount exactly one ProductLayout.');
   assert(projection.internalLabCount === 0, 'Product route mounted the InternalLabLayout.');
@@ -855,8 +1133,8 @@ async function verifyProductPage(page, route, runtimeErrors) {
   }
   assert(projection.mainCount === 1, 'Formal product route did not keep exactly one main landmark.');
   assert(productRequests.length > 0, 'Product route emitted no observable GET requests.');
-  assert(writeRequests.length === 0,
-    `Product route emitted write requests: ${JSON.stringify(writeRequests)}`);
+  assert(unexpectedWriteRequests.length === 0,
+    `Product route emitted writes outside Preview cleanup: ${JSON.stringify(unexpectedWriteRequests)}`);
   assert(preferenceCycle.dark.attributeValue === 'dark', 'Dark theme projection was not applied.');
   assert(preferenceCycle.comfortable.attributeValue === 'comfortable',
     'Comfortable density projection was not applied.');
@@ -874,11 +1152,13 @@ async function verifyProductPage(page, route, runtimeErrors) {
         url.pathname !== '/api/auth/me' &&
         !(url.pathname === '/api/operators/library' && url.search === '?includeCompatibility=true') &&
         !/^\/api\/operators\/[^/]+\/metadata$/i.test(url.pathname) &&
+        url.pathname !== '/api/flows/preview-node' &&
+        !/^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname) &&
         !/^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
           .test(url.pathname);
     });
     assert(unexpectedWorkspaceRequests.length === 0,
-      `Workspace emitted a route outside the G2 GET allowlist: ${JSON.stringify(unexpectedWorkspaceRequests)}`);
+      `Workspace emitted a route outside the G4 Preview allowlist: ${JSON.stringify(unexpectedWorkspaceRequests)}`);
     assert(projection.workspaceMode === 'true' && projection.workspaceShellCount === 1,
       `ProductLayout did not enter workspaceMode: ${JSON.stringify(projection)}`);
   }
@@ -897,6 +1177,7 @@ async function verifyProductPage(page, route, runtimeErrors) {
     preferenceWriteRequests,
     resultsFilterLayout,
     workspaceG3,
+    workspaceG4,
     workspaceLifecycle
   };
 }

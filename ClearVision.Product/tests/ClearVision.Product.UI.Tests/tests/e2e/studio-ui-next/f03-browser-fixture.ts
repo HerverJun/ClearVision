@@ -4,7 +4,7 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import type { Page, Request, Route } from '@playwright/test';
 
 export const f03BrowserFixture = Object.freeze({
-  schemaVersion: 'f03-g2-browser.v1',
+  schemaVersion: 'f03-g4-browser.v1',
   phase: 'f03',
   dataSource: 'BROWSER_FIXTURE',
   authSource: 'HARNESS_SEEDED_SESSION',
@@ -66,16 +66,19 @@ export function auditF03Request(request: Request): F03RequestAuditEntry {
   });
 }
 
-export function isF03G2RequestAllowlist(
+export function isF03G4RequestAllowlist(
   audit: readonly F03RequestAuditEntry[]
 ): boolean {
   return audit.every(entry => {
+    if (entry.method === 'POST') return entry.path === '/api/flows/preview-node';
+    if (entry.method === 'DELETE') return /^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(entry.path);
     if (entry.method !== 'GET') return false;
     return entry.path === '/api/auth/me' ||
       entry.path === '/api/operators/library?includeCompatibility=true' ||
       /^\/api\/operators\/(?:\d+|[A-Za-z][A-Za-z0-9_]*)\/metadata$/.test(entry.path) ||
       /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-        .test(entry.path);
+        .test(entry.path) ||
+      /^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(entry.path);
   });
 }
 
@@ -185,7 +188,7 @@ export async function captureF03WorkspaceEvidence(
   if (projection.horizontalOverflow > 1 || projection.verticalOverflow > 1) {
     throw new Error(`F03 Workspace overflowed globally: ${JSON.stringify(projection)}.`);
   }
-  if (!isF03G2RequestAllowlist(options.requests)) {
+  if (!isF03G4RequestAllowlist(options.requests)) {
     throw new Error(`F03 G2 request allowlist failed: ${JSON.stringify(options.requests)}.`);
   }
   if (options.runtimeErrors.consoleErrors.length || options.runtimeErrors.pageErrors.length) {
