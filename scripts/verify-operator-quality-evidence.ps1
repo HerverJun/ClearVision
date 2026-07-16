@@ -70,10 +70,10 @@ function Formal-Decision-Semantics($Comparison) {
             baseline = $_.baseline
             candidate = $_.candidate
             validationSelected = $_.validationSelected
-            testRmseImprovementPercent = $_.testRmseImprovementPercent
-            testP95ImprovementPercent = $_.testP95ImprovementPercent
-            testFailureRateDelta = $_.testFailureRateDelta
-            testAmbiguityRateDelta = $_.testAmbiguityRateDelta
+            testRmseImprovementPercent = [double]$_.testRmseImprovementPercent
+            testP95ImprovementPercent = [double]$_.testP95ImprovementPercent
+            testFailureRateDelta = [double]$_.testFailureRateDelta
+            testAmbiguityRateDelta = [double]$_.testAmbiguityRateDelta
             adopted = $_.adopted
             reason = $_.reason
             enable = $_.enable
