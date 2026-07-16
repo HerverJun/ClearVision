@@ -6,6 +6,7 @@ declare module 'vue-router' {
     readonly breadcrumb?: string;
     readonly requiresSession?: boolean;
     readonly internal?: boolean;
+    readonly workspaceMode?: boolean;
   }
 }
 

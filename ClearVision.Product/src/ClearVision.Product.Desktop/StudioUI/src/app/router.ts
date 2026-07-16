@@ -12,6 +12,7 @@ import AboutPage from '@/capabilities/about/AboutPage.vue';
 import OverviewPage from '@/capabilities/overview/OverviewPage.vue';
 import OperatorDetailPage from '@/capabilities/operators-read/OperatorDetailPage.vue';
 import OperatorsPage from '@/capabilities/operators-read/OperatorsPage.vue';
+import WorkspacePage from '@/capabilities/project-workspace/WorkspacePage.vue';
 import ProjectDetailPage from '@/capabilities/projects-read/ProjectDetailPage.vue';
 import ProjectsPage from '@/capabilities/projects-read/ProjectsPage.vue';
 import ResultsPage from '@/capabilities/results-read/ResultsPage.vue';
@@ -45,6 +46,17 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
         name: 'project-detail',
         component: ProjectDetailPage,
         meta: { title: '工程详情', breadcrumb: '工程详情', requiresSession: true }
+      },
+      {
+        path: 'projects/:id/workspace',
+        name: 'project-workspace',
+        component: WorkspacePage,
+        meta: {
+          title: '工程工作区',
+          breadcrumb: '工作区',
+          requiresSession: true,
+          workspaceMode: true
+        }
       },
       {
         path: 'operators',

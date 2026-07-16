@@ -14,12 +14,20 @@ const systemStatus = runtime.systemStatus.projection;
 const preferences = runtime.preferences.projection;
 const contentRoot = ref<HTMLElement>();
 const appearanceDetails = ref<HTMLDetailsElement>();
+const workspaceMode = computed(() => route.meta.workspaceMode === true);
+
+function resolveBreadcrumbPath(path: string): string {
+  return path.replace(/:([A-Za-z0-9_]+)/g, (_match, parameterName: string) => {
+    const value = route.params[parameterName];
+    return encodeURIComponent(Array.isArray(value) ? value[0] ?? '' : String(value ?? ''));
+  });
+}
 
 const breadcrumbs = computed(() => route.matched
   .filter(record => !record.meta.internal && record.meta.breadcrumb)
   .map(record => ({
     label: record.meta.breadcrumb,
-    to: record.path === '/' ? '/overview' : record.path
+    to: record.path === '/' ? '/overview' : resolveBreadcrumbPath(record.path)
   }))
 );
 const statusTone = computed(() => {
@@ -51,7 +59,7 @@ function closeAppearance(): void {
   details.querySelector<HTMLElement>('summary')?.focus();
 }
 
-watch(() => route.fullPath, async (current, previous) => {
+watch(() => route.path, async (current, previous) => {
   if (!previous || current === previous) return;
   await nextTick();
   contentRoot.value?.focus({ preventScroll: true });
@@ -63,7 +71,9 @@ onMounted(() => runtime.preferences.apply());
 <template>
   <div
     class="product-layout"
+    :class="{ 'product-layout--workspace': workspaceMode }"
     data-product-shell="ready"
+    :data-workspace-mode="workspaceMode"
   >
     <a
       class="product-layout__skip-link"
@@ -99,7 +109,7 @@ onMounted(() => runtime.preferences.apply());
           :aria-label="`${item.label}，${item.description}`"
           :title="item.description"
         >
-          <span>{{ item.label }}</span>
+          <span>{{ workspaceMode ? item.label.slice(0, 1) : item.label }}</span>
           <small>{{ item.description }}</small>
         </RouterLink>
       </nav>
@@ -240,10 +250,11 @@ onMounted(() => runtime.preferences.apply());
         id="product-main"
         ref="contentRoot"
         class="product-layout__content"
+        :class="{ 'product-layout__content--workspace': workspaceMode }"
         tabindex="-1"
       >
         <CvInlineAlert
-          v-if="session.phase === 'unauthorized'"
+          v-if="!workspaceMode && session.phase === 'unauthorized'"
           class="product-layout__session-alert"
           tone="warning"
           compact
@@ -262,7 +273,7 @@ onMounted(() => runtime.preferences.apply());
           </template>
         </CvInlineAlert>
         <CvInlineAlert
-          v-else-if="session.phase === 'error'"
+          v-else-if="!workspaceMode && session.phase === 'error'"
           class="product-layout__session-alert"
           tone="error"
           compact
@@ -272,7 +283,7 @@ onMounted(() => runtime.preferences.apply());
           {{ session.message }} 页面仍会挂载，但后端授权继续是唯一安全边界。
         </CvInlineAlert>
         <CvInlineAlert
-          v-else-if="session.phase === 'stale'"
+          v-else-if="!workspaceMode && session.phase === 'stale'"
           class="product-layout__session-alert"
           tone="warning"
           compact
@@ -281,7 +292,12 @@ onMounted(() => runtime.preferences.apply());
         >
           {{ session.message }}
         </CvInlineAlert>
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <component
+            :is="Component"
+            :key="route.path"
+          />
+        </RouterView>
       </main>
     </div>
   </div>

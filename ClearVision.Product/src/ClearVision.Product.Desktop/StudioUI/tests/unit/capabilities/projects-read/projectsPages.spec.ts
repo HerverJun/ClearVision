@@ -27,7 +27,8 @@ function createTestRouter(): Router {
     history: createMemoryHistory(),
     routes: [
       { path: '/projects', component: { template: '<div />' } },
-      { path: '/projects/:projectId', component: { template: '<div />' } }
+      { path: '/projects/:projectId', component: { template: '<div />' } },
+      { path: '/projects/:projectId/workspace', component: { template: '<div />' } }
     ]
   });
 }
@@ -99,7 +100,7 @@ describe('Projects read pages', () => {
     await router.isReady();
 
     const wrapper = mount(ProjectDetailPage, {
-      props: { projectId, runtime: { queries } },
+      props: { projectId, runtime: { queries }, workspaceEnabled: true },
       global: { plugins: [router] }
     });
     await flushPromises();
@@ -112,6 +113,7 @@ describe('Projects read pages', () => {
     expect(wrapper.text()).toContain('标定资源');
     expect(wrapper.text()).toContain('空间资源');
     expect(wrapper.text()).toContain('2');
+    expect(wrapper.get('a[href$="/workspace"]').text()).toContain('打开工作区');
 
     wrapper.unmount();
     queries.dispose();

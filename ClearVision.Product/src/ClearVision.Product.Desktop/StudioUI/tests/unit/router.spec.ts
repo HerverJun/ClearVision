@@ -12,6 +12,7 @@ describe('StudioUI router', () => {
       '/overview',
       '/projects',
       '/projects/:id',
+      '/projects/:id/workspace',
       '/operators',
       '/operators/:operatorType',
       '/stations',
@@ -42,5 +43,13 @@ describe('StudioUI router', () => {
     const routes = createTestRouter().getRoutes();
     expect(routes.find(route => route.path === '/labs/design')?.meta.internal).toBe(true);
     expect(routes.find(route => route.path === '/overview')?.meta.internal).not.toBe(true);
+  });
+
+  it('marks only the formal Workspace route as ProductLayout workspaceMode', () => {
+    const routes = createTestRouter().getRoutes();
+    expect(routes.find(route => route.path === '/projects/:id/workspace')?.meta)
+      .toMatchObject({ workspaceMode: true, requiresSession: true });
+    expect(routes.find(route => route.path === '/projects/:id')?.meta.workspaceMode)
+      .not.toBe(true);
   });
 });

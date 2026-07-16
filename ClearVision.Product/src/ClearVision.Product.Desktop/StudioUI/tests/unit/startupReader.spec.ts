@@ -19,6 +19,7 @@ function createStartupFixture(
     apiBaseUrl: `${localhostOrigin}/api`,
     studioUiBasePath: '/studio/',
     featureFlags: {
+      'Studio2.Workspace': false,
       'Studio2.PropertyPanel': true,
       'Studio2.PreviewPanel': false
     },
@@ -54,6 +55,7 @@ function expectStartupError(
 describe('readDesktopStudioStartupConfig', () => {
   it('reads the exact Desktop V1 contract without writing to the supplied window', () => {
     const sourceFeatureFlags = {
+      'Studio2.Workspace': false,
       'Studio2.PropertyPanel': true,
       'Studio2.PreviewPanel': false
     };
@@ -73,6 +75,7 @@ describe('readDesktopStudioStartupConfig', () => {
     sourceFeatureFlags['Studio2.PropertyPanel'] = false;
     expect(startup.apiBaseUrl).toBe(`${localhostOrigin}/api`);
     expect(startup.featureFlags['Studio2.PropertyPanel']).toBe(true);
+    expect(startup.featureFlags['Studio2.Workspace']).toBe(false);
   });
 
   it('fails fast when Desktop did not inject startup configuration', () => {

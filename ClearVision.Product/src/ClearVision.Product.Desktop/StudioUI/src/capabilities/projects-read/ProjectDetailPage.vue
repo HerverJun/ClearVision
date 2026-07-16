@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, watch } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
+import { productRuntimeKey } from '@/app/productRuntime';
 import {
   CvButton,
   CvDescriptionList,
@@ -20,10 +21,13 @@ import {
 const props = defineProps<{
   projectId?: string;
   runtime?: ProjectsReadRuntime;
+  workspaceEnabled?: boolean;
 }>();
 
 const route = useRoute();
+const productRuntime = inject(productRuntimeKey, null);
 const runtime = useProjectsReadRuntime(props.runtime);
+const workspaceEnabled = computed(() => props.workspaceEnabled ?? productRuntime?.workspace.enabled ?? false);
 const activeProjectId = computed(() => props.projectId ?? String(route.params.id ?? route.params.projectId ?? ''));
 const detailsQuery = createProjectDetailsQuery(runtime.queries, () => activeProjectId.value);
 const state = computed(() => detailsQuery.state.value);
@@ -87,6 +91,13 @@ onBeforeUnmount(() => {
         </RouterLink>
       </template>
       <template #actions>
+        <RouterLink
+          v-if="workspaceEnabled && state.data"
+          class="project-details__workspace-link"
+          :to="`/projects/${state.data.id}/workspace`"
+        >
+          打开工作区
+        </RouterLink>
         <CvButton
           size="sm"
           :loading="state.isRefreshing"
@@ -205,6 +216,8 @@ onBeforeUnmount(() => {
 .project-details { display: grid; gap: var(--cv-space-5); min-width: 0; }
 .project-details__back { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); text-decoration: none; }
 .project-details__back:hover { color: var(--cv-color-link); text-decoration: underline; }
+.project-details__workspace-link { min-height: var(--cv-density-control-height-sm); padding: 0 var(--cv-space-3); display: inline-flex; align-items: center; border: 1px solid var(--cv-color-brand-border); border-radius: var(--cv-radius-sm); background: var(--cv-color-brand-soft); color: var(--cv-color-brand-text); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; }
+.project-details__workspace-link:hover { border-color: var(--cv-color-brand-500); color: var(--cv-color-brand-text); }
 .project-details__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-4); align-items: start; }
 .project-details__grid > :first-child { grid-row: span 2; }
 @media (max-width: 800px) { .project-details__grid { grid-template-columns: 1fr; } .project-details__grid > :first-child { grid-row: auto; } }

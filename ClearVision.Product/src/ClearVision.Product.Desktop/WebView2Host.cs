@@ -227,6 +227,7 @@ public sealed class WebView2Host : IAsyncDisposable
     {
         return new Dictionary<string, bool>
         {
+            ["Studio2.Workspace"] = studioOptions.WorkspaceCapabilityEnabled,
             ["Studio:NodePreviewInspectorEnabled"] = studioOptions.NodePreviewInspectorEnabled,
             ["Studio2.PropertyPanel"] = studioOptions.PropertyPanelCapabilityEnabled,
             ["Studio2.PreviewPanel"] = studioOptions.PreviewPanelCapabilityEnabled,

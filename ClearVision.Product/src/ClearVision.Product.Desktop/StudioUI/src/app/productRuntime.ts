@@ -2,6 +2,10 @@ import { inject, type InjectionKey } from 'vue';
 import { createUiPreferencesOwner, type UiPreferencesOwner } from '@/app/preferences';
 import { createSessionProjectionOwner, type SessionProjectionOwner } from '@/app/session';
 import type { StudioPlatform } from '@/app/studioPlatform';
+import {
+  createWorkspaceRuntime,
+  type WorkspaceRuntime
+} from '@/capabilities/project-workspace/workspaceRuntime';
 import { createReadQueryClient, type ReadQueryClient } from '@/platform/query';
 import { createSystemStatusOwner, type SystemStatusOwner } from '@/platform/status';
 
@@ -10,6 +14,7 @@ export interface ProductRuntime {
   readonly session: SessionProjectionOwner;
   readonly systemStatus: SystemStatusOwner;
   readonly preferences: UiPreferencesOwner;
+  readonly workspace: WorkspaceRuntime;
   dispose(): void;
 }
 
@@ -23,6 +28,11 @@ export function createProductRuntime(platform: StudioPlatform): ProductRuntime {
     hasToken: platform.hasToken
   });
   const systemStatus = createSystemStatusOwner({ queries });
+  const workspace = createWorkspaceRuntime({
+    queries,
+    session,
+    featureFlags: platform.startup.featureFlags
+  });
   let disposed = false;
   session.start();
   systemStatus.start();
@@ -32,9 +42,11 @@ export function createProductRuntime(platform: StudioPlatform): ProductRuntime {
     session,
     systemStatus,
     preferences,
+    workspace,
     dispose(): void {
       if (disposed) return;
       disposed = true;
+      workspace.dispose();
       session.dispose();
       systemStatus.dispose();
       queries.dispose();

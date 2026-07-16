@@ -33,6 +33,7 @@ public class WebView2HostTests
             var options = new StudioOptions
             {
                 StudioUiEnabled = true,
+                WorkspaceCapabilityEnabled = true,
                 NodePreviewInspectorEnabled = true,
                 PropertyPanelCapabilityEnabled = true
             };
@@ -53,6 +54,7 @@ public class WebView2HostTests
             plan.StartupInjectionScript.Should().Contain("\"apiBaseUrl\":\"http://localhost:5000/api\"");
             plan.StartupInjectionScript.Should().Contain("\"studioUiBasePath\":\"/studio/\"");
             plan.StartupInjectionScript.Should().Contain("\"featureFlags\":");
+            plan.StartupInjectionScript.Should().Contain("\"Studio2.Workspace\":true");
             plan.StartupInjectionScript.Should().Contain("Object.freeze(startup)");
             plan.StartupInjectionScript.Should().Contain("writable: false");
             plan.StartupInjectionScript.Should().Contain("configurable: false");
@@ -64,6 +66,18 @@ public class WebView2HostTests
         {
             Directory.Delete(tempRoot, recursive: true);
         }
+    }
+
+    [Fact]
+    public void BuildStudioUiStartupInjectionScript_ShouldKeepWorkspaceCapabilityDefaultOff()
+    {
+        var script = WebView2Host.BuildStudioUiStartupInjectionScript(
+            "http://localhost:5000/api",
+            new StudioOptions());
+
+        script.Should().Contain("\"Studio2.Workspace\":false");
+        script.Should().Contain("Object.freeze(startup)");
+        script.Should().NotContain("window.__API_BASE_URL__");
     }
 
     [Fact]

@@ -5,6 +5,7 @@ public sealed class StudioOptions
     public const string SectionName = "Studio";
 
     public bool StudioUiEnabled { get; set; } = false;
+    public bool WorkspaceCapabilityEnabled { get; set; } = false;
     public bool NodePreviewInspectorEnabled { get; set; }
     public bool PropertyPanelCapabilityEnabled { get; set; }
     public bool PreviewPanelCapabilityEnabled { get; set; }
