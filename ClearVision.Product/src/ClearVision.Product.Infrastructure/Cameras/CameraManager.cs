@@ -55,6 +55,11 @@ public class CameraManager : ICameraManager, IDisposable
     /// </summary>
     public async Task<ICamera> GetOrCreateCameraAsync(string cameraId)
     {
+        return await GetOrCreateCameraAsync(cameraId, manufacturerHint: null);
+    }
+
+    private async Task<ICamera> GetOrCreateCameraAsync(string cameraId, string? manufacturerHint)
+    {
         ThrowIfDisposed();
         var cameraKey = NormalizeCameraKey(cameraId);
         if (_cameras.TryGetValue(cameraKey, out var existingCamera))
@@ -72,7 +77,7 @@ public class CameraManager : ICameraManager, IDisposable
             }
 
             // AutoDetect internally opens the camera and returns a connected provider.
-            var provider = CameraProviderFactory.AutoDetect(cameraKey);
+            var provider = CameraProviderFactory.AutoDetect(cameraKey, manufacturerHint);
             if (provider == null)
                 throw new InvalidOperationException($"Failed to detect camera: {cameraKey}. Check power, connection, and SDK installation.");
 
@@ -106,7 +111,7 @@ public class CameraManager : ICameraManager, IDisposable
             throw new InvalidOperationException($"绑定 '{binding.DisplayName}' 未关联物理设备序列号");
         }
 
-        return await GetOrCreateCameraAsync(binding.SerialNumber);
+        return await GetOrCreateCameraAsync(binding.SerialNumber, binding.Manufacturer);
     }
 
     public Task<ICamera> OpenCameraAsync(string cameraId) => GetOrCreateCameraAsync(cameraId);
