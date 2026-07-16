@@ -4,7 +4,7 @@
 - After product SHA: `727414e2ca6bd5785aac3f2dbc68fb5b8badc369`
 - Dataset generated SHA: `5d60098525547bf873b9e4618b3d7b5a08bf202164295dac9c2eff6f99c2507a`
 - Harness program SHA: `572dfc2826d0eb597839442c0b2b2e49040348287fc01174288e18e803a57b9f`
-- Old/current default conformance: exact on accuracy, failure and diagnostics for Circle and Line validation/test rows.
+- Old/current default conformance: aggregate accuracy, failure and diagnostic-summary fields match for Circle and Line validation/test rows; no per-case diagnostic fingerprint is claimed.
 - Managed allocation is benchmark-thread only; process working-set/private-byte observations remain separate in the source reports.
 
 | Domain | Baseline | Candidate | Test RMSE improvement | Test P95 improvement | Failure delta | P95 latency cost ms | Managed alloc cost B/case | Adopted | Reason |

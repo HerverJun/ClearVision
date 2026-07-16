@@ -20,8 +20,8 @@
 | FieldValidation | `NotValidated` |
 | Quality Evidence Refs | quality/evals/reports/operator-product-e2e-baseline-acceptance.json<br>quality/evals/reports/operator-product-e2e-after-acceptance.json<br>quality/evals/reports/operator-product-e2e-phase5-comparison.json<br>quality/evals/reports/operator-quality-phase5-evidence.json |
 | Evidence Scope | `ModeAggregate` |
-| Evidence Identity | `clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d/line-formal-product-e2e` |
-| Mode Evidence | Method=FitLine; FitLoss=L2(default): SyntheticBenchmarkEvidence; adopted=True; default=True; Exact old/current default accuracy, failure and diagnostic conformance on validation/test.<br>Method=FitLine; FitLoss=Welsch: SyntheticBenchmarkValidated; adopted=True; default=False; Accepted opt-in: validation RMSE/P95 improved; independent test RMSE and P95 improved with unchanged failure/ambiguity and written cost budgets passed. |
+| Evidence Identity | `clearvision-operator-quality-phase5-evidence@1.0.0:063a441e37e34e42fe94cf2f7cd15f42de80e577d6d12021bd17c31271e49927/line-formal-product-e2e` |
+| Mode Evidence | Method=FitLine; FitLoss=L2(default): SyntheticBenchmarkEvidence; adopted=True; default=True; Aggregate old/current default accuracy, failure and diagnostic-summary conformance on validation/test; no per-case diagnostic fingerprint is claimed.<br>Method=FitLine; FitLoss=Welsch: SyntheticBenchmarkValidated; adopted=True; default=False; Accepted opt-in: validation RMSE/P95 improved; independent test RMSE and P95 improved with unchanged failure/ambiguity and written cost budgets passed. |
 | 标签 (Tags) | `AlgorithmQuality:SyntheticBenchmarkEvidence`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle

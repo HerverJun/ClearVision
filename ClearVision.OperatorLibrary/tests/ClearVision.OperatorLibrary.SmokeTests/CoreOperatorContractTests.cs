@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Reflection;
+using System.Security.Cryptography;
 using ClearVision.OperatorLibrary.Abstractions.Adapters;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -20,6 +21,7 @@ using OperatorFieldValidation = ClearVision.Product.Core.Services.OperatorFieldV
 using OperatorMetadata = ClearVision.Product.Core.Services.OperatorMetadata;
 using OperatorProductionReadiness = ClearVision.Product.Core.Services.OperatorProductionReadiness;
 using OperatorQualityState = ClearVision.Product.Core.Services.OperatorQualityState;
+using OperatorQualityStateCatalog = ClearVision.Product.Core.Services.OperatorQualityStateCatalog;
 
 namespace ClearVision.OperatorLibrary.SmokeTests;
 
@@ -136,6 +138,42 @@ public class CoreOperatorContractTests
 
         Assert.Equal(qualityState, descriptor.QualityState);
         Assert.Equal(OperatorFieldValidation.NotValidated, descriptor.QualityState.FieldValidation);
+    }
+
+    [Fact]
+    public void PackagedQualityCatalog_ShouldLoadEmbeddedModeScopedEvidence()
+    {
+        const string resourceName = "ClearVision.Product.Core.Evidence.OperatorQualityPhase5.json";
+        var packageAssembly = typeof(OperatorQualityStateCatalog).Assembly;
+        Assert.Equal("ClearVision.OperatorLibrary", packageAssembly.GetName().Name);
+        Assert.Contains(resourceName, packageAssembly.GetManifestResourceNames());
+
+        using var resource = Assert.IsAssignableFrom<Stream>(packageAssembly.GetManifestResourceStream(resourceName));
+        using var memory = new MemoryStream();
+        resource.CopyTo(memory);
+        var manifestSha = Convert.ToHexString(SHA256.HashData(memory.ToArray())).ToLowerInvariant();
+
+        var line = OperatorQualityStateCatalog.Resolve(OperatorType.LineMeasurement, OperatorLifecycle.Stable);
+        var circle = OperatorQualityStateCatalog.Resolve(OperatorType.CircleMeasurement, OperatorLifecycle.Stable);
+        var unregistered = OperatorQualityStateCatalog.Resolve(OperatorType.MeanFilter, OperatorLifecycle.Stable);
+
+        Assert.Equal(OperatorAlgorithmQuality.SyntheticBenchmarkEvidence, line.AlgorithmQuality);
+        Assert.StartsWith($"clearvision-operator-quality-phase5-evidence@1.0.0:{manifestSha}/", line.EvidenceIdentity);
+        var lineWelsch = Assert.Single(line.ModeEvidence, mode => mode.ModeId == "Method=FitLine; FitLoss=Welsch");
+        Assert.Equal(OperatorAlgorithmQuality.SyntheticBenchmarkValidated, lineWelsch.AlgorithmQuality);
+        Assert.True(lineWelsch.Adopted);
+        Assert.False(lineWelsch.IsDefault);
+        Assert.Contains("Accepted opt-in", lineWelsch.Verdict, StringComparison.Ordinal);
+
+        Assert.Equal(OperatorAlgorithmQuality.SyntheticBenchmarkEvidence, circle.AlgorithmQuality);
+        var circleWelsch = Assert.Single(circle.ModeEvidence, mode => mode.ModeId == "Method=CaliperFitV2; RefinementLoss=Welsch");
+        Assert.False(circleWelsch.Adopted);
+        Assert.False(circleWelsch.IsDefault);
+        Assert.Contains("Not adopted", circleWelsch.Verdict, StringComparison.Ordinal);
+
+        Assert.Equal(OperatorAlgorithmQuality.Unknown, unregistered.AlgorithmQuality);
+        Assert.Empty(unregistered.ModeEvidence);
+        Assert.Equal($"clearvision-operator-quality-phase5-evidence@1.0.0:{manifestSha}", unregistered.EvidenceIdentity);
     }
 
     [Fact]

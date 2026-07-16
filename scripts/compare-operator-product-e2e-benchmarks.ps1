@@ -67,7 +67,7 @@ foreach ($entry in @(@{ Domain="Circle"; Algorithm="LegacyDefault" }, @{ Domain=
             split = $split
             oldAlgorithm = $entry.Algorithm
             currentAlgorithm = $entry.Algorithm
-            exactAccuracyAndDiagnosticConformance = $true
+            aggregateAccuracyFailureAndDiagnosticSummaryConformance = $true
         }
     }
 }
@@ -121,7 +121,7 @@ foreach ($domain in @("Circle", "Line")) {
 }
 
 $comparison = [ordered]@{
-    schemaVersion = "2026-07-16.operator-product-e2e-comparison.v1"
+    schemaVersion = "2026-07-16.operator-product-e2e-comparison.v2"
     benchmarkId = $after.benchmarkId
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
     baselineProductSha = $baseline.productImplementation.repositorySha
@@ -147,7 +147,7 @@ $lines.Add("- Frozen executable product SHA: ``$($comparison.baselineProductSha)
 $lines.Add("- After product SHA: ``$($comparison.afterProductSha)``")
 $lines.Add("- Dataset generated SHA: ``$($comparison.dataset.generatedDataSha256)``")
 $lines.Add("- Harness program SHA: ``$($comparison.harness.programSha256)``")
-$lines.Add("- Old/current default conformance: exact on accuracy, failure and diagnostics for Circle and Line validation/test rows.")
+$lines.Add("- Old/current default conformance: aggregate accuracy, failure and diagnostic-summary fields match for Circle and Line validation/test rows; no per-case diagnostic fingerprint is claimed.")
 $lines.Add("- Managed allocation is benchmark-thread only; process working-set/private-byte observations remain separate in the source reports.")
 $lines.Add("")
 $lines.Add("| Domain | Baseline | Candidate | Test RMSE improvement | Test P95 improvement | Failure delta | P95 latency cost ms | Managed alloc cost B/case | Adopted | Reason |")

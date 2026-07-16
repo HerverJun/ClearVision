@@ -1,7 +1,7 @@
 {
-    "schemaVersion":  "2026-07-16.operator-product-e2e-comparison.v1",
+    "schemaVersion":  "2026-07-16.operator-product-e2e-comparison.v2",
     "benchmarkId":  "clearvision-operator-product-e2e-v1",
-    "generatedAtUtc":  "2026-07-16T01:18:48.4526503Z",
+    "generatedAtUtc":  "2026-07-16T02:47:05.9015330Z",
     "baselineProductSha":  "ce266626e0bec0a8cd4a68c11b176df95e8cb482",
     "afterProductSha":  "727414e2ca6bd5785aac3f2dbc68fb5b8badc369",
     "dataset":  {
@@ -59,28 +59,28 @@
                                       "split":  "validation",
                                       "oldAlgorithm":  "LegacyDefault",
                                       "currentAlgorithm":  "LegacyDefault",
-                                      "exactAccuracyAndDiagnosticConformance":  true
+                                      "aggregateAccuracyFailureAndDiagnosticSummaryConformance":  true
                                   },
                                   {
                                       "domain":  "Circle",
                                       "split":  "test",
                                       "oldAlgorithm":  "LegacyDefault",
                                       "currentAlgorithm":  "LegacyDefault",
-                                      "exactAccuracyAndDiagnosticConformance":  true
+                                      "aggregateAccuracyFailureAndDiagnosticSummaryConformance":  true
                                   },
                                   {
                                       "domain":  "Line",
                                       "split":  "validation",
                                       "oldAlgorithm":  "L2Default",
                                       "currentAlgorithm":  "L2Default",
-                                      "exactAccuracyAndDiagnosticConformance":  true
+                                      "aggregateAccuracyFailureAndDiagnosticSummaryConformance":  true
                                   },
                                   {
                                       "domain":  "Line",
                                       "split":  "test",
                                       "oldAlgorithm":  "L2Default",
                                       "currentAlgorithm":  "L2Default",
-                                      "exactAccuracyAndDiagnosticConformance":  true
+                                      "aggregateAccuracyFailureAndDiagnosticSummaryConformance":  true
                                   }
                               ],
     "decisions":  [

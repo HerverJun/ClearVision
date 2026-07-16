@@ -43,7 +43,7 @@
     {
       "id": "product-comparison",
       "path": "quality/evals/reports/operator-product-e2e-phase5-comparison.json",
-      "sha256": "4acdac5d12b60ffae4e7cda01a1d1c9216a42b550ed259f599a4fa416a8cca81",
+      "sha256": "0f6c4ee62dd4083f26f26438f5fbf35b6cc457e4caca338fe2589fc7a8918e33",
       "kind": "FormalOperatorDecision"
     },
     {
@@ -121,7 +121,7 @@
           "algorithmQuality": "SyntheticBenchmarkEvidence",
           "adopted": true,
           "isDefault": true,
-          "verdict": "Exact old/current default accuracy, failure and diagnostic conformance on validation/test.",
+          "verdict": "Aggregate old/current default accuracy, failure and diagnostic-summary conformance on validation/test; no per-case diagnostic fingerprint is claimed.",
           "claimBoundary": "Synthetic raster formal-operator evidence only.",
           "evidenceRefs": ["quality/evals/reports/operator-product-e2e-phase5-comparison.json"]
         },
@@ -156,7 +156,7 @@
           "algorithmQuality": "SyntheticBenchmarkEvidence",
           "adopted": true,
           "isDefault": true,
-          "verdict": "Exact old/current default accuracy, failure and diagnostic conformance on validation/test.",
+          "verdict": "Aggregate old/current default accuracy, failure and diagnostic-summary conformance on validation/test; no per-case diagnostic fingerprint is claimed.",
           "claimBoundary": "Synthetic raster formal-operator evidence only.",
           "evidenceRefs": ["quality/evals/reports/operator-product-e2e-phase5-comparison.json"]
         },

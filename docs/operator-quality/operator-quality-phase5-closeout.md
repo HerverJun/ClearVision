@@ -17,7 +17,7 @@
 
 ## 正式算子端到端结果
 
-旧提交默认路径与当前默认路径在 Circle/Line 的 validation/test 四个 metric row 上，`caseCount`、Bias、RMSE、P95、Failure、Ambiguity、Outlier、secondary/residual diagnostics 和 failure taxonomy 完全一致。该 conformance 证明当前默认兼容路径没有偏离 `ce266626` 的正式产品行为。
+旧提交默认路径与当前默认路径在 Circle/Line 的 validation/test 四个 aggregate metric row 上，`caseCount`、Bias、RMSE、P95、Failure、Ambiguity、Outlier、secondary/residual diagnostic summary 和 failure taxonomy 一致。该 conformance 仅证明这些聚合精度、失败和诊断摘要字段没有偏离 `ce266626`；未生成逐案例诊断语义 fingerprint，因此不宣称逐案例诊断完全一致。
 
 | Domain | 当前默认 | 候选模式 | Test RMSE 改善 | Test P95 改善 | Failure delta | P95 latency cost | managed allocation cost | 结论 |
 |---|---|---|---:|---:|---:|---:|---:|---|
@@ -82,7 +82,7 @@ Circle 正式路径覆盖参数映射、profile sampling、edge selection、歧�
 ```powershell
 & ".\scripts\run-operator-product-e2e-evidence.ps1" `
   -Profile acceptance `
-  -ResultsDirectory ".tmp\operator-product-e2e"
+  -ResultsDirectory ".tmp\operator-precision"
 
 & ".\scripts\run-operator-precision-benchmark.ps1" `
   -Profile acceptance `
@@ -100,5 +100,6 @@ Circle 正式路径覆盖参数映射、profile sampling、edge selection、歧�
   -OutputPath ".tmp\operator-precision\operator-precision-phase5-comparison.json" `
   -ReportPath ".tmp\operator-precision\operator-precision-phase5-comparison.md"
 
-& ".\scripts\verify-operator-quality-evidence.ps1"
+& ".\scripts\verify-operator-quality-evidence.ps1" `
+  -FreshEvidenceDirectory ".tmp\operator-precision"
 ```
