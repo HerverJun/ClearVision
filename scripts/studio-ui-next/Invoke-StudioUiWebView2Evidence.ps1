@@ -13,7 +13,7 @@ param(
     [string]$Configuration = "Debug",
     [ValidateSet("debug", "publish", "missing-assets")]
     [string]$RuntimeKind = "debug",
-    [ValidateSet("f01", "f02")]
+    [ValidateSet("f01", "f02", "f03")]
     [string]$EvidencePhase = "f01",
     [string]$DesktopExecutablePath,
     [string]$NodeExecutablePath,
@@ -29,6 +29,7 @@ param(
     [int]$WindowHeight = 1000,
     [switch]$SanitizeDesktopPath,
     [switch]$DeepCanvas,
+    [switch]$WorkspaceCapabilityEnabled,
     [switch]$NoBuild
 )
 
@@ -184,6 +185,7 @@ $resolvedRoute = if (-not [string]::IsNullOrWhiteSpace($Route)) {
 
 $customEnvironment = [ordered]@{
     "Studio__StudioUiEnabled" = if ($studioUiEnabled) { "true" } else { "false" }
+    "Studio__WorkspaceCapabilityEnabled" = if ($WorkspaceCapabilityEnabled) { "true" } else { "false" }
     "CV_STUDIO_UI_EXPECTATION" = $Expectation
     "CV_STUDIO_UI_ROUTE" = $resolvedRoute
     "CV_STUDIO_UI_DESKTOP_EXECUTABLE" = $desktopExe
@@ -376,6 +378,7 @@ $cleanup = [pscustomobject]@{
     runnerSucceeded = $runnerSucceeded
     runnerError = if ($runnerError) { [string]$runnerError.Exception.Message } else { $null }
     studioUiEnabled = $studioUiEnabled
+    workspaceCapabilityEnabled = [bool]$WorkspaceCapabilityEnabled
     sanitizedDesktopPath = [bool]$SanitizeDesktopPath
     externalNodeDriver = [pscustomobject]@{
         executablePath = $nodeExe

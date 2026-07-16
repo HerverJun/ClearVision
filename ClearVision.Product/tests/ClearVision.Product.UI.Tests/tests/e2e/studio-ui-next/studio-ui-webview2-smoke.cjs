@@ -229,15 +229,27 @@ async function verifyDiagnosticsPage(page) {
 
 async function verifyProductPage(page, route, runtimeErrors) {
   await page.waitForSelector('[data-product-shell="ready"]', { state: 'visible', timeout: 30_000 });
+  const isWorkspaceRoute = /^\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/workspace$/i
+    .test(route);
   const selectors = [
+    ['/projects/', '[data-evidence-surface="f03-workspace-shell"]'],
     ['/projects', '[data-capability="projects-read"]'],
     ['/operators', '[data-capability="operators-read"]'],
     ['/stations', '[data-capability="stations-read"]'],
     ['/results', '[data-capability="results-read"]']
   ];
-  const selector = selectors.find(([prefix]) => route.startsWith(prefix))?.[1]
+  const selector = isWorkspaceRoute
+    ? '[data-evidence-surface="f03-workspace-shell"]'
+    : selectors.find(([prefix]) => route.startsWith(prefix))?.[1]
     || '[data-capability="overview"]';
   await page.waitForSelector(selector, { state: 'visible', timeout: 30_000 });
+  if (isWorkspaceRoute) {
+    await page.waitForFunction(() => {
+      const state = document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+        ?.getAttribute('data-workspace-state');
+      return Boolean(state && state !== 'loading');
+    }, null, { timeout: 30_000 });
+  }
   await page.waitForLoadState('networkidle');
   await page.waitForFunction(() => {
     const user = document.querySelector('.product-layout__user strong')?.textContent?.trim();
@@ -254,15 +266,18 @@ async function verifyProductPage(page, route, runtimeErrors) {
     theme: document.documentElement.dataset.theme || null,
     density: document.documentElement.dataset.density || null,
     horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    verticalOverflow: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+    mainCount: document.querySelectorAll('main').length,
+    workspaceMode: document.querySelector('[data-product-shell]')?.getAttribute('data-workspace-mode') || null,
+    workspaceShellCount: document.querySelectorAll('[data-evidence-surface="f03-workspace-shell"]').length,
     dataSource: 'REAL_WEBVIEW2_EMPTY_AUTHORITY',
     authSource: 'HARNESS_SEEDED_SESSION'
   }));
   const origin = new URL(page.url()).origin;
-  const productRequests = runtimeErrors.requests.filter(item => {
+  const isProductRequest = item => {
     const url = new URL(item.url);
     return url.origin === origin && (url.pathname === '/health' || url.pathname.startsWith('/api/'));
-  });
-  const writeRequests = productRequests.filter(item => item.method !== 'GET');
+  };
 
   const preferenceRequestStart = runtimeErrors.requests.length;
   await page.locator('[data-product-appearance] > summary').click();
@@ -324,6 +339,70 @@ async function verifyProductPage(page, route, runtimeErrors) {
     return url.origin === origin && (url.pathname === '/health' || url.pathname.startsWith('/api/'));
   });
   const preferenceWriteRequests = preferenceRequests.filter(item => item.method !== 'GET');
+  let workspaceLifecycle = null;
+  if (isWorkspaceRoute) {
+    const readWorkspace = () => page.evaluate(() => {
+      const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+      const diagnostics = window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
+      return {
+        state: shell?.getAttribute('data-workspace-state') || null,
+        projectId: shell?.getAttribute('data-workspace-project-id') || null,
+        ownerCount: Number(shell?.getAttribute('data-workspace-owner-count') || -1),
+        activeSubscriptions: Number(shell?.getAttribute('data-workspace-active-subscriptions') || -1),
+        inFlightReads: Number(shell?.getAttribute('data-workspace-in-flight-reads') || -1),
+        diagnostics: diagnostics ? { ...diagnostics } : null,
+        mainCount: document.querySelectorAll('main').length,
+        shellCount: document.querySelectorAll('[data-evidence-surface="f03-workspace-shell"]').length,
+        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        verticalOverflow: document.documentElement.scrollHeight - document.documentElement.clientHeight
+      };
+    });
+    const mounted = await readWorkspace();
+    await page.goto(`${origin}/studio/index.html#/about`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-studio-page="about"]', { state: 'visible', timeout: 30_000 });
+    await page.waitForFunction(() => {
+      const diagnostics = window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
+      return diagnostics?.workspaceOwnerCount === 0 &&
+        diagnostics.activeSubscriptions === 0 &&
+        diagnostics.activeAbortControllers === 0 &&
+        diagnostics.inFlightReads === 0;
+    }, null, { timeout: 30_000 });
+    const disposed = await page.evaluate(() => ({
+      diagnostics: { ...window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__ },
+      shellCount: document.querySelectorAll('[data-evidence-surface="f03-workspace-shell"]').length,
+      mainCount: document.querySelectorAll('main').length
+    }));
+    await page.goto(`${origin}/studio/index.html#${route}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-evidence-surface="f03-workspace-shell"]', {
+      state: 'visible',
+      timeout: 30_000
+    });
+    await page.waitForFunction(() => {
+      const state = document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+        ?.getAttribute('data-workspace-state');
+      return Boolean(state && state !== 'loading');
+    }, null, { timeout: 30_000 });
+    const remounted = await readWorkspace();
+    workspaceLifecycle = { mounted, disposed, remounted };
+
+    assert(mounted.mainCount === 1 && mounted.shellCount === 1,
+      `Workspace did not remain inside the single Product main: ${JSON.stringify(mounted)}`);
+    assert(mounted.ownerCount >= 0 && mounted.ownerCount <= 1,
+      `Workspace owner count escaped 0/1: ${JSON.stringify(mounted)}`);
+    assert(disposed.shellCount === 0 && disposed.mainCount === 1,
+      `Workspace route leave did not unmount its shell: ${JSON.stringify(disposed)}`);
+    assert(disposed.diagnostics.workspaceOwnerCount === 0 &&
+      disposed.diagnostics.activeSubscriptions === 0 &&
+      disposed.diagnostics.activeAbortControllers === 0 &&
+      disposed.diagnostics.inFlightReads === 0,
+    `Workspace resources survived route leave: ${JSON.stringify(disposed)}`);
+    assert(remounted.ownerCount >= 0 && remounted.ownerCount <= 1,
+      `Workspace remount owner count escaped 0/1: ${JSON.stringify(remounted)}`);
+    assert(remounted.horizontalOverflow <= 1 && remounted.verticalOverflow <= 1,
+      `Workspace remount overflowed globally: ${JSON.stringify(remounted)}`);
+  }
+  const productRequests = runtimeErrors.requests.filter(isProductRequest);
+  const writeRequests = productRequests.filter(item => item.method !== 'GET');
 
   assert(projection.shellCount === 1, 'Product route did not mount exactly one ProductLayout.');
   assert(projection.internalLabCount === 0, 'Product route mounted the InternalLabLayout.');
@@ -338,6 +417,10 @@ async function verifyProductPage(page, route, runtimeErrors) {
     'Formal product navigation is incomplete.');
   assert(projection.density === 'compact', 'Formal product did not default to compact density.');
   assert(projection.horizontalOverflow <= 1, 'Formal product route has global horizontal overflow.');
+  if (isWorkspaceRoute) {
+    assert(projection.verticalOverflow <= 1, 'Workspace route has global vertical overflow.');
+  }
+  assert(projection.mainCount === 1, 'Formal product route did not keep exactly one main landmark.');
   assert(productRequests.length > 0, 'Product route emitted no observable GET requests.');
   assert(writeRequests.length === 0,
     `Product route emitted write requests: ${JSON.stringify(writeRequests)}`);
@@ -351,6 +434,19 @@ async function verifyProductPage(page, route, runtimeErrors) {
     'Theme/density preference cycle was not persisted as a disposable UI projection.');
   assert(preferenceWriteRequests.length === 0,
     `Theme/density controls emitted write requests: ${JSON.stringify(preferenceWriteRequests)}`);
+  if (isWorkspaceRoute) {
+    const unexpectedWorkspaceRequests = productRequests.filter(item => {
+      const url = new URL(item.url);
+      return url.pathname !== '/health' &&
+        url.pathname !== '/api/auth/me' &&
+        !/^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+          .test(url.pathname);
+    });
+    assert(unexpectedWorkspaceRequests.length === 0,
+      `Workspace emitted a route outside the G1 GET allowlist: ${JSON.stringify(unexpectedWorkspaceRequests)}`);
+    assert(projection.workspaceMode === 'true' && projection.workspaceShellCount === 1,
+      `ProductLayout did not enter workspaceMode: ${JSON.stringify(projection)}`);
+  }
   if (resultsFilterLayout) {
     assert(resultsFilterLayout.controls.length === 7,
       `Results filter rail did not expose seven controls: ${JSON.stringify(resultsFilterLayout)}`);
@@ -364,7 +460,8 @@ async function verifyProductPage(page, route, runtimeErrors) {
     preferenceCycle,
     preferenceRequests,
     preferenceWriteRequests,
-    resultsFilterLayout
+    resultsFilterLayout,
+    workspaceLifecycle
   };
 }
 

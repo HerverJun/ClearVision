@@ -6,7 +6,7 @@ param(
     [string]$EvidenceDirectory,
     [string]$RuntimeDirectory,
     [string]$PublishDirectory,
-    [ValidateSet("f01", "f02")]
+    [ValidateSet("f01", "f02", "f03")]
     [string]$EvidencePhase = "f01",
     [ValidateSet("full", "publish-only")]
     [string]$RunScope = "full",

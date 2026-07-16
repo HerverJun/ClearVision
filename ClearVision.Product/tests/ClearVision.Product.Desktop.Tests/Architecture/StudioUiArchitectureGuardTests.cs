@@ -258,6 +258,9 @@ public sealed class StudioUiArchitectureGuardTests
         var evidenceWrapper = File.ReadAllText(RepoPath(
             "scripts/studio-ui-next/Invoke-StudioUiWebView2Evidence.ps1"));
         evidenceWrapper.Should().Contain("scripts/run-ai-webview2-release-smoke.ps1");
+        evidenceWrapper.Should().Contain("\"f01\", \"f02\", \"f03\"");
+        evidenceWrapper.Should().Contain("WorkspaceCapabilityEnabled");
+        evidenceWrapper.Should().Contain("Studio__WorkspaceCapabilityEnabled");
         evidenceWrapper.Should().NotContain("Start-Process");
 
         var matrix = File.ReadAllText(RepoPath(
@@ -269,7 +272,17 @@ public sealed class StudioUiArchitectureGuardTests
         matrix.Should().Contain("RestorePackagesWithLockFile=false");
         matrix.Should().Contain("NuGetLockFilePath");
         matrix.Should().Contain("restore-disabled.packages.lock.json");
+        matrix.Should().Contain("\"f01\", \"f02\", \"f03\"");
         matrix.Should().NotContain("Start-Process");
+
+        var browserFixtureServer = File.ReadAllText(RepoPath(
+            "ClearVision.Product/tests/ClearVision.Product.UI.Tests/tests/support/studio-ui-next-server.cjs"));
+        browserFixtureServer.Should().Contain("'f01', 'f02', 'f03'");
+
+        var webView2Scenario = File.ReadAllText(RepoPath(
+            "ClearVision.Product/tests/ClearVision.Product.UI.Tests/tests/e2e/studio-ui-next/studio-ui-webview2-smoke.cjs"));
+        webView2Scenario.Should().Contain("f03-workspace-shell");
+        webView2Scenario.Should().Contain("__STUDIO_UI_WORKSPACE_DIAGNOSTICS__");
     }
 
     [Fact]
@@ -284,10 +297,17 @@ public sealed class StudioUiArchitectureGuardTests
             .GetBoolean()
             .Should()
             .BeFalse();
+        settings.RootElement
+            .GetProperty("Studio")
+            .GetProperty("WorkspaceCapabilityEnabled")
+            .GetBoolean()
+            .Should()
+            .BeFalse();
 
         var options = File.ReadAllText(RepoPath(
             "ClearVision.Product/src/ClearVision.Product.Desktop/Configuration/StudioOptions.cs"));
         options.Should().Contain("StudioUiEnabled { get; set; } = false");
+        options.Should().Contain("WorkspaceCapabilityEnabled { get; set; } = false");
 
         var host = File.ReadAllText(RepoPath(
             "ClearVision.Product/src/ClearVision.Product.Desktop/WebView2Host.cs"));
@@ -377,6 +397,63 @@ public sealed class StudioUiArchitectureGuardTests
         navigation.Should().Contain("to: '/diagnostics'");
         navigation.Should().Contain("to: '/about'");
         navigation.Should().NotContain("/labs");
+    }
+
+    [Fact]
+    public void StudioUiF03G1Workspace_ShouldKeepOneOwnerAndExactReadOnlyBoundary()
+    {
+        var workspaceRoot = Path.Combine(
+            RepoPath(StudioUiRoot),
+            "src",
+            "capabilities",
+            "project-workspace");
+        Directory.Exists(workspaceRoot).Should().BeTrue();
+        var workspaceFiles = Directory.EnumerateFiles(
+                workspaceRoot,
+                "*.*",
+                SearchOption.AllDirectories)
+            .Where(path => path.EndsWith(".ts", StringComparison.OrdinalIgnoreCase) ||
+                           path.EndsWith(".vue", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        workspaceFiles.Count(path => Path.GetFileName(path) == "workspaceOwner.ts")
+            .Should()
+            .Be(1);
+
+        foreach (var file in workspaceFiles)
+        {
+            var text = File.ReadAllText(file);
+            var relativePath = StudioUiRelativePath(file);
+            text.Should().NotMatchRegex(
+                @"\b(?:globalThis\.)?fetch\s*\(",
+                $"{relativePath} must consume only the narrow Workspace read port");
+            text.Should().NotContain("ApiTransport", $"{relativePath} must not hold the generic transport");
+            text.Should().NotMatchRegex(
+                "method\\s*:\\s*['\\\"](?:POST|PUT|PATCH|DELETE)['\\\"]",
+                $"{relativePath} must remain GET-only in G1");
+            text.Should().NotMatchRegex(
+                "from\\s+['\\\"][^'\\\"]*(?:/labs/|FrontendV2)",
+                $"{relativePath} must not import retired or Lab production code");
+            text.Should().NotMatchRegex(@"\bnew\s+(?:FlowCanvas|ImageCanvas)\s*\(");
+            text.Should().NotContain("window.flowCanvas");
+            text.Should().NotContain("FlowCanvas.serialize()");
+            text.Should().NotContain("new EventSource");
+        }
+
+        var query = File.ReadAllText(Path.Combine(workspaceRoot, "workspaceQueries.ts"));
+        query.Should().Contain("return `projects/${projectId}`");
+        query.Should().Contain("workspace-project:${client.sessionGeneration}:${projectId}");
+        query.Should().NotContain("preview");
+        query.Should().NotContain("artifact");
+        query.Should().NotContain("admission");
+        query.Should().NotContain("execute");
+
+        var router = File.ReadAllText(Path.Combine(RepoPath(StudioUiRoot), "src", "app", "router.ts"));
+        router.Should().Contain("path: 'projects/:id/workspace'");
+        router.Should().Contain("workspaceMode: true");
+
+        var host = File.ReadAllText(RepoPath(
+            "ClearVision.Product/src/ClearVision.Product.Desktop/WebView2Host.cs"));
+        host.Should().Contain("[\"Studio2.Workspace\"] = studioOptions.WorkspaceCapabilityEnabled");
     }
 
     private static string RepoPath(string relativePath) =>
