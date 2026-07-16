@@ -16,6 +16,8 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;
+    padding: 32px;
+    box-sizing: border-box;
 }
 
 .calib-wizard-overlay.visible {
@@ -24,8 +26,9 @@
 }
 
 .calib-wizard-modal {
-    width: min(56.25rem, calc(100vw - 2rem));
-    height: min(40.625rem, calc(100vh - 2rem));
+    width: min(73.75rem, calc(100vw - 4rem));
+    height: min(50rem, calc(100vh - 4rem));
+    min-height: 0;
     background: var(--bg-surface, #ffffff);
     border-radius: 12px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
@@ -48,12 +51,13 @@ html[data-theme="dark"] .calib-wizard-modal {
 
 /* Header */
 .calib-wizard-header {
-    padding: 20px 24px;
+    padding: 18px 24px;
     border-bottom: 1px solid var(--border-color, #e2e8f0);
     display: flex;
     justify-content: space-between;
     align-items: center;
     background: var(--bg-surface, #ffffff);
+    flex: 0 0 auto;
 }
 
 html[data-theme="dark"] .calib-wizard-header {
@@ -86,9 +90,11 @@ html[data-theme="dark"] .calib-wizard-header {
 /* Stepper */
 .calib-stepper {
     display: flex;
-    padding: 20px 48px;
+    gap: 24px;
+    padding: 16px 40px;
     background: var(--bg-subtle, #f8fafc);
     border-bottom: 1px solid var(--border-color, #e2e8f0);
+    flex: 0 0 auto;
 }
 
 html[data-theme="dark"] .calib-stepper {
@@ -103,6 +109,7 @@ html[data-theme="dark"] .calib-stepper {
     position: relative;
     opacity: 0.5;
     transition: opacity 0.3s;
+    min-width: 0;
 }
 
 .calib-step.active, .calib-step.completed {
@@ -163,15 +170,25 @@ html[data-theme="dark"] .calib-step-circle {
 
 .calib-step-label {
     margin-left: 12px;
+    padding-right: 12px;
     font-size: 14px;
     font-weight: 500;
     color: var(--text-primary, #0f172a);
+    background: var(--bg-subtle, #f8fafc);
+    position: relative;
+    z-index: 2;
+    white-space: nowrap;
+}
+
+html[data-theme="dark"] .calib-step-label {
+    background: #0f172a;
 }
 
 /* Body */
 .calib-wizard-body {
     flex: 1;
-    padding: 24px;
+    min-height: 0;
+    padding: 24px 28px;
     overflow-y: auto;
     background: var(--bg-surface, #ffffff);
     position: relative;
@@ -183,7 +200,8 @@ html[data-theme="dark"] .calib-wizard-body {
 
 .calib-step-content {
     display: none;
-    height: 100%;
+    min-height: 100%;
+    box-sizing: border-box;
     animation: fadeIn 0.3s ease;
 }
 
@@ -200,7 +218,7 @@ html[data-theme="dark"] .calib-wizard-body {
 .calib-layout-s1 {
     display: flex;
     gap: 20px;
-    height: 100%;
+    min-height: 100%;
 }
 
 .calib-camera-view {
@@ -210,6 +228,8 @@ html[data-theme="dark"] .calib-wizard-body {
     overflow: hidden;
     position: relative;
     border: 1px solid var(--border-color, #e2e8f0);
+    min-width: 0;
+    min-height: 22rem;
 }
 
 .calib-camera-placeholder {
@@ -248,6 +268,14 @@ html[data-theme="dark"] .calib-wizard-body {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-width: 22rem;
+}
+
+.calib-input-heading {
+    margin-bottom: 4px;
+    color: var(--text-secondary, #64748b);
+    font-size: 13px;
+    font-weight: 500;
 }
 
 .calib-input-group {
@@ -369,9 +397,27 @@ html[data-theme="dark"] .calib-table td {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    height: 100%;
-    gap: 30px;
+    justify-content: safe center;
+    min-height: 100%;
+    gap: 20px;
+    padding: 4px 0 12px;
+    box-sizing: border-box;
+}
+
+.calib-solve-heading {
+    text-align: center;
+}
+
+.calib-solve-heading h3 {
+    margin: 0 0 8px;
+    color: var(--text-primary, #0f172a);
+    font-size: 18px;
+}
+
+.calib-solve-heading p {
+    margin: 0;
+    color: var(--text-secondary, #64748b);
+    font-size: 14px;
 }
 
 .calib-solve-btn {
@@ -397,12 +443,46 @@ html[data-theme="dark"] .calib-table td {
 
 .calib-solve-result {
     width: 100%;
-    max-width: 600px;
+    max-width: 760px;
     background: var(--bg-subtle, #f8fafc);
     border-radius: 12px;
-    padding: 24px;
+    padding: 20px;
     border: 1px solid var(--border-color, #e2e8f0);
     display: none;
+    box-sizing: border-box;
+}
+
+.calib-result-heading {
+    margin: 0;
+    color: var(--text-primary, #0f172a);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.calib-status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: #e0e7ff;
+    color: #4338ca;
+    font-size: 12px;
+}
+
+.calib-status-badge.review {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.calib-status-badge.accepted {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.calib-quality-hint {
+    margin: 10px 0 0;
+    color: var(--text-secondary, #64748b);
+    font-size: 13px;
+    line-height: 1.5;
 }
 
 html[data-theme="dark"] .calib-solve-result {
@@ -419,7 +499,7 @@ html[data-theme="dark"] .calib-solve-result {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
-    margin-top: 16px;
+    margin-top: 14px;
 }
 
 .calib-metric {
@@ -526,6 +606,7 @@ html[data-theme="dark"] .calib-save-input-group input {
     justify-content: space-between;
     align-items: center;
     background: var(--bg-subtle, #f8fafc);
+    flex: 0 0 auto;
 }
 
 html[data-theme="dark"] .calib-wizard-footer {
@@ -582,4 +663,74 @@ html[data-theme="dark"] .calib-btn-next:disabled {
     background: #475569;
     border-color: #475569;
     color: #94a3b8;
+}
+
+@media (max-width: 68rem) {
+    .calib-wizard-overlay {
+        padding: 20px;
+    }
+
+    .calib-wizard-modal {
+        width: calc(100vw - 40px);
+        height: calc(100vh - 40px);
+    }
+
+    .calib-layout-s1 {
+        gap: 16px;
+    }
+
+    .calib-data-panel {
+        min-width: 20rem;
+    }
+}
+
+@media (max-width: 50rem) {
+    .calib-stepper {
+        gap: 8px;
+        padding: 14px 20px;
+    }
+
+    .calib-step-label {
+        font-size: 12px;
+        white-space: normal;
+    }
+
+    .calib-layout-s1 {
+        flex-direction: column;
+    }
+
+    .calib-camera-view,
+    .calib-data-panel {
+        min-width: 0;
+    }
+
+    .calib-result-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-height: 47.5rem) {
+    .calib-wizard-overlay {
+        padding: 16px;
+    }
+
+    .calib-wizard-modal {
+        height: calc(100vh - 32px);
+    }
+
+    .calib-wizard-header,
+    .calib-wizard-footer {
+        padding-top: 12px;
+        padding-bottom: 12px;
+    }
+
+    .calib-stepper {
+        padding-top: 12px;
+        padding-bottom: 12px;
+    }
+
+    .calib-wizard-body {
+        padding-top: 16px;
+        padding-bottom: 16px;
+    }
 }

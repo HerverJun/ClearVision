@@ -7,6 +7,8 @@
  * Step 3: 保存标定文件
  */
 
+const MIN_ACCEPTED_POINT_COUNT = 3;
+
 export class PlanarScaleOffsetCalibWizard {
     constructor(cameraManager = null, options = {}) {
         this.cameraManager = cameraManager;
@@ -69,7 +71,7 @@ export class PlanarScaleOffsetCalibWizard {
                         </div>
                         <div class="calib-data-panel">
                             <div class="calib-input-group">
-                                <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; font-weight: 500;">当前点位录入 (要求最少 2 个点)</div>
+                                <div class="calib-input-heading">当前点位录入（至少 ${MIN_ACCEPTED_POINT_COUNT} 个有效点）</div>
                                 <div class="calib-input-row">
                                     <label>像素 X:</label>
                                     <input type="number" id="calib-px" step="0.1" placeholder="点击图像获取" readonly>
@@ -109,9 +111,9 @@ export class PlanarScaleOffsetCalibWizard {
 
                 <div class="calib-step-content" id="calib-step-2-content">
                     <div class="calib-layout-s2">
-                        <div style="text-align: center;">
-                            <h3 style="margin-bottom: 8px; font-size: 18px; color: var(--text-primary);">开始解算标定矩阵</h3>
-                            <p style="color: var(--text-secondary); font-size: 14px;" id="calib-s2-desc">已采集 0 个有效点位，将使用最小二乘法进行线性回归解算。</p>
+                        <div class="calib-solve-heading">
+                            <h3>开始解算标定矩阵</h3>
+                            <p id="calib-s2-desc">已采集 0 个有效点位，将使用最小二乘法进行线性回归解算。</p>
                         </div>
 
                         <button class="calib-solve-btn" id="calib-btn-solve" type="button">
@@ -119,10 +121,12 @@ export class PlanarScaleOffsetCalibWizard {
                         </button>
 
                         <div class="calib-solve-result" id="calib-solve-result">
-                            <h4 style="margin: 0 0 16px 0; color: var(--text-primary); display: flex; align-items: center; justify-content: space-between;">
+                            <h4 class="calib-result-heading">
                                 <span>解算成功</span>
-                                <span id="calib-status-badge" style="font-size: 12px; padding: 4px 8px; border-radius: 4px; background: #e0e7ff; color: #4338ca;">数据更新</span>
+                                <span id="calib-status-badge" class="calib-status-badge">数据更新</span>
                             </h4>
+
+                            <p id="calib-quality-hint" class="calib-quality-hint"></p>
 
                             <div class="calib-result-grid">
                                 <div class="calib-metric">
@@ -201,6 +205,7 @@ export class PlanarScaleOffsetCalibWizard {
             valOx: this.overlay.querySelector('#calib-res-ox'),
             valOy: this.overlay.querySelector('#calib-res-oy'),
             badge: this.overlay.querySelector('#calib-status-badge'),
+            qualityHint: this.overlay.querySelector('#calib-quality-hint'),
             inpFilename: this.overlay.querySelector('#calib-filename')
         };
     }
@@ -260,6 +265,7 @@ export class PlanarScaleOffsetCalibWizard {
             };
 
             this.points.push(point);
+            this.invalidateSolveResult();
             this.renderTable();
             this.clearCurrentPointInputs();
         });
@@ -303,11 +309,23 @@ export class PlanarScaleOffsetCalibWizard {
             button.addEventListener('click', (event) => {
                 const index = parseInt(event.currentTarget.dataset.index, 10);
                 this.points.splice(index, 1);
+                this.invalidateSolveResult();
                 this.renderTable();
             });
         });
 
-        this.els.btnNext.disabled = this.points.length < 2;
+        if (this.currentStep === 1) {
+            this.els.btnNext.disabled = this.points.length < MIN_ACCEPTED_POINT_COUNT;
+        }
+    }
+
+    invalidateSolveResult() {
+        this.solveResult = null;
+        this.els.resPanel.classList.remove('visible');
+        this.els.qualityHint.textContent = '';
+        if (this.currentStep === 2) {
+            this.els.btnNext.disabled = true;
+        }
     }
 
     goToStep(step) {
@@ -326,11 +344,11 @@ export class PlanarScaleOffsetCalibWizard {
 
         if (step === 1) {
             this.els.btnNext.textContent = '下一步';
-            this.els.btnNext.disabled = this.points.length < 2;
+            this.els.btnNext.disabled = this.points.length < MIN_ACCEPTED_POINT_COUNT;
         } else if (step === 2) {
             this.els.btnNext.textContent = '下一步';
-            this.els.btnNext.disabled = !this.solveResult?.success;
-            this.els.desc2.textContent = `已采集 ${this.points.length} 个点位，点击执行进行最小二乘法解算。`;
+            this.els.btnNext.disabled = !this.solveResult?.accepted;
+            this.els.desc2.textContent = `已采集 ${this.points.length} 个点位，点击执行计算进行最小二乘法解算。`;
         } else {
             this.els.btnNext.textContent = '保存并完成';
             this.els.btnNext.disabled = false;
@@ -446,8 +464,15 @@ export class PlanarScaleOffsetCalibWizard {
     }
 
     solveCalibration() {
+        if (this.points.length < MIN_ACCEPTED_POINT_COUNT) {
+            alert(`至少需要 ${MIN_ACCEPTED_POINT_COUNT} 个空间分布有效的标定点才能进行生产标定。`);
+            this.goToStep(1);
+            return;
+        }
+
         this.els.btnSolve.innerHTML = '<span style="font-size: 20px;">◌</span> 解算中...';
         this.els.btnSolve.disabled = true;
+        this.els.btnNext.disabled = true;
 
         if (window.chrome?.webview) {
             window.chrome.webview.postMessage({
@@ -460,11 +485,16 @@ export class PlanarScaleOffsetCalibWizard {
         setTimeout(() => {
             this.handleSolveResult({
                 success: true,
+                accepted: true,
+                message: 'Solve succeeded and passed planar scale-offset acceptance.',
                 rmse: 0.043,
                 scaleX: 0.051,
                 scaleY: 0.051,
                 originX: Math.random() * 10,
-                originY: -Math.random() * 10
+                originY: -Math.random() * 10,
+                meanErrorX: 0.03,
+                meanErrorY: 0.03,
+                pointCount: this.points.length
             });
         }, 500);
     }
@@ -474,6 +504,9 @@ export class PlanarScaleOffsetCalibWizard {
         this.els.btnSolve.disabled = false;
 
         if (!result.success) {
+            this.solveResult = null;
+            this.els.resPanel.classList.remove('visible');
+            this.els.btnNext.disabled = true;
             alert(`标定解算失败: ${result.message || '数据异常或共线'}`);
             return;
         }
@@ -498,12 +531,24 @@ export class PlanarScaleOffsetCalibWizard {
         this.els.btnNext.disabled = !result.accepted;
         if (!result.accepted) {
             this.els.badge.textContent = '需要复核';
-            this.els.badge.style.background = '#fef3c7';
-            this.els.badge.style.color = '#92400e';
+            this.els.badge.classList.remove('accepted');
+            this.els.badge.classList.add('review');
+            const reasons = [];
+            if ((result.pointCount ?? this.points.length) < MIN_ACCEPTED_POINT_COUNT) {
+                reasons.push(`有效点位不足 ${MIN_ACCEPTED_POINT_COUNT} 个`);
+            }
+            if (Number(result.rmse) > 0.15) {
+                reasons.push('RMSE 超过 0.15 mm');
+            }
+            if (Number(result.meanErrorX) > 0.10 || Number(result.meanErrorY) > 0.10) {
+                reasons.push('单轴平均误差超过 0.10 mm');
+            }
+            this.els.qualityHint.textContent = `${reasons.join('；') || result.message || '当前结果未通过生产验收门槛'}。请返回上一步补充或调整标定点后重新计算。`;
         } else {
             this.els.badge.textContent = '已通过';
-            this.els.badge.style.background = '#dcfce7';
-            this.els.badge.style.color = '#166534';
+            this.els.badge.classList.remove('review');
+            this.els.badge.classList.add('accepted');
+            this.els.qualityHint.textContent = '结果已通过生产验收门槛，可以进入下一步保存标定文件。';
         }
     }
 

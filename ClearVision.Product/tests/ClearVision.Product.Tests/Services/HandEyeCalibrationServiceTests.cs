@@ -7,6 +7,39 @@ namespace ClearVision.Product.Tests.Services;
 public class PlanarScaleOffsetCalibrationServiceTests
 {
     [Fact]
+    public async Task SolveAsync_WithTwoPoints_ShouldSolveButRequireAdditionalValidationPoint()
+    {
+        var service = new PlanarScaleOffsetCalibrationService();
+
+        var result = await service.SolveAsync(
+        [
+            new PlanarScaleOffsetCalibrationPoint { PixelX = 100, PixelY = 200, PhysicalX = 10, PhysicalY = 20 },
+            new PlanarScaleOffsetCalibrationPoint { PixelX = 300, PixelY = 500, PhysicalX = 30, PhysicalY = 50 }
+        ]);
+
+        Assert.True(result.Success);
+        Assert.False(result.Accepted);
+        Assert.Equal(2, result.PointCount);
+    }
+
+    [Fact]
+    public async Task SolveAsync_WithThreeDistributedPoints_ShouldPassAcceptance()
+    {
+        var service = new PlanarScaleOffsetCalibrationService();
+
+        var result = await service.SolveAsync(
+        [
+            new PlanarScaleOffsetCalibrationPoint { PixelX = 100, PixelY = 200, PhysicalX = 10, PhysicalY = 20 },
+            new PlanarScaleOffsetCalibrationPoint { PixelX = 300, PixelY = 500, PhysicalX = 30, PhysicalY = 50 },
+            new PlanarScaleOffsetCalibrationPoint { PixelX = 600, PixelY = 800, PhysicalX = 60, PhysicalY = 80 }
+        ]);
+
+        Assert.True(result.Success);
+        Assert.True(result.Accepted);
+        Assert.Equal(3, result.PointCount);
+    }
+
+    [Fact]
     public async Task SaveCalibrationAsync_WithSuccessfulResult_ShouldPersistCalibrationBundleV2()
     {
         var service = new PlanarScaleOffsetCalibrationService();

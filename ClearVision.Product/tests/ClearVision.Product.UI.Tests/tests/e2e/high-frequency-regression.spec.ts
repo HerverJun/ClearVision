@@ -594,6 +594,90 @@ test.describe('High Frequency Regression', () => {
         await page.locator('#calib-btn-close').click();
     });
 
+    test('settings camera regression: planar calibration advances after three-point solve and fits 1080p', async ({ page }) => {
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        await mockProjectApis(page);
+        await mockSettingsApis(page);
+        await bootRegressionApp(page);
+
+        await page.locator('.nav-btn[data-view="settings"]').click();
+        await page.locator('.settings-menu-item[data-tab="cameras"]').click();
+        await page.locator('#camera-bindings-table tbody tr.camera-row').first().click();
+        await page.locator('#btn-hand-eye-calib').click();
+
+        const cameraImage = page.locator('#calib-camera-img');
+        const nextButton = page.locator('#calib-btn-next');
+        await expect(cameraImage).toBeVisible();
+        await expect(page.locator('.calib-input-heading')).toContainText('至少 3 个有效点');
+
+        for (const point of [
+            { x: 0.2, y: 0.2, physicalX: '0', physicalY: '0' },
+            { x: 0.5, y: 0.55, physicalX: '10', physicalY: '12' },
+            { x: 0.8, y: 0.8, physicalX: '20', physicalY: '24' },
+        ]) {
+            const box = await cameraImage.boundingBox();
+            expect(box).not.toBeNull();
+            await cameraImage.click({
+                position: {
+                    x: box!.width * point.x,
+                    y: box!.height * point.y,
+                },
+            });
+            await page.locator('#calib-hx').fill(point.physicalX);
+            await page.locator('#calib-hy').fill(point.physicalY);
+            await page.locator('#calib-btn-add').click();
+
+            if (await page.locator('#calib-table-body tr').count() < 3) {
+                await expect(nextButton).toBeDisabled();
+            }
+        }
+
+        await expect(page.locator('#calib-table-body tr')).toHaveCount(3);
+        await expect(nextButton).toBeEnabled();
+        await nextButton.click();
+        await page.locator('#calib-btn-solve').click();
+
+        await expect(page.locator('#calib-solve-result')).toBeVisible();
+        await expect(page.locator('#calib-status-badge')).toHaveText('已通过');
+        await expect(nextButton).toBeEnabled();
+
+        const layout = await page.evaluate(() => {
+            const rect = (selector: string) => {
+                const element = document.querySelector(selector);
+                if (!element) return null;
+                const bounds = element.getBoundingClientRect();
+                return {
+                    left: bounds.left,
+                    top: bounds.top,
+                    right: bounds.right,
+                    bottom: bounds.bottom,
+                    width: bounds.width,
+                    height: bounds.height,
+                };
+            };
+
+            return {
+                viewport: { width: window.innerWidth, height: window.innerHeight },
+                modal: rect('.calib-wizard-modal'),
+                body: rect('.calib-wizard-body'),
+                result: rect('#calib-solve-result'),
+                footer: rect('.calib-wizard-footer'),
+            };
+        });
+
+        expect(layout.modal?.left ?? -1).toBeGreaterThanOrEqual(0);
+        expect(layout.modal?.top ?? -1).toBeGreaterThanOrEqual(0);
+        expect(layout.modal?.right ?? layout.viewport.width + 1).toBeLessThanOrEqual(layout.viewport.width);
+        expect(layout.modal?.bottom ?? layout.viewport.height + 1).toBeLessThanOrEqual(layout.viewport.height);
+        expect(layout.modal?.width ?? 0).toBeGreaterThanOrEqual(1100);
+        expect(layout.result?.bottom ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual((layout.body?.bottom ?? 0) + 1);
+        expect(layout.footer?.top ?? 0).toBeGreaterThanOrEqual((layout.body?.bottom ?? 0) - 1);
+
+        await nextButton.click();
+        await expect(page.locator('#calib-step-3-content')).toBeVisible();
+        await expect(nextButton).toHaveText('保存并完成');
+    });
+
     test('settings camera regression: save all skips PLC validation when PLC config is unchanged', async ({ page }) => {
         const plcSettingsPuts: any[] = [];
         const cameraBindingPuts: any[] = [];
