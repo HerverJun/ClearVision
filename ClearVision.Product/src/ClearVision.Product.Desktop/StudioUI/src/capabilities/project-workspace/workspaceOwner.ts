@@ -1,6 +1,7 @@
 import { readonly, reactive, type DeepReadonly } from 'vue';
 import type { WorkspaceProjectV1 } from './workspaceContracts';
 import type { ReadQueryClient } from '@/platform/query';
+import type { ApiTransport } from '@/platform/api';
 import {
   createFlowCanvasOwner,
   type FlowCanvasOwner
@@ -33,7 +34,9 @@ export interface WorkspaceOwner {
 export function createWorkspaceOwner(
   project: WorkspaceProjectV1,
   diagnostics: WorkspaceLifecycleDiagnosticsOwner,
-  queries: ReadQueryClient
+  queries: ReadQueryClient,
+  api: ApiTransport | undefined,
+  featureFlags: Readonly<Record<string, boolean>>
 ): WorkspaceOwner {
   const lease: WorkspaceOwnerDiagnosticsLease = diagnostics.reserveWorkspaceOwner(project.id);
   const isEmpty = project.flow === null || project.flow.operators.length === 0;
@@ -51,9 +54,12 @@ export function createWorkspaceOwner(
     openFlowCanvas(): FlowCanvasOwner {
       if (disposed) throw new Error('Workspace owner has been disposed.');
       if (flowOwner) throw new Error(`FlowCanvas owner already exists for project ${project.id}.`);
+      if (!api) throw new Error('Workspace Flow/Preview composition requires the shared ApiTransport.');
       flowOwner = createFlowCanvasOwner({
         project,
         queries,
+        api,
+        featureFlags,
         diagnostics,
         initialMutationGate: state.phase === 'readonly' ? 'readonly' : 'editable'
       });

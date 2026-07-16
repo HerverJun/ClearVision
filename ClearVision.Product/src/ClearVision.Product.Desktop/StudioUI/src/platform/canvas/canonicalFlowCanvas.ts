@@ -162,6 +162,18 @@ export interface CanonicalNodeParameterPatch {
   readonly definition?: CanonicalOperatorParameterDefinition;
 }
 
+export interface CanonicalNodeParametersPatch {
+  readonly nodeId: string;
+  readonly values: Readonly<Record<string, unknown>>;
+  readonly definitions?: readonly CanonicalOperatorParameterDefinition[];
+}
+
+export interface CanonicalCaliperSearchRegionPatch {
+  readonly caliperNodeId: string;
+  readonly values: Readonly<Record<string, unknown>>;
+  readonly rectangleRegion: CanonicalOperatorDefinition;
+}
+
 export interface CanonicalNodePropertiesPatch {
   readonly nodeId: string;
   readonly name?: string;
@@ -197,6 +209,8 @@ export interface CanonicalFlowCanvasHost {
   connect(command: CanonicalConnectCommand): CanonicalFlowCommandResult;
   disconnect(connectionId: string): CanonicalFlowCommandResult;
   patchNodeParameter(command: CanonicalNodeParameterPatch): CanonicalFlowCommandResult;
+  patchNodeParameters(command: CanonicalNodeParametersPatch): CanonicalFlowCommandResult;
+  upsertCaliperSearchRegion(command: CanonicalCaliperSearchRegionPatch): CanonicalFlowCommandResult;
   patchNodeProperties(command: CanonicalNodePropertiesPatch): CanonicalFlowCommandResult;
   zoomBy(factor: number): CanonicalFlowCommandResult;
   resetView(): CanonicalFlowCommandResult;
@@ -235,6 +249,8 @@ interface CanonicalNode {
   readonly id?: unknown;
   readonly type?: unknown;
   readonly title?: unknown;
+  readonly x?: unknown;
+  readonly y?: unknown;
   readonly disabled?: unknown;
   readonly inputs?: readonly CanonicalPort[];
   readonly outputs?: readonly CanonicalPort[];
@@ -249,6 +265,10 @@ interface CanonicalSelectionState {
 
 interface CanonicalConnection {
   readonly id?: unknown;
+  readonly source?: unknown;
+  readonly sourcePort?: unknown;
+  readonly target?: unknown;
+  readonly targetPort?: unknown;
 }
 
 interface CanonicalFlowCanvas {
@@ -278,6 +298,7 @@ interface CanonicalFlowCanvas {
   getPortPosition?(nodeId: string, portIndex: number, isOutput: boolean): Readonly<Record<string, unknown>> | null;
   getConnectionValidationError?(sourceId: string, sourcePort: number, targetId: string, targetPort: number): unknown;
   addConnection?(sourceId: string, sourcePort: number, targetId: string, targetPort: number): unknown;
+  removeNode?(nodeId: string): boolean;
   removeConnection?(connectionId: string): boolean;
   toggleNodeDisabled?(nodeId: string): boolean;
   markSelectionChanged?(reason?: string): void;
@@ -659,6 +680,33 @@ export function createCanonicalFlowCanvasHost(
       : -1;
   };
 
+  const findPortIndexByName = (node: CanonicalNode | undefined, name: string, isOutput: boolean): number => {
+    const ports = isOutput ? node?.outputs : node?.inputs;
+    const identity = name.trim().toLowerCase();
+    return Array.isArray(ports)
+      ? ports.findIndex(port => textValue(port.name ?? port.Name).trim().toLowerCase() === identity)
+      : -1;
+  };
+
+  const isRectanglePort = (port: CanonicalPort | undefined): boolean => {
+    const value = textValue(port?.dataType ?? port?.DataType ?? port?.type ?? port?.Type).trim().toLowerCase();
+    return value === 'rectangle' || value === 'region';
+  };
+
+  const findInputConnection = (nodeId: string, inputPortIndex: number): CanonicalConnection | undefined =>
+    canvas.connections.find(connection =>
+      textValue(connection.target) === nodeId && finiteNumber(connection.targetPort, -1) === inputPortIndex);
+
+  const parameterDefinitionsWithValues = (
+    definition: CanonicalOperatorDefinition,
+    values: Readonly<Record<string, unknown>>
+  ): readonly Readonly<Record<string, unknown>>[] => Object.freeze(definition.parameters.map(parameter => Object.freeze({
+    ...parameter,
+    value: Object.prototype.hasOwnProperty.call(values, parameter.name)
+      ? values[parameter.name]
+      : parameter.defaultValue
+  })));
+
   return Object.freeze({
     serialize(): unknown {
       return ownedAdapter.serialize();
@@ -850,6 +898,108 @@ export function createCanonicalFlowCanvasHost(
           ? '节点不存在。'
           : '参数不存在。';
       return commandResult(false, code, message);
+    },
+    patchNodeParameters(command: CanonicalNodeParametersPatch): CanonicalFlowCommandResult {
+      assertActive();
+      const rejected = rejectMutation('patch-node-parameters');
+      if (rejected) return rejected;
+      if (!command.nodeId || Object.keys(command.values).length === 0) {
+        return commandResult(false, 'invalid-parameter-patch', '参数批量写入命令为空。');
+      }
+      const result = ownedAdapter.patchNodeParameters(command.nodeId, command.values, {
+        allowCreateParameters: false,
+        parameterDefinitions: command.definitions ?? Object.freeze([])
+      });
+      if (result.updated) {
+        ownedInteraction.saveState({ reason: 'patch-node-parameters-atomic' });
+        return commandResult(true, 'node-parameters-patched', '参数已原子更新。');
+      }
+      const code = result.reason === 'no_change' ? 'no-change' : result.reason;
+      const message = result.reason === 'node_not_found'
+        ? '节点不存在。'
+        : result.reason === 'parameter_not_found'
+          ? `参数不存在：${result.missingParameters.join(' / ')}`
+          : '参数值未变化。';
+      return commandResult(false, code, message);
+    },
+    upsertCaliperSearchRegion(command: CanonicalCaliperSearchRegionPatch): CanonicalFlowCommandResult {
+      assertActive();
+      const rejected = rejectMutation('upsert-caliper-search-region');
+      if (rejected) return rejected;
+      const caliperNode = canvas.nodes.get(command.caliperNodeId);
+      if (!caliperNode || textValue(caliperNode.type).trim().toLowerCase() !== 'calipertool') {
+        return commandResult(false, 'caliper-node-not-found', '当前节点不是可编辑的 CaliperTool。');
+      }
+      const targetPortIndex = findPortIndexByName(caliperNode, 'SearchRegion', false);
+      if (targetPortIndex < 0) {
+        return commandResult(false, 'search-region-port-not-found', 'CaliperTool.SearchRegion 输入端口不存在。');
+      }
+
+      const existingConnection = findInputConnection(command.caliperNodeId, targetPortIndex);
+      if (existingConnection) {
+        const sourceNodeId = textValue(existingConnection.source);
+        const sourceNode = canvas.nodes.get(sourceNodeId);
+        const sourcePortIndex = finiteNumber(existingConnection.sourcePort, -1);
+        const sourcePort = Array.isArray(sourceNode?.outputs) ? sourceNode.outputs[sourcePortIndex] : undefined;
+        if (textValue(sourceNode?.type).trim().toLowerCase() !== 'rectangleregion' || !isRectanglePort(sourcePort)) {
+          return commandResult(
+            false,
+            'search-region-connected-to-non-rectangle-region',
+            'CaliperTool.SearchRegion 已连接到非 RectangleRegion 节点。'
+          );
+        }
+        const result = ownedAdapter.patchNodeParameters(sourceNodeId, command.values, {
+          allowCreateParameters: true,
+          parameterDefinitions: command.rectangleRegion.parameters
+        });
+        if (!result.updated) {
+          return commandResult(
+            false,
+            result.reason === 'no_change' ? 'no-change' : result.reason,
+            result.reason === 'no_change' ? '搜索区域未变化。' : 'RectangleRegion 参数更新失败。'
+          );
+        }
+        ownedInteraction.saveState({ reason: 'caliper-search-region-update-atomic' });
+        return commandResult(true, 'caliper-search-region-updated', '卡尺搜索区域已更新。');
+      }
+
+      const regionData = {
+        ...command.rectangleRegion,
+        type: command.rectangleRegion.operatorType,
+        name: command.rectangleRegion.displayName,
+        parameters: parameterDefinitionsWithValues(command.rectangleRegion, command.values)
+      };
+      const regionNode = ownedInteraction.addOperatorNode(
+        command.rectangleRegion.operatorType,
+        finiteNumber(caliperNode.x) - 260,
+        finiteNumber(caliperNode.y),
+        regionData
+      ) as CanonicalNode | null;
+      if (!regionNode) {
+        return commandResult(false, 'rectangle-region-create-failed', 'RectangleRegion 创建失败。');
+      }
+      const regionNodeId = textValue(regionNode.id);
+      const sourcePortIndex = Array.isArray(regionNode.outputs)
+        ? regionNode.outputs.findIndex(port => isRectanglePort(port))
+        : -1;
+      if (sourcePortIndex < 0) {
+        canvas.removeNode?.(regionNodeId);
+        cachedDraft = undefined;
+        return commandResult(false, 'rectangle-region-output-not-found', 'RectangleRegion 缺少 Rectangle 输出端口，已回滚。');
+      }
+      const connection = canvas.addConnection?.(
+        regionNodeId,
+        sourcePortIndex,
+        command.caliperNodeId,
+        targetPortIndex
+      );
+      if (!connection) {
+        canvas.removeNode?.(regionNodeId);
+        cachedDraft = undefined;
+        return commandResult(false, 'search-region-connection-failed', 'SearchRegion 连接失败，已回滚新节点。');
+      }
+      ownedInteraction.saveState({ reason: 'caliper-search-region-create-atomic' });
+      return commandResult(true, 'caliper-search-region-created', '已创建并连接 RectangleRegion。');
     },
     patchNodeProperties(command: CanonicalNodePropertiesPatch): CanonicalFlowCommandResult {
       assertActive();

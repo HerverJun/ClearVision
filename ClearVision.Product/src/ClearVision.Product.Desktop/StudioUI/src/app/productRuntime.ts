@@ -30,6 +30,7 @@ export function createProductRuntime(platform: StudioPlatform): ProductRuntime {
   const systemStatus = createSystemStatusOwner({ queries });
   const workspace = createWorkspaceRuntime({
     queries,
+    api: platform.api,
     session,
     featureFlags: platform.startup.featureFlags
   });

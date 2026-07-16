@@ -5,3 +5,6 @@ export * from './workspaceLifecycleDiagnostics';
 export * from './workspaceOwner';
 export * from './workspaceQueries';
 export * from './workspaceRuntime';
+export * from './preview';
+export * from './image';
+export * from './roi';

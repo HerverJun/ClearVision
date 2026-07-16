@@ -148,7 +148,8 @@ interface FakeCanvas {
   getNodeScreenRect(nodeId: string): Record<string, number> | null;
   getPortPosition(nodeId: string, portIndex: number, isOutput: boolean): Record<string, number> | null;
   getConnectionValidationError(): string | null;
-  addConnection(sourceId: string, sourcePort: number, targetId: string, targetPort: number): object;
+  addConnection(sourceId: string, sourcePort: number, targetId: string, targetPort: number): object | null;
+  removeNode(nodeId: string): boolean;
   removeConnection(connectionId: string): boolean;
   toggleNodeDisabled(nodeId: string): boolean;
   markSelectionChanged(): void;
@@ -200,10 +201,31 @@ function createAdapter() {
     getPortPosition: () => ({ x: 20, y: 30 }),
     getConnectionValidationError: () => null,
     addConnection: (sourceId, sourcePort, targetId, targetPort) => {
-      const connection = { id: `connection-${raw.connections.length + 1}`, sourceId, sourcePort, targetId, targetPort };
+      const sourceNode = raw.nodes.get(sourceId);
+      const targetNode = raw.nodes.get(targetId);
+      const connection = {
+        id: `connection-${raw.connections.length + 1}`,
+        source: sourceId,
+        sourceId,
+        sourcePort,
+        sourcePortId: (sourceNode?.outputs as Array<Record<string, unknown>> | undefined)?.[sourcePort]?.id,
+        target: targetId,
+        targetId,
+        targetPort,
+        targetPortId: (targetNode?.inputs as Array<Record<string, unknown>> | undefined)?.[targetPort]?.id
+      };
       raw.connections.push(connection);
       emitStructure();
       return connection;
+    },
+    removeNode: nodeId => {
+      const removed = raw.nodes.delete(nodeId);
+      if (removed) {
+        raw.connections = raw.connections.filter(connection =>
+          connection.source !== nodeId && connection.target !== nodeId);
+        emitStructure();
+      }
+      return removed;
     },
     removeConnection: connectionId => {
       const before = raw.connections.length;
@@ -462,6 +484,98 @@ describe('production canonical FlowCanvas facade', () => {
     expect(mountedHost.getProjection().draft.operators[0]?.parameters).toEqual(expect.arrayContaining([
       expect.objectContaining({ value: 12 })
     ]));
+  });
+
+  it('commits a multi-parameter ROI patch as one revision/history entry', () => {
+    mountedHost = createCanonicalFlowCanvasHost('canonical-unit-canvas', {
+      id: 'flow-roi', name: 'ROI flow', operators: [{
+        id: 'roi-1', name: 'ROI', type: 'RoiManager', x: 0, y: 0,
+        inputPorts: [], outputPorts: [],
+        parameters: [
+          { id: 'x', name: 'X', displayName: 'X', description: null, dataType: 'int', value: 1, defaultValue: 0, minValue: 0, maxValue: 1000, isRequired: true, options: null },
+          { id: 'y', name: 'Y', displayName: 'Y', description: null, dataType: 'int', value: 2, defaultValue: 0, minValue: 0, maxValue: 1000, isRequired: true, options: null },
+          { id: 'w', name: 'Width', displayName: 'Width', description: null, dataType: 'int', value: 10, defaultValue: 1, minValue: 1, maxValue: 1000, isRequired: true, options: null },
+          { id: 'h', name: 'Height', displayName: 'Height', description: null, dataType: 'int', value: 20, defaultValue: 1, minValue: 1, maxValue: 1000, isRequired: true, options: null }
+        ],
+        isEnabled: true
+      }], connections: []
+    });
+
+    expect(mountedHost.patchNodeParameters({
+      nodeId: 'roi-1',
+      values: { X: 11, Y: 12, Width: 30, Height: 40 }
+    })).toMatchObject({ ok: true, flowRevision: 1 });
+    expect(mountedHost.getProjection().draft.operators[0]?.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'X', value: 11 }),
+      expect.objectContaining({ name: 'Y', value: 12 }),
+      expect.objectContaining({ name: 'Width', value: 30 }),
+      expect.objectContaining({ name: 'Height', value: 40 })
+    ]));
+    expect(mountedHost.undo()).toMatchObject({ ok: true, flowRevision: 2 });
+    expect(mountedHost.getProjection().draft.operators[0]?.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'X', value: 1 }),
+      expect.objectContaining({ name: 'Height', value: 20 })
+    ]));
+  });
+
+  it('creates Caliper RectangleRegion plus connection atomically and rolls the whole change back on undo', () => {
+    mountedHost = createCanonicalFlowCanvasHost('canonical-unit-canvas', {
+      id: 'flow-caliper', name: 'Caliper flow', operators: [{
+        id: 'caliper-1', name: 'Caliper', type: 'CaliperTool', x: 400, y: 120,
+        inputPorts: [{ id: 'search-region', name: 'SearchRegion', dataType: 'Rectangle', isRequired: true }],
+        outputPorts: [], parameters: [], isEnabled: true
+      }], connections: []
+    });
+    const rectangleRegion: CanonicalOperatorDefinition = Object.freeze({
+      operatorType: 'RectangleRegion',
+      displayName: 'Rectangle Region',
+      category: 'SegmentationAndRegion',
+      iconName: null,
+      inputPorts: Object.freeze([]),
+      outputPorts: Object.freeze([{ name: 'Rectangle', dataType: 'Rectangle', isRequired: false }]),
+      parameters: Object.freeze([
+        { name: 'X', displayName: 'X', description: null, dataType: 'int', defaultValue: 0, minValue: 0, maxValue: 1000, isRequired: true, options: null },
+        { name: 'Y', displayName: 'Y', description: null, dataType: 'int', defaultValue: 0, minValue: 0, maxValue: 1000, isRequired: true, options: null },
+        { name: 'Width', displayName: 'Width', description: null, dataType: 'int', defaultValue: 1, minValue: 1, maxValue: 1000, isRequired: true, options: null },
+        { name: 'Height', displayName: 'Height', description: null, dataType: 'int', defaultValue: 1, minValue: 1, maxValue: 1000, isRequired: true, options: null }
+      ])
+    });
+
+    expect(mountedHost.upsertCaliperSearchRegion({
+      caliperNodeId: 'caliper-1',
+      values: { X: 10, Y: 20, Width: 100, Height: 40 },
+      rectangleRegion
+    })).toMatchObject({ ok: true, code: 'caliper-search-region-created', flowRevision: 1 });
+    expect(mountedHost.getProjection().runtime).toMatchObject({ nodeCount: 2, connectionCount: 1 });
+    expect(mountedHost.undo()).toMatchObject({ ok: true, flowRevision: 2 });
+    expect(mountedHost.getProjection().runtime).toMatchObject({ nodeCount: 1, connectionCount: 0 });
+  });
+
+  it('rolls back a newly created Caliper RectangleRegion when the connection cannot be created', () => {
+    mountedHost = createCanonicalFlowCanvasHost('canonical-unit-canvas', {
+      id: 'flow-caliper', name: 'Caliper flow', operators: [{
+        id: 'caliper-1', name: 'Caliper', type: 'CaliperTool', x: 400, y: 120,
+        inputPorts: [{ id: 'search-region', name: 'SearchRegion', dataType: 'Rectangle', isRequired: true }],
+        outputPorts: [], parameters: [], isEnabled: true
+      }], connections: []
+    });
+    raw.addConnection = () => null;
+    const rectangleRegion: CanonicalOperatorDefinition = Object.freeze({
+      operatorType: 'RectangleRegion', displayName: 'Rectangle Region', category: 'SegmentationAndRegion', iconName: null,
+      inputPorts: Object.freeze([]),
+      outputPorts: Object.freeze([{ name: 'Rectangle', dataType: 'Rectangle', isRequired: false }]),
+      parameters: Object.freeze([
+        { name: 'X', displayName: 'X', description: null, dataType: 'int', defaultValue: 0, minValue: 0, maxValue: 1000, isRequired: true, options: null },
+        { name: 'Y', displayName: 'Y', description: null, dataType: 'int', defaultValue: 0, minValue: 0, maxValue: 1000, isRequired: true, options: null },
+        { name: 'Width', displayName: 'Width', description: null, dataType: 'int', defaultValue: 1, minValue: 1, maxValue: 1000, isRequired: true, options: null },
+        { name: 'Height', displayName: 'Height', description: null, dataType: 'int', defaultValue: 1, minValue: 1, maxValue: 1000, isRequired: true, options: null }
+      ])
+    });
+
+    expect(mountedHost.upsertCaliperSearchRegion({
+      caliperNodeId: 'caliper-1', values: { X: 1, Y: 2, Width: 3, Height: 4 }, rectangleRegion
+    })).toMatchObject({ ok: false, code: 'search-region-connection-failed', flowRevision: 0 });
+    expect(mountedHost.getProjection().runtime).toMatchObject({ nodeCount: 1, connectionCount: 0 });
   });
 
   it('preserves flow/operator/port/parameter/connection opaque fields after a normal edit', () => {

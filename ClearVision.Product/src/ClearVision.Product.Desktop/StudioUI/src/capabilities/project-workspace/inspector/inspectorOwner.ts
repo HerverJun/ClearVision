@@ -60,6 +60,7 @@ export interface InspectorParameterProjection extends InspectorParameterValidati
   readonly description: string | null;
   readonly valueSource: InspectorValueSource;
   readonly editorKind: InspectorParameterEditorKind;
+  readonly extensionSlot: 'file-picker' | 'camera-binding' | 'image-backed' | null;
   readonly extensionMessage: string | null;
   readonly persisted: boolean;
   readonly visible: boolean;
@@ -135,10 +136,19 @@ export interface InspectorOwner {
   readonly projection: DeepReadonly<InspectorOwnerProjection>;
   patchNodeParameter(parameterName: string, value: unknown): InspectorMutationResult;
   patchNodeProperties(patch: Readonly<{ name?: string; isEnabled?: boolean }>): InspectorMutationResult;
+  commitImageBacked(command: InspectorImageBackedCommit): InspectorMutationResult;
   disconnectConnection(): InspectorMutationResult;
   selectNode(nodeId: string): CanonicalFlowCommandResult;
   setDraftActive(key: string, active: boolean): void;
   dispose(reason?: string): void;
+}
+
+export interface InspectorImageBackedCommit {
+  readonly nodeId: string;
+  readonly selectionRevision: number;
+  readonly flowRevision: number;
+  readonly mode: 'parameters' | 'caliper-search-region';
+  readonly values: Readonly<Record<string, WorkspaceJsonValue>>;
 }
 
 function record(value: unknown): Readonly<Record<string, unknown>> {
@@ -265,6 +275,7 @@ function buildParameters(
       defaultValue: values.defaultValue,
       valueSource: values.source,
       editorKind: editor.kind,
+      extensionSlot: editor.extensionSlot,
       extensionMessage: editor.message,
       persisted: stored !== undefined,
       visible: true,
@@ -622,6 +633,46 @@ export function createInspectorOwner(options: {
         command.isEnabled = patch.isEnabled;
       }
       const result = options.flowOwner.commands.patchNodeProperties(command as FlowNodePropertiesPatch);
+      sync();
+      return commandResult(result);
+    },
+    commitImageBacked(command: InspectorImageBackedCommit): InspectorMutationResult {
+      if (disposed) return reject('disposed', 'Inspector owner 已释放。');
+      const node = state.node;
+      if (state.mode !== 'node' || !node || node.id !== command.nodeId) {
+        return reject('selection-mismatch', 'ROI 编辑会话已因节点切换失效。');
+      }
+      if (state.selectionRevision !== command.selectionRevision || state.flowRevision !== command.flowRevision) {
+        return reject('stale-editor-session', 'Flow 或选择已变化，请重新打开图像编辑器。');
+      }
+      if (state.mutationGate !== 'editable') {
+        return reject(state.mutationGate, '当前状态禁止提交图像参数。');
+      }
+      if (Object.keys(command.values).length === 0) {
+        return reject('empty-image-backed-patch', '图像参数提交为空。');
+      }
+      if (command.mode === 'caliper-search-region') {
+        const result = options.flowOwner.commands.upsertCaliperSearchRegion({
+          caliperNodeId: node.id,
+          values: command.values
+        });
+        sync();
+        return commandResult(result);
+      }
+
+      const definitions: OperatorParameter[] = [];
+      for (const name of Object.keys(command.values)) {
+        const parameter = node.parameters.find(item => normalized(item.name) === normalized(name));
+        if (!parameter || !parameter.persisted) {
+          return reject('parameter-not-persisted', `图像参数 ${name} 不在正式 Flow draft 中。`);
+        }
+        if (parameter.definition) definitions.push(parameter.definition);
+      }
+      const result = options.flowOwner.commands.patchNodeParameters({
+        nodeId: node.id,
+        values: command.values,
+        definitions: Object.freeze(definitions)
+      });
       sync();
       return commandResult(result);
     },

@@ -5,6 +5,7 @@ import type { WorkspaceOwner } from '../workspaceOwner';
 import FlowCanvasSurface from './FlowCanvasSurface.vue';
 import OperatorRail from './OperatorRail.vue';
 import InspectorPanel from '../inspector/InspectorPanel.vue';
+import PreviewPanel from '../preview/PreviewPanel.vue';
 
 const props = defineProps<{
   workspaceOwner: WorkspaceOwner;
@@ -13,6 +14,7 @@ const props = defineProps<{
 
 const flowOwner = props.workspaceOwner.openFlowCanvas();
 const inspectorOwner = flowOwner.openInspector();
+const previewWorkbenchOwner = flowOwner.openPreviewWorkbench(inspectorOwner);
 const projection = flowOwner.projection;
 const shortcutScope = ref<HTMLElement | null>(null);
 const operatorRailHost = ref<HTMLElement | null>(null);
@@ -37,7 +39,6 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  inspectorOwner.dispose('flow-workspace-unmounted');
   flowOwner.dispose('flow-workspace-unmounted');
 });
 </script>
@@ -82,13 +83,7 @@ onBeforeUnmount(() => {
         @reset-view="flowOwner.commands.resetView"
       />
 
-      <section
-        class="flow-workspace__preview"
-        aria-label="预览区占位"
-      >
-        <strong>预览区</strong>
-        <span>G4 未启用 · 无 Preview、artifact 或 binary transport</span>
-      </section>
+      <PreviewPanel :owner="previewWorkbenchOwner" />
     </div>
 
     <InspectorPanel :owner="inspectorOwner" />
@@ -99,11 +94,8 @@ onBeforeUnmount(() => {
 .flow-workspace { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(196px, 232px) minmax(520px, 1fr) minmax(280px, 320px); overflow: hidden; }
 .flow-workspace__rail-host, .flow-workspace__center { min-width: 0; min-height: 0; }
 .flow-workspace__rail-host { overflow: hidden; }
-.flow-workspace__center { display: grid; grid-template-rows: minmax(300px, 1fr) 44px; overflow: hidden; }
-.flow-workspace__preview { padding: 0 var(--cv-space-3); display: flex; align-items: center; gap: var(--cv-space-3); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
-.flow-workspace__preview strong { font-size: var(--cv-font-size-xs); }
-.flow-workspace__preview span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.flow-workspace__center { display: grid; grid-template-rows: minmax(300px, 1fr) minmax(180px, 280px); overflow: hidden; }
 @media (max-width: 1220px) { .flow-workspace { grid-template-columns: 196px minmax(520px, 1fr); } .flow-workspace > :deep(.inspector-panel) { display: none; } }
 @media (max-width: 920px) { .flow-workspace { grid-template-columns: minmax(0, 1fr); } .flow-workspace__rail-host { display: none; } }
-@media (max-height: 650px) { .flow-workspace__center { grid-template-rows: minmax(300px, 1fr) 36px; } }
+@media (max-height: 650px) { .flow-workspace__center { grid-template-rows: minmax(300px, 1fr) minmax(160px, 180px); } }
 </style>

@@ -21,6 +21,7 @@ function parameter(overrides: Partial<InspectorParameterProjection> = {}): Inspe
     defaultValue: '',
     valueSource: 'explicit',
     editorKind: 'text',
+    extensionSlot: null,
     extensionMessage: null,
     persisted: true,
     visible: true,

@@ -4,6 +4,7 @@ import type {
   SessionProjectionOwner
 } from '@/app/session/sessionProjectionOwner';
 import type { ReadQueryClient } from '@/platform/query';
+import type { ApiTransport } from '@/platform/api';
 import type { WorkspaceProjectV1 } from './workspaceContracts';
 import {
   createWorkspaceLifecycleDiagnosticsOwner,
@@ -21,6 +22,7 @@ export const workspaceCapabilityFlagKey = 'Studio2.Workspace';
 
 export interface CreateWorkspaceRuntimeOptions {
   readonly queries: ReadQueryClient;
+  readonly api?: ApiTransport;
   readonly session: SessionProjectionOwner;
   readonly featureFlags: Readonly<Record<string, boolean>>;
   readonly diagnostics?: WorkspaceLifecycleDiagnosticsOwner;
@@ -80,7 +82,13 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
     mountProject(project: WorkspaceProjectV1): WorkspaceOwner {
       assertActive();
       if (!enabled) throw new Error('Workspace capability is disabled by startup configuration.');
-      const inner = createWorkspaceOwner(project, diagnosticsOwner, options.queries);
+      const inner = createWorkspaceOwner(
+        project,
+        diagnosticsOwner,
+        options.queries,
+        options.api,
+        options.featureFlags
+      );
       let ownerDisposed = false;
       const owner: WorkspaceOwner = Object.freeze({
         projectId: inner.projectId,

@@ -7,12 +7,15 @@ import {
   type CanonicalFlowDraft,
   type CanonicalFlowFeedback,
   type CanonicalNodeParameterPatch,
+  type CanonicalNodeParametersPatch,
   type CanonicalNodePropertiesPatch,
+  type CanonicalCaliperSearchRegionPatch,
   type CanonicalOperatorDefinition,
   type CanonicalCanvasRuntimeSnapshot,
   type FlowMutationGate
 } from '@/platform/canvas';
 import type { ReadQueryClient, ReadQueryState } from '@/platform/query';
+import type { ApiTransport } from '@/platform/api';
 import {
   createOperatorCatalogQuery
 } from '@/capabilities/operators-read/operatorQueries';
@@ -32,6 +35,10 @@ import {
   createInspectorOwner,
   type InspectorOwner
 } from '../inspector';
+import {
+  createPreviewWorkbenchOwner,
+  type PreviewWorkbenchOwner
+} from '../preview/previewWorkbenchOwner';
 
 export type FlowCanvasOwnerPhase = 'idle' | 'mounted' | 'error' | 'disposed';
 
@@ -78,6 +85,8 @@ export interface FlowCanvasCommands {
   connect(command: CanonicalConnectCommand): CanonicalFlowCommandResult;
   disconnect(connectionId: string): CanonicalFlowCommandResult;
   patchNodeParameter(command: FlowNodeParameterPatch): CanonicalFlowCommandResult;
+  patchNodeParameters(command: FlowNodeParametersPatch): CanonicalFlowCommandResult;
+  upsertCaliperSearchRegion(command: FlowCaliperSearchRegionPatch): CanonicalFlowCommandResult;
   patchNodeProperties(command: FlowNodePropertiesPatch): CanonicalFlowCommandResult;
   zoomIn(): CanonicalFlowCommandResult;
   zoomOut(): CanonicalFlowCommandResult;
@@ -98,12 +107,24 @@ export interface FlowNodePropertiesPatch {
   readonly isEnabled?: boolean;
 }
 
+export interface FlowNodeParametersPatch {
+  readonly nodeId: string;
+  readonly values: Readonly<Record<string, WorkspaceJsonValue>>;
+  readonly definitions?: readonly OperatorParameter[];
+}
+
+export interface FlowCaliperSearchRegionPatch {
+  readonly caliperNodeId: string;
+  readonly values: Readonly<Record<string, WorkspaceJsonValue>>;
+}
+
 export interface FlowCanvasOwner {
   readonly projectId: string;
   readonly projection: DeepReadonly<FlowCanvasOwnerProjection>;
   readonly commands: FlowCanvasCommands;
   mountCanvas(options: FlowCanvasMountOptions): void;
   openInspector(): InspectorOwner;
+  openPreviewWorkbench(inspectorOwner: InspectorOwner): PreviewWorkbenchOwner;
   refreshOperators(force?: boolean): Promise<void>;
   setMutationGate(gate: FlowMutationGate): void;
   dispose(reason?: string): void;
@@ -227,7 +248,7 @@ function operatorDefinition(operator: OperatorCatalogItem): CanonicalOperatorDef
   });
 }
 
-function parameterDefinition(parameter: OperatorParameter): CanonicalNodeParameterPatch['definition'] {
+function parameterDefinition(parameter: OperatorParameter): NonNullable<CanonicalNodeParameterPatch['definition']> {
   return Object.freeze({
     name: parameter.name,
     displayName: parameter.displayName,
@@ -261,6 +282,8 @@ function zeroResources(): WorkspaceResourceSnapshot {
 export function createFlowCanvasOwner(options: {
   readonly project: WorkspaceProjectV1;
   readonly queries: ReadQueryClient;
+  readonly api: ApiTransport;
+  readonly featureFlags: Readonly<Record<string, boolean>>;
   readonly diagnostics: WorkspaceLifecycleDiagnosticsOwner;
   readonly initialMutationGate?: FlowMutationGate;
 }): FlowCanvasOwner {
@@ -288,6 +311,7 @@ export function createFlowCanvasOwner(options: {
   let disposed = false;
   let commandFeedbackSequence = 0;
   let inspectorOwner: InspectorOwner | undefined;
+  let previewWorkbenchOwner: PreviewWorkbenchOwner | undefined;
 
   function assertActive(): void {
     if (disposed) throw new Error('FlowCanvas owner has been disposed.');
@@ -386,6 +410,36 @@ export function createFlowCanvasOwner(options: {
           });
       return applyCommandResult(host!.patchNodeParameter(canonical));
     },
+    patchNodeParameters(command: FlowNodeParametersPatch) {
+      assertActive();
+      const base = {
+        nodeId: command.nodeId,
+        values: Object.freeze({ ...command.values })
+      };
+      const canonical: CanonicalNodeParametersPatch = command.definitions
+        ? Object.freeze({ ...base, definitions: Object.freeze(command.definitions.map(parameterDefinition)) })
+        : Object.freeze(base);
+      return applyCommandResult(host!.patchNodeParameters(canonical));
+    },
+    upsertCaliperSearchRegion(command: FlowCaliperSearchRegionPatch) {
+      assertActive();
+      const rectangleRegion = state.catalog.operators.find(operator =>
+        operator.operatorType.trim().toLowerCase() === 'rectangleregion');
+      if (!rectangleRegion) {
+        return Object.freeze({
+          ok: false,
+          code: 'rectangle-region-metadata-missing',
+          message: '算子目录缺少 RectangleRegion，无法编辑 CaliperTool.SearchRegion。',
+          flowRevision: state.runtime?.flowRevision ?? 0
+        });
+      }
+      const canonical: CanonicalCaliperSearchRegionPatch = Object.freeze({
+        caliperNodeId: command.caliperNodeId,
+        values: Object.freeze({ ...command.values }),
+        rectangleRegion: operatorDefinition(rectangleRegion)
+      });
+      return applyCommandResult(host!.upsertCaliperSearchRegion(canonical));
+    },
     patchNodeProperties(command: FlowNodePropertiesPatch) {
       assertActive();
       const canonical: CanonicalNodePropertiesPatch = Object.freeze({ ...command });
@@ -412,6 +466,24 @@ export function createFlowCanvasOwner(options: {
         diagnostics: options.diagnostics
       });
       return inspectorOwner;
+    },
+    openPreviewWorkbench(openedInspector: InspectorOwner): PreviewWorkbenchOwner {
+      assertActive();
+      if (openedInspector !== inspectorOwner) {
+        throw new Error('Preview workbench requires the Flow owner\'s active Inspector owner.');
+      }
+      if (previewWorkbenchOwner) {
+        throw new Error(`Preview workbench owner already exists for project ${options.project.id}.`);
+      }
+      previewWorkbenchOwner = createPreviewWorkbenchOwner({
+        projectId: options.project.id,
+        flowOwner: owner,
+        inspectorOwner: openedInspector,
+        api: options.api,
+        diagnostics: options.diagnostics,
+        featureFlags: options.featureFlags
+      });
+      return previewWorkbenchOwner;
     },
     mountCanvas(mountOptions: FlowCanvasMountOptions): void {
       assertActive();
@@ -461,9 +533,15 @@ export function createFlowCanvasOwner(options: {
       disposed = true;
       let disposalError: unknown;
       try {
-        inspectorOwner?.dispose(reason);
+        previewWorkbenchOwner?.dispose(reason);
       } catch (error) {
         disposalError = error;
+      }
+      previewWorkbenchOwner = undefined;
+      try {
+        inspectorOwner?.dispose(reason);
+      } catch (error) {
+        disposalError ??= error;
       }
       inspectorOwner = undefined;
       try {

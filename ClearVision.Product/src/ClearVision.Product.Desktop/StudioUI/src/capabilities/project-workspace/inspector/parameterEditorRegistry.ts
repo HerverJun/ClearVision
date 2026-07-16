@@ -50,8 +50,8 @@ export function resolveInspectorParameterEditor(
   if (dataType === 'camerabinding') {
     return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'camera-binding', message: 'CameraBinding 资源补齐在 G3 本轮范围外。' });
   }
-  if (['rectangle', 'circle', 'polygon', 'annulus', 'circlesearch', 'npoint', 'caliper'].includes(dataType)) {
-    return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'image-backed', message: '图像耦合编辑器接口已保留，将由 G4 接入唯一 ImageCanvas owner。' });
+  if (['rectangle', 'circle', 'polygon', 'annulus', 'arc', 'circlesearch', 'npoint', 'caliper'].includes(dataType)) {
+    return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'image-backed', message: '请在下方 Preview 工作台使用唯一 ImageCanvas 进行图上编辑。' });
   }
   if (input.options && input.options.length > 0) {
     return Object.freeze({ kind: 'enum', integer: false, nullable, extensionSlot: null, message: null });

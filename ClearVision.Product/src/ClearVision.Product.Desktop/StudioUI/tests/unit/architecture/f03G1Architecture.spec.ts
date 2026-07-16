@@ -26,7 +26,7 @@ function studioRelative(path: string): string {
   return relative(studioRoot, path).replaceAll('\\', '/');
 }
 
-describe('F03 G1-G3 architecture guards', () => {
+describe('F03 G1-G4 architecture guards', () => {
   const files = sourceFiles(sourceRoot);
   const workspaceFiles = sourceFiles(workspaceRoot);
 
@@ -44,18 +44,19 @@ describe('F03 G1-G3 architecture guards', () => {
       .toEqual(['src/app/layouts/ProductLayout.vue']);
   });
 
-  it('keeps the Workspace capability on a narrow GET-only read port', () => {
+  it('keeps Workspace HTTP on the shared transport and the G4 method allowlist', () => {
     const workspaceSource = workspaceFiles.map(read).join('\n');
     const transport = read(join(sourceRoot, 'platform/api/apiTransport.ts'));
     const session = read(join(sourceRoot, 'app/session/sessionProjectionOwner.ts'));
     const query = read(join(workspaceRoot, 'workspaceQueries.ts'));
 
-    expect(workspaceSource).not.toMatch(/\bApiTransport\b/);
     expect(workspaceSource).not.toMatch(/\b(?:globalThis\.)?fetch\s*\(/);
-    expect(workspaceSource).not.toMatch(/\b(?:api|transport|client)\s*\.\s*(?:post|put|patch|delete)\s*\(/i);
-    expect(workspaceSource).not.toMatch(/method\s*:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/i);
-    expect(transport).toContain("method: 'GET'");
-    expect(transport).not.toMatch(/method\s*:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/i);
+    expect(workspaceSource).not.toMatch(/\.\s*(?:put|patch)\s*\(/i);
+    expect(transport).toContain("method: 'GET' | 'POST' | 'DELETE'");
+    const previewTransport = read(join(workspaceRoot, 'preview/previewTransport.ts'));
+    expect(previewTransport).toContain("'flows/preview-node'");
+    expect(previewTransport).toContain('preview-artifacts/');
+    expect(previewTransport).not.toMatch(/api\/projects.*(?:PUT|POST)|inspection\/(?:admission|execute)/i);
     expect(session).toContain("path: 'auth/me'");
     expect(query).toContain('return `projects/${projectId}`');
     expect(query).not.toMatch(/preview|artifact|admission|execute|results|upload|global-variables/i);
@@ -70,6 +71,11 @@ describe('F03 G1-G3 architecture guards', () => {
     const productionFacade = read(join(sourceRoot, 'platform/canvas/canonicalFlowCanvas.ts'));
     const flowOwner = read(join(workspaceRoot, 'flow/flowCanvasOwner.ts'));
     const labOwner = read(join(sourceRoot, 'labs/canvas/canvasLabOwner.ts'));
+    const imageFacade = read(join(sourceRoot, 'platform/canvas/canonicalImageCanvas.ts'));
+    const imageOwner = read(join(workspaceRoot, 'image/imageCanvasOwner.ts'));
+    const imageAliasConsumers = files
+      .filter(path => /from\s+['"]@clearvision\/canonical-image-canvas['"]/.test(read(path)))
+      .map(studioRelative);
 
     expect(aliasConsumers).toEqual(['src/platform/canvas/canonicalFlowCanvas.ts']);
     expect(productionFacade).toContain('createHostedFlowCanvasAdapter');
@@ -81,6 +87,11 @@ describe('F03 G1-G3 architecture guards', () => {
     expect(productionFacade).toContain('patchNodeParameter');
     expect(productionFacade).toContain('patchNodeProperties');
     expect(flowOwner).toContain('openInspector');
+    expect(imageFacade).toContain('new ImageCanvas');
+    expect(imageFacade).toContain('CanonicalImageCanvasOwnerConflictError');
+    expect(imageAliasConsumers).toEqual(['src/platform/canvas/canonicalImageCanvas.ts']);
+    expect(imageOwner).toContain("from '@/platform/canvas'");
+    expect(imageOwner).not.toMatch(/\bnew\s+ImageCanvas\s*\(/);
   });
 
   it('forbids Labs, FrontendV2, raw Canvas and global command bypasses from Workspace production', () => {
@@ -93,10 +104,28 @@ describe('F03 G1-G3 architecture guards', () => {
       expect(source, studioRelative(file)).not.toContain('FlowCanvas.serialize()');
       expect(source, studioRelative(file)).not.toMatch(/\b(?:EventBus|ServiceRegistry|EventSource)\b/);
       expect(source, studioRelative(file)).not.toMatch(/\bchrome\s*\?*\.\s*webview\b/);
+      expect(source, studioRelative(file)).not.toMatch(/RoiEditorPanel|PreviewPanelCapabilityOwner/);
     }
   });
 
-  it('keeps G4-G6 absent while G1-G3 are the only implemented F03 slices', () => {
+  it('keeps Preview on the shared transport without the legacy static HTTP owner', () => {
+    const previewTransportPath = join(workspaceRoot, 'preview/previewTransport.ts');
+    const previewEndpointConsumers = workspaceFiles
+      .filter(path => read(path).includes("'flows/preview-node'"))
+      .map(studioRelative);
+    const legacyCoordinator = read(join(
+      repositoryRoot,
+      'ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js'
+    ));
+
+    expect(previewEndpointConsumers).toEqual([studioRelative(previewTransportPath)]);
+    expect(files.map(read).join('\n')).not.toMatch(/core\/messaging\/httpClient\.js/);
+    expect(legacyCoordinator).not.toMatch(/from\s+['"][^'"]*httpClient\.js['"]/);
+    expect(read(join(workspaceRoot, 'preview/previewOwner.ts')))
+      .toContain("from '@clearvision/canonical-preview-coordinator'");
+  });
+
+  it('keeps G5-G6 absent while G1-G4 are the implemented F03 slices', () => {
     const plan = read(join(
       repositoryRoot,
       'docs/进行中/StudioUINext/Studio_UI_Next_F03_完整开发计划.md'
@@ -115,7 +144,14 @@ describe('F03 G1-G3 architecture guards', () => {
       'src/capabilities/project-workspace/inspector/ParameterEditor.vue',
       'src/capabilities/project-workspace/inspector/parameterValidation.ts'
     ]));
-    expect(existsSync(join(workspaceRoot, 'preview'))).toBe(false);
+    expect(existsSync(join(workspaceRoot, 'preview'))).toBe(true);
+    expect(existsSync(join(workspaceRoot, 'image'))).toBe(true);
+    expect(existsSync(join(workspaceRoot, 'roi'))).toBe(true);
+    expect(sourceFiles(join(workspaceRoot, 'preview')).map(studioRelative)).toEqual(expect.arrayContaining([
+      'src/capabilities/project-workspace/preview/previewOwner.ts',
+      'src/capabilities/project-workspace/preview/previewTransport.ts',
+      'src/capabilities/project-workspace/preview/PreviewPanel.vue'
+    ]));
     expect(existsSync(join(workspaceRoot, 'persistence'))).toBe(false);
     expect(existsSync(join(workspaceRoot, 'run'))).toBe(false);
   });
