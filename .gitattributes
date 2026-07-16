@@ -4,7 +4,7 @@
 # across Windows/Linux checkouts instead of allowing core.autocrlf conversion.
 quality/datasets/operator-precision-v1/manifest.json text eol=lf
 quality/datasets/operator-product-e2e-v1/manifest.json text eol=lf
-ClearVision.Product/tests/TestData/model_test_suite/identity_2x2/*.json text eol=lf
+ClearVision.Product/tests/TestData/model_test_suite/identity_2x2/embedding_manifest.json text eol=lf
 quality/tools/OperatorPrecisionBenchmarkRunner/Program.cs text eol=lf
 quality/tools/OperatorPrecisionBenchmarkRunner/OperatorPrecisionBenchmarkRunner.csproj text eol=lf
 scripts/run-operator-precision-benchmark.ps1 text eol=lf
