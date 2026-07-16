@@ -801,6 +801,25 @@ function getLatestInspectionImageBase64() {
         || getInlineResultImageBase64(inspectionController.getLastResult?.());
 }
 
+function getStudioPreviewInputFrame() {
+    const frame = serviceRegistry.get('studioPreviewInputFrame');
+    if (!frame?.imageBase64) {
+        return null;
+    }
+
+    const currentProjectId = getCurrentProject()?.id || null;
+    if (frame.projectId && frame.projectId !== currentProjectId) {
+        return null;
+    }
+
+    return frame;
+}
+
+function getStudioPreviewInputImageSource() {
+    const imageBase64 = getStudioPreviewInputFrame()?.imageBase64 || null;
+    return imageBase64 ? `data:image/png;base64,${imageBase64}` : null;
+}
+
 function getLatestInspectionImageSource() {
     const latestBase64 = getLatestInspectionImageBase64();
     if (latestBase64) {
@@ -818,6 +837,11 @@ function getLatestInspectionImageUrl() {
 }
 
 async function getLatestInspectionInputImageBase64() {
+    const studioFrame = getStudioPreviewInputFrame();
+    if (studioFrame?.imageBase64) {
+        return studioFrame.imageBase64;
+    }
+
     const latestImage = getLatestInspectionImageBase64();
     if (latestImage) {
         return latestImage;
@@ -1656,6 +1680,13 @@ function createPropertyPanelCapabilityOwner() {
         previewCoordinator: nodePreviewCoordinator,
         previewResourcesEnabled: !isPreviewPanelCapabilityEnabled(),
         onOpenPreviewImage: openImageViewerFromPreview,
+        onCapturePreviewInput: frame => {
+            serviceRegistry.register('studioPreviewInputFrame', {
+                ...frame,
+                projectId: getCurrentProject()?.id || null
+            });
+        },
+        getPreviewInputImageSource: () => getStudioPreviewInputImageSource(),
         circleSearchV2ToolEnabled: readStartupFeatureFlagOnce('Studio:CircleSearchV2ToolEnabled'),
         nPointCalibrationWorkbenchEnabled: readStartupFeatureFlagOnce('Studio:NPointCalibrationWorkbenchEnabled'),
         showToast

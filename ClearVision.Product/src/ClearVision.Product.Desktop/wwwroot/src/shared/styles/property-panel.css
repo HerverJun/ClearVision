@@ -526,6 +526,52 @@
     gap: 8px;
 }
 
+.property-camera-capture-section {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    background: var(--bg-subtle);
+}
+
+.property-camera-capture-header {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.property-camera-capture-header h5 {
+    margin: 0;
+}
+
+.property-camera-capture-header span {
+    min-width: 0;
+    color: var(--text-muted);
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.property-summary-section .property-camera-capture-description,
+.property-summary-section .property-camera-capture-hint {
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+}
+
+.property-summary-section .property-camera-capture-hint.is-error {
+    color: var(--status-ng);
+}
+
+.property-camera-capture-button {
+    width: 100%;
+    justify-content: center;
+}
+
 .property-capability-status {
     min-height: 18px;
     color: var(--text-muted);

@@ -1282,6 +1282,56 @@ export class NodePreviewCoordinator {
         this.updateState(patch);
     }
 
+    publishExternalFrame(node, frame = {}) {
+        if (!node?.id) {
+            throw new Error('发布单帧预览需要有效的算子节点。');
+        }
+
+        const imageBase64 = normalizeBase64Image(frame.imageBase64 || frame.imageData || frame.imageSource);
+        if (!imageBase64) {
+            throw new Error('单帧预览图像为空。');
+        }
+        if (isPreviewPayloadTooLarge(imageBase64)) {
+            throw new Error('单帧图像过大，无法送入预览工作台。');
+        }
+
+        this.setActiveNode(node, { autoPreview: false });
+        const metadata = this.getOperatorMetadata(node.type);
+        const flowRevision = normalizeFlowRevision(this.getFlowRevision());
+        const request = buildPreviewRequestKey({
+            projectId: this.getProjectId(),
+            nodeId: node.id,
+            flowRevision,
+            parameterSnapshot: buildParameterSnapshot(node.parameters),
+            inputImageBase64: imageBase64
+        });
+        const outputData = compactPreviewOutputValue({
+            Source: frame.source || 'camera-single-frame',
+            CameraBindingId: frame.cameraBindingId || null,
+            TriggerMode: frame.triggerMode || null,
+            Width: Number.isFinite(Number(frame.width)) ? Number(frame.width) : null,
+            Height: Number.isFinite(Number(frame.height)) ? Number(frame.height) : null,
+            CapturedAtUtc: frame.capturedAtUtc || new Date().toISOString()
+        });
+
+        this.replacePreviewState(withClearedPreviewResources({
+            activeNodeId: node.id,
+            nodeType: node.type,
+            title: node.title || metadata?.displayName || node.type,
+            status: 'success',
+            executionTimeMs: null,
+            errorMessage: null,
+            canvasEligibility: getCanvasPreviewEligibility(node, metadata),
+            request,
+            inputImageBase64: imageBase64,
+            outputImageBase64: imageBase64,
+            outputData,
+            previewCost: getOperatorPreviewCostPolicy(node, metadata)
+        }));
+
+        return this.state;
+    }
+
     setActiveNode(node, options = {}) {
         this.cancelPendingPreviewRequest({ status: 'superseded' });
 

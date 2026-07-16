@@ -9,6 +9,8 @@ import {
   normalizeAcquisitionSourceType
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/parameterDependencyRules.js';
 
+const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==';
+
 function waitFor(assertion, timeoutMs = 1000) {
   const startedAt = Date.now();
   return new Promise((resolve, reject) => {
@@ -707,6 +709,45 @@ test('NodePreviewCoordinator releases live camera artifact resources between byp
   } finally {
     globalThis.URL.createObjectURL = originalCreateObjectUrl;
     globalThis.URL.revokeObjectURL = originalRevokeObjectUrl;
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator publishes an explicitly captured camera frame without executing side-effect preview', () => {
+  const cameraNode = {
+    id: 'camera-capture-node',
+    type: 'ImageAcquisition',
+    title: '图像采集',
+    parameters: [
+      { name: 'SourceType', value: 'Camera' },
+      { name: 'CameraId', value: 'cam-1' },
+    ],
+    outputs: [{ type: 'image' }],
+  };
+  const { coordinator, getExecuteCount } = createCoordinator({
+    node: cameraNode,
+    getInputImageBase64: () => null,
+  });
+
+  try {
+    const state = coordinator.publishExternalFrame(cameraNode, {
+      imageBase64: PNG_BASE64,
+      cameraBindingId: 'cam-1',
+      triggerMode: 'Software',
+      width: 1920,
+      height: 1080,
+      capturedAtUtc: '2026-07-16T08:00:00Z',
+    });
+
+    assert.equal(getExecuteCount(), 0);
+    assert.equal(state.status, 'success');
+    assert.equal(state.activeNodeId, cameraNode.id);
+    assert.equal(state.inputImageBase64, PNG_BASE64);
+    assert.equal(state.outputImageBase64, PNG_BASE64);
+    assert.equal(state.outputData.CameraBindingId, 'cam-1');
+    assert.equal(state.outputData.Width, 1920);
+    assert.equal(state.presenter.outputImageSrc, `data:image/png;base64,${PNG_BASE64}`);
+  } finally {
     coordinator.destroy();
   }
 });
