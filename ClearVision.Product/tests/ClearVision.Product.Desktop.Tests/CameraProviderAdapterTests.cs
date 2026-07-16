@@ -12,6 +12,21 @@ namespace ClearVision.Product.Desktop.Tests;
 public class CameraProviderAdapterTests
 {
     [Theory]
+    [InlineData("Hikvision", "Hikvision", "Huaray")]
+    [InlineData("Hikrobot", "Hikvision", "Huaray")]
+    [InlineData("Huaray", "Huaray", "Hikvision")]
+    [InlineData("MindVision", "Huaray", "Hikvision")]
+    [InlineData("", "Huaray", "Hikvision")]
+    public void CameraProviderOrder_ShouldPreferBindingManufacturer(
+        string manufacturer,
+        string expectedFirst,
+        string expectedSecond)
+    {
+        CameraProviderFactory.GetProviderOrderForManufacturer(manufacturer)
+            .Should().Equal(expectedFirst, expectedSecond);
+    }
+
+    [Theory]
     [InlineData("Huaray", "MV-CA050-10GM", "GigE", false)]
     [InlineData("MindVision", "MV-GE200", "GigE", false)]
     [InlineData("Daheng Imaging", "MER2-503", "GigE", false)]

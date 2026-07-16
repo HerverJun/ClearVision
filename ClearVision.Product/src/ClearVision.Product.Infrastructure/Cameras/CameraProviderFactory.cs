@@ -78,52 +78,70 @@ public static class CameraProviderFactory
     /// <summary>
     /// 自动检测相机
     /// </summary>
-    public static ICameraProvider? AutoDetect(string serialNumber)
+    public static ICameraProvider? AutoDetect(string serialNumber, string? manufacturerHint = null)
     {
-        // 尝试华睿
-        try
+        var normalizedSerial = serialNumber?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedSerial))
         {
-            var mv = new MindVisionCamera();
-            var devices = mv.EnumerateDevices();
-            if (devices.Exists(d => d.SerialNumber == serialNumber))
-            {
-                // 直接在 AutoDetect 内完成 Open，避免枚举与打开之间 SDK 全局状态变更
-                mv.Open(serialNumber);
-                return mv;
-            }
-            mv.Dispose();
-        }
-        catch (InvalidOperationException)
-        {
-            throw; // 透传详细的相机打开故障（例如此相机被占用等直接原因）
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[CameraProviderFactory] Huaray AutoDetect failed: {ex.Message}");
+            return null;
         }
 
-        // 尝试海康
-        try
+        foreach (var candidate in BuildProviderCandidates(manufacturerHint))
         {
-            var hik = new HikvisionCamera();
-            var devices = hik.EnumerateDevices();
-            if (devices.Exists(d => d.SerialNumber == serialNumber))
+            ICameraProvider? provider = null;
+            List<CameraDeviceInfo> devices;
+            try
             {
-                hik.Open(serialNumber);
-                return hik;
+                provider = candidate.Factory();
+                devices = provider.EnumerateDevices();
             }
-            hik.Dispose();
-        }
-        catch (InvalidOperationException)
-        {
-            throw; // 同理透传海康的具体抛错
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[CameraProviderFactory] Hikvision AutoDetect failed: {ex.Message}");
+            catch (Exception ex)
+            {
+                provider?.Dispose();
+                Debug.WriteLine($"[CameraProviderFactory] {candidate.Name} enumeration failed during AutoDetect: {ex.Message}");
+                continue;
+            }
+
+            var matchedDevice = devices.FirstOrDefault(device =>
+                string.Equals(device.SerialNumber?.Trim(), normalizedSerial, StringComparison.OrdinalIgnoreCase));
+            if (matchedDevice == null)
+            {
+                provider.Dispose();
+                continue;
+            }
+
+            try
+            {
+                // 使用 SDK 枚举返回的原始序列号打开设备，避免大小写或不可见空白差异。
+                provider.Open(matchedDevice.SerialNumber);
+                return provider;
+            }
+            catch
+            {
+                provider.Dispose();
+                throw;
+            }
         }
 
         return null;
+    }
+
+    internal static IReadOnlyList<string> GetProviderOrderForManufacturer(string? manufacturerHint)
+    {
+        return BuildProviderCandidates(manufacturerHint)
+            .Select(candidate => candidate.Name)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<ProviderCandidate> BuildProviderCandidates(string? manufacturerHint)
+    {
+        var normalized = NormalizeName(manufacturerHint);
+        var huaray = new ProviderCandidate("Huaray", () => new MindVisionCamera());
+        var hikvision = new ProviderCandidate("Hikvision", () => new HikvisionCamera());
+
+        return normalized is "hikvision" or "hikrobot" or "hik"
+            ? new[] { hikvision, huaray }
+            : new[] { huaray, hikvision };
     }
 
     private static List<CameraDeviceInfo> DeduplicateBySerial(IEnumerable<DiscoveredDevice> discoveredDevices)
@@ -272,6 +290,8 @@ public static class CameraProviderFactory
         public string SourceProvider { get; }
         public CameraDeviceInfo Device { get; }
     }
+
+    private sealed record ProviderCandidate(string Name, Func<ICameraProvider> Factory);
 }
 
 /// <summary>
