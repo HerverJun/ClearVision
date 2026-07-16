@@ -1,20 +1,32 @@
+<script setup lang="ts">
+import { CvPageState } from '@/design-system/patterns';
+</script>
+
 <template>
   <section
     class="product-page-state"
     data-studio-page="not-found"
   >
-    <p>404</p>
-    <h1>未找到此页面</h1>
-    <span>该地址不属于当前 StudioUI 产品路由。</span>
-    <RouterLink to="/overview">
-      返回概览
-    </RouterLink>
+    <CvPageState
+      kind="not-found"
+      title="未找到此页面"
+      description="错误代码 404。该地址不属于当前 StudioUI 产品路由。"
+      :heading-level="1"
+    >
+      <template #actions>
+        <RouterLink
+          class="product-page-state__action"
+          to="/overview"
+        >
+          返回概览
+        </RouterLink>
+      </template>
+    </CvPageState>
   </section>
 </template>
 
 <style scoped>
-.product-page-state { width: min(620px, 100%); margin: 12vh auto 0; text-align: center; }
-.product-page-state p { margin: 0; color: var(--cv-color-brand-text); font-size: 42px; font-weight: var(--cv-font-weight-semibold); }
-.product-page-state h1 { margin: var(--cv-space-2) 0; font-size: var(--cv-font-size-2xl); }
-.product-page-state span { display: block; margin-bottom: var(--cv-space-4); color: var(--cv-text-secondary); }
+.product-page-state { width: min(680px, 100%); margin: 8vh auto 0; }
+.product-page-state__action { min-height: var(--cv-density-control-height); padding: 0 var(--cv-space-4); display: inline-flex; align-items: center; border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-sm); background: var(--cv-surface-raised); color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-medium); text-decoration: none; }
+.product-page-state__action:hover { border-color: var(--cv-control-border-hover); background: var(--cv-interactive-hover); }
 </style>

@@ -29,6 +29,14 @@ const defaultCopy: Readonly<Record<CvPageStateKind, { title: string; description
 const copy = computed(() => defaultCopy[props.kind]);
 const resolvedTitle = computed(() => props.title ?? copy.value.title);
 const resolvedDescription = computed(() => props.description ?? copy.value.description);
+const stateRole = computed(() => props.kind === 'error'
+  ? 'alert'
+  : props.kind === 'loading' ? 'status' : undefined
+);
+const liveMode = computed(() => props.kind === 'error'
+  ? 'assertive'
+  : props.kind === 'loading' ? 'polite' : undefined
+);
 </script>
 
 <template>
@@ -38,8 +46,8 @@ const resolvedDescription = computed(() => props.description ?? copy.value.descr
       `cv-page-state--${kind}`,
       { 'cv-page-state--compact': compact }
     ]"
-    :role="kind === 'error' ? 'alert' : 'status'"
-    :aria-live="kind === 'error' ? 'assertive' : 'polite'"
+    :role="stateRole"
+    :aria-live="liveMode"
     :aria-busy="kind === 'loading' ? 'true' : undefined"
     data-design-pattern="page-state"
     :data-page-state="kind"
@@ -74,32 +82,31 @@ const resolvedDescription = computed(() => props.description ?? copy.value.descr
 <style scoped>
 .cv-page-state {
   display: grid;
-  min-height: 220px;
+  min-height: 168px;
   place-items: center;
   align-content: center;
-  gap: var(--cv-space-3);
-  padding: var(--cv-space-8) var(--cv-space-4);
-  border: 1px dashed var(--cv-border-default);
+  gap: var(--cv-space-2);
+  padding: var(--cv-space-6) var(--cv-space-4);
   border-radius: var(--cv-radius-md);
-  background: var(--cv-surface-2);
+  background: var(--cv-surface-page);
   text-align: center;
 }
 
 .cv-page-state--compact {
-  min-height: 120px;
+  min-height: 76px;
   grid-template-columns: auto minmax(0, 1fr) auto;
   place-items: center start;
   align-content: center;
-  padding: var(--cv-space-4);
+  padding: var(--cv-space-3);
   text-align: left;
 }
 
 .cv-page-state__icon {
   display: grid;
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   place-items: center;
-  border-radius: 50%;
+  border-radius: var(--cv-radius-md);
   background: var(--cv-color-status-info-soft);
   color: var(--cv-color-status-info-strong);
 }
@@ -113,14 +120,14 @@ const resolvedDescription = computed(() => props.description ?? copy.value.descr
 .cv-page-state__title {
   margin: 0;
   color: var(--cv-text-primary);
-  font-size: var(--cv-font-size-lg);
+  font-size: var(--cv-type-section-title-size);
   font-weight: var(--cv-font-weight-semibold);
   line-height: var(--cv-line-height-tight);
 }
 
 .cv-page-state p {
   max-width: 54ch;
-  margin: var(--cv-space-2) 0 0;
+  margin: var(--cv-space-1) 0 0;
   color: var(--cv-text-secondary);
   font-size: var(--cv-font-size-sm);
   line-height: var(--cv-line-height-normal);

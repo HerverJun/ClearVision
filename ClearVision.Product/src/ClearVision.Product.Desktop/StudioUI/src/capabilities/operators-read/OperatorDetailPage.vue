@@ -75,7 +75,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
 </script>
 
 <template>
-  <main
+  <section
     class="operator-detail"
     data-capability="operators-read-detail"
   >
@@ -257,7 +257,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
         </CvDataTable>
       </CvPanel>
     </div>
-  </main>
+  </section>
 </template>
 
 <style scoped>

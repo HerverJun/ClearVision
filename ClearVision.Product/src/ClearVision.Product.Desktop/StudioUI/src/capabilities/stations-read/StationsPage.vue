@@ -233,7 +233,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main
+  <section
     class="stations-page"
     data-capability="stations-read"
   >
@@ -314,7 +314,10 @@ onBeforeUnmount(() => {
       title="工作站列表"
       description="普通详情完全由列表项构建；管理员详情仅作为独立增强区域。"
     >
-      <CvToolbar label="工作站列表筛选">
+      <CvToolbar
+        interaction="group"
+        label="工作站列表筛选"
+      >
         <CvSearchField
           v-model="searchDraft"
           class="stations-page__search"
@@ -327,7 +330,7 @@ onBeforeUnmount(() => {
         />
         <CvButton
           size="sm"
-          variant="primary"
+          variant="secondary"
           @click="submitSearch"
         >
           搜索
@@ -446,7 +449,10 @@ onBeforeUnmount(() => {
       title="结果统计"
       description="九类标准结果分别呈现，不将未判定、无效或执行失败折叠为 NG。"
     >
-      <CvToolbar label="Station 结果统计筛选">
+      <CvToolbar
+        interaction="group"
+        label="Station 结果统计筛选"
+      >
         <CvSelect
           v-model="range"
           label="时间范围"
@@ -532,21 +538,21 @@ onBeforeUnmount(() => {
         </article>
       </div>
     </CvPanel>
-  </main>
+  </section>
 </template>
 
 <style scoped>
-.stations-page { display: grid; min-width: 0; gap: var(--cv-space-5); }
+.stations-page { display: grid; max-width: 1620px; min-width: 0; gap: var(--cv-density-page-gap); }
 .stations-page__search { flex: 1 1 320px; }
-.stations-page__metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; margin: 0; overflow: hidden; border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); }
-.stations-page__metrics div { display: grid; gap: var(--cv-space-1); padding: var(--cv-space-3); border-right: 1px solid var(--cv-border-subtle); background: var(--cv-surface-2); }
+.stations-page__metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; margin: 0; overflow: hidden; border-block: 1px solid var(--cv-border-subtle); }
+.stations-page__metrics div { display: grid; gap: var(--cv-space-1); padding: var(--cv-space-2) var(--cv-space-3); border-right: 1px solid var(--cv-border-subtle); }
 .stations-page__metrics div:last-child { border-right: 0; }
 .stations-page__metrics dt { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-.stations-page__metrics dd { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-xl); font-weight: var(--cv-font-weight-semibold); }
+.stations-page__metrics dd { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-xl); font-weight: var(--cv-font-weight-medium); font-variant-numeric: tabular-nums lining-nums; }
 .stations-page__station-name { display: grid; gap: var(--cv-space-1); }
 .stations-page__station-name span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .stations-page__outcomes { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: var(--cv-space-2); }
-.stations-page__outcomes article { display: grid; justify-items: start; gap: var(--cv-space-2); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); background: var(--cv-surface-2); }
+.stations-page__outcomes article { display: grid; justify-items: start; gap: var(--cv-space-2); padding: var(--cv-space-3); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); }
 .stations-page__outcomes strong { font-size: var(--cv-font-size-lg); }
 @media (max-width: 980px) {
   .stations-page__metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }

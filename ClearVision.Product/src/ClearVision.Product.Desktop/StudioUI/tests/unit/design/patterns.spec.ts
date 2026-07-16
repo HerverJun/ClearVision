@@ -57,6 +57,25 @@ describe('Design System page patterns', () => {
     wrapper.unmount();
   });
 
+  it('uses natural tab order for mixed-control groups', async () => {
+    const wrapper = mount(CvToolbar, {
+      attachTo: document.body,
+      props: { interaction: 'group', label: '筛选条件' },
+      slots: {
+        default: () => [
+          h('button', { id: 'filter-button', type: 'button' }, '筛选'),
+          h('input', { id: 'filter-input' })
+        ]
+      }
+    });
+    const button = wrapper.get('#filter-button');
+    (button.element as HTMLElement).focus();
+    await button.trigger('keydown', { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(button.element);
+    expect(wrapper.attributes('role')).toBe('group');
+    wrapper.unmount();
+  });
+
   it.each([
     ['loading', '正在加载'],
     ['empty', '暂无数据'],
@@ -70,5 +89,6 @@ describe('Design System page patterns', () => {
     expect(wrapper.text().trim().length).toBeGreaterThan(title.length);
     if (kind === 'loading') expect(wrapper.attributes('aria-busy')).toBe('true');
     if (kind === 'error') expect(wrapper.attributes('role')).toBe('alert');
+    if (!['loading', 'error'].includes(kind)) expect(wrapper.attributes('role')).toBeUndefined();
   });
 });

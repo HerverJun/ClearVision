@@ -439,7 +439,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main
+  <section
     class="results-page"
     data-capability="results-read"
     :data-results-source="source"
@@ -465,7 +465,10 @@ onBeforeUnmount(() => {
       title="筛选"
       description="筛选条件保存在地址栏参数中，便于恢复当前只读视图。"
     >
-      <CvToolbar label="结果筛选工具栏">
+      <CvToolbar
+        interaction="group"
+        label="结果筛选工具栏"
+      >
         <CvSelect
           v-model="sourceModel"
           class="results-page__source"
@@ -905,18 +908,18 @@ onBeforeUnmount(() => {
         </template>
       </CvPanel>
     </section>
-  </main>
+  </section>
 </template>
 
 <style scoped>
-.results-page { display: grid; min-width: 0; gap: var(--cv-space-5); }
+.results-page { display: grid; max-width: 1720px; min-width: 0; gap: var(--cv-density-page-gap); }
 .results-page__layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.8fr); gap: var(--cv-space-4); align-items: start; }
-.results-page__source { min-width: 150px; }
-.results-page__project { min-width: 230px; flex: 1 1 260px; }
-.results-page__outcome { min-width: 160px; }
-.results-page__diagnostic { min-width: 190px; }
-.results-page__date { min-width: 210px; }
-.results-page__page-size { min-width: 130px; }
+.results-page__source { min-width: 132px; }
+.results-page__project { min-width: 196px; flex: 1 1 220px; }
+.results-page__outcome { min-width: 136px; }
+.results-page__diagnostic { min-width: 156px; }
+.results-page__date { min-width: 176px; }
+.results-page__page-size { min-width: 112px; }
 .results-page__notice { margin-bottom: var(--cv-space-3); }
 .results-page__outcome-cell { display: grid; justify-items: start; gap: var(--cv-space-1); }
 .results-page__outcome-cell small { color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-2xs); }

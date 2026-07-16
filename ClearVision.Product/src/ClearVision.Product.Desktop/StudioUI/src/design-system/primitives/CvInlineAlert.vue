@@ -7,11 +7,13 @@ import type { CvInlineAlertTone } from './types';
 const props = withDefaults(defineProps<{
   tone?: CvInlineAlertTone;
   title?: string | undefined;
+  compact?: boolean;
   dismissible?: boolean;
   closeLabel?: string;
 }>(), {
   tone: 'info',
   title: undefined,
+  compact: false,
   dismissible: false,
   closeLabel: '关闭提示'
 });
@@ -31,7 +33,7 @@ const iconName = computed<CvIconName>(() => {
 <template>
   <aside
     class="cv-inline-alert"
-    :class="`cv-inline-alert--${tone}`"
+    :class="[`cv-inline-alert--${tone}`, { 'cv-inline-alert--compact': compact }]"
     :role="tone === 'error' ? 'alert' : 'status'"
     :aria-live="tone === 'error' ? 'assertive' : 'polite'"
     data-design-primitive="inline-alert"
@@ -48,12 +50,12 @@ const iconName = computed<CvIconName>(() => {
       <div class="cv-inline-alert__message">
         <slot />
       </div>
-      <div
-        v-if="$slots.actions"
-        class="cv-inline-alert__actions"
-      >
-        <slot name="actions" />
-      </div>
+    </div>
+    <div
+      v-if="$slots.actions"
+      class="cv-inline-alert__actions"
+    >
+      <slot name="actions" />
     </div>
     <button
       v-if="dismissible"
@@ -73,25 +75,26 @@ const iconName = computed<CvIconName>(() => {
 <style scoped>
 .cv-inline-alert {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--cv-space-3);
-  padding: var(--cv-space-3);
-  border: 1px solid var(--cv-color-status-info-border);
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--cv-space-2);
+  padding: var(--cv-space-2) var(--cv-space-3);
+  border: 1px solid var(--cv-border-subtle);
+  border-left: 2px solid var(--cv-color-status-info);
   border-radius: var(--cv-radius-sm);
   background: var(--cv-color-status-info-soft);
   color: var(--cv-color-status-info-strong);
 }
 
-.cv-inline-alert--success { border-color: var(--cv-color-status-ok-border); background: var(--cv-color-status-ok-soft); color: var(--cv-color-status-ok-strong); }
-.cv-inline-alert--warning { border-color: var(--cv-color-status-warning-border); background: var(--cv-color-status-warning-soft); color: var(--cv-color-status-warning-strong); }
-.cv-inline-alert--error { border-color: var(--cv-color-status-ng-border); background: var(--cv-color-status-ng-soft); color: var(--cv-color-status-ng-strong); }
-.cv-inline-alert__icon { margin-top: 1px; }
+.cv-inline-alert--success { border-left-color: var(--cv-color-status-ok); background: var(--cv-color-status-ok-soft); color: var(--cv-color-status-ok-strong); }
+.cv-inline-alert--warning { border-left-color: var(--cv-color-status-warning); background: var(--cv-color-status-warning-soft); color: var(--cv-color-status-warning-strong); }
+.cv-inline-alert--error { border-left-color: var(--cv-color-status-ng); background: var(--cv-color-status-ng-soft); color: var(--cv-color-status-ng-strong); }
+.cv-inline-alert--compact { padding-block: var(--cv-space-1); }
 .cv-inline-alert__content { min-width: 0; }
 .cv-inline-alert__title { display: block; font-size: var(--cv-font-size-sm); line-height: var(--cv-line-height-tight); }
 .cv-inline-alert__message { color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
 .cv-inline-alert__title + .cv-inline-alert__message { margin-top: var(--cv-space-1); }
-.cv-inline-alert__actions { display: flex; flex-wrap: wrap; gap: var(--cv-space-2); margin-top: var(--cv-space-2); }
+.cv-inline-alert__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--cv-space-2); }
 
 .cv-inline-alert__close {
   display: grid;
@@ -107,4 +110,9 @@ const iconName = computed<CvIconName>(() => {
 }
 
 .cv-inline-alert__close:hover { background: var(--cv-interactive-hover); }
+
+@media (max-width: 640px) {
+  .cv-inline-alert { align-items: start; grid-template-columns: auto minmax(0, 1fr) auto; }
+  .cv-inline-alert__actions { grid-column: 2 / -1; justify-content: flex-start; }
+}
 </style>

@@ -59,6 +59,9 @@ describe('mountStudioApp', () => {
     });
     expect(document.body.textContent).toContain('ClearVision');
     expect(document.body.textContent).toContain('tester');
+    expect(document.querySelectorAll('main')).toHaveLength(1);
+    expect(document.querySelector('main')?.id).toBe('product-main');
+    expect(document.querySelector('.product-layout__skip-link')?.textContent).toContain('跳到主要内容');
 
     mountedApp.unmount();
     mountedApp.unmount();
@@ -99,6 +102,7 @@ describe('mountStudioApp', () => {
       expect(document.querySelectorAll('[data-probe-state="ok"]')).toHaveLength(2);
     });
     expect(document.querySelectorAll('[data-product-shell]')).toHaveLength(1);
+    expect(document.querySelectorAll('main')).toHaveLength(1);
 
     await router.push('/about');
     await nextTick();

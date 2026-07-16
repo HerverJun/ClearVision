@@ -3,6 +3,9 @@
   background: var(--cv-surface-app);
   font-family: var(--cv-font-sans);
   font-synthesis: none;
+  font-feature-settings: "kern" 1, "liga" 1;
+  font-variant-numeric: tabular-nums lining-nums;
+  line-height: var(--cv-line-height-normal);
   text-rendering: optimizeLegibility;
 }
 
@@ -25,15 +28,13 @@ html {
 body {
   min-width: 320px;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 20% -10%, var(--cv-color-brand-soft), transparent 34rem),
-    var(--cv-surface-app);
+  background: var(--cv-surface-app);
   color: var(--cv-text-primary);
 }
 
 ::selection {
-  background: var(--cv-color-brand-200);
-  color: var(--cv-text-primary);
+  background: var(--cv-selection-background);
+  color: var(--cv-selection-text);
 }
 
 a {

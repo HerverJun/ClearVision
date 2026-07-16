@@ -265,6 +265,7 @@ async function verifyProductPage(page, route, runtimeErrors) {
   const writeRequests = productRequests.filter(item => item.method !== 'GET');
 
   const preferenceRequestStart = runtimeErrors.requests.length;
+  await page.locator('[data-product-appearance] > summary').click();
   const setPreference = async (groupName, buttonName, attribute, expectedValue) => {
     const group = page.getByRole('group', { name: groupName });
     const button = group.getByRole('button', { name: buttonName, exact: true });

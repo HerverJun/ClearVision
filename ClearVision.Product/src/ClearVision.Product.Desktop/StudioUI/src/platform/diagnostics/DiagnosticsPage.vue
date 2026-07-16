@@ -65,7 +65,7 @@ async function refreshSharedOwners(): Promise<void> {
 </script>
 
 <template>
-  <main
+  <section
     class="diagnostics-page"
     data-studio-page="diagnostics"
   >
@@ -136,7 +136,7 @@ async function refreshSharedOwners(): Promise<void> {
     >
       当前阶段使用预置会话进行认证预览，不代表真实登录交接、默认入口切换或现场执行链路已经迁移。
     </CvInlineAlert>
-  </main>
+  </section>
 </template>
 
 <style scoped>

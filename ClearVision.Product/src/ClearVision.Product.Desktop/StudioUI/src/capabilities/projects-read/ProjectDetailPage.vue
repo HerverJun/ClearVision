@@ -70,7 +70,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main
+  <section
     class="project-details"
     data-capability="projects-read-detail"
   >
@@ -198,7 +198,7 @@ onBeforeUnmount(() => {
         />
       </CvPanel>
     </div>
-  </main>
+  </section>
 </template>
 
 <style scoped>

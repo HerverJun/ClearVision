@@ -177,9 +177,8 @@ function requestSort(column: CvDataTableColumn<Row>): void {
 .cv-data-table {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--cv-border-subtle);
-  border-radius: var(--cv-radius-md);
-  background: var(--cv-surface-1);
+  border-block: 1px solid var(--cv-border-subtle);
+  background: transparent;
 }
 
 .cv-data-table__scroll-region {
@@ -192,6 +191,7 @@ table {
   border-collapse: collapse;
   color: var(--cv-text-primary);
   font-size: var(--cv-font-size-sm);
+  font-variant-numeric: tabular-nums lining-nums;
   text-align: left;
 }
 
@@ -212,7 +212,7 @@ caption {
   white-space: nowrap;
 }
 
-thead { background: var(--cv-surface-2); }
+thead { background: var(--cv-surface-page); }
 
 th,
 td {
@@ -226,7 +226,8 @@ td {
 th {
   color: var(--cv-text-secondary);
   font-size: var(--cv-font-size-xs);
-  font-weight: var(--cv-font-weight-semibold);
+  font-weight: var(--cv-font-weight-medium);
+  letter-spacing: var(--cv-letter-spacing-caption);
   white-space: nowrap;
 }
 
@@ -261,7 +262,6 @@ tbody tr:hover { background: var(--cv-interactive-hover); }
   justify-content: center;
   gap: var(--cv-space-2);
   padding: var(--cv-space-4);
-  border-top: 1px solid var(--cv-border-subtle);
   color: var(--cv-text-secondary);
   font-size: var(--cv-font-size-sm);
 }

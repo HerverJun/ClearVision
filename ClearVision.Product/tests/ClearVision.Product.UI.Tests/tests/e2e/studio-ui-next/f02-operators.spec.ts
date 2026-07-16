@@ -169,6 +169,28 @@ test('Operator surfaces malformed catalog and missing detail as frozen product s
   await expect(page.getByText('算子不存在（404）')).toBeVisible();
 });
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`Operator filters expose a visible ${theme} focus boundary`, async ({ page }) => {
+    await installF02VisualPreferences(page, theme, 'compact');
+    await bootOperators(page);
+    await page.goto('/studio/index.html#/operators');
+    const search = page.getByRole('searchbox', { name: '搜索算子' });
+    await search.focus();
+    await expect(search).toBeFocused();
+    const focusStyle = await search.evaluate(element => {
+      const style = getComputedStyle(element);
+      return {
+        outlineStyle: style.outlineStyle,
+        outlineWidth: Number.parseFloat(style.outlineWidth),
+        outlineColor: style.outlineColor
+      };
+    });
+    expect(focusStyle.outlineStyle).toBe('solid');
+    expect(focusStyle.outlineWidth).toBeGreaterThanOrEqual(2);
+    expect(focusStyle.outlineColor).not.toBe('rgba(0, 0, 0, 0)');
+  });
+}
+
 for (const visual of [
   { id: 'operators-light-compact', width: 1366, height: 768, theme: 'light' },
   { id: 'operators-dark-compact', width: 1366, height: 768, theme: 'dark' },

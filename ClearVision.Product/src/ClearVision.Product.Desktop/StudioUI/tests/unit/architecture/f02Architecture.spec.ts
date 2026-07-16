@@ -52,6 +52,17 @@ describe('F02 architecture guards', () => {
     expect(files.filter(path => /\b(?:EventBus|ServiceRegistry)\b/.test(read(path)))).toEqual([]);
   });
 
+  it('keeps one formal main landmark and one design token source', () => {
+    const formalMainFiles = files
+      .filter(path => !path.includes(`${join(sourceRoot, 'labs')}`))
+      .filter(path => /<main(?:\s|>)/.test(read(path)))
+      .map(path => relative(studioRoot, path).replaceAll('\\', '/'));
+    expect(formalMainFiles).toEqual(['src/app/layouts/ProductLayout.vue']);
+    expect(existsSync(join(sourceRoot, 'design-system/tokens/tokens.css'))).toBe(true);
+    expect(files.filter(path => /data-product-shell="ready"/.test(read(path))))
+      .toEqual([join(sourceRoot, 'app/layouts/ProductLayout.vue')]);
+  });
+
   it('isolates Labs from the formal navigation', () => {
     const navigation = read(join(sourceRoot, 'app/navigation.ts'));
     const router = read(join(sourceRoot, 'app/router.ts'));

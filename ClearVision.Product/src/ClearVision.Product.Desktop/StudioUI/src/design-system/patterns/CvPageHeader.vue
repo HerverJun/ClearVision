@@ -64,8 +64,7 @@ withDefaults(defineProps<{
   display: grid;
   min-width: 0;
   gap: var(--cv-space-2);
-  padding-block: var(--cv-space-2) var(--cv-space-4);
-  border-bottom: 1px solid var(--cv-border-subtle);
+  padding-block: 0 var(--cv-space-2);
 }
 
 .cv-page-header__row {
@@ -80,23 +79,24 @@ withDefaults(defineProps<{
 
 .cv-page-header__eyebrow {
   margin: 0 0 var(--cv-space-1);
-  color: var(--cv-color-brand-text);
+  color: var(--cv-text-muted);
   font-size: var(--cv-font-size-2xs);
-  font-weight: var(--cv-font-weight-semibold);
-  letter-spacing: 0.04em;
+  font-weight: var(--cv-font-weight-medium);
+  letter-spacing: 0.08em;
 }
 
 .cv-page-header__title {
   margin: 0;
   color: var(--cv-text-primary);
-  font-size: var(--cv-font-size-xl);
+  font-size: var(--cv-type-page-title-size);
   font-weight: var(--cv-font-weight-semibold);
+  letter-spacing: var(--cv-letter-spacing-title);
   line-height: var(--cv-line-height-tight);
 }
 
 .cv-page-header__description {
   max-width: 76ch;
-  margin: var(--cv-space-2) 0 0;
+  margin: var(--cv-space-1) 0 0;
   color: var(--cv-text-secondary);
   font-size: var(--cv-font-size-sm);
   line-height: var(--cv-line-height-normal);

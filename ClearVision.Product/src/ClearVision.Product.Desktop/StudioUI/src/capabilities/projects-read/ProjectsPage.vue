@@ -96,7 +96,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main
+  <section
     class="projects-page"
     data-capability="projects-read"
   >
@@ -122,7 +122,10 @@ onBeforeUnmount(() => {
         title="全部工程"
         description="列表仅显示稳定摘要字段，不从列表数据推断流程信息。"
       >
-        <CvToolbar label="工程列表工具栏">
+        <CvToolbar
+          interaction="group"
+          label="工程列表工具栏"
+        >
           <CvSearchField
             v-model="searchDraft"
             class="projects-page__search"
@@ -135,7 +138,7 @@ onBeforeUnmount(() => {
           />
           <CvButton
             size="sm"
-            variant="primary"
+            variant="secondary"
             @click="submitSearch"
           >
             搜索
@@ -283,18 +286,19 @@ onBeforeUnmount(() => {
         </ol>
       </CvPanel>
     </div>
-  </main>
+  </section>
 </template>
 
 <style scoped>
-.projects-page { display: grid; gap: var(--cv-space-5); min-width: 0; }
+.projects-page { display: grid; max-width: 1540px; gap: var(--cv-density-page-gap); min-width: 0; }
 .projects-page__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); gap: var(--cv-space-4); align-items: start; }
 .projects-page__search { flex: 1 1 320px; }
 .projects-page__sort { min-width: 150px; }
 .projects-page__notice { margin-bottom: var(--cv-space-3); }
 .projects-page__name { color: var(--cv-text-primary); font-weight: var(--cv-font-weight-semibold); }
-.projects-page__recent-list { display: grid; gap: var(--cv-space-3); margin: 0; padding: 0; list-style: none; }
-.projects-page__recent-list li { display: grid; gap: var(--cv-space-1); padding-bottom: var(--cv-space-3); border-bottom: 1px solid var(--cv-border-subtle); }
+.projects-page__recent-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.projects-page__recent-list li { display: grid; gap: var(--cv-space-1); padding-block: var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); }
+.projects-page__recent-list li:last-child { border-bottom: 0; }
 .projects-page__recent-list span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 @media (max-width: 900px) { .projects-page__layout { grid-template-columns: 1fr; } }
 </style>

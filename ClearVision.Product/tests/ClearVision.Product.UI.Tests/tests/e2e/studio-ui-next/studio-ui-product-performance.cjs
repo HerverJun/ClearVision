@@ -1388,10 +1388,10 @@ async function runBrowserFixtureProfile() {
   const url = new URL(origin);
   assert(['127.0.0.1', 'localhost'].includes(url.hostname),
     'Browser fixture performance origin must be local.');
-  const evidenceRoot = path.resolve(repoRoot, '.tmp/studio-ui-next/f02/performance-owner');
+  const evidenceRoot = path.resolve(repoRoot, '.tmp/studio-ui-next/f02-1/performance-owner');
   const evidencePrefix = `${evidenceRoot}${path.sep}`;
   assert(evidenceDir.startsWith(evidencePrefix),
-    'CV_EVIDENCE_DIR must remain under .tmp/studio-ui-next/f02/performance-owner.');
+    'CV_EVIDENCE_DIR must remain under .tmp/studio-ui-next/f02-1/performance-owner.');
   fs.mkdirSync(evidenceDir, { recursive: true });
   const outputPath = path.join(evidenceDir, 'studio-ui-product-performance.json');
   assert(!fs.existsSync(outputPath), `Evidence already exists: ${outputPath}`);

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
 import { productNavigation } from '@/app/navigation';
 import { useProductRuntime } from '@/app/productRuntime';
 import { CvButton, CvInlineAlert, CvStatusBadge } from '@/design-system/primitives';
+import { CvIcon } from '@/design-system/icons';
 import './product-layout.css';
 
 const route = useRoute();
@@ -11,6 +12,8 @@ const runtime = useProductRuntime();
 const session = runtime.session.projection;
 const systemStatus = runtime.systemStatus.projection;
 const preferences = runtime.preferences.projection;
+const contentRoot = ref<HTMLElement>();
+const appearanceDetails = ref<HTMLDetailsElement>();
 
 const breadcrumbs = computed(() => route.matched
   .filter(record => !record.meta.internal && record.meta.breadcrumb)
@@ -37,6 +40,22 @@ const roleLabel = computed(() => {
   if (role === 'Operator') return '操作员';
   return role ?? '预置会话不可用';
 });
+const themeLabel = computed(() => preferences.theme === 'dark' ? '深色' : '浅色');
+const densityLabel = computed(() => preferences.density === 'comfortable' ? '舒适' : '紧凑');
+const userInitial = computed(() => (session.user?.username?.trim().charAt(0) || '未').toLocaleUpperCase());
+
+function closeAppearance(): void {
+  const details = appearanceDetails.value;
+  if (!details?.open) return;
+  details.open = false;
+  details.querySelector<HTMLElement>('summary')?.focus();
+}
+
+watch(() => route.fullPath, async (current, previous) => {
+  if (!previous || current === previous) return;
+  await nextTick();
+  contentRoot.value?.focus({ preventScroll: true });
+});
 
 onMounted(() => runtime.preferences.apply());
 </script>
@@ -46,6 +65,11 @@ onMounted(() => runtime.preferences.apply());
     class="product-layout"
     data-product-shell="ready"
   >
+    <a
+      class="product-layout__skip-link"
+      href="#product-main"
+    >跳到主要内容</a>
+
     <aside class="product-layout__sidebar">
       <RouterLink
         class="product-layout__brand"
@@ -58,10 +82,13 @@ onMounted(() => runtime.preferences.apply());
         >CV</span>
         <span>
           <strong>ClearVision</strong>
-          <small>工业视觉 Studio</small>
+          <small>Vision Studio</small>
         </span>
       </RouterLink>
 
+      <div class="product-layout__nav-heading">
+        产品工作区
+      </div>
       <nav aria-label="产品主导航">
         <RouterLink
           v-for="item in productNavigation"
@@ -69,6 +96,8 @@ onMounted(() => runtime.preferences.apply());
           :to="item.to"
           class="product-layout__nav-item"
           :data-product-nav="item.to"
+          :aria-label="`${item.label}，${item.description}`"
+          :title="item.description"
         >
           <span>{{ item.label }}</span>
           <small>{{ item.description }}</small>
@@ -76,6 +105,7 @@ onMounted(() => runtime.preferences.apply());
       </nav>
 
       <div class="product-layout__sidebar-note">
+        <small>工作模式</small>
         <strong>只读工作区</strong>
         <span>正式保存、执行与现场控制继续由现有后端权威链路负责。</span>
       </div>
@@ -107,66 +137,116 @@ onMounted(() => runtime.preferences.apply());
         </nav>
 
         <div class="product-layout__topbar-actions">
-          <CvStatusBadge
-            :tone="statusTone"
-            :label="statusLabel"
-          />
           <div
-            class="product-layout__preference-group"
-            role="group"
-            aria-label="主题"
+            class="product-layout__service-status"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
           >
-            <CvButton
-              size="sm"
-              :variant="preferences.theme === 'light' ? 'secondary' : 'quiet'"
-              :aria-pressed="preferences.theme === 'light'"
-              @click="runtime.preferences.setTheme('light')"
-            >
-              浅色
-            </CvButton>
-            <CvButton
-              size="sm"
-              :variant="preferences.theme === 'dark' ? 'secondary' : 'quiet'"
-              :aria-pressed="preferences.theme === 'dark'"
-              @click="runtime.preferences.setTheme('dark')"
-            >
-              深色
-            </CvButton>
+            <CvStatusBadge
+              :tone="statusTone"
+              :label="statusLabel"
+            />
           </div>
-          <div
-            class="product-layout__preference-group"
-            role="group"
-            aria-label="界面密度"
+
+          <details
+            ref="appearanceDetails"
+            class="product-layout__appearance"
+            data-product-appearance
+            @keydown.esc.stop.prevent="closeAppearance"
           >
-            <CvButton
-              size="sm"
-              :variant="preferences.density === 'compact' ? 'secondary' : 'quiet'"
-              :aria-pressed="preferences.density === 'compact'"
-              @click="runtime.preferences.setDensity('compact')"
+            <summary
+              class="product-layout__appearance-trigger"
+              :aria-label="`外观设置，当前${themeLabel}主题，${densityLabel}密度`"
             >
-              紧凑
-            </CvButton>
-            <CvButton
-              size="sm"
-              :variant="preferences.density === 'comfortable' ? 'secondary' : 'quiet'"
-              :aria-pressed="preferences.density === 'comfortable'"
-              @click="runtime.preferences.setDensity('comfortable')"
+              <span>外观</span>
+              <small>{{ themeLabel }} · {{ densityLabel }}</small>
+              <CvIcon
+                name="chevron-right"
+                size="sm"
+              />
+            </summary>
+            <div
+              class="product-layout__appearance-popover"
+              aria-label="外观设置"
             >
-              舒适
-            </CvButton>
-          </div>
+              <div class="product-layout__appearance-section">
+                <span>主题</span>
+                <div
+                  class="product-layout__preference-group"
+                  role="group"
+                  aria-label="主题"
+                >
+                  <CvButton
+                    size="sm"
+                    :variant="preferences.theme === 'light' ? 'secondary' : 'quiet'"
+                    :aria-pressed="preferences.theme === 'light'"
+                    @click="runtime.preferences.setTheme('light')"
+                  >
+                    浅色
+                  </CvButton>
+                  <CvButton
+                    size="sm"
+                    :variant="preferences.theme === 'dark' ? 'secondary' : 'quiet'"
+                    :aria-pressed="preferences.theme === 'dark'"
+                    @click="runtime.preferences.setTheme('dark')"
+                  >
+                    深色
+                  </CvButton>
+                </div>
+              </div>
+              <div class="product-layout__appearance-section">
+                <span>界面密度</span>
+                <div
+                  class="product-layout__preference-group"
+                  role="group"
+                  aria-label="界面密度"
+                >
+                  <CvButton
+                    size="sm"
+                    :variant="preferences.density === 'compact' ? 'secondary' : 'quiet'"
+                    :aria-pressed="preferences.density === 'compact'"
+                    @click="runtime.preferences.setDensity('compact')"
+                  >
+                    紧凑
+                  </CvButton>
+                  <CvButton
+                    size="sm"
+                    :variant="preferences.density === 'comfortable' ? 'secondary' : 'quiet'"
+                    :aria-pressed="preferences.density === 'comfortable'"
+                    @click="runtime.preferences.setDensity('comfortable')"
+                  >
+                    舒适
+                  </CvButton>
+                </div>
+              </div>
+            </div>
+          </details>
+
           <div class="product-layout__user">
-            <strong>{{ session.user?.username ?? '未认证' }}</strong>
-            <small>{{ roleLabel }}</small>
+            <span
+              class="product-layout__user-avatar"
+              aria-hidden="true"
+            >{{ userInitial }}</span>
+            <span class="product-layout__user-copy">
+              <strong>{{ session.user?.username ?? '未认证' }}</strong>
+              <small>{{ roleLabel }}</small>
+            </span>
           </div>
         </div>
       </header>
 
-      <main class="product-layout__content">
+      <main
+        id="product-main"
+        ref="contentRoot"
+        class="product-layout__content"
+        tabindex="-1"
+      >
         <CvInlineAlert
           v-if="session.phase === 'unauthorized'"
           class="product-layout__session-alert"
           tone="warning"
+          compact
           title="需要预置会话"
           data-product-state="unauthorized"
         >
@@ -185,6 +265,7 @@ onMounted(() => runtime.preferences.apply());
           v-else-if="session.phase === 'error'"
           class="product-layout__session-alert"
           tone="error"
+          compact
           title="会话读取失败"
           data-product-state="error"
         >
@@ -194,6 +275,7 @@ onMounted(() => runtime.preferences.apply());
           v-else-if="session.phase === 'stale'"
           class="product-layout__session-alert"
           tone="warning"
+          compact
           title="会话投影已过期"
           data-product-state="stale"
         >

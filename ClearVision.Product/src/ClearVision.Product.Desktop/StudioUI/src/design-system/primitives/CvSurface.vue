@@ -38,9 +38,9 @@ withDefaults(defineProps<{
   color: var(--cv-text-primary);
 }
 
-.cv-surface--level-1 { background: var(--cv-surface-1); }
-.cv-surface--level-2 { background: var(--cv-surface-2); }
-.cv-surface--level-3 { background: var(--cv-surface-3); }
+.cv-surface--level-1 { background: var(--cv-surface-raised); }
+.cv-surface--level-2 { background: var(--cv-surface-page); }
+.cv-surface--level-3 { background: var(--cv-surface-sunken); }
 .cv-surface--bordered { border: 1px solid var(--cv-border-subtle); }
 .cv-surface--elevation-1 { box-shadow: var(--cv-elevation-1); }
 .cv-surface--elevation-2 { box-shadow: var(--cv-elevation-2); }

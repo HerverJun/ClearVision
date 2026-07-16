@@ -45,7 +45,6 @@ withDefaults(defineProps<{
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
   margin: 0;
-  border-top: 1px solid var(--cv-border-subtle);
 }
 
 .cv-description-list--columns-2 {
@@ -57,9 +56,11 @@ withDefaults(defineProps<{
   min-width: 0;
   grid-template-columns: minmax(96px, 0.42fr) minmax(0, 1fr);
   gap: var(--cv-space-3);
-  padding: var(--cv-space-3) var(--cv-space-2);
+  padding: var(--cv-space-2) 0;
   border-bottom: 1px solid var(--cv-border-subtle);
 }
+
+.cv-description-list__item:last-child { border-bottom: 0; }
 
 .cv-description-list__item--wide { grid-column: 1 / -1; }
 
@@ -74,6 +75,7 @@ dd {
   margin: 0;
   color: var(--cv-text-primary);
   font-size: var(--cv-font-size-sm);
+  font-variant-numeric: tabular-nums lining-nums;
   overflow-wrap: anywhere;
 }
 

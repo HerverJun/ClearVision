@@ -1,7 +1,17 @@
 <script setup lang="ts">
 withDefaults(defineProps<{
   as?: 'span' | 'p' | 'div' | 'h1' | 'h2' | 'h3' | 'h4' | 'code';
-  variant?: 'display' | 'title' | 'heading' | 'body' | 'caption' | 'label';
+  variant?:
+    | 'display'
+    | 'page-title'
+    | 'section-title'
+    | 'body'
+    | 'secondary'
+    | 'caption'
+    | 'numeric'
+    | 'title'
+    | 'heading'
+    | 'label';
   tone?: 'primary' | 'secondary' | 'muted' | 'inverse';
   weight?: 'regular' | 'medium' | 'semibold';
   mono?: boolean;
@@ -40,36 +50,53 @@ withDefaults(defineProps<{
 }
 
 .cv-typography--display {
-  font-size: clamp(var(--cv-font-size-xl), 2vw, var(--cv-font-size-2xl));
+  font-size: clamp(var(--cv-font-size-xl), 2vw, var(--cv-type-display-size));
   line-height: var(--cv-line-height-tight);
-  letter-spacing: -0.025em;
+  letter-spacing: var(--cv-letter-spacing-display);
 }
 
+.cv-typography--page-title,
 .cv-typography--title {
-  font-size: var(--cv-font-size-xl);
+  font-size: var(--cv-type-page-title-size);
   line-height: var(--cv-line-height-tight);
-  letter-spacing: -0.015em;
+  letter-spacing: var(--cv-letter-spacing-title);
 }
 
+.cv-typography--section-title,
 .cv-typography--heading {
-  font-size: var(--cv-font-size-lg);
+  font-size: var(--cv-type-section-title-size);
   line-height: var(--cv-line-height-tight);
 }
 
 .cv-typography--body {
-  font-size: var(--cv-font-size-md);
+  font-size: var(--cv-type-body-size);
+  line-height: var(--cv-line-height-normal);
+  letter-spacing: var(--cv-letter-spacing-body);
+}
+
+.cv-typography--secondary {
+  font-size: var(--cv-type-secondary-size);
   line-height: var(--cv-line-height-normal);
 }
 
 .cv-typography--caption,
 .cv-typography--label {
-  font-size: var(--cv-font-size-xs);
+  font-size: var(--cv-type-caption-size);
   line-height: var(--cv-line-height-normal);
+  letter-spacing: var(--cv-letter-spacing-caption);
 }
 
 .cv-typography--label {
   letter-spacing: 0.035em;
   text-transform: uppercase;
+}
+
+.cv-typography--numeric {
+  font-family: var(--cv-font-numeric);
+  font-size: var(--cv-type-numeric-size);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.01em;
+  line-height: var(--cv-line-height-tight);
 }
 
 .cv-typography--secondary {

@@ -18,8 +18,8 @@
   --cv-color-brand-soft: rgba(182, 69, 60, 0.1);
   --cv-color-brand-border: rgba(182, 69, 60, 0.3);
 
-  --cv-color-link: #2f6fed;
-  --cv-color-link-hover: #245dcc;
+  --cv-color-link: #245fc2;
+  --cv-color-link-hover: #174d9f;
 
   --cv-color-status-ok: #16866f;
   --cv-color-status-ok-strong: #0f6f5c;
@@ -33,29 +33,41 @@
   --cv-color-status-warning-strong: #8e5005;
   --cv-color-status-warning-soft: rgba(181, 106, 10, 0.1);
   --cv-color-status-warning-border: rgba(181, 106, 10, 0.28);
-  --cv-color-status-info: #53768c;
-  --cv-color-status-info-strong: #3d5f74;
-  --cv-color-status-info-soft: rgba(83, 118, 140, 0.1);
-  --cv-color-status-info-border: rgba(83, 118, 140, 0.26);
-  --cv-color-status-idle: #737b87;
-  --cv-color-status-idle-soft: rgba(115, 123, 135, 0.1);
+  --cv-color-status-info: #2563d8;
+  --cv-color-status-info-strong: #174da9;
+  --cv-color-status-info-soft: rgba(37, 99, 216, 0.09);
+  --cv-color-status-info-border: rgba(37, 99, 216, 0.3);
+  --cv-color-status-idle: #646c68;
+  --cv-color-status-idle-soft: rgba(100, 108, 104, 0.09);
 
   /* Typography */
-  --cv-font-sans: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  --cv-font-sans: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
   --cv-font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  --cv-font-numeric: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
   --cv-font-size-2xs: 11px;
   --cv-font-size-xs: 12px;
   --cv-font-size-sm: 13px;
   --cv-font-size-md: 14px;
   --cv-font-size-lg: 16px;
-  --cv-font-size-xl: 20px;
-  --cv-font-size-2xl: 26px;
-  --cv-line-height-tight: 1.25;
-  --cv-line-height-normal: 1.5;
-  --cv-line-height-relaxed: 1.65;
+  --cv-font-size-xl: 22px;
+  --cv-font-size-2xl: 28px;
+  --cv-line-height-tight: 1.28;
+  --cv-line-height-normal: 1.55;
+  --cv-line-height-relaxed: 1.68;
   --cv-font-weight-regular: 400;
-  --cv-font-weight-medium: 550;
-  --cv-font-weight-semibold: 650;
+  --cv-font-weight-medium: 520;
+  --cv-font-weight-semibold: 620;
+  --cv-type-display-size: var(--cv-font-size-2xl);
+  --cv-type-page-title-size: var(--cv-font-size-xl);
+  --cv-type-section-title-size: var(--cv-font-size-lg);
+  --cv-type-body-size: var(--cv-font-size-md);
+  --cv-type-secondary-size: var(--cv-font-size-sm);
+  --cv-type-caption-size: var(--cv-font-size-xs);
+  --cv-type-numeric-size: var(--cv-font-size-md);
+  --cv-letter-spacing-display: -0.025em;
+  --cv-letter-spacing-title: -0.018em;
+  --cv-letter-spacing-body: 0;
+  --cv-letter-spacing-caption: 0.01em;
 
   /* Spacing */
   --cv-space-0: 0;
@@ -72,23 +84,23 @@
   /* Radius */
   --cv-radius-xs: 3px;
   --cv-radius-sm: 5px;
-  --cv-radius-md: 8px;
-  --cv-radius-lg: 12px;
-  --cv-radius-xl: 16px;
+  --cv-radius-md: 7px;
+  --cv-radius-lg: 10px;
+  --cv-radius-xl: 14px;
   --cv-radius-pill: 999px;
 
   /* Elevation */
   --cv-elevation-0: none;
-  --cv-elevation-1: 0 1px 2px rgba(18, 31, 53, 0.06);
-  --cv-elevation-2: 0 8px 24px rgba(18, 31, 53, 0.09);
-  --cv-elevation-3: 0 18px 48px rgba(18, 31, 53, 0.14);
-  --cv-elevation-modal: 0 28px 80px rgba(8, 18, 36, 0.22);
+  --cv-elevation-1: 0 1px 2px rgba(25, 29, 27, 0.05), 0 8px 22px rgba(25, 29, 27, 0.035);
+  --cv-elevation-2: 0 10px 28px rgba(25, 29, 27, 0.09);
+  --cv-elevation-3: 0 22px 56px rgba(25, 29, 27, 0.14);
+  --cv-elevation-modal: 0 28px 76px rgba(15, 18, 16, 0.24);
 
   /* Motion */
-  --cv-motion-duration-instant: 70ms;
-  --cv-motion-duration-fast: 120ms;
+  --cv-motion-duration-instant: 100ms;
+  --cv-motion-duration-fast: 140ms;
   --cv-motion-duration-normal: 180ms;
-  --cv-motion-duration-slow: 260ms;
+  --cv-motion-duration-slow: 200ms;
   --cv-motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --cv-motion-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
   --cv-motion-distance: 6px;
@@ -105,30 +117,47 @@
   --cv-density-control-height: 30px;
   --cv-density-control-height-sm: 26px;
   --cv-density-row-height: 32px;
-  --cv-density-panel-padding: 14px;
+  --cv-density-panel-padding: 12px;
   --cv-density-field-gap: 6px;
   --cv-density-content-gap: 12px;
   --cv-density-icon-size: 16px;
+  --cv-density-page-padding: 20px;
+  --cv-density-page-gap: 16px;
 
   /* Light surfaces */
-  --cv-surface-app: #edf2f8;
+  --cv-surface-app: #f1f2ef;
+  --cv-surface-page: #f7f7f5;
+  --cv-surface-raised: #ffffff;
+  --cv-surface-floating: #ffffff;
+  --cv-surface-sunken: #ebede9;
   --cv-surface-1: #ffffff;
-  --cv-surface-2: #f7f9fc;
-  --cv-surface-3: #eef3f8;
+  --cv-surface-2: #f7f7f5;
+  --cv-surface-3: #ebede9;
   --cv-surface-overlay: rgba(255, 255, 255, 0.98);
   --cv-surface-canvas: #e8eef6;
-  --cv-text-primary: #172235;
-  --cv-text-secondary: #536174;
-  --cv-text-muted: #7c8899;
-  --cv-text-inverse: #f7fbff;
-  --cv-border-subtle: #dce4ee;
-  --cv-border-default: #cbd6e3;
-  --cv-border-strong: #aebdcd;
-  --cv-interactive-hover: #f0f5fb;
-  --cv-interactive-active: #e4edf8;
-  --cv-backdrop: rgba(15, 29, 52, 0.5);
-  --cv-focus-ring-color: #2f6fed;
-  --cv-focus-ring: 0 0 0 3px rgba(47, 111, 237, 0.2);
+  --cv-text-primary: #191c1a;
+  --cv-text-secondary: #505753;
+  --cv-text-muted: #626a65;
+  --cv-text-inverse: #f6f7f4;
+  --cv-border-subtle: #dde1dd;
+  --cv-border-default: #bec5c0;
+  --cv-border-strong: #737c76;
+  --cv-control-border: #858e88;
+  --cv-control-border-hover: #636d66;
+  --cv-interactive-hover: #ecefeb;
+  --cv-interactive-active: #e2e6e1;
+  --cv-backdrop: rgba(20, 24, 21, 0.52);
+  --cv-focus-ring-color: #1769d2;
+  --cv-focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #1769d2;
+  --cv-selection-background: #f0d6d2;
+  --cv-selection-text: #191c1a;
+  --cv-shell-sidebar: #181b1e;
+  --cv-shell-sidebar-surface: #202428;
+  --cv-shell-sidebar-text: #f2f3f0;
+  --cv-shell-sidebar-muted: #abb2ad;
+  --cv-shell-sidebar-border: rgba(255, 255, 255, 0.09);
+  --cv-shell-sidebar-hover: rgba(255, 255, 255, 0.055);
+  --cv-shell-sidebar-active: rgba(255, 255, 255, 0.09);
 
   /* Canvas tokens consumed by the canonical FlowCanvas. */
   --flow-canvas-background: #e6edf6;
@@ -173,8 +202,8 @@ html[data-theme="dark"] {
   --cv-color-brand-soft: rgba(182, 69, 60, 0.18);
   --cv-color-brand-border: rgba(182, 69, 60, 0.42);
 
-  --cv-color-link: #82adff;
-  --cv-color-link-hover: #a5c4ff;
+  --cv-color-link: #8bb7ff;
+  --cv-color-link-hover: #b4d0ff;
 
   --cv-color-status-ok: #55b59d;
   --cv-color-status-ok-strong: #78cbb5;
@@ -188,36 +217,51 @@ html[data-theme="dark"] {
   --cv-color-status-warning-strong: #efbe7d;
   --cv-color-status-warning-soft: rgba(224, 166, 90, 0.13);
   --cv-color-status-warning-border: rgba(224, 166, 90, 0.32);
-  --cv-color-status-info: #8db4ca;
-  --cv-color-status-info-strong: #acd0e3;
-  --cv-color-status-info-soft: rgba(141, 180, 202, 0.13);
-  --cv-color-status-info-border: rgba(141, 180, 202, 0.3);
-  --cv-color-status-idle: #929ba8;
-  --cv-color-status-idle-soft: rgba(146, 155, 168, 0.13);
+  --cv-color-status-info: #74a7ff;
+  --cv-color-status-info-strong: #a9c8ff;
+  --cv-color-status-info-soft: rgba(116, 167, 255, 0.13);
+  --cv-color-status-info-border: rgba(116, 167, 255, 0.34);
+  --cv-color-status-idle: #9aa39e;
+  --cv-color-status-idle-soft: rgba(154, 163, 158, 0.12);
 
-  --cv-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.22);
-  --cv-elevation-2: 0 10px 28px rgba(0, 0, 0, 0.3);
-  --cv-elevation-3: 0 20px 56px rgba(0, 0, 0, 0.4);
-  --cv-elevation-modal: 0 32px 88px rgba(0, 0, 0, 0.56);
+  --cv-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.28), 0 10px 24px rgba(0, 0, 0, 0.12);
+  --cv-elevation-2: 0 12px 32px rgba(0, 0, 0, 0.34);
+  --cv-elevation-3: 0 24px 60px rgba(0, 0, 0, 0.44);
+  --cv-elevation-modal: 0 34px 88px rgba(0, 0, 0, 0.58);
 
-  --cv-surface-app: #0d1420;
-  --cv-surface-1: #141d2a;
-  --cv-surface-2: #192433;
-  --cv-surface-3: #223044;
-  --cv-surface-overlay: rgba(20, 29, 42, 0.98);
+  --cv-surface-app: #0f1113;
+  --cv-surface-page: #131619;
+  --cv-surface-raised: #191d20;
+  --cv-surface-floating: #20252a;
+  --cv-surface-sunken: #0b0d0f;
+  --cv-surface-1: #191d20;
+  --cv-surface-2: #131619;
+  --cv-surface-3: #23282d;
+  --cv-surface-overlay: rgba(25, 29, 32, 0.98);
   --cv-surface-canvas: #0a1019;
-  --cv-text-primary: #edf4ff;
-  --cv-text-secondary: #b7c3d3;
-  --cv-text-muted: #8492a5;
-  --cv-text-inverse: #101a29;
-  --cv-border-subtle: #253246;
-  --cv-border-default: #33445c;
-  --cv-border-strong: #485d78;
-  --cv-interactive-hover: #1e2b3d;
-  --cv-interactive-active: #27374d;
-  --cv-backdrop: rgba(2, 7, 15, 0.72);
-  --cv-focus-ring-color: #82adff;
-  --cv-focus-ring: 0 0 0 3px rgba(109, 160, 255, 0.26);
+  --cv-text-primary: #f0f2ef;
+  --cv-text-secondary: #bac1bc;
+  --cv-text-muted: #969f99;
+  --cv-text-inverse: #111412;
+  --cv-border-subtle: #2b312d;
+  --cv-border-default: #454e48;
+  --cv-border-strong: #69736c;
+  --cv-control-border: #6c7770;
+  --cv-control-border-hover: #8b968f;
+  --cv-interactive-hover: #232925;
+  --cv-interactive-active: #2d3430;
+  --cv-backdrop: rgba(3, 5, 4, 0.76);
+  --cv-focus-ring-color: #78aaff;
+  --cv-focus-ring: 0 0 0 2px #191d20, 0 0 0 4px #78aaff;
+  --cv-selection-background: #6d2a26;
+  --cv-selection-text: #ffffff;
+  --cv-shell-sidebar: #0b0d0f;
+  --cv-shell-sidebar-surface: #121518;
+  --cv-shell-sidebar-text: #f2f3f0;
+  --cv-shell-sidebar-muted: #9fa7a2;
+  --cv-shell-sidebar-border: rgba(255, 255, 255, 0.08);
+  --cv-shell-sidebar-hover: rgba(255, 255, 255, 0.055);
+  --cv-shell-sidebar-active: rgba(255, 255, 255, 0.09);
 
   --flow-canvas-background: #090f18;
   --flow-canvas-grid: rgba(139, 161, 191, 0.18);
@@ -248,20 +292,24 @@ html[data-density="compact"] {
   --cv-density-control-height: 30px;
   --cv-density-control-height-sm: 26px;
   --cv-density-row-height: 32px;
-  --cv-density-panel-padding: 14px;
+  --cv-density-panel-padding: 12px;
   --cv-density-field-gap: 6px;
   --cv-density-content-gap: 12px;
   --cv-density-icon-size: 16px;
+  --cv-density-page-padding: 20px;
+  --cv-density-page-gap: 16px;
 }
 
 html[data-density="comfortable"] {
   --cv-density-control-height: 36px;
   --cv-density-control-height-sm: 30px;
   --cv-density-row-height: 38px;
-  --cv-density-panel-padding: 18px;
+  --cv-density-panel-padding: 16px;
   --cv-density-field-gap: 8px;
   --cv-density-content-gap: 16px;
   --cv-density-icon-size: 18px;
+  --cv-density-page-padding: 28px;
+  --cv-density-page-gap: 20px;
 }
 
 html[data-reduced-motion="true"] {

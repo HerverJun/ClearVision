@@ -1,15 +1,28 @@
-# ClearVision Design System V1
+# ClearVision Design System V1.1
 
 Design System V1 服务正式 Studio 产品页面与隔离 Labs。它不导入 legacy CSS，不创建第二产品 Shell，
 也不承载 Project、Flow、Session、Inspection 或 Station authority。
 
-## 视觉语义
+## Quiet Precision / 静谧精密
 
-- 中性冷白与蓝灰用于大面积表面；丹红只用于品牌与关键意图；
+- app、page、raised、floating 使用中性灰白/石墨表面，不以蓝灰染大面积背景；
+- 丹红只用于品牌、导航选中与关键意图；普通系统事实、链接和焦点使用技术蓝；
 - brand、OK、NG、warning、info、idle 与 Canvas 技术蓝使用独立 token；
 - 正式产品默认 compact，允许持久化切换 compact/comfortable；
 - light/dark 都必须维持相同的信息层级、焦点与状态语义；
-- 常规页面容器优先边框和层级表面，阴影保留给显式浮层或 elevated 场景。
+- 常规页面优先排版、间距、背景差和单向分割线，避免 Panel、Table 与内部卡片重复整圈描边；
+- 阴影保持克制，只用于 raised、floating、modal 与显式 elevated 场景。
+
+## 排版层级
+
+- Display：内部视觉样本和特殊产品身份；
+- Page Title：正式路由唯一 `h1`；
+- Section Title：Panel 和工作区分区；
+- Body / Secondary / Caption：按信息权重递减，不依靠大量粗体制造层级；
+- Numeric：使用 tabular lining numbers，稳定呈现计数、时间、耗时、版本与状态值。
+
+字体栈只使用 Windows/系统可用字体，不下载外部字体或在线资源。普通交互动效为 140–200ms，
+不使用弹跳和大幅位移，并由系统偏好及根 projection 同时尊重 reduced motion。
 
 ## Public API
 
@@ -40,6 +53,9 @@ Unauthorized、Forbidden 与 Not Found 由 `CvPageState` 统一呈现；Stale �
 - 原生 table、caption、heading、nav、dl 和 button 语义优先；
 - icon-only 控件必须有可读 label；
 - keyboard focus 使用统一 focus-visible token；
+- Product Shell 提供 skip link、唯一 `main`，正式路由切换后把焦点恢复到主要内容；
+- 混合筛选控件使用 group 与自然 Tab，纯按钮 toolbar 才使用方向键模型；
+- 静态 Empty、Unauthorized、Forbidden 与 404 不创建多余 live region；
 - Modal、Toast、Splitter、Toolbar 等 transient listener/timer 由 mounted owner 清理；
 - reduced-motion 由系统偏好和根 projection 共同控制；
 - 1366×768 不允许全局横向滚动，表格需要时只在局部容器滚动。

@@ -5,10 +5,12 @@ const props = withDefaults(defineProps<{
   label?: string;
   orientation?: 'horizontal' | 'vertical';
   wrap?: boolean;
+  interaction?: 'toolbar' | 'group';
 }>(), {
   label: '页面工具栏',
   orientation: 'horizontal',
-  wrap: true
+  wrap: true,
+  interaction: 'toolbar'
 });
 
 const root = ref<HTMLElement>();
@@ -28,6 +30,7 @@ function focusableElements(): HTMLElement[] {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
+  if (props.interaction !== 'toolbar') return;
   const eventTarget = event.target;
   if (!(eventTarget instanceof HTMLElement)) return;
   if (eventTarget.matches('input, textarea, select')) return;
@@ -58,9 +61,9 @@ function handleKeydown(event: KeyboardEvent): void {
       `cv-toolbar--${orientation}`,
       { 'cv-toolbar--wrap': wrap }
     ]"
-    role="toolbar"
+    :role="interaction"
     :aria-label="label"
-    :aria-orientation="orientation"
+    :aria-orientation="interaction === 'toolbar' ? orientation : undefined"
     data-design-pattern="toolbar"
     @keydown="handleKeydown"
   >
@@ -83,7 +86,7 @@ function handleKeydown(event: KeyboardEvent): void {
   align-items: center;
   justify-content: space-between;
   gap: var(--cv-space-3);
-  padding: var(--cv-space-2) 0;
+  padding: var(--cv-space-1) 0;
 }
 
 .cv-toolbar--wrap { flex-wrap: wrap; }

@@ -29,8 +29,8 @@ import { RouterLink, RouterView } from 'vue-router';
   align-items: center;
   justify-content: space-between;
   gap: var(--cv-space-3);
-  border-bottom: 1px solid var(--cv-border-default);
-  background: var(--cv-surface-1);
+  border-bottom: 1px solid var(--cv-border-subtle);
+  background: var(--cv-surface-page);
 }
 .internal-lab-layout > header div { display: flex; align-items: baseline; gap: var(--cv-space-3); }
 .internal-lab-layout > header strong { font-size: var(--cv-font-size-sm); }

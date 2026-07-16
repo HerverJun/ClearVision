@@ -2,20 +2,30 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
   CvButton,
+  CvDataTable,
   CvField,
   CvIconButton,
+  CvInlineAlert,
   CvModal,
+  CvPagination,
   CvPanel,
+  CvSearchField,
   CvSelect,
   CvSplitter,
   CvStatusBadge,
   CvSurface,
   CvToastRegion,
   CvTypography,
+  type CvDataTableColumn,
   type CvSelectOption,
   type CvStatusTone,
   type CvToastItem
 } from '@/design-system/primitives';
+import {
+  CvPageHeader,
+  CvPageState,
+  CvToolbar
+} from '@/design-system/patterns';
 import './designLab.css';
 
 type Theme = 'light' | 'dark';
@@ -33,7 +43,9 @@ const reducedMotion = ref(false);
 const modalOpen = ref(false);
 const showGuidance = ref(false);
 const fieldValue = ref('CV-Station-01');
+const searchValue = ref('edge');
 const selectValue = ref('camera');
+const samplePage = ref(1);
 const inspectorWidth = ref(292);
 const toasts = ref<CvToastItem[]>([]);
 let toastSequence = 0;
@@ -54,6 +66,24 @@ const statusSamples: readonly { tone: CvStatusTone; label: string; detail: strin
   { tone: 'info', label: 'Info', detail: 'Neutral process fact' },
   { tone: 'idle', label: 'Idle', detail: 'No active execution' }
 ];
+
+interface DesignLabTableRow {
+  readonly id: string;
+  readonly stage: string;
+  readonly status: string;
+  readonly duration: string;
+}
+
+const tableColumns: readonly CvDataTableColumn<DesignLabTableRow>[] = Object.freeze([
+  { key: 'stage', label: '阶段', width: '42%' },
+  { key: 'status', label: '状态', width: '28%' },
+  { key: 'duration', label: '耗时', align: 'end', width: '30%' }
+]);
+const tableRows: readonly DesignLabTableRow[] = Object.freeze([
+  { id: 'acquire', stage: '图像采集', status: '完成', duration: '12.8 ms' },
+  { id: 'locate', stage: '边缘定位', status: '完成', duration: '7.4 ms' },
+  { id: 'decision', stage: '最终判定', status: '等待', duration: '—' }
+]);
 
 const activeModeLabel = computed(() =>
   `${theme.value} · ${density.value} · ${reducedMotion.value ? 'reduced motion' : 'standard motion'}`
@@ -131,48 +161,6 @@ onUnmounted(() => {
     data-studio-page="design-placeholder"
     data-design-lab="ready"
   >
-    <header class="design-lab__topbar">
-      <div class="design-lab__identity">
-        <span
-          class="design-lab__mark"
-          aria-hidden="true"
-        >CV</span>
-        <div>
-          <CvTypography
-            as="p"
-            variant="label"
-            tone="muted"
-            weight="semibold"
-          >
-            ClearVision Studio
-          </CvTypography>
-          <CvTypography
-            as="h1"
-            variant="display"
-            weight="semibold"
-          >
-            Design Foundation Lab
-          </CvTypography>
-        </div>
-      </div>
-
-      <div
-        class="design-lab__mode-readout"
-        aria-live="polite"
-      >
-        <CvStatusBadge
-          tone="info"
-          :label="activeModeLabel"
-        />
-        <RouterLink
-          class="design-lab__diagnostics-link"
-          to="/diagnostics"
-        >
-          Diagnostics
-        </RouterLink>
-      </div>
-    </header>
-
     <CvSurface
       as="section"
       :level="1"
@@ -181,27 +169,42 @@ onUnmounted(() => {
       class="design-lab__hero"
     >
       <div class="design-lab__hero-copy">
+        <div
+          class="design-lab__hero-meta"
+          aria-live="polite"
+        >
+          <CvStatusBadge
+            tone="info"
+            :label="activeModeLabel"
+          />
+          <RouterLink
+            class="design-lab__diagnostics-link"
+            to="/diagnostics"
+          >
+            查看诊断
+          </RouterLink>
+        </div>
         <CvTypography
           as="p"
           variant="label"
           tone="secondary"
           weight="semibold"
         >
-          Quiet Precision · F01
+          Quiet Precision · F02.1
         </CvTypography>
         <CvTypography
           as="h2"
-          variant="title"
+          variant="page-title"
           weight="semibold"
         >
-          A restrained blue-white foundation for industrial vision work.
+          Design System V1.1 / Product Shell Calibration
         </CvTypography>
         <CvTypography
           as="p"
           variant="body"
           tone="secondary"
         >
-          Brand emphasis, industrial outcomes, dense controls and Canvas semantics remain deliberately separate.
+          以中性表面、精密排版和严格状态色承载高密度工业视觉工作流，并为后续画布、属性与预览工作台保持稳定扩展边界。
         </CvTypography>
       </div>
 
@@ -225,7 +228,7 @@ onUnmounted(() => {
           >
             <CvButton
               size="sm"
-              :variant="theme === 'light' ? 'primary' : 'quiet'"
+              :variant="theme === 'light' ? 'secondary' : 'quiet'"
               :aria-pressed="theme === 'light'"
               data-design-theme="light"
               @click="setTheme('light')"
@@ -234,7 +237,7 @@ onUnmounted(() => {
             </CvButton>
             <CvButton
               size="sm"
-              :variant="theme === 'dark' ? 'primary' : 'quiet'"
+              :variant="theme === 'dark' ? 'secondary' : 'quiet'"
               :aria-pressed="theme === 'dark'"
               data-design-theme="dark"
               @click="setTheme('dark')"
@@ -260,7 +263,7 @@ onUnmounted(() => {
           >
             <CvButton
               size="sm"
-              :variant="density === 'comfortable' ? 'primary' : 'quiet'"
+              :variant="density === 'comfortable' ? 'secondary' : 'quiet'"
               :aria-pressed="density === 'comfortable'"
               data-design-density="comfortable"
               @click="setDensity('comfortable')"
@@ -269,7 +272,7 @@ onUnmounted(() => {
             </CvButton>
             <CvButton
               size="sm"
-              :variant="density === 'compact' ? 'primary' : 'quiet'"
+              :variant="density === 'compact' ? 'secondary' : 'quiet'"
               :aria-pressed="density === 'compact'"
               data-design-density="compact"
               @click="setDensity('compact')"
@@ -445,6 +448,105 @@ onUnmounted(() => {
         </div>
       </CvPanel>
     </div>
+
+    <CvPanel
+      title="Product patterns"
+      description="Page header、筛选、提示、表格与分页共享同一套 V1.1 表面和密度语义。"
+      class="design-lab__wide-panel"
+    >
+      <CvPageHeader
+        eyebrow="只读样本"
+        title="检测流程摘要"
+        description="以高信息密度展示稳定投影，不依靠重复外框制造层级。"
+        :heading-level="2"
+      >
+        <template #actions>
+          <CvButton size="sm">
+            刷新摘要
+          </CvButton>
+        </template>
+      </CvPageHeader>
+      <CvToolbar
+        interaction="group"
+        label="Design Lab 筛选样本"
+      >
+        <CvSearchField
+          v-model="searchValue"
+          label="搜索阶段"
+          :hide-label="false"
+          placeholder="名称或状态"
+        />
+        <CvSelect
+          v-model="selectValue"
+          label="算子族"
+          :options="selectOptions"
+        />
+      </CvToolbar>
+      <CvInlineAlert
+        class="design-lab__pattern-alert"
+        tone="info"
+        title="技术信息"
+      >
+        Info、Link 与 Focus 使用技术蓝；品牌丹红不承担普通系统事实。
+      </CvInlineAlert>
+      <CvDataTable
+        :rows="tableRows"
+        :columns="tableColumns"
+        row-key="id"
+        caption="Design System V1.1 表格样本"
+      />
+      <CvPagination
+        v-model:page="samplePage"
+        :page-size="3"
+        :total-items="12"
+        label="Design Lab 分页样本"
+      />
+    </CvPanel>
+
+    <CvPanel
+      title="Product states"
+      description="Loading、Empty、Error、Unauthorized、Forbidden 与 404 使用统一而克制的状态轴线。"
+      class="design-lab__wide-panel"
+    >
+      <div class="design-lab__state-grid">
+        <CvPageState
+          compact
+          kind="loading"
+          title="正在读取"
+          :heading-level="3"
+        />
+        <CvPageState
+          compact
+          kind="empty"
+          title="暂无数据"
+          :heading-level="3"
+        />
+        <CvPageState
+          compact
+          kind="error"
+          title="读取失败"
+          :heading-level="3"
+        />
+        <CvPageState
+          compact
+          kind="unauthorized"
+          title="需要预置会话"
+          :heading-level="3"
+        />
+        <CvPageState
+          compact
+          kind="forbidden"
+          title="无权访问"
+          :heading-level="3"
+        />
+        <CvPageState
+          compact
+          kind="not-found"
+          title="页面不存在"
+          :heading-level="3"
+        />
+      </div>
+    </CvPanel>
 
     <CvPanel
       title="Splitter lifecycle workbench"

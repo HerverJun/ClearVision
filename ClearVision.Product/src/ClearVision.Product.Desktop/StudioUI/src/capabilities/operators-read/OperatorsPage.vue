@@ -134,7 +134,7 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
 </script>
 
 <template>
-  <main
+  <section
     class="operators-page"
     data-capability="operators-read"
   >
@@ -159,7 +159,10 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
       title="算子目录"
       description="筛选在当前只读目录内执行，全部条件保存在地址栏参数中。"
     >
-      <CvToolbar label="算子目录筛选">
+      <CvToolbar
+        interaction="group"
+        label="算子目录筛选"
+      >
         <CvSearchField
           v-model="searchModel"
           class="operators-page__search"
@@ -307,13 +310,13 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
         next-label="下一页"
       />
     </CvPanel>
-  </main>
+  </section>
 </template>
 
 <style scoped>
-.operators-page { display: grid; gap: var(--cv-space-5); min-width: 0; }
-.operators-page__search { flex: 1 1 320px; }
-.operators-page__compact-search { flex: 1 1 210px; }
+.operators-page { display: grid; max-width: 1620px; gap: var(--cv-density-page-gap); min-width: 0; }
+.operators-page__search { flex: 1 1 280px; }
+.operators-page__compact-search { flex: 1 1 180px; }
 .operators-page__identity { display: grid; gap: var(--cv-space-1); }
 .operators-page__identity code { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 </style>

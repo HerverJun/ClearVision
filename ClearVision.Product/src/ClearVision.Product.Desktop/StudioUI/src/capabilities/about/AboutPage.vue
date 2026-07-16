@@ -20,7 +20,7 @@ const buildItems = computed<readonly CvDescriptionItem[]>(() => [
 </script>
 
 <template>
-  <main
+  <section
     class="about-page"
     data-studio-page="about"
   >
@@ -50,7 +50,7 @@ const buildItems = computed<readonly CvDescriptionItem[]>(() => [
         <li>本阶段产品页面只发起冻结合同内的 GET 请求，不提供业务写操作。</li>
       </ul>
     </CvPanel>
-  </main>
+  </section>
 </template>
 
 <style scoped>

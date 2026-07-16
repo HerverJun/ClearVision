@@ -32,19 +32,20 @@ withDefaults(defineProps<{
 .cv-status-badge {
   display: inline-flex;
   align-items: center;
-  gap: var(--cv-space-2);
-  min-height: 24px;
+  gap: var(--cv-space-1);
+  min-height: 22px;
   padding: 2px var(--cv-space-2);
   border: 1px solid var(--cv-border-default);
   border-radius: var(--cv-radius-pill);
   background: var(--cv-color-status-idle-soft);
   color: var(--cv-text-secondary);
   font-size: var(--cv-font-size-2xs);
-  font-weight: var(--cv-font-weight-semibold);
+  font-weight: var(--cv-font-weight-medium);
+  font-variant-numeric: tabular-nums lining-nums;
   line-height: var(--cv-line-height-tight);
   white-space: nowrap;
 }
-.cv-status-badge__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cv-color-status-idle); }
+.cv-status-badge__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cv-color-status-idle); }
 .cv-status-badge--ok { border-color: var(--cv-color-status-ok-border); background: var(--cv-color-status-ok-soft); color: var(--cv-color-status-ok-strong); }
 .cv-status-badge--ok .cv-status-badge__dot { background: var(--cv-color-status-ok); }
 .cv-status-badge--ng { border-color: var(--cv-color-status-ng-border); background: var(--cv-color-status-ng-soft); color: var(--cv-color-status-ng-strong); }

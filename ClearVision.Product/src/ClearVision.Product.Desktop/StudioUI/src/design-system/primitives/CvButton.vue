@@ -78,18 +78,16 @@ const isDisabled = computed(() => props.disabled || props.loading);
   border-radius: var(--cv-radius-sm);
   cursor: pointer;
   font-size: var(--cv-font-size-sm);
-  font-weight: var(--cv-font-weight-semibold);
+  font-weight: var(--cv-font-weight-medium);
   line-height: 1;
   transition:
     background var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
     border-color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
     color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
-    transform var(--cv-motion-duration-instant) var(--cv-motion-ease-standard);
+    box-shadow var(--cv-motion-duration-fast) var(--cv-motion-ease-standard);
 }
 
-.cv-button:hover:not(:disabled) { transform: translateY(-1px); }
-.cv-button:active:not(:disabled) { transform: translateY(0); }
-.cv-button:disabled { cursor: not-allowed; opacity: 0.52; }
+.cv-button:disabled { cursor: not-allowed; opacity: 0.48; }
 .cv-button--sm { height: var(--cv-density-control-height-sm); padding-inline: var(--cv-space-3); }
 .cv-button--block { width: 100%; }
 
@@ -97,26 +95,27 @@ const isDisabled = computed(() => props.disabled || props.loading);
   border-color: var(--cv-color-brand-600);
   background: var(--cv-color-brand-500);
   color: var(--cv-color-on-brand);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .cv-button--primary:hover:not(:disabled) { background: var(--cv-color-brand-600); }
 .cv-button--primary:active:not(:disabled) { background: var(--cv-color-brand-700); }
 
 .cv-button--secondary {
-  border-color: var(--cv-border-default);
-  background: var(--cv-surface-1);
+  border-color: var(--cv-control-border);
+  background: var(--cv-surface-raised);
   color: var(--cv-text-primary);
 }
 
-.cv-button--secondary:hover:not(:disabled) { border-color: var(--cv-border-strong); background: var(--cv-interactive-hover); }
+.cv-button--secondary:hover:not(:disabled) { border-color: var(--cv-control-border-hover); background: var(--cv-interactive-hover); }
 .cv-button--secondary:active:not(:disabled) { background: var(--cv-interactive-active); }
 
 .cv-button--quiet {
   background: transparent;
-  color: var(--cv-color-brand-text);
+  color: var(--cv-text-secondary);
 }
 
-.cv-button--quiet:hover:not(:disabled) { background: var(--cv-color-brand-soft); }
+.cv-button--quiet:hover:not(:disabled) { background: var(--cv-interactive-hover); color: var(--cv-color-link); }
 .cv-button--quiet:active:not(:disabled) { background: var(--cv-interactive-active); }
 
 .cv-button--danger {

@@ -47,7 +47,7 @@ describe('Design Foundation Lab', () => {
     expect(document.documentElement.dataset.reducedMotion).toBe('prior-motion');
   });
 
-  it('renders all eleven representative primitive families', async () => {
+  it('renders all fifteen representative primitive families', async () => {
     const wrapper = mount(DesignLab, {
       global: {
         stubs: {
@@ -64,8 +64,12 @@ describe('Design Foundation Lab', () => {
       'typography',
       'surface',
       'button',
+      'data-table',
       'icon-button',
       'field',
+      'inline-alert',
+      'pagination',
+      'search-field',
       'select',
       'panel',
       'status-badge',

@@ -75,5 +75,43 @@ describe('Design Foundation color tokens', () => {
     expect(brand).not.toBe(tokens.get('--flow-canvas-connection'));
     expect(brand).not.toBe(tokens.get('--flow-canvas-selection-border'));
     expect(brand).not.toBe(tokens.get('--flow-canvas-guide'));
+    expect(brand).not.toBe(tokens.get('--cv-color-status-warning'));
+    expect(tokens.get('--cv-color-status-info')).not.toBe(tokens.get('--cv-focus-ring-color'));
+  });
+
+  it.each([
+    ['light', light],
+    ['dark', dark]
+  ] as const)('keeps %s readable text and control boundaries on product surfaces', (_theme, tokens) => {
+    for (const foreground of ['--cv-text-primary', '--cv-text-secondary', '--cv-text-muted'] as const) {
+      for (const background of ['--cv-surface-page', '--cv-surface-raised'] as const) {
+        expect(contrastRatio(tokens.get(foreground)!, tokens.get(background)!)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    for (const background of ['--cv-surface-page', '--cv-surface-raised'] as const) {
+      expect(contrastRatio(tokens.get('--cv-control-border')!, tokens.get(background)!)).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(tokens.get('--cv-focus-ring-color')!, tokens.get(background)!)).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('defines the V1.1 surface, typography and motion semantics once', () => {
+    for (const token of [
+      '--cv-surface-app',
+      '--cv-surface-page',
+      '--cv-surface-raised',
+      '--cv-surface-floating',
+      '--cv-type-display-size',
+      '--cv-type-page-title-size',
+      '--cv-type-section-title-size',
+      '--cv-type-body-size',
+      '--cv-type-secondary-size',
+      '--cv-type-caption-size',
+      '--cv-type-numeric-size'
+    ]) {
+      expect(light.has(token)).toBe(true);
+    }
+    expect(light.get('--cv-motion-duration-fast')).toBe('140ms');
+    expect(light.get('--cv-motion-duration-normal')).toBe('180ms');
+    expect(light.get('--cv-motion-duration-slow')).toBe('200ms');
   });
 });

@@ -33,6 +33,7 @@ export interface F02VisualEvidenceOptions {
   readonly density: 'compact' | 'comfortable';
   readonly requests: readonly F02MethodAuditEntry[];
   readonly runtimeErrors: F02RuntimeErrorAudit;
+  readonly expectedHttpStatuses?: readonly number[];
 }
 
 const preferencesStorageKey = 'clearvision.studio-ui.preferences.v1';
@@ -41,11 +42,11 @@ function visualEvidenceRoot(): string | null {
   const configured = process.env.CV_F02_VISUAL_EVIDENCE_DIR?.trim();
   if (!configured) return null;
   const repositoryRoot = resolve(process.cwd(), '..', '..', '..');
-  const allowedRoot = resolve(repositoryRoot, '.tmp', 'studio-ui-next', 'f02');
+  const allowedRoot = resolve(repositoryRoot, '.tmp', 'studio-ui-next', 'f02-1');
   const outputRoot = isAbsolute(configured) ? resolve(configured) : resolve(repositoryRoot, configured);
   const relativeOutput = relative(allowedRoot, outputRoot);
   if (relativeOutput.startsWith('..') || isAbsolute(relativeOutput)) {
-    throw new Error('CV_F02_VISUAL_EVIDENCE_DIR must remain under .tmp/studio-ui-next/f02.');
+    throw new Error('CV_F02_VISUAL_EVIDENCE_DIR must remain under .tmp/studio-ui-next/f02-1.');
   }
   return outputRoot;
 }
@@ -68,11 +69,19 @@ export function hasF02VisualEvidenceTarget(): boolean {
   return Boolean(process.env.CV_F02_VISUAL_EVIDENCE_DIR?.trim());
 }
 
-export function createF02RuntimeErrorAudit(page: Page): F02RuntimeErrorAudit {
+export function createF02RuntimeErrorAudit(
+  page: Page,
+  expectedHttpStatuses: readonly number[] = []
+): F02RuntimeErrorAudit {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
+  const expectedStatuses = new Set(expectedHttpStatuses);
   page.on('console', message => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
+    if (message.type() !== 'error') return;
+    const text = message.text();
+    const statusMatch = text.match(/status of (\d{3})/i);
+    if (statusMatch && expectedStatuses.has(Number(statusMatch[1]))) return;
+    consoleErrors.push(text);
   });
   page.on('pageerror', error => pageErrors.push(error.stack ?? error.message));
   return { consoleErrors, pageErrors };
@@ -141,8 +150,9 @@ export async function captureF02VisualEvidence(
   const screenshot = await page.screenshot({ animations: 'disabled', fullPage: false, type: 'png' });
   await writeFile(screenshotPath, screenshot);
   const metadata = {
-    schemaVersion: 'f02-visual-evidence.v1',
+    schemaVersion: 'f02-1-visual-evidence.v1',
     capturedAtUtc: new Date().toISOString(),
+    sourceSha: candidateSha,
     finalCandidateSha: candidateSha,
     fixtureSourceSha: f02BrowserFixture.sourceSha,
     DATA_SOURCE: f02BrowserFixture.DATA_SOURCE,
@@ -163,7 +173,10 @@ export async function captureF02VisualEvidence(
     horizontalOverflow: projection.horizontalOverflow,
     requestMethods: options.requests,
     getOnly: expectGetOnly(options.requests),
+    expectedHttpStatuses: options.expectedHttpStatuses ?? [],
     runtimeErrors: options.runtimeErrors,
+    consoleErrorCount: options.runtimeErrors.consoleErrors.length,
+    pageErrorCount: options.runtimeErrors.pageErrors.length,
     screenshot: {
       fileName: `${stem}.png`,
       sha256: createHash('sha256').update(screenshot).digest('hex').toUpperCase(),
