@@ -8,9 +8,11 @@
   "seed": 20260715,
   "expectedGeneratedDataSha256": "85389261aa17bb99ecd70c51dfcb18545a0a417417b0b16ef33f07c42174ae72",
   "splits": {
-    "train": "case index modulo 5 equals 0",
-    "validation": "case index modulo 5 equals 1",
-    "test": "case index modulo 5 is 2, 3, or 4"
+    "unit": "scenario bundle (or normal/anomaly pair for Anomaly)",
+    "train": "bundle index modulo 5 equals 0",
+    "validation": "bundle index modulo 5 equals 1",
+    "test": "bundle index modulo 5 is 2, 3, or 4",
+    "grouping": "Caliper/Circle/Line bundle index is case index divided by scenario count; Anomaly pair index is case index divided by 2. Every mathematical scenario is represented in each split."
   },
   "caliper": {
     "caseCount": 240,

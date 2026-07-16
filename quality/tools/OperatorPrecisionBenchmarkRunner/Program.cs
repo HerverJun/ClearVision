@@ -103,6 +103,7 @@ internal sealed class OperatorPrecisionBenchmark
             SchemaVersion: "2026-07-16.operator-precision-report.v2",
             BenchmarkId: "clearvision-operator-precision-v1",
             Label: _options.Label,
+            ExecutionScope: "Versioned mathematical reference algorithms, shared geometry kernels and preprocessing contracts. This report is supplemental and is not execution evidence for a historical product commit or a complete formal operator image path.",
             SourceSha: _options.SourceSha,
             GeneratedAtUtc: DateTime.UtcNow,
             Dataset: new DatasetIdentity(
@@ -1652,6 +1653,7 @@ internal static class BenchmarkMarkdown
         builder.AppendLine();
         builder.AppendLine($"- Label: `{report.Label}`");
         builder.AppendLine($"- Source SHA: `{report.SourceSha}`");
+        builder.AppendLine($"- Execution scope: {report.ExecutionScope}");
         builder.AppendLine($"- Dataset: `{report.Dataset.DatasetId}` `{report.Dataset.Version}` manifest SHA `{report.Dataset.ManifestSha256}` generated-data SHA `{report.Dataset.GeneratedDataSha256}`");
         builder.AppendLine($"- Seed: `{report.Dataset.Seed}`");
         builder.AppendLine($"- Model SHA: `{report.Model.Sha256}`");
@@ -1723,6 +1725,7 @@ internal sealed record BenchmarkReport(
     string SchemaVersion,
     string BenchmarkId,
     string Label,
+    string ExecutionScope,
     string SourceSha,
     DateTime GeneratedAtUtc,
     DatasetIdentity Dataset,

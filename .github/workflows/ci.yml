@@ -708,15 +708,34 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Restore Benchmark Runner
-        run: dotnet restore quality/tools/OperatorPrecisionBenchmarkRunner/OperatorPrecisionBenchmarkRunner.csproj
+      - name: Restore Benchmark Runners
+        shell: pwsh
+        run: |
+          dotnet restore quality/tools/OperatorPrecisionBenchmarkRunner/OperatorPrecisionBenchmarkRunner.csproj
+          dotnet restore quality/tools/OperatorProductE2EBenchmarkRunner/OperatorProductE2EBenchmarkRunner.csproj
 
-      - name: Run Acceptance Benchmark
+      - name: Run Supplemental Kernel Acceptance Evidence
         shell: pwsh
         run: |
           & "./scripts/run-operator-precision-benchmark.ps1" `
             -Profile acceptance `
+            -Label baseline `
+            -ResultsDirectory "TestResults/operator-precision"
+          & "./scripts/run-operator-precision-benchmark.ps1" `
+            -Profile acceptance `
             -Label after `
+            -ResultsDirectory "TestResults/operator-precision"
+          & "./scripts/compare-operator-precision-benchmarks.ps1" `
+            -BaselinePath "TestResults/operator-precision/operator-precision-baseline-acceptance.json" `
+            -AfterPath "TestResults/operator-precision/operator-precision-after-acceptance.json" `
+            -OutputPath "TestResults/operator-precision/operator-precision-phase5-comparison.json" `
+            -ReportPath "TestResults/operator-precision/operator-precision-phase5-comparison.md"
+
+      - name: Run Executable Product Baseline and Formal Operator E2E Evidence
+        shell: pwsh
+        run: |
+          & "./scripts/run-operator-product-e2e-evidence.ps1" `
+            -Profile acceptance `
             -ResultsDirectory "TestResults/operator-precision"
 
       - name: Upload Operator Precision Evidence

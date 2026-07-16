@@ -45,17 +45,35 @@ $after = Get-Content -LiteralPath (Resolve-RepoPath $AfterPath) -Raw -Encoding U
 if ($baseline.label -ne "baseline" -or $after.label -ne "after") {
     throw "Expected baseline/after report labels."
 }
-if ($baseline.sourceSha -ne "ce266626e0bec0a8cd4a68c11b176df95e8cb482") {
-    throw "Frozen baseline SHA drifted: $($baseline.sourceSha)."
+if ($baseline.sourceSha -ne $baseline.harness.commitSha -or $after.sourceSha -ne $after.harness.commitSha) {
+    throw "Supplemental kernel reports must bind sourceSha to the actually executed harness commit."
 }
-if ([string]::IsNullOrWhiteSpace($after.sourceSha)) {
-    throw "After report is missing its source SHA."
+if ($baseline.sourceSha -ne $after.sourceSha) {
+    throw "Supplemental baseline/after reports must execute from the same committed harness source."
+}
+if ($baseline.harness.repositoryDirty -or $after.harness.repositoryDirty) {
+    throw "Supplemental kernel evidence must be generated from a clean harness worktree."
 }
 
+Assert-Equal "schemaVersion" $baseline.schemaVersion $after.schemaVersion
+Assert-Equal "benchmarkId" $baseline.benchmarkId $after.benchmarkId
+Assert-Equal "executionScope" $baseline.executionScope $after.executionScope
 Assert-Equal "dataset" $baseline.dataset $after.dataset
 Assert-Equal "model" $baseline.model $after.model
 Assert-Equal "harness" $baseline.harness $after.harness
 Assert-Equal "environment" $baseline.environment $after.environment
+Assert-Equal "warmupIterations" $baseline.warmupIterations $after.warmupIterations
+Assert-Equal "measurementIterations" $baseline.measurementIterations $after.measurementIterations
+
+$baselineSharedMetrics = @($baseline.metrics | ForEach-Object { "$($_.domain)|$($_.algorithm)|$($_.split)" })
+foreach ($key in $baselineSharedMetrics) {
+    $parts = $key.Split('|')
+    $beforeMetric = Get-Metric $baseline $parts[0] $parts[1] $parts[2]
+    $afterMetric = Get-Metric $after $parts[0] $parts[1] $parts[2]
+    foreach ($field in @("caseCount", "bias", "rmse", "p95Error", "failureRate", "ambiguityRate", "outlierRate", "extra")) {
+        Assert-Equal "sharedMetric/$key/$field" $beforeMetric.$field $afterMetric.$field
+    }
+}
 
 $adoptedSpecs = @(
     [ordered]@{ Domain = "Circle"; Baseline = "AlgebraicL2"; Winner = "OrthogonalWelsch"; Production = "ProductionOrthogonalWelsch"; Conformance = "ExactAccuracy" },
@@ -93,8 +111,10 @@ $decisions = foreach ($spec in $adoptedSpecs) {
         baseline = $spec.Baseline
         winner = $spec.Winner
         productionAlgorithm = $spec.Production
-        adopted = $true
-        reason = $decision.reason
+        adopted = $false
+        reason = "Kernel-level candidate selected; formal mode adoption is decided only by operator-product E2E evidence."
+        kernelCandidateSupported = $true
+        evidenceScope = "kernel"
         baselineMetric = [ordered]@{
             rmse = [double]$beforeMetric.rmse
             p95Error = [double]$beforeMetric.p95Error
@@ -205,7 +225,7 @@ $report = [ordered]@{
         harness = $after.harness
         identicalAcrossReports = $true
     }
-    claimBoundary = "Synthetic mathematical and preprocessing-contract evidence only; public MVTec evidence remains separate. This report does not establish E4, Release Ready, Field Verified, commercial-grade, or production-site accuracy."
+    claimBoundary = "Supplemental synthetic mathematical-kernel and preprocessing-contract evidence only; public MVTec and formal product-operator E2E evidence remain separate. This report does not establish historical product execution, complete operator-path improvement, E4, Release Ready, Field Verified, commercial-grade, or production-site accuracy."
     decisions = @($caliperRow) + @($decisions)
     rejectedCandidates = @(
         [ordered]@{ domain = "Caliper"; candidate = "GaussianDerivative formal integration"; reason = $caliperRow.reason },
@@ -232,7 +252,8 @@ $report = [ordered]@{
     acceptance = [ordered]@{
         sameDatasetModelEnvironment = $true
         decisionsStable = $true
-        productionConformancePassed = $true
+        productionConformancePassed = $false
+        formalProductPathEvaluated = $false
         performanceBudgetsPassed = $true
         releaseReady = $false
         fieldVerified = $false
@@ -249,8 +270,7 @@ $utf8 = [Text.UTF8Encoding]::new($false)
 $lines = [Collections.Generic.List[string]]::new()
 $lines.Add("# Operator Precision Phase 5 Comparison")
 $lines.Add("")
-$lines.Add("- Baseline SHA: ``$($baseline.sourceSha)``")
-$lines.Add("- After SHA: ``$($after.sourceSha)``")
+$lines.Add("- Supplemental harness source SHA (both reports): ``$($baseline.sourceSha)``")
 $lines.Add("- Dataset manifest SHA: ``$($after.dataset.manifestSha256)``")
 $lines.Add("- Generated input/truth SHA: ``$($after.dataset.generatedDataSha256)``")
 $lines.Add("- Seed: ``$($after.dataset.seed)``")
@@ -259,7 +279,7 @@ $lines.Add("- Preprocess fingerprint: ``$($after.model.preprocessFingerprint)``"
 $lines.Add("- Harness SHA: ``$($after.harness.programSha256)`` (commit ``$($after.harness.commitSha)``; dirty=$($after.harness.repositoryDirty))")
 $lines.Add("- Identity check: baseline and after used the same generated input/truth, harness, model, preprocessing identity, seed and runtime environment.")
 $lines.Add("")
-$lines.Add("> Kernel-level synthetic mathematical and preprocessing-contract evidence only. This is not E4, end-to-end field accuracy, Release Ready, Field Verified, commercial-grade, or production-site evidence.")
+$lines.Add("> Supplemental kernel-level synthetic mathematical and preprocessing-contract evidence only. This is not executable historical-product evidence, complete formal operator-path evidence, E4, end-to-end field accuracy, Release Ready, Field Verified, commercial-grade, or production-site evidence.")
 $lines.Add("")
 $lines.Add("| Domain | Baseline | Evaluated path | RMSE improvement | P95 error improvement | Failure delta | Ambiguity delta | P95 latency | Allocation | Budget | Adopted | Conformance |")
 $lines.Add("|---|---|---|---:|---:|---:|---:|---:|---:|---|---|---|")

@@ -7,8 +7,6 @@ param(
 
     [string]$ResultsDirectory = ".tmp/operator-precision",
 
-    [string]$SourceShaOverride = "",
-
     [switch]$AllowDirty,
 
     [switch]$ReturnExitCode
@@ -43,7 +41,7 @@ $allowedEvidencePaths = @(
 ) | ForEach-Object { [IO.Path]::GetFullPath($_) }
 
 $harnessCommitSha = (& git -C $repoRoot rev-parse HEAD).Trim()
-$sourceSha = if ([string]::IsNullOrWhiteSpace($SourceShaOverride)) { $harnessCommitSha } else { $SourceShaOverride.Trim() }
+$sourceSha = $harnessCommitSha
 $changedPaths = @(& git -C $repoRoot diff --name-only) +
     @(& git -C $repoRoot diff --cached --name-only) +
     @(& git -C $repoRoot ls-files --others --exclude-standard)
