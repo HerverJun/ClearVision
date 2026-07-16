@@ -1,166 +1,166 @@
 # Operator Quality Four-Axis State
 
-GeneratedAtUtc: `2026-07-16T01:07:27.7681703+08:00`
+GeneratedAtUtc: `2026-07-16T09:29:06.0756074+08:00`
 
 > Execution, AlgorithmQuality, ProductionReadiness and FieldValidation are independent. Synthetic/public-dataset evidence is not Release Ready or Field Verified evidence.
 
-| Operator | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | Evidence |
-|---|---|---|---|---|---|
-| `AdaptiveThreshold` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `AffineTransform` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `Aggregator` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `AkazeFeatureMatch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `AngleMeasurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `AnomalyDetection` | `Implemented` | `PublicDatasetEvidence` | `Experimental` | `NotValidated` | quality/evals/reports/operator-precision-after-acceptance.json<br>quality/evals/reports/AnomalyDetection_mvtec_baseline.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
-| `ArcCaliper` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ArrayIndexer` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `BilateralFilter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `BinaryImageToRegion` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `BlobAnalysis` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `BlobLabeling` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `BoxFilter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `BoxNms` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `CalibrationLoader` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `CaliperTool` | `Implemented` | `SyntheticBenchmarkEvidence` | `Unknown` | `NotValidated` | quality/evals/reports/operator-precision-after-acceptance.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
-| `CameraCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `CircleMeasurement` | `Implemented` | `SyntheticBenchmarkValidated` | `Unknown` | `NotValidated` | quality/evals/reports/operator-precision-after-acceptance.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
-| `ClaheEnhancement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `CodeRecognition` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ColorConversion` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ColorDetection` | `Implemented` | `Unknown` | `Experimental` | `NotValidated` |  |
-| `ColorMeasurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `Comment` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `Comparator` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ConditionalBranch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ContourDetection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ContourExtrema` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ContourMeasurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `CoordinateTransform` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `CopyMakeBorder` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `CornerDetection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `CycleCounter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `DatabaseWrite` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `DeepLearning` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `Delay` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `DetectionSequenceJudge` | `Implemented` | `Unknown` | `Experimental` | `NotValidated` |  |
-| `DistanceTransform` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `DualModalVoting` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `EdgeDetection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `EdgeIntersection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `EdgePairDefect` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `EuclideanClusterExtraction` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `FFT1D` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `Filtering` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `FisheyeCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `FisheyeUndistort` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ForEach` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `FrameAveraging` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `FrameChangeTrigger` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `FrequencyFilter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `GapMeasurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `GeoMeasurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `GeometricFitting` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `GeometricTolerance` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `GlcmTexture` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `GradientShapeMatch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `HandEyeCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `HandEyeCalibrationValidator` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `HistogramAnalysis` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `HistogramEqualization` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `HttpRequest` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageAcquisition` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageAdd` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageBlend` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageCompose` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageCrop` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageDiff` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageNormalize` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageResize` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageRotate` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageSave` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageStitching` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageSubtract` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ImageTiling` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `InverseFFT1D` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `JsonExtractor` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `LaplacianSharpen` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `LawsTextureFilter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `LineLineDistance` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `LineMeasurement` | `Implemented` | `SyntheticBenchmarkValidated` | `Unknown` | `NotValidated` | quality/evals/reports/operator-precision-after-acceptance.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
-| `LocalDeformableMatching` | `Implemented` | `Unknown` | `Experimental` | `NotValidated` |  |
-| `LogicGate` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `MathOperation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `MeanFilter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `Measurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `MedianBlur` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `MinEnclosingGeometry` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `MitsubishiMcCommunication` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ModbusCommunication` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `MorphologicalOperation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `Morphology` | `Implemented` | `Unknown` | `CompatibilityOnly` | `NotValidated` |  |
-| `MqttPublish` | `Implemented` | `Unknown` | `Reference` | `NotValidated` |  |
-| `NPointCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `OcrRecognition` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `OmronFinsCommunication` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `OrbFeatureMatch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PPFEstimation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PPFMatch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ParallelLineFind` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PerspectiveTransform` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PhaseClosure` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PixelStatistics` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PixelToWorldTransform` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PlanarMatching` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PointAlignment` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PointCorrection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PointLineDistance` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PointSetTool` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PolarUnwrap` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PositionCorrection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `PyramidShapeMatch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `QuadrilateralFind` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RansacPlaneSegmentation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RectangleDetection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RectangleRegion` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RegionClosing` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RegionComplement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RegionDifference` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RegionDilation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RegionErosion` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RegionIntersection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RegionOpening` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RegionSkeleton` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RegionUnion` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ResultJudgment` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ResultOutput` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RoiManager` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `RoiTransform` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ScriptOperator` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `SemanticSegmentation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `SerialCommunication` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ShadingCorrection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `ShapeMatching` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `SharpnessEvaluation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `SiemensS7Communication` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `StatisticalOutlierRemoval` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `Statistics` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `StereoCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `StringFormat` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `SubpixelEdgeDetection` | `Implemented` | `Unknown` | `Reference` | `NotValidated` |  |
-| `SurfaceDefectDetection` | `Implemented` | `Unknown` | `Experimental` | `NotValidated` |  |
-| `TcpCommunication` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `TemplateMatching` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `TextSave` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `Thresholding` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `TimerStatistics` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `TranslationRotationCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `TriggerModule` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `TryCatch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `TypeConvert` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `Undistort` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `UnitConvert` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `VariableIncrement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `VariableRead` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `VariableWrite` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `VoxelDownsample` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
-| `WidthMeasurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` |  |
+| Operator | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | Scope | Mode evidence | Evidence |
+|---|---|---|---|---|---|---|---|
+| `AdaptiveThreshold` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `AffineTransform` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `Aggregator` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `AkazeFeatureMatch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `AngleMeasurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `AnomalyDetection` | `Implemented` | `PublicDatasetEvidence` | `Experimental` | `NotValidated` | `DefaultMode` | FeatureExtractor=lab_gradient_stats(default): PublicDatasetEvidence; adopted=True; default=True<br>FeatureExtractor=onnx_embedding: SyntheticBenchmarkEvidence; adopted=True; default=False | quality/evals/reports/AnomalyDetection_mvtec_baseline.json<br>quality/evals/reports/operator-precision-after-acceptance.json<br>quality/evals/reports/operator-precision-phase5-comparison.json<br>quality/evals/reports/operator-quality-phase5-evidence.json |
+| `ArcCaliper` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ArrayIndexer` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `BilateralFilter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `BinaryImageToRegion` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `BlobAnalysis` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `BlobLabeling` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `BoxFilter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `BoxNms` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `CalibrationLoader` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `CaliperTool` | `Implemented` | `SyntheticBenchmarkEvidence` | `Unknown` | `NotValidated` | `ModeAggregate` | EdgeModel=Legacy(default): SyntheticBenchmarkEvidence; adopted=True; default=True<br>EdgeModel=GaussianDerivative(candidate): SyntheticBenchmarkEvidence; adopted=False; default=False | quality/evals/reports/operator-precision-baseline-acceptance.json<br>quality/evals/reports/operator-precision-after-acceptance.json<br>quality/evals/reports/operator-precision-phase5-comparison.json<br>quality/evals/reports/operator-quality-phase5-evidence.json |
+| `CameraCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `CircleMeasurement` | `Implemented` | `SyntheticBenchmarkEvidence` | `Unknown` | `NotValidated` | `ModeAggregate` | Method=CaliperFitV2; RefinementLoss=Legacy(default): SyntheticBenchmarkEvidence; adopted=True; default=True<br>Method=CaliperFitV2; RefinementLoss=Welsch: SyntheticBenchmarkEvidence; adopted=False; default=False | quality/evals/reports/operator-product-e2e-baseline-acceptance.json<br>quality/evals/reports/operator-product-e2e-after-acceptance.json<br>quality/evals/reports/operator-product-e2e-phase5-comparison.json<br>quality/evals/reports/operator-quality-phase5-evidence.json |
+| `ClaheEnhancement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `CodeRecognition` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ColorConversion` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ColorDetection` | `Implemented` | `Unknown` | `Experimental` | `NotValidated` | `Operator` |  |  |
+| `ColorMeasurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `Comment` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `Comparator` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ConditionalBranch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ContourDetection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ContourExtrema` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ContourMeasurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `CoordinateTransform` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `CopyMakeBorder` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `CornerDetection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `CycleCounter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `DatabaseWrite` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `DeepLearning` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `Delay` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `DetectionSequenceJudge` | `Implemented` | `Unknown` | `Experimental` | `NotValidated` | `Operator` |  |  |
+| `DistanceTransform` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `DualModalVoting` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `EdgeDetection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `EdgeIntersection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `EdgePairDefect` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `EuclideanClusterExtraction` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `FFT1D` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `Filtering` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `FisheyeCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `FisheyeUndistort` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ForEach` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `FrameAveraging` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `FrameChangeTrigger` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `FrequencyFilter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `GapMeasurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `GeoMeasurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `GeometricFitting` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `GeometricTolerance` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `GlcmTexture` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `GradientShapeMatch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `HandEyeCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `HandEyeCalibrationValidator` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `HistogramAnalysis` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `HistogramEqualization` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `HttpRequest` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageAcquisition` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageAdd` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageBlend` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageCompose` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageCrop` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageDiff` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageNormalize` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageResize` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageRotate` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageSave` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageStitching` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageSubtract` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ImageTiling` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `InverseFFT1D` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `JsonExtractor` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `LaplacianSharpen` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `LawsTextureFilter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `LineLineDistance` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `LineMeasurement` | `Implemented` | `SyntheticBenchmarkEvidence` | `Unknown` | `NotValidated` | `ModeAggregate` | Method=FitLine; FitLoss=L2(default): SyntheticBenchmarkEvidence; adopted=True; default=True<br>Method=FitLine; FitLoss=Welsch: SyntheticBenchmarkValidated; adopted=True; default=False | quality/evals/reports/operator-product-e2e-baseline-acceptance.json<br>quality/evals/reports/operator-product-e2e-after-acceptance.json<br>quality/evals/reports/operator-product-e2e-phase5-comparison.json<br>quality/evals/reports/operator-quality-phase5-evidence.json |
+| `LocalDeformableMatching` | `Implemented` | `Unknown` | `Experimental` | `NotValidated` | `Operator` |  |  |
+| `LogicGate` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `MathOperation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `MeanFilter` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `Measurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `MedianBlur` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `MinEnclosingGeometry` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `MitsubishiMcCommunication` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ModbusCommunication` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `MorphologicalOperation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `Morphology` | `Implemented` | `Unknown` | `CompatibilityOnly` | `NotValidated` | `Operator` |  |  |
+| `MqttPublish` | `Implemented` | `Unknown` | `Reference` | `NotValidated` | `Operator` |  |  |
+| `NPointCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `OcrRecognition` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `OmronFinsCommunication` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `OrbFeatureMatch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PPFEstimation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PPFMatch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ParallelLineFind` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PerspectiveTransform` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PhaseClosure` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PixelStatistics` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PixelToWorldTransform` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PlanarMatching` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PointAlignment` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PointCorrection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PointLineDistance` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PointSetTool` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PolarUnwrap` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PositionCorrection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `PyramidShapeMatch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `QuadrilateralFind` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RansacPlaneSegmentation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RectangleDetection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RectangleRegion` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RegionClosing` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RegionComplement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RegionDifference` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RegionDilation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RegionErosion` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RegionIntersection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RegionOpening` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RegionSkeleton` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RegionUnion` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ResultJudgment` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ResultOutput` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RoiManager` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `RoiTransform` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ScriptOperator` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `SemanticSegmentation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `SerialCommunication` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ShadingCorrection` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `ShapeMatching` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `SharpnessEvaluation` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `SiemensS7Communication` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `StatisticalOutlierRemoval` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `Statistics` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `StereoCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `StringFormat` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `SubpixelEdgeDetection` | `Implemented` | `Unknown` | `Reference` | `NotValidated` | `Operator` |  |  |
+| `SurfaceDefectDetection` | `Implemented` | `Unknown` | `Experimental` | `NotValidated` | `Operator` |  |  |
+| `TcpCommunication` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `TemplateMatching` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `TextSave` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `Thresholding` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `TimerStatistics` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `TranslationRotationCalibration` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `TriggerModule` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `TryCatch` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `TypeConvert` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `Undistort` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `UnitConvert` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `VariableIncrement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `VariableRead` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `VariableWrite` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `VoxelDownsample` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |
+| `WidthMeasurement` | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | `Operator` |  |  |

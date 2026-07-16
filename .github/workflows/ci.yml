@@ -738,6 +738,10 @@ jobs:
             -Profile acceptance `
             -ResultsDirectory "TestResults/operator-precision"
 
+      - name: Verify Tracked Operator Quality Evidence Identity
+        shell: pwsh
+        run: ./scripts/verify-operator-quality-evidence.ps1
+
       - name: Upload Operator Precision Evidence
         uses: actions/upload-artifact@v4
         if: always()

@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-07-16 01:07:27 +08:00`
+> 生成时间 / Generated At: `2026-07-16 09:29:06 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
@@ -24,7 +24,7 @@
 ## 四轴质量状态 / Four-Axis Quality State
 > 四个轴必须独立解释；生命周期、测试数量或历史 A/B 分数均不能代表整体成熟度。合成或公开数据证据不会自动提升 ProductionReadiness 或 FieldValidation。
 - Execution: Implemented=158
-- AlgorithmQuality: PublicDatasetEvidence=1, SyntheticBenchmarkEvidence=1, SyntheticBenchmarkValidated=2, Unknown=154
+- AlgorithmQuality: PublicDatasetEvidence=1, SyntheticBenchmarkEvidence=3, Unknown=154
 - ProductionReadiness: CompatibilityOnly=1, Experimental=5, Reference=2, Unknown=150
 - FieldValidation: NotValidated=158
 
@@ -140,7 +140,7 @@
 | `OperatorType.AngleMeasurement` | 角度测量 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 6 | 3 | 7 | `1.0.0` | 该算子用于通过三点或两线计算角度，兼容亚像素级输入。运行时从声明输入端口读取数据，按… | [AngleMeasurement](./AngleMeasurement.md) |
 | `OperatorType.ArcCaliper` | 圆弧卡尺 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 7 | 2 | 0 | `1.0.1` | Radial band-profile arc edge scan | [ArcCaliper](./ArcCaliper.md) |
 | `OperatorType.CaliperTool` | 卡尺工具 | `Implemented` | `SyntheticBenchmarkEvidence` | `Unknown` | `NotValidated` | 2 | 9 | 9 | `1.2.1` | 该算子用于沿扫描线检测边缘对并输出宽度。运行时从声明输入端口读取数据，按参数表解析配… | [CaliperTool](./CaliperTool.md) |
-| `OperatorType.CircleMeasurement` | 圆测量 | `Implemented` | `SyntheticBenchmarkValidated` | `Unknown` | `NotValidated` | 1 | 14 | 26 | `1.2.0` | 该算子用于霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位。运行时从声… | [CircleMeasurement](./CircleMeasurement.md) |
+| `OperatorType.CircleMeasurement` | 圆测量 | `Implemented` | `SyntheticBenchmarkEvidence` | `Unknown` | `NotValidated` | 1 | 14 | 26 | `1.2.0` | 该算子用于霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位。运行时从声… | [CircleMeasurement](./CircleMeasurement.md) |
 | `OperatorType.ColorMeasurement` | 颜色测量 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 8 | 9 | `2.0.0` | 该算子用于在选定 ROI 内统计 Lab 色差或 HSV 颜色特征。运行时从声明输入… | [ColorMeasurement](./ColorMeasurement.md) |
 | `OperatorType.ContourMeasurement` | 轮廓测量 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 4 | 4 | `1.0.0` | 该算子用于计算轮廓面积、周长和质心，并支持按灰度权重估算面积。运行时从声明输入端口读… | [ContourMeasurement](./ContourMeasurement.md) |
 | `OperatorType.GapMeasurement` | 间隙测量 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 9 | 8 | `1.0.0` | 该算子用于通过点或图像投影方式测量间距。运行时从声明输入端口读取数据，按参数表解析配… | [GapMeasurement](./GapMeasurement.md) |
@@ -148,7 +148,7 @@
 | `OperatorType.GeometricFitting` | 几何拟合 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 8 | `1.0.0` | 该算子用于根据轮廓点拟合直线、圆或椭圆。运行时从声明输入端口读取数据，按参数表解析配… | [GeometricFitting](./GeometricFitting.md) |
 | `OperatorType.GeometricTolerance` | 二维几何公差判定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 5 | 7 | 5 | `1.0.1` | 该算子用于基于特征与基准评估平行度、垂直度、位置度、同心度等受限二维公差带并输出判定… | [GeometricTolerance](./GeometricTolerance.md) |
 | `OperatorType.LineLineDistance` | 线线距离 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 5 | 3 | `1.0.0` | 该算子用于计算两条直线或线段之间的距离与夹角。运行时从声明输入端口读取数据，按参数表… | [LineLineDistance](./LineLineDistance.md) |
-| `OperatorType.LineMeasurement` | 直线测量 | `Implemented` | `SyntheticBenchmarkValidated` | `Unknown` | `NotValidated` | 1 | 6 | 5 | `1.2.1` | 该算子用于检测直线特征，输出方向、跨度和拟合质量诊断。运行时从声明输入端口读取数据，… | [LineMeasurement](./LineMeasurement.md) |
+| `OperatorType.LineMeasurement` | 直线测量 | `Implemented` | `SyntheticBenchmarkEvidence` | `Unknown` | `NotValidated` | 1 | 6 | 5 | `1.2.1` | 该算子用于检测直线特征，输出方向、跨度和拟合质量诊断。运行时从声明输入端口读取数据，… | [LineMeasurement](./LineMeasurement.md) |
 | `OperatorType.Measurement` | 测量 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 6 | 17 | 8 | `1.1.0` | 该算子用于统一基础二维几何测量入口，支持点点距离、点线距离、线线距离/夹角和三点角度… | [Measurement](./Measurement.md) |
 | `OperatorType.MinEnclosingGeometry` | 最小外接几何体 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 10 | `1.0.1` | Contour-derived enclosing geometry and robust fitting | [MinEnclosingGeometry](./MinEnclosingGeometry.md) |
 | `OperatorType.PhaseClosure` | 相位解缠绕 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 4 | 4 | 0 | `1.0.1` | Itoh/quality-guided phase unwrapping | [PhaseClosure](./PhaseClosure.md) |

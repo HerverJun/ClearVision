@@ -273,7 +273,10 @@ static void GenerateFourAxisQualityReport(IReadOnlyList<CatalogOperator> operato
             item.QualityState.AlgorithmQuality,
             item.QualityState.ProductionReadiness,
             item.QualityState.FieldValidation,
-            evidenceRefs = item.QualityState.EvidenceRefs
+            item.QualityState.EvidenceScope,
+            item.QualityState.EvidenceIdentity,
+            evidenceRefs = item.QualityState.EvidenceRefs,
+            modeEvidence = item.QualityState.ModeEvidence
         })
         .ToArray();
     var document = new
@@ -308,11 +311,12 @@ static void GenerateFourAxisQualityReport(IReadOnlyList<CatalogOperator> operato
     markdown.AppendLine();
     markdown.AppendLine("> Execution, AlgorithmQuality, ProductionReadiness and FieldValidation are independent. Synthetic/public-dataset evidence is not Release Ready or Field Verified evidence.");
     markdown.AppendLine();
-    markdown.AppendLine("| Operator | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | Evidence |");
-    markdown.AppendLine("|---|---|---|---|---|---|");
+    markdown.AppendLine("| Operator | Execution | AlgorithmQuality | ProductionReadiness | FieldValidation | Scope | Mode evidence | Evidence |");
+    markdown.AppendLine("|---|---|---|---|---|---|---|---|");
     foreach (var row in rows)
     {
-        markdown.AppendLine($"| `{row.operatorType}` | `{row.Execution}` | `{row.AlgorithmQuality}` | `{row.ProductionReadiness}` | `{row.FieldValidation}` | {EscapeCell(string.Join("<br>", row.evidenceRefs))} |");
+        var modes = string.Join("<br>", row.modeEvidence.Select(mode => $"{mode.ModeId}: {mode.AlgorithmQuality}; adopted={mode.Adopted}; default={mode.IsDefault}"));
+        markdown.AppendLine($"| `{row.operatorType}` | `{row.Execution}` | `{row.AlgorithmQuality}` | `{row.ProductionReadiness}` | `{row.FieldValidation}` | `{row.EvidenceScope}` | {EscapeCell(modes)} | {EscapeCell(string.Join("<br>", row.evidenceRefs))} |");
     }
     File.WriteAllText(Path.Combine(reportDirectory, "operator_quality_four_axis.md"), markdown.ToString(), new UTF8Encoding(false));
 }
@@ -624,6 +628,12 @@ static string BuildDocument(
     sb.AppendLine($"| ProductionReadiness | `{metadata.QualityState.ProductionReadiness}` |");
     sb.AppendLine($"| FieldValidation | `{metadata.QualityState.FieldValidation}` |");
     sb.AppendLine($"| Quality Evidence Refs | {EscapeCell(string.Join("<br>", metadata.QualityState.EvidenceRefs))} |");
+    if (metadata.QualityState.ModeEvidence.Count > 0)
+    {
+        sb.AppendLine($"| Evidence Scope | `{metadata.QualityState.EvidenceScope}` |");
+        sb.AppendLine($"| Evidence Identity | `{metadata.QualityState.EvidenceIdentity}` |");
+        sb.AppendLine($"| Mode Evidence | {EscapeCell(string.Join("<br>", metadata.QualityState.ModeEvidence.Select(mode => $"{mode.ModeId}: {mode.AlgorithmQuality}; adopted={mode.Adopted}; default={mode.IsDefault}; {mode.Verdict}")))} |");
+    }
     sb.AppendLine($"| 标签 (Tags) | {EscapeCell(string.Join(", ", tags.Select(tag => $"`{tag}`")))} |");
 
     sb.AppendLine();

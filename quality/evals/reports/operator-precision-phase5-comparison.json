@@ -1,12 +1,12 @@
 {
     "schemaVersion":  "2026-07-16.operator-precision-phase5-comparison.v2",
-    "generatedAtUtc":  "2026-07-15T17:28:21.8857758Z",
-    "baselineSourceSha":  "ce266626e0bec0a8cd4a68c11b176df95e8cb482",
-    "afterSourceSha":  "9df0fa73db4b2a94a748f377147ded3511162746",
+    "generatedAtUtc":  "2026-07-16T01:21:26.6337082Z",
+    "baselineSourceSha":  "f7e9eea4022734ece1be602f36f97aa44e3226da",
+    "afterSourceSha":  "f7e9eea4022734ece1be602f36f97aa44e3226da",
     "immutableInputs":  {
                             "datasetId":  "clearvision-operator-precision-synthetic-v1",
                             "datasetVersion":  "1.0.0",
-                            "manifestSha256":  "ec29b22e0bbda301a0fef4b23375413d7a569240f8c4abf06d45318493938920",
+                            "manifestSha256":  "4a7518093f3e73db759c356c47a082bb13b69fa53e93b88b51ad7e7b6744e321",
                             "generatedDataSha256":  "85389261aa17bb99ecd70c51dfcb18545a0a417417b0b16ef33f07c42174ae72",
                             "seed":  20260715,
                             "modelSha256":  "5ee8135365428e700eba8c3eb3cd66b0d6e697f9f5df9d23fcb931655378fc90",
@@ -24,15 +24,15 @@
                                                 "gcLatencyMode":  "Interactive"
                                             },
                             "harness":  {
-                                            "commitSha":  "9df0fa73db4b2a94a748f377147ded3511162746",
-                                            "programSha256":  "58a1fba586e60e33a822b29175d3069423c956d62d9855f6c037870a36e6120e",
+                                            "commitSha":  "f7e9eea4022734ece1be602f36f97aa44e3226da",
+                                            "programSha256":  "0d8e14ae658d301b5b4f852f7b803fd03b2a0d879b7567f1406f476fb9359472",
                                             "projectSha256":  "d50131b05af4ab3efa1dd477f3000f09b4ab225cf99f3f4931adce93a41e273a",
-                                            "runScriptSha256":  "2e38238e5029bbee1687ac04cfd305c402641cc757bf5549398ab9232909b6f7",
+                                            "runScriptSha256":  "5b72680682ba210d8a8e3527a46ee892dd762d67ebe7684cfe30e4bb84105d7c",
                                             "repositoryDirty":  false
                                         },
                             "identicalAcrossReports":  true
                         },
-    "claimBoundary":  "Synthetic mathematical and preprocessing-contract evidence only; public MVTec evidence remains separate. This report does not establish E4, Release Ready, Field Verified, commercial-grade, or production-site accuracy.",
+    "claimBoundary":  "Supplemental synthetic mathematical-kernel and preprocessing-contract evidence only; public MVTec and formal product-operator E2E evidence remain separate. This report does not establish historical product execution, complete operator-path improvement, E4, Release Ready, Field Verified, commercial-grade, or production-site accuracy.",
     "decisions":  [
                       {
                           "domain":  "Caliper",
@@ -46,7 +46,7 @@
                                                  "p95Error":  13.560419716815565,
                                                  "failureRate":  0,
                                                  "ambiguityRate":  0.029629629629629631,
-                                                 "latencyP95Milliseconds":  0.0073793703703703686,
+                                                 "latencyP95Milliseconds":  0.0066925555555555549,
                                                  "allocatedBytesPerCase":  1312
                                              },
                           "productionMetric":  {
@@ -54,7 +54,7 @@
                                                    "p95Error":  50.827452364872805,
                                                    "failureRate":  0,
                                                    "ambiguityRate":  0,
-                                                   "latencyP95Milliseconds":  0.043705407407407408,
+                                                   "latencyP95Milliseconds":  0.048834333333333327,
                                                    "allocatedBytesPerCase":  27013
                                                },
                           "improvement":  {
@@ -64,7 +64,7 @@
                                               "ambiguityRateDelta":  -0.029629629629629631
                                           },
                           "cost":  {
-                                       "latencyP95Ratio":  5.922647,
+                                       "latencyP95Ratio":  7.296814,
                                        "allocationRatio":  20.589177
                                    },
                           "writtenBudget":  {
@@ -81,14 +81,16 @@
                           "baseline":  "AlgebraicL2",
                           "winner":  "OrthogonalWelsch",
                           "productionAlgorithm":  "ProductionOrthogonalWelsch",
-                          "adopted":  true,
-                          "reason":  "Candidate reduced combined RMSE/P95 without material failure-rate regression.",
+                          "adopted":  false,
+                          "reason":  "Kernel-level candidate selected; formal mode adoption is decided only by operator-product E2E evidence.",
+                          "kernelCandidateSupported":  true,
+                          "evidenceScope":  "kernel",
                           "baselineMetric":  {
                                                  "rmse":  1.9946116221604331,
                                                  "p95Error":  3.9223962858461112,
                                                  "failureRate":  0,
                                                  "ambiguityRate":  0.3928571428571429,
-                                                 "latencyP95Milliseconds":  0.014930464285714285,
+                                                 "latencyP95Milliseconds":  0.016744821428571428,
                                                  "allocatedBytesPerCase":  6192
                                              },
                           "productionMetric":  {
@@ -96,7 +98,7 @@
                                                    "p95Error":  1.2567422780387341,
                                                    "failureRate":  0,
                                                    "ambiguityRate":  0.11428571428571428,
-                                                   "latencyP95Milliseconds":  0.30291321428571433,
+                                                   "latencyP95Milliseconds":  0.30843371428571426,
                                                    "allocatedBytesPerCase":  198270
                                                },
                           "improvement":  {
@@ -106,7 +108,7 @@
                                               "ambiguityRateDelta":  -0.27857142857142864
                                           },
                           "cost":  {
-                                       "latencyP95Ratio":  20.288265,
+                                       "latencyP95Ratio":  18.419648,
                                        "allocationRatio":  32.020349
                                    },
                           "productionConformance":  "ExactAccuracy"
@@ -116,14 +118,16 @@
                           "baseline":  "L2",
                           "winner":  "Welsch",
                           "productionAlgorithm":  "ProductionWelsch",
-                          "adopted":  true,
-                          "reason":  "Candidate reduced combined RMSE/P95 without material failure-rate regression.",
+                          "adopted":  false,
+                          "reason":  "Kernel-level candidate selected; formal mode adoption is decided only by operator-product E2E evidence.",
+                          "kernelCandidateSupported":  true,
+                          "evidenceScope":  "kernel",
                           "baselineMetric":  {
                                                  "rmse":  0.62169605287735041,
                                                  "p95Error":  1.4574634848412384,
                                                  "failureRate":  0,
                                                  "ambiguityRate":  0.4,
-                                                 "latencyP95Milliseconds":  0.027731821428571422,
+                                                 "latencyP95Milliseconds":  0.035058964285714284,
                                                  "allocatedBytesPerCase":  2744
                                              },
                           "productionMetric":  {
@@ -131,7 +135,7 @@
                                                    "p95Error":  0.17809677317018421,
                                                    "failureRate":  0,
                                                    "ambiguityRate":  0,
-                                                   "latencyP95Milliseconds":  0.17371910714285715,
+                                                   "latencyP95Milliseconds":  0.16304825,
                                                    "allocatedBytesPerCase":  115850
                                                },
                           "improvement":  {
@@ -141,7 +145,7 @@
                                               "ambiguityRateDelta":  -0.4
                                           },
                           "cost":  {
-                                       "latencyP95Ratio":  6.264252,
+                                       "latencyP95Ratio":  4.650686,
                                        "allocationRatio":  42.219388
                                    },
                           "productionConformance":  "ExactAccuracy"
@@ -192,7 +196,8 @@
     "acceptance":  {
                        "sameDatasetModelEnvironment":  true,
                        "decisionsStable":  true,
-                       "productionConformancePassed":  true,
+                       "productionConformancePassed":  false,
+                       "formalProductPathEvaluated":  false,
                        "performanceBudgetsPassed":  true,
                        "releaseReady":  false,
                        "fieldVerified":  false

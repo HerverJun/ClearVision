@@ -1,0 +1,210 @@
+{
+  "schemaVersion": "2026-07-16.operator-quality-evidence.v1",
+  "manifestId": "clearvision-operator-quality-phase5-evidence",
+  "manifestVersion": "1.0.0",
+  "claimBoundary": "Evidence is scoped by operator mode. Synthetic raster, mathematical-kernel, preprocessing-contract and public-dataset evidence do not imply release readiness, field validation, E4 or commercial-grade accuracy.",
+  "identities": {
+    "productE2E": {
+      "datasetId": "clearvision-operator-product-e2e-synthetic-v1",
+      "datasetVersion": "1.0.0",
+      "datasetManifestSha256": "a507e7345388017506dc60f544598721042a0cdaa12dd0f2402cb6236256eaeb",
+      "generatedDataSha256": "5d60098525547bf873b9e4618b3d7b5a08bf202164295dac9c2eff6f99c2507a",
+      "baselineProductSha": "ce266626e0bec0a8cd4a68c11b176df95e8cb482",
+      "afterProductSha": "727414e2ca6bd5785aac3f2dbc68fb5b8badc369",
+      "harnessCommitSha": "727414e2ca6bd5785aac3f2dbc68fb5b8badc369",
+      "harnessProgramSha256": "572dfc2826d0eb597839442c0b2b2e49040348287fc01174288e18e803a57b9f",
+      "harnessProjectSha256": "ad0a4fa0f2a627e4f18435806053aa765429c921ba9e521158bdb25e03225206"
+    },
+    "supplementalKernel": {
+      "datasetId": "clearvision-operator-precision-v1",
+      "datasetVersion": "1.0.0",
+      "datasetManifestSha256": "4a7518093f3e73db759c356c47a082bb13b69fa53e93b88b51ad7e7b6744e321",
+      "generatedDataSha256": "85389261aa17bb99ecd70c51dfcb18545a0a417417b0b16ef33f07c42174ae72",
+      "harnessCommitSha": "f7e9eea4022734ece1be602f36f97aa44e3226da",
+      "harnessProgramSha256": "0d8e14ae658d301b5b4f852f7b803fd03b2a0d879b7567f1406f476fb9359472",
+      "modelSha256": "5ee8135365428e700eba8c3eb3cd66b0d6e697f9f5df9d23fcb931655378fc90",
+      "embeddingManifestSha256": "963888736d8d11fbbc4179c102b059c0a29220a21a9a0a13992aabc31b01f9c3",
+      "preprocessFingerprint": "c9e4e703eb2bdeab37496422a47243afc424d84769fa2ecb7dd75787361c86a8"
+    }
+  },
+  "artifacts": [
+    {
+      "id": "product-baseline",
+      "path": "quality/evals/reports/operator-product-e2e-baseline-acceptance.json",
+      "sha256": "7b54e656c8bb4e47cebb60d795ddd73eac047899244dda6ccd1d123e71e4370b",
+      "kind": "ExecutableFrozenProductBaseline"
+    },
+    {
+      "id": "product-after",
+      "path": "quality/evals/reports/operator-product-e2e-after-acceptance.json",
+      "sha256": "a83294f7479f3d2894094891ffb1f175d46305adbbaae99fc6b48152ea0b57c3",
+      "kind": "FormalOperatorE2E"
+    },
+    {
+      "id": "product-comparison",
+      "path": "quality/evals/reports/operator-product-e2e-phase5-comparison.json",
+      "sha256": "4acdac5d12b60ffae4e7cda01a1d1c9216a42b550ed259f599a4fa416a8cca81",
+      "kind": "FormalOperatorDecision"
+    },
+    {
+      "id": "kernel-baseline",
+      "path": "quality/evals/reports/operator-precision-baseline-acceptance.json",
+      "sha256": "f07a097333b4808f2cb7d42b9e41a9987f90012ba79e603f58e6c1cf3148fb65",
+      "kind": "SupplementalKernelBaseline"
+    },
+    {
+      "id": "kernel-after",
+      "path": "quality/evals/reports/operator-precision-after-acceptance.json",
+      "sha256": "b17dccf0eb1bab23b9aff106196c4c9660285c49a07e64972ff28492c85c498e",
+      "kind": "SupplementalKernelAfter"
+    },
+    {
+      "id": "kernel-comparison",
+      "path": "quality/evals/reports/operator-precision-phase5-comparison.json",
+      "sha256": "7674038538774b36bdce1824e184ed8e520b41f51dcc0d022131bab62d77134f",
+      "kind": "SupplementalKernelDecision"
+    },
+    {
+      "id": "anomaly-public-dataset",
+      "path": "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+      "sha256": "4db2ce0ad44bb95a213d127fd925cd3260b08173595d01b3a8f19f214a9300d5",
+      "kind": "PublicDatasetTraditionalMode"
+    }
+  ],
+  "operators": [
+    {
+      "operatorType": "CaliperTool",
+      "algorithmQuality": "SyntheticBenchmarkEvidence",
+      "evidenceScope": "ModeAggregate",
+      "evidenceIdentity": "caliper-kernel-candidate-rejected",
+      "evidenceRefs": [
+        "quality/evals/reports/operator-precision-baseline-acceptance.json",
+        "quality/evals/reports/operator-precision-after-acceptance.json",
+        "quality/evals/reports/operator-precision-phase5-comparison.json",
+        "quality/evals/reports/operator-quality-phase5-evidence.json"
+      ],
+      "modes": [
+        {
+          "modeId": "EdgeModel=Legacy(default)",
+          "algorithmQuality": "SyntheticBenchmarkEvidence",
+          "adopted": true,
+          "isDefault": true,
+          "verdict": "Compatibility default retained.",
+          "claimBoundary": "Synthetic profile evidence only.",
+          "evidenceRefs": ["quality/evals/reports/operator-precision-phase5-comparison.json"]
+        },
+        {
+          "modeId": "EdgeModel=GaussianDerivative(candidate)",
+          "algorithmQuality": "SyntheticBenchmarkEvidence",
+          "adopted": false,
+          "isDefault": false,
+          "verdict": "Rejected: formal-detector seeded RMSE/P95 regressed and managed allocation exceeded budget.",
+          "claimBoundary": "Rejected synthetic candidate; it is not a production mode.",
+          "evidenceRefs": ["quality/evals/reports/operator-precision-phase5-comparison.json"]
+        }
+      ]
+    },
+    {
+      "operatorType": "CircleMeasurement",
+      "algorithmQuality": "SyntheticBenchmarkEvidence",
+      "evidenceScope": "ModeAggregate",
+      "evidenceIdentity": "circle-formal-product-e2e",
+      "evidenceRefs": [
+        "quality/evals/reports/operator-product-e2e-baseline-acceptance.json",
+        "quality/evals/reports/operator-product-e2e-after-acceptance.json",
+        "quality/evals/reports/operator-product-e2e-phase5-comparison.json",
+        "quality/evals/reports/operator-quality-phase5-evidence.json"
+      ],
+      "modes": [
+        {
+          "modeId": "Method=CaliperFitV2; RefinementLoss=Legacy(default)",
+          "algorithmQuality": "SyntheticBenchmarkEvidence",
+          "adopted": true,
+          "isDefault": true,
+          "verdict": "Exact old/current default accuracy, failure and diagnostic conformance on validation/test.",
+          "claimBoundary": "Synthetic raster formal-operator evidence only.",
+          "evidenceRefs": ["quality/evals/reports/operator-product-e2e-phase5-comparison.json"]
+        },
+        {
+          "modeId": "Method=CaliperFitV2; RefinementLoss=Welsch",
+          "algorithmQuality": "SyntheticBenchmarkEvidence",
+          "adopted": false,
+          "isDefault": false,
+          "verdict": "Not adopted: validation RMSE/P95 regressed; independent test RMSE/P95 regressed and failure rate increased.",
+          "claimBoundary": "Rejected synthetic raster candidate; kernel improvement did not survive the complete formal operator path.",
+          "evidenceRefs": [
+            "quality/evals/reports/operator-product-e2e-phase5-comparison.json",
+            "quality/evals/reports/operator-precision-phase5-comparison.json"
+          ]
+        }
+      ]
+    },
+    {
+      "operatorType": "LineMeasurement",
+      "algorithmQuality": "SyntheticBenchmarkEvidence",
+      "evidenceScope": "ModeAggregate",
+      "evidenceIdentity": "line-formal-product-e2e",
+      "evidenceRefs": [
+        "quality/evals/reports/operator-product-e2e-baseline-acceptance.json",
+        "quality/evals/reports/operator-product-e2e-after-acceptance.json",
+        "quality/evals/reports/operator-product-e2e-phase5-comparison.json",
+        "quality/evals/reports/operator-quality-phase5-evidence.json"
+      ],
+      "modes": [
+        {
+          "modeId": "Method=FitLine; FitLoss=L2(default)",
+          "algorithmQuality": "SyntheticBenchmarkEvidence",
+          "adopted": true,
+          "isDefault": true,
+          "verdict": "Exact old/current default accuracy, failure and diagnostic conformance on validation/test.",
+          "claimBoundary": "Synthetic raster formal-operator evidence only.",
+          "evidenceRefs": ["quality/evals/reports/operator-product-e2e-phase5-comparison.json"]
+        },
+        {
+          "modeId": "Method=FitLine; FitLoss=Welsch",
+          "algorithmQuality": "SyntheticBenchmarkValidated",
+          "adopted": true,
+          "isDefault": false,
+          "verdict": "Accepted opt-in: validation RMSE/P95 improved; independent test RMSE and P95 improved with unchanged failure/ambiguity and written cost budgets passed.",
+          "claimBoundary": "Mode-scoped synthetic raster validation only; the whole operator is not Validated and field validation is absent.",
+          "evidenceRefs": [
+            "quality/evals/reports/operator-product-e2e-phase5-comparison.json",
+            "quality/evals/reports/operator-precision-phase5-comparison.json"
+          ]
+        }
+      ]
+    },
+    {
+      "operatorType": "AnomalyDetection",
+      "algorithmQuality": "PublicDatasetEvidence",
+      "evidenceScope": "DefaultMode",
+      "evidenceIdentity": "anomaly-mode-scoped-public-and-contract-evidence",
+      "evidenceRefs": [
+        "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
+        "quality/evals/reports/operator-precision-after-acceptance.json",
+        "quality/evals/reports/operator-precision-phase5-comparison.json",
+        "quality/evals/reports/operator-quality-phase5-evidence.json"
+      ],
+      "modes": [
+        {
+          "modeId": "FeatureExtractor=lab_gradient_stats(default)",
+          "algorithmQuality": "PublicDatasetEvidence",
+          "adopted": true,
+          "isDefault": true,
+          "verdict": "Traditional mode has MVTec-lite public-dataset evidence.",
+          "claimBoundary": "Public-dataset evidence only; not production-site validation.",
+          "evidenceRefs": ["quality/evals/reports/AnomalyDetection_mvtec_baseline.json"]
+        },
+        {
+          "modeId": "FeatureExtractor=onnx_embedding",
+          "algorithmQuality": "SyntheticBenchmarkEvidence",
+          "adopted": true,
+          "isDefault": false,
+          "verdict": "Preprocessing/model/feature-bank identity contract is fail-closed; no public-dataset accuracy claim is inherited from traditional mode.",
+          "claimBoundary": "Preprocessing-contract evidence only.",
+          "evidenceRefs": ["quality/evals/reports/operator-precision-phase5-comparison.json"]
+        }
+      ]
+    }
+  ]
+}

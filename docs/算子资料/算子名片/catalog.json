@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-16T01:07:27.7681703+08:00",
-  "generationFingerprint": "E0B7FE8FAF4CEDA40CFC3559FADEF26B7748BD0791618831FF8E4CF417A21BB5",
+  "generatedAt": "2026-07-16T09:29:06.0756074+08:00",
+  "generationFingerprint": "FB215F8AC572C36642F36AAF250ECA2D71F65F1B11C2F45B4EF25304627BC9C8",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -293,7 +293,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -879,7 +882,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -1130,7 +1136,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.0",
       "keywords": [
@@ -1320,7 +1329,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -1544,7 +1556,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -1732,7 +1747,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -1950,7 +1968,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -2040,7 +2061,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.2.0",
       "keywords": [
@@ -2910,7 +2934,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -3083,7 +3110,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -3184,7 +3214,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -3373,7 +3406,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -3667,7 +3703,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -3908,7 +3947,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -4326,7 +4368,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -4508,7 +4553,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.3",
       "keywords": [
@@ -5171,7 +5219,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -5382,7 +5433,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -5576,7 +5630,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -5845,7 +5902,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -6082,7 +6142,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -6282,7 +6345,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -6372,7 +6438,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.3",
       "keywords": [
@@ -6678,7 +6747,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.0",
       "keywords": [
@@ -6848,7 +6920,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.0",
       "keywords": [
@@ -7088,7 +7163,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -7460,7 +7538,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -7690,7 +7771,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -7977,7 +8061,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.2",
       "keywords": [
@@ -8665,7 +8752,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -8875,7 +8965,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.0",
       "keywords": [
@@ -9069,7 +9162,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.2.1",
       "keywords": [
@@ -9783,7 +9879,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -10037,7 +10136,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -10287,7 +10389,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "CompatibilityOnly",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -10497,7 +10602,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -10599,7 +10707,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.2",
       "keywords": [
@@ -10800,7 +10911,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.2",
       "keywords": [
@@ -10965,7 +11079,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.2",
       "keywords": [
@@ -11046,7 +11163,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.2",
       "keywords": [
@@ -11259,7 +11379,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.2",
       "keywords": [
@@ -11471,7 +11594,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.2",
       "keywords": [
@@ -11552,7 +11678,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.2",
       "keywords": [
@@ -11753,7 +11882,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.2",
       "keywords": [
@@ -11942,7 +12074,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.2",
       "keywords": [
@@ -12024,7 +12159,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.0",
       "keywords": [
@@ -12400,7 +12538,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -12604,7 +12745,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -12810,7 +12954,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Experimental",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "2.0.1",
       "keywords": [
@@ -13225,7 +13372,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -13550,7 +13700,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -13762,7 +13915,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -14320,7 +14476,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.2",
       "keywords": [
@@ -14584,7 +14743,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.0",
       "keywords": [
@@ -15037,7 +15199,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -15255,7 +15420,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -15472,7 +15640,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -15858,7 +16029,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.0",
       "keywords": [
@@ -17543,7 +17717,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Reference",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -17751,7 +17928,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -18207,7 +18387,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -18313,7 +18496,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -18420,7 +18606,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.0",
       "keywords": [],
@@ -18790,7 +18979,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Experimental",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.1",
       "keywords": [
@@ -19183,7 +19375,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -19672,7 +19867,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -19881,7 +20079,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.3",
       "keywords": [
@@ -20440,7 +20641,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.4",
       "keywords": [
@@ -20554,7 +20758,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.4",
       "keywords": [
@@ -20723,7 +20930,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.3",
       "keywords": [
@@ -20902,7 +21112,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -21321,7 +21534,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -21530,7 +21746,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -21764,7 +21983,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.2",
       "keywords": [
@@ -21848,7 +22070,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.2.0",
       "keywords": [
@@ -22220,7 +22445,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.2.0",
       "keywords": [
@@ -23510,7 +23738,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Experimental",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -23884,7 +24115,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -24048,7 +24282,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -24268,7 +24505,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Experimental",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "2.0.1",
       "keywords": [
@@ -24877,7 +25117,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -25142,7 +25385,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -25321,8 +25567,36 @@
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
         "evidenceRefs": [
+          "quality/evals/reports/operator-precision-baseline-acceptance.json",
           "quality/evals/reports/operator-precision-after-acceptance.json",
-          "docs/operator-quality/operator-quality-phase5-closeout.md"
+          "quality/evals/reports/operator-precision-phase5-comparison.json",
+          "quality/evals/reports/operator-quality-phase5-evidence.json"
+        ],
+        "evidenceScope": "ModeAggregate",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d/caliper-kernel-candidate-rejected",
+        "modeEvidence": [
+          {
+            "modeId": "EdgeModel=Legacy(default)",
+            "algorithmQuality": "SyntheticBenchmarkEvidence",
+            "adopted": true,
+            "isDefault": true,
+            "verdict": "Compatibility default retained.",
+            "claimBoundary": "Synthetic profile evidence only.",
+            "evidenceRefs": [
+              "quality/evals/reports/operator-precision-phase5-comparison.json"
+            ]
+          },
+          {
+            "modeId": "EdgeModel=GaussianDerivative(candidate)",
+            "algorithmQuality": "SyntheticBenchmarkEvidence",
+            "adopted": false,
+            "isDefault": false,
+            "verdict": "Rejected: formal-detector seeded RMSE/P95 regressed and managed allocation exceeded budget.",
+            "claimBoundary": "Rejected synthetic candidate; it is not a production mode.",
+            "evidenceRefs": [
+              "quality/evals/reports/operator-precision-phase5-comparison.json"
+            ]
+          }
         ]
       },
       "version": "1.2.1",
@@ -25667,12 +25941,41 @@
       "requiresLifecycleDisclosure": true,
       "qualityState": {
         "execution": "Implemented",
-        "algorithmQuality": "SyntheticBenchmarkValidated",
+        "algorithmQuality": "SyntheticBenchmarkEvidence",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
         "evidenceRefs": [
-          "quality/evals/reports/operator-precision-after-acceptance.json",
-          "docs/operator-quality/operator-quality-phase5-closeout.md"
+          "quality/evals/reports/operator-product-e2e-baseline-acceptance.json",
+          "quality/evals/reports/operator-product-e2e-after-acceptance.json",
+          "quality/evals/reports/operator-product-e2e-phase5-comparison.json",
+          "quality/evals/reports/operator-quality-phase5-evidence.json"
+        ],
+        "evidenceScope": "ModeAggregate",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d/circle-formal-product-e2e",
+        "modeEvidence": [
+          {
+            "modeId": "Method=CaliperFitV2; RefinementLoss=Legacy(default)",
+            "algorithmQuality": "SyntheticBenchmarkEvidence",
+            "adopted": true,
+            "isDefault": true,
+            "verdict": "Exact old/current default accuracy, failure and diagnostic conformance on validation/test.",
+            "claimBoundary": "Synthetic raster formal-operator evidence only.",
+            "evidenceRefs": [
+              "quality/evals/reports/operator-product-e2e-phase5-comparison.json"
+            ]
+          },
+          {
+            "modeId": "Method=CaliperFitV2; RefinementLoss=Welsch",
+            "algorithmQuality": "SyntheticBenchmarkEvidence",
+            "adopted": false,
+            "isDefault": false,
+            "verdict": "Not adopted: validation RMSE/P95 regressed; independent test RMSE/P95 regressed and failure rate increased.",
+            "claimBoundary": "Rejected synthetic raster candidate; kernel improvement did not survive the complete formal operator path.",
+            "evidenceRefs": [
+              "quality/evals/reports/operator-product-e2e-phase5-comparison.json",
+              "quality/evals/reports/operator-precision-phase5-comparison.json"
+            ]
+          }
         ]
       },
       "version": "1.2.0",
@@ -25690,7 +25993,7 @@
         "霍夫"
       ],
       "tags": [
-        "AlgorithmQuality:SyntheticBenchmarkValidated",
+        "AlgorithmQuality:SyntheticBenchmarkEvidence",
         "Execution:Implemented",
         "FieldValidation:NotValidated",
         "ProductionReadiness:Unknown",
@@ -26241,7 +26544,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "2.0.0",
       "keywords": [
@@ -26542,7 +26848,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -26750,7 +27059,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -27041,7 +27353,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -27212,7 +27527,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -27474,7 +27792,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -27760,7 +28081,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -27898,12 +28222,41 @@
       "requiresLifecycleDisclosure": true,
       "qualityState": {
         "execution": "Implemented",
-        "algorithmQuality": "SyntheticBenchmarkValidated",
+        "algorithmQuality": "SyntheticBenchmarkEvidence",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
         "evidenceRefs": [
-          "quality/evals/reports/operator-precision-after-acceptance.json",
-          "docs/operator-quality/operator-quality-phase5-closeout.md"
+          "quality/evals/reports/operator-product-e2e-baseline-acceptance.json",
+          "quality/evals/reports/operator-product-e2e-after-acceptance.json",
+          "quality/evals/reports/operator-product-e2e-phase5-comparison.json",
+          "quality/evals/reports/operator-quality-phase5-evidence.json"
+        ],
+        "evidenceScope": "ModeAggregate",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d/line-formal-product-e2e",
+        "modeEvidence": [
+          {
+            "modeId": "Method=FitLine; FitLoss=L2(default)",
+            "algorithmQuality": "SyntheticBenchmarkEvidence",
+            "adopted": true,
+            "isDefault": true,
+            "verdict": "Exact old/current default accuracy, failure and diagnostic conformance on validation/test.",
+            "claimBoundary": "Synthetic raster formal-operator evidence only.",
+            "evidenceRefs": [
+              "quality/evals/reports/operator-product-e2e-phase5-comparison.json"
+            ]
+          },
+          {
+            "modeId": "Method=FitLine; FitLoss=Welsch",
+            "algorithmQuality": "SyntheticBenchmarkValidated",
+            "adopted": true,
+            "isDefault": false,
+            "verdict": "Accepted opt-in: validation RMSE/P95 improved; independent test RMSE and P95 improved with unchanged failure/ambiguity and written cost budgets passed.",
+            "claimBoundary": "Mode-scoped synthetic raster validation only; the whole operator is not Validated and field validation is absent.",
+            "evidenceRefs": [
+              "quality/evals/reports/operator-product-e2e-phase5-comparison.json",
+              "quality/evals/reports/operator-precision-phase5-comparison.json"
+            ]
+          }
         ]
       },
       "version": "1.2.1",
@@ -27917,7 +28270,7 @@
         "霍夫"
       ],
       "tags": [
-        "AlgorithmQuality:SyntheticBenchmarkValidated",
+        "AlgorithmQuality:SyntheticBenchmarkEvidence",
         "Execution:Implemented",
         "FieldValidation:NotValidated",
         "ProductionReadiness:Unknown",
@@ -28154,7 +28507,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.0",
       "keywords": [
@@ -29229,7 +29585,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -29525,7 +29884,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -29804,7 +30166,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -29917,7 +30282,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -30213,7 +30581,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -30293,7 +30664,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -30530,7 +30904,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -30721,7 +31098,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -30980,7 +31360,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -31173,7 +31556,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -31353,7 +31739,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -31490,7 +31879,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -31794,7 +32186,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -32128,7 +32523,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -32511,7 +32909,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.1",
       "keywords": [
@@ -32850,7 +33251,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -32991,9 +33395,36 @@
         "productionReadiness": "Experimental",
         "fieldValidation": "NotValidated",
         "evidenceRefs": [
-          "quality/evals/reports/operator-precision-after-acceptance.json",
           "quality/evals/reports/AnomalyDetection_mvtec_baseline.json",
-          "docs/operator-quality/operator-quality-phase5-closeout.md"
+          "quality/evals/reports/operator-precision-after-acceptance.json",
+          "quality/evals/reports/operator-precision-phase5-comparison.json",
+          "quality/evals/reports/operator-quality-phase5-evidence.json"
+        ],
+        "evidenceScope": "DefaultMode",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d/anomaly-mode-scoped-public-and-contract-evidence",
+        "modeEvidence": [
+          {
+            "modeId": "FeatureExtractor=lab_gradient_stats(default)",
+            "algorithmQuality": "PublicDatasetEvidence",
+            "adopted": true,
+            "isDefault": true,
+            "verdict": "Traditional mode has MVTec-lite public-dataset evidence.",
+            "claimBoundary": "Public-dataset evidence only; not production-site validation.",
+            "evidenceRefs": [
+              "quality/evals/reports/AnomalyDetection_mvtec_baseline.json"
+            ]
+          },
+          {
+            "modeId": "FeatureExtractor=onnx_embedding",
+            "algorithmQuality": "SyntheticBenchmarkEvidence",
+            "adopted": true,
+            "isDefault": false,
+            "verdict": "Preprocessing/model/feature-bank identity contract is fail-closed; no public-dataset accuracy claim is inherited from traditional mode.",
+            "claimBoundary": "Preprocessing-contract evidence only.",
+            "evidenceRefs": [
+              "quality/evals/reports/operator-precision-phase5-comparison.json"
+            ]
+          }
         ]
       },
       "version": "1.2.0",
@@ -33782,7 +34213,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.0",
       "keywords": [
@@ -36088,7 +36522,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -36224,7 +36661,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -36668,7 +37108,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.1.0",
       "keywords": [
@@ -36788,7 +37231,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -36897,7 +37343,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.5",
       "keywords": [
@@ -37169,7 +37618,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -37320,7 +37772,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -37420,7 +37875,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -37501,7 +37959,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -37643,7 +38104,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -37774,7 +38238,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -38045,7 +38512,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -38344,7 +38814,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -38512,7 +38985,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -38623,7 +39099,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -38724,7 +39203,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -38865,7 +39347,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -39053,7 +39538,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -39185,7 +39673,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -39335,7 +39826,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -39411,7 +39905,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -39547,7 +40044,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -39675,7 +40175,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -39830,7 +40333,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -40009,7 +40515,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -40288,7 +40797,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -40590,7 +41102,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -40898,7 +41413,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -41009,7 +41527,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -41095,7 +41616,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -41209,7 +41733,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -41667,7 +42194,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -41880,7 +42410,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -42002,7 +42535,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -42119,7 +42655,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -42282,7 +42821,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -43032,7 +43574,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -43416,7 +43961,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Reference",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "0.1.0",
       "keywords": [
@@ -43557,7 +44105,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -44301,7 +44852,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -44519,7 +45073,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -45276,7 +45833,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -47101,7 +47661,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -47186,7 +47749,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [
@@ -47312,7 +47878,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [],
@@ -47602,7 +48171,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.1",
       "keywords": [
@@ -47864,7 +48436,10 @@
         "algorithmQuality": "Unknown",
         "productionReadiness": "Unknown",
         "fieldValidation": "NotValidated",
-        "evidenceRefs": []
+        "evidenceRefs": [],
+        "evidenceScope": "Operator",
+        "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d",
+        "modeEvidence": []
       },
       "version": "1.0.0",
       "keywords": [

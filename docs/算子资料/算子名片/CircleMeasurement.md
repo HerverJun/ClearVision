@@ -15,11 +15,14 @@
 | AI 默认推荐 (Default AI Recommendation) | No |
 | AI 必须披露状态 (Requires Disclosure) | Yes |
 | Execution | `Implemented` |
-| AlgorithmQuality | `SyntheticBenchmarkValidated` |
+| AlgorithmQuality | `SyntheticBenchmarkEvidence` |
 | ProductionReadiness | `Unknown` |
 | FieldValidation | `NotValidated` |
-| Quality Evidence Refs | quality/evals/reports/operator-precision-after-acceptance.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
-| 标签 (Tags) | `AlgorithmQuality:SyntheticBenchmarkValidated`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
+| Quality Evidence Refs | quality/evals/reports/operator-product-e2e-baseline-acceptance.json<br>quality/evals/reports/operator-product-e2e-after-acceptance.json<br>quality/evals/reports/operator-product-e2e-phase5-comparison.json<br>quality/evals/reports/operator-quality-phase5-evidence.json |
+| Evidence Scope | `ModeAggregate` |
+| Evidence Identity | `clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d/circle-formal-product-e2e` |
+| Mode Evidence | Method=CaliperFitV2; RefinementLoss=Legacy(default): SyntheticBenchmarkEvidence; adopted=True; default=True; Exact old/current default accuracy, failure and diagnostic conformance on validation/test.<br>Method=CaliperFitV2; RefinementLoss=Welsch: SyntheticBenchmarkEvidence; adopted=False; default=False; Not adopted: validation RMSE/P95 regressed; independent test RMSE/P95 regressed and failure rate increased. |
+| 标签 (Tags) | `AlgorithmQuality:SyntheticBenchmarkEvidence`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle
 该算子用于霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果写入输出字典。

@@ -1,139 +1,104 @@
-# ClearVision 算子质量提升阶段 5 收口
+# ClearVision 算子质量阶段 5 证据收口
 
-## 结论边界
+## 基线执行方式
 
-阶段 5 按“建立 Benchmark → 冻结基线 → 只实施数据证明的升级 → 重新 Benchmark → 治理与兼容收口”执行。正式结论来自固定合成数学数据与 ONNX 预处理契约夹具；Anomaly 的公开 MVTec 证据继续单独引用。上述证据不代表 E4、商业级精度、生产现场验收、Release Ready 或 Field Verified。
+冻结基线为 `ce266626e0bec0a8cd4a68c11b176df95e8cb482`。`scripts/reproduce-operator-precision-baseline.ps1` 会：
 
-冻结产品基线为 `ce266626e0bec0a8cd4a68c11b176df95e8cb482`。正式 acceptance 的实现与 harness commit 为 `9df0fa73db4b2a94a748f377147ded3511162746`，baseline 与 after 报告均记录 `repositoryDirty=false`，并通过相同数据、模型、预处理、harness 和运行环境身份校验。
+1. 在短路径 detached worktree 中检出该提交；
+2. 将已提交且内容 SHA 固定的 `OperatorProductE2EBenchmarkRunner` 适配器复制到隔离 worktree；
+3. 在该 worktree 内编译旧版 Product Infrastructure；
+4. 通过正式 `CircleMeasurementOperator.ExecuteAsync` 和 `LineMeasurementOperator.ExecuteAsync`、`ImageWrapper` 图像输入以及完整 OperatorBase 生命周期执行；
+5. 记录旧产品仓库 SHA、正式源码 SHA、实际加载的 Core/Infrastructure assembly SHA、harness SHA 和 clean 状态；
+6. 运行结束后删除隔离 worktree。
 
-## Benchmark 身份
+不再使用 `SourceShaOverride`。数学参考/共享内核报告的 `sourceSha` 只表示实际执行它们的当前 harness commit，不能再解释为旧产品执行证据。
 
-- Dataset: `clearvision-operator-precision-synthetic-v1` / `1.0.0`
-- Dataset source/license: 仓库内确定性生成 / `CC0-1.0`
-- Manifest SHA-256: `ec29b22e0bbda301a0fef4b23375413d7a569240f8c4abf06d45318493938920`
-- Generated input/truth SHA-256: `85389261aa17bb99ecd70c51dfcb18545a0a417417b0b16ef33f07c42174ae72`
-- Seed: `20260715`
-- Split: train/validation/test 固定为 case index modulo 5 的 `0 / 1 / 2,3,4`
-- Test cases: Caliper `135`、Circle `140`、Line `140`、Anomaly `48`；uncertainty 独立固定 `280` cases
-- Identity ONNX SHA-256: `5ee8135365428e700eba8c3eb3cd66b0d6e697f9f5df9d23fcb931655378fc90`
-- Embedding manifest SHA-256: `963888736d8d11fbbc4179c102b059c0a29220a21a9a0a13992aabc31b01f9c3`
-- Reference input SHA-256: `e18a231c2db2b801f4f41e314508b296dea562ce5883cda94c7499fc92743c8c`
-- Reference output SHA-256: `89321c2ae539bbe018a4acc4766456f93ae1a1db5689f7e1f446b6aefbc0201f`
-- Preprocessing fingerprint: `c9e4e703eb2bdeab37496422a47243afc424d84769fa2ecb7dd75787361c86a8`
-- Harness Program SHA-256: `58a1fba586e60e33a822b29175d3069423c956d62d9855f6c037870a36e6120e`
-- Harness run-script SHA-256: `2e38238e5029bbee1687ac04cfd305c402641cc757bf5549398ab9232909b6f7`
-- Environment: Windows `10.0.22000` x64、.NET runtime `8.0.19`、SDK `9.0.304`、OpenCV `4.9.0`、Server GC `false`
-- 正式证据：`quality/evals/reports/operator-precision-baseline-acceptance.json`、`quality/evals/reports/operator-precision-after-acceptance.json`、`quality/evals/reports/operator-precision-phase5-comparison.json`
+正式产品 E2E 数据为 `clearvision-operator-product-e2e-synthetic-v1/1.0.0`，manifest SHA 为 `a507e7345388017506dc60f544598721042a0cdaa12dd0f2402cb6236256eaeb`，生成 raster/truth SHA 为 `5d60098525547bf873b9e4618b3d7b5a08bf202164295dac9c2eff6f99c2507a`。split 单位是 scenario bundle：bundle index 模 5 的 `0/1/2,3,4` 分别为 train/validation/test；每个 split 都保留全部场景。
 
-卡尺覆盖 clean、模糊、噪声、相位、极性、饱和、纹理、双边缘和遮挡；圆覆盖 clean、短弧、离群点、尺度和椭圆干扰，并跨角度覆盖；直线覆盖 clean、断边、毛刺、遮挡和离群点。候选由 validation split 选择，以下数值来自独立 test split。
+## 正式算子端到端结果
 
-## Benchmark 决策
+旧提交默认路径与当前默认路径在 Circle/Line 的 validation/test 四个 metric row 上，`caseCount`、Bias、RMSE、P95、Failure、Ambiguity、Outlier、secondary/residual diagnostics 和 failure taxonomy 完全一致。该 conformance 证明当前默认兼容路径没有偏离 `ce266626` 的正式产品行为。
 
-| Domain | Path | Bias | RMSE | P95 error | Failure | Ambiguity | Outlier | Latency P95 | Allocation | Adopted |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| Caliper | `LegacyGradientCentroid` | -0.898781 | 3.605459 | 13.560420 | 0 | 0.029630 | 0.066667 | 0.007379 ms | 1,312 B/case | Baseline/default |
-| Caliper | `IntegratedGaussianDerivative` | -5.693582 | 17.288111 | 50.827452 | 0 | 0 | 0.118519 | 0.043705 ms | 27,013 B/case | **No** |
-| Circle | `AlgebraicL2` | -0.187351 | 1.994612 | 3.922396 | 0 | 0.392857 | 0 | 0.014930 ms | 6,192 B/case | Baseline/default |
-| Circle | `ProductionOrthogonalWelsch` | 0.070351 | 1.207139 | 1.256742 | 0 | 0.114286 | 0.054762 | 0.302913 ms | 198,270 B/case | **Yes, opt-in** |
-| Line | `L2` | 0.004843 | 0.621696 | 1.457463 | 0 | 0.400000 | 0 | 0.027732 ms | 2,744 B/case | Baseline/default |
-| Line | `ProductionWelsch` | -0.003164 | 0.081725 | 0.178097 | 0 | 0 | 0.086429 | 0.173719 ms | 115,850 B/case | **Yes, opt-in** |
+| Domain | 当前默认 | 候选模式 | Test RMSE 改善 | Test P95 改善 | Failure delta | P95 latency cost | managed allocation cost | 结论 |
+|---|---|---|---:|---:|---:|---:|---:|---|
+| Circle | `CaliperFitV2/Legacy` | `CaliperFitV2/Welsch` | `-8.204056%` | `-20.513562%` | `+0.013889` | `-1.7503 ms` | `+173,585.19 B/case` | **不采用** |
+| Line | `FitLine/L2` | `FitLine/Welsch` | `+0.985996%` | `+15.820713%` | `0` | `+0.7287 ms` | `+129,262.09 B/case` | **采用为 opt-in** |
 
-决策摘要：
+Circle 的 validation RMSE/P95 已回退，独立 test 又出现 RMSE/P95 回退和新增 failure，因此点集内核中的改善不能支持正式算子采用。代码中的 Welsch 参数为兼容保留的非默认模式，但不再标记为已验证采用；回滚方式是省略 `RefinementLoss` 或设为 `Legacy`。
 
-- Circle：RMSE 改善 `39.479997%`，P95 error 改善 `67.959834%`，failure 未恶化，ambiguity 降低，且 P95/分配在书面预算内，因此保留 opt-in Welsch 精化。
-- Line：RMSE 改善 `86.854588%`，P95 error 改善 `87.780361%`，failure 未恶化，ambiguity 降低，且 P95/分配在书面预算内，因此保留 opt-in Welsch 精化。
-- Caliper：kernel-level `GaussianDerivative` 在局部定位器上改善，但接入正式 detector/pairing 后 RMSE/P95 分别恶化 `379.498220% / 274.822118%`，分配 `27,013 B/case` 也超过书面 `20,000 B/case` 诊断预算，因此不进入正式算子。
+Line Welsch 在 validation 同时改善 RMSE/P95，独立 test 的 RMSE/P95 也均改善，Failure/Ambiguity 未恶化，P95 和 managed allocation 增量在书面预算内，因此仅 `Method=FitLine; FitLoss=Welsch` 模式保留 `SyntheticBenchmarkValidated`。整个 `LineMeasurement` OperatorType 不继承该模式级成熟度；默认仍为 L2，回滚方式是省略 `FitLoss` 或设为 `L2`。
 
-## 已实施升级与回滚
+Circle 正式路径覆盖参数映射、profile sampling、edge selection、歧义判断、`BuildRobustFit`、MAD/Huber、Welsch refine、coverage/angular coverage/residual gates；Line 正式路径覆盖灰度转换、Canny、HoughP seed、候选排序、caliper sampling、stripe center、L2/Welsch refine 和最终候选输出。点集内核 Benchmark 只作为补充证据。
 
-### Circle
+## 性能证据边界
 
-- 共享正交几何精化内核支持 L2/Huber/Welsch、稳健权重、退化检测、收敛诊断、尺度、残差和原始 covariance。
-- 仅统计圆拟合路径可选择 `RefinementLoss=Huber|Welsch`；默认仍为 `Legacy`。
-- `MinEnclosingCircle` 的最小包围语义未改变。
-- 回滚：将 `RefinementLoss` 设回 `Legacy`，旧工程无需迁移。
+- Latency：包围完整正式 `ExecuteAsync` 调用，包括图像解码、Canny/profile、候选选择、overlay 和输出构造。
+- Managed allocation：`GC.GetAllocatedBytesForCurrentThread`，只代表 benchmark thread managed allocation，不代表完整进程或 OpenCV native allocation。
+- Process resources：报告单独记录完整 benchmark 进程的 peak working set、private bytes 和 working set，不能归因到单个算子案例。
 
-### Caliper
+## 四轴与证据身份
 
-- 正式算子不暴露 `Quadratic`、`GaussianDerivative` 或 `Erf` EdgeModel 参数；旧默认和旧算法保持不变。
-- 输出继续明确记录 `EdgeModel=Legacy`、残差、测量证据、歧义和失败诊断。
-- `CaliperEdgeModelKernel` 仅作为 Benchmark 候选内核保留，不构成正式能力或默认切换。
-- 回滚：无需切换；正式路径从未采用候选模型。
+权威清单为 `quality/evals/reports/operator-quality-phase5-evidence.json`。它绑定：
 
-### LineMeasurement
+- baseline/after/comparison 报告路径和 SHA-256；
+- dataset、generated raster/truth、model、embedding manifest、preprocess、harness 和产品实现身份；
+- 算法模式、默认状态、采用结论、回滚方式和 claim boundary；
+- public-dataset、正式产品 E2E 与补充 kernel evidence 的不同作用域。
 
-- 支持 `FitLoss=L2|Huber|Welsch`，区分初始 seed 与稳健 refine，并输出残差、尺度、异常点和退化诊断。
-- 默认仍为 `L2`；稳健模式失败时不静默回退到 L2。
-- 回滚：将 `FitLoss` 设回 `L2`。
+`OperatorQualityStateCatalog` 从嵌入的该 manifest 生成状态；manifest 缺失、schema/条目非法时 fail-closed 为 `Unknown`。`scripts/verify-operator-quality-evidence.ps1` 对仓库中的报告内容和 SHA 做完整校验，Nightly/Manual 同时重放 baseline、after、comparison 并验证 tracked evidence identity。
 
-### MeasurementEvidence
+整算子四轴汇总：
 
-- 统一证据包含 Value、Unit、CoordinateFrame、Sigma/Covariance、Provenance、SourceOperator、SourceAlgorithm、SourceParametersFingerprint 和 QualityFlags。
-- 负数或非有限 Sigma 被拒绝；非方阵或包含非有限元素的 covariance 整体置空并标记无效，不压缩矩阵维度。
-- Line L2 的像素残差不再伪装成角度 sigma；Sigma 为 null，并标记 `AngleSigmaUnavailable`、`ResidualUncertaintyOnly`、`LegacyCompatibility`。
-- Residual heuristic 的 68%/95% coverage 为 `0.896429 / 0.953571`，说明 68% 区间过度保守；raw covariance 为 `0.550000 / 0.785714`，明显未校准。因此 covariance 仅标记 `UncalibratedCovariance`，不得作为统计置信区间。
+- Execution：158 `Implemented`；
+- AlgorithmQuality：154 `Unknown`、3 `SyntheticBenchmarkEvidence`（Caliper/Circle/Line）、1 `PublicDatasetEvidence`（仅 Anomaly traditional default scope）；
+- ProductionReadiness：保持 150 `Unknown`、5 `Experimental`、1 `CompatibilityOnly`、2 `Reference`；
+- FieldValidation：158 `NotValidated`。
 
-### Anomaly
+模式级结论：
 
-- 轻量传统特征模式继续作为兼容默认；未把 ONNX embedding 切成默认算法。
-- ONNX embedding 必须由 manifest 声明完整 resize、插值、颜色顺序、scale、mean/std、layout、数据类型和输出归一化；不假设 ImageNet mean/std。
-- 训练、建库、加载和推理共享预处理 fingerprint；feature bank 同时绑定模型内容 SHA、预处理 SHA 和 bank identity。
-- session cache 每次按实际模型内容 SHA 校验，同路径、同长度、恢复 mtime 但内容被替换时仍 fail-closed。
-- 预处理 reference RMSE 为 `0`，身份 mismatch 实际执行并记录 `mismatchRejectedFailClosed=1`。
-- 回滚：显式切回传统模式。缺 manifest 或旧身份不完整的 ONNX bank 不允许静默兼容。
+- Circle `RefinementLoss=Welsch`：`SyntheticBenchmarkEvidence`，`Adopted=false`；
+- Line `FitLoss=Welsch`：`SyntheticBenchmarkValidated`，`Adopted=true`，`IsDefault=false`；
+- Anomaly `lab_gradient_stats`：`PublicDatasetEvidence`；
+- Anomaly `onnx_embedding`：仅 `SyntheticBenchmarkEvidence` 的预处理/身份契约，不继承 traditional 模式的公开数据精度。
 
-## 未采用候选
+## 补充 Benchmark 与既有结论
 
-- Caliper `IntegratedGaussianDerivative`：正式 detector/pairing 集成精度严重回退且 allocation 超预算。
-- Caliper `Quadratic`：相对 legacy 没有可重复的目标指标改善。
-- Caliper `Erf`：没有精度收益，且 P95 延迟和分配显著增加。
-- Measurement covariance 作为“已校准置信区间”：68%/95% coverage 不合格。
-- ONNX embedding 作为 Anomaly 默认算法：未采用；本阶段只收紧 manifest 和 feature-bank 身份治理。
+`operator-precision-*.json` 继续保留卡尺、点集圆/线、不确定度和 Anomaly 预处理契约，但已明确标注为 supplemental kernel/preprocessing evidence：
 
-## 四轴质量状态
+- Caliper GaussianDerivative 正式集成仍拒绝：RMSE/P95 回退且 allocation 超预算；
+- Measurement covariance 68%/95% coverage 仍为 `0.55/0.785714`，保持 `UncalibratedCovariance`；
+- ONNX model SHA、embedding manifest SHA、preprocess fingerprint 与 feature-bank identity 继续 fail-closed；
+- MVTec 公开证据只属于传统 `lab_gradient_stats` 模式。
 
-四轴独立生成和投影，禁止用单一 Stable、A/B/C、测试数量、TotalScore、QScore 或 Accepted 代替：
+## CI 与剩余阻断
 
-- Execution：158 个正式算子均为 `Implemented`。
-- AlgorithmQuality：154 `Unknown`、1 `PublicDatasetEvidence`（Anomaly）、1 `SyntheticBenchmarkEvidence`（Caliper）、2 `SyntheticBenchmarkValidated`（Circle/Line）。
-- ProductionReadiness：150 `Unknown`、5 `Experimental`、1 `CompatibilityOnly`、2 `Reference`。
-- FieldValidation：158 个均为 `NotValidated`。
+- Benchmark 仍只在 Nightly/Manual 运行，不进入普通 PR lane；
+- 原有 Nightly 19 个 AI、Runtime、ResultAnalysis 和 DeepLearning blocker 保持不变，本阶段没有降低阈值、删除断言、改 lane 或增加 skip；
+- 上一基线远端 Safe CI 的 Windows/OpenCV Unicode ImageAcquisition 失败，以及 Vision Agent Quality Suite 的既有 AI blocker，仍属于范围外阻断；在最终 SHA 的远端运行完成前不得写成全绿；
+- 不宣称 Release Ready、Field Verified、E4、商业级或现场精度。
 
-状态由 runtime metadata 生成，并同步到 Application DTO、AI 只读目录、Prompt、知识图谱、文档目录和 OperatorLibrary descriptor。`Unknown`、compatibility-only、synthetic 或 public-dataset 证据均不会自动提升为 Release Ready 或 Field Verified。
-
-## 兼容、版本与门禁
-
-- 算子版本：Caliper `1.2.1`、Circle `1.2.0`、Line `1.2.1`、Anomaly `1.2.0`。
-- OperatorLibrary：`1.0.3`；实际 pack + 本地 NuGet restore + package acceptance `43/43` 通过，smoke 默认版本、lock file、README、third-party notice 和 SBOM 身份一致。
-- 旧工程、package、runtime load/save/run：`78/78` 通过。
-- Desktop preview 与 Station package/deploy/replay/store：`84/84` 通过。
-- 本地 PR lane：governance `3692` classified / 0 errors / 0 warnings；Product `2435 passed / 2 existing skips`；Desktop `599/599`；OperatorLibrary `43/43`；Frontend `43/43`；UI contract `967/967`；Stage 4 smoke `3/3`。
-- OperatorLibrary industrial profile：17/17 子门禁通过；包括 measurement regression `183/183`、accuracy `3/3`、determinism `16/16`、stability `1/1`、acceptance performance `2/2`、calibration `135/135`、calibration integration `7/7`、detection regression `112/112`、detection accuracy `2/2`、detection stability `1/1`、detection performance `1/1`、matching determinism `3/3`、matching stability `1/1`、preprocessing robustness `1/1`、virtual PLC `56/56 + 15/15`。
-- Final product Nightly：`1560 total / 1541 passed / 19 failed / 0 skipped`；19 个失败与 `quality/evals/reports/stage4-nightly-attribution.json` 的 `remaining_blocker` 集合精确一致，missing=0、new=0。
-- 既有 warning：`System.Collections.Immutable` 8/9 解析冲突仍如实保留；未通过降低阈值、删除断言、改 lane 或增加 skip 处理。
-- Benchmark 只属于 Nightly/Manual；普通 PR lane 未加入阶段 5 acceptance Benchmark。
-
-## 后续 P3 路线（本阶段不实施）
-
-1. 使用获授权的真实卡尺、圆和直线现场数据建立跨设备、镜头、曝光、温漂和材料域的独立 test split。
-2. 对 sigma/covariance 做独立校准、可靠性图和 68%/95% coverage 验证后，再评估 uncertainty claim。
-3. 在目标工控机复验 P50/P95、allocation、长时间稳定性和降级策略。
-4. 为实际部署的 Anomaly 模型和现场数据建立模型卡、许可、manifest、feature-bank lineage 和漂移回放。
-5. 只有现场签署和发布门禁全部具备后，才讨论 ProductionReadiness 或 FieldValidation 提升。
-
-## 复现命令
+## 复现
 
 ```powershell
-& ".\scripts\reproduce-operator-precision-baseline.ps1" `
+& ".\scripts\run-operator-product-e2e-evidence.ps1" `
   -Profile acceptance `
-  -ResultsDirectory "quality\evals\reports"
+  -ResultsDirectory ".tmp\operator-product-e2e"
+
+& ".\scripts\run-operator-precision-benchmark.ps1" `
+  -Profile acceptance `
+  -Label baseline `
+  -ResultsDirectory ".tmp\operator-precision"
 
 & ".\scripts\run-operator-precision-benchmark.ps1" `
   -Profile acceptance `
   -Label after `
-  -ResultsDirectory "quality\evals\reports"
+  -ResultsDirectory ".tmp\operator-precision"
 
-& ".\scripts\compare-operator-precision-benchmarks.ps1"
+& ".\scripts\compare-operator-precision-benchmarks.ps1" `
+  -BaselinePath ".tmp\operator-precision\operator-precision-baseline-acceptance.json" `
+  -AfterPath ".tmp\operator-precision\operator-precision-after-acceptance.json" `
+  -OutputPath ".tmp\operator-precision\operator-precision-phase5-comparison.json" `
+  -ReportPath ".tmp\operator-precision\operator-precision-phase5-comparison.md"
+
+& ".\scripts\verify-operator-quality-evidence.ps1"
 ```
-
-这些命令只忽略本套固定生成报告；任何源码、配置或其他未预期脏区仍会 fail-closed。远端 SHA 和 GitHub Actions 状态在最终交付时单独核对，不用于伪造 Release Ready 或 Field Verified。

@@ -18,4 +18,10 @@
   <ItemGroup>
     <ProjectReference Include="..\ClearVision.Product.Contracts\ClearVision.Product.Contracts.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\quality\evals\reports\operator-quality-phase5-evidence.json"
+                      Link="Evidence\operator-quality-phase5-evidence.json"
+                      LogicalName="ClearVision.Product.Core.Evidence.OperatorQualityPhase5.json" />
+  </ItemGroup>
 </Project>

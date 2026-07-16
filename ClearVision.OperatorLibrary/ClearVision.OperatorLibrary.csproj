@@ -41,6 +41,9 @@
     <None Include="README.md" Pack="true" PackagePath="\" />
     <None Include="THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
     <None Include="SBOM.md" Pack="true" PackagePath="\" />
+    <EmbeddedResource Include="..\quality\evals\reports\operator-quality-phase5-evidence.json"
+                      Link="Evidence\operator-quality-phase5-evidence.json"
+                      LogicalName="ClearVision.Product.Core.Evidence.OperatorQualityPhase5.json" />
   </ItemGroup>
 
   <ItemGroup>

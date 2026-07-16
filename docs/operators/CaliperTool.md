@@ -18,7 +18,10 @@
 | AlgorithmQuality | `SyntheticBenchmarkEvidence` |
 | ProductionReadiness | `Unknown` |
 | FieldValidation | `NotValidated` |
-| Quality Evidence Refs | quality/evals/reports/operator-precision-after-acceptance.json<br>docs/operator-quality/operator-quality-phase5-closeout.md |
+| Quality Evidence Refs | quality/evals/reports/operator-precision-baseline-acceptance.json<br>quality/evals/reports/operator-precision-after-acceptance.json<br>quality/evals/reports/operator-precision-phase5-comparison.json<br>quality/evals/reports/operator-quality-phase5-evidence.json |
+| Evidence Scope | `ModeAggregate` |
+| Evidence Identity | `clearvision-operator-quality-phase5-evidence@1.0.0:0e45168d04633feceb1a6e79a52df2c064ee649680332fec76f6e0269774f68d/caliper-kernel-candidate-rejected` |
+| Mode Evidence | EdgeModel=Legacy(default): SyntheticBenchmarkEvidence; adopted=True; default=True; Compatibility default retained.<br>EdgeModel=GaussianDerivative(candidate): SyntheticBenchmarkEvidence; adopted=False; default=False; Rejected: formal-detector seeded RMSE/P95 regressed and managed allocation exceeded budget. |
 | 标签 (Tags) | `AlgorithmQuality:SyntheticBenchmarkEvidence`, `Execution:Implemented`, `FieldValidation:NotValidated`, `ProductionReadiness:Unknown`, `分类:Measurement`, `分类显示:测量`, `生命周期:Stable`, `算法类型:自研` |
 
 ## 算法原理 / Algorithm Principle

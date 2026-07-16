@@ -515,16 +515,32 @@ public sealed class OperatorProductMetadataGovernanceTests
         foreach (var type in new[] { OperatorType.CircleMeasurement, OperatorType.LineMeasurement })
         {
             var state = metadata[type].QualityState;
-            state.AlgorithmQuality.Should().Be(OperatorAlgorithmQuality.SyntheticBenchmarkValidated);
+            state.AlgorithmQuality.Should().Be(OperatorAlgorithmQuality.SyntheticBenchmarkEvidence);
             state.ProductionReadiness.Should().Be(OperatorProductionReadiness.Unknown);
-            state.EvidenceRefs.Should().Contain("quality/evals/reports/operator-precision-after-acceptance.json");
-            state.EvidenceRefs.Should().Contain("docs/operator-quality/operator-quality-phase5-closeout.md");
+            state.EvidenceScope.Should().Be("ModeAggregate");
+            state.EvidenceIdentity.Should().StartWith("clearvision-operator-quality-phase5-evidence@1.0.0:");
+            state.EvidenceRefs.Should().Contain("quality/evals/reports/operator-product-e2e-phase5-comparison.json");
+            state.EvidenceRefs.Should().Contain("quality/evals/reports/operator-quality-phase5-evidence.json");
         }
+
+        var circleWelsch = metadata[OperatorType.CircleMeasurement].QualityState.ModeEvidence
+            .Single(item => item.ModeId == "Method=CaliperFitV2; RefinementLoss=Welsch");
+        circleWelsch.Adopted.Should().BeFalse();
+        circleWelsch.AlgorithmQuality.Should().Be(OperatorAlgorithmQuality.SyntheticBenchmarkEvidence);
+
+        var lineWelsch = metadata[OperatorType.LineMeasurement].QualityState.ModeEvidence
+            .Single(item => item.ModeId == "Method=FitLine; FitLoss=Welsch");
+        lineWelsch.Adopted.Should().BeTrue();
+        lineWelsch.IsDefault.Should().BeFalse();
+        lineWelsch.AlgorithmQuality.Should().Be(OperatorAlgorithmQuality.SyntheticBenchmarkValidated);
 
         metadata[OperatorType.AnomalyDetection].QualityState.AlgorithmQuality
             .Should().Be(OperatorAlgorithmQuality.PublicDatasetEvidence);
         metadata[OperatorType.AnomalyDetection].QualityState.ProductionReadiness
             .Should().Be(OperatorProductionReadiness.Experimental);
+        metadata[OperatorType.AnomalyDetection].QualityState.ModeEvidence
+            .Single(item => item.ModeId == "FeatureExtractor=onnx_embedding")
+            .AlgorithmQuality.Should().Be(OperatorAlgorithmQuality.SyntheticBenchmarkEvidence);
         metadata[OperatorType.Morphology].QualityState.ProductionReadiness
             .Should().Be(OperatorProductionReadiness.CompatibilityOnly);
 

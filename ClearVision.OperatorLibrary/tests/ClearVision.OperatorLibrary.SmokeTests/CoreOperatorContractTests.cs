@@ -20,6 +20,7 @@ using OperatorFieldValidation = ClearVision.Product.Core.Services.OperatorFieldV
 using OperatorMetadata = ClearVision.Product.Core.Services.OperatorMetadata;
 using OperatorProductionReadiness = ClearVision.Product.Core.Services.OperatorProductionReadiness;
 using OperatorQualityState = ClearVision.Product.Core.Services.OperatorQualityState;
+using OperatorQualityStateCatalog = ClearVision.Product.Core.Services.OperatorQualityStateCatalog;
 
 namespace ClearVision.OperatorLibrary.SmokeTests;
 
@@ -136,6 +137,24 @@ public class CoreOperatorContractTests
 
         Assert.Equal(qualityState, descriptor.QualityState);
         Assert.Equal(OperatorFieldValidation.NotValidated, descriptor.QualityState.FieldValidation);
+    }
+
+    [Fact]
+    public void PackagedQualityCatalog_ShouldLoadEmbeddedModeScopedEvidence()
+    {
+        var line = OperatorQualityStateCatalog.Resolve(OperatorType.LineMeasurement, OperatorLifecycle.Stable);
+        var circle = OperatorQualityStateCatalog.Resolve(OperatorType.CircleMeasurement, OperatorLifecycle.Stable);
+
+        Assert.Equal(OperatorAlgorithmQuality.SyntheticBenchmarkEvidence, line.AlgorithmQuality);
+        Assert.Contains(line.ModeEvidence, mode =>
+            mode.ModeId == "Method=FitLine; FitLoss=Welsch" &&
+            mode.AlgorithmQuality == OperatorAlgorithmQuality.SyntheticBenchmarkValidated &&
+            mode.Adopted &&
+            !mode.IsDefault);
+        Assert.Equal(OperatorAlgorithmQuality.SyntheticBenchmarkEvidence, circle.AlgorithmQuality);
+        Assert.Contains(circle.ModeEvidence, mode =>
+            mode.ModeId == "Method=CaliperFitV2; RefinementLoss=Welsch" &&
+            !mode.Adopted);
     }
 
     [Fact]

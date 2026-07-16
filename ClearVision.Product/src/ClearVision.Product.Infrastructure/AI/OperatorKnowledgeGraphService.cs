@@ -164,7 +164,7 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
                 {
                     Contract = evidence.Contract,
                     Golden = evidence.Golden,
-                    Dataset = evidence.Dataset,
+                    Dataset = BuildDatasetEvidence(evidence, item.QualityState),
                     FieldReplay = evidence.FieldReplay,
                     PrecisionClaim = BuildPrecisionClaim(item.QualityState),
                     IndustrialStatus = evidence.IndustrialStatus
@@ -177,7 +177,7 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
 
     private static string BuildPrecisionClaim(OperatorQualityState qualityState)
     {
-        return qualityState.AlgorithmQuality switch
+        var boundary = qualityState.AlgorithmQuality switch
         {
             OperatorAlgorithmQuality.SyntheticBenchmarkEvidence or OperatorAlgorithmQuality.SyntheticBenchmarkValidated =>
                 "Synthetic benchmark evidence only; it does not establish field accuracy, release readiness, or production-site capability.",
@@ -185,6 +185,26 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
                 "Public-dataset evidence only; model, preprocessing and feature-bank identity remain deployment-specific and field validation is absent.",
             _ => "AlgorithmQuality=Unknown; contract tests, golden cases and test counts are not precision evidence."
         };
+
+        if (qualityState.ModeEvidence.Count == 0)
+        {
+            return boundary;
+        }
+
+        var modes = string.Join("; ", qualityState.ModeEvidence.Select(mode =>
+            $"{mode.ModeId}: {mode.AlgorithmQuality}, adopted={mode.Adopted}, default={mode.IsDefault}"));
+        return $"{boundary} EvidenceScope={qualityState.EvidenceScope}. Mode evidence: {modes}.";
+    }
+
+    private static string BuildDatasetEvidence(QualityOperatorEvidence legacyEvidence, OperatorQualityState qualityState)
+    {
+        if (qualityState.ModeEvidence.Count == 0)
+        {
+            return legacyEvidence.Dataset;
+        }
+
+        return "Mode-scoped algorithm evidence: " + string.Join("; ", qualityState.ModeEvidence.Select(mode =>
+            $"{mode.ModeId}={mode.AlgorithmQuality} (adopted={mode.Adopted}, default={mode.IsDefault})"));
     }
 
     private static List<OperatorKnowledgeEdge> BuildEdges(

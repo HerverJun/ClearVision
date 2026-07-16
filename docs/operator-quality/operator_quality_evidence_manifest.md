@@ -1,5 +1,7 @@
 # Operator Quality Evidence Manifest
 
+> Legacy quality-matrix vocabulary only. This document is not the Stage 5 four-axis source of truth and must not be used to promote AlgorithmQuality. The authoritative, SHA-bound, mode-scoped Stage 5 manifest is `quality/evals/reports/operator-quality-phase5-evidence.json`, verified by `scripts/verify-operator-quality-evidence.ps1`.
+
 GeneratedAtUtc: `2026-05-20T15:05:00+00:00`
 SourceMatrix: `quality/evals/reports/operator_quality_matrix.md`
 SourceCatalog: `docs/算子资料/算子名片/CATALOG.md`
