@@ -232,6 +232,39 @@ public class FlowConnectionScenariosTests
         output.OutputData.Should().NotContainKey("Image");
     }
 
+    [Fact]
+    public async Task ExecuteFlowAsync_ImageAcquisitionToMeasurement_ShouldRetainInspectionInputSnapshotWithoutPollutingOutputData()
+    {
+        var sourceExecutor = new TestImageSourceOperator(NullLogger<TestImageSourceOperator>.Instance);
+        var measurementExecutor = new TestInitialImageConsumerOperator(NullLogger<TestInitialImageConsumerOperator>.Instance);
+        var service = CreateFlowService(sourceExecutor, measurementExecutor);
+
+        var flow = new OperatorFlow();
+        var source = CreateOperator(
+            "source",
+            OperatorType.ImageAcquisition,
+            outputPorts: [("Image", PortDataType.Image)]);
+        var measurement = CreateOperator(
+            "measurement",
+            OperatorType.ImageDiff,
+            inputPorts: [("Image", PortDataType.Image)],
+            outputPorts: [("Width", PortDataType.Integer), ("Height", PortDataType.Integer)]);
+
+        flow.AddOperator(source);
+        flow.AddOperator(measurement);
+        flow.AddConnection(CreateConnection(source, "Image", measurement, "Image"));
+
+        var output = await service.ExecuteFlowAsync(flow);
+
+        output.IsSuccess.Should().BeTrue(output.ErrorMessage);
+        output.OutputData.Should().ContainKey("Width");
+        output.OutputData.Should().ContainKey("Height");
+        output.OutputData.Should().NotContainKey("Image");
+        output.InputImage.Should().NotBeNullOrEmpty();
+        sourceExecutor.LastOutputImage.Should().NotBeNull();
+        sourceExecutor.LastOutputImage!.RefCount.Should().Be(0);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

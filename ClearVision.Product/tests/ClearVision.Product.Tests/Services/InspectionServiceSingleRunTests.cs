@@ -135,6 +135,66 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
+    public async Task ExecuteSingleAsync_WhenFinalOutputHasNoImage_ShouldUseAcquisitionInputImageForResult()
+    {
+        var projectId = Guid.NewGuid();
+        var imageId = Guid.NewGuid();
+        var inputImage = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageCache = Substitute.For<IImageCacheRepository>();
+        var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
+        var explicitFlow = CreateFlow("client-flow");
+        projectRepository.GetByIdFreshAsync(projectId).Returns(new Project("active-inline-project"));
+        flowExecution
+            .ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                ExecutionTimeMs = 12,
+                InputImage = inputImage,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["JudgmentResult"] = "OK",
+                    ["Width"] = 1,
+                    ["Height"] = 1
+                }
+            }));
+        imageCache.AddAsync(Arg.Any<byte[]>(), Arg.Any<string>()).Returns(imageId);
+        resultRepository.AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            Substitute.For<IImageAcquisitionService>(),
+            Substitute.For<IConfigurationService>(),
+            Substitute.For<IInspectionRuntimeCoordinator>(),
+            Substitute.For<IInspectionWorker>(),
+            imageCache,
+            new AnalysisDataBuilder(),
+            Substitute.For<IProjectFlowStorage>(),
+            NullLogger<InspectionService>.Instance,
+            imagePersistence);
+
+        var result = await service.ExecuteSingleAsync(projectId, inputImage, explicitFlow);
+
+        result.OutputImage.Should().Equal(inputImage);
+        result.ImageId.Should().Be(imageId);
+        await imagePersistence.Received(1).PersistAsync(result, Arg.Any<CancellationToken>());
+        await imageCache.Received(1).AddAsync(
+            Arg.Is<byte[]>(bytes => bytes.SequenceEqual(inputImage)),
+            Arg.Any<string>());
+    }
+
+    [Fact]
     public async Task ExecuteSingleAsync_WithInlineFlowAndMissingProject_ShouldRejectWithoutPersistingResult()
     {
         var projectId = Guid.NewGuid();

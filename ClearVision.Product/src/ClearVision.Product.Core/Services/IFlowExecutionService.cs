@@ -5,6 +5,7 @@
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ValueObjects;
+using System.Text.Json.Serialization;
 
 namespace ClearVision.Product.Core.Services;
 
@@ -350,6 +351,13 @@ public class FlowExecutionResult
     /// </summary>
     public Dictionary<string, object>? OutputData { get; set; }
 
+    /// <summary>
+    /// 正式检测界面使用的采集源图像快照。该字段不属于流程业务输出，避免最终测量算子
+    /// 不返回 Image 时丢失检测画面。
+    /// </summary>
+    [JsonIgnore]
+    public byte[]? InputImage { get; set; }
+
     public bool WasShortCircuited { get; set; }
 
     /// <summary>
@@ -407,6 +415,12 @@ public class OperatorExecutionResult
     /// 输出数据
     /// </summary>
     public Dictionary<string, object>? OutputData { get; set; }
+
+    /// <summary>
+    /// 图像采集算子在输出仍有效时生成的源图快照，仅供流程级检测画面回退使用。
+    /// </summary>
+    [JsonIgnore]
+    public byte[]? InputImage { get; set; }
 
     /// <summary>
     /// 错误信息
