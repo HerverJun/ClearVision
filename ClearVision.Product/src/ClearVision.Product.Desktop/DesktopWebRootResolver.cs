@@ -14,7 +14,7 @@ internal static class DesktopWebRootResolver
     {
         var normalizedBaseDirectory = Path.GetFullPath(
             string.IsNullOrWhiteSpace(baseDirectory)
-                ? AppContext.BaseDirectory
+                ? ResolveDefaultBaseDirectory()
                 : baseDirectory);
 
         if (preferProjectSource &&
@@ -30,10 +30,38 @@ internal static class DesktopWebRootResolver
     {
         var normalizedBaseDirectory = Path.GetFullPath(
             string.IsNullOrWhiteSpace(baseDirectory)
-                ? AppContext.BaseDirectory
+                ? ResolveDefaultBaseDirectory()
                 : baseDirectory);
 
         return Path.GetFullPath(Path.Combine(normalizedBaseDirectory, "wwwroot", "studio"));
+    }
+
+    internal static string ResolveDefaultBaseDirectory(
+        string? appContextBaseDirectory = null,
+        string? processPath = null)
+    {
+        var appBaseDirectory = Path.GetFullPath(
+            string.IsNullOrWhiteSpace(appContextBaseDirectory)
+                ? AppContext.BaseDirectory
+                : appContextBaseDirectory);
+        if (Directory.Exists(Path.Combine(appBaseDirectory, "wwwroot")))
+        {
+            return appBaseDirectory;
+        }
+
+        var resolvedProcessPath = string.IsNullOrWhiteSpace(processPath)
+            ? Environment.ProcessPath
+            : processPath;
+        if (string.IsNullOrWhiteSpace(resolvedProcessPath))
+        {
+            return appBaseDirectory;
+        }
+
+        var executableDirectory = Path.GetDirectoryName(Path.GetFullPath(resolvedProcessPath));
+        return !string.IsNullOrWhiteSpace(executableDirectory) &&
+            Directory.Exists(Path.Combine(executableDirectory, "wwwroot"))
+            ? Path.GetFullPath(executableDirectory)
+            : appBaseDirectory;
     }
 
     private static bool TryFindProjectWwwRoot(string baseDirectory, out string wwwRoot)

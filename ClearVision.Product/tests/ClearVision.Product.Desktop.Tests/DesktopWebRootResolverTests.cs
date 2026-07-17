@@ -70,6 +70,23 @@ public sealed class DesktopWebRootResolverTests : IDisposable
         resolved.Should().Be(Path.GetFullPath(Path.Combine(baseDirectory, "wwwroot", "studio")));
     }
 
+    [Fact]
+    public void ResolveDefaultBaseDirectory_ShouldUseExecutableDirectoryWhenSingleFileExtractionHasNoWebRoot()
+    {
+        var extractionDirectory = Path.Combine(_tempRoot, "single-file-extraction");
+        var publishDirectory = Path.Combine(_tempRoot, "publish");
+        Directory.CreateDirectory(extractionDirectory);
+        CreateOutputWwwRoot(publishDirectory);
+        var executablePath = Path.Combine(publishDirectory, "ClearVision.Product.Desktop.exe");
+        File.WriteAllText(executablePath, string.Empty);
+
+        var resolved = DesktopWebRootResolver.ResolveDefaultBaseDirectory(
+            extractionDirectory,
+            executablePath);
+
+        resolved.Should().Be(Path.GetFullPath(publishDirectory));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempRoot))
