@@ -26,7 +26,7 @@ function studioRelative(path: string): string {
   return relative(studioRoot, path).replaceAll('\\', '/');
 }
 
-describe('F03 G1-G4 architecture guards', () => {
+describe('F03 G1-G5 architecture guards', () => {
   const files = sourceFiles(sourceRoot);
   const workspaceFiles = sourceFiles(workspaceRoot);
 
@@ -44,7 +44,7 @@ describe('F03 G1-G4 architecture guards', () => {
       .toEqual(['src/app/layouts/ProductLayout.vue']);
   });
 
-  it('keeps Workspace HTTP on the shared transport and the G4 method allowlist', () => {
+  it('keeps Workspace HTTP on the shared transport and the G5 method allowlist', () => {
     const workspaceSource = workspaceFiles.map(read).join('\n');
     const transport = read(join(sourceRoot, 'platform/api/apiTransport.ts'));
     const session = read(join(sourceRoot, 'app/session/sessionProjectionOwner.ts'));
@@ -52,7 +52,7 @@ describe('F03 G1-G4 architecture guards', () => {
 
     expect(workspaceSource).not.toMatch(/\b(?:globalThis\.)?fetch\s*\(/);
     expect(workspaceSource).not.toMatch(/\.\s*(?:put|patch)\s*\(/i);
-    expect(transport).toContain("method: 'GET' | 'POST' | 'DELETE'");
+    expect(transport).toContain("method: 'GET' | 'POST' | 'PUT' | 'DELETE'");
     const previewTransport = read(join(workspaceRoot, 'preview/previewTransport.ts'));
     expect(previewTransport).toContain("'flows/preview-node'");
     expect(previewTransport).toContain('preview-artifacts/');
@@ -125,7 +125,7 @@ describe('F03 G1-G4 architecture guards', () => {
       .toContain("from '@clearvision/canonical-preview-coordinator'");
   });
 
-  it('keeps G5-G6 absent while G1-G4 are the implemented F03 slices', () => {
+  it('keeps G6 absent while G1-G5 are the implemented F03 slices', () => {
     const plan = read(join(
       repositoryRoot,
       'docs/进行中/StudioUINext/Studio_UI_Next_F03_完整开发计划.md'
@@ -152,7 +152,18 @@ describe('F03 G1-G4 architecture guards', () => {
       'src/capabilities/project-workspace/preview/previewTransport.ts',
       'src/capabilities/project-workspace/preview/PreviewPanel.vue'
     ]));
-    expect(existsSync(join(workspaceRoot, 'persistence'))).toBe(false);
+    expect(existsSync(join(workspaceRoot, 'persistence'))).toBe(true);
+    expect(sourceFiles(join(workspaceRoot, 'persistence')).map(studioRelative)).toEqual(expect.arrayContaining([
+      'src/capabilities/project-workspace/persistence/projectPersistencePort.ts',
+      'src/capabilities/project-workspace/persistence/index.ts',
+      'src/capabilities/project-workspace/persistence/workspacePersistenceOwner.ts'
+    ]));
+    const persistenceSource = sourceFiles(join(workspaceRoot, 'persistence')).map(read).join('\n');
+    expect(persistenceSource).toContain('api.put.bind(api)');
+    expect(persistenceSource).toContain('projects/${projectId}');
+    expect(persistenceSource).not.toMatch(
+      /['"`](?:inspection\/(?:admission|execute)|runs\/|results\/|runtime\/)/i
+    );
     expect(existsSync(join(workspaceRoot, 'run'))).toBe(false);
   });
 

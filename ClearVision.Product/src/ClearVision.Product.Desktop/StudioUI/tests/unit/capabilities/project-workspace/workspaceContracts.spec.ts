@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   WorkspaceContractDecodeError,
   WorkspaceSaveCompatibilityError,
+  buildWorkspaceProjectUpdatePayloadV1,
   decodeWorkspaceProjectV1,
+  encodeWorkspaceFlowDraftUpdateV1,
   encodeWorkspaceFlowUpdateV1,
+  workspacePersistenceFingerprint,
   workspacePersistenceFieldsV1,
   workspaceTransientStripFieldsV1
 } from '@/capabilities/project-workspace/workspaceContracts';
@@ -233,6 +236,184 @@ describe('F03 G1 Workspace persistence contracts', () => {
     expect(workspacePersistenceFieldsV1.flow).toEqual([
       'id', 'name', 'decisionConfiguration', 'operators', 'connections'
     ]);
+  });
+
+  it('merges the typed G2-G4 draft with the G1 baseline without losing null, falsy, ROI, structure or opaque fields', () => {
+    const sourceFlow = flowFixture({ futureFlowPolicy: { mode: 'strict' } });
+    const sourceOperator = (sourceFlow.operators as Array<Record<string, unknown>>)[0]!;
+    sourceOperator.futureOperatorField = { keep: true };
+    (sourceOperator.inputPorts as Array<Record<string, unknown>>)[0]!.futurePortField = 'input-opaque';
+    const sourceParameter = (sourceOperator.parameters as Array<Record<string, unknown>>)[0]!;
+    sourceParameter.futureParameterField = { keep: 'parameter' };
+    sourceParameter.value = null;
+    sourceOperator.parameters = [
+      sourceParameter,
+      {
+        id: 'abababab-abab-4bab-8bab-abababababab',
+        name: 'Zero', displayName: 'Zero', description: null, dataType: 'int',
+        value: 0, defaultValue: 1, minValue: 0, maxValue: 10, isRequired: false, options: null
+      },
+      {
+        id: 'bcbcbcbc-bcbc-4cbc-8cbc-bcbcbcbcbcbc',
+        name: 'Disabled', displayName: 'Disabled', description: null, dataType: 'bool',
+        value: false, defaultValue: true, minValue: null, maxValue: null, isRequired: false, options: null
+      },
+      {
+        id: 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
+        name: 'Label', displayName: 'Label', description: null, dataType: 'string',
+        value: '', defaultValue: 'default', minValue: null, maxValue: null, isRequired: false, options: null
+      },
+      {
+        id: 'dededede-dede-4ede-8ede-dededededede',
+        name: 'Roi', displayName: 'ROI', description: null, dataType: 'roi',
+        value: { x: 10, y: 11, width: 40, height: 30 }, defaultValue: null,
+        minValue: null, maxValue: null, isRequired: false, options: null
+      }
+    ];
+    const decoded = decodeWorkspaceProjectV1(projectFixture({ flow: sourceFlow }));
+    const encodedBaseline = encodeWorkspaceFlowUpdateV1(decoded)!;
+    const operators = structuredClone(encodedBaseline.operators) as Array<Record<string, unknown>>;
+    const edited = operators[0]!;
+    edited.x = 240;
+    edited.y = 160;
+    const parameters = edited.parameters as Array<Record<string, unknown>>;
+    parameters.find(parameter => parameter.name === 'Roi')!.value = { x: 12, y: 14, width: 52, height: 38 };
+    const rectangleNodeId = 'efefefef-efef-4fef-8fef-efefefefefef';
+    const rectangleInputId = '12121212-1212-4212-8212-121212121212';
+    operators.push({
+      id: rectangleNodeId,
+      name: 'Caliper RectangleRegion',
+      type: 'RectangleRegion',
+      metadata: { lifecycle: 'Stable' },
+      x: 480,
+      y: 160,
+      inputPorts: [{
+        id: rectangleInputId,
+        name: 'Image',
+        direction: 'Input',
+        dataType: 'Image',
+        isRequired: true,
+        futurePortField: 'new-port-opaque'
+      }],
+      outputPorts: [],
+      parameters: [{
+        id: '13131313-1313-4313-8313-131313131313',
+        name: 'Region', displayName: 'Region', description: null, dataType: 'rectangle',
+        value: { x: 20, y: 30, width: 100, height: 24, angle: 5 }, defaultValue: null,
+        minValue: null, maxValue: null, isRequired: true, options: null
+      }],
+      isEnabled: true,
+      uiCatalogField: { createdBy: 'caliper-structure-editor' }
+    });
+    const nextConnectionId = '14141414-1414-4414-8414-141414141414';
+    const draft = {
+      id: decoded.flow!.id,
+      name: decoded.flow!.name,
+      operators,
+      connections: [{
+        id: nextConnectionId,
+        sourceOperatorId: operatorId,
+        sourcePortId: outputPortId,
+        targetOperatorId: rectangleNodeId,
+        targetPortId: rectangleInputId,
+        uiConnectionField: 'connected'
+      }],
+      decisionConfiguration: encodedBaseline.decisionConfiguration,
+      opaquePassthrough: { futureFlowPolicy: { mode: 'strict' } }
+    };
+
+    const flow = encodeWorkspaceFlowDraftUpdateV1(decoded, draft);
+    const payload = buildWorkspaceProjectUpdatePayloadV1(decoded, draft);
+
+    expect(flow).toMatchObject({
+      futureFlowPolicy: { mode: 'strict' },
+      operators: [{
+        x: 240,
+        y: 160,
+        futureOperatorField: { keep: true },
+        inputPorts: [{ futurePortField: 'input-opaque' }],
+        parameters: [
+          { name: 'Exposure', value: null, futureParameterField: { keep: 'parameter' } },
+          { name: 'Zero', value: 0 },
+          { name: 'Disabled', value: false },
+          { name: 'Label', value: '' },
+          { name: 'Roi', value: { x: 12, y: 14, width: 52, height: 38 } }
+        ]
+      }, {
+        id: rectangleNodeId,
+        type: 'RectangleRegion',
+        parameters: [{ value: { x: 20, y: 30, width: 100, height: 24, angle: 5 } }]
+      }],
+      connections: [{ id: nextConnectionId }]
+    });
+    expect(flow).not.toHaveProperty('operators.1.uiCatalogField');
+    expect(flow).not.toHaveProperty('connections.0.uiConnectionField');
+    expect(flow).not.toHaveProperty('operators.0.executionStatus');
+    expect(flow).not.toHaveProperty('operators.0.executionTimeMs');
+    expect(flow).not.toHaveProperty('operators.0.errorMessage');
+    expect(payload).toMatchObject({
+      globalVariables: null,
+      expectedPersistenceRevision: 17,
+      flow: { id: flowId }
+    });
+    expect(workspacePersistenceFingerprint(flow)).toBe(
+      workspacePersistenceFingerprint(JSON.parse(JSON.stringify(flow)))
+    );
+  });
+
+  it('normalizes a catalog-added numeric operator type before PUT and decodes the saved response', () => {
+    const decoded = decodeWorkspaceProjectV1(projectFixture());
+    const encodedBaseline = encodeWorkspaceFlowUpdateV1(decoded)!;
+    const operators = structuredClone(encodedBaseline.operators) as Array<Record<string, unknown>>;
+    const addedOperatorId = '15151515-1515-4515-8515-151515151515';
+    operators.push({
+      id: addedOperatorId,
+      name: 'Catalog Line Measurement',
+      type: '20',
+      metadata: null,
+      x: 320,
+      y: 180,
+      inputPorts: [],
+      outputPorts: [],
+      parameters: [{
+        id: '16161616-1616-4616-8616-161616161616',
+        name: 'Text',
+        displayName: 'Text',
+        description: null,
+        dataType: 'string',
+        value: 'catalog-added',
+        defaultValue: '',
+        minValue: null,
+        maxValue: null,
+        isRequired: false,
+        options: null
+      }],
+      isEnabled: true
+    });
+    const draft = {
+      id: decoded.flow!.id,
+      name: decoded.flow!.name,
+      operators,
+      connections: encodedBaseline.connections as readonly Readonly<Record<string, unknown>>[],
+      decisionConfiguration: encodedBaseline.decisionConfiguration,
+      opaquePassthrough: decoded.flow!.opaquePassthrough
+    };
+
+    const payload = buildWorkspaceProjectUpdatePayloadV1(decoded, draft);
+    const savedFlow = payload.flow!;
+    expect((savedFlow.operators as Array<Record<string, unknown>>)[1]!.type).toBe(20);
+
+    const saved = decodeWorkspaceProjectV1(projectFixture({
+      persistenceRevision: 18,
+      flow: savedFlow
+    }));
+    expect(saved.persistenceRevision).toBe(18);
+    expect(saved.flow!.operators[1]!.type).toMatchObject({
+      value: 'LineMeasurement',
+      persistenceValue: 20
+    });
+    expect((encodeWorkspaceFlowUpdateV1(saved)!.operators as Array<Record<string, unknown>>)[1]!.type)
+      .toBe(20);
   });
 
   it('preserves safe unknown persistence keys through opaque passthrough at every write-capable layer', () => {

@@ -13,7 +13,7 @@ const projectId = '11111111-1111-4111-8111-111111111111';
 const nodeId = '22222222-2222-4222-8222-222222222222';
 const debugSessionId = '33333333-3333-4333-8333-333333333333';
 const artifactId = 'A'.repeat(43);
-const sha256 = 'a'.repeat(64);
+const sha256 = '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a';
 
 function apiPost(value: unknown): NonNullable<ApiTransport['post']> {
   return value as NonNullable<ApiTransport['post']>;
@@ -202,6 +202,25 @@ describe('G4 Preview transport', () => {
     const port = createPreviewTransportPort(api);
     await port.previewNode(command());
     await expect(port.getPreviewArtifactBlob(artifactId)).rejects.toBeInstanceOf(PreviewArtifactIntegrityError);
+    port.dispose();
+  });
+
+  it('hashes the actual Blob bytes and rejects a same-length body with matching forged headers', async () => {
+    const forged = blobResponse({
+      blob: new Blob([new Uint8Array([4, 3, 2, 1])], { type: 'image/png' })
+    });
+    const api: ApiTransport = {
+      apiBaseUrl: 'http://localhost:5000/api',
+      get: vi.fn(),
+      post: apiPost(vi.fn(async () => response())),
+      getBlob: vi.fn(async () => forged),
+      delete: vi.fn()
+    };
+    const port = createPreviewTransportPort(api);
+    await port.previewNode(command());
+
+    await expect(port.getPreviewArtifactBlob(artifactId))
+      .rejects.toThrow(/actual Blob bytes|bytes did not match/i);
     port.dispose();
   });
 

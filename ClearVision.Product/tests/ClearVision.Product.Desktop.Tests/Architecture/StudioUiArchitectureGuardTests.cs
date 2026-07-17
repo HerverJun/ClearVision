@@ -75,8 +75,6 @@ public sealed class StudioUiArchitectureGuardTests
             "workspaceV2Enabled",
             "frontendV2BasePath",
             "window.__API_BASE_URL__",
-            "new ImageCanvas",
-            "class ImageCanvas",
             "class EventBus",
             "createEventBus(",
             "class ServiceRegistry",
@@ -103,13 +101,35 @@ public sealed class StudioUiArchitectureGuardTests
                 $"{relativePath} must not define a second FlowCanvas kernel");
         }
 
+        var imageCanvasConstructors = sourceFiles
+            .Where(file => Regex.IsMatch(
+                File.ReadAllText(file),
+                @"\bnew\s+ImageCanvas\s*\(",
+                RegexOptions.CultureInvariant))
+            .Select(StudioUiRelativePath)
+            .ToList();
+        imageCanvasConstructors.Should().Equal(
+            new[] { "src/platform/canvas/canonicalImageCanvas.ts" },
+            "the reviewed canonical facade must remain the sole ImageCanvas lifecycle owner");
+
+        var imageCanvasDeclarations = sourceFiles
+            .Where(file => Regex.IsMatch(
+                File.ReadAllText(file),
+                @"\bclass\s+ImageCanvas\b",
+                RegexOptions.CultureInvariant))
+            .Select(StudioUiRelativePath)
+            .ToList();
+        imageCanvasDeclarations.Should().Equal(
+            new[] { "src/platform/canvas/canonical-image-modules.d.ts" },
+            "StudioUI may describe the canonical package type but must not define a second ImageCanvas kernel");
+
         var apiTransport = File.ReadAllText(Path.Combine(
             RepoPath(StudioUiRoot), "src", "platform", "api", "apiTransport.ts"));
-        apiTransport.Should().Contain("method: 'GET'");
-        apiTransport.Should().NotContain("method: 'POST'");
-        apiTransport.Should().NotContain("method: 'PUT'");
-        apiTransport.Should().NotContain("method: 'PATCH'");
-        apiTransport.Should().NotContain("method: 'DELETE'");
+        Regex.Matches(apiTransport, @"\basync\s+get<").Count.Should().Be(1);
+        Regex.Matches(apiTransport, @"\basync\s+post<").Count.Should().Be(1);
+        Regex.Matches(apiTransport, @"\basync\s+put<").Count.Should().Be(1);
+        Regex.Matches(apiTransport, @"\basync\s+delete\s*\(").Count.Should().Be(1);
+        apiTransport.Should().NotContain("'PATCH'");
         apiTransport.Should().NotContain("EventSource");
         apiTransport.Should().NotContain("localStorage");
 
@@ -131,6 +151,7 @@ public sealed class StudioUiArchitectureGuardTests
             .ToList();
         abortControllerOwners.Should().BeEquivalentTo(new[]
         {
+            "src/capabilities/project-workspace/preview/previewTransport.ts",
             "src/platform/diagnostics/runtimeDiagnostics.ts",
             "src/platform/query/readQuery.ts"
         });
@@ -352,6 +373,7 @@ public sealed class StudioUiArchitectureGuardTests
 
         var productSource = sourceFiles
             .Where(file => !StudioUiRelativePath(file).StartsWith("src/labs/", StringComparison.Ordinal))
+            .Where(file => StudioUiRelativePath(file) != "src/platform/api/apiTransport.ts")
             .Select(File.ReadAllText)
             .ToList();
         productSource.Should().OnlyContain(text =>
@@ -402,7 +424,7 @@ public sealed class StudioUiArchitectureGuardTests
     }
 
     [Fact]
-    public void StudioUiF03G3Workspace_ShouldKeepOneOwnerTypedInspectorAndExactReadOnlyBoundary()
+    public void StudioUiF03G5Workspace_ShouldKeepOnePersistenceOwnerAndExactProjectPutBoundary()
     {
         var workspaceRoot = Path.Combine(
             RepoPath(StudioUiRoot),
@@ -428,10 +450,19 @@ public sealed class StudioUiArchitectureGuardTests
             text.Should().NotMatchRegex(
                 @"\b(?:globalThis\.)?fetch\s*\(",
                 $"{relativePath} must consume only the narrow Workspace read port");
-            text.Should().NotContain("ApiTransport", $"{relativePath} must not hold the generic transport");
+            if (!relativePath.EndsWith("workspaceRuntime.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("workspaceOwner.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("flow/flowCanvasOwner.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("preview/previewOwner.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("preview/previewWorkbenchOwner.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("preview/previewTransport.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("persistence/projectPersistencePort.ts", StringComparison.Ordinal))
+            {
+                text.Should().NotContain("ApiTransport", $"{relativePath} must not hold the generic transport");
+            }
             text.Should().NotMatchRegex(
                 "method\\s*:\\s*['\\\"](?:POST|PUT|PATCH|DELETE)['\\\"]",
-                $"{relativePath} must remain GET-only in G1-G3");
+                $"{relativePath} must not create an ad-hoc HTTP method owner");
             text.Should().NotMatchRegex(
                 "from\\s+['\\\"][^'\\\"]*(?:/labs/|FrontendV2)",
                 $"{relativePath} must not import retired or Lab production code");
@@ -480,9 +511,34 @@ public sealed class StudioUiArchitectureGuardTests
         inspectorSource.Should().NotContain("FlowCanvas.serialize()");
         inspectorSource.Should().NotContain("FilePickedEvent");
         inspectorSource.Should().NotContain("HostBridge");
-        Directory.Exists(Path.Combine(workspaceRoot, "preview")).Should().BeFalse();
-        Directory.Exists(Path.Combine(workspaceRoot, "persistence")).Should().BeFalse();
+        Directory.Exists(Path.Combine(workspaceRoot, "preview")).Should().BeTrue();
+        Directory.Exists(Path.Combine(workspaceRoot, "persistence")).Should().BeTrue();
         Directory.Exists(Path.Combine(workspaceRoot, "run")).Should().BeFalse();
+
+        var persistenceRoot = Path.Combine(workspaceRoot, "persistence");
+        Directory.EnumerateFiles(persistenceRoot, "workspacePersistenceOwner.ts", SearchOption.AllDirectories)
+            .Should()
+            .ContainSingle();
+        var persistenceSource = string.Join(
+            Environment.NewLine,
+            Directory.EnumerateFiles(persistenceRoot, "*.ts", SearchOption.AllDirectories)
+                .Select(File.ReadAllText));
+        persistenceSource.Should().Contain("projects/${projectId}");
+        persistenceSource.Should().Contain("PSV011");
+        persistenceSource.Should().Contain("GV031");
+        persistenceSource.Should().Contain("unknown-outcome");
+        persistenceSource.Should().NotContain("projects/${projectId}/flow");
+        persistenceSource.Should().NotContain("global-variables");
+        persistenceSource.Should().NotContain("inspection/execute");
+        persistenceSource.Should().NotContain("inspection/admission");
+
+        var workspaceContracts = File.ReadAllText(Path.Combine(workspaceRoot, "workspaceContracts.ts"));
+        workspaceContracts.Should().Contain("expectedPersistenceRevision: baseline.persistenceRevision");
+        workspaceContracts.Should().Contain("globalVariables: null");
+
+        var apiTransport = File.ReadAllText(Path.Combine(
+            RepoPath(StudioUiRoot), "src", "platform", "api", "apiTransport.ts"));
+        Regex.Matches(apiTransport, @"\bsend\(\s*path,\s*'PUT'").Count.Should().Be(1);
 
         var canonical = File.ReadAllText(Path.Combine(
             RepoPath(StudioUiRoot), "src", "platform", "canvas", "canonicalFlowCanvas.ts"));
@@ -497,6 +553,10 @@ public sealed class StudioUiArchitectureGuardTests
         var host = File.ReadAllText(RepoPath(
             "ClearVision.Product/src/ClearVision.Product.Desktop/WebView2Host.cs"));
         host.Should().Contain("[\"Studio2.Workspace\"] = studioOptions.WorkspaceCapabilityEnabled");
+        var mainForm = File.ReadAllText(RepoPath(
+            "ClearVision.Product/src/ClearVision.Product.Desktop/MainForm.cs"));
+        mainForm.Should().Contain("__clearVisionFlushProjectWorkspace");
+        mainForm.Should().Contain("Promise.all(flushers.map");
     }
 
     private static string RepoPath(string relativePath) =>

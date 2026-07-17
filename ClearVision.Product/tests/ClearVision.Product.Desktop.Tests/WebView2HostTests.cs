@@ -228,7 +228,10 @@ public class WebView2HostTests
     {
         var script = MainForm.BuildAiWorkspaceFlushStartScript("op-1", "host_close");
 
-        script.Should().Contain("Promise.resolve(flush(reason))");
+        script.Should().Contain("window.__clearVisionFlushProjectWorkspace");
+        script.Should().Contain("window.__clearVisionFlushAiPanelWorkspace");
+        script.Should().Contain("Promise.all(flushers.map(flush => Promise.resolve(flush(reason))))");
+        script.Should().Contain("values.every(value => value === true)");
         script.Should().Contain("return true;");
         script.Should().NotContain("async()=>");
         script.Should().NotContain("await (window.__clearVisionFlushAiPanelWorkspace");

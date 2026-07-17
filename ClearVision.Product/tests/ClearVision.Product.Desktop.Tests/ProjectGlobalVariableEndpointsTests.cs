@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Decisions;
@@ -832,6 +833,178 @@ public sealed class ProjectGlobalVariableEndpointsTests
         await host.FlowStorage.DidNotReceive().SaveFlowJsonAsync(host.Project.Id, Arg.Any<string>(), Arg.Any<long>());
     }
 
+    [Fact]
+    public async Task ProjectPut_GetPutGetGolden_ShouldPreserveFalsyNullableRoiStructureAndOpaqueFields()
+    {
+        var variableId = Guid.NewGuid();
+        var factory = new OperatorFactory();
+        var image = CreateGoldenOperator(factory, OperatorType.ImageAcquisition, "Image", 20, 30);
+        var roi = CreateGoldenOperator(factory, OperatorType.RoiManager, "ROI", 260, 30);
+        var removed = CreateGoldenOperator(factory, OperatorType.Thresholding, "Removed", 500, 30);
+        var caliper = CreateGoldenOperator(factory, OperatorType.CaliperTool, "Caliper", 500, 220);
+        image.ExtensionData = new Dictionary<string, JsonElement>
+        {
+            ["futureOperatorField"] = JsonSerializer.SerializeToElement(new { keep = true })
+        };
+        image.OutputPorts[0].ExtensionData = new Dictionary<string, JsonElement>
+        {
+            ["futurePortField"] = JsonSerializer.SerializeToElement("port-opaque")
+        };
+        image.Parameters[0].ExtensionData = new Dictionary<string, JsonElement>
+        {
+            ["futureParameterField"] = JsonSerializer.SerializeToElement("parameter-opaque")
+        };
+        var imageOutput = image.OutputPorts.First();
+        var roiImageInput = roi.InputPorts.First(port => port.DataType == PortDataType.Image);
+        var originalConnection = new OperatorConnectionDto
+        {
+            Id = Guid.NewGuid(),
+            SourceOperatorId = image.Id,
+            SourcePortId = imageOutput.Id,
+            TargetOperatorId = roi.Id,
+            TargetPortId = roiImageInput.Id,
+            ExtensionData = new Dictionary<string, JsonElement>
+            {
+                ["futureConnectionField"] = JsonSerializer.SerializeToElement("old-connection")
+            }
+        };
+        var initialFlow = new OperatorFlowDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "G5 Golden",
+            Operators = [image, roi, removed, caliper],
+            Connections = [originalConnection],
+            ExtensionData = new Dictionary<string, JsonElement>
+            {
+                ["futureFlowField"] = JsonSerializer.SerializeToElement(new { mode = "preserve" })
+            }
+        };
+        var storage = new RecordingProjectFlowStorage();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 7, manualWriteAllowed: true),
+            storedFlowJson: JsonSerializer.Serialize(initialFlow),
+            flowStorage: storage);
+
+        using var initialGet = await host.Client.GetAsync($"/api/projects/{host.Project.Id}");
+        initialGet.StatusCode.Should().Be(HttpStatusCode.OK);
+        var initial = JsonNode.Parse(await initialGet.Content.ReadAsStringAsync())!.AsObject();
+        var nextFlow = initial["flow"]!.DeepClone().AsObject();
+        var operators = nextFlow["operators"]!.AsArray();
+        var imageNode = operators.Select(node => node!.AsObject()).Single(node =>
+            node["id"]!.GetValue<Guid>() == image.Id);
+        var roiNode = operators.Select(node => node!.AsObject()).Single(node =>
+            node["id"]!.GetValue<Guid>() == roi.Id);
+        operators.Remove(operators.Single(node => node!["id"]!.GetValue<Guid>() == removed.Id));
+        roiNode["x"] = 312.5;
+        roiNode["y"] = 96.25;
+        var roiParameters = roiNode["parameters"]!.AsArray().Select(node => node!.AsObject()).ToList();
+        roiParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "X")["value"] = 12;
+        roiParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "Y")["value"] = 14;
+        roiParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "Width")["value"] = 52;
+        roiParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "Height")["value"] = 38;
+        var imageParameters = imageNode["parameters"]!.AsArray();
+        imageParameters.Add(CreateGoldenParameterNode("ExplicitNull", null));
+        imageParameters.Add(CreateGoldenParameterNode("Zero", 0));
+        imageParameters.Add(CreateGoldenParameterNode("Disabled", false));
+        imageParameters.Add(CreateGoldenParameterNode("Empty", string.Empty));
+
+        var rectangle = CreateGoldenOperator(factory, OperatorType.RectangleRegion, "Caliper RectangleRegion", 300, 220);
+        rectangle.ExtensionData = new Dictionary<string, JsonElement>
+        {
+            ["futureRectangleField"] = JsonSerializer.SerializeToElement(new { source = "g5" })
+        };
+        rectangle.Parameters.Single(parameter => parameter.Name == "X").Value = 20;
+        rectangle.Parameters.Single(parameter => parameter.Name == "Y").Value = 30;
+        rectangle.Parameters.Single(parameter => parameter.Name == "Width").Value = 100;
+        rectangle.Parameters.Single(parameter => parameter.Name == "Height").Value = 24;
+        operators.Add(JsonNode.Parse(JsonSerializer.Serialize(rectangle)));
+        foreach (var operatorNode in operators.Select(node => node!.AsObject()))
+        {
+            operatorNode.Remove("executionStatus");
+            operatorNode.Remove("executionTimeMs");
+            operatorNode.Remove("errorMessage");
+        }
+
+        var newConnections = new JsonArray();
+        var replacementConnectionId = Guid.NewGuid();
+        newConnections.Add(JsonNode.Parse(JsonSerializer.Serialize(new OperatorConnectionDto
+        {
+            Id = replacementConnectionId,
+            SourceOperatorId = image.Id,
+            SourcePortId = imageOutput.Id,
+            TargetOperatorId = roi.Id,
+            TargetPortId = roiImageInput.Id,
+            ExtensionData = new Dictionary<string, JsonElement>
+            {
+                ["futureConnectionField"] = JsonSerializer.SerializeToElement("replacement")
+            }
+        })));
+        var rectangleOutput = rectangle.OutputPorts.Single(port => port.DataType == PortDataType.Rectangle);
+        var caliperRegionInput = caliper.InputPorts.Single(port => port.Name == "SearchRegion");
+        newConnections.Add(JsonNode.Parse(JsonSerializer.Serialize(new OperatorConnectionDto
+        {
+            Id = Guid.NewGuid(),
+            SourceOperatorId = rectangle.Id,
+            SourcePortId = rectangleOutput.Id,
+            TargetOperatorId = caliper.Id,
+            TargetPortId = caliperRegionInput.Id
+        })));
+        nextFlow["connections"] = newConnections;
+        var putBody = new JsonObject
+        {
+            ["name"] = initial["name"]!.DeepClone(),
+            ["description"] = initial["description"]?.DeepClone(),
+            ["expectedPersistenceRevision"] = initial["persistenceRevision"]!.DeepClone(),
+            ["flow"] = nextFlow,
+            ["globalVariables"] = null
+        };
+
+        using var put = await host.Client.PutAsync(
+            $"/api/projects/{host.Project.Id}",
+            new StringContent(putBody.ToJsonString(), Encoding.UTF8, "application/json"));
+        put.StatusCode.Should().Be(HttpStatusCode.OK, await put.Content.ReadAsStringAsync());
+        using var finalGet = await host.Client.GetAsync($"/api/projects/{host.Project.Id}");
+        finalGet.StatusCode.Should().Be(HttpStatusCode.OK);
+        var final = JsonNode.Parse(await finalGet.Content.ReadAsStringAsync())!.AsObject();
+        final["persistenceRevision"]!.GetValue<long>().Should().Be(1);
+        var finalFlow = final["flow"]!.AsObject();
+        finalFlow["futureFlowField"]!["mode"]!.GetValue<string>().Should().Be("preserve");
+        var finalOperators = finalFlow["operators"]!.AsArray().Select(node => node!.AsObject()).ToList();
+        finalOperators.Should().NotContain(node => node["id"]!.GetValue<Guid>() == removed.Id);
+        var finalImage = finalOperators.Single(node => node["id"]!.GetValue<Guid>() == image.Id);
+        finalImage["futureOperatorField"]!["keep"]!.GetValue<bool>().Should().BeTrue();
+        finalImage["outputPorts"]![0]!["futurePortField"]!.GetValue<string>().Should().Be("port-opaque");
+        var finalImageParameters = finalImage["parameters"]!.AsArray().Select(node => node!.AsObject()).ToList();
+        finalImageParameters.First()["futureParameterField"]!.GetValue<string>().Should().Be("parameter-opaque");
+        finalImageParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "ExplicitNull")
+            .ContainsKey("value").Should().BeTrue();
+        finalImageParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "ExplicitNull")["value"]
+            .Should().BeNull();
+        finalImageParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "Zero")["value"]!
+            .GetValue<int>().Should().Be(0);
+        finalImageParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "Disabled")["value"]!
+            .GetValue<bool>().Should().BeFalse();
+        finalImageParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "Empty")["value"]!
+            .GetValue<string>().Should().BeEmpty();
+        var finalRoi = finalOperators.Single(node => node["id"]!.GetValue<Guid>() == roi.Id);
+        finalRoi["x"]!.GetValue<double>().Should().Be(312.5);
+        finalRoi["y"]!.GetValue<double>().Should().Be(96.25);
+        var finalRoiParameters = finalRoi["parameters"]!.AsArray().Select(node => node!.AsObject()).ToList();
+        finalRoiParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "X")["value"]!.GetValue<int>().Should().Be(12);
+        finalRoiParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "Y")["value"]!.GetValue<int>().Should().Be(14);
+        finalRoiParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "Width")["value"]!.GetValue<int>().Should().Be(52);
+        finalRoiParameters.Single(parameter => parameter["name"]!.GetValue<string>() == "Height")["value"]!.GetValue<int>().Should().Be(38);
+        var finalRectangle = finalOperators.Single(node => node["id"]!.GetValue<Guid>() == rectangle.Id);
+        finalRectangle["futureRectangleField"]!["source"]!.GetValue<string>().Should().Be("g5");
+        finalFlow["connections"]!.AsArray().Should().Contain(node =>
+            node!["id"]!.GetValue<Guid>() == replacementConnectionId &&
+            node["futureConnectionField"]!.GetValue<string>() == "replacement");
+        host.Project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(7);
+        storage.LastSavedFlowJson.Should().NotContain("executionStatus");
+        storage.LastSavedFlowJson.Should().NotContain("executionTimeMs");
+        storage.LastSavedFlowJson.Should().NotContain("errorMessage");
+    }
+
     private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue, bool manualWriteAllowed)
     {
         return new ProjectGlobalVariableSchema
@@ -933,6 +1106,77 @@ public sealed class ProjectGlobalVariableEndpointsTests
                 ]
             });
     }
+
+    private static OperatorDto CreateGoldenOperator(
+        IOperatorFactory factory,
+        OperatorType type,
+        string name,
+        double x,
+        double y)
+    {
+        var metadata = factory.GetMetadata(type) ?? throw new InvalidOperationException($"Missing metadata for {type}.");
+        return new OperatorDto
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Type = type,
+            X = x,
+            Y = y,
+            InputPorts = metadata.InputPorts.Select(port => new PortDto
+            {
+                Id = Guid.NewGuid(),
+                Name = port.Name,
+                Direction = PortDirection.Input,
+                DataType = port.DataType,
+                IsRequired = port.IsRequired
+            }).ToList(),
+            OutputPorts = metadata.OutputPorts.Select(port => new PortDto
+            {
+                Id = Guid.NewGuid(),
+                Name = port.Name,
+                Direction = PortDirection.Output,
+                DataType = port.DataType,
+                IsRequired = false
+            }).ToList(),
+            Parameters = metadata.Parameters.Select(parameter => new ParameterDto
+            {
+                Id = Guid.NewGuid(),
+                Name = parameter.Name,
+                DisplayName = parameter.DisplayName,
+                Description = parameter.Description,
+                DataType = parameter.DataType,
+                Value = parameter.DefaultValue,
+                DefaultValue = parameter.DefaultValue,
+                MinValue = parameter.MinValue,
+                MaxValue = parameter.MaxValue,
+                IsRequired = parameter.IsRequired,
+                Options = parameter.Options
+            }).ToList(),
+            IsEnabled = true
+        };
+    }
+
+    private static JsonObject CreateGoldenParameterNode(string name, object? value) => new()
+    {
+        ["id"] = Guid.NewGuid(),
+        ["name"] = name,
+        ["displayName"] = name,
+        ["description"] = null,
+        ["dataType"] = value switch
+        {
+            bool => "bool",
+            int => "int",
+            string => "string",
+            _ => "nullable"
+        },
+        ["value"] = value == null ? null : JsonValue.Create(value),
+        ["defaultValue"] = null,
+        ["minValue"] = null,
+        ["maxValue"] = null,
+        ["isRequired"] = false,
+        ["options"] = null,
+        ["futureParameterField"] = "new-parameter-opaque"
+    };
 
     private static string SerializeFlow(OperatorFlowDto flow) =>
         JsonSerializer.Serialize(flow, new JsonSerializerOptions

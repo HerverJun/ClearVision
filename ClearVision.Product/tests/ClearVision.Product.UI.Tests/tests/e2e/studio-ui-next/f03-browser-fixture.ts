@@ -4,7 +4,7 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import type { Page, Request, Route } from '@playwright/test';
 
 export const f03BrowserFixture = Object.freeze({
-  schemaVersion: 'f03-g4-browser.v1',
+  schemaVersion: 'f03-g5-browser.v1',
   phase: 'f03',
   dataSource: 'BROWSER_FIXTURE',
   authSource: 'HARNESS_SEEDED_SESSION',
@@ -79,6 +79,18 @@ export function isF03G4RequestAllowlist(
       /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
         .test(entry.path) ||
       /^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(entry.path);
+  });
+}
+
+export function isF03G5RequestAllowlist(
+  audit: readonly F03RequestAuditEntry[]
+): boolean {
+  return audit.every(entry => {
+    if (entry.method === 'PUT') {
+      return /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        .test(entry.path);
+    }
+    return isF03G4RequestAllowlist([entry]);
   });
 }
 
@@ -188,8 +200,8 @@ export async function captureF03WorkspaceEvidence(
   if (projection.horizontalOverflow > 1 || projection.verticalOverflow > 1) {
     throw new Error(`F03 Workspace overflowed globally: ${JSON.stringify(projection)}.`);
   }
-  if (!isF03G4RequestAllowlist(options.requests)) {
-    throw new Error(`F03 G2 request allowlist failed: ${JSON.stringify(options.requests)}.`);
+  if (!isF03G5RequestAllowlist(options.requests)) {
+    throw new Error(`F03 G5 request allowlist failed: ${JSON.stringify(options.requests)}.`);
   }
   if (options.runtimeErrors.consoleErrors.length || options.runtimeErrors.pageErrors.length) {
     throw new Error(`F03 Workspace emitted runtime errors: ${JSON.stringify(options.runtimeErrors)}.`);
@@ -197,7 +209,7 @@ export async function captureF03WorkspaceEvidence(
   const screenshot = await page.screenshot({ animations: 'disabled', fullPage: false, type: 'png' });
   await writeFile(screenshotPath, screenshot);
   await writeFile(metadataPath, `${JSON.stringify({
-    schemaVersion: 'f03-g2-browser-evidence.v1',
+    schemaVersion: 'f03-g5-browser-evidence.v1',
     capturedAtUtc: new Date().toISOString(),
     sourceSha,
     stableAuditSha,
@@ -208,7 +220,7 @@ export async function captureF03WorkspaceEvidence(
     scenario: options.scenario,
     viewport: options.viewport,
     projection,
-    expectedMethods: ['GET'],
+    expectedMethods: ['GET', 'PUT'],
     observedRequests: options.requests,
     requestAllowlistPassed: true,
     runtimeErrors: options.runtimeErrors,

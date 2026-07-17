@@ -8,10 +8,11 @@ import {
   hasF03VisualEvidenceTarget,
   installF03BrowserStartup,
   isF03G4RequestAllowlist,
+  isF03G5RequestAllowlist,
   type F03RequestAuditEntry
 } from './f03-browser-fixture';
 
-const fixtureSchema = 'f03-g4-workspace.v1';
+const fixtureSchema = 'f03-g5-workspace.v1';
 const projectA = '11111111-1111-4111-8111-111111111111';
 const projectB = '22222222-2222-4222-8222-222222222222';
 const flowId = '33333333-3333-4333-8333-333333333333';
@@ -250,6 +251,17 @@ interface BootOptions {
   readonly projectStatus?: number | (() => number);
   readonly projectBody?: unknown | ((projectId: string) => unknown);
   readonly projectDelayMs?: number;
+  readonly projectPutScenario?: (
+    request: Readonly<Record<string, unknown>>,
+    current: Readonly<Record<string, unknown>>,
+    call: number
+  ) => Readonly<{
+    status?: number;
+    body?: unknown;
+    delayMs?: number;
+    abort?: boolean;
+    authoritativeProject?: Readonly<Record<string, unknown>>;
+  }>;
   readonly operatorCatalogBody?: unknown;
   readonly previewScenario?: (
     request: Readonly<Record<string, unknown>>,
@@ -260,6 +272,8 @@ interface BootOptions {
 async function bootWorkspace(page: Page, options: BootOptions = {}) {
   const audit: F03RequestAuditEntry[] = [];
   let previewCall = 0;
+  let projectPutCall = 0;
+  const projects = new Map<string, Readonly<Record<string, unknown>>>();
   await installF03BrowserStartup(page, options.workspaceEnabled ?? true);
   await page.route('**/health', route => fulfillF03Json(
     route,
@@ -333,13 +347,44 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
     if (projectMatch) {
       if (options.projectDelayMs) await new Promise(resolve => setTimeout(resolve, options.projectDelayMs));
       const id = projectMatch[1]!;
+      const current = projects.get(id) ?? structuredClone(
+        (typeof options.projectBody === 'function'
+          ? options.projectBody(id)
+          : options.projectBody ?? projectPayload(id)) as Readonly<Record<string, unknown>>
+      );
+      projects.set(id, current);
+      if (request.method() === 'PUT') {
+        projectPutCall += 1;
+        const requestBody = request.postDataJSON() as Readonly<Record<string, unknown>>;
+        const scenario = options.projectPutScenario?.(requestBody, current, projectPutCall);
+        if (scenario?.delayMs) await new Promise(resolve => setTimeout(resolve, scenario.delayMs));
+        if (scenario?.authoritativeProject) {
+          projects.set(id, structuredClone(scenario.authoritativeProject));
+        }
+        if (scenario?.abort) {
+          await route.abort('failed');
+          return;
+        }
+        const status = scenario?.status ?? 200;
+        const responseBody = scenario?.body ?? {
+          ...current,
+          name: requestBody.name,
+          description: requestBody.description,
+          flow: requestBody.flow,
+          globalVariables: current.globalVariables,
+          persistenceRevision: Number(current.persistenceRevision) + 1,
+          modifiedAt: '2026-07-17T03:00:00Z'
+        };
+        if (status >= 200 && status < 300 && typeof responseBody === 'object' && responseBody !== null) {
+          projects.set(id, structuredClone(responseBody as Readonly<Record<string, unknown>>));
+        }
+        await fulfillF03Json(route, status, responseBody, fixtureSchema);
+        return;
+      }
       const status = typeof options.projectStatus === 'function'
         ? options.projectStatus()
         : options.projectStatus ?? 200;
-      const body = typeof options.projectBody === 'function'
-        ? options.projectBody(id)
-        : options.projectBody ?? projectPayload(id);
-      await fulfillF03Json(route, status, body, fixtureSchema);
+      await fulfillF03Json(route, status, current, fixtureSchema);
       return;
     }
     await fulfillF03Json(route, 404, { code: 'UNEXPECTED_F03_ROUTE' }, fixtureSchema);
@@ -605,7 +650,7 @@ test('flag on mounts one owner only after full decode and disposes on route leav
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
   await expect(shell).toHaveAttribute('data-workspace-state', 'empty');
   await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
-  expect(await workspaceDiagnostics(page)).toMatchObject({
+  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
     workspaceOwnerCount: 1,
     activeProjectId: projectA,
     flowCanvasOwnerCount: 1,
@@ -616,24 +661,14 @@ test('flag on mounts one owner only after full decode and disposes on route leav
   await page.goto(`/studio/index.html#/projects/${projectB}/workspace`);
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectB);
   await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
-  expect(await workspaceDiagnostics(page)).toMatchObject({
+  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
     workspaceOwnerCount: 1,
     activeProjectId: projectB,
     lastDisposedProjectId: projectA,
-    lastDisposedResources: {
-      activeSubscriptions: 0,
-      activeTimers: 0,
-      activeAnimationFrames: 0,
-      activeObservers: 0,
-      activeAbortControllers: 0,
-      activeBlobUrls: 0,
-      activePreviewArtifactIds: 0,
-      activeHostSubscriptions: 0,
-      inFlightReads: 0,
-      inFlightWrites: 0,
-      inFlightPreview: 0,
-      inFlightExecute: 0
-    }
+    persistenceOwnerCount: 1,
+    inFlightReads: 0,
+    inFlightWrites: 0,
+    ownerConflictCount: 0
   });
 
   await page.goto('/studio/index.html#/about');
@@ -995,6 +1030,7 @@ test('G4 Preview and ImageCanvas render artifacts, probe pixels and commit ROI o
   await page.locator('[data-testid="roi-cancel"]').click();
   await expect(xInput).toHaveValue('11');
 
+  page.once('dialog', dialog => dialog.accept());
   await page.goto('/studio/index.html#/about');
   await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
     previewOwnerCount: 0,
@@ -1014,6 +1050,217 @@ test('G4 Preview and ImageCanvas render artifacts, probe pixels and commit ROI o
   expect(audit.some(entry => entry.method === 'POST' && entry.path === '/api/flows/preview-node')).toBe(true);
   expect(audit.some(entry => entry.method === 'GET' && entry.path.startsWith('/api/preview-artifacts/'))).toBe(true);
   expect(audit.some(entry => entry.method === 'DELETE' && entry.path.startsWith('/api/preview-artifacts/'))).toBe(true);
+});
+
+test('G5 GET PUT GET saves one canonical payload and preserves null, falsy and opaque values', async ({ page }) => {
+  let captured: Readonly<Record<string, unknown>> | null = null;
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    projectPutScenario: request => {
+      captured = request;
+      return {};
+    }
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await selectInspectorNode(page, 120, 125);
+  const textInput = page.locator('[data-evidence-surface="f03-g3-inspector"] [data-parameter-name="Text"] input');
+  await textInput.fill('saved-value');
+  await textInput.press('Enter');
+  await expect(shell).toHaveAttribute('data-workspace-dirty', 'true');
+  await expect(page.locator('[data-testid="workspace-save"]')).toBeEnabled();
+  await page.locator('[data-testid="workspace-save"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'saved');
+  await expect(shell).toHaveAttribute('data-workspace-dirty', 'false');
+  await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
+
+  expect(captured).not.toBeNull();
+  expect(captured).toMatchObject({ expectedPersistenceRevision: 7, globalVariables: null });
+  const capturedFlow = captured!.flow as Readonly<Record<string, unknown>>;
+  expect(capturedFlow).toMatchObject({ futureFlowField: { schema: 3 } });
+  const capturedOperator = (capturedFlow.operators as Array<Record<string, unknown>>)[0]!;
+  expect(capturedOperator).not.toHaveProperty('executionStatus');
+  expect(capturedOperator).not.toHaveProperty('executionTimeMs');
+  expect(capturedOperator).not.toHaveProperty('errorMessage');
+  const values = Object.fromEntries(
+    (capturedOperator.parameters as Array<Record<string, unknown>>).map(parameter => [parameter.name, parameter.value])
+  );
+  expect(values).toMatchObject({
+    Text: 'saved-value', Count: 0, Enabled: false, Gain: 0, OptionalCount: null, FilePath: ''
+  });
+
+  const putsAfterSave = audit.filter(entry => entry.method === 'PUT').length;
+  await page.keyboard.press('Control+s');
+  await page.waitForTimeout(50);
+  expect(audit.filter(entry => entry.method === 'PUT')).toHaveLength(putsAfterSave);
+
+  await page.reload();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
+  await selectInspectorNode(page, 120, 125);
+  await expect(textInput).toHaveValue('saved-value');
+  await textInput.fill('edited-again');
+  await textInput.press('Enter');
+  await expect(shell).toHaveAttribute('data-workspace-dirty', 'true');
+  expect(isF03G5RequestAllowlist(audit)).toBe(true);
+  expect(audit.some(entry => /\/api\/(?:inspection\/execute|inspection\/admission|runs)/i.test(entry.path))).toBe(false);
+});
+
+test('G5 saves and reloads a catalog-added numeric operator type through the formal Project PUT', async ({ page }) => {
+  let captured: Readonly<Record<string, unknown>> | null = null;
+  const audit = await bootWorkspace(page, {
+    projectPutScenario: request => {
+      captured = request;
+      return {};
+    }
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const canvas = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
+  const operator = await searchOperator(page, 'threshold');
+  await expect(operator).toHaveCount(1);
+  await operator.click();
+  await expect(canvas).toHaveAttribute('data-node-count', '1');
+  await expect(shell).toHaveAttribute('data-workspace-dirty', 'true');
+  await page.locator('[data-testid="workspace-save"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'saved');
+  await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
+  await expect(shell).toHaveAttribute('data-workspace-dirty', 'false');
+
+  expect(captured).not.toBeNull();
+  const savedOperator = ((captured!.flow as Readonly<Record<string, unknown>>)
+    .operators as Array<Record<string, unknown>>)[0]!;
+  expect(savedOperator.type).toBe(20);
+  expect(savedOperator).not.toHaveProperty('executionStatus');
+  expect(audit.filter(entry => entry.method === 'PUT')).toHaveLength(1);
+
+  await page.reload();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
+  await expect(canvas).toHaveAttribute('data-node-count', '1');
+  expect(audit.some(entry => /\/api\/(?:inspection\/execute|inspection\/admission|runs)/i.test(entry.path))).toBe(false);
+  expect(isF03G5RequestAllowlist(audit)).toBe(true);
+});
+
+test('G5 save failure retries explicitly, PSV011 reconciles fail closed, and unknown outcome reconciles by GET', async ({ page }) => {
+  let mode: 'failure' | 'conflict' | 'unknown' = 'failure';
+  let putCall = 0;
+  const bodies: Readonly<Record<string, unknown>>[] = [];
+  const serverConflictFlow = structuredClone(inspectorFlow());
+  ((serverConflictFlow.operators[0]!.parameters as Array<Record<string, unknown>>)
+    .find(parameter => parameter.name === 'Text')!).value = 'server-value';
+  await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    projectPutScenario: (request, current) => {
+      bodies.push(request);
+      putCall += 1;
+      if (mode === 'failure' && putCall === 1) {
+        return { status: 500, body: { code: 'PSV999', error: 'injected' } };
+      }
+      if (mode === 'conflict' && putCall === 3) {
+        return {
+          status: 409,
+          body: { code: 'PSV011', error: 'stale' },
+          authoritativeProject: projectPayload(projectA, {
+            persistenceRevision: 9,
+            flow: serverConflictFlow
+          })
+        };
+      }
+      if (mode === 'unknown' && putCall === 5) {
+        return {
+          abort: true,
+          authoritativeProject: {
+            ...current,
+            name: request.name,
+            description: request.description,
+            flow: request.flow,
+            persistenceRevision: Number(current.persistenceRevision) + 1
+          }
+        };
+      }
+      return {};
+    }
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const textInput = page.locator('[data-evidence-surface="f03-g3-inspector"] [data-parameter-name="Text"] input');
+
+  await selectInspectorNode(page, 120, 125);
+  await textInput.fill('failure-local');
+  await textInput.press('Enter');
+  await page.locator('[data-testid="workspace-save"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'error');
+  await expect(textInput).toHaveValue('failure-local');
+  await page.locator('[data-testid="workspace-save-retry"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'saved');
+
+  mode = 'conflict';
+  await selectInspectorNode(page, 120, 125);
+  await textInput.fill('conflict-local');
+  await textInput.press('Enter');
+  await page.locator('[data-testid="workspace-save"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'conflict');
+  await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
+  await expect(textInput).toHaveValue('conflict-local');
+  await page.locator('[data-testid="workspace-conflict-reapply"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '9');
+  await expect(shell).toHaveAttribute('data-workspace-dirty', 'true');
+  await page.locator('[data-testid="workspace-save"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '10');
+  expect(bodies[3]).toMatchObject({ expectedPersistenceRevision: 9 });
+
+  mode = 'unknown';
+  await selectInspectorNode(page, 120, 125);
+  await textInput.fill('unknown-local');
+  await textInput.press('Enter');
+  await page.locator('[data-testid="workspace-save"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'unknown-outcome');
+  await expect(page.locator('[data-testid="workspace-save-retry"]')).toHaveCount(0);
+  await page.locator('[data-testid="workspace-save-reconcile"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'saved');
+  await expect(shell).toHaveAttribute('data-workspace-dirty', 'false');
+});
+
+test('G5 protects route leave and project switch while readonly and running responses disable saving', async ({ page }) => {
+  let responseMode: 'success' | 'readonly' | 'running' = 'success';
+  await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    projectPutScenario: () => responseMode === 'readonly'
+      ? { status: 403, body: { code: 'AUTH403', error: 'forbidden' } }
+      : responseMode === 'running'
+        ? { status: 409, body: { code: 'GV031', error: 'running' } }
+        : {}
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const textInput = page.locator('[data-evidence-surface="f03-g3-inspector"] [data-parameter-name="Text"] input');
+  await selectInspectorNode(page, 120, 125);
+  await textInput.fill('protected');
+  await textInput.press('Enter');
+
+  const dismissed = new Promise<string>(resolve => page.once('dialog', async dialog => {
+    resolve(dialog.message());
+    await dialog.dismiss();
+  }));
+  await page.goto('/studio/index.html#/about').catch(() => undefined);
+  await expect(dismissed).resolves.toContain('未保存修改');
+  await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
+  page.once('dialog', dialog => dialog.accept());
+  await page.goto(`/studio/index.html#/projects/${projectB}/workspace`);
+  await expect(shell).toHaveAttribute('data-workspace-project-id', projectB);
+
+  await selectInspectorNode(page, 120, 125);
+  await textInput.fill('readonly');
+  await textInput.press('Enter');
+  responseMode = 'readonly';
+  await page.locator('[data-testid="workspace-save"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'readonly');
+  await expect(page.locator('[data-testid="workspace-save"]')).toBeDisabled();
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.goto(`/studio/index.html#/projects/${projectA}/workspace`);
+  await selectInspectorNode(page, 120, 125);
+  await textInput.fill('running');
+  await textInput.press('Enter');
+  responseMode = 'running';
+  await page.locator('[data-testid="workspace-save"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'running');
+  await expect(page.locator('[data-testid="workspace-save"]')).toBeDisabled();
 });
 
 test('G4 Preview exposes structured, empty, business failure, network failure and cancellation states', async ({ page }) => {
@@ -1051,7 +1298,7 @@ test('G4 Preview keeps the latest node when an older response arrives late', asy
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
     previewScenario: (request, call) => ({
-      delayMs: call === 1 ? 1500 : 0,
+      delayMs: request.targetNodeId === fixtureUuid(40_001) ? 1500 : 0,
       body: previewPayload(request, call)
     })
   });
@@ -1118,12 +1365,75 @@ test('passes 20 project switches with one owner and a zero final resource ledger
   expect(isF03G4RequestAllowlist(audit)).toBe(true);
 });
 
+test('G5 passes 20 save and project-switch cycles with one PUT per save and a zero final ledger', async ({ page }) => {
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  for (let cycle = 0; cycle < 20; cycle += 1) {
+    await expect(shell, `cycle ${cycle} owner ready`).toHaveAttribute('data-workspace-state', 'ready');
+    await expect(shell, `cycle ${cycle} owner count`).toHaveAttribute('data-workspace-owner-count', '1');
+    await selectInspectorNode(page, 120, 125);
+    const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+    await expect(inspector).toHaveAttribute('data-inspector-mode', 'node');
+    await expect(inspector).toHaveAttribute('data-metadata-phase', 'ready');
+    const textInput = page.locator(
+      '[data-evidence-surface="f03-g3-inspector"] [data-parameter-name="Text"] input'
+    );
+    const revisionBefore = Number(await page.locator('[data-evidence-surface="f03-g2-flow-canvas"]')
+      .getAttribute('data-flow-revision'));
+    await textInput.fill(`save-cycle-${cycle}`);
+    await expect(textInput, `cycle ${cycle} filled editor value`).toHaveValue(`save-cycle-${cycle}`);
+    await textInput.press('Enter');
+    await expect(textInput, `cycle ${cycle} editor value`).toHaveValue(`save-cycle-${cycle}`);
+    await expect.poll(async () => Number(
+      await page.locator('[data-evidence-surface="f03-g2-flow-canvas"]').getAttribute('data-flow-revision')
+    ), { message: `cycle ${cycle} flow revision` }).toBeGreaterThan(revisionBefore);
+    await expect(shell, `cycle ${cycle} dirty`).toHaveAttribute('data-workspace-dirty', 'true');
+    await page.locator('[data-testid="workspace-save"]').click();
+    await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'saved');
+    await expect(shell).toHaveAttribute('data-workspace-dirty', 'false');
+    const nextProject = cycle % 2 === 0 ? projectB : projectA;
+    await page.goto(`/studio/index.html#/projects/${nextProject}/workspace`);
+    await expect(shell).toHaveAttribute('data-workspace-project-id', nextProject);
+    await expect(shell).toHaveAttribute('data-workspace-state', 'ready');
+    await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
+    await expect(shell).toHaveAttribute('data-workspace-dirty', 'false');
+  }
+  await page.goto('/studio/index.html#/about');
+  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
+    workspaceOwnerCount: 0,
+    flowCanvasOwnerCount: 0,
+    inspectorOwnerCount: 0,
+    previewOwnerCount: 0,
+    imageCanvasOwnerCount: 0,
+    roiOwnerCount: 0,
+    persistenceOwnerCount: 0,
+    activeSubscriptions: 0,
+    activeTimers: 0,
+    activeAnimationFrames: 0,
+    activeObservers: 0,
+    activeAbortControllers: 0,
+    activeBlobUrls: 0,
+    activePreviewArtifactIds: 0,
+    inFlightReads: 0,
+    inFlightWrites: 0,
+    inFlightPreview: 0,
+    ownerConflictCount: 0
+  });
+  expect(audit.filter(entry => entry.method === 'PUT')).toHaveLength(20);
+  expect(audit.filter(entry => /\/api\/(?:inspection\/execute|inspection\/admission|runs)/i.test(entry.path)))
+    .toEqual([]);
+  expect(isF03G5RequestAllowlist(audit)).toBe(true);
+});
+
 for (const fixture of [
   { nodes: 100, connections: 150 },
   { nodes: 300, connections: 450 }
 ] as const) {
   test(`formal Workspace records ${fixture.nodes}/${fixture.connections} route-ready and interaction samples`, async ({ page }) => {
     const samples: number[] = [];
+    page.on('dialog', dialog => dialog.accept());
     const flow = performanceFlow(fixture.nodes, fixture.connections);
     await bootWorkspace(page, {
       projectBody: projectId => projectPayload(projectId, { flow })

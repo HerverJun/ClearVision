@@ -121,6 +121,31 @@ describe('createApiTransport', () => {
     expect(headers.get('Authorization')).toBe('Bearer preview-token');
   });
 
+  it('sends the single Project persistence PUT through the shared transport without retrying', async () => {
+    const fetchMock = createFetchMock();
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ persistenceRevision: 18 }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    }));
+    const transport = createApiTransport({ apiBaseUrl, expectedOrigin, tokenProvider: () => 'save-token' });
+    const body = {
+      name: 'demo',
+      description: null,
+      flow: { id: 'flow-1', operators: [], connections: [] },
+      globalVariables: null,
+      expectedPersistenceRevision: 17
+    };
+
+    await expect(transport.put?.('projects/project-1', body)).resolves.toEqual({ persistenceRevision: 18 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('http://localhost:5000/api/projects/project-1');
+    expect(init).toMatchObject({ method: 'PUT', body: JSON.stringify(body) });
+    const headers = new Headers(init.headers);
+    expect(headers.get('Content-Type')).toBe('application/json');
+    expect(headers.get('Authorization')).toBe('Bearer save-token');
+  });
+
   it('reads binary artifacts with content metadata and deletes them through the shared transport', async () => {
     const fetchMock = createFetchMock();
     const bytes = new Uint8Array([1, 2, 3, 4]);

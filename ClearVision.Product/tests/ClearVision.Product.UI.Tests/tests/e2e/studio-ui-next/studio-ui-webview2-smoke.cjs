@@ -609,6 +609,8 @@ async function waitForSeededPreview(page) {
 
 async function verifyWorkspaceG4(page) {
   await page.waitForSelector('[data-capability="flow-workspace"]', { state: 'visible', timeout: 30_000 });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const initialPersistenceRevision = Number(await shell.getAttribute('data-workspace-persistence-revision'));
   const { flowCanvas } = await selectSeededRoiNode(page);
   await waitForSeededPreview(page);
   const preview = page.locator('[data-capability="preview-workbench"]');
@@ -685,7 +687,41 @@ async function verifyWorkspaceG4(page) {
   assert(JSON.stringify(await readRoiParameters()) === JSON.stringify(roiAfter),
     'ROI cancel mutated the Flow draft.');
 
-  return page.evaluate(() => {
+  assert(await shell.getAttribute('data-workspace-dirty') === 'true',
+    'The confirmed ROI edit did not mark the Workspace dirty.');
+  const saveButton = page.locator('[data-testid="workspace-save"]');
+  assert(await saveButton.isEnabled(), 'The G5 save command did not enable for the ROI draft.');
+  await saveButton.click();
+  await page.waitForFunction(() => {
+    const surface = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+    return surface?.getAttribute('data-workspace-persistence-phase') === 'saved' &&
+      surface.getAttribute('data-workspace-dirty') === 'false';
+  }, null, { timeout: 30_000 });
+  const savedPersistenceRevision = Number(await shell.getAttribute('data-workspace-persistence-revision'));
+  assert(savedPersistenceRevision > initialPersistenceRevision,
+    `Project PUT did not advance PersistenceRevision: ${initialPersistenceRevision} -> ${savedPersistenceRevision}.`);
+  const savedProject = await page.evaluate(async () => {
+    const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+    const projectId = shell?.getAttribute('data-workspace-project-id');
+    const token = sessionStorage.getItem('cv_auth_token');
+    const response = await fetch(`/api/projects/${projectId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      cache: 'no-store'
+    });
+    return { status: response.status, body: await response.json() };
+  });
+  assert(savedProject.status === 200, `Post-save Project GET returned ${savedProject.status}.`);
+  assert(Number(savedProject.body.persistenceRevision) === savedPersistenceRevision,
+    'Post-save Project GET did not return the saved PersistenceRevision.');
+  const savedRoi = savedProject.body.flow.operators.find(operator => operator.id === roiAfter.id) ||
+    savedProject.body.flow.operators.find(operator => operator.name === 'G4 ROI Rectangle');
+  const savedRoiValues = Object.fromEntries((savedRoi?.parameters || []).map(parameter => [parameter.name, parameter.value]));
+  assert(String(savedRoiValues.X) === String(roiAfter.X) && String(savedRoiValues.Y) === String(roiAfter.Y) &&
+    String(savedRoiValues.Width) === String(roiAfter.Width) && String(savedRoiValues.Height) === String(roiAfter.Height),
+  `Post-save Project GET lost ROI parameters: ${JSON.stringify({ roiAfter, savedRoiValues })}`);
+  await waitForSeededPreview(page);
+
+  const projection = await page.evaluate(() => {
     const diagnostics = window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
     const previewSurface = document.querySelector('[data-capability="preview-workbench"]');
     const imageSurface = document.querySelector('[data-capability="image-canvas"]');
@@ -703,6 +739,15 @@ async function verifyWorkspaceG4(page) {
       diagnostics: diagnostics ? { ...diagnostics } : null
     };
   });
+  return {
+    ...projection,
+    save: {
+      initialPersistenceRevision,
+      savedPersistenceRevision,
+      postSaveGetStatus: savedProject.status,
+      roiValues: savedRoiValues
+    }
+  };
 }
 
 async function verifyWorkspaceG3(page) {
@@ -968,15 +1013,26 @@ async function verifyProductPage(page, route, runtimeErrors) {
     const readWorkspace = () => page.evaluate(() => {
       const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
       const diagnostics = window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
+      const activeElement = document.activeElement;
       return {
         state: shell?.getAttribute('data-workspace-state') || null,
         projectId: shell?.getAttribute('data-workspace-project-id') || null,
+        persistencePhase: shell?.getAttribute('data-workspace-persistence-phase') || null,
+        dirty: shell?.getAttribute('data-workspace-dirty') || null,
+        dirtyGeneration: Number(shell?.getAttribute('data-workspace-dirty-generation') ?? -1),
+        activeElement: activeElement ? {
+          tagName: activeElement.tagName,
+          testId: activeElement.getAttribute('data-testid'),
+          parameterName: activeElement.closest('[data-parameter-name]')?.getAttribute('data-parameter-name') || null,
+          value: 'value' in activeElement ? activeElement.value : null
+        } : null,
         ownerCount: Number(shell?.getAttribute('data-workspace-owner-count') || -1),
         flowCanvasOwnerCount: Number(diagnostics?.flowCanvasOwnerCount ?? -1),
         inspectorOwnerCount: Number(diagnostics?.inspectorOwnerCount ?? -1),
         previewOwnerCount: Number(diagnostics?.previewOwnerCount ?? -1),
         imageCanvasOwnerCount: Number(diagnostics?.imageCanvasOwnerCount ?? -1),
         roiOwnerCount: Number(diagnostics?.roiOwnerCount ?? -1),
+        persistenceOwnerCount: Number(diagnostics?.persistenceOwnerCount ?? -1),
         activeInspectorDrafts: Number(diagnostics?.activeInspectorDrafts ?? -1),
         activeSubscriptions: Number(shell?.getAttribute('data-workspace-active-subscriptions') || -1),
         activeAnimationFrames: Number(diagnostics?.activeAnimationFrames ?? -1),
@@ -986,6 +1042,7 @@ async function verifyProductPage(page, route, runtimeErrors) {
         activePreviewArtifactIds: Number(diagnostics?.activePreviewArtifactIds ?? -1),
         inFlightPreview: Number(diagnostics?.inFlightPreview ?? -1),
         inFlightReads: Number(shell?.getAttribute('data-workspace-in-flight-reads') || -1),
+        inFlightWrites: Number(shell?.getAttribute('data-workspace-in-flight-writes') || -1),
         diagnostics: diagnostics ? { ...diagnostics } : null,
         mainCount: document.querySelectorAll('main').length,
         shellCount: document.querySelectorAll('[data-evidence-surface="f03-workspace-shell"]').length,
@@ -994,12 +1051,42 @@ async function verifyProductPage(page, route, runtimeErrors) {
       };
     });
     const mounted = await readWorkspace();
+    assert(mounted.dirty === 'false' && ['clean', 'saved'].includes(mounted.persistencePhase),
+      `Workspace was not clean before lifecycle navigation: ${JSON.stringify(mounted)}`);
     const lifecycleCycles = [];
+    await page.evaluate(() => {
+      window.__g5LifecycleOriginalConfirm = window.confirm;
+      window.__g5LifecycleConfirmSnapshots = [];
+      window.confirm = message => {
+        const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+        const flow = document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]');
+        const diagnostics = window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
+        const activeElement = document.activeElement;
+        window.__g5LifecycleConfirmSnapshots.push({
+          message,
+          persistencePhase: shell?.getAttribute('data-workspace-persistence-phase') || null,
+          dirty: shell?.getAttribute('data-workspace-dirty') || null,
+          dirtyGeneration: Number(shell?.getAttribute('data-workspace-dirty-generation') ?? -1),
+          flowRevision: Number(flow?.getAttribute('data-flow-revision') ?? -1),
+          activeInspectorDrafts: Number(diagnostics?.activeInspectorDrafts ?? -1),
+          activeElement: activeElement ? {
+            tagName: activeElement.tagName,
+            testId: activeElement.getAttribute('data-testid'),
+            parameterName: activeElement.closest('[data-parameter-name]')?.getAttribute('data-parameter-name') || null,
+            value: 'value' in activeElement ? activeElement.value : null
+          } : null
+        });
+        return true;
+      };
+    });
     let disposed = null;
     let remounted = null;
     for (let cycle = 0; cycle < 20; cycle += 1) {
-      await page.goto(`${origin}/studio/index.html#/about`, { waitUntil: 'domcontentloaded' });
+      await page.locator('[data-product-nav="/about"]').click();
       await page.waitForSelector('[data-studio-page="about"]', { state: 'visible', timeout: 30_000 });
+      const confirmSnapshots = await page.evaluate(() => [...window.__g5LifecycleConfirmSnapshots]);
+      assert(confirmSnapshots.length === 0,
+        `Clean Workspace navigation unexpectedly prompted: ${JSON.stringify(confirmSnapshots)}`);
       await page.waitForFunction(() => {
         const diagnostics = window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
         return diagnostics?.workspaceOwnerCount === 0 &&
@@ -1008,6 +1095,7 @@ async function verifyProductPage(page, route, runtimeErrors) {
           diagnostics.previewOwnerCount === 0 &&
           diagnostics.imageCanvasOwnerCount === 0 &&
           diagnostics.roiOwnerCount === 0 &&
+          diagnostics.persistenceOwnerCount === 0 &&
           diagnostics.activeInspectorDrafts === 0 &&
           diagnostics.activeSubscriptions === 0 &&
           diagnostics.activeAnimationFrames === 0 &&
@@ -1017,14 +1105,15 @@ async function verifyProductPage(page, route, runtimeErrors) {
           diagnostics.activeBlobUrls === 0 &&
           diagnostics.activePreviewArtifactIds === 0 &&
           diagnostics.inFlightPreview === 0 &&
-          diagnostics.inFlightReads === 0;
+          diagnostics.inFlightReads === 0 &&
+          diagnostics.inFlightWrites === 0;
       }, null, { timeout: 30_000 });
       disposed = await page.evaluate(() => ({
         diagnostics: { ...window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__ },
         shellCount: document.querySelectorAll('[data-evidence-surface="f03-workspace-shell"]').length,
         mainCount: document.querySelectorAll('main').length
       }));
-      await page.goto(`${origin}/studio/index.html#${route}`, { waitUntil: 'domcontentloaded' });
+      await page.evaluate(nextRoute => { window.location.hash = `#${nextRoute}`; }, route);
       await page.waitForSelector('[data-evidence-surface="f03-workspace-shell"]', {
         state: 'visible',
         timeout: 30_000
@@ -1039,7 +1128,8 @@ async function verifyProductPage(page, route, runtimeErrors) {
           diagnostics.inspectorOwnerCount === 1 &&
           diagnostics.previewOwnerCount === 1 &&
           diagnostics.imageCanvasOwnerCount === 1 &&
-          diagnostics.roiOwnerCount === 1;
+          diagnostics.roiOwnerCount === 1 &&
+          diagnostics.persistenceOwnerCount === 1;
       }, null, { timeout: 30_000 });
       remounted = await readWorkspace();
       lifecycleCycles.push({
@@ -1049,13 +1139,20 @@ async function verifyProductPage(page, route, runtimeErrors) {
         disposedPreviewCount: disposed.diagnostics.previewOwnerCount,
         disposedImageCount: disposed.diagnostics.imageCanvasOwnerCount,
         disposedRoiCount: disposed.diagnostics.roiOwnerCount,
+        disposedPersistenceCount: disposed.diagnostics.persistenceOwnerCount,
         remountedOwnerCount: remounted.ownerCount,
         remountedInspectorCount: remounted.inspectorOwnerCount,
         remountedPreviewCount: remounted.previewOwnerCount,
         remountedImageCount: remounted.imageCanvasOwnerCount,
-        remountedRoiCount: remounted.roiOwnerCount
+        remountedRoiCount: remounted.roiOwnerCount,
+        remountedPersistenceCount: remounted.persistenceOwnerCount
       });
     }
+    await page.evaluate(() => {
+      window.confirm = window.__g5LifecycleOriginalConfirm;
+      delete window.__g5LifecycleOriginalConfirm;
+      delete window.__g5LifecycleConfirmSnapshots;
+    });
     workspaceLifecycle = { mounted, disposed, remounted, cycles: lifecycleCycles };
 
     assert(mounted.mainCount === 1 && mounted.shellCount === 1,
@@ -1064,7 +1161,8 @@ async function verifyProductPage(page, route, runtimeErrors) {
       `Workspace owner count escaped 0/1: ${JSON.stringify(mounted)}`);
     if (workspaceG3 || workspaceG4) {
       assert(mounted.ownerCount === 1 && mounted.flowCanvasOwnerCount === 1 && mounted.inspectorOwnerCount === 1 &&
-        mounted.previewOwnerCount === 1 && mounted.imageCanvasOwnerCount === 1 && mounted.roiOwnerCount === 1,
+        mounted.previewOwnerCount === 1 && mounted.imageCanvasOwnerCount === 1 && mounted.roiOwnerCount === 1 &&
+        mounted.persistenceOwnerCount === 1,
       `Formal G4 Workspace did not retain exactly one owner chain: ${JSON.stringify(mounted)}`);
     }
     assert(disposed.shellCount === 0 && disposed.mainCount === 1,
@@ -1075,6 +1173,7 @@ async function verifyProductPage(page, route, runtimeErrors) {
       disposed.diagnostics.previewOwnerCount === 0 &&
       disposed.diagnostics.imageCanvasOwnerCount === 0 &&
       disposed.diagnostics.roiOwnerCount === 0 &&
+      disposed.diagnostics.persistenceOwnerCount === 0 &&
       disposed.diagnostics.activeInspectorDrafts === 0 &&
       disposed.diagnostics.activeSubscriptions === 0 &&
       disposed.diagnostics.activeAnimationFrames === 0 &&
@@ -1084,20 +1183,23 @@ async function verifyProductPage(page, route, runtimeErrors) {
       disposed.diagnostics.activeBlobUrls === 0 &&
       disposed.diagnostics.activePreviewArtifactIds === 0 &&
       disposed.diagnostics.inFlightPreview === 0 &&
-      disposed.diagnostics.inFlightReads === 0,
+      disposed.diagnostics.inFlightReads === 0 &&
+      disposed.diagnostics.inFlightWrites === 0,
     `Workspace resources survived route leave: ${JSON.stringify(disposed)}`);
     assert(remounted.ownerCount >= 0 && remounted.ownerCount <= 1,
       `Workspace remount owner count escaped 0/1: ${JSON.stringify(remounted)}`);
     if (workspaceG3 || workspaceG4) {
       assert(remounted.ownerCount === 1 && remounted.flowCanvasOwnerCount === 1 && remounted.inspectorOwnerCount === 1 &&
-        remounted.previewOwnerCount === 1 && remounted.imageCanvasOwnerCount === 1 && remounted.roiOwnerCount === 1,
+        remounted.previewOwnerCount === 1 && remounted.imageCanvasOwnerCount === 1 && remounted.roiOwnerCount === 1 &&
+        remounted.persistenceOwnerCount === 1,
       `Formal G4 Workspace remount did not restore one owner chain: ${JSON.stringify(remounted)}`);
     }
     assert(lifecycleCycles.length === 20 && lifecycleCycles.every(item =>
       item.disposedOwnerCount === 0 && item.disposedInspectorCount === 0 && item.disposedPreviewCount === 0 &&
       item.disposedImageCount === 0 && item.disposedRoiCount === 0 &&
+      item.disposedPersistenceCount === 0 &&
       item.remountedOwnerCount === 1 && item.remountedInspectorCount === 1 && item.remountedPreviewCount === 1 &&
-      item.remountedImageCount === 1 && item.remountedRoiCount === 1),
+      item.remountedImageCount === 1 && item.remountedRoiCount === 1 && item.remountedPersistenceCount === 1),
     `Workspace 20-cycle lifecycle ledger failed: ${JSON.stringify(lifecycleCycles)}`);
     assert(remounted.horizontalOverflow <= 1 && remounted.verticalOverflow <= 1,
       `Workspace remount overflowed globally: ${JSON.stringify(remounted)}`);
@@ -1108,10 +1210,19 @@ async function verifyProductPage(page, route, runtimeErrors) {
   }
   const productRequests = runtimeErrors.requests.filter(isProductRequest);
   const writeRequests = productRequests.filter(item => item.method !== 'GET');
+  const projectPutRequests = productRequests.filter(item => {
+    const url = new URL(item.url);
+    return item.method === 'PUT' && /^\/api\/projects\/[0-9a-f-]{36}$/i.test(url.pathname);
+  });
+  const forbiddenRunRequests = productRequests.filter(item => {
+    const url = new URL(item.url);
+    return /\/api\/(?:inspection\/(?:admission|execute)|runs)(?:\/|$)/i.test(url.pathname);
+  });
   const unexpectedWriteRequests = writeRequests.filter(item => {
     if (!isWorkspaceRoute) return true;
     const url = new URL(item.url);
     return !(item.method === 'POST' && url.pathname === '/api/flows/preview-node') &&
+      !(item.method === 'PUT' && /^\/api\/projects\/[0-9a-f-]{36}$/i.test(url.pathname)) &&
       !(item.method === 'DELETE' && /^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname));
   });
 
@@ -1132,9 +1243,15 @@ async function verifyProductPage(page, route, runtimeErrors) {
     assert(projection.verticalOverflow <= 1, 'Workspace route has global vertical overflow.');
   }
   assert(projection.mainCount === 1, 'Formal product route did not keep exactly one main landmark.');
-  assert(productRequests.length > 0, 'Product route emitted no observable GET requests.');
+  assert(productRequests.length > 0, 'Product route emitted no observable API requests.');
   assert(unexpectedWriteRequests.length === 0,
     `Product route emitted writes outside Preview cleanup: ${JSON.stringify(unexpectedWriteRequests)}`);
+  assert(forbiddenRunRequests.length === 0,
+    `G5 emitted Run/Admission/Execute requests: ${JSON.stringify(forbiddenRunRequests)}`);
+  if (workspaceG4) {
+    assert(projectPutRequests.length === 1,
+      `G5 real WebView2 expected exactly one Project PUT: ${JSON.stringify(projectPutRequests)}`);
+  }
   assert(preferenceCycle.dark.attributeValue === 'dark', 'Dark theme projection was not applied.');
   assert(preferenceCycle.comfortable.attributeValue === 'comfortable',
     'Comfortable density projection was not applied.');
@@ -1158,7 +1275,7 @@ async function verifyProductPage(page, route, runtimeErrors) {
           .test(url.pathname);
     });
     assert(unexpectedWorkspaceRequests.length === 0,
-      `Workspace emitted a route outside the G4 Preview allowlist: ${JSON.stringify(unexpectedWorkspaceRequests)}`);
+      `Workspace emitted a route outside the G5 persistence/Preview allowlist: ${JSON.stringify(unexpectedWorkspaceRequests)}`);
     assert(projection.workspaceMode === 'true' && projection.workspaceShellCount === 1,
       `ProductLayout did not enter workspaceMode: ${JSON.stringify(projection)}`);
   }
@@ -1172,6 +1289,8 @@ async function verifyProductPage(page, route, runtimeErrors) {
     ...projection,
     productRequests,
     writeRequests,
+    projectPutRequests,
+    forbiddenRunRequests,
     preferenceCycle,
     preferenceRequests,
     preferenceWriteRequests,

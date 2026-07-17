@@ -155,6 +155,8 @@ describe('G4 Preview owner identity and lifecycle', () => {
     expect(diagnostics.diagnostics.previewOwnerCount).toBe(1);
 
     owner.dispose('test-route-leave');
+    await Promise.resolve();
+    await Promise.resolve();
     expect(diagnostics.diagnostics).toMatchObject({
       previewOwnerCount: 0,
       activeAbortControllers: 0,
@@ -186,9 +188,64 @@ describe('G4 Preview owner identity and lifecycle', () => {
     owner.dispose('route-leave');
     resolveRequest?.(response(lastBody));
     await Promise.resolve();
+    await Promise.resolve();
     await nextTick();
     expect(owner.projection.phase).toBe('disposed');
     expect(diagnostics.diagnostics.previewOwnerCount).toBe(0);
+    diagnostics.dispose();
+  });
+
+  it('keeps lifecycle diagnostics non-zero until artifact DELETE settles after disposal', async () => {
+    const flowOwner = createFlowOwner();
+    const artifactId = 'A'.repeat(43);
+    let resolveDelete: (() => void) | undefined;
+    const api: ApiTransport = {
+      apiBaseUrl: 'http://localhost:5000/api',
+      get: vi.fn(),
+      post: vi.fn(async (_path, body) => ({
+        ...response(body as Readonly<Record<string, unknown>>),
+        artifacts: [{
+          artifactId,
+          kind: 'image',
+          role: 'outputImage',
+          pathHint: '$.output',
+          contentType: 'image/png',
+          length: 4,
+          sha256: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
+          createdAtUtc: '2026-07-17T00:00:00Z',
+          expiresAtUtc: '2026-07-17T00:10:00Z',
+          width: 1,
+          height: 1,
+          channels: 4
+        }]
+      })) as unknown as NonNullable<ApiTransport['post']>,
+      getBlob: vi.fn(),
+      delete: vi.fn(() => new Promise<void>(resolve => { resolveDelete = resolve; }))
+    };
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const owner = createPreviewOwner({ projectId, flowOwner, api, diagnostics });
+    await vi.advanceTimersByTimeAsync(500);
+    await nextTick();
+    expect(diagnostics.diagnostics.activePreviewArtifactIds).toBe(1);
+
+    owner.dispose('route-leave');
+    expect(diagnostics.diagnostics).toMatchObject({
+      previewOwnerCount: 1,
+      activePreviewArtifactIds: 1,
+      activeAbortControllers: 1,
+      inFlightPreview: 1
+    });
+
+    resolveDelete?.();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
+    await nextTick();
+    expect(diagnostics.diagnostics).toMatchObject({
+      previewOwnerCount: 0,
+      activePreviewArtifactIds: 0,
+      activeAbortControllers: 0,
+      inFlightPreview: 0
+    });
     diagnostics.dispose();
   });
 });
