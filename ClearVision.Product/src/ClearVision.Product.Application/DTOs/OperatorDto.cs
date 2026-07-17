@@ -4,6 +4,7 @@
 
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace ClearVision.Product.Application.DTOs;
@@ -64,17 +65,23 @@ public class OperatorDto
     /// <summary>
     /// 执行状态
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public OperatorExecutionStatus ExecutionStatus { get; set; }
 
     /// <summary>
     /// 执行耗时（毫秒）
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? ExecutionTimeMs { get; set; }
 
     /// <summary>
     /// 错误信息
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ErrorMessage { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 /// <summary>
@@ -87,6 +94,9 @@ public class PortDto
     public PortDirection Direction { get; set; }
     public PortDataType DataType { get; set; }
     public bool IsRequired { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 /// <summary>
@@ -105,6 +115,9 @@ public class ParameterDto
     public object? MaxValue { get; set; }
     public bool IsRequired { get; set; }
     public List<ParameterOption>? Options { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }
 
 /// <summary>
@@ -117,4 +130,7 @@ public class OperatorConnectionDto
     public Guid SourcePortId { get; set; }
     public Guid TargetOperatorId { get; set; }
     public Guid TargetPortId { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 }

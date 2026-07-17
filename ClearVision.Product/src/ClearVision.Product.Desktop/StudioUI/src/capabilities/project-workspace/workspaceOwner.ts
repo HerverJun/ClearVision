@@ -6,6 +6,13 @@ import {
   createFlowCanvasOwner,
   type FlowCanvasOwner
 } from './flow';
+import {
+  createWorkspacePersistenceOwner,
+  createWorkspaceProjectPersistencePort,
+  type WorkspacePersistenceOwner,
+  type WorkspacePersistenceProjection,
+  type WorkspaceSaveAttemptResult
+} from './persistence';
 import type {
   WorkspaceLifecycleDiagnosticsOwner,
   WorkspaceOwnerDiagnosticsLease
@@ -17,6 +24,7 @@ export interface WorkspaceOwnerProjection {
   readonly phase: WorkspaceOwnerPhase;
   readonly project: WorkspaceProjectV1;
   readonly readonlyReason: string | null;
+  readonly persistence: DeepReadonly<WorkspacePersistenceProjection> | null;
 }
 
 type MutableWorkspaceOwnerProjection = {
@@ -27,6 +35,12 @@ export interface WorkspaceOwner {
   readonly projectId: string;
   readonly projection: DeepReadonly<WorkspaceOwnerProjection>;
   openFlowCanvas(): FlowCanvasOwner;
+  save(): Promise<WorkspaceSaveAttemptResult>;
+  retrySave(): Promise<WorkspaceSaveAttemptResult>;
+  reconcileSave(): Promise<WorkspaceSaveAttemptResult>;
+  reapplyConflict(): void;
+  discardConflict(): void;
+  prepareForLeave(reason?: string): Promise<boolean>;
   setReadonly(reason: string): void;
   dispose(reason?: string): void;
 }
@@ -43,10 +57,12 @@ export function createWorkspaceOwner(
   const state = reactive<MutableWorkspaceOwnerProjection>({
     phase: isEmpty ? 'empty' : 'ready',
     project,
-    readonlyReason: null
+    readonlyReason: null,
+    persistence: null
   });
   let disposed = false;
   let flowOwner: FlowCanvasOwner | undefined;
+  let persistenceOwner: WorkspacePersistenceOwner | undefined;
 
   return Object.freeze({
     projectId: project.id,
@@ -63,26 +79,76 @@ export function createWorkspaceOwner(
         diagnostics,
         initialMutationGate: state.phase === 'readonly' ? 'readonly' : 'editable'
       });
+      persistenceOwner = createWorkspacePersistenceOwner({
+        baseline: state.project,
+        flowOwner,
+        port: createWorkspaceProjectPersistencePort(api, project.id),
+        diagnostics,
+        readonlyReason: state.phase === 'readonly' ? state.readonlyReason : null,
+        onBaselineChanged(nextProject) {
+          if (disposed) return;
+          state.project = nextProject;
+          state.phase = nextProject.flow === null || nextProject.flow.operators.length === 0
+            ? 'empty'
+            : 'ready';
+        }
+      });
+      state.persistence = persistenceOwner.projection;
       return flowOwner;
+    },
+    save(): Promise<WorkspaceSaveAttemptResult> {
+      if (!persistenceOwner) {
+        return Promise.resolve(Object.freeze({ status: 'failed', project: null }));
+      }
+      return persistenceOwner.save();
+    },
+    retrySave(): Promise<WorkspaceSaveAttemptResult> {
+      if (!persistenceOwner) {
+        return Promise.resolve(Object.freeze({ status: 'failed', project: null }));
+      }
+      return persistenceOwner.retry();
+    },
+    reconcileSave(): Promise<WorkspaceSaveAttemptResult> {
+      if (!persistenceOwner) {
+        return Promise.resolve(Object.freeze({ status: 'failed', project: null }));
+      }
+      return persistenceOwner.reconcile();
+    },
+    reapplyConflict(): void {
+      persistenceOwner?.reapplyConflict();
+    },
+    discardConflict(): void {
+      persistenceOwner?.discardConflict();
+    },
+    prepareForLeave(reason = 'route-leave'): Promise<boolean> {
+      void reason;
+      return persistenceOwner?.prepareForLeave(reason) ?? Promise.resolve(true);
     },
     setReadonly(reason: string): void {
       if (disposed) return;
       state.phase = 'readonly';
       state.readonlyReason = reason.trim() || '后端拒绝当前读取刷新；保留已解码的只读投影。';
       flowOwner?.setMutationGate('readonly');
+      persistenceOwner?.setReadonly(state.readonlyReason);
     },
     dispose(reason = 'workspace-owner-disposed'): void {
       if (disposed) return;
       disposed = true;
       state.phase = 'disposed';
       try {
-        flowOwner?.dispose(reason);
+        persistenceOwner?.dispose(reason);
       } finally {
         try {
-          lease.dispose(reason);
+          flowOwner?.dispose(reason);
         } finally {
-          flowOwner = undefined;
-          state.readonlyReason = null;
+          try {
+            lease.dispose(reason);
+          } finally {
+            persistenceOwner = undefined;
+            flowOwner = undefined;
+            state.persistence = null;
+            state.readonlyReason = null;
+          }
         }
       }
     }

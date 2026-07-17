@@ -6,7 +6,7 @@ import {
   shallowRef,
   watch
 } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useProductRuntime } from '@/app/productRuntime';
 import WorkspaceShell, { type WorkspaceShellState } from './WorkspaceShell.vue';
 import {
@@ -23,6 +23,7 @@ const props = defineProps<{
 }>();
 
 const route = useRoute();
+const router = useRouter();
 const runtime = props.runtime ?? useProductRuntime().workspace;
 const activeProjectId = computed(() => props.projectId ?? String(route.params.id ?? ''));
 const shellState = ref<WorkspaceShellState>('loading');
@@ -32,6 +33,49 @@ const message = ref<string | null>(null);
 let lifecycleGeneration = 0;
 let readPort: WorkspaceProjectReadPort | undefined;
 let workspaceOwner: WorkspaceOwner | undefined;
+
+type WorkspaceFlushWindow = Window & {
+  __clearVisionFlushProjectWorkspace?: (reason?: string) => Promise<boolean>;
+};
+
+function hasProtectedDraft(): boolean {
+  const persistence = workspaceOwner?.projection.persistence;
+  return Boolean(persistence && (
+    persistence.dirty || persistence.phase === 'saving' || persistence.phase === 'conflict' ||
+    persistence.phase === 'unknown-outcome'
+  ));
+}
+
+async function allowWorkspaceLeave(reason: string): Promise<boolean> {
+  if (!workspaceOwner || !hasProtectedDraft()) return true;
+  const settled = await workspaceOwner.prepareForLeave(reason);
+  if (settled) return true;
+  return globalThis.confirm('此工程存在未保存修改或未完成的保存协调。确定要离开并放弃本地 draft 吗？');
+}
+
+const removeRouteGuard = router.beforeEach(async (to, from) => {
+  if (!workspaceOwner || to.fullPath === from.fullPath) return true;
+  return await allowWorkspaceLeave('route-leave');
+});
+
+function handleBeforeUnload(event: BeforeUnloadEvent): void {
+  if (!hasProtectedDraft()) return;
+  event.preventDefault();
+  event.returnValue = '';
+}
+
+function handleSaveShortcut(event: KeyboardEvent): void {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 's') return;
+  event.preventDefault();
+  void workspaceOwner?.save();
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', handleBeforeUnload);
+  window.addEventListener('keydown', handleSaveShortcut);
+  (window as WorkspaceFlushWindow).__clearVisionFlushProjectWorkspace = async reason =>
+    workspaceOwner?.prepareForLeave(reason ?? 'host-close') ?? true;
+}
 
 function disposeActive(reason: string): void {
   lifecycleGeneration += 1;
@@ -159,6 +203,15 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  removeRouteGuard();
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+    window.removeEventListener('keydown', handleSaveShortcut);
+    const runtimeWindow = window as WorkspaceFlushWindow;
+    if (runtimeWindow.__clearVisionFlushProjectWorkspace) {
+      delete runtimeWindow.__clearVisionFlushProjectWorkspace;
+    }
+  }
   disposeActive('route-leave');
 });
 </script>

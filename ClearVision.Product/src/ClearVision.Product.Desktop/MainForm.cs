@@ -176,7 +176,7 @@ public partial class MainForm : Form
             if (!flushed && e.CloseReason != CloseReason.WindowsShutDown)
             {
                 var choice = MessageBox.Show(
-                    "Plan 修改尚未保存，仍要退出吗？",
+                    "工作区修改尚未保存或保存结果尚未协调，仍要退出吗？",
                     "ClearVision",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning,
@@ -195,7 +195,7 @@ public partial class MainForm : Form
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] Shutdown coordination failed: {ex}");
             var choice = MessageBox.Show(
-                "Plan 修改尚未保存，仍要退出吗？",
+                "工作区修改尚未保存或保存结果尚未协调，仍要退出吗？",
                 "ClearVision",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning,
@@ -247,7 +247,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[MainForm] AI workspace flush before close failed: {ex}");
+            System.Diagnostics.Debug.WriteLine($"[MainForm] workspace flush before close failed: {ex}");
             return false;
         }
     }
@@ -279,8 +279,11 @@ public partial class MainForm : Form
                 const store = window[storeName] || (window[storeName] = {});
                 store[operationId] = { status: 'pending', value: false, error: '', startedAt: Date.now() };
                 try {
-                    const flush = window.__clearVisionFlushAiPanelWorkspace;
-                    if (typeof flush !== 'function') {
+                    const flushers = [
+                        window.__clearVisionFlushProjectWorkspace,
+                        window.__clearVisionFlushAiPanelWorkspace
+                    ].filter(flush => typeof flush === 'function');
+                    if (flushers.length === 0) {
                         store[operationId] = {
                             status: 'completed',
                             value: true,
@@ -290,11 +293,11 @@ public partial class MainForm : Form
                         return true;
                     }
 
-                    Promise.resolve(flush(reason))
-                        .then(value => {
+                    Promise.all(flushers.map(flush => Promise.resolve(flush(reason))))
+                        .then(values => {
                             store[operationId] = {
                                 status: 'completed',
-                                value: value === true,
+                                value: values.every(value => value === true),
                                 error: '',
                                 startedAt: Date.now()
                             };

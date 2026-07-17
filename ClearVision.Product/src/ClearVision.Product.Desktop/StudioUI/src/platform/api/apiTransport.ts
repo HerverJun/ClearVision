@@ -38,6 +38,7 @@ export interface ApiTransport {
   readonly apiBaseUrl: string;
   get<T = unknown>(path: string, options?: ApiGetOptions): Promise<T | undefined>;
   post?<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined>;
+  put?<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined>;
   getBlob?(path: string, options?: ApiGetOptions): Promise<ApiBlobResponse>;
   delete?(path: string, options?: ApiWriteOptions): Promise<void>;
 }
@@ -247,7 +248,7 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
 
   async function send(
     path: string,
-    method: 'GET' | 'POST' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     requestOptions: ApiGetOptions = {},
     body?: BodyInit,
     headers: Readonly<Record<string, string>> = {}
@@ -325,6 +326,23 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
       const { response, url } = await send(
         path,
         'POST',
+        requestOptions,
+        JSON.stringify(body),
+        requestHeaders('application/json', {
+          'Content-Type': 'application/json',
+          ...requestOptions.headers
+        })
+      );
+      return readJson<T>(response, url, requestOptions.signal);
+    },
+    async put<T = unknown>(
+      path: string,
+      body: unknown,
+      requestOptions: ApiWriteOptions = {}
+    ): Promise<T | undefined> {
+      const { response, url } = await send(
+        path,
+        'PUT',
         requestOptions,
         JSON.stringify(body),
         requestHeaders('application/json', {

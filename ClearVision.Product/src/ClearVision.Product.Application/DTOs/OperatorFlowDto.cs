@@ -4,6 +4,8 @@
 
 namespace ClearVision.Product.Application.DTOs;
 
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -35,6 +37,9 @@ public class OperatorFlowDto
     public List<OperatorConnectionDto> Connections { get; set; } = new();
 
     public DecisionConfiguration? DecisionConfiguration { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; set; }
 
     /// <summary>
     /// 转换为实体对象

@@ -123,6 +123,7 @@ export interface FlowCanvasOwner {
   readonly projection: DeepReadonly<FlowCanvasOwnerProjection>;
   readonly commands: FlowCanvasCommands;
   mountCanvas(options: FlowCanvasMountOptions): void;
+  replaceFlow(flow: Readonly<Record<string, unknown>> | null, projectName: string): void;
   openInspector(): InspectorOwner;
   openPreviewWorkbench(inspectorOwner: InspectorOwner): PreviewWorkbenchOwner;
   refreshOperators(force?: boolean): Promise<void>;
@@ -196,7 +197,13 @@ function toCanvasFlow(flow: WorkspaceFlowV1 | null, projectName: string): Readon
         minValue: decisionValue(parameter.minValue),
         maxValue: decisionValue(parameter.maxValue),
         isRequired: parameter.isRequired,
-        options: parameter.options
+        options: parameter.options === null
+          ? null
+          : Object.freeze(parameter.options.map(option => Object.freeze({
+              ...option.opaquePassthrough,
+              label: option.label,
+              value: option.value
+            })))
       }))),
       isEnabled: operator.isEnabled
     }))),
@@ -514,6 +521,18 @@ export function createFlowCanvasOwner(options: {
         syncDiagnostics();
         throw error;
       }
+    },
+    replaceFlow(flow: Readonly<Record<string, unknown>> | null, projectName: string): void {
+      assertActive();
+      if (!host) throw new Error('FlowCanvas must be mounted before its persistence baseline can be replaced.');
+      host.replaceFlow(flow ?? toCanvasFlow(null, projectName));
+      const next = host.getProjection();
+      state.draft = next.draft;
+      state.runtime = next.runtime;
+      state.feedback = next.feedback;
+      state.phase = 'mounted';
+      state.error = null;
+      syncDiagnostics();
     },
     async refreshOperators(force = true): Promise<void> {
       assertActive();

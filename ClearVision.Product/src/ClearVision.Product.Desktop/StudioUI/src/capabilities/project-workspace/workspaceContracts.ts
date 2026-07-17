@@ -672,16 +672,15 @@ function decodeOperator(
     parameters: array(required(source, 'parameters', path), `${path}.parameters`,
       (item, itemPath) => decodeParameter(item, itemPath, accumulator)),
     isEnabled: boolean(required(source, 'isEnabled', path), `${path}.isEnabled`),
-    executionStatus: enumValue(
-      required(source, 'executionStatus', path),
-      `${path}.executionStatus`,
-      executionStatusValues
-    ),
-    executionTimeMs: nullableNonNegativeInteger(
-      required(source, 'executionTimeMs', path),
-      `${path}.executionTimeMs`
-    ),
-    errorMessage: nullableString(required(source, 'errorMessage', path), `${path}.errorMessage`),
+    executionStatus: Object.prototype.hasOwnProperty.call(source, 'executionStatus')
+      ? enumValue(source.executionStatus, `${path}.executionStatus`, executionStatusValues)
+      : Object.freeze({ value: 'NotExecuted', persistenceValue: 0 }),
+    executionTimeMs: Object.prototype.hasOwnProperty.call(source, 'executionTimeMs')
+      ? nullableNonNegativeInteger(source.executionTimeMs, `${path}.executionTimeMs`)
+      : null,
+    errorMessage: Object.prototype.hasOwnProperty.call(source, 'errorMessage')
+      ? nullableString(source.errorMessage, `${path}.errorMessage`)
+      : null,
     opaquePassthrough: collectUnknown(source, known, path, accumulator, 'passthrough')
   });
 }
@@ -1188,4 +1187,258 @@ export function encodeWorkspaceFlowUpdateV1(project: WorkspaceProjectV1): Worksp
     connections: Object.freeze(flow.connections.map(encodeConnection)),
     decisionConfiguration: encodeDecisionConfiguration(flow.decisionConfiguration)
   });
+}
+
+export interface WorkspaceFlowDraftV1 {
+  readonly id: string | null;
+  readonly name: string;
+  readonly operators: readonly Readonly<Record<string, unknown>>[];
+  readonly connections: readonly Readonly<Record<string, unknown>>[];
+  readonly decisionConfiguration: unknown;
+  readonly opaquePassthrough: Readonly<Record<string, unknown>>;
+}
+
+export interface WorkspaceProjectUpdatePayloadV1 {
+  readonly name: string;
+  readonly description: string | null;
+  readonly flow: WorkspaceJsonObject | null;
+  readonly globalVariables: null;
+  readonly expectedPersistenceRevision: number;
+}
+
+export interface WorkspaceFlowDraftEncodeOptions {
+  readonly materializedFlowId?: string | null;
+  readonly createFlowId?: () => string;
+}
+
+function objectIdentity(value: WorkspaceJsonObject, keys: readonly string[]): string | null {
+  for (const key of keys) {
+    const candidate = value[key];
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  }
+  return null;
+}
+
+function mergeObjectArrayByIdentity(
+  baselineValue: WorkspaceJsonValue | undefined,
+  draftValue: unknown,
+  path: string,
+  identityKeys: readonly string[],
+  mergeItem?: (baseline: WorkspaceJsonObject | undefined, draft: WorkspaceJsonObject, path: string) => WorkspaceJsonObject
+): WorkspaceJsonArray {
+  if (!Array.isArray(draftValue)) throw new WorkspaceContractDecodeError(path, 'an array');
+  const baseline = Array.isArray(baselineValue)
+    ? baselineValue.filter(isRecord) as WorkspaceJsonObject[]
+    : [];
+  const byIdentity = new Map<string, WorkspaceJsonObject>();
+  for (const item of baseline) {
+    const identity = objectIdentity(item, identityKeys);
+    if (identity) byIdentity.set(identity, item);
+  }
+  return Object.freeze(draftValue.map((item, index) => {
+    const draft = jsonObject(item, `${path}[${index}]`);
+    const identity = objectIdentity(draft, identityKeys);
+    const previous = identity ? byIdentity.get(identity) : undefined;
+    return mergeItem
+      ? mergeItem(previous, draft, `${path}[${index}]`)
+      : Object.freeze({ ...(previous ?? {}), ...draft });
+  }));
+}
+
+function mergeKnownFields(
+  baseline: WorkspaceJsonObject | undefined,
+  draft: WorkspaceJsonObject,
+  fields: readonly string[]
+): Record<string, WorkspaceJsonValue> {
+  const merged: Record<string, WorkspaceJsonValue> = { ...(baseline ?? {}) };
+  for (const field of fields) {
+    if (Object.prototype.hasOwnProperty.call(draft, field)) merged[field] = draft[field]!;
+  }
+  return merged;
+}
+
+function mergePortDraft(
+  baseline: WorkspaceJsonObject | undefined,
+  draft: WorkspaceJsonObject
+): WorkspaceJsonObject {
+  return Object.freeze(mergeKnownFields(baseline, draft, workspacePersistenceFieldsV1.port));
+}
+
+function mergeConnectionDraft(
+  baseline: WorkspaceJsonObject | undefined,
+  draft: WorkspaceJsonObject
+): WorkspaceJsonObject {
+  return Object.freeze(mergeKnownFields(baseline, draft, workspacePersistenceFieldsV1.connection));
+}
+
+function mergeParameterOptionDraft(
+  baseline: WorkspaceJsonObject | undefined,
+  draft: WorkspaceJsonObject
+): WorkspaceJsonObject {
+  return Object.freeze(mergeKnownFields(baseline, draft, workspacePersistenceFieldsV1.parameterOption));
+}
+
+function mergeParameterDraft(
+  baseline: WorkspaceJsonObject | undefined,
+  draft: WorkspaceJsonObject,
+  path: string
+): WorkspaceJsonObject {
+  const merged = mergeKnownFields(baseline, draft, workspacePersistenceFieldsV1.parameter);
+  if (Array.isArray(draft.options)) {
+    merged.options = mergeObjectArrayByIdentity(
+      baseline?.options,
+      draft.options,
+      `${path}.options`,
+      ['value', 'label'],
+      mergeParameterOptionDraft
+    );
+  } else if (draft.options === null) {
+    merged.options = null;
+  }
+  return Object.freeze(merged);
+}
+
+function mergeOperatorDraft(
+  baseline: WorkspaceJsonObject | undefined,
+  draft: WorkspaceJsonObject,
+  path: string
+): WorkspaceJsonObject {
+  const merged = mergeKnownFields(baseline, draft, workspacePersistenceFieldsV1.operator);
+  const type = merged.type;
+  if (typeof type === 'string' && /^\d+$/.test(type)) {
+    const numericType = Number(type);
+    if (!Number.isSafeInteger(numericType) || operatorTypeValues[numericType] === undefined) {
+      throw new WorkspaceContractDecodeError(`${path}.type`, 'a supported string or numeric enum value');
+    }
+    merged.type = numericType;
+  } else {
+    enumValue(type, `${path}.type`, operatorTypeValues);
+  }
+  if (draft.metadata === null) delete merged.metadata;
+  merged.inputPorts = mergeObjectArrayByIdentity(
+    baseline?.inputPorts,
+    draft.inputPorts,
+    `${path}.inputPorts`,
+    ['id'],
+    mergePortDraft
+  );
+  merged.outputPorts = mergeObjectArrayByIdentity(
+    baseline?.outputPorts,
+    draft.outputPorts,
+    `${path}.outputPorts`,
+    ['id'],
+    mergePortDraft
+  );
+  merged.parameters = mergeObjectArrayByIdentity(
+    baseline?.parameters,
+    draft.parameters,
+    `${path}.parameters`,
+    ['id', 'name'],
+    mergeParameterDraft
+  );
+  for (const transient of workspaceTransientStripFieldsV1.operator) delete merged[transient];
+  return Object.freeze(merged);
+}
+
+function validateEncodedFlowDraft(flow: WorkspaceJsonObject): void {
+  uuid(flow.id, '$.flow.id');
+  string(flow.name, '$.flow.name');
+  if (!Array.isArray(flow.operators)) throw new WorkspaceContractDecodeError('$.flow.operators', 'an array');
+  if (!Array.isArray(flow.connections)) throw new WorkspaceContractDecodeError('$.flow.connections', 'an array');
+  flow.operators.forEach((item, index) => {
+    const source = record(item, `$.flow.operators[${index}]`);
+    uuid(source.id, `$.flow.operators[${index}].id`);
+    string(source.name, `$.flow.operators[${index}].name`);
+    const type = source.type;
+    if (typeof type !== 'string' && (typeof type !== 'number' || !Number.isInteger(type))) {
+      throw new WorkspaceContractDecodeError(`$.flow.operators[${index}].type`, 'a string or integer enum value');
+    }
+    finiteNumber(source.x, `$.flow.operators[${index}].x`);
+    finiteNumber(source.y, `$.flow.operators[${index}].y`);
+    if (!Array.isArray(source.inputPorts)) {
+      throw new WorkspaceContractDecodeError(`$.flow.operators[${index}].inputPorts`, 'an array');
+    }
+    if (!Array.isArray(source.outputPorts)) {
+      throw new WorkspaceContractDecodeError(`$.flow.operators[${index}].outputPorts`, 'an array');
+    }
+    if (!Array.isArray(source.parameters)) {
+      throw new WorkspaceContractDecodeError(`$.flow.operators[${index}].parameters`, 'an array');
+    }
+    boolean(source.isEnabled, `$.flow.operators[${index}].isEnabled`);
+  });
+}
+
+function createFlowId(options: WorkspaceFlowDraftEncodeOptions): string {
+  const supplied = options.materializedFlowId;
+  if (supplied) return uuid(supplied, '$.flow.id');
+  const factory = options.createFlowId ?? (() => globalThis.crypto.randomUUID());
+  return uuid(factory(), '$.flow.id');
+}
+
+export function encodeWorkspaceFlowDraftUpdateV1(
+  baseline: WorkspaceProjectV1,
+  draft: WorkspaceFlowDraftV1,
+  options: WorkspaceFlowDraftEncodeOptions = {}
+): WorkspaceJsonObject | null {
+  if (!baseline.saveCompatibility.canEncode) {
+    throw new WorkspaceSaveCompatibilityError(baseline.saveCompatibility.blockedPaths);
+  }
+  const hasDraftFlow = draft.id !== null || draft.operators.length > 0 ||
+    draft.connections.length > 0 || draft.decisionConfiguration !== null;
+  if (baseline.flow === null && !hasDraftFlow) return null;
+
+  const baselineFlow = encodeWorkspaceFlowUpdateV1(baseline);
+  const opaque = jsonObject(draft.opaquePassthrough, '$.flow.opaquePassthrough');
+  const flowId = draft.id ?? baseline.flow?.id ?? createFlowId(options);
+  const flow: WorkspaceJsonObject = Object.freeze({
+    ...(baselineFlow ?? {}),
+    ...opaque,
+    id: uuid(flowId, '$.flow.id'),
+    name: string(draft.name, '$.flow.name'),
+    operators: mergeObjectArrayByIdentity(
+      baselineFlow?.operators,
+      draft.operators,
+      '$.flow.operators',
+      ['id'],
+      mergeOperatorDraft
+    ),
+    connections: mergeObjectArrayByIdentity(
+      baselineFlow?.connections,
+      draft.connections,
+      '$.flow.connections',
+      ['id'],
+      mergeConnectionDraft
+    ),
+    decisionConfiguration: draft.decisionConfiguration === null
+      ? null
+      : jsonValue(draft.decisionConfiguration, '$.flow.decisionConfiguration')
+  });
+  validateEncodedFlowDraft(flow);
+  return flow;
+}
+
+export function buildWorkspaceProjectUpdatePayloadV1(
+  baseline: WorkspaceProjectV1,
+  draft: WorkspaceFlowDraftV1,
+  options: WorkspaceFlowDraftEncodeOptions = {}
+): WorkspaceProjectUpdatePayloadV1 {
+  return Object.freeze({
+    name: baseline.name,
+    description: baseline.description,
+    flow: encodeWorkspaceFlowDraftUpdateV1(baseline, draft, options),
+    globalVariables: null,
+    expectedPersistenceRevision: baseline.persistenceRevision
+  });
+}
+
+function canonicalizeWorkspaceJson(value: WorkspaceJsonValue): WorkspaceJsonValue {
+  if (Array.isArray(value)) return Object.freeze(value.map(canonicalizeWorkspaceJson));
+  if (!isRecord(value)) return value;
+  const target: Record<string, WorkspaceJsonValue> = {};
+  for (const key of Object.keys(value).sort()) target[key] = canonicalizeWorkspaceJson(value[key]!);
+  return Object.freeze(target);
+}
+
+export function workspacePersistenceFingerprint(value: unknown): string {
+  return JSON.stringify(canonicalizeWorkspaceJson(jsonValue(value, '$')));
 }

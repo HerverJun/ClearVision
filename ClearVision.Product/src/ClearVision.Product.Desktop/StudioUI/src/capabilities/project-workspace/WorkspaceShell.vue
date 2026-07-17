@@ -76,17 +76,42 @@ const stateDescription = computed(() => props.message ?? {
 const isReadySurface = computed(() =>
   props.state === 'ready' || props.state === 'empty' || props.state === 'readonly');
 const isReadonly = computed(() => props.state === 'forbidden' || props.state === 'readonly');
+const currentProject = computed(() => props.workspaceOwner?.projection.project ?? props.project);
+const persistence = computed(() => props.workspaceOwner?.projection.persistence ?? null);
 const saveCompatibilityTone = computed(() => {
-  const status = props.project?.saveCompatibility.status;
+  const status = currentProject.value?.saveCompatibility.status;
   if (status === 'blocked') return 'ng';
   if (status === 'opaque-passthrough') return 'warning';
   return 'ok';
 });
 const saveCompatibilityLabel = computed(() => {
-  const status = props.project?.saveCompatibility.status;
+  const status = currentProject.value?.saveCompatibility.status;
   if (status === 'blocked') return '保存合同：阻断';
   if (status === 'opaque-passthrough') return '保存合同：opaque passthrough';
   return '保存合同：兼容';
+});
+const persistenceTone = computed(() => {
+  const phase = persistence.value?.phase;
+  if (phase === 'conflict' || phase === 'error' || phase === 'unknown-outcome') return 'ng';
+  if (phase === 'dirty' || phase === 'saving' || phase === 'running' || phase === 'readonly') return 'warning';
+  if (phase === 'saved' || phase === 'clean') return 'ok';
+  return 'idle';
+});
+const persistenceLabel = computed(() => {
+  const projection = persistence.value;
+  if (!projection) return '保存 owner：初始化中';
+  return {
+    clean: '已保存',
+    dirty: '未保存',
+    saving: '保存中',
+    saved: '保存成功',
+    error: '保存失败',
+    conflict: '保存冲突',
+    running: '运行中锁定',
+    readonly: '只读',
+    'unknown-outcome': '保存结果未知',
+    disposed: '已释放'
+  }[projection.phase];
 });
 </script>
 
@@ -106,7 +131,13 @@ const saveCompatibilityLabel = computed(() => {
     :data-workspace-inspector-draft-count="diagnostics.activeInspectorDrafts"
     :data-workspace-active-subscriptions="diagnostics.activeSubscriptions"
     :data-workspace-in-flight-reads="diagnostics.inFlightReads"
-    :data-workspace-save-compatibility="project?.saveCompatibility.status ?? 'unavailable'"
+    :data-workspace-in-flight-writes="diagnostics.inFlightWrites"
+    :data-workspace-persistence-owner-count="diagnostics.persistenceOwnerCount"
+    :data-workspace-persistence-phase="persistence?.phase ?? 'unavailable'"
+    :data-workspace-dirty="persistence?.dirty ?? false"
+    :data-workspace-dirty-generation="persistence?.dirtyGeneration ?? 0"
+    :data-workspace-persistence-revision="persistence?.persistenceRevision ?? currentProject?.persistenceRevision ?? -1"
+    :data-workspace-save-compatibility="currentProject?.saveCompatibility.status ?? 'unavailable'"
   >
     <header class="workspace-shell__toolbar">
       <div class="workspace-shell__identity">
@@ -121,34 +152,75 @@ const saveCompatibilityLabel = computed(() => {
           aria-hidden="true"
         />
         <div>
-          <strong>{{ project?.name ?? '工程工作区' }}</strong>
+          <strong>{{ currentProject?.name ?? '工程工作区' }}</strong>
           <small>
-            {{ project ? `版本 ${project.version} · revision ${project.persistenceRevision}` : projectId }}
+            {{ currentProject ? `版本 ${currentProject.version} · revision ${persistence?.persistenceRevision ?? currentProject.persistenceRevision}` : projectId }}
           </small>
         </div>
       </div>
 
       <div class="workspace-shell__toolbar-status">
+        <CvButton
+          v-if="persistence"
+          data-testid="workspace-save"
+          size="sm"
+          :disabled="!persistence.canSave"
+          @click="workspaceOwner?.save()"
+        >
+          {{ persistence.phase === 'saving' ? '保存中…' : '保存' }}
+        </CvButton>
+        <CvButton
+          v-if="persistence?.canRetry"
+          data-testid="workspace-save-retry"
+          size="sm"
+          @click="workspaceOwner?.retrySave()"
+        >
+          重试
+        </CvButton>
+        <CvButton
+          v-if="persistence?.canReconcile"
+          data-testid="workspace-save-reconcile"
+          size="sm"
+          @click="workspaceOwner?.reconcileSave()"
+        >
+          重新读取
+        </CvButton>
+        <CvButton
+          v-if="persistence?.canReapplyConflict"
+          data-testid="workspace-conflict-reapply"
+          size="sm"
+          @click="workspaceOwner?.reapplyConflict()"
+        >
+          重放 draft
+        </CvButton>
+        <CvButton
+          v-if="persistence?.canDiscardConflict"
+          data-testid="workspace-conflict-discard"
+          size="sm"
+          @click="workspaceOwner?.discardConflict()"
+        >
+          放弃 draft
+        </CvButton>
         <CvStatusBadge
-          v-if="project"
+          v-if="currentProject"
           :tone="saveCompatibilityTone"
           :label="saveCompatibilityLabel"
         />
         <CvStatusBadge
-          :tone="isReadonly ? 'warning' : state === 'ready' || state === 'empty' ? 'ok' : 'idle'"
-          :label="isReadonly ? '只读预览' : 'G4 Preview / ROI'"
+          :tone="persistenceTone"
+          :label="persistenceLabel"
         />
       </div>
     </header>
 
     <div
-      v-if="isReadySurface && project && workspaceOwner"
+      v-if="isReadySurface && currentProject && workspaceOwner"
       class="workspace-shell__work-area"
     >
       <FlowWorkspace
         :key="projectId"
         :workspace-owner="workspaceOwner"
-        :project="project"
+        :project="currentProject"
       />
     </div>
 
@@ -250,9 +322,11 @@ const saveCompatibilityLabel = computed(() => {
       <span>Preview {{ diagnostics.previewOwnerCount }}/1</span>
       <span>Image {{ diagnostics.imageCanvasOwnerCount }}/1</span>
       <span>ROI {{ diagnostics.roiOwnerCount }}/1</span>
+      <span>Persistence {{ diagnostics.persistenceOwnerCount }}/1</span>
       <span>写入 {{ diagnostics.inFlightWrites }}</span>
+      <span v-if="persistence">{{ persistence.message }}</span>
       <span class="workspace-shell__statusbar-spacer" />
-      <span>F03 · G1–G4 Workspace</span>
+      <span>F03 · G1–G5 Workspace</span>
     </footer>
   </section>
 </template>

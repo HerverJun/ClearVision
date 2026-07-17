@@ -39,7 +39,7 @@ export class ApiNetworkError extends Error {
   readonly url: string;
 
   constructor(url: string, cause: unknown) {
-    super(`GET request to ${url} failed before a response was available.`, { cause });
+    super(`Request to ${url} failed before a response was available.`, { cause });
     this.name = 'ApiNetworkError';
     this.url = url;
   }
@@ -50,7 +50,7 @@ export class ApiAbortError extends Error {
   readonly url: string;
 
   constructor(url: string, cause?: unknown) {
-    super(`GET request to ${url} was aborted.`, { cause });
+    super(`Request to ${url} was aborted.`, { cause });
     this.name = 'ApiAbortError';
     this.url = url;
   }
@@ -87,7 +87,7 @@ export class ApiHttpError extends Error {
 
   protected constructor(kind: ApiHttpErrorKind, details: ApiHttpErrorDetails) {
     const suffix = details.statusText ? ` ${details.statusText}` : '';
-    super(`GET request to ${details.url} failed with HTTP ${details.status}${suffix}.`);
+    super(`Request to ${details.url} failed with HTTP ${details.status}${suffix}.`);
     this.name = 'ApiHttpError';
     this.kind = kind;
     this.url = details.url;

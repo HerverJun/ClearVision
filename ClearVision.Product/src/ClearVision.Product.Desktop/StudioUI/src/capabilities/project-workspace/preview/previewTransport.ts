@@ -83,10 +83,17 @@ function extractCleanupArtifactIds(payload: unknown): readonly string[] {
   return Object.freeze([...ids]);
 }
 
-function assertArtifactResponse(
+async function blobSha256(blob: Blob): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) throw new Error('Web Crypto SHA-256 is unavailable.');
+  const digest = await subtle.digest('SHA-256', await blob.arrayBuffer());
+  return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
+}
+
+async function assertArtifactResponse(
   expected: PreviewArtifactReferenceV1,
   response: ApiBlobResponse
-): void {
+): Promise<void> {
   if (normalizedContentType(response.contentType) !== normalizedContentType(expected.contentType)) {
     throw new PreviewArtifactIntegrityError(
       expected.artifactId,
@@ -105,6 +112,13 @@ function assertArtifactResponse(
     throw new PreviewArtifactIntegrityError(
       expected.artifactId,
       `Artifact ${expected.artifactId} checksum did not match its Preview reference.`
+    );
+  }
+  const actualSha256 = await blobSha256(response.blob);
+  if (actualSha256 !== expected.sha256) {
+    throw new PreviewArtifactIntegrityError(
+      expected.artifactId,
+      `Artifact ${expected.artifactId} bytes did not match its Preview SHA-256 reference.`
     );
   }
 }
@@ -241,7 +255,7 @@ export function createPreviewTransportPort(api: ApiTransport): PreviewTransportP
       publish();
       try {
         const response = await getBlob(`preview-artifacts/${encodeURIComponent(artifactId)}`, options);
-        assertArtifactResponse(expected, response);
+        await assertArtifactResponse(expected, response);
         return Object.freeze({ blob: response.blob, headers: response.headers });
       } finally {
         state.inFlightArtifactReads = Math.max(0, state.inFlightArtifactReads - 1);

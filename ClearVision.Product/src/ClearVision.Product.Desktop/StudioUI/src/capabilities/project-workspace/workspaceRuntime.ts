@@ -94,6 +94,12 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
         projectId: inner.projectId,
         projection: inner.projection,
         openFlowCanvas: inner.openFlowCanvas,
+        save: inner.save,
+        retrySave: inner.retrySave,
+        reconcileSave: inner.reconcileSave,
+        reapplyConflict: inner.reapplyConflict,
+        discardConflict: inner.discardConflict,
+        prepareForLeave: inner.prepareForLeave,
         setReadonly: inner.setReadonly,
         dispose(reason = 'workspace-owner-disposed'): void {
           if (ownerDisposed) return;

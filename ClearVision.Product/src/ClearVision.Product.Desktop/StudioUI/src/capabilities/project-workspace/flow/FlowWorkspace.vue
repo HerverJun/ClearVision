@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import type { WorkspaceProjectV1 } from '../workspaceContracts';
 import type { WorkspaceOwner } from '../workspaceOwner';
 import FlowCanvasSurface from './FlowCanvasSurface.vue';
@@ -38,9 +38,6 @@ onMounted(async () => {
   flowOwner.commands.focus();
 });
 
-onBeforeUnmount(() => {
-  flowOwner.dispose('flow-workspace-unmounted');
-});
 </script>
 
 <template>

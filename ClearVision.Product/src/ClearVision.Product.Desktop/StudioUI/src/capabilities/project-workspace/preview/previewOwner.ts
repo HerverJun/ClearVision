@@ -316,7 +316,6 @@ export function createPreviewOwner(options: {
   });
 
   function syncDiagnostics(): void {
-    if (disposed) return;
     lease.update(ownerResources(coordinator));
   }
 
@@ -423,10 +422,8 @@ export function createPreviewOwner(options: {
       disposed = true;
       stopSelectionWatch();
       unsubscribeCoordinator();
-      unsubscribeTransport();
       coordinator.destroy();
       transport.dispose();
-      void transport.settle();
       state.phase = 'disposed';
       state.canPreview = false;
       state.canCancel = false;
@@ -435,8 +432,12 @@ export function createPreviewOwner(options: {
       state.outputData = null;
       state.artifacts = Object.freeze([]);
       state.requestIdentity = null;
-      lease.update(zeroResources());
-      lease.dispose(reason);
+      syncDiagnostics();
+      void transport.settle().finally(() => {
+        unsubscribeTransport();
+        lease.update(zeroResources());
+        lease.dispose(reason);
+      });
     }
   });
 }
