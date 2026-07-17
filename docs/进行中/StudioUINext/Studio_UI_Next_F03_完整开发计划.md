@@ -13,7 +13,7 @@ Studio:StudioUiEnabled=false
 F03_IMPLEMENTED=YES
 F03_STATUS=PARTIAL
 F03_G6_STATUS=DONE
-OPEN_BLOCKERS=5
+OPEN_BLOCKERS=6
 F04_STARTED=NO
 AUTH_ENTRY_DECISION=PRESEEDED_SESSION_PREVIEW_ONLY
 STATION_SSE=DEFERRED
@@ -1339,12 +1339,12 @@ explicit <code>null</code> 的正式语义为“使用参数 DefaultValue”：P
 | Full Desktop endpoint regression | BLOCKED by pre-existing shared-temp instability | <code>run-tests-desktop-endpoints.ps1 -NoBuild -NoRestore</code> discovered 25 endpoint classes but one existing ProjectGlobalVariable endpoint test returned <code>Access to the path is denied</code>. The identical test passed on immediate isolated serial rerun; this does not establish the full regression gate. |
 | Playwright Browser fixture | PASS | <code>f03-workspace.spec.ts</code>: 35 passed, including persisted admission/execute/Results identity, admission rejection without execute, abort unknown-outcome lock, explicit reconcile late-response dispose, request allowlist, and 20 formal Run/project/route cycles with owner/SSE/request/timer/blob/artifact ledger at zero. Browser fixture is not WebView2 evidence. |
 | Real WebView2 seeded Workspace / Preview / Formal Run | PASS | <code>Invoke-StudioUiWebView2Evidence.ps1 -EvidencePhase f03 -WorkspaceCapabilityEnabled -SeedWorkspace -FormalRun</code> passed against real Edge WebView2. It retains G4 Preview isolation and 20 lifecycle cycles, then persists FinalDecisionBinding, reloads clean, sends exactly one Admission followed by one Execute, reaches Results with the same Project/result identity, and audits only Project/Preview/artifact/Admission/Execute/Result requests. Process, port, WebView2 user-data, database, conversation and AgentRun runtime roots all cleaned to zero. |
-| Release publish / local no-Node audit | PASS, limited scope | <code>Invoke-StudioUiWebView2Matrix.ps1 -RunScope publish-only</code> passed self-contained Release build/publish, published overview, missing-assets behavior, static asset audit, and local process-tree no-Node audit. A separate clean target machine without Node remains <code>NOT PERFORMED</code>. |
+| Release publish / local no-Node audit | BLOCKED | Final-candidate <code>Invoke-StudioUiWebView2Matrix.ps1 -EvidencePhase f03 -RunScope publish-only</code> built and published the self-contained executable, but the published host returned no static-file candidate for <code>/studio/index.html</code> and its bundled assets despite a copied <code>wwwroot/studio</code>. The matrix timed out before runtime/no-Node audit evidence was produced; earlier publish-only evidence is not carried forward to this Final SHA. |
 | Real DPI matrix | NOT PERFORMED | Formal Run WebView2 closure is now covered separately; the multi-scale DPI matrix remains independent evidence and was not rerun for this closure. |
 | Full CI / remote workflow | NOT PERFORMED | ordinary branch push is not CI |
 | Camera / PLC / Station / field hardware | NOT PERFORMED | outside F03 front-end scope |
 
-G6 code closure is complete. F03 remains partial for five external/configuration gates: the protected local startup-default guard, the full Desktop endpoint regression with its pre-existing shared-temp instability, the independent real DPI matrix, a clean target machine without Node, and remote full CI. The user-owned <code>appsettings.json</code> working-tree edit currently sets <code>StudioUiEnabled=true</code>. F03 code did not change this protected file; it must not be staged or claimed as the final safe default. The intended release policy remains:
+G6 code closure is complete. F03 remains partial for six external/configuration gates: the protected local startup-default guard, the full Desktop endpoint regression with its pre-existing shared-temp instability, the Final SHA Release publish/static-host/no-Node audit, the independent real DPI matrix, a clean target machine without Node, and remote full CI. The user-owned <code>appsettings.json</code> working-tree edit currently sets <code>StudioUiEnabled=true</code>. F03 code did not change this protected file; it must not be staged or claimed as the final safe default. The intended release policy remains:
 
 ~~~text
 Studio:StudioUiEnabled=false
