@@ -535,11 +535,44 @@ async function openProject(page: Page) {
 
 test.describe('High Frequency Regression', () => {
     test('login regression: unauthenticated user is redirected to login page', async ({ page }) => {
+        await page.setViewportSize({ width: 1920, height: 1080 });
         await page.goto('/index.html');
 
         await expect(page).toHaveURL(/\/login\.html$/);
         await expect(page.locator('#loginForm')).toBeVisible();
         await expect(page.locator('#username')).toBeVisible();
+
+        const passwordInput = page.locator('#password');
+        const passwordToggle = page.locator('[data-password-toggle="password"]');
+        await expect(passwordToggle).toBeVisible();
+        const geometry = await page.evaluate(() => {
+            const input = document.querySelector('#password') as HTMLInputElement | null;
+            const toggle = document.querySelector('[data-password-toggle="password"]') as HTMLButtonElement | null;
+            if (!input || !toggle) {
+                return null;
+            }
+
+            const inputRect = input.getBoundingClientRect();
+            const toggleRect = toggle.getBoundingClientRect();
+            return {
+                inputCenterY: inputRect.top + inputRect.height / 2,
+                toggleCenterY: toggleRect.top + toggleRect.height / 2,
+                insideRight: toggleRect.right <= inputRect.right,
+                insideTop: toggleRect.top >= inputRect.top,
+                insideBottom: toggleRect.bottom <= inputRect.bottom,
+                transform: getComputedStyle(toggle).transform,
+            };
+        });
+
+        expect(geometry).not.toBeNull();
+        expect(Math.abs((geometry?.inputCenterY ?? 0) - (geometry?.toggleCenterY ?? 0))).toBeLessThanOrEqual(1);
+        expect(geometry?.insideRight).toBe(true);
+        expect(geometry?.insideTop).toBe(true);
+        expect(geometry?.insideBottom).toBe(true);
+        expect(geometry?.transform).not.toBe('none');
+        await passwordInput.fill('secret');
+        await passwordToggle.click();
+        await expect(passwordInput).toHaveAttribute('type', 'text');
     });
 
     test('project open regression: opening a project hydrates status and returns to flow view', async ({ page }) => {
