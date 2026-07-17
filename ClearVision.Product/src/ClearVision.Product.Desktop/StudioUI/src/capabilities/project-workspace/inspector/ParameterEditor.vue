@@ -134,7 +134,7 @@ onBeforeUnmount(() => emit('draftActive', false));
           :disabled="effectiveDisabled"
           @change="toggleNull"
         >
-        <span>设为空值</span>
+        <span>Use default value (null)</span>
       </label>
 
       <input

@@ -372,4 +372,35 @@ describe('F03 G5 Workspace persistence owner', () => {
     await harness.owner.settle();
     harness.diagnostics.dispose();
   });
+
+  it('silently drops a reconcile response that arrives after the owner is disposed', async () => {
+    let resolveRead: ((project: WorkspaceProjectV1) => void) | undefined;
+    const getProject = vi.fn(() => new Promise<WorkspaceProjectV1>(resolve => {
+      resolveRead = resolve;
+    }));
+    const harness = createHarness({
+      putProject: vi.fn(async () => {
+        throw new ApiNetworkError('http://localhost/api/projects/test', new Error('lost'));
+      }),
+      getProject
+    });
+    harness.flow.editParameter(77);
+    await expect(harness.owner.save()).resolves.toMatchObject({ status: 'unknown-outcome' });
+
+    const reconciling = harness.owner.reconcile();
+    expect(harness.owner.projection.phase).toBe('unknown-outcome');
+    harness.owner.dispose('route-leave');
+    resolveRead?.(baseline(4));
+
+    await expect(reconciling).resolves.toMatchObject({ status: 'disposed', project: null });
+    expect(harness.owner.projection.phase).toBe('disposed');
+    expect(harness.flow.owner.setMutationGate).not.toHaveBeenCalledWith('readonly');
+    await harness.owner.settle();
+    expect(harness.diagnostics.diagnostics).toMatchObject({
+      persistenceOwnerCount: 0,
+      inFlightReads: 0,
+      inFlightWrites: 0
+    });
+    harness.diagnostics.dispose();
+  });
 });

@@ -173,6 +173,58 @@ public class InspectionService : IInspectionService
 
     #region 单次检测
 
+    public async Task<StudioInspectionRunAdmission> AdmitPersistedStudioRunAsync(
+        Guid projectId,
+        long expectedPersistenceRevision,
+        Guid clientSnapshotId,
+        CancellationToken cancellationToken = default)
+    {
+        var (snapshot, _) = await ResolveExecutionFlowAsync(
+            projectId,
+            flow: null,
+            ExecutionAdmissionSurface.StudioInspectionRun,
+            cancellationToken,
+            clientSnapshotId);
+        EnsurePersistedStudioRunIdentity(snapshot, expectedPersistenceRevision, null, null);
+        return new StudioInspectionRunAdmission(
+            snapshot.ProjectId,
+            snapshot.SnapshotId,
+            snapshot.PersistenceRevision,
+            snapshot.FlowHash,
+            snapshot.DecisionConfigurationHash);
+    }
+
+    public async Task<InspectionResult> ExecutePersistedStudioRunAsync(
+        Guid projectId,
+        long expectedPersistenceRevision,
+        Guid clientSnapshotId,
+        string expectedCanonicalFlowHash,
+        string expectedDecisionConfigurationHash,
+        CancellationToken cancellationToken = default)
+    {
+        var (snapshot, globalVariables) = await ResolveExecutionFlowAsync(
+            projectId,
+            flow: null,
+            ExecutionAdmissionSurface.StudioInspectionRun,
+            cancellationToken,
+            clientSnapshotId);
+        EnsurePersistedStudioRunIdentity(
+            snapshot,
+            expectedPersistenceRevision,
+            expectedCanonicalFlowHash,
+            expectedDecisionConfigurationHash);
+        return await ExecuteSingleWithCoordinatorAsync(
+            snapshot,
+            sessionId => ExecuteSingleResolvedCoreAsync(
+                projectId,
+                imageData: null,
+                snapshot,
+                globalVariables,
+                sessionId,
+                cancellationToken),
+            cancellationToken);
+    }
+
     public async Task<InspectionResult> ExecuteSingleAsync(
         Guid projectId,
         byte[] imageData,
@@ -962,7 +1014,8 @@ public class InspectionService : IInspectionService
         Guid projectId,
         OperatorFlow? flow,
         ExecutionAdmissionSurface surface,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? snapshotId = null)
     {
         var access = _projectSaveCoordinator == null
             ? null
@@ -980,6 +1033,7 @@ public class InspectionService : IInspectionService
                     ExecutionSnapshotSource.Draft,
                     ExecutionRunMode.FormalPrimary,
                     new Dictionary<string, string> { ["ProjectRevision"] = draftProject.PersistenceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+                    snapshotId: snapshotId,
                     globalVariables: draftProject.GlobalVariables);
                 ThrowIfAdmissionRejected(_executionAdmissionService.ValidateSnapshot(snapshot, surface));
                 _logger.LogInformation(
@@ -1006,6 +1060,7 @@ public class InspectionService : IInspectionService
                     ExecutionSnapshotSource.PersistedProject,
                     ExecutionRunMode.FormalPrimary,
                     new Dictionary<string, string> { ["ProjectRevision"] = project.PersistenceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+                    snapshotId: snapshotId,
                     globalVariables: project.GlobalVariables);
                 ThrowIfAdmissionRejected(_executionAdmissionService.ValidateSnapshot(snapshot, surface));
                 return (snapshot, snapshot.CreateGlobalVariables());
@@ -1110,6 +1165,43 @@ public class InspectionService : IInspectionService
         if (!admission.IsAllowed)
         {
             throw new ExecutionAdmissionService.ExecutionAdmissionRejectedException(admission);
+        }
+    }
+
+    private static void EnsurePersistedStudioRunIdentity(
+        ExecutionSnapshot snapshot,
+        long expectedPersistenceRevision,
+        string? expectedCanonicalFlowHash,
+        string? expectedDecisionConfigurationHash)
+    {
+        if (snapshot.Source != ExecutionSnapshotSource.PersistedProject)
+        {
+            throw new StudioInspectionRunIdentityException(
+                "ADMISSION_PERSISTED_SNAPSHOT_REQUIRED",
+                "Studio Workspace Run requires a persisted Project snapshot.");
+        }
+
+        if (snapshot.PersistenceRevision != expectedPersistenceRevision)
+        {
+            throw new StudioInspectionRunIdentityException(
+                "ADMISSION_PERSISTENCE_REVISION_MISMATCH",
+                "The Project persistence revision changed. Save or reload, then request admission again.");
+        }
+
+        if (expectedCanonicalFlowHash != null &&
+            !string.Equals(snapshot.FlowHash, expectedCanonicalFlowHash, StringComparison.Ordinal))
+        {
+            throw new StudioInspectionRunIdentityException(
+                "ADMISSION_SNAPSHOT_MISMATCH",
+                "The persisted Flow changed after admission. Request admission again.");
+        }
+
+        if (expectedDecisionConfigurationHash != null &&
+            !string.Equals(snapshot.DecisionConfigurationHash, expectedDecisionConfigurationHash, StringComparison.Ordinal))
+        {
+            throw new StudioInspectionRunIdentityException(
+                "ADMISSION_DECISION_IDENTITY_MISMATCH",
+                "The final decision binding changed after admission. Request admission again.");
         }
     }
 

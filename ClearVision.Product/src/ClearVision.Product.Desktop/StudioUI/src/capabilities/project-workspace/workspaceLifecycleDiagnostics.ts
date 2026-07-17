@@ -23,6 +23,7 @@ export interface WorkspaceLifecycleDiagnostics extends WorkspaceResourceSnapshot
   readonly roiOwnerCount: number;
   readonly previewOwnerCount: number;
   readonly persistenceOwnerCount: number;
+  readonly runOwnerCount: number;
   readonly activeProjectId: string | null;
   readonly activeReadProjectId: string | null;
   readonly totalWorkspaceMounts: number;
@@ -33,6 +34,8 @@ export interface WorkspaceLifecycleDiagnostics extends WorkspaceResourceSnapshot
   readonly totalInspectorDisposals: number;
   readonly totalPersistenceMounts: number;
   readonly totalPersistenceDisposals: number;
+  readonly totalRunMounts: number;
+  readonly totalRunDisposals: number;
   readonly activeInspectorDrafts: number;
   readonly ownerConflictCount: number;
   readonly lastDisposedProjectId: string | null;
@@ -46,11 +49,11 @@ export interface WorkspaceDiagnosticsWindow {
 }
 
 export class WorkspaceOwnerConflictError extends Error {
-  readonly ownerKind: 'workspace' | 'read' | 'flow-canvas' | 'inspector' | 'preview' | 'image-canvas' | 'roi' | 'persistence';
+  readonly ownerKind: 'workspace' | 'read' | 'flow-canvas' | 'inspector' | 'preview' | 'image-canvas' | 'roi' | 'persistence' | 'run';
   readonly activeProjectId: string;
 
   constructor(
-    ownerKind: 'workspace' | 'read' | 'flow-canvas' | 'inspector' | 'preview' | 'image-canvas' | 'roi' | 'persistence',
+    ownerKind: 'workspace' | 'read' | 'flow-canvas' | 'inspector' | 'preview' | 'image-canvas' | 'roi' | 'persistence' | 'run',
     activeProjectId: string
   ) {
     super(`A ${ownerKind} owner is already active for project ${activeProjectId}.`);
@@ -100,6 +103,7 @@ export interface WorkspaceLifecycleDiagnosticsOwner {
   reserveImageCanvas(projectId: string): WorkspaceCapabilityDiagnosticsLease;
   reserveRoi(projectId: string): WorkspaceCapabilityDiagnosticsLease;
   reservePersistence(projectId: string): WorkspaceCapabilityDiagnosticsLease;
+  reserveRun(projectId: string): WorkspaceCapabilityDiagnosticsLease;
   dispose(): void;
 }
 
@@ -120,6 +124,7 @@ interface MutableWorkspaceDiagnosticsState extends MutableWorkspaceResourceSnaps
   roiOwnerCount: number;
   previewOwnerCount: number;
   persistenceOwnerCount: number;
+  runOwnerCount: number;
   activeProjectId: string | null;
   activeReadProjectId: string | null;
   totalWorkspaceMounts: number;
@@ -130,6 +135,8 @@ interface MutableWorkspaceDiagnosticsState extends MutableWorkspaceResourceSnaps
   totalInspectorDisposals: number;
   totalPersistenceMounts: number;
   totalPersistenceDisposals: number;
+  totalRunMounts: number;
+  totalRunDisposals: number;
   activeInspectorDrafts: number;
   ownerConflictCount: number;
   lastDisposedProjectId: string | null;
@@ -187,6 +194,7 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
     roiOwnerCount: 0,
     previewOwnerCount: 0,
     persistenceOwnerCount: 0,
+    runOwnerCount: 0,
     activeProjectId: null,
     activeReadProjectId: null,
     activeSubscriptions: 0,
@@ -209,6 +217,8 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
     totalInspectorDisposals: 0,
     totalPersistenceMounts: 0,
     totalPersistenceDisposals: 0,
+    totalRunMounts: 0,
+    totalRunDisposals: 0,
     activeInspectorDrafts: 0,
     ownerConflictCount: 0,
     lastDisposedProjectId: null,
@@ -224,6 +234,7 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
   let activeImageCanvasLease: object | undefined;
   let activeRoiLease: object | undefined;
   let activePersistenceLease: object | undefined;
+  let activeRunLease: object | undefined;
   let readOwnerSubscriptionActive = false;
   let readRequestActive = false;
   let inspectorSubscriptionActive = false;
@@ -232,10 +243,11 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
   let imageCanvasResources: WorkspaceResourceSnapshot = zeroResources();
   let roiResources: WorkspaceResourceSnapshot = zeroResources();
   let persistenceResources: WorkspaceResourceSnapshot = zeroResources();
+  let runResources: WorkspaceResourceSnapshot = zeroResources();
   let publishedWindow: WorkspaceDiagnosticsWindow | undefined;
 
   function recomputeResources(): void {
-    const owned = [flowResources, previewResources, imageCanvasResources, roiResources, persistenceResources];
+    const owned = [flowResources, previewResources, imageCanvasResources, roiResources, persistenceResources, runResources];
     const sum = (key: keyof WorkspaceResourceSnapshot): number =>
       owned.reduce((total, resources) => total + resources[key], 0);
     state.activeSubscriptions = (readOwnerSubscriptionActive ? 1 : 0) +
@@ -261,6 +273,7 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
     get roiOwnerCount() { return state.roiOwnerCount; },
     get previewOwnerCount() { return state.previewOwnerCount; },
     get persistenceOwnerCount() { return state.persistenceOwnerCount; },
+    get runOwnerCount() { return state.runOwnerCount; },
     get activeProjectId() { return state.activeProjectId; },
     get activeReadProjectId() { return state.activeReadProjectId; },
     get activeSubscriptions() { return state.activeSubscriptions; },
@@ -283,6 +296,8 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
     get totalInspectorDisposals() { return state.totalInspectorDisposals; },
     get totalPersistenceMounts() { return state.totalPersistenceMounts; },
     get totalPersistenceDisposals() { return state.totalPersistenceDisposals; },
+    get totalRunMounts() { return state.totalRunMounts; },
+    get totalRunDisposals() { return state.totalRunDisposals; },
     get activeInspectorDrafts() { return state.activeInspectorDrafts; },
     get ownerConflictCount() { return state.ownerConflictCount; },
     get lastDisposedProjectId() { return state.lastDisposedProjectId; },
@@ -565,6 +580,39 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
         }
       });
     },
+    reserveRun(projectId: string): WorkspaceCapabilityDiagnosticsLease {
+      assertActive();
+      assertProjectId(projectId);
+      if (activeRunLease) {
+        state.ownerConflictCount += 1;
+        throw new WorkspaceOwnerConflictError('run', state.activeProjectId ?? projectId);
+      }
+      const leaseIdentity = {};
+      activeRunLease = leaseIdentity;
+      state.runOwnerCount = 1;
+      state.totalRunMounts += 1;
+      let leaseDisposed = false;
+      return Object.freeze({
+        projectId,
+        update(resources: WorkspaceResourceSnapshot): void {
+          if (leaseDisposed || activeRunLease !== leaseIdentity || state.disposed) return;
+          runResources = Object.freeze({ ...resources });
+          recomputeResources();
+        },
+        dispose(reason = 'run-disposed'): void {
+          if (leaseDisposed) return;
+          leaseDisposed = true;
+          if (activeRunLease === leaseIdentity) {
+            activeRunLease = undefined;
+            state.runOwnerCount = 0;
+            state.totalRunDisposals += 1;
+            runResources = zeroResources();
+            recomputeResources();
+            state.lastDisposeReason = reason;
+          }
+        }
+      });
+    },
     reserveWorkspaceOwner(projectId: string): WorkspaceOwnerDiagnosticsLease {
       assertActive();
       assertProjectId(projectId);
@@ -607,6 +655,7 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
       activeImageCanvasLease = undefined;
       activeRoiLease = undefined;
       activePersistenceLease = undefined;
+      activeRunLease = undefined;
       readOwnerSubscriptionActive = false;
       readRequestActive = false;
       inspectorSubscriptionActive = false;
@@ -617,6 +666,7 @@ export function createWorkspaceLifecycleDiagnosticsOwner(
       state.roiOwnerCount = 0;
       state.previewOwnerCount = 0;
       state.persistenceOwnerCount = 0;
+      state.runOwnerCount = 0;
       state.activeInspectorDrafts = 0;
       state.activeProjectId = null;
       state.activeReadProjectId = null;

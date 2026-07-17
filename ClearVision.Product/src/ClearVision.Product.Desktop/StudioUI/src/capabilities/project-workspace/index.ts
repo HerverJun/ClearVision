@@ -7,5 +7,6 @@ export * from './workspaceQueries';
 export * from './workspaceRuntime';
 export * from './preview';
 export * from './persistence';
+export * from './run';
 export * from './image';
 export * from './roi';

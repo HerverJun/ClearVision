@@ -21,6 +21,108 @@ namespace ClearVision.Product.Tests.Services;
 public class InspectionServiceSingleRunTests
 {
     [Fact]
+    public async Task PersistedStudioRun_UsesAdmissionIdentityAndPreservesExplicitNullUntilRuntimeResolution()
+    {
+        var projectId = Guid.NewGuid();
+        var clientSnapshotId = Guid.NewGuid();
+        var flow = CreateFlow("persisted-studio-run");
+        var explicitNull = new Parameter(Guid.NewGuid(), "OptionalThreshold", "OptionalThreshold", string.Empty, "int", 42);
+        explicitNull.SetValue(null);
+        flow.Operators.Single().AddParameter(explicitNull);
+        var project = new Project("persisted-studio-run-project");
+        project.UpdateFlow(flow);
+        project.SetPersistenceRevision(7);
+
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        Parameter? capturedParameter = null;
+        flowExecution
+            .ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                capturedParameter = callInfo.Arg<ExecutionSnapshot>().CreateExecutionFlow().Operators
+                    .Single().Parameters.Single(parameter => parameter.Name == "OptionalThreshold");
+                return Task.FromResult(new FlowExecutionResult
+                {
+                    IsSuccess = true,
+                    ExecutionTimeMs = 1,
+                    OutputData = new Dictionary<string, object> { ["JudgmentResult"] = "OK" }
+                });
+            });
+        resultRepository.AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            Substitute.For<IImageAcquisitionService>(),
+            Substitute.For<IConfigurationService>(),
+            coordinator,
+            Substitute.For<IInspectionWorker>(),
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            Substitute.For<IProjectFlowStorage>(),
+            NullLogger<InspectionService>.Instance);
+
+        var admission = await service.AdmitPersistedStudioRunAsync(projectId, 7, clientSnapshotId);
+        var result = await service.ExecutePersistedStudioRunAsync(
+            projectId,
+            admission.PersistenceRevision,
+            clientSnapshotId,
+            admission.CanonicalFlowHash,
+            admission.DecisionConfigurationHash);
+
+        admission.ProjectId.Should().Be(projectId);
+        admission.ClientSnapshotId.Should().Be(clientSnapshotId);
+        result.ExecutionSnapshotId.Should().Be(clientSnapshotId);
+        result.ProjectPersistenceRevision.Should().Be(7);
+        result.FlowVersionHash.Should().Be(admission.CanonicalFlowHash);
+        result.DecisionConfigurationHash.Should().Be(admission.DecisionConfigurationHash);
+        capturedParameter.Should().NotBeNull();
+        capturedParameter!.Value.Should().BeNull();
+        capturedParameter.GetValue().Should().Be(42);
+    }
+
+    [Fact]
+    public async Task PersistedStudioRun_RejectsRevisionMismatchBeforeExecution()
+    {
+        var projectId = Guid.NewGuid();
+        var project = new Project("revision-mismatch-project");
+        project.UpdateFlow(CreateFlow("persisted-flow"));
+        project.SetPersistenceRevision(8);
+        var projectRepository = Substitute.For<IProjectRepository>();
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var service = new InspectionService(
+            Substitute.For<IInspectionResultRepository>(),
+            projectRepository,
+            flowExecution,
+            Substitute.For<IImageAcquisitionService>(),
+            Substitute.For<IConfigurationService>(),
+            Substitute.For<IInspectionRuntimeCoordinator>(),
+            Substitute.For<IInspectionWorker>(),
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            Substitute.For<IProjectFlowStorage>(),
+            NullLogger<InspectionService>.Instance);
+
+        var act = async () => await service.AdmitPersistedStudioRunAsync(projectId, 7, Guid.NewGuid());
+
+        var failure = await act.Should().ThrowAsync<StudioInspectionRunIdentityException>();
+        failure.Which.Code.Should().Be("ADMISSION_PERSISTENCE_REVISION_MISMATCH");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
+            default!, default!, default, default);
+    }
+
+    [Fact]
     public async Task HistoryReads_WhenProjectIsNotActive_ShouldReturnEmptyAndNotReadResults()
     {
         var projectId = Guid.NewGuid();

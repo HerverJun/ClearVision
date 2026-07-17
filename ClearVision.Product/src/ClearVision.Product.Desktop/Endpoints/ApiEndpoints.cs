@@ -10,6 +10,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Exceptions;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Core.ProjectVariables;
@@ -584,6 +585,68 @@ public static class ApiEndpoints
             });
         });
 
+        // Admission is deliberately a projection of the persisted Project snapshot.
+        // It does not create a Runtime session, reservation, or execute capability.
+        app.MapPost("/api/inspection/admission", async (
+            StudioInspectionRunAdmissionRequest request,
+            Core.Services.IInspectionService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (request.ProjectId == Guid.Empty || request.ClientSnapshotId == Guid.Empty ||
+                request.ExpectedPersistenceRevision < 0)
+            {
+                return Results.BadRequest(new
+                {
+                    Code = "ADMISSION_IDENTITY_INVALID",
+                    Error = "ProjectId, clientSnapshotId, and a non-negative persistence revision are required."
+                });
+            }
+
+            try
+            {
+                var admission = await service.AdmitPersistedStudioRunAsync(
+                    request.ProjectId,
+                    request.ExpectedPersistenceRevision,
+                    request.ClientSnapshotId,
+                    cancellationToken);
+                return Results.Ok(new
+                {
+                    allowed = true,
+                    code = (string?)null,
+                    message = "Persisted Project snapshot admitted.",
+                    projectId = admission.ProjectId,
+                    clientSnapshotId = admission.ClientSnapshotId,
+                    projectPersistenceRevision = admission.PersistenceRevision,
+                    canonicalFlowHash = admission.CanonicalFlowHash,
+                    decisionConfigurationHash = admission.DecisionConfigurationHash,
+                    violations = Array.Empty<object>()
+                });
+            }
+            catch (ExecutionAdmissionService.ExecutionAdmissionRejectedException ex)
+            {
+                return Results.Ok(new
+                {
+                    allowed = false,
+                    code = ex.Admission.Code,
+                    message = ex.Admission.Message,
+                    projectId = request.ProjectId,
+                    clientSnapshotId = request.ClientSnapshotId,
+                    projectPersistenceRevision = (long?)null,
+                    canonicalFlowHash = (string?)null,
+                    decisionConfigurationHash = (string?)null,
+                    violations = ex.Admission.Violations
+                });
+            }
+            catch (StudioInspectionRunIdentityException ex)
+            {
+                return Results.Conflict(new { Code = ex.Code, Error = ex.Message });
+            }
+            catch (ProjectNotFoundException)
+            {
+                return Results.NotFound(new { Code = "ADMISSION_PROJECT_NOT_FOUND", Error = "Project was not found." });
+            }
+        });
+
         // 执行检测
         app.MapPost("/api/inspection/execute", async (
             ExecuteInspectionRequest request,
@@ -592,6 +655,45 @@ public static class ApiEndpoints
         {
             try
             {
+                var hasWorkspaceIdentity = request.ClientSnapshotId.HasValue ||
+                    request.ExpectedPersistenceRevision.HasValue ||
+                    !string.IsNullOrWhiteSpace(request.ExpectedCanonicalFlowHash) ||
+                    !string.IsNullOrWhiteSpace(request.ExpectedDecisionConfigurationHash);
+                if (hasWorkspaceIdentity)
+                {
+                    if (request.ClientSnapshotId is not { } clientSnapshotId || clientSnapshotId == Guid.Empty ||
+                        request.ExpectedPersistenceRevision is not { } expectedPersistenceRevision ||
+                        expectedPersistenceRevision < 0 ||
+                        string.IsNullOrWhiteSpace(request.ExpectedCanonicalFlowHash) ||
+                        string.IsNullOrWhiteSpace(request.ExpectedDecisionConfigurationHash))
+                    {
+                        return Results.BadRequest(new
+                        {
+                            Code = "ADMISSION_IDENTITY_INVALID",
+                            Error = "Workspace execute requires a complete persisted snapshot identity."
+                        });
+                    }
+
+                    if (request.FlowData != null || !string.IsNullOrEmpty(request.ImageBase64) ||
+                        !string.IsNullOrEmpty(request.CameraId))
+                    {
+                        return Results.BadRequest(new
+                        {
+                            Code = "ADMISSION_PERSISTED_SNAPSHOT_REQUIRED",
+                            Error = "Workspace Run executes the admitted persisted Project snapshot and does not accept FlowData or ad-hoc input."
+                        });
+                    }
+
+                    var result = await service.ExecutePersistedStudioRunAsync(
+                        request.ProjectId,
+                        expectedPersistenceRevision,
+                        clientSnapshotId,
+                        request.ExpectedCanonicalFlowHash,
+                        request.ExpectedDecisionConfigurationHash,
+                        cancellationToken);
+                    return Results.Ok(ToInspectionExecutionResponse(result));
+                }
+
                 if (!string.IsNullOrEmpty(request.ImageBase64))
                 {
                     if (!ImagePayloadDecoder.TryDecodeBytes(request.ImageBase64, "ImageBase64", out var imageData, out var decodeError, out var statusCode))
@@ -633,6 +735,10 @@ public static class ApiEndpoints
             catch (ExecutionAdmissionService.ExecutionAdmissionRejectedException ex)
             {
                 return ToAdmissionFailure(ex.Admission);
+            }
+            catch (StudioInspectionRunIdentityException ex)
+            {
+                return Results.Conflict(new { Code = ex.Code, Error = ex.Message });
             }
             catch (InvalidOperationException ex)
             {
@@ -1504,6 +1610,10 @@ public static class ApiEndpoints
             timestamp = result.InspectionTime,
             inspectionTime = result.InspectionTime,
             confidenceScore = result.ConfidenceScore,
+            flowVersionHash = result.FlowVersionHash,
+            executionSnapshotId = result.ExecutionSnapshotId,
+            projectPersistenceRevision = result.ProjectPersistenceRevision,
+            decisionConfigurationHash = result.DecisionConfigurationHash,
             imageId = result.ImageId,
             outputImage = result.ImageId.HasValue
                 ? null

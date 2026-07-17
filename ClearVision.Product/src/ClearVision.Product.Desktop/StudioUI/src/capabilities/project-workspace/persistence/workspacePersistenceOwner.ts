@@ -43,6 +43,7 @@ export interface WorkspacePersistenceProjection {
   readonly submittedDirtyGeneration: number | null;
   readonly dirty: boolean;
   readonly canSave: boolean;
+  readonly canRun: boolean;
   readonly canRetry: boolean;
   readonly canReconcile: boolean;
   readonly canReapplyConflict: boolean;
@@ -81,6 +82,8 @@ export interface WorkspacePersistenceOwner {
   reconcile(): Promise<WorkspaceSaveAttemptResult>;
   reapplyConflict(): void;
   discardConflict(): void;
+  setRunning(reason?: string): boolean;
+  clearRunning(reason?: string): void;
   setReadonly(reason: string): void;
   prepareForLeave(reason?: string): Promise<boolean>;
   settle(): Promise<void>;
@@ -151,6 +154,7 @@ export function createWorkspacePersistenceOwner(options: {
   let conflictServerProject: WorkspaceProjectV1 | null = null;
   let lastSubmitted: SubmittedSave | null = null;
   let disposed = false;
+  let operationGeneration = 0;
   let suppressDraftObservation = false;
   let inFlightReads = 0;
   let inFlightWrites = 0;
@@ -165,6 +169,7 @@ export function createWorkspacePersistenceOwner(options: {
     submittedDirtyGeneration: null,
     dirty: false,
     canSave: false,
+    canRun: false,
     canRetry: false,
     canReconcile: false,
     canReapplyConflict: false,
@@ -196,9 +201,12 @@ export function createWorkspacePersistenceOwner(options: {
   }
 
   function syncAvailability(): void {
+    if (disposed) return;
     const editable = state.phase !== 'readonly' && state.phase !== 'running' &&
       state.phase !== 'conflict' && state.phase !== 'unknown-outcome' && state.phase !== 'disposed';
     state.canSave = editable && state.dirty && inFlightWrites === 0 && state.phase !== 'error';
+    state.canRun = !state.dirty && inFlightReads === 0 && inFlightWrites === 0 &&
+      (state.phase === 'clean' || state.phase === 'saved');
     state.canRetry = state.phase === 'error' && state.dirty && inFlightWrites === 0;
     state.canReconcile = (state.phase === 'conflict' || state.phase === 'unknown-outcome') &&
       inFlightReads === 0 && inFlightWrites === 0;
@@ -207,12 +215,18 @@ export function createWorkspacePersistenceOwner(options: {
   }
 
   function syncDiagnostics(activeSubscription = !disposed): void {
+    if (disposed) return;
     lease.update(Object.freeze({
       ...zeroResources(),
       activeSubscriptions: activeSubscription ? 1 : 0,
       inFlightReads,
       inFlightWrites
     }));
+  }
+
+  function isCurrentOperation(generation: number): boolean {
+    return !disposed && generation === operationGeneration && state.projectId === baseline.id &&
+      options.port.projectId === state.projectId;
   }
 
   function track<T>(promise: Promise<T>): Promise<T> {
@@ -330,30 +344,38 @@ export function createWorkspacePersistenceOwner(options: {
     return Object.freeze({ status: 'saved', project });
   }
 
-  async function readServerProject(): Promise<WorkspaceProjectV1> {
+  async function readServerProject(operation: number): Promise<WorkspaceProjectV1> {
     inFlightReads += 1;
     syncDiagnostics();
     syncAvailability();
     try {
-      return await options.port.getProject();
+      const project = await options.port.getProject();
+      if (!isCurrentOperation(operation)) throw new ApiAbortError('workspace-reconcile', new Error('owner disposed'));
+      return project;
     } finally {
-      inFlightReads = Math.max(0, inFlightReads - 1);
-      syncDiagnostics();
-      syncAvailability();
+      if (isCurrentOperation(operation)) {
+        inFlightReads = Math.max(0, inFlightReads - 1);
+        syncDiagnostics();
+        syncAvailability();
+      }
     }
   }
 
   async function enterConflict(code = 'PSV011'): Promise<WorkspaceSaveAttemptResult> {
+    const operation = operationGeneration;
     state.phase = 'conflict';
     state.errorCode = code;
     state.message = '保存冲突：本地 draft 已保留，正在读取服务器版本。';
     options.flowOwner.setMutationGate('readonly');
     syncAvailability();
     try {
-      conflictServerProject = await readServerProject();
+      const server = await readServerProject(operation);
+      if (!isCurrentOperation(operation)) return Object.freeze({ status: 'disposed', project: null });
+      conflictServerProject = server;
       state.conflictServerRevision = conflictServerProject.persistenceRevision;
       state.message = `保存冲突：服务器 revision ${conflictServerProject.persistenceRevision}；请选择重放或放弃本地 draft。`;
     } catch (error) {
+      if (!isCurrentOperation(operation)) return Object.freeze({ status: 'disposed', project: null });
       state.message = `保存冲突：本地 draft 已保留；服务器版本读取失败。${errorMessage(error)}`;
     }
     syncAvailability();
@@ -369,6 +391,7 @@ export function createWorkspacePersistenceOwner(options: {
       return Object.freeze({ status: state.phase, project: conflictServerProject });
     }
 
+    const operation = operationGeneration;
     const payload = buildWorkspaceProjectUpdatePayloadV1(
       baseline,
       options.flowOwner.projection.draft,
@@ -400,10 +423,10 @@ export function createWorkspacePersistenceOwner(options: {
     syncAvailability();
     try {
       const project = await options.port.putProject(payload);
-      if (disposed) return Object.freeze({ status: 'disposed', project: null });
+      if (!isCurrentOperation(operation)) return Object.freeze({ status: 'disposed', project: null });
       return applySuccessfulProject(project, submitted);
     } catch (error) {
-      if (disposed) return Object.freeze({ status: 'disposed', project: null });
+      if (!isCurrentOperation(operation)) return Object.freeze({ status: 'disposed', project: null });
       const code = httpErrorCode(error);
       if (error instanceof ApiForbiddenError) {
         state.phase = 'readonly';
@@ -437,10 +460,12 @@ export function createWorkspacePersistenceOwner(options: {
       syncAvailability();
       return Object.freeze({ status: 'failed', project: null });
     } finally {
-      inFlightWrites = Math.max(0, inFlightWrites - 1);
-      state.submittedDirtyGeneration = null;
-      syncDiagnostics();
-      syncAvailability();
+      if (isCurrentOperation(operation)) {
+        inFlightWrites = Math.max(0, inFlightWrites - 1);
+        state.submittedDirtyGeneration = null;
+        syncDiagnostics();
+        syncAvailability();
+      }
     }
   }
 
@@ -449,8 +474,10 @@ export function createWorkspacePersistenceOwner(options: {
     if (state.phase !== 'conflict' && state.phase !== 'unknown-outcome') {
       return Object.freeze({ status: 'failed', project: null });
     }
+    const operation = operationGeneration;
     try {
-      const server = await readServerProject();
+      const server = await readServerProject(operation);
+      if (!isCurrentOperation(operation)) return Object.freeze({ status: 'disposed', project: null });
       conflictServerProject = server;
       state.conflictServerRevision = server.persistenceRevision;
       if (state.phase === 'unknown-outcome' && lastSubmitted && sameProjectContent(server, lastSubmitted)) {
@@ -472,6 +499,7 @@ export function createWorkspacePersistenceOwner(options: {
       syncAvailability();
       return Object.freeze({ status: 'conflict', project: server });
     } catch (error) {
+      if (!isCurrentOperation(operation)) return Object.freeze({ status: 'disposed', project: null });
       state.message = `Reconcile 失败：${errorMessage(error)}`;
       syncAvailability();
       return Object.freeze({ status: 'failed', project: null });
@@ -532,6 +560,23 @@ export function createWorkspacePersistenceOwner(options: {
       options.flowOwner.setMutationGate('editable');
       syncAvailability();
     },
+    setRunning(reason = 'Formal Run is active.'): boolean {
+      if (disposed || !state.canRun) return false;
+      state.phase = 'running';
+      state.message = reason;
+      state.errorCode = null;
+      options.flowOwner.setMutationGate('running');
+      syncAvailability();
+      return true;
+    },
+    clearRunning(reason = 'Formal Run completed.'): void {
+      if (disposed || state.phase !== 'running') return;
+      state.phase = state.dirty ? 'dirty' : 'clean';
+      state.message = reason;
+      state.errorCode = null;
+      options.flowOwner.setMutationGate('editable');
+      syncAvailability();
+    },
     setReadonly(reason: string): void {
       if (disposed) return;
       state.phase = 'readonly';
@@ -550,6 +595,7 @@ export function createWorkspacePersistenceOwner(options: {
     dispose(reason = 'workspace-persistence-disposed'): void {
       if (disposed) return;
       disposed = true;
+      operationGeneration += 1;
       stopDraftWatch();
       state.phase = 'disposed';
       state.canSave = false;
@@ -557,11 +603,8 @@ export function createWorkspacePersistenceOwner(options: {
       state.canReconcile = false;
       state.canReapplyConflict = false;
       state.canDiscardConflict = false;
-      syncDiagnostics(false);
-      void Promise.allSettled([...pending]).then(() => {
-        lease.update(zeroResources());
-        lease.dispose(reason);
-      });
+      lease.update(zeroResources());
+      lease.dispose(reason);
     }
   });
   return owner;

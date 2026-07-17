@@ -94,6 +94,22 @@ export function isF03G5RequestAllowlist(
   });
 }
 
+export function isF03G6RequestAllowlist(
+  audit: readonly F03RequestAuditEntry[]
+): boolean {
+  return audit.every(entry => {
+    if (entry.method === 'POST') {
+      return entry.path === '/api/flows/preview-node' || entry.path === '/api/inspection/admission' ||
+        entry.path === '/api/inspection/execute';
+    }
+    if (entry.method === 'GET' && (entry.path === '/api/projects' ||
+      /^\/api\/inspection\/history\/[0-9a-f-]{36}(?:\/[0-9a-f-]{36})?(?:\?.*)?$/i.test(entry.path))) {
+      return true;
+    }
+    return isF03G5RequestAllowlist([entry]);
+  });
+}
+
 export function createF03RuntimeErrorAudit(page: Page): F03RuntimeErrorAudit {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];

@@ -202,6 +202,24 @@ watch(
   { immediate: true }
 );
 
+watch(
+  () => activeWorkspaceOwner.value?.projection.run?.result ?? null,
+  result => {
+    if (!result || result.projectId !== activeProjectId.value) return;
+    const currentOwner = workspaceOwner;
+    if (!currentOwner || currentOwner.projectId !== result.projectId ||
+      currentOwner.projection.run?.result?.executionSnapshotId !== result.executionSnapshotId) return;
+    void router.push({
+      path: '/results',
+      query: {
+        source: 'local',
+        projectId: result.projectId,
+        resultId: result.id
+      }
+    });
+  }
+);
+
 onBeforeUnmount(() => {
   removeRouteGuard();
   if (typeof window !== 'undefined') {

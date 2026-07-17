@@ -152,6 +152,7 @@ public sealed class StudioUiArchitectureGuardTests
         abortControllerOwners.Should().BeEquivalentTo(new[]
         {
             "src/capabilities/project-workspace/preview/previewTransport.ts",
+            "src/capabilities/project-workspace/run/runCommandOwner.ts",
             "src/platform/diagnostics/runtimeDiagnostics.ts",
             "src/platform/query/readQuery.ts"
         });
@@ -456,7 +457,8 @@ public sealed class StudioUiArchitectureGuardTests
                 !relativePath.EndsWith("preview/previewOwner.ts", StringComparison.Ordinal) &&
                 !relativePath.EndsWith("preview/previewWorkbenchOwner.ts", StringComparison.Ordinal) &&
                 !relativePath.EndsWith("preview/previewTransport.ts", StringComparison.Ordinal) &&
-                !relativePath.EndsWith("persistence/projectPersistencePort.ts", StringComparison.Ordinal))
+                !relativePath.EndsWith("persistence/projectPersistencePort.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("run/runContracts.ts", StringComparison.Ordinal))
             {
                 text.Should().NotContain("ApiTransport", $"{relativePath} must not hold the generic transport");
             }
@@ -513,7 +515,11 @@ public sealed class StudioUiArchitectureGuardTests
         inspectorSource.Should().NotContain("HostBridge");
         Directory.Exists(Path.Combine(workspaceRoot, "preview")).Should().BeTrue();
         Directory.Exists(Path.Combine(workspaceRoot, "persistence")).Should().BeTrue();
-        Directory.Exists(Path.Combine(workspaceRoot, "run")).Should().BeFalse();
+        var runRoot = Path.Combine(workspaceRoot, "run");
+        Directory.Exists(runRoot).Should().BeTrue();
+        Directory.EnumerateFiles(runRoot, "runCommandOwner.ts", SearchOption.AllDirectories)
+            .Should()
+            .ContainSingle();
 
         var persistenceRoot = Path.Combine(workspaceRoot, "persistence");
         Directory.EnumerateFiles(persistenceRoot, "workspacePersistenceOwner.ts", SearchOption.AllDirectories)
@@ -531,6 +537,20 @@ public sealed class StudioUiArchitectureGuardTests
         persistenceSource.Should().NotContain("global-variables");
         persistenceSource.Should().NotContain("inspection/execute");
         persistenceSource.Should().NotContain("inspection/admission");
+
+        var runSource = string.Join(
+            Environment.NewLine,
+            Directory.EnumerateFiles(runRoot, "*.ts", SearchOption.AllDirectories)
+                .Select(File.ReadAllText));
+        runSource.Should().Contain("'inspection/admission'");
+        runSource.Should().Contain("'inspection/execute'");
+        runSource.Should().Contain("expectedPersistenceRevision");
+        runSource.Should().Contain("expectedCanonicalFlowHash");
+        runSource.Should().Contain("expectedDecisionConfigurationHash");
+        runSource.Should().Contain("unknown-outcome");
+        runSource.Should().NotContain("FlowData");
+        runSource.Should().NotContain("EventSource");
+        runSource.Should().NotContain("WebMessage");
 
         var workspaceContracts = File.ReadAllText(Path.Combine(workspaceRoot, "workspaceContracts.ts"));
         workspaceContracts.Should().Contain("expectedPersistenceRevision: baseline.persistenceRevision");

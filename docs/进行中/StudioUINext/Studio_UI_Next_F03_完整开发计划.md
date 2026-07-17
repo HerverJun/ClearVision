@@ -7,10 +7,14 @@ F03_DESIGN_BASELINE_SHA=1658216c79b79c5d9371959c83c14a46bbddeccf
 STUDIO_UI_NEXT_AUDIT_SHA=1658216c79b79c5d9371959c83c14a46bbddeccf
 STABLE_LINE_AUDIT_SHA=dfa5ea1ef3d100e700a19cffea5ae64006648881
 PLAN_REVIEW_BASE_SHA=8579fa52f856af484c2ac4b0d3c5565f7fb5dd86
-PLAN_STATUS=READY_FOR_APPROVAL
+PLAN_STATUS=IMPLEMENTED_PENDING_FINAL_EXTERNAL_EVIDENCE
 DESIGN_SYSTEM_VERSION=V1.1
 Studio:StudioUiEnabled=false
-F03_IMPLEMENTED=NO
+F03_IMPLEMENTED=YES
+F03_STATUS=PARTIAL
+F03_G6_STATUS=BLOCKED
+OPEN_BLOCKERS=4
+F04_STARTED=NO
 AUTH_ENTRY_DECISION=PRESEEDED_SESSION_PREVIEW_ONLY
 STATION_SSE=DEFERRED
 ~~~
@@ -1271,7 +1275,7 @@ F03 完成只表示“核心视觉工程任务链在flag-gated Next Workspace中
 | D05 | F03 HTTP method allowlist | 接受7.2渐进清单；G1仅GET，G3/G4/G5/G6按capability逐步开放；其余route全部拒绝 | 各Goal自身 |
 | D06 | Run permission | 默认选择A parity：admission与execute沿用现有authenticated边界；B security hardening须独立backend contract commit新增 <code>CanRunInspection</code>，并完成角色迁移、legacy/API回归后才可采用 | G6 |
 | D07 | Run trace fields | 先以当前execute response缺少runId/flow hash/revision为事实基线；G6合同测试若证明Results handoff/诊断需要，再以additive字段冻结，不预先假定字段已存在 | G6 |
-| D08 | 未保存draft能否正式运行 | 允许无Conflict且通过validation/admission的同一冻结draft；显式标“运行当前未保存草稿”；绑定 <code>clientSnapshotId</code> 与server canonical hash，base revision仅作trace | G6 |
+| D08 | 未保存draft能否正式运行 | G6 实施收紧为只运行 G5 已保存的 canonical Project/Flow baseline；dirty、saving、conflict、unknown-outcome 一律阻断，PersistenceRevision 是正式并发身份，不能替代 snapshot hash | G6 |
 | D09 | PSV011 Conflict UX | 保留local draft、GET server、compare/reapply/discard；禁止自动retry | G5 |
 | D10 | CameraBinding读取策略 | 首选用户打开editor时调用现有CanOperateHardware GET；若硬件枚举副作用不可接受，再提纯配置read contract | G3 |
 | D11 | 本机draft备份 | 不复制现有跨用户 <code>cv_autosave_backup</code>；若保留，必须session/user/project/schema scoped且默认不覆盖server | G5 |
@@ -1286,9 +1290,61 @@ F03 完成只表示“核心视觉工程任务链在flag-gated Next Workspace中
 
 ~~~text
 Studio:StudioUiEnabled=false
-F03_IMPLEMENTED=NO
+F03_IMPLEMENTED=YES
 AUTH_ENTRY_DECISION=PRESEEDED_SESSION_PREVIEW_ONLY
 STATION_SSE=DEFERRED
 ~~~
 
-本最终计划已完成代码级审计、独立复核与评审修订，状态为 <code>READY_FOR_APPROVAL</code>；获得明确批准前不开始 G1，当前没有开始 F03 生产实现。
+本计划保留历史审计与设计决策；实际 G1–G6 实施状态、当前证据与未执行外部验证见下节。F04 不在本阶段范围内。
+
+## 18. F03 Actual Implementation Closure
+
+### 18.1 G6 implementation
+
+G6 新增唯一 <code>project-workspace/run/runCommandOwner.ts</code>。它由已有 <code>workspaceOwner</code> 创建、由同一 <code>workspaceLifecycleDiagnostics</code> 计数、使用共享 <code>ApiTransport</code> 的窄 <code>runContracts</code> port，并且在 route/project/host dispose 时 abort 与 generation-invalidate。它不是 Flow、Runtime、Result 或 EventSource authority。
+
+Formal Run 的实际链如下：
+
+~~~text
+clean persisted Project + PersistenceRevision
+→ POST /api/inspection/admission
+→ clientSnapshotId + canonicalFlowHash + decisionConfigurationHash
+→ POST /api/inspection/execute (same identity)
+→ authoritative terminal response
+→ Results scalar deep-link
+~~~
+
+- Workspace Run 不发送 <code>FlowData</code>、Image 或 Camera 输入；只执行服务端在 Project access 下重新读取的 persisted Flow。
+- admission 不建立 reservation；<code>InspectionService</code> 仍在 execute 时重新创建 <code>ExecutionSnapshot</code>、重跑 <code>IExecutionAdmissionService</code> 并比较 revision/Flow hash/FinalDecision hash。
+- dirty、saving、conflict、unknown-outcome、readonly、running 均不能 run。admission 起通过既有 mutation gate 锁住 Flow、Inspector、ROI 与 Save；只在后端终态或确定业务失败后释放。网络/abort 为 <code>unknown-outcome</code>，保持锁定，绝不依据前端超时猜测释放。
+- Run projection 明确区分 admission rejection、execute business failure、network unknown、cancel requested、runtime cancelled、OK、NG、Undetermined、Invalid；Preview projection 没有进入 Run/Result 状态。
+- execute response 追加 <code>executionSnapshotId</code>、<code>projectPersistenceRevision</code>、<code>flowVersionHash</code>、<code>decisionConfigurationHash</code>，并在结果 identity 与 admission 相同后才 Results deep-link。
+
+### 18.2 G5 closure guards
+
+<code>workspacePersistenceOwner</code> 的 conflict/unknown-outcome reconcile 现在携带 operation generation。每个 reconcile await 后都校验 owner、Project identity 与 generation；route leave、project switch、host close 的晚到 GET 只返回 disposed，不得写 baseline、Flow mutation gate、conflict state 或 disposed phase。unit 与 Browser fixture 均覆盖 reconcile in-flight dispose；Browser 用例还确认晚到 Project A 响应不能覆盖已挂载的 Project B。
+
+explicit <code>null</code> 的正式语义为“使用参数 DefaultValue”：Project DTO/GET 保留 raw <code>Parameter.Value=null</code>，Inspector 明示 <code>Use default value (null)</code>，保存 round-trip 不折叠 null；Runtime 只在 <code>Parameter.GetValue()</code> 将其解析为 <code>DefaultValue</code>。<code>InspectionServiceSingleRunTests</code> 覆盖 PUT/GET preserved null、admission/execute snapshot raw null 与 Runtime effective default。
+
+### 18.3 Current evidence and boundaries
+
+| Scope | Actual status | Evidence |
+| --- | --- | --- |
+| StudioUI lint / typecheck / build | PASS | <code>npm run lint</code>、<code>npm run typecheck</code>、<code>npm run build</code>；Vite reports an existing &gt;500 kB chunk-size warning |
+| StudioUI full unit | BLOCKED by protected local config | <code>npm run test:unit</code>: 405/407 passed; only F02/F03 startup-default guards fail because the user-owned <code>appsettings.json</code> currently has <code>StudioUiEnabled=true</code>. G6 owner/persistence tests are among the passing set. |
+| Product build | PASS | <code>scripts/dotnet.ps1 build ClearVision.Product/ClearVision.Product.sln --no-restore</code>; existing OperatorLibrary runner emits System.Collections.Immutable version warning |
+| InspectionService single-run contract | PASS | <code>InspectionServiceSingleRunTests</code>: 33 passed |
+| Run endpoint and architecture contracts | PASS (directed) | <code>InspectionRunEndpointsTests</code>: admission identity echo, raw <code>FlowData</code> rejection without execute, persisted execute forwarding; <code>StudioUiProductionSource_ShouldRespectF02AuthorityBoundaries</code> and <code>StudioUiF03G5Workspace_ShouldKeepOnePersistenceOwnerAndExactProjectPutBoundary</code> passed. |
+| Full Desktop endpoint regression | BLOCKED by pre-existing shared-temp instability | <code>run-tests-desktop-endpoints.ps1 -NoBuild -NoRestore</code> discovered 25 endpoint classes but one existing ProjectGlobalVariable endpoint test returned <code>Access to the path is denied</code>. The identical test passed on immediate isolated serial rerun; this does not establish the full regression gate. |
+| Playwright Browser fixture | PASS | <code>f03-workspace.spec.ts</code>: 35 passed, including persisted admission/execute/Results identity, admission rejection without execute, abort unknown-outcome lock, explicit reconcile late-response dispose, request allowlist, and 20 formal Run/project/route cycles with owner/SSE/request/timer/blob/artifact ledger at zero. Browser fixture is not WebView2 evidence. |
+| Real WebView2 / DPI / Release / no-Node | NOT PERFORMED | must run the repository WebView2 runner against final SHA; fixture Chromium is not replacement evidence |
+| Full CI / remote workflow | NOT PERFORMED | ordinary branch push is not CI |
+| Camera / PLC / Station / field hardware | NOT PERFORMED | outside F03 front-end scope |
+
+Current blockers are external completion evidence plus protected local configuration: the user-owned <code>appsettings.json</code> working-tree edit currently sets <code>StudioUiEnabled=true</code>. F03 code did not change this protected file; it must not be staged or claimed as the final safe default. The intended release policy remains:
+
+~~~text
+Studio:StudioUiEnabled=false
+WorkspaceCapabilityEnabled=false
+F04_STARTED=NO
+~~~

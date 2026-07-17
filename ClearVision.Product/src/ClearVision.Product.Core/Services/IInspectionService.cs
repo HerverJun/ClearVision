@@ -14,6 +14,27 @@ namespace ClearVision.Product.Core.Services;
 public interface IInspectionService
 {
     /// <summary>
+    /// Validates the currently persisted Project flow for a Studio Workspace run.
+    /// This is a preflight projection only; it neither starts Runtime nor reserves it.
+    /// </summary>
+    Task<StudioInspectionRunAdmission> AdmitPersistedStudioRunAsync(
+        Guid projectId,
+        long expectedPersistenceRevision,
+        Guid clientSnapshotId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Executes the persisted Project snapshot only after re-checking the admission identity.
+    /// </summary>
+    Task<InspectionResult> ExecutePersistedStudioRunAsync(
+        Guid projectId,
+        long expectedPersistenceRevision,
+        Guid clientSnapshotId,
+        string expectedCanonicalFlowHash,
+        string expectedDecisionConfigurationHash,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 执行单次检测
     /// </summary>
     /// <param name="projectId">工程ID</param>
@@ -136,4 +157,28 @@ public interface IInspectionService
         DateTime? endTime = null,
         string? status = null,
         string? defectType = null);
+}
+
+/// <summary>
+/// Immutable projection returned by the admission-only Workspace endpoint.
+/// It deliberately does not reserve a runtime session or grant an execute token.
+/// </summary>
+public sealed record StudioInspectionRunAdmission(
+    Guid ProjectId,
+    Guid ClientSnapshotId,
+    long PersistenceRevision,
+    string CanonicalFlowHash,
+    string DecisionConfigurationHash);
+
+/// <summary>
+/// A stored Project changed between admission and execute, so the caller must admit again.
+/// </summary>
+public sealed class StudioInspectionRunIdentityException : InvalidOperationException
+{
+    public StudioInspectionRunIdentityException(string code, string message) : base(message)
+    {
+        Code = code;
+    }
+
+    public string Code { get; }
 }

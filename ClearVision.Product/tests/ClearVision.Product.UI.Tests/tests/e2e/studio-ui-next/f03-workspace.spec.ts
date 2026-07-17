@@ -9,6 +9,7 @@ import {
   installF03BrowserStartup,
   isF03G4RequestAllowlist,
   isF03G5RequestAllowlist,
+  isF03G6RequestAllowlist,
   type F03RequestAuditEntry
 } from './f03-browser-fixture';
 
@@ -251,6 +252,11 @@ interface BootOptions {
   readonly projectStatus?: number | (() => number);
   readonly projectBody?: unknown | ((projectId: string) => unknown);
   readonly projectDelayMs?: number;
+  readonly projectGetScenario?: (
+    projectId: string,
+    current: Readonly<Record<string, unknown>>,
+    call: number
+  ) => Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }>;
   readonly projectPutScenario?: (
     request: Readonly<Record<string, unknown>>,
     current: Readonly<Record<string, unknown>>,
@@ -267,12 +273,19 @@ interface BootOptions {
     request: Readonly<Record<string, unknown>>,
     call: number
   ) => Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }>;
+  readonly runScenario?: (
+    stage: 'admission' | 'execute',
+    request: Readonly<Record<string, unknown>>,
+    call: number
+  ) => Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }>;
 }
 
 async function bootWorkspace(page: Page, options: BootOptions = {}) {
   const audit: F03RequestAuditEntry[] = [];
   let previewCall = 0;
+  let projectGetCall = 0;
   let projectPutCall = 0;
+  let runCall = 0;
   const projects = new Map<string, Readonly<Record<string, unknown>>>();
   await installF03BrowserStartup(page, options.workspaceEnabled ?? true);
   await page.route('**/health', route => fulfillF03Json(
@@ -309,6 +322,51 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
         scenario.body ?? previewPayload(requestBody, previewCall),
         fixtureSchema
       );
+      return;
+    }
+    if (url.pathname === '/api/inspection/admission' && request.method() === 'POST') {
+      runCall += 1;
+      const requestBody = request.postDataJSON() as Readonly<Record<string, unknown>>;
+      const scenario = options.runScenario?.('admission', requestBody, runCall) ?? {};
+      if (scenario.delayMs) await new Promise(resolve => setTimeout(resolve, scenario.delayMs));
+      if (scenario.abort) {
+        await route.abort('failed');
+        return;
+      }
+      await fulfillF03Json(route, scenario.status ?? 200, scenario.body ?? {
+        allowed: true,
+        code: null,
+        message: 'fixture admission allowed',
+        projectId: requestBody.projectId,
+        clientSnapshotId: requestBody.clientSnapshotId,
+        projectPersistenceRevision: requestBody.expectedPersistenceRevision,
+        canonicalFlowHash: 'fixture-persisted-flow-hash',
+        decisionConfigurationHash: 'fixture-decision-hash',
+        violations: []
+      }, fixtureSchema);
+      return;
+    }
+    if (url.pathname === '/api/inspection/execute' && request.method() === 'POST') {
+      runCall += 1;
+      const requestBody = request.postDataJSON() as Readonly<Record<string, unknown>>;
+      const scenario = options.runScenario?.('execute', requestBody, runCall) ?? {};
+      if (scenario.delayMs) await new Promise(resolve => setTimeout(resolve, scenario.delayMs));
+      if (scenario.abort) {
+        await route.abort('failed');
+        return;
+      }
+      await fulfillF03Json(route, scenario.status ?? 200, scenario.body ?? {
+        id: fixtureUuid(90_001),
+        projectId: requestBody.projectId,
+        status: 'Completed',
+        executionOutcome: 'Succeeded',
+        decisionOutcome: 'Ok',
+        executionSnapshotId: requestBody.clientSnapshotId,
+        projectPersistenceRevision: requestBody.expectedPersistenceRevision,
+        flowVersionHash: requestBody.expectedCanonicalFlowHash,
+        decisionConfigurationHash: requestBody.expectedDecisionConfigurationHash,
+        errorMessage: null
+      }, fixtureSchema);
       return;
     }
     if (/^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname)) {
@@ -381,10 +439,17 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
         await fulfillF03Json(route, status, responseBody, fixtureSchema);
         return;
       }
-      const status = typeof options.projectStatus === 'function'
+      projectGetCall += 1;
+      const scenario = options.projectGetScenario?.(id, current, projectGetCall);
+      if (scenario?.delayMs) await new Promise(resolve => setTimeout(resolve, scenario.delayMs));
+      if (scenario?.abort) {
+        await route.abort('failed');
+        return;
+      }
+      const status = scenario?.status ?? (typeof options.projectStatus === 'function'
         ? options.projectStatus()
-        : options.projectStatus ?? 200;
-      await fulfillF03Json(route, status, current, fixtureSchema);
+        : options.projectStatus ?? 200);
+      await fulfillF03Json(route, status, scenario?.body ?? current, fixtureSchema);
       return;
     }
     await fulfillF03Json(route, 404, { code: 'UNEXPECTED_F03_ROUTE' }, fixtureSchema);
@@ -1104,6 +1169,80 @@ test('G5 GET PUT GET saves one canonical payload and preserves null, falsy and o
   expect(audit.some(entry => /\/api\/(?:inspection\/execute|inspection\/admission|runs)/i.test(entry.path))).toBe(false);
 });
 
+test('G6 runs only the saved Project identity through admission, execute, and Results handoff', async ({ page }) => {
+  const requests: Array<{ stage: string; request: Readonly<Record<string, unknown>> }> = [];
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    runScenario: (stage, request) => {
+      requests.push({ stage, request });
+      return {};
+    }
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await expect(page.locator('[data-testid="workspace-run"]')).toBeEnabled();
+  await page.locator('[data-testid="workspace-run"]').click();
+  await expect(page.locator('[data-capability="results-read"]')).toBeVisible();
+  expect(requests.map(item => item.stage)).toEqual(['admission', 'execute']);
+  expect(requests[0]!.request).toMatchObject({ projectId: projectA, expectedPersistenceRevision: 7 });
+  expect(requests[0]!.request).not.toHaveProperty('flowData');
+  expect(requests[1]!.request).toMatchObject({
+    projectId: projectA,
+    expectedPersistenceRevision: 7,
+    expectedCanonicalFlowHash: 'fixture-persisted-flow-hash',
+    expectedDecisionConfigurationHash: 'fixture-decision-hash'
+  });
+  expect(requests[1]!.request.clientSnapshotId).toBe(requests[0]!.request.clientSnapshotId);
+  expect(audit.filter(item => item.method === 'POST').map(item => item.path)).toEqual([
+    '/api/inspection/admission',
+    '/api/inspection/execute'
+  ]);
+  expect(isF03G6RequestAllowlist(audit)).toBe(true);
+  await expect(shell).toHaveCount(0);
+});
+
+test('G6 blocks execute after admission rejection and keeps the saved Workspace editable', async ({ page }) => {
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    runScenario: (stage, request) => stage === 'admission'
+      ? {
+          body: {
+            allowed: false,
+            code: 'ADMISSION_FINAL_DECISION_INVALID',
+            message: 'fixture decision invalid',
+            projectId: request.projectId,
+            clientSnapshotId: request.clientSnapshotId,
+            projectPersistenceRevision: null,
+            canonicalFlowHash: null,
+            decisionConfigurationHash: null,
+            violations: [{ code: 'FINAL_DECISION_INVALID' }]
+          }
+        }
+      : {}
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await page.locator('[data-testid="workspace-run"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'blocked');
+  await expect(page.locator('[data-testid="workspace-run"]')).toBeEnabled();
+  expect(audit.filter(item => item.path === '/api/inspection/execute')).toHaveLength(0);
+  expect(isF03G6RequestAllowlist(audit)).toBe(true);
+});
+
+test('G6 holds Flow and save mutation gates after an aborted execute outcome', async ({ page }) => {
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    runScenario: stage => stage === 'execute' ? { delayMs: 700, abort: true } : {}
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await page.locator('[data-testid="workspace-run"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'executing');
+  await expect(page.locator('[data-testid="workspace-save"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="workspace-run-stop"]')).toBeVisible();
+  await page.locator('[data-testid="workspace-run-stop"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'unknown-outcome');
+  await expect(page.locator('[data-testid="workspace-run"]')).toBeDisabled();
+  expect(isF03G6RequestAllowlist(audit)).toBe(true);
+});
+
 test('G5 saves and reloads a catalog-added numeric operator type through the formal Project PUT', async ({ page }) => {
   let captured: Readonly<Record<string, unknown>> | null = null;
   const audit = await bootWorkspace(page, {
@@ -1215,6 +1354,64 @@ test('G5 save failure retries explicitly, PSV011 reconciles fail closed, and unk
   await page.locator('[data-testid="workspace-save-reconcile"]').click();
   await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'saved');
   await expect(shell).toHaveAttribute('data-workspace-dirty', 'false');
+});
+
+test('G5 silently drops a late reconcile GET after route leave and cannot overwrite the next Project', async ({ page }) => {
+  const runtimeErrors = createF03RuntimeErrorAudit(page);
+  let delayedReconcileStarted = false;
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    projectPutScenario: (request, current) => ({
+      abort: true,
+      authoritativeProject: {
+        ...current,
+        name: request.name,
+        description: request.description,
+        flow: request.flow,
+        persistenceRevision: Number(current.persistenceRevision) + 1
+      }
+    }),
+    projectGetScenario: (projectId, current, call) => {
+      if (projectId === projectA && call === 2) {
+        delayedReconcileStarted = true;
+        return {
+          delayMs: 700,
+          body: { ...current, persistenceRevision: 9, flow: inspectorFlow() }
+        };
+      }
+      return {};
+    }
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const textInput = page.locator('[data-evidence-surface="f03-g3-inspector"] [data-parameter-name="Text"] input');
+  await selectInspectorNode(page, 120, 125);
+  await textInput.fill('route-leave-local');
+  await textInput.press('Enter');
+  await page.locator('[data-testid="workspace-save"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'unknown-outcome');
+
+  await page.locator('[data-testid="workspace-save-reconcile"]').click();
+  await expect.poll(() => delayedReconcileStarted).toBe(true);
+  page.once('dialog', dialog => dialog.accept());
+  await page.goto(`/studio/index.html#/projects/${projectB}/workspace`);
+  await expect(shell).toHaveAttribute('data-workspace-project-id', projectB);
+  await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
+  await page.waitForTimeout(800);
+  await expect(shell).toHaveAttribute('data-workspace-project-id', projectB);
+  await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
+  expect(runtimeErrors.pageErrors).toEqual([]);
+  expect(runtimeErrors.consoleErrors.filter(message => !message.includes('net::ERR_FAILED'))).toEqual([]);
+
+  await page.goto('/studio/index.html#/about');
+  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
+    workspaceOwnerCount: 0,
+    persistenceOwnerCount: 0,
+    runOwnerCount: 0,
+    inFlightReads: 0,
+    inFlightWrites: 0,
+    activeAbortControllers: 0
+  });
+  expect(isF03G5RequestAllowlist(audit)).toBe(true);
 });
 
 test('G5 protects route leave and project switch while readonly and running responses disable saving', async ({ page }) => {
@@ -1425,6 +1622,60 @@ test('G5 passes 20 save and project-switch cycles with one PUT per save and a ze
   expect(audit.filter(entry => /\/api\/(?:inspection\/execute|inspection\/admission|runs)/i.test(entry.path)))
     .toEqual([]);
   expect(isF03G5RequestAllowlist(audit)).toBe(true);
+});
+
+test('G6 passes 20 formal Run, Project switch, and route-leave cycles with a zero final ledger', async ({ page }) => {
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  for (let cycle = 0; cycle < 20; cycle += 1) {
+    await expect(shell, `cycle ${cycle} Workspace ready`).toHaveAttribute('data-workspace-state', 'ready');
+    await expect(page.locator('[data-testid="workspace-run"]'), `cycle ${cycle} Run enabled`).toBeEnabled();
+    await page.locator('[data-testid="workspace-run"]').click();
+    await expect(page.locator('[data-capability="results-read"]'), `cycle ${cycle} Results handoff`).toBeVisible();
+
+    const nextProject = cycle % 2 === 0 ? projectB : projectA;
+    await page.goto(`/studio/index.html#/projects/${nextProject}/workspace`);
+    await expect(shell, `cycle ${cycle} next Project`).toHaveAttribute('data-workspace-project-id', nextProject);
+    await expect.poll(async () => await workspaceDiagnostics(page), { message: `cycle ${cycle} owner ledger` })
+      .toMatchObject({
+        workspaceOwnerCount: 1,
+        persistenceOwnerCount: 1,
+        runOwnerCount: 1,
+        activeProjectId: nextProject,
+        inFlightExecute: 0,
+        activeAbortControllers: 0,
+        ownerConflictCount: 0
+      });
+  }
+  await page.goto('/studio/index.html#/about');
+  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
+    workspaceOwnerCount: 0,
+    flowCanvasOwnerCount: 0,
+    persistenceOwnerCount: 0,
+    runOwnerCount: 0,
+    inspectorOwnerCount: 0,
+    previewOwnerCount: 0,
+    imageCanvasOwnerCount: 0,
+    roiOwnerCount: 0,
+    activeSubscriptions: 0,
+    activeTimers: 0,
+    activeAnimationFrames: 0,
+    activeObservers: 0,
+    activeAbortControllers: 0,
+    activeBlobUrls: 0,
+    activePreviewArtifactIds: 0,
+    inFlightReads: 0,
+    inFlightWrites: 0,
+    inFlightPreview: 0,
+    inFlightExecute: 0,
+    totalRunMounts: 21,
+    totalRunDisposals: 21,
+    ownerConflictCount: 0
+  });
+  expect(audit.filter(entry => entry.method === 'POST').map(entry => entry.path)).toHaveLength(40);
+  expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
 
 for (const fixture of [

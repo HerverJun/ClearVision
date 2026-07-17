@@ -78,6 +78,7 @@ const isReadySurface = computed(() =>
 const isReadonly = computed(() => props.state === 'forbidden' || props.state === 'readonly');
 const currentProject = computed(() => props.workspaceOwner?.projection.project ?? props.project);
 const persistence = computed(() => props.workspaceOwner?.projection.persistence ?? null);
+const run = computed(() => props.workspaceOwner?.projection.run ?? null);
 const saveCompatibilityTone = computed(() => {
   const status = currentProject.value?.saveCompatibility.status;
   if (status === 'blocked') return 'ng';
@@ -113,6 +114,29 @@ const persistenceLabel = computed(() => {
     disposed: '已释放'
   }[projection.phase];
 });
+const runTone = computed(() => {
+  const phase = run.value?.phase;
+  if (phase === 'succeeded') return 'ok';
+  if (phase === 'failed' || phase === 'unknown-outcome') return 'ng';
+  if (phase === 'admitting' || phase === 'executing' || phase === 'cancel-requested') return 'warning';
+  return 'idle';
+});
+const runLabel = computed(() => {
+  const projection = run.value;
+  if (!projection) return 'Formal Run: unavailable';
+  return {
+    idle: 'Formal Run: ready',
+    blocked: 'Formal Run: blocked',
+    admitting: 'Formal Run: admission',
+    executing: 'Formal Run: executing',
+    succeeded: 'Formal Run: completed',
+    failed: 'Formal Run: failed',
+    cancelled: 'Formal Run: cancelled',
+    'cancel-requested': 'Formal Run: cancellation requested',
+    'unknown-outcome': 'Formal Run: outcome unknown',
+    disposed: 'Formal Run: disposed'
+  }[projection.phase];
+});
 </script>
 
 <template>
@@ -133,6 +157,9 @@ const persistenceLabel = computed(() => {
     :data-workspace-in-flight-reads="diagnostics.inFlightReads"
     :data-workspace-in-flight-writes="diagnostics.inFlightWrites"
     :data-workspace-persistence-owner-count="diagnostics.persistenceOwnerCount"
+    :data-workspace-run-owner-count="diagnostics.runOwnerCount"
+    :data-workspace-run-phase="run?.phase ?? 'unavailable'"
+    :data-workspace-run-snapshot-id="run?.clientSnapshotId ?? ''"
     :data-workspace-persistence-phase="persistence?.phase ?? 'unavailable'"
     :data-workspace-dirty="persistence?.dirty ?? false"
     :data-workspace-dirty-generation="persistence?.dirtyGeneration ?? 0"
@@ -168,6 +195,24 @@ const persistenceLabel = computed(() => {
           @click="workspaceOwner?.save()"
         >
           {{ persistence.phase === 'saving' ? '保存中…' : '保存' }}
+        </CvButton>
+        <CvButton
+          v-if="run"
+          data-testid="workspace-run"
+          size="sm"
+          :disabled="!run.canRun"
+          @click="workspaceOwner?.runFormal()"
+        >
+          Run
+        </CvButton>
+        <CvButton
+          v-if="run?.canStop"
+          data-testid="workspace-run-stop"
+          size="sm"
+          variant="quiet"
+          @click="workspaceOwner?.stopFormal()"
+        >
+          Stop
         </CvButton>
         <CvButton
           v-if="persistence?.canRetry"
@@ -209,6 +254,11 @@ const persistenceLabel = computed(() => {
         <CvStatusBadge
           :tone="persistenceTone"
           :label="persistenceLabel"
+        />
+        <CvStatusBadge
+          v-if="run"
+          :tone="runTone"
+          :label="runLabel"
         />
       </div>
     </header>

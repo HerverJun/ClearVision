@@ -637,7 +637,7 @@ public class OperatorService : IOperatorService
                 Name = p.Name,
                 DisplayName = p.DisplayName,
                 DataType = p.DataType,
-                Value = p.GetValue()
+                Value = p.Value
             }).ToList()
         };
     }

@@ -314,7 +314,7 @@ public class DemoProjectService
                         DisplayName = p.DisplayName,
                         Description = p.Description,
                         DataType = p.DataType,
-                        Value = p.GetValue(),
+                        Value = p.Value,
                         DefaultValue = p.DefaultValue,
                         MinValue = p.MinValue,
                         MaxValue = p.MaxValue,

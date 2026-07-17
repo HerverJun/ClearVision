@@ -228,6 +228,31 @@ public class ExecuteInspectionRequest
     /// 流程数据（包含前端编辑过的算子参数）
     /// </summary>
     public OperatorFlowDto? FlowData { get; set; }
+
+    /// <summary>
+    /// Workspace Run identity. When present, execute is constrained to the persisted Project flow.
+    /// Legacy clients without this identity retain their existing contract.
+    /// </summary>
+    public Guid? ClientSnapshotId { get; set; }
+
+    public long? ExpectedPersistenceRevision { get; set; }
+
+    public string? ExpectedCanonicalFlowHash { get; set; }
+
+    public string? ExpectedDecisionConfigurationHash { get; set; }
+}
+
+/// <summary>
+/// Admission-only request for a persisted Studio Workspace run.
+/// It intentionally does not contain FlowData or input image data.
+/// </summary>
+public sealed class StudioInspectionRunAdmissionRequest
+{
+    public Guid ProjectId { get; set; }
+
+    public Guid ClientSnapshotId { get; set; }
+
+    public long ExpectedPersistenceRevision { get; set; }
 }
 
 /// <summary>

@@ -13,6 +13,12 @@ import {
   type WorkspacePersistenceProjection,
   type WorkspaceSaveAttemptResult
 } from './persistence';
+import {
+  createWorkspaceRunCommandOwner,
+  createWorkspaceRunPort,
+  type WorkspaceRunCommandOwner,
+  type WorkspaceRunResultV1
+} from './run';
 import type {
   WorkspaceLifecycleDiagnosticsOwner,
   WorkspaceOwnerDiagnosticsLease
@@ -25,6 +31,7 @@ export interface WorkspaceOwnerProjection {
   readonly project: WorkspaceProjectV1;
   readonly readonlyReason: string | null;
   readonly persistence: DeepReadonly<WorkspacePersistenceProjection> | null;
+  readonly run: DeepReadonly<WorkspaceRunCommandOwner['projection']> | null;
 }
 
 type MutableWorkspaceOwnerProjection = {
@@ -40,6 +47,8 @@ export interface WorkspaceOwner {
   reconcileSave(): Promise<WorkspaceSaveAttemptResult>;
   reapplyConflict(): void;
   discardConflict(): void;
+  runFormal(): Promise<WorkspaceRunResultV1 | null>;
+  stopFormal(): boolean;
   prepareForLeave(reason?: string): Promise<boolean>;
   setReadonly(reason: string): void;
   dispose(reason?: string): void;
@@ -58,11 +67,13 @@ export function createWorkspaceOwner(
     phase: isEmpty ? 'empty' : 'ready',
     project,
     readonlyReason: null,
-    persistence: null
+    persistence: null,
+    run: null
   });
   let disposed = false;
   let flowOwner: FlowCanvasOwner | undefined;
   let persistenceOwner: WorkspacePersistenceOwner | undefined;
+  let runOwner: WorkspaceRunCommandOwner | undefined;
 
   return Object.freeze({
     projectId: project.id,
@@ -94,6 +105,13 @@ export function createWorkspaceOwner(
         }
       });
       state.persistence = persistenceOwner.projection;
+      runOwner = createWorkspaceRunCommandOwner({
+        projectId: project.id,
+        persistenceOwner,
+        port: createWorkspaceRunPort(api, project.id),
+        diagnostics
+      });
+      state.run = runOwner.projection;
       return flowOwner;
     },
     save(): Promise<WorkspaceSaveAttemptResult> {
@@ -120,6 +138,12 @@ export function createWorkspaceOwner(
     discardConflict(): void {
       persistenceOwner?.discardConflict();
     },
+    runFormal(): Promise<WorkspaceRunResultV1 | null> {
+      return runOwner?.run() ?? Promise.resolve(null);
+    },
+    stopFormal(): boolean {
+      return runOwner?.stop() ?? false;
+    },
     prepareForLeave(reason = 'route-leave'): Promise<boolean> {
       void reason;
       return persistenceOwner?.prepareForLeave(reason) ?? Promise.resolve(true);
@@ -136,18 +160,24 @@ export function createWorkspaceOwner(
       disposed = true;
       state.phase = 'disposed';
       try {
-        persistenceOwner?.dispose(reason);
+        runOwner?.dispose(reason);
       } finally {
         try {
-          flowOwner?.dispose(reason);
+          persistenceOwner?.dispose(reason);
         } finally {
           try {
-            lease.dispose(reason);
+            flowOwner?.dispose(reason);
           } finally {
-            persistenceOwner = undefined;
-            flowOwner = undefined;
-            state.persistence = null;
-            state.readonlyReason = null;
+            try {
+              lease.dispose(reason);
+            } finally {
+              runOwner = undefined;
+              persistenceOwner = undefined;
+              flowOwner = undefined;
+              state.persistence = null;
+              state.run = null;
+              state.readonlyReason = null;
+            }
           }
         }
       }

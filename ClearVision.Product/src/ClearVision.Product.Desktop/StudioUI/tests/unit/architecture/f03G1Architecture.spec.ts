@@ -125,12 +125,12 @@ describe('F03 G1-G5 architecture guards', () => {
       .toContain("from '@clearvision/canonical-preview-coordinator'");
   });
 
-  it('keeps G6 absent while G1-G5 are the implemented F03 slices', () => {
+  it('keeps G6 on one persisted-snapshot Run owner without a parallel execution authority', () => {
     const plan = read(join(
       repositoryRoot,
       'docs/进行中/StudioUINext/Studio_UI_Next_F03_完整开发计划.md'
     ));
-    expect(plan).toContain('F03_IMPLEMENTED=NO');
+    expect(plan).toContain('F03_IMPLEMENTED=YES');
     expect(existsSync(join(workspaceRoot, 'flow'))).toBe(true);
     expect(sourceFiles(join(workspaceRoot, 'flow')).map(studioRelative)).toEqual(expect.arrayContaining([
       'src/capabilities/project-workspace/flow/flowCanvasOwner.ts',
@@ -164,7 +164,20 @@ describe('F03 G1-G5 architecture guards', () => {
     expect(persistenceSource).not.toMatch(
       /['"`](?:inspection\/(?:admission|execute)|runs\/|results\/|runtime\/)/i
     );
-    expect(existsSync(join(workspaceRoot, 'run'))).toBe(false);
+    const runRoot = join(workspaceRoot, 'run');
+    expect(existsSync(runRoot)).toBe(true);
+    expect(sourceFiles(runRoot).map(studioRelative)).toEqual(expect.arrayContaining([
+      'src/capabilities/project-workspace/run/runContracts.ts',
+      'src/capabilities/project-workspace/run/runCommandOwner.ts'
+    ]));
+    const runSource = sourceFiles(runRoot).map(read).join('\n');
+    expect(runSource).toContain("'inspection/admission'");
+    expect(runSource).toContain("'inspection/execute'");
+    expect(runSource).toContain('expectedPersistenceRevision');
+    expect(runSource).toContain('expectedCanonicalFlowHash');
+    expect(runSource).toContain('expectedDecisionConfigurationHash');
+    expect(runSource).toContain('unknown-outcome');
+    expect(runSource).not.toMatch(/FlowData|new\s+EventSource|WebMessage|fetch\s*\(/);
   });
 
   it('keeps Inspector on the G2 projection/commands without Host, Preview, save, or raw Canvas authority', () => {

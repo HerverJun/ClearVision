@@ -196,6 +196,8 @@ public class Parameter : ValueObject
 
     public object? GetValue()
     {
+        // ValueJson=null is the persisted "use default" contract. The raw Value
+        // property remains available to DTOs so inspectors can represent that null.
         return Value ?? DefaultValue;
     }
 

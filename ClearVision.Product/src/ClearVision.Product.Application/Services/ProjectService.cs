@@ -767,7 +767,9 @@ public class ProjectService
             DisplayName = param.DisplayName,
             Description = param.Description,
             DataType = param.DataType,
-            Value = param.GetValue(),
+            // Preserve a persisted explicit null for the editor and save round-trip.
+            // Runtime resolution remains Parameter.GetValue(), where null means use DefaultValue.
+            Value = param.Value,
             DefaultValue = param.DefaultValue,
             MinValue = param.MinValue,
             MaxValue = param.MaxValue,
