@@ -621,6 +621,40 @@ describe('production canonical FlowCanvas facade', () => {
     expect(draft.connections[0]).toMatchObject({ futureConnectionField: 'keep-connection' });
   });
 
+  it('retains the persisted Final Decision binding when the canvas adapter projects null', () => {
+    mountedHost = createCanonicalFlowCanvasHost('canonical-unit-canvas', {
+      id: 'flow-decision',
+      name: 'decision flow',
+      operators: [],
+      connections: [],
+      decisionConfiguration: {
+        finalDecisionBinding: {
+          sourceOperatorId: '11111111-1111-1111-1111-111111111111',
+          sourceOutputPortId: '22222222-2222-2222-2222-222222222222',
+          sourceOutputName: 'JudgmentResult',
+          dataType: 'String',
+          rule: 'StringMap',
+          trueMeansOk: true,
+          okValue: 'OK',
+          ngValue: 'NG',
+          comparator: null,
+          threshold: null
+        },
+        missingDecisionPolicy: 'Undetermined'
+      }
+    });
+
+    expect(mountedHost.getProjection().draft.decisionConfiguration).toMatchObject({
+      finalDecisionBinding: {
+        sourceOperatorId: '11111111-1111-1111-1111-111111111111',
+        sourceOutputName: 'JudgmentResult',
+        dataType: 'String',
+        rule: 'StringMap'
+      },
+      missingDecisionPolicy: 'Undetermined'
+    });
+  });
+
   it('rejects parameter/property edits in readonly and running modes without revision changes', () => {
     mountedHost = createCanonicalFlowCanvasHost('canonical-unit-canvas', {
       id: 'flow-1', name: '流程', operators: [{

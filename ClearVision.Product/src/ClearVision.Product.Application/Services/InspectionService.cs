@@ -1048,9 +1048,29 @@ public class InspectionService : IInspectionService
                 throw new ProjectNotFoundException(projectId);
             }
 
-            // Persisted formal execution has one authority: Project.Flow from the
-            // database row captured under the project access lease.  The file is
-            // a save artifact and must never become an implicit fallback.
+            // Workspace Run consumes the revisioned artifact committed by
+            // ProjectSaveCoordinator under the same project access lease. It
+            // never accepts a browser flow or falls back to the unsynchronized
+            // legacy Project.Flow table split.
+            if (surface == ExecutionAdmissionSurface.StudioInspectionRun)
+            {
+                var persistedFlow = await LoadVerifiedPersistedStudioFlowAsync(project, cancellationToken);
+                var snapshot = new ExecutionSnapshot(
+                    projectId,
+                    persistedFlow,
+                    project.PersistenceRevision,
+                    ExecutionSnapshotSource.PersistedProject,
+                    ExecutionRunMode.FormalPrimary,
+                    new Dictionary<string, string> { ["ProjectRevision"] = project.PersistenceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+                    snapshotId: snapshotId,
+                    globalVariables: project.GlobalVariables);
+                ThrowIfAdmissionRejected(_executionAdmissionService.ValidateSnapshot(snapshot, surface));
+                return (snapshot, snapshot.CreateGlobalVariables());
+            }
+
+            // Other established execution surfaces retain their existing
+            // repository-backed behavior; Workspace Run is intentionally not a
+            // fallback consumer of this legacy representation.
             if (HasExecutableFlow(project.Flow))
             {
                 var snapshot = new ExecutionSnapshot(
@@ -1066,24 +1086,77 @@ public class InspectionService : IInspectionService
                 return (snapshot, snapshot.CreateGlobalVariables());
             }
 
-#if false // File storage is a save/recovery artifact, never a run authority.
-            if (HasExecutableFlow(fileFlow))
-            {
-                ThrowIfAdmissionRejected(await _executionAdmissionService.ValidateFlowAsync(
-                    projectId,
-                    fileFlow,
-                    surface,
-                    cancellationToken));
-                _logger.LogWarning(
-                    "[InspectionService] 项目 {ProjectId} 数据库流程为空，已回退到 ProjectFlows 文件流程 (算子数: {OperatorCount})",
-                    projectId,
-                    fileFlow!.Operators.Count);
-                throw new InvalidOperationException("Project flow storage is not an execution authority.");
-            }
-#endif
-
             throw new InvalidOperationException($"Project {projectId} does not contain an executable flow.");
         }
+    }
+
+    private async Task<OperatorFlow> LoadVerifiedPersistedStudioFlowAsync(
+        Project project,
+        CancellationToken cancellationToken)
+    {
+        var metadata = await _flowStorage.LoadMetadataAsync(project.Id);
+        if (metadata == null || metadata.SchemaVersion != 1 || metadata.ProjectId != project.Id)
+        {
+            throw new StudioInspectionRunIdentityException(
+                "ADMISSION_CANONICAL_FLOW_METADATA_INVALID",
+                "The persisted canonical Flow metadata is missing or does not belong to this Project.");
+        }
+
+        if (metadata.PersistenceRevision != project.PersistenceRevision)
+        {
+            throw new StudioInspectionRunIdentityException(
+                "ADMISSION_PERSISTENCE_REVISION_MISMATCH",
+                "The persisted canonical Flow revision does not match the Project. Save or reload, then request admission again.");
+        }
+
+        string? flowJson;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            flowJson = await _flowStorage.LoadFlowJsonAsync(project.Id);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[InspectionService] Failed to load canonical persisted Flow for Studio Run: {ProjectId}", project.Id);
+            throw new StudioInspectionRunIdentityException(
+                "ADMISSION_CANONICAL_FLOW_UNAVAILABLE",
+                "The persisted canonical Flow could not be loaded. Save or reload, then request admission again.");
+        }
+
+        if (string.IsNullOrWhiteSpace(flowJson) ||
+            !string.Equals(metadata.FlowHash, ComputeStoredFlowArtifactHash(flowJson), StringComparison.Ordinal))
+        {
+            throw new StudioInspectionRunIdentityException(
+                "ADMISSION_CANONICAL_FLOW_HASH_MISMATCH",
+                "The persisted canonical Flow failed integrity verification. Save or reload, then request admission again.");
+        }
+
+        try
+        {
+            var flowDto = JsonSerializer.Deserialize<OperatorFlowDto>(flowJson, FlowJsonOptions);
+            if (flowDto?.Operators?.Count > 0)
+            {
+                return flowDto.ToEntity();
+            }
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "[InspectionService] Failed to deserialize canonical persisted Flow for Studio Run: {ProjectId}", project.Id);
+        }
+
+        throw new StudioInspectionRunIdentityException(
+            "ADMISSION_CANONICAL_FLOW_UNAVAILABLE",
+            "The persisted canonical Flow is not executable. Save or reload, then request admission again.");
+    }
+
+    private static string ComputeStoredFlowArtifactHash(string flowJson)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(flowJson));
+        return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     private ProjectVariableExecutionContext? CreateProjectVariableContext(

@@ -7,13 +7,13 @@ F03_DESIGN_BASELINE_SHA=1658216c79b79c5d9371959c83c14a46bbddeccf
 STUDIO_UI_NEXT_AUDIT_SHA=1658216c79b79c5d9371959c83c14a46bbddeccf
 STABLE_LINE_AUDIT_SHA=dfa5ea1ef3d100e700a19cffea5ae64006648881
 PLAN_REVIEW_BASE_SHA=8579fa52f856af484c2ac4b0d3c5565f7fb5dd86
-PLAN_STATUS=IMPLEMENTED_PENDING_FINAL_EXTERNAL_EVIDENCE
+PLAN_STATUS=IMPLEMENTED_PENDING_EXTERNAL_GATES
 DESIGN_SYSTEM_VERSION=V1.1
 Studio:StudioUiEnabled=false
 F03_IMPLEMENTED=YES
 F03_STATUS=PARTIAL
-F03_G6_STATUS=BLOCKED
-OPEN_BLOCKERS=4
+F03_G6_STATUS=DONE
+OPEN_BLOCKERS=5
 F04_STARTED=NO
 AUTH_ENTRY_DECISION=PRESEEDED_SESSION_PREVIEW_ONLY
 STATION_SSE=DEFERRED
@@ -1315,6 +1315,7 @@ clean persisted Project + PersistenceRevision
 ~~~
 
 - Workspace Run 不发送 <code>FlowData</code>、Image 或 Camera 输入；只执行服务端在 Project access 下重新读取的 persisted Flow。
+- G5 的 <code>ProjectSaveCoordinator</code> canonical Flow artifact 是 Workspace Run 的唯一 persisted Flow 来源：<code>InspectionService</code> 在同一 Project access lease 下验证 artifact metadata schema、Project identity、<code>PersistenceRevision</code> 与原始 JSON SHA-256，再反序列化为 <code>ExecutionSnapshotSource.PersistedProject</code>。Workspace Run 不回退到未同步的 legacy <code>Project.Flow</code> 表拆分，也不接受 browser Flow。
 - admission 不建立 reservation；<code>InspectionService</code> 仍在 execute 时重新创建 <code>ExecutionSnapshot</code>、重跑 <code>IExecutionAdmissionService</code> 并比较 revision/Flow hash/FinalDecision hash。
 - dirty、saving、conflict、unknown-outcome、readonly、running 均不能 run。admission 起通过既有 mutation gate 锁住 Flow、Inspector、ROI 与 Save；只在后端终态或确定业务失败后释放。网络/abort 为 <code>unknown-outcome</code>，保持锁定，绝不依据前端超时猜测释放。
 - Run projection 明确区分 admission rejection、execute business failure、network unknown、cancel requested、runtime cancelled、OK、NG、Undetermined、Invalid；Preview projection 没有进入 Run/Result 状态。
@@ -1324,26 +1325,26 @@ clean persisted Project + PersistenceRevision
 
 <code>workspacePersistenceOwner</code> 的 conflict/unknown-outcome reconcile 现在携带 operation generation。每个 reconcile await 后都校验 owner、Project identity 与 generation；route leave、project switch、host close 的晚到 GET 只返回 disposed，不得写 baseline、Flow mutation gate、conflict state 或 disposed phase。unit 与 Browser fixture 均覆盖 reconcile in-flight dispose；Browser 用例还确认晚到 Project A 响应不能覆盖已挂载的 Project B。
 
-explicit <code>null</code> 的正式语义为“使用参数 DefaultValue”：Project DTO/GET 保留 raw <code>Parameter.Value=null</code>，Inspector 明示 <code>Use default value (null)</code>，保存 round-trip 不折叠 null；Runtime 只在 <code>Parameter.GetValue()</code> 将其解析为 <code>DefaultValue</code>。<code>InspectionServiceSingleRunTests</code> 覆盖 PUT/GET preserved null、admission/execute snapshot raw null 与 Runtime effective default。
+explicit <code>null</code> 的正式语义为“使用参数 DefaultValue”：Project DTO/GET 保留 raw <code>Parameter.Value=null</code>，Inspector 明示 <code>Use default value (null)</code>，保存 round-trip 不折叠 null；DTO 同时区分 legacy 缺失字段与显式 JSON null；Runtime 只在 <code>Parameter.GetValue()</code> 将其解析为 <code>DefaultValue</code>。<code>InspectionServiceSingleRunTests</code> 覆盖 persisted JSON → admission/execute snapshot raw null → Runtime effective default。
 
 ### 18.3 Current evidence and boundaries
 
 | Scope | Actual status | Evidence |
 | --- | --- | --- |
 | StudioUI lint / typecheck / build | PASS | <code>npm run lint</code>、<code>npm run typecheck</code>、<code>npm run build</code>；Vite reports an existing &gt;500 kB chunk-size warning |
-| StudioUI full unit | BLOCKED by protected local config | <code>npm run test:unit</code>: 405/407 passed; only F02/F03 startup-default guards fail because the user-owned <code>appsettings.json</code> currently has <code>StudioUiEnabled=true</code>. G6 owner/persistence tests are among the passing set. |
+| StudioUI full unit | BLOCKED by protected local config | <code>npm run test:unit</code>: 406/408 passed; only F02/F03 startup-default guards fail because the user-owned <code>appsettings.json</code> currently has <code>StudioUiEnabled=true</code>. G6 owner/persistence tests are among the passing set. |
 | Product build | PASS | <code>scripts/dotnet.ps1 build ClearVision.Product/ClearVision.Product.sln --no-restore</code>; existing OperatorLibrary runner emits System.Collections.Immutable version warning |
-| InspectionService single-run contract | PASS | <code>InspectionServiceSingleRunTests</code>: 33 passed |
-| Run endpoint and architecture contracts | PASS (directed) | <code>InspectionRunEndpointsTests</code>: admission identity echo, raw <code>FlowData</code> rejection without execute, persisted execute forwarding; <code>StudioUiProductionSource_ShouldRespectF02AuthorityBoundaries</code> and <code>StudioUiF03G5Workspace_ShouldKeepOnePersistenceOwnerAndExactProjectPutBoundary</code> passed. |
+| InspectionService single-run contract | PASS | <code>InspectionServiceSingleRunTests</code>: 34 passed, including canonical artifact ID/revision/hash validation, stale artifact rejection, raw null snapshot and effective runtime default. |
+| Run endpoint and architecture contracts | PASS (directed) | <code>InspectionRunEndpointsTests</code> plus <code>ProjectGlobalVariableEndpointsTests</code>: 34 passed; admission identity echo, raw <code>FlowData</code> rejection without execute, persisted execute forwarding and PUT/GET null round-trip. Eight non-default architecture guards including <code>StudioUiProductionSource_ShouldRespectF02AuthorityBoundaries</code> and <code>StudioUiF03G5Workspace_ShouldKeepOnePersistenceOwnerAndExactProjectPutBoundary</code> passed. |
 | Full Desktop endpoint regression | BLOCKED by pre-existing shared-temp instability | <code>run-tests-desktop-endpoints.ps1 -NoBuild -NoRestore</code> discovered 25 endpoint classes but one existing ProjectGlobalVariable endpoint test returned <code>Access to the path is denied</code>. The identical test passed on immediate isolated serial rerun; this does not establish the full regression gate. |
 | Playwright Browser fixture | PASS | <code>f03-workspace.spec.ts</code>: 35 passed, including persisted admission/execute/Results identity, admission rejection without execute, abort unknown-outcome lock, explicit reconcile late-response dispose, request allowlist, and 20 formal Run/project/route cycles with owner/SSE/request/timer/blob/artifact ledger at zero. Browser fixture is not WebView2 evidence. |
-| Real WebView2 seeded Workspace / Preview | PASS, limited scope | <code>Invoke-StudioUiWebView2Evidence.ps1</code> passed with real Edge WebView2, harness-seeded Project authority, process/port/user-data cleanup, no runtime errors, and request audit restricted to Project/Preview/artifact paths. The existing runner does not drive Formal Run admission/execute/result, so this is not G6 Run closure evidence. |
+| Real WebView2 seeded Workspace / Preview / Formal Run | PASS | <code>Invoke-StudioUiWebView2Evidence.ps1 -EvidencePhase f03 -WorkspaceCapabilityEnabled -SeedWorkspace -FormalRun</code> passed against real Edge WebView2. It retains G4 Preview isolation and 20 lifecycle cycles, then persists FinalDecisionBinding, reloads clean, sends exactly one Admission followed by one Execute, reaches Results with the same Project/result identity, and audits only Project/Preview/artifact/Admission/Execute/Result requests. Process, port, WebView2 user-data, database, conversation and AgentRun runtime roots all cleaned to zero. |
 | Release publish / local no-Node audit | PASS, limited scope | <code>Invoke-StudioUiWebView2Matrix.ps1 -RunScope publish-only</code> passed self-contained Release build/publish, published overview, missing-assets behavior, static asset audit, and local process-tree no-Node audit. A separate clean target machine without Node remains <code>NOT PERFORMED</code>. |
-| Real DPI / formal Run WebView2 chain | NOT PERFORMED | publish-only excludes DPI; the current runner does not contain an admission/execute/result scenario for the Workspace Run owner. Browser fixture is not a substitute. |
+| Real DPI matrix | NOT PERFORMED | Formal Run WebView2 closure is now covered separately; the multi-scale DPI matrix remains independent evidence and was not rerun for this closure. |
 | Full CI / remote workflow | NOT PERFORMED | ordinary branch push is not CI |
 | Camera / PLC / Station / field hardware | NOT PERFORMED | outside F03 front-end scope |
 
-Current blockers are external completion evidence plus protected local configuration: the user-owned <code>appsettings.json</code> working-tree edit currently sets <code>StudioUiEnabled=true</code>. F03 code did not change this protected file; it must not be staged or claimed as the final safe default. The intended release policy remains:
+G6 code closure is complete. F03 remains partial for five external/configuration gates: the protected local startup-default guard, the full Desktop endpoint regression with its pre-existing shared-temp instability, the independent real DPI matrix, a clean target machine without Node, and remote full CI. The user-owned <code>appsettings.json</code> working-tree edit currently sets <code>StudioUiEnabled=true</code>. F03 code did not change this protected file; it must not be staged or claimed as the final safe default. The intended release policy remains:
 
 ~~~text
 Studio:StudioUiEnabled=false

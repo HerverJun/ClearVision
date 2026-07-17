@@ -104,12 +104,27 @@ public class PortDto
 /// </summary>
 public class ParameterDto
 {
+    private object? _value;
+
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string DataType { get; set; } = string.Empty;
-    public object? Value { get; set; }
+    // A missing legacy field keeps the constructor's default value, while an
+    // explicit JSON null is the persisted "use default" value contract.
+    public object? Value
+    {
+        get => _value;
+        set
+        {
+            _value = value;
+            HasExplicitValue = true;
+        }
+    }
+
+    [JsonIgnore]
+    public bool HasExplicitValue { get; private set; }
     public object? DefaultValue { get; set; }
     public object? MinValue { get; set; }
     public object? MaxValue { get; set; }

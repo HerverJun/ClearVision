@@ -119,7 +119,7 @@ function instantiateOperator(definition, operatorType, name, x, y, values = {}) 
   };
 }
 
-async function seedWorkspaceProject(webPort, token, runName) {
+async function seedWorkspaceProject(webPort, token, runName, formalRun = false) {
   const evidenceDirectory = path.resolve(requiredEnvironment('CV_EVIDENCE_DIR'));
   const imageEvidence = createPreviewPpm(path.join(evidenceDirectory, 'g4-preview-input.ppm'));
   const catalogPayload = await readAuthorizedJson(webPort, token, '/api/operators/library?includeCompatibility=true');
@@ -128,8 +128,11 @@ async function seedWorkspaceProject(webPort, token, runName) {
     String(metadataField(item, 'type') || '').toLowerCase() === name.toLowerCase();
   const imageDefinition = catalog.find(item => matchesType(item, 0, 'ImageAcquisition'));
   const roiDefinition = catalog.find(item => matchesType(item, 42, 'RoiManager'));
-  assert(imageDefinition && roiDefinition,
-    `The operator catalog did not expose ImageAcquisition and RoiManager: ${JSON.stringify(catalog.slice(0, 3))}`);
+  const judgmentDefinition = formalRun
+    ? catalog.find(item => matchesType(item, -1, 'ResultJudgment'))
+    : null;
+  assert(imageDefinition && roiDefinition && (!formalRun || judgmentDefinition),
+    `The operator catalog did not expose the seeded operators: ${JSON.stringify(catalog.slice(0, 3))}`);
   const image = instantiateOperator(imageDefinition, 0, 'G4 File Image', 60, 80, {
     SourceType: 'File',
     FilePath: imageEvidence.filePath
@@ -145,6 +148,31 @@ async function seedWorkspaceProject(webPort, token, runName) {
   const imageOutput = image.outputPorts.find(port => port.name === 'Image');
   const roiInput = roi.inputPorts.find(port => port.name === 'Image');
   assert(imageOutput && roiInput, 'The G4 seed operators did not expose the expected Image ports.');
+  let formalRunSeed = null;
+  if (formalRun) {
+    const judgment = instantiateOperator(
+      judgmentDefinition,
+      metadataField(judgmentDefinition, 'type'),
+      'G6 Formal Judgment',
+      580,
+      80,
+      { Condition: 'Equal', ExpectValue: '' }
+    );
+    const judgmentOutput = judgment.outputPorts.find(port => port.name === 'JudgmentResult');
+    assert(judgmentOutput, 'The Formal Run ResultJudgment seed did not expose JudgmentResult.');
+    formalRunSeed = {
+      operator: judgment,
+      binding: {
+        sourceOperatorId: judgment.id,
+        sourceOutputPortId: judgmentOutput.id,
+        sourceOutputName: judgmentOutput.name,
+        dataType: 'String',
+        rule: 'StringMap',
+        okValue: 'OK',
+        ngValue: 'NG'
+      }
+    };
+  }
   const response = await fetch(`http://127.0.0.1:${webPort}/api/projects`, {
     method: 'POST',
     headers: {
@@ -181,7 +209,8 @@ async function seedWorkspaceProject(webPort, token, runName) {
     authority: 'HARNESS_SEEDED_EXISTING_PROJECT_APPLICATION_SERVICE',
     runtimeAuditStartedAfterSeed: true,
     imageEvidence,
-    roiNodeId: roi.id
+    roiNodeId: roi.id,
+    formalRunSeed
   };
 }
 
@@ -750,6 +779,118 @@ async function verifyWorkspaceG4(page) {
   };
 }
 
+async function installFormalRunDecision(page, formalRunSeed) {
+  assert(formalRunSeed?.operator && formalRunSeed?.binding,
+    'Formal Run evidence did not retain an unpersisted Final Decision seed.');
+  const installed = await page.evaluate(async seed => {
+    const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+    const projectId = shell?.getAttribute('data-workspace-project-id');
+    const token = sessionStorage.getItem('cv_auth_token');
+    const headers = {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+    const projectResponse = await fetch(`/api/projects/${projectId}`, {
+      headers,
+      cache: 'no-store'
+    });
+    const projectText = await projectResponse.text();
+    const project = projectText ? JSON.parse(projectText) : null;
+    if (!projectResponse.ok || !project?.flow) {
+      return { getStatus: projectResponse.status, putStatus: null, project };
+    }
+    const response = await fetch(`/api/projects/${projectId}`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: project.name,
+        description: project.description,
+        expectedPersistenceRevision: project.persistenceRevision,
+        flow: {
+          ...project.flow,
+          operators: [...project.flow.operators, seed.operator],
+          decisionConfiguration: {
+            finalDecisionBinding: seed.binding,
+            missingDecisionPolicy: 'Undetermined'
+          }
+        },
+        globalVariables: null
+      })
+    });
+    const text = await response.text();
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = { raw: text };
+    }
+    return {
+      getStatus: projectResponse.status,
+      putStatus: response.status,
+      previousPersistenceRevision: project.persistenceRevision,
+      project: body
+    };
+  }, formalRunSeed);
+  assert(installed.getStatus === 200, `Formal Run decision Project GET returned ${installed.getStatus}.`);
+  assert(installed.putStatus === 200,
+    `Formal Run decision Project PUT returned ${installed.putStatus}: ${JSON.stringify(installed.project)}`);
+  assert(Number(installed.project?.persistenceRevision) > Number(installed.previousPersistenceRevision),
+    `Formal Run decision PUT did not advance PersistenceRevision: ${JSON.stringify(installed)}`);
+  assert(installed.project?.flow?.decisionConfiguration?.finalDecisionBinding?.sourceOperatorId ===
+    formalRunSeed.binding.sourceOperatorId,
+  `Formal Run decision PUT did not persist the configured source identity: ${JSON.stringify(installed.project)}`);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-evidence-surface="f03-workspace-shell"]', {
+    state: 'visible',
+    timeout: 30_000
+  });
+  try {
+    await page.waitForFunction(expectedRevision => {
+      const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+      return shell?.getAttribute('data-workspace-state') === 'ready' &&
+        Number(shell.getAttribute('data-workspace-persistence-revision')) === expectedRevision &&
+        shell.getAttribute('data-workspace-dirty') === 'false';
+    }, Number(installed.project.persistenceRevision), { timeout: 30_000 });
+  } catch (error) {
+    const reloaded = await page.evaluate(() => {
+      const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+      return {
+        shell: shell ? Object.fromEntries([...shell.attributes].map(item => [item.name, item.value])) : null,
+        diagnostics: window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__
+          ? { ...window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__ }
+          : null,
+        text: document.querySelector('[data-evidence-surface="f03-workspace-shell"]')?.textContent?.trim() || null
+      };
+    });
+    throw new Error(`Formal Run canonical reload did not settle: ${JSON.stringify(reloaded)}; ${error.message}`);
+  }
+  return {
+    ...installed,
+    reloadedPersistenceRevision: Number(await page.locator('[data-evidence-surface="f03-workspace-shell"]')
+      .getAttribute('data-workspace-persistence-revision'))
+  };
+}
+
+async function verifyWorkspaceG6(page) {
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const projectId = await shell.getAttribute('data-workspace-project-id');
+  assert(projectId && /^[0-9a-f-]{36}$/i.test(projectId), 'Formal Run lost the persisted Project identity.');
+  const run = page.locator('[data-testid="workspace-run"]');
+  assert(await run.isEnabled(), 'Formal Run did not enable after the persisted Project save settled.');
+  await run.click();
+  await page.waitForSelector('[data-capability="results-read"]', { state: 'visible', timeout: 45_000 });
+  const hash = new URL(page.url()).hash.replace(/^#/, '');
+  const [route, query = ''] = hash.split('?');
+  const params = new URLSearchParams(query);
+  const resultId = params.get('resultId');
+  assert(route === '/results', `Formal Run did not navigate to Results: ${hash}`);
+  assert(params.get('source') === 'local', `Formal Run Results source was not local: ${hash}`);
+  assert(params.get('projectId') === projectId, `Formal Run Results Project identity changed: ${hash}`);
+  assert(resultId && /^[0-9a-f-]{36}$/i.test(resultId), `Formal Run Results did not contain a result id: ${hash}`);
+  return { projectId, resultId, route: hash };
+}
+
 async function verifyWorkspaceG3(page) {
   await page.waitForSelector('[data-capability="flow-workspace"]', { state: 'visible', timeout: 30_000 });
   await page.waitForFunction(() =>
@@ -888,7 +1029,7 @@ async function verifyWorkspaceG3(page) {
   };
 }
 
-async function verifyProductPage(page, route, runtimeErrors) {
+async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = null) {
   await page.waitForSelector('[data-product-shell="ready"]', { state: 'visible', timeout: 30_000 });
   const isWorkspaceRoute = /^\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/workspace$/i
     .test(route);
@@ -1005,7 +1146,10 @@ async function verifyProductPage(page, route, runtimeErrors) {
   });
   const preferenceWriteRequests = preferenceRequests.filter(item => item.method !== 'GET');
   const seededWorkspace = parseBooleanEnvironment('CV_STUDIO_UI_SEED_WORKSPACE');
+  const formalRun = parseBooleanEnvironment('CV_STUDIO_UI_FORMAL_RUN');
   const workspaceReady = isWorkspaceRoute && ['ready', 'empty'].includes(projection.workspaceState);
+  assert(!formalRun || (seededWorkspace && workspaceReady),
+    'Formal Run evidence requires a seeded, ready Workspace route.');
   const workspaceG4 = workspaceReady && seededWorkspace ? await verifyWorkspaceG4(page) : null;
   const workspaceG3 = workspaceReady && !seededWorkspace ? await verifyWorkspaceG3(page) : null;
   let workspaceLifecycle = null;
@@ -1208,6 +1352,8 @@ async function verifyProductPage(page, route, runtimeErrors) {
       await waitForSeededPreview(page);
     }
   }
+  const formalRunInstallation = formalRun ? await installFormalRunDecision(page, formalRunSeed) : null;
+  const workspaceG6 = formalRun ? await verifyWorkspaceG6(page) : null;
   const productRequests = runtimeErrors.requests.filter(isProductRequest);
   const writeRequests = productRequests.filter(item => item.method !== 'GET');
   const projectPutRequests = productRequests.filter(item => {
@@ -1218,12 +1364,14 @@ async function verifyProductPage(page, route, runtimeErrors) {
     const url = new URL(item.url);
     return /\/api\/(?:inspection\/(?:admission|execute)|runs)(?:\/|$)/i.test(url.pathname);
   });
+  const expectedRunPaths = ['/api/inspection/admission', '/api/inspection/execute'];
   const unexpectedWriteRequests = writeRequests.filter(item => {
     if (!isWorkspaceRoute) return true;
     const url = new URL(item.url);
     return !(item.method === 'POST' && url.pathname === '/api/flows/preview-node') &&
       !(item.method === 'PUT' && /^\/api\/projects\/[0-9a-f-]{36}$/i.test(url.pathname)) &&
-      !(item.method === 'DELETE' && /^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname));
+      !(item.method === 'DELETE' && /^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname)) &&
+      !(formalRun && item.method === 'POST' && expectedRunPaths.includes(url.pathname));
   });
 
   assert(projection.shellCount === 1, 'Product route did not mount exactly one ProductLayout.');
@@ -1246,11 +1394,19 @@ async function verifyProductPage(page, route, runtimeErrors) {
   assert(productRequests.length > 0, 'Product route emitted no observable API requests.');
   assert(unexpectedWriteRequests.length === 0,
     `Product route emitted writes outside Preview cleanup: ${JSON.stringify(unexpectedWriteRequests)}`);
-  assert(forbiddenRunRequests.length === 0,
-    `G5 emitted Run/Admission/Execute requests: ${JSON.stringify(forbiddenRunRequests)}`);
+  if (formalRun) {
+    assert(forbiddenRunRequests.map(item => new URL(item.url).pathname).join(',') === expectedRunPaths.join(','),
+      `Formal Run did not issue exactly one Admission then Execute request: ${JSON.stringify(forbiddenRunRequests)}`);
+    assert(workspaceG6?.projectId && workspaceG6.resultId,
+      `Formal Run did not retain the Results handoff identity: ${JSON.stringify(workspaceG6)}`);
+  } else {
+    assert(forbiddenRunRequests.length === 0,
+      `G5 emitted Run/Admission/Execute requests: ${JSON.stringify(forbiddenRunRequests)}`);
+  }
   if (workspaceG4) {
-    assert(projectPutRequests.length === 1,
-      `G5 real WebView2 expected exactly one Project PUT: ${JSON.stringify(projectPutRequests)}`);
+    const expectedProjectPutCount = formalRun ? 2 : 1;
+    assert(projectPutRequests.length === expectedProjectPutCount,
+      `G5/G6 real WebView2 expected ${expectedProjectPutCount} Project PUT request(s): ${JSON.stringify(projectPutRequests)}`);
   }
   assert(preferenceCycle.dark.attributeValue === 'dark', 'Dark theme projection was not applied.');
   assert(preferenceCycle.comfortable.attributeValue === 'comfortable',
@@ -1272,10 +1428,13 @@ async function verifyProductPage(page, route, runtimeErrors) {
         url.pathname !== '/api/flows/preview-node' &&
         !/^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname) &&
         !/^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-          .test(url.pathname);
+          .test(url.pathname) &&
+        !(formalRun && url.pathname === '/api/projects') &&
+        !(formalRun && expectedRunPaths.includes(url.pathname)) &&
+        !(formalRun && /^\/api\/inspection\/history\/[0-9a-f-]{36}(?:\/[0-9a-f-]{36})?$/i.test(url.pathname));
     });
     assert(unexpectedWorkspaceRequests.length === 0,
-      `Workspace emitted a route outside the G5 persistence/Preview allowlist: ${JSON.stringify(unexpectedWorkspaceRequests)}`);
+      `Workspace emitted a route outside the formal persistence/Preview/Run allowlist: ${JSON.stringify(unexpectedWorkspaceRequests)}`);
     assert(projection.workspaceMode === 'true' && projection.workspaceShellCount === 1,
       `ProductLayout did not enter workspaceMode: ${JSON.stringify(projection)}`);
   }
@@ -1297,6 +1456,8 @@ async function verifyProductPage(page, route, runtimeErrors) {
     resultsFilterLayout,
     workspaceG3,
     workspaceG4,
+    formalRunInstallation,
+    workspaceG6,
     workspaceLifecycle
   };
 }
@@ -1534,6 +1695,7 @@ async function main() {
   const configuration = String(process.env.CV_STUDIO_UI_CONFIGURATION || 'unknown').trim();
   const sanitizedDesktopPath = parseBooleanEnvironment('CV_STUDIO_UI_SANITIZED_PATH');
   const deepCanvas = parseBooleanEnvironment('CV_STUDIO_UI_DEEP_CANVAS', scale === 1);
+  const formalRun = parseBooleanEnvironment('CV_STUDIO_UI_FORMAL_RUN');
   let route = normalizeStudioRoute(
     process.env.CV_STUDIO_UI_ROUTE || routeForExpectation(expectation)
   );
@@ -1543,6 +1705,8 @@ async function main() {
   assert(Number.isInteger(cdpPort) && cdpPort > 0, 'CV_CDP_PORT must be a valid port.');
   assert(Number.isInteger(webPort) && webPort > 0, 'CV_WEB_PORT must be a valid port.');
   assert(Number.isFinite(scale) && scale > 0, 'CV_DPI_SCALE must be a positive number.');
+  assert(!formalRun || (expectation === 'studio-product' && seedWorkspace),
+    'CV_STUDIO_UI_FORMAL_RUN requires studio-product plus a seeded Workspace.');
 
   const evidence = {
     schemaVersion: 1,
@@ -1556,6 +1720,7 @@ async function main() {
     sanitizedDesktopPath,
     deepCanvas,
     seedWorkspace,
+    formalRun,
     route,
     sourceSha: String(process.env.CV_STUDIO_UI_SOURCE_SHA || 'unknown').trim(),
     capturedAtUtc: new Date().toISOString(),
@@ -1585,7 +1750,7 @@ async function main() {
       assert(expectation === 'studio-product', 'Workspace seeding requires studio-product evidence.');
       assert(route === '/projects/seeded/workspace',
         'Workspace seeding requires the /projects/seeded/workspace route placeholder.');
-      evidence.workspaceSeed = await seedWorkspaceProject(webPort, token, runName);
+      evidence.workspaceSeed = await seedWorkspaceProject(webPort, token, runName, formalRun);
       route = evidence.workspaceSeed.route;
       evidence.route = route;
     }
@@ -1611,7 +1776,12 @@ async function main() {
         if (expectation === 'studio-diagnostics') {
           evidence.diagnosticsPage = await verifyDiagnosticsPage(page);
         } else if (expectation === 'studio-product') {
-          evidence.productPage = await verifyProductPage(page, route, runtimeErrors);
+          evidence.productPage = await verifyProductPage(
+            page,
+            route,
+            runtimeErrors,
+            evidence.workspaceSeed?.formalRunSeed ?? null
+          );
         } else if (expectation === 'studio-design') {
           evidence.designPage = await verifyDesignPage(page);
         } else if (expectation === 'studio-canvas') {

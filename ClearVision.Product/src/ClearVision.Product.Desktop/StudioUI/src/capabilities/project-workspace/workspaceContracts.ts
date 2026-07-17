@@ -1160,7 +1160,7 @@ function encodeDecisionBinding(binding: WorkspaceFinalDecisionBindingV1): Worksp
   });
 }
 
-function encodeDecisionConfiguration(
+export function encodeWorkspaceDecisionConfigurationV1(
   decision: WorkspaceDecisionConfigurationV1 | null
 ): WorkspaceJsonObject | null {
   if (decision === null) return null;
@@ -1185,7 +1185,7 @@ export function encodeWorkspaceFlowUpdateV1(project: WorkspaceProjectV1): Worksp
     name: flow.name,
     operators: Object.freeze(flow.operators.map(encodeOperator)),
     connections: Object.freeze(flow.connections.map(encodeConnection)),
-    decisionConfiguration: encodeDecisionConfiguration(flow.decisionConfiguration)
+    decisionConfiguration: encodeWorkspaceDecisionConfigurationV1(flow.decisionConfiguration)
   });
 }
 

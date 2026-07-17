@@ -90,8 +90,9 @@ public class OperatorFlowDto
                     p.IsRequired,
                     p.Options
                 );
-                // 【关键】设置前端编辑过的值
-                if (p.Value != null)
+                // Preserve the distinction between an omitted legacy field and
+                // an explicit null, which represents "use default" at runtime.
+                if (p.HasExplicitValue)
                 {
                     param.SetValue(p.Value);
                 }

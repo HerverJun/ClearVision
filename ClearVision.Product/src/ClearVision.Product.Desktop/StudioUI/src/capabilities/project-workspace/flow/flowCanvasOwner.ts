@@ -21,10 +21,11 @@ import {
 } from '@/capabilities/operators-read/operatorQueries';
 import type { OperatorCatalogItem } from '@/capabilities/operators-read/operatorContracts';
 import type { OperatorParameter } from '@/capabilities/operators-read/operatorContracts';
-import type {
-  WorkspaceFlowV1,
-  WorkspaceJsonValue,
-  WorkspaceProjectV1
+import {
+  encodeWorkspaceDecisionConfigurationV1,
+  type WorkspaceFlowV1,
+  type WorkspaceJsonValue,
+  type WorkspaceProjectV1
 } from '../workspaceContracts';
 import type {
   WorkspaceFlowCanvasDiagnosticsLease,
@@ -215,7 +216,7 @@ function toCanvasFlow(flow: WorkspaceFlowV1 | null, projectName: string): Readon
       targetOperatorId: connection.targetOperatorId,
       targetPortId: connection.targetPortId
     }))),
-    decisionConfiguration: flow.decisionConfiguration
+    decisionConfiguration: encodeWorkspaceDecisionConfigurationV1(flow.decisionConfiguration)
   });
 }
 

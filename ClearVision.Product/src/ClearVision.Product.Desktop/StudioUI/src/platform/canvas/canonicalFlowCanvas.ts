@@ -384,6 +384,8 @@ function mergeFlowPersistence(
   const baselineSource = recordValue(baselineValue);
   const nested = recordValue(baselineSource.flow ?? baselineSource.Flow);
   const baseline = Object.keys(nested).length > 0 ? nested : baselineSource;
+  const currentDecisionConfiguration = current.decisionConfiguration ?? current.DecisionConfiguration;
+  const baselineDecisionConfiguration = baseline.decisionConfiguration ?? baseline.DecisionConfiguration;
   return Object.freeze({
     ...baseline,
     ...current,
@@ -395,7 +397,10 @@ function mergeFlowPersistence(
     connections: mergeByIdentity(
       current.connections ?? current.Connections,
       baseline.connections ?? baseline.Connections
-    )
+    ),
+    // The canvas adapter owns graph edits but has no Final Decision editor. Its null projection
+    // must not erase the persisted binding or turn an untouched canonical Project into a dirty draft.
+    decisionConfiguration: currentDecisionConfiguration ?? baselineDecisionConfiguration ?? null
   });
 }
 

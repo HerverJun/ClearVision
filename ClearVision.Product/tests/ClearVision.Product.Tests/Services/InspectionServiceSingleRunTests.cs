@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.Analysis;
 using ClearVision.Product.Application.DTOs;
@@ -23,21 +25,35 @@ public class InspectionServiceSingleRunTests
     [Fact]
     public async Task PersistedStudioRun_UsesAdmissionIdentityAndPreservesExplicitNullUntilRuntimeResolution()
     {
-        var projectId = Guid.NewGuid();
-        var clientSnapshotId = Guid.NewGuid();
-        var flow = CreateFlow("persisted-studio-run");
-        var explicitNull = new Parameter(Guid.NewGuid(), "OptionalThreshold", "OptionalThreshold", string.Empty, "int", 42);
-        explicitNull.SetValue(null);
-        flow.Operators.Single().AddParameter(explicitNull);
         var project = new Project("persisted-studio-run-project");
-        project.UpdateFlow(flow);
+        var projectId = project.Id;
+        var clientSnapshotId = Guid.NewGuid();
+        var persistedFlowJson = SerializeFlowDto(
+            "persisted-studio-run",
+            new ParameterDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "OptionalThreshold",
+                DisplayName = "OptionalThreshold",
+                DataType = "int",
+                Value = null,
+                DefaultValue = 42
+            });
         project.SetPersistenceRevision(7);
 
         var resultRepository = Substitute.For<IInspectionResultRepository>();
         var projectRepository = Substitute.For<IProjectRepository>();
         var flowExecution = Substitute.For<IFlowExecutionService>();
         var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
         projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        flowStorage.LoadFlowJsonAsync(projectId).Returns(persistedFlowJson);
+        flowStorage.LoadMetadataAsync(projectId).Returns(new ProjectFlowStorageMetadata(
+            1,
+            projectId,
+            7,
+            ComputeStoredFlowArtifactHash(persistedFlowJson),
+            DateTimeOffset.UtcNow));
         Parameter? capturedParameter = null;
         flowExecution
             .ExecuteWithSnapshotAsync(
@@ -69,7 +85,7 @@ public class InspectionServiceSingleRunTests
             Substitute.For<IInspectionWorker>(),
             Substitute.For<IImageCacheRepository>(),
             new AnalysisDataBuilder(),
-            Substitute.For<IProjectFlowStorage>(),
+            flowStorage,
             NullLogger<InspectionService>.Instance);
 
         var admission = await service.AdmitPersistedStudioRunAsync(projectId, 7, clientSnapshotId);
@@ -94,12 +110,20 @@ public class InspectionServiceSingleRunTests
     [Fact]
     public async Task PersistedStudioRun_RejectsRevisionMismatchBeforeExecution()
     {
-        var projectId = Guid.NewGuid();
         var project = new Project("revision-mismatch-project");
-        project.UpdateFlow(CreateFlow("persisted-flow"));
+        var projectId = project.Id;
         project.SetPersistenceRevision(8);
         var projectRepository = Substitute.For<IProjectRepository>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var persistedFlowJson = SerializeFlowDto("persisted-flow");
         projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        flowStorage.LoadFlowJsonAsync(projectId).Returns(persistedFlowJson);
+        flowStorage.LoadMetadataAsync(projectId).Returns(new ProjectFlowStorageMetadata(
+            1,
+            projectId,
+            8,
+            ComputeStoredFlowArtifactHash(persistedFlowJson),
+            DateTimeOffset.UtcNow));
         var flowExecution = Substitute.For<IFlowExecutionService>();
         var service = new InspectionService(
             Substitute.For<IInspectionResultRepository>(),
@@ -111,10 +135,49 @@ public class InspectionServiceSingleRunTests
             Substitute.For<IInspectionWorker>(),
             Substitute.For<IImageCacheRepository>(),
             new AnalysisDataBuilder(),
-            Substitute.For<IProjectFlowStorage>(),
+            flowStorage,
             NullLogger<InspectionService>.Instance);
 
         var act = async () => await service.AdmitPersistedStudioRunAsync(projectId, 7, Guid.NewGuid());
+
+        var failure = await act.Should().ThrowAsync<StudioInspectionRunIdentityException>();
+        failure.Which.Code.Should().Be("ADMISSION_PERSISTENCE_REVISION_MISMATCH");
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
+            default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task PersistedStudioRun_RejectsStaleCanonicalArtifactBeforeExecution()
+    {
+        var project = new Project("stale-canonical-artifact-project");
+        var projectId = project.Id;
+        project.SetPersistenceRevision(8);
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var persistedFlowJson = SerializeFlowDto("stale-canonical-flow");
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        flowStorage.LoadFlowJsonAsync(projectId).Returns(persistedFlowJson);
+        flowStorage.LoadMetadataAsync(projectId).Returns(new ProjectFlowStorageMetadata(
+            1,
+            projectId,
+            7,
+            ComputeStoredFlowArtifactHash(persistedFlowJson),
+            DateTimeOffset.UtcNow));
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var service = new InspectionService(
+            Substitute.For<IInspectionResultRepository>(),
+            projectRepository,
+            flowExecution,
+            Substitute.For<IImageAcquisitionService>(),
+            Substitute.For<IConfigurationService>(),
+            Substitute.For<IInspectionRuntimeCoordinator>(),
+            Substitute.For<IInspectionWorker>(),
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance);
+
+        var act = async () => await service.AdmitPersistedStudioRunAsync(projectId, 8, Guid.NewGuid());
 
         var failure = await act.Should().ThrowAsync<StudioInspectionRunIdentityException>();
         failure.Which.Code.Should().Be("ADMISSION_PERSISTENCE_REVISION_MISMATCH");
@@ -1920,7 +1983,7 @@ public class InspectionServiceSingleRunTests
         return flow.BindStringDecision(acquisition);
     }
 
-    private static string SerializeFlowDto(string operatorName)
+    private static string SerializeFlowDto(string operatorName, ParameterDto? parameter = null)
     {
         var operatorId = Guid.NewGuid();
         var outputPortId = Guid.NewGuid();
@@ -1958,7 +2021,8 @@ public class InspectionServiceSingleRunTests
                             Direction = PortDirection.Output,
                             DataType = PortDataType.String
                         }
-                    ]
+                    ],
+                    Parameters = parameter == null ? [] : [parameter]
                 }
             }
         };
@@ -1968,5 +2032,11 @@ public class InspectionServiceSingleRunTests
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
         });
+    }
+
+    private static string ComputeStoredFlowArtifactHash(string flowJson)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(flowJson));
+        return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
     }
 }
