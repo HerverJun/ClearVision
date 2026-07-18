@@ -1125,8 +1125,10 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
     token,
     `/api/inspection/history/${projectId}/${cancelledResult.id}`
   );
-  assert(storedCancelledResult.executionOutcome === 'Cancelled' &&
-    storedCancelledResult.executionSnapshotId === admitted.clientSnapshotId,
+  assert(storedCancelledResult.id === cancelledResult.id &&
+    storedCancelledResult.projectId === projectId &&
+    storedCancelledResult.executionOutcome === 'Cancelled' &&
+    storedCancelledResult.flowVersionHash === admitted.canonicalFlowHash,
   `Stored Cancelled result did not preserve identity: ${JSON.stringify(storedCancelledResult)}`);
   assert(new URL(page.url()).hash.includes(`/projects/${projectId}/workspace`),
     `Cancelled Formal Run navigated away from Workspace: ${page.url()}`);
