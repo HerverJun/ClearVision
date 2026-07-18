@@ -46,6 +46,23 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
         return items.Select(ToInspectionResultWithoutOutputImage).ToList();
     }
 
+    public async Task<InspectionResult?> FindByExecutionSnapshotIdAsync(Guid projectId, Guid executionSnapshotId)
+    {
+        if (projectId == Guid.Empty || executionSnapshotId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await _dbSet
+            .Include(result => result.Defects)
+            .Where(result => result.ProjectId == projectId &&
+                             result.ExecutionSnapshotId == executionSnapshotId &&
+                             !result.IsDeleted)
+            .OrderByDescending(result => result.InspectionTime)
+            .ThenByDescending(result => result.Id)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<InspectionHistoryPage> GetHistoryPageAsync(
         Guid projectId,
         DateTime? startTime = null,

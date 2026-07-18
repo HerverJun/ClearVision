@@ -24,6 +24,12 @@ public interface IInspectionResultRepository : IRepository<InspectionResult>
     Task<IEnumerable<InspectionResult>> GetByProjectIdAsync(Guid projectId, int pageIndex = 0, int pageSize = 20);
 
     /// <summary>
+    /// Finds the formal result for one execution snapshot. The caller must
+    /// still compare the complete snapshot identity before using the result.
+    /// </summary>
+    Task<InspectionResult?> FindByExecutionSnapshotIdAsync(Guid projectId, Guid executionSnapshotId);
+
+    /// <summary>
     /// 获取统一分页语义的检测历史记录。
     /// </summary>
     Task<InspectionHistoryPage> GetHistoryPageAsync(

@@ -35,6 +35,22 @@ public interface IInspectionService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Requests cancellation through the existing runtime coordinator and
+    /// returns the authoritative state observed for the supplied identity.
+    /// </summary>
+    Task<StudioInspectionRunReconciliation> StopPersistedStudioRunAsync(
+        StudioInspectionRunIdentity identity,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reconciles a response-less formal run against the runtime coordinator
+    /// and the persisted inspection result repository.
+    /// </summary>
+    Task<StudioInspectionRunReconciliation> ReconcilePersistedStudioRunAsync(
+        StudioInspectionRunIdentity identity,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 执行单次检测
     /// </summary>
     /// <param name="projectId">工程ID</param>
@@ -169,6 +185,35 @@ public sealed record StudioInspectionRunAdmission(
     long PersistenceRevision,
     string CanonicalFlowHash,
     string DecisionConfigurationHash);
+
+public sealed record StudioInspectionRunIdentity(
+    Guid ProjectId,
+    Guid ClientSnapshotId,
+    long PersistenceRevision,
+    string CanonicalFlowHash,
+    string DecisionConfigurationHash);
+
+public enum StudioInspectionRunReconciliationStatus
+{
+    StillRunning,
+    CancelRequested,
+    Cancelled,
+    Succeeded,
+    Failed,
+    ResultNotFound,
+    IdentityMismatch
+}
+
+public sealed record StudioInspectionRunReconciliation(
+    Guid ProjectId,
+    Guid ClientSnapshotId,
+    long PersistenceRevision,
+    string CanonicalFlowHash,
+    string DecisionConfigurationHash,
+    StudioInspectionRunReconciliationStatus Status,
+    string? Code,
+    string Message,
+    InspectionResult? Result);
 
 /// <summary>
 /// A stored Project changed between admission and execute, so the caller must admit again.

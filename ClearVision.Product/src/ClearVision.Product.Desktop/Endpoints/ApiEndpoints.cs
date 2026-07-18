@@ -647,6 +647,34 @@ public static class ApiEndpoints
             }
         });
 
+        app.MapPost("/api/inspection/stop", async (
+            StudioInspectionRunIdentityRequest request,
+            Core.Services.IInspectionService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!TryCreateStudioRunIdentity(request, out var identity, out var error))
+            {
+                return Results.BadRequest(new { Code = "RUN_IDENTITY_INVALID", Error = error });
+            }
+
+            var reconciliation = await service.StopPersistedStudioRunAsync(identity, cancellationToken);
+            return Results.Ok(ToInspectionRunReconciliationResponse(reconciliation));
+        });
+
+        app.MapPost("/api/inspection/reconcile", async (
+            StudioInspectionRunIdentityRequest request,
+            Core.Services.IInspectionService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!TryCreateStudioRunIdentity(request, out var identity, out var error))
+            {
+                return Results.BadRequest(new { Code = "RUN_IDENTITY_INVALID", Error = error });
+            }
+
+            var reconciliation = await service.ReconcilePersistedStudioRunAsync(identity, cancellationToken);
+            return Results.Ok(ToInspectionRunReconciliationResponse(reconciliation));
+        });
+
         // 执行检测
         app.MapPost("/api/inspection/execute", async (
             ExecuteInspectionRequest request,
@@ -1622,6 +1650,57 @@ public static class ApiEndpoints
             analysisData = TryDeserializeAnalysisData(result.AnalysisDataJson),
             errorMessage = result.ErrorMessage
         };
+    }
+
+    internal static object ToInspectionRunReconciliationResponse(StudioInspectionRunReconciliation reconciliation)
+    {
+        return new
+        {
+            status = reconciliation.Status switch
+            {
+                StudioInspectionRunReconciliationStatus.StillRunning => "still-running",
+                StudioInspectionRunReconciliationStatus.CancelRequested => "cancel-requested",
+                StudioInspectionRunReconciliationStatus.Cancelled => "cancelled",
+                StudioInspectionRunReconciliationStatus.Succeeded => "succeeded",
+                StudioInspectionRunReconciliationStatus.Failed => "failed",
+                StudioInspectionRunReconciliationStatus.ResultNotFound => "result-not-found",
+                StudioInspectionRunReconciliationStatus.IdentityMismatch => "identity-mismatch",
+                _ => "identity-mismatch"
+            },
+            code = reconciliation.Code,
+            message = reconciliation.Message,
+            projectId = reconciliation.ProjectId,
+            clientSnapshotId = reconciliation.ClientSnapshotId,
+            projectPersistenceRevision = reconciliation.PersistenceRevision,
+            canonicalFlowHash = reconciliation.CanonicalFlowHash,
+            decisionConfigurationHash = reconciliation.DecisionConfigurationHash,
+            result = reconciliation.Result == null ? null : ToInspectionExecutionResponse(reconciliation.Result)
+        };
+    }
+
+    private static bool TryCreateStudioRunIdentity(
+        StudioInspectionRunIdentityRequest request,
+        out StudioInspectionRunIdentity identity,
+        out string error)
+    {
+        var flowHash = request.ExpectedCanonicalFlowHash?.Trim() ?? string.Empty;
+        var decisionHash = request.ExpectedDecisionConfigurationHash?.Trim() ?? string.Empty;
+        identity = new StudioInspectionRunIdentity(
+            request.ProjectId,
+            request.ClientSnapshotId,
+            request.ExpectedPersistenceRevision,
+            flowHash,
+            decisionHash);
+        if (request.ProjectId == Guid.Empty || request.ClientSnapshotId == Guid.Empty ||
+            request.ExpectedPersistenceRevision < 0 || string.IsNullOrWhiteSpace(flowHash) ||
+            string.IsNullOrWhiteSpace(decisionHash))
+        {
+            error = "ProjectId, clientSnapshotId, persistence revision, Flow hash, and decision hash are required.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
     }
 
     private static IResult ToAdmissionFailure(ExecutionAdmissionResult admission)

@@ -206,23 +206,135 @@ public class InspectionService : IInspectionService
             projectId,
             flow: null,
             ExecutionAdmissionSurface.StudioInspectionRun,
-            cancellationToken,
+            CancellationToken.None,
             clientSnapshotId);
         EnsurePersistedStudioRunIdentity(
             snapshot,
             expectedPersistenceRevision,
             expectedCanonicalFlowHash,
             expectedDecisionConfigurationHash);
-        return await ExecuteSingleWithCoordinatorAsync(
-            snapshot,
-            sessionId => ExecuteSingleResolvedCoreAsync(
-                projectId,
-                imageData: null,
+
+        try
+        {
+            // A disconnected HTTP client must not cancel the authoritative
+            // formal execution. Stop uses the coordinator-owned token instead.
+            return await ExecuteSingleWithCoordinatorAsync(
                 snapshot,
-                globalVariables,
-                sessionId,
-                cancellationToken),
-            cancellationToken);
+                (sessionId, executionCancellationToken) => ExecuteSingleResolvedCoreAsync(
+                    projectId,
+                    imageData: null,
+                    snapshot,
+                    globalVariables,
+                    sessionId,
+                    executionCancellationToken),
+                CancellationToken.None,
+                useRuntimeCancellationToken: true);
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancellation is an authoritative formal terminal outcome, not
+            // an HTTP transport failure. Persist it so reconcile can remain
+            // result-repository backed even after coordinator cleanup.
+            return await PersistCancelledStudioRunAsync(snapshot);
+        }
+    }
+
+    public async Task<StudioInspectionRunReconciliation> StopPersistedStudioRunAsync(
+        StudioInspectionRunIdentity identity,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryNormalizeStudioRunIdentity(identity, out var normalized, out var invalid))
+        {
+            return invalid!;
+        }
+
+        var state = _coordinator.GetState(normalized.ProjectId);
+        if (state != null && !MatchesRuntimeIdentity(state, normalized))
+        {
+            return IdentityMismatch(normalized, "RUN_IDENTITY_MISMATCH", "The active runtime session does not match the requested formal run.");
+        }
+
+        if (state?.Status is RuntimeStatus.Starting or RuntimeStatus.Running)
+        {
+            await _coordinator.TryStopAsync(normalized.ProjectId, CancellationToken.None);
+        }
+
+        return await ReconcilePersistedStudioRunAsync(normalized, cancellationToken);
+    }
+
+    public async Task<StudioInspectionRunReconciliation> ReconcilePersistedStudioRunAsync(
+        StudioInspectionRunIdentity identity,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryNormalizeStudioRunIdentity(identity, out var normalized, out var invalid))
+        {
+            return invalid!;
+        }
+
+        var storedResult = await _resultRepository.FindByExecutionSnapshotIdAsync(
+            normalized.ProjectId,
+            normalized.ClientSnapshotId);
+        if (storedResult != null)
+        {
+            return MatchesResultIdentity(storedResult, normalized)
+                ? ReconcileStoredResult(normalized, storedResult)
+                : IdentityMismatch(normalized, "RUN_RESULT_IDENTITY_MISMATCH", "The persisted result does not match the requested formal run identity.");
+        }
+
+        var runtimeState = _coordinator.GetState(normalized.ProjectId);
+        if (runtimeState != null)
+        {
+            if (!MatchesRuntimeIdentity(runtimeState, normalized))
+            {
+                return IdentityMismatch(normalized, "RUN_IDENTITY_MISMATCH", "The active runtime session does not match the requested formal run.");
+            }
+
+            return runtimeState.Status switch
+            {
+                RuntimeStatus.Starting or RuntimeStatus.Running =>
+                    RuntimeReconciliation(normalized, StudioInspectionRunReconciliationStatus.StillRunning,
+                        "RUN_STILL_RUNNING", "The authoritative formal run is still running."),
+                RuntimeStatus.Stopping =>
+                    RuntimeReconciliation(normalized, StudioInspectionRunReconciliationStatus.CancelRequested,
+                        "RUN_CANCEL_REQUESTED", "Cancellation was requested; the authoritative terminal outcome is not stored yet."),
+                RuntimeStatus.Faulted =>
+                    RuntimeReconciliation(normalized, StudioInspectionRunReconciliationStatus.Failed,
+                        "RUN_RUNTIME_FAULT", runtimeState.ErrorMessage ?? "The authoritative runtime session failed."),
+                _ => RuntimeReconciliation(normalized, StudioInspectionRunReconciliationStatus.ResultNotFound,
+                    "RUN_RESULT_NOT_FOUND", "The runtime session ended without a matching persisted formal result.")
+            };
+        }
+
+        try
+        {
+            var current = await AdmitPersistedStudioRunAsync(
+                normalized.ProjectId,
+                normalized.PersistenceRevision,
+                normalized.ClientSnapshotId,
+                cancellationToken);
+            if (!string.Equals(current.CanonicalFlowHash, normalized.CanonicalFlowHash, StringComparison.Ordinal) ||
+                !string.Equals(current.DecisionConfigurationHash, normalized.DecisionConfigurationHash, StringComparison.Ordinal))
+            {
+                return IdentityMismatch(normalized, "RUN_IDENTITY_MISMATCH", "The current persisted Project identity differs from the formal run identity.");
+            }
+        }
+        catch (StudioInspectionRunIdentityException ex)
+        {
+            return IdentityMismatch(normalized, ex.Code, ex.Message);
+        }
+        catch (ProjectNotFoundException)
+        {
+            return RuntimeReconciliation(normalized, StudioInspectionRunReconciliationStatus.ResultNotFound,
+                "RUN_PROJECT_NOT_FOUND", "The Project or its formal result was not found.");
+        }
+        catch (ExecutionAdmissionService.ExecutionAdmissionRejectedException ex)
+        {
+            return RuntimeReconciliation(normalized, StudioInspectionRunReconciliationStatus.ResultNotFound,
+                ex.Admission.Code, "No matching persisted formal result is available.");
+        }
+
+        return RuntimeReconciliation(normalized, StudioInspectionRunReconciliationStatus.ResultNotFound,
+            "RUN_RESULT_NOT_FOUND", "No formal result matches the supplied snapshot identity.");
     }
 
     public async Task<InspectionResult> ExecuteSingleAsync(
@@ -248,13 +360,13 @@ public class InspectionService : IInspectionService
             cancellationToken);
         return await ExecuteSingleWithCoordinatorAsync(
             snapshot,
-            sessionId => ExecuteSingleResolvedCoreAsync(
+            (sessionId, executionCancellationToken) => ExecuteSingleResolvedCoreAsync(
                 projectId,
                 imageData,
                 snapshot,
                 globalVariables,
                 sessionId,
-                cancellationToken),
+                executionCancellationToken),
             cancellationToken);
 #if false
         var actualFlow = await ResolveExecutionFlowAsync(projectId, flow);
@@ -386,13 +498,13 @@ public class InspectionService : IInspectionService
             cancellationToken);
         return await ExecuteSingleWithCoordinatorAsync(
             snapshot,
-            sessionId => ExecuteSingleFromCameraCoreAsync(
+            (sessionId, executionCancellationToken) => ExecuteSingleFromCameraCoreAsync(
                 projectId,
                 cameraId,
                 snapshot,
                 globalVariables,
                 sessionId,
-                cancellationToken),
+                executionCancellationToken),
             cancellationToken);
     }
 
@@ -762,8 +874,9 @@ public class InspectionService : IInspectionService
 
     private async Task<InspectionResult> ExecuteSingleWithCoordinatorAsync(
         ExecutionSnapshot snapshot,
-        Func<Guid, Task<InspectionResult>> executeAsync,
-        CancellationToken cancellationToken)
+        Func<Guid, CancellationToken, Task<InspectionResult>> executeAsync,
+        CancellationToken cancellationToken,
+        bool useRuntimeCancellationToken = false)
     {
         var projectId = snapshot.ProjectId;
         var sessionId = Guid.NewGuid();
@@ -778,9 +891,14 @@ public class InspectionService : IInspectionService
         try
         {
             _coordinator.UpdateSessionStatus(projectId, sessionId, RuntimeStatus.Running);
-            return await executeAsync(sessionId);
+            var executionCancellationToken = useRuntimeCancellationToken
+                ? _coordinator.GetCancellationToken(projectId)
+                : cancellationToken;
+            return await executeAsync(sessionId, executionCancellationToken);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (
+            cancellationToken.IsCancellationRequested ||
+            useRuntimeCancellationToken && _coordinator.GetCancellationToken(projectId).IsCancellationRequested)
         {
             throw;
         }
@@ -794,6 +912,105 @@ public class InspectionService : IInspectionService
             _coordinator.MarkAsStopped(projectId, sessionId);
         }
     }
+
+    private async Task<InspectionResult> PersistCancelledStudioRunAsync(ExecutionSnapshot snapshot)
+    {
+        var runtimeState = _coordinator.GetState(snapshot.ProjectId);
+        var result = new InspectionResult(snapshot.ProjectId);
+        result.SetOutcome(new InspectionOutcome(
+            ExecutionOutcome.Cancelled,
+            DecisionOutcome.NotApplicable,
+            "StudioFormalRun",
+            "Cancelled",
+            "The formal run was cancelled by the operator."),
+            processingTimeMs: 0);
+        result.SetExecutionTraceability(snapshot, null, runtimeState?.SessionId);
+        await _resultRepository.AddAsync(InspectionResultPersistenceSnapshot.WithoutOutputImage(result));
+        return result;
+    }
+
+    private static bool TryNormalizeStudioRunIdentity(
+        StudioInspectionRunIdentity identity,
+        out StudioInspectionRunIdentity normalized,
+        out StudioInspectionRunReconciliation? invalid)
+    {
+        normalized = identity with
+        {
+            CanonicalFlowHash = identity.CanonicalFlowHash?.Trim() ?? string.Empty,
+            DecisionConfigurationHash = identity.DecisionConfigurationHash?.Trim() ?? string.Empty
+        };
+        invalid = normalized.ProjectId == Guid.Empty ||
+                  normalized.ClientSnapshotId == Guid.Empty ||
+                  normalized.PersistenceRevision < 0 ||
+                  string.IsNullOrWhiteSpace(normalized.CanonicalFlowHash) ||
+                  string.IsNullOrWhiteSpace(normalized.DecisionConfigurationHash)
+            ? IdentityMismatch(normalized, "RUN_IDENTITY_INVALID", "A complete persisted formal run identity is required.")
+            : null;
+        return invalid == null;
+    }
+
+    private static bool MatchesRuntimeIdentity(RuntimeState state, StudioInspectionRunIdentity identity) =>
+        state.ExecutionSnapshotId == identity.ClientSnapshotId &&
+        state.ProjectId == identity.ProjectId &&
+        state.ProjectRevision == identity.PersistenceRevision &&
+        string.Equals(state.FlowHash, identity.CanonicalFlowHash, StringComparison.Ordinal) &&
+        string.Equals(state.DecisionConfigurationHash, identity.DecisionConfigurationHash, StringComparison.Ordinal);
+
+    private static bool MatchesResultIdentity(InspectionResult result, StudioInspectionRunIdentity identity) =>
+        result.ProjectId == identity.ProjectId &&
+        result.ExecutionSnapshotId == identity.ClientSnapshotId &&
+        result.ProjectPersistenceRevision == identity.PersistenceRevision &&
+        string.Equals(result.FlowVersionHash, identity.CanonicalFlowHash, StringComparison.Ordinal) &&
+        string.Equals(result.DecisionConfigurationHash, identity.DecisionConfigurationHash, StringComparison.Ordinal);
+
+    private static StudioInspectionRunReconciliation ReconcileStoredResult(
+        StudioInspectionRunIdentity identity,
+        InspectionResult result)
+    {
+        var outcome = result.GetOutcome();
+        var status = outcome.Execution switch
+        {
+            ExecutionOutcome.Cancelled => StudioInspectionRunReconciliationStatus.Cancelled,
+            ExecutionOutcome.Succeeded => StudioInspectionRunReconciliationStatus.Succeeded,
+            _ => StudioInspectionRunReconciliationStatus.Failed
+        };
+        var code = status switch
+        {
+            StudioInspectionRunReconciliationStatus.Cancelled => "RUN_CANCELLED",
+            StudioInspectionRunReconciliationStatus.Succeeded => null,
+            _ => "RUN_FAILED"
+        };
+        var message = status switch
+        {
+            StudioInspectionRunReconciliationStatus.Cancelled => "The formal run was authoritatively cancelled.",
+            StudioInspectionRunReconciliationStatus.Succeeded => "The formal run completed and its persisted result was recovered.",
+            _ => result.ErrorMessage ?? "The formal run completed with a failed execution outcome."
+        };
+        return RuntimeReconciliation(identity, status, code, message, result);
+    }
+
+    private static StudioInspectionRunReconciliation IdentityMismatch(
+        StudioInspectionRunIdentity identity,
+        string code,
+        string message) =>
+        RuntimeReconciliation(identity, StudioInspectionRunReconciliationStatus.IdentityMismatch, code, message);
+
+    private static StudioInspectionRunReconciliation RuntimeReconciliation(
+        StudioInspectionRunIdentity identity,
+        StudioInspectionRunReconciliationStatus status,
+        string? code,
+        string message,
+        InspectionResult? result = null) =>
+        new(
+            identity.ProjectId,
+            identity.ClientSnapshotId,
+            identity.PersistenceRevision,
+            identity.CanonicalFlowHash,
+            identity.DecisionConfigurationHash,
+            status,
+            code,
+            message,
+            result);
 
     private async Task<InspectionResult> ExecuteSingleCoreAsync(
         Guid projectId,

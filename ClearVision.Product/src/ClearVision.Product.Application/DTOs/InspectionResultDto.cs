@@ -256,6 +256,23 @@ public sealed class StudioInspectionRunAdmissionRequest
 }
 
 /// <summary>
+/// Identity used by formal Run stop and reconcile operations. It is never a
+/// substitute for the persisted Project or Runtime authority.
+/// </summary>
+public sealed class StudioInspectionRunIdentityRequest
+{
+    public Guid ProjectId { get; set; }
+
+    public Guid ClientSnapshotId { get; set; }
+
+    public long ExpectedPersistenceRevision { get; set; }
+
+    public string? ExpectedCanonicalFlowHash { get; set; }
+
+    public string? ExpectedDecisionConfigurationHash { get; set; }
+}
+
+/// <summary>
 /// 启动实时检测请求
 /// 【第二优先级】支持相机驱动和流程驱动两种模式
 /// </summary>
