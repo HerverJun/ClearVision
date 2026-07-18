@@ -29,6 +29,15 @@ function createTestPlatform(): StudioPlatform {
     async get<T>(path: string): Promise<T | undefined> {
       const payload = path === '/health'
         ? { status: 'Healthy', port: 5000 }
+        : path === 'auth/setup-status'
+          ? {
+              requiresInitialAdminSetup: false,
+              usernameMinLength: 3,
+              passwordMinLength: 6,
+              requiresUppercase: false,
+              requiresLowercase: false,
+              requiresDigit: false
+            }
         : path === 'auth/me'
           ? { userId: 'user-1', username: 'tester', role: 'Engineer' }
           : [];
@@ -107,7 +116,7 @@ describe('mountStudioApp', () => {
     await router.push('/about');
     await nextTick();
     expect(document.querySelector('[data-studio-page="about"]')).not.toBeNull();
-    expect(document.body.textContent).toContain('预置会话 authenticated preview');
+    expect(document.body.textContent).toContain('authenticated');
 
     await router.push('/missing-page');
     await nextTick();

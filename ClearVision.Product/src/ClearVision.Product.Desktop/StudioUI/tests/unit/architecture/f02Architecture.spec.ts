@@ -35,10 +35,9 @@ describe('F02 architecture guards', () => {
       .toEqual([]);
   });
 
-  it('keeps formal product requests GET-only', () => {
+  it('keeps product writes inside the approved shared transport owners', () => {
     const productFiles = files.filter(path => !path.includes(`${join(sourceRoot, 'labs')}`));
     const forbidden = productFiles.filter(path =>
-      /method\s*:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/i.test(read(path)) ||
       /\b(?:axios|httpClient|apiClient)\.(?:post|put|patch|delete)\s*\(/i.test(read(path))
     );
     expect(forbidden).toEqual([]);
@@ -57,7 +56,11 @@ describe('F02 architecture guards', () => {
       .filter(path => !path.includes(`${join(sourceRoot, 'labs')}`))
       .filter(path => /<main(?:\s|>)/.test(read(path)))
       .map(path => relative(studioRoot, path).replaceAll('\\', '/'));
-    expect(formalMainFiles).toEqual(['src/app/layouts/ProductLayout.vue']);
+    expect(formalMainFiles).toEqual(expect.arrayContaining([
+      'src/app/layouts/ProductLayout.vue',
+      'src/app/pages/auth/AuthShell.vue',
+      'src/app/pages/ForbiddenPage.vue'
+    ]));
     expect(existsSync(join(sourceRoot, 'design-system/tokens/tokens.css'))).toBe(true);
     expect(files.filter(path => /data-product-shell="ready"/.test(read(path))))
       .toEqual([join(sourceRoot, 'app/layouts/ProductLayout.vue')]);

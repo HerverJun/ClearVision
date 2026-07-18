@@ -21,7 +21,8 @@ async function fulfillJson(route: Route, status: number, body: unknown): Promise
 async function bootOverview(
   page: Page,
   authenticated = true,
-  recentProjectsStatus: 200 | 401 | 403 = authenticated ? 200 : 401
+  recentProjectsStatus: 200 | 401 | 403 = authenticated ? 200 : 401,
+  role: 'Admin' | 'Engineer' | 'Operator' = 'Operator'
 ): Promise<F02MethodAuditEntry[]> {
   const audit: F02MethodAuditEntry[] = [];
   await installF02BrowserStartup(page);
@@ -35,9 +36,13 @@ async function bootOverview(
     const request = route.request();
     const url = new URL(request.url());
     audit.push(auditF02Request(request));
+    if (url.pathname === '/api/auth/setup-status') {
+      await fulfillJson(route, 200, { requiresInitialAdminSetup: false, usernameMinLength: 3, passwordMinLength: 6, requiresUppercase: false, requiresLowercase: false, requiresDigit: false });
+      return;
+    }
     if (url.pathname === '/api/auth/me') {
       await fulfillJson(route, authenticated ? 200 : 401, authenticated
-        ? { userId: 'fixture-user', username: 'fixture-operator', role: 'Operator' }
+        ? { userId: 'fixture-user', username: 'fixture-operator', role }
         : { error: 'Unauthorized' });
       return;
     }
@@ -64,7 +69,7 @@ async function bootOverview(
   if (authenticated) {
     await expect(page.locator('[data-capability="overview"]')).toBeVisible();
   } else {
-    await expect(page.locator('[data-product-state="unauthorized"]')).toBeVisible();
+    await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
   }
   return audit;
 }
@@ -81,11 +86,12 @@ test('Overview consumes shared health/session and recent-project projections wit
   expect(expectGetOnly(audit)).toBe(true);
 });
 
-test('Overview keeps public system status visible when the seeded session is rejected', async ({ page }) => {
+test('Overview does not mount ProductRuntime when the seeded session is rejected', async ({ page }) => {
   const audit = await bootOverview(page, false);
 
-  await expect(page.getByText('健康', { exact: true })).toBeVisible();
-  await expect(page.locator('[data-product-state="unauthorized"]')).toBeVisible();
+  await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
+  await expect(page.locator('[data-product-shell]')).toHaveCount(0);
+  await expect(page.locator('[data-capability="overview"]')).toHaveCount(0);
   expect(expectGetOnly(audit)).toBe(true);
 });
 
@@ -125,7 +131,7 @@ test('Product shell exposes one main landmark, skip navigation and disclosure fo
   await expect(appearance).not.toHaveAttribute('open', '');
   await expect(trigger).toBeFocused();
 
-  await page.getByRole('link', { name: /关于/ }).click();
+  await page.locator('[data-product-nav="/about"]').click();
   await expect(page.locator('[data-studio-page="about"]')).toBeVisible();
   await expect(page.getByRole('main')).toBeFocused();
 });
@@ -158,7 +164,7 @@ test('Product shell keeps reduced motion and short-viewport keyboard targets vis
 });
 
 test('Diagnostics, About and 404 remain inside the single product shell', async ({ page }) => {
-  await bootOverview(page);
+  await bootOverview(page, true, 200, 'Engineer');
 
   await page.goto('/studio/index.html#/diagnostics');
   await expect(page.locator('[data-studio-page="diagnostics"]')).toBeVisible();
@@ -229,7 +235,7 @@ for (const state of [
     id: 'unauthorized',
     authenticated: false,
     recentProjectsStatus: 401,
-    selector: '[data-product-state="unauthorized"]'
+    selector: '[data-auth-page="login"]'
   },
   {
     id: 'forbidden',

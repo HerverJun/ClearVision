@@ -37,17 +37,14 @@ describe('F03 G1-G5 architecture guards', () => {
       .toEqual(['src/platform/api/apiTransport.ts']);
     expect(files.filter(path => path.endsWith('ProductLayout.vue'))).toHaveLength(1);
     expect(files.filter(path => path.endsWith('workspaceOwner.ts'))).toHaveLength(1);
-    expect(files
-      .filter(path => !studioRelative(path).startsWith('src/labs/'))
-      .filter(path => /<main(?:\s|>)/.test(read(path)))
-      .map(studioRelative))
+    expect(files.filter(path => /data-product-shell="ready"/.test(read(path))).map(studioRelative))
       .toEqual(['src/app/layouts/ProductLayout.vue']);
   });
 
   it('keeps Workspace HTTP on the shared transport and the G5 method allowlist', () => {
     const workspaceSource = workspaceFiles.map(read).join('\n');
     const transport = read(join(sourceRoot, 'platform/api/apiTransport.ts'));
-    const session = read(join(sourceRoot, 'app/session/sessionProjectionOwner.ts'));
+    const auth = read(join(sourceRoot, 'app/auth/authLifecycleOwner.ts'));
     const query = read(join(workspaceRoot, 'workspaceQueries.ts'));
 
     expect(workspaceSource).not.toMatch(/\b(?:globalThis\.)?fetch\s*\(/);
@@ -57,7 +54,7 @@ describe('F03 G1-G5 architecture guards', () => {
     expect(previewTransport).toContain("'flows/preview-node'");
     expect(previewTransport).toContain('preview-artifacts/');
     expect(previewTransport).not.toMatch(/api\/projects.*(?:PUT|POST)|inspection\/(?:admission|execute)/i);
-    expect(session).toContain("path: 'auth/me'");
+    expect(auth).toContain("'auth/me'");
     expect(query).toContain('return `projects/${projectId}`');
     expect(query).not.toMatch(/preview|artifact|admission|execute|results|upload|global-variables/i);
     expect(read(join(sourceRoot, 'capabilities/operators-read/operatorQueries.ts')))

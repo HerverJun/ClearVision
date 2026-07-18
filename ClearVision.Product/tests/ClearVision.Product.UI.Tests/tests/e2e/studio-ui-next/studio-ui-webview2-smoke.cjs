@@ -25,6 +25,7 @@ const expectations = new Set([
   'legacy',
   'studio-diagnostics',
   'studio-product',
+  'studio-auth',
   'studio-design',
   'studio-canvas',
   'missing-assets'
@@ -276,10 +277,57 @@ function normalizeStudioRoute(value) {
 function routeForExpectation(expectation) {
   switch (expectation) {
     case 'studio-product': return '/overview';
+    case 'studio-auth': return '/login';
     case 'studio-design': return '/labs/design';
     case 'studio-canvas': return '/labs/canvas';
     default: return '/diagnostics';
   }
+}
+
+async function verifyStudioAuthLifecycle(page, userJson, password) {
+  const user = JSON.parse(userJson);
+  const username = user.username || user.Username;
+  assert(username, 'The WebView2 auth scenario did not receive a username.');
+  assert(password, 'CV_SMOKE_PASSWORD is required for the WebView2 auth scenario.');
+
+  await page.waitForSelector('[data-auth-page="login"]', { state: 'visible', timeout: 45_000 });
+  const beforeLogin = await page.evaluate(() => ({
+    authShellCount: document.querySelectorAll('[data-auth-shell="ready"]').length,
+    productShellCount: document.querySelectorAll('[data-product-shell]').length,
+    tokenPresent: Boolean(sessionStorage.getItem('cv_auth_token'))
+  }));
+  assert(beforeLogin.authShellCount === 1, 'WebView2 did not mount the login shell.');
+  assert(beforeLogin.productShellCount === 0, 'ProductRuntime mounted before WebView2 login.');
+  assert(beforeLogin.tokenPresent === false, 'WebView2 auth scenario started with a pre-seeded page token.');
+
+  await page.getByLabel('用户名').fill(username);
+  await page.getByLabel('密码').fill(password);
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+  await page.waitForSelector('[data-product-shell="ready"]', { state: 'visible', timeout: 45_000 });
+  const authenticated = await page.evaluate(() => ({
+    authShellCount: document.querySelectorAll('[data-auth-shell="ready"]').length,
+    productShellCount: document.querySelectorAll('[data-product-shell="ready"]').length,
+    tokenPresent: Boolean(sessionStorage.getItem('cv_auth_token')),
+    route: location.hash
+  }));
+  assert(authenticated.productShellCount === 1, 'WebView2 login did not mount exactly one ProductRuntime shell.');
+  assert(authenticated.authShellCount === 0, 'WebView2 login left the Auth shell mounted.');
+  assert(authenticated.tokenPresent, 'WebView2 login did not persist the token through the token port.');
+
+  await page.getByRole('button', { name: '退出', exact: true }).click();
+  await page.waitForSelector('[data-auth-page="login"]', { state: 'visible', timeout: 45_000 });
+  await page.goBack();
+  await page.waitForSelector('[data-auth-page="login"]', { state: 'visible', timeout: 45_000 });
+  const loggedOut = await page.evaluate(() => ({
+    authShellCount: document.querySelectorAll('[data-auth-shell="ready"]').length,
+    productShellCount: document.querySelectorAll('[data-product-shell]').length,
+    tokenPresent: Boolean(sessionStorage.getItem('cv_auth_token')),
+    route: location.hash
+  }));
+  assert(loggedOut.authShellCount === 1, 'WebView2 logout did not restore the Auth shell.');
+  assert(loggedOut.productShellCount === 0, 'WebView2 logout retained ProductRuntime DOM.');
+  assert(loggedOut.tokenPresent === false, 'WebView2 logout did not clear the token port.');
+  return { beforeLogin, authenticated, loggedOut };
 }
 
 function meaningfulRequestFailures(requestFailures) {
@@ -2030,6 +2078,9 @@ async function main() {
   const evidenceDirectory = path.resolve(requiredEnvironment('CV_EVIDENCE_DIR'));
   const executablePath = path.resolve(requiredEnvironment('CV_STUDIO_UI_DESKTOP_EXECUTABLE'));
   const expectation = requiredEnvironment('CV_STUDIO_UI_EXPECTATION').toLowerCase();
+  const password = expectation === 'studio-auth'
+    ? requiredEnvironment('CV_SMOKE_PASSWORD')
+    : String(process.env.CV_SMOKE_PASSWORD || '');
   const runName = String(process.env.CV_STUDIO_UI_RUN_NAME || expectation).trim();
   const phase = String(process.env.CV_SMOKE_PHASE || 'full').trim();
   const runtimeKind = String(process.env.CV_STUDIO_UI_RUNTIME_KIND || 'unknown').trim();
@@ -2101,8 +2152,12 @@ async function main() {
       runtimeErrors = captureRuntimeErrors(page);
       evidence.missingAssets = await verifyMissingAssets(page);
     } else {
-      await seedAuthenticatedSession(page, webPort, token, user);
-      runtimeErrors = captureRuntimeErrors(page);
+      if (expectation === 'studio-auth') {
+        runtimeErrors = captureRuntimeErrors(page);
+      } else {
+        await seedAuthenticatedSession(page, webPort, token, user);
+        runtimeErrors = captureRuntimeErrors(page);
+      }
       evidence.targetUrl = await navigateWithAuthenticatedSession(
         page,
         webPort,
@@ -2110,7 +2165,9 @@ async function main() {
         route
       );
 
-      if (expectation === 'legacy') {
+      if (expectation === 'studio-auth') {
+        evidence.authLifecycle = await verifyStudioAuthLifecycle(page, user, password);
+      } else if (expectation === 'legacy') {
         evidence.legacy = await verifyLegacy(page, webPort);
       } else {
         evidence.studio = await verifyStudioFoundation(page, webPort, route);

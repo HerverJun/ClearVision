@@ -27,7 +27,9 @@ describe('StudioPlatform composition', () => {
       sessionStorage: {
         getItem(key: string) {
           return key === 'cv_auth_token' ? 'browser-token' : null;
-        }
+        },
+        setItem() {},
+        removeItem() {}
       },
       __CLEARVISION_STARTUP__: {
         schemaVersion: 1,

@@ -255,6 +255,7 @@ const operatorCatalog = Object.freeze([
 interface BootOptions {
   readonly workspaceEnabled?: boolean;
   readonly authStatus?: number;
+  readonly expectAuthShell?: boolean;
   readonly projectStatus?: number | (() => number);
   readonly projectBody?: unknown | ((projectId: string) => unknown);
   readonly projectDelayMs?: number;
@@ -305,6 +306,10 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
     const request = route.request();
     const url = new URL(request.url());
     audit.push(auditF03Request(request));
+    if (url.pathname === '/api/auth/setup-status') {
+      await fulfillF03Json(route, 200, { requiresInitialAdminSetup: false, usernameMinLength: 3, passwordMinLength: 6, requiresUppercase: false, requiresLowercase: false, requiresDigit: false }, fixtureSchema);
+      return;
+    }
     if (url.pathname === '/api/auth/me') {
       const status = options.authStatus ?? 200;
       await fulfillF03Json(route, status, status === 200
@@ -517,7 +522,11 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
     await fulfillF03Json(route, 404, { code: 'UNEXPECTED_F03_ROUTE' }, fixtureSchema);
   });
   await page.goto(`/studio/index.html#/projects/${projectA}/workspace`);
-  await expect(page.locator('[data-evidence-surface="f03-workspace-shell"]')).toBeVisible();
+  if (options.expectAuthShell) {
+    await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
+  } else {
+    await expect(page.locator('[data-evidence-surface="f03-workspace-shell"]')).toBeVisible();
+  }
   return audit;
 }
 
@@ -2191,7 +2200,6 @@ for (const fixture of [
 }
 
 for (const scenario of [
-  { label: '401', options: { authStatus: 401 }, state: 'unauthorized', readonly: 'false' },
   { label: '403/readonly', options: { projectStatus: 403 }, state: 'forbidden', readonly: 'true' },
   { label: '404', options: { projectStatus: 404 }, state: 'not-found', readonly: 'false' },
   {
@@ -2211,6 +2219,14 @@ for (const scenario of [
     expect(isF03G4RequestAllowlist(audit)).toBe(true);
   });
 }
+
+test('rejects a 401 before mounting ProductRuntime or Workspace owners', async ({ page }) => {
+  const audit = await bootWorkspace(page, { authStatus: 401, expectAuthShell: true });
+  await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
+  await expect(page.locator('[data-evidence-surface="f03-workspace-shell"]')).toHaveCount(0);
+  expect(await workspaceDiagnostics(page)).toBeNull();
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
+});
 
 test('passes 20 real Browser route mount/unmount cycles with a zero ledger', async ({ page }) => {
   const audit = await bootWorkspace(page);

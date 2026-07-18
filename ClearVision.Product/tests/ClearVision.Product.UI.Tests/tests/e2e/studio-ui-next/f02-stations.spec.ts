@@ -151,12 +151,16 @@ async function bootStations(
   listPayload: unknown = [station()]
 ): Promise<F02MethodAuditEntry[]> {
   const audit: F02MethodAuditEntry[] = [];
-  await installF02BrowserStartup(page);
+  await installF02BrowserStartup(page, { 'Studio2.StationsRead': true });
   await page.route('**/health', route => fulfill(route, 200, { status: 'Healthy', port: 5177 }));
   await page.route('**/api/**', async route => {
     const request = route.request();
     const url = new URL(request.url());
     audit.push(auditF02Request(request));
+    if (url.pathname === '/api/auth/setup-status') {
+      await fulfill(route, 200, { requiresInitialAdminSetup: false, usernameMinLength: 3, passwordMinLength: 6, requiresUppercase: false, requiresLowercase: false, requiresDigit: false });
+      return;
+    }
     if (url.pathname === '/api/auth/me') {
       await fulfill(route, 200, { userId: 'fixture-user', username: 'fixture-engineer', role: 'Engineer' });
       return;

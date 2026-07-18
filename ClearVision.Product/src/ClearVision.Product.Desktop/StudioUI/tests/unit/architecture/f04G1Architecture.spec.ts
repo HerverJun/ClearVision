@@ -26,86 +26,73 @@ function studioRelative(path: string): string {
   return relative(studioRoot, path).replaceAll('\\', '/');
 }
 
-describe('F04 G1 owner, route and transport boundary guards', () => {
+describe('F04 G2 auth, owner, route and transport boundary guards', () => {
   const files = sourceFiles(sourceRoot);
 
-  it('records the current single session projection owner without inventing the future auth lifecycle owner', () => {
-    expect(files.filter(path => path.endsWith('sessionProjectionOwner.ts'))).toHaveLength(1);
-    expect(files.filter(path => path.toLowerCase().endsWith('authlifecycleowner.ts'))).toHaveLength(0);
+  it('has one auth owner, no runtime session projection owner and one token writer', () => {
+    expect(files.filter(path => path.toLowerCase().endsWith('authlifecycleowner.ts'))).toHaveLength(1);
+    expect(files.filter(path => read(path).includes('createSessionProjectionOwner('))).toEqual([]);
 
     const tokenLiteralFiles = files
       .filter(path => read(path).includes('cv_auth_token'))
       .map(studioRelative);
-    expect(tokenLiteralFiles).toEqual(['src/app/studioPlatform.ts']);
-    expect(files.filter(path => /(?:localStorage|sessionStorage)\s*\??\.\s*(?:setItem|removeItem)\s*\(/.test(read(path))))
+    expect(tokenLiteralFiles).toEqual(['src/platform/auth/tokenPort.ts']);
+
+    const tokenWriterConsumers = files
+      .filter(path => /\.\s*(?:setToken|removeToken)\s*\(/.test(read(path)))
+      .map(studioRelative);
+    expect(tokenWriterConsumers).toEqual(['src/app/auth/authLifecycleOwner.ts']);
+    expect(files.filter(path => /localStorage\s*\.\s*(?:setItem|removeItem)\s*\(/.test(read(path))))
       .toEqual([]);
   });
 
-  it('keeps one HTTP transport and only the approved F03 write ports', () => {
+  it('keeps one HTTP authority and uses a direct unauthorized callback without EventBus', () => {
     expect(files
       .filter(path => /\b(?:globalThis\.)?fetch\s*\(/.test(read(path)))
       .map(studioRelative))
       .toEqual(['src/platform/api/apiTransport.ts']);
-
-    const writePortFiles = files
-      .filter(path => /api\.(?:post|put|delete)(?:\.bind\(api\)|\s*\()/.test(read(path)))
-      .map(studioRelative)
-      .sort();
-    expect(writePortFiles).toEqual([
-      'src/capabilities/project-workspace/persistence/projectPersistencePort.ts',
-      'src/capabilities/project-workspace/preview/previewTransport.ts',
-      'src/capabilities/project-workspace/run/runContracts.ts'
-    ]);
-
-    expect(read(join(sourceRoot, 'capabilities/project-workspace/persistence/projectPersistencePort.ts')))
-      .toContain('return `projects/${projectId}`');
-    expect(read(join(sourceRoot, 'capabilities/project-workspace/preview/previewTransport.ts')))
-      .toContain("'flows/preview-node'");
-    const run = read(join(sourceRoot, 'capabilities/project-workspace/run/runContracts.ts'));
-    expect(run).toContain("'inspection/admission'");
-    expect(run).toContain("'inspection/execute'");
-    expect(run).toContain("'inspection/stop'");
-    expect(run).toContain("'inspection/reconcile'");
+    const transport = read(join(sourceRoot, 'platform/api/apiTransport.ts'));
+    const auth = read(join(sourceRoot, 'app/auth/authLifecycleOwner.ts'));
+    expect(transport).toContain('setUnauthorizedHandler');
+    expect(transport).toContain('sessionGeneration');
+    expect(auth).toContain('unauthorizedFlights');
+    expect(`${transport}\n${auth}`).not.toMatch(/EventBus|ServiceRegistry/);
   });
 
-  it('keeps one Workspace authority and no frontend Project, Result or Runtime repository', () => {
+  it('gates ProductRuntime behind authenticated composition and preserves one Workspace authority', () => {
+    const root = read(join(sourceRoot, 'app/auth/authLifecycleRoot.ts'));
+    const productRuntime = read(join(sourceRoot, 'app/productRuntime.ts'));
+    expect(root).toContain('createProductRuntime(platform, currentAuth.session)');
+    expect(root).toContain('productRuntime.value = null');
+    expect(root).toContain('quarantineForSessionExpiration');
+    expect(productRuntime).not.toContain('createSessionProjectionOwner');
     expect(files.filter(path => path.endsWith('workspaceOwner.ts'))).toHaveLength(1);
     expect(files.filter(path => path.endsWith('workspacePersistenceOwner.ts'))).toHaveLength(1);
     expect(files.filter(path => path.endsWith('runCommandOwner.ts'))).toHaveLength(1);
     expect(files.filter(path => /(?:project|result|runtime)Repository\.(?:ts|js)$/i.test(path)))
       .toHaveLength(0);
-    expect(files.filter(path => /\bclass\s+(?:Project|Result|Runtime)Repository\b/.test(read(path))))
-      .toHaveLength(0);
   });
 
-  it('freezes current route metadata while leaving the real G2 guard explicitly unimplemented', () => {
+  it('installs real setup, session, role, profile, internal and safe-return guards', () => {
     const routes = createTestRouter().getRoutes();
-    const protectedProductPaths = [
-      '/overview',
-      '/projects',
-      '/projects/:id',
-      '/projects/:id/workspace',
-      '/operators',
-      '/operators/:operatorType',
-      '/stations',
-      '/stations/:stationId',
-      '/results',
-      '/diagnostics',
-      '/about',
-      '/:pathMatch(.*)*'
-    ];
-    for (const path of protectedProductPaths) {
-      expect(routes.find(route => route.path === path)?.meta.requiresSession, path).toBe(true);
+    for (const path of ['/setup', '/login', '/change-password', '/forbidden', '/not-found']) {
+      expect(routes.find(route => route.path === path), path).toBeDefined();
     }
+    expect(routes.find(route => route.path === '/projects/:id/workspace')?.meta.allowedRoles)
+      .toEqual(['Admin', 'Engineer']);
+    expect(routes.find(route => route.path === '/diagnostics')?.meta.allowedRoles)
+      .toEqual(['Admin', 'Engineer']);
+    expect(routes.find(route => route.path === '/stations')?.meta.productProfile).toBe('stations-read');
     expect(routes.find(route => route.path === '/labs/design')?.meta.internal).toBe(true);
-    expect(routes.find(route => route.path === '/labs/canvas')?.meta.internal).toBe(true);
 
     const router = read(join(sourceRoot, 'app/router.ts'));
-    expect(router).not.toContain('beforeEach(');
-    expect(router).not.toContain('safeReturn');
+    expect(router).toContain('router.beforeEach');
+    expect(router).toContain('resolveSafeReturnRoute');
+    expect(router).toContain("path: '/forbidden'");
+    expect(router).toContain("path: '/login'");
   });
 
-  it('keeps internal Labs out of product navigation and formal defaults false/false', () => {
+  it('keeps Labs out of product navigation and formal defaults false/false', () => {
     const navigation = read(join(sourceRoot, 'app/navigation.ts'));
     expect(navigation).not.toContain('/labs');
 

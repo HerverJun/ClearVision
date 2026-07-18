@@ -151,6 +151,7 @@ public sealed class StudioUiArchitectureGuardTests
             .ToList();
         abortControllerOwners.Should().BeEquivalentTo(new[]
         {
+            "src/app/auth/authLifecycleOwner.ts",
             "src/capabilities/project-workspace/preview/previewTransport.ts",
             "src/capabilities/project-workspace/run/runCommandOwner.ts",
             "src/platform/diagnostics/runtimeDiagnostics.ts",
@@ -369,6 +370,7 @@ public sealed class StudioUiArchitectureGuardTests
         sourceFiles.Count(file => Path.GetFileName(file) == "ProductLayout.vue").Should().Be(1);
         sourceFiles.Count(file => Path.GetFileName(file) == "InternalLabLayout.vue").Should().Be(1);
         sourceFiles.Count(file => Path.GetFileName(file) == "sessionProjectionOwner.ts").Should().Be(1);
+        sourceFiles.Count(file => Path.GetFileName(file) == "authLifecycleOwner.ts").Should().Be(1);
         sourceFiles.Count(file => Path.GetFileName(file) == "systemStatusOwner.ts").Should().Be(1);
         sourceFiles.Count(file => Path.GetFileName(file) == "readQuery.ts").Should().Be(1);
 
@@ -384,6 +386,20 @@ public sealed class StudioUiArchitectureGuardTests
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
         productSource.Should().OnlyContain(text =>
             !text.Contains("new EventSource", StringComparison.Ordinal));
+
+        sourceFiles.Should().NotContain(file =>
+            File.ReadAllText(file).Contains("createSessionProjectionOwner(", StringComparison.Ordinal));
+        sourceFiles
+            .Where(file => File.ReadAllText(file).Contains("cv_auth_token", StringComparison.Ordinal))
+            .Select(StudioUiRelativePath)
+            .Should()
+            .Equal("src/platform/auth/tokenPort.ts");
+
+        var authOwner = File.ReadAllText(Path.Combine(
+            RepoPath(StudioUiRoot), "src", "app", "auth", "authLifecycleOwner.ts"));
+        authOwner.Should().Contain("setUnauthorizedHandler");
+        authOwner.Should().Contain("unauthorizedFlights");
+        authOwner.Should().NotContain("EventBus");
     }
 
     [Fact]
@@ -410,6 +426,11 @@ public sealed class StudioUiArchitectureGuardTests
         router.Should().Contain("path: '/labs'");
         router.Should().Contain("path: 'design'");
         router.Should().Contain("path: 'canvas'");
+        router.Should().Contain("router.beforeEach");
+        router.Should().Contain("resolveSafeReturnRoute");
+        router.Should().Contain("path: '/login'");
+        router.Should().Contain("path: '/setup'");
+        router.Should().Contain("path: '/forbidden'");
         router.Should().NotContain("/inspection");
         router.Should().NotContain("/settings");
         router.Should().NotContain("/ai");

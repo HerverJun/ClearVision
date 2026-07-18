@@ -35,7 +35,7 @@ describe('StudioUI router', () => {
     await router.push('/unknown');
 
     expect(router.currentRoute.value.path).toBe('/unknown');
-    expect(router.currentRoute.value.name).toBe('not-found');
+    expect(router.currentRoute.value.name).toBe('not-found-catchall');
     expect(router.currentRoute.value.meta.title).toBe('页面未找到');
   });
 

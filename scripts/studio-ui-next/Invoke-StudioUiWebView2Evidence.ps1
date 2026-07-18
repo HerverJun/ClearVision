@@ -5,6 +5,7 @@ param(
         "legacy",
         "studio-diagnostics",
         "studio-product",
+        "studio-auth",
         "studio-design",
         "studio-canvas",
         "missing-assets")]
@@ -13,7 +14,7 @@ param(
     [string]$Configuration = "Debug",
     [ValidateSet("debug", "publish", "missing-assets")]
     [string]$RuntimeKind = "debug",
-    [ValidateSet("f01", "f02", "f03")]
+    [ValidateSet("f01", "f02", "f03", "f04")]
     [string]$EvidencePhase = "f01",
     [string]$DesktopExecutablePath,
     [string]$NodeExecutablePath,
@@ -188,6 +189,8 @@ $resolvedRoute = if (-not [string]::IsNullOrWhiteSpace($Route)) {
     "/projects/seeded/workspace"
 } elseif ($Expectation -eq "studio-product") {
     "/overview"
+} elseif ($Expectation -eq "studio-auth") {
+    "/login"
 } elseif ($Expectation -eq "studio-design") {
     "/labs/design"
 } elseif ($Expectation -eq "studio-canvas") {

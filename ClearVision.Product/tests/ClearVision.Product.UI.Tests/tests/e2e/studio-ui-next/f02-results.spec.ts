@@ -141,6 +141,10 @@ async function bootResults(page: Page, initialHash = '/results'): Promise<F02Met
     const request = route.request();
     const url = new URL(request.url());
     audit.push(auditF02Request(request));
+    if (url.pathname === '/api/auth/setup-status') {
+      await fulfillJson(route, 200, { requiresInitialAdminSetup: false, usernameMinLength: 3, passwordMinLength: 6, requiresUppercase: false, requiresLowercase: false, requiresDigit: false });
+      return;
+    }
     if (url.pathname === '/api/auth/me') {
       await fulfillJson(route, 200, {
         userId: 'fixture-user',

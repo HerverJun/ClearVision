@@ -721,6 +721,10 @@ async function installFrozenBrowserFixture(page, authority, operators, results, 
     const request = route.request();
     const url = new URL(request.url());
     requestAudit.push({ method: request.method(), path: `${url.pathname}${url.search}` });
+    if (url.pathname === '/api/auth/setup-status') {
+      await fulfill(route, { requiresInitialAdminSetup: false, usernameMinLength: 3, passwordMinLength: 6, requiresUppercase: false, requiresLowercase: false, requiresDigit: false }, 'f04-auth-setup.v1', 200, fixtureStarted);
+      return;
+    }
     if (url.pathname === '/api/auth/me') {
       await fulfill(route, {
         userId: 'fixture-user',

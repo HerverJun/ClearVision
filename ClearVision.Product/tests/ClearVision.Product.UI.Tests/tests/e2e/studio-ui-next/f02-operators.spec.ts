@@ -95,6 +95,10 @@ async function bootOperators(
     const request = route.request();
     const url = new URL(request.url());
     audit.push(auditF02Request(request));
+    if (url.pathname === '/api/auth/setup-status') {
+      await fulfill(route, 200, { requiresInitialAdminSetup: false, usernameMinLength: 3, passwordMinLength: 6, requiresUppercase: false, requiresLowercase: false, requiresDigit: false });
+      return;
+    }
     if (url.pathname === '/api/auth/me') {
       await fulfill(route, 200, { userId: 'fixture-user', username: 'fixture-engineer', role: 'Engineer' });
       return;

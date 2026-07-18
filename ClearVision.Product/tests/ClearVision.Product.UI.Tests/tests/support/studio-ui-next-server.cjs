@@ -15,7 +15,7 @@ const host = (process.env.CV_UI_HOST || '127.0.0.1').trim();
 const port = (process.env.CV_UI_PORT || '5177').trim();
 const configuredWebRoot = process.env.CV_UI_WEB_ROOT?.trim();
 const evidencePhase = (process.env.CV_STUDIO_UI_EVIDENCE_PHASE || 'f01').trim().toLowerCase();
-if (!['f01', 'f02', 'f03'].includes(evidencePhase)) {
+if (!['f01', 'f02', 'f03', 'f04'].includes(evidencePhase)) {
   throw new Error(`Unsupported StudioUI evidence phase: ${evidencePhase}`);
 }
 const fixtureRoot = path.join(

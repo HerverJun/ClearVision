@@ -187,8 +187,11 @@ export async function captureF02VisualEvidence(
   return Object.freeze({ screenshotPath, metadataPath });
 }
 
-export async function installF02BrowserStartup(page: Page): Promise<void> {
-  await page.addInitScript(metadata => {
+export async function installF02BrowserStartup(
+  page: Page,
+  featureFlags: Readonly<Record<string, boolean>> = {}
+): Promise<void> {
+  await page.addInitScript(({ metadata, flags }) => {
     sessionStorage.setItem('cv_auth_token', 'f02-browser-fixture-token');
     sessionStorage.setItem('cv_current_user', 'fixture-user');
     Object.defineProperty(window, '__CLEARVISION_STARTUP__', {
@@ -198,7 +201,7 @@ export async function installF02BrowserStartup(page: Page): Promise<void> {
         hostKind: 'browser-test',
         apiBaseUrl: `${window.location.origin}/api`,
         studioUiBasePath: '/studio/',
-        featureFlags: Object.freeze({})
+        featureFlags: Object.freeze(flags)
       }),
       writable: false,
       configurable: false
@@ -208,7 +211,7 @@ export async function installF02BrowserStartup(page: Page): Promise<void> {
       writable: false,
       configurable: false
     });
-  }, f02BrowserFixture);
+  }, { metadata: f02BrowserFixture, flags: featureFlags });
 }
 
 export async function fulfillF02Json(

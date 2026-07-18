@@ -22,6 +22,12 @@ async function bootDesignLab(page: Page): Promise<string[]> {
     headers: { 'x-clearvision-data-source': 'BROWSER_FIXTURE' },
     body: JSON.stringify({ userId: 'design-lab-user', username: 'design-lab', role: 'Engineer' })
   }));
+  await page.route('**/api/auth/setup-status', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    headers: { 'x-clearvision-data-source': 'BROWSER_FIXTURE' },
+    body: JSON.stringify({ requiresInitialAdminSetup: false, usernameMinLength: 3, passwordMinLength: 6, requiresUppercase: false, requiresLowercase: false, requiresDigit: false })
+  }));
 
   await page.addInitScript(() => {
     sessionStorage.setItem('cv_auth_token', 'design-lab-browser-fixture-token');
