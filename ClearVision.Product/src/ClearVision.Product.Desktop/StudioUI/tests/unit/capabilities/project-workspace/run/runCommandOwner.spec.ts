@@ -218,6 +218,64 @@ describe('F03 G6 Workspace Run command owner', () => {
     diagnostics.dispose();
   });
 
+  it('keeps Stop unavailable during admission', async () => {
+    let resolveAdmission: ((value: WorkspaceRunAdmissionV1) => void) | undefined;
+    const persistence = createPersistence();
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const port = createPort({ admit: vi.fn(payload => new Promise<WorkspaceRunAdmissionV1>(resolve => {
+      resolveAdmission = resolve;
+      void payload;
+    })) });
+    const owner = createWorkspaceRunCommandOwner({ projectId, persistenceOwner: persistence.owner, port, diagnostics });
+
+    const running = owner.run();
+    expect(owner.projection).toMatchObject({ phase: 'admitting', canStop: false });
+    await expect(owner.stop()).resolves.toBe(false);
+    expect(port.stop).not.toHaveBeenCalled();
+
+    await expect(owner.prepareForLeave('test-cleanup')).resolves.toBe(true);
+    resolveAdmission?.(admission(owner.projection.clientSnapshotId ?? projectId));
+    await expect(running).resolves.toBeNull();
+    owner.dispose();
+    diagnostics.dispose();
+  });
+
+  it.each([
+    ['route leave during admission', 'route-leave'],
+    ['project switch during admission', 'project-switch'],
+    ['Host close during admission', 'host-close']
+  ] as const)('%s returns to a recoverable Workspace state', async (_label, reason) => {
+    let admissionSignal: AbortSignal | undefined;
+    const persistence = createPersistence();
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const port = createPort({ admit: vi.fn((_payload, options) => {
+      admissionSignal = options?.signal;
+      return new Promise<WorkspaceRunAdmissionV1>(() => {});
+    }) });
+    const owner = createWorkspaceRunCommandOwner({ projectId, persistenceOwner: persistence.owner, port, diagnostics });
+
+    void owner.run();
+    expect(owner.projection.phase).toBe('admitting');
+    await expect(owner.prepareForLeave(reason)).resolves.toBe(true);
+
+    expect(admissionSignal?.aborted).toBe(true);
+    expect(owner.projection).toMatchObject({
+      phase: 'idle',
+      clientSnapshotId: null,
+      admission: null,
+      canRun: true,
+      canStop: false,
+      canReconcile: false,
+      errorCode: 'RUN_ADMISSION_CANCELLED'
+    });
+    expect(persistence.owner.clearRunning).toHaveBeenCalledTimes(1);
+    expect(port.execute).not.toHaveBeenCalled();
+    expect(port.stop).not.toHaveBeenCalled();
+
+    owner.dispose();
+    diagnostics.dispose();
+  });
+
   it('reconciles a successful backend run after the execute response is lost', async () => {
     const persistence = createPersistence();
     const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
@@ -314,7 +372,7 @@ describe('F03 G6 Workspace Run command owner', () => {
     diagnostics.dispose();
   });
 
-  it('drops an admission response that arrives after route disposal', async () => {
+  it('drops a late admission response after cancellation', async () => {
     let resolveAdmission: ((value: WorkspaceRunAdmissionV1) => void) | undefined;
     const persistence = createPersistence();
     const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
@@ -326,13 +384,16 @@ describe('F03 G6 Workspace Run command owner', () => {
 
     const running = owner.run();
     expect(owner.projection.phase).toBe('admitting');
-    owner.dispose('route-leave');
+    await expect(owner.prepareForLeave('route-leave')).resolves.toBe(true);
+    expect(owner.projection).toMatchObject({ phase: 'idle', clientSnapshotId: null, canRun: true });
     resolveAdmission?.(admission('33333333-3333-4333-8333-333333333333'));
 
     await expect(running).resolves.toBeNull();
     expect(port.execute).not.toHaveBeenCalled();
-    expect(owner.projection.phase).toBe('disposed');
-    expect(diagnostics.diagnostics).toMatchObject({ runOwnerCount: 0, inFlightExecute: 0, activeAbortControllers: 0 });
+    expect(owner.projection).toMatchObject({ phase: 'idle', clientSnapshotId: null, canRun: true });
+    expect(persistence.owner.clearRunning).toHaveBeenCalledTimes(1);
+    expect(diagnostics.diagnostics).toMatchObject({ runOwnerCount: 1, inFlightExecute: 0, activeAbortControllers: 0 });
+    owner.dispose();
     diagnostics.dispose();
   });
 

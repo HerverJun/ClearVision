@@ -151,8 +151,7 @@ export function createWorkspaceRunCommandOwner(options: {
     state.canRun = !runPromise && options.persistenceOwner.projection.canRun &&
       (state.phase === 'idle' || state.phase === 'blocked' || state.phase === 'succeeded' ||
         state.phase === 'failed' || state.phase === 'cancelled');
-    state.canStop = Boolean(runPromise && activeController &&
-      (state.phase === 'admitting' || state.phase === 'executing'));
+    state.canStop = Boolean(runPromise && activeController && state.phase === 'executing');
     state.canReconcile = Boolean(!stopPromise && !reconcilePromise && state.clientSnapshotId && state.admission &&
       (state.phase === 'executing' || state.phase === 'cancel-requested' || state.phase === 'unknown-outcome'));
   }
@@ -192,6 +191,26 @@ export function createWorkspaceRunCommandOwner(options: {
       result.persistenceRevision === identity.expectedPersistenceRevision &&
       result.flowHash === identity.expectedCanonicalFlowHash &&
       result.decisionConfigurationHash === identity.expectedDecisionConfigurationHash;
+  }
+
+  function cancelAdmission(reason: string): boolean {
+    if (disposed || state.phase !== 'admitting' || !activeController) return false;
+    const controller = activeController;
+    operationGeneration += 1;
+    activeController = undefined;
+    authoritySettledLocalAbort = undefined;
+    runPromise = undefined;
+    state.clientSnapshotId = null;
+    state.admission = null;
+    state.result = null;
+    state.errorCode = 'RUN_ADMISSION_CANCELLED';
+    state.message = `Formal Run admission was cancelled locally (${reason}); no runtime session was created.`;
+    controller.abort();
+    options.persistenceOwner.clearRunning(state.message);
+    state.phase = options.persistenceOwner.projection.canRun ? 'idle' : 'blocked';
+    syncDiagnostics(false);
+    syncAvailability();
+    return true;
   }
 
   function applyReconciliation(
@@ -386,15 +405,6 @@ export function createWorkspaceRunCommandOwner(options: {
     const generation = operationGeneration;
     const clientSnapshotId = state.clientSnapshotId;
     if (!clientSnapshotId) return false;
-    if (state.phase === 'admitting') {
-      state.phase = 'unknown-outcome';
-      state.errorCode = 'RUN_ADMISSION_CANCELLED';
-      state.message = 'Formal Run admission was interrupted before a runtime session existed. Reconcile is required before leaving.';
-      activeController.abort();
-      syncAvailability();
-      return true;
-    }
-
     const identity = currentIdentity();
     if (!identity) {
       state.phase = 'unknown-outcome';
@@ -488,8 +498,8 @@ export function createWorkspaceRunCommandOwner(options: {
     void reason;
     if (disposed) return true;
     if (state.phase === 'admitting') {
-      await stopCurrent();
-      return false;
+      cancelAdmission(reason);
+      return true;
     }
     if (state.phase === 'executing') {
       await stopCurrent();
@@ -511,10 +521,13 @@ export function createWorkspaceRunCommandOwner(options: {
     run(): Promise<WorkspaceRunResultV1 | null> {
       if (runPromise) return runPromise;
       const operation = track(performRun());
-      runPromise = operation.finally(() => {
-        runPromise = undefined;
-        syncAvailability();
+      const flight = operation.finally(() => {
+        if (runPromise === flight) {
+          runPromise = undefined;
+          syncAvailability();
+        }
       });
+      runPromise = flight;
       syncAvailability();
       return runPromise;
     },
@@ -532,6 +545,7 @@ export function createWorkspaceRunCommandOwner(options: {
     },
     dispose(reason = 'workspace-run-disposed'): void {
       if (disposed) return;
+      if (state.phase === 'admitting') cancelAdmission(reason);
       disposed = true;
       operationGeneration += 1;
       activeController?.abort();
