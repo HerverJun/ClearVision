@@ -39,12 +39,16 @@ param(
     [string]$AuthMode = "HARNESS_SEEDED_SESSION",
     [string]$RollbackPhase,
     [string]$RollbackStatePath,
+    [string]$FinalJourneyPhase,
+    [string]$FinalJourneyStatePath,
+    [int]$SoakCycles = 0,
     [string]$DatabasePath,
     [string]$Username = "admin",
     [string]$Password,
     [switch]$KeepDatabase,
     [switch]$ReuseDatabase,
     [switch]$AllowInitialAdminSetup,
+    [switch]$DeferAuthToScenario,
     [switch]$NoBuild
 )
 
@@ -241,6 +245,42 @@ $rollbackStateFullPath = if ([string]::IsNullOrWhiteSpace($RollbackStatePath)) {
 } else {
     [System.IO.Path]::GetFullPath((Join-Path $repoRoot $RollbackStatePath))
 }
+$validFinalJourneyPhases = @("", "CREATE_RUN_LOGOUT", "REOPEN_DELETE", "SOAK")
+$normalizedFinalJourneyPhase = ([string]$FinalJourneyPhase).Trim().ToUpperInvariant()
+if ($normalizedFinalJourneyPhase -notin $validFinalJourneyPhases) {
+    throw "Unsupported FinalJourneyPhase '$FinalJourneyPhase'."
+}
+if ($normalizedFinalJourneyPhase -and -not $DeferAuthToScenario) {
+    throw "FinalJourneyPhase requires DeferAuthToScenario so setup/login remain UI-owned."
+}
+if ($normalizedFinalJourneyPhase -and
+    ($Expectation -ne "studio-product" -or -not $WorkspaceCapabilityEnabled -or
+        $SeedWorkspace -or $FormalRun -or $DpiOnly -or $normalizedRollbackPhase)) {
+    throw "FinalJourneyPhase requires an unseeded studio-product NEXT profile with Workspace enabled."
+}
+if ($normalizedFinalJourneyPhase -and
+    ([string]::IsNullOrWhiteSpace($configuredDatabasePath) -or
+        [string]::IsNullOrWhiteSpace($Password))) {
+    throw "FinalJourneyPhase requires an explicit isolated DatabasePath and UI password."
+}
+if ($normalizedFinalJourneyPhase -eq "SOAK") {
+    if ($SoakCycles -lt 20) {
+        throw "SOAK requires at least 20 cycles."
+    }
+} elseif ($SoakCycles -ne 0) {
+    throw "SoakCycles is only valid with FinalJourneyPhase SOAK."
+}
+$finalJourneyStateFullPath = if ([string]::IsNullOrWhiteSpace($FinalJourneyStatePath)) {
+    ""
+} elseif ([System.IO.Path]::IsPathRooted($FinalJourneyStatePath)) {
+    [System.IO.Path]::GetFullPath($FinalJourneyStatePath)
+} else {
+    [System.IO.Path]::GetFullPath((Join-Path $repoRoot $FinalJourneyStatePath))
+}
+if ($normalizedFinalJourneyPhase -in @("CREATE_RUN_LOGOUT", "REOPEN_DELETE") -and
+    [string]::IsNullOrWhiteSpace($finalJourneyStateFullPath)) {
+    throw "$normalizedFinalJourneyPhase requires FinalJourneyStatePath."
+}
 $databaseAllowedPrefix = $allowedEvidenceRoot.TrimEnd(
     [System.IO.Path]::DirectorySeparatorChar,
     [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
@@ -260,6 +300,12 @@ if ($rollbackStateFullPath -and
         $databaseAllowedPrefix,
         [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "RollbackStatePath must remain under .tmp/studio-ui-next."
+}
+if ($finalJourneyStateFullPath -and
+    -not $finalJourneyStateFullPath.StartsWith(
+        $databaseAllowedPrefix,
+        [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "FinalJourneyStatePath must remain under .tmp/studio-ui-next."
 }
 $resolvedRoute = if (-not [string]::IsNullOrWhiteSpace($Route)) {
     $Route
@@ -297,6 +343,9 @@ $customEnvironment = [ordered]@{
     "CV_STUDIO_UI_AUTH_MODE" = $AuthMode.Trim().ToUpperInvariant()
     "CV_STUDIO_UI_ROLLBACK_PHASE" = $normalizedRollbackPhase
     "CV_STUDIO_UI_ROLLBACK_STATE" = $rollbackStateFullPath
+    "CV_STUDIO_UI_FINAL_JOURNEY_PHASE" = $normalizedFinalJourneyPhase
+    "CV_STUDIO_UI_FINAL_JOURNEY_STATE" = $finalJourneyStateFullPath
+    "CV_STUDIO_UI_SOAK_CYCLES" = [string]$SoakCycles
     "CV_NATIVE_DPI_PROBE" = Join-Path $scriptRoot "Get-DesktopRuntimeProbe.ps1"
 }
 $previousEnvironment = @{}
@@ -317,6 +366,7 @@ $runnerManagedEnvironmentNames = @(
     "CV_SMOKE_PHASE",
     "CV_SMOKE_TOKEN",
     "CV_SMOKE_USER",
+    "CV_SMOKE_USERNAME",
     "CV_SMOKE_PASSWORD",
     "CV_EVIDENCE_DIR",
     "PATH"
@@ -431,6 +481,9 @@ if ($ReuseDatabase) {
 }
 if ($AllowInitialAdminSetup) {
     $runnerParameters["AllowInitialAdminSetup"] = $true
+}
+if ($DeferAuthToScenario) {
+    $runnerParameters["DeferAuthToScenario"] = $true
 }
 if ($SanitizeDesktopPath) {
     $runnerParameters["SanitizeDesktopPath"] = $true
@@ -556,6 +609,10 @@ $cleanup = [pscustomobject]@{
     authMode = $AuthMode.Trim().ToUpperInvariant()
     rollbackPhase = $normalizedRollbackPhase
     rollbackStatePath = if ($rollbackStateFullPath) { $rollbackStateFullPath } else { $null }
+    finalJourneyPhase = if ($normalizedFinalJourneyPhase) { $normalizedFinalJourneyPhase } else { $null }
+    finalJourneyStatePath = if ($finalJourneyStateFullPath) { $finalJourneyStateFullPath } else { $null }
+    soakCycles = $SoakCycles
+    authenticationDeferredToScenario = [bool]$DeferAuthToScenario
     sanitizedDesktopPath = [bool]$SanitizeDesktopPath
     externalNodeDriver = [pscustomobject]@{
         executablePath = $nodeExe

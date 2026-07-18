@@ -267,6 +267,7 @@ public sealed class StudioUiArchitectureGuardTests
                      "KeepDatabase",
                      "ReuseDatabase",
                      "AllowInitialAdminSetup",
+                     "DeferAuthToScenario",
                      "SanitizeDesktopPath",
                      "CV_DESKTOP_HTTP_PORT",
                      "CV_WEBVIEW2_USER_DATA_FOLDER",
@@ -295,6 +296,8 @@ public sealed class StudioUiArchitectureGuardTests
         evidenceWrapper.Should().Contain("startupLog");
         evidenceWrapper.Should().Contain("KeepDatabase");
         evidenceWrapper.Should().Contain("ReuseDatabase");
+        evidenceWrapper.Should().Contain("FinalJourneyPhase");
+        evidenceWrapper.Should().Contain("DeferAuthToScenario");
         evidenceWrapper.Should().NotContain("Start-Process");
 
         var profileEvidence = File.ReadAllText(RepoPath(
@@ -317,6 +320,17 @@ public sealed class StudioUiArchitectureGuardTests
         rollbackEvidence.Should().Contain("ReuseDatabase");
         rollbackEvidence.Should().NotContain("Start-Process");
 
+        var finalEvidence = File.ReadAllText(RepoPath(
+            "scripts/studio-ui-next/Invoke-StudioUiFinalEvidence.ps1"));
+        finalEvidence.Should().Contain("Invoke-StudioUiWebView2Evidence.ps1");
+        finalEvidence.Should().Contain("CREATE_RUN_LOGOUT");
+        finalEvidence.Should().Contain("REOPEN_DELETE");
+        finalEvidence.Should().Contain("SOAK");
+        finalEvidence.Should().Contain("DeferAuthToScenario");
+        finalEvidence.Should().Contain("KeepDatabase");
+        finalEvidence.Should().Contain("ReuseDatabase");
+        finalEvidence.Should().NotContain("Start-Process");
+
         var matrix = File.ReadAllText(RepoPath(
             "scripts/studio-ui-next/Invoke-StudioUiWebView2Matrix.ps1"));
         matrix.Should().Contain("Invoke-StudioUiWebView2Evidence.ps1");
@@ -337,6 +351,13 @@ public sealed class StudioUiArchitectureGuardTests
             "ClearVision.Product/tests/ClearVision.Product.UI.Tests/tests/e2e/studio-ui-next/studio-ui-webview2-smoke.cjs"));
         webView2Scenario.Should().Contain("f03-workspace-shell");
         webView2Scenario.Should().Contain("__STUDIO_UI_WORKSPACE_DIAGNOSTICS__");
+        webView2Scenario.Should().Contain("CREATE_RUN_LOGOUT");
+        webView2Scenario.Should().Contain("REOPEN_DELETE");
+        webView2Scenario.Should().Contain("Memory.getDOMCounters");
+        webView2Scenario.Should().Contain("HeapProfiler.collectGarbage");
+        webView2Scenario.Should().Contain("WeakRef");
+        webView2Scenario.Should().Contain("waitForSelectorWithoutHandle");
+        webView2Scenario.Should().Contain("OWNER_RESOURCE_WEAKREF_AND_STABLE_LOGIN_DOM_COUNTERS");
     }
 
     [Fact]

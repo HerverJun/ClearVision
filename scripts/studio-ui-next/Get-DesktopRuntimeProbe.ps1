@@ -207,6 +207,7 @@ $nodeDescendants = @($descendants | Where-Object {
     [string]$_.name -match '^node(?:\.exe)?$' -or
     [string]$_.executablePath -match '(?i)[\\/]node(?:\.exe)?$'
 })
+$managedProcess = Get-Process -Id $desktopProcessId -ErrorAction Stop
 $dpi = [int][ClearVisionStudioUiNext.NativeDpiProbe]::GetDpiForWindow($window)
 
 [pscustomobject]@{
@@ -217,6 +218,12 @@ $dpi = [int][ClearVisionStudioUiNext.NativeDpiProbe]::GetDpiForWindow($window)
         name = [string]$desktop.Name
         executablePath = [string]$desktop.ExecutablePath
         commandLine = [string]$desktop.CommandLine
+        workingSetBytes = [int64]$managedProcess.WorkingSet64
+        privateMemoryBytes = [int64]$managedProcess.PrivateMemorySize64
+        virtualMemoryBytes = [int64]$managedProcess.VirtualMemorySize64
+        pagedMemoryBytes = [int64]$managedProcess.PagedMemorySize64
+        handleCount = [int]$managedProcess.HandleCount
+        threadCount = [int]$managedProcess.Threads.Count
     }
     nativeWindow = [pscustomobject]@{
         handle = $window.ToInt64()

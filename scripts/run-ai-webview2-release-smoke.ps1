@@ -24,6 +24,7 @@ param(
     [switch]$KeepDatabase,
     [switch]$ReuseDatabase,
     [switch]$AllowInitialAdminSetup,
+    [switch]$DeferAuthToScenario,
     [switch]$SanitizeDesktopPath,
     [switch]$NoBuild
 )
@@ -99,6 +100,7 @@ $environmentNames = @(
     "CV_SMOKE_PHASE",
     "CV_SMOKE_TOKEN",
     "CV_SMOKE_USER",
+    "CV_SMOKE_USERNAME",
     "CV_SMOKE_PASSWORD",
     "CV_EVIDENCE_DIR",
     "PATH"
@@ -395,13 +397,19 @@ function Get-AuthSession {
 
 function Invoke-WebViewSmoke {
     param([int]$CdpPort, [double]$Scale, [string]$Phase)
-    $login = Get-AuthSession
+    $login = if ($DeferAuthToScenario) { $null } else { Get-AuthSession }
     $env:CV_CDP_PORT = [string]$CdpPort
     $env:CV_WEB_PORT = [string]$WebPort
     $env:CV_DPI_SCALE = [string]$Scale
     $env:CV_SMOKE_PHASE = $Phase
-    $env:CV_SMOKE_TOKEN = [string]$login.token
-    $env:CV_SMOKE_USER = ($login.user | ConvertTo-Json -Compress)
+    if ($login) {
+        $env:CV_SMOKE_TOKEN = [string]$login.token
+        $env:CV_SMOKE_USER = ($login.user | ConvertTo-Json -Compress)
+    } else {
+        Remove-Item Env:CV_SMOKE_TOKEN -ErrorAction SilentlyContinue
+        Remove-Item Env:CV_SMOKE_USER -ErrorAction SilentlyContinue
+    }
+    $env:CV_SMOKE_USERNAME = $Username
     $env:CV_SMOKE_PASSWORD = $Password
     $env:CV_EVIDENCE_DIR = $evidence
     Push-Location $uiTests
@@ -412,6 +420,7 @@ function Invoke-WebViewSmoke {
         Pop-Location
         Remove-Item Env:CV_SMOKE_TOKEN -ErrorAction SilentlyContinue
         Remove-Item Env:CV_SMOKE_USER -ErrorAction SilentlyContinue
+        Remove-Item Env:CV_SMOKE_USERNAME -ErrorAction SilentlyContinue
         Remove-Item Env:CV_SMOKE_PASSWORD -ErrorAction SilentlyContinue
     }
 }
@@ -463,5 +472,6 @@ try {
     DatabaseKept = [bool]$KeepDatabase
     DatabaseReused = [bool]$ReuseDatabase
     InitialAdminSetupAllowed = [bool]$AllowInitialAdminSetup
+    AuthenticationDeferredToScenario = [bool]$DeferAuthToScenario
     CompletedAtUtc = [DateTime]::UtcNow.ToString("O")
 } | ConvertTo-Json -Depth 4

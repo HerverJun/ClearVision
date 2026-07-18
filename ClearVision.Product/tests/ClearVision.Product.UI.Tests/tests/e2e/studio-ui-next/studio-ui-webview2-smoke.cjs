@@ -82,6 +82,40 @@ async function postAuthorizedJson(webPort, token, requestPath, body) {
   return JSON.parse(text);
 }
 
+async function requestJson(webPort, requestPath, options = {}) {
+  const token = String(options.token || '');
+  const method = String(options.method || 'GET').toUpperCase();
+  const expectedStatuses = options.expectedStatuses || [200];
+  const response = await fetch(`http://127.0.0.1:${webPort}${requestPath}`, {
+    method,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' })
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+  });
+  const text = await response.text();
+  let body = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = { raw: text };
+  }
+  assert(expectedStatuses.includes(response.status),
+    `${method} ${requestPath} returned ${response.status}: ${text.slice(0, 500)}`);
+  return { status: response.status, body, headers: Object.fromEntries(response.headers.entries()) };
+}
+
+async function putAuthorizedJson(webPort, token, requestPath, body) {
+  const response = await requestJson(webPort, requestPath, {
+    token,
+    method: 'PUT',
+    body,
+    expectedStatuses: [200]
+  });
+  return response.body;
+}
+
 async function waitForAuthoritativeRunStatus(webPort, token, identity, expectedStatus, timeoutMs = 10_000) {
   const startedAt = Date.now();
   const observations = [];
@@ -344,14 +378,25 @@ function meaningfulRequestFailures(requestFailures) {
   return requestFailures.filter(item => !/ERR_ABORTED|NS_BINDING_ABORTED/i.test(item.errorText));
 }
 
-function classifyConsoleErrors(consoleErrors, productPage) {
+async function waitForSelectorWithoutHandle(page, selector, options = {}) {
+  await page.locator(selector).waitFor(options);
+}
+
+async function waitForFunctionWithoutHandle(page, pageFunction, arg, options) {
+  const handle = await page.waitForFunction(pageFunction, arg, options);
+  await handle.dispose();
+}
+
+function classifyConsoleErrors(consoleErrors, productPage, finalJourney) {
   const lifecycle = productPage?.workspaceLifecycle;
   const expectedNotFoundCount = [lifecycle?.mounted?.state, lifecycle?.remounted?.state]
     .filter(state => state === 'not-found')
-    .length;
+    .length + Number(finalJourney?.expectedConsoleErrors?.notFound || 0);
   const expectedNotFoundMessage = 'Failed to load resource: the server responded with a status of 404 (Not Found)';
   let remainingExpectedNotFound = expectedNotFoundCount;
-  const expectedResponseLossCount = productPage?.workspaceG6?.responseLoss?.backendResultRecovered ? 1 : 0;
+  const expectedResponseLossCount =
+    (productPage?.workspaceG6?.responseLoss?.backendResultRecovered ? 1 : 0) +
+    Number(finalJourney?.expectedConsoleErrors?.responseLoss || 0);
   const expectedResponseLossMessage = 'Failed to load resource: the server responded with a status of 599 (Unknown)';
   let remainingExpectedResponseLoss = expectedResponseLossCount;
   const ignoredExpected = [];
@@ -1101,7 +1146,11 @@ async function setFormalRunSlowFixture(page, formalRunSeed, enabled) {
 }
 
 async function readFormalResultsHandoff(page, projectId) {
-  await page.waitForSelector('[data-capability="results-read"]', { state: 'visible', timeout: 45_000 });
+  await waitForSelectorWithoutHandle(
+    page,
+    '[data-capability="results-read"]',
+    { state: 'visible', timeout: 45_000 }
+  );
   const hash = new URL(page.url()).hash.replace(/^#/, '');
   const [route, query = ''] = hash.split('?');
   const params = new URLSearchParams(query);
@@ -2230,6 +2279,1266 @@ function assertNativeRuntime(nativeRuntime) {
     `Desktop process tree contains ${nativeRuntime.nodeDescendantCount} Node descendant(s).`);
 }
 
+async function captureFinalJourneyScene(page, evidenceDirectory, phase, scene, sourceSha) {
+  const buffer = await page.screenshot({ type: 'png', animations: 'disabled' });
+  const artifact = writePngEvidence(
+    evidenceDirectory,
+    `f04-g6-${safeFileName(phase)}-${safeFileName(scene)}.png`,
+    buffer
+  );
+  return {
+    ...artifact,
+    phase,
+    scene,
+    sourceSha,
+    route: new URL(page.url()).hash.replace(/^#/, '') || new URL(page.url()).pathname,
+    dataSource: 'REAL_WEBVIEW2_PROJECT_AUTHORITY',
+    authSource: 'UI_SETUP_OR_LOGIN'
+  };
+}
+
+async function readUiSessionAuthority(page, webPort) {
+  const session = await page.evaluate(() => ({
+    token: sessionStorage.getItem('cv_auth_token'),
+    projectedUser: sessionStorage.getItem('cv_current_user')
+  }));
+  assert(session.token, 'UI authentication did not persist the authoritative session token.');
+  const me = await requestJson(webPort, '/api/auth/me', {
+    token: session.token,
+    expectedStatuses: [200]
+  });
+  const user = me.body?.user ?? me.body;
+  const userId = metadataField(user, 'userId') || metadataField(user, 'id');
+  assert(userId && metadataField(user, 'username'),
+    `Authenticated UI session did not expose a stable user identity: ${JSON.stringify(me.body)}`);
+  return {
+    token: session.token,
+    user: {
+      userId: String(userId),
+      username: String(metadataField(user, 'username')),
+      role: String(metadataField(user, 'role') || '')
+    },
+    projectedUser: session.projectedUser ? JSON.parse(session.projectedUser) : null
+  };
+}
+
+async function assertProductOverview(page) {
+  await waitForSelectorWithoutHandle(
+    page,
+    '[data-product-shell="ready"]',
+    { state: 'visible', timeout: 45_000 }
+  );
+  await waitForSelectorWithoutHandle(
+    page,
+    '[data-capability="overview"]',
+    { state: 'visible', timeout: 45_000 }
+  );
+  const projection = await page.evaluate(() => ({
+    route: location.hash,
+    productShellCount: document.querySelectorAll('[data-product-shell="ready"]').length,
+    authShellCount: document.querySelectorAll('[data-auth-shell]').length,
+    projectLifecycleOwnerCount: Number(window.__STUDIO_UI_PROJECT_LIFECYCLE_DIAGNOSTICS__?.ownerCount ?? -1),
+    leaveGuardOwnerCount: Number(window.__STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__?.ownerCount ?? -1)
+  }));
+  assert(projection.route === '#/overview' && projection.productShellCount === 1 &&
+    projection.authShellCount === 0 && projection.projectLifecycleOwnerCount === 1 &&
+    projection.leaveGuardOwnerCount === 1,
+  `UI authentication did not settle on one ProductRuntime owner chain: ${JSON.stringify(projection)}`);
+  return projection;
+}
+
+async function setupAdminThroughUi(page, webPort, username, password, captureScene) {
+  const setupStatus = await requestJson(webPort, '/api/auth/setup-status', { expectedStatuses: [200] });
+  assert(setupStatus.body?.requiresInitialAdminSetup === true,
+    `Fresh final-journey database did not require setup: ${JSON.stringify(setupStatus.body)}`);
+  await waitForSelectorWithoutHandle(
+    page,
+    '[data-auth-page="setup"]',
+    { state: 'visible', timeout: 45_000 }
+  );
+  if (captureScene) await captureScene('setup');
+  await page.getByLabel('管理员用户名').fill(username);
+  await page.getByLabel('密码', { exact: true }).fill(password);
+  await page.getByLabel('确认密码').fill(password);
+  await page.getByRole('button', { name: '创建并进入 Studio' }).click();
+  const product = await assertProductOverview(page);
+  const session = await readUiSessionAuthority(page, webPort);
+  assert(session.user.username === username,
+    `Setup auto-login authenticated ${session.user.username}, expected ${username}.`);
+  return { setupStatus: setupStatus.body, product, session };
+}
+
+async function loginThroughUi(page, webPort, username, password, captureScene) {
+  const setupStatus = await requestJson(webPort, '/api/auth/setup-status', { expectedStatuses: [200] });
+  assert(setupStatus.body?.requiresInitialAdminSetup === false,
+    `Restarted final-journey database unexpectedly required setup: ${JSON.stringify(setupStatus.body)}`);
+  await waitForSelectorWithoutHandle(
+    page,
+    '[data-auth-page="login"]',
+    { state: 'visible', timeout: 45_000 }
+  );
+  if (captureScene) await captureScene('login');
+  await page.getByLabel('用户名').fill(username);
+  await page.getByLabel('密码').fill(password);
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+  const product = await assertProductOverview(page);
+  const session = await readUiSessionAuthority(page, webPort);
+  assert(session.user.username === username,
+    `Restart login authenticated ${session.user.username}, expected ${username}.`);
+  return { setupStatus: setupStatus.body, product, session };
+}
+
+async function logoutThroughUi(page) {
+  await page.getByRole('button', { name: '退出', exact: true }).click();
+  await waitForSelectorWithoutHandle(
+    page,
+    '[data-auth-page="login"]',
+    { state: 'visible', timeout: 45_000 }
+  );
+  const projection = await page.evaluate(() => ({
+    route: location.hash,
+    authShellCount: document.querySelectorAll('[data-auth-shell="ready"]').length,
+    productShellCount: document.querySelectorAll('[data-product-shell]').length,
+    tokenPresent: Boolean(sessionStorage.getItem('cv_auth_token')),
+    currentUserPresent: Boolean(sessionStorage.getItem('cv_current_user')),
+    projectLifecycleDiagnosticsType: typeof window.__STUDIO_UI_PROJECT_LIFECYCLE_DIAGNOSTICS__,
+    leaveGuardDiagnosticsType: typeof window.__STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__,
+    workspaceDiagnosticsType: typeof window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__
+  }));
+  assert(projection.route.startsWith('#/login') && projection.authShellCount === 1 &&
+    projection.productShellCount === 0 && !projection.tokenPresent && !projection.currentUserPresent &&
+    projection.projectLifecycleDiagnosticsType === 'undefined' &&
+    projection.leaveGuardDiagnosticsType === 'undefined' &&
+    projection.workspaceDiagnosticsType === 'undefined',
+  `Logout retained ProductRuntime authority or token residue: ${JSON.stringify(projection)}`);
+  return projection;
+}
+
+async function withholdLifecycleResponse(page, requestPath, expectedMethod = 'POST') {
+  let captured = null;
+  const pattern = `**${requestPath}`;
+  const handler = async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (captured || request.method() !== expectedMethod || url.pathname !== requestPath) {
+      await route.continue();
+      return;
+    }
+    const requestBody = request.postDataJSON();
+    const response = await route.fetch();
+    const responseText = await response.text();
+    let responseBody = null;
+    try { responseBody = responseText ? JSON.parse(responseText) : null; } catch { responseBody = { raw: responseText }; }
+    captured = {
+      method: request.method(),
+      path: url.pathname,
+      requestBody,
+      serverStatus: response.status(),
+      serverBody: responseBody,
+      clientStatus: 599
+    };
+    await route.fulfill({
+      status: 599,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 'WEBVIEW2_RESPONSE_WITHHELD',
+        error: 'Evidence runner withheld the lifecycle response after the server committed it.'
+      })
+    });
+  };
+  await page.route(pattern, handler);
+  return {
+    get captured() { return captured; },
+    async dispose() { await page.unroute(pattern, handler); }
+  };
+}
+
+function projectIdFromHash(pageUrl) {
+  const match = new URL(pageUrl).hash.match(/^#\/projects\/([0-9a-f-]{36})(?:\/|$)/i);
+  assert(match, `Project route did not contain a UUID: ${pageUrl}`);
+  return match[1];
+}
+
+async function createBlankProjectThroughUi(page, runName, options = {}) {
+  const responseLoss = options.responseLoss === true;
+  await page.locator('[data-product-nav="/projects"]').click();
+  await waitForSelectorWithoutHandle(
+    page,
+    '[data-capability="projects-read"]',
+    { state: 'visible', timeout: 45_000 }
+  );
+  if (options.captureScene) await options.captureScene('projects-empty');
+  const withholder = responseLoss ? await withholdLifecycleResponse(page, '/api/projects') : null;
+  const name = `F04 G6 ${runName}`;
+  const description = responseLoss
+    ? 'UI blank create with authoritative response-loss reconciliation.'
+    : 'UI blank create for the isolated 20-cycle soak.';
+  try {
+    await page.getByRole('button', { name: '新建空白工程' }).click();
+    if (options.captureScene) await options.captureScene('create-project');
+    await page.getByLabel('工程名称').fill(name);
+    await page.getByLabel('工程描述').fill(description);
+    await page.getByRole('button', { name: '创建', exact: true }).click();
+    await waitForSelectorWithoutHandle(page, '[data-capability="projects-read-detail"]', {
+      state: 'visible',
+      timeout: 45_000
+    });
+  } finally {
+    await withholder?.dispose();
+  }
+  const projectId = projectIdFromHash(page.url());
+  const diagnostics = await page.evaluate(() => ({
+    ...window.__STUDIO_UI_PROJECT_LIFECYCLE_DIAGNOSTICS__
+  }));
+  if (responseLoss) {
+    assert(withholder?.captured?.serverStatus === 201,
+      `Create response-loss fixture did not commit a new Project: ${JSON.stringify(withholder?.captured)}`);
+    assert(withholder.captured.serverBody?.projectId === projectId,
+      'Create response-loss reconcile returned a different Project identity.');
+    assert(diagnostics.totalReconcileCount >= 1,
+      `Create response loss did not query operation authority: ${JSON.stringify(diagnostics)}`);
+  }
+  if (options.captureScene) await options.captureScene('project-detail');
+  return {
+    projectId,
+    name,
+    description,
+    responseLoss: withholder?.captured ?? null,
+    diagnostics
+  };
+}
+
+async function waitForWorkspaceReady(page, projectId) {
+  await waitForSelectorWithoutHandle(page, '[data-evidence-surface="f03-workspace-shell"]', {
+    state: 'visible',
+    timeout: 45_000
+  });
+  await waitForFunctionWithoutHandle(page, expectedProjectId => {
+    const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+    const state = shell?.getAttribute('data-workspace-state');
+    return shell?.getAttribute('data-workspace-project-id') === expectedProjectId &&
+      Boolean(state && state !== 'loading');
+  }, projectId, { timeout: 45_000 });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const state = await shell.getAttribute('data-workspace-state');
+  assert(['ready', 'empty'].includes(state), `Workspace did not reach a usable state: ${state}`);
+  return {
+    state,
+    persistenceRevision: Number(await shell.getAttribute('data-workspace-persistence-revision')),
+    ownerCount: Number(await shell.getAttribute('data-workspace-owner-count'))
+  };
+}
+
+async function openWorkspaceFromDetail(page, projectId) {
+  await page.getByRole('button', { name: '打开工作区' }).click();
+  const workspace = await waitForWorkspaceReady(page, projectId);
+  const command = await page.evaluate(() => ({
+    phase: document.querySelector('[data-product-shell]')?.getAttribute('data-project-command-phase'),
+    diagnostics: { ...window.__STUDIO_UI_PROJECT_LIFECYCLE_DIAGNOSTICS__ }
+  }));
+  assert(command.phase === 'succeeded',
+    `Explicit Project open did not reach succeeded: ${JSON.stringify(command)}`);
+  return { workspace, command };
+}
+
+async function selectWorkspaceNode(page, position) {
+  const canvas = page.locator('[data-testid="flow-canvas"]');
+  const box = await canvas.boundingBox();
+  assert(box, 'Workspace Flow Canvas did not expose a bounding box.');
+  await page.mouse.click(box.x + Number(position.x) + 40, box.y + Number(position.y) + 16);
+  await waitForFunctionWithoutHandle(page, () =>
+    document.querySelector('[data-evidence-surface="f03-g3-inspector"]')
+      ?.getAttribute('data-inspector-mode') === 'node', null, { timeout: 30_000 });
+}
+
+async function saveWorkspaceThroughUi(page) {
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await waitForFunctionWithoutHandle(page, () =>
+    document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+      ?.getAttribute('data-workspace-dirty') === 'true', null, { timeout: 30_000 });
+  await page.locator('[data-testid="workspace-save"]').click();
+  await waitForFunctionWithoutHandle(page, () => {
+    const surface = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+    return surface?.getAttribute('data-workspace-persistence-phase') === 'saved' &&
+      surface.getAttribute('data-workspace-dirty') === 'false';
+  }, null, { timeout: 45_000 });
+  return Number(await shell.getAttribute('data-workspace-persistence-revision'));
+}
+
+async function addConfigureAndSaveAcquisition(page) {
+  await waitForFunctionWithoutHandle(page, () =>
+    document.querySelector('[data-evidence-surface="f03-g2-operator-rail"]')
+      ?.getAttribute('data-catalog-phase') === 'success', null, { timeout: 30_000 });
+  const canvas = page.locator('[data-testid="flow-canvas"]');
+  const box = await canvas.boundingBox();
+  assert(box && box.width >= 500 && box.height >= 300,
+    `Final journey Flow Canvas is undersized: ${JSON.stringify(box)}`);
+  const position = { x: 64, y: 64 };
+  await dragOperatorToCanvas(page, ['ImageAcquisition', '0'], position);
+  await waitForFlowSurfaceNumber(page, 'data-node-count', 1);
+  await selectWorkspaceNode(page, position);
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  const sourceType = inspector.locator('[data-parameter-name="SourceType"] select');
+  await sourceType.selectOption('Camera');
+  const exposure = inspector.locator('[data-parameter-name="ExposureTime"] input[type="number"]');
+  await exposure.waitFor({ state: 'visible', timeout: 30_000 });
+  await waitForFunctionWithoutHandle(page, () => {
+    const input = document.querySelector('[data-parameter-name="ExposureTime"] input[type="number"]');
+    return input && !input.disabled;
+  }, null, { timeout: 30_000 });
+  await exposure.fill('6200');
+  await exposure.press('Enter');
+  await sourceType.selectOption('File');
+  const revision = await saveWorkspaceThroughUi(page);
+  return { position, exposureTime: 6200, sourceType: 'File', persistenceRevision: revision };
+}
+
+function setOperatorParameter(operator, name, value) {
+  let found = false;
+  const parameters = (operator.parameters || []).map(parameter => {
+    if (String(parameter.name).toLowerCase() !== name.toLowerCase()) return parameter;
+    found = true;
+    return { ...parameter, value };
+  });
+  assert(found, `Operator ${operator.name} did not expose parameter ${name}.`);
+  return { ...operator, parameters };
+}
+
+async function installFinalJourneyAuthority(webPort, token, projectId, evidenceDirectory) {
+  const imageEvidence = createPreviewPpm(path.join(evidenceDirectory, `f04-g6-${projectId}-input.ppm`));
+  const [project, catalogPayload] = await Promise.all([
+    readAuthorizedJson(webPort, token, `/api/projects/${projectId}`),
+    readAuthorizedJson(webPort, token, '/api/operators/library?includeCompatibility=true')
+  ]);
+  const catalog = Array.isArray(catalogPayload) ? catalogPayload : catalogPayload.items || catalogPayload.Items || [];
+  const judgmentDefinition = catalog.find(item =>
+    Number(metadataField(item, 'type')) === -1 ||
+    String(metadataField(item, 'type') || '').toLowerCase() === 'resultjudgment');
+  assert(judgmentDefinition, 'Final journey operator catalog did not expose ResultJudgment.');
+  const acquisition = project.flow?.operators?.find(operator =>
+    Number(operator.type) === 0 || String(operator.type).toLowerCase() === 'imageacquisition');
+  assert(acquisition, 'UI-added ImageAcquisition was not persisted through ProjectSaveCoordinator.');
+  const fileAcquisition = setOperatorParameter(
+    setOperatorParameter(acquisition, 'SourceType', 'File'),
+    'FilePath',
+    imageEvidence.filePath
+  );
+  const judgment = instantiateOperator(
+    judgmentDefinition,
+    metadataField(judgmentDefinition, 'type'),
+    'F04 G6 Final Judgment',
+    360,
+    64,
+    { Condition: 'Equal', ExpectValue: '' }
+  );
+  const judgmentOutput = judgment.outputPorts.find(port => port.name === 'JudgmentResult');
+  assert(judgmentOutput, 'Final journey ResultJudgment did not expose JudgmentResult.');
+  const binding = {
+    sourceOperatorId: judgment.id,
+    sourceOutputPortId: judgmentOutput.id,
+    sourceOutputName: judgmentOutput.name,
+    dataType: 'String',
+    rule: 'StringMap',
+    okValue: 'OK',
+    ngValue: 'NG'
+  };
+  const updated = await putAuthorizedJson(webPort, token, `/api/projects/${projectId}`, {
+    name: project.name,
+    description: project.description,
+    expectedPersistenceRevision: project.persistenceRevision,
+    flow: {
+      ...project.flow,
+      operators: project.flow.operators.map(operator =>
+        operator.id === acquisition.id ? fileAcquisition : operator).concat(judgment),
+      decisionConfiguration: {
+        finalDecisionBinding: binding,
+        missingDecisionPolicy: 'Undetermined'
+      }
+    },
+    globalVariables: project.globalVariables ?? null
+  });
+  assert(updated.persistenceRevision > project.persistenceRevision &&
+    updated.flow?.decisionConfiguration?.finalDecisionBinding?.sourceOperatorId === judgment.id,
+  `Authority preparation did not persist the formal-ready flow: ${JSON.stringify(updated)}`);
+  return {
+    authority: 'EXISTING_PROJECT_APPLICATION_SERVICE_PUT',
+    directFrontendMutation: false,
+    projectId,
+    acquisitionId: acquisition.id,
+    acquisitionPosition: { x: fileAcquisition.x, y: fileAcquisition.y },
+    judgmentId: judgment.id,
+    binding,
+    imageEvidence,
+    persistenceRevision: updated.persistenceRevision,
+    flowId: updated.flow.id
+  };
+}
+
+async function reloadWorkspaceAuthority(page, projectId, expectedRevision) {
+  assert(new URL(page.url()).hash === `#/projects/${projectId}/workspace`,
+    `Authority reload started from a different Workspace route: ${page.url()}`);
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 45_000 });
+  await waitForWorkspaceReady(page, projectId);
+  await waitForFunctionWithoutHandle(page, revision => {
+    const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+    return Number(shell?.getAttribute('data-workspace-persistence-revision')) === revision &&
+      shell?.getAttribute('data-workspace-dirty') === 'false';
+  }, expectedRevision, { timeout: 45_000 });
+}
+
+async function previewAndSaveFinalWorkspace(page, projectId, authority, nameSuffix) {
+  await selectWorkspaceNode(page, authority.acquisitionPosition);
+  const nameInput = page.locator('[data-evidence-surface="f03-g3-inspector"] .inspector-panel__field input');
+  const currentName = await nameInput.inputValue();
+  const nextName = `${currentName} ${nameSuffix}`.trim();
+  await nameInput.fill(nextName);
+  await nameInput.press('Enter');
+  const previewRun = page.locator('[data-testid="preview-run"]');
+  await previewRun.waitFor({ state: 'visible', timeout: 30_000 });
+  await previewRun.click();
+  await waitForFunctionWithoutHandle(page, () =>
+    document.querySelector('[data-capability="preview-workbench"]')
+      ?.getAttribute('data-preview-phase') === 'success', null, { timeout: 45_000 });
+  await waitForFunctionWithoutHandle(page, () =>
+    document.querySelector('[data-capability="image-canvas"]')
+      ?.getAttribute('data-image-phase') === 'ready', null, { timeout: 45_000 });
+  const revision = await saveWorkspaceThroughUi(page);
+  const project = await page.evaluate(async id => {
+    const token = sessionStorage.getItem('cv_auth_token');
+    const response = await fetch(`/api/projects/${id}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      cache: 'no-store'
+    });
+    return { status: response.status, body: await response.json() };
+  }, projectId);
+  assert(project.status === 200 && Number(project.body.persistenceRevision) === revision,
+    `UI save did not reconcile to the Project authority: ${JSON.stringify(project)}`);
+  const acquisition = project.body.flow.operators.find(operator => operator.id === authority.acquisitionId);
+  const values = Object.fromEntries((acquisition?.parameters || []).map(parameter => [parameter.name, parameter.value]));
+  assert(acquisition?.name === nextName && values.SourceType === 'File' &&
+    values.FilePath === authority.imageEvidence.filePath &&
+    project.body.flow.decisionConfiguration?.finalDecisionBinding?.sourceOperatorId === authority.judgmentId,
+  `UI save lost formal-ready authority fields: ${JSON.stringify({ acquisition, values, project: project.body })}`);
+  return { revision, nextName, project: project.body };
+}
+
+async function executeFormalRunOnce(page, projectId) {
+  const run = page.locator('[data-testid="workspace-run"]');
+  await run.waitFor({ state: 'visible', timeout: 30_000 });
+  assert(await run.isEnabled(), 'Formal Run was not enabled for the saved final-journey Project.');
+  const admissionPromise = page.waitForResponse(response =>
+    response.request().method() === 'POST' &&
+    new URL(response.url()).pathname === '/api/inspection/admission');
+  const executePromise = page.waitForResponse(response =>
+    response.request().method() === 'POST' &&
+    new URL(response.url()).pathname === '/api/inspection/execute');
+  await run.click();
+  const [admissionResponse, executeResponse] = await Promise.all([admissionPromise, executePromise]);
+  const [admission, result] = await Promise.all([admissionResponse.json(), executeResponse.json()]);
+  const handoff = await readFormalResultsHandoff(page, projectId);
+  const identity = {
+    projectId,
+    clientSnapshotId: admission.clientSnapshotId,
+    expectedPersistenceRevision: admission.projectPersistenceRevision,
+    expectedCanonicalFlowHash: admission.canonicalFlowHash,
+    expectedDecisionConfigurationHash: admission.decisionConfigurationHash
+  };
+  assert(result.id === handoff.resultId && result.projectId === projectId &&
+    result.executionSnapshotId === identity.clientSnapshotId &&
+    result.projectPersistenceRevision === identity.expectedPersistenceRevision &&
+    result.flowVersionHash === identity.expectedCanonicalFlowHash &&
+    result.decisionConfigurationHash === identity.expectedDecisionConfigurationHash,
+  `Formal Run identity drifted across admission/execute/results: ${JSON.stringify({ admission, result, handoff })}`);
+  return { admission, result, handoff, identity };
+}
+
+function writeFinalJourneyState(statePath, value) {
+  fs.mkdirSync(path.dirname(statePath), { recursive: true });
+  fs.writeFileSync(statePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+}
+
+function assertFinalResultIdentity(expected, actual, phase) {
+  for (const field of [
+    'projectId', 'flowId', 'resultId', 'resultProjectRevision', 'executionSnapshotId',
+    'flowHash', 'decisionHash', 'hasImage', 'imageId', 'evidenceStatus', 'reconciliationStatus'
+  ]) {
+    assert(Object.is(actual[field], expected[field]),
+      `${phase} changed final-journey authority field ${field}: ${JSON.stringify({ expected, actual })}`);
+  }
+  assert(JSON.stringify(actual.imageReference) === JSON.stringify(expected.imageReference) &&
+    actual.historyContainsResult,
+  `${phase} changed final-journey image/history identity.`);
+}
+
+async function verifyFinalJourneyCreateRunLogout(
+  page, webPort, username, password, runName, evidenceDirectory, sourceSha, statePath
+) {
+  const screenshots = [];
+  const captureScene = async scene => screenshots.push(await captureFinalJourneyScene(
+    page, evidenceDirectory, 'create-run-logout', scene, sourceSha));
+  const auth = await setupAdminThroughUi(page, webPort, username, password, captureScene);
+  const studio = await verifyStudioFoundation(page, webPort, '/overview');
+  await captureScene('overview');
+  const created = await createBlankProjectThroughUi(page, runName, {
+    responseLoss: true,
+    captureScene
+  });
+  const projectAfterCreate = await readAuthorizedJson(webPort, auth.session.token, `/api/projects/${created.projectId}`);
+  assert(projectAfterCreate.persistenceRevision === 0 &&
+    projectAfterCreate.flow?.operators?.length === 0 &&
+    projectAfterCreate.flow?.connections?.length === 0,
+  `UI blank create did not return the canonical empty Project: ${JSON.stringify(projectAfterCreate)}`);
+  await page.locator('[data-product-nav="/projects"]').click();
+  await page.waitForSelector('[data-capability="projects-read"]', { state: 'visible', timeout: 45_000 });
+  await page.getByText(created.name, { exact: true }).first().waitFor({ state: 'visible', timeout: 30_000 });
+  await captureScene('projects-populated');
+  await page.getByRole('link', { name: '查看详情', exact: true }).first().click();
+  await page.waitForSelector('[data-capability="projects-read-detail"]', { state: 'visible', timeout: 30_000 });
+  const opened = await openWorkspaceFromDetail(page, created.projectId);
+  const configured = await addConfigureAndSaveAcquisition(page);
+  const prepared = await installFinalJourneyAuthority(
+    webPort, auth.session.token, created.projectId, evidenceDirectory);
+  await reloadWorkspaceAuthority(page, created.projectId, prepared.persistenceRevision);
+  const saved = await previewAndSaveFinalWorkspace(page, created.projectId, prepared, 'UI configured');
+  await captureScene('workspace-preview-saved');
+  const formal = await executeFormalRunOnce(page, created.projectId);
+  await captureScene('formal-results');
+  const resultDetail = await readAuthorizedJson(
+    webPort, auth.session.token, `/api/inspection/history/${created.projectId}/${formal.result.id}`);
+  assert(rollbackResultId(resultDetail) === formal.result.id,
+    'Formal Results detail did not expose the executed result identity.');
+  await page.locator('[data-testid="results-return-workspace"]').click();
+  await waitForWorkspaceReady(page, created.projectId);
+  await selectWorkspaceNode(page, prepared.acquisitionPosition);
+  const nameInput = page.locator('[data-evidence-surface="f03-g3-inspector"] .inspector-panel__field input');
+  const finalOperatorName = `${await nameInput.inputValue()} post-run`;
+  await nameInput.fill(finalOperatorName);
+  await nameInput.press('Enter');
+  const finalRevision = await saveWorkspaceThroughUi(page);
+  await captureScene('workspace-post-run-saved');
+  const authority = await readRollbackAuthority(
+    webPort,
+    auth.session.token,
+    created.projectId,
+    formal.result.id,
+    formal.identity
+  );
+  assert(authority.persistenceRevision === finalRevision && authority.flowId === prepared.flowId,
+    `Final post-run save identity drifted: ${JSON.stringify(authority)}`);
+  const state = {
+    schemaVersion: 'f04-g6-final-journey.v1',
+    sourceSha,
+    createdAtUtc: new Date().toISOString(),
+    user: auth.session.user,
+    project: {
+      projectId: created.projectId,
+      projectName: authority.projectName,
+      persistenceRevision: authority.persistenceRevision,
+      flowId: authority.flowId,
+      acquisitionId: prepared.acquisitionId,
+      acquisitionPosition: prepared.acquisitionPosition,
+      judgmentId: prepared.judgmentId,
+      finalOperatorName
+    },
+    authority,
+    runIdentity: formal.identity,
+    createResponseLoss: created.responseLoss
+  };
+  writeFinalJourneyState(statePath, state);
+  const logout = await logoutThroughUi(page);
+  await captureScene('login-after-logout');
+  return {
+    phase: 'CREATE_RUN_LOGOUT',
+    studio,
+    auth: { setupStatus: auth.setupStatus, user: auth.session.user },
+    created,
+    canonicalBlank: {
+      persistenceRevision: projectAfterCreate.persistenceRevision,
+      flowId: projectAfterCreate.flow.id,
+      operatorCount: projectAfterCreate.flow.operators.length,
+      connectionCount: projectAfterCreate.flow.connections.length
+    },
+    explicitOpen: opened,
+    configured,
+    prepared,
+    saved: { revision: saved.revision, operatorName: saved.nextName },
+    formal: {
+      resultId: formal.result.id,
+      resultProjectRevision: formal.result.projectPersistenceRevision,
+      executionSnapshotId: formal.result.executionSnapshotId,
+      flowHash: formal.result.flowVersionHash,
+      decisionHash: formal.result.decisionConfigurationHash,
+      handoff: formal.handoff
+    },
+    finalAuthority: authority,
+    logout,
+    statePath,
+    screenshots,
+    expectedConsoleErrors: { responseLoss: 1, notFound: 0 }
+  };
+}
+
+async function verifyFinalJourneyReopenDelete(
+  page, webPort, username, password, evidenceDirectory, sourceSha, statePath
+) {
+  assert(fs.existsSync(statePath), `Final journey state was not found after restart: ${statePath}`);
+  const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  assert(state.schemaVersion === 'f04-g6-final-journey.v1' && state.sourceSha === sourceSha,
+    'Final journey restart state schema/source SHA changed.');
+  const screenshots = [];
+  const captureScene = async scene => screenshots.push(await captureFinalJourneyScene(
+    page, evidenceDirectory, 'reopen-delete', scene, sourceSha));
+  const auth = await loginThroughUi(page, webPort, username, password, captureScene);
+  assert(auth.session.user.userId === state.user.userId && auth.session.user.username === state.user.username,
+    'Final journey restart authenticated a different user identity.');
+  const studio = await verifyStudioFoundation(page, webPort, '/overview');
+  const recentLink = page.getByRole('link', { name: state.project.projectName, exact: true }).first();
+  await recentLink.waitFor({ state: 'visible', timeout: 45_000 });
+  await captureScene('overview-recent-project');
+  await recentLink.click();
+  await page.waitForSelector('[data-capability="projects-read-detail"]', { state: 'visible', timeout: 30_000 });
+  const beforeRename = await readRollbackAuthority(
+    webPort, auth.session.token, state.project.projectId, state.authority.resultId, state.runIdentity);
+  assertRollbackAuthorityMatches(state.authority, beforeRename, 'G6_RESTART_REOPEN');
+  const renamedName = `${state.project.projectName}（重启后重命名）`;
+  await page.getByLabel('工程名称').fill(renamedName);
+  await page.getByRole('button', { name: '保存工程信息' }).click();
+  await page.getByRole('heading', { name: renamedName, exact: true }).waitFor({ state: 'visible', timeout: 30_000 });
+  const renamed = await readAuthorizedJson(webPort, auth.session.token, `/api/projects/${state.project.projectId}`);
+  assert(renamed.name === renamedName &&
+    renamed.persistenceRevision > state.project.persistenceRevision &&
+    renamed.flow.id === state.project.flowId,
+  `Restart rename did not preserve Project/Flow identity: ${JSON.stringify(renamed)}`);
+  await captureScene('renamed-project-detail');
+  const opened = await openWorkspaceFromDetail(page, state.project.projectId);
+  assert(opened.workspace.persistenceRevision === renamed.persistenceRevision,
+    'Reopened Workspace did not load the renamed Project revision.');
+  const afterRenameAuthority = await readRollbackAuthority(
+    webPort, auth.session.token, state.project.projectId, state.authority.resultId, state.runIdentity);
+  assertFinalResultIdentity(state.authority, afterRenameAuthority, 'G6_RENAMED_REOPEN');
+  await page.getByRole('link', { name: '工程详情' }).click();
+  await page.waitForSelector('[data-capability="projects-read-detail"]', { state: 'visible', timeout: 30_000 });
+  const withholder = await withholdLifecycleResponse(
+    page, `/api/projects/${state.project.projectId}/delete`);
+  try {
+    await page.getByRole('button', { name: '删除', exact: true }).click();
+    await captureScene('destructive-delete');
+    await page.locator('[data-testid="project-detail-delete-confirm"]').click();
+    await page.waitForSelector('[data-capability="projects-read"]', { state: 'visible', timeout: 45_000 });
+  } finally {
+    await withholder.dispose();
+  }
+  assert(withholder.captured?.serverStatus === 200 &&
+    withholder.captured.serverBody?.projectId === state.project.projectId &&
+    Number(withholder.captured.requestBody?.expectedPersistenceRevision) === renamed.persistenceRevision,
+  `Delete response-loss fixture did not use the latest revision authority: ${JSON.stringify(withholder.captured)}`);
+  const deleteDiagnostics = await page.evaluate(() => ({
+    ...window.__STUDIO_UI_PROJECT_LIFECYCLE_DIAGNOSTICS__
+  }));
+  assert(deleteDiagnostics.totalReconcileCount >= 1,
+    `Delete response loss did not reconcile operation authority: ${JSON.stringify(deleteDiagnostics)}`);
+  const listAfterDelete = await readAuthorizedJson(webPort, auth.session.token, '/api/projects');
+  assert(!listAfterDelete.some(project => project.id === state.project.projectId),
+    'Tombstoned Project remained visible in the authoritative list.');
+  const origin = new URL(page.url()).origin;
+  await page.goto(`${origin}/studio/index.html#/projects/${state.project.projectId}`, {
+    waitUntil: 'domcontentloaded', timeout: 45_000
+  });
+  await page.getByText('工程不存在（404）', { exact: true }).waitFor({ state: 'visible', timeout: 30_000 });
+  await captureScene('detail-not-found');
+  await page.goto(`${origin}/studio/index.html#/projects/${state.project.projectId}/workspace`, {
+    waitUntil: 'domcontentloaded', timeout: 45_000
+  });
+  await page.waitForSelector('[data-evidence-surface="f03-workspace-shell"]', {
+    state: 'visible', timeout: 30_000
+  });
+  await page.waitForFunction(() =>
+    document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+      ?.getAttribute('data-workspace-state') === 'not-found', null, { timeout: 30_000 });
+  const detail404 = await requestJson(webPort, `/api/projects/${state.project.projectId}`, {
+    token: auth.session.token, expectedStatuses: [404]
+  });
+  const open404 = await requestJson(webPort, `/api/projects/${state.project.projectId}/open`, {
+    token: auth.session.token, method: 'POST', body: {}, expectedStatuses: [404]
+  });
+  await captureScene('workspace-open-not-found');
+  const logout = await logoutThroughUi(page);
+  state.deletedAtUtc = new Date().toISOString();
+  state.renamedProject = {
+    name: renamed.name,
+    persistenceRevision: renamed.persistenceRevision,
+    flowId: renamed.flow.id
+  };
+  state.deleteResponseLoss = withholder.captured;
+  state.notFound = { listVisible: false, detailStatus: detail404.status, openStatus: open404.status };
+  writeFinalJourneyState(statePath, state);
+  return {
+    phase: 'REOPEN_DELETE',
+    studio,
+    auth: { setupStatus: auth.setupStatus, user: auth.session.user },
+    recentProject: { projectId: state.project.projectId, name: state.project.projectName },
+    authorityBeforeRename: beforeRename,
+    renamed: {
+      name: renamed.name,
+      persistenceRevision: renamed.persistenceRevision,
+      flowId: renamed.flow.id
+    },
+    explicitOpen: opened,
+    authorityAfterRename: afterRenameAuthority,
+    deleteResponseLoss: withholder.captured,
+    deleteDiagnostics,
+    notFound: { listVisible: false, detailStatus: detail404.status, openStatus: open404.status },
+    logout,
+    statePath,
+    screenshots,
+    expectedConsoleErrors: { responseLoss: 1, notFound: 2 }
+  };
+}
+
+async function readWorkspaceResourceLedger(page) {
+  return page.evaluate(() => {
+    const diagnostics = window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
+    if (!diagnostics) return null;
+    return {
+      workspaceOwnerCount: Number(diagnostics.workspaceOwnerCount ?? -1),
+      flowCanvasOwnerCount: Number(diagnostics.flowCanvasOwnerCount ?? -1),
+      inspectorOwnerCount: Number(diagnostics.inspectorOwnerCount ?? -1),
+      previewOwnerCount: Number(diagnostics.previewOwnerCount ?? -1),
+      imageCanvasOwnerCount: Number(diagnostics.imageCanvasOwnerCount ?? -1),
+      roiOwnerCount: Number(diagnostics.roiOwnerCount ?? -1),
+      persistenceOwnerCount: Number(diagnostics.persistenceOwnerCount ?? -1),
+      runOwnerCount: Number(diagnostics.runOwnerCount ?? -1),
+      activeInspectorDrafts: Number(diagnostics.activeInspectorDrafts ?? -1),
+      activeSubscriptions: Number(diagnostics.activeSubscriptions ?? -1),
+      activeAnimationFrames: Number(diagnostics.activeAnimationFrames ?? -1),
+      activeObservers: Number(diagnostics.activeObservers ?? -1),
+      activeTimers: Number(diagnostics.activeTimers ?? -1),
+      activeAbortControllers: Number(diagnostics.activeAbortControllers ?? -1),
+      activeBlobUrls: Number(diagnostics.activeBlobUrls ?? -1),
+      activePreviewArtifactIds: Number(diagnostics.activePreviewArtifactIds ?? -1),
+      inFlightPreview: Number(diagnostics.inFlightPreview ?? -1),
+      inFlightReads: Number(diagnostics.inFlightReads ?? -1),
+      inFlightWrites: Number(diagnostics.inFlightWrites ?? -1)
+    };
+  });
+}
+
+function workspaceLedgerIsZero(ledger) {
+  return ledger === null || Object.values(ledger).every(value => value === 0);
+}
+
+async function markSoakWeakReference(page, cycle, label, selector) {
+  const marker = await page.evaluate(({ currentCycle, currentLabel, currentSelector }) => {
+    if (typeof WeakRef !== 'function') {
+      return { supported: false, targetFound: false };
+    }
+    const target = document.querySelector(currentSelector);
+    if (!target) return { supported: true, targetFound: false };
+    const sentinel = document.createElement('span');
+    sentinel.dataset.soakGcSentinel = `${currentCycle}-${currentLabel}`;
+    document.body.append(sentinel);
+    sentinel.remove();
+    const runtimeWindow = window;
+    const store = runtimeWindow.__CV_STUDIO_UI_SOAK_WEAK_REFS__ ??= Object.create(null);
+    const cycleStore = store[currentCycle] ??= Object.create(null);
+    cycleStore[currentLabel] = new WeakRef(target);
+    cycleStore[`${currentLabel}Sentinel`] = new WeakRef(sentinel);
+    return { supported: true, targetFound: true };
+  }, { currentCycle: cycle, currentLabel: label, currentSelector: selector });
+  assert(marker.supported && marker.targetFound,
+    `Soak cycle ${cycle} could not mark ${label} for GC verification: ${JSON.stringify(marker)}`);
+  return marker;
+}
+
+async function markSoakWeakGlobalReference(page, cycle, label, propertyName) {
+  const marker = await page.evaluate(({ currentCycle, currentLabel, currentPropertyName }) => {
+    if (typeof WeakRef !== 'function') {
+      return { supported: false, targetFound: false };
+    }
+    const runtimeWindow = window;
+    const target = runtimeWindow[currentPropertyName];
+    if ((typeof target !== 'object' || target === null) && typeof target !== 'function') {
+      return { supported: true, targetFound: false };
+    }
+    const store = runtimeWindow.__CV_STUDIO_UI_SOAK_WEAK_REFS__ ??= Object.create(null);
+    const cycleStore = store[currentCycle] ??= Object.create(null);
+    cycleStore[currentLabel] = new WeakRef(target);
+    return { supported: true, targetFound: true };
+  }, { currentCycle: cycle, currentLabel: label, currentPropertyName: propertyName });
+  assert(marker.supported && marker.targetFound,
+    `Soak cycle ${cycle} could not mark ${label} for GC verification: ${JSON.stringify(marker)}`);
+  return marker;
+}
+
+async function readAndClearSoakWeakReferences(page, cycle) {
+  return page.evaluate(currentCycle => {
+    if (typeof WeakRef !== 'function') {
+      return { supported: false, found: false, observations: [], priorCyclesCollected: false };
+    }
+    const runtimeWindow = window;
+    const store = runtimeWindow.__CV_STUDIO_UI_SOAK_WEAK_REFS__;
+    if (!store) {
+      return { supported: true, found: false, observations: [], priorCyclesCollected: true };
+    }
+    const observations = Object.keys(store)
+      .map(Number)
+      .sort((left, right) => left - right)
+      .map(observedCycle => {
+        const alive = Object.fromEntries(Object.entries(store[observedCycle])
+          .map(([label, reference]) => [label, reference.deref() !== undefined]));
+        return {
+          cycle: observedCycle,
+          alive,
+          targetsCollected: Object.entries(alive)
+            .filter(([label]) => !label.endsWith('Sentinel'))
+            .every(([, isAlive]) => isAlive === false),
+          sentinelsCollected: Object.entries(alive)
+            .filter(([label]) => label.endsWith('Sentinel'))
+            .every(([, isAlive]) => isAlive === false)
+        };
+      });
+    for (const observation of observations) {
+      if (observation.cycle < currentCycle && observation.targetsCollected && observation.sentinelsCollected) {
+        delete store[observation.cycle];
+      }
+    }
+    if (Object.keys(store).length === 0) delete runtimeWindow.__CV_STUDIO_UI_SOAK_WEAK_REFS__;
+    const current = observations.find(observation => observation.cycle === currentCycle) ?? null;
+    const prior = observations.filter(observation => observation.cycle < currentCycle);
+    return {
+      supported: true,
+      found: observations.length > 0,
+      current,
+      observations,
+      priorCyclesCollected: prior.every(observation =>
+        observation.targetsCollected && observation.sentinelsCollected)
+    };
+  }, cycle);
+}
+
+async function captureSoakMetricSample(
+  page,
+  cdpSession,
+  executablePath,
+  cycle,
+  stage,
+  options = {}
+) {
+  await waitForDoubleAnimationFrame(page);
+  const garbageCollection = { attempted: options.collectGarbage !== false, succeeded: false, error: null };
+  if (garbageCollection.attempted) {
+    try {
+      await cdpSession.send('HeapProfiler.collectGarbage');
+      garbageCollection.succeeded = true;
+    } catch (error) {
+      garbageCollection.error = error?.message || String(error);
+    }
+  }
+  const weakReferences = options.readWeakReferences
+    ? await readAndClearSoakWeakReferences(page, cycle)
+    : null;
+  const [heap, performance, memoryDom, nativeRuntime, dom] = await Promise.all([
+    cdpSession.send('Runtime.getHeapUsage'),
+    cdpSession.send('Performance.getMetrics'),
+    cdpSession.send('Memory.getDOMCounters'),
+    options.includeNative
+      ? Promise.resolve(runDesktopRuntimeProbe(executablePath))
+      : Promise.resolve(null),
+    page.evaluate(() => ({
+      route: location.hash,
+      elementCount: document.querySelectorAll('*').length,
+      productShellCount: document.querySelectorAll('[data-product-shell]').length,
+      authShellCount: document.querySelectorAll('[data-auth-shell="ready"]').length,
+      tokenPresent: Boolean(sessionStorage.getItem('cv_auth_token'))
+    }))
+  ]);
+  const performanceMap = Object.fromEntries(performance.metrics.map(metric => [metric.name, metric.value]));
+  return {
+    cycle,
+    stage,
+    capturedAtUtc: new Date().toISOString(),
+    garbageCollection,
+    weakReferences,
+    jsHeap: heap,
+    memoryDom,
+    performance: {
+      JSHeapUsedSize: performanceMap.JSHeapUsedSize ?? null,
+      JSHeapTotalSize: performanceMap.JSHeapTotalSize ?? null,
+      Nodes: performanceMap.Nodes ?? null,
+      Documents: performanceMap.Documents ?? null,
+      Frames: performanceMap.Frames ?? null,
+      JSEventListeners: performanceMap.JSEventListeners ?? null
+    },
+    desktop: nativeRuntime ? {
+      workingSetBytes: nativeRuntime.desktop.workingSetBytes,
+      privateMemoryBytes: nativeRuntime.desktop.privateMemoryBytes,
+      virtualMemoryBytes: nativeRuntime.desktop.virtualMemoryBytes,
+      handleCount: nativeRuntime.desktop.handleCount,
+      threadCount: nativeRuntime.desktop.threadCount,
+      nodeDescendantCount: nativeRuntime.nodeDescendantCount
+    } : null,
+    dom
+  };
+}
+
+function analyzeSoakMetric(samples, selector, policy) {
+  const values = samples
+    .slice(Math.min(2, samples.length - 1))
+    .map(selector)
+    .map(Number)
+    .filter(Number.isFinite);
+  assert(values.length > 1, `Soak metric ${policy.name} did not provide enough finite samples.`);
+  const first = values[0];
+  const last = values[values.length - 1];
+  const delta = last - first;
+  const monotonicIncrease = values.length > 1 && values.every((value, index) =>
+    index === 0 || value >= values[index - 1]);
+  const unexplainedMonotonicGrowth = monotonicIncrease && delta > policy.monotonicGrowthLimit;
+  return {
+    name: policy.name,
+    sampleCount: values.length,
+    first,
+    last,
+    minimum: Math.min(...values),
+    maximum: Math.max(...values),
+    delta,
+    growthLimit: policy.growthLimit,
+    monotonicGrowthLimit: policy.monotonicGrowthLimit,
+    monotonicIncrease,
+    unexplainedMonotonicGrowth,
+    passed: delta <= policy.growthLimit && !unexplainedMonotonicGrowth
+  };
+}
+
+async function verifyFinalJourneySoak(
+  page, context, webPort, username, password, runName, evidenceDirectory, sourceSha,
+  executablePath, cycleCount
+) {
+  const screenshots = [];
+  const captureScene = async scene => screenshots.push(await captureFinalJourneyScene(
+    page, evidenceDirectory, 'soak', scene, sourceSha));
+  const setup = await setupAdminThroughUi(page, webPort, username, password, captureScene);
+  const studio = await verifyStudioFoundation(page, webPort, '/overview');
+  const created = await createBlankProjectThroughUi(page, `${runName} Soak`, {
+    responseLoss: false,
+    captureScene: null
+  });
+  await openWorkspaceFromDetail(page, created.projectId);
+  const configured = await addConfigureAndSaveAcquisition(page);
+  const prepared = await installFinalJourneyAuthority(
+    webPort, setup.session.token, created.projectId, evidenceDirectory);
+  await reloadWorkspaceAuthority(page, created.projectId, prepared.persistenceRevision);
+  const saved = await previewAndSaveFinalWorkspace(page, created.projectId, prepared, 'soak-ready');
+  const preparationLogout = await logoutThroughUi(page);
+
+  const cdpSession = await context.newCDPSession(page);
+  await cdpSession.send('Performance.enable');
+  await cdpSession.send('HeapProfiler.enable');
+  const cycles = [];
+  const resultIds = new Set();
+  let postSoakDisposalSettle = null;
+  let postReloadSample = null;
+  try {
+    for (let cycle = 0; cycle < cycleCount; cycle += 1) {
+      const auth = await loginThroughUi(page, webPort, username, password, null);
+      await markSoakWeakReference(page, cycle, 'productShell', '[data-product-shell="ready"]');
+      await markSoakWeakGlobalReference(
+        page,
+        cycle,
+        'projectLifecycleDiagnostics',
+        '__STUDIO_UI_PROJECT_LIFECYCLE_DIAGNOSTICS__'
+      );
+      await markSoakWeakGlobalReference(
+        page,
+        cycle,
+        'leaveGuardDiagnostics',
+        '__STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__'
+      );
+      const stageSamples = {
+        login: await captureSoakMetricSample(
+          page, cdpSession, executablePath, cycle, 'login', { includeNative: false })
+      };
+      const projects = await readAuthorizedJson(webPort, auth.session.token, '/api/projects');
+      assert(projects.length === 1 && projects[0].id === created.projectId,
+        `Soak cycle ${cycle} observed duplicate or missing Projects: ${JSON.stringify(projects)}`);
+      await page.locator('[data-product-nav="/projects"]').click();
+      await waitForSelectorWithoutHandle(
+        page,
+        '[data-capability="projects-read"]',
+        { state: 'visible', timeout: 45_000 }
+      );
+      await page.locator(`[data-testid="project-open-${created.projectId}"]`).click();
+      const workspace = await waitForWorkspaceReady(page, created.projectId);
+      await selectWorkspaceNode(page, prepared.acquisitionPosition);
+      await page.locator('[data-testid="preview-run"]').click();
+      await waitForFunctionWithoutHandle(page, () =>
+        document.querySelector('[data-capability="preview-workbench"]')
+          ?.getAttribute('data-preview-phase') === 'success', null, { timeout: 45_000 });
+      await markSoakWeakReference(
+        page,
+        cycle,
+        'workspaceShell',
+        '[data-evidence-surface="f03-workspace-shell"]'
+      );
+      await markSoakWeakGlobalReference(
+        page,
+        cycle,
+        'workspaceDiagnostics',
+        '__STUDIO_UI_WORKSPACE_DIAGNOSTICS__'
+      );
+      stageSamples.workspace = await captureSoakMetricSample(
+        page, cdpSession, executablePath, cycle, 'workspace', { includeNative: false });
+      const formal = await executeFormalRunOnce(page, created.projectId);
+      await markSoakWeakReference(page, cycle, 'resultsPage', '[data-capability="results-read"]');
+      stageSamples.results = await captureSoakMetricSample(
+        page, cdpSession, executablePath, cycle, 'results', { includeNative: false });
+      assert(!resultIds.has(formal.result.id),
+        `Soak cycle ${cycle} reused Result identity ${formal.result.id}.`);
+      resultIds.add(formal.result.id);
+      const history = await readAuthorizedJson(
+        webPort, auth.session.token, `/api/inspection/history/${created.projectId}?pageIndex=0&pageSize=100`);
+      const historyIds = rollbackItems(history).map(rollbackResultId);
+      assert([...resultIds].every(id => historyIds.includes(id)),
+        `Soak cycle ${cycle} lost an authoritative Result history row.`);
+      const workspaceLedger = await readWorkspaceResourceLedger(page);
+      assert(workspaceLedgerIsZero(workspaceLedger),
+        `Soak cycle ${cycle} retained Workspace resources on Results: ${JSON.stringify(workspaceLedger)}`);
+      const logout = await logoutThroughUi(page);
+      const metrics = await captureSoakMetricSample(
+        page,
+        cdpSession,
+        executablePath,
+        cycle,
+        'logout',
+        { includeNative: true, readWeakReferences: true }
+      );
+      stageSamples.logout = metrics;
+      const weakReferenceProgressGate = metrics.weakReferences?.supported === true &&
+        metrics.weakReferences.current?.sentinelsCollected === true &&
+        metrics.weakReferences.priorCyclesCollected === true;
+      assert(metrics.dom.productShellCount === 0 && metrics.dom.authShellCount === 1 &&
+        !metrics.dom.tokenPresent && metrics.desktop.nodeDescendantCount === 0 &&
+        metrics.garbageCollection.succeeded && weakReferenceProgressGate,
+      `Soak cycle ${cycle} retained UI/token/Node residue: ${JSON.stringify(metrics)}`);
+      cycles.push({
+        cycle,
+        projectCount: projects.length,
+        workspace,
+        preview: 'success',
+        resultId: formal.result.id,
+        resultProjectRevision: formal.result.projectPersistenceRevision,
+        executionSnapshotId: formal.result.executionSnapshotId,
+        historyCount: rollbackItems(history).length,
+        workspaceLedger,
+        logout,
+        metrics,
+        stageSamples,
+        weakReferenceProgressGate
+      });
+    }
+    const settleAuth = await loginThroughUi(page, webPort, username, password, null);
+    const settleLogout = await logoutThroughUi(page);
+    const settleMetrics = await captureSoakMetricSample(
+      page,
+      cdpSession,
+      executablePath,
+      cycleCount,
+      'post-soak-disposal-settle',
+      { includeNative: false, readWeakReferences: true }
+    );
+    const allTrackedReferencesCollected = settleMetrics.weakReferences?.supported === true &&
+      settleMetrics.weakReferences.found === true &&
+      settleMetrics.weakReferences.observations.every(observation =>
+        observation.targetsCollected && observation.sentinelsCollected);
+    assert(settleMetrics.garbageCollection.succeeded && allTrackedReferencesCollected,
+      `Post-soak disposal settle retained a prior Product tree: ${JSON.stringify(settleMetrics)}`);
+    postSoakDisposalSettle = {
+      auth: { user: settleAuth.session.user },
+      logout: settleLogout,
+      metrics: settleMetrics,
+      allTrackedReferencesCollected
+    };
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 45_000 });
+    await waitForSelectorWithoutHandle(
+      page,
+      '[data-auth-page="login"]',
+      { state: 'visible', timeout: 45_000 }
+    );
+    postReloadSample = await captureSoakMetricSample(
+      page,
+      cdpSession,
+      executablePath,
+      cycleCount,
+      'login-after-reload',
+      { includeNative: false }
+    );
+  } finally {
+    await cdpSession.detach();
+  }
+
+  const requestAudit = await Promise.resolve(null);
+  const nativeSamples = cycles.map(item => item.metrics);
+  const stableUiSamples = cycles.map(item => item.stageSamples.login);
+  const trends = {
+    jsHeapUsedBytes: analyzeSoakMetric(stableUiSamples, item => item.jsHeap.usedSize, {
+      name: 'jsHeapUsedBytes', growthLimit: 8 * 1024 * 1024, monotonicGrowthLimit: 2 * 1024 * 1024
+    }),
+    domNodeCount: analyzeSoakMetric(stableUiSamples, item => item.memoryDom.nodes, {
+      name: 'domNodeCount', growthLimit: 512, monotonicGrowthLimit: 128
+    }),
+    jsEventListenerCount: analyzeSoakMetric(stableUiSamples, item => item.memoryDom.jsEventListeners, {
+      name: 'jsEventListenerCount', growthLimit: 128, monotonicGrowthLimit: 32
+    }),
+    documentCount: analyzeSoakMetric(stableUiSamples, item => item.memoryDom.documents, {
+      name: 'documentCount', growthLimit: 1, monotonicGrowthLimit: 0
+    }),
+    workingSetBytes: analyzeSoakMetric(nativeSamples, item => item.desktop.workingSetBytes, {
+      name: 'workingSetBytes', growthLimit: 128 * 1024 * 1024, monotonicGrowthLimit: 32 * 1024 * 1024
+    }),
+    privateMemoryBytes: analyzeSoakMetric(nativeSamples, item => item.desktop.privateMemoryBytes, {
+      name: 'privateMemoryBytes', growthLimit: 64 * 1024 * 1024, monotonicGrowthLimit: 16 * 1024 * 1024
+    }),
+    handleCount: analyzeSoakMetric(nativeSamples, item => item.desktop.handleCount, {
+      name: 'handleCount', growthLimit: 32, monotonicGrowthLimit: 8
+    })
+  };
+  const gcGate = cycles.every(item => Object.values(item.stageSamples)
+    .every(sample => sample.garbageCollection.succeeded)) &&
+    postSoakDisposalSettle?.metrics.garbageCollection.succeeded === true &&
+    postReloadSample?.garbageCollection.succeeded === true;
+  const weakReferenceGate = cycles.every(item => item.weakReferenceProgressGate) &&
+    postSoakDisposalSettle?.allTrackedReferencesCollected === true;
+  const firstLogout = nativeSamples[0];
+  const lastLogout = nativeSamples.at(-1);
+  const firstHistoryCount = cycles[0].historyCount;
+  const lastHistoryCount = cycles.at(-1).historyCount;
+  const historyDelta = lastHistoryCount - firstHistoryCount;
+  const logoutCurrentTreeObservation = {
+    sampleStage: 'LOGOUT_WITH_CURRENT_RESULTS_TREE_RETAINED_FOR_ONE_ROUTER_GENERATION',
+    firstHistoryCount,
+    lastHistoryCount,
+    historyDelta,
+    firstDomNodeCount: firstLogout.memoryDom.nodes,
+    lastDomNodeCount: lastLogout.memoryDom.nodes,
+    domNodeDelta: lastLogout.memoryDom.nodes - firstLogout.memoryDom.nodes,
+    domNodesPerAddedHistoryRow: historyDelta > 0
+      ? (lastLogout.memoryDom.nodes - firstLogout.memoryDom.nodes) / historyDelta
+      : null,
+    firstJsEventListenerCount: firstLogout.memoryDom.jsEventListeners,
+    lastJsEventListenerCount: lastLogout.memoryDom.jsEventListeners,
+    jsEventListenerDelta: lastLogout.memoryDom.jsEventListeners - firstLogout.memoryDom.jsEventListeners,
+    jsEventListenersPerAddedHistoryRow: historyDelta > 0
+      ? (lastLogout.memoryDom.jsEventListeners - firstLogout.memoryDom.jsEventListeners) / historyDelta
+      : null,
+    priorGenerationWeakReferencesCollected: weakReferenceGate
+  };
+  const postReloadComparison = postReloadSample ? {
+    before: {
+      jsHeapUsedBytes: nativeSamples.at(-1).jsHeap.usedSize,
+      domNodeCount: nativeSamples.at(-1).memoryDom.nodes,
+      jsEventListenerCount: nativeSamples.at(-1).memoryDom.jsEventListeners,
+      documentCount: nativeSamples.at(-1).memoryDom.documents
+    },
+    after: {
+      jsHeapUsedBytes: postReloadSample.jsHeap.usedSize,
+      domNodeCount: postReloadSample.memoryDom.nodes,
+      jsEventListenerCount: postReloadSample.memoryDom.jsEventListeners,
+      documentCount: postReloadSample.memoryDom.documents
+    }
+  } : null;
+  const soakGatePassed = cycles.length === cycleCount && resultIds.size === cycleCount &&
+    cycles.every(item => workspaceLedgerIsZero(item.workspaceLedger)) &&
+    gcGate && weakReferenceGate && Object.values(trends).every(item => item.passed);
+  const diagnosticArtifact = writeJsonEvidence(
+    evidenceDirectory,
+    `f04-g6-soak-diagnostics-${safeFileName(runName)}.json`,
+    {
+      status: soakGatePassed ? 'pass' : 'fail',
+      sourceSha,
+      cycleCount,
+      uniqueResultCount: resultIds.size,
+      gcGate,
+      weakReferenceGate,
+      trends,
+      logoutCurrentTreeObservation,
+      postSoakDisposalSettle,
+      postReloadSample,
+      postReloadComparison,
+      cycles
+    }
+  );
+  assert(soakGatePassed,
+  `F04 G6 soak did not satisfy lifecycle/result/memory gates: ${JSON.stringify({
+    cycles: cycles.length, resultIds: resultIds.size, gcGate, weakReferenceGate, trends, postReloadComparison
+  })}`);
+  await captureScene('login-after-20-cycle');
+  return {
+    phase: 'SOAK',
+    studio,
+    setup: { setupStatus: setup.setupStatus, user: setup.session.user },
+    project: {
+      projectId: created.projectId,
+      name: created.name,
+      flowId: prepared.flowId,
+      persistenceRevision: saved.revision,
+      acquisitionId: prepared.acquisitionId,
+      judgmentId: prepared.judgmentId
+    },
+    preparation: { configured, prepared, saved: { revision: saved.revision, operatorName: saved.nextName } },
+    preparationLogout,
+    cycleCount,
+    uniqueResultCount: resultIds.size,
+    resultIds: [...resultIds],
+    trends,
+    gcGate,
+    weakReferenceGate,
+    postSoakDisposalSettle,
+    postReloadSample,
+    postReloadComparison,
+    logoutCurrentTreeObservation,
+    diagnosticArtifact,
+    primaryLeakGate: 'OWNER_RESOURCE_WEAKREF_AND_STABLE_LOGIN_DOM_COUNTERS',
+    trendPolicy: {
+      rendererTrendSampleStage: 'LOGIN_AFTER_PRIOR_LOGOUT_GC',
+      nativeTrendSampleStage: 'LOGOUT',
+      warmupCyclesExcluded: Math.min(2, stableUiSamples.length - 1),
+      jsHeapGrowthLimitBytes: 8 * 1024 * 1024,
+      jsHeapMonotonicGrowthLimitBytes: 2 * 1024 * 1024,
+      domNodeGrowthLimit: 512,
+      domNodeMonotonicGrowthLimit: 128,
+      jsEventListenerGrowthLimit: 128,
+      jsEventListenerMonotonicGrowthLimit: 32,
+      nativeWorkingSetGrowthLimitBytes: 128 * 1024 * 1024,
+      nativePrivateMemoryGrowthLimitBytes: 64 * 1024 * 1024,
+      handleGrowthLimit: 32
+    },
+    requestAudit,
+    cycles,
+    screenshots,
+    expectedConsoleErrors: { responseLoss: 0, notFound: 0 }
+  };
+}
+
+async function verifyFinalJourney(options) {
+  const {
+    page, context, webPort, username, password, runName, evidenceDirectory,
+    sourceSha, executablePath, phase, statePath, soakCycles
+  } = options;
+  assert(username && password, 'Final journey requires UI username and password.');
+  if (phase === 'CREATE_RUN_LOGOUT') {
+    return verifyFinalJourneyCreateRunLogout(
+      page, webPort, username, password, runName, evidenceDirectory, sourceSha, statePath);
+  }
+  if (phase === 'REOPEN_DELETE') {
+    return verifyFinalJourneyReopenDelete(
+      page, webPort, username, password, evidenceDirectory, sourceSha, statePath);
+  }
+  assert(phase === 'SOAK' && soakCycles >= 20, 'Final journey SOAK requires at least 20 cycles.');
+  return verifyFinalJourneySoak(
+    page, context, webPort, username, password, runName, evidenceDirectory, sourceSha,
+    executablePath, soakCycles);
+}
+
 function rollbackItems(payload) {
   if (Array.isArray(payload)) return payload;
   return payload?.items || payload?.Items || payload?.results || payload?.Results || [];
@@ -2392,12 +3701,17 @@ async function main() {
   const cdpPort = Number(requiredEnvironment('CV_CDP_PORT'));
   const webPort = Number(requiredEnvironment('CV_WEB_PORT'));
   const scale = Number(requiredEnvironment('CV_DPI_SCALE'));
-  const token = requiredEnvironment('CV_SMOKE_TOKEN');
-  const user = requiredEnvironment('CV_SMOKE_USER');
+  const finalJourneyPhase = String(process.env.CV_STUDIO_UI_FINAL_JOURNEY_PHASE || '').trim().toUpperCase();
+  const authenticationDeferredToScenario = Boolean(finalJourneyPhase);
+  const token = authenticationDeferredToScenario ? '' : requiredEnvironment('CV_SMOKE_TOKEN');
+  const user = authenticationDeferredToScenario ? '' : requiredEnvironment('CV_SMOKE_USER');
+  const username = authenticationDeferredToScenario
+    ? requiredEnvironment('CV_SMOKE_USERNAME')
+    : String(process.env.CV_SMOKE_USERNAME || '');
   const evidenceDirectory = path.resolve(requiredEnvironment('CV_EVIDENCE_DIR'));
   const executablePath = path.resolve(requiredEnvironment('CV_STUDIO_UI_DESKTOP_EXECUTABLE'));
   const expectation = requiredEnvironment('CV_STUDIO_UI_EXPECTATION').toLowerCase();
-  const password = expectation === 'studio-auth'
+  const password = expectation === 'studio-auth' || authenticationDeferredToScenario
     ? requiredEnvironment('CV_SMOKE_PASSWORD')
     : String(process.env.CV_SMOKE_PASSWORD || '');
   const runName = String(process.env.CV_STUDIO_UI_RUN_NAME || expectation).trim();
@@ -2412,6 +3726,8 @@ async function main() {
   const authMode = String(process.env.CV_STUDIO_UI_AUTH_MODE || 'UNRECORDED').trim().toUpperCase();
   const rollbackPhase = String(process.env.CV_STUDIO_UI_ROLLBACK_PHASE || '').trim().toUpperCase();
   const rollbackStatePath = String(process.env.CV_STUDIO_UI_ROLLBACK_STATE || '').trim();
+  const finalJourneyStatePath = String(process.env.CV_STUDIO_UI_FINAL_JOURNEY_STATE || '').trim();
+  const soakCycles = Number(process.env.CV_STUDIO_UI_SOAK_CYCLES || 0);
   let route = normalizeStudioRoute(
     process.env.CV_STUDIO_UI_ROUTE || routeForExpectation(expectation)
   );
@@ -2427,6 +3743,13 @@ async function main() {
     'CV_STUDIO_UI_DPI_ONLY requires studio-product plus a seeded Workspace without Formal Run.');
   assert(['', 'NEXT_CREATE', 'LEGACY_VERIFY', 'NEXT_REOPEN'].includes(rollbackPhase),
     `Unsupported CV_STUDIO_UI_ROLLBACK_PHASE: ${rollbackPhase}`);
+  assert(['', 'CREATE_RUN_LOGOUT', 'REOPEN_DELETE', 'SOAK'].includes(finalJourneyPhase),
+    `Unsupported CV_STUDIO_UI_FINAL_JOURNEY_PHASE: ${finalJourneyPhase}`);
+  assert(!finalJourneyPhase || (expectation === 'studio-product' && !seedWorkspace &&
+    !formalRun && !dpiOnly && !rollbackPhase),
+  'Final journey must use an unseeded studio-product route without the standard Formal Run routine.');
+  assert(finalJourneyPhase !== 'SOAK' || (Number.isInteger(soakCycles) && soakCycles >= 20),
+    'Final journey SOAK requires at least 20 cycles.');
 
   const evidence = {
     schemaVersion: 1,
@@ -2445,6 +3768,9 @@ async function main() {
     startupProfileRequested: startupProfileRequested || null,
     authMode,
     rollbackPhase: rollbackPhase || null,
+    finalJourneyPhase: finalJourneyPhase || null,
+    authenticationDeferredToScenario,
+    soakCycles,
     route,
     sourceSha: String(process.env.CV_STUDIO_UI_SOURCE_SHA || 'unknown').trim(),
     capturedAtUtc: new Date().toISOString(),
@@ -2470,7 +3796,78 @@ async function main() {
     browser = connected.browser;
     const { context, page, version } = connected;
     evidence.cdpVersion = version;
-    if (seedWorkspace) {
+    if (finalJourneyPhase) {
+      runtimeErrors = captureRuntimeErrors(page);
+      const responseAudit = [];
+      page.on('response', response => {
+        const url = new URL(response.url());
+        if (url.origin === `http://localhost:${webPort}` && url.pathname.startsWith('/api/') &&
+          response.status() >= 400) {
+          responseAudit.push({ method: response.request().method(), path: url.pathname, status: response.status() });
+        }
+      });
+      evidence.targetUrl = await navigateWithAuthenticatedSession(
+        page,
+        webPort,
+        expectation,
+        route
+      );
+      evidence.finalJourney = await verifyFinalJourney({
+        page,
+        context,
+        webPort,
+        username,
+        password,
+        runName,
+        evidenceDirectory,
+        sourceSha: evidence.sourceSha,
+        executablePath,
+        phase: finalJourneyPhase,
+        statePath: finalJourneyStatePath,
+        soakCycles
+      });
+      evidence.finalJourney.httpFailureResponses = responseAudit;
+      evidence.finalJourney.expectedConsoleErrors = {
+        responseLoss: responseAudit.filter(item => item.status === 599).length,
+        notFound: responseAudit.filter(item => item.status === 404).length
+      };
+      const finalRequests = runtimeErrors.requests
+        .map(item => {
+          const url = new URL(item.url);
+          return { method: item.method, path: `${url.pathname}${url.search}` };
+        })
+        .filter(item => item.path.startsWith('/api/'));
+      const countRequest = (method, matcher) => finalRequests.filter(item =>
+        item.method === method && (typeof matcher === 'string' ? item.path === matcher : matcher.test(item.path))).length;
+      const requestAudit = {
+        setupAdminPosts: countRequest('POST', '/api/auth/setup-admin'),
+        loginPosts: countRequest('POST', '/api/auth/login'),
+        logoutPosts: countRequest('POST', '/api/auth/logout'),
+        createPosts: countRequest('POST', '/api/projects'),
+        operationGets: countRequest('GET', /^\/api\/project-operations\/[0-9a-f-]{36}\?kind=(?:create|delete)$/i),
+        openPosts: countRequest('POST', /^\/api\/projects\/[0-9a-f-]{36}\/open$/i),
+        deletePosts: countRequest('POST', /^\/api\/projects\/[0-9a-f-]{36}\/delete$/i),
+        admissionPosts: countRequest('POST', '/api/inspection/admission'),
+        executePosts: countRequest('POST', '/api/inspection/execute')
+      };
+      evidence.finalJourney.requestAudit = requestAudit;
+      if (finalJourneyPhase === 'CREATE_RUN_LOGOUT') {
+        assert(requestAudit.setupAdminPosts === 1 && requestAudit.createPosts === 1 &&
+          requestAudit.operationGets === 1 && requestAudit.admissionPosts === 1 &&
+          requestAudit.executePosts === 1 && requestAudit.logoutPosts === 1,
+        `Final create/run request audit drifted: ${JSON.stringify(requestAudit)}`);
+      } else if (finalJourneyPhase === 'REOPEN_DELETE') {
+        assert(requestAudit.loginPosts === 1 && requestAudit.deletePosts === 1 &&
+          requestAudit.operationGets === 1 && requestAudit.logoutPosts === 1,
+        `Final reopen/delete request audit drifted: ${JSON.stringify(requestAudit)}`);
+      } else {
+        assert(requestAudit.setupAdminPosts === 1 && requestAudit.createPosts === 1 &&
+          requestAudit.loginPosts === soakCycles + 1 && requestAudit.logoutPosts === soakCycles + 2 &&
+          requestAudit.admissionPosts === soakCycles && requestAudit.executePosts === soakCycles &&
+          requestAudit.deletePosts === 0,
+        `20-cycle request audit drifted: ${JSON.stringify({ requestAudit, soakCycles })}`);
+      }
+    } else if (seedWorkspace) {
       assert(expectation === 'studio-product', 'Workspace seeding requires studio-product evidence.');
       assert(route === '/projects/seeded/workspace',
         'Workspace seeding requires the /projects/seeded/workspace route placeholder.');
@@ -2478,9 +3875,11 @@ async function main() {
       route = evidence.workspaceSeed.route;
       evidence.route = route;
     }
-    evidence.api = await readApiEvidence(webPort, token);
+    if (!finalJourneyPhase) evidence.api = await readApiEvidence(webPort, token);
 
-    if (expectation === 'missing-assets') {
+    if (finalJourneyPhase) {
+      evidence.studio = evidence.finalJourney.studio;
+    } else if (expectation === 'missing-assets') {
       runtimeErrors = captureRuntimeErrors(page);
       evidence.missingAssets = await verifyMissingAssets(page);
     } else {
@@ -2524,7 +3923,7 @@ async function main() {
       }
     }
 
-    evidence.rollback = await applyRollbackEvidence(
+    evidence.rollback = finalJourneyPhase ? null : await applyRollbackEvidence(
       evidence,
       webPort,
       token,
@@ -2535,7 +3934,7 @@ async function main() {
 
     evidence.browserDpi = await readBrowserDpiEvidence(page, context);
     evidence.nativeRuntime = runDesktopRuntimeProbe(executablePath);
-    if (expectation === 'studio-product') {
+    if (expectation === 'studio-product' && evidence.productPage) {
       const routeName = safeFileName(route.replace(/^\//, '') || 'overview');
       const screenshotBuffer = await page.screenshot({ type: 'png' });
       const artifact = writePngEvidence(
@@ -2560,10 +3959,40 @@ async function main() {
         DPI_TYPE: 'NATIVE_WINDOW_DPI_OBSERVED',
         observedNativeWindowDpi: evidence.nativeRuntime.nativeWindow.dpi
       };
+    } else if (expectation === 'studio-product' && evidence.finalJourney) {
+      const routeName = safeFileName(new URL(page.url()).hash.replace(/^#\/?/, '') || 'final-journey');
+      const screenshotBuffer = await page.screenshot({ type: 'png' });
+      const artifact = writePngEvidence(
+        evidenceDirectory,
+        `real-webview2-${routeName}-${safeFileName(runName)}.png`,
+        screenshotBuffer
+      );
+      const appearance = await page.evaluate(() => ({
+        theme: document.documentElement.dataset.theme || null,
+        density: document.documentElement.dataset.density || null
+      }));
+      evidence.viewportScreenshot = {
+        ...artifact,
+        sourceSha: evidence.sourceSha,
+        scenes: ['f04-g6-final-journey', finalJourneyPhase.toLowerCase()],
+        route: new URL(page.url()).hash.replace(/^#/, ''),
+        DATA_SOURCE: 'REAL_WEBVIEW2_PROJECT_AUTHORITY',
+        AUTH_SOURCE: 'UI_SETUP_OR_LOGIN',
+        theme: appearance.theme,
+        density: appearance.density,
+        nativeWindow: evidence.nativeRuntime.nativeWindow,
+        browserViewport: evidence.browserDpi.js,
+        DPR_TYPE: 'WEBVIEW2_FORCE_DEVICE_SCALE_FACTOR',
+        requestedDprScale: scale,
+        observedDevicePixelRatio: evidence.browserDpi.js.devicePixelRatio,
+        DPI_TYPE: 'NATIVE_WINDOW_DPI_OBSERVED',
+        observedNativeWindowDpi: evidence.nativeRuntime.nativeWindow.dpi
+      };
     }
     const consoleErrorClassification = classifyConsoleErrors(
       runtimeErrors.consoleErrors,
-      evidence.productPage
+      evidence.productPage,
+      evidence.finalJourney
     );
     evidence.runtimeErrors = runtimeErrors;
     evidence.ignoredExpectedConsoleErrors = consoleErrorClassification.ignoredExpected;
