@@ -1401,3 +1401,5 @@ F04_STARTED=NO
 Studio:StudioUiEnabled=false
 WorkspaceCapabilityEnabled=false
 ~~~
+
+非追溯说明（2026-07-18）：产品负责人随后通过 F04 entry exception 批准进入 F04。该例外不改变以上 F03 Final Gate 当时的历史事实；F03 仍为 `PARTIAL`，唯一 evidence gap 仍是独立无 Node 目标机验证 `NOT_PERFORMED`。

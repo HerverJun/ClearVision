@@ -53,6 +53,8 @@ F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision
   已收口；当前唯一未闭合的产品门禁是用户视觉确认，状态为
   `F02_STATE=AWAITING_PRODUCT_VISUAL_CONFIRMATION`。Final SHA workflow_dispatch 的实际结论由不再修改
   该 SHA 的交付回报记录。
+- F03：G1–G6 核心实现已经完成，`F03_G6_STATUS=DONE`；总体状态仍为 `PARTIAL`，唯一历史 evidence gap 是独立无 Node 目标机验证 `NOT_PERFORMED`。产品负责人已接受延期，该项在 F04 中为非阻塞治理项，不改写为 PASS 或 COMPLETE。
+- F04：当前唯一执行权威是 [F04 完整开发计划](./Studio_UI_Next_F04_完整开发计划_PROPOSED_AUDITED.md)。G0B 已获批并完成必要稳定线语义同步；G1 仅冻结产品任务、路由、权限、HTTP、Owner 与 Project 合同，不实现 G2–G6 产品能力。
 - `Studio:StudioUiEnabled=false` 保持不变；legacy 仍是默认入口。
 
 ## 阶段门禁
@@ -66,7 +68,7 @@ F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision
 
 ## 文档导航
 
-F01 执行期间以本目录链接的计划为唯一权威；仓库外来源文件或备份只作取证，不同步维护。
+F04 执行期间以本目录链接的 F04 计划为唯一当前权威；仓库外来源文件或备份只作取证，不同步维护。
 
 - [初始化基线](./初始化基线.md)
 - [F01 完整开发计划（正式执行权威）](./Studio_UI_Next_F01_完整开发计划.md)
@@ -78,6 +80,8 @@ F01 执行期间以本目录链接的计划为唯一权威；仓库外来源文�
 - [F02 Operator 合同同步矩阵](./F02_Operator合同同步矩阵.md)
 - [F02 产品视觉证据索引](./F02_视觉证据索引.md)
 - [F02 完成报告](./F02_完成报告.md)
-- [F03 输入与迁移边界（未实施 F03）](./F03_输入与迁移边界.md)
+- [F03 完整开发计划（历史权威与完成记录）](./Studio_UI_Next_F03_完整开发计划.md)
+- [F03 输入与迁移边界（历史输入，已被 F03 完整计划取代）](./F03_输入与迁移边界.md)
+- [F04 完整开发计划（当前唯一权威）](./Studio_UI_Next_F04_完整开发计划_PROPOSED_AUDITED.md)
 - [仓库级协作规则](../../../AGENTS.md)
 - [旧 Studio2 历史入口](../Studio2/README.md)（历史取证，不是新计划）
