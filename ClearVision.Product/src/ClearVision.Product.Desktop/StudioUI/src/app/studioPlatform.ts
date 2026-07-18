@@ -5,6 +5,12 @@ import {
   type ApiTransport
 } from '@/platform/api';
 import {
+  createMemoryTokenPort,
+  createSessionStorageTokenPort,
+  type AuthTokenPort,
+  type AuthTokenStorage
+} from '@/platform/auth';
+import {
   createBrowserHostFake,
   createWebView2HostAdapter,
   type StudioHostAdapter
@@ -16,16 +22,15 @@ import {
   type StudioStartupWindow
 } from '@/platform/startup';
 
-const authTokenStorageKey = 'cv_auth_token';
-
 export interface DesktopStudioRuntimeWindow extends StudioStartupWindow {
-  readonly sessionStorage?: Pick<Storage, 'getItem'>;
+  readonly sessionStorage?: AuthTokenStorage;
 }
 
 export interface StudioPlatform {
   readonly startup: StudioStartupConfigV1;
   readonly host: StudioHostAdapter;
   readonly api: ApiTransport;
+  readonly tokenPort: AuthTokenPort;
   hasToken(): boolean;
   dispose(): void;
 }
@@ -34,6 +39,7 @@ export interface CreateStudioPlatformOptions {
   readonly startup: StudioStartupConfigV1;
   readonly host: StudioHostAdapter;
   readonly api: ApiTransport;
+  readonly tokenPort?: AuthTokenPort;
   readonly tokenProvider?: ApiTokenProvider;
 }
 
@@ -74,16 +80,6 @@ function assertCompatiblePlatform(options: CreateStudioPlatformOptions): void {
   }
 }
 
-function createSessionTokenProvider(runtimeWindow: DesktopStudioRuntimeWindow): ApiTokenProvider {
-  return () => {
-    try {
-      return runtimeWindow.sessionStorage?.getItem(authTokenStorageKey) ?? undefined;
-    } catch {
-      return undefined;
-    }
-  };
-}
-
 export function createStudioPlatform(options: CreateStudioPlatformOptions): StudioPlatform {
   try {
     assertCompatiblePlatform(options);
@@ -92,16 +88,17 @@ export function createStudioPlatform(options: CreateStudioPlatformOptions): Stud
     throw error;
   }
 
-  const tokenProvider = options.tokenProvider ?? (() => undefined);
+  const tokenPort = options.tokenPort ?? createMemoryTokenPort(options.tokenProvider?.() ?? undefined);
   let disposed = false;
 
   return Object.freeze({
     startup: options.startup,
     host: options.host,
     api: options.api,
+    tokenPort,
     hasToken(): boolean {
       try {
-        return Boolean(tokenProvider()?.trim());
+        return Boolean(tokenPort.readToken());
       } catch {
         return false;
       }
@@ -121,21 +118,21 @@ export function createDesktopStudioPlatform(
   runtimeWindow: DesktopStudioRuntimeWindow = window as unknown as DesktopStudioRuntimeWindow
 ): StudioPlatform {
   const startup = readDesktopStudioStartupConfig(runtimeWindow);
-  const tokenProvider = createSessionTokenProvider(runtimeWindow);
+  const tokenPort = createSessionStorageTokenPort(runtimeWindow.sessionStorage);
   const host = createWebView2HostAdapter();
 
   try {
     const api = createApiTransport({
       apiBaseUrl: startup.apiBaseUrl,
       expectedOrigin: runtimeWindow.location.origin,
-      tokenProvider
+      tokenProvider: tokenPort.readToken
     });
 
     return createStudioPlatform({
       startup,
       host,
       api,
-      tokenProvider
+      tokenPort
     });
   } catch (error) {
     host.dispose();
@@ -150,21 +147,21 @@ export function createBrowserTestStudioPlatform(
     runtimeWindow.__CLEARVISION_STARTUP__,
     { pageOrigin: runtimeWindow.location.origin }
   );
-  const tokenProvider = createSessionTokenProvider(runtimeWindow);
+  const tokenPort = createSessionStorageTokenPort(runtimeWindow.sessionStorage);
   const host = createBrowserHostFake();
 
   try {
     const api = createApiTransport({
       apiBaseUrl: startup.apiBaseUrl,
       expectedOrigin: runtimeWindow.location.origin,
-      tokenProvider
+      tokenProvider: tokenPort.readToken
     });
 
     return createStudioPlatform({
       startup,
       host,
       api,
-      tokenProvider
+      tokenPort
     });
   } catch (error) {
     host.dispose();

@@ -4,6 +4,8 @@ export {
   type ApiGetOptions,
   type ApiTokenProvider,
   type ApiTransport,
+  type ApiUnauthorizedContext,
+  type ApiUnauthorizedHandler,
   type ApiWriteOptions,
   type CreateApiTransportOptions
 } from './apiTransport';

@@ -17,8 +17,18 @@ import {
 
 export type ApiTokenProvider = () => string | null | undefined;
 
+export interface ApiUnauthorizedContext {
+  readonly method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  readonly path: string;
+  readonly url: string;
+  readonly sessionGeneration: number;
+}
+
+export type ApiUnauthorizedHandler = (context: ApiUnauthorizedContext) => void | Promise<void>;
+
 export interface ApiGetOptions {
   readonly signal?: AbortSignal;
+  readonly suppressUnauthorizedHandler?: boolean;
 }
 
 export interface ApiWriteOptions extends ApiGetOptions {
@@ -36,6 +46,10 @@ export interface ApiBlobResponse {
 
 export interface ApiTransport {
   readonly apiBaseUrl: string;
+  setUnauthorizedHandler?(
+    handler: ApiUnauthorizedHandler | null,
+    sessionGenerationProvider?: () => number
+  ): void;
   get<T = unknown>(path: string, options?: ApiGetOptions): Promise<T | undefined>;
   post?<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined>;
   put?<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined>;
@@ -47,6 +61,8 @@ export interface CreateApiTransportOptions {
   readonly apiBaseUrl: string;
   readonly tokenProvider?: ApiTokenProvider;
   readonly expectedOrigin?: string;
+  readonly onUnauthorized?: ApiUnauthorizedHandler;
+  readonly sessionGenerationProvider?: () => number;
 }
 
 const allowedRootPaths = new Set(['/health']);
@@ -235,6 +251,8 @@ function createHttpError(response: Response, url: string, body: string): ApiHttp
 export function createApiTransport(options: CreateApiTransportOptions): ApiTransport {
   const apiBaseUrl = validateApiBaseUrl(options.apiBaseUrl, options.expectedOrigin);
   const tokenProvider = options.tokenProvider ?? (() => undefined);
+  let unauthorizedHandler = options.onUnauthorized ?? null;
+  let sessionGenerationProvider = options.sessionGenerationProvider ?? (() => 0);
 
   function requestHeaders(
     accept: string,
@@ -294,10 +312,26 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
   async function readJson<T>(
     response: Response,
     url: string,
-    signal?: AbortSignal
+    signal: AbortSignal | undefined,
+    request: Readonly<{
+      method: ApiUnauthorizedContext['method'];
+      path: string;
+      suppressUnauthorizedHandler: boolean;
+    }>
   ): Promise<T | undefined> {
     const body = await readText(response, url, signal);
-    if (!response.ok) throw createHttpError(response, url, body);
+    if (!response.ok) {
+      const error = createHttpError(response, url, body);
+      if (response.status === 401 && !request.suppressUnauthorizedHandler && unauthorizedHandler) {
+        await unauthorizedHandler(Object.freeze({
+          method: request.method,
+          path: request.path,
+          url,
+          sessionGeneration: sessionGenerationProvider()
+        }));
+      }
+      throw error;
+    }
     if (response.status === 204 || response.status === 205 || !body.trim()) return undefined;
     try {
       return JSON.parse(body) as T;
@@ -308,6 +342,13 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
 
   return Object.freeze({
     apiBaseUrl: apiBaseUrl.toString().replace(/\/$/, ''),
+    setUnauthorizedHandler(
+      handler: ApiUnauthorizedHandler | null,
+      generationProvider: () => number = () => 0
+    ): void {
+      unauthorizedHandler = handler;
+      sessionGenerationProvider = generationProvider;
+    },
     async get<T = unknown>(path: string, requestOptions: ApiGetOptions = {}): Promise<T | undefined> {
       const { response, url } = await send(
         path,
@@ -316,7 +357,11 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
         undefined,
         requestHeaders('application/json')
       );
-      return readJson<T>(response, url, requestOptions.signal);
+      return readJson<T>(response, url, requestOptions.signal, {
+        method: 'GET',
+        path,
+        suppressUnauthorizedHandler: requestOptions.suppressUnauthorizedHandler === true
+      });
     },
     async post<T = unknown>(
       path: string,
@@ -333,7 +378,11 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
           ...requestOptions.headers
         })
       );
-      return readJson<T>(response, url, requestOptions.signal);
+      return readJson<T>(response, url, requestOptions.signal, {
+        method: 'POST',
+        path,
+        suppressUnauthorizedHandler: requestOptions.suppressUnauthorizedHandler === true
+      });
     },
     async put<T = unknown>(
       path: string,
@@ -350,7 +399,11 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
           ...requestOptions.headers
         })
       );
-      return readJson<T>(response, url, requestOptions.signal);
+      return readJson<T>(response, url, requestOptions.signal, {
+        method: 'PUT',
+        path,
+        suppressUnauthorizedHandler: requestOptions.suppressUnauthorizedHandler === true
+      });
     },
     async getBlob(path: string, requestOptions: ApiGetOptions = {}): Promise<ApiBlobResponse> {
       const { response, url } = await send(
@@ -362,7 +415,16 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
       );
       if (!response.ok) {
         const body = await readText(response, url, requestOptions.signal);
-        throw createHttpError(response, url, body);
+        const error = createHttpError(response, url, body);
+        if (response.status === 401 && !requestOptions.suppressUnauthorizedHandler && unauthorizedHandler) {
+          await unauthorizedHandler(Object.freeze({
+            method: 'GET',
+            path,
+            url,
+            sessionGeneration: sessionGenerationProvider()
+          }));
+        }
+        throw error;
       }
       let blob: Blob;
       try {
@@ -389,7 +451,18 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
         requestHeaders('application/json', requestOptions.headers)
       );
       const body = await readText(response, url, requestOptions.signal);
-      if (!response.ok) throw createHttpError(response, url, body);
+      if (!response.ok) {
+        const error = createHttpError(response, url, body);
+        if (response.status === 401 && !requestOptions.suppressUnauthorizedHandler && unauthorizedHandler) {
+          await unauthorizedHandler(Object.freeze({
+            method: 'DELETE',
+            path,
+            url,
+            sessionGeneration: sessionGenerationProvider()
+          }));
+        }
+        throw error;
+      }
     }
   } satisfies ApiTransport);
 }
