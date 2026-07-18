@@ -21,6 +21,9 @@ param(
     [int]$WindowWidth = 1920,
     [int]$WindowHeight = 1080,
     [switch]$SingleRun,
+    [switch]$KeepDatabase,
+    [switch]$ReuseDatabase,
+    [switch]$AllowInitialAdminSetup,
     [switch]$SanitizeDesktopPath,
     [switch]$NoBuild
 )
@@ -96,6 +99,7 @@ $environmentNames = @(
     "CV_SMOKE_PHASE",
     "CV_SMOKE_TOKEN",
     "CV_SMOKE_USER",
+    "CV_SMOKE_PASSWORD",
     "CV_EVIDENCE_DIR",
     "PATH"
 )
@@ -213,6 +217,12 @@ if (-not (Test-Path -LiteralPath $nodeSmoke -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $nodeExe -PathType Leaf)) {
     throw "Node executable was not found: $nodeExe"
 }
+if (($KeepDatabase -or $ReuseDatabase) -and [string]::IsNullOrWhiteSpace($DatabasePath)) {
+    throw "KeepDatabase/ReuseDatabase require an explicit isolated DatabasePath."
+}
+if ($AllowInitialAdminSetup -and [string]::IsNullOrWhiteSpace($DatabasePath)) {
+    throw "AllowInitialAdminSetup requires an explicit isolated DatabasePath."
+}
 
 Set-ProcessEnvironment -Name "CV_DESKTOP_HTTP_PORT" -Value ([string]$WebPort)
 Set-ProcessEnvironment -Name "CV_CONVERSATION_STORE_ROOT" -Value $conversationRoot
@@ -221,11 +231,13 @@ Set-ProcessEnvironment -Name "CV_AGENT_RUN_EVENT_STORE" -Value $agentRunRoot
 $databaseDirectory = Split-Path -Parent $isolatedDatabase
 if ($useIsolatedAuth -or -not [string]::IsNullOrWhiteSpace($DatabasePath)) {
     New-Item -ItemType Directory -Force -Path $databaseDirectory | Out-Null
-    foreach ($databaseArtifact in @(
-        $isolatedDatabase,
-        ($isolatedDatabase + "-shm"),
-        ($isolatedDatabase + "-wal"))) {
-        Remove-ItemWithRetry -LiteralPath $databaseArtifact
+    if (-not $ReuseDatabase) {
+        foreach ($databaseArtifact in @(
+            $isolatedDatabase,
+            ($isolatedDatabase + "-shm"),
+            ($isolatedDatabase + "-wal"))) {
+            Remove-ItemWithRetry -LiteralPath $databaseArtifact
+        }
     }
     Set-ProcessEnvironment -Name "Database__Path" -Value $isolatedDatabase
 }
@@ -371,7 +383,7 @@ function Get-AuthSession {
     try {
         return Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$WebPort/api/auth/login" -ContentType "application/json" -Body $body
     } catch {
-        if (-not $useIsolatedAuth) { throw }
+        if (-not $useIsolatedAuth -and -not $AllowInitialAdminSetup) { throw }
         $setupBody = @{
             username = $Username
             password = $Password
@@ -429,7 +441,8 @@ try {
     }
 } finally {
     Restore-ProcessEnvironment
-    if ($useIsolatedAuth -or -not [string]::IsNullOrWhiteSpace($DatabasePath)) {
+    if (($useIsolatedAuth -or -not [string]::IsNullOrWhiteSpace($DatabasePath)) -and
+        -not $KeepDatabase) {
         foreach ($databaseArtifact in @(
             $isolatedDatabase,
             ($isolatedDatabase + "-shm"),
@@ -446,5 +459,9 @@ try {
     Succeeded = $true
     EvidenceDirectory = $evidence
     Runs = @($runs).Count
+    DatabasePath = if ([string]::IsNullOrWhiteSpace($DatabasePath)) { $null } else { $isolatedDatabase }
+    DatabaseKept = [bool]$KeepDatabase
+    DatabaseReused = [bool]$ReuseDatabase
+    InitialAdminSetupAllowed = [bool]$AllowInitialAdminSetup
     CompletedAtUtc = [DateTime]::UtcNow.ToString("O")
 } | ConvertTo-Json -Depth 4

@@ -1137,8 +1137,43 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
   const run = page.locator('[data-testid="workspace-run"]');
   assert(await run.isEnabled(), 'Formal Run did not enable after the persisted Project save settled.');
 
+  const normalAdmissionResponsePromise = page.waitForResponse(response =>
+    new URL(response.url()).pathname === '/api/inspection/admission' &&
+    response.request().method() === 'POST'
+  );
+  const normalExecuteResponsePromise = page.waitForResponse(response =>
+    new URL(response.url()).pathname === '/api/inspection/execute' &&
+    response.request().method() === 'POST'
+  );
   await run.click();
+  const [normalAdmissionResponse, normalExecuteResponse] = await Promise.all([
+    normalAdmissionResponsePromise,
+    normalExecuteResponsePromise
+  ]);
+  const [normalAdmission, normalResult] = await Promise.all([
+    normalAdmissionResponse.json(),
+    normalExecuteResponse.json()
+  ]);
   const normalHandoff = await readFormalResultsHandoff(page, projectId);
+  const normalRunIdentity = {
+    projectId,
+    clientSnapshotId: normalAdmission.clientSnapshotId,
+    expectedPersistenceRevision: normalAdmission.projectPersistenceRevision,
+    expectedCanonicalFlowHash: normalAdmission.canonicalFlowHash,
+    expectedDecisionConfigurationHash: normalAdmission.decisionConfigurationHash
+  };
+  assert(normalResult.id === normalHandoff.resultId &&
+    normalResult.projectId === projectId &&
+    normalResult.executionSnapshotId === normalRunIdentity.clientSnapshotId &&
+    normalResult.projectPersistenceRevision === normalRunIdentity.expectedPersistenceRevision &&
+    normalResult.flowVersionHash === normalRunIdentity.expectedCanonicalFlowHash &&
+    normalResult.decisionConfigurationHash === normalRunIdentity.expectedDecisionConfigurationHash,
+  `Normal Formal Run identity changed between admission, execute, and Results: ${JSON.stringify({
+    normalAdmission,
+    normalResult,
+    normalHandoff
+  })}`);
+  normalHandoff.runIdentity = normalRunIdentity;
 
   await waitForPersistedWorkspace(page, projectId);
   let responseLossSeen = false;
@@ -1519,6 +1554,18 @@ async function verifyProductPage(
     workspaceShellCount: document.querySelectorAll('[data-evidence-surface="f03-workspace-shell"]').length,
     workspaceState: document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
       ?.getAttribute('data-workspace-state') || null,
+    ownerLedger: {
+      studio: window.__STUDIO_UI_DIAGNOSTICS__ ? { ...window.__STUDIO_UI_DIAGNOSTICS__ } : null,
+      projectLifecycle: window.__STUDIO_UI_PROJECT_LIFECYCLE_DIAGNOSTICS__
+        ? { ...window.__STUDIO_UI_PROJECT_LIFECYCLE_DIAGNOSTICS__ }
+        : null,
+      leaveGuard: window.__STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__
+        ? { ...window.__STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__ }
+        : null,
+      workspace: window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__
+        ? { ...window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__ }
+        : null
+    },
     dataSource: document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
       ? 'REAL_WEBVIEW2_PROJECT_AUTHORITY'
       : 'REAL_WEBVIEW2_EMPTY_AUTHORITY',
@@ -1595,13 +1642,16 @@ async function verifyProductPage(
   const seededWorkspace = parseBooleanEnvironment('CV_STUDIO_UI_SEED_WORKSPACE');
   const formalRun = parseBooleanEnvironment('CV_STUDIO_UI_FORMAL_RUN');
   const dpiOnly = parseBooleanEnvironment('CV_STUDIO_UI_DPI_ONLY');
+  const rollbackPhase = String(process.env.CV_STUDIO_UI_ROLLBACK_PHASE || '').trim().toUpperCase();
   const workspaceReady = isWorkspaceRoute && ['ready', 'empty'].includes(projection.workspaceState);
   assert(!formalRun || (seededWorkspace && workspaceReady),
     'Formal Run evidence requires a seeded, ready Workspace route.');
   assert(!dpiOnly || (seededWorkspace && workspaceReady && !formalRun),
     'DPI-only evidence requires a seeded, ready Workspace without Formal Run.');
   const workspaceG4 = workspaceReady && seededWorkspace && !dpiOnly ? await verifyWorkspaceG4(page) : null;
-  const workspaceG3 = workspaceReady && !seededWorkspace ? await verifyWorkspaceG3(page) : null;
+  const workspaceG3 = workspaceReady && !seededWorkspace && rollbackPhase !== 'NEXT_REOPEN'
+    ? await verifyWorkspaceG3(page)
+    : null;
   let workspaceLifecycle = null;
   if (isWorkspaceRoute) {
     const readWorkspace = () => page.evaluate(() => {
@@ -1859,6 +1909,16 @@ async function verifyProductPage(
 
   assert(projection.shellCount === 1, 'Product route did not mount exactly one ProductLayout.');
   assert(projection.internalLabCount === 0, 'Product route mounted the InternalLabLayout.');
+  assert(projection.ownerLedger.studio?.mountCount === 1 &&
+    projection.ownerLedger.studio?.activeRoot === 'studio-ui',
+  `Product route did not retain exactly one StudioUI root: ${JSON.stringify(projection.ownerLedger)}`);
+  assert(projection.ownerLedger.projectLifecycle?.ownerCount === 1,
+    `Project lifecycle owner ledger is not one: ${JSON.stringify(projection.ownerLedger)}`);
+  assert(projection.ownerLedger.leaveGuard?.ownerCount === 1,
+    `Leave Guard owner ledger is not one: ${JSON.stringify(projection.ownerLedger)}`);
+  assert(Number(projection.ownerLedger.workspace?.workspaceOwnerCount ?? 0) ===
+    (isWorkspaceRoute ? 1 : 0),
+  `Workspace owner ledger did not match the active route: ${JSON.stringify(projection.ownerLedger)}`);
   assert(projection.labNavigationCount === 0, 'Labs leaked into formal product navigation.');
   const missingNavigation = navigationContract.requiredRoutes
     .filter(routePath => !projection.formalNavigation.includes(routePath));
@@ -2170,6 +2230,164 @@ function assertNativeRuntime(nativeRuntime) {
     `Desktop process tree contains ${nativeRuntime.nodeDescendantCount} Node descendant(s).`);
 }
 
+function rollbackItems(payload) {
+  if (Array.isArray(payload)) return payload;
+  return payload?.items || payload?.Items || payload?.results || payload?.Results || [];
+}
+
+function rollbackResultId(result) {
+  return String(metadataField(result, 'resultId') || metadataField(result, 'id') || '');
+}
+
+function rollbackSnapshot(project, result, history, reconciliation) {
+  const flow = metadataField(project, 'flow') || {};
+  const imageReference = metadataField(result, 'imageReference') ?? null;
+  const reconciledResult = metadataField(reconciliation, 'result') || {};
+  return {
+    projectId: String(metadataField(project, 'id') || ''),
+    projectName: String(metadataField(project, 'name') || ''),
+    persistenceRevision: Number(metadataField(project, 'persistenceRevision')),
+    flowId: String(metadataField(flow, 'id') || ''),
+    resultId: rollbackResultId(result),
+    resultProjectRevision: Number(metadataField(reconciledResult, 'projectPersistenceRevision')),
+    executionSnapshotId: String(metadataField(reconciledResult, 'executionSnapshotId') || ''),
+    flowHash: String(metadataField(result, 'flowVersionHash') || ''),
+    decisionHash: String(metadataField(reconciledResult, 'decisionConfigurationHash') || ''),
+    hasImage: metadataField(result, 'hasImage') === true,
+    imageId: metadataField(result, 'imageId') ?? null,
+    imageReference,
+    evidenceStatus: metadataField(result, 'evidenceStatus') ?? null,
+    reconciliationStatus: String(metadataField(reconciliation, 'status') || ''),
+    historyContainsResult: rollbackItems(history)
+      .some(item => rollbackResultId(item) === rollbackResultId(result))
+  };
+}
+
+async function readRollbackAuthority(webPort, token, projectId, resultId, runIdentity) {
+  assert(runIdentity?.projectId === projectId && runIdentity.clientSnapshotId,
+    'Rollback authority requires the admitted Formal Run identity.');
+  const [project, result, history, reconciliation] = await Promise.all([
+    readAuthorizedJson(webPort, token, `/api/projects/${projectId}`),
+    readAuthorizedJson(webPort, token, `/api/inspection/history/${projectId}/${resultId}`),
+    readAuthorizedJson(webPort, token, `/api/inspection/history/${projectId}?pageIndex=0&pageSize=100`),
+    postAuthorizedJson(webPort, token, '/api/inspection/reconcile', runIdentity)
+  ]);
+  const snapshot = rollbackSnapshot(project, result, history, reconciliation);
+  assert(snapshot.projectId === projectId, 'Rollback Project authority changed identity.');
+  assert(snapshot.resultId === resultId, 'Rollback Result authority changed identity.');
+  assert(snapshot.historyContainsResult, 'Rollback Result disappeared from authoritative history.');
+  assert(snapshot.reconciliationStatus === 'succeeded' &&
+    rollbackResultId(metadataField(reconciliation, 'result')) === resultId,
+  `Rollback reconciliation did not recover the authoritative Result: ${JSON.stringify(reconciliation)}`);
+  assert(snapshot.executionSnapshotId === runIdentity.clientSnapshotId &&
+    snapshot.resultProjectRevision === runIdentity.expectedPersistenceRevision &&
+    snapshot.flowHash === runIdentity.expectedCanonicalFlowHash &&
+    snapshot.decisionHash === runIdentity.expectedDecisionConfigurationHash,
+  `Rollback reconciliation identity changed: ${JSON.stringify({ runIdentity, snapshot })}`);
+  assert(snapshot.flowId && snapshot.executionSnapshotId && snapshot.flowHash && snapshot.decisionHash,
+    `Rollback authority is missing frozen identity fields: ${JSON.stringify(snapshot)}`);
+  return snapshot;
+}
+
+function assertRollbackAuthorityMatches(expected, actual, phase) {
+  const fields = [
+    'projectId',
+    'projectName',
+    'persistenceRevision',
+    'flowId',
+    'resultId',
+    'resultProjectRevision',
+    'executionSnapshotId',
+    'flowHash',
+    'decisionHash',
+    'hasImage',
+    'imageId',
+    'evidenceStatus',
+    'reconciliationStatus'
+  ];
+  for (const field of fields) {
+    assert(Object.is(actual[field], expected[field]),
+      `${phase} changed rollback authority field ${field}: ${JSON.stringify({ expected, actual })}`);
+  }
+  assert(JSON.stringify(actual.imageReference) === JSON.stringify(expected.imageReference),
+    `${phase} changed the rollback image reference.`);
+  assert(actual.historyContainsResult, `${phase} lost the authoritative Result history row.`);
+}
+
+async function applyRollbackEvidence(evidence, webPort, token, user, rollbackPhase, statePath) {
+  if (!rollbackPhase) return null;
+  assert(statePath, 'Rollback evidence requires CV_STUDIO_UI_ROLLBACK_STATE.');
+  const normalizedUser = JSON.parse(user);
+  if (rollbackPhase === 'NEXT_CREATE') {
+    const handoff = evidence.productPage?.workspaceG6?.normalHandoff;
+    const userId = metadataField(normalizedUser, 'userId') || metadataField(normalizedUser, 'id');
+    assert(evidence.expectation === 'studio-product' && evidence.seedWorkspace && evidence.formalRun,
+      'NEXT_CREATE requires the seeded formal Product Workspace journey.');
+    assert(handoff?.projectId && handoff?.resultId,
+      `NEXT_CREATE did not produce a formal Result handoff: ${JSON.stringify(handoff)}`);
+    assert(userId, 'NEXT_CREATE did not capture the authenticated user identity.');
+    const authority = await readRollbackAuthority(
+      webPort,
+      token,
+      handoff.projectId,
+      handoff.resultId,
+      handoff.runIdentity
+    );
+    const state = {
+      schemaVersion: 'f04-next-legacy-next-rollback.v1',
+      sourceSha: evidence.sourceSha,
+      createdAtUtc: new Date().toISOString(),
+      user: {
+        userId,
+        username: metadataField(normalizedUser, 'username'),
+        role: metadataField(normalizedUser, 'role')
+      },
+      authority,
+      runIdentity: handoff.runIdentity
+    };
+    fs.mkdirSync(path.dirname(statePath), { recursive: true });
+    fs.writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+    return { phase: rollbackPhase, statePath, authority, matched: true };
+  }
+
+  assert(fs.existsSync(statePath), `Rollback state was not found: ${statePath}`);
+  const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  assert(state.schemaVersion === 'f04-next-legacy-next-rollback.v1',
+    'Rollback state schema is unsupported.');
+  assert(state.sourceSha === evidence.sourceSha, 'Rollback state source SHA changed between restarts.');
+  assert(state.runIdentity?.projectId === state.authority.projectId &&
+    state.runIdentity?.clientSnapshotId === state.authority.executionSnapshotId,
+  'Rollback state lost the admitted Formal Run identity.');
+  const currentUserId = metadataField(normalizedUser, 'userId') || metadataField(normalizedUser, 'id');
+  assert(currentUserId && String(currentUserId) === String(state.user.userId),
+    'Rollback restart authenticated a different user identity.');
+  assert(metadataField(normalizedUser, 'username') === state.user.username,
+    'Rollback restart authenticated a different user authority.');
+  if (rollbackPhase === 'LEGACY_VERIFY') {
+    assert(evidence.expectation === 'legacy', 'LEGACY_VERIFY requires the Legacy root.');
+  } else {
+    assert(rollbackPhase === 'NEXT_REOPEN' && evidence.expectation === 'studio-product',
+      'NEXT_REOPEN requires the Product StudioUI root.');
+    assert(evidence.route === `/projects/${state.authority.projectId}/workspace`,
+      'NEXT_REOPEN did not reopen the original Project route.');
+  }
+  const authority = await readRollbackAuthority(
+    webPort,
+    token,
+    state.authority.projectId,
+    state.authority.resultId,
+    state.runIdentity
+  );
+  assertRollbackAuthorityMatches(state.authority, authority, rollbackPhase);
+  return {
+    phase: rollbackPhase,
+    statePath,
+    authority,
+    matched: true,
+    root: evidence.expectation === 'legacy' ? 'LEGACY_DEFAULT' : 'NEXT_PILOT'
+  };
+}
+
 async function main() {
   const cdpPort = Number(requiredEnvironment('CV_CDP_PORT'));
   const webPort = Number(requiredEnvironment('CV_WEB_PORT'));
@@ -2190,6 +2408,10 @@ async function main() {
   const deepCanvas = parseBooleanEnvironment('CV_STUDIO_UI_DEEP_CANVAS', scale === 1);
   const formalRun = parseBooleanEnvironment('CV_STUDIO_UI_FORMAL_RUN');
   const dpiOnly = parseBooleanEnvironment('CV_STUDIO_UI_DPI_ONLY');
+  const startupProfileRequested = String(process.env.CV_STUDIO_UI_PROFILE || '').trim().toUpperCase();
+  const authMode = String(process.env.CV_STUDIO_UI_AUTH_MODE || 'UNRECORDED').trim().toUpperCase();
+  const rollbackPhase = String(process.env.CV_STUDIO_UI_ROLLBACK_PHASE || '').trim().toUpperCase();
+  const rollbackStatePath = String(process.env.CV_STUDIO_UI_ROLLBACK_STATE || '').trim();
   let route = normalizeStudioRoute(
     process.env.CV_STUDIO_UI_ROUTE || routeForExpectation(expectation)
   );
@@ -2203,6 +2425,8 @@ async function main() {
     'CV_STUDIO_UI_FORMAL_RUN requires studio-product plus a seeded Workspace.');
   assert(!dpiOnly || (expectation === 'studio-product' && seedWorkspace && !formalRun),
     'CV_STUDIO_UI_DPI_ONLY requires studio-product plus a seeded Workspace without Formal Run.');
+  assert(['', 'NEXT_CREATE', 'LEGACY_VERIFY', 'NEXT_REOPEN'].includes(rollbackPhase),
+    `Unsupported CV_STUDIO_UI_ROLLBACK_PHASE: ${rollbackPhase}`);
 
   const evidence = {
     schemaVersion: 1,
@@ -2218,6 +2442,9 @@ async function main() {
     seedWorkspace,
     formalRun,
     dpiOnly,
+    startupProfileRequested: startupProfileRequested || null,
+    authMode,
+    rollbackPhase: rollbackPhase || null,
     route,
     sourceSha: String(process.env.CV_STUDIO_UI_SOURCE_SHA || 'unknown').trim(),
     capturedAtUtc: new Date().toISOString(),
@@ -2296,6 +2523,15 @@ async function main() {
         }
       }
     }
+
+    evidence.rollback = await applyRollbackEvidence(
+      evidence,
+      webPort,
+      token,
+      user,
+      rollbackPhase,
+      rollbackStatePath
+    );
 
     evidence.browserDpi = await readBrowserDpiEvidence(page, context);
     evidence.nativeRuntime = runDesktopRuntimeProbe(executablePath);

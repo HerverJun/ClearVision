@@ -152,6 +152,7 @@ public sealed class StudioUiArchitectureGuardTests
         abortControllerOwners.Should().BeEquivalentTo(new[]
         {
             "src/app/auth/authLifecycleOwner.ts",
+            "src/capabilities/project-lifecycle/projectLifecycleCommandOwner.ts",
             "src/capabilities/project-workspace/preview/previewTransport.ts",
             "src/capabilities/project-workspace/run/runCommandOwner.ts",
             "src/platform/diagnostics/runtimeDiagnostics.ts",
@@ -263,6 +264,9 @@ public sealed class StudioUiArchitectureGuardTests
                      "NodeSmokePath",
                      "NodeExecutablePath",
                      "SingleRun",
+                     "KeepDatabase",
+                     "ReuseDatabase",
+                     "AllowInitialAdminSetup",
                      "SanitizeDesktopPath",
                      "CV_DESKTOP_HTTP_PORT",
                      "CV_WEBVIEW2_USER_DATA_FOLDER",
@@ -286,7 +290,32 @@ public sealed class StudioUiArchitectureGuardTests
         evidenceWrapper.Should().Contain("\"f01\", \"f02\", \"f03\"");
         evidenceWrapper.Should().Contain("WorkspaceCapabilityEnabled");
         evidenceWrapper.Should().Contain("Studio__WorkspaceCapabilityEnabled");
+        evidenceWrapper.Should().Contain("CV_STUDIO_UI_PROFILE");
+        evidenceWrapper.Should().Contain("[StudioStartup]");
+        evidenceWrapper.Should().Contain("startupLog");
+        evidenceWrapper.Should().Contain("KeepDatabase");
+        evidenceWrapper.Should().Contain("ReuseDatabase");
         evidenceWrapper.Should().NotContain("Start-Process");
+
+        var profileEvidence = File.ReadAllText(RepoPath(
+            "scripts/studio-ui-next/Invoke-StudioUiProfileEvidence.ps1"));
+        profileEvidence.Should().Contain("Invoke-StudioUiWebView2Evidence.ps1");
+        profileEvidence.Should().Contain("LEGACY_DEFAULT");
+        profileEvidence.Should().Contain("NEXT_PILOT");
+        profileEvidence.Should().Contain("NEXT_FULL_CANDIDATE");
+        profileEvidence.Should().Contain("ISOLATED_TRUTH_TABLE");
+        profileEvidence.Should().Contain("missing-assets");
+        profileEvidence.Should().NotContain("Start-Process");
+
+        var rollbackEvidence = File.ReadAllText(RepoPath(
+            "scripts/studio-ui-next/Invoke-StudioUiRollbackEvidence.ps1"));
+        rollbackEvidence.Should().Contain("Invoke-StudioUiWebView2Evidence.ps1");
+        rollbackEvidence.Should().Contain("NEXT_CREATE");
+        rollbackEvidence.Should().Contain("LEGACY_VERIFY");
+        rollbackEvidence.Should().Contain("NEXT_REOPEN");
+        rollbackEvidence.Should().Contain("KeepDatabase");
+        rollbackEvidence.Should().Contain("ReuseDatabase");
+        rollbackEvidence.Should().NotContain("Start-Process");
 
         var matrix = File.ReadAllText(RepoPath(
             "scripts/studio-ui-next/Invoke-StudioUiWebView2Matrix.ps1"));

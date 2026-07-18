@@ -42,7 +42,10 @@ public class WebView2HostTests
                 webPort: 5000,
                 studioOptions: options,
                 cssVersion: "123",
-                studioUiWebRoot: tempRoot);
+                studioUiWebRoot: tempRoot,
+                startupProfile: StudioStartupProfileCatalog.NextPilot,
+                sourceSha: "1111111111111111111111111111111111111111",
+                authMode: "harness-seeded-session");
 
             plan.Decision.Kind.Should().Be(StudioStartupPageKind.StudioUi);
             plan.InitialPageUri.Should().Be(new Uri("http://localhost:5000/studio/index.html"));
@@ -61,11 +64,67 @@ public class WebView2HostTests
             plan.StartupInjectionScript.Should().NotContain("window.__API_BASE_URL__");
             plan.StartupInjectionScript.Should().NotContain("window.__CSS_VERSION__");
             plan.StartupInjectionScript.Should().NotContain("\"nodePreviewInspectorEnabled\":");
+            plan.Diagnostics.Profile.Should().Be(StudioStartupProfileCatalog.NextPilot);
+            plan.Diagnostics.PageKind.Should().Be(nameof(StudioStartupPageKind.StudioUi));
+            plan.Diagnostics.InitialPageUri.Should().Be("http://localhost:5000/studio/index.html");
+            plan.Diagnostics.AssetRoot.Should().Be(Path.GetFullPath(tempRoot));
+            plan.Diagnostics.SourceSha.Should().Be("1111111111111111111111111111111111111111");
+            plan.Diagnostics.AuthMode.Should().Be("HARNESS-SEEDED-SESSION");
+            plan.Diagnostics.ConfigurationRequiresRestart.Should().BeTrue();
+            plan.Diagnostics.Flags["Studio:StudioUiEnabled"].Should().BeTrue();
+            plan.Diagnostics.Flags["Studio:WorkspaceCapabilityEnabled"].Should().BeTrue();
+            plan.Diagnostics.Flags["Studio2.Workspace"].Should().BeTrue();
         }
         finally
         {
             Directory.Delete(tempRoot, recursive: true);
         }
+    }
+
+    [Theory]
+    [InlineData(false, false, null, StudioStartupProfileCatalog.LegacyDefault)]
+    [InlineData(true, true, null, StudioStartupProfileCatalog.NextFullCandidate)]
+    [InlineData(false, true, null, StudioStartupProfileCatalog.IsolatedTruthTable)]
+    [InlineData(true, false, null, StudioStartupProfileCatalog.IsolatedTruthTable)]
+    [InlineData(false, false, StudioStartupProfileCatalog.LegacyDefault, StudioStartupProfileCatalog.LegacyDefault)]
+    [InlineData(true, true, StudioStartupProfileCatalog.NextPilot, StudioStartupProfileCatalog.NextPilot)]
+    [InlineData(true, true, StudioStartupProfileCatalog.NextFullCandidate, StudioStartupProfileCatalog.NextFullCandidate)]
+    public void StudioStartupProfileCatalog_ShouldFreezeNamedProfilesAndTruthTableLabels(
+        bool studioUiEnabled,
+        bool workspaceEnabled,
+        string? requestedProfile,
+        string expectedProfile)
+    {
+        var options = new StudioOptions
+        {
+            StudioUiEnabled = studioUiEnabled,
+            WorkspaceCapabilityEnabled = workspaceEnabled
+        };
+
+        StudioStartupProfileCatalog.Resolve(options, requestedProfile)
+            .Should()
+            .Be(expectedProfile);
+    }
+
+    [Theory]
+    [InlineData(StudioStartupProfileCatalog.LegacyDefault, true, true)]
+    [InlineData(StudioStartupProfileCatalog.NextPilot, true, false)]
+    [InlineData(StudioStartupProfileCatalog.NextFullCandidate, false, false)]
+    [InlineData("UNKNOWN_PROFILE", false, false)]
+    public void StudioStartupProfileCatalog_ShouldRejectMislabelledFlagCombinations(
+        string requestedProfile,
+        bool studioUiEnabled,
+        bool workspaceEnabled)
+    {
+        var options = new StudioOptions
+        {
+            StudioUiEnabled = studioUiEnabled,
+            WorkspaceCapabilityEnabled = workspaceEnabled
+        };
+
+        var act = () => StudioStartupProfileCatalog.Resolve(options, requestedProfile);
+
+        act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]

@@ -34,6 +34,17 @@ param(
     [switch]$SeedWorkspace,
     [switch]$FormalRun,
     [switch]$DpiOnly,
+    [ValidateSet("LEGACY_DEFAULT", "NEXT_PILOT", "NEXT_FULL_CANDIDATE")]
+    [string]$StartupProfile,
+    [string]$AuthMode = "HARNESS_SEEDED_SESSION",
+    [string]$RollbackPhase,
+    [string]$RollbackStatePath,
+    [string]$DatabasePath,
+    [string]$Username = "admin",
+    [string]$Password,
+    [switch]$KeepDatabase,
+    [switch]$ReuseDatabase,
+    [switch]$AllowInitialAdminSetup,
     [switch]$NoBuild
 )
 
@@ -171,7 +182,12 @@ $hostLogs = Join-Path $runRoot "host-logs"
 $webView2UserData = Join-Path $runtimeRoot "webview2"
 $conversationStore = Join-Path $runtimeRoot "conversation"
 $agentRunStore = Join-Path $runtimeRoot "agent-runs"
-$databasePath = Join-Path $runtimeRoot "database/vision.db"
+$configuredDatabasePath = $DatabasePath
+$databasePath = if ([string]::IsNullOrWhiteSpace($configuredDatabasePath)) {
+    Join-Path $runtimeRoot "database/vision.db"
+} else {
+    [System.IO.Path]::GetFullPath($configuredDatabasePath)
+}
 New-Item -ItemType Directory -Force -Path $evidencePath | Out-Null
 
 $studioUiEnabled = $Expectation -ne "legacy"
@@ -189,6 +205,61 @@ if ($DpiOnly -and ($Expectation -ne "studio-product" -or -not $SeedWorkspace)) {
 }
 if ($DpiOnly -and $FormalRun) {
     throw "DpiOnly and FormalRun are separate evidence scopes and cannot share one run."
+}
+if (($KeepDatabase -or $ReuseDatabase) -and [string]::IsNullOrWhiteSpace($configuredDatabasePath)) {
+    throw "KeepDatabase/ReuseDatabase require an explicit isolated DatabasePath."
+}
+if ($AllowInitialAdminSetup -and
+    ([string]::IsNullOrWhiteSpace($configuredDatabasePath) -or
+        [string]::IsNullOrWhiteSpace($Password))) {
+    throw "AllowInitialAdminSetup requires an explicit isolated DatabasePath and Password."
+}
+if (-not [string]::IsNullOrWhiteSpace($StartupProfile)) {
+    if ($StartupProfile -eq "LEGACY_DEFAULT" -and $studioUiEnabled) {
+        throw "LEGACY_DEFAULT cannot be combined with a StudioUI expectation."
+    }
+    if ($StartupProfile -in @("NEXT_PILOT", "NEXT_FULL_CANDIDATE") -and
+        (-not $studioUiEnabled -or -not $WorkspaceCapabilityEnabled)) {
+        throw "$StartupProfile requires StudioUI plus WorkspaceCapabilityEnabled."
+    }
+}
+if ([string]::IsNullOrWhiteSpace($AuthMode)) {
+    throw "AuthMode must be non-empty."
+}
+$validRollbackPhases = @("", "NEXT_CREATE", "LEGACY_VERIFY", "NEXT_REOPEN")
+$normalizedRollbackPhase = ([string]$RollbackPhase).Trim().ToUpperInvariant()
+if ($normalizedRollbackPhase -notin $validRollbackPhases) {
+    throw "Unsupported RollbackPhase '$RollbackPhase'."
+}
+if ($normalizedRollbackPhase -and [string]::IsNullOrWhiteSpace($RollbackStatePath)) {
+    throw "RollbackPhase requires RollbackStatePath."
+}
+$rollbackStateFullPath = if ([string]::IsNullOrWhiteSpace($RollbackStatePath)) {
+    ""
+} elseif ([System.IO.Path]::IsPathRooted($RollbackStatePath)) {
+    [System.IO.Path]::GetFullPath($RollbackStatePath)
+} else {
+    [System.IO.Path]::GetFullPath((Join-Path $repoRoot $RollbackStatePath))
+}
+$databaseAllowedPrefix = $allowedEvidenceRoot.TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+if (-not [string]::IsNullOrWhiteSpace($configuredDatabasePath) -and
+    -not $databasePath.StartsWith($databaseAllowedPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "DatabasePath must remain under .tmp/studio-ui-next."
+}
+$runtimeRootPrefix = $runtimeRoot.TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+if ($KeepDatabase -and
+    $databasePath.StartsWith($runtimeRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "A retained DatabasePath must be outside the per-run RuntimeDirectory."
+}
+if ($rollbackStateFullPath -and
+    -not $rollbackStateFullPath.StartsWith(
+        $databaseAllowedPrefix,
+        [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "RollbackStatePath must remain under .tmp/studio-ui-next."
 }
 $resolvedRoute = if (-not [string]::IsNullOrWhiteSpace($Route)) {
     $Route
@@ -222,6 +293,10 @@ $customEnvironment = [ordered]@{
     "CV_STUDIO_UI_SEED_WORKSPACE" = if ($SeedWorkspace) { "true" } else { "false" }
     "CV_STUDIO_UI_FORMAL_RUN" = if ($FormalRun) { "true" } else { "false" }
     "CV_STUDIO_UI_DPI_ONLY" = if ($DpiOnly) { "true" } else { "false" }
+    "CV_STUDIO_UI_PROFILE" = if ([string]::IsNullOrWhiteSpace($StartupProfile)) { "" } else { $StartupProfile }
+    "CV_STUDIO_UI_AUTH_MODE" = $AuthMode.Trim().ToUpperInvariant()
+    "CV_STUDIO_UI_ROLLBACK_PHASE" = $normalizedRollbackPhase
+    "CV_STUDIO_UI_ROLLBACK_STATE" = $rollbackStateFullPath
     "CV_NATIVE_DPI_PROBE" = Join-Path $scriptRoot "Get-DesktopRuntimeProbe.ps1"
 }
 $previousEnvironment = @{}
@@ -242,6 +317,7 @@ $runnerManagedEnvironmentNames = @(
     "CV_SMOKE_PHASE",
     "CV_SMOKE_TOKEN",
     "CV_SMOKE_USER",
+    "CV_SMOKE_PASSWORD",
     "CV_EVIDENCE_DIR",
     "PATH"
 )
@@ -342,6 +418,19 @@ $runnerParameters = @{
     WindowWidth = $WindowWidth
     WindowHeight = $WindowHeight
     SingleRun = $true
+    Username = $Username
+}
+if (-not [string]::IsNullOrWhiteSpace($Password)) {
+    $runnerParameters["Password"] = $Password
+}
+if ($KeepDatabase) {
+    $runnerParameters["KeepDatabase"] = $true
+}
+if ($ReuseDatabase) {
+    $runnerParameters["ReuseDatabase"] = $true
+}
+if ($AllowInitialAdminSetup) {
+    $runnerParameters["AllowInitialAdminSetup"] = $true
 }
 if ($SanitizeDesktopPath) {
     $runnerParameters["SanitizeDesktopPath"] = $true
@@ -379,11 +468,19 @@ $agentRunStoreRemoved = -not (Test-Path -LiteralPath $agentRunStore)
 $databaseArtifactsRemoved = -not ($databaseArtifacts | Where-Object {
     Test-Path -LiteralPath $_
 })
+$databaseStatePassed = if ($KeepDatabase) {
+    Test-Path -LiteralPath $databasePath -PathType Leaf
+} else {
+    $databaseArtifactsRemoved
+}
+$databaseInsideRuntime = $databasePath.StartsWith(
+    $runtimeRootPrefix,
+    [System.StringComparison]::OrdinalIgnoreCase)
 $runtimeRootRemovalError = $null
 if ($webView2UserDataRemoved -and
     $conversationStoreRemoved -and
     $agentRunStoreRemoved -and
-    $databaseArtifactsRemoved -and
+    (-not $databaseInsideRuntime -or $databaseArtifactsRemoved) -and
     (Test-Path -LiteralPath $runtimeRoot)) {
     try {
         Remove-Item -LiteralPath $runtimeRoot -Recurse -Force
@@ -394,6 +491,52 @@ if ($webView2UserDataRemoved -and
 $runtimeRootRemoved = -not (Test-Path -LiteralPath $runtimeRoot)
 $webPortReleased = Test-TcpPortAvailable -Port $WebPort
 $cdpPortReleased = Test-TcpPortAvailable -Port $CdpPort
+$startupRecords = [System.Collections.Generic.List[object]]::new()
+foreach ($logFile in Get-ChildItem -LiteralPath $hostLogs -Recurse -File -Filter "*-desktop*.log" -ErrorAction SilentlyContinue) {
+    foreach ($line in Get-Content -LiteralPath $logFile.FullName -Encoding UTF8) {
+        $marker = "[StudioStartup] "
+        $markerIndex = $line.IndexOf($marker, [System.StringComparison]::Ordinal)
+        if ($markerIndex -lt 0) {
+            continue
+        }
+        $json = $line.Substring($markerIndex + $marker.Length)
+        try {
+            $startupRecords.Add(($json | ConvertFrom-Json))
+        } catch {
+            $startupRecords.Add([pscustomobject]@{
+                parseError = $_.Exception.Message
+                raw = $json
+            })
+        }
+    }
+}
+$startupRecord = if ($startupRecords.Count -eq 1) { $startupRecords[0] } else { $null }
+$expectedProfile = if (-not [string]::IsNullOrWhiteSpace($StartupProfile)) {
+    $StartupProfile
+} elseif (-not $studioUiEnabled -and -not $WorkspaceCapabilityEnabled) {
+    "LEGACY_DEFAULT"
+} elseif ($studioUiEnabled -and $WorkspaceCapabilityEnabled) {
+    "NEXT_FULL_CANDIDATE"
+} else {
+    "ISOLATED_TRUTH_TABLE"
+}
+$expectedPageKind = if ($Expectation -eq "legacy") {
+    "Legacy"
+} elseif ($Expectation -eq "missing-assets") {
+    "Diagnostic"
+} else {
+    "StudioUi"
+}
+$startupRecordPassed = $startupRecord -and
+    [string]$startupRecord.profile -eq $expectedProfile -and
+    [string]$startupRecord.pageKind -eq $expectedPageKind -and
+    [string]$startupRecord.sourceSha -eq $sourceSha.ToLowerInvariant() -and
+    [string]$startupRecord.authMode -eq $AuthMode.Trim().ToUpperInvariant() -and
+    -not [string]::IsNullOrWhiteSpace([string]$startupRecord.assetRoot) -and
+    [bool]$startupRecord.configurationRequiresRestart -and
+    [bool]$startupRecord.flags.'Studio:StudioUiEnabled' -eq $studioUiEnabled -and
+    [bool]$startupRecord.flags.'Studio:WorkspaceCapabilityEnabled' -eq [bool]$WorkspaceCapabilityEnabled -and
+    [bool]$startupRecord.flags.'Studio2.Workspace' -eq [bool]$WorkspaceCapabilityEnabled
 $cleanup = [pscustomobject]@{
     schemaVersion = 1
     runName = $RunName
@@ -408,6 +551,11 @@ $cleanup = [pscustomobject]@{
     workspaceSeededByHarness = [bool]$SeedWorkspace
     formalRun = [bool]$FormalRun
     dpiOnly = [bool]$DpiOnly
+    startupProfileRequested = if ([string]::IsNullOrWhiteSpace($StartupProfile)) { $null } else { $StartupProfile }
+    startupProfileExpected = $expectedProfile
+    authMode = $AuthMode.Trim().ToUpperInvariant()
+    rollbackPhase = $normalizedRollbackPhase
+    rollbackStatePath = if ($rollbackStateFullPath) { $rollbackStateFullPath } else { $null }
     sanitizedDesktopPath = [bool]$SanitizeDesktopPath
     externalNodeDriver = [pscustomobject]@{
         executablePath = $nodeExe
@@ -432,9 +580,18 @@ $cleanup = [pscustomobject]@{
         webView2UserDataRemoved = $webView2UserDataRemoved
         conversationStoreRemoved = $conversationStoreRemoved
         agentRunStoreRemoved = $agentRunStoreRemoved
+        databasePath = $databasePath
+        databaseKept = [bool]$KeepDatabase
+        databaseReused = [bool]$ReuseDatabase
         databaseArtifactsRemoved = $databaseArtifactsRemoved
+        databaseStatePassed = $databaseStatePassed
         runtimeRootRemoved = $runtimeRootRemoved
         removalError = $runtimeRootRemovalError
+    }
+    startupLog = [pscustomobject]@{
+        recordCount = $startupRecords.Count
+        record = $startupRecord
+        passed = [bool]$startupRecordPassed
     }
     environmentRestored = Test-EnvironmentRestored
 }
@@ -443,8 +600,9 @@ $cleanupPassed = $cleanup.processCleanup.passed -and
     $cleanup.runtimeCleanup.webView2UserDataRemoved -and
     $cleanup.runtimeCleanup.conversationStoreRemoved -and
     $cleanup.runtimeCleanup.agentRunStoreRemoved -and
-    $cleanup.runtimeCleanup.databaseArtifactsRemoved -and
+    $cleanup.runtimeCleanup.databaseStatePassed -and
     $cleanup.runtimeCleanup.runtimeRootRemoved -and
+    $cleanup.startupLog.passed -and
     $cleanup.environmentRestored
 $cleanup | Add-Member -NotePropertyName passed -NotePropertyValue $cleanupPassed
 
