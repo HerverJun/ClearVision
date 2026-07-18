@@ -600,6 +600,7 @@ public class InspectionWorkerTests
     public async Task ExecuteCycleAsync_WithNgOutputImage_ShouldPersistResultImage()
     {
         var outputImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 5, 6, 7, 8 };
+        var acquisitionImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 9, 9, 9, 9 };
         var flowExecution = Substitute.For<IFlowExecutionService>();
         flowExecution.ExecuteWithSnapshotAsync(
                 Arg.Any<ExecutionSnapshot>(),
@@ -610,6 +611,7 @@ public class InspectionWorkerTests
             {
                 IsSuccess = true,
                 ExecutionTimeMs = 1,
+                InputImage = acquisitionImage,
                 OutputData = new Dictionary<string, object>
                 {
                     ["JudgmentResult"] = "NG",
@@ -656,6 +658,74 @@ public class InspectionWorkerTests
                 item.OutputImage != null &&
                 item.OutputImage.SequenceEqual(outputImage)),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteCycleAsync_WithMeasurementOutput_ShouldPersistAcquisitionInputImage()
+    {
+        var inputImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 9, 10, 11, 12 };
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ExecuteWithSnapshotAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                ExecutionTimeMs = 1,
+                InputImage = inputImage,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["JudgmentResult"] = "OK",
+                    ["Width"] = 24,
+                    ["Height"] = 16,
+                    ["BlobCount"] = 2
+                }
+            }));
+
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var imageCache = Substitute.For<IImageCacheRepository>();
+        imageCache.AddAsync(Arg.Any<byte[]>(), Arg.Any<string>()).Returns(Task.FromResult(Guid.NewGuid()));
+        var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
+        using var serviceProvider = BuildScopedServices(
+            flowExecution,
+            imageAcquisition,
+            Substitute.For<IInspectionResultChannelWriter>(),
+            Substitute.For<IInspectionResultRepository>(),
+            Substitute.For<IProjectRepository>());
+
+        var worker = new InspectionWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance),
+            new InMemoryInspectionEventBus(
+                NullLogger<InMemoryInspectionEventBus>.Instance,
+                new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance)),
+            NullLogger<InspectionWorker>.Instance,
+            Substitute.For<IHostApplicationLifetime>(),
+            new InspectionMetrics(),
+            imageCache,
+            new AnalysisDataBuilder(),
+            imagePersistence);
+
+        var result = await InvokeExecuteCycleAsync(
+            worker,
+            CreateDecisionFlow("MeasurementOutputFlow", "JudgmentResult"),
+            null,
+            flowExecution,
+            imageAcquisition,
+            CancellationToken.None);
+
+        result.Status.Should().Be(InspectionStatus.OK);
+        result.OutputDataJson.Should().Contain("BlobCount");
+        await imagePersistence.Received(1).PersistAsync(
+            Arg.Is<InspectionResult>(item =>
+                item.OutputImage != null &&
+                item.OutputImage.SequenceEqual(inputImage)),
+            Arg.Any<CancellationToken>());
+        await imageCache.Received(1).AddAsync(
+            Arg.Is<byte[]>(bytes => bytes.SequenceEqual(inputImage)),
+            Arg.Any<string>());
     }
 
     [Fact]
