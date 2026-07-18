@@ -2052,6 +2052,7 @@ test('passes 20 project switches with one owner and a zero final resource ledger
     });
     await selectInspectorNode(page, 120, 125);
     await expect(shell).toHaveAttribute('data-workspace-inspector-owner-count', '1');
+    await expect(page.locator('[data-product-shell]')).toHaveAttribute('data-project-command-phase', 'succeeded');
   }
   await page.goto('/studio/index.html#/about');
   await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
@@ -2084,10 +2085,19 @@ test('G5 passes 20 save and project-switch cycles with one PUT per save and a ze
   for (let cycle = 0; cycle < 20; cycle += 1) {
     await expect(shell, `cycle ${cycle} owner ready`).toHaveAttribute('data-workspace-state', 'ready');
     await expect(shell, `cycle ${cycle} owner count`).toHaveAttribute('data-workspace-owner-count', '1');
+    await expect(page.locator('[data-product-shell]'), `cycle ${cycle} open authority`)
+      .toHaveAttribute('data-project-command-phase', 'succeeded');
+    const flowWorkspace = page.locator('[data-capability="flow-workspace"]');
+    await expect(flowWorkspace, `cycle ${cycle} flow owner phase`)
+      .toHaveAttribute('data-flow-owner-phase', 'mounted');
+    await expect(flowWorkspace, `cycle ${cycle} flow owner count`)
+      .toHaveAttribute('data-flow-owner-count', '1');
     await selectInspectorNode(page, 120, 125);
     const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
     await expect(inspector).toHaveAttribute('data-inspector-mode', 'node');
     await expect(inspector).toHaveAttribute('data-metadata-phase', 'ready');
+    await expect(page.locator('[data-capability="preview-workbench"]'), `cycle ${cycle} preview settled`)
+      .toHaveAttribute('data-preview-phase', 'success');
     const textInput = page.locator(
       '[data-evidence-surface="f03-g3-inspector"] [data-parameter-name="Text"] input'
     );
@@ -2298,6 +2308,9 @@ for (const fixture of [
       await expect(surface).toHaveAttribute('data-node-count', String(fixture.nodes));
       await expect(surface).toHaveAttribute('data-connection-count', String(fixture.connections));
       if (sample >= 2) samples.push(Date.now() - started);
+      const workspace = page.locator('[data-capability="flow-workspace"]');
+      await expect(workspace).toHaveAttribute('data-flow-owner-phase', 'mounted');
+      await expect(workspace).toHaveAttribute('data-flow-owner-count', '1');
       const canvas = page.locator('[data-testid="flow-canvas"]');
       const box = await canvas.boundingBox();
       if (box) {
@@ -2308,6 +2321,9 @@ for (const fixture of [
         await canvas.hover();
         await page.mouse.wheel(0, -120);
       }
+      await expect(surface).toHaveAttribute('data-selected-count', '1');
+      await expect(page.locator('[data-evidence-surface="f03-workspace-shell"]'))
+        .toHaveAttribute('data-workspace-dirty', 'true');
       await requestStudioHashNavigation(page, '#/about');
       await resolveLeavePrompt(page, 'discard');
       await expect(page).toHaveURL(/#\/about$/);
