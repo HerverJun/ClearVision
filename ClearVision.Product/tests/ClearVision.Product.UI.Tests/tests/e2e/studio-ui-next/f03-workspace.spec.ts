@@ -1809,10 +1809,27 @@ test('G5 protects route leave and project switch while readonly and running resp
         : {}
   });
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  const flowCanvas = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
   const textInput = page.locator('[data-evidence-surface="f03-g3-inspector"] [data-parameter-name="Text"] input');
-  await selectInspectorNode(page, 120, 125);
-  await textInput.fill('protected');
-  await textInput.press('Enter');
+  const saveButton = page.locator('[data-testid="workspace-save"]');
+  const editSelectedNode = async (value: string) => {
+    await expect(shell).toHaveAttribute('data-workspace-state', 'ready');
+    await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
+    await selectInspectorNode(page, 120, 125);
+    await expect(inspector).toHaveAttribute('data-inspector-mode', 'node');
+    await expect(inspector).toHaveAttribute('data-metadata-phase', 'ready');
+    const revisionBefore = Number(await flowCanvas.getAttribute('data-flow-revision'));
+    await textInput.fill(value);
+    await expect(textInput).toHaveValue(value);
+    await textInput.press('Enter');
+    await expect.poll(async () => Number(
+      await flowCanvas.getAttribute('data-flow-revision')
+    ), { message: `${value} flow revision` }).toBeGreaterThan(revisionBefore);
+    await expect(shell).toHaveAttribute('data-workspace-dirty', 'true');
+    await expect(saveButton).toBeEnabled();
+  };
+  await editSelectedNode('protected');
 
   const dismissed = new Promise<string>(resolve => page.once('dialog', async dialog => {
     resolve(dialog.message());
@@ -1825,23 +1842,20 @@ test('G5 protects route leave and project switch while readonly and running resp
   await page.goto(`/studio/index.html#/projects/${projectB}/workspace`);
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectB);
 
-  await selectInspectorNode(page, 120, 125);
-  await textInput.fill('readonly');
-  await textInput.press('Enter');
+  await editSelectedNode('readonly');
   responseMode = 'readonly';
-  await page.locator('[data-testid="workspace-save"]').click();
+  await saveButton.click();
   await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'readonly');
-  await expect(page.locator('[data-testid="workspace-save"]')).toBeDisabled();
+  await expect(saveButton).toBeDisabled();
 
   page.once('dialog', dialog => dialog.accept());
   await page.goto(`/studio/index.html#/projects/${projectA}/workspace`);
-  await selectInspectorNode(page, 120, 125);
-  await textInput.fill('running');
-  await textInput.press('Enter');
+  await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
+  await editSelectedNode('running');
   responseMode = 'running';
-  await page.locator('[data-testid="workspace-save"]').click();
+  await saveButton.click();
   await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'running');
-  await expect(page.locator('[data-testid="workspace-save"]')).toBeDisabled();
+  await expect(saveButton).toBeDisabled();
 });
 
 test('G4 Preview exposes structured, empty, business failure, network failure and cancellation states', async ({ page }) => {
