@@ -99,13 +99,20 @@ When adding or changing an operator you typically touch: the operator class, the
 
 `ClearVision.Product/UI.md` documents DOM IDs, CSS class names, HTTP endpoints, WebMessage types, and `data-*` attributes that the **legacy** JS depends on — treat those as a contract and do not rename/remove them without updating the JS.
 
+**Studio UI Next red lines (this branch).** Root `AGENTS.md` is authoritative for the `studio-ui-next` rebuild's operating rules; the load-bearing constraints for any StudioUI code:
+- One capability has exactly one mounted owner, one subscription set, one write path. On a feature-flag switch the old owner must unmount/dispose (stop subscriptions, timers, SSE, requests) — CSS-hiding is not unmounting.
+- Pinia / Vue state / DOM / localStorage hold only UI projection, editing drafts, and disposable cache — never authority over Project, Flow, GlobalVariables, AgentRun, or execution results. Saves reuse the existing Application Services and land in `ProjectSaveCoordinator`; do not add a second save endpoint, save client, or persistence path.
+- Do not create a second EventBus, ServiceRegistry, HTTP stack, Canvas kernel, or HostBridge. Vue must not directly hold imperative objects (`FlowCanvas`, `ImageCanvas`, `EventSource`, `AbortController`, WebView2 bridge) — an adapter/lifecycle owner creates them, exposes a narrow interface, and disposes them.
+- Reuse existing backend contracts; report contract gaps upward rather than self-extending scope. Execution/detection go through the authenticated HTTP/SSE entries — the WebMessage bridge is host-capability adaptation only, not an execution channel.
+
 ### Studio ↔ Station flow
 
 Studio builds/executes flows locally, exports a **runtime package** (`Runtime/RuntimePackageExporter`), and syncs it to field Stations, which run inspections and report health/results/audit back. Operators can also be shipped independently as the `ClearVision.OperatorLibrary` NuGet package.
 
 ## Repository conventions
 
-- **Docs must stay in sync with code.** `DEVELOPMENT_RULES.md` requires updating the relevant doc entry when you change code/config/CI, runtime or operator contracts, Station sync, deployment, or quality gates. The doc entry points are `docs/README.md` / `docs/导航.md`; in-progress work is under `docs/进行中/`, archived under `docs/归档/`. Do not reference the old "active 待办总表" path.
+- **Root `AGENTS.md` is authoritative for this branch's operating rules** — the `studio-ui-next` mission and its relationship to the stable `codex初稿` baseline, the architecture red lines summarized under *Frontend*, parallel/subagent file-ownership rules, git/worktree safety, and the truthfulness bar (never report an unrun build/test/WebView2/DPI/hardware validation as passed; mark it `NOT RUN`). Read it before structural frontend or multi-agent work.
+- **Docs must stay in sync with code.** `ClearVision.Product/DEVELOPMENT_RULES.md` requires updating the relevant doc entry when you change code/config/CI, runtime or operator contracts, Station sync, deployment, or quality gates. The doc entry points are `docs/README.md` / `docs/导航.md`; in-progress work is under `docs/进行中/`, archived under `docs/归档/`. Do not reference the old "active 待办总表" path.
 - **Temp/scratch output** for ad-hoc `dotnet publish` or packaging verification goes under `./.tmp/publish-check/` (disposable) or outside the repo — never new unignored temp dirs in the repo root.
 - **Secrets** (AI provider keys, etc.) are never committed; configure them in local config or environment. The secret scanner runs in CI.
 - Much of the codebase and docs are in **Chinese**; match the surrounding language when editing comments and docs. XML doc comments are expected on public APIs and complex lifecycle logic (concurrency, cancellation, `ImageWrapper` lifetime, Station sync, persistence recovery).
