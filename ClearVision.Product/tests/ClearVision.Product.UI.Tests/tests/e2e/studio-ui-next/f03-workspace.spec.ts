@@ -274,7 +274,7 @@ interface BootOptions {
     call: number
   ) => Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }>;
   readonly runScenario?: (
-    stage: 'admission' | 'execute',
+    stage: 'admission' | 'execute' | 'stop' | 'reconcile',
     request: Readonly<Record<string, unknown>>,
     call: number
   ) => Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }>;
@@ -343,6 +343,61 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
         canonicalFlowHash: 'fixture-persisted-flow-hash',
         decisionConfigurationHash: 'fixture-decision-hash',
         violations: []
+      }, fixtureSchema);
+      return;
+    }
+    if (url.pathname === '/api/inspection/stop' && request.method() === 'POST') {
+      runCall += 1;
+      const requestBody = request.postDataJSON() as Readonly<Record<string, unknown>>;
+      const scenario = options.runScenario?.('stop', requestBody, runCall) ?? {};
+      if (scenario.delayMs) await new Promise(resolve => setTimeout(resolve, scenario.delayMs));
+      if (scenario.abort) {
+        await route.abort('failed');
+        return;
+      }
+      await fulfillF03Json(route, scenario.status ?? 200, scenario.body ?? {
+        status: 'cancelled',
+        code: 'RUN_CANCELLED',
+        message: 'fixture authoritative cancellation',
+        projectId: requestBody.projectId,
+        clientSnapshotId: requestBody.clientSnapshotId,
+        projectPersistenceRevision: requestBody.expectedPersistenceRevision,
+        canonicalFlowHash: requestBody.expectedCanonicalFlowHash,
+        decisionConfigurationHash: requestBody.expectedDecisionConfigurationHash,
+        result: {
+          id: fixtureUuid(90_002),
+          projectId: requestBody.projectId,
+          status: 'NotInspected',
+          executionOutcome: 'Cancelled',
+          decisionOutcome: 'NotApplicable',
+          executionSnapshotId: requestBody.clientSnapshotId,
+          projectPersistenceRevision: requestBody.expectedPersistenceRevision,
+          flowVersionHash: requestBody.expectedCanonicalFlowHash,
+          decisionConfigurationHash: requestBody.expectedDecisionConfigurationHash,
+          errorMessage: null
+        }
+      }, fixtureSchema);
+      return;
+    }
+    if (url.pathname === '/api/inspection/reconcile' && request.method() === 'POST') {
+      runCall += 1;
+      const requestBody = request.postDataJSON() as Readonly<Record<string, unknown>>;
+      const scenario = options.runScenario?.('reconcile', requestBody, runCall) ?? {};
+      if (scenario.delayMs) await new Promise(resolve => setTimeout(resolve, scenario.delayMs));
+      if (scenario.abort) {
+        await route.abort('failed');
+        return;
+      }
+      await fulfillF03Json(route, scenario.status ?? 200, scenario.body ?? {
+        status: 'result-not-found',
+        code: 'RUN_RESULT_NOT_FOUND',
+        message: 'fixture result not found',
+        projectId: requestBody.projectId,
+        clientSnapshotId: requestBody.clientSnapshotId,
+        projectPersistenceRevision: requestBody.expectedPersistenceRevision,
+        canonicalFlowHash: requestBody.expectedCanonicalFlowHash,
+        decisionConfigurationHash: requestBody.expectedDecisionConfigurationHash,
+        result: null
       }, fixtureSchema);
       return;
     }
@@ -484,6 +539,44 @@ async function dragOperator(page: Page, name: string, x: number, y: number) {
 
 function fixtureUuid(seed: number): string {
   return `aaaaaaaa-aaaa-4aaa-8aaa-${seed.toString(16).padStart(12, '0')}`;
+}
+
+function formalRunFixtureResult(
+  request: Readonly<Record<string, unknown>>,
+  seed: number,
+  executionOutcome: string,
+  decisionOutcome: string
+) {
+  return {
+    id: fixtureUuid(seed),
+    projectId: request.projectId,
+    status: executionOutcome === 'Succeeded' ? 'Completed' : 'NotInspected',
+    executionOutcome,
+    decisionOutcome,
+    executionSnapshotId: request.clientSnapshotId,
+    projectPersistenceRevision: request.expectedPersistenceRevision,
+    flowVersionHash: request.expectedCanonicalFlowHash,
+    decisionConfigurationHash: request.expectedDecisionConfigurationHash,
+    errorMessage: null
+  };
+}
+
+function reconciliationFixture(
+  request: Readonly<Record<string, unknown>>,
+  status: string,
+  result: Readonly<Record<string, unknown>> | null = null
+) {
+  return {
+    status,
+    code: status === 'cancelled' ? 'RUN_CANCELLED' : status === 'still-running' ? 'RUN_STILL_RUNNING' : null,
+    message: `fixture ${status}`,
+    projectId: request.projectId,
+    clientSnapshotId: request.clientSnapshotId,
+    projectPersistenceRevision: request.expectedPersistenceRevision,
+    canonicalFlowHash: request.expectedCanonicalFlowHash,
+    decisionConfigurationHash: request.expectedDecisionConfigurationHash,
+    result
+  };
 }
 
 function performanceFlow(nodeCount: number, connectionCount: number) {
@@ -1227,7 +1320,7 @@ test('G6 blocks execute after admission rejection and keeps the saved Workspace 
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
 
-test('G6 holds Flow and save mutation gates after an aborted execute outcome', async ({ page }) => {
+test('G6 Stop requests authoritative cancellation after an aborted execute response', async ({ page }) => {
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
     runScenario: stage => stage === 'execute' ? { delayMs: 700, abort: true } : {}
@@ -1238,8 +1331,232 @@ test('G6 holds Flow and save mutation gates after an aborted execute outcome', a
   await expect(page.locator('[data-testid="workspace-save"]')).toBeDisabled();
   await expect(page.locator('[data-testid="workspace-run-stop"]')).toBeVisible();
   await page.locator('[data-testid="workspace-run-stop"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'cancelled');
+  await expect(page.locator('[data-testid="workspace-run"]')).toBeEnabled();
+  expect(audit.some(entry => entry.path === '/api/inspection/stop')).toBe(true);
+  expect(isF03G6RequestAllowlist(audit)).toBe(true);
+});
+
+test('G6 explicit reconcile recovers a successful result after execute response loss', async ({ page }) => {
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    runScenario: (stage, request) => stage === 'execute'
+      ? { abort: true }
+      : stage === 'reconcile'
+        ? {
+            body: {
+              status: 'succeeded',
+              code: null,
+              message: 'fixture recovered result',
+              projectId: request.projectId,
+              clientSnapshotId: request.clientSnapshotId,
+              projectPersistenceRevision: request.expectedPersistenceRevision,
+              canonicalFlowHash: request.expectedCanonicalFlowHash,
+              decisionConfigurationHash: request.expectedDecisionConfigurationHash,
+              result: {
+                id: fixtureUuid(90_003),
+                projectId: request.projectId,
+                status: 'Completed',
+                executionOutcome: 'Succeeded',
+                decisionOutcome: 'Ok',
+                executionSnapshotId: request.clientSnapshotId,
+                projectPersistenceRevision: request.expectedPersistenceRevision,
+                flowVersionHash: request.expectedCanonicalFlowHash,
+                decisionConfigurationHash: request.expectedDecisionConfigurationHash,
+                errorMessage: null
+              }
+            }
+          }
+        : {}
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await page.locator('[data-testid="workspace-run"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'unknown-outcome');
+  await page.locator('[data-testid="workspace-run-reconcile"]').click();
+  await expect(page.locator('[data-capability="results-read"]')).toBeVisible();
+  expect(audit.some(entry => entry.path === '/api/inspection/reconcile')).toBe(true);
+  expect(isF03G6RequestAllowlist(audit)).toBe(true);
+});
+
+test('G6 reconcile still-running and identity mismatch remain fail-closed', async ({ page }) => {
+  let mode: 'running' | 'mismatch' = 'running';
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    runScenario: (stage, request) => stage === 'execute'
+      ? { abort: true }
+      : stage === 'reconcile'
+        ? mode === 'running'
+          ? {
+              body: {
+                status: 'still-running',
+                code: 'RUN_STILL_RUNNING',
+                message: 'fixture still running',
+                projectId: request.projectId,
+                clientSnapshotId: request.clientSnapshotId,
+                projectPersistenceRevision: request.expectedPersistenceRevision,
+                canonicalFlowHash: request.expectedCanonicalFlowHash,
+                decisionConfigurationHash: request.expectedDecisionConfigurationHash,
+                result: null
+              }
+            }
+          : {
+              body: {
+                status: 'identity-mismatch',
+                code: 'RUN_IDENTITY_MISMATCH',
+                message: 'fixture identity mismatch',
+                projectId: request.projectId,
+                clientSnapshotId: fixtureUuid(90_004),
+                projectPersistenceRevision: request.expectedPersistenceRevision,
+                canonicalFlowHash: request.expectedCanonicalFlowHash,
+                decisionConfigurationHash: request.expectedDecisionConfigurationHash,
+                result: null
+              }
+            }
+        : {}
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await page.locator('[data-testid="workspace-run"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'unknown-outcome');
+  await page.locator('[data-testid="workspace-run-reconcile"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'executing');
+  await expect(page.locator('[data-testid="workspace-save"]')).toBeDisabled();
+
+  mode = 'mismatch';
+  await page.locator('[data-testid="workspace-run-reconcile"]').click();
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'unknown-outcome');
   await expect(page.locator('[data-testid="workspace-run"]')).toBeDisabled();
+  expect(isF03G6RequestAllowlist(audit)).toBe(true);
+});
+
+test('G6 protects route leave while Formal Run is still executing', async ({ page }) => {
+  let reconcileStatus: 'still-running' | 'cancelled' = 'still-running';
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    runScenario: (stage, request) => {
+      if (stage === 'execute') return { delayMs: 1000, abort: true };
+      if (stage === 'stop') return { body: reconciliationFixture(request, 'cancel-requested') };
+      if (stage === 'reconcile') {
+        return { body: reconciliationFixture(request, reconcileStatus === 'cancelled' ? 'cancelled' : 'still-running') };
+      }
+      return {};
+    }
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await page.locator('[data-testid="workspace-run"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'executing');
+
+  const dialogMessage = new Promise<string>(resolve => page.once('dialog', async dialog => {
+    resolve(dialog.message());
+    await dialog.dismiss();
+  }));
+  await page.goto('/studio/index.html#/about').catch(() => undefined);
+  await expect(dialogMessage).resolves.toContain('Formal Run');
+  await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
+  expect(audit.some(entry => entry.path === '/api/inspection/stop')).toBe(true);
+  expect(audit.some(entry => entry.path === '/api/inspection/reconcile')).toBe(true);
+
+  reconcileStatus = 'cancelled';
+  await page.locator('[data-testid="workspace-run-reconcile"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'cancelled');
+  await page.goto('/studio/index.html#/about');
+  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
+    workspaceOwnerCount: 0,
+    runOwnerCount: 0,
+    activeAbortControllers: 0,
+    inFlightExecute: 0
+  });
+  expect(isF03G6RequestAllowlist(audit)).toBe(true);
+});
+
+test('G6 protects project switch while Formal Run is still executing', async ({ page }) => {
+  let reconcileStatus: 'still-running' | 'cancelled' = 'still-running';
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    runScenario: (stage, request) => {
+      if (stage === 'execute') return { delayMs: 1000, abort: true };
+      if (stage === 'stop') return { body: reconciliationFixture(request, 'cancel-requested') };
+      if (stage === 'reconcile') {
+        return { body: reconciliationFixture(request, reconcileStatus === 'cancelled' ? 'cancelled' : 'still-running') };
+      }
+      return {};
+    }
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await page.locator('[data-testid="workspace-run"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'executing');
+
+  const dialogMessage = new Promise<string>(resolve => page.once('dialog', async dialog => {
+    resolve(dialog.message());
+    await dialog.dismiss();
+  }));
+  await page.goto(`/studio/index.html#/projects/${projectB}/workspace`).catch(() => undefined);
+  await expect(dialogMessage).resolves.toContain('Formal Run');
+  await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
+
+  reconcileStatus = 'cancelled';
+  await page.locator('[data-testid="workspace-run-reconcile"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'cancelled');
+  await page.goto(`/studio/index.html#/projects/${projectB}/workspace`);
+  await expect(shell).toHaveAttribute('data-workspace-project-id', projectB);
+  await page.goto('/studio/index.html#/about');
+  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
+    workspaceOwnerCount: 0,
+    runOwnerCount: 0,
+    activeAbortControllers: 0,
+    inFlightExecute: 0
+  });
+  expect(isF03G6RequestAllowlist(audit)).toBe(true);
+});
+
+test('G6 Host close flush keeps the owner alive when Formal Run cannot be settled', async ({ page }) => {
+  let reconcileStatus: 'still-running' | 'cancelled' = 'still-running';
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    runScenario: (stage, request) => {
+      if (stage === 'execute') return { delayMs: 1000, abort: true };
+      if (stage === 'stop') return { body: reconciliationFixture(request, 'cancel-requested') };
+      if (stage === 'reconcile') {
+        return { body: reconciliationFixture(request, reconcileStatus === 'cancelled' ? 'cancelled' : 'still-running') };
+      }
+      return {};
+    }
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await page.locator('[data-testid="workspace-run"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'executing');
+
+  const flushResult = await page.evaluate(async () => {
+    const flush = (window as Window & {
+      __clearVisionFlushProjectWorkspace?: (reason?: string) => Promise<boolean>;
+    }).__clearVisionFlushProjectWorkspace;
+    return await flush?.('host-close');
+  });
+  expect(flushResult).toBe(false);
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'cancel-requested');
+  await expect(page.locator('[data-testid="workspace-save"]')).toBeDisabled();
+  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
+    workspaceOwnerCount: 1,
+    runOwnerCount: 1,
+    activeAbortControllers: 0,
+    inFlightExecute: 0
+  });
+
+  reconcileStatus = 'cancelled';
+  await page.locator('[data-testid="workspace-run-reconcile"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'cancelled');
+  await expect(page.evaluate(async () => {
+    const flush = (window as Window & {
+      __clearVisionFlushProjectWorkspace?: (reason?: string) => Promise<boolean>;
+    }).__clearVisionFlushProjectWorkspace;
+    return await flush?.('host-close-after-reconcile');
+  })).resolves.toBe(true);
+  await page.goto('/studio/index.html#/about');
+  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
+    workspaceOwnerCount: 0,
+    runOwnerCount: 0,
+    activeAbortControllers: 0,
+    inFlightExecute: 0
+  });
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
 
@@ -1675,6 +1992,91 @@ test('G6 passes 20 formal Run, Project switch, and route-leave cycles with a zer
     ownerConflictCount: 0
   });
   expect(audit.filter(entry => entry.method === 'POST').map(entry => entry.path)).toHaveLength(40);
+  expect(isF03G6RequestAllowlist(audit)).toBe(true);
+});
+
+test('G6 passes 20 run, stop/reconcile, project, and route lifecycle cycles with zero resources', async ({ page }) => {
+  let mode: 'stop' | 'reconcile' = 'stop';
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    runScenario: (stage, request) => {
+      if (stage === 'execute') return mode === 'stop' ? { delayMs: 1000, abort: true } : { abort: true };
+      if (stage === 'stop') {
+        return {
+          body: reconciliationFixture(
+            request,
+            'cancelled',
+            formalRunFixtureResult(request, 91_000 + Number(request.expectedPersistenceRevision), 'Cancelled', 'NotApplicable')
+          )
+        };
+      }
+      if (stage === 'reconcile') {
+        return {
+          body: mode === 'reconcile'
+            ? reconciliationFixture(
+                request,
+                'succeeded',
+                formalRunFixtureResult(request, 92_000 + Number(request.expectedPersistenceRevision), 'Succeeded', 'Ok')
+              )
+            : reconciliationFixture(request, 'cancelled')
+        };
+      }
+      return {};
+    }
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  let currentProject = projectA;
+
+  for (let cycle = 0; cycle < 20; cycle += 1) {
+    await page.goto(`/studio/index.html#/projects/${currentProject}/workspace`);
+    await expect(shell, `cycle ${cycle} Workspace ready`).toHaveAttribute('data-workspace-state', 'ready');
+    await expect(page.locator('[data-testid="workspace-run"]'), `cycle ${cycle} Run enabled`).toBeEnabled();
+    mode = cycle % 2 === 0 ? 'stop' : 'reconcile';
+    await page.locator('[data-testid="workspace-run"]').click();
+
+    if (mode === 'stop') {
+      await expect(shell, `cycle ${cycle} executing`).toHaveAttribute('data-workspace-run-phase', 'executing');
+      await page.locator('[data-testid="workspace-run-stop"]').click();
+      await expect(shell, `cycle ${cycle} cancelled`).toHaveAttribute('data-workspace-run-phase', 'cancelled');
+    } else {
+      await expect(shell, `cycle ${cycle} unknown outcome`).toHaveAttribute('data-workspace-run-phase', 'unknown-outcome');
+      await page.locator('[data-testid="workspace-run-reconcile"]').click();
+      await expect(page.locator('[data-capability="results-read"]'), `cycle ${cycle} Results handoff`).toBeVisible();
+    }
+
+    currentProject = currentProject === projectA ? projectB : projectA;
+    await page.goto(`/studio/index.html#/projects/${currentProject}/workspace`);
+    await expect(shell, `cycle ${cycle} project switch`).toHaveAttribute('data-workspace-project-id', currentProject);
+    await expect.poll(async () => await workspaceDiagnostics(page), { message: `cycle ${cycle} active ledger` })
+      .toMatchObject({
+        workspaceOwnerCount: 1,
+        persistenceOwnerCount: 1,
+        runOwnerCount: 1,
+        activeProjectId: currentProject,
+        activeAbortControllers: 0,
+        inFlightReads: 0,
+        inFlightWrites: 0,
+        inFlightExecute: 0
+      });
+    await page.goto('/studio/index.html#/about');
+    await expect.poll(async () => await workspaceDiagnostics(page), { message: `cycle ${cycle} route leave ledger` })
+      .toMatchObject({
+        workspaceOwnerCount: 0,
+        persistenceOwnerCount: 0,
+        runOwnerCount: 0,
+        activeSubscriptions: 0,
+        activeTimers: 0,
+        activeAbortControllers: 0,
+        activeBlobUrls: 0,
+        activePreviewArtifactIds: 0,
+        inFlightReads: 0,
+        inFlightWrites: 0,
+        inFlightPreview: 0,
+        inFlightExecute: 0
+      });
+  }
+
+  expect(audit.filter(entry => entry.method === 'POST')).toHaveLength(60);
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
 

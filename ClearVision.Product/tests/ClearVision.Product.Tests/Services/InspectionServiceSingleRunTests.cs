@@ -108,6 +108,234 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
+    public async Task PersistedStudioRun_ReconcileRecoversStoredResultByCompleteSnapshotIdentity()
+    {
+        var projectId = Guid.NewGuid();
+        var clientSnapshotId = Guid.NewGuid();
+        var snapshot = new ExecutionSnapshot(
+            projectId,
+            CreateFlow("reconcile-flow"),
+            7,
+            ExecutionSnapshotSource.PersistedProject,
+            ExecutionRunMode.FormalPrimary,
+            snapshotId: clientSnapshotId);
+        var result = new InspectionResult(projectId);
+        result.SetOutcome(new InspectionOutcome(
+            ExecutionOutcome.Succeeded,
+            DecisionOutcome.Ok,
+            "FinalDecision",
+            "Ok",
+            null),
+            processingTimeMs: 3);
+        result.SetExecutionTraceability(snapshot, null, Guid.NewGuid());
+
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        resultRepository.FindByExecutionSnapshotIdAsync(projectId, clientSnapshotId).Returns(result);
+        var service = CreateMinimalInspectionService(
+            resultRepository,
+            Substitute.For<IProjectRepository>(),
+            Substitute.For<IInspectionRuntimeCoordinator>());
+        var identity = new StudioInspectionRunIdentity(
+            projectId,
+            clientSnapshotId,
+            snapshot.PersistenceRevision,
+            snapshot.FlowHash,
+            snapshot.DecisionConfigurationHash);
+
+        var reconciliation = await service.ReconcilePersistedStudioRunAsync(identity);
+
+        reconciliation.Status.Should().Be(StudioInspectionRunReconciliationStatus.Succeeded);
+        reconciliation.Result.Should().BeSameAs(result);
+        await resultRepository.Received(1).FindByExecutionSnapshotIdAsync(projectId, clientSnapshotId);
+    }
+
+    [Fact]
+    public async Task PersistedStudioRun_ReconcileFailsClosedForMismatchedStoredResultIdentity()
+    {
+        var projectId = Guid.NewGuid();
+        var clientSnapshotId = Guid.NewGuid();
+        var snapshot = new ExecutionSnapshot(
+            projectId,
+            CreateFlow("reconcile-mismatch-flow"),
+            7,
+            ExecutionSnapshotSource.PersistedProject,
+            ExecutionRunMode.FormalPrimary,
+            snapshotId: clientSnapshotId);
+        var result = new InspectionResult(projectId);
+        result.SetResult(InspectionStatus.OK, 1);
+        result.SetExecutionTraceability(snapshot, null, Guid.NewGuid());
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        resultRepository.FindByExecutionSnapshotIdAsync(projectId, clientSnapshotId).Returns(result);
+        var service = CreateMinimalInspectionService(
+            resultRepository,
+            Substitute.For<IProjectRepository>(),
+            Substitute.For<IInspectionRuntimeCoordinator>());
+        var identity = new StudioInspectionRunIdentity(
+            projectId,
+            clientSnapshotId,
+            snapshot.PersistenceRevision,
+            "sha256:wrong-flow",
+            snapshot.DecisionConfigurationHash);
+
+        var reconciliation = await service.ReconcilePersistedStudioRunAsync(identity);
+
+        reconciliation.Status.Should().Be(StudioInspectionRunReconciliationStatus.IdentityMismatch);
+        reconciliation.Code.Should().Be("RUN_RESULT_IDENTITY_MISMATCH");
+        reconciliation.Result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PersistedStudioRun_ReconcileReportsExistingCoordinatorAsStillRunning()
+    {
+        var projectId = Guid.NewGuid();
+        var clientSnapshotId = Guid.NewGuid();
+        var snapshot = new ExecutionSnapshot(
+            projectId,
+            CreateFlow("reconcile-running-flow"),
+            7,
+            ExecutionSnapshotSource.PersistedProject,
+            ExecutionRunMode.FormalPrimary,
+            snapshotId: clientSnapshotId);
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        coordinator.GetState(projectId).Returns(new RuntimeState
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            Status = RuntimeStatus.Running,
+            StartedAt = DateTime.UtcNow,
+            ExecutionSnapshotId = snapshot.SnapshotId,
+            FlowHash = snapshot.FlowHash,
+            ProjectRevision = snapshot.PersistenceRevision,
+            DecisionConfigurationHash = snapshot.DecisionConfigurationHash,
+            ExecutionSource = snapshot.Source.ToString()
+        });
+        var service = CreateMinimalInspectionService(
+            Substitute.For<IInspectionResultRepository>(),
+            Substitute.For<IProjectRepository>(),
+            coordinator);
+        var identity = new StudioInspectionRunIdentity(
+            projectId,
+            clientSnapshotId,
+            snapshot.PersistenceRevision,
+            snapshot.FlowHash,
+            snapshot.DecisionConfigurationHash);
+
+        var reconciliation = await service.ReconcilePersistedStudioRunAsync(identity);
+
+        reconciliation.Status.Should().Be(StudioInspectionRunReconciliationStatus.StillRunning);
+        reconciliation.Code.Should().Be("RUN_STILL_RUNNING");
+    }
+
+    [Fact]
+    public async Task PersistedStudioRun_StopUsesCoordinatorCancellationAndReconcilesCurrentState()
+    {
+        var projectId = Guid.NewGuid();
+        var clientSnapshotId = Guid.NewGuid();
+        var snapshot = new ExecutionSnapshot(
+            projectId,
+            CreateFlow("stop-authority-flow"),
+            7,
+            ExecutionSnapshotSource.PersistedProject,
+            ExecutionRunMode.FormalPrimary,
+            snapshotId: clientSnapshotId);
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        coordinator.GetState(projectId).Returns(new RuntimeState
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            Status = RuntimeStatus.Running,
+            StartedAt = DateTime.UtcNow,
+            ExecutionSnapshotId = snapshot.SnapshotId,
+            FlowHash = snapshot.FlowHash,
+            ProjectRevision = snapshot.PersistenceRevision,
+            DecisionConfigurationHash = snapshot.DecisionConfigurationHash,
+            ExecutionSource = snapshot.Source.ToString()
+        });
+        coordinator.TryStopAsync(projectId, Arg.Any<CancellationToken>()).Returns(true);
+        var service = CreateMinimalInspectionService(
+            Substitute.For<IInspectionResultRepository>(),
+            Substitute.For<IProjectRepository>(),
+            coordinator);
+        var identity = new StudioInspectionRunIdentity(
+            projectId,
+            clientSnapshotId,
+            snapshot.PersistenceRevision,
+            snapshot.FlowHash,
+            snapshot.DecisionConfigurationHash);
+
+        var reconciliation = await service.StopPersistedStudioRunAsync(identity);
+
+        reconciliation.Status.Should().Be(StudioInspectionRunReconciliationStatus.StillRunning);
+        await coordinator.Received(1).TryStopAsync(projectId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PersistedStudioRun_CoordinatorCancellationPersistsAuthoritativeCancelledResult()
+    {
+        var project = new Project("cancelled-studio-run-project");
+        project.SetPersistenceRevision(7);
+        var projectId = project.Id;
+        var clientSnapshotId = Guid.NewGuid();
+        var persistedFlowJson = SerializeFlowDto("cancelled-studio-run");
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        flowStorage.LoadFlowJsonAsync(projectId).Returns(persistedFlowJson);
+        flowStorage.LoadMetadataAsync(projectId).Returns(new ProjectFlowStorageMetadata(
+            1,
+            projectId,
+            7,
+            ComputeStoredFlowArtifactHash(persistedFlowJson),
+            DateTimeOffset.UtcNow));
+        coordinator.TryStartAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<Guid>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(StartResult.Success));
+        coordinator.GetCancellationToken(projectId).Returns(cancellation.Token);
+        resultRepository.AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            Substitute.For<IImageAcquisitionService>(),
+            Substitute.For<IConfigurationService>(),
+            coordinator,
+            Substitute.For<IInspectionWorker>(),
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance);
+        var admission = await service.AdmitPersistedStudioRunAsync(projectId, 7, clientSnapshotId);
+
+        var result = await service.ExecutePersistedStudioRunAsync(
+            projectId,
+            admission.PersistenceRevision,
+            clientSnapshotId,
+            admission.CanonicalFlowHash,
+            admission.DecisionConfigurationHash);
+
+        result.GetOutcome().Execution.Should().Be(ExecutionOutcome.Cancelled);
+        result.ExecutionSnapshotId.Should().Be(clientSnapshotId);
+        result.ProjectPersistenceRevision.Should().Be(7);
+        result.FlowVersionHash.Should().Be(admission.CanonicalFlowHash);
+        result.DecisionConfigurationHash.Should().Be(admission.DecisionConfigurationHash);
+        await flowExecution.DidNotReceiveWithAnyArgs().ExecuteWithSnapshotAsync(
+            Arg.Any<ExecutionSnapshot>(),
+            Arg.Any<Dictionary<string, object>?>(),
+            Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
+        await resultRepository.Received(1).AddAsync(Arg.Any<InspectionResult>());
+    }
+
+    [Fact]
     public async Task PersistedStudioRun_RejectsRevisionMismatchBeforeExecution()
     {
         var project = new Project("revision-mismatch-project");
@@ -1918,6 +2146,25 @@ public class InspectionServiceSingleRunTests
         op.AddInputPort("Input", PortDataType.Any, isRequired: false);
         op.AddOutputPort("Output", PortDataType.Any);
         return op;
+    }
+
+    private static InspectionService CreateMinimalInspectionService(
+        IInspectionResultRepository resultRepository,
+        IProjectRepository projectRepository,
+        IInspectionRuntimeCoordinator coordinator)
+    {
+        return new InspectionService(
+            resultRepository,
+            projectRepository,
+            Substitute.For<IFlowExecutionService>(),
+            Substitute.For<IImageAcquisitionService>(),
+            Substitute.For<IConfigurationService>(),
+            coordinator,
+            Substitute.For<IInspectionWorker>(),
+            Substitute.For<IImageCacheRepository>(),
+            new AnalysisDataBuilder(),
+            Substitute.For<IProjectFlowStorage>(),
+            NullLogger<InspectionService>.Instance);
     }
 
     private static OperatorFlow CreateFlow(string operatorName)

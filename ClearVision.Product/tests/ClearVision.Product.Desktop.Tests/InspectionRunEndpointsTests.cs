@@ -117,6 +117,90 @@ public sealed class InspectionRunEndpointsTests
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task PersistedWorkspaceRun_StopAndReconcile_ReturnAuthoritativeStatusAndIdentity()
+    {
+        var identity = new StudioInspectionRunIdentity(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            9,
+            "flow-hash",
+            "decision-hash");
+        var service = Substitute.For<IInspectionService>();
+        service.StopPersistedStudioRunAsync(identity, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new StudioInspectionRunReconciliation(
+                identity.ProjectId,
+                identity.ClientSnapshotId,
+                identity.PersistenceRevision,
+                identity.CanonicalFlowHash,
+                identity.DecisionConfigurationHash,
+                StudioInspectionRunReconciliationStatus.Cancelled,
+                "RUN_CANCELLED",
+                "cancelled",
+                null)));
+        service.ReconcilePersistedStudioRunAsync(identity, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new StudioInspectionRunReconciliation(
+                identity.ProjectId,
+                identity.ClientSnapshotId,
+                identity.PersistenceRevision,
+                identity.CanonicalFlowHash,
+                identity.DecisionConfigurationHash,
+                StudioInspectionRunReconciliationStatus.IdentityMismatch,
+                "RUN_IDENTITY_MISMATCH",
+                "mismatch",
+                null)));
+
+        await using var host = await InspectionRunEndpointHost.CreateAsync(service);
+        var request = new StudioInspectionRunIdentityRequest
+        {
+            ProjectId = identity.ProjectId,
+            ClientSnapshotId = identity.ClientSnapshotId,
+            ExpectedPersistenceRevision = identity.PersistenceRevision,
+            ExpectedCanonicalFlowHash = identity.CanonicalFlowHash,
+            ExpectedDecisionConfigurationHash = identity.DecisionConfigurationHash
+        };
+
+        using var stopResponse = await host.Client.PostAsJsonAsync("/api/inspection/stop", request);
+        stopResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using (var stop = JsonDocument.Parse(await stopResponse.Content.ReadAsStringAsync()))
+        {
+            stop.RootElement.GetProperty("status").GetString().Should().Be("cancelled");
+            stop.RootElement.GetProperty("clientSnapshotId").GetGuid().Should().Be(identity.ClientSnapshotId);
+            stop.RootElement.GetProperty("projectPersistenceRevision").GetInt64().Should().Be(identity.PersistenceRevision);
+        }
+
+        using var reconcileResponse = await host.Client.PostAsJsonAsync("/api/inspection/reconcile", request);
+        reconcileResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using (var reconcile = JsonDocument.Parse(await reconcileResponse.Content.ReadAsStringAsync()))
+        {
+            reconcile.RootElement.GetProperty("status").GetString().Should().Be("identity-mismatch");
+            reconcile.RootElement.GetProperty("code").GetString().Should().Be("RUN_IDENTITY_MISMATCH");
+        }
+
+        await service.Received(1).StopPersistedStudioRunAsync(identity, Arg.Any<CancellationToken>());
+        await service.Received(1).ReconcilePersistedStudioRunAsync(identity, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PersistedWorkspaceRun_StopAndReconcile_RejectIncompleteIdentity()
+    {
+        var service = Substitute.For<IInspectionService>();
+        await using var host = await InspectionRunEndpointHost.CreateAsync(service);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/inspection/reconcile", new
+        {
+            projectId = Guid.NewGuid(),
+            clientSnapshotId = Guid.NewGuid(),
+            expectedPersistenceRevision = 1,
+            expectedCanonicalFlowHash = "",
+            expectedDecisionConfigurationHash = "decision-hash"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("RUN_IDENTITY_INVALID");
+        await service.DidNotReceiveWithAnyArgs().ReconcilePersistedStudioRunAsync(default!, default);
+    }
+
     private sealed class InspectionRunEndpointHost : IAsyncDisposable
     {
         private readonly WebApplication app;

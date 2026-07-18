@@ -7,7 +7,10 @@ import {
   WorkspacePage,
   createWorkspaceLifecycleDiagnosticsOwner,
   createWorkspaceRuntime,
-  workspaceCapabilityFlagKey
+  workspaceCapabilityFlagKey,
+  type WorkspaceOwner,
+  type WorkspaceProjectV1,
+  type WorkspaceRuntime
 } from '@/capabilities/project-workspace';
 import {
   ApiForbiddenError,
@@ -136,7 +139,125 @@ async function createHarness(options: {
   return { requests, queries, diagnostics, runtime, router };
 }
 
+function createProtectedRunHarness(runPhase: 'executing' | 'cancel-requested' | 'unknown-outcome' = 'executing') {
+  const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+  const project = {
+    ...projectPayload(),
+    opaqueProjectFields: {},
+    saveCompatibility: {
+      status: 'compatible',
+      canEncode: true,
+      opaquePassthroughPaths: [],
+      blockedPaths: [],
+      readOnlyUnknownPaths: []
+    }
+  } as unknown as WorkspaceProjectV1;
+  const session = createSession();
+  const persistence = reactive({
+    phase: 'running',
+    projectId: projectA,
+    persistenceRevision: 3,
+    dirtyGeneration: 0,
+    submittedDirtyGeneration: null,
+    dirty: false,
+    canSave: false,
+    canRun: false,
+    canRetry: false,
+    canReconcile: false,
+    canReapplyConflict: false,
+    canDiscardConflict: false,
+    message: 'running',
+    errorCode: null,
+    conflictServerRevision: null,
+    lastSavedAt: null
+  });
+  const run = reactive({
+    phase: runPhase,
+    projectId: projectA,
+    clientSnapshotId: '33333333-3333-4333-8333-333333333333',
+    admission: null,
+    result: null,
+    message: runPhase,
+    errorCode: null,
+    canRun: false,
+    canStop: runPhase === 'executing',
+    canReconcile: runPhase !== 'executing'
+  });
+  const owner = {
+    projectId: projectA,
+    projection: reactive({
+      phase: 'ready',
+      project,
+      readonlyReason: null,
+      persistence,
+      run
+    }),
+    openFlowCanvas: vi.fn(),
+    save: vi.fn(async () => ({ status: 'running', project: null })),
+    retrySave: vi.fn(async () => ({ status: 'running', project: null })),
+    reconcileSave: vi.fn(async () => ({ status: 'running', project: null })),
+    reapplyConflict: vi.fn(),
+    discardConflict: vi.fn(),
+    runFormal: vi.fn(async () => null),
+    stopFormal: vi.fn(async () => true),
+    reconcileFormalRun: vi.fn(async () => null),
+    prepareForLeave: vi.fn(async () => false),
+    setReadonly: vi.fn(),
+    dispose: vi.fn()
+  } as unknown as WorkspaceOwner;
+  const readState = reactive({ phase: 'success', data: project, failure: null });
+  const readPort = {
+    projectId: projectA,
+    state: readState,
+    refresh: vi.fn(async () => readState),
+    dispose: vi.fn()
+  };
+  const runtime = {
+    enabled: true,
+    session: session.projection,
+    diagnostics: diagnostics.diagnostics,
+    refreshSession: vi.fn(async () => undefined),
+    openProject: vi.fn(() => readPort),
+    mountProject: vi.fn(() => owner),
+    dispose: vi.fn()
+  } as unknown as WorkspaceRuntime;
+  return { diagnostics, owner, runtime };
+}
+
 describe('F03 G1 WorkspacePage', () => {
+  it('protects route leave, project switch, and Host close while Formal Run is executing', async () => {
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirm);
+    const harness = createProtectedRunHarness();
+    const router = await createTestRouter();
+    const wrapper = mount(WorkspacePage, {
+      props: { projectId: projectA, runtime: harness.runtime },
+      global: { plugins: [router], stubs: { FlowWorkspace: flowWorkspaceStub } }
+    });
+    await flushPromises();
+
+    await router.push('/about');
+    expect(router.currentRoute.value.fullPath).toBe(`/projects/${projectA}/workspace`);
+    expect(harness.owner.prepareForLeave).toHaveBeenCalledWith('route-leave');
+    expect(harness.owner.dispose).not.toHaveBeenCalled();
+
+    await router.push(`/projects/${projectB}/workspace`);
+    expect(router.currentRoute.value.fullPath).toBe(`/projects/${projectA}/workspace`);
+    expect(harness.owner.prepareForLeave).toHaveBeenCalledWith('route-leave');
+
+    const flush = (window as Window & {
+      __clearVisionFlushProjectWorkspace?: (reason?: string) => Promise<boolean>;
+    }).__clearVisionFlushProjectWorkspace;
+    await expect(flush?.('host-close')).resolves.toBe(false);
+    expect(harness.owner.prepareForLeave).toHaveBeenCalledWith('host-close');
+    expect(harness.owner.dispose).not.toHaveBeenCalled();
+    expect(confirm).toHaveBeenCalled();
+
+    wrapper.unmount();
+    harness.runtime.dispose();
+    vi.unstubAllGlobals();
+  });
+
   it('keeps flag-off at owner=0 and does not issue a Project GET', async () => {
     const harness = await createHarness({ enabled: false });
     const wrapper = mount(WorkspacePage, {

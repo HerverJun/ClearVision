@@ -388,6 +388,12 @@ public sealed class InspectionResultBackgroundServiceTests
             return Task.FromResult<IEnumerable<InspectionResult>>(Added.Where(result => result.ProjectId == projectId));
         }
 
+        public Task<InspectionResult?> FindByExecutionSnapshotIdAsync(Guid projectId, Guid executionSnapshotId)
+        {
+            return Task.FromResult<InspectionResult?>(Added.FirstOrDefault(result =>
+                result.ProjectId == projectId && result.ExecutionSnapshotId == executionSnapshotId));
+        }
+
         public Task<InspectionHistoryPage> GetHistoryPageAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null, int pageIndex = 0, int pageSize = 20, string? flowVersionHash = null)
         {
             return Task.FromResult(new InspectionHistoryPage());
