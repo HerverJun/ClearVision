@@ -5,7 +5,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$RuntimeEvidenceDirectory,
     [string[]]$RequiredProductRoutes = @(),
-    [ValidateSet("", "f01", "f02")]
+    [ValidateSet("", "f01", "f02", "f03")]
     [string]$ExpectedEvidencePhase = "",
     [string]$ExpectedSourceSha = "",
     [string]$OutputPath,

@@ -427,7 +427,7 @@ try {
             RuntimeEvidenceDirectory = $evidenceRoot
             OutputPath = Join-Path $evidenceRoot "studio-ui-no-node-evidence.json"
         }
-        if ($EvidencePhase -eq "f02") {
+        if ($EvidencePhase -in @("f02", "f03")) {
             $noNodeParameters["RequiredProductRoutes"] = $publishProductRoutes
             $noNodeParameters["ExpectedEvidencePhase"] = $EvidencePhase
             $noNodeParameters["ExpectedSourceSha"] = $sourceSha
