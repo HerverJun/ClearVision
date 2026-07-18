@@ -5,6 +5,7 @@
 using System.Net;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Desktop.Configuration;
 using ClearVision.Product.Desktop.Handlers;
@@ -17,7 +18,18 @@ internal sealed record WebView2StartupPlan(
     StudioStartupPageDecision Decision,
     Uri? InitialPageUri,
     string? StartupInjectionScript,
-    string? DiagnosticHtml);
+    string? DiagnosticHtml,
+    StudioStartupDiagnostics Diagnostics);
+
+internal sealed record StudioStartupDiagnostics(
+    string Profile,
+    string PageKind,
+    string? InitialPageUri,
+    string AssetRoot,
+    string SourceSha,
+    string AuthMode,
+    bool ConfigurationRequiresRestart,
+    IReadOnlyDictionary<string, bool> Flags);
 
 /// <summary>
 /// WebView2 宿主类，负责 WebView2 控件的异步初始化和配置。
@@ -25,6 +37,9 @@ internal sealed record WebView2StartupPlan(
 /// </summary>
 public sealed class WebView2Host : IAsyncDisposable
 {
+    private static readonly Regex SourceShaPattern = new(
+        "[0-9a-f]{40}",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly JsonSerializerOptions StartupScriptJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -171,7 +186,10 @@ public sealed class WebView2Host : IAsyncDisposable
         string cssVersion,
         string? baseDirectory = null,
         string? legacyWebRoot = null,
-        string? studioUiWebRoot = null)
+        string? studioUiWebRoot = null,
+        string? startupProfile = null,
+        string? sourceSha = null,
+        string? authMode = null)
     {
         if (webPort < 1 || webPort > 65535)
         {
@@ -214,12 +232,94 @@ public sealed class WebView2Host : IAsyncDisposable
         var diagnosticHtml = decision.IsNavigable
             ? null
             : BuildStartupDiagnosticHtml(decision);
+        var profile = StudioStartupProfileCatalog.Resolve(
+            studioOptions,
+            startupProfile ?? Environment.GetEnvironmentVariable("CV_STUDIO_UI_PROFILE"));
+        var diagnostics = new StudioStartupDiagnostics(
+            profile,
+            decision.Kind.ToString(),
+            initialPageUri?.ToString(),
+            ResolveStartupAssetRoot(
+                decision.Kind,
+                baseDirectory,
+                legacyWebRoot,
+                studioUiWebRoot),
+            ResolveSourceSha(sourceSha),
+            ResolveMetadataValue(
+                authMode,
+                "CV_STUDIO_UI_AUTH_MODE",
+                "LOCAL_HTTP_AUTHORITY"),
+            ConfigurationRequiresRestart: true,
+            BuildStartupDiagnosticsFlags(studioOptions));
 
         return new WebView2StartupPlan(
             decision,
             initialPageUri,
             startupInjectionScript,
-            diagnosticHtml);
+            diagnosticHtml,
+            diagnostics);
+    }
+
+    private static IReadOnlyDictionary<string, bool> BuildStartupDiagnosticsFlags(
+        StudioOptions studioOptions)
+    {
+        var flags = new Dictionary<string, bool>(BuildStudioUiFeatureFlags(studioOptions))
+        {
+            ["Studio:StudioUiEnabled"] = studioOptions.StudioUiEnabled,
+            ["Studio:WorkspaceCapabilityEnabled"] = studioOptions.WorkspaceCapabilityEnabled
+        };
+        return flags;
+    }
+
+    private static string ResolveStartupAssetRoot(
+        StudioStartupPageKind pageKind,
+        string? baseDirectory,
+        string? legacyWebRoot,
+        string? studioUiWebRoot)
+    {
+        var root = pageKind is StudioStartupPageKind.StudioUi or StudioStartupPageKind.Diagnostic
+            ? (string.IsNullOrWhiteSpace(studioUiWebRoot)
+                ? DesktopWebRootResolver.ResolveStudioUi(baseDirectory)
+                : studioUiWebRoot)
+            : (string.IsNullOrWhiteSpace(legacyWebRoot)
+                ? DesktopWebRootResolver.Resolve(baseDirectory)
+                : legacyWebRoot);
+        return Path.GetFullPath(root);
+    }
+
+    private static string ResolveSourceSha(string? explicitSourceSha)
+    {
+        var candidates = new[]
+        {
+            explicitSourceSha,
+            Environment.GetEnvironmentVariable("CV_STUDIO_UI_SOURCE_SHA"),
+            typeof(WebView2Host).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion
+        };
+        foreach (var candidate in candidates)
+        {
+            var match = SourceShaPattern.Match(candidate ?? string.Empty);
+            if (match.Success)
+            {
+                return match.Value.ToLowerInvariant();
+            }
+        }
+
+        return "UNAVAILABLE";
+    }
+
+    private static string ResolveMetadataValue(
+        string? explicitValue,
+        string environmentName,
+        string fallback)
+    {
+        var value = string.IsNullOrWhiteSpace(explicitValue)
+            ? Environment.GetEnvironmentVariable(environmentName)
+            : explicitValue;
+        return string.IsNullOrWhiteSpace(value)
+            ? fallback
+            : value.Trim().ToUpperInvariant();
     }
 
     private static IReadOnlyDictionary<string, bool> BuildStudioUiFeatureFlags(
@@ -299,6 +399,12 @@ public sealed class WebView2Host : IAsyncDisposable
                 Program.GetWebPort(),
                 _studioOptions,
                 GenerateCssVersion());
+            var startupDiagnosticsJson = JsonSerializer.Serialize(
+                startupPlan.Diagnostics,
+                StartupScriptJsonOptions);
+            Serilog.Log.Information(
+                "[StudioStartup] {StartupDiagnostics:l}",
+                startupDiagnosticsJson);
 
             // 配置用户数据文件夹
             var dataFolder = userDataFolder ?? Path.Combine(

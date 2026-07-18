@@ -18,3 +18,51 @@ public sealed class StudioOptions
     public bool CircleSearchV2ToolEnabled { get; set; } = true;
     public bool NPointCalibrationWorkbenchEnabled { get; set; } = true;
 }
+
+internal static class StudioStartupProfileCatalog
+{
+    public const string LegacyDefault = "LEGACY_DEFAULT";
+    public const string NextPilot = "NEXT_PILOT";
+    public const string NextFullCandidate = "NEXT_FULL_CANDIDATE";
+    public const string IsolatedTruthTable = "ISOLATED_TRUTH_TABLE";
+
+    public static string Resolve(
+        StudioOptions options,
+        string? requestedProfile = null)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrWhiteSpace(requestedProfile))
+        {
+            if (!options.StudioUiEnabled && !options.WorkspaceCapabilityEnabled)
+            {
+                return LegacyDefault;
+            }
+
+            if (options.StudioUiEnabled && options.WorkspaceCapabilityEnabled)
+            {
+                return NextFullCandidate;
+            }
+
+            return IsolatedTruthTable;
+        }
+
+        var normalized = requestedProfile.Trim().ToUpperInvariant();
+        var matches = normalized switch
+        {
+            LegacyDefault => !options.StudioUiEnabled && !options.WorkspaceCapabilityEnabled,
+            NextPilot or NextFullCandidate =>
+                options.StudioUiEnabled && options.WorkspaceCapabilityEnabled,
+            _ => throw new InvalidOperationException(
+                $"Unknown Studio startup profile '{requestedProfile}'.")
+        };
+
+        if (!matches)
+        {
+            throw new InvalidOperationException(
+                $"Studio startup profile '{normalized}' does not match the configured root/workspace flags.");
+        }
+
+        return normalized;
+    }
+}
