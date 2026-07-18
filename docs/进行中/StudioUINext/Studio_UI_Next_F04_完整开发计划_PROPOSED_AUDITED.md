@@ -1,7 +1,7 @@
 # Studio UI Next F04 完整开发计划
 
-> 文档状态：**ACTIVE_G1_CONTRACT_FREEZE**  
-> 本计划已经结合 F03 最终实现、当前 `studio-ui-next` 分支代码事实、原 F04 初稿及独立复审意见修订。  
+> 文档状态：**G1_CONTRACTS_FROZEN**
+> 本计划已经结合 F03 最终实现、当前 `studio-ui-next` 分支代码事实、原 F04 初稿及独立复审意见修订。
 > 产品负责人已批准 G0B，并在 G0 通过后批准进入 G1 合同冻结；G2–G6 产品实现仍未批准。
 
 ---
@@ -11,12 +11,13 @@
 ```text
 PLAN_NAME=Studio UI Next F04
 PLAN_THEME=产品化入口、认证闭环、工程生命周期与受控切换
-PLAN_STATUS=ACTIVE_G1_CONTRACT_FREEZE
+PLAN_STATUS=G1_CONTRACTS_FROZEN
 
 CODE_AUDIT_BASE_SHA=b24d20b3531bdea66f0b9b73ba5e18827489eedf
-PLAN_DOCUMENT_COMMIT_SHA=PENDING_FIRST_CONTROLLED_COMMIT
+PLAN_DOCUMENT_COMMIT_SHA=42a2c8811d97af2212fa2a3ec40ba7b86aab649e
 STABLE_LINE_AUDIT_SHA=4386d8f3537e80084802567b41d96414b0ddacd0
 F04_IMPLEMENTATION_BASE_SHA=64311b41d76f1d736fd879e6c28372ca7b8e9e3f
+G1_GUARD_SHA=f2ff1f858c63f40b14993a5e9d4cdbb5e59eb394
 
 F03_G6_STATUS=DONE
 F03_STATUS=PARTIAL
@@ -42,6 +43,8 @@ F04_AUDIT_ENTRY=APPROVED
 G0B_APPROVED=YES
 G1_ENTRY_APPROVED_AFTER_G0B_PASS=YES
 G2_TO_G6_IMPLEMENTATION=NO
+G0_STATUS=DONE
+G1_STATUS=DONE
 F04_STARTED=YES
 
 OFFICIAL_STUDIO_UI_DEFAULT=false
@@ -609,6 +612,15 @@ workspaceOwner = F03 唯一 Workspace authority
 - 没有默认暴露未验收页面；
 - 没有第二 Auth、Project 或 HTTP 基础设施；
 - G3 合同缺口进入正式 decision register。
+
+G1 冻结结果与全部矩阵见 [F04 G1 产品合同与边界冻结](./F04_G1_产品合同与边界冻结.md)。该记录包含 parity、visible route、route guard、permission、HTTP allowlist、owner topology、Project decision register 与 architecture guard 清单。
+
+```text
+G1_STATUS=DONE
+G1_MATRICES_COMPLETE=YES
+G1_ARCHITECTURE_GUARDS=ADDED
+G2_TO_G6_IMPLEMENTED=NO
+```
 
 ---
 
