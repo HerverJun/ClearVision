@@ -24,6 +24,12 @@ const previewImage = Buffer.from(
 );
 const previewImageSha256 = createHash('sha256').update(previewImage).digest('hex');
 
+function deferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>(next => { resolve = next; });
+  return { promise, resolve };
+}
+
 function previewArtifactId(call: number): string {
   return createHash('sha256').update(`f03-preview-artifact-${call}`).digest('base64url');
 }
@@ -277,7 +283,8 @@ interface BootOptions {
     stage: 'admission' | 'execute' | 'stop' | 'reconcile',
     request: Readonly<Record<string, unknown>>,
     call: number
-  ) => Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }>;
+  ) => Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }> |
+    Promise<Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }>>;
 }
 
 async function bootWorkspace(page: Page, options: BootOptions = {}) {
@@ -327,7 +334,7 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
     if (url.pathname === '/api/inspection/admission' && request.method() === 'POST') {
       runCall += 1;
       const requestBody = request.postDataJSON() as Readonly<Record<string, unknown>>;
-      const scenario = options.runScenario?.('admission', requestBody, runCall) ?? {};
+      const scenario = await (options.runScenario?.('admission', requestBody, runCall) ?? {});
       if (scenario.delayMs) await new Promise(resolve => setTimeout(resolve, scenario.delayMs));
       if (scenario.abort) {
         await route.abort('failed');
@@ -349,7 +356,7 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
     if (url.pathname === '/api/inspection/stop' && request.method() === 'POST') {
       runCall += 1;
       const requestBody = request.postDataJSON() as Readonly<Record<string, unknown>>;
-      const scenario = options.runScenario?.('stop', requestBody, runCall) ?? {};
+      const scenario = await (options.runScenario?.('stop', requestBody, runCall) ?? {});
       if (scenario.delayMs) await new Promise(resolve => setTimeout(resolve, scenario.delayMs));
       if (scenario.abort) {
         await route.abort('failed');
@@ -382,7 +389,7 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
     if (url.pathname === '/api/inspection/reconcile' && request.method() === 'POST') {
       runCall += 1;
       const requestBody = request.postDataJSON() as Readonly<Record<string, unknown>>;
-      const scenario = options.runScenario?.('reconcile', requestBody, runCall) ?? {};
+      const scenario = await (options.runScenario?.('reconcile', requestBody, runCall) ?? {});
       if (scenario.delayMs) await new Promise(resolve => setTimeout(resolve, scenario.delayMs));
       if (scenario.abort) {
         await route.abort('failed');
@@ -404,7 +411,7 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
     if (url.pathname === '/api/inspection/execute' && request.method() === 'POST') {
       runCall += 1;
       const requestBody = request.postDataJSON() as Readonly<Record<string, unknown>>;
-      const scenario = options.runScenario?.('execute', requestBody, runCall) ?? {};
+      const scenario = await (options.runScenario?.('execute', requestBody, runCall) ?? {});
       if (scenario.delayMs) await new Promise(resolve => setTimeout(resolve, scenario.delayMs));
       if (scenario.abort) {
         await route.abort('failed');
@@ -1320,20 +1327,71 @@ test('G6 blocks execute after admission rejection and keeps the saved Workspace 
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
 
-test('G6 Stop requests authoritative cancellation after an aborted execute response', async ({ page }) => {
+test('G6 genuine running Stop cancels before execute completion and unlocks without Results navigation', async ({ page }) => {
+  const executeEntered = deferred();
+  const cancellationRequested = deferred();
+  let executeCompleted = false;
+  let stopObservedBeforeCompletion = false;
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
-    runScenario: stage => stage === 'execute' ? { delayMs: 700, abort: true } : {}
+    runScenario: async (stage, request) => {
+      if (stage === 'execute') {
+        executeEntered.resolve();
+        await cancellationRequested.promise;
+        executeCompleted = true;
+        return { abort: true };
+      }
+      if (stage === 'stop') {
+        stopObservedBeforeCompletion = !executeCompleted;
+        cancellationRequested.resolve();
+        return {
+          body: {
+            status: 'cancelled',
+            code: 'RUN_CANCELLED',
+            message: 'fixture coordinator token cancelled and result persisted',
+            projectId: request.projectId,
+            clientSnapshotId: request.clientSnapshotId,
+            projectPersistenceRevision: request.expectedPersistenceRevision,
+            canonicalFlowHash: request.expectedCanonicalFlowHash,
+            decisionConfigurationHash: request.expectedDecisionConfigurationHash,
+            result: {
+              id: fixtureUuid(90_002),
+              projectId: request.projectId,
+              status: 'NotInspected',
+              executionOutcome: 'Cancelled',
+              decisionOutcome: 'NotApplicable',
+              executionSnapshotId: request.clientSnapshotId,
+              projectPersistenceRevision: request.expectedPersistenceRevision,
+              flowVersionHash: request.expectedCanonicalFlowHash,
+              decisionConfigurationHash: request.expectedDecisionConfigurationHash,
+              errorMessage: null
+            }
+          }
+        };
+      }
+      return {};
+    }
   });
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
   await page.locator('[data-testid="workspace-run"]').click();
+  await executeEntered.promise;
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'executing');
   await expect(page.locator('[data-testid="workspace-save"]')).toBeDisabled();
   await expect(page.locator('[data-testid="workspace-run-stop"]')).toBeVisible();
+  await expect(page.locator('[data-capability="results-read"]')).toHaveCount(0);
   await page.locator('[data-testid="workspace-run-stop"]').click();
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'cancelled');
   await expect(page.locator('[data-testid="workspace-run"]')).toBeEnabled();
-  expect(audit.some(entry => entry.path === '/api/inspection/stop')).toBe(true);
+  await expect(page.locator('[data-evidence-surface="f03-g2-flow-canvas"]')).toHaveAttribute('data-mutation-gate', 'editable');
+  await expect(page.locator('[data-capability="results-read"]')).toHaveCount(0);
+  expect(new URL(page.url()).hash).toContain(`/projects/${projectA}/workspace`);
+  expect(stopObservedBeforeCompletion).toBe(true);
+  expect(executeCompleted).toBe(true);
+  expect(audit.filter(entry => entry.method === 'POST').map(entry => entry.path)).toEqual([
+    '/api/inspection/admission',
+    '/api/inspection/execute',
+    '/api/inspection/stop'
+  ]);
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
 

@@ -64,6 +64,45 @@ async function readAuthorizedJson(webPort, token, requestPath) {
   return JSON.parse(text);
 }
 
+async function postAuthorizedJson(webPort, token, requestPath, body) {
+  const response = await fetch(`http://127.0.0.1:${webPort}${requestPath}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  const text = await response.text();
+  assert(response.ok, `POST ${requestPath} returned ${response.status}: ${text.slice(0, 500)}`);
+  return JSON.parse(text);
+}
+
+async function waitForAuthoritativeRunStatus(webPort, token, identity, expectedStatus, timeoutMs = 10_000) {
+  const startedAt = Date.now();
+  const observations = [];
+  while (Date.now() - startedAt < timeoutMs) {
+    const reconciliation = await postAuthorizedJson(
+      webPort,
+      token,
+      '/api/inspection/reconcile',
+      identity
+    );
+    observations.push({
+      status: reconciliation.status,
+      code: reconciliation.code,
+      observedAtUtc: new Date().toISOString()
+    });
+    if (reconciliation.status === expectedStatus) {
+      return { reconciliation, observations };
+    }
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  throw new Error(
+    `Authoritative run status did not reach ${expectedStatus}: ${JSON.stringify(observations)}`
+  );
+}
+
 function metadataField(value, camelName) {
   return value?.[camelName] ?? value?.[camelName[0].toUpperCase() + camelName.slice(1)];
 }
@@ -131,7 +170,10 @@ async function seedWorkspaceProject(webPort, token, runName, formalRun = false) 
   const judgmentDefinition = formalRun
     ? catalog.find(item => matchesType(item, -1, 'ResultJudgment'))
     : null;
-  assert(imageDefinition && roiDefinition && (!formalRun || judgmentDefinition),
+  const delayDefinition = formalRun
+    ? catalog.find(item => matchesType(item, 123, 'Delay'))
+    : null;
+  assert(imageDefinition && roiDefinition && (!formalRun || (judgmentDefinition && delayDefinition)),
     `The operator catalog did not expose the seeded operators: ${JSON.stringify(catalog.slice(0, 3))}`);
   const image = instantiateOperator(imageDefinition, 0, 'G4 File Image', 60, 80, {
     SourceType: 'File',
@@ -160,8 +202,17 @@ async function seedWorkspaceProject(webPort, token, runName, formalRun = false) 
     );
     const judgmentOutput = judgment.outputPorts.find(port => port.name === 'JudgmentResult');
     assert(judgmentOutput, 'The Formal Run ResultJudgment seed did not expose JudgmentResult.');
+    const slowOperator = instantiateOperator(
+      delayDefinition,
+      metadataField(delayDefinition, 'type'),
+      'G6 Deterministic Running Stop',
+      780,
+      80,
+      { Milliseconds: 60_000 }
+    );
     formalRunSeed = {
       operator: judgment,
+      slowOperator,
       binding: {
         sourceOperatorId: judgment.id,
         sourceOutputPortId: judgmentOutput.id,
@@ -878,6 +929,74 @@ async function installFormalRunDecision(page, formalRunSeed) {
   };
 }
 
+async function setFormalRunSlowFixture(page, formalRunSeed, enabled) {
+  assert(formalRunSeed?.slowOperator?.id,
+    'Formal Run evidence did not retain the deterministic slow operator fixture.');
+  const updated = await page.evaluate(async ({ slowOperator, shouldEnable }) => {
+    const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+    const projectId = shell?.getAttribute('data-workspace-project-id');
+    const token = sessionStorage.getItem('cv_auth_token');
+    const headers = {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+    const projectResponse = await fetch(`/api/projects/${projectId}`, { headers, cache: 'no-store' });
+    const projectText = await projectResponse.text();
+    const project = projectText ? JSON.parse(projectText) : null;
+    if (!projectResponse.ok || !project?.flow) {
+      return { getStatus: projectResponse.status, putStatus: null, project };
+    }
+    const withoutSlowFixture = project.flow.operators.filter(operator => operator.id !== slowOperator.id);
+    const operators = shouldEnable ? [...withoutSlowFixture, slowOperator] : withoutSlowFixture;
+    const response = await fetch(`/api/projects/${projectId}`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: project.name,
+        description: project.description,
+        expectedPersistenceRevision: project.persistenceRevision,
+        flow: { ...project.flow, operators },
+        globalVariables: project.globalVariables ?? null
+      })
+    });
+    const text = await response.text();
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = { raw: text };
+    }
+    return {
+      getStatus: projectResponse.status,
+      putStatus: response.status,
+      previousPersistenceRevision: project.persistenceRevision,
+      project: body,
+      enabled: shouldEnable
+    };
+  }, { slowOperator: formalRunSeed.slowOperator, shouldEnable: enabled });
+  assert(updated.getStatus === 200, `Formal Run slow fixture GET returned ${updated.getStatus}.`);
+  assert(updated.putStatus === 200,
+    `Formal Run slow fixture PUT returned ${updated.putStatus}: ${JSON.stringify(updated.project)}`);
+  const hasSlowFixture = updated.project?.flow?.operators?.some(
+    operator => operator.id === formalRunSeed.slowOperator.id
+  );
+  assert(hasSlowFixture === enabled,
+    `Formal Run slow fixture state did not match ${enabled}: ${JSON.stringify(updated.project)}`);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-evidence-surface="f03-workspace-shell"]', {
+    state: 'visible',
+    timeout: 30_000
+  });
+  await page.waitForFunction(expectedRevision => {
+    const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+    return shell?.getAttribute('data-workspace-state') === 'ready' &&
+      Number(shell.getAttribute('data-workspace-persistence-revision')) === expectedRevision &&
+      shell.getAttribute('data-workspace-dirty') === 'false';
+  }, Number(updated.project.persistenceRevision), { timeout: 30_000 });
+  return updated;
+}
+
 async function readFormalResultsHandoff(page, projectId) {
   await page.waitForSelector('[data-capability="results-read"]', { state: 'visible', timeout: 45_000 });
   const hash = new URL(page.url()).hash.replace(/^#/, '');
@@ -908,7 +1027,7 @@ async function waitForPersistedWorkspace(page, projectId) {
   }, null, { timeout: 45_000 });
 }
 
-async function verifyWorkspaceG6(page, runtimeErrors) {
+async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, token) {
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
   const projectId = await shell.getAttribute('data-workspace-project-id');
   assert(projectId && /^[0-9a-f-]{36}$/i.test(projectId), 'Formal Run lost the persisted Project identity.');
@@ -919,39 +1038,127 @@ async function verifyWorkspaceG6(page, runtimeErrors) {
   const normalHandoff = await readFormalResultsHandoff(page, projectId);
 
   await waitForPersistedWorkspace(page, projectId);
-  let stopResponseReadyResolve;
-  let releaseStopResponseResolve;
-  const stopResponseReady = new Promise(resolve => { stopResponseReadyResolve = resolve; });
-  const releaseStopResponse = new Promise(resolve => { releaseStopResponseResolve = resolve; });
-  const holdExecuteResponse = async route => {
-    const response = await route.fetch();
-    stopResponseReadyResolve();
-    await releaseStopResponse;
-    try {
-      await route.fulfill({ response });
-    } catch (error) {
-      if (!String(error?.message || error).includes('Route is already handled')) throw error;
-    }
+  const slowFixtureEnabled = await setFormalRunSlowFixture(page, formalRunSeed, true);
+  let executeResponseCompleted = false;
+  const observeExecuteResponse = response => {
+    if (new URL(response.url()).pathname === '/api/inspection/execute') executeResponseCompleted = true;
   };
-  await page.route('**/api/inspection/execute', holdExecuteResponse);
-  let stopHandoff;
-  try {
-    await page.locator('[data-testid="workspace-run"]').click();
-    await stopResponseReady;
-    await page.waitForSelector('[data-testid="workspace-run-stop"]', {
+  page.on('response', observeExecuteResponse);
+  const admissionResponsePromise = page.waitForResponse(response =>
+    new URL(response.url()).pathname === '/api/inspection/admission' &&
+    response.request().method() === 'POST'
+  );
+  await page.locator('[data-testid="workspace-run"]').click();
+  const admissionResponse = await admissionResponsePromise;
+  const admitted = await admissionResponse.json();
+  const identity = {
+    projectId,
+    clientSnapshotId: admitted.clientSnapshotId,
+    expectedPersistenceRevision: admitted.projectPersistenceRevision,
+    expectedCanonicalFlowHash: admitted.canonicalFlowHash,
+    expectedDecisionConfigurationHash: admitted.decisionConfigurationHash
+  };
+  const runningSignal = await waitForAuthoritativeRunStatus(
+    webPort,
+    token,
+    identity,
+    'still-running'
+  );
+  await page.waitForSelector('[data-testid="workspace-run-stop"]', {
+    state: 'visible',
+    timeout: 45_000
+  });
+  assert(await shell.getAttribute('data-workspace-run-phase') === 'executing',
+    'Real WebView2 Formal Run was not executing after the coordinator reported Running.');
+  assert(await shell.getAttribute('data-workspace-run-snapshot-id') === admitted.clientSnapshotId,
+    'Real WebView2 Formal Run snapshot identity did not match admission.');
+  assert(!executeResponseCompleted,
+    'Real WebView2 Stop was attempted after the execute response had already completed.');
+
+  const stopResponsePromise = page.waitForResponse(response =>
+    new URL(response.url()).pathname === '/api/inspection/stop' &&
+    response.request().method() === 'POST'
+  );
+  await page.locator('[data-testid="workspace-run-stop"]').click();
+  const stopResponse = await stopResponsePromise;
+  const stopReconciliation = await stopResponse.json();
+  const cancelledSignal = await waitForAuthoritativeRunStatus(
+    webPort,
+    token,
+    identity,
+    'cancelled'
+  );
+  await page.waitForFunction(() => {
+    const phase = document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+      ?.getAttribute('data-workspace-run-phase');
+    return phase === 'cancelled' || phase === 'cancel-requested' || phase === 'unknown-outcome';
+  }, null, { timeout: 45_000 });
+  let uiReconciliation = null;
+  if (await shell.getAttribute('data-workspace-run-phase') !== 'cancelled') {
+    const reconcileResponsePromise = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/inspection/reconcile' &&
+      response.request().method() === 'POST'
+    );
+    await page.waitForSelector('[data-testid="workspace-run-reconcile"]', {
       state: 'visible',
       timeout: 45_000
     });
-    assert(
-      await shell.getAttribute('data-workspace-run-phase') === 'executing',
-      'Real WebView2 Formal Run did not remain executing while its response was held.'
-    );
-    await page.locator('[data-testid="workspace-run-stop"]').click();
-    stopHandoff = await readFormalResultsHandoff(page, projectId);
-  } finally {
-    releaseStopResponseResolve();
-    await page.unroute('**/api/inspection/execute', holdExecuteResponse);
+    await page.locator('[data-testid="workspace-run-reconcile"]').click();
+    uiReconciliation = await (await reconcileResponsePromise).json();
   }
+  await page.waitForFunction(() =>
+    document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+      ?.getAttribute('data-workspace-run-phase') === 'cancelled',
+  null, { timeout: 45_000 });
+  page.off('response', observeExecuteResponse);
+
+  const cancelledResult = cancelledSignal.reconciliation.result;
+  assert(cancelledResult?.executionOutcome === 'Cancelled',
+    `Cancelled reconcile did not return a Cancelled result: ${JSON.stringify(cancelledSignal)}`);
+  assert(cancelledResult.executionSnapshotId === admitted.clientSnapshotId &&
+    cancelledResult.projectPersistenceRevision === admitted.projectPersistenceRevision &&
+    cancelledResult.flowVersionHash === admitted.canonicalFlowHash &&
+    cancelledResult.decisionConfigurationHash === admitted.decisionConfigurationHash,
+  `Cancelled result identity changed: ${JSON.stringify(cancelledResult)}`);
+  const storedCancelledResult = await readAuthorizedJson(
+    webPort,
+    token,
+    `/api/inspection/history/${projectId}/${cancelledResult.id}`
+  );
+  assert(storedCancelledResult.executionOutcome === 'Cancelled' &&
+    storedCancelledResult.executionSnapshotId === admitted.clientSnapshotId,
+  `Stored Cancelled result did not preserve identity: ${JSON.stringify(storedCancelledResult)}`);
+  assert(new URL(page.url()).hash.includes(`/projects/${projectId}/workspace`),
+    `Cancelled Formal Run navigated away from Workspace: ${page.url()}`);
+  assert(await page.locator('[data-capability="results-read"]').count() === 0,
+    'Cancelled Formal Run mounted the success Results page.');
+  assert(await shell.getAttribute('data-workspace-persistence-phase') === 'clean',
+    'Cancelled Formal Run did not release the persistence mutation gate.');
+  assert(await page.locator('[data-evidence-surface="f03-g2-flow-canvas"]')
+    .getAttribute('data-mutation-gate') === 'editable',
+  'Cancelled Formal Run did not release the Flow mutation gate.');
+  await selectSeededRoiNode(page);
+  await waitForSeededPreview(page);
+  assert(await page.locator('[data-testid="roi-start"]').isEnabled(),
+    'Cancelled Formal Run did not release the ROI mutation gate.');
+  const roiX = page.locator('[data-parameter-name="X"] input');
+  const previousRoiX = Number(await roiX.inputValue());
+  await roiX.fill(String(previousRoiX + 1));
+  await roiX.press('Enter');
+  await page.waitForFunction(() =>
+    document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+      ?.getAttribute('data-workspace-dirty') === 'true',
+  null, { timeout: 30_000 });
+  assert(await page.locator('[data-testid="workspace-save"]').isEnabled(),
+    'Cancelled Formal Run did not re-enable save after an ROI mutation.');
+  await page.locator('[data-testid="workspace-save"]').click();
+  await page.waitForFunction(() => {
+    const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+    return shell?.getAttribute('data-workspace-dirty') === 'false' &&
+      shell.getAttribute('data-workspace-persistence-phase') === 'clean';
+  }, null, { timeout: 30_000 });
+
+  const slowFixtureDisabled = await setFormalRunSlowFixture(page, formalRunSeed, false);
 
   await waitForPersistedWorkspace(page, projectId);
   let responseLossSeen = false;
@@ -989,7 +1196,20 @@ async function verifyWorkspaceG6(page, runtimeErrors) {
     resultId: reconcileHandoff.resultId,
     route: reconcileHandoff.route,
     normalHandoff,
-    stopHandoff,
+    genuineRunningStop: {
+      fixture: 'DETERMINISTIC_DELAY_OPERATOR_60000MS',
+      slowFixtureEnabled,
+      runtimeRunningSignal: runningSignal,
+      executeResponseCompletedBeforeStop: false,
+      stopReconciliation,
+      cancelledSignal,
+      uiReconciliation,
+      cancelledResult,
+      storedCancelledResult,
+      workspaceRouteRetained: true,
+      mutationSaveRoiUnlocked: true,
+      slowFixtureDisabled
+    },
     reconcileHandoff,
     runPaths,
     responseLoss: {
@@ -1137,7 +1357,7 @@ async function verifyWorkspaceG3(page) {
   };
 }
 
-async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = null) {
+async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = null, webPort = null, token = null) {
   await page.waitForSelector('[data-product-shell="ready"]', { state: 'visible', timeout: 30_000 });
   const isWorkspaceRoute = /^\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/workspace$/i
     .test(route);
@@ -1461,7 +1681,9 @@ async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = nul
     }
   }
   const formalRunInstallation = formalRun ? await installFormalRunDecision(page, formalRunSeed) : null;
-  const workspaceG6 = formalRun ? await verifyWorkspaceG6(page, runtimeErrors) : null;
+  const workspaceG6 = formalRun
+    ? await verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, token)
+    : null;
   const productRequests = runtimeErrors.requests.filter(isProductRequest);
   const writeRequests = productRequests.filter(item => item.method !== 'GET');
   const projectPutRequests = productRequests.filter(item => {
@@ -1476,6 +1698,7 @@ async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = nul
     ? [
         '/api/inspection/admission', '/api/inspection/execute',
         '/api/inspection/admission', '/api/inspection/execute', '/api/inspection/stop',
+        ...(workspaceG6?.genuineRunningStop?.uiReconciliation ? ['/api/inspection/reconcile'] : []),
         '/api/inspection/admission', '/api/inspection/execute', '/api/inspection/reconcile'
       ]
     : [];
@@ -1518,7 +1741,7 @@ async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = nul
       `G5 emitted Run/Admission/Execute requests: ${JSON.stringify(forbiddenRunRequests)}`);
   }
   if (workspaceG4) {
-    const expectedProjectPutCount = formalRun ? 2 : 1;
+    const expectedProjectPutCount = formalRun ? 5 : 1;
     assert(projectPutRequests.length === expectedProjectPutCount,
       `G5/G6 real WebView2 expected ${expectedProjectPutCount} Project PUT request(s): ${JSON.stringify(projectPutRequests)}`);
   }
@@ -1894,7 +2117,9 @@ async function main() {
             page,
             route,
             runtimeErrors,
-            evidence.workspaceSeed?.formalRunSeed ?? null
+            evidence.workspaceSeed?.formalRunSeed ?? null,
+            webPort,
+            token
           );
         } else if (expectation === 'studio-design') {
           evidence.designPage = await verifyDesignPage(page);
