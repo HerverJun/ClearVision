@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRouter } from 'vue-router';
 import {
   CvButton,
   CvDataTable,
+  CvField,
   CvInlineAlert,
+  CvModal,
   CvPageHeader,
   CvPageState,
   CvPagination,
@@ -35,7 +37,9 @@ const props = defineProps<{
   runtime?: ProjectsReadRuntime;
 }>();
 
+const router = useRouter();
 const runtime = useProjectsReadRuntime(props.runtime);
+const commands = runtime.projectLifecycle;
 const searchDraft = ref('');
 const activeSearch = ref('');
 const sort = ref<ProjectSort>('modified-desc');
@@ -43,12 +47,21 @@ const page = ref(1);
 const pageSize = 10;
 const listQuery = createProjectsListQuery(runtime.queries, () => activeSearch.value);
 const recentQuery = createRecentProjectsQuery(runtime.queries);
+const createOpen = ref(false);
+const createName = ref('');
+const createDescription = ref('');
+const createValidationError = ref<string | null>(null);
+const deleteTarget = ref<ProjectSummary | null>(null);
 
 const listState = computed(() => listQuery.state.value);
 const recentState = computed(() => recentQuery.state.value);
 const sortedProjects = computed(() => sortProjects(listState.value.data ?? [], sort.value));
 const pageSlice = computed(() => paginateProjects(sortedProjects.value, page.value, pageSize));
 const isSearching = computed(() => activeSearch.value.length > 0);
+const commandState = computed(() => commands?.projection ?? null);
+const commandBusy = computed(() => commandState.value?.phase === 'creating' ||
+  commandState.value?.phase === 'updating' || commandState.value?.phase === 'deleting' ||
+  commandState.value?.phase === 'reconciling');
 const sortModel = computed({
   get: () => sort.value,
   set: value => { sort.value = value as ProjectSort; }
@@ -64,7 +77,7 @@ const columns: readonly CvDataTableColumn<ProjectSummary>[] = Object.freeze([
   { key: 'version', label: '版本', width: '10%' },
   { key: 'modifiedAt', label: '修改时间', width: '17%' },
   { key: 'lastOpenedAt', label: '最近打开', width: '17%' },
-  { key: 'actions', label: '操作', align: 'end', width: '12%' }
+  { key: 'actions', label: '操作', align: 'end', width: '24%' }
 ]);
 
 watch([sortedProjects, sort], () => {
@@ -84,7 +97,95 @@ async function clearSearch(): Promise<void> {
   await listQuery.refresh({ force: true });
 }
 
+function showCreate(): void {
+  if (!commands || commandBusy.value) return;
+  commands.setProjectScope(null);
+  commands.reset();
+  createName.value = '';
+  createDescription.value = '';
+  createValidationError.value = null;
+  createOpen.value = true;
+}
+
+function closeCreate(): void {
+  if (commandBusy.value) return;
+  createOpen.value = false;
+}
+
+async function submitCreate(): Promise<void> {
+  if (!commands) return;
+  if (!createName.value.trim()) {
+    createValidationError.value = '请输入工程名称。';
+    return;
+  }
+  createValidationError.value = null;
+  const result = await commands.createBlank({
+    name: createName.value,
+    description: createDescription.value
+  });
+  if (!result) return;
+  createOpen.value = false;
+  await Promise.all([
+    listQuery.refresh({ force: true }),
+    recentQuery.refresh({ force: true })
+  ]);
+  await router.push(`/projects/${result.projectId}`);
+}
+
+async function openWorkspace(project: ProjectSummary): Promise<void> {
+  if (!commands) return;
+  commands.setProjectScope(project.id);
+  const opened = await commands.openProject(project.id);
+  if (!opened) return;
+  await recentQuery.refresh({ force: true });
+  await router.push(`/projects/${project.id}/workspace`);
+}
+
+function requestDelete(project: ProjectSummary): void {
+  if (!commands || commandBusy.value) return;
+  commands.setProjectScope(project.id);
+  commands.reset();
+  deleteTarget.value = project;
+}
+
+function closeDelete(): void {
+  if (commandBusy.value) return;
+  deleteTarget.value = null;
+}
+
+async function confirmDelete(): Promise<void> {
+  const project = deleteTarget.value;
+  if (!commands || !project) return;
+  const result = await commands.deleteProject({
+    projectId: project.id,
+    expectedPersistenceRevision: project.persistenceRevision
+  });
+  if (!result) return;
+  deleteTarget.value = null;
+  await Promise.all([
+    listQuery.refresh({ force: true }),
+    recentQuery.refresh({ force: true })
+  ]);
+}
+
+async function reconcileUnknownOutcome(): Promise<void> {
+  if (!commands) return;
+  const result = await commands.reconcile();
+  if (!result) return;
+  await Promise.all([
+    listQuery.refresh({ force: true }),
+    recentQuery.refresh({ force: true })
+  ]);
+  if (result.operation.kind === 'create') {
+    createOpen.value = false;
+    await router.push(`/projects/${result.projectId}`);
+  } else {
+    deleteTarget.value = null;
+  }
+}
+
 onMounted(() => {
+  commands?.setProjectScope(null);
   void listQuery.refresh();
   void recentQuery.refresh();
 });
@@ -103,9 +204,18 @@ onBeforeUnmount(() => {
     <CvPageHeader
       eyebrow="工程管理"
       title="工程"
-      description="浏览服务端工程摘要。此页面不提供创建、保存、删除或编辑入口。"
+      description="创建空白工程、查看服务端摘要，并通过权威 open/delete command 进入后续任务。"
     >
       <template #actions>
+        <CvButton
+          v-if="commands"
+          size="sm"
+          variant="primary"
+          data-testid="project-create-open"
+          @click="showCreate"
+        >
+          新建空白工程
+        </CvButton>
         <CvButton
           size="sm"
           :loading="listState.isRefreshing"
@@ -116,6 +226,40 @@ onBeforeUnmount(() => {
         </CvButton>
       </template>
     </CvPageHeader>
+
+    <CvInlineAlert
+      v-if="commandState?.phase === 'unknown-outcome'"
+      tone="warning"
+      title="工程操作结果未知"
+      role="status"
+    >
+      {{ commandState.message }}
+      <template #actions>
+        <CvButton
+          size="sm"
+          data-testid="project-command-reconcile"
+          @click="reconcileUnknownOutcome"
+        >
+          查询权威结果
+        </CvButton>
+      </template>
+    </CvInlineAlert>
+    <CvInlineAlert
+      v-else-if="commandState?.phase === 'conflict'"
+      tone="warning"
+      title="工程操作冲突"
+      role="alert"
+    >
+      {{ commandState.message }}
+    </CvInlineAlert>
+    <CvInlineAlert
+      v-else-if="commandState?.phase === 'failed' && commandState.errorCode"
+      tone="error"
+      title="工程操作未完成"
+      role="alert"
+    >
+      {{ commandState.message }}
+    </CvInlineAlert>
 
     <div class="projects-page__layout">
       <CvPanel
@@ -230,9 +374,31 @@ onBeforeUnmount(() => {
             {{ formatProjectDateTime(row.lastOpenedAt) }}
           </template>
           <template #cell-actions="{ row }">
-            <RouterLink :to="`/projects/${row.id}`">
-              查看详情
-            </RouterLink>
+            <span class="projects-page__actions">
+              <RouterLink :to="`/projects/${row.id}`">
+                查看详情
+              </RouterLink>
+              <CvButton
+                v-if="commands"
+                size="sm"
+                variant="quiet"
+                :disabled="commandBusy"
+                :data-testid="`project-open-${row.id}`"
+                @click="openWorkspace(row)"
+              >
+                打开
+              </CvButton>
+              <CvButton
+                v-if="commands"
+                size="sm"
+                variant="danger"
+                :disabled="commandBusy"
+                :data-testid="`project-delete-${row.id}`"
+                @click="requestDelete(row)"
+              >
+                删除
+              </CvButton>
+            </span>
           </template>
         </CvDataTable>
 
@@ -282,10 +448,102 @@ onBeforeUnmount(() => {
               {{ project.name }}
             </RouterLink>
             <span>{{ formatProjectDateTime(project.lastOpenedAt) }}</span>
+            <CvButton
+              v-if="commands"
+              size="sm"
+              variant="quiet"
+              :disabled="commandBusy"
+              @click="openWorkspace(project)"
+            >
+              打开工作区
+            </CvButton>
           </li>
         </ol>
       </CvPanel>
     </div>
+
+    <CvModal
+      :open="createOpen"
+      title="新建空白工程"
+      description="创建阶段只保存工程记录；不接受 initial Flow、模板或导入资源。"
+      :close-on-backdrop="!commandBusy"
+      @close="closeCreate"
+    >
+      <form
+        class="projects-page__form"
+        @submit.prevent="submitCreate"
+      >
+        <CvField
+          v-model="createName"
+          label="工程名称"
+          required
+          autocomplete="off"
+          :disabled="commandBusy"
+          :error="createValidationError ?? undefined"
+          data-modal-initial-focus
+        />
+        <CvField
+          v-model="createDescription"
+          label="工程描述"
+          autocomplete="off"
+          :disabled="commandBusy"
+        />
+      </form>
+      <template #footer>
+        <CvButton
+          size="sm"
+          variant="quiet"
+          :disabled="commandBusy"
+          @click="closeCreate"
+        >
+          取消
+        </CvButton>
+        <CvButton
+          size="sm"
+          variant="primary"
+          :loading="commandState?.phase === 'creating' || commandState?.phase === 'reconciling'"
+          loading-label="正在创建工程"
+          data-testid="project-create-submit"
+          @click="submitCreate"
+        >
+          创建
+        </CvButton>
+      </template>
+    </CvModal>
+
+    <CvModal
+      :open="deleteTarget !== null"
+      title="删除工程"
+      :description="deleteTarget ? `将删除“${deleteTarget.name}”。服务端 tombstone 成功后才会从列表移除。` : undefined"
+      size="sm"
+      :close-on-backdrop="!commandBusy"
+      @close="closeDelete"
+    >
+      <CvInlineAlert tone="error">
+        此操作使用当前服务端 revision；冲突时不会自动覆盖或乐观移除。
+      </CvInlineAlert>
+      <template #footer>
+        <CvButton
+          size="sm"
+          variant="quiet"
+          :disabled="commandBusy"
+          data-modal-initial-focus
+          @click="closeDelete"
+        >
+          取消
+        </CvButton>
+        <CvButton
+          size="sm"
+          variant="danger"
+          :loading="commandState?.phase === 'deleting' || commandState?.phase === 'reconciling'"
+          loading-label="正在确认删除"
+          data-testid="project-delete-confirm"
+          @click="confirmDelete"
+        >
+          确认删除
+        </CvButton>
+      </template>
+    </CvModal>
   </section>
 </template>
 
@@ -296,6 +554,8 @@ onBeforeUnmount(() => {
 .projects-page__sort { min-width: 150px; }
 .projects-page__notice { margin-bottom: var(--cv-space-3); }
 .projects-page__name { color: var(--cv-text-primary); font-weight: var(--cv-font-weight-semibold); }
+.projects-page__actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--cv-space-1); }
+.projects-page__form { display: grid; gap: var(--cv-space-4); }
 .projects-page__recent-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
 .projects-page__recent-list li { display: grid; gap: var(--cv-space-1); padding-block: var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); }
 .projects-page__recent-list li:last-child { border-bottom: 0; }

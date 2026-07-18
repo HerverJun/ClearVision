@@ -37,6 +37,7 @@ export interface WorkspaceRuntime {
   refreshSession(): Promise<void>;
   openProject(projectId: string): WorkspaceProjectReadPort;
   mountProject(project: WorkspaceProjectV1): WorkspaceOwner;
+  prepareForProjectTransition(projectId: string, reason: 'project-delete'): Promise<boolean>;
   prepareForProtectedTransition(reason: 'logout' | 'change-password'): Promise<boolean>;
   quarantineForSessionExpiration(): WorkspaceRuntimeQuarantine;
   reconcileAfterReauthentication(): Promise<boolean>;
@@ -124,6 +125,13 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
       });
       activeOwners.add(owner);
       return owner;
+    },
+    async prepareForProjectTransition(projectId: string, reason: 'project-delete'): Promise<boolean> {
+      assertActive();
+      for (const owner of [...activeOwners]) {
+        if (owner.projectId === projectId && !(await owner.prepareForLeave(reason))) return false;
+      }
+      return true;
     },
     async prepareForProtectedTransition(reason: 'logout' | 'change-password'): Promise<boolean> {
       assertActive();

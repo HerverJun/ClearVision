@@ -71,7 +71,7 @@ export function createRecentProjectsDefinition(
     decode: decodeProjectSummaryList,
     isEmpty: (projects: readonly ProjectSummary[]) => projects.length === 0,
     protected: true,
-    cacheTimeMs: 15_000
+    cacheTimeMs: 0
   });
 }
 

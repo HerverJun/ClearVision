@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, watch } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { productRuntimeKey } from '@/app/productRuntime';
 import {
   CvButton,
   CvDescriptionList,
+  CvField,
   CvInlineAlert,
+  CvModal,
   CvPageHeader,
   CvPageState,
   CvPanel,
   type CvDescriptionItem
 } from '@/design-system';
+import { isProjectId } from './projectContracts';
 import { createProjectDetailsQuery } from './projectQueries';
 import { describeProjectDecision, formatProjectDateTime } from './projectViewModel';
 import {
@@ -21,16 +24,28 @@ import {
 const props = defineProps<{
   projectId?: string;
   runtime?: ProjectsReadRuntime;
-  workspaceEnabled?: boolean;
+  workspaceEnabled?: unknown;
 }>();
 
 const route = useRoute();
+const router = useRouter();
 const productRuntime = inject(productRuntimeKey, null);
 const runtime = useProjectsReadRuntime(props.runtime);
-const workspaceEnabled = computed(() => props.workspaceEnabled ?? productRuntime?.workspace.enabled ?? false);
+const commands = runtime.projectLifecycle ?? productRuntime?.projectLifecycle;
+const workspaceEnabled = computed(() => typeof props.workspaceEnabled === 'boolean'
+  ? props.workspaceEnabled
+  : productRuntime?.workspace.enabled ?? false);
 const activeProjectId = computed(() => props.projectId ?? String(route.params.id ?? route.params.projectId ?? ''));
 const detailsQuery = createProjectDetailsQuery(runtime.queries, () => activeProjectId.value);
 const state = computed(() => detailsQuery.state.value);
+const editName = ref('');
+const editDescription = ref('');
+const editValidationError = ref<string | null>(null);
+const deleteOpen = ref(false);
+const commandState = computed(() => commands?.projection ?? null);
+const commandBusy = computed(() => commandState.value?.phase === 'creating' ||
+  commandState.value?.phase === 'updating' || commandState.value?.phase === 'deleting' ||
+  commandState.value?.phase === 'reconciling');
 const summaryItems = computed<readonly CvDescriptionItem[]>(() => state.value.data
   ? [
       { key: 'name', label: '名称', value: state.value.data.name, span: 2 },
@@ -60,13 +75,95 @@ const assetItems = computed<readonly CvDescriptionItem[]>(() => state.value.data
     ]
   : []);
 
+function syncEditForm(): void {
+  const project = state.value.data;
+  if (!project) return;
+  editName.value = project.name;
+  editDescription.value = project.description ?? '';
+  editValidationError.value = null;
+}
+
+async function updateProject(): Promise<void> {
+  const project = state.value.data;
+  if (!commands || !project) return;
+  if (!editName.value.trim()) {
+    editValidationError.value = '请输入工程名称。';
+    return;
+  }
+  editValidationError.value = null;
+  const updated = await commands.updateProject({
+    projectId: project.id,
+    name: editName.value,
+    description: editDescription.value,
+    expectedPersistenceRevision: project.persistenceRevision
+  });
+  if (!updated) return;
+  await detailsQuery.refresh({ force: true });
+  syncEditForm();
+}
+
+async function reloadAfterConflict(): Promise<void> {
+  await detailsQuery.refresh({ force: true });
+  syncEditForm();
+  commands?.reset();
+}
+
+async function openWorkspace(): Promise<void> {
+  const project = state.value.data;
+  if (!commands || !project || !workspaceEnabled.value) return;
+  commands.setProjectScope(project.id);
+  const opened = await commands.openProject(project.id);
+  if (opened) await router.push(`/projects/${project.id}/workspace`);
+}
+
+function requestDelete(): void {
+  const project = state.value.data;
+  if (!commands || !project || commandBusy.value) return;
+  commands.setProjectScope(project.id);
+  commands.reset();
+  deleteOpen.value = true;
+}
+
+function closeDelete(): void {
+  if (!commandBusy.value) deleteOpen.value = false;
+}
+
+async function confirmDelete(): Promise<void> {
+  const project = state.value.data;
+  if (!commands || !project) return;
+  const deleted = await commands.deleteProject({
+    projectId: project.id,
+    expectedPersistenceRevision: project.persistenceRevision
+  });
+  if (!deleted) return;
+  deleteOpen.value = false;
+  runtime.queries.clearProtectedCache('project-deleted');
+  await router.replace('/projects');
+}
+
+async function reconcileUnknownOutcome(): Promise<void> {
+  if (!commands) return;
+  const result = await commands.reconcile();
+  if (result?.operation.kind === 'delete') {
+    deleteOpen.value = false;
+    runtime.queries.clearProtectedCache('project-deleted-reconciled');
+    await router.replace('/projects');
+  }
+}
+
 onMounted(() => {
+  if (isProjectId(activeProjectId.value)) commands?.setProjectScope(activeProjectId.value);
   void detailsQuery.refresh();
 });
 
 watch(activeProjectId, (next, previous) => {
-  if (next !== previous) void detailsQuery.refresh({ force: true });
+  if (next !== previous) {
+    if (isProjectId(next)) commands?.setProjectScope(next);
+    void detailsQuery.refresh({ force: true });
+  }
 });
+
+watch(() => state.value.data, () => syncEditForm());
 
 onBeforeUnmount(() => {
   detailsQuery.dispose();
@@ -91,13 +188,26 @@ onBeforeUnmount(() => {
         </RouterLink>
       </template>
       <template #actions>
-        <RouterLink
-          v-if="workspaceEnabled && state.data"
-          class="project-details__workspace-link"
-          :to="`/projects/${state.data.id}/workspace`"
+        <CvButton
+          v-if="workspaceEnabled && state.data && commands"
+          size="sm"
+          variant="primary"
+          :loading="commandState?.command === 'open' && commandBusy"
+          data-testid="project-detail-open"
+          @click="openWorkspace"
         >
           打开工作区
-        </RouterLink>
+        </CvButton>
+        <CvButton
+          v-if="state.data && commands"
+          size="sm"
+          variant="danger"
+          :disabled="commandBusy"
+          data-testid="project-detail-delete"
+          @click="requestDelete"
+        >
+          删除
+        </CvButton>
         <CvButton
           size="sm"
           :loading="state.isRefreshing"
@@ -108,6 +218,52 @@ onBeforeUnmount(() => {
         </CvButton>
       </template>
     </CvPageHeader>
+
+    <CvInlineAlert
+      v-if="commandState?.phase === 'conflict'"
+      tone="warning"
+      title="工程 revision 或 mutation 冲突"
+    >
+      {{ commandState.message }}
+      <template #actions>
+        <CvButton
+          size="sm"
+          @click="reloadAfterConflict"
+        >
+          重新读取服务端版本
+        </CvButton>
+      </template>
+    </CvInlineAlert>
+    <CvInlineAlert
+      v-else-if="commandState?.phase === 'unknown-outcome'"
+      tone="warning"
+      title="工程操作结果未知"
+    >
+      {{ commandState.message }}
+      <template #actions>
+        <CvButton
+          v-if="commandState.canReconcile"
+          size="sm"
+          @click="reconcileUnknownOutcome"
+        >
+          查询权威结果
+        </CvButton>
+        <CvButton
+          v-else
+          size="sm"
+          @click="reloadAfterConflict"
+        >
+          重新读取工程
+        </CvButton>
+      </template>
+    </CvInlineAlert>
+    <CvInlineAlert
+      v-else-if="commandState?.phase === 'failed' && commandState.errorCode"
+      tone="error"
+      title="工程操作未完成"
+    >
+      {{ commandState.message }}
+    </CvInlineAlert>
 
     <CvInlineAlert
       v-if="state.isRefreshing && state.data"
@@ -174,12 +330,48 @@ onBeforeUnmount(() => {
     >
       <CvPanel
         title="工程摘要"
-        description="服务端工程数据的只读摘要。"
+        description="服务端工程数据与当前 persistence revision。"
       >
         <CvDescriptionList
           :items="summaryItems"
           label="工程摘要"
         />
+      </CvPanel>
+
+      <CvPanel
+        v-if="commands"
+        title="编辑工程信息"
+        description="名称与描述更新复用 ProjectService / ProjectSaveCoordinator，不复制 Flow save。"
+      >
+        <form
+          class="project-details__form"
+          @submit.prevent="updateProject"
+        >
+          <CvField
+            v-model="editName"
+            label="工程名称"
+            required
+            autocomplete="off"
+            :disabled="commandBusy"
+            :error="editValidationError ?? undefined"
+          />
+          <CvField
+            v-model="editDescription"
+            label="工程描述"
+            autocomplete="off"
+            :disabled="commandBusy"
+          />
+          <CvButton
+            type="submit"
+            size="sm"
+            variant="primary"
+            :loading="commandState?.phase === 'updating'"
+            loading-label="正在保存工程信息"
+            data-testid="project-detail-update"
+          >
+            保存工程信息
+          </CvButton>
+        </form>
       </CvPanel>
 
       <CvPanel
@@ -209,6 +401,40 @@ onBeforeUnmount(() => {
         />
       </CvPanel>
     </div>
+
+    <CvModal
+      :open="deleteOpen"
+      title="删除工程"
+      :description="state.data ? `将删除“${state.data.name}”。只有服务端 tombstone 成功后才会返回工程列表。` : undefined"
+      size="sm"
+      :close-on-backdrop="!commandBusy"
+      @close="closeDelete"
+    >
+      <CvInlineAlert tone="error">
+        删除使用当前服务端 revision；发生 revision 或运行冲突时不会自动覆盖。
+      </CvInlineAlert>
+      <template #footer>
+        <CvButton
+          size="sm"
+          variant="quiet"
+          :disabled="commandBusy"
+          data-modal-initial-focus
+          @click="closeDelete"
+        >
+          取消
+        </CvButton>
+        <CvButton
+          size="sm"
+          variant="danger"
+          :loading="commandState?.phase === 'deleting' || commandState?.phase === 'reconciling'"
+          loading-label="正在确认删除"
+          data-testid="project-detail-delete-confirm"
+          @click="confirmDelete"
+        >
+          确认删除
+        </CvButton>
+      </template>
+    </CvModal>
   </section>
 </template>
 
@@ -216,9 +442,9 @@ onBeforeUnmount(() => {
 .project-details { display: grid; gap: var(--cv-space-5); min-width: 0; }
 .project-details__back { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); text-decoration: none; }
 .project-details__back:hover { color: var(--cv-color-link); text-decoration: underline; }
-.project-details__workspace-link { min-height: var(--cv-density-control-height-sm); padding: 0 var(--cv-space-3); display: inline-flex; align-items: center; border: 1px solid var(--cv-color-brand-border); border-radius: var(--cv-radius-sm); background: var(--cv-color-brand-soft); color: var(--cv-color-brand-text); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; }
-.project-details__workspace-link:hover { border-color: var(--cv-color-brand-500); color: var(--cv-color-brand-text); }
 .project-details__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-4); align-items: start; }
 .project-details__grid > :first-child { grid-row: span 2; }
+.project-details__form { display: grid; gap: var(--cv-space-3); }
+.project-details__form .cv-button { justify-self: start; }
 @media (max-width: 800px) { .project-details__grid { grid-template-columns: 1fr; } .project-details__grid > :first-child { grid-row: auto; } }
 </style>

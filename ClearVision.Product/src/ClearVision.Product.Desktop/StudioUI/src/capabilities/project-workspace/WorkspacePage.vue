@@ -8,6 +8,7 @@ import {
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useProductRuntime } from '@/app/productRuntime';
+import type { ProjectLifecycleCommandOwner } from '@/capabilities/project-lifecycle';
 import WorkspaceShell, { type WorkspaceShellState } from './WorkspaceShell.vue';
 import {
   isWorkspaceProjectId,
@@ -20,11 +21,14 @@ import type { WorkspaceRuntime } from './workspaceRuntime';
 const props = defineProps<{
   projectId?: string;
   runtime?: WorkspaceRuntime;
+  projectLifecycle?: ProjectLifecycleCommandOwner;
 }>();
 
 const route = useRoute();
 const router = useRouter();
-const runtime = props.runtime ?? useProductRuntime().workspace;
+const productRuntime = props.runtime ? null : useProductRuntime();
+const runtime = props.runtime ?? productRuntime!.workspace;
+const projectLifecycle = props.projectLifecycle ?? productRuntime?.projectLifecycle ?? null;
 const activeProjectId = computed(() => props.projectId ?? String(route.params.id ?? ''));
 const shellState = ref<WorkspaceShellState>('loading');
 const project = shallowRef<WorkspaceProjectV1 | null>(null);
@@ -115,6 +119,14 @@ function projectFailureState(): WorkspaceShellState {
   return 'error';
 }
 
+function openFailureState(): WorkspaceShellState {
+  const code = projectLifecycle?.projection.errorCode;
+  if (code === 'SESSION_UNAUTHORIZED') return 'unauthorized';
+  if (code === 'PROJECT_FORBIDDEN') return 'forbidden';
+  if (code === 'PROJECT_NOT_FOUND') return 'not-found';
+  return 'error';
+}
+
 async function startLifecycle(reason: string): Promise<void> {
   if (reason === 'project-changed' && !routeGuardApproved && workspaceOwner && hasProtectedDraft()) {
     if (!(await allowWorkspaceLeave('project-switch'))) return;
@@ -153,6 +165,18 @@ async function startLifecycle(reason: string): Promise<void> {
   }
 
   shellState.value = 'loading';
+  if (projectLifecycle) {
+    projectLifecycle.setProjectScope(projectId);
+    message.value = '正在通过 POST /api/projects/{id}/open 确认打开 authority。';
+    const opened = await projectLifecycle.openProject(projectId);
+    if (generation !== lifecycleGeneration) return;
+    if (!opened) {
+      shellState.value = openFailureState();
+      message.value = projectLifecycle.projection.message;
+      return;
+    }
+  }
+
   let nextRead: WorkspaceProjectReadPort;
   try {
     nextRead = runtime.openProject(projectId);
