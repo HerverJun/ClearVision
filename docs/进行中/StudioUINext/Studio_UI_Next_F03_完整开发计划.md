@@ -1,21 +1,27 @@
 # Studio UI Next F03 完整开发计划
 
-> 文档状态：<strong>READY_FOR_APPROVAL</strong>。本文件是在代码级审计初稿、独立复核与第二轮评审后形成的最终实施计划；只有获得明确批准后才可开始 G1。本文不批准入口切换，也不代表 F03 已经开始实现。
+> 文档状态：<strong>F03_G6_FINAL_CLOSURE_DELIVERED</strong>。本文件保留原始计划、审计与评审决定，并记录已经完成的 G1–G6 实施及 Final Closure 证据。F03 仍不批准默认入口切换、F04、Station、PLC、相机、实时检测或运行域重构。
 
 ~~~text
 F03_DESIGN_BASELINE_SHA=1658216c79b79c5d9371959c83c14a46bbddeccf
 STUDIO_UI_NEXT_AUDIT_SHA=1658216c79b79c5d9371959c83c14a46bbddeccf
 STABLE_LINE_AUDIT_SHA=dfa5ea1ef3d100e700a19cffea5ae64006648881
 PLAN_REVIEW_BASE_SHA=8579fa52f856af484c2ac4b0d3c5565f7fb5dd86
-PLAN_STATUS=FINAL_CLOSURE_PARTIAL
+PLAN_STATUS=FINAL_CLOSURE_DELIVERED
+FINAL_CODE_SHA=3a5b31b201f41b3fe344d16a812436d1162d63d0
+FINAL_REMOTE_CI_RUN=29634335021
 DESIGN_SYSTEM_VERSION=V1.1
 Studio:StudioUiEnabled=false
+WorkspaceCapabilityEnabled=false
 F03_IMPLEMENTED=YES
 F03_STATUS=PARTIAL
 F03_G6_STATUS=DONE
-OPEN_BLOCKERS=3
+OPEN_BLOCKERS=0
 OPEN_FUNCTIONAL_BLOCKERS=0
-OPEN_VERIFICATION_GATES=3
+OPEN_CODE_PORTABILITY_BLOCKERS=0
+OPEN_EVIDENCE_GAPS=1
+OPEN_DELIVERY_GAPS=0
+OPEN_EXTERNAL_VERIFICATION_GATES=0
 F04_ENTRY=REJECTED
 F04_STARTED=NO
 AUTH_ENTRY_DECISION=PRESEEDED_SESSION_PREVIEW_ONLY
@@ -1302,79 +1308,96 @@ STATION_SSE=DEFERRED
 
 ## 18. F03 Actual Implementation Closure
 
-### 18.1 G6 implementation
+### 18.1 Admission cancellation and authoritative running Stop
 
-G6 新增唯一 <code>project-workspace/run/runCommandOwner.ts</code>。它由已有 <code>workspaceOwner</code> 创建、由同一 <code>workspaceLifecycleDiagnostics</code> 计数、使用共享 <code>ApiTransport</code> 的窄 <code>runContracts</code> port，并且在 route/project/host dispose 时 abort 与 generation-invalidate。它不是 Flow、Runtime、Result 或 EventSource authority。
+G6 只有一个 <code>project-workspace/run/runCommandOwner.ts</code>。它由 <code>workspaceOwner</code> 创建，使用共享 <code>ApiTransport</code> 与既有 admission/execute/stop/reconcile endpoints，不创建第二 Runtime、第二 reconcile 合同或伪 Run identity。
 
-Formal Run 的实际链如下：
+Admission 的最终语义为：<strong>admitting 阶段不允许正式 Stop</strong>。
+
+- <code>canStop</code> 仅在 <code>executing</code> 为 true；admitting UI 不显示可用 Stop，直接调用 <code>stop()</code> 也返回 false，且不会发送 <code>POST /api/inspection/stop</code>。
+- route leave、Project switch、Host close 或 owner dispose 发生在 admitting 时，会提升 generation、abort 本地 admission 请求、清空 admission/snapshot、调用 <code>clearRunning()</code>，并回到可恢复的 idle/blocked 投影；不会进入缺少完整 identity 的 <code>unknown-outcome</code>。
+- Admission 晚到响应继续由 owner/disposed/generation/project identity 守卫丢弃；旧 flight 的 finally 不得清除新的 admission flight。
+- unit 覆盖 <code>Stop unavailable during admission</code>、<code>route leave during admission</code>、<code>project switch during admission</code>、<code>Host close during admission</code>、<code>late admission response after cancellation</code>，证明 Workspace 不会因 Admission 取消永久锁死。
+
+真实运行中 Stop 的权威链为：
 
 ~~~text
 clean persisted Project + PersistenceRevision
 → POST /api/inspection/admission
-→ clientSnapshotId + canonicalFlowHash + decisionConfigurationHash
-→ POST /api/inspection/execute (same identity)
-→ POST /api/inspection/stop when requested
-→ POST /api/inspection/reconcile when the response is unknown or still running
-→ authoritative terminal response or identity-checked result recovery
-→ Results scalar deep-link
+→ POST /api/inspection/execute (same frozen identity)
+→ explicit synchronization proves RuntimeStatus.Running
+→ UI Stop while execute is still incomplete
+→ POST /api/inspection/stop
+→ InspectionRuntimeCoordinator cancellation token cancelled
+→ execution observes OperationCanceledException
+→ existing result repository persists Cancelled + complete identity
+→ stop/reconcile returns cancelled
+→ mutation/save/ROI gates unlock; Results success navigation does not occur
 ~~~
 
-- Workspace Run 不发送 <code>FlowData</code>、Image 或 Camera 输入；只执行服务端在 Project access 下重新读取的 persisted Flow。
-- G5 的 <code>ProjectSaveCoordinator</code> canonical Flow artifact 是 Workspace Run 的唯一 persisted Flow 来源：<code>InspectionService</code> 在同一 Project access lease 下验证 artifact metadata schema、Project identity、<code>PersistenceRevision</code> 与原始 JSON SHA-256，再反序列化为 <code>ExecutionSnapshotSource.PersistedProject</code>。Workspace Run 不回退到未同步的 legacy <code>Project.Flow</code> 表拆分，也不接受 browser Flow。
-- admission 不建立 reservation；<code>InspectionService</code> 仍在 execute 时重新创建 <code>ExecutionSnapshot</code>、重跑 <code>IExecutionAdmissionService</code> 并比较 revision/Flow hash/FinalDecision hash。
-- dirty、saving、conflict、unknown-outcome、readonly、running 均不能 run。admission 起通过既有 mutation gate 锁住 Flow、Inspector、ROI 与 Save；只在后端终态或确定业务失败后释放。网络/abort 为 <code>unknown-outcome</code>，保持锁定，绝不依据前端超时猜测释放。
-- Run projection 明确区分 admission rejection、execute business failure、network unknown、cancel requested、runtime cancelled、still running、result not found、identity mismatch、OK、NG、Undetermined、Invalid；Preview projection 没有进入 Run/Result 状态。
-- execute response 追加 <code>executionSnapshotId</code>、<code>projectPersistenceRevision</code>、<code>flowVersionHash</code>、<code>decisionConfigurationHash</code>，并在结果 identity 与 admission 相同后才 Results deep-link。
-- Stop 复用 Runtime coordinator 的 cancellation token；后端将 cancelled 结果写入既有 Inspection result repository，Stop 本身不会因 HTTP abort 被当作成功。unknown-outcome 只能通过带 ProjectId、clientSnapshotId、PersistenceRevision、Flow hash、Decision hash 的 reconcile 解除锁定。
-- admitting、executing、cancel-requested、unknown-outcome 均受 route leave、Project switch、beforeunload 与 Host close 保护；dispose 只释放资源，generation/project/owner 失效后的 admission、execute、stop、reconcile response 静默丢弃。
+后端并发集成测试使用真实 <code>InspectionRuntimeCoordinator</code> 与 <code>TaskCompletionSource</code> 同步信号，不使用随机 sleep。Browser fixture 使用显式 execute-entry/cancellation gate；真实 WebView2 使用测试注入的确定性 <code>DelayOperator(60000ms)</code>，并且只有在后端 reconcile 明确报告 <code>still-running</code> 后才点击 Stop。三层证据均证明 Stop 发生于执行完成前，而不是先取得完整 Execute 响应再延迟前端 fulfill。
 
-### 18.2 G5 closure guards
+Cancelled result 保留 resultId、Project、execution snapshot、PersistenceRevision、Flow hash、Decision hash 与 flow trace；Cancelled 不进入成功 Results 页面，但历史 detail 可读取明确终态，Flow mutation、Save、ROI 与后续正式保存均恢复。response-loss reconcile 是独立场景：后端已成功完成、Execute 响应丢失，前端以完整 identity 调用 reconcile 找回成功 result；它不作为运行中取消证据。
 
-<code>workspacePersistenceOwner</code> 的 conflict/unknown-outcome reconcile 现在携带 operation generation。每个 reconcile await 后都校验 owner、Project identity 与 generation；route leave、project switch、host close 的晚到 GET 只返回 disposed，不得写 baseline、Flow mutation gate、conflict state 或 disposed phase。unit 与 Browser fixture 均覆盖 reconcile in-flight dispose；Browser 用例还确认晚到 Project A 响应不能覆盖已挂载的 Project B。
+### 18.2 G5 closure guards and Preview integrity
 
-explicit <code>null</code> 的正式语义为“使用参数 DefaultValue”：Project DTO/GET 保留 raw <code>Parameter.Value=null</code>，Inspector 明示 <code>Use default value (null)</code>，保存 round-trip 不折叠 null；DTO 同时区分 legacy 缺失字段与显式 JSON null；Runtime 只在 <code>Parameter.GetValue()</code> 将其解析为 <code>DefaultValue</code>。<code>InspectionServiceSingleRunTests</code> 覆盖 persisted JSON → admission/execute snapshot raw null → Runtime effective default。
+<code>workspacePersistenceOwner</code> 的 conflict/unknown-outcome reconcile 携带 operation generation。每个 reconcile await 后都校验 owner、Project identity 与 generation；route leave、Project switch、Host close 的晚到 GET 只返回 disposed，不得覆盖 baseline、Flow mutation gate、conflict state 或后续 Project。
 
-### 18.3 G6 commit scope and Final-SHA evidence
+explicit <code>null</code> 的正式语义仍为“使用参数 DefaultValue”：Project DTO/GET 保留 raw <code>Parameter.Value=null</code>，保存 round-trip 不折叠 null；Runtime 仅在 <code>Parameter.GetValue()</code> 解析 DefaultValue。
 
-G6 进入本轮 Final Closure 前的五个提交实际范围如下；它们共同构成真实远端基线 <code>937bc94da72519aae29b5b0423250705fbc7d3c1</code>，不等同于本轮修复：
+Preview artifact SHA-256 仍校验真实 Blob body。修复将 <code>blob.arrayBuffer()</code> 的字节复制到当前 JavaScript realm 新建的 <code>Uint8Array</code>，再把规范化 bytes 交给 <code>subtle.digest('SHA-256', ...)</code>，避免 Node Web Crypto/跨 realm <code>ArrayBuffer</code> 或 <code>Uint8Array</code> 的 BufferSource brand/type 拒绝。forged headers + same-length wrong body 仍 fail closed；没有降级为 header、ETag 或长度检查。
+
+### 18.3 Commit topology and Final code SHA
+
+本地文档提交 <code>182addca6294c35a58f8c4eafb23e72a903787f8</code> 完整保留为本轮所有实现提交的祖先，没有 reset、丢弃或覆盖。G6 最终缺口修复提交为：
 
 | Commit | 实际范围 |
 | --- | --- |
-| <code>bac796b6</code> | 建立 persisted Project admission/execute/Results 链、唯一 <code>runCommandOwner</code>、run contracts、基础 endpoint 与 G6 Browser/contract tests。 |
-| <code>d8965f13</code> | 记录当时的 G6 closure evidence。 |
-| <code>e3ce6ebf</code> | 补齐 formal run identity、canonical Flow/Decision 校验、结果合同与 WebView2 runner。 |
-| <code>a5b03a4e</code> | 记录 Final closure blockers 与门禁状态。 |
-| <code>937bc94d</code> | 修复 published StudioUI static asset resolver，并补对应 Desktop resolver test。 |
+| <code>77701c1c</code> | Admission cancellation 状态机与五类回归测试。 |
+| <code>a05281b3</code> | Preview Blob digest bytes 跨 runtime/realm 规范化与 fail-closed 回归。 |
+| <code>c8c45b6f</code> | 后端并发、Browser fixture 与真实 WebView2 genuine running Stop。 |
+| <code>7f6a5a3f</code> | Cancelled history detail 与 result identity 证据对齐。 |
+| <code>8e47ad95</code> | Cancelled 后 Workspace 解锁及正式保存 authority 验证。 |
+| <code>a93adda0</code> | genuine running Stop 与 response-loss reconcile 场景隔离。 |
+| <code>3a5b31b2</code> | F03 published runtime/no-Node matrix 要求收口。 |
 
-本轮代码冻结后的四个 Final Closure 提交范围为：<code>1b518b81</code>（Run reconcile/stop authority）、<code>120b3b1a</code>（route/project/Host close lifecycle）、<code>c3caa91c</code>（unit/endpoint/Browser closure tests）、<code>ed997738</code>（真实 WebView2 Stop/Reconcile evidence runner）。以下每份新证据的 <code>sourceSha</code> 都是 <code>ed997738551875f0081a08b595e55e3184fdda7e</code>；旧 SHA 证据不继承。
+最终代码 SHA 为 <code>3a5b31b201f41b3fe344d16a812436d1162d63d0</code>。以下代码、WebView2、matrix 与远端 CI 证据均绑定该 SHA；旧 SHA 证据不继承。
+
+### 18.4 Final-SHA evidence
 
 | Scope | Actual status | Evidence |
 | --- | --- | --- |
-| StudioUI lint / typecheck / build | PASS | clean isolated checkout 的 <code>npm run lint</code>、<code>npm run typecheck</code>；Final code tree 的 <code>npm run build</code>；source SHA=<code>ed997738551875f0081a08b595e55e3184fdda7e</code>。仅有既存 &gt;500 kB chunk warning。 |
-| StudioUI full unit | PASS | clean isolated checkout 的 <code>npm run test:unit</code>：64 files，415/415 PASS；不读取或修改主工作树保护配置。source SHA=<code>ed997738551875f0081a08b595e55e3184fdda7e</code>。 |
-| Product build | PASS | <code>scripts/dotnet.ps1 build ClearVision.Product/ClearVision.Product.sln --no-restore</code>；既存 OperatorLibrary <code>System.Collections.Immutable</code> warning，0 errors。source SHA=<code>ed997738551875f0081a08b595e55e3184fdda7e</code>。 |
-| InspectionService / result / run focused contract | PASS | clean isolated checkout：InspectionService + InspectionResultBackgroundService 44/44，<code>InspectionRunEndpointsTests</code> 3/3，共 47/47 PASS。source SHA=<code>ed997738551875f0081a08b595e55e3184fdda7e</code>。 |
-| Full Desktop endpoint regression | PASS | <code>run-tests-desktop-endpoints.ps1 -NoBuild -NoRestore</code>：25 endpoint classes，312/312 PASS。source SHA=<code>ed997738551875f0081a08b595e55e3184fdda7e</code>。 |
-| Playwright Browser fixture | PASS | <code>CV_UI_SCENARIO=studio-ui-next npx playwright test tests/e2e/studio-ui-next/f03-workspace.spec.ts</code>：41/41 PASS，包含 Stop、successful response-loss reconcile、still-running/identity mismatch、route/project/Host close 与 20-cycle zero ledger。Browser fixture 不是 WebView2 证据。source SHA=<code>ed997738551875f0081a08b595e55e3184fdda7e</code>。 |
-| Real WebView2 Formal Run | PASS | <code>.tmp/studio-ui-next/f03/final-ed997738-formal-webview2-rebuilt/evidence/studio-ui-webview2-final-ed997738-formal-webview2-rebuilt.json</code>：真实 Desktop binary version=<code>1.0.0+ed997738...</code>；admission→execute、UI Stop→authoritative cancelled、服务端成功但响应丢失→reconcile 找回正式结果、Results handoff、20-cycle owner/request/timer/subscription/blob/artifact/runtime cleanup 全部通过。 |
-| Release publish / sanitized static host / local no-Node | PASS | <code>.tmp/studio-ui-next/f03/matrix/final-ed997738-full-matrix-1600x1000/studio-ui-webview2-matrix.json</code>：Release build/publish、static asset scan、sanitized-path startup 与 published Desktop child-process audit PASS；13 个 published WebView2 checks 的 <code>nodeDescendantCount=0</code>。source SHA=<code>ed997738551875f0081a08b595e55e3184fdda7e</code>。 |
-| Real DPI matrix | PASS | 同一 matrix evidence 的 official <code>1600×1000</code> real WebView2 matrix：1.0/1.25/1.5/2.0 全 PASS，<code>PerMonitorV2</code> 已记录；本机 native DPI probe 观测为 96，不能表述为外部多显示器物理 DPI。另有 1366×768@2x exploratory run 因 Canvas DOM hit-test 不通过而未计入 official matrix，见边界说明。 |
-| Clean target machine without Node | NOT PERFORMED | 本机 published process tree 的 no-Node 结论与“单独无 Node 目标机”分开；当前没有可用的 clean target machine。 |
-| Full CI / remote workflow | FAIL | GitHub Actions run <code>29629443875</code>，head/source SHA=<code>ed997738551875f0081a08b595e55e3184fdda7e</code>；Product Tests、Browser、Contracts/Data 等通过，StudioUI Quality Gates 为 413/415（<code>previewTransport.spec.ts</code> 两个 Node/Web Crypto <code>SubtleCrypto.digest</code> 输入类型失败），Desktop Tests 为 621/622（<code>AgentRunEndpointsTests.CreatePlanRunBackgroundCancellation_ShouldPersistTerminalWhenNoEndpointTerminalExists</code> timeout），Final Gate 因 required jobs failure。该 CI failure 不改变已关闭的 G6 两个功能 blocker；AgentRun 测试不在本轮运行域扩修范围。 |
-| Camera / PLC / Station / field hardware | NOT PERFORMED | 明确超出 F03 前端 Final Closure 范围。 |
+| StudioUI lint / typecheck | PASS | 本地 <code>npm run lint</code>、<code>npm run typecheck</code> 在 Final code SHA 通过。 |
+| StudioUI full unit | PASS_REMOTE / LOCAL_PROTECTED_OVERRIDE | 本地主工作树 64 files、419/421；仅两个 architecture guard 因用户受保护的本地启动配置覆盖而失败，未修改该文件。远端干净 checkout 的 StudioUI Quality Gates 为 64 files、421/421 PASS，lint/typecheck 同时通过。 |
+| Preview digest portability | PASS | 本地 <code>previewTransport.spec.ts</code> 8/8；跨 realm ArrayBuffer/Uint8Array 与 forged headers + same-length wrong body 均覆盖；远端 Node/Web Crypto StudioUI gate 421/421 PASS。 |
+| Product focused backend | PASS | Final code SHA 上 11 个 execution/result/project authority classes，227/227 PASS；包含 admission、single-run、runtime coordinator、Cancelled persistence/history 与 Project save/concurrency。 |
+| Desktop endpoint regression | PASS | <code>run-tests-desktop-endpoints.ps1</code>：25 endpoint classes，313/313 PASS；包含真实 coordinator 并发 Stop 集成测试。 |
+| Playwright Browser fixture | PASS | <code>CV_UI_SCENARIO=studio-ui-next</code>、<code>CV_STUDIO_UI_EVIDENCE_PHASE=f03</code>：41/41 PASS；genuine running Stop、response-loss reconcile、identity mismatch、Admission/执行期离开与 20-cycle zero ledger 分开验证。Browser fixture 不冒充 WebView2。 |
+| Real WebView2 Formal Run | PASS | <code>.tmp/studio-ui-next/f03/g6-running-stop-3a5b31b2/evidence/studio-ui-webview2-g6-running-stop-3a5b31b2.json</code>，status=pass，sourceSha=<code>3a5b31b201f41b3fe344d16a812436d1162d63d0</code>；normal execute、genuine running Stop、Cancelled persistence/history、response-loss reconcile、Results handoff、post-cancel Save/ROI/mutation unlock 与 20-cycle cleanup 全部通过。 |
+| Release/static/sanitized-path/published runtime | PASS | <code>.tmp/studio-ui-next/f03/matrix/f03-final-3a5b31b2-r2/studio-ui-webview2-matrix.json</code>，status=PASS，sourceSha=<code>3a5b31b201f41b3fe344d16a812436d1162d63d0</code>；Release publish、static audit、sanitized path、missing-assets fail-closed 与 published <code>/overview</code> runtime 通过。 |
+| Local published process-tree audit | PASS | 同一 matrix 的 <code>localNoNodeEvidence=PASS</code>；13 个 Debug/Publish process-tree checks 的 Desktop Node descendants 均为 0。外部 CDP driver 明确不属于 Desktop process tree。 |
+| Real WebView2 DPI | PASS | 同一 matrix 的 <code>dpiAuthority=PASS</code>；1.0/1.25/1.5/2.0 全通过并记录 PerMonitorV2。此证据不冒充外部多显示器物理 DPI 实验室。 |
+| Clean target machine without Node | NOT_PERFORMED | <code>cleanMachineWithoutNode=NOT_PERFORMED</code>；没有用本机 process-tree audit 冒充单独干净目标机。 |
+| Full remote CI | PASS | GitHub Actions run <code>29634335021</code>，head/source SHA=<code>3a5b31b201f41b3fe344d16a812436d1162d63d0</code>；Guard、StudioUI、Product、Desktop、Legacy UI & StudioUI Browser、Contracts & Vision Agent、Detection/Measurement/Data、Operator jobs、Coverage Summary 与 Final Gate 全部 success。没有 AgentRun timeout 外部门禁。Release/Create Release 因 workflow_dispatch 条件 skipped，不冒充发布证据；Release 证据来自本地 Final-SHA matrix。 |
+| Camera / PLC / Station / field hardware | NOT PERFORMED | 明确超出 F03 G6 最终缺口修复范围。 |
 
-### 18.4 Final status and open gates
+### 18.5 Final status and open gates
 
-G6 code closure is complete. The two functional blockers are closed: Run stop/reconcile has one authoritative identity-backed backend path, and admitting/executing/cancel-requested/unknown-outcome are protected across route leave, Project switch, beforeunload and Host close. F03 remains <strong>PARTIAL</strong> for exactly three verification gates: the user-protected local startup-default configuration, a separate clean target machine without Node, and remote full CI. The main worktree protected-file edits remain untouched and are not part of any Final commit. The intended release policy remains:
+Admission Stop 死锁、genuine running cancellation、Cancelled result 持久化与解锁、response-loss reconcile、Blob digest portability、StudioUI remote gate、权威文档交付和三方 SHA 对齐均已关闭。F03 G6 满足 DONE 的全部内部条件。
+
+F03 整体仍为 <strong>PARTIAL</strong>，唯一剩余证据缺口是单独的 clean no-Node 目标机 <code>NOT_PERFORMED</code>；它不属于功能、代码可移植性或交付 blocker。用户工作区的 <code>CLAUDE.md</code>、<code>.codex/config.toml</code> 与本地 <code>appsettings.json</code> 改动未读取为实施输入、未修改、未暂存、未提交。默认交付策略保持：
 
 ~~~text
-Studio:StudioUiEnabled=false
-WorkspaceCapabilityEnabled=false
 F03_G6_STATUS=DONE
 F03_STATUS=PARTIAL
 F03_IMPLEMENTED=YES
 OPEN_FUNCTIONAL_BLOCKERS=0
-OPEN_VERIFICATION_GATES=3
+OPEN_CODE_PORTABILITY_BLOCKERS=0
+OPEN_EVIDENCE_GAPS=1
+OPEN_DELIVERY_GAPS=0
+OPEN_EXTERNAL_VERIFICATION_GATES=0
 F04_ENTRY=REJECTED
 F04_STARTED=NO
+Studio:StudioUiEnabled=false
+WorkspaceCapabilityEnabled=false
 ~~~
