@@ -86,7 +86,10 @@ function extractCleanupArtifactIds(payload: unknown): readonly string[] {
 async function blobSha256(blob: Blob): Promise<string> {
   const subtle = globalThis.crypto?.subtle;
   if (!subtle) throw new Error('Web Crypto SHA-256 is unavailable.');
-  const digest = await subtle.digest('SHA-256', await blob.arrayBuffer());
+  const source = new Uint8Array(await blob.arrayBuffer());
+  const digestBytes = new Uint8Array(source.byteLength);
+  digestBytes.set(source);
+  const digest = await subtle.digest('SHA-256', digestBytes);
   return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
 }
 

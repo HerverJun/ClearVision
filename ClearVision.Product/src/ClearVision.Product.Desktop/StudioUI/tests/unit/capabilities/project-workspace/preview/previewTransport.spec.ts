@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ApiNotFoundError,
@@ -100,6 +101,15 @@ function blobResponse(overrides: Partial<ApiBlobResponse> = {}): ApiBlobResponse
     headers,
     ...overrides
   });
+}
+
+function crossRealmBlob(bytes: ArrayBuffer | Uint8Array): Blob {
+  const arrayBuffer = bytes instanceof Uint8Array ? bytes.buffer : bytes;
+  return {
+    size: arrayBuffer.byteLength,
+    type: 'image/png',
+    arrayBuffer: async () => arrayBuffer
+  } as unknown as Blob;
 }
 
 describe('G4 Preview transport', () => {
@@ -221,6 +231,25 @@ describe('G4 Preview transport', () => {
 
     await expect(port.getPreviewArtifactBlob(artifactId))
       .rejects.toThrow(/actual Blob bytes|bytes did not match/i);
+    port.dispose();
+  });
+
+  it.each([
+    ['ArrayBuffer', () => runInNewContext('Uint8Array.from([1, 2, 3, 4]).buffer') as ArrayBuffer],
+    ['Uint8Array', () => runInNewContext('Uint8Array.from([1, 2, 3, 4])') as Uint8Array]
+  ] as const)('normalizes cross-realm %s bytes before Web Crypto SHA-256', async (_kind, createBytes) => {
+    const api: ApiTransport = {
+      apiBaseUrl: 'http://localhost:5000/api',
+      get: vi.fn(),
+      post: apiPost(vi.fn(async () => response())),
+      getBlob: vi.fn(async () => blobResponse({ blob: crossRealmBlob(createBytes()) })),
+      delete: vi.fn()
+    };
+    const port = createPreviewTransportPort(api);
+    await port.previewNode(command());
+
+    await expect(port.getPreviewArtifactBlob(artifactId))
+      .resolves.toMatchObject({ blob: expect.anything() });
     port.dispose();
   });
 
