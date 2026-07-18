@@ -341,7 +341,7 @@ onBeforeUnmount(() => {
       <CvPanel
         v-if="commands"
         title="编辑工程信息"
-        description="名称与描述更新复用 ProjectService / ProjectSaveCoordinator，不复制 Flow save。"
+        description="名称与描述更新复用现有工程保存链，不复制流程保存逻辑。"
       >
         <form
           class="project-details__form"
