@@ -33,6 +33,7 @@ param(
     [switch]$WorkspaceCapabilityEnabled,
     [switch]$SeedWorkspace,
     [switch]$FormalRun,
+    [switch]$DpiOnly,
     [switch]$NoBuild
 )
 
@@ -183,6 +184,12 @@ if ($SeedWorkspace -and -not $WorkspaceCapabilityEnabled) {
 if ($FormalRun -and -not $SeedWorkspace) {
     throw "FormalRun requires SeedWorkspace so the runner can execute a persisted Project authority."
 }
+if ($DpiOnly -and ($Expectation -ne "studio-product" -or -not $SeedWorkspace)) {
+    throw "DpiOnly requires studio-product plus SeedWorkspace."
+}
+if ($DpiOnly -and $FormalRun) {
+    throw "DpiOnly and FormalRun are separate evidence scopes and cannot share one run."
+}
 $resolvedRoute = if (-not [string]::IsNullOrWhiteSpace($Route)) {
     $Route
 } elseif ($SeedWorkspace) {
@@ -214,6 +221,7 @@ $customEnvironment = [ordered]@{
     "CV_STUDIO_UI_DEEP_CANVAS" = if ($DeepCanvas) { "true" } else { "false" }
     "CV_STUDIO_UI_SEED_WORKSPACE" = if ($SeedWorkspace) { "true" } else { "false" }
     "CV_STUDIO_UI_FORMAL_RUN" = if ($FormalRun) { "true" } else { "false" }
+    "CV_STUDIO_UI_DPI_ONLY" = if ($DpiOnly) { "true" } else { "false" }
     "CV_NATIVE_DPI_PROBE" = Join-Path $scriptRoot "Get-DesktopRuntimeProbe.ps1"
 }
 $previousEnvironment = @{}
@@ -399,6 +407,7 @@ $cleanup = [pscustomobject]@{
     workspaceCapabilityEnabled = [bool]$WorkspaceCapabilityEnabled
     workspaceSeededByHarness = [bool]$SeedWorkspace
     formalRun = [bool]$FormalRun
+    dpiOnly = [bool]$DpiOnly
     sanitizedDesktopPath = [bool]$SanitizeDesktopPath
     externalNodeDriver = [pscustomobject]@{
         executablePath = $nodeExe

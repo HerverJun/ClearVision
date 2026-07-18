@@ -739,6 +739,51 @@ async function selectSeededRoiNode(page) {
   return { flowCanvas, box };
 }
 
+async function readWorkspaceCanvasDpiEvidence(page, pointerNodeId) {
+  assert(/^[0-9a-f-]{36}$/i.test(pointerNodeId || ''),
+    'F04 Workspace DPI evidence did not retain the seeded pointer-hit node identity.');
+  const observed = await page.evaluate(() => {
+    const canvas = document.querySelector('[data-testid="flow-canvas"]');
+    const surface = document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]');
+    const inspector = document.querySelector('[data-evidence-surface="f03-g3-inspector"]');
+    if (!(canvas instanceof HTMLCanvasElement)) return null;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      runtime: {
+        dpr: window.devicePixelRatio,
+        logicalWidth: rect.width,
+        logicalHeight: rect.height,
+        backingWidth: canvas.width,
+        backingHeight: canvas.height
+      },
+      selectedCount: Number(surface?.getAttribute('data-selected-count') || -1),
+      inspectorMode: inspector?.getAttribute('data-inspector-mode') || null
+    };
+  });
+  assert(observed, 'F04 Workspace DPI evidence did not find the canonical Flow Canvas element.');
+  assert(observed.runtime.logicalWidth > 0 && observed.runtime.logicalHeight > 0,
+    `F04 Workspace Flow Canvas has no logical size: ${JSON.stringify(observed)}`);
+  assert(
+    Math.abs(observed.runtime.backingWidth -
+        (observed.runtime.logicalWidth * observed.runtime.dpr)) <= 2 &&
+      Math.abs(observed.runtime.backingHeight -
+        (observed.runtime.logicalHeight * observed.runtime.dpr)) <= 2,
+    `F04 Workspace Flow Canvas backing store does not match DPR: ${JSON.stringify(observed)}`
+  );
+  assert(observed.selectedCount === 1 && observed.inspectorMode === 'node',
+    `F04 Workspace pointer hit did not preserve the seeded ROI selection: ${JSON.stringify(observed)}`);
+  return {
+    source: 'FORMAL_PRODUCT_WORKSPACE_CANONICAL_FLOW_CANVAS',
+    mounted: { canvas: { runtime: observed.runtime } },
+    pointerHit: {
+      id: pointerNodeId,
+      logicalOffset: { x: 360, y: 125 },
+      selectedCount: observed.selectedCount,
+      inspectorMode: observed.inspectorMode
+    }
+  };
+}
+
 async function waitForSeededPreview(page) {
   await page.waitForFunction(() =>
     document.querySelector('[data-capability="preview-workbench"]')
@@ -1426,7 +1471,8 @@ async function verifyProductPage(
   formalRunSeed = null,
   webPort = null,
   token = null,
-  phase = 'full'
+  phase = 'full',
+  workspaceSeedRoiNodeId = null
 ) {
   await page.waitForSelector('[data-product-shell="ready"]', { state: 'visible', timeout: 30_000 });
   const isWorkspaceRoute = /^\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/workspace$/i
@@ -1548,10 +1594,13 @@ async function verifyProductPage(
   const preferenceWriteRequests = preferenceRequests.filter(item => item.method !== 'GET');
   const seededWorkspace = parseBooleanEnvironment('CV_STUDIO_UI_SEED_WORKSPACE');
   const formalRun = parseBooleanEnvironment('CV_STUDIO_UI_FORMAL_RUN');
+  const dpiOnly = parseBooleanEnvironment('CV_STUDIO_UI_DPI_ONLY');
   const workspaceReady = isWorkspaceRoute && ['ready', 'empty'].includes(projection.workspaceState);
   assert(!formalRun || (seededWorkspace && workspaceReady),
     'Formal Run evidence requires a seeded, ready Workspace route.');
-  const workspaceG4 = workspaceReady && seededWorkspace ? await verifyWorkspaceG4(page) : null;
+  assert(!dpiOnly || (seededWorkspace && workspaceReady && !formalRun),
+    'DPI-only evidence requires a seeded, ready Workspace without Formal Run.');
+  const workspaceG4 = workspaceReady && seededWorkspace && !dpiOnly ? await verifyWorkspaceG4(page) : null;
   const workspaceG3 = workspaceReady && !seededWorkspace ? await verifyWorkspaceG3(page) : null;
   let workspaceLifecycle = null;
   if (isWorkspaceRoute) {
@@ -1595,11 +1644,22 @@ async function verifyProductPage(
         verticalOverflow: document.documentElement.scrollHeight - document.documentElement.clientHeight
       };
     });
-    const mounted = await readWorkspace();
-    assert(mounted.dirty === 'false' && ['clean', 'saved'].includes(mounted.persistencePhase),
-      `Workspace was not clean before lifecycle navigation: ${JSON.stringify(mounted)}`);
-    const lifecycleCycles = [];
-    await page.evaluate(() => {
+    if (dpiOnly) {
+      const mounted = await readWorkspace();
+      assert(mounted.dirty === 'false' && ['clean', 'saved'].includes(mounted.persistencePhase),
+        `Workspace was not clean before DPI capture: ${JSON.stringify(mounted)}`);
+      assert(mounted.mainCount === 1 && mounted.shellCount === 1 &&
+        mounted.ownerCount === 1 && mounted.flowCanvasOwnerCount === 1 && mounted.inspectorOwnerCount === 1 &&
+        mounted.previewOwnerCount === 1 && mounted.imageCanvasOwnerCount === 1 && mounted.roiOwnerCount === 1 &&
+        mounted.persistenceOwnerCount === 1,
+      `F04 DPI-only Workspace did not retain exactly one owner chain: ${JSON.stringify(mounted)}`);
+      workspaceLifecycle = { mode: 'dpi-only', mounted, disposed: null, remounted: null, cycles: [] };
+    } else {
+      const mounted = await readWorkspace();
+      assert(mounted.dirty === 'false' && ['clean', 'saved'].includes(mounted.persistencePhase),
+        `Workspace was not clean before lifecycle navigation: ${JSON.stringify(mounted)}`);
+      const lifecycleCycles = [];
+      await page.evaluate(() => {
       window.__g5LifecycleOriginalConfirm = window.confirm;
       window.__g5LifecycleConfirmSnapshots = [];
       window.confirm = message => {
@@ -1748,11 +1808,18 @@ async function verifyProductPage(
     `Workspace 20-cycle lifecycle ledger failed: ${JSON.stringify(lifecycleCycles)}`);
     assert(remounted.horizontalOverflow <= 1 && remounted.verticalOverflow <= 1,
       `Workspace remount overflowed globally: ${JSON.stringify(remounted)}`);
-    if (workspaceG4) {
-      await selectSeededRoiNode(page);
-      await waitForSeededPreview(page);
+      if (workspaceG4) {
+        await selectSeededRoiNode(page);
+        await waitForSeededPreview(page);
+      }
     }
   }
+  if (dpiOnly && workspaceReady && seededWorkspace) {
+    await selectSeededRoiNode(page);
+  }
+  const workspaceCanvasDpi = isF04Evidence && workspaceReady && seededWorkspace
+    ? await readWorkspaceCanvasDpiEvidence(page, workspaceSeedRoiNodeId)
+    : null;
   const formalRunInstallation = formalRun ? await installFormalRunDecision(page, formalRunSeed) : null;
   const workspaceG6 = formalRun
     ? await verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, token)
@@ -1878,6 +1945,7 @@ async function verifyProductPage(
     resultsFilterLayout,
     workspaceG3,
     workspaceG4,
+    workspaceCanvasDpi,
     formalRunInstallation,
     workspaceG6,
     workspaceLifecycle
@@ -2121,6 +2189,7 @@ async function main() {
   const sanitizedDesktopPath = parseBooleanEnvironment('CV_STUDIO_UI_SANITIZED_PATH');
   const deepCanvas = parseBooleanEnvironment('CV_STUDIO_UI_DEEP_CANVAS', scale === 1);
   const formalRun = parseBooleanEnvironment('CV_STUDIO_UI_FORMAL_RUN');
+  const dpiOnly = parseBooleanEnvironment('CV_STUDIO_UI_DPI_ONLY');
   let route = normalizeStudioRoute(
     process.env.CV_STUDIO_UI_ROUTE || routeForExpectation(expectation)
   );
@@ -2132,6 +2201,8 @@ async function main() {
   assert(Number.isFinite(scale) && scale > 0, 'CV_DPI_SCALE must be a positive number.');
   assert(!formalRun || (expectation === 'studio-product' && seedWorkspace),
     'CV_STUDIO_UI_FORMAL_RUN requires studio-product plus a seeded Workspace.');
+  assert(!dpiOnly || (expectation === 'studio-product' && seedWorkspace && !formalRun),
+    'CV_STUDIO_UI_DPI_ONLY requires studio-product plus a seeded Workspace without Formal Run.');
 
   const evidence = {
     schemaVersion: 1,
@@ -2146,6 +2217,7 @@ async function main() {
     deepCanvas,
     seedWorkspace,
     formalRun,
+    dpiOnly,
     route,
     sourceSha: String(process.env.CV_STUDIO_UI_SOURCE_SHA || 'unknown').trim(),
     capturedAtUtc: new Date().toISOString(),
@@ -2214,7 +2286,8 @@ async function main() {
             evidence.workspaceSeed?.formalRunSeed ?? null,
             webPort,
             token,
-            phase
+            phase,
+            evidence.workspaceSeed?.roiNodeId ?? null
           );
         } else if (expectation === 'studio-design') {
           evidence.designPage = await verifyDesignPage(page);

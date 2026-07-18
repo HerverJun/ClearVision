@@ -52,7 +52,7 @@ foreach ($file in Get-ChildItem -LiteralPath $runtimeRoot -Recurse -File -Filter
         continue
     }
     try {
-        $document = Get-Content -Raw -LiteralPath $file.FullName | ConvertFrom-Json
+        $document = Get-Content -Raw -Encoding UTF8 -LiteralPath $file.FullName | ConvertFrom-Json
     } catch {
         continue
     }
@@ -72,9 +72,18 @@ $layers = @($runtimeDocuments | ForEach-Object {
     $native = $document.nativeRuntime
     $canvasRuntime = $null
     $pointerHit = $null
+    $canvasEvidenceSource = $null
     if (($document.PSObject.Properties.Name -contains "canvasPage") -and $document.canvasPage) {
         $canvasRuntime = $document.canvasPage.mounted.canvas.runtime
         $pointerHit = $document.canvasPage.pointerHit
+        $canvasEvidenceSource = "internal-canvas-page"
+    } elseif (($document.PSObject.Properties.Name -contains "productPage") -and
+        $document.productPage -and
+        ($document.productPage.PSObject.Properties.Name -contains "workspaceCanvasDpi") -and
+        $document.productPage.workspaceCanvasDpi) {
+        $canvasRuntime = $document.productPage.workspaceCanvasDpi.mounted.canvas.runtime
+        $pointerHit = $document.productPage.workspaceCanvasDpi.pointerHit
+        $canvasEvidenceSource = "formal-product-workspace"
     }
     $screenshotScaleX = if ([double]$js.innerWidth -gt 0) {
         [double]$screenshot.width / [double]$js.innerWidth
@@ -123,6 +132,8 @@ $layers = @($runtimeDocuments | ForEach-Object {
     [pscustomobject]@{
         evidence = $_.path
         expectation = [string]$document.expectation
+        phase = [string]$document.phase
+        canvasEvidenceSource = $canvasEvidenceSource
         requestedWebView2ForceScale = $requestedScale
         observedWebView2ForceScaleArguments = $forceScaleValues
         nativeAwareness = [pscustomobject]@{
@@ -166,7 +177,10 @@ $layers = @($runtimeDocuments | ForEach-Object {
 $scaleCoverage = @($ExpectedScales | ForEach-Object {
     $expected = [double]$_
     $matches = @($layers | Where-Object {
-        $_.expectation -eq "studio-canvas" -and
+        ($_.expectation -eq "studio-canvas" -or
+            ($_.phase -eq "f04" -and
+                $_.expectation -eq "studio-product" -and
+                $_.canvasEvidenceSource -eq "formal-product-workspace")) -and
         [Math]::Abs([double]$_.requestedWebView2ForceScale - $expected) -le 0.001
     })
     [pscustomobject]@{

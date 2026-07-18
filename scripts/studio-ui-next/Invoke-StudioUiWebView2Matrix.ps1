@@ -6,7 +6,7 @@ param(
     [string]$EvidenceDirectory,
     [string]$RuntimeDirectory,
     [string]$PublishDirectory,
-    [ValidateSet("f01", "f02", "f03")]
+    [ValidateSet("f01", "f02", "f03", "f04")]
     [string]$EvidencePhase = "f01",
     [ValidateSet("full", "publish-only")]
     [string]$RunScope = "full",
@@ -199,7 +199,10 @@ function Invoke-MatrixRun {
         [double]$Scale,
         [string]$Route,
         [bool]$DeepCanvas,
-        [bool]$NoBuild
+        [bool]$NoBuild,
+        [bool]$WorkspaceCapabilityEnabled = $false,
+        [bool]$SeedWorkspace = $false,
+        [bool]$DpiOnly = $false
     )
 
     $webPort = $BaseWebPort + $script:nextPortOffset
@@ -231,6 +234,15 @@ function Invoke-MatrixRun {
     }
     if ($NoBuild) {
         $parameters["NoBuild"] = $true
+    }
+    if ($WorkspaceCapabilityEnabled) {
+        $parameters["WorkspaceCapabilityEnabled"] = $true
+    }
+    if ($SeedWorkspace) {
+        $parameters["SeedWorkspace"] = $true
+    }
+    if ($DpiOnly) {
+        $parameters["DpiOnly"] = $true
     }
 
     $started = [DateTime]::UtcNow
@@ -300,18 +312,29 @@ try {
         Invoke-MatrixRun -Name "debug-projects" -Expectation "studio-product" `
             -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
             -Scale 1.0 -Route "/projects" -DeepCanvas $false -NoBuild $true
-        Invoke-MatrixRun -Name "debug-design" -Expectation "studio-design" `
-            -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
-            -Scale 1.0 -Route "/labs/design" -DeepCanvas $false -NoBuild $true
+        if ($EvidencePhase -ne "f04") {
+            Invoke-MatrixRun -Name "debug-design" -Expectation "studio-design" `
+                -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
+                -Scale 1.0 -Route "/labs/design" -DeepCanvas $false -NoBuild $true
+        }
 
         foreach ($scale in @(1.0, 1.25, 1.5, 2.0)) {
             $scaleName = ([string]$scale).Replace('.', '-')
-            Invoke-MatrixRun -Name "debug-canvas-dpi-$scaleName" -Expectation "studio-canvas" `
-                -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
-                -Scale $scale -Route "/labs/canvas" -DeepCanvas ($scale -eq 1.0) -NoBuild $true
+            if ($EvidencePhase -eq "f04") {
+                Invoke-MatrixRun -Name "debug-workspace-dpi-$scaleName" -Expectation "studio-product" `
+                    -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
+                    -Scale $scale -Route "" -DeepCanvas $false -NoBuild $true `
+                    -WorkspaceCapabilityEnabled $true -SeedWorkspace $true -DpiOnly $true
+            } else {
+                Invoke-MatrixRun -Name "debug-canvas-dpi-$scaleName" -Expectation "studio-canvas" `
+                    -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
+                    -Scale $scale -Route "/labs/canvas" -DeepCanvas ($scale -eq 1.0) -NoBuild $true
+            }
         }
 
-        if (-not $SkipPerformance) {
+        if ($EvidencePhase -eq "f04") {
+            $performanceStatus = "NOT_APPLICABLE_INTERNAL_LABS_HIDDEN"
+        } elseif (-not $SkipPerformance) {
             & $performanceRun `
                 -Configuration "Debug" `
                 -RuntimeKind "debug" `
@@ -389,9 +412,16 @@ try {
                 -Scale 1.0 -Route $productRoute -DeepCanvas $false -NoBuild $true
         }
         if ($RunScope -eq "full") {
-            Invoke-MatrixRun -Name "publish-canvas" -Expectation "studio-canvas" `
-                -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
-                -Scale 1.0 -Route "/labs/canvas" -DeepCanvas $false -NoBuild $true
+            if ($EvidencePhase -eq "f04") {
+                Invoke-MatrixRun -Name "publish-workspace-dpi" -Expectation "studio-product" `
+                    -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
+                    -Scale 1.0 -Route "" -DeepCanvas $false -NoBuild $true `
+                    -WorkspaceCapabilityEnabled $true -SeedWorkspace $true -DpiOnly $true
+            } else {
+                Invoke-MatrixRun -Name "publish-canvas" -Expectation "studio-canvas" `
+                    -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
+                    -Scale 1.0 -Route "/labs/canvas" -DeepCanvas $false -NoBuild $true
+            }
         }
 
         $verifiedMissingRoot = Assert-TemporaryPath `
@@ -427,7 +457,7 @@ try {
             RuntimeEvidenceDirectory = $evidenceRoot
             OutputPath = Join-Path $evidenceRoot "studio-ui-no-node-evidence.json"
         }
-        if ($EvidencePhase -in @("f02", "f03")) {
+        if ($EvidencePhase -in @("f02", "f03", "f04")) {
             $noNodeParameters["RequiredProductRoutes"] = $publishProductRoutes
             $noNodeParameters["ExpectedEvidencePhase"] = $EvidencePhase
             $noNodeParameters["ExpectedSourceSha"] = $sourceSha
