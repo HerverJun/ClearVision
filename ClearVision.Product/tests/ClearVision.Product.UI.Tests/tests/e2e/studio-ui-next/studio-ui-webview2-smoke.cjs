@@ -1038,6 +1038,34 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
   const normalHandoff = await readFormalResultsHandoff(page, projectId);
 
   await waitForPersistedWorkspace(page, projectId);
+  let responseLossSeen = false;
+  const withholdExecuteResponse = async route => {
+    const response = await route.fetch();
+    responseLossSeen = true;
+    await route.fulfill({
+      status: 599,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: 'WEBVIEW2_RESPONSE_WITHHELD', error: 'Evidence runner withheld the execute response.' })
+    });
+  };
+  await page.route('**/api/inspection/execute', withholdExecuteResponse);
+  let reconcileHandoff;
+  try {
+    await page.locator('[data-testid="workspace-run"]').click();
+    await page.waitForFunction(() =>
+      document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+        ?.getAttribute('data-workspace-run-phase') === 'unknown-outcome',
+      null,
+      { timeout: 45_000 }
+    );
+    assert(responseLossSeen, 'Real WebView2 execute response-loss fixture did not reach the server.');
+    await page.locator('[data-testid="workspace-run-reconcile"]').click();
+    reconcileHandoff = await readFormalResultsHandoff(page, projectId);
+  } finally {
+    await page.unroute('**/api/inspection/execute', withholdExecuteResponse);
+  }
+
+  await waitForPersistedWorkspace(page, projectId);
   const slowFixtureEnabled = await setFormalRunSlowFixture(page, formalRunSeed, true);
   let executeResponseCompleted = false;
   const observeExecuteResponse = response => {
@@ -1165,36 +1193,6 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
     Number(unlockedSave.persistenceRevision) > revisionBeforeUnlockedSave,
   `Cancelled Formal Run save did not reach the authoritative Project service: ${JSON.stringify(unlockedSave)}`);
 
-  const slowFixtureDisabled = await setFormalRunSlowFixture(page, formalRunSeed, false);
-
-  await waitForPersistedWorkspace(page, projectId);
-  let responseLossSeen = false;
-  const withholdExecuteResponse = async route => {
-    const response = await route.fetch();
-    responseLossSeen = true;
-    await route.fulfill({
-      status: 599,
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ code: 'WEBVIEW2_RESPONSE_WITHHELD', error: 'Evidence runner withheld the execute response.' })
-    });
-  };
-  await page.route('**/api/inspection/execute', withholdExecuteResponse);
-  let reconcileHandoff;
-  try {
-    await page.locator('[data-testid="workspace-run"]').click();
-    await page.waitForFunction(() =>
-      document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
-        ?.getAttribute('data-workspace-run-phase') === 'unknown-outcome',
-      null,
-      { timeout: 45_000 }
-    );
-    assert(responseLossSeen, 'Real WebView2 execute response-loss fixture did not reach the server.');
-    await page.locator('[data-testid="workspace-run-reconcile"]').click();
-    reconcileHandoff = await readFormalResultsHandoff(page, projectId);
-  } finally {
-    await page.unroute('**/api/inspection/execute', withholdExecuteResponse);
-  }
-
   const runPaths = runtimeErrors.requests
     .map(item => new URL(item.url).pathname)
     .filter(path => /^\/api\/inspection\/(admission|execute|stop|reconcile)$/.test(path));
@@ -1214,8 +1212,7 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
       cancelledResult,
       storedCancelledResult,
       workspaceRouteRetained: true,
-      mutationSaveRoiUnlocked: true,
-      slowFixtureDisabled
+      mutationSaveRoiUnlocked: true
     },
     reconcileHandoff,
     runPaths,
@@ -1704,9 +1701,9 @@ async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = nul
   const expectedRunPaths = formalRun
     ? [
         '/api/inspection/admission', '/api/inspection/execute',
+        '/api/inspection/admission', '/api/inspection/execute', '/api/inspection/reconcile',
         '/api/inspection/admission', '/api/inspection/execute', '/api/inspection/stop',
-        ...(workspaceG6?.genuineRunningStop?.uiReconciliation ? ['/api/inspection/reconcile'] : []),
-        '/api/inspection/admission', '/api/inspection/execute', '/api/inspection/reconcile'
+        ...(workspaceG6?.genuineRunningStop?.uiReconciliation ? ['/api/inspection/reconcile'] : [])
       ]
     : [];
   const unexpectedWriteRequests = writeRequests.filter(item => {
@@ -1748,7 +1745,7 @@ async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = nul
       `G5 emitted Run/Admission/Execute requests: ${JSON.stringify(forbiddenRunRequests)}`);
   }
   if (workspaceG4) {
-    const expectedProjectPutCount = formalRun ? 5 : 1;
+    const expectedProjectPutCount = formalRun ? 4 : 1;
     assert(projectPutRequests.length === expectedProjectPutCount,
       `G5/G6 real WebView2 expected ${expectedProjectPutCount} Project PUT request(s): ${JSON.stringify(projectPutRequests)}`);
   }
