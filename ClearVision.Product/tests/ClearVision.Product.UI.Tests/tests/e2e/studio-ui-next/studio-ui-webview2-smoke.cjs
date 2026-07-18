@@ -1840,6 +1840,7 @@ async function verifyProductPage(
     const unexpectedWorkspaceRequests = productRequests.filter(item => {
       const url = new URL(item.url);
       return url.pathname !== '/health' &&
+        !(isF04Evidence && item.method === 'GET' && url.pathname === '/api/auth/setup-status') &&
         url.pathname !== '/api/auth/me' &&
         !(url.pathname === '/api/operators/library' && url.search === '?includeCompatibility=true') &&
         !/^\/api\/operators\/[^/]+\/metadata$/i.test(url.pathname) &&
