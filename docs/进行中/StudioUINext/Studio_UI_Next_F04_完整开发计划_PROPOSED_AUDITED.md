@@ -1,8 +1,8 @@
 # Studio UI Next F04 完整开发计划
 
-> 文档状态：**G1_CONTRACTS_FROZEN**
+> 文档状态：**G2_DONE_G3A_CONTRACTS_FROZEN**
 > 本计划已经结合 F03 最终实现、当前 `studio-ui-next` 分支代码事实、原 F04 初稿及独立复审意见修订。
-> 产品负责人已批准 G0B，并在 G0 通过后批准进入 G1 合同冻结；G2–G6 产品实现仍未批准。
+> 产品负责人已通过 Prompt 3/4 批准并完成 G2 Auth 生命周期实现，以及 G3A Project 生命周期合同冻结；G3B/G3C/G4–G6 尚未实现。
 
 ---
 
@@ -11,7 +11,7 @@
 ```text
 PLAN_NAME=Studio UI Next F04
 PLAN_THEME=产品化入口、认证闭环、工程生命周期与受控切换
-PLAN_STATUS=G1_CONTRACTS_FROZEN
+PLAN_STATUS=G2_DONE_G3A_CONTRACTS_FROZEN
 
 CODE_AUDIT_BASE_SHA=b24d20b3531bdea66f0b9b73ba5e18827489eedf
 PLAN_DOCUMENT_COMMIT_SHA=42a2c8811d97af2212fa2a3ec40ba7b86aab649e
@@ -31,6 +31,8 @@ CLEAN_NO_NODE_TARGET_MACHINE_BLOCKING=NO
 BLOCKS_F04=NO
 BLOCKS_G1=NO
 BLOCKS_G2_TO_G6=NO
+BLOCKS_G2=NO
+BLOCKS_G3A=NO
 BLOCKS_NEXT_PILOT=NO
 BLOCKS_DEFAULT_ENTRY_RECOMMENDATION=NO
 
@@ -42,9 +44,16 @@ F04_ENTRY_RATIONALE=F03功能、代码、WebView2、Release、DPI、远端CI及�
 F04_AUDIT_ENTRY=APPROVED
 G0B_APPROVED=YES
 G1_ENTRY_APPROVED_AFTER_G0B_PASS=YES
-G2_TO_G6_IMPLEMENTATION=NO
+G2_IMPLEMENTED=YES
+G3A_CONTRACTS_FROZEN=YES
+G3B_BACKEND_IMPLEMENTATION=NO
+G3C_FRONTEND_IMPLEMENTATION=NO
+G4_TO_G6_IMPLEMENTATION=NO
 G0_STATUS=DONE
 G1_STATUS=DONE
+G2_STATUS=DONE
+G3A_STATUS=DONE
+G3B_ENTRY=APPROVED
 F04_STARTED=YES
 
 OFFICIAL_STUDIO_UI_DEFAULT=false
@@ -789,6 +798,20 @@ fresh database
 - late response；
 - owner ledger。
 
+G2 实际 closure、owner topology、状态机、route guard 与证据口径见：
+
+- [F04 G2 Auth 生命周期闭环](./F04_G2_Auth生命周期闭环.md)
+- [ADR F04-G2：401 会话失效与运行重认证协调](./ADR-F04-G2-401会话失效与运行重认证协调.md)
+
+```text
+G2_STATUS=DONE
+F04-B10=CLOSED
+F04-B11=CLOSED
+F04-B12=CLOSED
+F04-B13=CLOSED
+F04-B14=CLOSED
+```
+
 ---
 
 # 8. G3：Project 合同与生命周期
@@ -909,6 +932,19 @@ DEFERRED_WITH_REASON
 
 ```text
 G3B_ENTRY=REJECTED
+```
+
+Prompt 3/4 已完成正式合同批准，详见：
+
+- [F04 G3A Project 生命周期合同决策](./F04_G3A_Project生命周期合同决策.md)
+- [ADR F04-G3A：Project 生命周期合同](./ADR-F04-G3A-Project生命周期合同.md)
+
+```text
+G3A_STATUS=DONE
+G3A_APPROVED_BY=PRODUCT_OWNER
+G3A_APPROVED_AT=2026-07-18
+G3B_ENTRY=APPROVED
+G3B_IMPLEMENTED=NO
 ```
 
 ## 8.3 G3B：Approved backend hardening

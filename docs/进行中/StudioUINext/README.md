@@ -54,7 +54,7 @@ F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision
   `F02_STATE=AWAITING_PRODUCT_VISUAL_CONFIRMATION`。Final SHA workflow_dispatch 的实际结论由不再修改
   该 SHA 的交付回报记录。
 - F03：G1–G6 核心实现已经完成，`F03_G6_STATUS=DONE`；总体状态仍为 `PARTIAL`，唯一历史 evidence gap 是独立无 Node 目标机验证 `NOT_PERFORMED`。产品负责人已接受延期，该项在 F04 中为非阻塞治理项，不改写为 PASS 或 COMPLETE。
-- F04：当前唯一执行权威是 [F04 完整开发计划](./Studio_UI_Next_F04_完整开发计划_PROPOSED_AUDITED.md)。G0B 已获批并完成必要稳定线语义同步；G1 仅冻结产品任务、路由、权限、HTTP、Owner 与 Project 合同，不实现 G2–G6 产品能力。
+- F04：当前唯一执行权威是 [F04 完整开发计划](./Studio_UI_Next_F04_完整开发计划_PROPOSED_AUDITED.md)。G0/G1 已完成；G2 已实现唯一 Auth/session 生命周期、token authority、ProductRuntime auth gating 与真实 route guard；G3A 已冻结并由产品负责人批准 Project create/delete/open/reconcile 合同。G3B/G3C/G4–G6 尚未实现。
 - `Studio:StudioUiEnabled=false` 保持不变；legacy 仍是默认入口。
 
 ## 阶段门禁
@@ -84,5 +84,9 @@ F04 执行期间以本目录链接的 F04 计划为唯一当前权威；仓库�
 - [F03 输入与迁移边界（历史输入，已被 F03 完整计划取代）](./F03_输入与迁移边界.md)
 - [F04 完整开发计划（当前唯一权威）](./Studio_UI_Next_F04_完整开发计划_PROPOSED_AUDITED.md)
 - [F04 G1 产品合同与边界冻结](./F04_G1_产品合同与边界冻结.md)
+- [F04 G2 Auth 生命周期闭环](./F04_G2_Auth生命周期闭环.md)
+- [ADR F04-G2：401 会话失效与运行重认证协调](./ADR-F04-G2-401会话失效与运行重认证协调.md)
+- [F04 G3A Project 生命周期合同决策](./F04_G3A_Project生命周期合同决策.md)
+- [ADR F04-G3A：Project 生命周期合同](./ADR-F04-G3A-Project生命周期合同.md)
 - [仓库级协作规则](../../../AGENTS.md)
 - [旧 Studio2 历史入口](../Studio2/README.md)（历史取证，不是新计划）
