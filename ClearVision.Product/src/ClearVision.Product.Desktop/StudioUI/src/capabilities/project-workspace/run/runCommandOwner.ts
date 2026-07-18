@@ -49,6 +49,7 @@ export interface WorkspaceRunCommandOwner {
   run(): Promise<WorkspaceRunResultV1 | null>;
   stop(): Promise<boolean>;
   reconcile(): Promise<WorkspaceRunReconciliationV1 | null>;
+  reconciliationIdentity(): WorkspaceRunIdentityV1 | null;
   prepareForLeave(reason?: string): Promise<boolean>;
   settle(): Promise<void>;
   dispose(reason?: string): void;
@@ -536,6 +537,9 @@ export function createWorkspaceRunCommandOwner(options: {
     },
     reconcile(): Promise<WorkspaceRunReconciliationV1 | null> {
       return reconcileCurrent();
+    },
+    reconciliationIdentity(): WorkspaceRunIdentityV1 | null {
+      return currentIdentity();
     },
     prepareForLeave(reason = 'route-leave'): Promise<boolean> {
       return prepareRunForLeave(reason);

@@ -20,6 +20,7 @@ import {
   type WorkspaceRunReconciliationV1,
   type WorkspaceRunResultV1
 } from './run';
+import type { WorkspaceRunIdentityV1 } from './run/runContracts';
 import type {
   WorkspaceLifecycleDiagnosticsOwner,
   WorkspaceOwnerDiagnosticsLease
@@ -52,8 +53,16 @@ export interface WorkspaceOwner {
   stopFormal(): Promise<boolean>;
   reconcileFormalRun(): Promise<WorkspaceRunReconciliationV1 | null>;
   prepareForLeave(reason?: string): Promise<boolean>;
+  quarantineForSessionExpiration(): WorkspaceSessionReconcileIdentity | null;
+  reconcileAfterReauthentication(): Promise<boolean>;
   setReadonly(reason: string): void;
   dispose(reason?: string): void;
+}
+
+export interface WorkspaceSessionReconcileIdentity extends WorkspaceRunIdentityV1 {
+  readonly operationId: string;
+  readonly runId: string | null;
+  readonly executionSnapshotId: string;
 }
 
 export function createWorkspaceOwner(
@@ -154,6 +163,38 @@ export function createWorkspaceOwner(
         return false;
       }
       return await persistenceOwner?.prepareForLeave(reason) ?? true;
+    },
+    quarantineForSessionExpiration(): WorkspaceSessionReconcileIdentity | null {
+      if (disposed) return null;
+      state.phase = 'readonly';
+      state.readonlyReason = '会话已失效；本地 draft 与运行身份已隔离，重新认证并完成 reconcile 前禁止写入。';
+      flowOwner?.setMutationGate('readonly');
+      persistenceOwner?.setReadonly(state.readonlyReason);
+      const identity = runOwner?.reconciliationIdentity();
+      if (!identity) return null;
+      return Object.freeze({
+        ...identity,
+        operationId: identity.clientSnapshotId,
+        runId: runOwner?.projection.result?.id ?? null,
+        executionSnapshotId: runOwner?.projection.result?.executionSnapshotId ?? identity.clientSnapshotId
+      });
+    },
+    async reconcileAfterReauthentication(): Promise<boolean> {
+      if (disposed) return true;
+      if (persistenceOwner?.projection.phase === 'unknown-outcome') {
+        const save = await persistenceOwner.reconcile();
+        if (save.status === 'unknown-outcome' || save.status === 'failed') return false;
+      }
+      const runPhase = runOwner?.projection.phase;
+      if (runPhase === 'executing' || runPhase === 'cancel-requested' || runPhase === 'unknown-outcome') {
+        const reconciliation = await runOwner?.reconcile();
+        return Boolean(reconciliation && (
+          reconciliation.status === 'cancelled' ||
+          reconciliation.status === 'succeeded' ||
+          reconciliation.status === 'failed'
+        ));
+      }
+      return runPhase !== 'admitting';
     },
     setReadonly(reason: string): void {
       if (disposed) return;

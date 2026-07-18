@@ -2,12 +2,9 @@ import { createPinia } from 'pinia';
 import { createApp, type App as VueApp } from 'vue';
 import type { Router } from 'vue-router';
 import App from '@/app/App.vue';
-import {
-  createProductRuntime,
-  productRuntimeKey,
-  type ProductRuntime
-} from '@/app/productRuntime';
-import { createStudioRouter } from '@/app/router';
+import { authLifecycleRootKey, createAuthLifecycleRoot, type AuthLifecycleRoot } from '@/app/auth';
+import type { ProductRuntime } from '@/app/productRuntime';
+import { createStudioRouter, installAuthRouteGuard } from '@/app/router';
 import {
   createDesktopStudioPlatform,
   createRuntimeStudioPlatform,
@@ -18,7 +15,6 @@ import {
 
 export interface MountStudioAppOptions {
   readonly platform: StudioPlatform;
-  readonly productRuntime?: ProductRuntime;
   router?: Router;
 }
 
@@ -31,7 +27,8 @@ export interface MountedStudioApp {
   readonly app: VueApp<Element>;
   readonly router: Router;
   readonly platform: StudioPlatform;
-  readonly productRuntime: ProductRuntime;
+  readonly authRoot: AuthLifecycleRoot;
+  readonly productRuntime: ProductRuntime | null;
   unmount(): void;
 }
 
@@ -50,25 +47,22 @@ export async function mountStudioApp(
 
   const app = createApp(App);
   const router = options.router ?? createStudioRouter();
-  let productRuntime: ProductRuntime | undefined;
+  const authRoot = createAuthLifecycleRoot(options.platform);
 
   try {
-    productRuntime = options.productRuntime ?? createProductRuntime(options.platform);
+    authRoot.bindRouter(router);
+    installAuthRouteGuard(router, authRoot.auth, options.platform.startup);
     app.use(createPinia());
     app.use(router);
     app.provide(studioPlatformKey, options.platform);
-    app.provide(productRuntimeKey, productRuntime);
+    app.provide(authLifecycleRootKey, authRoot);
+    await authRoot.start();
     await router.isReady();
     app.mount(mountTarget);
   } catch (error) {
-    productRuntime?.dispose();
+    authRoot.dispose();
     options.platform.dispose();
     throw error;
-  }
-
-  if (!productRuntime) {
-    options.platform.dispose();
-    throw new Error('ProductRuntime was not created.');
   }
 
   let mounted = true;
@@ -76,7 +70,10 @@ export async function mountStudioApp(
     app,
     router,
     platform: options.platform,
-    productRuntime,
+    authRoot,
+    get productRuntime(): ProductRuntime | null {
+      return authRoot.productRuntime.value;
+    },
     unmount() {
       if (!mounted) {
         return;
@@ -87,7 +84,7 @@ export async function mountStudioApp(
         app.unmount();
       } finally {
         try {
-          productRuntime.dispose();
+          authRoot.dispose();
         } finally {
           options.platform.dispose();
         }

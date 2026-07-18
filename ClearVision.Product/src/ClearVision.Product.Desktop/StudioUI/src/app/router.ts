@@ -1,12 +1,19 @@
 import {
   createRouter,
   createWebHashHistory,
+  type RouteLocationNormalized,
   type RouteRecordRaw,
   type Router,
   type RouterHistory
 } from 'vue-router';
+import type { AuthLifecycleOwner } from '@/app/auth';
+import ProductRuntimeBoundary from '@/app/layouts/ProductRuntimeBoundary.vue';
 import ProductLayout from '@/app/layouts/ProductLayout.vue';
 import InternalLabLayout from '@/app/layouts/InternalLabLayout.vue';
+import LoginPage from '@/app/pages/auth/LoginPage.vue';
+import SetupPage from '@/app/pages/auth/SetupPage.vue';
+import ChangePasswordPage from '@/app/pages/auth/ChangePasswordPage.vue';
+import ForbiddenPage from '@/app/pages/ForbiddenPage.vue';
 import NotFoundPage from '@/app/pages/NotFoundPage.vue';
 import AboutPage from '@/capabilities/about/AboutPage.vue';
 import OverviewPage from '@/capabilities/overview/OverviewPage.vue';
@@ -21,121 +28,263 @@ import StationsPage from '@/capabilities/stations-read/StationsPage.vue';
 import CanvasLabPlaceholder from '@/labs/canvas/CanvasLabPlaceholder.vue';
 import DesignLabPlaceholder from '@/labs/design/DesignLabPlaceholder.vue';
 import DiagnosticsPage from '@/platform/diagnostics/DiagnosticsPage.vue';
+import type { StudioStartupConfigV1 } from '@/platform/startup';
+
+const editorRoles = Object.freeze(['Admin', 'Engineer']);
+const stationFlagKey = 'Studio2.StationsRead';
 
 export const studioRoutes: readonly RouteRecordRaw[] = [
   {
+    path: '/setup',
+    name: 'setup',
+    component: SetupPage,
+    meta: { title: '首次管理员初始化', breadcrumb: '初始化', public: true, setupOnly: true }
+  },
+  {
+    path: '/login',
+    name: 'login',
+    component: LoginPage,
+    meta: { title: '登录', breadcrumb: '登录', public: true }
+  },
+  {
+    path: '/change-password',
+    name: 'change-password',
+    component: ChangePasswordPage,
+    meta: { title: '修改密码', breadcrumb: '修改密码', requiresSession: true }
+  },
+  {
+    path: '/forbidden',
+    name: 'forbidden',
+    component: ForbiddenPage,
+    meta: { title: '无权访问', breadcrumb: '403', requiresSession: true }
+  },
+  {
+    path: '/not-found',
+    name: 'not-found',
+    component: NotFoundPage,
+    meta: { title: '页面未找到', breadcrumb: '404', requiresSession: true }
+  },
+  {
     path: '/',
-    component: ProductLayout,
-    meta: { title: 'ClearVision Studio', breadcrumb: 'Studio', requiresSession: true },
+    component: ProductRuntimeBoundary,
+    meta: { requiresSession: true },
     children: [
-      { path: '', redirect: '/overview' },
       {
-        path: 'overview',
-        name: 'overview',
-        component: OverviewPage,
-        meta: { title: '概览', breadcrumb: '概览', requiresSession: true }
-      },
-      {
-        path: 'projects',
-        name: 'projects',
-        component: ProjectsPage,
-        meta: { title: '工程', breadcrumb: '工程', requiresSession: true }
-      },
-      {
-        path: 'projects/:id',
-        name: 'project-detail',
-        component: ProjectDetailPage,
-        meta: { title: '工程详情', breadcrumb: '工程详情', requiresSession: true }
-      },
-      {
-        path: 'projects/:id/workspace',
-        name: 'project-workspace',
-        component: WorkspacePage,
-        meta: {
-          title: '工程工作区',
-          breadcrumb: '工作区',
-          requiresSession: true,
-          workspaceMode: true
-        }
-      },
-      {
-        path: 'operators',
-        name: 'operators',
-        component: OperatorsPage,
-        meta: { title: '算子库', breadcrumb: '算子库', requiresSession: true }
-      },
-      {
-        path: 'operators/:operatorType',
-        name: 'operator-detail',
-        component: OperatorDetailPage,
-        meta: { title: '算子详情', breadcrumb: '算子详情', requiresSession: true }
-      },
-      {
-        path: 'stations',
-        name: 'stations',
-        component: StationsPage,
-        meta: { title: '工作站', breadcrumb: '工作站', requiresSession: true }
-      },
-      {
-        path: 'stations/:stationId',
-        name: 'station-detail',
-        component: StationDetailPage,
-        meta: { title: '工作站详情', breadcrumb: '工作站详情', requiresSession: true }
-      },
-      {
-        path: 'results',
-        name: 'results',
-        component: ResultsPage,
-        meta: { title: '检测结果', breadcrumb: '检测结果', requiresSession: true }
-      },
-      {
-        path: 'diagnostics',
-        name: 'diagnostics',
-        component: DiagnosticsPage,
-        meta: { title: '诊断', breadcrumb: '诊断', requiresSession: true }
-      },
-      {
-        path: 'about',
-        name: 'about',
-        component: AboutPage,
-        meta: { title: '关于', breadcrumb: '关于', requiresSession: true }
-      },
-      {
-        path: ':pathMatch(.*)*',
-        name: 'not-found',
-        component: NotFoundPage,
-        meta: { title: '页面未找到', breadcrumb: '404', requiresSession: true }
+        path: '',
+        component: ProductLayout,
+        meta: { title: 'ClearVision Studio', breadcrumb: 'Studio', requiresSession: true },
+        children: [
+          { path: '', redirect: '/overview' },
+          {
+            path: 'overview',
+            name: 'overview',
+            component: OverviewPage,
+            meta: { title: '概览', breadcrumb: '概览', requiresSession: true }
+          },
+          {
+            path: 'projects',
+            name: 'projects',
+            component: ProjectsPage,
+            meta: { title: '工程', breadcrumb: '工程', requiresSession: true }
+          },
+          {
+            path: 'projects/:id',
+            name: 'project-detail',
+            component: ProjectDetailPage,
+            meta: { title: '工程详情', breadcrumb: '工程详情', requiresSession: true }
+          },
+          {
+            path: 'projects/:id/workspace',
+            name: 'project-workspace',
+            component: WorkspacePage,
+            meta: {
+              title: '工程工作区',
+              breadcrumb: '工作区',
+              requiresSession: true,
+              allowedRoles: editorRoles,
+              workspaceMode: true
+            }
+          },
+          {
+            path: 'operators',
+            name: 'operators',
+            component: OperatorsPage,
+            meta: { title: '算子库', breadcrumb: '算子库', requiresSession: true }
+          },
+          {
+            path: 'operators/:operatorType',
+            name: 'operator-detail',
+            component: OperatorDetailPage,
+            meta: { title: '算子详情', breadcrumb: '算子详情', requiresSession: true }
+          },
+          {
+            path: 'stations',
+            name: 'stations',
+            component: StationsPage,
+            meta: {
+              title: '工作站',
+              breadcrumb: '工作站',
+              requiresSession: true,
+              productProfile: 'stations-read'
+            }
+          },
+          {
+            path: 'stations/:stationId',
+            name: 'station-detail',
+            component: StationDetailPage,
+            meta: {
+              title: '工作站详情',
+              breadcrumb: '工作站详情',
+              requiresSession: true,
+              productProfile: 'stations-read'
+            }
+          },
+          {
+            path: 'results',
+            name: 'results',
+            component: ResultsPage,
+            meta: { title: '检测结果', breadcrumb: '检测结果', requiresSession: true }
+          },
+          {
+            path: 'diagnostics',
+            name: 'diagnostics',
+            component: DiagnosticsPage,
+            meta: {
+              title: '诊断',
+              breadcrumb: '诊断',
+              requiresSession: true,
+              allowedRoles: editorRoles
+            }
+          },
+          {
+            path: 'about',
+            name: 'about',
+            component: AboutPage,
+            meta: { title: '关于', breadcrumb: '关于', requiresSession: true }
+          },
+          {
+            path: ':pathMatch(.*)*',
+            name: 'not-found-catchall',
+            component: NotFoundPage,
+            meta: { title: '页面未找到', breadcrumb: '404', requiresSession: true }
+          }
+        ]
       }
     ]
   },
   {
     path: '/labs',
-    component: InternalLabLayout,
-    meta: { title: '内部实验室', breadcrumb: '实验室', internal: true },
+    component: ProductRuntimeBoundary,
+    meta: { title: '内部实验室', breadcrumb: '实验室', internal: true, requiresSession: true },
     children: [
       {
-        path: 'design',
-        name: 'design-lab-placeholder',
-        component: DesignLabPlaceholder,
-        meta: { title: 'Design Lab', breadcrumb: 'Design Lab', internal: true }
-      },
-      {
-        path: 'canvas',
-        name: 'canvas-lab-placeholder',
-        component: CanvasLabPlaceholder,
-        meta: { title: 'Canvas Lab', breadcrumb: 'Canvas Lab', internal: true }
+        path: '',
+        component: InternalLabLayout,
+        meta: { internal: true, requiresSession: true },
+        children: [
+          {
+            path: 'design',
+            name: 'design-lab-placeholder',
+            component: DesignLabPlaceholder,
+            meta: { title: 'Design Lab', breadcrumb: 'Design Lab', internal: true, requiresSession: true }
+          },
+          {
+            path: 'canvas',
+            name: 'canvas-lab-placeholder',
+            component: CanvasLabPlaceholder,
+            meta: { title: 'Canvas Lab', breadcrumb: 'Canvas Lab', internal: true, requiresSession: true }
+          }
+        ]
       }
     ]
   }
 ];
 
+function containsUnsafeReturnSyntax(value: string): boolean {
+  if (!value || value !== value.trim() || value.includes('\\')) return true;
+  if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(value)) return true;
+  if (/%(?:2f|5c)/i.test(value)) return true;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    return true;
+  }
+  return decoded.split(/[?#]/, 1)[0]?.split('/').includes('..') === true;
+}
+
+export function resolveSafeReturnRoute(value: unknown): string | null {
+  if (typeof value !== 'string' || containsUnsafeReturnSyntax(value)) return null;
+  const path = value.split(/[?#]/, 1)[0] ?? '';
+  if (path === '/overview' || path === '/projects' || path.startsWith('/projects/') ||
+      path === '/operators' || path.startsWith('/operators/') || path === '/results' ||
+      path === '/diagnostics' || path === '/about') {
+    return value;
+  }
+  return null;
+}
+
+function requestedReturnRoute(to: RouteLocationNormalized): string | null {
+  return resolveSafeReturnRoute(to.query.returnTo);
+}
+
+export function installAuthRouteGuard(
+  router: Router,
+  auth: AuthLifecycleOwner,
+  startup: StudioStartupConfigV1
+): () => void {
+  return router.beforeEach(async to => {
+    if (auth.projection.phase === 'checking-setup') await auth.start();
+    const projection = auth.projection;
+
+    if (projection.phase === 'setup-required') {
+      return to.name === 'setup' ? true : { path: '/setup', replace: true };
+    }
+    if (to.name === 'setup') {
+      return projection.phase === 'authenticated' ? { path: '/overview', replace: true } :
+        { path: '/login', replace: true };
+    }
+    if (to.name === 'login') {
+      if (projection.phase === 'authenticated') {
+        return { path: requestedReturnRoute(to) ?? '/overview', replace: true };
+      }
+      return true;
+    }
+
+    const requiresSession = to.matched.some(record => record.meta.requiresSession === true);
+    if (requiresSession && projection.phase !== 'authenticated') {
+      const returnTo = resolveSafeReturnRoute(to.fullPath);
+      return {
+        path: '/login',
+        query: returnTo ? { returnTo } : {},
+        replace: true
+      };
+    }
+
+    if (!requiresSession) return true;
+    if (to.name === 'change-password' && to.fullPath !== router.currentRoute.value.fullPath) {
+      if (!(await auth.prepareChangePasswordRoute())) return false;
+    }
+    const role = projection.user?.role;
+    const allowedRoles = to.matched.flatMap(record => record.meta.allowedRoles ?? []);
+    if (allowedRoles.length > 0 && (!role || !allowedRoles.includes(role))) {
+      return to.name === 'forbidden' ? true : { path: '/forbidden', replace: true };
+    }
+    if (to.matched.some(record => record.meta.productProfile === 'stations-read') &&
+        startup.featureFlags[stationFlagKey] !== true) {
+      return { path: '/forbidden', replace: true };
+    }
+    if (to.matched.some(record => record.meta.internal === true) && startup.hostKind !== 'browser-test') {
+      return { path: '/forbidden', replace: true };
+    }
+    return true;
+  });
+}
+
 export function createStudioRouter(
   history: RouterHistory = createWebHashHistory(import.meta.env.BASE_URL)
 ): Router {
-  const router = createRouter({
-    history,
-    routes: [...studioRoutes]
-  });
+  const router = createRouter({ history, routes: [...studioRoutes] });
   router.afterEach(to => {
     if (typeof document !== 'undefined') {
       document.title = `${to.meta.title ?? 'ClearVision Studio'} · ClearVision`;

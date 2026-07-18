@@ -13,6 +13,7 @@ import {
   type WorkspaceLifecycleDiagnosticsOwner
 } from './workspaceLifecycleDiagnostics';
 import { createWorkspaceOwner, type WorkspaceOwner } from './workspaceOwner';
+import type { WorkspaceSessionReconcileIdentity } from './workspaceOwner';
 import {
   createWorkspaceProjectReadPort,
   type WorkspaceProjectReadPort
@@ -36,7 +37,15 @@ export interface WorkspaceRuntime {
   refreshSession(): Promise<void>;
   openProject(projectId: string): WorkspaceProjectReadPort;
   mountProject(project: WorkspaceProjectV1): WorkspaceOwner;
+  prepareForProtectedTransition(reason: 'logout' | 'change-password'): Promise<boolean>;
+  quarantineForSessionExpiration(): WorkspaceRuntimeQuarantine;
+  reconcileAfterReauthentication(): Promise<boolean>;
   dispose(): void;
+}
+
+export interface WorkspaceRuntimeQuarantine {
+  readonly activeOwnerCount: number;
+  readonly runIdentities: readonly WorkspaceSessionReconcileIdentity[];
 }
 
 export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): WorkspaceRuntime {
@@ -103,6 +112,8 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
         stopFormal: inner.stopFormal,
         reconcileFormalRun: inner.reconcileFormalRun,
         prepareForLeave: inner.prepareForLeave,
+        quarantineForSessionExpiration: inner.quarantineForSessionExpiration,
+        reconcileAfterReauthentication: inner.reconcileAfterReauthentication,
         setReadonly: inner.setReadonly,
         dispose(reason = 'workspace-owner-disposed'): void {
           if (ownerDisposed) return;
@@ -113,6 +124,30 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
       });
       activeOwners.add(owner);
       return owner;
+    },
+    async prepareForProtectedTransition(reason: 'logout' | 'change-password'): Promise<boolean> {
+      assertActive();
+      for (const owner of [...activeOwners]) {
+        if (!(await owner.prepareForLeave(`auth-${reason}`))) return false;
+      }
+      return true;
+    },
+    quarantineForSessionExpiration(): WorkspaceRuntimeQuarantine {
+      assertActive();
+      const runIdentities = [...activeOwners]
+        .map(owner => owner.quarantineForSessionExpiration())
+        .filter((identity): identity is WorkspaceSessionReconcileIdentity => identity !== null);
+      return Object.freeze({
+        activeOwnerCount: activeOwners.size,
+        runIdentities: Object.freeze(runIdentities)
+      });
+    },
+    async reconcileAfterReauthentication(): Promise<boolean> {
+      assertActive();
+      for (const owner of [...activeOwners]) {
+        if (!(await owner.reconcileAfterReauthentication())) return false;
+      }
+      return true;
     },
     dispose(): void {
       if (disposed) return;

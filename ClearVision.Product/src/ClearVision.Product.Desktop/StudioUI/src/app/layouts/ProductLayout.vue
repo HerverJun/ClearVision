@@ -1,20 +1,28 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
-import { productNavigation } from '@/app/navigation';
+import { visibleProductNavigation } from '@/app/navigation';
+import { useAuthLifecycleRoot } from '@/app/auth';
 import { useProductRuntime } from '@/app/productRuntime';
+import { useStudioPlatform } from '@/app/studioPlatform';
 import { CvButton, CvInlineAlert, CvStatusBadge } from '@/design-system/primitives';
 import { CvIcon } from '@/design-system/icons';
 import './product-layout.css';
 
 const route = useRoute();
 const runtime = useProductRuntime();
+const authRoot = useAuthLifecycleRoot();
+const platform = useStudioPlatform();
 const session = runtime.session.projection;
 const systemStatus = runtime.systemStatus.projection;
 const preferences = runtime.preferences.projection;
 const contentRoot = ref<HTMLElement>();
 const appearanceDetails = ref<HTMLDetailsElement>();
 const workspaceMode = computed(() => route.meta.workspaceMode === true);
+const navigation = computed(() => visibleProductNavigation(
+  session.user?.role,
+  platform.startup.featureFlags
+));
 
 function resolveBreadcrumbPath(path: string): string {
   return path.replace(/:([A-Za-z0-9_]+)/g, (_match, parameterName: string) => {
@@ -59,6 +67,10 @@ function closeAppearance(): void {
   details.querySelector<HTMLElement>('summary')?.focus();
 }
 
+function focusContent(): void {
+  contentRoot.value?.focus({ preventScroll: true });
+}
+
 watch(() => route.path, async (current, previous) => {
   if (!previous || current === previous) return;
   await nextTick();
@@ -78,6 +90,7 @@ onMounted(() => runtime.preferences.apply());
     <a
       class="product-layout__skip-link"
       href="#product-main"
+      @click.prevent="focusContent"
     >跳到主要内容</a>
 
     <aside class="product-layout__sidebar">
@@ -101,7 +114,7 @@ onMounted(() => runtime.preferences.apply());
       </div>
       <nav aria-label="产品主导航">
         <RouterLink
-          v-for="item in productNavigation"
+          v-for="item in navigation"
           :key="item.to"
           :to="item.to"
           class="product-layout__nav-item"
@@ -243,6 +256,20 @@ onMounted(() => runtime.preferences.apply());
               <small>{{ roleLabel }}</small>
             </span>
           </div>
+          <RouterLink
+            class="product-layout__session-command"
+            to="/change-password"
+          >
+            修改密码
+          </RouterLink>
+          <CvButton
+            size="sm"
+            variant="quiet"
+            data-auth-command="logout"
+            @click="authRoot.auth.logout()"
+          >
+            退出
+          </CvButton>
         </div>
       </header>
 
@@ -254,33 +281,23 @@ onMounted(() => runtime.preferences.apply());
         tabindex="-1"
       >
         <CvInlineAlert
-          v-if="!workspaceMode && session.phase === 'unauthorized'"
+          v-if="authRoot.auth.projection.errorCode === 'CHANGE_PASSWORD_BLOCKED'"
           class="product-layout__session-alert"
           tone="warning"
           compact
-          title="需要预置会话"
-          data-product-state="unauthorized"
+          title="会话操作已阻止"
         >
-          {{ session.message }} 当前只支持宿主预置会话，不提供新的登录跳转或首次启动流程。
-          <template #actions>
-            <CvButton
-              size="sm"
-              variant="secondary"
-              @click="runtime.session.refresh()"
-            >
-              重新检查
-            </CvButton>
-          </template>
+          {{ authRoot.auth.projection.message }}
         </CvInlineAlert>
         <CvInlineAlert
-          v-else-if="!workspaceMode && session.phase === 'error'"
+          v-if="!workspaceMode && session.phase === 'error'"
           class="product-layout__session-alert"
           tone="error"
           compact
           title="会话读取失败"
           data-product-state="error"
         >
-          {{ session.message }} 页面仍会挂载，但后端授权继续是唯一安全边界。
+          {{ session.message }} 后端授权继续是唯一安全边界。
         </CvInlineAlert>
         <CvInlineAlert
           v-else-if="!workspaceMode && session.phase === 'stale'"

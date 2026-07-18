@@ -1,6 +1,6 @@
 import { inject, type InjectionKey } from 'vue';
 import { createUiPreferencesOwner, type UiPreferencesOwner } from '@/app/preferences';
-import { createSessionProjectionOwner, type SessionProjectionOwner } from '@/app/session';
+import { sessionIdentityOf, type SessionProjectionOwner } from '@/app/session';
 import type { StudioPlatform } from '@/app/studioPlatform';
 import {
   createWorkspaceRuntime,
@@ -15,18 +15,29 @@ export interface ProductRuntime {
   readonly systemStatus: SystemStatusOwner;
   readonly preferences: UiPreferencesOwner;
   readonly workspace: WorkspaceRuntime;
+  prepareForProtectedTransition(reason: 'logout' | 'change-password'): Promise<boolean>;
+  quarantineForSessionExpiration(): ProductRuntimeQuarantine;
+  reconcileAfterReauthentication(): Promise<boolean>;
   dispose(): void;
+}
+
+export interface ProductRuntimeQuarantine {
+  readonly requiresPreservation: boolean;
+  readonly activeWorkspaceOwnerCount: number;
+  readonly runIdentities: ReturnType<WorkspaceRuntime['quarantineForSessionExpiration']>['runIdentities'];
 }
 
 export const productRuntimeKey: InjectionKey<ProductRuntime> = Symbol('ProductRuntime');
 
-export function createProductRuntime(platform: StudioPlatform): ProductRuntime {
+export function createProductRuntime(
+  platform: StudioPlatform,
+  session: SessionProjectionOwner
+): ProductRuntime {
   const queries = createReadQueryClient(platform.api);
+  const authenticatedUser = session.projection.user;
+  if (!authenticatedUser) throw new Error('ProductRuntime requires an authenticated session projection.');
+  queries.setSessionIdentity(sessionIdentityOf(authenticatedUser));
   const preferences = createUiPreferencesOwner();
-  const session = createSessionProjectionOwner({
-    queries,
-    hasToken: platform.hasToken
-  });
   const systemStatus = createSystemStatusOwner({ queries });
   const workspace = createWorkspaceRuntime({
     queries,
@@ -35,7 +46,7 @@ export function createProductRuntime(platform: StudioPlatform): ProductRuntime {
     featureFlags: platform.startup.featureFlags
   });
   let disposed = false;
-  session.start();
+  let quarantined = false;
   systemStatus.start();
 
   return Object.freeze({
@@ -44,11 +55,35 @@ export function createProductRuntime(platform: StudioPlatform): ProductRuntime {
     systemStatus,
     preferences,
     workspace,
+    prepareForProtectedTransition(reason: 'logout' | 'change-password'): Promise<boolean> {
+      if (disposed || quarantined) return Promise.resolve(false);
+      return workspace.prepareForProtectedTransition(reason);
+    },
+    quarantineForSessionExpiration(): ProductRuntimeQuarantine {
+      if (disposed) return Object.freeze({
+        requiresPreservation: false,
+        activeWorkspaceOwnerCount: 0,
+        runIdentities: Object.freeze([])
+      });
+      quarantined = true;
+      const result = workspace.quarantineForSessionExpiration();
+      systemStatus.dispose();
+      return Object.freeze({
+        requiresPreservation: result.activeOwnerCount > 0,
+        activeWorkspaceOwnerCount: result.activeOwnerCount,
+        runIdentities: result.runIdentities
+      });
+    },
+    async reconcileAfterReauthentication(): Promise<boolean> {
+      if (disposed) return false;
+      const reconciled = await workspace.reconcileAfterReauthentication();
+      if (reconciled) quarantined = false;
+      return reconciled;
+    },
     dispose(): void {
       if (disposed) return;
       disposed = true;
       workspace.dispose();
-      session.dispose();
       systemStatus.dispose();
       queries.dispose();
       preferences.dispose();
