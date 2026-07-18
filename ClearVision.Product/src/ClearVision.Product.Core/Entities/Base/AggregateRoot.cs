@@ -13,6 +13,14 @@ public abstract class AggregateRoot : Entity, IAggregateRoot
 {
     private readonly List<Events.IDomainEvent> _domainEvents = [];
 
+    protected AggregateRoot()
+    {
+    }
+
+    protected AggregateRoot(Guid id) : base(id)
+    {
+    }
+
     public IReadOnlyCollection<Events.IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
     public void AddDomainEvent(Events.IDomainEvent eventItem)

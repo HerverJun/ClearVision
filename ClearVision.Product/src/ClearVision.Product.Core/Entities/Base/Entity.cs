@@ -36,6 +36,18 @@ public abstract class Entity
         IsDeleted = false;
     }
 
+    protected Entity(Guid id)
+    {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("Entity id cannot be empty.", nameof(id));
+        }
+
+        Id = id;
+        CreatedAt = DateTime.UtcNow;
+        IsDeleted = false;
+    }
+
     /// <summary>
     /// 更新修改时间
     /// </summary>

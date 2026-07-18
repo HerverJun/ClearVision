@@ -5,6 +5,8 @@
 namespace ClearVision.Product.Application.DTOs;
 
 using ClearVision.Product.Core.ProjectVariables;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 /// <summary>
 /// 工程数据传输对象
@@ -68,6 +70,8 @@ public class ProjectDto
 /// </summary>
 public class CreateProjectRequest
 {
+    public Guid? ClientOperationId { get; set; }
+
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
 
@@ -77,6 +81,9 @@ public class CreateProjectRequest
     public OperatorFlowDto? Flow { get; set; }
 
     public ProjectGlobalVariableSchema? GlobalVariables { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? AdditionalProperties { get; set; }
 }
 
 /// <summary>

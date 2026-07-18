@@ -231,6 +231,7 @@ public static class VisionRuntimeServiceCollectionExtensions
 
         services.AddScoped(typeof(IRepository<>), typeof(RepositoryBase<>));
         services.AddScoped<IProjectRepository, ProjectRepository>();
+        services.AddScoped<IProjectLifecycleOperationRepository, ProjectLifecycleOperationRepository>();
         services.AddScoped<IOperatorRepository, OperatorRepository>();
         services.AddScoped<IInspectionResultRepository, InspectionResultRepository>();
         var imageCacheQueueCapacity = ResolveConfiguredInt(
@@ -258,6 +259,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<ProjectVariableSessionRegistry>();
         services.AddScoped<ProjectSaveCoordinator>();
         services.AddHostedService<ProjectSaveRecoveryHostedService>();
+        services.AddHostedService<ProjectLifecycleRecoveryHostedService>();
 
         services.AddSingleton<IInspectionRuntimeCoordinator, InspectionRuntimeCoordinator>();
         services.AddSingleton<InspectionWorker>();
@@ -275,6 +277,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IAutoTuneService, AutoTuneService>();
 
         services.AddScoped<ProjectService>();
+        services.AddScoped<ProjectLifecycleCoordinator>();
         services.AddSingleton<IAnalysisDataBuilder, AnalysisDataBuilder>();
         services.AddScoped<IInspectionEvidenceManifestService, InspectionEvidenceManifestService>();
         services.AddScoped<IInspectionService, InspectionService>();

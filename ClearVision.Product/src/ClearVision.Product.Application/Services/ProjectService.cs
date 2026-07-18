@@ -77,6 +77,12 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectDto> CreateAsync(CreateProjectRequest request)
     {
+        if (!request.ClientOperationId.HasValue)
+        {
+            _logger?.LogWarning(
+                "Deprecated legacy project create contract used. Flow/global-variable create compatibility remains enabled outside Studio UI Next F04.");
+        }
+
         var project = new Project(request.Name, request.Description);
         var globalVariables = request.GlobalVariables ?? new ProjectGlobalVariableSchema();
         if (request.Flow != null)
@@ -97,6 +103,31 @@ public class ProjectService
         }
 
         return MapToDto(project);
+    }
+
+    public async Task<ProjectDto> CreateBlankFromOperationAsync(
+        ProjectLifecycleOperation operation,
+        DateTimeOffset completedAtUtc,
+        DateTimeOffset expiresAtUtc)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        if (operation.Kind != ProjectLifecycleOperationKind.Create ||
+            operation.Status is not (ProjectLifecycleOperationStatus.Pending or ProjectLifecycleOperationStatus.FailedRetryable))
+        {
+            throw new InvalidOperationException("Project create operation is not executable.");
+        }
+
+        var project = new Project(
+            operation.ProjectId,
+            operation.ProjectName ?? throw new InvalidOperationException("Reserved project name is missing."),
+            operation.ProjectDescription);
+        var dto = MapToDto(project);
+        operation.CompleteCreate(
+            JsonSerializer.Serialize(new ProjectLifecycleOperationResultDto { Project = dto }, _jsonOptions),
+            completedAtUtc,
+            expiresAtUtc);
+        await _projectRepository.AddWithLifecycleOperationAsync(project, operation);
+        return dto;
     }
 
     /// <summary>
@@ -486,14 +517,59 @@ public class ProjectService
     /// <summary>
     /// 删除工程
     /// </summary>
-    public async Task DeleteAsync(Guid id)
+    public async Task<ProjectLifecycleOperationResultDto> TombstoneFromOperationAsync(
+        ProjectLifecycleOperation operation,
+        DateTimeOffset completedAtUtc,
+        DateTimeOffset expiresAtUtc)
     {
-        await using var access = await _saveCoordinator.AcquireProjectAccessAsync(id);
-        var project = await _projectRepository.GetByIdForUpdateAsync(id)
-            ?? throw new ProjectNotFoundException(id);
+        ArgumentNullException.ThrowIfNull(operation);
+        if (operation.Kind != ProjectLifecycleOperationKind.Delete ||
+            operation.ExpectedPersistenceRevision == null)
+        {
+            throw new InvalidOperationException("Project delete operation is not executable.");
+        }
 
+        await using var access = await _saveCoordinator.TryAcquireProjectAccessAsync(operation.ProjectId);
+        if (access == null)
+        {
+            throw new ProjectMutationConflictException(operation.ProjectId);
+        }
+
+        var project = await _projectRepository.GetByIdForUpdateAsync(operation.ProjectId)
+            ?? throw new ProjectNotFoundException(operation.ProjectId);
+        if (project.PersistenceRevision != operation.ExpectedPersistenceRevision.Value)
+        {
+            throw new ProjectRevisionConflictException(
+                project.Id,
+                operation.ExpectedPersistenceRevision.Value,
+                project.PersistenceRevision);
+        }
+
+        var result = new ProjectLifecycleOperationResultDto
+        {
+            Deleted = true,
+            AlreadyDeleted = false,
+            CleanupStatus = "cleanup-pending"
+        };
         project.MarkAsDeleted();
-        await _projectRepository.UpdateAsync(project);
+        operation.CompleteDelete(
+            JsonSerializer.Serialize(result, _jsonOptions),
+            completedAtUtc,
+            expiresAtUtc);
+        await _projectRepository.TombstoneWithLifecycleOperationAsync(project, operation);
+        _saveCoordinator.ClearProjectState(project.Id);
+        return result;
+    }
+
+    public async Task CleanupDeletedProjectAsync(Guid id)
+    {
+        var project = await _projectRepository.GetByIdIncludingDeletedAsync(id)
+            ?? throw new ProjectNotFoundException(id);
+        if (!project.IsDeleted)
+        {
+            throw new InvalidOperationException($"Project '{id}' is not tombstoned.");
+        }
+
         try
         {
             _projectVariableSessions?.Delete(id);
@@ -512,6 +588,18 @@ public class ProjectService
         {
             _saveCoordinator.ClearProjectState(id);
         }
+    }
+
+    public async Task<ProjectOpenResponse> OpenAsync(Guid id, DateTime openedAtUtc)
+    {
+        await using var access = await _saveCoordinator.AcquireProjectAccessAsync(id);
+        var lastOpenedAt = await _projectRepository.RecordOpenAsync(id, openedAtUtc)
+            ?? throw new ProjectNotFoundException(id);
+        return new ProjectOpenResponse
+        {
+            ProjectId = id,
+            LastOpenedAtUtc = DateTime.SpecifyKind(lastOpenedAt, DateTimeKind.Utc)
+        };
     }
 
     /// <summary>

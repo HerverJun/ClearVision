@@ -3,6 +3,7 @@
 // 作者：蘅芜君
 
 using System.Linq;
+using System.Security.Claims;
 using System.Text.Json;
 using ClearVision.Product.Application.Analysis;
 using ClearVision.Product.Application.DTOs;
@@ -142,28 +143,102 @@ public static class ApiEndpoints
             try
             {
                 var project = await service.GetByIdAsync(id);
-                return project != null ? Results.Ok(project) : Results.NotFound();
+                return project != null
+                    ? Results.Ok(project)
+                    : Results.NotFound(new { Code = "PROJECT_NOT_FOUND", Error = "Project was not found." });
             }
             catch (Exception ex)
             {
-                return ToBadRequest(ex);
+                return ex is ProjectNotFoundException
+                    ? ToProjectLifecycleFailure(ex)
+                    : ToBadRequest(ex);
             }
         });
 
         // 创建工程
-        app.MapPost("/api/projects", async (CreateProjectRequest request, ProjectService service) =>
+        app.MapPost("/api/projects", async (
+            CreateProjectRequest request,
+            ProjectService service,
+            ProjectLifecycleCoordinator lifecycleCoordinator,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
         {
             try
             {
+                if (request.ClientOperationId.HasValue)
+                {
+                    var result = await lifecycleCoordinator.CreateBlankAsync(
+                        GetAuthenticatedUserId(context),
+                        request,
+                        cancellationToken);
+                    var response = new
+                    {
+                        projectId = result.Project.Id,
+                        project = result.Project,
+                        operationReplayed = result.OperationReplayed,
+                        operation = result.Operation
+                    };
+                    return result.OperationReplayed
+                        ? Results.Ok(response)
+                        : Results.Created($"/api/projects/{result.Project.Id}", response);
+                }
+
                 var project = await service.CreateAsync(request);
                 return Results.Created($"/api/projects/{project.Id}", project);
             }
             catch (Exception ex)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return request.ClientOperationId.HasValue
+                    ? ToProjectLifecycleFailure(ex)
+                    : Results.BadRequest(new { Error = ex.Message });
             }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
+
+        app.MapGet("/api/project-operations/{clientOperationId:guid}", async (
+            Guid clientOperationId,
+            string? kind,
+            ProjectLifecycleCoordinator lifecycleCoordinator,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var operationKind = kind?.Trim().ToLowerInvariant() switch
+                {
+                    "create" => ProjectLifecycleOperationKind.Create,
+                    "delete" => ProjectLifecycleOperationKind.Delete,
+                    _ => throw new ProjectLifecycleValidationException(
+                        "PROJECT_VALIDATION_OPERATION_KIND_INVALID",
+                        "kind must be create or delete.")
+                };
+                var operation = await lifecycleCoordinator.GetOperationAsync(
+                    GetAuthenticatedUserId(context),
+                    clientOperationId,
+                    operationKind,
+                    cancellationToken);
+                return Results.Ok(operation);
+            }
+            catch (Exception ex)
+            {
+                return ToProjectLifecycleFailure(ex);
+            }
+        });
+
+        app.MapPost("/api/projects/{id:guid}/open", async (
+            Guid id,
+            ProjectService service) =>
+        {
+            try
+            {
+                var opened = await service.OpenAsync(id, DateTime.UtcNow);
+                return Results.Ok(opened);
+            }
+            catch (Exception ex)
+            {
+                return ToProjectLifecycleFailure(ex);
+            }
+        });
 
         // 更新工程
         app.MapPut("/api/projects/{id:guid}", async (
@@ -178,7 +253,12 @@ public static class ApiEndpoints
                 : null;
             if (requiresMutationLease && mutationLease == null)
             {
-                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
+                return Results.Conflict(new
+                {
+                    Code = "PROJECT_MUTATION_CONFLICT",
+                    CompatibilityCode = "GV031",
+                    Error = "Project is currently running."
+                });
             }
 
             try
@@ -194,25 +274,52 @@ public static class ApiEndpoints
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         // 删除工程
-        app.MapDelete("/api/projects/{id:guid}", async (
+        app.MapPost("/api/projects/{id:guid}/delete", async (
             Guid id,
-            ProjectService service,
-            IInspectionRuntimeCoordinator runtimeCoordinator) =>
+            DeleteProjectRequest request,
+            ProjectLifecycleCoordinator lifecycleCoordinator,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
         {
-            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "project-delete", CancellationToken.None);
-            if (mutationLease == null)
-            {
-                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
-            }
-
             try
             {
-                await service.DeleteAsync(id);
+                var deleted = await lifecycleCoordinator.DeleteAsync(
+                    GetAuthenticatedUserId(context),
+                    id,
+                    request,
+                    waitForCleanup: false,
+                    cancellationToken);
+                return Results.Ok(new
+                {
+                    projectId = deleted.ProjectId,
+                    operationReplayed = deleted.OperationReplayed,
+                    operation = deleted.Operation
+                });
+            }
+            catch (Exception ex)
+            {
+                return ToProjectLifecycleFailure(ex);
+            }
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
+
+        app.MapDelete("/api/projects/{id:guid}", async (
+            Guid id,
+            ProjectLifecycleCoordinator lifecycleCoordinator,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                await lifecycleCoordinator.DeleteLegacyAsync(
+                    GetAuthenticatedUserId(context),
+                    id,
+                    cancellationToken);
                 return Results.NoContent();
             }
             catch (Exception ex)
             {
-                return ToBadRequest(ex);
+                return ToProjectLifecycleFailure(ex);
             }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
@@ -1061,12 +1168,30 @@ public static class ApiEndpoints
 
     private static IResult ToProjectUpdateFailure(Exception ex)
     {
+        if (ex is ProjectNotFoundException)
+        {
+            return Results.NotFound(new { Code = "PROJECT_NOT_FOUND", Error = "Project was not found." });
+        }
+
+        if (ex is ProjectSaveRevisionConflictException conflict)
+        {
+            return Results.Conflict(new
+            {
+                Code = "PROJECT_REVISION_CONFLICT",
+                CompatibilityCode = "PSV011",
+                Error = "Project flow was updated by another save. Refresh and retry.",
+                ExpectedRevision = conflict.ExpectedRevision,
+                ActualRevision = conflict.ActualRevision
+            });
+        }
+
         if (TryParseStableError(ex.Message, out var code, out var message))
         {
             return string.Equals(code, "PSV011", StringComparison.Ordinal)
                 ? Results.Conflict(new
                 {
-                    Code = code,
+                    Code = "PROJECT_REVISION_CONFLICT",
+                    CompatibilityCode = code,
                     Error = "Project flow was updated by another save. Refresh and retry.",
                     Detail = message
                 })
@@ -1074,6 +1199,48 @@ public static class ApiEndpoints
         }
 
         return Results.BadRequest(new { Error = ex.Message });
+    }
+
+    private static IResult ToProjectLifecycleFailure(Exception ex)
+    {
+        var code = ex is DomainException domainException
+            ? domainException.ErrorCode
+            : "PROJECT_OPERATION_RETRYABLE";
+        var error = code switch
+        {
+            "PROJECT_NOT_FOUND" => "Project was not found.",
+            "PROJECT_OPERATION_NOT_FOUND" => "Project operation was not found.",
+            "PROJECT_REVISION_CONFLICT" => "Project revision changed. Refresh and retry with the server revision.",
+            "PROJECT_MUTATION_CONFLICT" => "Project has an active run, save, or mutation.",
+            "OPERATION_PAYLOAD_MISMATCH" => "clientOperationId was already used with a different payload.",
+            "PROJECT_OPERATION_RETRYABLE" => "Project operation outcome must be reconciled before retrying.",
+            "PROJECT_CLEANUP_RETRYABLE" => "Project is deleted; cleanup remains queued for retry.",
+            _ when code.StartsWith("PROJECT_VALIDATION_", StringComparison.Ordinal) => ex.Message,
+            _ => "Project lifecycle operation failed."
+        };
+
+        var body = new { Code = code, Error = error };
+        return code switch
+        {
+            "PROJECT_NOT_FOUND" or "PROJECT_OPERATION_NOT_FOUND" => Results.NotFound(body),
+            "PROJECT_REVISION_CONFLICT" or "PROJECT_MUTATION_CONFLICT" or "OPERATION_PAYLOAD_MISMATCH" => Results.Conflict(body),
+            "PROJECT_OPERATION_RETRYABLE" or "PROJECT_CLEANUP_RETRYABLE" => Results.Json(body, statusCode: StatusCodes.Status503ServiceUnavailable),
+            _ when code.StartsWith("PROJECT_VALIDATION_", StringComparison.Ordinal) => Results.BadRequest(body),
+            _ => Results.Json(body, statusCode: StatusCodes.Status500InternalServerError)
+        };
+    }
+
+    private static string GetAuthenticatedUserId(HttpContext context)
+    {
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_VALIDATION_USER_REQUIRED",
+                "Authenticated user identity is required.");
+        }
+
+        return userId;
     }
 
     private static IResult ToProjectVariableMutationFailure(string? error)

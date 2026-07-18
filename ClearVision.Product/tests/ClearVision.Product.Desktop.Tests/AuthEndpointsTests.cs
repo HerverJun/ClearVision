@@ -205,6 +205,19 @@ public class AuthEndpointsTests
         await host.AuthService.Received(1).LogoutAsync("token-x");
     }
 
+    [Fact]
+    public async Task ProjectEndpoints_WithoutToken_ShouldReturnStructuredUnauthenticated()
+    {
+        await using var host = await AuthPipelineTestHost.CreateAsync();
+
+        using var response = await host.Client.GetAsync("/api/projects");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        GetProperty(document.RootElement, "Code").GetString().Should().Be("UNAUTHENTICATED");
+        GetProperty(document.RootElement, "Error").GetString().Should().Be("Unauthorized");
+    }
+
     private static JsonElement GetProperty(JsonElement element, string propertyName)
     {
         foreach (var property in element.EnumerateObject())

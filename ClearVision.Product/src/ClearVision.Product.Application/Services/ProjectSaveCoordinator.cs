@@ -92,6 +92,47 @@ public sealed class ProjectSaveCoordinator
         }
     }
 
+    public async Task<ProjectAccessLease?> TryAcquireProjectAccessAsync(
+        Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        await WaitForStartupRecoveryAsync(cancellationToken);
+        var gate = await RentProjectGateAsync(projectId, cancellationToken);
+        var acquired = false;
+        try
+        {
+            acquired = await gate.TryWaitAsync(cancellationToken);
+            if (!acquired)
+            {
+                return null;
+            }
+
+            if (RecoveryRequired.TryGetValue(projectId, out var reason))
+            {
+                throw new InvalidOperationException($"PSV001: project '{projectId}' requires save recovery before access: {reason}");
+            }
+
+            return new ProjectAccessLease(() => ReleaseAcquiredProjectGate(projectId, gate));
+        }
+        catch
+        {
+            if (acquired)
+            {
+                gate.Release();
+                ReleaseProjectGateReference(projectId, gate);
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (!acquired)
+            {
+                ReleaseProjectGateReference(projectId, gate);
+            }
+        }
+    }
+
     public void ClearProjectState(Guid projectId)
     {
         if (ProjectStates.TryGetValue(projectId, out var state) &&
@@ -245,8 +286,10 @@ public sealed class ProjectSaveCoordinator
             ?? throw new InvalidOperationException($"PSV002: project '{request.Project.Id}' does not exist.");
         if (project.PersistenceRevision != request.ExpectedRevision)
         {
-            throw new InvalidOperationException(
-                $"PSV011: stale project save request. Expected={request.ExpectedRevision}, Current={project.PersistenceRevision}.");
+            throw new ProjectSaveRevisionConflictException(
+                project.Id,
+                request.ExpectedRevision,
+                project.PersistenceRevision);
         }
 
         var previousFlowJson = await _flowStorage.LoadFlowJsonAsync(project.Id);
@@ -945,6 +988,23 @@ public sealed record ProjectSaveRequest(
 
 public sealed record ProjectSaveResult(Project Project, OperatorFlowDto? Flow, bool Changed);
 
+public sealed class ProjectSaveRevisionConflictException : InvalidOperationException
+{
+    public ProjectSaveRevisionConflictException(Guid projectId, long expectedRevision, long actualRevision)
+        : base($"PSV011: stale project save request. Expected={expectedRevision}, Current={actualRevision}.")
+    {
+        ProjectId = projectId;
+        ExpectedRevision = expectedRevision;
+        ActualRevision = actualRevision;
+    }
+
+    public Guid ProjectId { get; }
+
+    public long ExpectedRevision { get; }
+
+    public long ActualRevision { get; }
+}
+
 public sealed record ProjectSaveRecoverySummary(
     int RecoveredCount,
     int DiscardedPreparedCount,
@@ -1089,6 +1149,9 @@ internal sealed class ProjectGate
 
     public Task WaitAsync(CancellationToken cancellationToken = default) =>
         _semaphore.WaitAsync(cancellationToken);
+
+    public Task<bool> TryWaitAsync(CancellationToken cancellationToken = default) =>
+        _semaphore.WaitAsync(0, cancellationToken);
 
     public void Release() => _semaphore.Release();
 

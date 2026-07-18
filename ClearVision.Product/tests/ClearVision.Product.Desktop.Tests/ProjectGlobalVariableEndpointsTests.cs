@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -467,9 +468,11 @@ public sealed class ProjectGlobalVariableEndpointsTests
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().Should().Be("PSV011");
+        body.GetProperty("code").GetString().Should().Be("PROJECT_REVISION_CONFLICT");
+        body.GetProperty("compatibilityCode").GetString().Should().Be("PSV011");
         body.GetProperty("error").GetString().Should().Contain("Refresh and retry");
-        body.GetProperty("detail").GetString().Should().Contain("Expected=1");
+        body.GetProperty("expectedRevision").GetInt64().Should().Be(1);
+        body.GetProperty("actualRevision").GetInt64().Should().Be(2);
         host.Project.PersistenceRevision.Should().Be(2);
         flowStorage.SaveCount.Should().Be(0);
         await host.Repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
@@ -662,7 +665,8 @@ public sealed class ProjectGlobalVariableEndpointsTests
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().Should().Be("GV031");
+        body.GetProperty("code").GetString().Should().Be("PROJECT_MUTATION_CONFLICT");
+        body.GetProperty("compatibilityCode").GetString().Should().Be("GV031");
         host.Project.Name.Should().Be("demo");
         host.Project.Description.Should().BeNull();
         host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).Should().BeSameAs(oldSession);
@@ -722,7 +726,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
     }
 
     [Fact]
-    public async Task ProjectPut_WhenExpectedPersistenceRevisionIsStale_ShouldReturnPsv011ConflictWithoutWrite()
+    public async Task ProjectPut_WhenExpectedPersistenceRevisionIsStale_ShouldReturnStructuredConflictWithoutWrite()
     {
         var variableId = Guid.NewGuid();
         await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
@@ -740,7 +744,8 @@ public sealed class ProjectGlobalVariableEndpointsTests
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().Should().Be("PSV011");
+        body.GetProperty("code").GetString().Should().Be("PROJECT_REVISION_CONFLICT");
+        body.GetProperty("compatibilityCode").GetString().Should().Be("PSV011");
         host.Project.Name.Should().Be("demo");
         host.Project.Description.Should().BeNull();
         host.Project.PersistenceRevision.Should().Be(2);
@@ -1003,6 +1008,115 @@ public sealed class ProjectGlobalVariableEndpointsTests
         storage.LastSavedFlowJson.Should().NotContain("executionStatus");
         storage.LastSavedFlowJson.Should().NotContain("executionTimeMs");
         storage.LastSavedFlowJson.Should().NotContain("errorMessage");
+    }
+
+    [Fact]
+    public async Task ProjectLifecycleEndpoints_ShouldCreateReplayReconcileAndRejectPayloadMismatch()
+    {
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            new ProjectGlobalVariableSchema());
+        var operationId = Guid.NewGuid();
+        var request = new
+        {
+            clientOperationId = operationId,
+            name = "  lifecycle project  ",
+            description = "  authoritative  "
+        };
+
+        using var first = await host.Client.PostAsJsonAsync("/api/projects", request);
+        first.StatusCode.Should().Be(HttpStatusCode.Created, await first.Content.ReadAsStringAsync());
+        var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>();
+        var projectId = firstBody.GetProperty("projectId").GetGuid();
+        firstBody.GetProperty("operationReplayed").GetBoolean().Should().BeFalse();
+        firstBody.GetProperty("project").GetProperty("name").GetString().Should().Be("lifecycle project");
+        firstBody.GetProperty("project").GetProperty("flow").GetProperty("operators").GetArrayLength().Should().Be(0);
+
+        using var replay = await host.Client.PostAsJsonAsync("/api/projects", request);
+        replay.StatusCode.Should().Be(HttpStatusCode.OK);
+        var replayBody = await replay.Content.ReadFromJsonAsync<JsonElement>();
+        replayBody.GetProperty("projectId").GetGuid().Should().Be(projectId);
+        replayBody.GetProperty("operationReplayed").GetBoolean().Should().BeTrue();
+
+        using var reconcile = await host.Client.GetAsync($"/api/project-operations/{operationId}?kind=create");
+        reconcile.StatusCode.Should().Be(HttpStatusCode.OK);
+        var reconcileBody = await reconcile.Content.ReadFromJsonAsync<JsonElement>();
+        reconcileBody.GetProperty("status").GetString().Should().Be("completed");
+        reconcileBody.GetProperty("projectId").GetGuid().Should().Be(projectId);
+
+        using var mismatch = await host.Client.PostAsJsonAsync("/api/projects", new
+        {
+            clientOperationId = operationId,
+            name = "different"
+        });
+        mismatch.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var mismatchBody = await mismatch.Content.ReadFromJsonAsync<JsonElement>();
+        mismatchBody.GetProperty("code").GetString().Should().Be("OPERATION_PAYLOAD_MISMATCH");
+
+        using var nonBlank = await host.Client.PostAsJsonAsync("/api/projects", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            name = "invalid",
+            template = "unsupported"
+        });
+        nonBlank.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var nonBlankBody = await nonBlank.Content.ReadFromJsonAsync<JsonElement>();
+        nonBlankBody.GetProperty("code").GetString().Should().Be("PROJECT_VALIDATION_BLANK_CREATE_ONLY");
+    }
+
+    [Fact]
+    public async Task ProjectLifecycleEndpoints_ShouldOpenThenTombstoneAndReturnStructuredNotFound()
+    {
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            new ProjectGlobalVariableSchema());
+        var revision = host.Project.PersistenceRevision;
+
+        using var opened = await host.Client.PostAsync($"/api/projects/{host.Project.Id}/open", null);
+        opened.StatusCode.Should().Be(HttpStatusCode.OK);
+        var openedBody = await opened.Content.ReadFromJsonAsync<JsonElement>();
+        openedBody.GetProperty("projectId").GetGuid().Should().Be(host.Project.Id);
+        openedBody.GetProperty("lastOpenedAtUtc").GetDateTime().Kind.Should().Be(DateTimeKind.Utc);
+        host.Project.PersistenceRevision.Should().Be(revision);
+
+        var operationId = Guid.NewGuid();
+        using var deleted = await host.Client.PostAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/delete",
+            new
+            {
+                clientOperationId = operationId,
+                expectedPersistenceRevision = revision
+            });
+        deleted.StatusCode.Should().Be(HttpStatusCode.OK, await deleted.Content.ReadAsStringAsync());
+        var deletedBody = await deleted.Content.ReadFromJsonAsync<JsonElement>();
+        deletedBody.GetProperty("operation").GetProperty("result").GetProperty("cleanupStatus")
+            .GetString().Should().Be("cleanup-pending");
+
+        using var list = await host.Client.GetAsync("/api/projects");
+        using var detail = await host.Client.GetAsync($"/api/projects/{host.Project.Id}");
+        using var reopen = await host.Client.PostAsync($"/api/projects/{host.Project.Id}/open", null);
+        using var update = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}",
+            new UpdateProjectRequest
+            {
+                Name = "must-not-return",
+                ExpectedPersistenceRevision = revision
+            });
+        list.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await list.Content.ReadFromJsonAsync<JsonElement>()).GetArrayLength().Should().Be(0);
+        detail.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        reopen.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        update.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await detail.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString()
+            .Should().Be("PROJECT_NOT_FOUND");
+        (await reopen.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString()
+            .Should().Be("PROJECT_NOT_FOUND");
+        (await update.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString()
+            .Should().Be("PROJECT_NOT_FOUND");
+
+        using var reconcile = await host.Client.GetAsync($"/api/project-operations/{operationId}?kind=delete");
+        reconcile.StatusCode.Should().Be(HttpStatusCode.OK);
+        var reconcileBody = await reconcile.Content.ReadFromJsonAsync<JsonElement>();
+        reconcileBody.GetProperty("status").GetString().Should().Be("completed");
+        reconcileBody.GetProperty("result").GetProperty("deleted").GetBoolean().Should().BeTrue();
     }
 
     private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue, bool manualWriteAllowed)
@@ -1286,10 +1400,77 @@ public sealed class ProjectGlobalVariableEndpointsTests
             }
 
             project.UpdateGlobalVariables(schema);
+            var projects = new Dictionary<Guid, Project>
+            {
+                [project.Id] = project
+            };
             var repository = Substitute.For<IProjectRepository>();
-            repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
-            repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
-            repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+            repository.GetByIdAsync(Arg.Any<Guid>()).Returns(call =>
+            {
+                var candidate = projects.GetValueOrDefault(call.Arg<Guid>());
+                return Task.FromResult(candidate is { IsDeleted: false } ? candidate : null);
+            });
+            repository.GetByIdFreshAsync(Arg.Any<Guid>()).Returns(call =>
+            {
+                var candidate = projects.GetValueOrDefault(call.Arg<Guid>());
+                return Task.FromResult(candidate is { IsDeleted: false } ? candidate : null);
+            });
+            repository.GetByIdForUpdateAsync(Arg.Any<Guid>()).Returns(call =>
+            {
+                var candidate = projects.GetValueOrDefault(call.Arg<Guid>());
+                return Task.FromResult(candidate is { IsDeleted: false } ? candidate : null);
+            });
+            repository.GetByIdIncludingDeletedAsync(Arg.Any<Guid>()).Returns(call =>
+                Task.FromResult(projects.GetValueOrDefault(call.Arg<Guid>())));
+            repository.GetAllAsync().Returns(_ => Task.FromResult<IEnumerable<Project>>(
+                projects.Values.Where(candidate => !candidate.IsDeleted).ToList()));
+            repository.GetRecentlyOpenedAsync(Arg.Any<int>()).Returns(call => Task.FromResult<IEnumerable<Project>>(
+                projects.Values
+                    .Where(candidate => !candidate.IsDeleted && candidate.LastOpenedAt != null)
+                    .OrderByDescending(candidate => candidate.LastOpenedAt)
+                    .Take(call.Arg<int>())
+                    .ToList()));
+            repository.SearchAsync(Arg.Any<string>()).Returns(call => Task.FromResult<IEnumerable<Project>>(
+                projects.Values
+                    .Where(candidate => !candidate.IsDeleted && candidate.Name.Contains(call.Arg<string>(), StringComparison.OrdinalIgnoreCase))
+                    .ToList()));
+            repository.AddAsync(Arg.Any<Project>()).Returns(call =>
+            {
+                var candidate = call.Arg<Project>();
+                projects[candidate.Id] = candidate;
+                return Task.FromResult(candidate);
+            });
+            repository.UpdateAsync(Arg.Any<Project>()).Returns(call =>
+            {
+                var candidate = call.Arg<Project>();
+                projects[candidate.Id] = candidate;
+                return Task.CompletedTask;
+            });
+            repository.AddWithLifecycleOperationAsync(Arg.Any<Project>(), Arg.Any<ProjectLifecycleOperation>())
+                .Returns(call =>
+                {
+                    var candidate = call.ArgAt<Project>(0);
+                    projects[candidate.Id] = candidate;
+                    return Task.CompletedTask;
+                });
+            repository.TombstoneWithLifecycleOperationAsync(Arg.Any<Project>(), Arg.Any<ProjectLifecycleOperation>())
+                .Returns(call =>
+                {
+                    var candidate = call.ArgAt<Project>(0);
+                    projects[candidate.Id] = candidate;
+                    return Task.CompletedTask;
+                });
+            repository.RecordOpenAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(call =>
+            {
+                var candidate = projects.GetValueOrDefault(call.ArgAt<Guid>(0));
+                if (candidate is not { IsDeleted: false })
+                {
+                    return Task.FromResult<DateTime?>(null);
+                }
+
+                candidate.RecordOpen(call.ArgAt<DateTime>(1));
+                return Task.FromResult(candidate.LastOpenedAt);
+            });
 
             var storage = flowStorage ?? Substitute.For<IProjectFlowStorage>();
             if (flowStorage == null)
@@ -1331,6 +1512,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             });
             builder.WebHost.UseTestServer();
             builder.Services.AddSingleton(repository);
+            builder.Services.AddSingleton<IProjectLifecycleOperationRepository>(new InMemoryProjectLifecycleOperationRepository());
             builder.Services.AddSingleton(storage);
             if (assetStorage != null)
             {
@@ -1341,6 +1523,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             builder.Services.AddSingleton(registry);
             builder.Services.AddSingleton(coordinator);
             builder.Services.AddSingleton<ILogger<ProjectService>>(NullLogger<ProjectService>.Instance);
+            builder.Services.AddSingleton<ILogger<ProjectLifecycleCoordinator>>(NullLogger<ProjectLifecycleCoordinator>.Instance);
             builder.Services.AddScoped<ProjectSaveCoordinator>();
             builder.Services.AddScoped(sp => new RuntimePackageExporter(
                 sp.GetRequiredService<IOperatorFactory>(),
@@ -1349,6 +1532,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
                 sp.GetRequiredService<IServiceScopeFactory>(),
                 NullLogger<StationPackageStore>.Instance));
             builder.Services.AddScoped<ProjectService>();
+            builder.Services.AddScoped<ProjectLifecycleCoordinator>();
             var app = builder.Build();
             app.Use(async (context, next) =>
             {
@@ -1359,6 +1543,12 @@ public sealed class ProjectGlobalVariableEndpointsTests
                     Role = role.ToString(),
                     ExpiresAt = DateTime.UtcNow.AddHours(1)
                 };
+                context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.NameIdentifier, $"test-{role.ToString().ToLowerInvariant()}"),
+                    new Claim(ClaimTypes.Name, $"test-{role.ToString().ToLowerInvariant()}"),
+                    new Claim(ClaimTypes.Role, role.ToString())
+                ], "Test"));
                 await next();
             });
             MapProjectEndpoints(app);
@@ -1456,6 +1646,124 @@ public sealed class ProjectGlobalVariableEndpointsTests
         {
             var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
             return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
+        }
+    }
+
+    private sealed class InMemoryProjectLifecycleOperationRepository : IProjectLifecycleOperationRepository
+    {
+        private readonly object _sync = new();
+        private readonly Dictionary<Guid, ProjectLifecycleOperation> _operations = new();
+
+        public Task<ProjectLifecycleOperation?> GetAsync(
+            string userId,
+            ProjectLifecycleOperationKind kind,
+            Guid clientOperationId,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_sync)
+            {
+                return Task.FromResult(_operations.Values.FirstOrDefault(operation =>
+                    operation.UserId == userId &&
+                    operation.Kind == kind &&
+                    operation.ClientOperationId == clientOperationId));
+            }
+        }
+
+        public Task<ProjectLifecycleOperation?> GetByIdAsync(
+            Guid operationId,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_sync)
+            {
+                return Task.FromResult(_operations.GetValueOrDefault(operationId));
+            }
+        }
+
+        public Task<ProjectLifecycleOperation?> GetDeleteAuthorityAsync(
+            Guid projectId,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_sync)
+            {
+                return Task.FromResult(_operations.Values
+                    .Where(operation =>
+                        operation.ProjectId == projectId &&
+                        operation.Kind == ProjectLifecycleOperationKind.Delete &&
+                        operation.Status == ProjectLifecycleOperationStatus.Completed)
+                    .OrderByDescending(operation => operation.UpdatedAtUtc)
+                    .FirstOrDefault());
+            }
+        }
+
+        public Task AddAsync(
+            ProjectLifecycleOperation operation,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_sync)
+            {
+                if (_operations.Values.Any(existing =>
+                        existing.UserId == operation.UserId &&
+                        existing.Kind == operation.Kind &&
+                        existing.ClientOperationId == operation.ClientOperationId))
+                {
+                    throw new InvalidOperationException("duplicate operation identity");
+                }
+
+                _operations.Add(operation.Id, operation);
+                return Task.CompletedTask;
+            }
+        }
+
+        public Task UpdateAsync(
+            ProjectLifecycleOperation operation,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_sync)
+            {
+                _operations[operation.Id] = operation;
+                return Task.CompletedTask;
+            }
+        }
+
+        public Task<IReadOnlyList<ProjectLifecycleOperation>> GetRecoverableAsync(
+            DateTimeOffset nowUtc,
+            int take,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_sync)
+            {
+                IReadOnlyList<ProjectLifecycleOperation> result = _operations.Values
+                    .Where(operation => operation.Status == ProjectLifecycleOperationStatus.Pending ||
+                        operation.Status == ProjectLifecycleOperationStatus.FailedRetryable ||
+                        (operation.Kind == ProjectLifecycleOperationKind.Delete &&
+                         operation.Status == ProjectLifecycleOperationStatus.Completed &&
+                         operation.CleanupAuthorityOperationId == null &&
+                         operation.CleanupStatus != ProjectLifecycleCleanupStatus.CleanupCompleted))
+                    .Where(operation => operation.CleanupNextAttemptAtUtc == null || operation.CleanupNextAttemptAtUtc <= nowUtc)
+                    .OrderBy(operation => operation.UpdatedAtUtc)
+                    .Take(take)
+                    .ToList();
+                return Task.FromResult(result);
+            }
+        }
+
+        public Task<int> DeleteExpiredAsync(
+            DateTimeOffset nowUtc,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_sync)
+            {
+                var expired = _operations.Values
+                    .Where(operation => operation.ExpiresAtUtc <= nowUtc)
+                    .Select(operation => operation.Id)
+                    .ToList();
+                foreach (var operationId in expired)
+                {
+                    _operations.Remove(operationId);
+                }
+
+                return Task.FromResult(expired.Count);
+            }
         }
     }
 }

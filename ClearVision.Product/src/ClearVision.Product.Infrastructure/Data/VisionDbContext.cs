@@ -24,6 +24,8 @@ public class VisionDbContext : DbContext
     /// </summary>
     public DbSet<Project> Projects { get; set; } = null!;
 
+    public DbSet<ProjectLifecycleOperation> ProjectLifecycleOperations { get; set; } = null!;
+
     /// <summary>
     /// 算子表
     /// </summary>
@@ -94,6 +96,32 @@ public class VisionDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.ToTable("Projects");
+        });
+
+        modelBuilder.Entity<ProjectLifecycleOperation>(entity =>
+        {
+            entity.ToTable("ProjectLifecycleOperations");
+            entity.HasKey(operation => operation.Id);
+            entity.Property(operation => operation.UserId).IsRequired().HasMaxLength(128);
+            entity.Property(operation => operation.Kind).HasConversion<string>().IsRequired().HasMaxLength(16);
+            entity.Property(operation => operation.ClientOperationId).IsRequired();
+            entity.Property(operation => operation.PayloadFingerprintVersion).IsRequired();
+            entity.Property(operation => operation.PayloadFingerprint).IsRequired().HasMaxLength(96);
+            entity.Property(operation => operation.Status).HasConversion<string>().IsRequired().HasMaxLength(32);
+            entity.Property(operation => operation.ProjectId).IsRequired();
+            entity.Property(operation => operation.ProjectName).HasMaxLength(200);
+            entity.Property(operation => operation.ProjectDescription).HasMaxLength(1000);
+            entity.Property(operation => operation.ResultJson);
+            entity.Property(operation => operation.ErrorCode).HasMaxLength(100);
+            entity.Property(operation => operation.CleanupStatus).HasConversion<string>().IsRequired().HasMaxLength(40);
+            entity.Property(operation => operation.CleanupAuthorityOperationId);
+            entity.Property(operation => operation.LastCleanupErrorCode).HasMaxLength(100);
+            entity.HasIndex(operation => new { operation.UserId, operation.Kind, operation.ClientOperationId })
+                .IsUnique();
+            entity.HasIndex(operation => operation.ProjectId);
+            entity.HasIndex(operation => new { operation.Status, operation.UpdatedAtUtc });
+            entity.HasIndex(operation => new { operation.CleanupStatus, operation.CleanupNextAttemptAtUtc });
+            entity.HasIndex(operation => operation.ExpiresAtUtc);
         });
 
 

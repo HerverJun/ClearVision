@@ -205,6 +205,7 @@ public class AuthMiddleware
         context.Response.ContentType = "application/json";
         await context.Response.WriteAsJsonAsync(new
         {
+            Code = "UNAUTHENTICATED",
             Error = "Unauthorized",
             Message = "请先登录"
         });

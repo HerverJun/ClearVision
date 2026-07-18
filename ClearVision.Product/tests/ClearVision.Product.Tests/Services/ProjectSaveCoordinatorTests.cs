@@ -1330,6 +1330,31 @@ public sealed class ProjectSaveCoordinatorTests
 
         public Task<Project?> GetByIdForUpdateAsync(Guid id) => GetByIdAsync(id);
 
+        public Task<Project?> GetByIdIncludingDeletedAsync(Guid id) => GetByIdAsync(id);
+
+        public Task AddWithLifecycleOperationAsync(Project project, ProjectLifecycleOperation operation)
+        {
+            _projects[project.Id] = project;
+            return Task.CompletedTask;
+        }
+
+        public Task TombstoneWithLifecycleOperationAsync(Project project, ProjectLifecycleOperation operation)
+        {
+            _projects[project.Id] = project;
+            return Task.CompletedTask;
+        }
+
+        public Task<DateTime?> RecordOpenAsync(Guid id, DateTime openedAtUtc)
+        {
+            if (!_projects.TryGetValue(id, out var project) || project.IsDeleted)
+            {
+                return Task.FromResult<DateTime?>(null);
+            }
+
+            project.RecordOpen(openedAtUtc);
+            return Task.FromResult(project.LastOpenedAt);
+        }
+
         public Task<IEnumerable<Project>> GetAllAsync() => Task.FromResult<IEnumerable<Project>>(_projects.Values);
 
         public Task<IEnumerable<Project>> FindAsync(Expression<Func<Project, bool>> predicate) =>

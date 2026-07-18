@@ -82,6 +82,95 @@ public class ProjectRepository : RepositoryBase<Project>, IProjectRepository
         return await _dbSet.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
     }
 
+    public async Task<Project?> GetByIdIncludingDeletedAsync(Guid id)
+    {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("Project id cannot be empty.", nameof(id));
+        }
+
+        return await _dbSet
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == id);
+    }
+
+    public async Task AddWithLifecycleOperationAsync(
+        Project project,
+        ProjectLifecycleOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(operation);
+
+        await _dbSet.AddAsync(project);
+        _context.Set<ProjectLifecycleOperation>().Update(operation);
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch
+        {
+            _context.Entry(project).State = EntityState.Detached;
+            await _context.Entry(operation).ReloadAsync();
+            throw;
+        }
+    }
+
+    public async Task TombstoneWithLifecycleOperationAsync(
+        Project project,
+        ProjectLifecycleOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(operation);
+
+        _dbSet.Update(project);
+        _context.Set<ProjectLifecycleOperation>().Update(operation);
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch
+        {
+            await _context.Entry(project).ReloadAsync();
+            await _context.Entry(operation).ReloadAsync();
+            throw;
+        }
+    }
+
+    public async Task<DateTime?> RecordOpenAsync(Guid id, DateTime openedAtUtc)
+    {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("Project id cannot be empty.", nameof(id));
+        }
+
+        if (openedAtUtc.Kind == DateTimeKind.Local)
+        {
+            openedAtUtc = openedAtUtc.ToUniversalTime();
+        }
+        else if (openedAtUtc.Kind == DateTimeKind.Unspecified)
+        {
+            openedAtUtc = DateTime.SpecifyKind(openedAtUtc, DateTimeKind.Utc);
+        }
+
+        var affected = await _dbSet
+            .Where(project => project.Id == id && !project.IsDeleted)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(
+                project => project.LastOpenedAt,
+                project => project.LastOpenedAt == null || project.LastOpenedAt < openedAtUtc
+                    ? openedAtUtc
+                    : project.LastOpenedAt));
+        if (affected == 0)
+        {
+            return null;
+        }
+
+        return await _dbSet
+            .AsNoTracking()
+            .Where(project => project.Id == id && !project.IsDeleted)
+            .Select(project => project.LastOpenedAt)
+            .SingleAsync();
+    }
+
     public async Task<Project?> GetByNameAsync(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);

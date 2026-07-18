@@ -681,7 +681,7 @@ public sealed class VisionDatabaseRestoreRequest
 
 internal static class VisionDatabaseMaintenance
 {
-    public const int CurrentSqliteSchemaVersion = 5;
+    public const int CurrentSqliteSchemaVersion = 6;
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -698,6 +698,7 @@ internal static class VisionDatabaseMaintenance
         }
 
         await RepairStationPackageKindColumnAsync(dbContext, cancellationToken);
+        await EnsureProjectLifecycleOperationSchemaAsync(dbContext, cancellationToken);
         await EnsureStationCanonicalOutcomeSchemaAsync(dbContext, cancellationToken);
         await EnsureStationExecutionIdentitySchemaAsync(dbContext, cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", cancellationToken);
@@ -766,6 +767,8 @@ internal static class VisionDatabaseMaintenance
         {
             await dbContext.Database.ExecuteSqlRawAsync(statement, cancellationToken);
         }
+
+        await EnsureProjectLifecycleOperationSchemaAsync(dbContext, cancellationToken);
 
         await EnsureStationCanonicalOutcomeSchemaAsync(dbContext, cancellationToken);
         await EnsureStationExecutionIdentitySchemaAsync(dbContext, cancellationToken);
@@ -1123,6 +1126,16 @@ internal static class VisionDatabaseMaintenance
         }
     }
 
+    private static async Task EnsureProjectLifecycleOperationSchemaAsync(
+        VisionDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        foreach (var statement in ProjectLifecycleOperationSchemaStatements)
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(statement, cancellationToken);
+        }
+    }
+
     private static async Task SetUserVersionAsync(
         IDbConnection connection,
         int version,
@@ -1231,6 +1244,7 @@ internal static class VisionDatabaseMaintenance
     private static readonly string[] KnownHistoryAndAuditTables =
     [
         "Projects",
+        "ProjectLifecycleOperations",
         "InspectionResults",
         "Defects",
         "StationNodes",
@@ -1260,6 +1274,12 @@ internal static class VisionDatabaseMaintenance
         "column:InspectionResults.ExecutionRunMode",
         "column:InspectionResults.ShadowRole",
         "column:Projects.Flow_DecisionConfiguration",
+        "table:ProjectLifecycleOperations",
+        "index:IX_ProjectLifecycleOperations_CleanupStatus_CleanupNextAttemptAtUtc",
+        "index:IX_ProjectLifecycleOperations_ExpiresAtUtc",
+        "index:IX_ProjectLifecycleOperations_ProjectId",
+        "index:IX_ProjectLifecycleOperations_Status_UpdatedAtUtc",
+        "index:IX_ProjectLifecycleOperations_UserId_Kind_ClientOperationId",
         "table:StationAlarmEvents",
         "table:StationAuditRecords",
         "table:StationCommandRecords",
@@ -1517,6 +1537,40 @@ internal static class VisionDatabaseMaintenance
         """CREATE INDEX IF NOT EXISTS "IX_StationAuditRecords_TargetStationId_CreatedAtUtc" ON "StationAuditRecords" ("TargetStationId", "CreatedAtUtc");""",
         """CREATE UNIQUE INDEX IF NOT EXISTS "IX_StationPackageRecords_PackageId" ON "StationPackageRecords" ("PackageId");""",
         """CREATE INDEX IF NOT EXISTS "IX_StationPackageRecords_CreatedAtUtc" ON "StationPackageRecords" ("CreatedAtUtc");"""
+    ];
+
+    private static readonly string[] ProjectLifecycleOperationSchemaStatements =
+    [
+        """
+        CREATE TABLE IF NOT EXISTS "ProjectLifecycleOperations" (
+            "Id" TEXT NOT NULL CONSTRAINT "PK_ProjectLifecycleOperations" PRIMARY KEY,
+            "UserId" TEXT NOT NULL,
+            "Kind" TEXT NOT NULL,
+            "ClientOperationId" TEXT NOT NULL,
+            "PayloadFingerprintVersion" INTEGER NOT NULL,
+            "PayloadFingerprint" TEXT NOT NULL,
+            "Status" TEXT NOT NULL,
+            "ProjectId" TEXT NOT NULL,
+            "ProjectName" TEXT NULL,
+            "ProjectDescription" TEXT NULL,
+            "ExpectedPersistenceRevision" INTEGER NULL,
+            "ResultJson" TEXT NULL,
+            "ErrorCode" TEXT NULL,
+            "CleanupStatus" TEXT NOT NULL,
+            "CleanupAuthorityOperationId" TEXT NULL,
+            "CleanupAttemptCount" INTEGER NOT NULL,
+            "LastCleanupErrorCode" TEXT NULL,
+            "CreatedAtUtc" TEXT NOT NULL,
+            "UpdatedAtUtc" TEXT NOT NULL,
+            "ExpiresAtUtc" TEXT NULL,
+            "CleanupNextAttemptAtUtc" TEXT NULL
+        );
+        """,
+        """CREATE INDEX IF NOT EXISTS "IX_ProjectLifecycleOperations_CleanupStatus_CleanupNextAttemptAtUtc" ON "ProjectLifecycleOperations" ("CleanupStatus", "CleanupNextAttemptAtUtc");""",
+        """CREATE INDEX IF NOT EXISTS "IX_ProjectLifecycleOperations_ExpiresAtUtc" ON "ProjectLifecycleOperations" ("ExpiresAtUtc");""",
+        """CREATE INDEX IF NOT EXISTS "IX_ProjectLifecycleOperations_ProjectId" ON "ProjectLifecycleOperations" ("ProjectId");""",
+        """CREATE INDEX IF NOT EXISTS "IX_ProjectLifecycleOperations_Status_UpdatedAtUtc" ON "ProjectLifecycleOperations" ("Status", "UpdatedAtUtc");""",
+        """CREATE UNIQUE INDEX IF NOT EXISTS "IX_ProjectLifecycleOperations_UserId_Kind_ClientOperationId" ON "ProjectLifecycleOperations" ("UserId", "Kind", "ClientOperationId");"""
     ];
 
     private sealed class BaselineSchemaRequirements

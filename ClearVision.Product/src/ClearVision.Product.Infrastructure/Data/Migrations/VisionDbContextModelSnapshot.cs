@@ -305,6 +305,102 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.ToTable("Projects", (string)null);
                 });
 
+            modelBuilder.Entity("ClearVision.Product.Core.Entities.ProjectLifecycleOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CleanupAttemptCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("CleanupAuthorityOperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("CleanupNextAttemptAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CleanupStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ClientOperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ExpiresAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("ExpectedPersistenceRevision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastCleanupErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PayloadFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(96)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PayloadFingerprintVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ProjectDescription")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProjectName")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CleanupStatus", "CleanupNextAttemptAtUtc");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("Status", "UpdatedAtUtc");
+
+                    b.HasIndex("UserId", "Kind", "ClientOperationId")
+                        .IsUnique();
+
+                    b.ToTable("ProjectLifecycleOperations", (string)null);
+                });
+
             modelBuilder.Entity("ClearVision.Product.Core.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")

@@ -60,7 +60,29 @@ public class Project : AggregateRoot
         PersistenceRevision = 0;
     }
 
+    private Project(Guid id) : base(id)
+    {
+        Name = string.Empty;
+        Version = "1.0.0";
+        Flow = new OperatorFlow(id, "默认流程");
+        GlobalSettings = new Dictionary<string, string>();
+        GlobalVariables = new ProjectGlobalVariableSchema();
+        PersistenceRevision = 0;
+    }
+
     public Project(string name, string? description = null) : this()
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("工程名称不能为空", nameof(name));
+
+        Name = name;
+        Description = description;
+        ModifiedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new ProjectCreatedEvent(Id, Name));
+    }
+
+    public Project(Guid id, string name, string? description = null) : this(id)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("工程名称不能为空", nameof(name));
@@ -101,8 +123,24 @@ public class Project : AggregateRoot
     /// </summary>
     public void RecordOpen()
     {
-        LastOpenedAt = DateTime.UtcNow;
-        MarkAsModified();
+        RecordOpen(DateTime.UtcNow);
+    }
+
+    public void RecordOpen(DateTime openedAtUtc)
+    {
+        if (openedAtUtc.Kind == DateTimeKind.Local)
+        {
+            openedAtUtc = openedAtUtc.ToUniversalTime();
+        }
+        else if (openedAtUtc.Kind == DateTimeKind.Unspecified)
+        {
+            openedAtUtc = DateTime.SpecifyKind(openedAtUtc, DateTimeKind.Utc);
+        }
+
+        if (LastOpenedAt == null || openedAtUtc > LastOpenedAt.Value)
+        {
+            LastOpenedAt = openedAtUtc;
+        }
     }
 
     /// <summary>

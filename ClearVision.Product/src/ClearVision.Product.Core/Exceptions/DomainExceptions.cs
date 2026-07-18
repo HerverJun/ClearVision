@@ -130,6 +130,80 @@ public class ProjectNotFoundException : DomainException
     }
 }
 
+public sealed class ProjectOperationNotFoundException : DomainException
+{
+    public ProjectOperationNotFoundException(Guid clientOperationId)
+        : base($"Project operation was not found: {clientOperationId}", "PROJECT_OPERATION_NOT_FOUND")
+    {
+        ClientOperationId = clientOperationId;
+    }
+
+    public Guid ClientOperationId { get; }
+}
+
+public sealed class ProjectOperationPayloadMismatchException : DomainException
+{
+    public ProjectOperationPayloadMismatchException(Guid clientOperationId)
+        : base($"Project operation payload does not match the reserved identity: {clientOperationId}", "OPERATION_PAYLOAD_MISMATCH")
+    {
+        ClientOperationId = clientOperationId;
+    }
+
+    public Guid ClientOperationId { get; }
+}
+
+public sealed class ProjectRevisionConflictException : DomainException
+{
+    public ProjectRevisionConflictException(Guid projectId, long expectedRevision, long actualRevision)
+        : base(
+            $"Project revision conflict for '{projectId}'. Expected {expectedRevision}, actual {actualRevision}.",
+            "PROJECT_REVISION_CONFLICT")
+    {
+        ProjectId = projectId;
+        ExpectedRevision = expectedRevision;
+        ActualRevision = actualRevision;
+    }
+
+    public Guid ProjectId { get; }
+
+    public long ExpectedRevision { get; }
+
+    public long ActualRevision { get; }
+}
+
+public sealed class ProjectMutationConflictException : DomainException
+{
+    public ProjectMutationConflictException(Guid projectId)
+        : base($"Project '{projectId}' has an active run, save, or mutation.", "PROJECT_MUTATION_CONFLICT")
+    {
+        ProjectId = projectId;
+    }
+
+    public Guid ProjectId { get; }
+}
+
+public sealed class ProjectLifecycleValidationException : DomainException
+{
+    public ProjectLifecycleValidationException(string errorCode, string message)
+        : base(message, errorCode)
+    {
+    }
+}
+
+public sealed class ProjectOperationRetryableException : DomainException
+{
+    public ProjectOperationRetryableException(Guid clientOperationId, string errorCode, Exception? innerException = null)
+        : base(
+            $"Project operation '{clientOperationId}' has a retryable authoritative outcome.",
+            errorCode,
+            innerException ?? new InvalidOperationException(errorCode))
+    {
+        ClientOperationId = clientOperationId;
+    }
+
+    public Guid ClientOperationId { get; }
+}
+
 /// <summary>
 /// 算子不存在异常
 /// </summary>

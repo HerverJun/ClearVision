@@ -22,6 +22,28 @@ public interface IProjectRepository : IRepository<Project>
     Task<Project?> GetByIdForUpdateAsync(Guid id);
 
     /// <summary>
+    /// Reads a project regardless of its tombstone state. Lifecycle coordinators use
+    /// this only to reconcile durable command outcomes; product reads remain filtered.
+    /// </summary>
+    Task<Project?> GetByIdIncludingDeletedAsync(Guid id);
+
+    /// <summary>
+    /// Atomically persists a reserved Project and its completed create operation.
+    /// </summary>
+    Task AddWithLifecycleOperationAsync(Project project, ProjectLifecycleOperation operation);
+
+    /// <summary>
+    /// Atomically persists the Project tombstone and completed delete operation.
+    /// </summary>
+    Task TombstoneWithLifecycleOperationAsync(Project project, ProjectLifecycleOperation operation);
+
+    /// <summary>
+    /// Updates only LastOpenedAt using server UTC authority. PersistenceRevision,
+    /// ModifiedAt, Flow, variables and assets are not changed.
+    /// </summary>
+    Task<DateTime?> RecordOpenAsync(Guid id, DateTime openedAtUtc);
+
+    /// <summary>
     /// 根据名称查找工程
     /// </summary>
     Task<Project?> GetByNameAsync(string name);

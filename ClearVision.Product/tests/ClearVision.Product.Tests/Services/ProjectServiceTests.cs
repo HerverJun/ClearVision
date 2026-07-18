@@ -1270,7 +1270,10 @@ public class ProjectServiceTests
 
             repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
             repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+            repository.GetByIdIncludingDeletedAsync(project.Id).Returns(Task.FromResult<Project?>(project));
             repository.UpdateAsync(Arg.Any<Project>()).Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
+            repository.TombstoneWithLifecycleOperationAsync(project, Arg.Any<ProjectLifecycleOperation>())
+                .Returns(Task.CompletedTask);
             storage.Seed(project.Id, JsonSerializer.Serialize(CreateVariableReadFlow(variableId, "stats.count")), 0);
             var assets = new ProjectAssetsDto
             {
@@ -1320,7 +1323,18 @@ public class ProjectServiceTests
             repository.ClearReceivedCalls();
             var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry, coordinator, assetStorage);
 
-            await sut.DeleteAsync(project.Id);
+            var deleteOperation = ProjectLifecycleOperation.ReserveDelete(
+                "test-user",
+                Guid.NewGuid(),
+                "sha256:test",
+                project.Id,
+                project.PersistenceRevision,
+                DateTimeOffset.UtcNow);
+            await sut.TombstoneFromOperationAsync(
+                deleteOperation,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow.AddDays(30));
+            await sut.CleanupDeletedProjectAsync(project.Id);
 
             project.IsDeleted.Should().BeTrue();
             registry.GetOrCreate(project.Id, project.GlobalVariables).Should().NotBeSameAs(authoritative);
@@ -1335,7 +1349,7 @@ public class ProjectServiceTests
             ProjectSaveCoordinator.HasProjectStateForTests(project.Id).Should().BeFalse();
             ProjectSaveCoordinator.HasRecoveryRequiredForTests(project.Id).Should().BeFalse();
             ProjectSaveCoordinator.HasProjectGateForTests(project.Id).Should().BeFalse();
-            await repository.Received(1).UpdateAsync(project);
+            await repository.Received(1).TombstoneWithLifecycleOperationAsync(project, deleteOperation);
         }
         finally
         {
@@ -1348,39 +1362,37 @@ public class ProjectServiceTests
     }
 
     [Fact]
-    public async Task DeleteAsync_WhenCleanupFails_ShouldThrowAndNotReportSuccess()
+    public async Task CleanupDeletedProjectAsync_WhenCleanupFails_ShouldThrowAndKeepTombstone()
     {
         var repository = Substitute.For<IProjectRepository>();
         var storage = Substitute.For<IProjectFlowStorage>();
         var assets = Substitute.For<IProjectAssetStorage>();
         var project = new Project("demo");
-        repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
-        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        project.MarkAsDeleted();
+        repository.GetByIdIncludingDeletedAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         storage.DeleteFlowJsonAsync(project.Id).Returns(_ => Task.FromException(new IOException("flow cleanup failed")));
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, projectAssetStorage: assets);
 
-        var act = async () => await sut.DeleteAsync(project.Id);
+        var act = async () => await sut.CleanupDeletedProjectAsync(project.Id);
 
         await act.Should().ThrowAsync<IOException>().WithMessage("*flow cleanup failed*");
         project.IsDeleted.Should().BeTrue();
-        await repository.Received(1).UpdateAsync(project);
         await assets.DidNotReceive().DeleteAssetsAsync(project.Id);
     }
 
     [Fact]
-    public async Task DeleteAsync_WhenProjectAlreadyDeleted_ShouldReturnProjectNotFoundWithoutCleanup()
+    public async Task CleanupDeletedProjectAsync_WhenProjectDoesNotExist_ShouldReturnProjectNotFoundWithoutCleanup()
     {
         var repository = Substitute.For<IProjectRepository>();
         var storage = Substitute.For<IProjectFlowStorage>();
         var assets = Substitute.For<IProjectAssetStorage>();
         var projectId = Guid.NewGuid();
-        repository.GetByIdForUpdateAsync(projectId).Returns(Task.FromResult<Project?>(null));
+        repository.GetByIdIncludingDeletedAsync(projectId).Returns(Task.FromResult<Project?>(null));
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, projectAssetStorage: assets);
 
-        var act = async () => await sut.DeleteAsync(projectId);
+        var act = async () => await sut.CleanupDeletedProjectAsync(projectId);
 
         await act.Should().ThrowAsync<ProjectNotFoundException>();
-        await repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
         await storage.DidNotReceive().DeleteFlowJsonAsync(projectId);
         await assets.DidNotReceive().DeleteAssetsAsync(projectId);
     }
