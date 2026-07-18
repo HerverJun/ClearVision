@@ -242,12 +242,18 @@ function classifyConsoleErrors(consoleErrors, productPage) {
     .length;
   const expectedNotFoundMessage = 'Failed to load resource: the server responded with a status of 404 (Not Found)';
   let remainingExpectedNotFound = expectedNotFoundCount;
+  const expectedResponseLossCount = productPage?.workspaceG6?.responseLoss?.backendResultRecovered ? 1 : 0;
+  const expectedResponseLossMessage = 'Failed to load resource: the server responded with a status of 599 (Unknown)';
+  let remainingExpectedResponseLoss = expectedResponseLossCount;
   const ignoredExpected = [];
   const meaningful = [];
 
   for (const message of consoleErrors) {
     if (remainingExpectedNotFound > 0 && message === expectedNotFoundMessage) {
       remainingExpectedNotFound -= 1;
+      ignoredExpected.push(message);
+    } else if (remainingExpectedResponseLoss > 0 && message === expectedResponseLossMessage) {
+      remainingExpectedResponseLoss -= 1;
       ignoredExpected.push(message);
     } else {
       meaningful.push(message);
@@ -872,13 +878,7 @@ async function installFormalRunDecision(page, formalRunSeed) {
   };
 }
 
-async function verifyWorkspaceG6(page) {
-  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
-  const projectId = await shell.getAttribute('data-workspace-project-id');
-  assert(projectId && /^[0-9a-f-]{36}$/i.test(projectId), 'Formal Run lost the persisted Project identity.');
-  const run = page.locator('[data-testid="workspace-run"]');
-  assert(await run.isEnabled(), 'Formal Run did not enable after the persisted Project save settled.');
-  await run.click();
+async function readFormalResultsHandoff(page, projectId) {
   await page.waitForSelector('[data-capability="results-read"]', { state: 'visible', timeout: 45_000 });
   const hash = new URL(page.url()).hash.replace(/^#/, '');
   const [route, query = ''] = hash.split('?');
@@ -889,6 +889,114 @@ async function verifyWorkspaceG6(page) {
   assert(params.get('projectId') === projectId, `Formal Run Results Project identity changed: ${hash}`);
   assert(resultId && /^[0-9a-f-]{36}$/i.test(resultId), `Formal Run Results did not contain a result id: ${hash}`);
   return { projectId, resultId, route: hash };
+}
+
+async function waitForPersistedWorkspace(page, projectId) {
+  const origin = new URL(page.url()).origin;
+  await page.goto(`${origin}/studio/index.html#/projects/${projectId}/workspace`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 45_000
+  });
+  await page.waitForSelector('[data-evidence-surface="f03-workspace-shell"]', {
+    state: 'visible',
+    timeout: 45_000
+  });
+  await page.waitForFunction(() => {
+    const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+    return shell?.getAttribute('data-workspace-state') === 'ready' &&
+      shell.getAttribute('data-workspace-dirty') === 'false';
+  }, null, { timeout: 45_000 });
+}
+
+async function verifyWorkspaceG6(page, runtimeErrors) {
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const projectId = await shell.getAttribute('data-workspace-project-id');
+  assert(projectId && /^[0-9a-f-]{36}$/i.test(projectId), 'Formal Run lost the persisted Project identity.');
+  const run = page.locator('[data-testid="workspace-run"]');
+  assert(await run.isEnabled(), 'Formal Run did not enable after the persisted Project save settled.');
+
+  await run.click();
+  const normalHandoff = await readFormalResultsHandoff(page, projectId);
+
+  await waitForPersistedWorkspace(page, projectId);
+  let stopResponseReadyResolve;
+  let releaseStopResponseResolve;
+  const stopResponseReady = new Promise(resolve => { stopResponseReadyResolve = resolve; });
+  const releaseStopResponse = new Promise(resolve => { releaseStopResponseResolve = resolve; });
+  const holdExecuteResponse = async route => {
+    const response = await route.fetch();
+    stopResponseReadyResolve();
+    await releaseStopResponse;
+    try {
+      await route.fulfill({ response });
+    } catch (error) {
+      if (!String(error?.message || error).includes('Route is already handled')) throw error;
+    }
+  };
+  await page.route('**/api/inspection/execute', holdExecuteResponse);
+  let stopHandoff;
+  try {
+    await page.locator('[data-testid="workspace-run"]').click();
+    await stopResponseReady;
+    await page.waitForSelector('[data-testid="workspace-run-stop"]', {
+      state: 'visible',
+      timeout: 45_000
+    });
+    assert(
+      await shell.getAttribute('data-workspace-run-phase') === 'executing',
+      'Real WebView2 Formal Run did not remain executing while its response was held.'
+    );
+    await page.locator('[data-testid="workspace-run-stop"]').click();
+    stopHandoff = await readFormalResultsHandoff(page, projectId);
+  } finally {
+    releaseStopResponseResolve();
+    await page.unroute('**/api/inspection/execute', holdExecuteResponse);
+  }
+
+  await waitForPersistedWorkspace(page, projectId);
+  let responseLossSeen = false;
+  const withholdExecuteResponse = async route => {
+    const response = await route.fetch();
+    responseLossSeen = true;
+    await route.fulfill({
+      status: 599,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: 'WEBVIEW2_RESPONSE_WITHHELD', error: 'Evidence runner withheld the execute response.' })
+    });
+  };
+  await page.route('**/api/inspection/execute', withholdExecuteResponse);
+  let reconcileHandoff;
+  try {
+    await page.locator('[data-testid="workspace-run"]').click();
+    await page.waitForFunction(() =>
+      document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+        ?.getAttribute('data-workspace-run-phase') === 'unknown-outcome',
+      null,
+      { timeout: 45_000 }
+    );
+    assert(responseLossSeen, 'Real WebView2 execute response-loss fixture did not reach the server.');
+    await page.locator('[data-testid="workspace-run-reconcile"]').click();
+    reconcileHandoff = await readFormalResultsHandoff(page, projectId);
+  } finally {
+    await page.unroute('**/api/inspection/execute', withholdExecuteResponse);
+  }
+
+  const runPaths = runtimeErrors.requests
+    .map(item => new URL(item.url).pathname)
+    .filter(path => /^\/api\/inspection\/(admission|execute|stop|reconcile)$/.test(path));
+  return {
+    projectId,
+    resultId: reconcileHandoff.resultId,
+    route: reconcileHandoff.route,
+    normalHandoff,
+    stopHandoff,
+    reconcileHandoff,
+    runPaths,
+    responseLoss: {
+      transport: 'REAL_WEBVIEW2_ROUTE_WITHHELD_AFTER_SERVER_RESPONSE',
+      backendResultRecovered: true
+    }
+  };
 }
 
 async function verifyWorkspaceG3(page) {
@@ -1353,7 +1461,7 @@ async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = nul
     }
   }
   const formalRunInstallation = formalRun ? await installFormalRunDecision(page, formalRunSeed) : null;
-  const workspaceG6 = formalRun ? await verifyWorkspaceG6(page) : null;
+  const workspaceG6 = formalRun ? await verifyWorkspaceG6(page, runtimeErrors) : null;
   const productRequests = runtimeErrors.requests.filter(isProductRequest);
   const writeRequests = productRequests.filter(item => item.method !== 'GET');
   const projectPutRequests = productRequests.filter(item => {
@@ -1362,9 +1470,15 @@ async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = nul
   });
   const forbiddenRunRequests = productRequests.filter(item => {
     const url = new URL(item.url);
-    return /\/api\/(?:inspection\/(?:admission|execute)|runs)(?:\/|$)/i.test(url.pathname);
+    return /\/api\/(?:inspection\/(?:admission|execute|stop|reconcile)|runs)(?:\/|$)/i.test(url.pathname);
   });
-  const expectedRunPaths = ['/api/inspection/admission', '/api/inspection/execute'];
+  const expectedRunPaths = formalRun
+    ? [
+        '/api/inspection/admission', '/api/inspection/execute',
+        '/api/inspection/admission', '/api/inspection/execute', '/api/inspection/stop',
+        '/api/inspection/admission', '/api/inspection/execute', '/api/inspection/reconcile'
+      ]
+    : [];
   const unexpectedWriteRequests = writeRequests.filter(item => {
     if (!isWorkspaceRoute) return true;
     const url = new URL(item.url);
@@ -1396,7 +1510,7 @@ async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = nul
     `Product route emitted writes outside Preview cleanup: ${JSON.stringify(unexpectedWriteRequests)}`);
   if (formalRun) {
     assert(forbiddenRunRequests.map(item => new URL(item.url).pathname).join(',') === expectedRunPaths.join(','),
-      `Formal Run did not issue exactly one Admission then Execute request: ${JSON.stringify(forbiddenRunRequests)}`);
+      `Formal Run did not issue the expected Admission/Execute/Stop/Reconcile request chain: ${JSON.stringify(forbiddenRunRequests)}`);
     assert(workspaceG6?.projectId && workspaceG6.resultId,
       `Formal Run did not retain the Results handoff identity: ${JSON.stringify(workspaceG6)}`);
   } else {
