@@ -290,6 +290,13 @@ async function verifyStudioAuthLifecycle(page, userJson, password) {
   assert(username, 'The WebView2 auth scenario did not receive a username.');
   assert(password, 'CV_SMOKE_PASSWORD is required for the WebView2 auth scenario.');
 
+  await page.waitForFunction(() => Boolean(
+    document.querySelector('[data-auth-page="setup"]') ||
+    document.querySelector('[data-auth-page="login"]')
+  ), null, { timeout: 45_000 });
+  if (await page.locator('[data-auth-page="setup"]').isVisible()) {
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 45_000 });
+  }
   await page.waitForSelector('[data-auth-page="login"]', { state: 'visible', timeout: 45_000 });
   const beforeLogin = await page.evaluate(() => ({
     authShellCount: document.querySelectorAll('[data-auth-shell="ready"]').length,

@@ -390,6 +390,7 @@ function Invoke-WebViewSmoke {
     $env:CV_SMOKE_PHASE = $Phase
     $env:CV_SMOKE_TOKEN = [string]$login.token
     $env:CV_SMOKE_USER = ($login.user | ConvertTo-Json -Compress)
+    $env:CV_SMOKE_PASSWORD = $Password
     $env:CV_EVIDENCE_DIR = $evidence
     Push-Location $uiTests
     try {
@@ -399,6 +400,7 @@ function Invoke-WebViewSmoke {
         Pop-Location
         Remove-Item Env:CV_SMOKE_TOKEN -ErrorAction SilentlyContinue
         Remove-Item Env:CV_SMOKE_USER -ErrorAction SilentlyContinue
+        Remove-Item Env:CV_SMOKE_PASSWORD -ErrorAction SilentlyContinue
     }
 }
 
