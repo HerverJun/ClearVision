@@ -3,6 +3,7 @@ import { createApp, type App as VueApp } from 'vue';
 import type { Router } from 'vue-router';
 import App from '@/app/App.vue';
 import { authLifecycleRootKey, createAuthLifecycleRoot, type AuthLifecycleRoot } from '@/app/auth';
+import { installProductLeaveGuardBridge } from '@/app/leave';
 import type { ProductRuntime } from '@/app/productRuntime';
 import { createStudioRouter, installAuthRouteGuard } from '@/app/router';
 import {
@@ -48,10 +49,13 @@ export async function mountStudioApp(
   const app = createApp(App);
   const router = options.router ?? createStudioRouter();
   const authRoot = createAuthLifecycleRoot(options.platform);
+  let removeAuthRouteGuard: (() => void) | undefined;
+  let removeLeaveGuardBridge: (() => void) | undefined;
 
   try {
     authRoot.bindRouter(router);
-    installAuthRouteGuard(router, authRoot.auth, options.platform.startup);
+    removeAuthRouteGuard = installAuthRouteGuard(router, authRoot.auth, options.platform.startup);
+    removeLeaveGuardBridge = installProductLeaveGuardBridge(router, authRoot);
     app.use(createPinia());
     app.use(router);
     app.provide(studioPlatformKey, options.platform);
@@ -60,6 +64,8 @@ export async function mountStudioApp(
     await router.isReady();
     app.mount(mountTarget);
   } catch (error) {
+    removeLeaveGuardBridge?.();
+    removeAuthRouteGuard?.();
     authRoot.dispose();
     options.platform.dispose();
     throw error;
@@ -84,9 +90,14 @@ export async function mountStudioApp(
         app.unmount();
       } finally {
         try {
-          authRoot.dispose();
+          removeLeaveGuardBridge?.();
+          removeAuthRouteGuard?.();
         } finally {
-          options.platform.dispose();
+          try {
+            authRoot.dispose();
+          } finally {
+            options.platform.dispose();
+          }
         }
       }
     }

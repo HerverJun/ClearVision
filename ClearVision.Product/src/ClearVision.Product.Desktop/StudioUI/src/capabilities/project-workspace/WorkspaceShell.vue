@@ -168,20 +168,32 @@ const runLabel = computed(() => {
   >
     <header class="workspace-shell__toolbar">
       <div class="workspace-shell__identity">
-        <RouterLink
-          class="workspace-shell__back"
-          :to="`/projects/${projectId}`"
+        <nav
+          class="workspace-shell__back-nav"
+          aria-label="工程导航"
         >
-          ← 工程详情
-        </RouterLink>
+          <RouterLink
+            class="workspace-shell__back"
+            to="/projects"
+          >
+            工程列表
+          </RouterLink>
+          <RouterLink
+            class="workspace-shell__back"
+            :to="`/projects/${projectId}`"
+          >
+            工程详情
+          </RouterLink>
+        </nav>
         <span
           class="workspace-shell__divider"
           aria-hidden="true"
         />
         <div>
           <strong>{{ currentProject?.name ?? '工程工作区' }}</strong>
-          <small>
-            {{ currentProject ? `版本 ${currentProject.version} · revision ${persistence?.persistenceRevision ?? currentProject.persistenceRevision}` : projectId }}
+          <small>ProjectId {{ projectId }}</small>
+          <small v-if="currentProject">
+            版本 {{ currentProject.version }} · PersistenceRevision {{ persistence?.persistenceRevision ?? currentProject.persistenceRevision }}
           </small>
         </div>
       </div>
@@ -205,6 +217,13 @@ const runLabel = computed(() => {
         >
           Run
         </CvButton>
+        <RouterLink
+          class="workspace-shell__results-link"
+          :to="{ path: '/results', query: { source: 'local', projectId } }"
+          data-testid="workspace-results"
+        >
+          当前工程结果
+        </RouterLink>
         <CvButton
           v-if="run?.canStop"
           data-testid="workspace-run-stop"
@@ -349,7 +368,7 @@ const runLabel = computed(() => {
           aria-label="预览区占位"
         >
           <strong>预览区</strong>
-          <span>G4 未启用 · 无 Preview、artifact 或 binary transport</span>
+          <span>工程加载成功后由现有 Preview owner 提供调试投影；不等同于 Formal Run。</span>
         </section>
       </div>
 
@@ -359,7 +378,7 @@ const runLabel = computed(() => {
       >
         <div class="workspace-shell__pane-heading">
           <strong>属性区</strong>
-          <small>G3 未启用</small>
+          <small>等待工程</small>
         </div>
         <div
           class="workspace-shell__placeholder-field"
@@ -369,7 +388,7 @@ const runLabel = computed(() => {
           class="workspace-shell__placeholder-field"
           aria-hidden="true"
         />
-        <p>没有 Inspector、参数编辑或 Host file picker。</p>
+        <p>工程加载成功后挂载唯一 Inspector owner；Host file picker 仍由窄适配层负责。</p>
       </aside>
     </div>
 
@@ -432,8 +451,25 @@ const runLabel = computed(() => {
 .workspace-shell__identity small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-shell__identity strong { font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); }
 .workspace-shell__identity small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.workspace-shell__back-nav { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .workspace-shell__back { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); text-decoration: none; white-space: nowrap; }
 .workspace-shell__back:hover { color: var(--cv-color-link); }
+.workspace-shell__results-link {
+  display: inline-flex;
+  align-items: center;
+  height: var(--cv-density-control-height-sm);
+  padding: 0 var(--cv-space-3);
+  border: 1px solid var(--cv-control-border);
+  border-radius: var(--cv-radius-sm);
+  background: var(--cv-surface-raised);
+  color: var(--cv-text-secondary);
+  font-size: var(--cv-font-size-xs);
+  font-weight: var(--cv-font-weight-medium);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.workspace-shell__results-link:hover { border-color: var(--cv-control-border-hover); background: var(--cv-interactive-hover); color: var(--cv-color-link); }
+.workspace-shell__results-link:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
 .workspace-shell__divider { width: 1px; height: 22px; background: var(--cv-border-subtle); }
 
 .workspace-shell__work-area {

@@ -38,53 +38,6 @@ let lifecycleGeneration = 0;
 let readPort: WorkspaceProjectReadPort | undefined;
 let workspaceOwner: WorkspaceOwner | undefined;
 
-type WorkspaceFlushWindow = Window & {
-  __clearVisionFlushProjectWorkspace?: (reason?: string) => Promise<boolean>;
-};
-
-function hasProtectedDraft(): boolean {
-  const persistence = workspaceOwner?.projection.persistence;
-  const runPhase = workspaceOwner?.projection.run?.phase;
-  return Boolean(persistence && (
-    persistence.dirty || persistence.phase === 'saving' || persistence.phase === 'conflict' ||
-    persistence.phase === 'unknown-outcome'
-  )) || runPhase === 'admitting' || runPhase === 'executing' ||
-    runPhase === 'cancel-requested' || runPhase === 'unknown-outcome';
-}
-
-function hasProtectedRun(): boolean {
-  const runPhase = workspaceOwner?.projection.run?.phase;
-  return runPhase === 'admitting' || runPhase === 'executing' ||
-    runPhase === 'cancel-requested' || runPhase === 'unknown-outcome';
-}
-
-function protectedRunLeaveMessage(): string {
-  return 'Formal Run is still executing or its outcome is unknown. Leaving now is not a successful Stop; the server run may continue and the Results handoff may be unavailable. Force leave anyway?';
-}
-
-async function allowWorkspaceLeave(reason: string): Promise<boolean> {
-  if (!workspaceOwner || !hasProtectedDraft()) return true;
-  const settled = await workspaceOwner.prepareForLeave(reason);
-  if (settled) return true;
-  if (hasProtectedRun()) return globalThis.confirm(protectedRunLeaveMessage());
-  return globalThis.confirm('此工程存在未保存修改或未完成的保存协调。确定要离开并放弃本地 draft 吗？');
-}
-
-let routeGuardApproved = false;
-
-const removeRouteGuard = router.beforeEach(async (to, from) => {
-  if (!workspaceOwner || to.fullPath === from.fullPath) return true;
-  const allowed = await allowWorkspaceLeave('route-leave');
-  if (allowed) routeGuardApproved = true;
-  return allowed;
-});
-
-function handleBeforeUnload(event: BeforeUnloadEvent): void {
-  if (!hasProtectedDraft()) return;
-  event.preventDefault();
-  event.returnValue = '';
-}
-
 function handleSaveShortcut(event: KeyboardEvent): void {
   if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 's') return;
   event.preventDefault();
@@ -92,10 +45,7 @@ function handleSaveShortcut(event: KeyboardEvent): void {
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', handleBeforeUnload);
   window.addEventListener('keydown', handleSaveShortcut);
-  (window as WorkspaceFlushWindow).__clearVisionFlushProjectWorkspace = async reason =>
-    workspaceOwner?.prepareForLeave(reason ?? 'host-close') ?? true;
 }
 
 function disposeActive(reason: string): void {
@@ -128,10 +78,6 @@ function openFailureState(): WorkspaceShellState {
 }
 
 async function startLifecycle(reason: string): Promise<void> {
-  if (reason === 'project-changed' && !routeGuardApproved && workspaceOwner && hasProtectedDraft()) {
-    if (!(await allowWorkspaceLeave('project-switch'))) return;
-  }
-  routeGuardApproved = false;
   disposeActive(reason);
   const generation = lifecycleGeneration;
   const projectId = activeProjectId.value;
@@ -268,14 +214,8 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  removeRouteGuard();
   if (typeof window !== 'undefined') {
-    window.removeEventListener('beforeunload', handleBeforeUnload);
     window.removeEventListener('keydown', handleSaveShortcut);
-    const runtimeWindow = window as WorkspaceFlushWindow;
-    if (runtimeWindow.__clearVisionFlushProjectWorkspace) {
-      delete runtimeWindow.__clearVisionFlushProjectWorkspace;
-    }
   }
   disposeActive('route-leave');
 });

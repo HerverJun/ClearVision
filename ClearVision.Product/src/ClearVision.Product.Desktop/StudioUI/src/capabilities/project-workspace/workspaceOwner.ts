@@ -162,6 +162,12 @@ export function createWorkspaceOwner(
       if (runOwner && !(await runOwner.prepareForLeave(reason))) {
         return false;
       }
+      if (persistenceOwner?.projection.phase === 'unknown-outcome') {
+        const reconciliation = await persistenceOwner.reconcile();
+        if (reconciliation.status === 'unknown-outcome' || reconciliation.status === 'failed') {
+          return false;
+        }
+      }
       return await persistenceOwner?.prepareForLeave(reason) ?? true;
     },
     quarantineForSessionExpiration(): WorkspaceSessionReconcileIdentity | null {

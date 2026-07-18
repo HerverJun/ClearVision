@@ -1,5 +1,6 @@
 import { inject, readonly, shallowRef, type DeepReadonly, type InjectionKey, type ShallowRef } from 'vue';
 import type { Router } from 'vue-router';
+import type { ProductLeaveGuardOwner } from '@/app/leave';
 import { createProductRuntime, type ProductRuntime } from '@/app/productRuntime';
 import type { StudioPlatform } from '@/app/studioPlatform';
 import {
@@ -11,6 +12,7 @@ import {
 export interface AuthLifecycleRoot {
   readonly auth: AuthLifecycleOwner;
   readonly productRuntime: DeepReadonly<ShallowRef<ProductRuntime | null>>;
+  getProductLeaveGuard(): ProductLeaveGuardOwner | null;
   bindRouter(router: Router): void;
   start(): Promise<void>;
   dispose(): void;
@@ -83,6 +85,9 @@ export function createAuthLifecycleRoot(platform: StudioPlatform): AuthLifecycle
   return Object.freeze({
     auth,
     productRuntime: readonly(productRuntime),
+    getProductLeaveGuard(): ProductLeaveGuardOwner | null {
+      return productRuntime.value?.leaveGuard ?? quarantinedRuntime?.leaveGuard ?? null;
+    },
     bindRouter(nextRouter: Router): void {
       if (router && router !== nextRouter) throw new Error('AuthLifecycleRoot router is already bound.');
       router = nextRouter;

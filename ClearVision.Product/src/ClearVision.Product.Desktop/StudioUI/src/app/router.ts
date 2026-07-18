@@ -262,9 +262,6 @@ export function installAuthRouteGuard(
     }
 
     if (!requiresSession) return true;
-    if (to.name === 'change-password' && to.fullPath !== router.currentRoute.value.fullPath) {
-      if (!(await auth.prepareChangePasswordRoute())) return false;
-    }
     const role = projection.user?.role;
     const allowedRoles = to.matched.flatMap(record => record.meta.allowedRoles ?? []);
     if (allowedRoles.length > 0 && (!role || !allowedRoles.includes(role))) {

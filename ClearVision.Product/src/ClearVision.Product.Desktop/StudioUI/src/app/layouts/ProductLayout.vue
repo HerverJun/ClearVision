@@ -5,7 +5,7 @@ import { visibleProductNavigation } from '@/app/navigation';
 import { useAuthLifecycleRoot } from '@/app/auth';
 import { useProductRuntime } from '@/app/productRuntime';
 import { useStudioPlatform } from '@/app/studioPlatform';
-import { CvButton, CvInlineAlert, CvStatusBadge } from '@/design-system/primitives';
+import { CvButton, CvInlineAlert, CvModal, CvStatusBadge } from '@/design-system/primitives';
 import { CvIcon } from '@/design-system/icons';
 import './product-layout.css';
 
@@ -59,6 +59,11 @@ const roleLabel = computed(() => {
 const themeLabel = computed(() => preferences.theme === 'dark' ? '深色' : '浅色');
 const densityLabel = computed(() => preferences.density === 'comfortable' ? '舒适' : '紧凑');
 const userInitial = computed(() => (session.user?.username?.trim().charAt(0) || '未').toLocaleUpperCase());
+const leaveGuard = runtime.leaveGuard;
+const leavePromptOpen = computed(() => leaveGuard.projection.phase === 'prompting');
+const leavePromptTitle = computed(() => leaveGuard.projection.protectionKind === 'project-update-conflict'
+  ? '放弃未解决的工程编辑？'
+  : '放弃本地工作区修改？');
 
 function closeAppearance(): void {
   const details = appearanceDetails.value;
@@ -86,6 +91,8 @@ onMounted(() => runtime.preferences.apply());
     :class="{ 'product-layout--workspace': workspaceMode }"
     data-product-shell="ready"
     :data-workspace-mode="workspaceMode"
+    :data-leave-guard-phase="leaveGuard.projection.phase"
+    :data-leave-guard-owner-count="leaveGuard.diagnostics.ownerCount"
   >
     <a
       class="product-layout__skip-link"
@@ -129,8 +136,8 @@ onMounted(() => runtime.preferences.apply());
 
       <div class="product-layout__sidebar-note">
         <small>工作模式</small>
-        <strong>只读工作区</strong>
-        <span>正式保存、执行与现场控制继续由现有后端权威链路负责。</span>
+        <strong>可编辑工程工作台</strong>
+        <span>Save 与 Formal Run 由后端权威链负责；Preview 不代表正式运行可执行。</span>
       </div>
     </aside>
 
@@ -281,6 +288,16 @@ onMounted(() => runtime.preferences.apply());
         tabindex="-1"
       >
         <CvInlineAlert
+          v-if="leaveGuard.projection.phase === 'blocked'"
+          class="product-layout__session-alert"
+          tone="warning"
+          compact
+          title="当前操作已被 Leave Guard 阻止"
+          data-product-state="leave-blocked"
+        >
+          {{ leaveGuard.projection.message }}
+        </CvInlineAlert>
+        <CvInlineAlert
           v-if="authRoot.auth.projection.errorCode === 'CHANGE_PASSWORD_BLOCKED'"
           class="product-layout__session-alert"
           tone="warning"
@@ -317,5 +334,37 @@ onMounted(() => runtime.preferences.apply());
         </RouterView>
       </main>
     </div>
+
+    <CvModal
+      :open="leavePromptOpen"
+      :title="leavePromptTitle"
+      :description="leaveGuard.projection.message"
+      size="sm"
+      :close-on-backdrop="false"
+      @close="leaveGuard.cancelPrompt"
+    >
+      <CvInlineAlert tone="warning">
+        后端状态已经明确；继续只会放弃本地未保存投影，不会把 UI 状态当作服务端结果。
+      </CvInlineAlert>
+      <template #footer>
+        <CvButton
+          size="sm"
+          variant="secondary"
+          data-modal-initial-focus
+          data-testid="leave-guard-stay"
+          @click="leaveGuard.cancelPrompt"
+        >
+          继续留在此页
+        </CvButton>
+        <CvButton
+          size="sm"
+          variant="danger"
+          data-testid="leave-guard-discard"
+          @click="leaveGuard.confirmPrompt"
+        >
+          放弃并离开
+        </CvButton>
+      </template>
+    </CvModal>
   </div>
 </template>

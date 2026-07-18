@@ -64,6 +64,11 @@ const localListOwner = shallowRef<ReadQueryOwner<LocalInspectionResultPage> | nu
 const localDetailOwner = shallowRef<ReadQueryOwner<LocalInspectionResultDetail> | null>(null);
 const stationListOwner = shallowRef<ReadQueryOwner<StationInspectionResultPage> | null>(null);
 
+function returnToWorkspace(): void {
+  if (!projectId.value) return;
+  void router.push(`/projects/${projectId.value}/workspace`);
+}
+
 function idleState<T>(): ReadQueryState<T> {
   return Object.freeze({
     phase: 'idle',
@@ -450,6 +455,15 @@ onBeforeUnmount(() => {
       description="只读浏览本机检测历史与工作站上报摘要；执行状态与判定结果双轴始终分别展示。"
     >
       <template #actions>
+        <CvButton
+          v-if="source === 'local' && projectId"
+          size="sm"
+          variant="quiet"
+          data-testid="results-return-workspace"
+          @click="returnToWorkspace"
+        >
+          返回工作区
+        </CvButton>
         <CvButton
           size="sm"
           :loading="localListState.isRefreshing || stationListState.isRefreshing"

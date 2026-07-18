@@ -37,11 +37,20 @@ export interface WorkspaceRuntime {
   refreshSession(): Promise<void>;
   openProject(projectId: string): WorkspaceProjectReadPort;
   mountProject(project: WorkspaceProjectV1): WorkspaceOwner;
+  getLeaveProtectionSnapshot(projectId?: string): WorkspaceLeaveProtectionSnapshot | null;
+  prepareForLeave(reason: string, projectId?: string): Promise<boolean>;
   prepareForProjectTransition(projectId: string, reason: 'project-delete'): Promise<boolean>;
   prepareForProtectedTransition(reason: 'logout' | 'change-password'): Promise<boolean>;
   quarantineForSessionExpiration(): WorkspaceRuntimeQuarantine;
   reconcileAfterReauthentication(): Promise<boolean>;
   dispose(): void;
+}
+
+export interface WorkspaceLeaveProtectionSnapshot {
+  readonly projectId: string;
+  readonly persistencePhase: string | null;
+  readonly dirty: boolean;
+  readonly runPhase: string | null;
 }
 
 export interface WorkspaceRuntimeQuarantine {
@@ -60,6 +69,15 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
 
   function assertActive(): void {
     if (disposed) throw new Error('WorkspaceRuntime has been disposed.');
+  }
+
+  async function prepareOwnersForLeave(reason: string, projectId?: string): Promise<boolean> {
+    assertActive();
+    for (const owner of [...activeOwners]) {
+      if (projectId !== undefined && owner.projectId !== projectId) continue;
+      if (!(await owner.prepareForLeave(reason))) return false;
+    }
+    return true;
   }
 
   return Object.freeze({
@@ -126,19 +144,25 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
       activeOwners.add(owner);
       return owner;
     },
-    async prepareForProjectTransition(projectId: string, reason: 'project-delete'): Promise<boolean> {
+    getLeaveProtectionSnapshot(projectId?: string): WorkspaceLeaveProtectionSnapshot | null {
       assertActive();
-      for (const owner of [...activeOwners]) {
-        if (owner.projectId === projectId && !(await owner.prepareForLeave(reason))) return false;
-      }
-      return true;
+      const owner = [...activeOwners].find(candidate => projectId === undefined || candidate.projectId === projectId);
+      if (!owner) return null;
+      return Object.freeze({
+        projectId: owner.projectId,
+        persistencePhase: owner.projection.persistence?.phase ?? null,
+        dirty: owner.projection.persistence?.dirty ?? false,
+        runPhase: owner.projection.run?.phase ?? null
+      });
     },
-    async prepareForProtectedTransition(reason: 'logout' | 'change-password'): Promise<boolean> {
-      assertActive();
-      for (const owner of [...activeOwners]) {
-        if (!(await owner.prepareForLeave(`auth-${reason}`))) return false;
-      }
-      return true;
+    prepareForLeave(reason: string, projectId?: string): Promise<boolean> {
+      return prepareOwnersForLeave(reason, projectId);
+    },
+    prepareForProjectTransition(projectId: string, reason: 'project-delete'): Promise<boolean> {
+      return prepareOwnersForLeave(reason, projectId);
+    },
+    prepareForProtectedTransition(reason: 'logout' | 'change-password'): Promise<boolean> {
+      return prepareOwnersForLeave(`auth-${reason}`);
     },
     quarantineForSessionExpiration(): WorkspaceRuntimeQuarantine {
       assertActive();
