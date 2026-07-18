@@ -1,8 +1,8 @@
 # Studio UI Next F04 完整开发计划
 
-> 文档状态：**G3B_DONE_G3C_APPROVED**
+> 文档状态：**G3C_DONE_G4_APPROVED**
 > 本计划已经结合 F03 最终实现、当前 `studio-ui-next` 分支代码事实、原 F04 初稿及独立复审意见修订。
-> Prompt 4/4 已按 G3A 批准合同完成 G3B Project backend hardening；G3C 已解锁，G4–G6 仍须继续串行门禁。
+> Prompt 4/4 已完成 G3B Project backend hardening 与 G3C frontend lifecycle；G4 已解锁，G5–G6 仍须继续串行门禁。
 
 ---
 
@@ -11,7 +11,7 @@
 ```text
 PLAN_NAME=Studio UI Next F04
 PLAN_THEME=产品化入口、认证闭环、工程生命周期与受控切换
-PLAN_STATUS=G3B_DONE_G3C_APPROVED
+PLAN_STATUS=G3C_DONE_G4_APPROVED
 
 CODE_AUDIT_BASE_SHA=b24d20b3531bdea66f0b9b73ba5e18827489eedf
 PLAN_DOCUMENT_COMMIT_SHA=42a2c8811d97af2212fa2a3ec40ba7b86aab649e
@@ -47,7 +47,7 @@ G1_ENTRY_APPROVED_AFTER_G0B_PASS=YES
 G2_IMPLEMENTED=YES
 G3A_CONTRACTS_FROZEN=YES
 G3B_BACKEND_IMPLEMENTATION=YES
-G3C_FRONTEND_IMPLEMENTATION=NO
+G3C_FRONTEND_IMPLEMENTATION=YES
 G4_TO_G6_IMPLEMENTATION=NO
 G0_STATUS=DONE
 G1_STATUS=DONE
@@ -56,7 +56,10 @@ G3A_STATUS=DONE
 G3B_STATUS=DONE
 G3B_BACKEND_SHA=3a0354a258a3696486ddc2b37bfd4ee6dc8dc7bb
 G3B_TEST_SHA=3a0354a258a3696486ddc2b37bfd4ee6dc8dc7bb
-G3C_ENTRY=APPROVED
+G3C_STATUS=DONE
+G3C_FRONTEND_SHA=2e766e41b21e4be0f4bb653373522072200147c7
+G3C_TEST_SHA=b6156c2c5e9dc7c1e27fe0d605dfa0f17350c662
+G4_ENTRY=APPROVED
 F04_STARTED=YES
 
 OFFICIAL_STUDIO_UI_DEFAULT=false
@@ -997,7 +1000,11 @@ G3C_ENTRY=APPROVED
 
 ## 8.4 G3C：Frontend command owner and UX
 
-建立唯一：
+G3C 已完成，权威 closure 见：
+
+- [F04 G3C Project 生命周期前端闭环](./F04_G3C_Project生命周期前端闭环.md)
+
+已建立唯一：
 
 ```text
 projectLifecycleCommandOwner
@@ -1029,6 +1036,18 @@ disposed
 - 删除当前工程前经过 Workspace leave protection；
 - 不复制 read-query cache；
 - recent-open 使用批准合同。
+
+门禁：
+
+```text
+G3C_STATUS=DONE
+PROJECT_COMMAND_OWNER_COUNT=1
+PROJECT_READ_QUERY_OWNER_COUNT=1
+SECOND_PROJECT_CACHE=NO
+PROJECT_UNKNOWN_OUTCOME_RECONCILE=PASS
+PROJECT_LEAVE_PROTECTION=PASS
+G4_ENTRY=APPROVED
+```
 
 ## 8.5 G3 用户旅程
 
