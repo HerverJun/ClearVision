@@ -275,9 +275,7 @@ describe('F03 G1 WorkspacePage', () => {
     harness.queries.dispose();
   });
 
-  it('protects route leave, project switch, and Host close while Formal Run is executing', async () => {
-    const confirm = vi.fn(() => false);
-    vi.stubGlobal('confirm', confirm);
+  it('does not install a second route, beforeunload, or Host-close guard', async () => {
     const harness = createProtectedRunHarness();
     const router = await createTestRouter();
     const wrapper = mount(WorkspacePage, {
@@ -287,25 +285,21 @@ describe('F03 G1 WorkspacePage', () => {
     await flushPromises();
 
     await router.push('/about');
-    expect(router.currentRoute.value.fullPath).toBe(`/projects/${projectA}/workspace`);
-    expect(harness.owner.prepareForLeave).toHaveBeenCalledWith('route-leave');
+    expect(router.currentRoute.value.fullPath).toBe('/about');
+    expect(harness.owner.prepareForLeave).not.toHaveBeenCalled();
     expect(harness.owner.dispose).not.toHaveBeenCalled();
 
     await router.push(`/projects/${projectB}/workspace`);
-    expect(router.currentRoute.value.fullPath).toBe(`/projects/${projectA}/workspace`);
-    expect(harness.owner.prepareForLeave).toHaveBeenCalledWith('route-leave');
+    expect(router.currentRoute.value.fullPath).toBe(`/projects/${projectB}/workspace`);
+    expect(harness.owner.prepareForLeave).not.toHaveBeenCalled();
 
     const flush = (window as Window & {
       __clearVisionFlushProjectWorkspace?: (reason?: string) => Promise<boolean>;
     }).__clearVisionFlushProjectWorkspace;
-    await expect(flush?.('host-close')).resolves.toBe(false);
-    expect(harness.owner.prepareForLeave).toHaveBeenCalledWith('host-close');
-    expect(harness.owner.dispose).not.toHaveBeenCalled();
-    expect(confirm).toHaveBeenCalled();
+    expect(flush).toBeUndefined();
 
     wrapper.unmount();
     harness.runtime.dispose();
-    vi.unstubAllGlobals();
   });
 
   it('keeps flag-off at owner=0 and does not issue a Project GET', async () => {

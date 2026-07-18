@@ -12,6 +12,11 @@ import {
   isF03G6RequestAllowlist,
   type F03RequestAuditEntry
 } from './f03-browser-fixture';
+import {
+  captureF04VisualEvidence,
+  createF04RuntimeErrorAudit,
+  hasF04VisualEvidenceTarget
+} from './f04-browser-evidence';
 
 const fixtureSchema = 'f03-g5-workspace.v1';
 const projectA = '11111111-1111-4111-8111-111111111111';
@@ -28,6 +33,16 @@ function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
   const promise = new Promise<T>(next => { resolve = next; });
   return { promise, resolve };
+}
+
+async function requestStudioHashNavigation(page: Page, hash: string): Promise<void> {
+  await page.evaluate(nextHash => { window.location.hash = nextHash; }, hash);
+}
+
+async function resolveLeavePrompt(page: Page, decision: 'stay' | 'discard'): Promise<void> {
+  const action = page.locator(`[data-testid="leave-guard-${decision}"]`);
+  await expect(action).toBeVisible();
+  await action.click();
 }
 
 function previewArtifactId(call: number): string {
@@ -1214,8 +1229,9 @@ test('G4 Preview and ImageCanvas render artifacts, probe pixels and commit ROI o
   await page.locator('[data-testid="roi-cancel"]').click();
   await expect(xInput).toHaveValue('11');
 
-  page.once('dialog', dialog => dialog.accept());
-  await page.goto('/studio/index.html#/about');
+  await requestStudioHashNavigation(page, '#/about');
+  await resolveLeavePrompt(page, 'discard');
+  await expect(page).toHaveURL(/#\/about$/);
   await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
     previewOwnerCount: 0,
     imageCanvasOwnerCount: 0,
@@ -1318,6 +1334,27 @@ test('G6 runs only the saved Project identity through admission, execute, and Re
   ]);
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
   await expect(shell).toHaveCount(0);
+});
+
+test('G4 visual evidence holds Formal Run executing until the authoritative result settles', async ({ page }) => {
+  const viewport = { width: 1600, height: 1000 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
+  const execute = deferred<Readonly<Record<string, unknown>>>();
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
+    runScenario: stage => stage === 'execute' ? execute.promise : {}
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  await page.locator('[data-testid="workspace-run"]').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'executing');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'formal-run', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
+  execute.resolve({});
+  await expect(page.locator('[data-capability="results-read"]')).toBeVisible();
 });
 
 test('G6 blocks execute after admission rejection and keeps the saved Workspace editable', async ({ page }) => {
@@ -1524,12 +1561,8 @@ test('G6 protects route leave while Formal Run is still executing', async ({ pag
   await page.locator('[data-testid="workspace-run"]').click();
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'executing');
 
-  const dialogMessage = new Promise<string>(resolve => page.once('dialog', async dialog => {
-    resolve(dialog.message());
-    await dialog.dismiss();
-  }));
-  await page.goto('/studio/index.html#/about').catch(() => undefined);
-  await expect(dialogMessage).resolves.toContain('Formal Run');
+  await requestStudioHashNavigation(page, '#/about');
+  await expect(page.locator('[data-product-state="leave-blocked"]')).toContainText('Formal Run');
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
   expect(audit.some(entry => entry.path === '/api/inspection/stop')).toBe(true);
   expect(audit.some(entry => entry.path === '/api/inspection/reconcile')).toBe(true);
@@ -1537,7 +1570,8 @@ test('G6 protects route leave while Formal Run is still executing', async ({ pag
   reconcileStatus = 'cancelled';
   await page.locator('[data-testid="workspace-run-reconcile"]').click();
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'cancelled');
-  await page.goto('/studio/index.html#/about');
+  await requestStudioHashNavigation(page, '#/about');
+  await expect(page).toHaveURL(/#\/about$/);
   await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
     workspaceOwnerCount: 0,
     runOwnerCount: 0,
@@ -1564,20 +1598,17 @@ test('G6 protects project switch while Formal Run is still executing', async ({ 
   await page.locator('[data-testid="workspace-run"]').click();
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'executing');
 
-  const dialogMessage = new Promise<string>(resolve => page.once('dialog', async dialog => {
-    resolve(dialog.message());
-    await dialog.dismiss();
-  }));
-  await page.goto(`/studio/index.html#/projects/${projectB}/workspace`).catch(() => undefined);
-  await expect(dialogMessage).resolves.toContain('Formal Run');
+  await requestStudioHashNavigation(page, `#/projects/${projectB}/workspace`);
+  await expect(page.locator('[data-product-state="leave-blocked"]')).toContainText('Formal Run');
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
 
   reconcileStatus = 'cancelled';
   await page.locator('[data-testid="workspace-run-reconcile"]').click();
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'cancelled');
-  await page.goto(`/studio/index.html#/projects/${projectB}/workspace`);
+  await requestStudioHashNavigation(page, `#/projects/${projectB}/workspace`);
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectB);
-  await page.goto('/studio/index.html#/about');
+  await requestStudioHashNavigation(page, '#/about');
+  await expect(page).toHaveURL(/#\/about$/);
   await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
     workspaceOwnerCount: 0,
     runOwnerCount: 0,
@@ -1674,13 +1705,15 @@ test('G5 saves and reloads a catalog-added numeric operator type through the for
 });
 
 test('G5 save failure retries explicitly, PSV011 reconciles fail closed, and unknown outcome reconciles by GET', async ({ page }) => {
+  const viewport = { width: 1600, height: 1000 } as const;
+  await page.setViewportSize(viewport);
   let mode: 'failure' | 'conflict' | 'unknown' = 'failure';
   let putCall = 0;
   const bodies: Readonly<Record<string, unknown>>[] = [];
   const serverConflictFlow = structuredClone(inspectorFlow());
   ((serverConflictFlow.operators[0]!.parameters as Array<Record<string, unknown>>)
     .find(parameter => parameter.name === 'Text')!).value = 'server-value';
-  await bootWorkspace(page, {
+  const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
     projectPutScenario: (request, current) => {
       bodies.push(request);
@@ -1733,6 +1766,14 @@ test('G5 save failure retries explicitly, PSV011 reconciles fail closed, and unk
   await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'conflict');
   await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
   await expect(textInput).toHaveValue('conflict-local');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-conflict',
+      viewport,
+      runtimeErrors: createF04RuntimeErrorAudit(page),
+      requestAudit: audit
+    });
+  }
   await page.locator('[data-testid="workspace-conflict-reapply"]').click();
   await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '9');
   await expect(shell).toHaveAttribute('data-workspace-dirty', 'true');
@@ -1747,12 +1788,20 @@ test('G5 save failure retries explicitly, PSV011 reconciles fail closed, and unk
   await page.locator('[data-testid="workspace-save"]').click();
   await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'unknown-outcome');
   await expect(page.locator('[data-testid="workspace-save-retry"]')).toHaveCount(0);
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-unknown-outcome',
+      viewport,
+      runtimeErrors: createF04RuntimeErrorAudit(page),
+      requestAudit: audit
+    });
+  }
   await page.locator('[data-testid="workspace-save-reconcile"]').click();
   await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'saved');
   await expect(shell).toHaveAttribute('data-workspace-dirty', 'false');
 });
 
-test('G5 silently drops a late reconcile GET after route leave and cannot overwrite the next Project', async ({ page }) => {
+test('G5 settles a delayed reconcile before route leave and cannot overwrite the next Project', async ({ page }) => {
   const runtimeErrors = createF03RuntimeErrorAudit(page);
   let delayedReconcileStarted = false;
   const audit = await bootWorkspace(page, {
@@ -1788,9 +1837,9 @@ test('G5 silently drops a late reconcile GET after route leave and cannot overwr
 
   await page.locator('[data-testid="workspace-save-reconcile"]').click();
   await expect.poll(() => delayedReconcileStarted).toBe(true);
-  page.once('dialog', dialog => dialog.accept());
-  await page.goto(`/studio/index.html#/projects/${projectB}/workspace`);
+  await requestStudioHashNavigation(page, `#/projects/${projectB}/workspace`);
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectB);
+  await expect(page.locator('[data-testid="leave-guard-discard"]')).toHaveCount(0);
   await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
   await page.waitForTimeout(800);
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectB);
@@ -1798,7 +1847,8 @@ test('G5 silently drops a late reconcile GET after route leave and cannot overwr
   expect(runtimeErrors.pageErrors).toEqual([]);
   expect(runtimeErrors.consoleErrors.filter(message => !message.includes('net::ERR_FAILED'))).toEqual([]);
 
-  await page.goto('/studio/index.html#/about');
+  await requestStudioHashNavigation(page, '#/about');
+  await expect(page).toHaveURL(/#\/about$/);
   await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
     workspaceOwnerCount: 0,
     persistenceOwnerCount: 0,
@@ -1843,15 +1893,12 @@ test('G5 protects route leave and project switch while readonly and running resp
   };
   await editSelectedNode('protected');
 
-  const dismissed = new Promise<string>(resolve => page.once('dialog', async dialog => {
-    resolve(dialog.message());
-    await dialog.dismiss();
-  }));
-  await page.goto('/studio/index.html#/about').catch(() => undefined);
-  await expect(dismissed).resolves.toContain('未保存修改');
+  await requestStudioHashNavigation(page, '#/about');
+  await expect(page.locator('[role="dialog"]')).toContainText('未保存修改');
+  await resolveLeavePrompt(page, 'stay');
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
-  page.once('dialog', dialog => dialog.accept());
-  await page.goto(`/studio/index.html#/projects/${projectB}/workspace`);
+  await requestStudioHashNavigation(page, `#/projects/${projectB}/workspace`);
+  await resolveLeavePrompt(page, 'discard');
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectB);
 
   await editSelectedNode('readonly');
@@ -1860,14 +1907,71 @@ test('G5 protects route leave and project switch while readonly and running resp
   await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'readonly');
   await expect(saveButton).toBeDisabled();
 
-  page.once('dialog', dialog => dialog.accept());
-  await page.goto(`/studio/index.html#/projects/${projectA}/workspace`);
+  await requestStudioHashNavigation(page, `#/projects/${projectA}/workspace`);
+  await resolveLeavePrompt(page, 'discard');
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
   await editSelectedNode('running');
   responseMode = 'running';
   await saveButton.click();
   await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'running');
   await expect(saveButton).toBeDisabled();
+});
+
+test('G4 unified leave prompt traps keyboard focus, Escape stays, and discard leaves', async ({ page }) => {
+  const viewport = { width: 1600, height: 1000 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
+  await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
+  });
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const textInput = page.locator(
+    '[data-evidence-surface="f03-g3-inspector"] [data-parameter-name="Text"] input'
+  );
+  await expect(shell).toContainText(`ProjectId ${projectA}`);
+  await expect(shell).toContainText('PersistenceRevision 7');
+  await expect(shell.getByRole('link', { name: '工程列表' })).toBeVisible();
+  await expect(shell.getByRole('link', { name: '工程详情' })).toBeVisible();
+  await expect(shell.getByRole('link', { name: '当前工程结果' })).toBeVisible();
+  await selectInspectorNode(page, 120, 125);
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, { scenario: 'workspace-idle', viewport, runtimeErrors });
+  }
+  await textInput.fill('keyboard-leave-guard');
+  await textInput.press('Enter');
+  await expect(shell).toHaveAttribute('data-workspace-dirty', 'true');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, { scenario: 'workspace-dirty', viewport, runtimeErrors });
+  }
+  await textInput.focus();
+
+  await requestStudioHashNavigation(page, '#/about');
+  const dialog = page.getByRole('dialog', { name: '放弃本地工作区修改？' });
+  const stay = page.locator('[data-testid="leave-guard-stay"]');
+  const discard = page.locator('[data-testid="leave-guard-discard"]');
+  const close = dialog.getByRole('button', { name: '关闭对话框' });
+  await expect(dialog).toBeVisible();
+  await expect(stay).toBeFocused();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, { scenario: 'leave-prompt', viewport, runtimeErrors });
+  }
+  await page.keyboard.press('Tab');
+  await expect(discard).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(discard).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(textInput).toBeFocused();
+  await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
+
+  await requestStudioHashNavigation(page, '#/about');
+  await expect(stay).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(discard).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/#\/about$/);
 });
 
 test('G4 Preview exposes structured, empty, business failure, network failure and cancellation states', async ({ page }) => {
@@ -2181,7 +2285,6 @@ for (const fixture of [
 ] as const) {
   test(`formal Workspace records ${fixture.nodes}/${fixture.connections} route-ready and interaction samples`, async ({ page }) => {
     const samples: number[] = [];
-    page.on('dialog', dialog => dialog.accept());
     const flow = performanceFlow(fixture.nodes, fixture.connections);
     await bootWorkspace(page, {
       projectBody: projectId => projectPayload(projectId, { flow })
@@ -2205,7 +2308,9 @@ for (const fixture of [
         await canvas.hover();
         await page.mouse.wheel(0, -120);
       }
-      await page.goto('/studio/index.html#/about');
+      await requestStudioHashNavigation(page, '#/about');
+      await resolveLeavePrompt(page, 'discard');
+      await expect(page).toHaveURL(/#\/about$/);
       await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
         workspaceOwnerCount: 0,
         flowCanvasOwnerCount: 0,

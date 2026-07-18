@@ -1,4 +1,9 @@
 import { expect, test, type Page, type Request, type Route } from '@playwright/test';
+import {
+  captureF04VisualEvidence,
+  createF04RuntimeErrorAudit,
+  hasF04VisualEvidenceTarget
+} from './f04-browser-evidence';
 
 const projectId = '11111111-1111-4111-8111-111111111111';
 const flowId = '22222222-2222-4222-8222-222222222222';
@@ -283,17 +288,46 @@ async function boot(page: Page, options: { initialProject?: FixtureProject; conf
 }
 
 test('F04 G3C completes create reconcile, open, rename, delete reconcile and tombstone journey', async ({ page }) => {
+  const viewport = { width: 1600, height: 1000 } as const;
+  await page.setViewportSize(viewport);
+  const initialRuntimeErrors = createF04RuntimeErrorAudit(page);
   const state = await boot(page);
   await page.goto('/studio/index.html#/projects');
   await expect(page.locator('[data-capability="projects-read"]')).toBeVisible();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'projects-empty', viewport, runtimeErrors: initialRuntimeErrors, requestAudit: state.audit
+    });
+  }
 
   await page.getByRole('button', { name: '新建空白工程' }).click();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'create-project', viewport, runtimeErrors: initialRuntimeErrors, requestAudit: state.audit
+    });
+  }
   await page.getByLabel('工程名称').fill('生命周期工程');
   await page.getByLabel('工程描述').fill('response-loss reconcile');
   await page.getByRole('button', { name: '创建', exact: true }).click();
   await expect(page.locator('[data-capability="projects-read-detail"]')).toBeVisible();
   expect(state.createPosts).toBe(1);
   expect(state.operationGets).toBe(1);
+  const productRuntimeErrors = createF04RuntimeErrorAudit(page);
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'project-detail', viewport, runtimeErrors: productRuntimeErrors, requestAudit: state.audit
+    });
+  }
+
+  await page.goto('/studio/index.html#/projects');
+  await expect(page.getByText('生命周期工程')).toBeVisible();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'projects-populated', viewport, runtimeErrors: productRuntimeErrors, requestAudit: state.audit
+    });
+  }
+  await page.goto(`/studio/index.html#/projects/${projectId}`);
+  await expect(page.locator('[data-capability="projects-read-detail"]')).toBeVisible();
 
   await page.getByLabel('工程名称').fill('生命周期工程（已重命名）');
   await page.getByRole('button', { name: '保存工程信息' }).click();
@@ -310,10 +344,23 @@ test('F04 G3C completes create reconcile, open, rename, delete reconcile and tom
     'empty'
   );
   expect(state.openPosts).toBeGreaterThanOrEqual(1);
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-empty', viewport, runtimeErrors: productRuntimeErrors, requestAudit: state.audit
+    });
+  }
 
   await page.getByRole('link', { name: '工程详情' }).click();
   await page.getByRole('button', { name: '删除', exact: true }).click();
-  await page.getByRole('button', { name: '确认删除' }).click();
+  await expect(page.getByRole('button', { name: '取消' })).toBeFocused();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'destructive-delete', viewport, runtimeErrors: productRuntimeErrors, requestAudit: state.audit
+    });
+  }
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: '确认删除' })).toBeFocused();
+  await page.keyboard.press('Enter');
   await expect(page.locator('[data-capability="projects-read"]')).toBeVisible();
   await expect(page.getByText('生命周期工程（已重命名）')).toHaveCount(0);
   expect(state.deletePosts).toBe(1);
@@ -330,6 +377,8 @@ test('F04 G3C completes create reconcile, open, rename, delete reconcile and tom
 });
 
 test('F04 G3C exposes revision conflict and reloads server authority without auto-overwrite', async ({ page }) => {
+  const viewport = { width: 1600, height: 1000 } as const;
+  await page.setViewportSize(viewport);
   const state = await boot(page, { initialProject: blankProject('本地基线'), conflictOnFirstUpdate: true });
   await page.goto(`/studio/index.html#/projects/${projectId}`);
   await expect(page.locator('[data-capability="projects-read-detail"]')).toBeVisible();
@@ -338,6 +387,15 @@ test('F04 G3C exposes revision conflict and reloads server authority without aut
   await page.getByRole('button', { name: '保存工程信息' }).click();
   await expect(page.getByText('工程 revision 或 mutation 冲突')).toBeVisible();
   await expect(page.getByRole('heading', { name: '本地基线' })).toBeVisible();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'project-conflict',
+      viewport,
+      runtimeErrors: createF04RuntimeErrorAudit(page),
+      requestAudit: state.audit,
+      notes: ['The expected 409 response occurred before the runtime-error audit used for this screenshot.']
+    });
+  }
 
   await page.getByRole('button', { name: '重新读取服务端版本' }).click();
   await expect(page.getByRole('heading', { name: '服务端并发版本' })).toBeVisible();

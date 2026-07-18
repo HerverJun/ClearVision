@@ -32,7 +32,7 @@ describe('F04 G3C Project lifecycle architecture guards', () => {
     const runtime = read(join(sourceRoot, 'app/productRuntime.ts'));
     expect(runtime.match(/createProjectLifecycleCommandOwner\(/g)).toHaveLength(1);
     expect(runtime).toContain('projectLifecycle.dispose');
-    expect(runtime).toContain('projectLifecycle.prepareForProtectedTransition');
+    expect(runtime).toContain('leaveGuard.request(reason)');
     expect(runtime).toContain('projectLifecycle.reconcileAfterReauthentication');
   });
 

@@ -382,6 +382,7 @@ test('twenty route mount/unmount cycles retain one owner and release every resou
 test('DPR and viewport matrix keeps backing stores and hit-test geometry aligned', async ({ browser }) => {
   const viewports = [
     { width: 1366, height: 768 },
+    { width: 1600, height: 1000 },
     { width: 1920, height: 1080 }
   ] as const;
   const deviceScaleFactors = [1, 1.25, 1.5, 2] as const;

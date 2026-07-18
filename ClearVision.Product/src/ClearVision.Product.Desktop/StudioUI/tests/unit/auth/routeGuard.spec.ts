@@ -93,7 +93,7 @@ describe('G2 route guard', () => {
     expect(router.currentRoute.value.path).toBe('/login');
   });
 
-  it('blocks the change-password route before Workspace can force-leave protected mutations', async () => {
+  it('leaves change-password protection to the single product leave guard', async () => {
     const session = auth('authenticated', 'Engineer');
     vi.mocked(session.owner.prepareChangePasswordRoute).mockResolvedValue(false);
     const router = createStudioRouter(createMemoryHistory());
@@ -101,7 +101,7 @@ describe('G2 route guard', () => {
     await router.push('/overview');
     await router.push('/change-password');
 
-    expect(router.currentRoute.value.path).toBe('/overview');
-    expect(session.owner.prepareChangePasswordRoute).toHaveBeenCalledTimes(1);
+    expect(router.currentRoute.value.path).toBe('/change-password');
+    expect(session.owner.prepareChangePasswordRoute).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,11 @@ import {
   installF02VisualPreferences,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
+import {
+  captureF04VisualEvidence,
+  createF04RuntimeErrorAudit,
+  hasF04VisualEvidenceTarget
+} from './f04-browser-evidence';
 
 const fixtureSchemaVersion = 'f02-results-read.v1';
 const projectId = '11111111-1111-4111-8111-111111111111';
@@ -204,11 +209,15 @@ async function bootResults(page: Page, initialHash = '/results'): Promise<F02Met
 }
 
 test('Results local view keeps query filters, dual axes, detail 404 and GET-only transport', async ({ page }) => {
+  const viewport = { width: 1600, height: 1000 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
   const audit = await bootResults(page, '/results?source=local');
   await expect(page.getByText('请选择本机工程')).toBeVisible();
   expect(audit.some(entry => entry.path.includes('/inspection/history/'))).toBe(false);
 
   await page.getByLabel('本机工程').selectOption(projectId);
+  await expect(page.getByRole('button', { name: '返回工作区' })).toBeVisible();
   await expect(page.getByRole('cell', { name: '不适用', exact: true }).first()).toBeVisible();
   await expect(page.getByRole('cell', { name: '执行成功', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: '不适用', exact: true }).nth(1)).toBeVisible();
@@ -219,6 +228,11 @@ test('Results local view keeps query filters, dual axes, detail 404 and GET-only
   await page.getByRole('button', { name: '查看详情' }).first().click();
   await expect(page.getByText('轻微划痕')).toBeVisible();
   await expect(page.getByText('Flow Hash')).toBeVisible();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'results', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
 
   await page.goto(`/studio/index.html#/results?source=local&projectId=${projectId}&resultId=${missingResultId}`);
   await expect(page.getByText('结果详情不存在')).toBeVisible();

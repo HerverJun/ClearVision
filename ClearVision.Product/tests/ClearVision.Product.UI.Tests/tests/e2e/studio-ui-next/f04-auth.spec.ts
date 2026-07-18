@@ -1,4 +1,9 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import {
+  captureF04VisualEvidence,
+  createF04RuntimeErrorAudit,
+  hasF04VisualEvidenceTarget
+} from './f04-browser-evidence';
 
 interface AuthFixtureState {
   requiresSetup: boolean;
@@ -160,19 +165,27 @@ function freshState(overrides: Partial<AuthFixtureState> = {}): AuthFixtureState
 }
 
 test('F04 auth lifecycle: setup auto-login, recovery, password invalidation, new login and logout', async ({ page }) => {
-  await page.setViewportSize({ width: 1366, height: 768 });
+  const viewport = { width: 1366, height: 768 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
   const state = freshState();
   await installStartup(page);
   await installAuthFixture(page, state);
   await page.goto('/studio/index.html#/overview');
 
   await expect(page.locator('[data-auth-page="setup"]')).toBeVisible();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, { scenario: 'setup', viewport, runtimeErrors });
+  }
   await page.getByLabel('管理员用户名').fill('admin');
   await page.getByLabel('密码', { exact: true }).fill('old-password');
   await page.getByLabel('确认密码').fill('old-password');
   await page.getByRole('button', { name: '创建并进入 Studio' }).click();
   await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
   await expect(page.locator('[data-capability="overview"]')).toBeVisible();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, { scenario: 'overview', viewport, runtimeErrors });
+  }
 
   await page.reload();
   await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
@@ -182,6 +195,9 @@ test('F04 auth lifecycle: setup auto-login, recovery, password invalidation, new
   await page.getByRole('button', { name: '修改密码并退出' }).click();
   await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
   await expect(page.locator('[data-auth-message]')).toContainText('新密码重新登录');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, { scenario: 'login', viewport, runtimeErrors });
+  }
 
   await page.getByLabel('用户名').fill('admin');
   await page.getByLabel('密码').fill('old-password');
@@ -203,6 +219,9 @@ test('F04 auth lifecycle: setup auto-login, recovery, password invalidation, new
 });
 
 test('F04 auth guards reject role/profile and external return routes', async ({ page }) => {
+  const viewport = { width: 1366, height: 768 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
   const state = freshState({ requiresSetup: false, role: 'Operator' });
   const token = 'operator-token';
   state.validTokens.add(token);
@@ -210,10 +229,19 @@ test('F04 auth guards reject role/profile and external return routes', async ({ 
   await installAuthFixture(page, state);
   await page.goto('/studio/index.html#/projects/11111111-1111-4111-8111-111111111111/workspace');
   await expect(page.locator('[data-studio-page="forbidden"]')).toBeVisible();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, { scenario: 'forbidden', viewport, runtimeErrors });
+  }
   await page.goto('/studio/index.html#/stations');
   await expect(page.locator('[data-studio-page="forbidden"]')).toBeVisible();
 
   await page.goto('/studio/index.html#/overview');
+  const navigation = page.getByRole('navigation', { name: '产品主导航' });
+  for (const path of ['/overview', '/projects', '/operators', '/results', '/about']) {
+    await expect(navigation.locator(`[data-product-nav="${path}"]`)).toBeVisible();
+  }
+  await expect(navigation.locator('[data-product-nav="/diagnostics"]')).toHaveCount(0);
+  await expect(navigation.locator('[data-product-nav="/stations"]')).toHaveCount(0);
   await page.getByRole('button', { name: '退出', exact: true }).click();
   await page.evaluate(() => { window.location.hash = '#/login?returnTo=https://evil.example/steal'; });
   await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
@@ -221,6 +249,56 @@ test('F04 auth guards reject role/profile and external return routes', async ({ 
   await page.getByLabel('密码').fill('old-password');
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await expect(page).toHaveURL(/#\/overview$/);
+});
+
+test('F04 product shell keeps the approved navigation stable across viewport and Browser DPR matrix', async ({ browser }) => {
+  const viewports = [
+    { width: 1366, height: 768 },
+    { width: 1600, height: 1000 },
+    { width: 1920, height: 1080 }
+  ] as const;
+  const deviceScaleFactors = [1, 1.25, 1.5, 2] as const;
+
+  for (const viewport of viewports) {
+    for (const deviceScaleFactor of deviceScaleFactors) {
+      const context = await browser.newContext({ viewport, deviceScaleFactor });
+      const page = await context.newPage();
+      const runtimeErrors = createF04RuntimeErrorAudit(page);
+      const state = freshState({ requiresSetup: false, role: 'Engineer' });
+      const token = `matrix-${viewport.width}-${deviceScaleFactor}`;
+      state.validTokens.add(token);
+      await installStartup(page, token);
+      await installAuthFixture(page, state);
+      await page.goto('/studio/index.html#/overview');
+      await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
+      await expect(page.locator('[data-product-nav="/diagnostics"]')).toBeVisible();
+
+      const projection = await page.evaluate(() => ({
+        dpr: window.devicePixelRatio,
+        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        shellCount: document.querySelectorAll('[data-product-shell="ready"]').length,
+        leaveOwnerCount: document.querySelector('[data-product-shell]')
+          ?.getAttribute('data-leave-guard-owner-count')
+      }));
+      expect(projection, `${viewport.width}x${viewport.height}@${deviceScaleFactor}`).toEqual({
+        dpr: deviceScaleFactor,
+        horizontalOverflow: 0,
+        shellCount: 1,
+        leaveOwnerCount: '1'
+      });
+      expect(runtimeErrors, `${viewport.width}x${viewport.height}@${deviceScaleFactor}`)
+        .toEqual({ consoleErrors: [], pageErrors: [] });
+      if (hasF04VisualEvidenceTarget()) {
+        await captureF04VisualEvidence(page, {
+          scenario: 'shell-matrix',
+          viewport,
+          runtimeErrors,
+          notes: ['Browser-emulated DPR evidence; not native WebView2 DPI evidence.']
+        });
+      }
+      await context.close();
+    }
+  }
 });
 
 test('F04 auth deduplicates submit, ignores late response and collapses concurrent protected 401s', async ({ page }) => {
