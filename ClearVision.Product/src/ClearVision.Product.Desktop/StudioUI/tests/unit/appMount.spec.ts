@@ -42,7 +42,9 @@ function createTestPlatform(): StudioPlatform {
           ? { userId: 'user-1', username: 'tester', role: 'Engineer' }
           : [];
       return payload as T;
-    }
+    },
+    async post<T>(): Promise<T | undefined> { return undefined; },
+    async put<T>(): Promise<T | undefined> { return undefined; }
   });
 
   return createStudioPlatform({

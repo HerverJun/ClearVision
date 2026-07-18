@@ -3,6 +3,7 @@ import { reactive } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 import type { SessionProjectionOwner } from '@/app/session/sessionProjectionOwner';
+import { createProjectLifecycleCommandOwner } from '@/capabilities/project-lifecycle';
 import {
   WorkspacePage,
   createWorkspaceLifecycleDiagnosticsOwner,
@@ -225,6 +226,55 @@ function createProtectedRunHarness(runPhase: 'executing' | 'cancel-requested' | 
 }
 
 describe('F03 G1 WorkspacePage', () => {
+  it('confirms explicit open authority before issuing the Workspace Project GET', async () => {
+    const sequence: string[] = [];
+    const harness = await createHarness({
+      get: async path => {
+        sequence.push(`get:${path}`);
+        return projectPayload(projectA);
+      }
+    });
+    const commandApi: ApiTransport = {
+      apiBaseUrl: 'http://localhost:5000/api',
+      async get<T>(): Promise<T | undefined> { return undefined; },
+      async post<T>(path: string): Promise<T | undefined> {
+        sequence.push(`post:${path}`);
+        return {
+          projectId: projectA,
+          lastOpenedAtUtc: '2026-07-19T00:00:00Z'
+        } as T;
+      },
+      async put<T>(): Promise<T | undefined> { return undefined; }
+    };
+    const projectLifecycle = createProjectLifecycleCommandOwner({
+      api: commandApi,
+      publishToWindow: false
+    });
+    const wrapper = mount(WorkspacePage, {
+      props: {
+        projectId: projectA,
+        runtime: harness.runtime,
+        projectLifecycle
+      },
+      global: { plugins: [harness.router], stubs: { FlowWorkspace: flowWorkspaceStub } }
+    });
+    await flushPromises();
+
+    expect(sequence).toEqual([
+      `post:projects/${projectA}/open`,
+      `get:projects/${projectA}`
+    ]);
+    expect(projectLifecycle.projection).toMatchObject({
+      phase: 'succeeded',
+      projectId: projectA
+    });
+
+    wrapper.unmount();
+    projectLifecycle.dispose();
+    harness.runtime.dispose();
+    harness.queries.dispose();
+  });
+
   it('protects route leave, project switch, and Host close while Formal Run is executing', async () => {
     const confirm = vi.fn(() => false);
     vi.stubGlobal('confirm', confirm);

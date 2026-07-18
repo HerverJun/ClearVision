@@ -466,6 +466,16 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
       await fulfillF03Json(route, metadata ? 200 : 404, metadata ?? { code: 'OPERATOR_NOT_FOUND' }, fixtureSchema);
       return;
     }
+    const projectOpenMatch = url.pathname.match(
+      /^\/api\/projects\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/open$/i
+    );
+    if (projectOpenMatch && request.method() === 'POST') {
+      await fulfillF03Json(route, 200, {
+        projectId: projectOpenMatch[1],
+        lastOpenedAtUtc: '2026-07-19T00:00:00Z'
+      }, fixtureSchema);
+      return;
+    }
     const projectMatch = url.pathname.match(
       /^\/api\/projects\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i
     );
@@ -1301,7 +1311,8 @@ test('G6 runs only the saved Project identity through admission, execute, and Re
     expectedDecisionConfigurationHash: 'fixture-decision-hash'
   });
   expect(requests[1]!.request.clientSnapshotId).toBe(requests[0]!.request.clientSnapshotId);
-  expect(audit.filter(item => item.method === 'POST').map(item => item.path)).toEqual([
+  expect(audit.filter(item => item.method === 'POST' && item.path.startsWith('/api/inspection/'))
+    .map(item => item.path)).toEqual([
     '/api/inspection/admission',
     '/api/inspection/execute'
   ]);
@@ -1396,7 +1407,8 @@ test('G6 genuine running Stop cancels before execute completion and unlocks with
   expect(new URL(page.url()).hash).toContain(`/projects/${projectA}/workspace`);
   expect(stopObservedBeforeCompletion).toBe(true);
   expect(executeCompleted).toBe(true);
-  expect(audit.filter(entry => entry.method === 'POST').map(entry => entry.path)).toEqual([
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path.startsWith('/api/inspection/'))
+    .map(entry => entry.path)).toEqual([
     '/api/inspection/admission',
     '/api/inspection/execute',
     '/api/inspection/stop'
@@ -2072,7 +2084,8 @@ test('G6 passes 20 formal Run, Project switch, and route-leave cycles with a zer
     totalRunDisposals: 21,
     ownerConflictCount: 0
   });
-  expect(audit.filter(entry => entry.method === 'POST').map(entry => entry.path)).toHaveLength(40);
+  expect(audit.filter(entry => entry.method === 'POST' && !entry.path.endsWith('/open')))
+    .toHaveLength(40);
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
 
@@ -2157,7 +2170,8 @@ test('G6 passes 20 run, stop/reconcile, project, and route lifecycle cycles with
       });
   }
 
-  expect(audit.filter(entry => entry.method === 'POST')).toHaveLength(60);
+  expect(audit.filter(entry => entry.method === 'POST' && !entry.path.endsWith('/open')))
+    .toHaveLength(60);
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
 

@@ -70,7 +70,11 @@ export function isF03G4RequestAllowlist(
   audit: readonly F03RequestAuditEntry[]
 ): boolean {
   return audit.every(entry => {
-    if (entry.method === 'POST') return entry.path === '/api/flows/preview-node';
+    if (entry.method === 'POST') {
+      return entry.path === '/api/flows/preview-node' ||
+        /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/open$/i
+          .test(entry.path);
+    }
     if (entry.method === 'DELETE') return /^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(entry.path);
     if (entry.method !== 'GET') return false;
     return entry.path === '/api/auth/setup-status' || entry.path === '/api/auth/me' ||
@@ -99,7 +103,9 @@ export function isF03G6RequestAllowlist(
 ): boolean {
   return audit.every(entry => {
     if (entry.method === 'POST') {
-      return entry.path === '/api/flows/preview-node' || entry.path === '/api/inspection/admission' ||
+      return entry.path === '/api/flows/preview-node' ||
+        /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/open$/i
+          .test(entry.path) || entry.path === '/api/inspection/admission' ||
         entry.path === '/api/inspection/execute' || entry.path === '/api/inspection/stop' ||
         entry.path === '/api/inspection/reconcile';
     }
