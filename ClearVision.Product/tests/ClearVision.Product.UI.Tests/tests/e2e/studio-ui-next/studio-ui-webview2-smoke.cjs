@@ -1478,6 +1478,8 @@ async function verifyProductPage(
       : 'REAL_WEBVIEW2_EMPTY_AUTHORITY',
     authSource: 'HARNESS_SEEDED_SESSION'
   }));
+  const navigationContract = resolveProductNavigationContract(phase, projection.startupFeatureFlags);
+  const isF04Evidence = navigationContract.phase === 'f04';
   const origin = new URL(page.url()).origin;
   const isProductRequest = item => {
     const url = new URL(item.url);
@@ -1761,6 +1763,11 @@ async function verifyProductPage(
     const url = new URL(item.url);
     return item.method === 'PUT' && /^\/api\/projects\/[0-9a-f-]{36}$/i.test(url.pathname);
   });
+  const isProjectOpenRequest = item => {
+    const url = new URL(item.url);
+    return item.method === 'POST' && /^\/api\/projects\/[0-9a-f-]{36}\/open$/i.test(url.pathname);
+  };
+  const projectOpenRequests = productRequests.filter(isProjectOpenRequest);
   const forbiddenRunRequests = productRequests.filter(item => {
     const url = new URL(item.url);
     return /\/api\/(?:inspection\/(?:admission|execute|stop|reconcile)|runs)(?:\/|$)/i.test(url.pathname);
@@ -1776,7 +1783,8 @@ async function verifyProductPage(
   const unexpectedWriteRequests = writeRequests.filter(item => {
     if (!isWorkspaceRoute) return true;
     const url = new URL(item.url);
-    return !(item.method === 'POST' && url.pathname === '/api/flows/preview-node') &&
+    return !(isF04Evidence && isProjectOpenRequest(item)) &&
+      !(item.method === 'POST' && url.pathname === '/api/flows/preview-node') &&
       !(item.method === 'PUT' && /^\/api\/projects\/[0-9a-f-]{36}$/i.test(url.pathname)) &&
       !(item.method === 'DELETE' && /^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname)) &&
       !(formalRun && item.method === 'POST' && expectedRunPaths.includes(url.pathname));
@@ -1785,7 +1793,6 @@ async function verifyProductPage(
   assert(projection.shellCount === 1, 'Product route did not mount exactly one ProductLayout.');
   assert(projection.internalLabCount === 0, 'Product route mounted the InternalLabLayout.');
   assert(projection.labNavigationCount === 0, 'Labs leaked into formal product navigation.');
-  const navigationContract = resolveProductNavigationContract(phase, projection.startupFeatureFlags);
   const missingNavigation = navigationContract.requiredRoutes
     .filter(routePath => !projection.formalNavigation.includes(routePath));
   const forbiddenNavigation = navigationContract.forbiddenRoutes
@@ -1801,8 +1808,10 @@ async function verifyProductPage(
   }
   assert(projection.mainCount === 1, 'Formal product route did not keep exactly one main landmark.');
   assert(productRequests.length > 0, 'Product route emitted no observable API requests.');
+  assert(!isF04Evidence || !isWorkspaceRoute || projectOpenRequests.length > 0,
+    'F04 Workspace navigation did not issue the approved explicit Project open command.');
   assert(unexpectedWriteRequests.length === 0,
-    `Product route emitted writes outside Preview cleanup: ${JSON.stringify(unexpectedWriteRequests)}`);
+    `Product route emitted writes outside approved Project/Preview/Run commands: ${JSON.stringify(unexpectedWriteRequests)}`);
   if (formalRun) {
     assert(forbiddenRunRequests.map(item => new URL(item.url).pathname).join(',') === expectedRunPaths.join(','),
       `Formal Run did not issue the expected Admission/Execute/Stop/Reconcile request chain: ${JSON.stringify(forbiddenRunRequests)}`);
@@ -1834,6 +1843,7 @@ async function verifyProductPage(
         url.pathname !== '/api/auth/me' &&
         !(url.pathname === '/api/operators/library' && url.search === '?includeCompatibility=true') &&
         !/^\/api\/operators\/[^/]+\/metadata$/i.test(url.pathname) &&
+        !(isF04Evidence && isProjectOpenRequest(item)) &&
         url.pathname !== '/api/flows/preview-node' &&
         !/^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname) &&
         !/^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -1859,6 +1869,7 @@ async function verifyProductPage(
     productRequests,
     writeRequests,
     projectPutRequests,
+    projectOpenRequests,
     forbiddenRunRequests,
     preferenceCycle,
     preferenceRequests,
