@@ -405,10 +405,10 @@ public class InspectionService : IInspectionService
 
             result.SetResult(status, flowResult.ExecutionTimeMs, null, flowResult.ErrorMessage);
 
-            if (flowResult.OutputData?.TryGetValue("Image", out var outputImage) == true
-                && outputImage is byte[] imageBytes)
+            var inspectionImage = ResolveInspectionImage(flowResult);
+            if (inspectionImage != null)
             {
-                result.SetOutputImage(imageBytes);
+                result.SetOutputImage(inspectionImage);
             }
 
             // 提取缺陷列表
@@ -1097,10 +1097,10 @@ public class InspectionService : IInspectionService
                 TryResolveCalibrationBundleId(flowResult.OutputData),
                 sessionId);
 
-            if (flowResult.OutputData?.TryGetValue("Image", out var outputImage) == true
-                && outputImage is byte[] imageBytes)
+            var inspectionImage = ResolveInspectionImage(flowResult);
+            if (inspectionImage != null)
             {
-                result.SetOutputImage(imageBytes);
+                result.SetOutputImage(inspectionImage);
             }
 
             if (flowResult.OutputData?.TryGetValue("Defects", out var defectsObj) == true
@@ -1770,6 +1770,20 @@ public class InspectionService : IInspectionService
             cancellationToken.ThrowIfCancellationRequested();
             _logger.LogWarning(ex, "[InspectionService] 检测图像落盘失败");
         }
+    }
+
+    private static byte[]? ResolveInspectionImage(FlowExecutionResult flowResult)
+    {
+        if (flowResult.OutputData?.TryGetValue("Image", out var outputImage) == true &&
+            outputImage is byte[] imageBytes &&
+            imageBytes.Length > 0)
+        {
+            return imageBytes;
+        }
+
+        return flowResult.InputImage is { Length: > 0 }
+            ? flowResult.InputImage
+            : null;
     }
 
     private async Task CaptureEvidenceManifestAsync(InspectionResult result, CancellationToken cancellationToken)

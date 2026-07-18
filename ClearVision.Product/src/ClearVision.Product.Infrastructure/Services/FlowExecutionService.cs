@@ -659,6 +659,9 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
             }
 
             result.WasShortCircuited = result.OperatorResults.Any(r => r.ShortCircuitedFlow);
+            result.InputImage = result.OperatorResults
+                .Select(operatorResult => operatorResult.InputImage)
+                .FirstOrDefault(image => image is { Length: > 0 });
 
             // 记录流程执行完成日志
             _logger.LogFlowExecution(flow.Id, executionOrder.Count, stopwatch.ElapsedMilliseconds, result.IsSuccess);
@@ -1506,6 +1509,7 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
 
             if (opResult.IsSuccess)
             {
+                var inputImage = CaptureAcquisitionInputImage(op, opResult.OutputData);
                 op.MarkExecutionCompleted(opStopwatch.ElapsedMilliseconds);
                 _logger.LogOperatorExecution(op.Id, op.Name, opStopwatch.ElapsedMilliseconds, true);
 
@@ -1516,6 +1520,7 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
                     IsSuccess = true,
                     ExecutionTimeMs = opStopwatch.ElapsedMilliseconds,
                     OutputData = opResult.OutputData,
+                    InputImage = inputImage,
                     ShortCircuitedFlow = opResult.ShouldShortCircuitFlow
                 };
             }
@@ -1714,6 +1719,41 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
             }
         }
         return result;
+    }
+
+    private byte[]? CaptureAcquisitionInputImage(
+        Operator op,
+        Dictionary<string, object>? outputData)
+    {
+        if (op.Type != OperatorType.ImageAcquisition || outputData == null)
+        {
+            return null;
+        }
+
+        var imageEntry = outputData.FirstOrDefault(entry =>
+            string.Equals(entry.Key, "Image", StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(imageEntry.Key))
+        {
+            return null;
+        }
+
+        try
+        {
+            return TryNormalizeOutputValue(imageEntry.Value, out var normalized) &&
+                   normalized is byte[] bytes &&
+                   bytes.Length > 0
+                ? bytes.ToArray()
+                : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "[FlowExecution] Failed to snapshot acquisition image for inspection display. Operator={OperatorName} ({OperatorId})",
+                SanitizeLogValue(op.Name),
+                SanitizeLogValue(op.Id));
+            return null;
+        }
     }
 
     private Operator? ResolveFlowOutputOperator(
@@ -2969,6 +3009,7 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
                     ExecutionTimeMs = opResult.ExecutionTimeMs,
                     ErrorMessage = opResult.ErrorMessage,
                     ShortCircuitedFlow = opResult.ShortCircuitedFlow,
+                    InputImage = opResult.InputImage,
                     OutputData = CloneNormalizedDictionary(normalizedOutputData),
                     ExecutionOrder = completedCount,
                     StartTime = DateTime.UtcNow.AddMilliseconds(-opResult.ExecutionTimeMs),
@@ -3042,6 +3083,9 @@ public class FlowExecutionService : IFlowExecutionEngine, IFlowDefinitionValidat
             }
 
             result.WasShortCircuited = result.OperatorResults.Any(r => r.ShortCircuitedFlow);
+            result.InputImage = result.OperatorResults
+                .Select(operatorResult => operatorResult.InputImage)
+                .FirstOrDefault(image => image is { Length: > 0 });
 
             if (result.IsSuccess)
             {

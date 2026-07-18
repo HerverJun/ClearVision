@@ -1094,10 +1094,10 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 sessionId);
 
             // 提取输出图像
-            if (flowResult.OutputData?.TryGetValue("Image", out var outputImage) == true
-                && outputImage is byte[] imageBytes)
+            var inspectionImage = ResolveInspectionImage(flowResult);
+            if (inspectionImage != null)
             {
-                result.SetOutputImage(imageBytes);
+                result.SetOutputImage(inspectionImage);
             }
 
             // 提取缺陷列表
@@ -1532,6 +1532,20 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         {
             _logger.LogWarning(ex, "[InspectionWorker] 结果图像缓存失败");
         }
+    }
+
+    private static byte[]? ResolveInspectionImage(FlowExecutionResult flowResult)
+    {
+        if (flowResult.OutputData?.TryGetValue("Image", out var outputImage) == true &&
+            outputImage is byte[] imageBytes &&
+            imageBytes.Length > 0)
+        {
+            return imageBytes;
+        }
+
+        return flowResult.InputImage is { Length: > 0 }
+            ? flowResult.InputImage
+            : null;
     }
 
     #endregion
