@@ -20,6 +20,9 @@ const {
 const {
   createCanvasFixtureDescriptor
 } = require('./canvas-benchmark-fixture.cjs');
+const {
+  resolveProductNavigationContract
+} = require('./product-navigation-contract.cjs');
 
 const expectations = new Set([
   'legacy',
@@ -1416,7 +1419,15 @@ async function verifyWorkspaceG3(page) {
   };
 }
 
-async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = null, webPort = null, token = null) {
+async function verifyProductPage(
+  page,
+  route,
+  runtimeErrors,
+  formalRunSeed = null,
+  webPort = null,
+  token = null,
+  phase = 'full'
+) {
   await page.waitForSelector('[data-product-shell="ready"]', { state: 'visible', timeout: 30_000 });
   const isWorkspaceRoute = /^\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/workspace$/i
     .test(route);
@@ -1451,6 +1462,7 @@ async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = nul
     capability: document.querySelector('[data-capability]')?.getAttribute('data-capability') || null,
     formalNavigation: [...document.querySelectorAll('[data-product-nav]')]
       .map(node => node.getAttribute('data-product-nav')),
+    startupFeatureFlags: { ...(window.__CLEARVISION_STARTUP__?.featureFlags || {}) },
     labNavigationCount: document.querySelectorAll('[data-product-nav^="/labs"]').length,
     theme: document.documentElement.dataset.theme || null,
     density: document.documentElement.dataset.density || null,
@@ -1773,14 +1785,15 @@ async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = nul
   assert(projection.shellCount === 1, 'Product route did not mount exactly one ProductLayout.');
   assert(projection.internalLabCount === 0, 'Product route mounted the InternalLabLayout.');
   assert(projection.labNavigationCount === 0, 'Labs leaked into formal product navigation.');
-  assert([
-    '/overview',
-    '/projects',
-    '/operators',
-    '/stations',
-    '/results'
-  ].every(routePath => projection.formalNavigation.includes(routePath)),
-    'Formal product navigation is incomplete.');
+  const navigationContract = resolveProductNavigationContract(phase, projection.startupFeatureFlags);
+  const missingNavigation = navigationContract.requiredRoutes
+    .filter(routePath => !projection.formalNavigation.includes(routePath));
+  const forbiddenNavigation = navigationContract.forbiddenRoutes
+    .filter(routePath => projection.formalNavigation.includes(routePath));
+  assert(missingNavigation.length === 0,
+    `Formal product navigation is incomplete: ${JSON.stringify({ navigationContract, missingNavigation, actual: projection.formalNavigation })}`);
+  assert(forbiddenNavigation.length === 0,
+    `Formal product navigation exposed a feature-disabled route: ${JSON.stringify({ navigationContract, forbiddenNavigation, actual: projection.formalNavigation })}`);
   assert(projection.density === 'compact', 'Formal product did not default to compact density.');
   assert(projection.horizontalOverflow <= 1, 'Formal product route has global horizontal overflow.');
   if (isWorkspaceRoute) {
@@ -1842,6 +1855,7 @@ async function verifyProductPage(page, route, runtimeErrors, formalRunSeed = nul
   }
   return {
     ...projection,
+    navigationContract,
     productRequests,
     writeRequests,
     projectPutRequests,
@@ -2187,7 +2201,8 @@ async function main() {
             runtimeErrors,
             evidence.workspaceSeed?.formalRunSeed ?? null,
             webPort,
-            token
+            token,
+            phase
           );
         } else if (expectation === 'studio-design') {
           evidence.designPage = await verifyDesignPage(page);
