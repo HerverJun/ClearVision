@@ -1153,12 +1153,17 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
   null, { timeout: 30_000 });
   assert(await page.locator('[data-testid="workspace-save"]').isEnabled(),
     'Cancelled Formal Run did not re-enable save after an ROI mutation.');
+  const revisionBeforeUnlockedSave = Number(await shell.getAttribute('data-workspace-persistence-revision'));
+  const unlockedSaveResponsePromise = page.waitForResponse(response =>
+    response.request().method() === 'PUT' &&
+    new URL(response.url()).pathname === `/api/projects/${projectId}`
+  );
   await page.locator('[data-testid="workspace-save"]').click();
-  await page.waitForFunction(() => {
-    const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
-    return shell?.getAttribute('data-workspace-dirty') === 'false' &&
-      shell.getAttribute('data-workspace-persistence-phase') === 'clean';
-  }, null, { timeout: 30_000 });
+  const unlockedSaveResponse = await unlockedSaveResponsePromise;
+  const unlockedSave = await unlockedSaveResponse.json();
+  assert(unlockedSaveResponse.status() === 200 &&
+    Number(unlockedSave.persistenceRevision) > revisionBeforeUnlockedSave,
+  `Cancelled Formal Run save did not reach the authoritative Project service: ${JSON.stringify(unlockedSave)}`);
 
   const slowFixtureDisabled = await setFormalRunSlowFixture(page, formalRunSeed, false);
 
