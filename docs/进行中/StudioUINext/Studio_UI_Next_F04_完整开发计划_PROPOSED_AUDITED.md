@@ -1,8 +1,8 @@
 # Studio UI Next F04 完整开发计划
 
-> 文档状态：**G2_DONE_G3A_CONTRACTS_FROZEN**
+> 文档状态：**G3B_DONE_G3C_APPROVED**
 > 本计划已经结合 F03 最终实现、当前 `studio-ui-next` 分支代码事实、原 F04 初稿及独立复审意见修订。
-> 产品负责人已通过 Prompt 3/4 批准并完成 G2 Auth 生命周期实现，以及 G3A Project 生命周期合同冻结；G3B/G3C/G4–G6 尚未实现。
+> Prompt 4/4 已按 G3A 批准合同完成 G3B Project backend hardening；G3C 已解锁，G4–G6 仍须继续串行门禁。
 
 ---
 
@@ -11,7 +11,7 @@
 ```text
 PLAN_NAME=Studio UI Next F04
 PLAN_THEME=产品化入口、认证闭环、工程生命周期与受控切换
-PLAN_STATUS=G2_DONE_G3A_CONTRACTS_FROZEN
+PLAN_STATUS=G3B_DONE_G3C_APPROVED
 
 CODE_AUDIT_BASE_SHA=b24d20b3531bdea66f0b9b73ba5e18827489eedf
 PLAN_DOCUMENT_COMMIT_SHA=42a2c8811d97af2212fa2a3ec40ba7b86aab649e
@@ -46,14 +46,17 @@ G0B_APPROVED=YES
 G1_ENTRY_APPROVED_AFTER_G0B_PASS=YES
 G2_IMPLEMENTED=YES
 G3A_CONTRACTS_FROZEN=YES
-G3B_BACKEND_IMPLEMENTATION=NO
+G3B_BACKEND_IMPLEMENTATION=YES
 G3C_FRONTEND_IMPLEMENTATION=NO
 G4_TO_G6_IMPLEMENTATION=NO
 G0_STATUS=DONE
 G1_STATUS=DONE
 G2_STATUS=DONE
 G3A_STATUS=DONE
-G3B_ENTRY=APPROVED
+G3B_STATUS=DONE
+G3B_BACKEND_SHA=3a0354a258a3696486ddc2b37bfd4ee6dc8dc7bb
+G3B_TEST_SHA=3a0354a258a3696486ddc2b37bfd4ee6dc8dc7bb
+G3C_ENTRY=APPROVED
 F04_STARTED=YES
 
 OFFICIAL_STUDIO_UI_DEFAULT=false
@@ -944,14 +947,44 @@ G3A_STATUS=DONE
 G3A_APPROVED_BY=PRODUCT_OWNER
 G3A_APPROVED_AT=2026-07-18
 G3B_ENTRY=APPROVED
-G3B_IMPLEMENTED=NO
+G3B_IMPLEMENTED=YES
+G3B_STATUS=DONE
+G3B_BACKEND_SHA=3a0354a258a3696486ddc2b37bfd4ee6dc8dc7bb
+G3B_TEST_SHA=3a0354a258a3696486ddc2b37bfd4ee6dc8dc7bb
+G3C_ENTRY=APPROVED
 ```
 
 ## 8.3 G3B：Approved backend hardening
 
-只实现 G3A 已批准合同。
+G3B 已严格按 G3A 批准合同完成，权威 closure 见：
 
-要求：
+- [F04 G3B Project 生命周期后端闭环](./F04_G3B_Project生命周期后端闭环.md)
+
+实现结果：
+
+- `(UserId, Kind, clientOperationId)` durable operation journal 与规范化 SHA-256 payload fingerprint；
+- blank-only create 首次返回 201、同 identity 重放返回 200，response loss 通过 operation query reconcile；
+- revision-aware delete、原子 tombstone、durable/retryable cleanup 与单一 hosted recovery owner；
+- explicit open 只更新 `LastOpenedAt`，不改变 `PersistenceRevision`、`ModifiedAt` 或 Flow；
+- 新 Project lifecycle 路径统一稳定 `Code`，不依赖 exception message 解析；
+- create operation 保留 7 天，delete/cleanup audit 保留 30 天，tombstone 长期保留；
+- EF migration 与 SQLite schema 6 repair 已实现；migration `Down` 明确为 forward-only；
+- Legacy create 与 DELETE compatibility adapter 保留且有回归覆盖，Next F04 UI 不调用旧 create contract。
+
+门禁：
+
+```text
+G3B_STATUS=DONE
+F04-B20-PROJECT-CREATE-NON-IDEMPOTENT=CLOSED
+F04-B21-PROJECT-CREATE-PARTIAL-SUCCESS=CLOSED
+F04-B22-PROJECT-DELETE-NO-REVISION=CLOSED
+F04-B23-PROJECT-DELETE-UNKNOWN-CLEANUP=CLOSED
+F04-B24-PROJECT-NOT-FOUND-SEMANTICS=CLOSED
+F04-B25-RECENT-PROJECT-NO-OPEN-AUTHORITY=CLOSED
+G3C_ENTRY=APPROVED
+```
+
+已满足要求：
 
 - 复用 `ProjectService`、`ProjectSaveCoordinator` 和既有 repository；
 - 不新增第二 Project service；
