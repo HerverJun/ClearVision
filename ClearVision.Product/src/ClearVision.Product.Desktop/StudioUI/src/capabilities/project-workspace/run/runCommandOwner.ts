@@ -8,7 +8,9 @@ import type {
 } from '../workspaceLifecycleDiagnostics';
 import {
   type WorkspaceRunAdmissionV1,
+  type WorkspaceRunIdentityV1,
   type WorkspaceRunPort,
+  type WorkspaceRunReconciliationV1,
   type WorkspaceRunResultV1
 } from './runContracts';
 
@@ -34,6 +36,7 @@ export interface WorkspaceRunProjection {
   readonly errorCode: string | null;
   readonly canRun: boolean;
   readonly canStop: boolean;
+  readonly canReconcile: boolean;
 }
 
 type MutableWorkspaceRunProjection = {
@@ -44,7 +47,9 @@ export interface WorkspaceRunCommandOwner {
   readonly projectId: string;
   readonly projection: DeepReadonly<WorkspaceRunProjection>;
   run(): Promise<WorkspaceRunResultV1 | null>;
-  stop(): boolean;
+  stop(): Promise<boolean>;
+  reconcile(): Promise<WorkspaceRunReconciliationV1 | null>;
+  prepareForLeave(reason?: string): Promise<boolean>;
   settle(): Promise<void>;
   dispose(reason?: string): void;
 }
@@ -110,12 +115,18 @@ export function createWorkspaceRunCommandOwner(options: {
     message: 'Formal Run is ready when the persisted Project is clean.',
     errorCode: null,
     canRun: false,
-    canStop: false
+    canStop: false,
+    canReconcile: false
   });
   let disposed = false;
   let operationGeneration = 0;
   let activeController: AbortController | undefined;
+  let authoritySettledLocalAbort: AbortController | undefined;
+  let stopController: AbortController | undefined;
+  let reconcileController: AbortController | undefined;
   let runPromise: Promise<WorkspaceRunResultV1 | null> | undefined;
+  let stopPromise: Promise<boolean> | undefined;
+  let reconcilePromise: Promise<WorkspaceRunReconciliationV1 | null> | undefined;
   const pending = new Set<Promise<unknown>>();
 
   function isCurrent(generation: number, clientSnapshotId: string): boolean {
@@ -125,10 +136,12 @@ export function createWorkspaceRunCommandOwner(options: {
 
   function syncDiagnostics(inFlight = false): void {
     if (disposed) return;
+    const activeAbortControllers = [activeController, stopController, reconcileController]
+      .filter(controller => controller !== undefined).length;
     lease.update(Object.freeze({
       ...zeroResources(),
       activeSubscriptions: 1,
-      activeAbortControllers: activeController ? 1 : 0,
+      activeAbortControllers,
       inFlightExecute: inFlight ? 1 : 0
     }));
   }
@@ -136,15 +149,118 @@ export function createWorkspaceRunCommandOwner(options: {
   function syncAvailability(): void {
     if (disposed) return;
     state.canRun = !runPromise && options.persistenceOwner.projection.canRun &&
-      (state.phase === 'idle' || state.phase === 'blocked' || state.phase === 'succeeded' || state.phase === 'failed');
+      (state.phase === 'idle' || state.phase === 'blocked' || state.phase === 'succeeded' ||
+        state.phase === 'failed' || state.phase === 'cancelled');
     state.canStop = Boolean(runPromise && activeController &&
       (state.phase === 'admitting' || state.phase === 'executing'));
+    state.canReconcile = Boolean(!stopPromise && !reconcilePromise && state.clientSnapshotId && state.admission &&
+      (state.phase === 'executing' || state.phase === 'cancel-requested' || state.phase === 'unknown-outcome'));
   }
 
   function track<T>(promise: Promise<T>): Promise<T> {
     pending.add(promise);
     promise.finally(() => pending.delete(promise)).catch(() => {});
     return promise;
+  }
+
+  function currentIdentity(): WorkspaceRunIdentityV1 | null {
+    const admission = state.admission;
+    if (!state.clientSnapshotId || !admission || admission.persistenceRevision == null ||
+      !admission.canonicalFlowHash || !admission.decisionConfigurationHash) {
+      return null;
+    }
+    return {
+      projectId: options.projectId,
+      clientSnapshotId: state.clientSnapshotId,
+      expectedPersistenceRevision: admission.persistenceRevision,
+      expectedCanonicalFlowHash: admission.canonicalFlowHash,
+      expectedDecisionConfigurationHash: admission.decisionConfigurationHash
+    };
+  }
+
+  function reconciliationMatchesIdentity(reconciliation: WorkspaceRunReconciliationV1, identity: WorkspaceRunIdentityV1): boolean {
+    return reconciliation.projectId === identity.projectId &&
+      reconciliation.clientSnapshotId === identity.clientSnapshotId &&
+      reconciliation.persistenceRevision === identity.expectedPersistenceRevision &&
+      reconciliation.canonicalFlowHash === identity.expectedCanonicalFlowHash &&
+      reconciliation.decisionConfigurationHash === identity.expectedDecisionConfigurationHash;
+  }
+
+  function resultMatchesIdentity(result: WorkspaceRunResultV1, identity: WorkspaceRunIdentityV1): boolean {
+    return result.projectId === identity.projectId &&
+      result.executionSnapshotId === identity.clientSnapshotId &&
+      result.persistenceRevision === identity.expectedPersistenceRevision &&
+      result.flowHash === identity.expectedCanonicalFlowHash &&
+      result.decisionConfigurationHash === identity.expectedDecisionConfigurationHash;
+  }
+
+  function applyReconciliation(
+    reconciliation: WorkspaceRunReconciliationV1,
+    identity: WorkspaceRunIdentityV1,
+    generation: number
+  ): void {
+    if (!isCurrent(generation, identity.clientSnapshotId)) return;
+    if (!reconciliationMatchesIdentity(reconciliation, identity)) {
+      state.phase = 'unknown-outcome';
+      state.errorCode = 'RUN_RECONCILE_IDENTITY_MISMATCH';
+      state.message = 'The reconcile response did not match the formal run identity. Workspace remains locked.';
+      syncAvailability();
+      return;
+    }
+    if (reconciliation.result && !resultMatchesIdentity(reconciliation.result, identity)) {
+      state.phase = 'unknown-outcome';
+      state.errorCode = 'RUN_RECONCILE_RESULT_IDENTITY_MISMATCH';
+      state.message = 'The reconciled result did not match the formal run identity. Workspace remains locked.';
+      syncAvailability();
+      return;
+    }
+
+    switch (reconciliation.status) {
+      case 'still-running':
+        state.phase = state.phase === 'cancel-requested' ? 'cancel-requested' : 'executing';
+        state.errorCode = reconciliation.code;
+        state.message = reconciliation.message;
+        break;
+      case 'cancel-requested':
+        state.phase = 'cancel-requested';
+        state.errorCode = reconciliation.code;
+        state.message = reconciliation.message;
+        break;
+      case 'cancelled':
+        state.result = reconciliation.result;
+        state.phase = 'cancelled';
+        state.errorCode = reconciliation.code;
+        state.message = reconciliation.message;
+        options.persistenceOwner.clearRunning(state.message);
+        break;
+      case 'succeeded':
+        if (!reconciliation.result) {
+          state.phase = 'unknown-outcome';
+          state.errorCode = 'RUN_RECONCILE_RESULT_MISSING';
+          state.message = 'The authoritative run succeeded but no formal result was returned. Workspace remains locked.';
+          break;
+        }
+        state.result = reconciliation.result;
+        state.phase = 'succeeded';
+        state.errorCode = reconciliation.code;
+        state.message = terminalMessage(reconciliation.result);
+        options.persistenceOwner.clearRunning(state.message);
+        break;
+      case 'failed':
+        state.result = reconciliation.result;
+        state.phase = 'failed';
+        state.errorCode = reconciliation.code;
+        state.message = reconciliation.message;
+        options.persistenceOwner.clearRunning(state.message);
+        break;
+      case 'result-not-found':
+      case 'identity-mismatch':
+        state.phase = 'unknown-outcome';
+        state.errorCode = reconciliation.code ?? `RUN_${reconciliation.status.toUpperCase().replace('-', '_')}`;
+        state.message = `${reconciliation.message} Workspace remains locked.`;
+        break;
+    }
+    syncAvailability();
   }
 
   async function performRun(): Promise<WorkspaceRunResultV1 | null> {
@@ -230,6 +346,13 @@ export function createWorkspaceRunCommandOwner(options: {
       return result;
     } catch (error) {
       if (!isCurrent(generation, clientSnapshotId)) return null;
+      if (state.phase === 'cancelled' || state.phase === 'succeeded' || state.phase === 'failed') {
+        return state.result;
+      }
+      if (authoritySettledLocalAbort === controller) {
+        authoritySettledLocalAbort = undefined;
+        return null;
+      }
       state.errorCode = errorCode(error) ?? (error instanceof ApiAbortError ? 'RUN_CANCELLED' : 'RUN_NETWORK_FAILURE');
       if (error instanceof ApiAbortError) {
         state.phase = 'unknown-outcome';
@@ -237,6 +360,9 @@ export function createWorkspaceRunCommandOwner(options: {
       } else if (error instanceof ApiNetworkError) {
         state.phase = 'unknown-outcome';
         state.message = 'Formal Run network outcome is unknown, so Workspace remains locked.';
+      } else if (error instanceof ApiHttpError) {
+        state.phase = 'unknown-outcome';
+        state.message = 'Formal Run returned an indeterminate server response. Reconcile the authoritative outcome before leaving.';
       } else {
         state.phase = 'failed';
         state.message = messageFor(error);
@@ -246,10 +372,137 @@ export function createWorkspaceRunCommandOwner(options: {
     } finally {
       if (isCurrent(generation, clientSnapshotId)) {
         activeController = undefined;
+        if (authoritySettledLocalAbort === controller) authoritySettledLocalAbort = undefined;
         syncDiagnostics(false);
         syncAvailability();
       }
     }
+  }
+
+  async function stopCurrent(): Promise<boolean> {
+    if (stopPromise) return stopPromise;
+    if (disposed || !activeController || !state.canStop) return false;
+
+    const generation = operationGeneration;
+    const clientSnapshotId = state.clientSnapshotId;
+    if (!clientSnapshotId) return false;
+    if (state.phase === 'admitting') {
+      state.phase = 'unknown-outcome';
+      state.errorCode = 'RUN_ADMISSION_CANCELLED';
+      state.message = 'Formal Run admission was interrupted before a runtime session existed. Reconcile is required before leaving.';
+      activeController.abort();
+      syncAvailability();
+      return true;
+    }
+
+    const identity = currentIdentity();
+    if (!identity) {
+      state.phase = 'unknown-outcome';
+      state.errorCode = 'RUN_IDENTITY_UNAVAILABLE';
+      state.message = 'Formal Run identity is incomplete. Workspace remains locked.';
+      activeController.abort();
+      syncAvailability();
+      return true;
+    }
+
+    state.phase = 'cancel-requested';
+    state.message = 'Stopping Formal Run through the authoritative runtime coordinator.';
+    syncAvailability();
+    const controller = new AbortController();
+    stopController = controller;
+    syncDiagnostics(Boolean(activeController));
+    const operation = track((async () => {
+      try {
+        const reconciliation = await options.port.stop(identity, { signal: controller.signal });
+        applyReconciliation(reconciliation, identity, generation);
+        if (isCurrent(generation, clientSnapshotId) && activeController) {
+          // The authoritative stop has settled the server-side run. Abort only
+          // the local execute response wait so the owner can release its flight.
+          authoritySettledLocalAbort = activeController;
+          activeController.abort();
+        }
+        return true;
+      } catch (error) {
+        if (isCurrent(generation, clientSnapshotId)) {
+          state.phase = 'unknown-outcome';
+          state.errorCode = errorCode(error) ?? 'RUN_STOP_NETWORK_FAILURE';
+          state.message = 'The stop request outcome is unknown. Reconcile the authoritative run before leaving.';
+          // The server-side run is no longer tied to this HTTP request. Abort
+          // only the local response wait so dispose cannot be mistaken for stop.
+          activeController?.abort();
+          syncDiagnostics(false);
+          syncAvailability();
+        }
+        return true;
+      }
+    })());
+    stopPromise = operation.finally(() => {
+      stopPromise = undefined;
+      if (stopController === controller) stopController = undefined;
+      syncDiagnostics(Boolean(activeController));
+      syncAvailability();
+    });
+    syncAvailability();
+    return stopPromise;
+  }
+
+  async function reconcileCurrent(): Promise<WorkspaceRunReconciliationV1 | null> {
+    if (reconcilePromise) return reconcilePromise;
+    if (disposed) return null;
+    const identity = currentIdentity();
+    const clientSnapshotId = state.clientSnapshotId;
+    if (!identity || !clientSnapshotId) return null;
+    const generation = operationGeneration;
+    state.message = 'Reconciling Formal Run against the authoritative runtime and result repository.';
+    syncAvailability();
+    const controller = new AbortController();
+    reconcileController = controller;
+    syncDiagnostics(Boolean(activeController));
+    const operation = track((async () => {
+      try {
+        const reconciliation = await options.port.reconcile(identity, { signal: controller.signal });
+        if (!isCurrent(generation, clientSnapshotId)) return null;
+        applyReconciliation(reconciliation, identity, generation);
+        return reconciliation;
+      } catch (error) {
+        if (isCurrent(generation, clientSnapshotId)) {
+          state.phase = 'unknown-outcome';
+          state.errorCode = errorCode(error) ?? 'RUN_RECONCILE_NETWORK_FAILURE';
+          state.message = 'Formal Run reconcile failed before an authoritative answer was received. Workspace remains locked.';
+          syncAvailability();
+        }
+        return null;
+      }
+    })());
+    reconcilePromise = operation.finally(() => {
+      reconcilePromise = undefined;
+      if (reconcileController === controller) reconcileController = undefined;
+      syncDiagnostics(Boolean(activeController));
+      syncAvailability();
+    });
+    syncAvailability();
+    return reconcilePromise;
+  }
+
+  async function prepareRunForLeave(reason = 'route-leave'): Promise<boolean> {
+    void reason;
+    if (disposed) return true;
+    if (state.phase === 'admitting') {
+      await stopCurrent();
+      return false;
+    }
+    if (state.phase === 'executing') {
+      await stopCurrent();
+    }
+    if (state.phase === 'cancel-requested' || state.phase === 'unknown-outcome') {
+      const reconciliation = await reconcileCurrent();
+      return Boolean(reconciliation && (
+        reconciliation.status === 'cancelled' ||
+        reconciliation.status === 'succeeded' ||
+        reconciliation.status === 'failed'
+      ));
+    }
+    return state.phase !== 'disposed';
   }
 
   const owner: WorkspaceRunCommandOwner = Object.freeze({
@@ -265,13 +518,14 @@ export function createWorkspaceRunCommandOwner(options: {
       syncAvailability();
       return runPromise;
     },
-    stop(): boolean {
-      if (disposed || !activeController || !state.canStop) return false;
-      state.phase = 'cancel-requested';
-      state.message = 'Stopping Formal Run. Waiting for the authoritative terminal outcome.';
-      activeController.abort();
-      syncAvailability();
-      return true;
+    stop(): Promise<boolean> {
+      return stopCurrent();
+    },
+    reconcile(): Promise<WorkspaceRunReconciliationV1 | null> {
+      return reconcileCurrent();
+    },
+    prepareForLeave(reason = 'route-leave'): Promise<boolean> {
+      return prepareRunForLeave(reason);
     },
     async settle(): Promise<void> {
       await Promise.allSettled([...pending]);
@@ -281,10 +535,16 @@ export function createWorkspaceRunCommandOwner(options: {
       disposed = true;
       operationGeneration += 1;
       activeController?.abort();
+      stopController?.abort();
+      reconcileController?.abort();
       activeController = undefined;
+      stopController = undefined;
+      reconcileController = undefined;
+      authoritySettledLocalAbort = undefined;
       state.phase = 'disposed';
       state.canRun = false;
       state.canStop = false;
+      state.canReconcile = false;
       lease.update(zeroResources());
       lease.dispose(reason);
     }

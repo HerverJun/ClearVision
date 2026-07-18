@@ -101,6 +101,7 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
         discardConflict: inner.discardConflict,
         runFormal: inner.runFormal,
         stopFormal: inner.stopFormal,
+        reconcileFormalRun: inner.reconcileFormalRun,
         prepareForLeave: inner.prepareForLeave,
         setReadonly: inner.setReadonly,
         dispose(reason = 'workspace-owner-disposed'): void {

@@ -34,7 +34,36 @@ export interface WorkspaceRunExecuteRequestV1 {
   readonly clientSnapshotId: string;
   readonly expectedPersistenceRevision: number;
   readonly expectedCanonicalFlowHash: string;
+    readonly expectedDecisionConfigurationHash: string;
+}
+
+export interface WorkspaceRunIdentityV1 {
+  readonly projectId: string;
+  readonly clientSnapshotId: string;
+  readonly expectedPersistenceRevision: number;
+  readonly expectedCanonicalFlowHash: string;
   readonly expectedDecisionConfigurationHash: string;
+}
+
+export type WorkspaceRunReconciliationStatus =
+  | 'still-running'
+  | 'cancel-requested'
+  | 'cancelled'
+  | 'succeeded'
+  | 'failed'
+  | 'result-not-found'
+  | 'identity-mismatch';
+
+export interface WorkspaceRunReconciliationV1 {
+  readonly status: WorkspaceRunReconciliationStatus;
+  readonly code: string | null;
+  readonly message: string;
+  readonly projectId: string;
+  readonly clientSnapshotId: string;
+  readonly persistenceRevision: number;
+  readonly canonicalFlowHash: string;
+  readonly decisionConfigurationHash: string;
+  readonly result: WorkspaceRunResultV1 | null;
 }
 
 export interface WorkspaceRunResultV1 {
@@ -53,6 +82,8 @@ export interface WorkspaceRunPort {
   readonly projectId: string;
   admit(payload: WorkspaceRunAdmissionRequestV1, options?: ApiWriteOptions): Promise<WorkspaceRunAdmissionV1>;
   execute(payload: WorkspaceRunExecuteRequestV1, options?: ApiWriteOptions): Promise<WorkspaceRunResultV1>;
+  stop(payload: WorkspaceRunIdentityV1, options?: ApiWriteOptions): Promise<WorkspaceRunReconciliationV1>;
+  reconcile(payload: WorkspaceRunIdentityV1, options?: ApiWriteOptions): Promise<WorkspaceRunReconciliationV1>;
 }
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -133,6 +164,41 @@ export function decodeWorkspaceRunResultV1(payload: unknown): WorkspaceRunResult
   });
 }
 
+const reconciliationStatuses: readonly WorkspaceRunReconciliationStatus[] = [
+  'still-running',
+  'cancel-requested',
+  'cancelled',
+  'succeeded',
+  'failed',
+  'result-not-found',
+  'identity-mismatch'
+];
+
+function reconciliationStatus(value: unknown, path: string): WorkspaceRunReconciliationStatus {
+  if (typeof value !== 'string' || !reconciliationStatuses.includes(value as WorkspaceRunReconciliationStatus)) {
+    throw new WorkspaceRunContractDecodeError(path, 'a known reconciliation status');
+  }
+  return value as WorkspaceRunReconciliationStatus;
+}
+
+export function decodeWorkspaceRunReconciliationV1(payload: unknown): WorkspaceRunReconciliationV1 {
+  const source = record(payload, '$');
+  const result = source.result === null || source.result === undefined
+    ? null
+    : decodeWorkspaceRunResultV1(source.result);
+  return Object.freeze({
+    status: reconciliationStatus(source.status, '$.status'),
+    code: nullableString(source.code, '$.code'),
+    message: string(source.message, '$.message'),
+    projectId: uuid(source.projectId, '$.projectId'),
+    clientSnapshotId: uuid(source.clientSnapshotId, '$.clientSnapshotId'),
+    persistenceRevision: nonNegativeInteger(source.projectPersistenceRevision, '$.projectPersistenceRevision'),
+    canonicalFlowHash: string(source.canonicalFlowHash, '$.canonicalFlowHash'),
+    decisionConfigurationHash: string(source.decisionConfigurationHash, '$.decisionConfigurationHash'),
+    result
+  });
+}
+
 function assertProjectId(projectId: string): void {
   uuid(projectId, 'projectId');
 }
@@ -154,6 +220,16 @@ export function createWorkspaceRunPort(api: ApiTransport, projectId: string): Wo
       if (payload.projectId !== projectId) throw new TypeError('Workspace Run execute project identity changed.');
       const response = await post<unknown>('inspection/execute', payload, options);
       return decodeWorkspaceRunResultV1(response);
+    },
+    async stop(payload: WorkspaceRunIdentityV1, options: ApiWriteOptions = {}): Promise<WorkspaceRunReconciliationV1> {
+      if (payload.projectId !== projectId) throw new TypeError('Workspace Run stop project identity changed.');
+      const response = await post<unknown>('inspection/stop', payload, options);
+      return decodeWorkspaceRunReconciliationV1(response);
+    },
+    async reconcile(payload: WorkspaceRunIdentityV1, options: ApiWriteOptions = {}): Promise<WorkspaceRunReconciliationV1> {
+      if (payload.projectId !== projectId) throw new TypeError('Workspace Run reconcile project identity changed.');
+      const response = await post<unknown>('inspection/reconcile', payload, options);
+      return decodeWorkspaceRunReconciliationV1(response);
     }
   });
 }

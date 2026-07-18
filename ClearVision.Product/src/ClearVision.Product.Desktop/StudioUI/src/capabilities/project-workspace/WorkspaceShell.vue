@@ -215,6 +215,15 @@ const runLabel = computed(() => {
           Stop
         </CvButton>
         <CvButton
+          v-if="run?.canReconcile"
+          data-testid="workspace-run-reconcile"
+          size="sm"
+          variant="quiet"
+          @click="workspaceOwner?.reconcileFormalRun()"
+        >
+          Reconcile
+        </CvButton>
+        <CvButton
           v-if="persistence?.canRetry"
           data-testid="workspace-save-retry"
           size="sm"

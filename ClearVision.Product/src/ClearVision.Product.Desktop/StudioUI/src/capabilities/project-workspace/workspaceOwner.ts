@@ -17,6 +17,7 @@ import {
   createWorkspaceRunCommandOwner,
   createWorkspaceRunPort,
   type WorkspaceRunCommandOwner,
+  type WorkspaceRunReconciliationV1,
   type WorkspaceRunResultV1
 } from './run';
 import type {
@@ -48,7 +49,8 @@ export interface WorkspaceOwner {
   reapplyConflict(): void;
   discardConflict(): void;
   runFormal(): Promise<WorkspaceRunResultV1 | null>;
-  stopFormal(): boolean;
+  stopFormal(): Promise<boolean>;
+  reconcileFormalRun(): Promise<WorkspaceRunReconciliationV1 | null>;
   prepareForLeave(reason?: string): Promise<boolean>;
   setReadonly(reason: string): void;
   dispose(reason?: string): void;
@@ -141,12 +143,17 @@ export function createWorkspaceOwner(
     runFormal(): Promise<WorkspaceRunResultV1 | null> {
       return runOwner?.run() ?? Promise.resolve(null);
     },
-    stopFormal(): boolean {
-      return runOwner?.stop() ?? false;
+    stopFormal(): Promise<boolean> {
+      return runOwner?.stop() ?? Promise.resolve(false);
     },
-    prepareForLeave(reason = 'route-leave'): Promise<boolean> {
-      void reason;
-      return persistenceOwner?.prepareForLeave(reason) ?? Promise.resolve(true);
+    reconcileFormalRun(): Promise<WorkspaceRunReconciliationV1 | null> {
+      return runOwner?.reconcile() ?? Promise.resolve(null);
+    },
+    async prepareForLeave(reason = 'route-leave'): Promise<boolean> {
+      if (runOwner && !(await runOwner.prepareForLeave(reason))) {
+        return false;
+      }
+      return await persistenceOwner?.prepareForLeave(reason) ?? true;
     },
     setReadonly(reason: string): void {
       if (disposed) return;

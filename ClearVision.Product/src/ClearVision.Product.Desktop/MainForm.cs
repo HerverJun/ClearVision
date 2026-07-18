@@ -18,6 +18,8 @@ namespace ClearVision.Product.Desktop;
 /// </summary>
 public partial class MainForm : Form
 {
+    private const string ForceCloseWarning =
+        "Formal Run may still be executing or its outcome may be unknown. Force-closing only releases local resources; it is not a successful Stop and may leave the server run active or lose the Results handoff. Force close anyway?";
     private readonly WebView2 _webView;
     private readonly WebView2Host _webView2Host;
     private readonly Handlers.WebMessageHandler? _messageHandler;
@@ -176,7 +178,7 @@ public partial class MainForm : Form
             if (!flushed && e.CloseReason != CloseReason.WindowsShutDown)
             {
                 var choice = MessageBox.Show(
-                    "工作区修改尚未保存或保存结果尚未协调，仍要退出吗？",
+                    ForceCloseWarning,
                     "ClearVision",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning,
@@ -195,7 +197,7 @@ public partial class MainForm : Form
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] Shutdown coordination failed: {ex}");
             var choice = MessageBox.Show(
-                "工作区修改尚未保存或保存结果尚未协调，仍要退出吗？",
+                ForceCloseWarning,
                 "ClearVision",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning,

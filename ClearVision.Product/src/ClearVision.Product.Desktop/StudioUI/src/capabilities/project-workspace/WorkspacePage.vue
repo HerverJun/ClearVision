@@ -40,22 +40,39 @@ type WorkspaceFlushWindow = Window & {
 
 function hasProtectedDraft(): boolean {
   const persistence = workspaceOwner?.projection.persistence;
+  const runPhase = workspaceOwner?.projection.run?.phase;
   return Boolean(persistence && (
     persistence.dirty || persistence.phase === 'saving' || persistence.phase === 'conflict' ||
     persistence.phase === 'unknown-outcome'
-  ));
+  )) || runPhase === 'admitting' || runPhase === 'executing' ||
+    runPhase === 'cancel-requested' || runPhase === 'unknown-outcome';
+}
+
+function hasProtectedRun(): boolean {
+  const runPhase = workspaceOwner?.projection.run?.phase;
+  return runPhase === 'admitting' || runPhase === 'executing' ||
+    runPhase === 'cancel-requested' || runPhase === 'unknown-outcome';
+}
+
+function protectedRunLeaveMessage(): string {
+  return 'Formal Run is still executing or its outcome is unknown. Leaving now is not a successful Stop; the server run may continue and the Results handoff may be unavailable. Force leave anyway?';
 }
 
 async function allowWorkspaceLeave(reason: string): Promise<boolean> {
   if (!workspaceOwner || !hasProtectedDraft()) return true;
   const settled = await workspaceOwner.prepareForLeave(reason);
   if (settled) return true;
+  if (hasProtectedRun()) return globalThis.confirm(protectedRunLeaveMessage());
   return globalThis.confirm('此工程存在未保存修改或未完成的保存协调。确定要离开并放弃本地 draft 吗？');
 }
 
+let routeGuardApproved = false;
+
 const removeRouteGuard = router.beforeEach(async (to, from) => {
   if (!workspaceOwner || to.fullPath === from.fullPath) return true;
-  return await allowWorkspaceLeave('route-leave');
+  const allowed = await allowWorkspaceLeave('route-leave');
+  if (allowed) routeGuardApproved = true;
+  return allowed;
 });
 
 function handleBeforeUnload(event: BeforeUnloadEvent): void {
@@ -99,6 +116,10 @@ function projectFailureState(): WorkspaceShellState {
 }
 
 async function startLifecycle(reason: string): Promise<void> {
+  if (reason === 'project-changed' && !routeGuardApproved && workspaceOwner && hasProtectedDraft()) {
+    if (!(await allowWorkspaceLeave('project-switch'))) return;
+  }
+  routeGuardApproved = false;
   disposeActive(reason);
   const generation = lifecycleGeneration;
   const projectId = activeProjectId.value;
@@ -205,7 +226,9 @@ watch(
 watch(
   () => activeWorkspaceOwner.value?.projection.run?.result ?? null,
   result => {
-    if (!result || result.projectId !== activeProjectId.value) return;
+    // Only a completed execution has a Results handoff. Cancelled and failed
+    // terminal results remain in Workspace so its mutation gate can settle.
+    if (!result || result.outcome.execution !== 'Succeeded' || result.projectId !== activeProjectId.value) return;
     const currentOwner = workspaceOwner;
     if (!currentOwner || currentOwner.projectId !== result.projectId ||
       currentOwner.projection.run?.result?.executionSnapshotId !== result.executionSnapshotId) return;
