@@ -7,11 +7,14 @@ Design System V1 服务正式 Studio 产品页面与隔离 Labs。它不导入 l
 
 - app、page、raised、floating 使用中性灰白/石墨表面，不以蓝灰染大面积背景；
 - 丹红只用于品牌、导航选中与关键意图；普通系统事实、链接和焦点使用技术蓝；
-- brand、OK、NG、warning、info、idle 与 Canvas 技术蓝使用独立 token；
+- brand、OK、NG、执行错误、warning、info、idle 与 destructive 使用独立 token，执行失败不得借用 NG；
 - 正式产品默认 compact，允许持久化切换 compact/comfortable；
 - light/dark 都必须维持相同的信息层级、焦点与状态语义；
 - 常规页面优先排版、间距、背景差和单向分割线，避免 Panel、Table 与内部卡片重复整圈描边；
 - 阴影保持克制，只用于 raised、floating、modal 与显式 elevated 场景。
+- 所有正式产品路由复用唯一 Product Shell：丹红雪花品牌、顶部产品导航、会话/外观区和统一页面容器；不再维护普通页面侧栏壳层。
+- 默认 Panel 使用低对比描边与 tonal layer，不同时叠加宽软阴影；Modal/Toast 通过真实 elevation 表达浮层。
+- 页面滚动区、表格、弹窗 body 与工作区滚动 owner 使用同一套窄滚动条 token。
 
 ## 排版层级
 

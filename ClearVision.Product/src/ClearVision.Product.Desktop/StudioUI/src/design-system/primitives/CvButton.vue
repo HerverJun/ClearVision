@@ -80,6 +80,7 @@ const isDisabled = computed(() => props.disabled || props.loading);
   font-size: var(--cv-font-size-sm);
   font-weight: var(--cv-font-weight-medium);
   line-height: 1;
+  touch-action: manipulation;
   transition:
     background var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
     border-color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
@@ -102,9 +103,9 @@ const isDisabled = computed(() => props.disabled || props.loading);
 .cv-button--primary:active:not(:disabled) { background: var(--cv-color-brand-700); }
 
 .cv-button--secondary {
-  border-color: var(--cv-control-border);
+  border-color: color-mix(in srgb, var(--cv-color-industrial-blue) 62%, var(--cv-border-default));
   background: var(--cv-surface-raised);
-  color: var(--cv-text-primary);
+  color: var(--cv-color-industrial-blue-hover);
 }
 
 .cv-button--secondary:hover:not(:disabled) { border-color: var(--cv-control-border-hover); background: var(--cv-interactive-hover); }
@@ -119,12 +120,12 @@ const isDisabled = computed(() => props.disabled || props.loading);
 .cv-button--quiet:active:not(:disabled) { background: var(--cv-interactive-active); }
 
 .cv-button--danger {
-  border-color: var(--cv-color-status-ng-border);
-  background: var(--cv-color-status-ng-soft);
-  color: var(--cv-color-status-ng-strong);
+  border-color: var(--cv-color-destructive-border);
+  background: var(--cv-color-destructive-soft);
+  color: var(--cv-color-destructive-strong);
 }
 
-.cv-button--danger:hover:not(:disabled) { border-color: var(--cv-color-status-ng); }
+.cv-button--danger:hover:not(:disabled) { border-color: var(--cv-color-destructive); background: color-mix(in srgb, var(--cv-color-destructive-soft) 78%, var(--cv-color-destructive) 22%); }
 
 .cv-button__spinner {
   width: 14px;

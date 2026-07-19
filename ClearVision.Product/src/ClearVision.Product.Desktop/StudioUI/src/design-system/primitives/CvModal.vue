@@ -192,7 +192,7 @@ onUnmounted(() => {
   max-height: calc(100vh - (2 * var(--cv-space-6)));
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--cv-border-default);
+  border: 0;
   border-radius: var(--cv-radius-xl);
   background: var(--cv-surface-overlay);
   box-shadow: var(--cv-elevation-modal);
@@ -206,7 +206,7 @@ onUnmounted(() => {
 .cv-modal__description { margin: var(--cv-space-2) 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); line-height: var(--cv-line-height-normal); }
 .cv-modal__close { display: grid; width: var(--cv-density-control-height-sm); height: var(--cv-density-control-height-sm); flex: 0 0 auto; place-items: center; padding: 0; border: 0; border-radius: var(--cv-radius-sm); background: transparent; color: var(--cv-text-secondary); cursor: pointer; font-size: 22px; line-height: 1; }
 .cv-modal__close:hover { background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
-.cv-modal__body { min-height: 0; overflow: auto; padding: var(--cv-space-6); }
+.cv-modal__body { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--cv-space-6); }
 .cv-modal__footer { display: flex; justify-content: flex-end; gap: var(--cv-space-2); padding: var(--cv-space-4) var(--cv-space-6); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-2); }
 @keyframes cv-modal-fade { from { opacity: 0; } }
 @keyframes cv-modal-enter { from { opacity: 0; transform: translateY(var(--cv-motion-distance)) scale(0.985); } }

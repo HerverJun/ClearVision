@@ -111,7 +111,7 @@ const liveMode = computed(() => props.kind === 'error'
   color: var(--cv-color-status-info-strong);
 }
 
-.cv-page-state--error .cv-page-state__icon { background: var(--cv-color-status-ng-soft); color: var(--cv-color-status-ng-strong); }
+.cv-page-state--error .cv-page-state__icon { background: var(--cv-color-status-error-soft); color: var(--cv-color-status-error-strong); }
 .cv-page-state--unauthorized .cv-page-state__icon,
 .cv-page-state--forbidden .cv-page-state__icon { background: var(--cv-color-status-warning-soft); color: var(--cv-color-status-warning-strong); }
 .cv-page-state__icon--loading { animation: cv-page-state-spin var(--cv-motion-duration-slow) linear infinite; }

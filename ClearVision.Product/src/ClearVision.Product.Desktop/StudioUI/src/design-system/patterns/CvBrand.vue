@@ -11,6 +11,7 @@ withDefaults(defineProps<{
     class="cv-brand"
     :class="{ 'cv-brand--compact': compact }"
     aria-label="ClearVision"
+    translate="no"
     data-design-pattern="brand"
   >
     <svg

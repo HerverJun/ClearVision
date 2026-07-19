@@ -27,6 +27,8 @@ describe('canonical inspection outcome formatter', () => {
     expect(formatInspectionOutcome(canonicalCases[2]![0]).label).toBe('未判定');
     expect(formatInspectionOutcome(canonicalCases[4]![0]).label).toBe('判定无效');
     expect(formatInspectionOutcome(canonicalCases[5]![0]).label).toBe('执行失败');
+    expect(formatInspectionOutcome(canonicalCases[5]![0]).tone).toBe('error');
+    expect(formatInspectionOutcome(canonicalCases[7]![0]).tone).toBe('error');
   });
 
   it('keeps the execution and decision axes visible in the presentation', () => {

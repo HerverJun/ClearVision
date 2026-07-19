@@ -34,43 +34,60 @@ const navigationIcons: Readonly<Record<string, CvIconName>> = Object.freeze({
   '/diagnostics': 'diagnostics',
   '/about': 'about'
 });
-const workspaceNavigation = computed(() => {
+
+interface ProductTopNavigationItem {
+  readonly label: string;
+  readonly description: string;
+  readonly to?: string;
+  readonly current?: boolean;
+  readonly disabled?: boolean;
+}
+
+const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() => {
   const available = new Set(navigation.value.map(item => item.to));
   return Object.freeze([
-    { label: '工程', to: '/projects', description: '工程管理' },
-    { label: '流程', to: route.fullPath, description: '当前工程流程', current: true },
+    {
+      label: '工程',
+      to: '/projects',
+      description: '工程管理',
+      current: !workspaceMode.value && route.path.startsWith('/projects')
+    },
+    workspaceMode.value
+      ? { label: '流程', to: route.fullPath, description: '当前工程流程', current: true }
+      : { label: '流程', description: '请先打开工程进入流程工作台', disabled: true },
     { label: '检测', description: '检测工作台尚未接入 Studio UI Next', disabled: true },
-    { label: '追溯', to: '/results', description: '正式检测结果与历史追溯' },
+    {
+      label: '追溯',
+      to: '/results',
+      description: '正式检测结果与历史追溯',
+      current: route.path.startsWith('/results')
+    },
     available.has('/stations')
-      ? { label: '监控', to: '/stations', description: '工作站状态监控' }
+      ? {
+          label: '监控',
+          to: '/stations',
+          description: '工作站状态监控',
+          current: route.path.startsWith('/stations')
+        }
       : { label: '监控', description: '当前启动配置未开放工作站监控', disabled: true },
     { label: 'AI', description: 'AI 工作台尚未接入 Studio UI Next', disabled: true },
     available.has('/diagnostics')
-      ? { label: '设置', to: '/diagnostics', description: '系统诊断与运行环境' }
+      ? {
+          label: '设置',
+          to: '/diagnostics',
+          description: '系统诊断与运行环境',
+          current: route.path.startsWith('/diagnostics')
+        }
       : { label: '设置', description: '当前账户不可访问系统诊断', disabled: true }
   ]);
 });
-const workspaceMoreNavigation = computed(() => navigation.value.filter(item =>
+const productMoreNavigation = computed(() => navigation.value.filter(item =>
   ['/overview', '/operators', '/about'].includes(item.to)));
-
-function resolveBreadcrumbPath(path: string): string {
-  return path.replace(/:([A-Za-z0-9_]+)/g, (_match, parameterName: string) => {
-    const value = route.params[parameterName];
-    return encodeURIComponent(Array.isArray(value) ? value[0] ?? '' : String(value ?? ''));
-  });
-}
-
-const breadcrumbs = computed(() => route.matched
-  .filter(record => !record.meta.internal && record.meta.breadcrumb)
-  .map(record => ({
-    label: record.meta.breadcrumb,
-    to: record.path === '/' ? '/overview' : resolveBreadcrumbPath(record.path)
-  }))
-);
 const statusTone = computed(() => {
   if (systemStatus.phase === 'online') return 'ok';
   if (systemStatus.phase === 'stale') return 'warning';
-  return 'ng';
+  if (systemStatus.phase === 'loading') return 'info';
+  return 'error';
 });
 const statusLabel = computed(() => {
   if (systemStatus.phase === 'loading') return '服务检查中';
@@ -130,61 +147,9 @@ onMounted(() => runtime.preferences.apply());
       @click.prevent="focusContent"
     >跳到主要内容</a>
 
-    <aside
-      v-if="!workspaceMode"
-      class="product-layout__sidebar"
-    >
-      <RouterLink
-        class="product-layout__brand"
-        to="/overview"
-        aria-label="ClearVision Studio 概览"
-      >
-        <span
-          class="product-layout__brand-mark"
-          aria-hidden="true"
-        >CV</span>
-        <span>
-          <strong>ClearVision</strong>
-          <small>Vision Studio</small>
-        </span>
-      </RouterLink>
-
-      <div class="product-layout__nav-heading">
-        产品工作区
-      </div>
-      <nav aria-label="产品主导航">
-        <RouterLink
-          v-for="item in navigation"
-          :key="item.to"
-          :to="item.to"
-          class="product-layout__nav-item"
-          :data-product-nav="item.to"
-          :aria-label="`${item.label}，${item.description}`"
-          :title="item.description"
-        >
-          <CvIcon
-            v-if="workspaceMode"
-            :name="navigationIcons[item.to] ?? 'overview'"
-            size="md"
-          />
-          <span class="product-layout__nav-label">{{ item.label }}</span>
-          <small>{{ item.description }}</small>
-        </RouterLink>
-      </nav>
-
-      <div class="product-layout__sidebar-note">
-        <small>工作模式</small>
-        <strong>可编辑工程工作台</strong>
-        <span>Save 与 Formal Run 由后端权威链负责；Preview 不代表正式运行可执行。</span>
-      </div>
-    </aside>
-
     <div class="product-layout__workspace">
       <header class="product-layout__topbar">
-        <div
-          v-if="workspaceMode"
-          class="product-layout__workspace-chrome"
-        >
+        <div class="product-layout__workspace-chrome">
           <RouterLink
             class="product-layout__workspace-brand"
             to="/overview"
@@ -198,16 +163,17 @@ onMounted(() => runtime.preferences.apply());
           />
           <nav
             class="product-layout__workspace-nav"
-            aria-label="Studio 产品导航"
+            aria-label="产品主导航"
           >
             <template
-              v-for="item in workspaceNavigation"
+              v-for="item in productTopNavigation"
               :key="item.label"
             >
               <RouterLink
                 v-if="item.to && !item.current"
                 class="product-layout__workspace-nav-item"
                 :to="item.to"
+                :data-product-nav="item.to"
                 :title="item.description"
               >
                 {{ item.label }}
@@ -216,6 +182,7 @@ onMounted(() => runtime.preferences.apply());
                 v-else-if="item.current"
                 class="product-layout__workspace-nav-item is-current"
                 aria-current="page"
+                :data-product-nav="item.to"
                 :title="item.description"
               >{{ item.label }}</span>
               <button
@@ -230,29 +197,6 @@ onMounted(() => runtime.preferences.apply());
             </template>
           </nav>
         </div>
-        <nav
-          v-else
-          class="product-layout__breadcrumbs"
-          aria-label="面包屑"
-        >
-          <ol>
-            <li
-              v-for="(crumb, index) in breadcrumbs"
-              :key="`${crumb.to}-${index}`"
-            >
-              <RouterLink
-                v-if="index < breadcrumbs.length - 1"
-                :to="crumb.to"
-              >
-                {{ crumb.label }}
-              </RouterLink>
-              <span
-                v-else
-                aria-current="page"
-              >{{ crumb.label }}</span>
-            </li>
-          </ol>
-        </nav>
 
         <div class="product-layout__topbar-actions">
           <div
@@ -278,7 +222,6 @@ onMounted(() => runtime.preferences.apply());
               :aria-label="`外观设置，当前${themeLabel}主题，${densityLabel}密度`"
             >
               <CvIcon
-                v-if="workspaceMode"
                 name="theme"
                 size="sm"
               />
@@ -347,8 +290,9 @@ onMounted(() => runtime.preferences.apply());
           </details>
 
           <details
-            v-if="workspaceMode && workspaceMoreNavigation.length"
+            v-if="productMoreNavigation.length"
             class="product-layout__more"
+            data-product-more
           >
             <summary title="更多产品入口">
               更多
@@ -359,9 +303,10 @@ onMounted(() => runtime.preferences.apply());
             </summary>
             <nav aria-label="更多产品入口">
               <RouterLink
-                v-for="item in workspaceMoreNavigation"
+                v-for="item in productMoreNavigation"
                 :key="item.to"
                 :to="item.to"
+                :data-product-nav="item.to"
               >
                 <CvIcon
                   :name="navigationIcons[item.to] ?? 'overview'"

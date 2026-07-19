@@ -31,7 +31,7 @@ const executionPresentation = computed<Readonly<{ label: string; tone: CvStatusT
   switch (projection.node?.executionStatus) {
     case 'Executing': return { label: '执行中', tone: 'info' };
     case 'Success': return { label: '执行成功', tone: 'ok' };
-    case 'Failed': return { label: '执行失败', tone: 'ng' };
+    case 'Failed': return { label: '执行失败', tone: 'error' };
     case 'Skipped': return { label: '已跳过', tone: 'warning' };
     default: return { label: '尚未执行', tone: 'idle' };
   }

@@ -68,15 +68,22 @@ describe('Design Foundation color tokens', () => {
   it.each([
     ['light', light],
     ['dark', dark]
-  ] as const)('separates %s brand, NG, Info and Canvas technical colors', (_theme, tokens) => {
+  ] as const)('separates %s brand, NG, execution error, Info and Canvas technical colors', (_theme, tokens) => {
     const brand = tokens.get('--cv-color-brand-500');
     expect(brand).not.toBe(tokens.get('--cv-color-status-ng'));
+    expect(brand).not.toBe(tokens.get('--cv-color-status-error'));
     expect(brand).not.toBe(tokens.get('--cv-color-status-info'));
     expect(brand).not.toBe(tokens.get('--flow-canvas-connection'));
     expect(brand).not.toBe(tokens.get('--flow-canvas-selection-border'));
     expect(brand).not.toBe(tokens.get('--flow-canvas-guide'));
     expect(brand).not.toBe(tokens.get('--cv-color-status-warning'));
+    expect(tokens.get('--cv-color-status-ng')).not.toBe(tokens.get('--cv-color-status-error'));
     expect(tokens.get('--cv-color-status-info')).not.toBe(tokens.get('--cv-focus-ring-color'));
+  });
+
+  it('freezes the light execution error color independently from NG', () => {
+    expect(light.get('--cv-color-status-ng')).toBe('#d12f3f');
+    expect(light.get('--cv-color-status-error')).toBe('#b85b16');
   });
 
   it.each([

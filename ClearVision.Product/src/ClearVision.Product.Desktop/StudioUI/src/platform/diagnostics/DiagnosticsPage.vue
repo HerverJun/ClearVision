@@ -92,7 +92,7 @@ async function refreshSharedOwners(): Promise<void> {
         <div>
           <span>本地服务</span>
           <CvStatusBadge
-            :tone="systemStatus.phase === 'online' ? 'ok' : systemStatus.phase === 'stale' ? 'warning' : 'ng'"
+            :tone="systemStatus.phase === 'online' ? 'ok' : systemStatus.phase === 'stale' ? 'warning' : 'error'"
             :label="systemStatus.message"
             :data-probe-state="healthProbeState"
           />
@@ -100,7 +100,7 @@ async function refreshSharedOwners(): Promise<void> {
         <div>
           <span>当前会话</span>
           <CvStatusBadge
-            :tone="session.phase === 'authenticated' ? 'ok' : session.phase === 'stale' ? 'warning' : 'ng'"
+            :tone="session.phase === 'authenticated' ? 'ok' : session.phase === 'stale' ? 'warning' : 'error'"
             :label="session.message"
             :data-probe-state="sessionProbeState"
           />

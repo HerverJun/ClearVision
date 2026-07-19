@@ -62,6 +62,7 @@ const selectOptions: readonly CvSelectOption[] = [
 const statusSamples: readonly { tone: CvStatusTone; label: string; detail: string }[] = [
   { tone: 'ok', label: 'OK', detail: 'Inspection accepted' },
   { tone: 'ng', label: 'NG', detail: 'Inspection rejected' },
+  { tone: 'error', label: 'Execution error', detail: 'Execution did not complete' },
   { tone: 'warning', label: 'Warning', detail: 'Operator attention' },
   { tone: 'info', label: 'Info', detail: 'Neutral process fact' },
   { tone: 'idle', label: 'Idle', detail: 'No active execution' }

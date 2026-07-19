@@ -31,7 +31,24 @@ body {
   min-height: 100vh;
   background: var(--cv-surface-app);
   color: var(--cv-text-primary);
+  scrollbar-color: var(--cv-scrollbar-thumb) var(--cv-scrollbar-track);
+  scrollbar-width: thin;
 }
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track { background: var(--cv-scrollbar-track); }
+*::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: var(--cv-radius-pill);
+  background: var(--cv-scrollbar-thumb);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--cv-scrollbar-thumb-hover); background-clip: padding-box; }
+*::-webkit-scrollbar-corner { background: transparent; }
 
 ::selection {
   background: var(--cv-selection-background);
@@ -52,6 +69,12 @@ select,
 textarea {
   color: inherit;
   font: inherit;
+}
+
+input,
+select,
+textarea {
+  caret-color: var(--cv-color-industrial-blue);
 }
 
 :focus-visible {

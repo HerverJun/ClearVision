@@ -51,6 +51,7 @@
 .design-lab__status-card--brand .design-lab__swatch { background: var(--cv-color-brand-500); }
 .design-lab__status-card--ok .design-lab__swatch { background: var(--cv-color-status-ok); }
 .design-lab__status-card--ng .design-lab__swatch { background: var(--cv-color-status-ng); }
+.design-lab__status-card--error .design-lab__swatch { background: var(--cv-color-status-error); }
 .design-lab__status-card--warning .design-lab__swatch { background: var(--cv-color-status-warning); }
 .design-lab__status-card--info .design-lab__swatch { background: var(--cv-color-status-info); }
 

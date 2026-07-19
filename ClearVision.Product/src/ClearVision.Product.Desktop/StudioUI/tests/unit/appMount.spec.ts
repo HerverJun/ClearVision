@@ -73,6 +73,11 @@ describe('mountStudioApp', () => {
     expect(document.querySelectorAll('main')).toHaveLength(1);
     expect(document.querySelector('main')?.id).toBe('product-main');
     expect(document.querySelector('.product-layout__skip-link')?.textContent).toContain('跳到主要内容');
+    expect(document.querySelector('[data-design-pattern="brand"]')).not.toBeNull();
+    expect(document.querySelector('.product-layout__sidebar')).toBeNull();
+    expect(document.querySelector('[aria-label="产品主导航"]')).not.toBeNull();
+    expect(document.querySelector('[data-product-nav="/projects"]')).not.toBeNull();
+    expect(document.querySelector('[data-product-nav="/results"]')).not.toBeNull();
 
     mountedApp.unmount();
     mountedApp.unmount();

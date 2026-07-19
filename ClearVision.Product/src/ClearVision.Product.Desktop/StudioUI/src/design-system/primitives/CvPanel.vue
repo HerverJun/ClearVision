@@ -72,9 +72,9 @@ const titleId = computed(() => `cv-panel-${generatedId}`);
   border: 1px solid var(--cv-border-subtle);
   border-radius: var(--cv-radius-lg);
   background: var(--cv-surface-raised);
-  box-shadow: var(--cv-elevation-1);
+  box-shadow: none;
 }
-.cv-panel--level-2 { border-color: transparent; background: var(--cv-surface-page); box-shadow: none; }
+.cv-panel--level-2 { border-color: var(--cv-border-subtle); background: var(--cv-surface-page); box-shadow: none; }
 .cv-panel--elevated { box-shadow: var(--cv-elevation-2); }
 .cv-panel__header { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: var(--cv-space-4); padding: var(--cv-density-panel-padding) var(--cv-density-panel-padding) var(--cv-space-2); }
 .cv-panel__heading { min-width: 0; }

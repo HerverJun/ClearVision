@@ -337,7 +337,7 @@ const toggleDisabledLabel = computed(() => {
 .flow-canvas-surface__hint { overflow: hidden; text-overflow: ellipsis; }
 .flow-canvas-surface__revision { color: var(--cv-text-secondary); }
 .flow-canvas-surface__feedback[data-tone="warning"] { color: var(--cv-color-status-warning-strong); }
-.flow-canvas-surface__feedback[data-tone="error"] { color: var(--cv-color-status-ng-strong); }
+.flow-canvas-surface__feedback[data-tone="error"] { color: var(--cv-color-status-error-strong); }
 .flow-canvas-surface__feedback[data-tone="success"] { color: var(--cv-color-status-ok-strong); }
 .flow-canvas-surface__spacer { flex: 1; }
 .flow-canvas-surface__stage :deep(.flow-selection-box) { border: 1px solid var(--flow-canvas-selection-border); background: var(--flow-canvas-selection-background); }

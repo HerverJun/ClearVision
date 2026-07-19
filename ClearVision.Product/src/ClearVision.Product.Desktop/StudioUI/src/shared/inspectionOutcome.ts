@@ -80,9 +80,9 @@ const kindPresentation: Readonly<Record<CanonicalInspectionOutcomeKind, {
   Undetermined: Object.freeze({ label: '未判定', tone: 'warning' }),
   NotApplicable: Object.freeze({ label: '不适用', tone: 'info' }),
   Invalid: Object.freeze({ label: '判定无效', tone: 'warning' }),
-  Failed: Object.freeze({ label: '执行失败', tone: 'ng' }),
+  Failed: Object.freeze({ label: '执行失败', tone: 'error' }),
   Cancelled: Object.freeze({ label: '已取消', tone: 'idle' }),
-  TimedOut: Object.freeze({ label: '执行超时', tone: 'ng' }),
+  TimedOut: Object.freeze({ label: '执行超时', tone: 'error' }),
   Skipped: Object.freeze({ label: '已跳过', tone: 'idle' })
 });
 

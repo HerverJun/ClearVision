@@ -237,11 +237,16 @@ test('F04 auth guards reject role/profile and external return routes', async ({ 
 
   await page.goto('/studio/index.html#/overview');
   const navigation = page.getByRole('navigation', { name: '产品主导航' });
-  for (const path of ['/overview', '/projects', '/operators', '/results', '/about']) {
+  for (const path of ['/projects', '/results']) {
     await expect(navigation.locator(`[data-product-nav="${path}"]`)).toBeVisible();
   }
-  await expect(navigation.locator('[data-product-nav="/diagnostics"]')).toHaveCount(0);
-  await expect(navigation.locator('[data-product-nav="/stations"]')).toHaveCount(0);
+  const more = page.locator('[data-product-more]');
+  await more.locator('summary').click();
+  for (const path of ['/overview', '/operators', '/about']) {
+    await expect(more.locator(`[data-product-nav="${path}"]`)).toBeVisible();
+  }
+  await expect(page.locator('[data-product-nav="/diagnostics"]')).toHaveCount(0);
+  await expect(page.locator('[data-product-nav="/stations"]')).toHaveCount(0);
   await page.getByRole('button', { name: '退出', exact: true }).click();
   await page.evaluate(() => { window.location.hash = '#/login?returnTo=https://evil.example/steal'; });
   await expect(page.locator('[data-auth-page="login"]')).toBeVisible();

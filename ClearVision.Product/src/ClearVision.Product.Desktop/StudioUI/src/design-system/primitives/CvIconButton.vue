@@ -59,6 +59,7 @@ const isDisabled = computed(() => props.disabled || props.loading);
   background: transparent;
   color: var(--cv-text-secondary);
   cursor: pointer;
+  touch-action: manipulation;
   transition:
     background var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
     border-color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),

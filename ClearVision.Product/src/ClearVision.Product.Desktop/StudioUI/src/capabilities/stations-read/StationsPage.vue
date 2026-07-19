@@ -174,9 +174,9 @@ const outcomeCounters = computed(() => {
     ['未判定', statistics.undeterminedCount, 'warning'],
     ['不适用', statistics.notApplicableCount, 'info'],
     ['判定无效', statistics.invalidCount, 'warning'],
-    ['执行失败', statistics.failedCount, 'ng'],
+    ['执行失败', statistics.failedCount, 'error'],
     ['已取消', statistics.cancelledCount, 'idle'],
-    ['执行超时', statistics.timedOutCount, 'ng'],
+    ['执行超时', statistics.timedOutCount, 'error'],
     ['已跳过', statistics.skippedCount, 'idle']
   ] as const;
 });

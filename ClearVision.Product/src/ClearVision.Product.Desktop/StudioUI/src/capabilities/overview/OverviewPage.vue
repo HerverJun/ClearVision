@@ -102,7 +102,7 @@ onBeforeUnmount(() => {
       >
         <div class="overview-page__status-row">
           <CvStatusBadge
-            :tone="systemStatus.phase === 'online' ? 'ok' : systemStatus.phase === 'stale' ? 'warning' : systemStatus.phase === 'loading' ? 'info' : 'ng'"
+            :tone="systemStatus.phase === 'online' ? 'ok' : systemStatus.phase === 'stale' ? 'warning' : systemStatus.phase === 'loading' ? 'info' : 'error'"
             :label="systemStatus.phase === 'online' ? '在线' : systemStatus.phase === 'loading' ? '连接中' : systemStatus.phase === 'stale' ? '状态过期' : '离线'"
           />
           <strong>{{ formatHealthStatus(systemStatus.health?.status) }}</strong>

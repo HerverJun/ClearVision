@@ -78,7 +78,7 @@ onUnmounted(() => {
         :key="toast.id"
         class="cv-toast"
         :class="`cv-toast--${toast.tone ?? 'info'}`"
-        :role="toast.tone === 'ng' ? 'alert' : 'status'"
+        :role="toast.tone === 'ng' || toast.tone === 'error' ? 'alert' : 'status'"
         :data-toast-id="toast.id"
         @mouseenter="clearTimer(toast.id)"
         @mouseleave="resume(toast.id)"
@@ -113,10 +113,11 @@ onUnmounted(() => {
 
 <style scoped>
 .cv-toast-region { position: fixed; z-index: var(--cv-z-toast); top: var(--cv-space-4); right: var(--cv-space-4); display: grid; width: min(380px, calc(100vw - (2 * var(--cv-space-4)))); gap: var(--cv-space-2); pointer-events: none; }
-.cv-toast { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; overflow: hidden; border: 1px solid var(--cv-border-default); border-radius: var(--cv-radius-md); background: var(--cv-surface-overlay); box-shadow: var(--cv-elevation-3); pointer-events: auto; }
+.cv-toast { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; overflow: hidden; border: 0; border-radius: var(--cv-radius-md); background: var(--cv-surface-overlay); box-shadow: var(--cv-elevation-3); pointer-events: auto; }
 .cv-toast__indicator { background: var(--cv-color-status-info); }
 .cv-toast--ok .cv-toast__indicator { background: var(--cv-color-status-ok); }
 .cv-toast--ng .cv-toast__indicator { background: var(--cv-color-status-ng); }
+.cv-toast--error .cv-toast__indicator { background: var(--cv-color-status-error); }
 .cv-toast--warning .cv-toast__indicator { background: var(--cv-color-status-warning); }
 .cv-toast--idle .cv-toast__indicator { background: var(--cv-color-status-idle); }
 .cv-toast__content { min-width: 0; padding: var(--cv-space-3) var(--cv-space-4); }

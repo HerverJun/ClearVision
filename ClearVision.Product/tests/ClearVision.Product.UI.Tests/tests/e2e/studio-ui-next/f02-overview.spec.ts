@@ -131,6 +131,7 @@ test('Product shell exposes one main landmark, skip navigation and disclosure fo
   await expect(appearance).not.toHaveAttribute('open', '');
   await expect(trigger).toBeFocused();
 
+  await page.locator('[data-product-more] > summary').click();
   await page.locator('[data-product-nav="/about"]').click();
   await expect(page.locator('[data-studio-page="about"]')).toBeVisible();
   await expect(page.getByRole('main')).toBeFocused();
@@ -146,6 +147,7 @@ test('Product shell keeps reduced motion and short-viewport keyboard targets vis
   );
   expect(['0ms', '0s']).toContain(duration);
 
+  await page.locator('[data-product-more] > summary').click();
   const aboutLink = page.locator('[data-product-nav="/about"]');
   await aboutLink.focus();
   const aboutBox = await aboutLink.boundingBox();

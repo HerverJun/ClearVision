@@ -89,7 +89,7 @@ test('Design Lab exposes themes, density and separated industrial status colors'
       color: getComputedStyle(card.querySelector('.design-lab__swatch') as Element).backgroundColor
     }))
   );
-  expect(palette.map(item => item.token)).toEqual(['brand', 'ok', 'ng', 'warning', 'info', 'idle']);
+  expect(palette.map(item => item.token)).toEqual(['brand', 'ok', 'ng', 'error', 'warning', 'info', 'idle']);
   expect(new Set(palette.map(item => item.color)).size).toBe(palette.length);
   expect(runtimeErrors).toEqual([]);
 });

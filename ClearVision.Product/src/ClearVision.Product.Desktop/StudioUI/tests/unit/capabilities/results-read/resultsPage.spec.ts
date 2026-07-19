@@ -205,7 +205,8 @@ describe('Results page', () => {
     expect(mounted.wrapper.text()).toContain('旧版工作站结果映射');
     expect(mounted.wrapper.text()).toContain('执行失败');
     expect(mounted.wrapper.text()).toContain('未判定');
-    expect(mounted.wrapper.findAll('[data-status-tone="ng"]')).toHaveLength(1);
+    expect(mounted.wrapper.findAll('[data-status-tone="error"]')).toHaveLength(1);
+    expect(mounted.wrapper.findAll('[data-status-tone="ng"]')).toHaveLength(0);
     expect(mounted.wrapper.text()).not.toContain('判定 NG');
 
     mounted.wrapper.unmount();

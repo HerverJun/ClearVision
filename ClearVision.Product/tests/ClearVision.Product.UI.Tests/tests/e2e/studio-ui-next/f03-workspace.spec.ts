@@ -2695,8 +2695,9 @@ test('Workspace splitters preserve bounds, Preview recovery and layout preferenc
   await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
   await expect(workspace).toHaveAttribute('data-inspector-width', '296');
   await expect(workspace).toHaveAttribute('data-preview-height', '220');
+  await expect(workspace).toHaveAttribute('data-preview-width', '380');
   await expect(inspectorSplitter).toHaveAttribute('aria-valuetext', '属性检查器宽度 296 像素');
-  await expect(previewSplitter).toHaveAttribute('aria-valuetext', '预览区高度 220 像素');
+  await expect(previewSplitter).toHaveAttribute('aria-valuetext', '预览工作台宽度 380 像素');
 
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
@@ -2713,7 +2714,7 @@ test('Workspace splitters preserve bounds, Preview recovery and layout preferenc
     inspectorStartY
   );
   await page.mouse.down();
-  await page.mouse.move(inspectorStartX - 40, inspectorStartY);
+  await page.mouse.move(inspectorStartX + 40, inspectorStartY);
   await page.mouse.up();
   await expect(workspace).toHaveAttribute('data-inspector-width', '336');
   await inspectorSplitter.dblclick();
@@ -2739,49 +2740,50 @@ test('Workspace splitters preserve bounds, Preview recovery and layout preferenc
 
   const previewSplitterBounds = await previewSplitter.boundingBox();
   expect(previewSplitterBounds).not.toBeNull();
-  const previewStartX = (previewSplitterBounds?.x ?? 0) + 120;
+  const previewStartX = (previewSplitterBounds?.x ?? 0) + (previewSplitterBounds?.width ?? 0) / 2;
   const previewStartY = (previewSplitterBounds?.y ?? 0) + (previewSplitterBounds?.height ?? 0) / 2;
   await page.mouse.move(
     previewStartX,
     previewStartY
   );
   await page.mouse.down();
-  await page.mouse.move(previewStartX, previewStartY - 40);
+  await page.mouse.move(previewStartX - 40, previewStartY);
   await page.mouse.up();
-  await expect(workspace).toHaveAttribute('data-preview-height', '260');
+  await expect(workspace).toHaveAttribute('data-preview-width', '420');
   await previewSplitter.dblclick();
-  await expect(workspace).toHaveAttribute('data-preview-height', '220');
+  await expect(workspace).toHaveAttribute('data-preview-width', '380');
 
   await previewSplitter.focus();
   await page.keyboard.press('Home');
-  await expect(workspace).toHaveAttribute('data-preview-height', '160');
+  await expect(workspace).toHaveAttribute('data-preview-width', '320');
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'workspace-preview-min', viewport, runtimeErrors, requestAudit: audit
     });
   }
   await page.keyboard.press('End');
-  await expect(workspace).toHaveAttribute('data-preview-height', '420');
+  await expect(workspace).toHaveAttribute('data-preview-width', '520');
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'workspace-preview-max', viewport, runtimeErrors, requestAudit: audit
     });
   }
   await previewSplitter.dblclick();
-  await expect(workspace).toHaveAttribute('data-preview-height', '220');
+  await expect(workspace).toHaveAttribute('data-preview-width', '380');
 
   await inspectorSplitter.focus();
-  await page.keyboard.press('Shift+ArrowLeft');
+  await page.keyboard.press('Shift+ArrowRight');
   await expect(workspace).toHaveAttribute('data-inspector-width', '328');
   await previewSplitter.focus();
-  await page.keyboard.press('Shift+ArrowUp');
-  await expect(workspace).toHaveAttribute('data-preview-height', '252');
+  await page.keyboard.press('Shift+ArrowLeft');
+  await expect(workspace).toHaveAttribute('data-preview-width', '412');
 
   await previewToggle.focus();
   await previewToggle.click();
   await expect(previewToggle).toBeFocused();
   await expect(workspace).toHaveAttribute('data-preview-collapsed', 'true');
   await expect(workspace).toHaveAttribute('data-preview-height', '38');
+  await expect(workspace).toHaveAttribute('data-preview-width', '44');
   await expect(previewSplitter).toBeHidden();
   await expect(shell).toHaveAttribute('data-workspace-preview-owner-count', '1');
   if (hasF04VisualEvidenceTarget()) {
@@ -2796,7 +2798,8 @@ test('Workspace splitters preserve bounds, Preview recovery and layout preferenc
   await expect(workspace).toHaveAttribute('data-preview-collapsed', 'true');
   await page.locator('[data-testid="preview-collapse-toggle"]').click();
   await expect(workspace).toHaveAttribute('data-preview-collapsed', 'false');
-  await expect(workspace).toHaveAttribute('data-preview-height', '252');
+  await expect(workspace).toHaveAttribute('data-preview-height', '220');
+  await expect(workspace).toHaveAttribute('data-preview-width', '412');
   await expect(previewSplitter).toBeVisible();
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
@@ -3076,6 +3079,7 @@ test('Prompt 3 Preview preserves image, result, ROI, empty and error hierarchy o
 
 for (const scenario of [
   { viewport: { width: 1920, height: 1080 }, density: 'compact' },
+  { viewport: { width: 1366, height: 768 }, density: 'compact' },
   { viewport: { width: 1350, height: 704 }, density: 'compact' },
   { viewport: { width: 1920, height: 1080 }, density: 'comfortable' },
   { viewport: { width: 1350, height: 704 }, density: 'comfortable' }

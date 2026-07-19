@@ -455,6 +455,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 .preview-panel__summary dd { margin: 2px 0 0; overflow: hidden; color: var(--cv-text-primary); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
 .preview-panel__summary dd[data-tone="ok"] { color: var(--cv-color-status-ok-strong); }
 .preview-panel__summary dd[data-tone="ng"] { color: var(--cv-color-status-ng-strong); }
+.preview-panel__summary dd[data-tone="error"] { color: var(--cv-color-status-error-strong); }
 .preview-panel__summary dd[data-tone="warning"] { color: var(--cv-color-status-warning-strong); }
 .preview-panel__summary dd[data-tone="info"] { color: var(--cv-color-status-info-strong); }
 .preview-panel__key-outputs dl { margin: var(--cv-space-2) 0 0; display: grid; }

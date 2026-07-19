@@ -11,6 +11,10 @@ import {
   installF02VisualPreferences,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
+import {
+  captureF04VisualEvidence,
+  hasF04VisualEvidenceTarget
+} from './f04-browser-evidence';
 
 const stationFixture = Object.freeze({
   schemaVersion: 'f02-stations-read.v1',
@@ -216,6 +220,9 @@ async function bootStations(
 }
 
 test('Station list uses URL filters, preserves nine outcomes and stays GET-only', async ({ page }) => {
+  const viewport = { width: 1600, height: 1000 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF02RuntimeErrorAudit(page);
   const audit = await bootStations(page);
   await page.goto('/studio/index.html#/stations?q=一号&online=Online&range=week&outcome=Ng&diagnosticCode=WIRE_SWAP');
 
@@ -229,6 +236,11 @@ test('Station list uses URL filters, preserves nine outcomes and stays GET-only'
   await expect.poll(() => audit.some(entry => entry.path.includes(
     '/api/stations/statistics?range=week&status=Ng&diagnosticCode=WIRE_SWAP'
   ))).toBe(true);
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'stations', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
   expect(expectGetOnly(audit)).toBe(true);
 });
 
@@ -262,21 +274,35 @@ for (const visual of [
   { id: 'stations-short-light-compact', width: 1366, height: 600 }
 ] as const) {
   test(`captures ${visual.id} Browser fixture evidence`, async ({ page }) => {
-    test.skip(!hasF02VisualEvidenceTarget(), 'F02 visual evidence output was not requested.');
+    test.skip(
+      !hasF02VisualEvidenceTarget() && !hasF04VisualEvidenceTarget(),
+      'Visual evidence output was not requested.'
+    );
     await page.setViewportSize({ width: visual.width, height: visual.height });
     await installF02VisualPreferences(page, 'light', 'compact');
     const runtimeErrors = createF02RuntimeErrorAudit(page);
     const audit = await bootStations(page);
     await page.goto('/studio/index.html#/stations');
     await expect(page.locator('[data-capability="stations-read"]')).toBeVisible();
-    await captureF02VisualEvidence(page, {
-      scenario: visual.id,
-      viewport: { width: visual.width, height: visual.height },
-      theme: 'light',
-      density: 'compact',
-      requests: audit,
-      runtimeErrors
-    });
+    if (hasF02VisualEvidenceTarget()) {
+      await captureF02VisualEvidence(page, {
+        scenario: visual.id,
+        viewport: { width: visual.width, height: visual.height },
+        theme: 'light',
+        density: 'compact',
+        requests: audit,
+        runtimeErrors
+      });
+    }
+    if (hasF04VisualEvidenceTarget()) {
+      await captureF04VisualEvidence(page, {
+        scenario: visual.id,
+        viewport: { width: visual.width, height: visual.height },
+        runtimeErrors,
+        requestAudit: audit,
+        notes: ['F04.1 product baseline short-screen evidence.']
+      });
+    }
     expect(expectGetOnly(audit)).toBe(true);
     expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
   });

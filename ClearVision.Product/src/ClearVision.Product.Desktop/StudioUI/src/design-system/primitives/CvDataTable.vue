@@ -184,6 +184,7 @@ function requestSort(column: CvDataTableColumn<Row>): void {
 .cv-data-table__scroll-region {
   max-width: 100%;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 table {
@@ -232,6 +233,7 @@ th {
 }
 
 tbody tr:last-child td { border-bottom: 0; }
+tbody tr:nth-child(even) { background: color-mix(in srgb, var(--cv-color-industrial-blue) 3%, transparent); }
 tbody tr:hover { background: var(--cv-interactive-hover); }
 .cv-data-table__cell--center { text-align: center; }
 .cv-data-table__cell--end { text-align: right; }
