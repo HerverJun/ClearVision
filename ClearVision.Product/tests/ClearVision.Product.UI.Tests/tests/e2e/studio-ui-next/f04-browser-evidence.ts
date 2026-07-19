@@ -85,6 +85,42 @@ export async function captureF04VisualEvidence(
       ?.getAttribute('data-workspace-run-phase') ?? null,
     leaveGuardPhase: document.querySelector('[data-product-shell]')
       ?.getAttribute('data-leave-guard-phase') ?? null,
+    workspaceInteractionState: {
+      operatorCatalogPhase: document.querySelector('[data-capability="operator-rail"]')
+        ?.getAttribute('data-catalog-phase') ?? null,
+      operatorCategory: document.querySelector('[data-capability="operator-rail"]')
+        ?.getAttribute('data-active-category') ?? null,
+      draggingOperator: document.querySelector('[data-capability="operator-rail"]')
+        ?.getAttribute('data-dragging-operator') ?? null,
+      canvasNodeCount: document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]')
+        ?.getAttribute('data-node-count') ?? null,
+      canvasConnectionCount: document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]')
+        ?.getAttribute('data-connection-count') ?? null,
+      canvasSelectedCount: document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]')
+        ?.getAttribute('data-selected-count') ?? null,
+      canvasSelectedDisabledCount: document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]')
+        ?.getAttribute('data-selected-disabled-count') ?? null,
+      inspectorMode: document.querySelector('[data-evidence-surface="f03-g3-inspector"]')
+        ?.getAttribute('data-inspector-mode') ?? null,
+      inspectorMetadataPhase: document.querySelector('[data-evidence-surface="f03-g3-inspector"]')
+        ?.getAttribute('data-metadata-phase') ?? null,
+      inspectorValidationErrorCount: document.querySelectorAll('.parameter-editor__errors li').length,
+      previewPhase: document.querySelector('[data-capability="preview-workbench"]')
+        ?.getAttribute('data-preview-phase') ?? null,
+      previewStale: document.querySelector('[data-capability="preview-workbench"]')
+        ?.getAttribute('data-preview-stale') ?? null,
+      imagePhase: document.querySelector('[data-capability="image-canvas"]')
+        ?.getAttribute('data-image-phase') ?? null,
+      pixelProbePhase: document.querySelector('.image-viewport__probe')
+        ?.getAttribute('data-probe-phase') ?? null,
+      roiPhase: document.querySelector('.preview-panel__roi')
+        ?.getAttribute('data-roi-phase') ?? null,
+      portCompatibility: document.querySelector('.flow-port-tooltip')
+        ?.getAttribute('data-compatibility') ?? null,
+      operatorFlyoutPresent: Boolean(document.querySelector('[data-capability="operator-flyout"], #operator-group-flyout')),
+      finalDecisionEntryPresent: Boolean(document.querySelector('[data-capability="final-decision"], [data-testid="final-decision"]')),
+      globalVariablesEntryPresent: Boolean(document.querySelector('[data-capability="global-variables"], [data-testid="global-variables"]'))
+    },
     workspaceGeometry: (() => {
       const rect = (selector: string) => {
         const bounds = document.querySelector(selector)?.getBoundingClientRect();

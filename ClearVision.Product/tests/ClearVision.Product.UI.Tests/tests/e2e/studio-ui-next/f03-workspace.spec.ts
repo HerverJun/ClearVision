@@ -954,6 +954,16 @@ async function selectInspectorNode(page: Page, x: number, y: number) {
   return { canvas, box: box! };
 }
 
+function withoutExpectedPreviewTransportConsoleErrors(
+  audit: Readonly<{ consoleErrors: string[]; pageErrors: string[] }>
+) {
+  return {
+    consoleErrors: audit.consoleErrors.filter(message =>
+      !/Failed to load resource: (?:the server responded with a status of 400|net::ERR_FAILED)/.test(message)),
+    pageErrors: [...audit.pageErrors]
+  };
+}
+
 test('flag off keeps Workspace owner/resources at zero and skips the Project GET', async ({ page }) => {
   const audit = await bootWorkspace(page, { workspaceEnabled: false });
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
@@ -1106,7 +1116,10 @@ test('pointer wiring creates and disconnects connections with stable feedback', 
 });
 
 test('G3 Inspector follows empty, node, multi-node and connection selection from Canvas', async ({ page }) => {
-  await bootWorkspace(page, {
+  const viewport = { width: 1920, height: 1080 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
+  const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
   });
   const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
@@ -1117,12 +1130,23 @@ test('G3 Inspector follows empty, node, multi-node and connection selection from
   await expect(inspector).toHaveAttribute('data-metadata-phase', 'ready');
   await expect(inspector).toContainText('Inspector Source');
   await expect(inspector.locator('[data-parameter-name]')).toHaveCount(7);
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-node-selected-success', viewport, runtimeErrors, requestAudit: audit,
+      notes: ['Selected node with authoritative executionStatus=Success in the Inspector.']
+    });
+  }
 
   await page.keyboard.down('Control');
   await page.mouse.click(box.x + 400, box.y + 125);
   await page.keyboard.up('Control');
   await expect(inspector).toHaveAttribute('data-inspector-mode', 'multi-node');
   await expect(inspector.locator('.inspector-panel__summary-node')).toHaveCount(2);
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-multi-node-selected', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
 
   await page.mouse.click(box.x + 250, box.y + 250);
   await expect(inspector).toHaveAttribute('data-inspector-mode', 'empty');
@@ -1131,6 +1155,12 @@ test('G3 Inspector follows empty, node, multi-node and connection selection from
   await expect(inspector).toHaveAttribute('data-inspector-mode', 'connection');
   await expect(inspector).toContainText('Inspector Source');
   await expect(inspector).toContainText('Inspector Target');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-connection-selected', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
 });
 
 test('G3 Inspector edits primitive, slider and nullable parameters with validation/history/focus isolation', async ({ page }) => {
@@ -1284,6 +1314,9 @@ test('G3 Inspector is fully unmounted when a later Project read is forbidden', a
 });
 
 test('G4 Preview and ImageCanvas render artifacts, probe pixels and commit ROI once with undo redo', async ({ page }) => {
+  const viewport = { width: 1920, height: 1080 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: roiPreviewFlow() }),
     previewScenario: (request, call) => ({
@@ -1325,10 +1358,20 @@ test('G4 Preview and ImageCanvas render artifacts, probe pixels and commit ROI o
   expect(imageBox).not.toBeNull();
   await page.mouse.click(imageBox!.x + imageBox!.width / 2, imageBox!.y + imageBox!.height / 2);
   await expect(image.locator('.image-viewport__probe')).toHaveAttribute('data-probe-phase', 'locked');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-image-probe-locked', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
 
   await expect(roi).toHaveAttribute('data-roi-phase', 'ready');
   await page.locator('[data-testid="roi-start"]').click();
   await expect(roi).toHaveAttribute('data-roi-phase', 'editing');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-roi-editing', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
   await expect(flow).toHaveAttribute('data-flow-revision', '0');
   await canvas.focus();
   await page.keyboard.press('ArrowRight');
@@ -1374,6 +1417,7 @@ test('G4 Preview and ImageCanvas render artifacts, probe pixels and commit ROI o
   expect(audit.some(entry => entry.method === 'POST' && entry.path === '/api/flows/preview-node')).toBe(true);
   expect(audit.some(entry => entry.method === 'GET' && entry.path.startsWith('/api/preview-artifacts/'))).toBe(true);
   expect(audit.some(entry => entry.method === 'DELETE' && entry.path.startsWith('/api/preview-artifacts/'))).toBe(true);
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
 });
 
 test('G5 GET PUT GET saves one canonical payload and preserves null, falsy and opaque values', async ({ page }) => {
@@ -2098,14 +2142,24 @@ test('G4 unified leave prompt traps keyboard focus, Escape stays, and discard le
   await expect(page).toHaveURL(/#\/about$/);
 });
 
-test('G4 Preview exposes structured, empty, business failure, network failure and cancellation states', async ({ page }) => {
+test('G4 Preview exposes structured, empty, business failure, safety block, network failure and cancellation states', async ({ page }) => {
+  const viewport = { width: 1920, height: 1080 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
     previewScenario: (request, call) => {
       if (call === 2) return { body: previewPayload(request, call, { outputData: null }) };
       if (call === 3) return { body: previewPayload(request, call, { success: false, outputData: null }) };
-      if (call === 4) return { abort: true };
-      if (call === 5) return { delayMs: 600, body: previewPayload(request, call) };
+      if (call === 4) return {
+        status: 400,
+        body: {
+          code: 'SIDE_EFFECT_BLOCKED',
+          error: '预览已安全拦截副作用算子：该算子可能访问外部设备或执行持久化写入。'
+        }
+      };
+      if (call === 5) return { abort: true };
+      if (call === 6) return { delayMs: 600, body: previewPayload(request, call) };
       return { body: previewPayload(request, call) };
     }
   });
@@ -2115,18 +2169,87 @@ test('G4 Preview exposes structured, empty, business failure, network failure an
 
   await expect(preview).toHaveAttribute('data-preview-phase', 'success');
   await expect(page.locator('[data-capability="image-canvas"]')).toHaveAttribute('data-image-phase', 'empty');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-preview-structured-success', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
 
   await run.click();
   await expect(preview).toHaveAttribute('data-preview-phase', 'empty');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-preview-no-output', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
   await run.click();
   await expect(preview).toHaveAttribute('data-preview-phase', 'error');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-preview-business-failure', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
+  await run.click();
+  await expect(preview).toHaveAttribute('data-preview-phase', 'blocked');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-preview-safety-blocked', viewport,
+      runtimeErrors: withoutExpectedPreviewTransportConsoleErrors(runtimeErrors), requestAudit: audit,
+      notes: ['Expected HTTP 400 SIDE_EFFECT_BLOCKED is excluded from the browser runtime-error audit.']
+    });
+  }
   await run.click();
   await expect(preview).toHaveAttribute('data-preview-phase', 'error');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-preview-network-failure', viewport,
+      runtimeErrors: withoutExpectedPreviewTransportConsoleErrors(runtimeErrors), requestAudit: audit,
+      notes: ['Expected route abort net::ERR_FAILED is excluded from the browser runtime-error audit.']
+    });
+  }
   await run.click();
   await expect(preview).toHaveAttribute('data-preview-phase', 'loading');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-preview-loading', viewport,
+      runtimeErrors: withoutExpectedPreviewTransportConsoleErrors(runtimeErrors), requestAudit: audit
+    });
+  }
   await page.locator('[data-testid="preview-cancel"]').click();
   await expect(preview).toHaveAttribute('data-preview-phase', 'cancelled');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-preview-cancelled', viewport,
+      runtimeErrors: withoutExpectedPreviewTransportConsoleErrors(runtimeErrors), requestAudit: audit
+    });
+  }
   expect(isF03G4RequestAllowlist(audit)).toBe(true);
+  expect(withoutExpectedPreviewTransportConsoleErrors(runtimeErrors))
+    .toEqual({ consoleErrors: [], pageErrors: [] });
+});
+
+test('F04 design handoff captures a deterministic complex flow without static showcase data', async ({ page }) => {
+  const viewport = { width: 1920, height: 1080 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: performanceFlow(100, 150) })
+  });
+  const surface = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
+  await expect(surface).toHaveAttribute('data-node-count', '100');
+  await expect(surface).toHaveAttribute('data-connection-count', '150');
+  const canvas = page.locator('[data-testid="flow-canvas"]');
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.click(box!.x + 60, box!.y + 60);
+  await expect(surface).toHaveAttribute('data-selected-count', '1');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-complex-flow-100-150', viewport, runtimeErrors, requestAudit: audit,
+      notes: ['Deterministic 100-node/150-connection canonical FlowCanvas fixture.']
+    });
+  }
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
 });
 
 test('G4 Preview keeps the latest node when an older response arrives late', async ({ page }) => {
@@ -2623,8 +2746,18 @@ test('Workspace splitters preserve bounds, Preview recovery and layout preferenc
   await previewSplitter.focus();
   await page.keyboard.press('Home');
   await expect(workspace).toHaveAttribute('data-preview-height', '160');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-preview-min', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
   await page.keyboard.press('End');
   await expect(workspace).toHaveAttribute('data-preview-height', '420');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-preview-max', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
   await previewSplitter.dblclick();
   await expect(workspace).toHaveAttribute('data-preview-height', '220');
 
@@ -2989,7 +3122,7 @@ for (const scenario of [
 
     if (hasF03VisualEvidenceTarget()) {
       await captureF03WorkspaceEvidence(page, {
-        scenario: `workspace-shell-${viewport.height}`,
+        scenario: `workspace-shell-${viewport.width}x${viewport.height}-${density}`,
         viewport,
         requests: audit,
         runtimeErrors
