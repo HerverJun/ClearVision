@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { CvButton, CvInlineAlert, CvStatusBadge } from '@/design-system';
+import { CvButton, CvIconButton, CvInlineAlert, CvStatusBadge } from '@/design-system';
+import { CvIcon } from '@/design-system/icons';
 import ImageViewport from '../image/ImageViewport.vue';
 import type { PreviewWorkbenchOwner } from './previewWorkbenchOwner';
 
-const props = defineProps<{ owner: PreviewWorkbenchOwner }>();
+const props = withDefaults(defineProps<{
+  owner: PreviewWorkbenchOwner;
+  collapsed?: boolean;
+}>(), {
+  collapsed: false
+});
+const emit = defineEmits<{
+  toggleCollapsed: [];
+}>();
 const preview = props.owner.preview.projection;
 const roi = props.owner.roi.projection;
 const artifactMessage = ref<string | null>(null);
@@ -42,10 +51,12 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 <template>
   <section
     class="preview-panel"
+    :class="{ 'preview-panel--collapsed': collapsed }"
     data-capability="preview-workbench"
     :data-preview-phase="preview.phase"
     :data-preview-stale="preview.isStale"
     :data-preview-owner="1"
+    :data-preview-collapsed="collapsed"
   >
     <header class="preview-panel__header">
       <div class="preview-panel__identity">
@@ -86,10 +97,31 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
         >
           手动预览
         </CvButton>
+        <CvIconButton
+          data-testid="preview-collapse-toggle"
+          size="sm"
+          aria-controls="workspace-preview-body"
+          :aria-expanded="!collapsed"
+          :label="collapsed ? '展开预览区' : '折叠预览区'"
+          :title="collapsed ? '展开预览区并恢复上次高度' : '折叠预览区，为流程画布释放空间'"
+          @click="emit('toggleCollapsed')"
+        >
+          <CvIcon
+            name="chevron-right"
+            size="sm"
+            class="preview-panel__collapse-icon"
+            :class="{ 'is-collapsed': collapsed }"
+          />
+        </CvIconButton>
       </div>
     </header>
 
-    <div class="preview-panel__body">
+    <div
+      id="workspace-preview-body"
+      class="preview-panel__body"
+      :aria-hidden="collapsed ? 'true' : undefined"
+      :inert="collapsed ? true : undefined"
+    >
       <ImageViewport :owner="owner.image" />
 
       <div class="preview-panel__details">
@@ -236,10 +268,14 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 
 <style scoped>
 .preview-panel { min-width: 0; min-height: 0; display: grid; grid-template-rows: 38px minmax(0, 1fr); overflow: hidden; border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
+.preview-panel--collapsed { grid-template-rows: 38px 0; }
+.preview-panel--collapsed .preview-panel__body { display: none; }
 .preview-panel__header { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); padding: 0 var(--cv-space-3); border-bottom: 1px solid var(--cv-border-subtle); }
 .preview-panel__identity, .preview-panel__actions, .preview-panel__roi-actions { min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); }
 .preview-panel__roi-actions { max-width: 100%; flex-wrap: wrap; justify-content: flex-end; }
 .preview-panel__identity strong { font-size: var(--cv-font-size-xs); }
+.preview-panel__collapse-icon { transform: rotate(90deg); transition: transform var(--cv-motion-duration-fast) var(--cv-motion-ease-standard); }
+.preview-panel__collapse-icon.is-collapsed { transform: rotate(-90deg); }
 .preview-panel__identity small, .preview-panel__manual-reason { overflow: hidden; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .preview-panel__body { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(300px, 1.2fr) minmax(280px, .8fr); overflow: hidden; }
 .preview-panel__details { min-width: 0; min-height: 0; padding: var(--cv-space-2); display: grid; align-content: start; gap: var(--cv-space-2); overflow: auto; border-left: 1px solid var(--cv-border-subtle); }

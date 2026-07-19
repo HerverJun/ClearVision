@@ -56,5 +56,34 @@ describe('CvSplitter', () => {
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([220]);
     await separator.trigger('keydown', { key: 'End' });
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([420]);
+    await separator.trigger('keydown', { key: 'Enter' });
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([300]);
+    expect(wrapper.emitted('resizeEnd')).toHaveLength(4);
+  });
+
+  it('supports reversed pane geometry, value text and double-click reset', async () => {
+    const wrapper = mount(CvSplitter, {
+      props: {
+        modelValue: 300,
+        min: 220,
+        max: 420,
+        defaultValue: 296,
+        reversed: true,
+        valueText: '属性检查器宽度 300 像素'
+      }
+    });
+    const separator = wrapper.get('[role="separator"]');
+
+    expect(separator.attributes('aria-valuetext')).toBe('属性检查器宽度 300 像素');
+    separator.element.dispatchEvent(pointerEvent('pointerdown', { pointerId: 8, clientX: 100 }));
+    window.dispatchEvent(pointerEvent('pointermove', { pointerId: 8, clientX: 140 }));
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([260]);
+    window.dispatchEvent(pointerEvent('pointerup', { pointerId: 8, clientX: 140 }));
+
+    await separator.trigger('keydown', { key: 'ArrowLeft' });
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([308]);
+    await separator.trigger('dblclick');
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([296]);
+    expect(wrapper.emitted('resizeEnd')).toHaveLength(3);
   });
 });

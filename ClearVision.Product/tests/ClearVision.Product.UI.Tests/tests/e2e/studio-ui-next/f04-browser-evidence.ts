@@ -99,10 +99,26 @@ export async function captureF04VisualEvidence(
         operatorRail: rect('.operator-rail'),
         canvasStage: rect('.flow-canvas-surface__stage'),
         preview: rect('.preview-panel'),
+        previewSplitter: rect('[data-workspace-splitter="preview"]'),
         inspector: rect('.inspector-panel'),
+        inspectorSplitter: rect('[data-workspace-splitter="inspector"]'),
         workspaceStatusbar: rect('.workspace-shell__statusbar'),
         saveCommand: rect('[data-testid="workspace-save"]'),
-        runCommand: rect('[data-testid="workspace-run"]')
+        runCommand: rect('[data-testid="workspace-run"]'),
+        inspectorWidth: document.querySelector('.flow-workspace')
+          ?.getAttribute('data-inspector-width') ?? null,
+        inspectorMinWidth: document.querySelector('.flow-workspace')
+          ?.getAttribute('data-inspector-min-width') ?? null,
+        inspectorMaxWidth: document.querySelector('.flow-workspace')
+          ?.getAttribute('data-inspector-max-width') ?? null,
+        previewHeight: document.querySelector('.flow-workspace')
+          ?.getAttribute('data-preview-height') ?? null,
+        previewMinHeight: document.querySelector('.flow-workspace')
+          ?.getAttribute('data-preview-min-height') ?? null,
+        previewMaxHeight: document.querySelector('.flow-workspace')
+          ?.getAttribute('data-preview-max-height') ?? null,
+        previewCollapsed: document.querySelector('.flow-workspace')
+          ?.getAttribute('data-preview-collapsed') ?? null
       };
     })(),
     modalTitle: document.querySelector('[role="dialog"] h2')?.textContent?.trim() ?? null,

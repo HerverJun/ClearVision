@@ -2425,6 +2425,161 @@ test('passes 20 real Browser route mount/unmount cycles with a zero ledger', asy
   expect(isF03G4RequestAllowlist(audit)).toBe(true);
 });
 
+test('Workspace splitters preserve bounds, Preview recovery and layout preferences across re-entry', async ({ page }) => {
+  const viewport = { width: 1920, height: 1080 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
+  const audit = await bootWorkspace(page);
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const workspace = page.locator('.flow-workspace');
+  const inspectorSplitter = page.locator('[data-workspace-splitter="inspector"]');
+  const previewSplitter = page.locator('[data-workspace-splitter="preview"]');
+  const previewToggle = page.locator('[data-testid="preview-collapse-toggle"]');
+
+  await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '296');
+  await expect(workspace).toHaveAttribute('data-preview-height', '220');
+  await expect(inspectorSplitter).toHaveAttribute('aria-valuetext', '属性检查器宽度 296 像素');
+  await expect(previewSplitter).toHaveAttribute('aria-valuetext', '预览区高度 220 像素');
+
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-layout-default', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
+
+  const inspectorSplitterBounds = await inspectorSplitter.boundingBox();
+  expect(inspectorSplitterBounds).not.toBeNull();
+  const inspectorStartX = (inspectorSplitterBounds?.x ?? 0) + (inspectorSplitterBounds?.width ?? 0) / 2;
+  const inspectorStartY = (inspectorSplitterBounds?.y ?? 0) + 120;
+  await page.mouse.move(
+    inspectorStartX,
+    inspectorStartY
+  );
+  await page.mouse.down();
+  await page.mouse.move(inspectorStartX - 40, inspectorStartY);
+  await page.mouse.up();
+  await expect(workspace).toHaveAttribute('data-inspector-width', '336');
+  await inspectorSplitter.dblclick();
+  await expect(workspace).toHaveAttribute('data-inspector-width', '296');
+
+  await inspectorSplitter.focus();
+  await page.keyboard.press('Home');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '248');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-inspector-min', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
+  await page.keyboard.press('End');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '420');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-inspector-max', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
+  await inspectorSplitter.dblclick();
+  await expect(workspace).toHaveAttribute('data-inspector-width', '296');
+
+  const previewSplitterBounds = await previewSplitter.boundingBox();
+  expect(previewSplitterBounds).not.toBeNull();
+  const previewStartX = (previewSplitterBounds?.x ?? 0) + 120;
+  const previewStartY = (previewSplitterBounds?.y ?? 0) + (previewSplitterBounds?.height ?? 0) / 2;
+  await page.mouse.move(
+    previewStartX,
+    previewStartY
+  );
+  await page.mouse.down();
+  await page.mouse.move(previewStartX, previewStartY - 40);
+  await page.mouse.up();
+  await expect(workspace).toHaveAttribute('data-preview-height', '260');
+  await previewSplitter.dblclick();
+  await expect(workspace).toHaveAttribute('data-preview-height', '220');
+
+  await previewSplitter.focus();
+  await page.keyboard.press('Home');
+  await expect(workspace).toHaveAttribute('data-preview-height', '160');
+  await page.keyboard.press('End');
+  await expect(workspace).toHaveAttribute('data-preview-height', '420');
+  await previewSplitter.dblclick();
+  await expect(workspace).toHaveAttribute('data-preview-height', '220');
+
+  await inspectorSplitter.focus();
+  await page.keyboard.press('Shift+ArrowLeft');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '328');
+  await previewSplitter.focus();
+  await page.keyboard.press('Shift+ArrowUp');
+  await expect(workspace).toHaveAttribute('data-preview-height', '252');
+
+  await previewToggle.focus();
+  await previewToggle.click();
+  await expect(previewToggle).toBeFocused();
+  await expect(workspace).toHaveAttribute('data-preview-collapsed', 'true');
+  await expect(workspace).toHaveAttribute('data-preview-height', '38');
+  await expect(previewSplitter).toBeHidden();
+  await expect(shell).toHaveAttribute('data-workspace-preview-owner-count', '1');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-preview-collapsed', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
+
+  await page.goto('/studio/index.html#/about');
+  await page.goto(`/studio/index.html#/projects/${projectA}/workspace`);
+  await expect(workspace).toHaveAttribute('data-inspector-width', '328');
+  await expect(workspace).toHaveAttribute('data-preview-collapsed', 'true');
+  await page.locator('[data-testid="preview-collapse-toggle"]').click();
+  await expect(workspace).toHaveAttribute('data-preview-collapsed', 'false');
+  await expect(workspace).toHaveAttribute('data-preview-height', '252');
+  await expect(previewSplitter).toBeVisible();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-preview-restored', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
+
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
+});
+
+test('narrow Workspace overlays restore focus and remain inside the viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 704 });
+  const runtimeErrors = createF03RuntimeErrorAudit(page);
+  await bootWorkspace(page);
+
+  const inspectorToggle = page.getByRole('button', { name: '打开属性检查器' });
+  await expect(inspectorToggle).toBeVisible();
+  await inspectorToggle.click();
+  await expect(page.locator('#workspace-inspector-pane')).toBeVisible();
+  expect(await page.locator('#workspace-inspector-pane').evaluate(element =>
+    element.contains(document.activeElement))).toBe(true);
+  const inspectorBounds = await page.locator('#workspace-inspector-pane').boundingBox();
+  expect((inspectorBounds?.x ?? 0) + (inspectorBounds?.width ?? 0)).toBeLessThanOrEqual(901);
+  await page.keyboard.press('Escape');
+  await expect(inspectorToggle).toBeFocused();
+  await expect(page.locator('#workspace-inspector-pane')).toBeHidden();
+
+  await page.setViewportSize({ width: 740, height: 704 });
+  const railToggle = page.getByRole('button', { name: '打开算子区' });
+  await expect(railToggle).toBeVisible();
+  await railToggle.click();
+  await expect(page.locator('#workspace-operator-pane')).toBeVisible();
+  expect(await page.locator('#workspace-operator-pane').evaluate(element =>
+    element.contains(document.activeElement))).toBe(true);
+  const railBounds = await page.locator('#workspace-operator-pane').boundingBox();
+  expect((railBounds?.x ?? 0) + (railBounds?.width ?? 0)).toBeLessThanOrEqual(741);
+  await page.keyboard.press('Escape');
+  await expect(railToggle).toBeFocused();
+  await expect(page.locator('#workspace-operator-pane')).toBeHidden();
+
+  const overflow = await page.evaluate(() => ({
+    horizontal: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    vertical: document.documentElement.scrollHeight - document.documentElement.clientHeight
+  }));
+  expect(overflow).toEqual({ horizontal: 0, vertical: 0 });
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+});
+
 for (const scenario of [
   { viewport: { width: 1920, height: 1080 }, density: 'compact' },
   { viewport: { width: 1350, height: 704 }, density: 'compact' },
@@ -2493,11 +2648,11 @@ for (const scenario of [
     }
     if (hasF04VisualEvidenceTarget()) {
       await captureF04VisualEvidence(page, {
-        scenario: `workspace-chrome-${density}`,
+        scenario: `workspace-layout-default-${density}`,
         viewport,
         runtimeErrors,
         requestAudit: audit,
-        notes: ['Prompt 1/5 Workspace Shell / Chrome convergence evidence.']
+        notes: ['Prompt 2/5 Workspace splitter and Preview layout evidence.']
       });
     }
   });
