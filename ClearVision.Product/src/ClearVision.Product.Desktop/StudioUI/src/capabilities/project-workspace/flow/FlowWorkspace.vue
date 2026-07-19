@@ -273,7 +273,7 @@ onBeforeUnmount(() => layoutOwner.dispose());
 .flow-workspace__center,
 .flow-workspace__inspector-host,
 .flow-workspace__preview { min-width: 0; min-height: 0; }
-.flow-workspace__rail-host { position: relative; z-index: calc(var(--cv-z-dropdown) - 1); overflow: visible; outline: none; }
+.flow-workspace__rail-host { position: relative; z-index: calc(var(--cv-z-dropdown) - 1); overflow: visible; outline: none; background: var(--cv-shell-sidebar); }
 .flow-workspace__inspector-host { overflow: hidden; outline: none; }
 .flow-workspace__center {
   display: block;

@@ -289,6 +289,7 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
 .operator-rail {
   position: relative;
   width: var(--cv-workspace-operator-rail-width);
+  height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: visible;

@@ -3100,6 +3100,8 @@ for (const scenario of [
       const status = document.querySelector('.workspace-shell__statusbar')?.getBoundingClientRect();
       const canvas = document.querySelector('.flow-canvas-surface__stage')?.getBoundingClientRect();
       const inspector = document.querySelector('.inspector-panel')?.getBoundingClientRect();
+      const operatorRail = document.querySelector('.operator-rail')?.getBoundingClientRect();
+      const workspace = document.querySelector('.flow-workspace')?.getBoundingClientRect();
       const save = document.querySelector('[data-testid="workspace-save"]')?.getBoundingClientRect();
       const run = document.querySelector('[data-testid="workspace-run"]')?.getBoundingClientRect();
       return {
@@ -3110,6 +3112,8 @@ for (const scenario of [
         status: status ? { top: status.top, bottom: status.bottom } : null,
         canvas: canvas ? { width: canvas.width, height: canvas.height } : null,
         inspector: inspector ? { width: inspector.width, height: inspector.height } : null,
+        operatorRail: operatorRail ? { top: operatorRail.top, bottom: operatorRail.bottom, height: operatorRail.height } : null,
+        workspace: workspace ? { top: workspace.top, bottom: workspace.bottom, height: workspace.height } : null,
         saveVisible: Boolean(save && save.width > 0 && save.height > 0),
         runVisible: Boolean(run && run.width > 0 && run.height > 0),
         viewport: { width: window.innerWidth, height: window.innerHeight }
@@ -3127,6 +3131,9 @@ for (const scenario of [
     expect(layout.saveVisible).toBe(true);
     expect(layout.runVisible).toBe(true);
     expect(layout.inspector?.width).toBeGreaterThanOrEqual(248);
+    expect(layout.operatorRail?.top).toBeCloseTo(layout.workspace?.top ?? -1, 0);
+    expect(layout.operatorRail?.bottom).toBeCloseTo(layout.workspace?.bottom ?? -1, 0);
+    expect(layout.operatorRail?.height).toBeCloseTo(layout.workspace?.height ?? -1, 0);
     expect(layout.canvas?.width).toBeGreaterThanOrEqual(viewport.width >= 1900 ? 900 : 600);
     expect(layout.canvas?.height).toBeGreaterThanOrEqual(300);
     expect(isF03G4RequestAllowlist(audit)).toBe(true);
