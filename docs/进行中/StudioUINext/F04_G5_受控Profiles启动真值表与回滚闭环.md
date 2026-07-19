@@ -8,7 +8,7 @@ G5_PROFILE_SHA=b5ca0f9166570f4485ef0b2e93cfb616506bb269
 G5_SUPPORTING_FIX_SHA=dbccc90e5df08c220f530036bf4ded9aaab8e565
 G5_TEST_SHA=17e261136a51da701cfe8e453cfe662ea000aca3
 G5_EVIDENCE_SOURCE_SHA=17e261136a51da701cfe8e453cfe662ea000aca3
-F04_FINAL_CODE_SHA=17e261136a51da701cfe8e453cfe662ea000aca3
+F04_FINAL_CODE_SHA=0c78962d2a005ebea165eaee8a98558aca88c99c
 
 LEGACY_DEFAULT_PROFILE=PASS
 NEXT_PILOT_PROFILE=PASS
@@ -25,7 +25,7 @@ F04-B43-ROLLBACK-DATA-LOSS=CLOSED
 F04-B44-FLAG-NAME-MIXED=CLOSED
 
 G6_ENTRY=APPROVED
-G6_STATUS=NOT_STARTED
+G6_STATUS=LOCAL_DONE_REMOTE_CI_PENDING
 NEXT_PILOT_PROFILE_AVAILABLE=YES
 ```
 
@@ -161,7 +161,23 @@ PROFILE_WEBVIEW2=PASS (8/8 independent processes)
 ROLLBACK_WEBVIEW2=PASS (3/3 sequential restarts, full rerun)
 ```
 
-## 7. Preserved boundaries
+## 7. F04 final-SHA 复验
+
+G5 的命名 profiles、四组合真值表、missing-assets diagnostic、double-root guard 与 Next → Legacy → Next 回滚已在 F04 final code SHA 上完整重跑：
+
+```text
+F04_FINAL_CODE_SHA=0c78962d2a005ebea165eaee8a98558aca88c99c
+PROFILE_MANIFEST=.tmp/studio-ui-next/f04/profiles/g6-profiles-0c78962d/studio-ui-profile-evidence.json
+PROFILE_STATUS=PASS (8/8 independent processes)
+ROLLBACK_MANIFEST=.tmp/studio-ui-next/f04/rollback/g6-rollback-0c78962d/studio-ui-rollback-evidence.json
+ROLLBACK_STATUS=PASS (3 restarts)
+PROJECT_FLOW_RESULT_IDENTITY=SAME
+DATABASE_REMOVED_AFTER_EVIDENCE=YES
+```
+
+final-SHA 复验没有修改正式 defaults，也没有引入迁移、双写或第二 root。完整证据见 [G6 隔离 E2E 与 Final Evidence](./F04_G6_隔离E2E与FinalEvidence闭环.md)。
+
+## 8. Preserved boundaries
 
 ```text
 Studio:StudioUiEnabled=false

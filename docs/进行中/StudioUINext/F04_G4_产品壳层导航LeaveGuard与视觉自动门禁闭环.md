@@ -131,7 +131,24 @@ NATIVE_AWARENESS=PerMonitorV2
 
 四档均验证 WebView2 force scale、JS DPR、CDP layout、screenshot pixels、native window、Canvas logical/backing size 与 pointer hit。DPR 2 的正式 Workspace Canvas 为 logical `843×300`、backing `1686×600`，节点 hit/Inspector selection 成功。
 
-## 7. Preserved boundaries
+## 7. F04 final-SHA 复验
+
+G4 产品壳层、导航、统一 Leave Guard、键盘合同和视觉门禁已在 F04 final code SHA 上重新采集：
+
+```text
+F04_FINAL_CODE_SHA=0c78962d2a005ebea165eaee8a98558aca88c99c
+VISUAL_MANIFEST=.tmp/studio-ui-next/f04/visual-0c78962d-final-r3/manifest.json
+VISUAL_STATUS=PASS (30 screenshots, 19 scenarios)
+TARGETED_VISUAL_CONTRACT=PASS (9/9)
+BROWSER_FULL=PASS (78 passed, 17 optional visual captures skipped)
+DPI_MATRIX=PASS (1, 1.25, 1.5, 2)
+KEYBOARD_ACCESSIBILITY=PASS
+F04_PRODUCT_VISUAL_CONFIRMATION=AWAITING_USER
+```
+
+自动复验不替代用户产品视觉确认；完整证据和两次既有 Browser fixture 偶发失败的披露见 [G6 隔离 E2E 与 Final Evidence](./F04_G6_隔离E2E与FinalEvidence闭环.md)。
+
+## 8. Preserved boundaries
 
 ```text
 Studio:StudioUiEnabled=false

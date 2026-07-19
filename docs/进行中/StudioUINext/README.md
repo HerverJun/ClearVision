@@ -54,7 +54,7 @@ F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision
   `F02_STATE=AWAITING_PRODUCT_VISUAL_CONFIRMATION`。Final SHA workflow_dispatch 的实际结论由不再修改
   该 SHA 的交付回报记录。
 - F03：G1–G6 核心实现已经完成，`F03_G6_STATUS=DONE`；总体状态仍为 `PARTIAL`，唯一历史 evidence gap 是独立无 Node 目标机验证 `NOT_PERFORMED`。产品负责人已接受延期，该项在 F04 中为非阻塞治理项，不改写为 PASS 或 COMPLETE。
-- F04：当前唯一执行权威是 [F04 完整开发计划](./Studio_UI_Next_F04_完整开发计划_PROPOSED_AUDITED.md)。G0/G1/G2/G3A/G3B/G3C/G4/G5 已完成；三种受控 profile、四组合启动真值表、缺资产诊断无静默 Legacy fallback 与 Next→Legacy→Next 共享数据库回滚已闭合。`F04_PRODUCT_VISUAL_CONFIRMATION=AWAITING_USER` 只保留产品批准事实；`G6_ENTRY=APPROVED`，G6 仍须继续串行。
+- F04：当前唯一执行权威是 [F04 完整开发计划](./Studio_UI_Next_F04_完整开发计划_PROPOSED_AUDITED.md)。G0–G5 已完成；G6 final-SHA 本地工程证据也已闭合，包括真实 UI Project 旅程、20-cycle、Release publish、sanitized path、四档 DPI、profiles、rollback、Browser 与自动视觉。当前只等待 push 后 Remote CI/Final Gate；`F04_PRODUCT_VISUAL_CONFIRMATION=AWAITING_USER` 继续保留产品批准事实，正式默认入口仍不授权切换。
 - `Studio:StudioUiEnabled=false` 保持不变；legacy 仍是默认入口。
 
 ## 阶段门禁
@@ -92,5 +92,6 @@ F04 执行期间以本目录链接的 F04 计划为唯一当前权威；仓库�
 - [F04 G3C Project 生命周期前端闭环](./F04_G3C_Project生命周期前端闭环.md)
 - [F04 G4 产品壳层、导航、Leave Guard 与视觉自动门禁闭环](./F04_G4_产品壳层导航LeaveGuard与视觉自动门禁闭环.md)
 - [F04 G5 受控 Profiles、启动真值表与回滚闭环](./F04_G5_受控Profiles启动真值表与回滚闭环.md)
+- [F04 G6 隔离 E2E、Final Evidence 与最终决策](./F04_G6_隔离E2E与FinalEvidence闭环.md)
 - [仓库级协作规则](../../../AGENTS.md)
 - [旧 Studio2 历史入口](../Studio2/README.md)（历史取证，不是新计划）

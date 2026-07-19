@@ -1,8 +1,8 @@
 # Studio UI Next F04 完整开发计划
 
-> 文档状态：**G5_DONE_G6_APPROVED**
+> 文档状态：**G6_LOCAL_DONE_REMOTE_CI_PENDING**
 > 本计划已经结合 F03 最终实现、当前 `studio-ui-next` 分支代码事实、原 F04 初稿及独立复审意见修订。
-> Prompt 4/4 已完成 G3B Project backend hardening、G3C frontend lifecycle、G4 产品壳层/导航/统一 Leave Guard/自动视觉闭环与 G5 受控 profiles/启动真值表/回滚闭环；G6 已解锁，仍须继续串行门禁。
+> Prompt 4/4 已完成 G3B Project backend hardening、G3C frontend lifecycle、G4 产品壳层/导航/统一 Leave Guard/自动视觉闭环、G5 受控 profiles/启动真值表/回滚闭环，以及 G6 final-SHA 本地工程证据；当前只等待 push 后 Remote CI/Final Gate。
 
 ---
 
@@ -11,7 +11,7 @@
 ```text
 PLAN_NAME=Studio UI Next F04
 PLAN_THEME=产品化入口、认证闭环、工程生命周期与受控切换
-PLAN_STATUS=G5_DONE_G6_APPROVED
+PLAN_STATUS=LOCAL_IMPLEMENTED_REMOTE_CI_PENDING
 
 CODE_AUDIT_BASE_SHA=b24d20b3531bdea66f0b9b73ba5e18827489eedf
 PLAN_DOCUMENT_COMMIT_SHA=42a2c8811d97af2212fa2a3ec40ba7b86aab649e
@@ -50,8 +50,8 @@ G3B_BACKEND_IMPLEMENTATION=YES
 G3C_FRONTEND_IMPLEMENTATION=YES
 G4_IMPLEMENTATION=YES
 G5_IMPLEMENTATION=YES
-G6_IMPLEMENTATION=NO
-G5_TO_G6_IMPLEMENTATION=G5_DONE_G6_PENDING
+G6_IMPLEMENTATION=YES
+G5_TO_G6_IMPLEMENTATION=G6_LOCAL_DONE_REMOTE_CI_PENDING
 G0_STATUS=DONE
 G1_STATUS=DONE
 G2_STATUS=DONE
@@ -72,10 +72,16 @@ G5_STATUS=DONE
 G5_PROFILE_SHA=b5ca0f9166570f4485ef0b2e93cfb616506bb269
 G5_TEST_SHA=17e261136a51da701cfe8e453cfe662ea000aca3
 G5_EVIDENCE_SOURCE_SHA=17e261136a51da701cfe8e453cfe662ea000aca3
-F04_FINAL_CODE_SHA=17e261136a51da701cfe8e453cfe662ea000aca3
+G6_EVIDENCE_SHA=0c78962d2a005ebea165eaee8a98558aca88c99c
+F04_FINAL_CODE_SHA=0c78962d2a005ebea165eaee8a98558aca88c99c
 G6_ENTRY=APPROVED
-G6_STATUS=NOT_STARTED
+G6_STATUS=LOCAL_DONE_REMOTE_CI_PENDING
+REMOTE_CI=PENDING_PUSH
+FINAL_GATE=PENDING_REMOTE_CI
+F04_STATUS=LOCAL_COMPLETE_REMOTE_CI_PENDING
+F04_IMPLEMENTED=YES
 NEXT_PILOT_PROFILE_AVAILABLE=YES
+NEXT_DEFAULT_ENTRY_RECOMMENDATION=DEFER
 F04_PRODUCT_VISUAL_AUTOMATED_GATE=PASS
 F04_PRODUCT_VISUAL_CONFIRMATION=AWAITING_USER
 F04_STARTED=YES
@@ -83,6 +89,7 @@ F04_STARTED=YES
 OFFICIAL_STUDIO_UI_DEFAULT=false
 OFFICIAL_WORKSPACE_DEFAULT=false
 USER_MACHINE_VALUES_COMMITTED_AS_DEFAULT=NO
+FORMAL_DEFAULTS_CHANGED=NO
 
 LEGACY_RETIREMENT=NOT_APPROVED
 F05_STARTED=NO
@@ -1302,7 +1309,7 @@ G5_STATUS=DONE
 PROFILE_MANIFEST=.tmp/studio-ui-next/f04/profiles/g5-profiles-17e26113/studio-ui-profile-evidence.json
 ROLLBACK_MANIFEST=.tmp/studio-ui-next/f04/rollback/g5-rollback-17e26113-r2/studio-ui-rollback-evidence.json
 G5_EVIDENCE_SOURCE_SHA=17e261136a51da701cfe8e453cfe662ea000aca3
-F04_FINAL_CODE_SHA=17e261136a51da701cfe8e453cfe662ea000aca3
+F04_FINAL_CODE_SHA=0c78962d2a005ebea165eaee8a98558aca88c99c
 
 LEGACY_DEFAULT_PROFILE=PASS
 NEXT_PILOT_PROFILE=PASS
@@ -1313,13 +1320,34 @@ DOUBLE_ROOT_GUARD=PASS
 NEXT_LEGACY_NEXT_ROLLBACK=PASS
 
 G6_ENTRY=APPROVED
-G6_STATUS=NOT_STARTED
+G6_STATUS=LOCAL_DONE_REMOTE_CI_PENDING
 NEXT_PILOT_PROFILE_AVAILABLE=YES
 ```
 
 ---
 
 # 11. G6：隔离 E2E、Final Closure 与决策包
+
+## 11.0 当前 closure
+
+权威证据见 [F04 G6 隔离 E2E、Final Evidence 与最终决策](./F04_G6_隔离E2E与FinalEvidence闭环.md)。
+
+```text
+G6_IMPLEMENTATION=YES
+G6_LOCAL_EVIDENCE=PASS
+G6_STATUS=LOCAL_DONE_REMOTE_CI_PENDING
+G6_EVIDENCE_SHA=0c78962d2a005ebea165eaee8a98558aca88c99c
+F04_FINAL_CODE_SHA=0c78962d2a005ebea165eaee8a98558aca88c99c
+
+FINAL_MANIFEST=.tmp/studio-ui-next/f04/final/g6-final-0c78962d/studio-ui-final-evidence.json
+MATRIX_MANIFEST=.tmp/studio-ui-next/f04/matrix/g6-matrix-0c78962d/studio-ui-webview2-matrix.json
+PROFILE_MANIFEST=.tmp/studio-ui-next/f04/profiles/g6-profiles-0c78962d/studio-ui-profile-evidence.json
+ROLLBACK_MANIFEST=.tmp/studio-ui-next/f04/rollback/g6-rollback-0c78962d/studio-ui-rollback-evidence.json
+VISUAL_MANIFEST=.tmp/studio-ui-next/f04/visual-0c78962d-final-r3/manifest.json
+
+REMOTE_CI=PENDING_PUSH
+FINAL_GATE=PENDING_REMOTE_CI
+```
 
 ## 11.1 Final-SHA 用户旅程
 
@@ -1329,7 +1357,8 @@ NEXT_PILOT_PROFILE_AVAILABLE=YES
 fresh database
 → setup-admin auto-login
 → Overview
-→ create project
+→ create blank project
+→ create response-loss reconcile
 → list/detail/open
 → Workspace
 → add/configure operator
@@ -1342,10 +1371,13 @@ fresh database
 → logout
 → restart
 → login
-→ reopen same project
-→ delete
-→ verify not-found
+→ recent/reopen same project
+→ rename
+→ delete response-loss reconcile
+→ verify list/detail/open not-found
 ```
+
+该旅程已在三个独立 Desktop 进程和 fresh database 上通过；20-cycle 也在独立数据库中完成 `20/20`，产生 `20/20` 唯一正式 Results。GC、WeakRef、owner/resource ledger 与 post-soak disposal settle 均通过。
 
 ## 11.2 验证矩阵
 
@@ -1368,6 +1400,33 @@ fresh database
 - remote CI；
 - Final Gate；
 - product visual confirmation。
+
+final-SHA 本地结果：
+
+```text
+LINT=PASS
+TYPECHECK=PASS
+STUDIO_UI_UNIT=PASS (480/480, 75 files)
+BACKEND_BUILD=PASS (0 errors; 1 existing System.Collections.Immutable warning)
+AUTH_AND_PROJECT_FOCUSED=PASS (90/90)
+SERVICES_REGRESSION=PASS (505/505)
+RUNTIME_FOCUSED=PASS (102/102)
+PHASE42_REGRESSION=PASS (143/143)
+DESKTOP_ENDPOINTS=PASS (316/316)
+ARCHITECTURE_GUARDS=PASS (9/9)
+BROWSER_FULL=PASS (78 passed, 17 optional visual captures skipped)
+REAL_WEBVIEW2_FULL=PASS
+RELEASE_PUBLISH=PASS
+SANITIZED_PATH=PASS
+STARTUP_TRUTH_TABLE=PASS
+DPI_MATRIX=PASS (1,1.25,1.5,2)
+KEYBOARD_ACCESSIBILITY=PASS
+20_CYCLE=PASS (20/20)
+NEXT_LEGACY_NEXT_ROLLBACK=PASS
+PRODUCT_VISUAL_AUTOMATED_GATE=PASS
+REMOTE_CI=PENDING_PUSH
+FINAL_GATE=PENDING_REMOTE_CI
+```
 
 独立无 Node 目标机继续：
 
@@ -1495,6 +1554,14 @@ F04-B41-DOUBLE-ROOT=CLOSED
 F04-B42-NEXT-LEGACY-DATA-DIVERGENCE=CLOSED
 F04-B43-ROLLBACK-DATA-LOSS=CLOSED
 F04-B44-FLAG-NAME-MIXED=CLOSED
+```
+
+当前 G6 blocker disposition：
+
+```text
+F04-B50-FINAL-SHA-EVIDENCE-MISMATCH=CLOSED
+F04-B51-REMOTE-CI-NOT-GREEN=OPEN_PENDING_REMOTE_CI
+F04-B52-SCOPE-CREEP=CLOSED
 ```
 
 以下不是 F04 blocker：
@@ -1643,37 +1710,51 @@ F05_STARTED=NO
 
 # 16. 当前批准边界
 
-当前只批准：
+当前已完成的授权范围：
 
 ```text
 G0B_APPROVED=YES
 G1_ENTRY_APPROVED_AFTER_G0B_PASS=YES
-G2_TO_G6_IMPLEMENTATION=NO
+G2_TO_G6_IMPLEMENTATION=YES
+G6_LOCAL_EVIDENCE=PASS
+NEXT_PILOT_PROFILE_AVAILABLE=YES
+F04_PRODUCT_VISUAL_CONFIRMATION=AWAITING_USER
+DEFAULT_ENTRY_CHANGE_NOT_AUTHORIZED=YES
+FORMAL_DEFAULTS_CHANGED=NO
 ```
 
 当前流程为：
 
 ```text
-完成并提交 G0 稳定线同步、测试与文档权威冻结
-→ 进入 G1 产品合同与架构守卫冻结
-→ 停止，不实现 G2–G6
+提交 final-SHA 代码与本地证据收口文档
+→ 非强推 push studio-ui-next
+→ 等待 Remote CI / Final Gate
+→ 记录 run ID/attempt 并完成最终 delivery 文档
+→ 停止；不修改正式 defaults，不退役 Legacy，不开始 F05
 ```
 
 ---
 
-# 17. 本次计划编制证据状态
+# 17. F04 final-SHA 证据状态
 
-本计划编制基于只读代码与文档审计。
+本节记录 `0c78962d2a005ebea165eaee8a98558aca88c99c` 的实际执行结果；未完成的远端项保持 pending，不以本地证据替代。
 
 ```text
-BUILD=NOT_RUN
-UNIT_TEST=NOT_RUN
-BACKEND_TEST=NOT_RUN
-PLAYWRIGHT=NOT_RUN
-WEBVIEW2=NOT_RUN
-DPI=NOT_RUN
-RELEASE=NOT_RUN
-REMOTE_CI=NOT_RUN
+BUILD=PASS
+UNIT_TEST=PASS
+BACKEND_TEST=PASS
+PLAYWRIGHT=PASS
+WEBVIEW2=PASS
+DPI=PASS
+RELEASE=PASS
+SANITIZED_PATH=PASS
+STARTUP_TRUTH_TABLE=PASS
+20_CYCLE=PASS
+ROLLBACK=PASS
+PRODUCT_VISUAL_AUTOMATED_GATE=PASS
+F04_PRODUCT_VISUAL_CONFIRMATION=AWAITING_USER
+REMOTE_CI=PENDING_PUSH
+FINAL_GATE=PENDING_REMOTE_CI
 ```
 
-上述 `NOT_RUN` 不代表功能失败，只表示计划编制阶段未执行运行性验证。实际验证从获批的 Goal 开始，并必须绑定对应 Final SHA。
+独立无 Node 目标机验证仍为 `NOT_PERFORMED / ACCEPTED_DEFERRED`，不是 PASS，也不阻塞 F04 或 NEXT_PILOT。

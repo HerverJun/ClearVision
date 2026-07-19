@@ -149,7 +149,24 @@ empty list
 
 Browser fixture 不等同于真实后端、真实 WebView2 或 DPI；这些证据不得由本节替代。
 
-## 7. Preserved boundaries
+## 7. F04 final-SHA 复验
+
+唯一 `projectLifecycleCommandOwner` 与完整 Project 旅程已在 F04 final code SHA 上复验：
+
+```text
+F04_FINAL_CODE_SHA=0c78962d2a005ebea165eaee8a98558aca88c99c
+STUDIO_UI_UNIT=PASS (480/480, 75 files)
+BROWSER_FULL=PASS (78 passed, 17 optional visual captures skipped)
+REAL_WEBVIEW2_FINAL_JOURNEY=PASS
+CREATE_RESPONSE_LOSS_RECONCILE=PASS
+EXPLICIT_OPEN_AFTER_RESTART=PASS
+DELETE_RESPONSE_LOSS_RECONCILE=PASS
+PROJECT_COMMAND_OWNER_COUNT=1
+```
+
+final-SHA journey 使用真实 UI 和后端合同，没有通过 fixture 直接篡改前端状态；完整证据见 [G6 隔离 E2E 与 Final Evidence](./F04_G6_隔离E2E与FinalEvidence闭环.md)。
+
+## 8. Preserved boundaries
 
 ```text
 Studio:StudioUiEnabled=false

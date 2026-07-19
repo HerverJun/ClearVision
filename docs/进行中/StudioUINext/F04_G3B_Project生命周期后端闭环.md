@@ -134,7 +134,23 @@ Project PUT 的 save revision conflict 使用 typed `ProjectSaveRevisionConflict
 
 测试构建仍报告仓库既有 `System.Collections.Immutable` 8/9 版本冲突 warning；本轮相关测试均通过，该 warning 未被改写为新 PASS 证据或隐藏。
 
-## 7. Boundaries preserved
+## 7. F04 final-SHA 复验
+
+G3B 的冻结合同在 F04 final code SHA 上再次由真实用户旅程和回归矩阵验证，没有发生 endpoint、错误码、operation journal、retention、cleanup 或兼容性语义漂移：
+
+```text
+F04_FINAL_CODE_SHA=0c78962d2a005ebea165eaee8a98558aca88c99c
+AUTH_AND_PROJECT_FOCUSED=PASS (90/90)
+SERVICES_REGRESSION=PASS (505/505)
+DESKTOP_ENDPOINTS=PASS (316/316)
+FINAL_SHA_CREATE_RECONCILE=PASS
+FINAL_SHA_DELETE_RECONCILE=PASS
+FINAL_SHA_TOMBSTONE_NOT_FOUND=PASS
+```
+
+该复验不改写 G3B 原冻结提交；final-SHA 证据见 [G6 隔离 E2E 与 Final Evidence](./F04_G6_隔离E2E与FinalEvidence闭环.md)。
+
+## 8. Boundaries preserved
 
 ```text
 Studio:StudioUiEnabled=false
