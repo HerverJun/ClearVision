@@ -22,19 +22,19 @@ const structuredText = computed(() => preview.outputData
   : null);
 
 async function openArtifact(artifactId: string, isImage: boolean): Promise<void> {
-  artifactMessage.value = '正在读取 artifact…';
+  artifactMessage.value = '正在读取附加结果…';
   artifactText.value = null;
   try {
     const result = await props.owner.preview.readArtifact(artifactId);
     if (isImage) {
       await props.owner.image.showArtifact(result.blob, `${preview.requestIdentity?.requestKey}:artifact:${artifactId}`);
-      artifactMessage.value = '已在唯一 ImageCanvas 中显示附加图像。';
+      artifactMessage.value = '已在图像预览区显示附加图像。';
     } else {
       artifactText.value = (await result.blob.text()).slice(0, 16_384);
-      artifactMessage.value = '已读取结构化 artifact。';
+      artifactMessage.value = '已读取结构化附加结果。';
     }
   } catch (error) {
-    artifactMessage.value = error instanceof Error ? error.message : 'Artifact 已过期或不可用。';
+    artifactMessage.value = error instanceof Error ? error.message : '附加结果已过期或不可用。';
   }
 }
 </script>
@@ -57,10 +57,10 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
         <CvStatusBadge
           v-if="preview.isStale"
           tone="warning"
-          label="STALE"
+          label="已过期"
         />
         <small v-if="preview.requestIdentity">
-          rev {{ preview.requestIdentity.flowRevision }} · {{ preview.requestIdentity.clientSnapshotHash }}
+          草稿 r{{ preview.requestIdentity.flowRevision }}
         </small>
       </div>
       <div class="preview-panel__actions">
@@ -168,7 +168,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
             选择节点后可执行预览。
           </p>
           <p v-else-if="preview.phase === 'loading'">
-            请求已绑定当前 Flow draft，等待后端结果。
+            请求已绑定当前本地流程草稿，正在等待结果。
           </p>
           <p v-else>
             暂无结构化输出。
@@ -179,7 +179,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
           v-if="preview.artifacts.length > 0"
           class="preview-panel__artifacts"
         >
-          <strong>Artifacts ({{ preview.artifacts.length }})</strong>
+          <strong>附加结果（{{ preview.artifacts.length }}）</strong>
           <ul>
             <li
               v-for="artifact in preview.artifacts"

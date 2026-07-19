@@ -1928,8 +1928,8 @@ test('G4 unified leave prompt traps keyboard focus, Escape stays, and discard le
   const textInput = page.locator(
     '[data-evidence-surface="f03-g3-inspector"] [data-parameter-name="Text"] input'
   );
-  await expect(shell).toContainText(`ProjectId ${projectA}`);
-  await expect(shell).toContainText('PersistenceRevision 7');
+  await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
+  await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '7');
   await expect(shell.getByRole('link', { name: '工程列表' })).toBeVisible();
   await expect(shell.getByRole('link', { name: '工程详情' })).toBeVisible();
   await expect(shell.getByRole('link', { name: '当前工程结果' })).toBeVisible();
@@ -2425,27 +2425,44 @@ test('passes 20 real Browser route mount/unmount cycles with a zero ledger', asy
   expect(isF03G4RequestAllowlist(audit)).toBe(true);
 });
 
-for (const viewport of [
-  { width: 1366, height: 768 },
-  { width: 1366, height: 600 }
+for (const scenario of [
+  { viewport: { width: 1920, height: 1080 }, density: 'compact' },
+  { viewport: { width: 1350, height: 704 }, density: 'compact' },
+  { viewport: { width: 1920, height: 1080 }, density: 'comfortable' },
+  { viewport: { width: 1350, height: 704 }, density: 'comfortable' }
 ] as const) {
-  test(`Workspace Shell fits ${viewport.width}x${viewport.height} without global overflow`, async ({ page }) => {
+  test(`Workspace Shell fits ${scenario.viewport.width}x${scenario.viewport.height} at ${scenario.density} density`, async ({ page }) => {
+    const { viewport, density } = scenario;
     await page.setViewportSize(viewport);
     const runtimeErrors = createF03RuntimeErrorAudit(page);
     const audit = await bootWorkspace(page);
     const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
     await expect(shell).toHaveAttribute('data-workspace-state', 'empty');
+    if (density === 'comfortable') {
+      await page.locator('[data-product-appearance] summary').click();
+      await page.getByRole('button', { name: '舒适' }).click();
+      await page.locator('[data-product-appearance] summary').click();
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-density', density);
 
     const layout = await page.evaluate(() => {
+      const topbar = document.querySelector('.product-layout__topbar')?.getBoundingClientRect();
       const toolbar = document.querySelector('.workspace-shell__toolbar')?.getBoundingClientRect();
       const status = document.querySelector('.workspace-shell__statusbar')?.getBoundingClientRect();
       const canvas = document.querySelector('.flow-canvas-surface__stage')?.getBoundingClientRect();
+      const inspector = document.querySelector('.inspector-panel')?.getBoundingClientRect();
+      const save = document.querySelector('[data-testid="workspace-save"]')?.getBoundingClientRect();
+      const run = document.querySelector('[data-testid="workspace-run"]')?.getBoundingClientRect();
       return {
         horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         verticalOverflow: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+        topbar: topbar ? { height: topbar.height } : null,
         toolbar: toolbar ? { top: toolbar.top, bottom: toolbar.bottom } : null,
         status: status ? { top: status.top, bottom: status.bottom } : null,
         canvas: canvas ? { width: canvas.width, height: canvas.height } : null,
+        inspector: inspector ? { width: inspector.width, height: inspector.height } : null,
+        saveVisible: Boolean(save && save.width > 0 && save.height > 0),
+        runVisible: Boolean(run && run.width > 0 && run.height > 0),
         viewport: { width: window.innerWidth, height: window.innerHeight }
       };
     });
@@ -2457,6 +2474,11 @@ for (const viewport of [
     });
     expect(layout.toolbar?.top).toBeGreaterThanOrEqual(0);
     expect(layout.status?.bottom).toBeLessThanOrEqual(viewport.height + 1);
+    expect(layout.topbar?.height).toBeLessThanOrEqual(density === 'comfortable' ? 44 : 40);
+    expect(layout.saveVisible).toBe(true);
+    expect(layout.runVisible).toBe(true);
+    expect(layout.inspector?.width).toBeGreaterThanOrEqual(248);
+    expect(layout.canvas?.width).toBeGreaterThanOrEqual(viewport.width >= 1900 ? 900 : 600);
     expect(layout.canvas?.height).toBeGreaterThanOrEqual(300);
     expect(isF03G4RequestAllowlist(audit)).toBe(true);
     expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
@@ -2467,6 +2489,15 @@ for (const viewport of [
         viewport,
         requests: audit,
         runtimeErrors
+      });
+    }
+    if (hasF04VisualEvidenceTarget()) {
+      await captureF04VisualEvidence(page, {
+        scenario: `workspace-chrome-${density}`,
+        viewport,
+        runtimeErrors,
+        requestAudit: audit,
+        notes: ['Prompt 1/5 Workspace Shell / Chrome convergence evidence.']
       });
     }
   });

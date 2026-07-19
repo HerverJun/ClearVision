@@ -12,6 +12,17 @@ const nameDraft = ref('');
 const lastMessage = ref<string | null>(null);
 const editingDisabled = computed(() => projection.mutationGate !== 'editable');
 const nameDirty = computed(() => projection.node !== null && nameDraft.value !== projection.node.name);
+const modeLabel = computed(() => ({
+  empty: '未选择',
+  'multi-node': '多选',
+  connection: '连线',
+  node: '节点'
+}[projection.mode] ?? '未选择'));
+const mutationGateLabel = computed(() => ({
+  editable: '可编辑',
+  readonly: '只读',
+  running: '运行中锁定'
+}[projection.mutationGate] ?? projection.mutationGate));
 
 watch(
   () => [projection.node?.id, projection.node?.name, projection.selectionRevision],
@@ -53,7 +64,7 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
 <template>
   <aside
     class="inspector-panel"
-    aria-label="工作区 Inspector"
+    aria-label="工作区属性检查器"
     data-capability="workspace-inspector"
     data-evidence-surface="f03-g3-inspector"
     :data-inspector-mode="projection.mode"
@@ -66,10 +77,10 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
   >
     <header class="inspector-panel__header">
       <div>
-        <strong>Inspector</strong>
-        <small>{{ projection.mode }}</small>
+        <strong>属性检查器</strong>
+        <small>{{ modeLabel }}</small>
       </div>
-      <span :data-gate="projection.mutationGate">{{ projection.mutationGate }}</span>
+      <span :data-gate="projection.mutationGate">{{ mutationGateLabel }}</span>
     </header>
 
     <div
@@ -77,11 +88,7 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
       class="inspector-panel__empty"
     >
       <strong>未选择对象</strong>
-      <p>选择节点或连线以查看正式 Flow draft 投影。</p>
-      <dl>
-        <div><dt>flowRevision</dt><dd>{{ projection.flowRevision }}</dd></div>
-        <div><dt>selectionRevision</dt><dd>{{ projection.selectionRevision }}</dd></div>
-      </dl>
+      <p>选择节点或连线后，可在此查看并编辑属性。</p>
     </div>
 
     <div
@@ -219,7 +226,7 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
           class="inspector-panel__metadata-message"
           :data-phase="projection.node.metadataPhase"
         >
-          {{ projection.node.metadataMessage ?? '正在读取 metadata。' }}
+          {{ projection.node.metadataMessage ?? '正在读取参数定义。' }}
         </p>
         <ParameterEditor
           v-for="parameter in projection.node.parameters"
@@ -249,7 +256,7 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
     </section>
 
     <footer class="inspector-panel__footer">
-      <span>draft r{{ projection.flowRevision }}</span>
+      <span>本地草稿 r{{ projection.flowRevision }}</span>
       <span>本地草稿 {{ projection.activeDraftCount }}</span>
       <span v-if="lastMessage">{{ lastMessage }}</span>
     </footer>

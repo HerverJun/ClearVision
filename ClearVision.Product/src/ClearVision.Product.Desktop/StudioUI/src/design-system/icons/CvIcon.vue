@@ -46,6 +46,84 @@ withDefaults(defineProps<{
       v-else-if="name === 'chevron-right'"
       d="m9 18 6-6-6-6"
     />
+    <template v-else-if="name === 'overview'">
+      <rect
+        x="4"
+        y="4"
+        width="6"
+        height="6"
+        rx="1"
+      />
+      <rect
+        x="14"
+        y="4"
+        width="6"
+        height="6"
+        rx="1"
+      />
+      <rect
+        x="4"
+        y="14"
+        width="6"
+        height="6"
+        rx="1"
+      />
+      <rect
+        x="14"
+        y="14"
+        width="6"
+        height="6"
+        rx="1"
+      />
+    </template>
+    <template v-else-if="name === 'projects'">
+      <path d="M3.5 7.5h6l2-2h9v13h-17z" />
+      <path d="M3.5 10h17" />
+    </template>
+    <template v-else-if="name === 'operators'">
+      <rect
+        x="3.5"
+        y="5"
+        width="6"
+        height="5"
+        rx="1"
+      />
+      <rect
+        x="14.5"
+        y="14"
+        width="6"
+        height="5"
+        rx="1"
+      />
+      <path d="M9.5 7.5h3a3 3 0 0 1 3 3V14M14.5 16.5h-3a3 3 0 0 1-3-3V10" />
+    </template>
+    <template v-else-if="name === 'stations'">
+      <rect
+        x="4"
+        y="4"
+        width="16"
+        height="12"
+        rx="2"
+      />
+      <path d="M9 20h6M12 16v4M7 8h3M7 12h6" />
+    </template>
+    <template v-else-if="name === 'results'">
+      <path d="M6 3.5h9l3 3V20H6z" />
+      <path d="M15 3.5V7h3M9 11h6M9 15h4" />
+      <path d="m8.5 18 1 1 2-2" />
+    </template>
+    <template v-else-if="name === 'diagnostics'">
+      <path d="M4 17h3l2.2-7 3.2 10 2.2-7H20" />
+      <path d="M4 5h16" />
+    </template>
+    <template v-else-if="name === 'about'">
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+      />
+      <path d="M12 11v5M12 8h.01" />
+    </template>
     <template v-else-if="name === 'info'">
       <circle
         cx="12"

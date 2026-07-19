@@ -85,6 +85,26 @@ export async function captureF04VisualEvidence(
       ?.getAttribute('data-workspace-run-phase') ?? null,
     leaveGuardPhase: document.querySelector('[data-product-shell]')
       ?.getAttribute('data-leave-guard-phase') ?? null,
+    workspaceGeometry: (() => {
+      const rect = (selector: string) => {
+        const bounds = document.querySelector(selector)?.getBoundingClientRect();
+        return bounds
+          ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+          : null;
+      };
+      return {
+        productRail: rect('.product-layout--workspace .product-layout__sidebar'),
+        productTopbar: rect('.product-layout--workspace .product-layout__topbar'),
+        workspaceToolbar: rect('.workspace-shell__toolbar'),
+        operatorRail: rect('.operator-rail'),
+        canvasStage: rect('.flow-canvas-surface__stage'),
+        preview: rect('.preview-panel'),
+        inspector: rect('.inspector-panel'),
+        workspaceStatusbar: rect('.workspace-shell__statusbar'),
+        saveCommand: rect('[data-testid="workspace-save"]'),
+        runCommand: rect('[data-testid="workspace-run"]')
+      };
+    })(),
     modalTitle: document.querySelector('[role="dialog"] h2')?.textContent?.trim() ?? null,
     activeElement: document.activeElement instanceof HTMLElement
       ? {

@@ -104,7 +104,7 @@ onBeforeUnmount(() => emit('draftActive', false));
         {{ parameter.label }}
         <span v-if="parameter.isRequired">*</span>
       </label>
-      <small v-if="parameter.valueSource === 'metadata-default'">metadata default</small>
+      <small v-if="parameter.valueSource === 'metadata-default'">使用参数默认值</small>
       <small v-else-if="parameter.valueSource === 'undefined'">未定义</small>
       <small v-if="parameter.deprecated">deprecated</small>
     </div>

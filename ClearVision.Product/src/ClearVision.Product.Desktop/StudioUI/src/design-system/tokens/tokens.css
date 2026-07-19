@@ -126,9 +126,9 @@
 
   /* F03 Workspace shell geometry. These tokens describe layout only; no
      Flow/Project authority is stored in the design system. */
-  --cv-workspace-toolbar-height: 44px;
-  --cv-workspace-status-height: 24px;
-  --cv-workspace-product-rail-width: 52px;
+  --cv-workspace-toolbar-height: 40px;
+  --cv-workspace-status-height: 22px;
+  --cv-workspace-product-rail-width: 60px;
 
   /* Light surfaces */
   --cv-surface-app: #f1f2ef;
@@ -316,9 +316,9 @@ html[data-density="comfortable"] {
   --cv-density-icon-size: 18px;
   --cv-density-page-padding: 28px;
   --cv-density-page-gap: 20px;
-  --cv-workspace-toolbar-height: 52px;
-  --cv-workspace-status-height: 28px;
-  --cv-workspace-product-rail-width: 60px;
+  --cv-workspace-toolbar-height: 44px;
+  --cv-workspace-status-height: 24px;
+  --cv-workspace-product-rail-width: 64px;
 }
 
 html[data-reduced-motion="true"] {

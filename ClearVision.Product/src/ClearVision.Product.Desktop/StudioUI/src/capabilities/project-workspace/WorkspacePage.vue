@@ -89,14 +89,14 @@ async function startLifecycle(reason: string): Promise<void> {
   }
   if (!isWorkspaceProjectId(projectId)) {
     shellState.value = 'decode-error';
-    message.value = 'Workspace route 中的 project id 不是有效的非空 UUID。';
+    message.value = '当前链接中的工程标识无效。';
     return;
   }
 
   const sessionPhase = runtime.session.phase;
   if (sessionPhase === 'loading') {
     shellState.value = 'loading';
-    message.value = '正在等待唯一 session owner 完成 GET /api/auth/me。';
+    message.value = '正在确认当前会话。';
     return;
   }
   if (sessionPhase === 'unauthorized') {
@@ -113,7 +113,7 @@ async function startLifecycle(reason: string): Promise<void> {
   shellState.value = 'loading';
   if (projectLifecycle) {
     projectLifecycle.setProjectScope(projectId);
-    message.value = '正在通过 POST /api/projects/{id}/open 确认打开 authority。';
+    message.value = '正在确认工程访问权限。';
     const opened = await projectLifecycle.openProject(projectId);
     if (generation !== lifecycleGeneration) return;
     if (!opened) {
@@ -129,12 +129,12 @@ async function startLifecycle(reason: string): Promise<void> {
     readPort = nextRead;
   } catch (error) {
     shellState.value = 'error';
-    message.value = error instanceof Error ? error.message : 'Workspace read owner 冲突。';
+    message.value = error instanceof Error ? error.message : '工程读取状态冲突，请重试。';
     return;
   }
 
   const pendingRead = nextRead.refresh({ force: true });
-  message.value = '正在执行唯一 GET /api/projects/{id} 读取；未创建 Workspace owner。';
+  message.value = '正在读取工程、流程与资源信息。';
   const result = await pendingRead;
   if (generation !== lifecycleGeneration || readPort !== nextRead) return;
 
@@ -149,7 +149,7 @@ async function startLifecycle(reason: string): Promise<void> {
       nextRead.dispose('workspace-owner-conflict');
       readPort = undefined;
       shellState.value = 'error';
-      message.value = error instanceof Error ? error.message : 'Workspace owner 冲突。';
+      message.value = error instanceof Error ? error.message : '工程工作区状态冲突，请重试。';
     }
     return;
   }
@@ -164,14 +164,14 @@ async function startLifecycle(reason: string): Promise<void> {
       message.value = workspaceOwner.projection.readonlyReason;
     } catch (error) {
       shellState.value = 'error';
-      message.value = error instanceof Error ? error.message : 'Workspace owner 冲突。';
+      message.value = error instanceof Error ? error.message : '工程工作区状态冲突，请重试。';
     }
     return;
   }
 
   shellState.value = projectFailureState();
   message.value = shellState.value === 'decode-error'
-    ? `${result.failure?.message ?? '服务响应不符合冻结合同。'} 未生成伪 Flow。`
+    ? `${result.failure?.message ?? '工程数据格式不受支持。'} 未创建临时流程。`
     : result.failure?.message ?? null;
 }
 

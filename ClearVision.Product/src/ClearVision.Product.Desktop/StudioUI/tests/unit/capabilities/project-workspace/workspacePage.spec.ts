@@ -302,6 +302,35 @@ describe('F03 G1 WorkspacePage', () => {
     harness.runtime.dispose();
   });
 
+  it('presents save and formal-run recovery commands in user-facing Chinese', async () => {
+    const executingHarness = createProtectedRunHarness('executing');
+    const executingRouter = await createTestRouter();
+    const executing = mount(WorkspacePage, {
+      props: { projectId: projectA, runtime: executingHarness.runtime },
+      global: { plugins: [executingRouter], stubs: { FlowWorkspace: flowWorkspaceStub } }
+    });
+    await flushPromises();
+
+    expect(executing.get('[data-testid="workspace-save"]').text()).toBe('保存');
+    expect(executing.get('[data-testid="workspace-run"]').text()).toBe('正式运行');
+    expect(executing.get('[data-testid="workspace-run-stop"]').text()).toBe('停止运行');
+    expect(executing.text()).not.toContain('Formal Run:');
+    executing.unmount();
+    executingHarness.runtime.dispose();
+
+    const reconcileHarness = createProtectedRunHarness('cancel-requested');
+    const reconcileRouter = await createTestRouter();
+    const reconciling = mount(WorkspacePage, {
+      props: { projectId: projectA, runtime: reconcileHarness.runtime },
+      global: { plugins: [reconcileRouter], stubs: { FlowWorkspace: flowWorkspaceStub } }
+    });
+    await flushPromises();
+
+    expect(reconciling.get('[data-testid="workspace-run-reconcile"]').text()).toBe('查询运行结果');
+    reconciling.unmount();
+    reconcileHarness.runtime.dispose();
+  });
+
   it('keeps flag-off at owner=0 and does not issue a Project GET', async () => {
     const harness = await createHarness({ enabled: false });
     const wrapper = mount(WorkspacePage, {
@@ -433,7 +462,7 @@ describe('F03 G1 WorkspacePage', () => {
         'data-workspace-owner-count': '0',
         'data-workspace-save-compatibility': 'unavailable'
       });
-    expect(wrapper.text()).toContain('未生成伪 Flow');
+    expect(wrapper.text()).toContain('未创建临时流程');
     expect(harness.diagnostics.diagnostics.workspaceOwnerCount).toBe(0);
 
     wrapper.unmount();

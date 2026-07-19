@@ -52,6 +52,7 @@ const selectedDisabledCount = computed(() => {
         data-flow-command="undo"
         :disabled="readonly || !runtime?.canUndo"
         title="撤销 Ctrl+Z"
+        aria-label="撤销（Ctrl+Z）"
         @click="emit('undo')"
       >
         ↶
@@ -61,6 +62,7 @@ const selectedDisabledCount = computed(() => {
         data-flow-command="redo"
         :disabled="readonly || !runtime?.canRedo"
         title="重做 Ctrl+Y"
+        aria-label="重做（Ctrl+Y）"
         @click="emit('redo')"
       >
         ↷
@@ -116,6 +118,7 @@ const selectedDisabledCount = computed(() => {
         type="button"
         data-flow-command="zoom-out"
         title="缩小"
+        aria-label="缩小流程画布"
         @click="emit('zoomOut')"
       >
         −
@@ -124,6 +127,7 @@ const selectedDisabledCount = computed(() => {
         type="button"
         data-flow-command="reset-view"
         title="重置视图"
+        aria-label="重置流程画布缩放"
         @click="emit('resetView')"
       >
         {{ Math.round((runtime?.scale ?? 1) * 100) }}%
@@ -132,6 +136,7 @@ const selectedDisabledCount = computed(() => {
         type="button"
         data-flow-command="zoom-in"
         title="放大"
+        aria-label="放大流程画布"
         @click="emit('zoomIn')"
       >
         ＋
@@ -163,7 +168,7 @@ const selectedDisabledCount = computed(() => {
       <span>节点 {{ runtime?.nodeCount ?? projection.draft.operators.length }}</span>
       <span>连线 {{ runtime?.connectionCount ?? projection.draft.connections.length }}</span>
       <span>选择 {{ selectedCount }}</span>
-      <span>draft r{{ runtime?.flowRevision ?? 0 }}</span>
+      <span>本地草稿 r{{ runtime?.flowRevision ?? 0 }}</span>
       <span class="flow-canvas-surface__spacer" />
       <span
         v-if="projection.feedback"
@@ -177,17 +182,18 @@ const selectedDisabledCount = computed(() => {
 </template>
 
 <style scoped>
-.flow-canvas-surface { min-width: 0; min-height: 0; display: grid; grid-template-rows: 36px minmax(0, 1fr) 24px; overflow: hidden; background: var(--flow-canvas-background); }
-.flow-canvas-surface__toolbar { min-width: 0; display: flex; align-items: center; gap: 4px; padding: 0 var(--cv-space-2); overflow-x: auto; border-bottom: 1px solid var(--cv-border-subtle); background: color-mix(in srgb, var(--cv-surface-raised) 94%, transparent); scrollbar-width: none; }
-.flow-canvas-surface__toolbar button { min-width: 28px; height: 26px; padding: 0 7px; border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); cursor: pointer; white-space: nowrap; }
+.flow-canvas-surface { min-width: 0; min-height: 0; display: grid; grid-template-rows: 32px minmax(0, 1fr) 20px; overflow: hidden; background: var(--flow-canvas-background); }
+.flow-canvas-surface__toolbar { min-width: 0; display: flex; align-items: center; gap: 2px; padding: 0 var(--cv-space-2); overflow-x: auto; border-bottom: 1px solid var(--cv-border-subtle); background: color-mix(in srgb, var(--cv-surface-raised) 96%, transparent); scrollbar-width: none; }
+.flow-canvas-surface__toolbar button { min-width: 26px; height: 24px; padding: 0 6px; border: 1px solid transparent; border-radius: var(--cv-radius-sm); background: transparent; color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); cursor: pointer; white-space: nowrap; }
+.flow-canvas-surface__toolbar button:hover:not(:disabled) { border-color: var(--cv-border-subtle); background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
 .flow-canvas-surface__toolbar button:disabled { opacity: 0.45; cursor: not-allowed; }
-.flow-canvas-surface__toolbar > span { width: 1px; height: 18px; margin-inline: 3px; background: var(--cv-border-subtle); }
+.flow-canvas-surface__toolbar > span { width: 1px; height: 16px; margin-inline: 3px; background: var(--cv-border-subtle); }
 .flow-canvas-surface__stage { position: relative; min-width: 0; min-height: 300px; overflow: hidden; }
 .flow-canvas-surface__stage canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
 .flow-canvas-surface__stage canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--cv-color-link); }
 .flow-canvas-surface__loading { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--flow-canvas-background) 86%, transparent); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); pointer-events: none; }
 .flow-canvas-surface__loading.is-error { color: var(--cv-color-status-ng-strong); }
-.flow-canvas-surface__status { min-width: 0; display: flex; align-items: center; gap: var(--cv-space-3); padding: 0 var(--cv-space-2); overflow: hidden; border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); white-space: nowrap; }
+.flow-canvas-surface__status { min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); padding: 0 var(--cv-space-2); overflow: hidden; border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); color: var(--cv-text-muted); font-size: 10px; white-space: nowrap; }
 .flow-canvas-surface__status span:last-child { overflow: hidden; text-overflow: ellipsis; }
 .flow-canvas-surface__status [data-tone="warning"] { color: var(--cv-color-status-warning-strong); }
 .flow-canvas-surface__status [data-tone="error"] { color: var(--cv-color-status-ng-strong); }

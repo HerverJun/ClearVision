@@ -7,6 +7,7 @@ import { useProductRuntime } from '@/app/productRuntime';
 import { useStudioPlatform } from '@/app/studioPlatform';
 import { CvButton, CvInlineAlert, CvModal, CvStatusBadge } from '@/design-system/primitives';
 import { CvIcon } from '@/design-system/icons';
+import type { CvIconName } from '@/design-system/icons';
 import './product-layout.css';
 
 const route = useRoute();
@@ -23,6 +24,15 @@ const navigation = computed(() => visibleProductNavigation(
   session.user?.role,
   platform.startup.featureFlags
 ));
+const navigationIcons: Readonly<Record<string, CvIconName>> = Object.freeze({
+  '/overview': 'overview',
+  '/projects': 'projects',
+  '/operators': 'operators',
+  '/stations': 'stations',
+  '/results': 'results',
+  '/diagnostics': 'diagnostics',
+  '/about': 'about'
+});
 
 function resolveBreadcrumbPath(path: string): string {
   return path.replace(/:([A-Za-z0-9_]+)/g, (_match, parameterName: string) => {
@@ -130,7 +140,12 @@ onMounted(() => runtime.preferences.apply());
           :aria-label="`${item.label}，${item.description}`"
           :title="item.description"
         >
-          <span>{{ workspaceMode ? item.label.slice(0, 1) : item.label }}</span>
+          <CvIcon
+            v-if="workspaceMode"
+            :name="navigationIcons[item.to] ?? 'overview'"
+            size="md"
+          />
+          <span class="product-layout__nav-label">{{ item.label }}</span>
           <small>{{ item.description }}</small>
         </RouterLink>
       </nav>
@@ -144,7 +159,15 @@ onMounted(() => runtime.preferences.apply());
 
     <div class="product-layout__workspace">
       <header class="product-layout__topbar">
+        <div
+          v-if="workspaceMode"
+          class="product-layout__workspace-mode-label"
+        >
+          <span>Studio</span>
+          <strong>工程工作台</strong>
+        </div>
         <nav
+          v-else
           class="product-layout__breadcrumbs"
           aria-label="面包屑"
         >

@@ -48,7 +48,7 @@ const pageStateKind = computed(() => {
 
 const stateTitle = computed(() => {
   switch (props.state) {
-    case 'flag-off': return 'Workspace capability 未启用';
+    case 'flag-off': return '工程工作区未启用';
     case 'loading': return '正在读取工程工作区';
     case 'empty': return '当前流程为空';
     case 'unauthorized': return '需要预置会话';
@@ -61,13 +61,13 @@ const stateTitle = computed(() => {
 });
 
 const stateDescription = computed(() => props.message ?? {
-  'flag-off': '启动配置中的 Studio2.Workspace 保持关闭，未创建读取或 Workspace owner。',
-  loading: '正在通过唯一只读端口读取正式 Project/Flow persistence envelope。',
-  empty: '工程已成功解码。可从算子区点击或拖拽创建本地 Flow draft。',
+  'flag-off': '当前启动配置未开放工程编辑工作区。',
+  loading: '正在读取工程、流程与资源信息。',
+  empty: '当前流程为空，可从左侧算子区点击或拖拽添加算子。',
   unauthorized: '当前仅支持宿主或测试环境预置会话，不提供新的登录入口。',
-  forbidden: '后端权限是唯一安全边界；未创建 Workspace owner。',
+  forbidden: '当前账户没有读取此工程的权限。',
   'not-found': '该工程可能已删除，或当前链接中的工程标识已失效。',
-  'decode-error': '服务响应缺少 required persistence 字段或字段类型非法；未生成伪 Flow。',
+  'decode-error': '工程数据不完整或格式不受支持，未创建临时流程。',
   error: '本地服务未返回可用的工程工作区数据。',
   ready: '',
   readonly: ''
@@ -87,10 +87,12 @@ const saveCompatibilityTone = computed(() => {
 });
 const saveCompatibilityLabel = computed(() => {
   const status = currentProject.value?.saveCompatibility.status;
-  if (status === 'blocked') return '保存合同：阻断';
-  if (status === 'opaque-passthrough') return '保存合同：opaque passthrough';
-  return '保存合同：兼容';
+  if (status === 'blocked') return '当前工程无法安全保存';
+  if (status === 'opaque-passthrough') return '含兼容字段，保存时将原样保留';
+  return '工程可安全保存';
 });
+const showSaveCompatibility = computed(() =>
+  currentProject.value?.saveCompatibility.status !== 'compatible');
 const persistenceTone = computed(() => {
   const phase = persistence.value?.phase;
   if (phase === 'conflict' || phase === 'error' || phase === 'unknown-outcome') return 'ng';
@@ -100,7 +102,7 @@ const persistenceTone = computed(() => {
 });
 const persistenceLabel = computed(() => {
   const projection = persistence.value;
-  if (!projection) return '保存 owner：初始化中';
+  if (!projection) return '正在准备保存';
   return {
     clean: '已保存',
     dirty: '未保存',
@@ -123,18 +125,18 @@ const runTone = computed(() => {
 });
 const runLabel = computed(() => {
   const projection = run.value;
-  if (!projection) return 'Formal Run: unavailable';
+  if (!projection) return '正式运行尚未就绪';
   return {
-    idle: 'Formal Run: ready',
-    blocked: 'Formal Run: blocked',
-    admitting: 'Formal Run: admission',
-    executing: 'Formal Run: executing',
-    succeeded: 'Formal Run: completed',
-    failed: 'Formal Run: failed',
-    cancelled: 'Formal Run: cancelled',
-    'cancel-requested': 'Formal Run: cancellation requested',
-    'unknown-outcome': 'Formal Run: outcome unknown',
-    disposed: 'Formal Run: disposed'
+    idle: '正式运行就绪',
+    blocked: '当前状态不可正式运行',
+    admitting: '正在检查运行条件',
+    executing: '正式运行中',
+    succeeded: '正式运行完成',
+    failed: '正式运行失败',
+    cancelled: '正式运行已取消',
+    'cancel-requested': '正在停止正式运行',
+    'unknown-outcome': '运行结果待确认',
+    disposed: '正式运行已结束'
   }[projection.phase];
 });
 </script>
@@ -189,16 +191,16 @@ const runLabel = computed(() => {
           class="workspace-shell__divider"
           aria-hidden="true"
         />
-        <div>
+        <div
+          class="workspace-shell__project"
+          :title="`工程 ID：${projectId}${currentProject ? `；版本：${currentProject.version}；保存修订：${persistence?.persistenceRevision ?? currentProject.persistenceRevision}` : ''}`"
+        >
           <strong>{{ currentProject?.name ?? '工程工作区' }}</strong>
-          <small>ProjectId {{ projectId }}</small>
-          <small v-if="currentProject">
-            版本 {{ currentProject.version }} · PersistenceRevision {{ persistence?.persistenceRevision ?? currentProject.persistenceRevision }}
-          </small>
+          <small v-if="currentProject">版本 {{ currentProject.version }}</small>
         </div>
       </div>
 
-      <div class="workspace-shell__toolbar-status">
+      <div class="workspace-shell__commands">
         <CvButton
           v-if="persistence"
           data-testid="workspace-save"
@@ -215,7 +217,7 @@ const runLabel = computed(() => {
           :disabled="!run.canRun"
           @click="workspaceOwner?.runFormal()"
         >
-          Run
+          正式运行
         </CvButton>
         <RouterLink
           class="workspace-shell__results-link"
@@ -231,7 +233,7 @@ const runLabel = computed(() => {
           variant="quiet"
           @click="workspaceOwner?.stopFormal()"
         >
-          Stop
+          停止运行
         </CvButton>
         <CvButton
           v-if="run?.canReconcile"
@@ -240,7 +242,7 @@ const runLabel = computed(() => {
           variant="quiet"
           @click="workspaceOwner?.reconcileFormalRun()"
         >
-          Reconcile
+          查询运行结果
         </CvButton>
         <CvButton
           v-if="persistence?.canRetry"
@@ -256,7 +258,7 @@ const runLabel = computed(() => {
           size="sm"
           @click="workspaceOwner?.reconcileSave()"
         >
-          重新读取
+          核对保存结果
         </CvButton>
         <CvButton
           v-if="persistence?.canReapplyConflict"
@@ -264,7 +266,7 @@ const runLabel = computed(() => {
           size="sm"
           @click="workspaceOwner?.reapplyConflict()"
         >
-          重放 draft
+          重新应用本地草稿
         </CvButton>
         <CvButton
           v-if="persistence?.canDiscardConflict"
@@ -272,22 +274,8 @@ const runLabel = computed(() => {
           size="sm"
           @click="workspaceOwner?.discardConflict()"
         >
-          放弃 draft
+          放弃本地草稿
         </CvButton>
-        <CvStatusBadge
-          v-if="currentProject"
-          :tone="saveCompatibilityTone"
-          :label="saveCompatibilityLabel"
-        />
-        <CvStatusBadge
-          :tone="persistenceTone"
-          :label="persistenceLabel"
-        />
-        <CvStatusBadge
-          v-if="run"
-          :tone="runTone"
-          :label="runLabel"
-        />
       </div>
     </header>
 
@@ -323,7 +311,7 @@ const runLabel = computed(() => {
           <span />
           <span />
         </div>
-        <p>工程读取成功后加载唯一 Operator catalog owner。</p>
+        <p>工程读取成功后将在此显示可用算子。</p>
       </aside>
 
       <div class="workspace-shell__center">
@@ -368,7 +356,7 @@ const runLabel = computed(() => {
           aria-label="预览区占位"
         >
           <strong>预览区</strong>
-          <span>工程加载成功后由现有 Preview owner 提供调试投影；不等同于 Formal Run。</span>
+          <span>工程加载成功后可在此查看节点预览；预览结果不等同于正式运行结果。</span>
         </section>
       </div>
 
@@ -388,23 +376,44 @@ const runLabel = computed(() => {
           class="workspace-shell__placeholder-field"
           aria-hidden="true"
         />
-        <p>工程加载成功后挂载唯一 Inspector owner；Host file picker 仍由窄适配层负责。</p>
+        <p>工程加载成功后可在此查看并编辑所选节点或连线的属性。</p>
       </aside>
     </div>
 
     <footer class="workspace-shell__statusbar">
-      <span>Workspace owner {{ diagnostics.workspaceOwnerCount }}/1</span>
-      <span>读取 {{ diagnostics.inFlightReads }}</span>
-      <span>订阅 {{ diagnostics.activeSubscriptions }}</span>
-      <span>Inspector {{ diagnostics.inspectorOwnerCount }}/1</span>
-      <span>Preview {{ diagnostics.previewOwnerCount }}/1</span>
-      <span>Image {{ diagnostics.imageCanvasOwnerCount }}/1</span>
-      <span>ROI {{ diagnostics.roiOwnerCount }}/1</span>
-      <span>Persistence {{ diagnostics.persistenceOwnerCount }}/1</span>
-      <span>写入 {{ diagnostics.inFlightWrites }}</span>
-      <span v-if="persistence">{{ persistence.message }}</span>
+      <CvStatusBadge
+        :tone="persistenceTone"
+        :label="persistenceLabel"
+      />
+      <CvStatusBadge
+        v-if="run"
+        :tone="runTone"
+        :label="runLabel"
+      />
+      <CvStatusBadge
+        v-if="showSaveCompatibility"
+        :tone="saveCompatibilityTone"
+        :label="saveCompatibilityLabel"
+      />
+      <span
+        v-if="persistence && ['error', 'conflict', 'unknown-outcome', 'readonly'].includes(persistence.phase)"
+        class="workspace-shell__status-message"
+      >{{ persistence.message }}</span>
       <span class="workspace-shell__statusbar-spacer" />
-      <span>F03 · G1–G5 Workspace</span>
+      <details class="workspace-shell__diagnostics">
+        <summary>技术状态</summary>
+        <dl>
+          <div><dt>工作区</dt><dd>{{ diagnostics.workspaceOwnerCount }}/1</dd></div>
+          <div><dt>属性检查器</dt><dd>{{ diagnostics.inspectorOwnerCount }}/1</dd></div>
+          <div><dt>预览</dt><dd>{{ diagnostics.previewOwnerCount }}/1</dd></div>
+          <div><dt>图像</dt><dd>{{ diagnostics.imageCanvasOwnerCount }}/1</dd></div>
+          <div><dt>ROI</dt><dd>{{ diagnostics.roiOwnerCount }}/1</dd></div>
+          <div><dt>保存</dt><dd>{{ diagnostics.persistenceOwnerCount }}/1</dd></div>
+          <div><dt>读取中</dt><dd>{{ diagnostics.inFlightReads }}</dd></div>
+          <div><dt>写入中</dt><dd>{{ diagnostics.inFlightWrites }}</dd></div>
+          <div><dt>活动订阅</dt><dd>{{ diagnostics.activeSubscriptions }}</dd></div>
+        </dl>
+      </details>
     </footer>
   </section>
 </template>
@@ -418,7 +427,6 @@ const runLabel = computed(() => {
   display: grid;
   grid-template-rows: var(--cv-workspace-toolbar-height, 44px) minmax(0, 1fr) var(--cv-workspace-status-height, 24px);
   overflow: hidden;
-  border: 1px solid var(--cv-border-subtle);
   background: var(--cv-surface-page);
 }
 
@@ -427,41 +435,48 @@ const runLabel = computed(() => {
   display: flex;
   align-items: center;
   border-color: var(--cv-border-subtle);
-  background: var(--cv-surface-raised);
+  background: var(--cv-surface-page);
 }
 
 .workspace-shell__toolbar {
   min-width: 0;
   justify-content: space-between;
-  gap: var(--cv-space-3);
-  padding: 0 var(--cv-space-3);
+  gap: var(--cv-space-2);
+  padding: 0 var(--cv-space-2);
   border-bottom: 1px solid var(--cv-border-subtle);
 }
 
 .workspace-shell__identity,
-.workspace-shell__toolbar-status {
+.workspace-shell__commands {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--cv-space-2);
+  gap: var(--cv-space-1);
 }
 
 .workspace-shell__identity > div { min-width: 0; }
 .workspace-shell__identity strong,
 .workspace-shell__identity small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workspace-shell__identity strong { font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); }
+.workspace-shell__identity strong { font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); letter-spacing: -0.01em; }
 .workspace-shell__identity small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
-.workspace-shell__back-nav { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.workspace-shell__project { display: flex; align-items: baseline; gap: var(--cv-space-2); }
+.workspace-shell__back-nav { display: flex; align-items: center; gap: var(--cv-space-2); }
 .workspace-shell__back { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); text-decoration: none; white-space: nowrap; }
 .workspace-shell__back:hover { color: var(--cv-color-link); }
+.workspace-shell__commands {
+  justify-content: flex-end;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.workspace-shell__commands::-webkit-scrollbar { display: none; }
 .workspace-shell__results-link {
   display: inline-flex;
   align-items: center;
   height: var(--cv-density-control-height-sm);
-  padding: 0 var(--cv-space-3);
-  border: 1px solid var(--cv-control-border);
+  padding: 0 var(--cv-space-2);
+  border: 1px solid transparent;
   border-radius: var(--cv-radius-sm);
-  background: var(--cv-surface-raised);
+  background: transparent;
   color: var(--cv-text-secondary);
   font-size: var(--cv-font-size-xs);
   font-weight: var(--cv-font-weight-medium);
@@ -470,17 +485,17 @@ const runLabel = computed(() => {
 }
 .workspace-shell__results-link:hover { border-color: var(--cv-control-border-hover); background: var(--cv-interactive-hover); color: var(--cv-color-link); }
 .workspace-shell__results-link:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
-.workspace-shell__divider { width: 1px; height: 22px; background: var(--cv-border-subtle); }
+.workspace-shell__divider { width: 1px; height: 18px; background: var(--cv-border-subtle); }
 
 .workspace-shell__work-area {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(196px, 232px) minmax(520px, 1fr) minmax(280px, 320px);
+  grid-template-columns: minmax(180px, 210px) minmax(600px, 1fr) minmax(260px, 296px);
   overflow: hidden;
 }
 .workspace-shell__work-area > :deep(.flow-workspace) { grid-column: 1 / -1; }
-.workspace-shell__work-area--state { grid-template-columns: minmax(196px, 232px) minmax(520px, 1fr) minmax(280px, 320px); }
+.workspace-shell__work-area--state { grid-template-columns: minmax(180px, 210px) minmax(600px, 1fr) minmax(260px, 296px); }
 
 .workspace-shell__rail,
 .workspace-shell__inspector {
@@ -570,27 +585,65 @@ const runLabel = computed(() => {
 .workspace-shell__preview span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 
 .workspace-shell__statusbar {
-  gap: var(--cv-space-3);
-  padding: 0 var(--cv-space-3);
+  position: relative;
+  gap: var(--cv-space-2);
+  padding: 0 var(--cv-space-2);
   border-top: 1px solid var(--cv-border-subtle);
   color: var(--cv-text-secondary);
   font-size: var(--cv-font-size-2xs);
   white-space: nowrap;
 }
+.workspace-shell__statusbar :deep(.cv-status-badge) {
+  min-height: 18px;
+  padding: 0 6px;
+  border-color: transparent;
+  background: transparent;
+}
+.workspace-shell__status-message { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .workspace-shell__statusbar-spacer { flex: 1; }
 
+.workspace-shell__diagnostics { position: relative; flex: 0 0 auto; }
+.workspace-shell__diagnostics summary {
+  padding: 2px var(--cv-space-1);
+  color: var(--cv-text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+.workspace-shell__diagnostics summary::-webkit-details-marker { display: none; }
+.workspace-shell__diagnostics summary:hover { color: var(--cv-text-primary); }
+.workspace-shell__diagnostics dl {
+  position: absolute;
+  z-index: var(--cv-z-dropdown);
+  right: 0;
+  bottom: calc(100% + var(--cv-space-2));
+  width: 224px;
+  margin: 0;
+  padding: var(--cv-space-3);
+  display: grid;
+  gap: var(--cv-space-2);
+  border: 1px solid var(--cv-border-subtle);
+  border-radius: var(--cv-radius-md);
+  background: var(--cv-surface-floating);
+  box-shadow: var(--cv-elevation-2);
+}
+.workspace-shell__diagnostics dl div { display: flex; justify-content: space-between; gap: var(--cv-space-3); }
+.workspace-shell__diagnostics dt { color: var(--cv-text-secondary); }
+.workspace-shell__diagnostics dd { margin: 0; color: var(--cv-text-primary); font-variant-numeric: tabular-nums; }
+
 @media (max-width: 1220px) {
-  .workspace-shell__work-area { grid-template-columns: 196px minmax(520px, 1fr); }
-  .workspace-shell__inspector { display: none; }
+  .workspace-shell__work-area--state { grid-template-columns: 176px minmax(520px, 1fr) 248px; }
+  .workspace-shell__project small { display: none; }
 }
 
 @media (max-width: 920px) {
-  .workspace-shell__work-area { grid-template-columns: minmax(0, 1fr); }
-  .workspace-shell__rail { display: none; }
+  .workspace-shell__work-area--state { grid-template-columns: minmax(0, 1fr); }
+  .workspace-shell__work-area--state .workspace-shell__rail,
+  .workspace-shell__work-area--state .workspace-shell__inspector { display: none; }
+  .workspace-shell__back-nav .workspace-shell__back:first-child { display: none; }
 }
 
 @media (max-height: 650px) {
-  .workspace-shell__center { grid-template-rows: minmax(300px, 1fr) 36px; }
+  .workspace-shell__center { grid-template-rows: minmax(280px, 1fr) 36px; }
   .workspace-shell__preview { padding-block: var(--cv-space-2); }
 }
 </style>

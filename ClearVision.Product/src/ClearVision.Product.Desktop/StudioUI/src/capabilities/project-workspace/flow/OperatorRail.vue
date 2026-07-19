@@ -100,7 +100,7 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
     <header class="operator-rail__header">
       <div>
         <strong>算子区</strong>
-        <small>{{ catalog.operators.length }} 项 metadata</small>
+        <small>{{ catalog.operators.length }} 项算子</small>
       </div>
       <button
         type="button"
@@ -163,14 +163,12 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
 
     <div
       class="operator-rail__list"
-      role="list"
       aria-label="算子列表"
     >
       <button
         v-for="operator in visibleOperators"
         :key="operator.operatorType"
         type="button"
-        role="listitem"
         class="operator-item operator-rail__item"
         :data-type="operator.operatorType"
         :data-name="operator.displayName"

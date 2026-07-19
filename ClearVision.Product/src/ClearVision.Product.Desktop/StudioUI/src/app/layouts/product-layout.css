@@ -107,6 +107,7 @@
   padding: var(--cv-space-2) var(--cv-space-3);
   display: flex;
   align-items: center;
+  gap: var(--cv-space-2);
   border-radius: var(--cv-radius-sm);
   color: var(--cv-shell-sidebar-muted);
   text-decoration: none;
@@ -178,6 +179,16 @@
   border-bottom: 1px solid var(--cv-border-subtle);
   background: var(--cv-surface-page);
 }
+
+.product-layout__workspace-mode-label {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--cv-space-2);
+  white-space: nowrap;
+}
+.product-layout__workspace-mode-label span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.product-layout__workspace-mode-label strong { font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); }
 
 .product-layout__breadcrumbs { min-width: 0; }
 .product-layout__breadcrumbs ol {
@@ -314,12 +325,28 @@
 .product-layout--workspace .product-layout__sidebar-note { display: none; }
 .product-layout--workspace .product-layout__sidebar nav { gap: var(--cv-space-2); }
 .product-layout--workspace .product-layout__nav-item {
-  min-height: 34px;
-  padding: var(--cv-space-2);
+  min-height: 42px;
+  padding: 5px var(--cv-space-1);
+  flex-direction: column;
+  gap: 2px;
   justify-content: center;
   text-align: center;
 }
-.product-layout--workspace .product-layout__nav-item span { font-size: var(--cv-font-size-xs); }
+.product-layout--workspace .product-layout__nav-item::before { inset-block: 7px; }
+.product-layout--workspace .product-layout__nav-item .cv-icon { color: currentColor; }
+.product-layout--workspace .product-layout__nav-item span { max-width: 100%; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+.product-layout--workspace .product-layout__topbar {
+  min-height: 40px;
+  padding: var(--cv-space-1) var(--cv-space-3);
+  gap: var(--cv-space-3);
+  background: var(--cv-surface-raised);
+}
+.product-layout--workspace .product-layout__topbar-actions { gap: 2px; }
+.product-layout--workspace .product-layout__appearance-trigger { padding-inline: var(--cv-space-2); }
+.product-layout--workspace .product-layout__appearance-trigger small,
+.product-layout--workspace .product-layout__user small { display: none; }
+.product-layout--workspace .product-layout__user { padding-left: var(--cv-space-2); }
 
 .product-layout--workspace .product-layout__workspace {
   height: 100vh;
