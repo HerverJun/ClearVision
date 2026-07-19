@@ -273,23 +273,31 @@ const toggleDisabledLabel = computed(() => {
 </template>
 
 <style scoped>
-.flow-canvas-surface { min-width: 0; min-height: 0; display: grid; grid-template-rows: 32px minmax(0, 1fr) 20px; overflow: hidden; background: var(--flow-canvas-background); }
+.flow-canvas-surface { position: relative; min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 22px; overflow: hidden; background: var(--flow-canvas-background); }
 .flow-canvas-surface__toolbar {
+  position: absolute;
+  z-index: calc(var(--cv-z-sticky) - 1);
+  top: 12px;
+  right: 12px;
+  left: 12px;
   min-width: 0;
+  height: 38px;
   display: flex;
   align-items: center;
   gap: var(--cv-space-1);
   padding: 0 var(--cv-space-2);
   overflow: hidden;
-  border-bottom: 1px solid var(--cv-border-subtle);
-  background: color-mix(in srgb, var(--cv-surface-raised) 97%, transparent);
+  border: 1px solid var(--cv-border-subtle);
+  border-radius: var(--cv-radius-md);
+  background: color-mix(in srgb, var(--cv-surface-raised) 96%, transparent);
+  box-shadow: 0 2px 6px rgba(37, 55, 72, 0.09);
 }
 .flow-canvas-surface__tool-group { min-width: 0; display: flex; align-items: center; gap: 2px; }
 .flow-canvas-surface__tool-group + .flow-canvas-surface__tool-group { margin-left: var(--cv-space-1); padding-left: var(--cv-space-1); border-left: 1px solid var(--cv-border-subtle); }
 .flow-canvas-surface__tool-group--view { margin-left: auto !important; }
 .flow-canvas-surface__tool-button {
-  min-width: 26px;
-  height: 24px;
+  min-width: 28px;
+  height: 28px;
   padding: 0 6px;
   display: inline-flex;
   align-items: center;
@@ -309,20 +317,20 @@ const toggleDisabledLabel = computed(() => {
     border-color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
     color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard);
 }
-.flow-canvas-surface__tool-button.is-icon-only { width: 26px; padding: 0; }
+.flow-canvas-surface__tool-button.is-icon-only { width: 28px; padding: 0; }
 .flow-canvas-surface__tool-button.is-scale { min-width: 46px; font-variant-numeric: tabular-nums; }
-.flow-canvas-surface__tool-button:hover:not(:disabled) { border-color: var(--cv-border-subtle); background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
+.flow-canvas-surface__tool-button:hover:not(:disabled) { border-color: var(--cv-border-subtle); background: var(--cv-interactive-hover); color: var(--cv-color-industrial-blue); }
 .flow-canvas-surface__tool-button:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 0; }
 .flow-canvas-surface__tool-button:active:not(:disabled) { background: var(--cv-interactive-active); }
 .flow-canvas-surface__tool-button.is-destructive:hover:not(:disabled) { background: var(--cv-color-status-ng-soft); color: var(--cv-color-status-ng-strong); }
 .flow-canvas-surface__tool-button:disabled { color: var(--cv-text-muted); cursor: not-allowed; opacity: 0.42; }
-.flow-canvas-surface__stage { position: relative; min-width: 0; min-height: 300px; overflow: hidden; }
+.flow-canvas-surface__stage { position: relative; grid-row: 1; min-width: 0; min-height: 300px; overflow: hidden; }
 .flow-canvas-surface__stage canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
 .flow-canvas-surface__stage canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--cv-focus-ring-color); }
 .flow-canvas-surface__loading { position: absolute; inset: 0; display: grid; place-content: center; gap: var(--cv-space-1); text-align: center; background: color-mix(in srgb, var(--flow-canvas-background) 86%, transparent); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); pointer-events: none; }
 .flow-canvas-surface__loading strong { color: var(--cv-color-status-ng-strong); font-size: var(--cv-font-size-sm); }
 .flow-canvas-surface__loading.is-error { color: var(--cv-color-status-ng-strong); }
-.flow-canvas-surface__status { min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); padding: 0 var(--cv-space-2); overflow: hidden; border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); color: var(--cv-text-muted); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.flow-canvas-surface__status { grid-row: 2; min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); padding: 0 var(--cv-space-2); overflow: hidden; border-top: 1px solid var(--cv-border-subtle); background: rgba(255, 255, 255, .92); color: var(--cv-text-muted); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .flow-canvas-surface__counts,
 .flow-canvas-surface__revision,
 .flow-canvas-surface__feedback,
@@ -333,6 +341,15 @@ const toggleDisabledLabel = computed(() => {
 .flow-canvas-surface__feedback[data-tone="success"] { color: var(--cv-color-status-ok-strong); }
 .flow-canvas-surface__spacer { flex: 1; }
 .flow-canvas-surface__stage :deep(.flow-selection-box) { border: 1px solid var(--flow-canvas-selection-border); background: var(--flow-canvas-selection-background); }
-.flow-canvas-surface__stage :deep(.flow-minimap) { border: 1px solid var(--flow-canvas-minimap-border) !important; background: var(--flow-canvas-minimap-background) !important; box-shadow: var(--cv-elevation-2); }
+.flow-canvas-surface__stage :deep(.flow-minimap) { border: 1px solid var(--flow-canvas-minimap-border) !important; border-radius: var(--cv-radius-sm); background: var(--flow-canvas-minimap-background) !important; box-shadow: 0 2px 6px rgba(37, 55, 72, 0.13); }
 .flow-canvas-surface__stage :deep(.flow-minimap-toggle) { border: 1px solid var(--flow-canvas-minimap-border) !important; background: var(--flow-canvas-minimap-background) !important; color: var(--flow-canvas-node-text) !important; }
+
+@media (max-width: 1360px) {
+  .flow-canvas-surface__tool-button:not(.is-icon-only):not(.is-scale) span { display: none; }
+  .flow-canvas-surface__tool-button:not(.is-icon-only):not(.is-scale) { width: 28px; padding: 0; }
+}
+
+@media (max-height: 760px) {
+  .flow-canvas-surface__toolbar { top: 8px; right: 8px; left: 8px; height: 34px; }
+}
 </style>

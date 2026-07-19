@@ -137,8 +137,34 @@ export async function captureF04VisualEvidence(
             }
           : null;
       };
+      const styles = (selector: string) => {
+        const element = document.querySelector(selector);
+        if (!element) return null;
+        const style = getComputedStyle(element);
+        return {
+          display: style.display,
+          position: style.position,
+          width: style.width,
+          height: style.height,
+          minHeight: style.minHeight,
+          gridTemplateColumns: style.gridTemplateColumns,
+          gridTemplateRows: style.gridTemplateRows,
+          transform: style.transform,
+          zoom: style.zoom
+        };
+      };
       return {
-        productRail: rect('.product-layout--workspace .product-layout__sidebar'),
+        appRoot: rect('#app'),
+        productLayout: rect('.product-layout'),
+        productWorkspace: rect('.product-layout__workspace'),
+        productContent: rect('.product-layout__content--workspace'),
+        computedStyles: {
+          appRoot: styles('#app'),
+          productLayout: styles('.product-layout'),
+          productWorkspace: styles('.product-layout__workspace'),
+          productContent: styles('.product-layout__content--workspace')
+        },
+        productRail: rect('.operator-rail'),
         productTopbar: rect('.product-layout--workspace .product-layout__topbar'),
         workspaceToolbar: rect('.workspace-shell__toolbar'),
         operatorRail: rect('.operator-rail'),
@@ -173,8 +199,14 @@ export async function captureF04VisualEvidence(
           ?.getAttribute('data-preview-max-height') ?? null,
         previewCollapsed: document.querySelector('.flow-workspace')
           ?.getAttribute('data-preview-collapsed') ?? null,
+        previewWidth: document.querySelector('.flow-workspace')
+          ?.getAttribute('data-preview-width') ?? null,
+        previewMinWidth: document.querySelector('.flow-workspace')
+          ?.getAttribute('data-preview-min-width') ?? null,
+        previewMaxWidth: document.querySelector('.flow-workspace')
+          ?.getAttribute('data-preview-max-width') ?? null,
         internalOverflow: {
-          operatorRail: overflow('.operator-rail'),
+          operatorRail: overflow('.operator-rail__categories'),
           flowToolbar: overflow('.flow-canvas-surface__toolbar'),
           inspectorBody: overflow('.inspector-panel__body'),
           previewBody: overflow('.preview-panel__body'),

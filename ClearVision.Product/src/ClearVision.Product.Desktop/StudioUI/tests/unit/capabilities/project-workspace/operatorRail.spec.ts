@@ -30,8 +30,8 @@ const operators = decodeOperatorCatalog([
   metadata({ type: 17, displayName: '形态学（兼容）', lifecycle: 'Legacy', defaultHidden: true })
 ]);
 
-function mountRail(readonly = false) {
-  return mount(OperatorRail, {
+async function mountRail(readonly = false) {
+  const wrapper = mount(OperatorRail, {
     props: {
       readonly,
       catalog: {
@@ -42,11 +42,13 @@ function mountRail(readonly = false) {
       }
     }
   });
+  await wrapper.get('.operator-rail__category-button[aria-label="搜索与全部算子"]').trigger('click');
+  return wrapper;
 }
 
 describe('F03 G2 Operator Rail', () => {
   it('filters by stable keywords and category, then click-adds the selected metadata', async () => {
-    const wrapper = mountRail();
+    const wrapper = await mountRail();
     await wrapper.get('[data-testid="operator-search"]').setValue('二值化');
     expect(wrapper.findAll('.operator-item')).toHaveLength(1);
     expect(wrapper.text()).toContain('全局阈值处理');
@@ -62,14 +64,25 @@ describe('F03 G2 Operator Rail', () => {
   });
 
   it('hides compatibility operators by default and exposes them explicitly', async () => {
-    const wrapper = mountRail();
+    const wrapper = await mountRail();
     expect(wrapper.text()).not.toContain('形态学（兼容）');
-    await wrapper.get('.operator-rail__compatibility input').setValue(true);
+    await wrapper.get('.operator-flyout__compatibility input').setValue(true);
     expect(wrapper.text()).toContain('形态学（兼容）');
   });
 
+  it('keeps recent and favorites as disposable UI projections over the real catalog', async () => {
+    const wrapper = await mountRail();
+    await wrapper.findAll('.operator-item')[0]!.trigger('click');
+    await wrapper.get('.operator-rail__category-button[title="最近使用的算子"]').trigger('click');
+    expect(wrapper.findAll('.operator-item')).toHaveLength(1);
+
+    await wrapper.get('.operator-flyout__favorite').trigger('click');
+    await wrapper.get('.operator-rail__category-button[title="收藏的算子"]').trigger('click');
+    expect(wrapper.findAll('.operator-item')).toHaveLength(1);
+  });
+
   it('writes a complete drag payload without a global OperatorLibrary owner', async () => {
-    const wrapper = mountRail();
+    const wrapper = await mountRail();
     const payloads = new Map<string, string>();
     const dataTransfer = {
       effectAllowed: 'none',
@@ -88,8 +101,8 @@ describe('F03 G2 Operator Rail', () => {
     expect(item.attributes('data-dragging')).toBe('false');
   });
 
-  it('disables click and drag mutations in readonly mode', () => {
-    const wrapper = mountRail(true);
+  it('disables click and drag mutations in readonly mode', async () => {
+    const wrapper = await mountRail(true);
     expect(wrapper.get('.operator-item').attributes('disabled')).toBeDefined();
     expect(wrapper.get('.operator-item').attributes('draggable')).toBe('false');
   });

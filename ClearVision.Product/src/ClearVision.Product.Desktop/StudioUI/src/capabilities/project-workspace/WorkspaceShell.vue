@@ -6,6 +6,7 @@ import {
   CvPageState,
   CvStatusBadge
 } from '@/design-system';
+import { CvIcon } from '@/design-system/icons';
 import type { WorkspaceProjectV1 } from './workspaceContracts';
 import type { WorkspaceOwner } from './workspaceOwner';
 import FlowWorkspace from './flow/FlowWorkspace.vue';
@@ -202,22 +203,77 @@ const runLabel = computed(() => {
 
       <div class="workspace-shell__commands">
         <CvButton
+          data-capability="final-decision"
+          data-testid="final-decision"
+          size="sm"
+          variant="secondary"
+          disabled
+          title="最终判定 capability 尚未接入 Studio UI Next；未创建前端替代权威"
+        >
+          <template #leading>
+            <CvIcon
+              name="decision"
+              size="sm"
+            />
+          </template>
+          最终判定
+        </CvButton>
+        <CvButton
           v-if="persistence"
           data-testid="workspace-save"
           size="sm"
+          variant="secondary"
           :disabled="!persistence.canSave"
           @click="workspaceOwner?.save()"
         >
+          <template #leading>
+            <CvIcon
+              name="save"
+              size="sm"
+            />
+          </template>
           {{ persistence.phase === 'saving' ? '保存中…' : '保存' }}
         </CvButton>
         <CvButton
           v-if="run"
           data-testid="workspace-run"
           size="sm"
+          variant="primary"
           :disabled="!run.canRun"
           @click="workspaceOwner?.runFormal()"
         >
-          正式运行
+          <template #leading>
+            <CvIcon
+              name="play"
+              size="sm"
+            />
+          </template>
+          运行
+        </CvButton>
+        <CvButton
+          v-if="run?.canStop"
+          data-testid="workspace-run-stop"
+          size="sm"
+          variant="danger"
+          @click="workspaceOwner?.stopFormal()"
+        >
+          停止运行
+        </CvButton>
+        <CvButton
+          data-capability="global-variables"
+          data-testid="global-variables"
+          size="sm"
+          variant="quiet"
+          disabled
+          title="全局变量 capability 尚未接入 Studio UI Next；工程合同仍由现有后端权威保存"
+        >
+          <template #leading>
+            <CvIcon
+              name="variables"
+              size="sm"
+            />
+          </template>
+          全局变量
         </CvButton>
         <RouterLink
           class="workspace-shell__results-link"
@@ -226,15 +282,6 @@ const runLabel = computed(() => {
         >
           当前工程结果
         </RouterLink>
-        <CvButton
-          v-if="run?.canStop"
-          data-testid="workspace-run-stop"
-          size="sm"
-          variant="quiet"
-          @click="workspaceOwner?.stopFormal()"
-        >
-          停止运行
-        </CvButton>
         <CvButton
           v-if="run?.canReconcile"
           data-testid="workspace-run-reconcile"
@@ -381,6 +428,14 @@ const runLabel = computed(() => {
     </div>
 
     <footer class="workspace-shell__statusbar">
+      <span
+        class="workspace-shell__project-status"
+        :title="currentProject ? `工程：${currentProject.name}；版本：${currentProject.version}` : `工程 ID：${projectId}`"
+      >工程：{{ currentProject?.name ?? projectId }}</span>
+      <span
+        class="workspace-shell__status-divider"
+        aria-hidden="true"
+      />
       <CvStatusBadge
         :tone="persistenceTone"
         :label="persistenceLabel"
@@ -453,6 +508,10 @@ const runLabel = computed(() => {
   align-items: center;
   gap: var(--cv-space-1);
 }
+.workspace-shell__commands :deep(.cv-button) { flex: 0 0 auto; }
+.workspace-shell__commands :deep(.cv-button:not(.cv-button--primary)) { background: var(--cv-surface-raised); }
+.workspace-shell__commands :deep(.cv-button--primary) { background: var(--cv-color-industrial-blue); border-color: var(--cv-color-industrial-blue); }
+.workspace-shell__commands :deep(.cv-button--primary:hover:not(:disabled)) { background: var(--cv-color-industrial-blue-hover); border-color: var(--cv-color-industrial-blue-hover); }
 
 .workspace-shell__identity > div { min-width: 0; }
 .workspace-shell__identity strong,
@@ -593,6 +652,8 @@ const runLabel = computed(() => {
   font-size: var(--cv-font-size-2xs);
   white-space: nowrap;
 }
+.workspace-shell__project-status { max-width: 240px; overflow: hidden; color: var(--cv-text-secondary); text-overflow: ellipsis; }
+.workspace-shell__status-divider { width: 1px; height: 12px; flex: 0 0 auto; background: var(--cv-border-subtle); }
 .workspace-shell__statusbar :deep(.cv-status-badge) {
   min-height: 18px;
   padding: 0 6px;
@@ -646,4 +707,5 @@ const runLabel = computed(() => {
   .workspace-shell__center { grid-template-rows: minmax(280px, 1fr) 36px; }
   .workspace-shell__preview { padding-block: var(--cv-space-2); }
 }
+
 </style>

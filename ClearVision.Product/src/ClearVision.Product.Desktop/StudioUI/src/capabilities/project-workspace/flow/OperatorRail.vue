@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
 import type { OperatorCatalogItem, OperatorCategoryId } from '@/capabilities/operators-read/operatorContracts';
-import {
-  operatorCategoryLabels,
-  operatorLifecycleLabels
-} from '@/capabilities/operators-read/operatorViewModel';
-import { CvIconButton, CvSearchField } from '@/design-system';
+import { operatorCategoryLabels } from '@/capabilities/operators-read/operatorViewModel';
 import { CvIcon } from '@/design-system/icons';
-import WorkspacePaneHeader from '../WorkspacePaneHeader.vue';
+import type { CvIconName } from '@/design-system/icons';
 import type { OperatorCatalogProjection } from './flowCanvasOwner';
+import OperatorFlyout from './OperatorFlyout.vue';
+
+type OperatorRailMode = 'all' | 'recent' | 'favorites' | 'category';
 
 const props = defineProps<{
   catalog: OperatorCatalogProjection;
@@ -20,10 +19,37 @@ const emit = defineEmits<{
   refresh: [];
 }>();
 
+const favoritesStorageKey = 'clearvision.studio-ui.operator-favorites.v1';
+const recentLimit = 12;
 const search = shallowRef('');
 const activeCategory = shallowRef<'' | OperatorCategoryId>('');
+const activeMode = shallowRef<OperatorRailMode>('all');
 const showCompatibility = shallowRef(false);
 const draggingOperatorType = shallowRef<string | null>(null);
+const flyoutOpen = shallowRef(false);
+const recentOperatorTypes = shallowRef<readonly string[]>([]);
+const favoriteOperatorTypes = shallowRef<readonly string[]>(readFavorites());
+
+function readFavorites(): readonly string[] {
+  try {
+    const raw = globalThis.localStorage?.getItem(favoritesStorageKey);
+    if (!raw) return Object.freeze([]);
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? Object.freeze(parsed.filter(value => typeof value === 'string'))
+      : Object.freeze([]);
+  } catch {
+    return Object.freeze([]);
+  }
+}
+
+function persistFavorites(values: readonly string[]): void {
+  try {
+    globalThis.localStorage?.setItem(favoritesStorageKey, JSON.stringify(values));
+  } catch {
+    // Favorites are a disposable UI preference; storage failure is non-fatal.
+  }
+}
 
 function normalized(value: string | null | undefined): string {
   return (value ?? '').trim().toLocaleLowerCase('zh-CN');
@@ -54,9 +80,14 @@ const availableOperators = computed(() => props.catalog.operators.filter(operato
 
 const visibleOperators = computed(() => {
   const query = normalized(search.value);
-  return availableOperators.value.filter(operator =>
-    (!activeCategory.value || operator.categoryId === activeCategory.value) &&
-    matches(operator, query));
+  const recent = new Set(recentOperatorTypes.value);
+  const favorites = new Set(favoriteOperatorTypes.value);
+  return availableOperators.value.filter(operator => {
+    if (activeMode.value === 'recent' && !recent.has(operator.operatorType)) return false;
+    if (activeMode.value === 'favorites' && !favorites.has(operator.operatorType)) return false;
+    if (activeMode.value === 'category' && activeCategory.value && operator.categoryId !== activeCategory.value) return false;
+    return matches(operator, query);
+  });
 });
 
 const categories = computed(() => {
@@ -69,12 +100,59 @@ const categories = computed(() => {
     .filter(item => item.count > 0);
 });
 
-const categoryLabel = computed(() => activeCategory.value
-  ? operatorCategoryLabels[activeCategory.value]
-  : '全部分类');
-const operatorCountLabel = computed(() => visibleOperators.value.length === availableOperators.value.length
-  ? `${availableOperators.value.length} 项`
-  : `${visibleOperators.value.length} / ${availableOperators.value.length}`);
+const activeLabel = computed(() => {
+  if (activeMode.value === 'recent') return '最近使用';
+  if (activeMode.value === 'favorites') return '收藏算子';
+  if (activeMode.value === 'category' && activeCategory.value) return operatorCategoryLabels[activeCategory.value];
+  return search.value ? '搜索结果' : '全部算子';
+});
+
+function categoryIcon(category: OperatorCategoryId): CvIconName {
+  if (category === 'Acquisition') return 'camera';
+  if (category === 'ImagePreprocessing' || category === 'DataProcessing') return 'sliders';
+  if (category === 'SegmentationAndRegion') return 'region';
+  if (category === 'Measurement' || category === 'CalibrationAndCoordinates') return 'measure';
+  if (category === 'MatchingAndLocalization' || category === 'DefectDetection') return 'filter';
+  if (category === 'AiInference') return 'spark';
+  return 'operators';
+}
+
+function openMode(mode: OperatorRailMode, category: '' | OperatorCategoryId = ''): void {
+  activeMode.value = mode;
+  activeCategory.value = category;
+  flyoutOpen.value = true;
+}
+
+function updateSearch(value: string): void {
+  search.value = value;
+  if (value.trim()) {
+    activeMode.value = 'all';
+    activeCategory.value = '';
+    flyoutOpen.value = true;
+  }
+}
+
+function updateCategory(value: '' | OperatorCategoryId): void {
+  activeCategory.value = value;
+  activeMode.value = value ? 'category' : 'all';
+  flyoutOpen.value = true;
+}
+
+function addOperator(operator: OperatorCatalogItem): void {
+  recentOperatorTypes.value = Object.freeze([
+    operator.operatorType,
+    ...recentOperatorTypes.value.filter(type => type !== operator.operatorType)
+  ].slice(0, recentLimit));
+  emit('add', operator);
+}
+
+function toggleFavorite(operatorType: string): void {
+  const current = new Set(favoriteOperatorTypes.value);
+  if (current.has(operatorType)) current.delete(operatorType);
+  else current.add(operatorType);
+  favoriteOperatorTypes.value = Object.freeze([...current]);
+  persistFavorites(favoriteOperatorTypes.value);
+}
 
 function dragPayload(operator: OperatorCatalogItem): string {
   return JSON.stringify({
@@ -101,309 +179,137 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
   event.dataTransfer.setData('application/json', payload);
   event.dataTransfer.setData('text/plain', operator.displayName);
 }
-
-function finishDrag(): void {
-  draggingOperatorType.value = null;
-}
 </script>
 
 <template>
   <aside
     class="operator-rail"
+    data-capability="operator-rail"
     data-evidence-surface="f03-g2-operator-rail"
     :data-catalog-phase="catalog.phase"
     :data-operator-count="visibleOperators.length"
     :data-active-category="activeCategory || 'all'"
     :data-dragging-operator="draggingOperatorType ?? ''"
+    :data-flyout-open="flyoutOpen"
   >
-    <WorkspacePaneHeader
-      title="算子"
-      :detail="operatorCountLabel"
-    >
-      <CvIconButton
-        size="sm"
-        label="刷新算子目录"
-        title="重新读取算子目录"
-        :loading="catalog.isRefreshing"
-        @click="emit('refresh')"
-      >
-        <CvIcon
-          name="refresh"
-          size="sm"
-        />
-      </CvIconButton>
-    </WorkspacePaneHeader>
-
-    <div class="operator-rail__controls">
-      <CvSearchField
-        v-model="search"
-        name="operator-search"
-        label="搜索算子"
-        placeholder="名称、类型或参数…"
-        input-test-id="operator-search"
-      />
-
-      <label class="operator-rail__category">
-        <span>分类</span>
-        <select
-          v-model="activeCategory"
-          name="operator-category"
-          data-testid="operator-category"
-        >
-          <option value="">全部分类（{{ availableOperators.length }}）</option>
-          <option
-            v-for="category in categories"
-            :key="category.id"
-            :value="category.id"
-            :data-category="category.id"
-          >
-            {{ category.label }}（{{ category.count }}）
-          </option>
-        </select>
-        <CvIcon
-          class="operator-rail__category-chevron"
-          name="chevron-right"
-          size="sm"
-        />
-      </label>
-
-      <label class="operator-rail__compatibility">
-        <input
-          v-model="showCompatibility"
-          type="checkbox"
-          name="operator-compatibility"
-        >
-        <span>显示兼容算子</span>
-      </label>
-    </div>
-
-    <div class="operator-rail__list-heading">
-      <strong>{{ categoryLabel }}</strong>
-      <small>单击添加 · 拖动定位</small>
-    </div>
-
-    <p
-      v-if="catalog.message"
-      class="operator-rail__message"
-      aria-live="polite"
-    >
-      {{ catalog.message }}
-    </p>
-
-    <div
-      class="operator-rail__list"
-      aria-label="算子列表"
+    <nav
+      class="operator-rail__categories"
+      aria-label="算子分类"
     >
       <button
-        v-for="operator in visibleOperators"
-        :key="operator.operatorType"
         type="button"
-        class="operator-item operator-rail__item"
-        :class="{ 'is-dragging': draggingOperatorType === operator.operatorType }"
-        :data-type="operator.operatorType"
-        :data-name="operator.displayName"
-        :data-operator="dragPayload(operator)"
-        :data-dragging="draggingOperatorType === operator.operatorType"
-        :draggable="!readonly"
-        :disabled="readonly"
-        :title="readonly ? '当前工作区只读，不能添加算子' : `${operator.displayName}：单击添加到画布，或拖动到指定位置`"
-        @click="emit('add', operator)"
-        @dragstart="startDrag($event, operator)"
-        @dragend="finishDrag"
+        class="operator-rail__category-button"
+        :class="{ 'is-active': flyoutOpen && activeMode === 'all' }"
+        title="搜索与全部算子"
+        aria-label="搜索与全部算子"
+        @click="openMode('all')"
       >
-        <span class="operator-rail__drag-handle">
-          <CvIcon
-            name="drag"
-            size="sm"
-          />
-        </span>
-        <span class="operator-rail__item-content">
-          <span class="operator-rail__item-main">
-            <strong :title="operator.displayName">{{ operator.displayName }}</strong>
-            <em :data-lifecycle="operator.lifecycle">{{ operatorLifecycleLabels[operator.lifecycle] }}</em>
-          </span>
-          <span
-            class="operator-rail__item-description"
-            :title="operator.description || operator.operatorType"
-          >{{ operator.description || operator.operatorType }}</span>
-          <span class="operator-rail__item-meta">
-            <small>{{ operatorCategoryLabels[operator.categoryId] }}</small>
-            <code
-              translate="no"
-              :title="operator.operatorType"
-            >{{ operator.operatorType }}</code>
-          </span>
-        </span>
+        <CvIcon
+          name="search"
+          size="md"
+        />
+        <span>搜索</span>
       </button>
-      <p
-        v-if="catalog.operators.length > 0 && visibleOperators.length === 0"
-        class="operator-rail__empty"
+      <button
+        type="button"
+        class="operator-rail__category-button"
+        :class="{ 'is-active': flyoutOpen && activeMode === 'recent' }"
+        title="最近使用的算子"
+        @click="openMode('recent')"
       >
-        <strong>没有匹配的算子</strong>
-        <span>调整关键词、分类或兼容算子选项后重试。</span>
-      </p>
-    </div>
+        <CvIcon
+          name="clock"
+          size="md"
+        />
+        <span>最近</span>
+      </button>
+      <button
+        type="button"
+        class="operator-rail__category-button"
+        :class="{ 'is-active': flyoutOpen && activeMode === 'favorites' }"
+        title="收藏的算子"
+        @click="openMode('favorites')"
+      >
+        <CvIcon
+          name="star"
+          size="md"
+        />
+        <span>收藏</span>
+      </button>
+      <span
+        class="operator-rail__separator"
+        aria-hidden="true"
+      />
+      <button
+        v-for="category in categories"
+        :key="category.id"
+        type="button"
+        class="operator-rail__category-button"
+        :class="{ 'is-active': flyoutOpen && activeMode === 'category' && activeCategory === category.id }"
+        :title="`${category.label}（${category.count}）`"
+        @click="openMode('category', category.id)"
+      >
+        <CvIcon
+          :name="categoryIcon(category.id)"
+          size="md"
+        />
+        <span>{{ category.label }}</span>
+      </button>
+    </nav>
+
+    <OperatorFlyout
+      v-if="flyoutOpen"
+      class="operator-rail__flyout"
+      :operators="visibleOperators"
+      :available-count="availableOperators.length"
+      :categories="categories"
+      :active-category="activeCategory"
+      :active-label="activeLabel"
+      :search="search"
+      :show-compatibility="showCompatibility"
+      :readonly="readonly"
+      :refreshing="catalog.isRefreshing"
+      :message="catalog.message"
+      :dragging-operator-type="draggingOperatorType"
+      :favorite-operator-types="favoriteOperatorTypes"
+      @close="flyoutOpen = false"
+      @refresh="emit('refresh')"
+      @add="addOperator"
+      @toggle-favorite="toggleFavorite"
+      @drag-start="startDrag"
+      @drag-end="draggingOperatorType = null"
+      @update:search="updateSearch"
+      @update:active-category="updateCategory"
+      @update:show-compatibility="showCompatibility = $event"
+    />
   </aside>
 </template>
 
 <style scoped>
 .operator-rail {
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr);
-  overflow: hidden;
-  border-right: 1px solid var(--cv-border-subtle);
-  background: var(--cv-surface-raised);
-}
-
-.operator-rail__controls {
-  display: grid;
-  gap: var(--cv-space-2);
-  padding: var(--cv-space-2) var(--cv-space-3);
-  border-bottom: 1px solid var(--cv-border-subtle);
-}
-
-.operator-rail__controls :deep(.cv-search-field) { min-width: 0; gap: 0; }
-.operator-rail__controls :deep(.cv-search-field__control) { height: 30px; font-size: var(--cv-font-size-xs); }
-.operator-rail__category {
   position: relative;
+  width: var(--cv-workspace-operator-rail-width);
   min-width: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--cv-space-2);
-  color: var(--cv-text-muted);
-  font-size: var(--cv-font-size-2xs);
-}
-.operator-rail__category select {
-  width: 100%;
-  min-width: 0;
-  height: 28px;
-  padding: 0 26px 0 var(--cv-space-2);
-  appearance: none;
-  border: 1px solid var(--cv-border-default);
-  border-radius: var(--cv-radius-sm);
-  background: var(--cv-surface-page);
-  color: var(--cv-text-primary);
-  font: inherit;
-  font-size: var(--cv-font-size-xs);
-}
-.operator-rail__category select:hover { border-color: var(--cv-control-border-hover); }
-.operator-rail__category select:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
-.operator-rail__category-chevron {
-  position: absolute;
-  right: var(--cv-space-2);
-  color: var(--cv-text-muted);
-  pointer-events: none;
-  transform: rotate(90deg);
-}
-.operator-rail__compatibility {
-  min-height: 22px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--cv-space-2);
-  color: var(--cv-text-secondary);
-  font-size: var(--cv-font-size-2xs);
-  cursor: pointer;
-}
-.operator-rail__compatibility input { margin: 0; }
-
-.operator-rail__list-heading {
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--cv-space-2);
-  padding: 7px var(--cv-space-3) 5px;
-  color: var(--cv-text-muted);
-}
-.operator-rail__list-heading strong {
-  overflow: hidden;
-  color: var(--cv-text-secondary);
-  font-size: var(--cv-font-size-2xs);
-  font-weight: var(--cv-font-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.operator-rail__list-heading small { flex: 0 0 auto; font-size: 9px; }
-
-.operator-rail__list {
-  grid-row: 5;
   min-height: 0;
-  padding: 0 var(--cv-space-2) var(--cv-space-2);
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  overflow: visible;
+  border-right: 1px solid var(--cv-shell-sidebar-border);
+  background: var(--cv-shell-sidebar);
+  color: var(--cv-shell-sidebar-muted);
 }
-.operator-rail__item {
-  width: 100%;
-  min-width: 0;
-  min-height: 58px;
-  padding: var(--cv-space-2) var(--cv-space-1);
-  display: grid;
-  grid-template-columns: 14px minmax(0, 1fr);
-  align-items: start;
-  gap: var(--cv-space-1);
-  text-align: left;
-  border: 0;
-  border-bottom: 1px solid var(--cv-border-subtle);
-  border-radius: var(--cv-radius-xs);
-  background: transparent;
-  color: var(--cv-text-primary);
-  cursor: grab;
-  content-visibility: auto;
-  contain-intrinsic-size: 58px;
-  touch-action: manipulation;
-  user-select: none;
-  transition:
-    background var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
-    color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
-    opacity var(--cv-motion-duration-fast) var(--cv-motion-ease-standard);
-}
-.operator-rail__item:hover:not(:disabled) { background: var(--cv-interactive-hover); }
-.operator-rail__item:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
-.operator-rail__item:active:not(:disabled) { background: var(--cv-interactive-active); cursor: grabbing; }
-.operator-rail__item.is-dragging { background: var(--cv-color-brand-soft); color: var(--cv-color-brand-text); opacity: 0.72; }
-.operator-rail__item:disabled { color: var(--cv-text-muted); cursor: not-allowed; opacity: 0.58; }
-.operator-rail__drag-handle { padding-top: 1px; color: var(--cv-text-muted); }
-.operator-rail__item-content { min-width: 0; display: grid; gap: 3px; }
-.operator-rail__item-main,
-.operator-rail__item-meta { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-2); }
-.operator-rail__item-main strong,
-.operator-rail__item-description,
-.operator-rail__item-meta code,
-.operator-rail__item-meta small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.operator-rail__item-main strong { font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
-.operator-rail__item-main em {
-  flex: 0 0 auto;
-  color: var(--cv-text-muted);
-  font-size: 9px;
-  font-style: normal;
-}
-.operator-rail__item-main em[data-lifecycle="Experimental"],
-.operator-rail__item-main em[data-lifecycle="Reference"] { color: var(--cv-color-status-info-strong); }
-.operator-rail__item-main em[data-lifecycle="Legacy"],
-.operator-rail__item-main em[data-lifecycle="Deprecated"] { color: var(--cv-color-status-warning-strong); }
-.operator-rail__item-description { color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); line-height: 1.35; }
-.operator-rail__item-meta { color: var(--cv-text-muted); font-size: 9px; }
-.operator-rail__item-meta code { min-width: 0; font-family: var(--cv-font-mono); font-size: 9px; }
-.operator-rail__item-meta small { max-width: 48%; }
+.operator-rail__categories { width: 100%; height: 100%; padding: var(--cv-space-2) 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; }
+.operator-rail__categories::-webkit-scrollbar { display: none; }
+.operator-rail__category-button { position: relative; width: 100%; min-height: 44px; padding: 4px 2px; display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 0; background: transparent; color: var(--cv-shell-sidebar-muted); font: inherit; cursor: pointer; }
+.operator-rail__category-button::before { position: absolute; inset: 8px auto 8px 0; width: 3px; border-radius: 0 var(--cv-radius-pill) var(--cv-radius-pill) 0; background: transparent; content: ''; }
+.operator-rail__category-button span { width: 100%; overflow: hidden; font-size: 9px; line-height: 1.15; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.operator-rail__category-button:hover { background: var(--cv-shell-sidebar-hover); color: var(--cv-shell-sidebar-text); }
+.operator-rail__category-button.is-active { background: rgba(182, 69, 60, 0.13); color: #e07168; }
+.operator-rail__category-button.is-active::before { background: var(--cv-color-brand-500); }
+.operator-rail__category-button:focus-visible { outline: 2px solid #9bbdd1; outline-offset: -2px; }
+.operator-rail__separator { height: 1px; margin: 5px var(--cv-space-2); flex: 0 0 auto; background: var(--cv-shell-sidebar-border); }
+.operator-rail__flyout { position: absolute; z-index: calc(var(--cv-z-dropdown) - 1); inset: 0 auto 0 100%; }
 
-.operator-rail__message,
-.operator-rail__empty {
-  margin: 0;
-  padding: var(--cv-space-2) var(--cv-space-3);
-  color: var(--cv-text-muted);
-  font-size: var(--cv-font-size-2xs);
-  line-height: 1.45;
-  overflow-wrap: anywhere;
+@media (max-height: 760px) {
+  .operator-rail__categories { padding-block: var(--cv-space-1); }
+  .operator-rail__category-button { min-height: 39px; }
 }
-.operator-rail__empty { display: grid; align-content: start; gap: var(--cv-space-1); }
-.operator-rail__empty strong { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 </style>

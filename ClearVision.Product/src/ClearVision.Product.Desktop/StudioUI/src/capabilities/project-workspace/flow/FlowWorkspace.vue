@@ -19,7 +19,7 @@ import PreviewPanel from '../preview/PreviewPanel.vue';
 import {
   createWorkspaceLayoutOwner,
   workspaceInspectorDefaultWidth,
-  workspacePreviewDefaultHeight
+  workspacePreviewDefaultWidth
 } from './workspaceLayoutOwner';
 
 const props = defineProps<{
@@ -44,6 +44,7 @@ const canvasId = `flow-canvas-${props.project.id.replaceAll('-', '')}`;
 const isReadonly = computed(() => projection.mutationGate !== 'editable');
 const workspaceStyle = computed(() => ({
   '--workspace-inspector-width': `${layout.inspectorWidth}px`,
+  '--workspace-preview-width': `${layout.previewCollapsed ? 44 : layout.previewWidth}px`,
   '--workspace-preview-height': `${layout.previewCollapsed ? 38 : layout.previewHeight}px`
 }) as CSSProperties);
 
@@ -140,6 +141,11 @@ onBeforeUnmount(() => layoutOwner.dispose());
     :data-preview-min-height="layout.previewMinHeight"
     :data-preview-max-height="layout.previewMaxHeight"
     :data-preview-collapsed="layout.previewCollapsed"
+    :data-preview-width="layout.previewCollapsed ? 44 : layout.previewWidth"
+    :data-preview-min-width="layout.previewMinWidth"
+    :data-preview-max-width="layout.previewMaxWidth"
+    :data-container-width="layout.containerWidth"
+    :data-container-height="layout.containerHeight"
     @keydown.esc="closeNarrowPane"
   >
     <div
@@ -155,6 +161,30 @@ onBeforeUnmount(() => layoutOwner.dispose());
         @refresh="flowOwner.refreshOperators(true)"
       />
     </div>
+
+    <div
+      id="workspace-inspector-pane"
+      ref="inspectorHost"
+      class="flow-workspace__inspector-host"
+      tabindex="-1"
+    >
+      <InspectorPanel :owner="inspectorOwner" />
+    </div>
+
+    <CvSplitter
+      class="flow-workspace__inspector-splitter"
+      data-workspace-splitter="inspector"
+      orientation="vertical"
+      :model-value="layout.inspectorWidth"
+      :min="layout.inspectorMinWidth"
+      :max="layout.inspectorMaxWidth"
+      :default-value="workspaceInspectorDefaultWidth"
+      label="调整属性检查器宽度"
+      :value-text="`属性检查器宽度 ${layout.inspectorWidth} 像素`"
+      help-text="拖动调整属性检查器宽度；方向键微调，Shift 加速，Home 最窄，End 最宽，Enter 或双击恢复默认宽度"
+      @update:model-value="layoutOwner.setInspectorWidth"
+      @resize-end="layoutOwner.commit"
+    />
 
     <div class="flow-workspace__center">
       <FlowCanvasSurface
@@ -174,56 +204,31 @@ onBeforeUnmount(() => layoutOwner.dispose());
         @zoom-out="flowOwner.commands.zoomOut"
         @reset-view="flowOwner.commands.resetView"
       />
-
-      <CvSplitter
-        v-show="!layout.previewCollapsed"
-        class="flow-workspace__preview-splitter"
-        data-workspace-splitter="preview"
-        orientation="horizontal"
-        reversed
-        :model-value="layout.previewHeight"
-        :min="layout.previewMinHeight"
-        :max="layout.previewMaxHeight"
-        :default-value="workspacePreviewDefaultHeight"
-        label="调整预览区高度"
-        :value-text="`预览区高度 ${layout.previewHeight} 像素`"
-        help-text="拖动调整预览区高度；方向键微调，Shift 加速，Home 最小，End 最大，Enter 或双击恢复默认高度"
-        @update:model-value="layoutOwner.setPreviewHeight"
-        @resize-end="layoutOwner.commit"
-      />
-
-      <PreviewPanel
-        class="flow-workspace__preview"
-        :owner="previewWorkbenchOwner"
-        :collapsed="layout.previewCollapsed"
-        @toggle-collapsed="layoutOwner.togglePreviewCollapsed"
-      />
     </div>
 
     <CvSplitter
-      class="flow-workspace__inspector-splitter"
-      data-workspace-splitter="inspector"
+      v-show="!layout.previewCollapsed"
+      class="flow-workspace__preview-splitter"
+      data-workspace-splitter="preview"
       orientation="vertical"
       reversed
-      :model-value="layout.inspectorWidth"
-      :min="layout.inspectorMinWidth"
-      :max="layout.inspectorMaxWidth"
-      :default-value="workspaceInspectorDefaultWidth"
-      label="调整属性检查器宽度"
-      :value-text="`属性检查器宽度 ${layout.inspectorWidth} 像素`"
-      help-text="拖动调整属性检查器宽度；方向键微调，Shift 加速，Home 最窄，End 最宽，Enter 或双击恢复默认宽度"
-      @update:model-value="layoutOwner.setInspectorWidth"
+      :model-value="layout.previewWidth"
+      :min="layout.previewMinWidth"
+      :max="layout.previewMaxWidth"
+      :default-value="workspacePreviewDefaultWidth"
+      label="调整预览工作台宽度"
+      :value-text="`预览工作台宽度 ${layout.previewWidth} 像素`"
+      help-text="拖动调整预览工作台宽度；方向键微调，Shift 加速，Home 最窄，End 最宽，Enter 或双击恢复默认宽度"
+      @update:model-value="layoutOwner.setPreviewWidth"
       @resize-end="layoutOwner.commit"
     />
 
-    <div
-      id="workspace-inspector-pane"
-      ref="inspectorHost"
-      class="flow-workspace__inspector-host"
-      tabindex="-1"
-    >
-      <InspectorPanel :owner="inspectorOwner" />
-    </div>
+    <PreviewPanel
+      class="flow-workspace__preview"
+      :owner="previewWorkbenchOwner"
+      :collapsed="layout.previewCollapsed"
+      @toggle-collapsed="layoutOwner.togglePreviewCollapsed"
+    />
 
     <button
       ref="narrowRailToggle"
@@ -255,32 +260,31 @@ onBeforeUnmount(() => layoutOwner.dispose());
   min-height: 0;
   display: grid;
   grid-template-columns:
-    minmax(180px, 210px)
-    minmax(600px, 1fr)
+    var(--cv-workspace-operator-rail-width)
+    var(--workspace-inspector-width)
     8px
-    var(--workspace-inspector-width);
+    minmax(560px, 1fr)
+    8px
+    var(--workspace-preview-width);
   overflow: hidden;
   background: var(--cv-surface-page);
 }
 .flow-workspace__rail-host,
 .flow-workspace__center,
-.flow-workspace__inspector-host { min-width: 0; min-height: 0; }
-.flow-workspace__rail-host,
+.flow-workspace__inspector-host,
+.flow-workspace__preview { min-width: 0; min-height: 0; }
+.flow-workspace__rail-host { position: relative; z-index: calc(var(--cv-z-dropdown) - 1); overflow: visible; outline: none; }
 .flow-workspace__inspector-host { overflow: hidden; outline: none; }
 .flow-workspace__center {
-  display: grid;
-  grid-template-rows: minmax(352px, 1fr) 8px var(--workspace-preview-height);
+  display: block;
   overflow: hidden;
 }
-.flow-workspace__canvas { grid-row: 1; }
-.flow-workspace__preview-splitter { grid-row: 2; }
-.flow-workspace__preview { grid-row: 3; }
-.flow-workspace--preview-collapsed .flow-workspace__center {
-  grid-template-rows: minmax(352px, 1fr) 0 38px;
-}
+.flow-workspace__canvas { width: 100%; height: 100%; }
+.flow-workspace__preview { border-left: 1px solid var(--cv-border-subtle); }
 .flow-workspace__preview-splitter,
 .flow-workspace__inspector-splitter { z-index: 2; align-self: stretch; }
 .flow-workspace__inspector-host > :deep(.inspector-panel) { width: 100%; height: 100%; }
+.flow-workspace__preview > :deep(.preview-panel) { width: 100%; height: 100%; }
 .flow-workspace__rail-host:focus-visible,
 .flow-workspace__inspector-host:focus-visible { box-shadow: inset 0 0 0 2px var(--cv-focus-ring-color); }
 .flow-workspace__narrow-pane-toggle {
@@ -305,41 +309,51 @@ onBeforeUnmount(() => layoutOwner.dispose());
 @media (max-width: 1180px) {
   .flow-workspace {
     grid-template-columns:
-      176px
-      minmax(520px, 1fr)
+      var(--cv-workspace-operator-rail-width)
+      minmax(500px, 1fr)
       8px
-      var(--workspace-inspector-width);
+      var(--workspace-preview-width);
   }
-}
-
-@media (max-width: 980px) {
-  .flow-workspace { grid-template-columns: 176px minmax(0, 1fr); }
   .flow-workspace__inspector-splitter,
   .flow-workspace__inspector-host { display: none; }
   .flow-workspace__narrow-pane-toggle--inspector { display: inline-flex; align-items: center; }
   .flow-workspace--narrow-inspector-open .flow-workspace__inspector-host {
     position: absolute;
-    z-index: var(--cv-z-sticky);
-    inset: 34px 0 0 auto;
-    width: min(var(--workspace-inspector-width), calc(100% - 48px));
+    z-index: calc(var(--cv-z-sticky) + 2);
+    inset: 36px auto 0 var(--cv-workspace-operator-rail-width);
+    width: min(var(--workspace-inspector-width), calc(100% - var(--cv-workspace-operator-rail-width) - 48px));
     display: grid;
     overscroll-behavior: contain;
-    box-shadow: var(--cv-elevation-2);
+    border-right: 1px solid var(--cv-border-default);
+    background: var(--cv-surface-raised);
+    box-shadow: 0 4px 12px rgba(37, 55, 72, 0.16);
   }
 }
 
-@media (max-width: 760px) {
-  .flow-workspace { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 820px) {
+  .flow-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(320px, 1fr) 8px var(--workspace-preview-height);
+  }
   .flow-workspace__rail-host { display: none; }
+  .flow-workspace__center { grid-row: 1; }
+  .flow-workspace__preview-splitter {
+    grid-row: 2;
+    display: grid !important;
+    width: auto;
+    height: 8px;
+  }
+  .flow-workspace__preview { grid-row: 3; width: 100%; border-top: 1px solid var(--cv-border-subtle); border-left: 0; }
   .flow-workspace__narrow-pane-toggle--rail { display: inline-flex; align-items: center; }
   .flow-workspace--narrow-rail-open .flow-workspace__rail-host {
     position: absolute;
-    z-index: var(--cv-z-sticky);
-    inset: 34px auto 0 0;
-    width: min(220px, calc(100% - 48px));
+    z-index: calc(var(--cv-z-sticky) + 2);
+    inset: 36px auto 0 0;
+    width: var(--cv-workspace-operator-rail-width);
     display: block;
     overscroll-behavior: contain;
-    box-shadow: var(--cv-elevation-2);
+    box-shadow: 0 4px 12px rgba(37, 55, 72, 0.16);
   }
+  .flow-workspace--preview-collapsed { grid-template-rows: minmax(320px, 1fr) 0 38px; }
 }
 </style>

@@ -612,8 +612,15 @@ async function readFlowSurface(page) {
 }
 
 async function resetOperatorRailFilters(page) {
+  await ensureOperatorFlyout(page);
   await page.locator('[data-testid="operator-search"]').fill('');
   await page.locator('.operator-rail__categories button').first().click();
+}
+
+async function ensureOperatorFlyout(page) {
+  if (await page.locator('[data-capability="operator-flyout"]').count()) return;
+  await page.getByRole('button', { name: '搜索与全部算子' }).click();
+  await page.locator('[data-capability="operator-flyout"]').waitFor({ state: 'visible' });
 }
 
 async function readOperatorDefinition(page, typeCandidates) {
@@ -622,7 +629,7 @@ async function readOperatorDefinition(page, typeCandidates) {
   await resetOperatorRailFilters(page);
   let item = page.locator(selector);
   if (await item.count() === 0) {
-    const compatibility = page.locator('.operator-rail__compatibility input');
+    const compatibility = page.locator('.operator-flyout__compatibility input');
     if (!(await compatibility.isChecked())) await compatibility.check();
     item = page.locator(selector);
   }

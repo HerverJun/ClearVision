@@ -565,9 +565,16 @@ async function workspaceDiagnostics(page: Page) {
 }
 
 async function searchOperator(page: Page, value: string) {
+  await ensureOperatorFlyout(page);
   const search = page.locator('[data-testid="operator-search"]');
   await search.fill(value);
   return page.locator('.operator-item');
+}
+
+async function ensureOperatorFlyout(page: Page): Promise<void> {
+  if (await page.locator('[data-capability="operator-flyout"]').count()) return;
+  await page.getByRole('button', { name: '搜索与全部算子' }).click();
+  await expect(page.locator('[data-capability="operator-flyout"]')).toBeVisible();
 }
 
 async function dragOperator(page: Page, name: string, x: number, y: number) {
@@ -1034,6 +1041,7 @@ test('Operator Rail supports search, category, click-add and drag-add', async ({
   await expect(canvas).toHaveAttribute('data-node-count', '1');
   await expect(canvas).toHaveAttribute('data-flow-revision', '1');
 
+  await ensureOperatorFlyout(page);
   await page.locator('[data-testid="operator-search"]').fill('');
   await page.locator('[data-testid="operator-category"]').selectOption('SegmentationAndRegion');
   await expect(page.locator('.operator-item')).toHaveCount(3);
@@ -1071,6 +1079,7 @@ test('node selection, move, copy/paste, undo/redo, delete and focus/IME gates st
   await page.keyboard.press('Control+y');
   await expect(surface).toHaveAttribute('data-node-count', '2');
 
+  await ensureOperatorFlyout(page);
   const search = page.locator('[data-testid="operator-search"]');
   await search.focus();
   await page.keyboard.press('Control+a');
@@ -2851,6 +2860,7 @@ test('Prompt 3 refines Operator Rail and populated Inspector across width and lo
   const workspace = page.locator('.flow-workspace');
   const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
   const inspectorSplitter = page.locator('[data-workspace-splitter="inspector"]');
+  await ensureOperatorFlyout(page);
   const search = page.locator('[data-testid="operator-search"]');
   const category = page.locator('[data-testid="operator-category"]');
 
@@ -2872,6 +2882,8 @@ test('Prompt 3 refines Operator Rail and populated Inspector across width and lo
   await operator.dispatchEvent('dragend');
   await search.fill('');
   await category.selectOption('');
+  await page.getByRole('button', { name: '关闭算子面板' }).click();
+  await expect(page.locator('[data-capability="operator-flyout"]')).toHaveCount(0);
 
   await selectInspectorNode(page, 120, 125);
   await expect(inspector).toHaveAttribute('data-inspector-mode', 'node');
@@ -2909,7 +2921,7 @@ test('Prompt 3 refines Operator Rail and populated Inspector across width and lo
   }
 
   const internalOverflow = await page.evaluate(() => Object.fromEntries([
-    ['operator', document.querySelector('.operator-rail')],
+    ['operator', document.querySelector('.operator-rail__categories')],
     ['flowToolbar', document.querySelector('.flow-canvas-surface__toolbar')],
     ['inspector', document.querySelector('.inspector-panel__body')]
   ].map(([key, element]) => [key, element ? element.scrollWidth - element.clientWidth : null])));
@@ -3111,7 +3123,7 @@ for (const scenario of [
     });
     expect(layout.toolbar?.top).toBeGreaterThanOrEqual(0);
     expect(layout.status?.bottom).toBeLessThanOrEqual(viewport.height + 1);
-    expect(layout.topbar?.height).toBeLessThanOrEqual(density === 'comfortable' ? 44 : 40);
+    expect(layout.topbar?.height).toBeLessThanOrEqual(density === 'comfortable' ? 56 : 52);
     expect(layout.saveVisible).toBe(true);
     expect(layout.runVisible).toBe(true);
     expect(layout.inspector?.width).toBeGreaterThanOrEqual(248);

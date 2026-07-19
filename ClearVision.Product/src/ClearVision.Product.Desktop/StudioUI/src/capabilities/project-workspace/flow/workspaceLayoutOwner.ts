@@ -8,12 +8,16 @@ export const workspacePreviewCollapsedHeight = 38;
 export const workspacePreviewMinHeight = 160;
 export const workspacePreviewDefaultHeight = 220;
 export const workspacePreviewMaxHeight = 420;
+export const workspacePreviewCollapsedWidth = 44;
+export const workspacePreviewMinWidth = 320;
+export const workspacePreviewDefaultWidth = 380;
+export const workspacePreviewMaxWidth = 520;
 
 const workspaceSplitterSize = 8;
-const workspaceWideOperatorWidth = 210;
-const workspaceCompactOperatorWidth = 176;
-const workspaceWideCanvasMinWidth = 600;
-const workspaceCompactCanvasMinWidth = 520;
+const workspaceWideOperatorWidth = 56;
+const workspaceCompactOperatorWidth = 56;
+const workspaceWideCanvasMinWidth = 560;
+const workspaceCompactCanvasMinWidth = 500;
 const workspaceCanvasSurfaceMinHeight = 352;
 
 export interface WorkspaceLayoutProjection {
@@ -26,6 +30,9 @@ export interface WorkspaceLayoutProjection {
   readonly previewMinHeight: number;
   readonly previewMaxHeight: number;
   readonly previewCollapsed: boolean;
+  readonly previewWidth: number;
+  readonly previewMinWidth: number;
+  readonly previewMaxWidth: number;
 }
 
 type MutableWorkspaceLayoutProjection = {
@@ -49,6 +56,7 @@ export interface WorkspaceLayoutOwner {
   attach(element: HTMLElement): void;
   setInspectorWidth(width: number): void;
   setPreviewHeight(height: number): void;
+  setPreviewWidth(width: number): void;
   setPreviewCollapsed(collapsed: boolean): void;
   togglePreviewCollapsed(): void;
   commit(): void;
@@ -58,6 +66,7 @@ export interface WorkspaceLayoutOwner {
 interface StoredWorkspaceLayout {
   readonly inspectorWidth: number;
   readonly previewHeight: number;
+  readonly previewWidth: number;
   readonly previewCollapsed: boolean;
 }
 
@@ -77,12 +86,16 @@ function readStoredLayout(storage?: Pick<Storage, 'getItem'>): StoredWorkspaceLa
       previewHeight: typeof parsed.previewHeight === 'number'
         ? clamp(parsed.previewHeight, workspacePreviewMinHeight, workspacePreviewMaxHeight)
         : workspacePreviewDefaultHeight,
+      previewWidth: typeof parsed.previewWidth === 'number'
+        ? clamp(parsed.previewWidth, workspacePreviewMinWidth, workspacePreviewMaxWidth)
+        : workspacePreviewDefaultWidth,
       previewCollapsed: parsed.previewCollapsed === true
     };
   } catch {
     return {
       inspectorWidth: workspaceInspectorDefaultWidth,
       previewHeight: workspacePreviewDefaultHeight,
+      previewWidth: workspacePreviewDefaultWidth,
       previewCollapsed: false
     };
   }
@@ -107,6 +120,7 @@ export function createWorkspaceLayoutOwner(
   const stored = readStoredLayout(storage);
   let preferredInspectorWidth = stored.inspectorWidth;
   let preferredPreviewHeight = stored.previewHeight;
+  let preferredPreviewWidth = stored.previewWidth;
   const state = reactive<MutableWorkspaceLayoutProjection>({
     containerWidth: 0,
     containerHeight: 0,
@@ -116,7 +130,10 @@ export function createWorkspaceLayoutOwner(
     previewHeight: stored.previewHeight,
     previewMinHeight: workspacePreviewMinHeight,
     previewMaxHeight: workspacePreviewMaxHeight,
-    previewCollapsed: stored.previewCollapsed
+    previewCollapsed: stored.previewCollapsed,
+    previewWidth: stored.previewWidth,
+    previewMinWidth: workspacePreviewMinWidth,
+    previewMaxWidth: workspacePreviewMaxWidth
   });
   let observer: WorkspaceLayoutObserver | null = null;
   let attachedElement: HTMLElement | null = null;
@@ -131,7 +148,7 @@ export function createWorkspaceLayoutOwner(
     const operatorWidth = wideLayout ? workspaceWideOperatorWidth : workspaceCompactOperatorWidth;
     const canvasMinWidth = wideLayout ? workspaceWideCanvasMinWidth : workspaceCompactCanvasMinWidth;
     const availableInspectorWidth = state.containerWidth > 0
-      ? state.containerWidth - operatorWidth - workspaceSplitterSize - canvasMinWidth
+      ? state.containerWidth - operatorWidth - workspaceSplitterSize * 2 - canvasMinWidth - state.previewMinWidth
       : workspaceInspectorMaxWidth;
     state.inspectorMaxWidth = clamp(
       availableInspectorWidth,
@@ -157,6 +174,19 @@ export function createWorkspaceLayoutOwner(
       state.previewMinHeight,
       state.previewMaxHeight
     );
+    const availablePreviewWidth = state.containerWidth > 0
+      ? state.containerWidth - operatorWidth - workspaceSplitterSize * 2 - canvasMinWidth - state.inspectorWidth
+      : workspacePreviewMaxWidth;
+    state.previewMaxWidth = clamp(
+      availablePreviewWidth,
+      workspacePreviewMinWidth,
+      workspacePreviewMaxWidth
+    );
+    state.previewWidth = clamp(
+      preferredPreviewWidth,
+      state.previewMinWidth,
+      state.previewMaxWidth
+    );
   }
 
   function updateFromElement(): void {
@@ -179,9 +209,10 @@ export function createWorkspaceLayoutOwner(
   function persist(): void {
     try {
       storage?.setItem(workspaceLayoutStorageKey, JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: 2,
         inspectorWidth: preferredInspectorWidth,
         previewHeight: preferredPreviewHeight,
+        previewWidth: preferredPreviewWidth,
         previewCollapsed: state.previewCollapsed
       }));
     } catch {
@@ -206,12 +237,17 @@ export function createWorkspaceLayoutOwner(
     setInspectorWidth(width: number): void {
       if (disposed) return;
       preferredInspectorWidth = clamp(width, state.inspectorMinWidth, state.inspectorMaxWidth);
-      state.inspectorWidth = preferredInspectorWidth;
+      updateBounds(state.containerWidth, state.containerHeight);
     },
     setPreviewHeight(height: number): void {
       if (disposed) return;
       preferredPreviewHeight = clamp(height, state.previewMinHeight, state.previewMaxHeight);
       state.previewHeight = preferredPreviewHeight;
+    },
+    setPreviewWidth(width: number): void {
+      if (disposed) return;
+      preferredPreviewWidth = clamp(width, state.previewMinWidth, state.previewMaxWidth);
+      updateBounds(state.containerWidth, state.containerHeight);
     },
     setPreviewCollapsed(collapsed: boolean): void {
       if (disposed || state.previewCollapsed === collapsed) return;

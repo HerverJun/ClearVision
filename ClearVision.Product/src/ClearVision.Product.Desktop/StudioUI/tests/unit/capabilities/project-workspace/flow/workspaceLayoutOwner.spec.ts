@@ -6,6 +6,7 @@ import {
   workspaceInspectorMinWidth,
   workspaceLayoutStorageKey,
   workspacePreviewDefaultHeight,
+  workspacePreviewDefaultWidth,
   workspacePreviewMinHeight,
   type WorkspaceLayoutObserver
 } from '@/capabilities/project-workspace/flow';
@@ -48,23 +49,26 @@ describe('Workspace layout owner', () => {
     observer.resize(1290, 600);
     expect(owner.projection).toMatchObject({
       inspectorMinWidth: 248,
-      inspectorMaxWidth: 420,
+      inspectorMaxWidth: 338,
       inspectorWidth: 296,
       previewMinHeight: 160,
       previewMaxHeight: 240,
-      previewHeight: 220
+      previewHeight: 220,
+      previewWidth: 362
     });
 
     owner.setInspectorWidth(999);
     owner.setPreviewHeight(999);
-    expect(owner.projection.inspectorWidth).toBe(420);
+    expect(owner.projection.inspectorWidth).toBe(338);
     expect(owner.projection.previewHeight).toBe(240);
+    expect(owner.projection.previewWidth).toBe(320);
 
     observer.resize(980, 520);
-    expect(owner.projection.inspectorMaxWidth).toBe(276);
-    expect(owner.projection.inspectorWidth).toBe(276);
+    expect(owner.projection.inspectorMaxWidth).toBe(248);
+    expect(owner.projection.inspectorWidth).toBe(248);
     expect(owner.projection.previewMaxHeight).toBe(160);
     expect(owner.projection.previewHeight).toBe(160);
+    expect(owner.projection.previewWidth).toBe(320);
 
     owner.dispose();
     expect(observer.disconnected).toBe(true);
@@ -78,14 +82,16 @@ describe('Workspace layout owner', () => {
     firstObserver.resize(1860, 980);
     first.setInspectorWidth(384);
     first.setPreviewHeight(320);
+    first.setPreviewWidth(448);
     first.setPreviewCollapsed(true);
     first.commit();
     first.dispose();
 
     expect(JSON.parse(storage.read() ?? '{}')).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       inspectorWidth: 384,
       previewHeight: 320,
+      previewWidth: 448,
       previewCollapsed: true
     });
 
@@ -96,6 +102,7 @@ describe('Workspace layout owner', () => {
     expect(second.projection).toMatchObject({
       inspectorWidth: 384,
       previewHeight: 320,
+      previewWidth: 448,
       previewCollapsed: true
     });
     second.dispose();
@@ -115,6 +122,7 @@ describe('Workspace layout owner', () => {
       inspectorMinWidth: workspaceInspectorMinWidth,
       inspectorMaxWidth: workspaceInspectorMaxWidth,
       previewHeight: workspacePreviewDefaultHeight,
+      previewWidth: workspacePreviewDefaultWidth,
       previewMinHeight: workspacePreviewMinHeight,
       previewCollapsed: false
     });

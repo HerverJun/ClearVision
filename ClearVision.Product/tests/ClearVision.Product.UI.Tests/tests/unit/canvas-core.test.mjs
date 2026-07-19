@@ -282,6 +282,22 @@ test('FlowCanvas portKey helper produces stable identifiers', async () => {
   fc.destroy();
 });
 
+test('FlowCanvas truncates long node titles without compressing or overflowing the header', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+  assert.equal(fc.fitTextWithEllipsis('短标题', 100), '短标题');
+  assert.equal(fc.fitTextWithEllipsis('上料工位瓶盖外观与密封完整性综合检测节点', 42), '上料工位瓶盖…');
+  assert.equal(fc.fitTextWithEllipsis('标题', 4), '');
+  fc.destroy();
+});
+
 test('FlowCanvas removeNode preserves _systemNode and clears selectedConnection', async () => {
   const { FlowCanvas } = await import(
     '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'

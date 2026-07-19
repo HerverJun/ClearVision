@@ -4,7 +4,15 @@ import { CvButton, CvIconButton } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 import type { ImageCanvasOwner } from './imageCanvasOwner';
 
-const props = defineProps<{ owner: ImageCanvasOwner }>();
+const props = withDefaults(defineProps<{
+  owner: ImageCanvasOwner;
+  expanded?: boolean;
+}>(), {
+  expanded: false
+});
+const emit = defineEmits<{
+  toggleExpanded: [];
+}>();
 const projection = props.owner.projection;
 const canvasId = `image-canvas-${props.owner.projectId.replaceAll('-', '')}`;
 const dimensions = computed(() => projection.width > 0
@@ -102,6 +110,18 @@ onMounted(async () => {
           </template>
           1:1
         </CvButton>
+        <CvIconButton
+          data-testid="image-expand"
+          size="sm"
+          :label="expanded ? '退出大图视图' : '打开大图视图'"
+          :title="expanded ? '退出大图视图' : '打开大图视图'"
+          @click="emit('toggleExpanded')"
+        >
+          <CvIcon
+            :name="expanded ? 'minimize' : 'maximize'"
+            size="sm"
+          />
+        </CvIconButton>
       </div>
     </header>
 
@@ -169,14 +189,14 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.image-viewport { min-width: 0; min-height: 0; display: grid; grid-template-rows: 34px minmax(150px, 1fr) 26px; overflow: hidden; background: var(--cv-surface-sunken); }
+.image-viewport { min-width: 0; min-height: 0; display: grid; grid-template-rows: 34px minmax(150px, 1fr) 26px; overflow: hidden; background: var(--cv-surface-sunken); container-type: inline-size; }
 .image-viewport__toolbar,
 .image-viewport__probe { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-2); padding: 0 var(--cv-space-2); background: var(--cv-surface-raised); }
 .image-viewport__toolbar { border-bottom: 1px solid var(--cv-border-subtle); }
 .image-viewport__probe { border-top: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }
 .image-viewport__probe > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .image-viewport__status,
-.image-viewport__actions { min-width: 0; display: flex; align-items: center; gap: var(--cv-space-1); }
+.image-viewport__actions { min-width: 0; display: flex; align-items: center; gap: 2px; }
 .image-viewport__status strong { font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
 .image-viewport__status span { overflow: hidden; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .image-viewport__status span::before { content: ""; width: 5px; height: 5px; margin-right: var(--cv-space-1); display: inline-block; border-radius: 50%; background: var(--cv-color-status-idle); vertical-align: 1px; }
@@ -198,4 +218,10 @@ onMounted(async () => {
 .image-viewport__empty--error,
 .image-viewport__empty--error strong,
 .image-viewport__empty--error :deep(svg) { color: var(--cv-color-status-ng-strong); }
+
+@container (max-width: 390px) {
+  .image-viewport__status strong { display: none; }
+  .image-viewport__actions :deep(.cv-button__visual-label) { display: none; }
+  .image-viewport__actions :deep(.cv-button--sm) { width: 28px; padding-inline: 0; }
+}
 </style>

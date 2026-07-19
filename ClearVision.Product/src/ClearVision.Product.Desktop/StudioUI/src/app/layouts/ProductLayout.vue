@@ -5,6 +5,7 @@ import { visibleProductNavigation } from '@/app/navigation';
 import { useAuthLifecycleRoot } from '@/app/auth';
 import { useProductRuntime } from '@/app/productRuntime';
 import { useStudioPlatform } from '@/app/studioPlatform';
+import { CvBrand } from '@/design-system/patterns';
 import { CvButton, CvInlineAlert, CvModal, CvStatusBadge } from '@/design-system/primitives';
 import { CvIcon } from '@/design-system/icons';
 import type { CvIconName } from '@/design-system/icons';
@@ -33,6 +34,24 @@ const navigationIcons: Readonly<Record<string, CvIconName>> = Object.freeze({
   '/diagnostics': 'diagnostics',
   '/about': 'about'
 });
+const workspaceNavigation = computed(() => {
+  const available = new Set(navigation.value.map(item => item.to));
+  return Object.freeze([
+    { label: '工程', to: '/projects', description: '工程管理' },
+    { label: '流程', to: route.fullPath, description: '当前工程流程', current: true },
+    { label: '检测', description: '检测工作台尚未接入 Studio UI Next', disabled: true },
+    { label: '追溯', to: '/results', description: '正式检测结果与历史追溯' },
+    available.has('/stations')
+      ? { label: '监控', to: '/stations', description: '工作站状态监控' }
+      : { label: '监控', description: '当前启动配置未开放工作站监控', disabled: true },
+    { label: 'AI', description: 'AI 工作台尚未接入 Studio UI Next', disabled: true },
+    available.has('/diagnostics')
+      ? { label: '设置', to: '/diagnostics', description: '系统诊断与运行环境' }
+      : { label: '设置', description: '当前账户不可访问系统诊断', disabled: true }
+  ]);
+});
+const workspaceMoreNavigation = computed(() => navigation.value.filter(item =>
+  ['/overview', '/operators', '/about'].includes(item.to)));
 
 function resolveBreadcrumbPath(path: string): string {
   return path.replace(/:([A-Za-z0-9_]+)/g, (_match, parameterName: string) => {
@@ -111,7 +130,10 @@ onMounted(() => runtime.preferences.apply());
       @click.prevent="focusContent"
     >跳到主要内容</a>
 
-    <aside class="product-layout__sidebar">
+    <aside
+      v-if="!workspaceMode"
+      class="product-layout__sidebar"
+    >
       <RouterLink
         class="product-layout__brand"
         to="/overview"
@@ -161,10 +183,52 @@ onMounted(() => runtime.preferences.apply());
       <header class="product-layout__topbar">
         <div
           v-if="workspaceMode"
-          class="product-layout__workspace-mode-label"
+          class="product-layout__workspace-chrome"
         >
-          <span>Studio</span>
-          <strong>工程工作台</strong>
+          <RouterLink
+            class="product-layout__workspace-brand"
+            to="/overview"
+            aria-label="ClearVision Studio 概览"
+          >
+            <CvBrand />
+          </RouterLink>
+          <span
+            class="product-layout__workspace-divider"
+            aria-hidden="true"
+          />
+          <nav
+            class="product-layout__workspace-nav"
+            aria-label="Studio 产品导航"
+          >
+            <template
+              v-for="item in workspaceNavigation"
+              :key="item.label"
+            >
+              <RouterLink
+                v-if="item.to && !item.current"
+                class="product-layout__workspace-nav-item"
+                :to="item.to"
+                :title="item.description"
+              >
+                {{ item.label }}
+              </RouterLink>
+              <span
+                v-else-if="item.current"
+                class="product-layout__workspace-nav-item is-current"
+                aria-current="page"
+                :title="item.description"
+              >{{ item.label }}</span>
+              <button
+                v-else
+                type="button"
+                class="product-layout__workspace-nav-item"
+                disabled
+                :title="item.description"
+              >
+                {{ item.label }}
+              </button>
+            </template>
+          </nav>
         </div>
         <nav
           v-else
@@ -213,6 +277,11 @@ onMounted(() => runtime.preferences.apply());
               class="product-layout__appearance-trigger"
               :aria-label="`外观设置，当前${themeLabel}主题，${densityLabel}密度`"
             >
+              <CvIcon
+                v-if="workspaceMode"
+                name="theme"
+                size="sm"
+              />
               <span>外观</span>
               <small>{{ themeLabel }} · {{ densityLabel }}</small>
               <CvIcon
@@ -277,6 +346,32 @@ onMounted(() => runtime.preferences.apply());
             </div>
           </details>
 
+          <details
+            v-if="workspaceMode && workspaceMoreNavigation.length"
+            class="product-layout__more"
+          >
+            <summary title="更多产品入口">
+              更多
+              <CvIcon
+                name="chevron-right"
+                size="sm"
+              />
+            </summary>
+            <nav aria-label="更多产品入口">
+              <RouterLink
+                v-for="item in workspaceMoreNavigation"
+                :key="item.to"
+                :to="item.to"
+              >
+                <CvIcon
+                  :name="navigationIcons[item.to] ?? 'overview'"
+                  size="sm"
+                />
+                <span>{{ item.label }}</span>
+              </RouterLink>
+            </nav>
+          </details>
+
           <div class="product-layout__user">
             <span
               class="product-layout__user-avatar"
@@ -294,6 +389,7 @@ onMounted(() => runtime.preferences.apply());
             修改密码
           </RouterLink>
           <CvButton
+            v-if="!workspaceMode"
             size="sm"
             variant="quiet"
             data-auth-command="logout"

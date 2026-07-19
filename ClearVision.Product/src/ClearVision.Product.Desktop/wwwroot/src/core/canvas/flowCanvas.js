@@ -459,7 +459,7 @@ class FlowCanvas {
             width: NODE_DEFAULT_WIDTH,
             height: NODE_MIN_HEIGHT,
             title: nodeConfig.title || canonicalType,
-            color: nodeConfig.color || '#1890ff',
+            color: nodeConfig.color || '#47738f',
             ...nodeConfig,
             inputs: configInputs.map(p => ({
                 ...p,
@@ -1005,7 +1005,7 @@ class FlowCanvas {
             glowColor = 'rgba(231, 76, 60, 0.5)';
         } else if (isForEach && isSequential) {
             // ForEach Sequential 模式：橙色边框。
-            borderColor = '#fa8c16';
+            borderColor = '#b85b16';
             borderWidth = 2;
             glowColor = 'rgba(250, 140, 22, 0.3)';
         } else if (isForEach) {
@@ -1015,12 +1015,12 @@ class FlowCanvas {
             glowColor = 'rgba(19, 194, 194, 0.2)';
         } else if (isCommunicationOp) {
             // 通信算子：红色边框。
-            borderColor = '#f5222d';
+            borderColor = '#d12f3f';
             borderWidth = 2;
             glowColor = 'rgba(245, 34, 45, 0.3)';
         } else if (hasFileParam) {
             // 已配置文件参数：橙色边框。
-            borderColor = '#fa8c16';
+            borderColor = '#b85b16';
             borderWidth = 2;
         } else if (isSelected) {
             glowColor = `${node.color}80`; // 50% opacity
@@ -1100,12 +1100,24 @@ class FlowCanvas {
         this.ctx.textAlign = 'left';
         this.ctx.textBaseline = 'middle';
         const titleX = (node.icon || node.iconPath) ? x + 28 * this.scale : x + 10 * this.scale;
-        this.ctx.fillText(node.title, titleX, y + 12 * this.scale);
+        const headerReservation = Math.max(
+            isForEach && ioMode ? 34 * this.scale : 0,
+            isCommunicationOp ? 30 * this.scale : 0
+        );
+        const titleMaxWidth = Math.max(
+            20 * this.scale,
+            x + w - 8 * this.scale - headerReservation - titleX
+        );
+        this.ctx.fillText(
+            this.fitTextWithEllipsis(node.title, titleMaxWidth),
+            titleX,
+            y + 12 * this.scale
+        );
 
         // Encoding cleanup: previous comment text was unreadable.
         if (isForEach && ioMode) {
             const ioLabel = isSequential ? 'SEQ' : 'PAR';
-            const labelColor = isSequential ? '#fa8c16' : '#13c2c2';
+            const labelColor = isSequential ? '#b85b16' : '#3f718e';
             this.ctx.fillStyle = labelColor;
             this.ctx.font = `bold ${9 * this.scale}px sans-serif`;
             this.ctx.textAlign = 'right';
@@ -1148,7 +1160,7 @@ class FlowCanvas {
         // === Sprint 4 Task 4.3: 绘制安全标记 ===
         if (isCommunicationOp) {
             // Encoding cleanup: previous comment text was unreadable.
-            this.ctx.fillStyle = '#f5222d';
+            this.ctx.fillStyle = '#d12f3f';
             this.ctx.font = `bold ${14 * this.scale}px sans-serif`;
             this.ctx.textAlign = 'right';
             this.ctx.textBaseline = 'top';
@@ -1178,7 +1190,7 @@ class FlowCanvas {
             badges.push({ text: `G^${sourceCount}`, color: '#13c2c2' });
         }
         if (targetCount > 0) {
-            badges.push({ text: `Gv${targetCount}`, color: '#fa8c16' });
+            badges.push({ text: `Gv${targetCount}`, color: '#b6453c' });
         }
         if (badges.length === 0) {
             return;
@@ -1217,6 +1229,34 @@ class FlowCanvas {
         return `rgb(${r}, ${g}, ${b})`;
     }
 
+    fitTextWithEllipsis(value, maxWidth) {
+        const text = String(value ?? '');
+        if (!text || maxWidth <= 0 || this.ctx.measureText(text).width <= maxWidth) {
+            return text;
+        }
+
+        const ellipsis = '…';
+        const ellipsisWidth = this.ctx.measureText(ellipsis).width;
+        if (ellipsisWidth > maxWidth) {
+            return '';
+        }
+
+        const glyphs = Array.from(text);
+        let low = 0;
+        let high = glyphs.length;
+        while (low < high) {
+            const middle = Math.ceil((low + high) / 2);
+            const candidate = `${glyphs.slice(0, middle).join('').trimEnd()}${ellipsis}`;
+            if (this.ctx.measureText(candidate).width <= maxWidth) {
+                low = middle;
+            } else {
+                high = middle - 1;
+            }
+        }
+
+        return `${glyphs.slice(0, low).join('').trimEnd()}${ellipsis}`;
+    }
+
     /**
      * 绘制状态指示器
      * Encoding cleanup: previous comment text was unreadable.
@@ -1231,17 +1271,17 @@ class FlowCanvas {
 
         switch (status) {
             case 'running':
-                this.ctx.fillStyle = '#1890ff';
+                this.ctx.fillStyle = '#47738f';
                 this.ctx.fill();
                 // 绘制旋转的进度环
                 this.ctx.beginPath();
                 this.ctx.arc(x, y, radius + 2 * this.scale, 0, Math.PI * 2);
-                this.ctx.strokeStyle = 'rgba(24, 144, 255, 0.5)';
+                this.ctx.strokeStyle = 'rgba(71, 115, 143, 0.5)';
                 this.ctx.lineWidth = 2 * this.scale;
                 this.ctx.stroke();
                 break;
             case 'success':
-                this.ctx.fillStyle = '#52c41a';
+                this.ctx.fillStyle = '#16866f';
                 this.ctx.fill();
                 // 绘制对勾
                 this.ctx.strokeStyle = '#ffffff';
@@ -1253,7 +1293,7 @@ class FlowCanvas {
                 this.ctx.stroke();
                 break;
             case 'error':
-                this.ctx.fillStyle = '#f5222d';
+                this.ctx.fillStyle = '#d12f3f';
                 this.ctx.fill();
                 // 绘制X
                 this.ctx.strokeStyle = '#ffffff';
@@ -1595,9 +1635,9 @@ class FlowCanvas {
                     if (pos) {
                         this.ctx.beginPath();
                         this.ctx.arc(pos.x, pos.y, 10 * this.scale, 0, Math.PI * 2);
-                        this.ctx.fillStyle = 'rgba(82, 196, 26, 0.2)';
+                        this.ctx.fillStyle = 'rgba(22, 134, 111, 0.2)';
                         this.ctx.fill();
-                        this.ctx.strokeStyle = '#52c41a';
+                        this.ctx.strokeStyle = '#16866f';
                         this.ctx.setLineDash([2, 2]);
                         this.ctx.stroke();
                         this.ctx.setLineDash([]);
@@ -2188,7 +2228,7 @@ class FlowCanvas {
                     parameters: op.parameters || op.Parameters || [],
                     metadata: op.metadata || op.Metadata || undefined,
                     disabled: (op.isEnabled ?? op.IsEnabled) === false,
-                    color: '#1890ff' // Default
+                    color: '#47738f' // ClearVision industrial blue default
                 };
                 node.height = Math.max(
                     this.getRequiredNodeHeight(node.inputs, node.outputs),
@@ -2196,7 +2236,7 @@ class FlowCanvas {
                 );
 
                 // Restore color logic based on type
-                if (node.type === 'ImageAcquisition') node.color = '#52c41a';
+                if (node.type === 'ImageAcquisition') node.color = '#47738f';
                 if (node.type === 'ResultOutput') node.color = '#595959';
 
                 this.nodes.set(node.id, node);
@@ -3157,7 +3197,7 @@ class FlowCanvas {
 
             cacheCtx.fillStyle = node.disabled
                 ? (this.themePalette?.minimapDisabled || FLOW_CANVAS_THEME_DEFAULTS.minimapDisabled)
-                : (node.color || '#1890ff');
+                : (node.color || '#47738f');
             cacheCtx.fillRect(x, y, w, h);
 
             if (node.id === this.selectedNode) {

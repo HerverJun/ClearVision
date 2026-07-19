@@ -19,6 +19,7 @@ const preview = props.owner.preview.projection;
 const roi = props.owner.roi.projection;
 const artifactMessage = shallowRef<string | null>(null);
 const artifactText = shallowRef<string | null>(null);
+const imageExpanded = shallowRef(false);
 const numberFormatter = new Intl.NumberFormat('zh-CN');
 const durationFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 
@@ -43,6 +44,14 @@ const phaseLabel = computed(() => ({
 const structuredText = computed(() => preview.outputData
   ? JSON.stringify(preview.outputData as unknown, null, 2)
   : null);
+const keyOutputs = computed(() => Object.entries(preview.outputData ?? {})
+  .filter(([, value]) => value === null || ['string', 'number', 'boolean'].includes(typeof value))
+  .slice(0, 8)
+  .map(([key, value]) => Object.freeze({
+    key,
+    value: value === null ? '空' : String(value)
+  })));
+const outputFieldCount = computed(() => Object.keys(preview.outputData ?? {}).length);
 const previewActionTitle = computed(() => preview.autoPreviewAllowed
   ? '使用当前本地流程执行节点预览'
   : preview.manualReason || '该算子仅允许手动预览');
@@ -68,7 +77,10 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 <template>
   <section
     class="preview-panel"
-    :class="{ 'preview-panel--collapsed': collapsed }"
+    :class="{
+      'preview-panel--collapsed': collapsed,
+      'preview-panel--image-expanded': imageExpanded
+    }"
     data-capability="preview-workbench"
     :data-preview-phase="preview.phase"
     :data-preview-stale="preview.isStale"
@@ -77,7 +89,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
   >
     <WorkspacePaneHeader
       class="preview-panel__header"
-      :title="preview.title || '节点预览'"
+      title="节点预览"
       :title-tooltip="preview.title || '节点预览'"
     >
       <template #meta>
@@ -91,9 +103,18 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
           label="结果已过期"
         />
         <small
+          v-if="preview.title"
+          class="preview-panel__node-title"
+          :title="preview.title"
+        >{{ preview.title }}</small>
+        <small
           v-if="preview.requestIdentity"
           class="preview-panel__revision"
         >流程 r{{ preview.requestIdentity.flowRevision }}</small>
+        <CvStatusBadge
+          :tone="preview.autoPreviewAllowed ? 'info' : 'idle'"
+          :label="preview.autoPreviewAllowed ? '自动预览' : '仅手动'"
+        />
       </template>
       <span
         v-if="!preview.autoPreviewAllowed"
@@ -120,7 +141,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
         :disabled="!preview.canPreview || preview.canCancel"
         @click="owner.preview.previewNow()"
       >
-        预览节点
+        手动预览
       </CvButton>
       <CvIconButton
         data-testid="preview-collapse-toggle"
@@ -146,7 +167,11 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
       :aria-hidden="collapsed ? 'true' : undefined"
       :inert="collapsed ? true : undefined"
     >
-      <ImageViewport :owner="owner.image" />
+      <ImageViewport
+        :owner="owner.image"
+        :expanded="imageExpanded"
+        @toggle-expanded="imageExpanded = !imageExpanded"
+      />
 
       <div class="preview-panel__details">
         <div
@@ -164,6 +189,27 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
             :title="preview.errorMessage"
           />
         </div>
+
+        <section class="preview-panel__summary">
+          <div class="preview-panel__section-heading">
+            <strong>结果摘要</strong>
+            <small v-if="preview.executionTimeMs !== null">{{ durationFormatter.format(preview.executionTimeMs) }} ms</small>
+          </div>
+          <dl>
+            <div>
+              <dt>节点类型</dt><dd translate="no">
+                {{ preview.selectedNodeType || '—' }}
+              </dd>
+            </div>
+            <div>
+              <dt>预览状态</dt><dd :data-tone="phaseTone">
+                {{ phaseLabel }}
+              </dd>
+            </div>
+            <div><dt>输出字段</dt><dd>{{ outputFieldCount }}</dd></div>
+            <div><dt>附加结果</dt><dd>{{ preview.artifacts.length }}</dd></div>
+          </dl>
+        </section>
 
         <section
           class="preview-panel__roi"
@@ -223,6 +269,32 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
               </template>
             </div>
           </div>
+        </section>
+
+        <section
+          v-if="keyOutputs.length > 0"
+          class="preview-panel__key-outputs"
+        >
+          <div class="preview-panel__section-heading">
+            <strong>关键输出</strong>
+            <small>{{ keyOutputs.length }} 项</small>
+          </div>
+          <dl>
+            <div
+              v-for="item in keyOutputs"
+              :key="item.key"
+            >
+              <dt
+                translate="no"
+                :title="item.key"
+              >
+                {{ item.key }}
+              </dt>
+              <dd :title="item.value">
+                {{ item.value }}
+              </dd>
+            </div>
+          </dl>
         </section>
 
         <section
@@ -346,24 +418,29 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: 38px minmax(0, 1fr);
+  grid-template-rows: 42px minmax(0, 1fr);
   overflow: hidden;
-  border-top: 1px solid var(--cv-border-subtle);
-  background: var(--cv-surface-raised);
+  background: #ffffff;
   container-name: preview;
   container-type: inline-size;
 }
-.preview-panel--collapsed { grid-template-rows: 38px 0; }
+.preview-panel--collapsed { grid-template-rows: minmax(0, 1fr) 0; }
 .preview-panel--collapsed .preview-panel__body { display: none; }
+.preview-panel :deep(.workspace-pane-header) { min-height: 42px; padding-inline: var(--cv-space-2); background: #ffffff; }
 .preview-panel__revision,
-.preview-panel__manual-reason { overflow: hidden; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
+.preview-panel__manual-reason,
+.preview-panel__node-title { overflow: hidden; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
+.preview-panel__node-title { max-width: 150px; }
 .preview-panel__manual-reason { max-width: 180px; }
-.preview-panel__collapse-icon { transform: rotate(90deg); transition: transform var(--cv-motion-duration-fast) var(--cv-motion-ease-standard); }
-.preview-panel__collapse-icon.is-collapsed { transform: rotate(-90deg); }
-.preview-panel__body { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(240px, .75fr); overflow: hidden; }
-.preview-panel__details { min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; border-left: 1px solid var(--cv-border-subtle); scrollbar-gutter: stable; }
+.preview-panel__collapse-icon { transform: rotate(180deg); transition: transform var(--cv-motion-duration-fast) var(--cv-motion-ease-standard); }
+.preview-panel__collapse-icon.is-collapsed { transform: rotate(0); }
+.preview-panel__body { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(250px, 43%) minmax(0, 1fr); overflow: hidden; }
+.preview-panel__body > :deep(.image-viewport) { min-height: 0; }
+.preview-panel__details { min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; border-top: 1px solid var(--cv-border-subtle); scrollbar-gutter: stable; }
 .preview-panel__alerts { padding: var(--cv-space-2) var(--cv-space-3) 0; display: grid; gap: var(--cv-space-2); }
+.preview-panel__summary,
 .preview-panel__roi,
+.preview-panel__key-outputs,
 .preview-panel__result,
 .preview-panel__artifacts,
 .preview-panel__diagnostics { min-width: 0; padding: var(--cv-space-2) var(--cv-space-3); border-bottom: 1px solid var(--cv-border-subtle); }
@@ -372,6 +449,21 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 .preview-panel__section-heading strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
 .preview-panel__section-heading small { overflow: hidden; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .preview-panel__roi-actions { max-width: 100%; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--cv-space-1); }
+.preview-panel__summary dl { margin: var(--cv-space-2) 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-1); }
+.preview-panel__summary dl div { min-width: 0; padding: 7px 8px; border-radius: var(--cv-radius-sm); background: #f7f8fa; }
+.preview-panel__summary dt { color: var(--cv-text-muted); font-size: 9px; }
+.preview-panel__summary dd { margin: 2px 0 0; overflow: hidden; color: var(--cv-text-primary); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
+.preview-panel__summary dd[data-tone="ok"] { color: var(--cv-color-status-ok-strong); }
+.preview-panel__summary dd[data-tone="ng"] { color: var(--cv-color-status-ng-strong); }
+.preview-panel__summary dd[data-tone="warning"] { color: var(--cv-color-status-warning-strong); }
+.preview-panel__summary dd[data-tone="info"] { color: var(--cv-color-status-info-strong); }
+.preview-panel__key-outputs dl { margin: var(--cv-space-2) 0 0; display: grid; }
+.preview-panel__key-outputs dl div { min-width: 0; padding: 6px 0; display: grid; grid-template-columns: minmax(88px, .8fr) minmax(0, 1.2fr); gap: var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); }
+.preview-panel__key-outputs dl div:last-child { border-bottom: 0; }
+.preview-panel__key-outputs dt,
+.preview-panel__key-outputs dd { overflow: hidden; font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
+.preview-panel__key-outputs dt { color: var(--cv-text-muted); }
+.preview-panel__key-outputs dd { margin: 0; color: var(--cv-text-primary); font-weight: var(--cv-font-weight-medium); text-align: right; }
 .preview-panel__result pre,
 .preview-panel__artifacts pre { margin: var(--cv-space-2) 0 0; padding: var(--cv-space-2); overflow: visible; border-radius: var(--cv-radius-sm); background: var(--cv-surface-sunken); color: var(--cv-text-primary); font-family: var(--cv-font-mono); font-size: var(--cv-font-size-2xs); line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 .preview-panel__empty-result { min-height: 58px; display: flex; align-items: center; gap: var(--cv-space-2); color: var(--cv-text-muted); }
@@ -390,8 +482,27 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 .preview-panel__diagnostics code { color: var(--cv-color-status-warning-strong); font-family: var(--cv-font-mono); font-size: 9px; overflow-wrap: anywhere; }
 .preview-panel__diagnostics span { color: var(--cv-text-secondary); overflow-wrap: anywhere; }
 
+.preview-panel--image-expanded .preview-panel__body { grid-template-rows: minmax(0, 1fr); }
+.preview-panel--image-expanded .preview-panel__details { display: none; }
+.preview-panel--collapsed :deep(.workspace-pane-header) { height: 100%; padding: var(--cv-space-1); align-items: flex-start; }
+.preview-panel--collapsed :deep(.workspace-pane-header__identity),
+.preview-panel--collapsed :deep(.workspace-pane-header__actions > :not([data-testid="preview-collapse-toggle"])) { display: none; }
+.preview-panel--collapsed :deep(.workspace-pane-header__actions) { width: 100%; justify-content: center; }
+
 @container preview (max-width: 680px) {
   .preview-panel__manual-reason,
-  .preview-panel__revision { display: none; }
+  .preview-panel__revision,
+  .preview-panel__node-title { display: none; }
+  .preview-panel :deep(.workspace-pane-header__identity [data-design-primitive="status-badge"]:last-child) { display: none; }
+}
+
+@media (max-height: 760px) {
+  .preview-panel__body { grid-template-rows: minmax(210px, 48%) minmax(0, 1fr); }
+  .preview-panel__summary,
+  .preview-panel__roi,
+  .preview-panel__key-outputs,
+  .preview-panel__result,
+  .preview-panel__artifacts,
+  .preview-panel__diagnostics { padding-block: var(--cv-space-1); }
 }
 </style>

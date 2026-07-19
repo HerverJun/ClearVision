@@ -243,6 +243,105 @@ withDefaults(defineProps<{
       <path d="M7 6H4v14h14v-3" />
       <path d="M10 4h10v10M20 4 10 14" />
     </template>
+    <template v-else-if="name === 'maximize'">
+      <path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4" />
+    </template>
+    <template v-else-if="name === 'minimize'">
+      <path d="M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5" />
+    </template>
+    <path
+      v-else-if="name === 'star'"
+      d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"
+    />
+    <template v-else-if="name === 'clock'">
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+      />
+      <path d="M12 7v5l3 2" />
+    </template>
+    <template v-else-if="name === 'camera'">
+      <path d="M4 8h3l1.5-2h7L17 8h3v10H4z" />
+      <circle
+        cx="12"
+        cy="13"
+        r="3.5"
+      />
+    </template>
+    <template v-else-if="name === 'sliders'">
+      <path d="M5 4v16M12 4v16M19 4v16" />
+      <path d="M2 9h6M9 15h6M16 8h6" />
+      <circle
+        cx="5"
+        cy="9"
+        r="1.5"
+        fill="currentColor"
+        stroke="none"
+      />
+      <circle
+        cx="12"
+        cy="15"
+        r="1.5"
+        fill="currentColor"
+        stroke="none"
+      />
+      <circle
+        cx="19"
+        cy="8"
+        r="1.5"
+        fill="currentColor"
+        stroke="none"
+      />
+    </template>
+    <template v-else-if="name === 'region'">
+      <path d="M4 8V4h4M16 4h4v4M4 16v4h4M20 16v4h-4" />
+      <rect
+        x="8"
+        y="8"
+        width="8"
+        height="8"
+        rx="1"
+      />
+    </template>
+    <template v-else-if="name === 'measure'">
+      <path d="m5 18 13-13 3 3L8 21H5z" />
+      <path d="m12 11 2 2m1-5 2 2m-8 4 2 2" />
+    </template>
+    <template v-else-if="name === 'filter'">
+      <path d="M4 5h16l-6 7v5l-4 2v-7z" />
+    </template>
+    <template v-else-if="name === 'spark'">
+      <path d="m12 3 1.4 4.1L18 8.5l-4.6 1.4L12 14l-1.4-4.1L6 8.5l4.6-1.4z" />
+      <path d="m18.5 15 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" />
+    </template>
+    <template v-else-if="name === 'save'">
+      <path d="M5 4h12l2 2v14H5z" />
+      <path d="M8 4v6h8V4M8 20v-6h8v6" />
+    </template>
+    <template v-else-if="name === 'play'">
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+      />
+      <path d="m10 8 6 4-6 4z" />
+    </template>
+    <template v-else-if="name === 'variables'">
+      <path d="M5 6h5M5 18h5M14 6h5M14 18h5" />
+      <path d="m8 6 8 12M16 6 8 18" />
+    </template>
+    <template v-else-if="name === 'decision'">
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+      />
+      <path d="m8 12 2.5 2.5L16.5 9" />
+    </template>
+    <template v-else-if="name === 'theme'">
+      <path d="M12 3a9 9 0 1 0 9 9c0-1-.2-2-.5-2.8A7 7 0 0 1 12 3Z" />
+    </template>
     <template v-else-if="name === 'drag'">
       <circle
         cx="9"
