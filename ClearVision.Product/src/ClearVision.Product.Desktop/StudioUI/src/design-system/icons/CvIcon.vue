@@ -170,9 +170,122 @@ withDefaults(defineProps<{
       <path d="M6 3h8l4 4v14H6z" />
       <path d="M14 3v5h4M9.5 13.5a2.5 2.5 0 1 1 4.3 1.7L16 17.5" />
     </template>
-    <template v-else>
+    <template v-else-if="name === 'refresh'">
       <path d="M20 11a8 8 0 1 0-2.3 5.7" />
       <path d="M20 4v7h-7" />
+    </template>
+    <template v-else-if="name === 'undo'">
+      <path d="M9 7 4 12l5 5" />
+      <path d="M5 12h8a6 6 0 0 1 6 6" />
+    </template>
+    <template v-else-if="name === 'redo'">
+      <path d="m15 7 5 5-5 5" />
+      <path d="M19 12h-8a6 6 0 0 0-6 6" />
+    </template>
+    <template v-else-if="name === 'copy'">
+      <rect
+        x="8"
+        y="8"
+        width="11"
+        height="11"
+        rx="2"
+      />
+      <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+    </template>
+    <template v-else-if="name === 'paste'">
+      <path d="M9 5h6M9 3h6v4H9z" />
+      <path d="M8 5H6a2 2 0 0 0-2 2v12h16V7a2 2 0 0 0-2-2h-2" />
+    </template>
+    <template v-else-if="name === 'duplicate'">
+      <rect
+        x="7"
+        y="7"
+        width="12"
+        height="12"
+        rx="2"
+      />
+      <path d="M5 16H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v1M13 10v6M10 13h6" />
+    </template>
+    <template v-else-if="name === 'power'">
+      <path d="M12 3v9" />
+      <path d="M7.1 6.8a7 7 0 1 0 9.8 0" />
+    </template>
+    <template v-else-if="name === 'trash'">
+      <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
+    </template>
+    <template v-else-if="name === 'zoom-in'">
+      <circle
+        cx="10.5"
+        cy="10.5"
+        r="6.5"
+      />
+      <path d="m16 16 4 4M10.5 7.5v6M7.5 10.5h6" />
+    </template>
+    <template v-else-if="name === 'zoom-out'">
+      <circle
+        cx="10.5"
+        cy="10.5"
+        r="6.5"
+      />
+      <path d="m16 16 4 4M7.5 10.5h6" />
+    </template>
+    <template v-else-if="name === 'fit'">
+      <path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4" />
+      <rect
+        x="8"
+        y="8"
+        width="8"
+        height="8"
+        rx="1"
+      />
+    </template>
+    <template v-else-if="name === 'actual-size'">
+      <path d="M7 6H4v14h14v-3" />
+      <path d="M10 4h10v10M20 4 10 14" />
+    </template>
+    <template v-else-if="name === 'drag'">
+      <circle
+        cx="9"
+        cy="6"
+        r="1"
+        fill="currentColor"
+        stroke="none"
+      />
+      <circle
+        cx="15"
+        cy="6"
+        r="1"
+        fill="currentColor"
+        stroke="none"
+      />
+      <circle
+        cx="9"
+        cy="12"
+        r="1"
+        fill="currentColor"
+        stroke="none"
+      />
+      <circle
+        cx="15"
+        cy="12"
+        r="1"
+        fill="currentColor"
+        stroke="none"
+      />
+      <circle
+        cx="9"
+        cy="18"
+        r="1"
+        fill="currentColor"
+        stroke="none"
+      />
+      <circle
+        cx="15"
+        cy="18"
+        r="1"
+        fill="currentColor"
+        stroke="none"
+      />
     </template>
   </svg>
 </template>

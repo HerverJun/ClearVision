@@ -46,6 +46,22 @@ describe('G3 ParameterEditor', () => {
     expect(wrapper.emitted('commit')).toEqual([['0'], ['']]);
   });
 
+  it('preserves a local draft when the owner republishes an equivalent parameter projection', async () => {
+    const current = parameter({
+      name: 'Count', label: '缺陷数量上限', dataType: 'int', editorKind: 'number', integer: true,
+      value: 0, minValue: 0, maxValue: 10
+    });
+    const wrapper = mount(ParameterEditor, { props: { parameter: current, disabled: false } });
+    const input = wrapper.get('input[type="number"]');
+
+    await input.setValue('11');
+    await wrapper.setProps({ parameter: parameter({ ...current }) });
+    expect((wrapper.get('input[type="number"]').element as HTMLInputElement).value).toBe('11');
+
+    await wrapper.get('input[type="number"]').trigger('blur');
+    expect(wrapper.emitted('commit')).toEqual([[11]]);
+  });
+
   it('commits numeric 0, boolean false, enum values and explicit null', async () => {
     const number = mount(ParameterEditor, {
       props: { parameter: parameter({ dataType: 'int', editorKind: 'number', integer: true, value: 1 }), disabled: false }
@@ -112,5 +128,39 @@ describe('G3 ParameterEditor', () => {
     });
     expect(wrapper.get('.parameter-editor__extension').text()).toContain('G4 extension slot');
     expect(wrapper.find('input[type="text"]').exists()).toBe(false);
+  });
+
+  it('uses Chinese parameter states and associates long help and validation text with the control', () => {
+    const wrapper = mount(ParameterEditor, {
+      props: {
+        parameter: parameter({
+          name: 'LongField',
+          label: '相机触发等待帧数（未配置时使用设备默认值）',
+          description: '超过等待帧数后停止当前预览，并提示操作员检查相机触发与网络连接。',
+          nullable: true,
+          value: null,
+          valueSource: 'metadata-default',
+          deprecated: true,
+          errors: Object.freeze([{
+            code: 'range',
+            parameterNames: Object.freeze(['LongField']),
+            message: '不能大于 10，请输入 0 到 10。',
+            reasonCode: 'OUT_OF_RANGE'
+          }])
+        }),
+        disabled: false
+      }
+    });
+
+    expect(wrapper.text()).toContain('默认值');
+    expect(wrapper.text()).toContain('已弃用');
+    expect(wrapper.text()).toContain('使用默认值（空值）');
+    expect(wrapper.text()).not.toContain('deprecated');
+    expect(wrapper.text()).not.toContain('Use default value');
+    const input = wrapper.get('input[type="text"]');
+    expect(input.attributes('name')).toBe('LongField');
+    expect(input.attributes('autocomplete')).toBe('off');
+    expect(input.attributes('aria-describedby')).toContain('-description');
+    expect(input.attributes('aria-describedby')).toContain('-errors');
   });
 });

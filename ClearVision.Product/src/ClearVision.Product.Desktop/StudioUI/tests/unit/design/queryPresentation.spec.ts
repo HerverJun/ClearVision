@@ -11,10 +11,11 @@ describe('read-only query presentation primitives', () => {
   it('provides a labelled search field with keyboard clearing and focus retention', async () => {
     const wrapper = mount(CvSearchField, {
       attachTo: document.body,
-      props: { modelValue: '相机', label: '搜索工程' }
+      props: { modelValue: '相机', label: '搜索工程', inputTestId: 'project-search' }
     });
     const input = wrapper.get('input');
     expect(input.attributes('type')).toBe('search');
+    expect(input.attributes('data-testid')).toBe('project-search');
     expect(wrapper.get('label').text()).toContain('搜索工程');
 
     input.element.focus();

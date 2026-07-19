@@ -5,6 +5,7 @@ import CvIcon from '../icons/CvIcon.vue';
 const props = withDefaults(defineProps<{
   modelValue?: string;
   id?: string | undefined;
+  inputTestId?: string | undefined;
   name?: string | undefined;
   label?: string;
   placeholder?: string;
@@ -15,6 +16,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   modelValue: '',
   id: undefined,
+  inputTestId: undefined,
   name: undefined,
   label: '搜索',
   placeholder: '搜索',
@@ -77,6 +79,7 @@ function handleEscape(event: KeyboardEvent): void {
       <input
         :id="inputId"
         ref="input"
+        :data-testid="inputTestId"
         class="cv-search-field__control"
         type="search"
         :name="name"

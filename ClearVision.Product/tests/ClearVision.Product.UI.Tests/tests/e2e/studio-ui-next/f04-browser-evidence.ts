@@ -92,15 +92,33 @@ export async function captureF04VisualEvidence(
           ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
           : null;
       };
+      const overflow = (selector: string) => {
+        const element = document.querySelector(selector);
+        return element
+          ? {
+              horizontal: element.scrollWidth - element.clientWidth,
+              vertical: element.scrollHeight - element.clientHeight
+            }
+          : null;
+      };
       return {
         productRail: rect('.product-layout--workspace .product-layout__sidebar'),
         productTopbar: rect('.product-layout--workspace .product-layout__topbar'),
         workspaceToolbar: rect('.workspace-shell__toolbar'),
         operatorRail: rect('.operator-rail'),
+        operatorSearch: rect('[data-testid="operator-search"]'),
+        operatorCategory: rect('[data-testid="operator-category"]'),
+        operatorFirstItem: rect('.operator-item'),
+        flowToolbar: rect('.flow-canvas-surface__toolbar'),
         canvasStage: rect('.flow-canvas-surface__stage'),
         preview: rect('.preview-panel'),
+        previewDetails: rect('.preview-panel__details'),
+        imageToolbar: rect('.image-viewport__toolbar'),
+        imageStage: rect('.image-viewport__stage'),
         previewSplitter: rect('[data-workspace-splitter="preview"]'),
         inspector: rect('.inspector-panel'),
+        inspectorBody: rect('.inspector-panel__body'),
+        inspectorFirstParameter: rect('.parameter-editor'),
         inspectorSplitter: rect('[data-workspace-splitter="inspector"]'),
         workspaceStatusbar: rect('.workspace-shell__statusbar'),
         saveCommand: rect('[data-testid="workspace-save"]'),
@@ -118,7 +136,15 @@ export async function captureF04VisualEvidence(
         previewMaxHeight: document.querySelector('.flow-workspace')
           ?.getAttribute('data-preview-max-height') ?? null,
         previewCollapsed: document.querySelector('.flow-workspace')
-          ?.getAttribute('data-preview-collapsed') ?? null
+          ?.getAttribute('data-preview-collapsed') ?? null,
+        internalOverflow: {
+          operatorRail: overflow('.operator-rail'),
+          flowToolbar: overflow('.flow-canvas-surface__toolbar'),
+          inspectorBody: overflow('.inspector-panel__body'),
+          previewBody: overflow('.preview-panel__body'),
+          previewDetails: overflow('.preview-panel__details'),
+          imageToolbar: overflow('.image-viewport__toolbar')
+        }
       };
     })(),
     modalTitle: document.querySelector('[role="dialog"] h2')?.textContent?.trim() ?? null,

@@ -54,7 +54,7 @@ describe('F03 G2 Operator Rail', () => {
     await wrapper.get('.operator-item').trigger('click');
     expect(wrapper.emitted('add')?.[0]?.[0]).toMatchObject({ displayName: '全局阈值处理' });
 
-    await wrapper.get('[data-category="FeatureExtraction"]').trigger('click');
+    await wrapper.get('[data-testid="operator-category"]').setValue('FeatureExtraction');
     expect(wrapper.findAll('.operator-item')).toHaveLength(0);
     await wrapper.get('[data-testid="operator-search"]').setValue('');
     expect(wrapper.findAll('.operator-item')).toHaveLength(1);
@@ -83,6 +83,9 @@ describe('F03 G2 Operator Rail', () => {
     expect(payload).toMatchObject({ displayName: '全局阈值处理' });
     expect(payload.inputPorts).toHaveLength(1);
     expect(payload.outputPorts).toHaveLength(1);
+    expect(item.attributes('data-dragging')).toBe('true');
+    await item.trigger('dragend');
+    expect(item.attributes('data-dragging')).toBe('false');
   });
 
   it('disables click and drag mutations in readonly mode', () => {

@@ -370,7 +370,9 @@ function metadataState(
     } catch (error) {
       return Object.freeze({
         phase: 'error',
-        message: error instanceof InspectorMetadataDecodeError ? error.message : '参数 metadata 解码失败。',
+        message: error instanceof InspectorMetadataDecodeError
+          ? '参数定义格式无效，当前节点暂不可编辑。请刷新算子目录或联系维护人员。'
+          : '参数定义读取失败，当前节点暂不可编辑。请刷新算子目录。',
         metadata,
         constraints: Object.freeze([]),
         outputRules: Object.freeze([])
@@ -381,9 +383,9 @@ function metadataState(
     return Object.freeze({ phase: 'loading', message: catalog.message, metadata: null, constraints: Object.freeze([]), outputRules: Object.freeze([]) });
   }
   if (catalog.phase === 'success' || catalog.phase === 'empty') {
-    return Object.freeze({ phase: 'missing', message: `未找到类型 ${type} 的算子 metadata。`, metadata: null, constraints: Object.freeze([]), outputRules: Object.freeze([]) });
+    return Object.freeze({ phase: 'missing', message: `未找到类型 ${type} 的参数定义，当前节点参数不可编辑。请刷新算子目录。`, metadata: null, constraints: Object.freeze([]), outputRules: Object.freeze([]) });
   }
-  return Object.freeze({ phase: 'error', message: catalog.message ?? '算子 metadata 不可用。', metadata: null, constraints: Object.freeze([]), outputRules: Object.freeze([]) });
+  return Object.freeze({ phase: 'error', message: catalog.message ?? '参数定义不可用，当前节点参数不可编辑。请刷新算子目录。', metadata: null, constraints: Object.freeze([]), outputRules: Object.freeze([]) });
 }
 
 function buildNode(
@@ -574,14 +576,14 @@ export function createInspectorOwner(options: {
     projectId: options.project.id,
     projection: readonly(state),
     patchNodeParameter(parameterName: string, value: unknown): InspectorMutationResult {
-      if (disposed) return reject('disposed', 'Inspector owner 已释放。');
+      if (disposed) return reject('disposed', '属性检查器已关闭，请重新进入工程工作台。');
       const node = state.node;
       if (state.mode !== 'node' || !node) return reject('selection-mismatch', '当前未选择单个节点。');
       if (state.mutationGate !== 'editable') return reject(state.mutationGate, '当前状态禁止修改参数。');
-      if (node.metadataPhase !== 'ready') return reject('metadata-unavailable', node.metadataMessage ?? '参数 metadata 不可用。');
+      if (node.metadataPhase !== 'ready') return reject('metadata-unavailable', node.metadataMessage ?? '参数定义不可用。');
       const parameter = node.parameters.find(item => normalized(item.name) === normalized(parameterName));
       if (!parameter) return reject('parameter-not-found', '参数合同不存在。');
-      if (!parameter.persisted) return reject('parameter-not-persisted', '参数未出现在正式 Flow draft 中，G3 不会隐式创建持久化字段。');
+      if (!parameter.persisted) return reject('parameter-not-persisted', '该参数不在当前流程数据中，不能直接创建。请刷新流程或重新添加节点。');
       if (parameter.editorKind === 'unsupported' || parameter.editorKind === 'extension') {
         return reject('editor-unavailable', parameter.extensionMessage ?? '参数编辑器不可用。');
       }
@@ -618,7 +620,7 @@ export function createInspectorOwner(options: {
       return commandResult(result);
     },
     patchNodeProperties(patch: Readonly<{ name?: string; isEnabled?: boolean }>): InspectorMutationResult {
-      if (disposed) return reject('disposed', 'Inspector owner 已释放。');
+      if (disposed) return reject('disposed', '属性检查器已关闭，请重新进入工程工作台。');
       const node = state.node;
       if (state.mode !== 'node' || !node) return reject('selection-mismatch', '当前未选择单个节点。');
       if (state.mutationGate !== 'editable') return reject(state.mutationGate, '当前状态禁止修改节点属性。');
@@ -637,13 +639,13 @@ export function createInspectorOwner(options: {
       return commandResult(result);
     },
     commitImageBacked(command: InspectorImageBackedCommit): InspectorMutationResult {
-      if (disposed) return reject('disposed', 'Inspector owner 已释放。');
+      if (disposed) return reject('disposed', '属性检查器已关闭，请重新进入工程工作台。');
       const node = state.node;
       if (state.mode !== 'node' || !node || node.id !== command.nodeId) {
         return reject('selection-mismatch', 'ROI 编辑会话已因节点切换失效。');
       }
       if (state.selectionRevision !== command.selectionRevision || state.flowRevision !== command.flowRevision) {
-        return reject('stale-editor-session', 'Flow 或选择已变化，请重新打开图像编辑器。');
+        return reject('stale-editor-session', '流程或选择已变化，请重新打开图像编辑器。');
       }
       if (state.mutationGate !== 'editable') {
         return reject(state.mutationGate, '当前状态禁止提交图像参数。');
@@ -664,7 +666,7 @@ export function createInspectorOwner(options: {
       for (const name of Object.keys(command.values)) {
         const parameter = node.parameters.find(item => normalized(item.name) === normalized(name));
         if (!parameter || !parameter.persisted) {
-          return reject('parameter-not-persisted', `图像参数 ${name} 不在正式 Flow draft 中。`);
+          return reject('parameter-not-persisted', `图像参数 ${name} 不在当前流程数据中，无法应用本次修改。`);
         }
         if (parameter.definition) definitions.push(parameter.definition);
       }
@@ -677,7 +679,7 @@ export function createInspectorOwner(options: {
       return commandResult(result);
     },
     disconnectConnection(): InspectorMutationResult {
-      if (disposed) return reject('disposed', 'Inspector owner 已释放。');
+      if (disposed) return reject('disposed', '属性检查器已关闭，请重新进入工程工作台。');
       if (state.mode !== 'connection' || !state.connection) return reject('selection-mismatch', '当前未选择连接。');
       if (state.mutationGate !== 'editable') return reject(state.mutationGate, '当前状态禁止断开连接。');
       const result = options.flowOwner.commands.disconnect(state.connection.id);
@@ -685,7 +687,7 @@ export function createInspectorOwner(options: {
       return commandResult(result);
     },
     selectNode(nodeId: string): CanonicalFlowCommandResult {
-      if (disposed) return Object.freeze({ ok: false, code: 'disposed', message: 'Inspector owner 已释放。', flowRevision: state.flowRevision });
+      if (disposed) return Object.freeze({ ok: false, code: 'disposed', message: '属性检查器已关闭，请重新进入工程工作台。', flowRevision: state.flowRevision });
       return options.flowOwner.commands.selectNode(nodeId);
     },
     setDraftActive(key: string, active: boolean): void {

@@ -17,4 +17,16 @@ export type CvIconName =
   | 'lock'
   | 'empty'
   | 'not-found'
-  | 'refresh';
+  | 'refresh'
+  | 'undo'
+  | 'redo'
+  | 'copy'
+  | 'paste'
+  | 'duplicate'
+  | 'power'
+  | 'trash'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'fit'
+  | 'actual-size'
+  | 'drag';

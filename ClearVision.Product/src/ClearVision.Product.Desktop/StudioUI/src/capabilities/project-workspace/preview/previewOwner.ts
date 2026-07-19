@@ -306,7 +306,7 @@ export function createPreviewOwner(options: {
           }
           if (revision === previous || disposed) return;
           state.isStale = true;
-          state.staleReason = 'Flow draft 已变化，正在更新预览。';
+          state.staleReason = '本地流程已变化，正在更新预览。';
           listener();
         },
         { immediate: true }
@@ -368,7 +368,7 @@ export function createPreviewOwner(options: {
       state.phase === 'blocked' || state.phase === 'auth-error' || state.phase === 'cancelled') {
       const currentRevision = options.flowOwner.projection.runtime?.flowRevision ?? 0;
       state.isStale = Boolean(state.requestIdentity && state.requestIdentity.flowRevision !== currentRevision);
-      state.staleReason = state.isStale ? '该结果对应旧的 Flow draft。' : null;
+      state.staleReason = state.isStale ? '该结果对应旧的本地流程，请重新预览。' : null;
     }
     syncDiagnostics();
   });
@@ -399,7 +399,7 @@ export function createPreviewOwner(options: {
     previewNow(): Promise<unknown> {
       if (disposed) return Promise.resolve({ status: 'disposed' });
       state.isStale = state.requestIdentity !== null;
-      state.staleReason = state.isStale ? '正在重新预览当前 Flow draft。' : null;
+      state.staleReason = state.isStale ? '正在使用当前本地流程重新预览。' : null;
       return coordinator.invalidateActivePreview({ immediate: true, force: true, trigger: 'manual' });
     },
     cancel(reason = '用户取消预览'): void {

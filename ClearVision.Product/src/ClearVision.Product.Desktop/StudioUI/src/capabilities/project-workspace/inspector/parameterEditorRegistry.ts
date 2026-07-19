@@ -45,13 +45,13 @@ export function resolveInspectorParameterEditor(
   const dataType = normalized(input.dataType);
   const nullable = explicitNullable(input.raw, input.value);
   if (dataType === 'file') {
-    return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'file-picker', message: '文件选择在 G3 本轮范围外。' });
+    return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'file-picker', message: '文件选择器尚未接入当前工作区。' });
   }
   if (dataType === 'camerabinding') {
-    return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'camera-binding', message: 'CameraBinding 资源补齐在 G3 本轮范围外。' });
+    return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'camera-binding', message: '相机绑定尚未接入当前工作区。' });
   }
   if (['rectangle', 'circle', 'polygon', 'annulus', 'arc', 'circlesearch', 'npoint', 'caliper'].includes(dataType)) {
-    return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'image-backed', message: '请在下方 Preview 工作台使用唯一 ImageCanvas 进行图上编辑。' });
+    return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'image-backed', message: '请在下方预览区使用“编辑 ROI”进行图上编辑。' });
   }
   if (input.options && input.options.length > 0) {
     return Object.freeze({ kind: 'enum', integer: false, nullable, extensionSlot: null, message: null });
@@ -66,7 +66,7 @@ export function resolveInspectorParameterEditor(
         typeof input.maxValue === 'number' && Number.isFinite(input.maxValue);
       return bounded
         ? Object.freeze({ kind: 'slider', integer, nullable, extensionSlot: null, message: null })
-        : Object.freeze({ kind: 'unsupported', integer, nullable, extensionSlot: null, message: 'slider metadata 必须同时提供有限 min/max。' });
+        : Object.freeze({ kind: 'unsupported', integer, nullable, extensionSlot: null, message: '滑块参数需要同时提供有效的最小值和最大值。' });
     }
     return Object.freeze({ kind: 'number', integer, nullable, extensionSlot: null, message: null });
   }
@@ -78,6 +78,6 @@ export function resolveInspectorParameterEditor(
     integer: false,
     nullable,
     extensionSlot: null,
-    message: `不支持的参数类型：${input.dataType || 'unknown'}`
+    message: `当前工作区暂不支持参数类型：${input.dataType || '未知类型'}`
   });
 }

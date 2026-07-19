@@ -761,6 +761,110 @@ function inspectorFlow() {
   };
 }
 
+const prompt3ParameterPresentation: Readonly<Record<string, Readonly<{
+  displayName: string;
+  description: string;
+}>>> = Object.freeze({
+  Text: {
+    displayName: '工艺切换备注与异常处置说明',
+    description: '记录当前批次的工艺切换原因、现场异常和后续处理要求；内容较长时应保持可读。'
+  },
+  Count: {
+    displayName: '连续检测允许缺陷数量上限',
+    description: '超过该数量后停止继续处理，并提示操作员检查上料、光照和瓶盖位置。'
+  },
+  Enabled: {
+    displayName: '输出二值图供后续区域分析',
+    description: '关闭后，下游区域分析节点不会收到二值图。'
+  },
+  Mode: {
+    displayName: '阈值计算模式',
+    description: '选择自动计算或使用当前工程中的手动阈值。'
+  },
+  Gain: {
+    displayName: '光照补偿增益',
+    description: '用于补偿现场光照波动，调整后应重新执行节点预览。'
+  },
+  OptionalCount: {
+    displayName: '相机触发等待帧数（未配置时使用设备默认值）',
+    description: '留空时使用相机设备配置中的默认等待帧数。'
+  },
+  FilePath: {
+    displayName: '标定文件路径',
+    description: '旧参数，仅用于兼容已有工程；新工程应使用正式标定资产。'
+  }
+});
+const prompt3RoiParameterPresentation: Readonly<Record<string, Readonly<{
+  displayName: string;
+  description: string;
+}>>> = Object.freeze({
+  Shape: { displayName: 'ROI 形状', description: '选择要编辑的感兴趣区域形状。' },
+  X: { displayName: 'X 坐标', description: '感兴趣区域左上角的图像 X 坐标。' },
+  Y: { displayName: 'Y 坐标', description: '感兴趣区域左上角的图像 Y 坐标。' },
+  Width: { displayName: '宽度', description: '感兴趣区域宽度。' },
+  Height: { displayName: '高度', description: '感兴趣区域高度。' }
+});
+
+function prompt3OperatorCatalog() {
+  const catalog = structuredClone(operatorCatalog) as Array<Record<string, unknown>>;
+  const threshold = catalog.find(item => String(item.type) === '20');
+  if (!threshold) throw new Error('Prompt 3 fixture requires operator type 20.');
+  const parameterCopy = (threshold.parameters as Array<Record<string, unknown>>).map(parameter => {
+    const name = String(parameter.name);
+    const presentation = prompt3ParameterPresentation[name];
+    return presentation ? { ...parameter, ...presentation } : parameter;
+  });
+  threshold.displayName = '瓶盖外观与密封完整性综合检测';
+  threshold.description = '对瓶盖位置、边缘、密封区域和表面缺陷进行综合检测。';
+  threshold.parameters = parameterCopy;
+  threshold.parameterConstraints = [
+    ...(threshold.parameterConstraints as Array<Record<string, unknown>>),
+    {
+      parameter: 'FilePath', requiredPolicy: 'optional', requiredWhen: null,
+      enabledWhen: null, disabledWhen: null, visibleWhen: null, hiddenWhen: null,
+      ignoredWhen: null, atLeastOneGroup: null, mutuallyExclusiveGroup: null,
+      aliasFor: null, deprecated: true, resourceKind: null,
+      reasonCode: 'LEGACY_CALIBRATION_PATH', satisfiedByInputPorts: []
+    }
+  ];
+  const roiOperator = catalog.find(item => String(item.type) === 'RoiManager');
+  if (!roiOperator) throw new Error('Prompt 3 fixture requires RoiManager.');
+  roiOperator.displayName = 'ROI 矩形编辑';
+  roiOperator.description = '在预览图像上编辑矩形感兴趣区域。';
+  roiOperator.parameters = (roiOperator.parameters as Array<Record<string, unknown>>).map(parameter => {
+    const presentation = prompt3RoiParameterPresentation[String(parameter.name)];
+    return presentation
+      ? {
+          ...parameter,
+          ...presentation,
+          ...(String(parameter.name) === 'Shape'
+            ? { options: [{ label: '矩形', value: 'Rectangle' }] }
+            : {})
+        }
+      : parameter;
+  });
+  return catalog;
+}
+
+function prompt3PreviewOperatorCatalog() {
+  return prompt3OperatorCatalog();
+}
+
+function prompt3InspectorFlow() {
+  const flow = structuredClone(inspectorFlow()) as Record<string, unknown>;
+  flow.name = '瓶盖外观与密封完整性综合检测主流程（华东二号产线夜班工艺）';
+  const operators = flow.operators as Array<Record<string, unknown>>;
+  operators[0]!.name = '上料工位瓶盖外观与密封完整性综合检测节点（主检测流程）';
+  operators[1]!.name = '不合格瓶盖区域提取与下游剔除信号准备节点';
+  for (const operator of operators) {
+    operator.parameters = (operator.parameters as Array<Record<string, unknown>>).map(parameter => {
+      const presentation = prompt3ParameterPresentation[String(parameter.name)];
+      return presentation ? { ...parameter, ...presentation } : parameter;
+    });
+  }
+  return flow;
+}
+
 function roiPreviewFlow() {
   const nodeId = fixtureUuid(50_001);
   const parameter = (seed: number, name: string, value: number) => ({
@@ -820,6 +924,26 @@ function roiPreviewFlow() {
     connections: [],
     decisionConfiguration: null
   };
+}
+
+function prompt3PreviewFlow() {
+  const flow = structuredClone(roiPreviewFlow()) as Record<string, unknown>;
+  flow.name = '瓶盖密封区域 ROI 与结构化结果联合调试流程';
+  const operator = (flow.operators as Array<Record<string, unknown>>)[0]!;
+  operator.name = '瓶盖密封区域矩形 ROI 编辑节点';
+  operator.parameters = (operator.parameters as Array<Record<string, unknown>>).map(parameter => {
+    const presentation = prompt3RoiParameterPresentation[String(parameter.name)];
+    return presentation
+      ? {
+          ...parameter,
+          ...presentation,
+          ...(String(parameter.name) === 'Shape'
+            ? { options: [{ label: '矩形', value: 'Rectangle' }] }
+            : {})
+        }
+      : parameter;
+  });
+  return flow;
 }
 
 async function selectInspectorNode(page: Page, x: number, y: number) {
@@ -901,7 +1025,7 @@ test('Operator Rail supports search, category, click-add and drag-add', async ({
   await expect(canvas).toHaveAttribute('data-flow-revision', '1');
 
   await page.locator('[data-testid="operator-search"]').fill('');
-  await page.locator('[data-category="SegmentationAndRegion"]').click();
+  await page.locator('[data-testid="operator-category"]').selectOption('SegmentationAndRegion');
   await expect(page.locator('.operator-item')).toHaveCount(3);
   await dragOperator(page, '二值图转区域', 120, 120);
   await expect(canvas).toHaveAttribute('data-node-count', '2');
@@ -2580,6 +2704,231 @@ test('narrow Workspace overlays restore focus and remain inside the viewport', a
   expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
 });
 
+test('Prompt 3 refines Operator Rail and populated Inspector across width and long-Chinese states', async ({ page }) => {
+  const viewport = { width: 1920, height: 1080 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, {
+      name: '华东二号产线瓶盖外观与密封完整性综合检测工程（夜班工艺验证）',
+      flow: prompt3InspectorFlow()
+    }),
+    operatorCatalogBody: prompt3OperatorCatalog()
+  });
+  const workspace = page.locator('.flow-workspace');
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  const inspectorSplitter = page.locator('[data-workspace-splitter="inspector"]');
+  const search = page.locator('[data-testid="operator-search"]');
+  const category = page.locator('[data-testid="operator-category"]');
+
+  await category.selectOption('ImagePreprocessing');
+  await search.fill('缺陷数量');
+  const operator = page.locator('.operator-item');
+  await expect(operator).toHaveCount(1);
+  await expect(operator).toContainText('瓶盖外观与密封完整性综合检测');
+  await operator.focus();
+  const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+  await operator.dispatchEvent('dragstart', { dataTransfer });
+  await expect(operator).toHaveAttribute('data-dragging', 'true');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-prompt3-operator-search-drag', viewport, runtimeErrors, requestAudit: audit,
+      notes: ['Prompt 3 Operator Rail search, category, focus and drag state.']
+    });
+  }
+  await operator.dispatchEvent('dragend');
+  await search.fill('');
+  await category.selectOption('');
+
+  await selectInspectorNode(page, 120, 125);
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'node');
+  await expect(inspector).toContainText('上料工位瓶盖外观与密封完整性综合检测节点');
+  await expect(inspector).toContainText('工艺切换备注与异常处置说明');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '296');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-prompt3-inspector-default-long-zh', viewport, runtimeErrors, requestAudit: audit,
+      notes: ['Prompt 3 populated Inspector at the 296px default width.']
+    });
+  }
+
+  await inspectorSplitter.focus();
+  await page.keyboard.press('Home');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '248');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-prompt3-inspector-min-long-zh', viewport, runtimeErrors, requestAudit: audit,
+      notes: ['Prompt 3 populated Inspector at the 248px minimum width.']
+    });
+  }
+
+  await page.keyboard.press('End');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '420');
+  const countInput = inspector.locator('[data-parameter-name="Count"] input[type="number"]');
+  await countInput.fill('11');
+  await countInput.blur();
+  await expect(inspector.locator('.inspector-panel__validation')).toContainText('不能大于 10');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-prompt3-inspector-max-validation', viewport, runtimeErrors, requestAudit: audit,
+      notes: ['Prompt 3 populated Inspector at 420px with an inline validation error.']
+    });
+  }
+
+  const internalOverflow = await page.evaluate(() => Object.fromEntries([
+    ['operator', document.querySelector('.operator-rail')],
+    ['flowToolbar', document.querySelector('.flow-canvas-surface__toolbar')],
+    ['inspector', document.querySelector('.inspector-panel__body')]
+  ].map(([key, element]) => [key, element ? element.scrollWidth - element.clientWidth : null])));
+  expect(internalOverflow).toEqual({ operator: 0, flowToolbar: 0, inspector: 0 });
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
+});
+
+test('Prompt 3 Inspector explains disabled parameters without exposing internal metadata terms', async ({ page }) => {
+  const viewport = { width: 1920, height: 1080 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: prompt3InspectorFlow() }),
+    operatorCatalogBody: []
+  });
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  await selectInspectorNode(page, 120, 125);
+  await expect(inspector).toHaveAttribute('data-metadata-phase', 'missing');
+  await expect(inspector).toContainText('参数定义');
+  await expect(inspector).not.toContainText('metadata');
+  await expect(inspector.locator('[data-parameter-name="Text"] input')).toBeDisabled();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-prompt3-inspector-disabled', viewport, runtimeErrors, requestAudit: audit,
+      notes: ['Prompt 3 disabled Inspector state with Chinese recovery guidance.']
+    });
+  }
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
+});
+
+test('Prompt 3 Preview preserves image, result, ROI, empty and error hierarchy on a short comfortable viewport', async ({ page }) => {
+  const viewport = { width: 1350, height: 704 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, {
+      name: '瓶盖 ROI 与结构化结果联合调试工程（短屏验证）',
+      flow: prompt3PreviewFlow()
+    }),
+    operatorCatalogBody: prompt3PreviewOperatorCatalog(),
+    previewScenario: (request, call) => {
+      if (call === 1) return {
+        body: previewPayload(request, call, {
+          outputData: {
+            判定: '检测通过',
+            置信度: 0.9826,
+            缺陷区域数量: 0,
+            说明: '瓶盖边缘、密封区域与表面纹理均满足当前工程阈值。'
+          },
+          artifacts: [previewArtifactReference(call)]
+        })
+      };
+      if (call === 2) return {
+        body: previewPayload(request, call, { outputData: null, artifacts: [] })
+      };
+      return {
+        body: previewPayload(request, call, {
+          success: false,
+          outputData: null,
+          artifacts: [],
+          errorMessage: '无法读取瓶盖定位所需的标定资产；当前预览已停止。请检查工程资产是否完整，然后重新预览。',
+          failedOperatorName: 'ROI 矩形编辑节点',
+          failedOperatorType: 'RoiManager',
+          diagnostics: [{ code: 'CALIBRATION_ASSET_MISSING', message: '未找到相机一对应的平面标定资产。', pathHint: '$.assets' }],
+          missingResources: [{
+            resourceType: 'CalibrationAsset', resourceKey: 'camera-1-plane',
+            description: '相机一平面标定资产未配置。', diagnosticCode: 'CVP401'
+          }]
+        })
+      };
+    }
+  });
+  await page.locator('[data-product-appearance] summary').click();
+  await page.getByRole('button', { name: '舒适' }).click();
+  await page.locator('[data-product-appearance] summary').click();
+  await expect(page.locator('html')).toHaveAttribute('data-density', 'comfortable');
+  await selectInspectorNode(page, 120, 125);
+
+  const preview = page.locator('[data-capability="preview-workbench"]');
+  const image = page.locator('[data-capability="image-canvas"]');
+  const roi = page.locator('.preview-panel__roi');
+  const run = page.locator('[data-testid="preview-run"]');
+  await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+  await expect(image).toHaveAttribute('data-image-phase', 'ready');
+  await expect(preview.locator('.preview-panel__result pre')).toContainText('检测通过');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-prompt3-preview-success-1350-comfortable', viewport, runtimeErrors, requestAudit: audit,
+      notes: ['Prompt 3 Preview with image, structured result and ROI at 1350x704 comfortable.']
+    });
+  }
+
+  await page.locator('[data-testid="roi-start"]').click();
+  await expect(roi).toHaveAttribute('data-roi-phase', 'editing');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-prompt3-preview-roi-editing-1350-comfortable', viewport, runtimeErrors, requestAudit: audit,
+      notes: ['Prompt 3 ROI editing actions remain visible on the short viewport.']
+    });
+  }
+  await page.locator('[data-testid="roi-cancel"]').click();
+
+  await run.click();
+  await expect(preview).toHaveAttribute('data-preview-phase', 'empty');
+  await expect(image).toHaveAttribute('data-image-phase', 'empty');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-prompt3-preview-empty-1350-comfortable', viewport, runtimeErrors, requestAudit: audit,
+      notes: ['Prompt 3 Preview empty result state.']
+    });
+  }
+
+  await run.click();
+  await expect(preview).toHaveAttribute('data-preview-phase', 'error');
+  await expect(preview).toContainText('无法读取瓶盖定位所需的标定资产');
+  await expect(preview).toContainText('CALIBRATION_ASSET_MISSING');
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-prompt3-preview-error-1350-comfortable', viewport, runtimeErrors, requestAudit: audit,
+      notes: ['Prompt 3 Preview error and diagnostic hierarchy with recovery guidance.']
+    });
+  }
+
+  const overflow = await page.evaluate(() => ({
+    pageHorizontal: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    pageVertical: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+    previewHorizontal: (() => {
+      const element = document.querySelector('.preview-panel__body');
+      return element ? element.scrollWidth - element.clientWidth : null;
+    })(),
+    imageToolbarHorizontal: (() => {
+      const element = document.querySelector('.image-viewport__toolbar');
+      return element ? element.scrollWidth - element.clientWidth : null;
+    })(),
+    detailsHorizontal: (() => {
+      const element = document.querySelector('.preview-panel__details');
+      return element ? element.scrollWidth - element.clientWidth : null;
+    })()
+  }));
+  expect(overflow).toEqual({
+    pageHorizontal: 0,
+    pageVertical: 0,
+    previewHorizontal: 0,
+    imageToolbarHorizontal: 0,
+    detailsHorizontal: 0
+  });
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
+});
+
 for (const scenario of [
   { viewport: { width: 1920, height: 1080 }, density: 'compact' },
   { viewport: { width: 1350, height: 704 }, density: 'compact' },
@@ -2648,11 +2997,11 @@ for (const scenario of [
     }
     if (hasF04VisualEvidenceTarget()) {
       await captureF04VisualEvidence(page, {
-        scenario: `workspace-layout-default-${density}`,
+        scenario: `workspace-prompt3-layout-default-${density}`,
         viewport,
         runtimeErrors,
         requestAudit: audit,
-        notes: ['Prompt 2/5 Workspace splitter and Preview layout evidence.']
+        notes: ['Prompt 3/5 Workspace core tool and Inspector visual refinement evidence.']
       });
     }
   });
