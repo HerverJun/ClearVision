@@ -5,7 +5,7 @@
 ```text
 G6_IMPLEMENTATION=YES
 G6_LOCAL_EVIDENCE=PASS
-G6_STATUS=LOCAL_DONE_REMOTE_CI_PENDING
+G6_STATUS=DONE
 
 G6_EVIDENCE_SHA=0c78962d2a005ebea165eaee8a98558aca88c99c
 F04_FINAL_CODE_SHA=0c78962d2a005ebea165eaee8a98558aca88c99c
@@ -21,8 +21,11 @@ ROLLBACK=PASS
 F04_PRODUCT_VISUAL_AUTOMATED_GATE=PASS
 F04_PRODUCT_VISUAL_CONFIRMATION=AWAITING_USER
 
-REMOTE_CI=PENDING_PUSH
-FINAL_GATE=PENDING_REMOTE_CI
+REMOTE_CI=PASS
+FINAL_GATE=PASS
+REMOTE_CI_RUN_ID=29666388675
+REMOTE_CI_ATTEMPT=1
+REMOTE_CI_HEAD_SHA=4ef30837ca1eb43f2aa751d8ea727e61b2b4b74a
 ```
 
 G6 没有新增 Auth、Project、Result、HTTP、EventBus、ServiceRegistry、Canvas、HostBridge 或保存权威。最终旅程继续复用现有 authenticated HTTP/API、`ProjectSaveCoordinator`、Inspection admission/execute/reconcile 与正式 Result repository。
@@ -111,6 +114,16 @@ REAL_WEBVIEW2_FINAL=PASS (3/3 processes)
 
 Browser full 的 17 个 skip 都是仅在显式证据目录存在时执行的可选截图用例；F04 视觉合同另行启用证据目录运行并通过。
 
+远端 `ClearVision CI/CD` 由 `workflow_dispatch` 在 `4ef30837ca1eb43f2aa751d8ea727e61b2b4b74a` 上执行，run `29666388675`、attempt 1 一次通过。Guard、StudioUI、Product、Desktop、Detection/Measurement/Data、OperatorLibrary、Contracts & Vision Agent、Legacy UI & StudioUI Browser、Coverage Summary、Operator Industrial Gate 与 Final Gate 均为 success；没有 rerun。
+
+设计性 skip：
+
+```text
+RELEASE_BUILD=SKIPPED_AS_DESIGNED_FOR_WORKFLOW_DISPATCH
+CREATE_RELEASE=SKIPPED_AS_DESIGNED_FOR_NON_TAG_REF
+CODE_QUALITY=SKIPPED_AS_DESIGNED_FOR_NON_PULL_REQUEST
+```
+
 ## 5. Release、sanitized path、DPI、profiles 与 rollback
 
 ```text
@@ -190,23 +203,24 @@ F04_PRODUCT_VISUAL_CONFIRMATION=AWAITING_USER
 
 ```text
 F04-B50-FINAL-SHA-EVIDENCE-MISMATCH=CLOSED
-F04-B51-REMOTE-CI-NOT-GREEN=OPEN_PENDING_REMOTE_CI
+F04-B51-REMOTE-CI-NOT-GREEN=CLOSED
 F04-B52-SCOPE-CREEP=CLOSED
 ```
 
-本地工程与自动证据已经闭合；push 和远端 Final Gate 完成前，delivery 状态保持：
+本地工程、final-SHA 自动证据与远端 Final Gate 已闭合：
 
 ```text
-PLAN_STATUS=LOCAL_IMPLEMENTED_REMOTE_CI_PENDING
-F04_STATUS=LOCAL_COMPLETE_REMOTE_CI_PENDING
+PLAN_STATUS=IMPLEMENTED
+F04_STATUS=COMPLETE
 F04_IMPLEMENTED=YES
+ENGINEERING_CLOSURE=COMPLETE
 NEXT_PILOT_PROFILE_AVAILABLE=YES
 NEXT_DEFAULT_ENTRY_RECOMMENDATION=DEFER
 AWAITING_PRODUCT_VISUAL_CONFIRMATION=YES
 DEFAULT_ENTRY_CHANGE_NOT_AUTHORIZED=YES
 ```
 
-远端 CI 通过后，本文件记录 run ID/attempt 并把工程 closure 更新为 `COMPLETE`。即使届时 F04 工程完成，未获得用户视觉确认前仍不得建议或修改正式默认入口。
+F04 工程 closure 已完成。用户产品视觉确认仍是非工程审批等待项；在其明确通过前，不得建议或修改正式默认入口。
 
 ## 8. Preserved boundaries
 
