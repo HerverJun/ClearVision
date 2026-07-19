@@ -1,0 +1,4 @@
+interface:
+  display_name: "ClearVision Studio UI Design"
+  short_description: "ClearVision Studio 中文工业界面设计与审查规则"
+  default_prompt: "使用 $clearvision-studio-ui-design 审查 ClearVision Studio UI 的旧版功能完整性、中文体验、Quiet Precision 与 1080P 效率。"
