@@ -88,7 +88,11 @@ import PropertySidebarController, {
     createPropertyPanelCapabilityAdapter
 } from './features/flow-editor/propertySidebarController.mjs';
 import PropertyPanelCapabilityOwner from './features/flow-editor/propertyPanelCapabilityOwner.mjs';
-import { NodePreviewCoordinator, resolvePreviewInputImageBase64 } from './features/flow-editor/previewCoordinator.js';
+import {
+    NodePreviewCoordinator,
+    resolveCameraPreviewInputFrame,
+    resolvePreviewInputImageBase64
+} from './features/flow-editor/previewCoordinator.js';
 import PreviewPanelCapabilityOwner, {
     createPreviewPanelCapabilityAdapter
 } from './features/flow-editor/previewPanelCapabilityOwner.mjs';
@@ -484,6 +488,7 @@ function getViewManager() {
             getPropertySidebarController: () => propertySidebarController,
             ensureInspectionPanelReady,
             initializeInspectionImageViewer,
+            restoreInspectionImageViewer,
             ensureResultPanel,
             loadInspectionHistory,
             ensureStationMonitorView,
@@ -801,32 +806,57 @@ function getLatestInspectionImageBase64() {
         || getInlineResultImageBase64(inspectionController.getLastResult?.());
 }
 
-function getStudioPreviewInputFrame() {
+function clearStudioPreviewInputFrame(message = '') {
+    const frame = serviceRegistry.get('studioPreviewInputFrame');
+    if (!frame) {
+        return;
+    }
+
+    serviceRegistry.unregister('studioPreviewInputFrame', frame);
+    if (message) {
+        showToast(message, 'warning');
+    }
+}
+
+function getStudioPreviewInputFrame(targetNodeId = null) {
     const frame = serviceRegistry.get('studioPreviewInputFrame');
     if (!frame?.imageBase64) {
         return null;
     }
 
     const currentProjectId = getCurrentProject()?.id || null;
-    if (frame.projectId && frame.projectId !== currentProjectId) {
-        return null;
+    const sourceNode = flowCanvas?.nodes?.get?.(frame.sourceNodeId) || null;
+    const resolution = resolveCameraPreviewInputFrame({
+        frame,
+        currentProjectId,
+        sourceNode,
+        targetNodeId,
+        connections: flowCanvas?.connections || []
+    });
+    if (resolution.shouldInvalidate) {
+        clearStudioPreviewInputFrame(resolution.message);
     }
 
-    return frame;
+    return resolution.frame;
 }
 
-function getStudioPreviewInputImageSource() {
-    const imageBase64 = getStudioPreviewInputFrame()?.imageBase64 || null;
+function getStudioPreviewInputImageSource(targetNodeId = null) {
+    const imageBase64 = getStudioPreviewInputFrame(targetNodeId)?.imageBase64 || null;
     return imageBase64 ? `data:image/png;base64,${imageBase64}` : null;
 }
 
 function getLatestInspectionImageSource() {
+    const latestBlob = inspectionController.getLastResultImageBlob?.();
+    if (latestBlob) {
+        return latestBlob;
+    }
+
     const latestBase64 = getLatestInspectionImageBase64();
     if (latestBase64) {
         return `data:image/png;base64,${latestBase64}`;
     }
 
-    return getLatestInspectionImageUrl();
+    return null;
 }
 
 function getLatestInspectionImageUrl() {
@@ -836,24 +866,36 @@ function getLatestInspectionImageUrl() {
         || getResultImageUrl(inspectionController.getLastResult?.());
 }
 
-async function getLatestInspectionInputImageBase64() {
-    const studioFrame = getStudioPreviewInputFrame();
+async function getLatestInspectionPreviewInput(targetNodeId = null) {
+    const studioFrame = getStudioPreviewInputFrame(targetNodeId);
     if (studioFrame?.imageBase64) {
-        return studioFrame.imageBase64;
+        return {
+            imageBase64: studioFrame.imageBase64,
+            sourceNodeId: studioFrame.sourceNodeId,
+            frameId: studioFrame.frameId
+        };
     }
 
     const latestImage = getLatestInspectionImageBase64();
     if (latestImage) {
-        return latestImage;
+        return { imageBase64: latestImage, sourceNodeId: null, frameId: null };
     }
 
     const inspectionResult = serviceRegistry.get('lastInspectionResult') || inspectionController.getLastResult?.();
     const inlineImage = resolvePreviewInputImageBase64(inspectionResult);
     if (inlineImage) {
-        return inlineImage;
+        return { imageBase64: inlineImage, sourceNodeId: null, frameId: null };
     }
 
-    return loadImageUrlAsBase64(getLatestInspectionImageUrl());
+    return {
+        imageBase64: await loadImageUrlAsBase64(getLatestInspectionImageUrl()),
+        sourceNodeId: null,
+        frameId: null
+    };
+}
+
+async function getLatestInspectionInputImageBase64(targetNodeId = null) {
+    return (await getLatestInspectionPreviewInput(targetNodeId)).imageBase64;
 }
 
 function loadViewerImageSilently(viewer, imageData) {
@@ -870,6 +912,54 @@ function loadViewerImageSilently(viewer, imageData) {
         }
     } catch (error) {
         debugLogger.warn('[App] 静默加载检测图像失败:', error);
+    }
+}
+
+function applyInspectionImageLoadState(state) {
+    const currentView = getCurrentView();
+    const viewer = currentView === 'inspection'
+        ? serviceRegistry.get('inspectionImageViewer')
+        : currentView === 'image'
+            ? serviceRegistry.get('imageViewer')
+            : null;
+    if (!viewer) {
+        return;
+    }
+
+    if (state?.status === 'loading') {
+        viewer.clearImage?.('正在加载最新检测图像');
+    } else if (state?.status === 'error') {
+        viewer.clearImage?.(state.message || '检测图像加载失败', {
+            retryLabel: '重试加载',
+            onRetry: () => void inspectionController.retryLastResultImage?.()
+        });
+    } else if (state?.status === 'empty') {
+        viewer.clearImage?.(state.message || '检测结果未提供可展示的图像');
+    }
+}
+
+function restoreInspectionImageViewer(viewer) {
+    if (!viewer) {
+        return;
+    }
+
+    const lastImageSource = getLatestInspectionImageSource();
+    if (lastImageSource) {
+        loadViewerImageSilently(viewer, lastImageSource);
+        return;
+    }
+
+    const imageState = inspectionController.getLastResultImageState?.();
+    if (imageState?.status === 'loading') {
+        viewer.clearImage?.('正在加载最新检测图像');
+        void inspectionController.ensureLastResultImageLoaded?.();
+    } else if (imageState?.status === 'error') {
+        viewer.clearImage?.(imageState.message || '检测图像加载失败', {
+            retryLabel: '重试加载',
+            onRetry: () => void inspectionController.retryLastResultImage?.()
+        });
+    } else if (imageState?.status === 'empty') {
+        viewer.clearImage?.(imageState.message || '检测结果未提供可展示的图像');
     }
 }
 
@@ -1229,6 +1319,7 @@ function initializeInspectionImageViewer() {
             requestAnimationFrame(() => {
                 existingInspectionImageViewer.imageCanvas?.resize();
             });
+            restoreInspectionImageViewer(existingInspectionImageViewer);
             return;
         }
 
@@ -1243,11 +1334,7 @@ function initializeInspectionImageViewer() {
     try {
         const inspectionImageViewer = new ImageViewerComponent('inspection-image-area');
         serviceRegistry.register('inspectionImageViewer', inspectionImageViewer);
-
-        const lastImageSource = getLatestInspectionImageSource();
-        if (lastImageSource) {
-            loadViewerImageSilently(inspectionImageViewer, lastImageSource);
-        }
+        restoreInspectionImageViewer(inspectionImageViewer);
 
         debugLogger.debug('[App] 检测图像查看器初始化完成');
     } catch (error) {
@@ -1305,8 +1392,12 @@ async function initializeNodePreviewExperience() {
             getNodeById: nodeId => flowCanvas.nodes.get(nodeId) || null,
             getOperatorMetadata: type => findOperatorDefinition(type),
             getInputImageBase64: () => getLatestInspectionInputImageBase64(),
+            getInputImageContext: node => getLatestInspectionPreviewInput(node?.id || null),
             previewExecutor: (nodeId, options) => inspectionController.previewNode(nodeId, options),
-            subscribeStructureState: listener => flowCanvas.subscribeStructureState(listener),
+            subscribeStructureState: listener => flowCanvas.subscribeStructureState(state => {
+                getStudioPreviewInputFrame();
+                listener(state);
+            }),
             debounceMs: 500
         });
         serviceRegistry.register('nodePreviewCoordinator', nodePreviewCoordinator);
@@ -1356,6 +1447,13 @@ async function initializeNodePreviewExperience() {
 }
 
 function initializeInspectionController() {
+    inspectionController.onInspectionImageState((state) => {
+        if (state?.status === 'loading' || state?.status === 'empty') {
+            serviceRegistry.unregister('lastInspectionImageBlob');
+        }
+        applyInspectionImageLoadState(state);
+    });
+
     const unsubscribeCompleted = inspectionController.onInspectionCompleted((result) => {
         const currentProjectId = getCurrentProject()?.id || null;
         const normalizedResult = normalizeInspectionResultRecord(result, currentProjectId);
@@ -1379,24 +1477,24 @@ function initializeInspectionController() {
         if (inlineResultImage) {
             serviceRegistry.register('lastInspectionImageBase64', inlineResultImage);
             serviceRegistry.unregister('lastInspectionImageUrl');
+            serviceRegistry.unregister('lastInspectionImageBlob');
         } else if (resultImageUrl) {
             serviceRegistry.unregister('lastInspectionImageBase64');
             serviceRegistry.register('lastInspectionImageUrl', resultImageUrl);
+            serviceRegistry.unregister('lastInspectionImageBlob');
         } else {
             serviceRegistry.unregister('lastInspectionImageBase64');
             serviceRegistry.unregister('lastInspectionImageUrl');
+            serviceRegistry.unregister('lastInspectionImageBlob');
         }
         window._lastInspectionResult = lightweightResult;
 
         const isRealtimeResult = inspectionController.getState?.().isRealtime === true;
 
         if (getCurrentView() === 'inspection') {
-            const outputImage = inlineResultImage
-                ? `data:image/png;base64,${inlineResultImage}`
-                : resultImageUrl;
             const inspectionImageViewerService = serviceRegistry.get('inspectionImageViewer');
-            if (outputImage && inspectionImageViewerService) {
-                loadViewerImageSilently(inspectionImageViewerService, outputImage);
+            if (inlineResultImage && inspectionImageViewerService) {
+                loadViewerImageSilently(inspectionImageViewerService, `data:image/png;base64,${inlineResultImage}`);
             }
 
             updateInspectionResultsPanel(normalizedResult);
@@ -1686,7 +1784,7 @@ function createPropertyPanelCapabilityOwner() {
                 projectId: getCurrentProject()?.id || null
             });
         },
-        getPreviewInputImageSource: () => getStudioPreviewInputImageSource(),
+        getPreviewInputImageSource: nodeId => getStudioPreviewInputImageSource(nodeId),
         circleSearchV2ToolEnabled: readStartupFeatureFlagOnce('Studio:CircleSearchV2ToolEnabled'),
         nPointCalibrationWorkbenchEnabled: readStartupFeatureFlagOnce('Studio:NPointCalibrationWorkbenchEnabled'),
         showToast
@@ -2001,6 +2099,11 @@ async function initializeFlowEditor() {
     inspectionController.setFlowProvider?.(() => flowCanvasAdapter.serialize());
     inspectionController.setImageSinks?.([
         (imageData) => {
+            if (typeof Blob !== 'undefined' && imageData instanceof Blob) {
+                serviceRegistry.register('lastInspectionImageBlob', imageData);
+                serviceRegistry.unregister('lastInspectionImageBase64');
+            }
+
             if (getCurrentView() !== 'inspection') {
                 return;
             }
@@ -2663,6 +2766,9 @@ async function bootstrapApp() {
 async function handleProjectChange(project) {
     eventBus.emit('project:changed', { project });
     const nextProjectId = project?.id || null;
+    if (nodePreviewProjectId !== nextProjectId) {
+        clearStudioPreviewInputFrame();
+    }
     const shouldClearPreview = nextProjectId === null ||
         (nodePreviewProjectId !== null && nodePreviewProjectId !== nextProjectId);
     nodePreviewProjectId = nextProjectId;

@@ -34,4 +34,15 @@ public static class InspectionImageFormatDetector
     {
         return GuessExtension(bytes).TrimStart('.');
     }
+
+    public static string GuessContentType(byte[]? bytes)
+    {
+        return GuessExtension(bytes) switch
+        {
+            ".png" => "image/png",
+            ".jpg" => "image/jpeg",
+            ".bmp" => "image/bmp",
+            _ => "application/octet-stream"
+        };
+    }
 }

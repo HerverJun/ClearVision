@@ -83,7 +83,8 @@ const IMAGE_NODE_TYPE_FALLBACKS = new Set([
  *   nodeId: string | null,
  *   flowRevision: number,
  *   parameterSnapshot: string,
- *   inputImageHash: string
+ *   inputImageHash: string,
+ *   inputFrameId: string | null
  * }} PreviewRequestKey
  */
 
@@ -463,6 +464,120 @@ export function buildPreviewParameterSnapshot(parameters) {
     return buildParameterSnapshot(parameters);
 }
 
+export function buildCameraPreviewSourceSignature(node) {
+    return hashString(stableSerialize({
+        nodeType: node?.type || null,
+        sourceType: normalizeAcquisitionSourceType(getParameterValue(node?.parameters, 'SourceType', 'sourceType')),
+        cameraBindingId: getCameraAcquisitionBindingValue(node),
+        triggerMode: String(getParameterValue(node?.parameters, 'TriggerMode', 'triggerMode') || '').trim(),
+        exposureTime: getParameterValue(node?.parameters, 'ExposureTime', 'exposureTime'),
+        gain: getParameterValue(node?.parameters, 'Gain', 'gain')
+    }));
+}
+
+function createCameraPreviewFrameId() {
+    return globalThis.crypto?.randomUUID?.()
+        || `camera-frame-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function normalizeOptionalFiniteNumber(value) {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+export function createCameraPreviewInputContext(node, frame = {}) {
+    const imageBase64 = normalizeBase64Image(frame.imageBase64 || frame.imageData || frame.imageSource);
+    if (!node?.id || !imageBase64) {
+        throw new Error('创建相机单帧预览上下文需要有效的采集节点和图像。');
+    }
+
+    return {
+        imageBase64,
+        sourceNodeId: node.id,
+        projectId: frame.projectId || null,
+        frameId: frame.frameId || createCameraPreviewFrameId(),
+        sourceSignature: buildCameraPreviewSourceSignature(node),
+        cameraBindingId: frame.cameraBindingId || null,
+        triggerMode: frame.triggerMode || null,
+        width: normalizeOptionalFiniteNumber(frame.width),
+        height: normalizeOptionalFiniteNumber(frame.height),
+        source: frame.source || 'camera-single-frame',
+        capturedAtUtc: frame.capturedAtUtc || new Date().toISOString()
+    };
+}
+
+export function isPreviewSourceReachable(sourceNodeId, targetNodeId, connections = []) {
+    if (!sourceNodeId || !targetNodeId) {
+        return false;
+    }
+    if (sourceNodeId === targetNodeId) {
+        return true;
+    }
+
+    const visited = new Set([sourceNodeId]);
+    const pending = [sourceNodeId];
+    while (pending.length > 0) {
+        const current = pending.shift();
+        for (const connection of connections || []) {
+            const source = connection?.source || connection?.sourceNodeId || connection?.sourceOperatorId;
+            const target = connection?.target || connection?.targetNodeId || connection?.targetOperatorId;
+            if (source !== current || !target || visited.has(target)) {
+                continue;
+            }
+            if (target === targetNodeId) {
+                return true;
+            }
+            visited.add(target);
+            pending.push(target);
+        }
+    }
+
+    return false;
+}
+
+export function resolveCameraPreviewInputFrame({
+    frame,
+    currentProjectId = null,
+    sourceNode = null,
+    targetNodeId = null,
+    connections = []
+} = {}) {
+    if (!frame?.imageBase64) {
+        return { frame: null, shouldInvalidate: false, message: '' };
+    }
+
+    if ((frame.projectId || null) !== (currentProjectId || null)) {
+        return { frame: null, shouldInvalidate: true, message: '' };
+    }
+
+    const sourceNodeType = sourceNode?.type || sourceNode?.operatorType || null;
+    if (!sourceNode || sourceNodeType !== 'ImageAcquisition' || sourceNode.disabled === true || sourceNode.isEnabled === false) {
+        return {
+            frame: null,
+            shouldInvalidate: true,
+            message: '原图像采集节点已不可用，请重新获取单帧图像。'
+        };
+    }
+
+    if (frame.sourceSignature !== buildCameraPreviewSourceSignature(sourceNode)) {
+        return {
+            frame: null,
+            shouldInvalidate: true,
+            message: '相机采集配置已变更，请重新获取单帧图像。'
+        };
+    }
+
+    if (targetNodeId && !isPreviewSourceReachable(frame.sourceNodeId, targetNodeId, connections)) {
+        return { frame: null, shouldInvalidate: false, message: '' };
+    }
+
+    return { frame, shouldInvalidate: false, message: '' };
+}
+
 function hashString(input) {
     const text = String(input || '');
     let hash = 5381;
@@ -476,6 +591,22 @@ function hashString(input) {
 
 export function buildPreviewInputImageHash(inputImageBase64) {
     return inputImageBase64 ? hashString(inputImageBase64) : 'none';
+}
+
+function normalizePreviewInputContext(value) {
+    if (typeof value === 'string') {
+        return {
+            imageBase64: normalizeBase64Image(value),
+            sourceNodeId: null,
+            frameId: null
+        };
+    }
+
+    return {
+        imageBase64: normalizeBase64Image(value?.imageBase64 || value?.imageData || value?.imageSource),
+        sourceNodeId: value?.sourceNodeId || null,
+        frameId: value?.frameId || null
+    };
 }
 
 function createPresenterState(state) {
@@ -698,15 +829,16 @@ function createPreviewArtifactAbortError(message) {
     return error;
 }
 
-function buildPreviewRequestKey({ projectId, nodeId, flowRevision, parameterSnapshot, inputImageBase64 }) {
+function buildPreviewRequestKey({ projectId, nodeId, flowRevision, parameterSnapshot, inputImageBase64, inputFrameId = null }) {
     const inputImageHash = buildPreviewInputImageHash(inputImageBase64);
     return {
-        requestKey: `${projectId || 'no-project'}:${nodeId || 'no-node'}:${flowRevision}:${hashString(parameterSnapshot)}:${inputImageHash}`,
+        requestKey: `${projectId || 'no-project'}:${nodeId || 'no-node'}:${flowRevision}:${hashString(parameterSnapshot)}:${inputImageHash}:${inputFrameId || 'no-frame'}`,
         projectId: projectId || null,
         nodeId: nodeId || null,
         flowRevision: Number(flowRevision || 0),
         parameterSnapshot,
-        inputImageHash
+        inputImageHash,
+        inputFrameId: inputFrameId || null
     };
 }
 
@@ -871,6 +1003,12 @@ export class NodePreviewCoordinator {
         this.getNodeById = options.getNodeById ?? (() => null);
         this.getOperatorMetadata = options.getOperatorMetadata ?? (() => null);
         this.getInputImageBase64 = options.getInputImageBase64 ?? (() => null);
+        this.getInputImageContext = options.getInputImageContext ?? (() => {
+            const imageValue = this.getInputImageBase64();
+            return imageValue && typeof imageValue.then === 'function'
+                ? imageValue.then(imageBase64 => ({ imageBase64, sourceNodeId: null, frameId: null }))
+                : { imageBase64: imageValue, sourceNodeId: null, frameId: null };
+        });
         this.previewExecutor = options.previewExecutor ?? (async () => null);
         this.artifactClient = options.artifactClient ?? httpClient;
         this.debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
@@ -1303,7 +1441,8 @@ export class NodePreviewCoordinator {
             nodeId: node.id,
             flowRevision,
             parameterSnapshot: buildParameterSnapshot(node.parameters),
-            inputImageBase64: imageBase64
+            inputImageBase64: imageBase64,
+            inputFrameId: frame.frameId || null
         });
         const outputData = compactPreviewOutputValue({
             Source: frame.source || 'camera-single-frame',
@@ -1518,9 +1657,17 @@ export class NodePreviewCoordinator {
                 return;
             }
 
-            const inputImageBase64 = shouldUseExternalInputImage(activeNode)
-                ? await Promise.resolve(this.getInputImageBase64())
+            const previewInput = normalizePreviewInputContext(
+                await Promise.resolve(this.getInputImageContext(activeNode)));
+            const isExplicitCapturedSource = Boolean(previewInput.sourceNodeId) &&
+                (activeNode.type !== 'ImageAcquisition' || previewInput.sourceNodeId === activeNode.id);
+            const inputImageBase64 = shouldUseExternalInputImage(activeNode) || isExplicitCapturedSource
+                ? previewInput.imageBase64
                 : null;
+            const inputImageSourceNodeId = inputImageBase64 && isExplicitCapturedSource
+                ? previewInput.sourceNodeId
+                : null;
+            const inputFrameId = inputImageBase64 ? previewInput.frameId : null;
             if (scheduledVersion !== this.requestVersion || this.state.activeNodeId !== activeNode.id) {
                 return;
             }
@@ -1575,7 +1722,8 @@ export class NodePreviewCoordinator {
                 nodeId: activeNode.id,
                 flowRevision,
                 parameterSnapshot: buildParameterSnapshot(activeNode.parameters),
-                inputImageBase64
+                inputImageBase64,
+                inputFrameId
             });
 
             const bypassCache = isLiveCameraAcquisitionNode(activeNode);
@@ -1634,6 +1782,7 @@ export class NodePreviewCoordinator {
                     clientRequestSequence,
                     flowRevision,
                     inputImageBase64,
+                    inputImageSourceNodeId,
                     parameters: null,
                     artifactMode: 'references',
                     signal: abortController?.signal,

@@ -169,6 +169,11 @@ public static class PreviewNodeEndpoints
                         statusCode: 400);
                 }
 
+                if (request.InputImageSourceNodeId.HasValue && !hasInlineFlowData)
+                {
+                    flow = ExecutionFlowIdentity.CloneFlow(flow);
+                }
+
                 // 应用参数覆盖（如果有）
                 if (request.Parameters != null && request.Parameters.Count > 0)
                 {
@@ -187,6 +192,28 @@ public static class PreviewNodeEndpoints
                 }
 
                 var targetOperator = flow.Operators.FirstOrDefault(o => o.Id == request.TargetNodeId);
+                byte[]? capturedFrameImageData = null;
+                if (request.InputImageSourceNodeId.HasValue)
+                {
+                    var capturedFramePreparation = PrepareCapturedFramePreviewFlow(
+                        flow,
+                        request.TargetNodeId,
+                        request.InputImageSourceNodeId.Value,
+                        request.InputImageBase64);
+                    if (!capturedFramePreparation.IsValid)
+                    {
+                        return Results.BadRequest(new
+                        {
+                            Code = "PREVIEW_CAPTURED_FRAME_SOURCE_INVALID",
+                            Error = capturedFramePreparation.ErrorMessage
+                        });
+                    }
+
+                    flow = capturedFramePreparation.Flow!;
+                    capturedFrameImageData = capturedFramePreparation.ImageData;
+                    targetOperator = flow.Operators.FirstOrDefault(o => o.Id == request.TargetNodeId);
+                }
+
                 if (targetOperator?.Type == OperatorType.ImageSave)
                 {
                     var imageSavePreviewTimeoutMs = NormalizePreviewTimeoutMs(request.TimeoutMs);
@@ -255,12 +282,17 @@ public static class PreviewNodeEndpoints
 
                 // 准备输入数据
                 Dictionary<string, object>? inputData = null;
-                var externalInputImageBase64 = ShouldUseExternalInputImage(flow, request.TargetNodeId)
+                var externalInputImageBase64 = capturedFrameImageData != null || ShouldUseExternalInputImage(flow, request.TargetNodeId)
                     ? request.InputImageBase64
                     : null;
                 if (!string.IsNullOrWhiteSpace(externalInputImageBase64))
                 {
-                    if (!ImagePayloadDecoder.TryDecodeBytes(externalInputImageBase64, "InputImageBase64", out var imageData, out var decodeError, out var statusCode))
+                    byte[] imageData;
+                    if (capturedFrameImageData != null)
+                    {
+                        imageData = capturedFrameImageData;
+                    }
+                    else if (!ImagePayloadDecoder.TryDecodeBytes(externalInputImageBase64, "InputImageBase64", out imageData, out var decodeError, out var statusCode))
                     {
                         return ImagePayloadDecoder.ToErrorResult(decodeError, statusCode);
                     }
@@ -2165,6 +2197,87 @@ public static class PreviewNodeEndpoints
         return ImageAcquisitionFlowAnalyzer.ShouldPassExternalInputImageToPreview(flow, targetNodeId);
     }
 
+    private static CapturedFramePreviewPreparation PrepareCapturedFramePreviewFlow(
+        ClearVision.Product.Core.Entities.OperatorFlow flow,
+        Guid targetNodeId,
+        Guid sourceNodeId,
+        string? inputImageBase64)
+    {
+        if (sourceNodeId == Guid.Empty)
+        {
+            return CapturedFramePreviewPreparation.Invalid("单帧预览来源节点不能为空。");
+        }
+
+        if (!ImagePayloadDecoder.TryDecodeBytes(
+                inputImageBase64,
+                "InputImageBase64",
+                out var imageData,
+                out var decodeError,
+                out _))
+        {
+            return CapturedFramePreviewPreparation.Invalid(decodeError);
+        }
+
+        var relevantIds = CollectRelevantOperatorIds(flow, targetNodeId);
+        if (!relevantIds.Contains(sourceNodeId))
+        {
+            return CapturedFramePreviewPreparation.Invalid("单帧预览来源节点不在目标节点的上游路径中。");
+        }
+
+        var sourceOperator = flow.Operators.FirstOrDefault(item => item.Id == sourceNodeId);
+        if (sourceOperator == null)
+        {
+            return CapturedFramePreviewPreparation.Invalid("找不到单帧预览来源节点。");
+        }
+
+        if (!sourceOperator.IsEnabled)
+        {
+            return CapturedFramePreviewPreparation.Invalid("单帧预览来源节点已禁用。");
+        }
+
+        if (sourceOperator.Type != OperatorType.ImageAcquisition ||
+            !ImageAcquisitionFlowAnalyzer.IsCameraSource(sourceOperator))
+        {
+            return CapturedFramePreviewPreparation.Invalid("单帧预览来源必须是相机模式的图像采集节点。");
+        }
+
+        if (flow.Connections.Any(connection => connection.TargetOperatorId == sourceNodeId))
+        {
+            return CapturedFramePreviewPreparation.Invalid("单帧预览来源必须是无上游连接的采集根节点。");
+        }
+
+        var previewFlow = ExecutionFlowIdentity.CloneFlow(flow);
+        var previewSource = previewFlow.Operators.Single(item => item.Id == sourceNodeId);
+        SetPreviewRuntimeImageParameter(previewSource, "SourceType", "File", "enum");
+        SetPreviewRuntimeImageParameter(previewSource, "FilePath", string.Empty, "file");
+
+        return CapturedFramePreviewPreparation.Valid(previewFlow, imageData);
+    }
+
+    private static void SetPreviewRuntimeImageParameter(
+        ClearVision.Product.Core.Entities.Operator @operator,
+        string name,
+        object value,
+        string dataType)
+    {
+        var parameter = @operator.Parameters.FirstOrDefault(item =>
+            item.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (parameter != null)
+        {
+            parameter.SetValue(value);
+            return;
+        }
+
+        @operator.AddParameter(new Parameter(
+            Guid.NewGuid(),
+            name,
+            name,
+            string.Empty,
+            dataType,
+            value,
+            isRequired: false));
+    }
+
     private static string BuildMissingNodeOutputDetail(
         FlowDebugExecutionResult result,
         Guid targetNodeId)
@@ -2756,6 +2869,23 @@ public static class PreviewNodeEndpoints
         Dictionary<string, object> OutputData,
         List<string> Diagnostics);
 
+    private sealed record CapturedFramePreviewPreparation(
+        bool IsValid,
+        ClearVision.Product.Core.Entities.OperatorFlow? Flow,
+        byte[]? ImageData,
+        string? ErrorMessage)
+    {
+        public static CapturedFramePreviewPreparation Valid(
+            ClearVision.Product.Core.Entities.OperatorFlow flow,
+            byte[] imageData) =>
+            new(true, flow, imageData, null);
+
+        public static CapturedFramePreviewPreparation Invalid(string? errorMessage) =>
+            new(false, null, null, string.IsNullOrWhiteSpace(errorMessage)
+                ? "单帧预览输入无效。"
+                : errorMessage);
+    }
+
     private static ExecutionSnapshot CreatePreviewSnapshot(Guid projectId, OperatorFlow flow) =>
         new(
             projectId == Guid.Empty
@@ -2857,6 +2987,11 @@ public class PreviewNodeRequest
     /// 输入图像（Base64），可选
     /// </summary>
     public string? InputImageBase64 { get; set; }
+
+    /// <summary>
+    /// 显式单帧预览所替代的相机采集节点，可选。
+    /// </summary>
+    public Guid? InputImageSourceNodeId { get; set; }
 
     /// <summary>
     /// 目标节点的新参数（覆盖原参数）

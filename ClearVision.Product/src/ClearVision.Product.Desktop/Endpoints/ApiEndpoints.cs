@@ -1609,9 +1609,12 @@ public static class ApiEndpoints
                 return Results.NotFound();
             }
 
-            return Results.File(imageData, "image/png");
+            return Results.File(imageData, GetImageResponseContentType(imageData));
         });
     }
+
+    private static string GetImageResponseContentType(byte[] imageData) =>
+        InspectionImageFormatDetector.GuessContentType(imageData);
 
     private static bool IsAdmin(HttpContext context)
     {

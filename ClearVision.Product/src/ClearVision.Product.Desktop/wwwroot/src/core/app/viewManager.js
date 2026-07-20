@@ -55,6 +55,7 @@ function getInlineResultImageBase64(result) {
  * @property {() => any} getPropertySidebarController
  * @property {() => Promise<any>} ensureInspectionPanelReady
  * @property {() => void} initializeInspectionImageViewer
+ * @property {(viewer: any) => void} restoreInspectionImageViewer
  * @property {() => Promise<any>} ensureResultPanel
  * @property {() => Promise<void>} loadInspectionHistory
  * @property {() => Promise<any>} ensureStationMonitorView
@@ -80,6 +81,7 @@ export function createViewManager(options) {
         getPropertySidebarController,
         ensureInspectionPanelReady,
         initializeInspectionImageViewer,
+        restoreInspectionImageViewer,
         ensureResultPanel,
         loadInspectionHistory,
         ensureStationMonitorView,
@@ -150,7 +152,22 @@ export function createViewManager(options) {
                 break;
             case 'image':
                 containers.image?.classList.remove('hidden');
-                scheduleFrame(() => serviceRegistry?.get?.('imageViewer')?.imageCanvas?.resize?.());
+                scheduleFrame(() => {
+                    const imageViewer = serviceRegistry?.get?.('imageViewer');
+                    imageViewer?.imageCanvas?.resize?.();
+                    if (typeof restoreInspectionImageViewer === 'function') {
+                        restoreInspectionImageViewer(imageViewer);
+                    } else {
+                        const inspectionImage = serviceRegistry?.get?.('lastInspectionImageBlob');
+                        const inspectionImageBase64 = serviceRegistry?.get?.('lastInspectionImageBase64');
+                        const source = inspectionImage || (inspectionImageBase64
+                            ? `data:image/png;base64,${inspectionImageBase64}`
+                            : null);
+                        if (source && imageViewer) {
+                            imageViewer.loadImage(source, { silent: true });
+                        }
+                    }
+                });
                 break;
             case 'inspection': {
                 containers.inspection?.classList.remove('hidden');
@@ -163,9 +180,10 @@ export function createViewManager(options) {
                     const lastInspectionResult = serviceRegistry?.get?.('lastInspectionResult');
                     const lastInspectionImageBase64 = serviceRegistry?.get?.('lastInspectionImageBase64')
                         || getInlineResultImageBase64(lastInspectionResult);
-                    const lastInspectionImage = lastInspectionImageBase64
-                        ? `data:image/png;base64,${lastInspectionImageBase64}`
-                        : serviceRegistry?.get?.('lastInspectionImageUrl');
+                    const lastInspectionImage = serviceRegistry?.get?.('lastInspectionImageBlob')
+                        || (lastInspectionImageBase64
+                            ? `data:image/png;base64,${lastInspectionImageBase64}`
+                            : null);
                     if (lastInspectionImage && inspectionImageViewer) {
                         inspectionImageViewer.loadImage(lastInspectionImage, { silent: true });
                     }

@@ -27,7 +27,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("Protocol", "Protocol", "enum", Description = "当前仅支持 TCP；RTU 选项用于旧流程兼容，执行时返回不支持。", DefaultValue = "TCP", Options = new[] { "TCP|TCP", "RTU|RTU" })]
 [OperatorParam("IpAddress", "IP Address", "string", DefaultValue = "192.168.1.1")]
 [OperatorParam("Port", "Port", "int", DefaultValue = 502, Min = 1, Max = 65535)]
-[OperatorParam("SlaveId", "Slave ID", "int", DefaultValue = 1, Min = 1, Max = 247)]
+[OperatorParam("SlaveId", "Slave ID", "int", DefaultValue = 1, Min = 1, Max = 255)]
 [OperatorParam("RegisterAddress", "Register Address", "int", DefaultValue = 0)]
 [OperatorParam("RegisterCount", "Register Count", "int", DefaultValue = 1, Min = 1, Max = 125)]
 [OperatorParam("FunctionCode", "Function Code", "enum", DefaultValue = "ReadHolding", Options = new[] { "ReadCoils|Read Coils", "ReadHolding|Read Holding Registers", "WriteSingle|Write Single Register", "WriteMultiple|Write Multiple Registers" })]
@@ -61,7 +61,7 @@ public class ModbusCommunicationOperator : OperatorBase
         var protocol = GetStringParam(@operator, "Protocol", "TCP");
         var ipAddress = GetStringParam(@operator, "IpAddress", "192.168.1.1");
         var port = GetIntParam(@operator, "Port", 502, 1, 65535);
-        var slaveId = GetIntParam(@operator, "SlaveId", 1, 1, 247);
+        var slaveId = GetIntParam(@operator, "SlaveId", 1, 1, 255);
         var registerAddress = GetIntParam(@operator, "RegisterAddress", 0);
         var registerCount = GetIntParam(@operator, "RegisterCount", 1, 1, 125);
         var functionCode = GetStringParam(@operator, "FunctionCode", "ReadHolding");
@@ -142,9 +142,9 @@ public class ModbusCommunicationOperator : OperatorBase
             return ValidationResult.Invalid("Port must be between 1 and 65535.");
         }
 
-        if (slaveId < 1 || slaveId > 247)
+        if (slaveId < 1 || slaveId > 255)
         {
-            return ValidationResult.Invalid("SlaveId must be between 1 and 247.");
+            return ValidationResult.Invalid("SlaveId must be between 1 and 255.");
         }
 
         if (registerCount < 1 || registerCount > 125)

@@ -447,6 +447,275 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_WithCapturedCameraFrameSource_ShouldExecuteDownstreamWithoutReadingCamera()
+    {
+        var project = new Project("preview-captured-camera-frame-downstream");
+        var cameraManager = Substitute.For<ICameraManager>();
+        var acquisitionId = Guid.NewGuid();
+        var acquisitionOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var equalizationId = Guid.NewGuid();
+        var equalizationInputPort = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+        var equalizationOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var blobId = Guid.NewGuid();
+        var blobInputPort = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+        var blobOutputPort = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var blobCountOutputPort = CreatePort("BlobCount", PortDataType.Integer, PortDirection.Output);
+        var inputImage = CreateTwoAreaBlobPreviewImageBytes();
+
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            new ProjectVariableSessionRegistry(),
+            [
+                new ImageAcquisitionOperator(
+                    NullLogger<ImageAcquisitionOperator>.Instance,
+                    cameraManager),
+                new HistogramEqualizationOperator(NullLogger<HistogramEqualizationOperator>.Instance),
+                new BlobDetectionOperator(NullLogger<BlobDetectionOperator>.Instance)
+            ]);
+
+        var flowData = CreateUpdateFlowRequest(
+            CreateOperatorDto(
+                acquisitionId,
+                "ImageAcquisition",
+                OperatorType.ImageAcquisition,
+                outputPorts: [acquisitionOutputPort],
+                parameters: new Dictionary<string, object>
+                {
+                    ["SourceType"] = "Camera",
+                    ["CameraId"] = "cam-preview"
+                }),
+            CreateOperatorDto(
+                equalizationId,
+                "HistogramEqualization",
+                OperatorType.HistogramEqualization,
+                inputPorts: [equalizationInputPort],
+                outputPorts: [equalizationOutputPort],
+                parameters: new Dictionary<string, object>
+                {
+                    ["Method"] = "Global"
+                }),
+            CreateOperatorDto(
+                blobId,
+                "BlobAnalysis",
+                OperatorType.BlobAnalysis,
+                inputPorts: [blobInputPort],
+                outputPorts: [blobOutputPort, blobCountOutputPort],
+                parameters: new Dictionary<string, object>
+                {
+                    ["MinArea"] = 1,
+                    ["MaxArea"] = 100000,
+                    ["Color"] = "White"
+                }),
+            CreateConnection(acquisitionId, acquisitionOutputPort.Id, equalizationId, equalizationInputPort.Id),
+            CreateConnection(equalizationId, equalizationOutputPort.Id, blobId, blobInputPort.Id));
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = blobId,
+            InputImageSourceNodeId = acquisitionId,
+            InputImageBase64 = Convert.ToBase64String(inputImage),
+            FlowData = flowData
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(payload);
+        document.RootElement.GetProperty("executedOperators").EnumerateArray()
+            .Select(item => item.GetProperty("operatorId").GetGuid())
+            .Should().Contain([acquisitionId, equalizationId, blobId]);
+        document.RootElement.GetProperty("outputData").GetProperty("BlobCount").GetInt32().Should().Be(2);
+        flowData.Operators.Single(item => item.Id == acquisitionId).Parameters
+            .Single(item => item.Name == "SourceType").Value.Should().Be("Camera");
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithCameraFlowButNoCapturedSource_ShouldRemainAdmissionBlocked()
+    {
+        var projectId = Guid.NewGuid();
+        var acquisitionId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var acquisitionOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var targetInput = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+        var targetOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(_ => { });
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            InputImageBase64 = Convert.ToBase64String(CreateBinaryPreviewImageBytes()),
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(
+                    acquisitionId,
+                    "Camera",
+                    OperatorType.ImageAcquisition,
+                    outputPorts: [acquisitionOutput],
+                    parameters: new Dictionary<string, object>
+                    {
+                        ["SourceType"] = "Camera",
+                        ["CameraId"] = "cam-preview"
+                    }),
+                CreateOperatorDto(
+                    targetNodeId,
+                    "Resize",
+                    OperatorType.ImageResize,
+                    inputPorts: [targetInput],
+                    outputPorts: [targetOutput]),
+                CreateConnection(acquisitionId, acquisitionOutput.Id, targetNodeId, targetInput.Id))
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+        payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
+    }
+
+    [Theory]
+    [InlineData("missing-image")]
+    [InlineData("missing-source")]
+    [InlineData("not-upstream")]
+    [InlineData("not-acquisition")]
+    [InlineData("not-camera-mode")]
+    [InlineData("disabled")]
+    [InlineData("not-root")]
+    public async Task PreviewNode_WithInvalidCapturedFrameSource_ShouldFailClosed(string scenario)
+    {
+        var projectId = Guid.NewGuid();
+        var upstreamId = Guid.NewGuid();
+        var sourceNodeId = scenario == "missing-source" ? Guid.NewGuid() : upstreamId;
+        var targetNodeId = Guid.NewGuid();
+        var upstreamOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var targetInput = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+        var targetOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var items = new List<object>();
+
+        if (scenario == "not-root")
+        {
+            var predecessorId = Guid.NewGuid();
+            var predecessorOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+            var upstreamInput = CreatePort("Image", PortDataType.Image, PortDirection.Input);
+            items.Add(CreateOperatorDto(predecessorId, "Predecessor", OperatorType.ImageResize, outputPorts: [predecessorOutput]));
+            items.Add(CreateOperatorDto(
+                upstreamId,
+                "Camera",
+                OperatorType.ImageAcquisition,
+                inputPorts: [upstreamInput],
+                outputPorts: [upstreamOutput],
+                parameters: new Dictionary<string, object>
+                {
+                    ["SourceType"] = "Camera",
+                    ["CameraId"] = "cam-preview"
+                }));
+            items.Add(CreateConnection(predecessorId, predecessorOutput.Id, upstreamId, upstreamInput.Id));
+        }
+        else
+        {
+            var source = CreateOperatorDto(
+                upstreamId,
+                "Source",
+                scenario == "not-acquisition" ? OperatorType.ImageResize : OperatorType.ImageAcquisition,
+                outputPorts: [upstreamOutput],
+                parameters: scenario == "not-acquisition"
+                    ? null
+                    : new Dictionary<string, object>
+                    {
+                        ["SourceType"] = scenario == "not-camera-mode" ? "File" : "Camera",
+                        ["CameraId"] = "cam-preview"
+                    });
+            source.IsEnabled = scenario != "disabled";
+            items.Add(source);
+        }
+
+        if (scenario == "not-upstream")
+        {
+            sourceNodeId = Guid.NewGuid();
+            items.Add(CreateOperatorDto(
+                sourceNodeId,
+                "Unrelated camera",
+                OperatorType.ImageAcquisition,
+                outputPorts: [CreatePort("Image", PortDataType.Image, PortDirection.Output)],
+                parameters: new Dictionary<string, object>
+                {
+                    ["SourceType"] = "Camera",
+                    ["CameraId"] = "cam-unrelated"
+                }));
+        }
+
+        items.Add(CreateOperatorDto(
+            targetNodeId,
+            "Target",
+            OperatorType.ImageResize,
+            inputPorts: [targetInput],
+            outputPorts: [targetOutput]));
+        items.Add(CreateConnection(upstreamId, upstreamOutput.Id, targetNodeId, targetInput.Id));
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(_ => { });
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            InputImageSourceNodeId = sourceNodeId,
+            InputImageBase64 = scenario == "missing-image"
+                ? null
+                : Convert.ToBase64String(CreateBinaryPreviewImageBytes()),
+            FlowData = CreateUpdateFlowRequest(items.ToArray())
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+        payload.Should().Contain("PREVIEW_CAPTURED_FRAME_SOURCE_INVALID");
+    }
+
+    [Fact]
+    public async Task PreviewNode_WithAnotherCameraUpstream_ShouldKeepRemainingDeviceReadBlocked()
+    {
+        var projectId = Guid.NewGuid();
+        var firstCameraId = Guid.NewGuid();
+        var secondCameraId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var firstOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var secondOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var firstInput = CreatePort("First", PortDataType.Image, PortDirection.Input);
+        var secondInput = CreatePort("Second", PortDataType.Image, PortDirection.Input);
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(_ => { });
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            InputImageSourceNodeId = firstCameraId,
+            InputImageBase64 = Convert.ToBase64String(CreateBinaryPreviewImageBytes()),
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(
+                    firstCameraId,
+                    "Camera A",
+                    OperatorType.ImageAcquisition,
+                    outputPorts: [firstOutput],
+                    parameters: new Dictionary<string, object> { ["SourceType"] = "Camera", ["CameraId"] = "cam-a" }),
+                CreateOperatorDto(
+                    secondCameraId,
+                    "Camera B",
+                    OperatorType.ImageAcquisition,
+                    outputPorts: [secondOutput],
+                    parameters: new Dictionary<string, object> { ["SourceType"] = "Camera", ["CameraId"] = "cam-b" }),
+                CreateOperatorDto(
+                    targetNodeId,
+                    "Target",
+                    OperatorType.ResultJudgment,
+                    inputPorts: [firstInput, secondInput]),
+                CreateConnection(firstCameraId, firstOutput.Id, targetNodeId, firstInput.Id),
+                CreateConnection(secondCameraId, secondOutput.Id, targetNodeId, secondInput.Id))
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+        payload.Should().Contain("ADMISSION_NODE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        payload.Should().Contain("Camera B");
+    }
+
+    [Fact]
     public async Task PreviewNode_BlobAnalysis_ShouldPersistMaxAreaAndReturnOnlyFilteredBlobsInArtifactPreview()
     {
         var project = new Project("preview-blob-analysis");

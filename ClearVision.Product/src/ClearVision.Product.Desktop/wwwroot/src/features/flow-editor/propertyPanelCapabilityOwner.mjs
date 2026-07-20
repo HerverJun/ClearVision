@@ -8,6 +8,7 @@ import {
     normalizeAcquisitionSourceType
 } from '../../shared/parameterDependencyRules.js';
 import RoiEditorPanel from './roiEditorPanel.js';
+import { createCameraPreviewInputContext } from './previewCoordinator.js';
 import {
     getOperatorRoiConfig,
     isCircleSearchV2ToolEnabled,
@@ -1011,7 +1012,7 @@ export class PropertyPanelCapabilityOwner {
 
             const width = Number(headers?.get?.('X-Image-Width')) || null;
             const height = Number(headers?.get?.('X-Image-Height')) || null;
-            const frame = {
+            const frame = createCameraPreviewInputContext(this.currentOperator, {
                 imageBase64,
                 cameraBindingId: headers?.get?.('X-Camera-Id') || context.cameraBindingId,
                 triggerMode: headers?.get?.('X-Trigger-Mode') || context.triggerMode,
@@ -1019,7 +1020,7 @@ export class PropertyPanelCapabilityOwner {
                 height,
                 source: 'camera-single-frame',
                 capturedAtUtc: new Date().toISOString()
-            };
+            });
 
             this.previewCoordinator?.publishExternalFrame?.(this.currentOperator, frame);
             this.onCapturePreviewInput(frame);
@@ -1784,7 +1785,7 @@ export class PropertyPanelCapabilityOwner {
                 return getOperatorRoiConfig(operator, this.getGeometryEditorOptions());
             },
             previewCoordinator: this.previewCoordinator,
-            getFallbackImageSource: this.getPreviewInputImageSource,
+            getFallbackImageSource: () => this.getPreviewInputImageSource(this.currentNodeId),
             previewResourcesEnabled: this.previewResourcesEnabled,
             onOpenPreviewImage: this.onOpenPreviewImage,
             onRectChanged: (values, phase) => this.handleGeometryChanged(values, phase),

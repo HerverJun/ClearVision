@@ -53,6 +53,17 @@ public class ModbusCommunicationOperatorTests
     }
 
     [Fact]
+    public void ValidateParameters_WithTcpGatewayUnitId255_ShouldBeValid()
+    {
+        var op = new Operator("test", OperatorType.ModbusCommunication, 0, 0);
+        op.AddParameter(new(Guid.NewGuid(), "SlaveId", "SlaveId", "", "int", 255, 1, 255, true));
+
+        var result = _operator.ValidateParameters(op);
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithUnsupportedRtuMode_ShouldReturnFailure()
     {
         var op = new Operator("test", OperatorType.ModbusCommunication, 0, 0);

@@ -201,3 +201,77 @@ test('inspection realtime aborts SSE when stop or start failure occurs', async (
   expect(result.startFailureAbortObserved).toBe(true);
   expect(result.startClosedConnection).toBe(true);
 });
+
+test('inspection result fetches a protected image as a Blob before drawing it', async ({ page }) => {
+  await openModuleHost(page);
+
+  const result = await page.evaluate(async () => {
+    document.body.innerHTML = '<div id="inspection-test-viewer" style="width: 640px; height: 480px"></div>';
+
+    const inspectionModule = await import('/src/features/inspection/inspectionController.js');
+    const imageViewerModule = await import('/src/features/image-viewer/imageViewer.js');
+    const httpClientModule = await import('/src/core/messaging/httpClient.js');
+    const controller = inspectionModule.default;
+    const httpClient = httpClientModule.default;
+    const viewer = new imageViewerModule.ImageViewerComponent('inspection-test-viewer');
+    const originalFetch = window.fetch;
+    const originalHeaders = httpClient.defaultHeaders;
+    const requests: Array<{ url: string; authorization: string | null }> = [];
+    const png = Uint8Array.from(
+      atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLJ4QAAAABJRU5ErkJggg=='),
+      value => value.charCodeAt(0),
+    );
+
+    try {
+      httpClient.defaultHeaders = {
+        ...originalHeaders,
+        Authorization: 'Bearer browser-image-token',
+      };
+      window.fetch = async (url, options = {}) => {
+        requests.push({
+          url: String(url),
+          authorization: new Headers(options.headers).get('authorization'),
+        });
+        return new Response(png, {
+          status: 200,
+          headers: { 'Content-Type': 'image/png' },
+        });
+      };
+
+      controller.recentCompletedResultKeys.clear();
+      controller.setImageSinks([source => viewer.loadImage(source, { silent: true })]);
+      controller.handleResultEvent({
+        resultId: `protected-image-${Date.now()}`,
+        projectId: 'project-protected-image',
+        imageId: '00000000-0000-0000-0000-000000000888',
+        status: 'OK',
+      });
+      await controller.ensureLastResultImageLoaded();
+
+      for (let attempt = 0; attempt < 20 && !viewer.currentImage; attempt += 1) {
+        await new Promise(resolve => window.setTimeout(resolve, 10));
+      }
+
+      return {
+        requests,
+        imageIsBlob: controller.getLastResultImageBlob() instanceof Blob,
+        imageWidth: viewer.currentImage?.width ?? 0,
+        imageHeight: viewer.currentImage?.height ?? 0,
+      };
+    } finally {
+      window.fetch = originalFetch;
+      httpClient.defaultHeaders = originalHeaders;
+      controller.cancelLastResultImageLoad();
+      controller.setImageSinks([]);
+      controller.recentCompletedResultKeys.clear();
+      viewer.destroy();
+    }
+  });
+
+  expect(result.requests).toHaveLength(1);
+  expect(result.requests[0].url).toContain('/api/images/00000000-0000-0000-0000-000000000888');
+  expect(result.requests[0].authorization).toBe('Bearer browser-image-token');
+  expect(result.imageIsBlob).toBe(true);
+  expect(result.imageWidth).toBe(1);
+  expect(result.imageHeight).toBe(1);
+});
