@@ -225,12 +225,18 @@ test('Results local view keeps query filters, dual axes, detail 404 and GET-only
   await expect.poll(() => audit.some(entry => entry.path.includes('status=Invalid'))).toBe(true);
   await page.getByLabel('诊断码').fill('FIXTURE_INVALID');
   await expect(page.getByText('本机诊断码为当前页过滤')).toBeVisible();
-  await page.getByRole('button', { name: '查看详情' }).first().click();
-  await expect(page.getByText('轻微划痕')).toBeVisible();
-  await expect(page.getByText('Flow Hash')).toBeVisible();
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
-      scenario: 'results', viewport, runtimeErrors, requestAudit: audit
+      scenario: 'results-filter-list', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
+  await page.getByRole('button', { name: '查看详情' }).first().click();
+  await expect(page.getByText('轻微划痕')).toBeVisible();
+  await page.getByText('技术追溯', { exact: true }).click();
+  await expect(page.getByText('流程版本哈希')).toBeVisible();
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'results-detail', viewport, runtimeErrors, requestAudit: audit
     });
   }
 
@@ -260,24 +266,39 @@ test('Results Station view paginates the frozen 500-result fixture and marks leg
 });
 
 for (const visual of [
+  { id: 'results-wide-light-compact', width: 1920, height: 1080 },
   { id: 'results-light-compact', width: 1366, height: 768 },
   { id: 'results-short-light-compact', width: 1366, height: 600 }
 ] as const) {
   test(`captures ${visual.id} Browser fixture evidence`, async ({ page }) => {
-    test.skip(!hasF02VisualEvidenceTarget(), 'F02 visual evidence output was not requested.');
+    test.skip(
+      !hasF02VisualEvidenceTarget() && !hasF04VisualEvidenceTarget(),
+      'Visual evidence output was not requested.'
+    );
     await page.setViewportSize({ width: visual.width, height: visual.height });
     await installF02VisualPreferences(page, 'light', 'compact');
     const runtimeErrors = createF02RuntimeErrorAudit(page);
     const audit = await bootResults(page, '/results?source=station&pageSize=200&resultId=fixture-result-0001');
     await expect(page.getByText('第 1–200 项，共 500 项')).toBeVisible();
-    await captureF02VisualEvidence(page, {
-      scenario: visual.id,
-      viewport: { width: visual.width, height: visual.height },
-      theme: 'light',
-      density: 'compact',
-      requests: audit,
-      runtimeErrors
-    });
+    if (hasF02VisualEvidenceTarget()) {
+      await captureF02VisualEvidence(page, {
+        scenario: visual.id,
+        viewport: { width: visual.width, height: visual.height },
+        theme: 'light',
+        density: 'compact',
+        requests: audit,
+        runtimeErrors
+      });
+    }
+    if (hasF04VisualEvidenceTarget()) {
+      await captureF04VisualEvidence(page, {
+        scenario: visual.id,
+        viewport: { width: visual.width, height: visual.height },
+        runtimeErrors,
+        requestAudit: audit,
+        notes: ['F04.1 core page short-screen evidence.']
+      });
+    }
     expect(expectGetOnly(audit)).toBe(true);
     expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
   });

@@ -183,9 +183,9 @@ describe('Results page', () => {
 
     expect(mounted.wrapper.text()).toContain('不适用');
     expect(mounted.wrapper.text()).toContain('执行成功');
-    expect(mounted.wrapper.text()).toContain('Decision不适用');
+    expect(mounted.wrapper.text()).toContain('判定结果不适用');
     expect(mounted.wrapper.text()).toContain('轻微划痕');
-    expect(mounted.wrapper.text()).toContain('Flow Hash');
+    expect(mounted.wrapper.text()).toContain('流程版本哈希');
     expect(mounted.wrapper.text()).not.toContain('图像预览');
 
     mounted.wrapper.unmount();
@@ -263,7 +263,7 @@ describe('Results page', () => {
     await stale.wrapper.get('button').trigger('click');
     await flushPromises();
     expect(stale.wrapper.text()).toContain('工作站结果刷新失败');
-    expect(stale.wrapper.text()).toContain('Stale');
+    expect(stale.wrapper.text()).toContain('旧数据');
     stale.wrapper.unmount();
     stale.queries.dispose();
 

@@ -10,6 +10,10 @@ import {
   installF02VisualPreferences,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
+import {
+  captureF04VisualEvidence,
+  hasF04VisualEvidenceTarget
+} from './f04-browser-evidence';
 
 const fixtureSchemaVersion = 'f02-projects-read.v1';
 const projectId = '11111111-1111-4111-8111-111111111111';
@@ -136,23 +140,38 @@ test('Projects surfaces malformed list and missing detail as localized product s
 });
 
 for (const visual of [
+  { id: 'projects-wide-light-compact', width: 1920, height: 1080 },
   { id: 'projects-light-compact', width: 1366, height: 768 },
   { id: 'projects-short-light-compact', width: 1366, height: 600 }
 ] as const) {
   test(`captures ${visual.id} Browser fixture evidence`, async ({ page }) => {
-    test.skip(!hasF02VisualEvidenceTarget(), 'F02 visual evidence output was not requested.');
+    test.skip(
+      !hasF02VisualEvidenceTarget() && !hasF04VisualEvidenceTarget(),
+      'Visual evidence output was not requested.'
+    );
     await page.setViewportSize({ width: visual.width, height: visual.height });
     await installF02VisualPreferences(page, 'light', 'compact');
     const runtimeErrors = createF02RuntimeErrorAudit(page);
     const audit = await bootProjects(page);
-    await captureF02VisualEvidence(page, {
-      scenario: visual.id,
-      viewport: { width: visual.width, height: visual.height },
-      theme: 'light',
-      density: 'compact',
-      requests: audit,
-      runtimeErrors
-    });
+    if (hasF02VisualEvidenceTarget()) {
+      await captureF02VisualEvidence(page, {
+        scenario: visual.id,
+        viewport: { width: visual.width, height: visual.height },
+        theme: 'light',
+        density: 'compact',
+        requests: audit,
+        runtimeErrors
+      });
+    }
+    if (hasF04VisualEvidenceTarget()) {
+      await captureF04VisualEvidence(page, {
+        scenario: visual.id,
+        viewport: { width: visual.width, height: visual.height },
+        runtimeErrors,
+        requestAudit: audit,
+        notes: ['F04.1 core page short-screen evidence.']
+      });
+    }
     expect(expectGetOnly(audit)).toBe(true);
     expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
   });

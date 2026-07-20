@@ -63,6 +63,9 @@ const projectsOwner = shallowRef<ReadQueryOwner<readonly ResultsProjectOption[]>
 const localListOwner = shallowRef<ReadQueryOwner<LocalInspectionResultPage> | null>(null);
 const localDetailOwner = shallowRef<ReadQueryOwner<LocalInspectionResultDetail> | null>(null);
 const stationListOwner = shallowRef<ReadQueryOwner<StationInspectionResultPage> | null>(null);
+const advancedFiltersOpen = shallowRef(
+  Boolean(firstQueryValue(route.query.diagnosticCode) || firstQueryValue(route.query.from) || firstQueryValue(route.query.to))
+);
 
 function returnToWorkspace(): void {
   if (!projectId.value) return;
@@ -351,40 +354,60 @@ function formatDuration(value: number): string {
   return `${value.toLocaleString('zh-CN')} ms`;
 }
 
-function localDetailItems(detail: LocalInspectionResultDetail): readonly CvDescriptionItem[] {
+function localOverviewItems(detail: LocalInspectionResultDetail): readonly CvDescriptionItem[] {
   const formatted = formatInspectionOutcome(detail.outcome);
   return Object.freeze([
     { key: 'result', label: '标准结果', value: formatted.label },
-    { key: 'execution', label: 'Execution', value: formatted.executionLabel },
-    { key: 'decision', label: 'Decision', value: formatted.decisionLabel },
+    { key: 'execution', label: '执行状态', value: formatted.executionLabel },
+    { key: 'decision', label: '判定结果', value: formatted.decisionLabel },
     { key: 'inspectionTime', label: '完成时间', value: formatDateTime(detail.inspectionTime) },
     { key: 'processingTimeMs', label: '执行耗时', value: formatDuration(detail.processingTimeMs) },
-    { key: 'defectCount', label: '缺陷数量', value: detail.defectCount },
-    { key: 'diagnosticCode', label: '诊断码', value: detail.diagnosticCode },
-    { key: 'diagnosticMessage', label: '诊断说明', value: detail.diagnosticMessage, span: 2 },
-    { key: 'flowVersionHash', label: 'Flow Hash', value: detail.traceability.flowVersionHash },
-    { key: 'calibrationBundleId', label: '标定包', value: detail.traceability.calibrationBundleId },
-    { key: 'runId', label: 'Run ID', value: detail.traceability.runId },
-    { key: 'sessionId', label: 'Session ID', value: detail.traceability.sessionId }
+    { key: 'defectCount', label: '缺陷数量', value: detail.defectCount }
   ]);
 }
 
-function stationDetailItems(detail: StationInspectionResultSummary): readonly CvDescriptionItem[] {
+function localDiagnosticItems(detail: LocalInspectionResultDetail): readonly CvDescriptionItem[] {
+  return Object.freeze([
+    { key: 'diagnosticCode', label: '诊断码', value: detail.diagnosticCode },
+    { key: 'diagnosticMessage', label: '诊断说明', value: detail.diagnosticMessage, span: 2 }
+  ]);
+}
+
+function localTraceabilityItems(detail: LocalInspectionResultDetail): readonly CvDescriptionItem[] {
+  return Object.freeze([
+    { key: 'flowVersionHash', label: '流程版本哈希', value: detail.traceability.flowVersionHash },
+    { key: 'calibrationBundleId', label: '标定包', value: detail.traceability.calibrationBundleId },
+    { key: 'runId', label: '运行标识', value: detail.traceability.runId },
+    { key: 'sessionId', label: '会话标识', value: detail.traceability.sessionId }
+  ]);
+}
+
+function stationOverviewItems(detail: StationInspectionResultSummary): readonly CvDescriptionItem[] {
   const formatted = formatInspectionOutcome(detail.outcome);
   return Object.freeze([
     { key: 'result', label: '标准结果', value: formatted.label },
-    { key: 'execution', label: 'Execution', value: formatted.executionLabel },
-    { key: 'decision', label: 'Decision', value: formatted.decisionLabel },
+    { key: 'execution', label: '执行状态', value: formatted.executionLabel },
+    { key: 'decision', label: '判定结果', value: formatted.decisionLabel },
     { key: 'stationId', label: '工作站', value: detail.stationId },
     { key: 'lineName', label: '产线', value: detail.lineName },
     { key: 'completedAtUtc', label: '完成时间', value: formatDateTime(detail.completedAtUtc) },
-    { key: 'executionTimeMs', label: '执行耗时', value: formatDuration(detail.executionTimeMs) },
+    { key: 'executionTimeMs', label: '执行耗时', value: formatDuration(detail.executionTimeMs) }
+  ]);
+}
+
+function stationDiagnosticItems(detail: StationInspectionResultSummary): readonly CvDescriptionItem[] {
+  return Object.freeze([
     { key: 'diagnosticCode', label: '诊断码', value: detail.diagnosticCode },
-    { key: 'diagnosticMessage', label: '诊断说明', value: detail.diagnosticMessage, span: 2 },
+    { key: 'diagnosticMessage', label: '诊断说明', value: detail.diagnosticMessage, span: 2 }
+  ]);
+}
+
+function stationTraceabilityItems(detail: StationInspectionResultSummary): readonly CvDescriptionItem[] {
+  return Object.freeze([
     { key: 'packageName', label: '运行包', value: detail.packageName },
     { key: 'packageVersion', label: '运行包版本', value: detail.packageVersion },
-    { key: 'runId', label: 'Run ID', value: detail.runId },
-    { key: 'messageId', label: 'Message ID', value: detail.messageId }
+    { key: 'runId', label: '运行标识', value: detail.runId },
+    { key: 'messageId', label: '消息标识', value: detail.messageId }
   ]);
 }
 
@@ -450,10 +473,20 @@ onBeforeUnmount(() => {
     :data-results-source="source"
   >
     <CvPageHeader
-      eyebrow="质量追溯"
-      title="检测结果"
-      description="只读浏览本机检测历史与工作站上报摘要；执行状态与判定结果双轴始终分别展示。"
+      title="结果与追溯"
+      description="筛选检测历史，快速判断结果，并查看诊断与追溯标识。"
     >
+      <template #meta>
+        <CvStatusBadge
+          tone="info"
+          :dot="false"
+        >
+          基础追溯 · 只读
+        </CvStatusBadge>
+        <span class="results-page__meta">
+          {{ source === 'local' ? '本机结果' : '工作站上报' }}
+        </span>
+      </template>
       <template #actions>
         <CvButton
           v-if="source === 'local' && projectId"
@@ -475,17 +508,27 @@ onBeforeUnmount(() => {
       </template>
     </CvPageHeader>
 
-    <CvPanel
-      title="筛选"
-      description="筛选条件保存在地址栏参数中，便于恢复当前只读视图。"
+    <section
+      class="results-page__filters"
+      aria-labelledby="results-filter-heading"
     >
+      <div class="results-page__filter-heading">
+        <div>
+          <h2 id="results-filter-heading">
+            筛选结果
+          </h2>
+          <p>筛选条件会保留在当前地址中。</p>
+        </div>
+      </div>
       <CvToolbar
+        class="results-page__filter-toolbar"
         interaction="group"
         label="结果筛选工具栏"
       >
         <CvSelect
           v-model="sourceModel"
           class="results-page__source"
+          name="resultsSource"
           label="数据来源"
           :options="sourceOptions"
         />
@@ -493,6 +536,7 @@ onBeforeUnmount(() => {
           v-if="source === 'local'"
           v-model="projectModel"
           class="results-page__project"
+          name="resultsProject"
           label="本机工程"
           :options="projectOptions"
           :disabled="projectsState.phase === 'loading'"
@@ -500,37 +544,65 @@ onBeforeUnmount(() => {
         <CvSelect
           v-model="outcomeModel"
           class="results-page__outcome"
+          name="resultsOutcome"
           label="标准结果"
           :options="outcomeOptions"
         />
         <CvField
           v-model="diagnosticModel"
           class="results-page__diagnostic"
+          name="diagnosticCode"
           label="诊断码"
-          placeholder="例如 CAMERA_TIMEOUT"
+          placeholder="例如 CAMERA_TIMEOUT…"
+          autocomplete="off"
         />
+        <CvSelect
+          v-model="pageSizeModel"
+          class="results-page__page-size"
+          name="resultsPageSize"
+          label="分页大小"
+          :options="pageSizeOptions"
+        />
+        <button
+          type="button"
+          class="results-page__advanced-trigger"
+          :aria-expanded="advancedFiltersOpen"
+          aria-controls="results-advanced-filters"
+          @click="advancedFiltersOpen = !advancedFiltersOpen"
+        >
+          高级筛选
+          <span
+            v-if="from || to"
+            class="results-page__filter-count"
+          >已应用</span>
+        </button>
+      </CvToolbar>
+
+      <div
+        v-show="advancedFiltersOpen"
+        id="results-advanced-filters"
+        class="results-page__advanced"
+      >
         <CvField
           v-model="fromModel"
           class="results-page__date"
-          label="开始时间"
-          placeholder="2026-07-15T00:00:00Z"
+          name="resultsFrom"
+          label="开始时间（ISO）"
+          placeholder="2026-07-15T00:00:00Z…"
+          autocomplete="off"
           :error="invalidFrom ? '请输入有效的 ISO 时间。' : undefined"
         />
         <CvField
           v-model="toModel"
           class="results-page__date"
-          label="结束时间"
-          placeholder="2026-07-15T23:59:59Z"
+          name="resultsTo"
+          label="结束时间（ISO）"
+          placeholder="2026-07-15T23:59:59Z…"
+          autocomplete="off"
           :error="invalidTo ? '请输入有效的 ISO 时间。' : undefined"
         />
-        <CvSelect
-          v-model="pageSizeModel"
-          class="results-page__page-size"
-          label="分页大小"
-          :options="pageSizeOptions"
-        />
-      </CvToolbar>
-    </CvPanel>
+      </div>
+    </section>
 
     <CvInlineAlert
       v-if="source === 'local' && diagnosticCode.trim()"
@@ -553,8 +625,9 @@ onBeforeUnmount(() => {
       class="results-page__layout"
     >
       <CvPanel
+        class="results-page__list-panel"
         title="本机结果"
-        description="列表由工程检测历史只读接口提供；九类标准结果分别保留。"
+        :padded="false"
       >
         <CvInlineAlert
           v-if="projectsState.phase === 'stale' || projectsState.phase === 'partial-failure'"
@@ -569,7 +642,7 @@ onBeforeUnmount(() => {
           tone="warning"
           title="结果列表刷新失败"
         >
-          当前显示上次成功读取的旧数据（Stale）。
+          当前显示上次成功读取的旧数据。
         </CvInlineAlert>
         <CvInlineAlert
           v-if="localListState.phase === 'aborted'"
@@ -689,8 +762,9 @@ onBeforeUnmount(() => {
       </CvPanel>
 
       <CvPanel
-        title="本机结果详情"
-        description="只显示标量、诊断、缺陷摘要和追溯信息；不提供图片、感兴趣区域、对比、导出或重跑。"
+        class="results-page__detail-panel"
+        title="结果详情"
+        :padded="false"
       >
         <CvInlineAlert
           v-if="localDetailState.phase === 'stale' || localDetailState.phase === 'partial-failure'"
@@ -698,7 +772,7 @@ onBeforeUnmount(() => {
           tone="warning"
           title="详情刷新失败"
         >
-          当前显示上次成功读取的旧数据（Stale）。
+          当前显示上次成功读取的旧数据。
         </CvInlineAlert>
         <CvInlineAlert
           v-if="localDetailState.phase === 'aborted'"
@@ -745,32 +819,49 @@ onBeforeUnmount(() => {
           :description="localDetailState.failure?.message"
         />
         <template v-if="localDetailState.data">
-          <CvDescriptionList
-            :items="localDetailItems(localDetailState.data)"
-            label="本机结果详情"
-          />
-          <h3 class="results-page__subheading">
-            缺陷摘要
-          </h3>
-          <ul
-            v-if="localDetailState.data.defects.length"
-            class="results-page__defects"
-          >
-            <li
-              v-for="defect in localDetailState.data.defects"
-              :key="defect.id"
+          <section class="results-page__detail-section results-page__detail-section--summary">
+            <h3>判定摘要</h3>
+            <CvDescriptionList
+              :items="localOverviewItems(localDetailState.data)"
+              label="本机结果判定摘要"
+            />
+          </section>
+          <section class="results-page__detail-section">
+            <h3>缺陷摘要</h3>
+            <ul
+              v-if="localDetailState.data.defects.length"
+              class="results-page__defects"
             >
-              <strong>{{ defect.type }}</strong>
-              <span>置信度 {{ defect.confidenceScore.toFixed(3) }}</span>
-              <span>{{ defect.description || '无描述' }}</span>
-            </li>
-          </ul>
-          <CvPageState
-            v-else
-            compact
-            kind="empty"
-            title="没有缺陷摘要"
-          />
+              <li
+                v-for="defect in localDetailState.data.defects"
+                :key="defect.id"
+              >
+                <strong>{{ defect.type }}</strong>
+                <span>置信度 {{ defect.confidenceScore.toFixed(3) }}</span>
+                <span>{{ defect.description || '无描述' }}</span>
+              </li>
+            </ul>
+            <CvPageState
+              v-else
+              compact
+              kind="empty"
+              title="没有缺陷摘要"
+            />
+          </section>
+          <section class="results-page__detail-section">
+            <h3>诊断</h3>
+            <CvDescriptionList
+              :items="localDiagnosticItems(localDetailState.data)"
+              label="本机结果诊断"
+            />
+          </section>
+          <details class="results-page__traceability">
+            <summary>技术追溯</summary>
+            <CvDescriptionList
+              :items="localTraceabilityItems(localDetailState.data)"
+              label="本机结果技术追溯"
+            />
+          </details>
         </template>
       </CvPanel>
     </section>
@@ -780,8 +871,9 @@ onBeforeUnmount(() => {
       class="results-page__layout"
     >
       <CvPanel
+        class="results-page__list-panel"
         title="工作站上报结果"
-        description="结果由 Studio 的工作站结果只读接口提供；旧格式数据仅做与后端一致的读取时映射。"
+        :padded="false"
       >
         <CvInlineAlert
           v-if="stationListState.phase === 'stale' || stationListState.phase === 'partial-failure'"
@@ -789,7 +881,7 @@ onBeforeUnmount(() => {
           tone="warning"
           title="工作站结果刷新失败"
         >
-          当前显示上次成功读取的旧数据（Stale）。
+          当前显示上次成功读取的旧数据。
         </CvInlineAlert>
         <CvInlineAlert
           v-if="stationListState.phase === 'aborted'"
@@ -890,8 +982,9 @@ onBeforeUnmount(() => {
       </CvPanel>
 
       <CvPanel
+        class="results-page__detail-panel"
         title="工作站结果详情"
-        description="详情来自当前页的只读工作站上报摘要，不请求命令、部署、图片或重跑接口。"
+        :padded="false"
       >
         <CvPageState
           v-if="!resultId"
@@ -915,10 +1008,27 @@ onBeforeUnmount(() => {
           >
             此旧格式数据缺少标准双轴；当前结果仅按后端固定映射展示，不从诊断文案推断。
           </CvInlineAlert>
-          <CvDescriptionList
-            :items="stationDetailItems(selectedStationResult)"
-            label="工作站结果详情"
-          />
+          <section class="results-page__detail-section results-page__detail-section--summary">
+            <h3>判定摘要</h3>
+            <CvDescriptionList
+              :items="stationOverviewItems(selectedStationResult)"
+              label="工作站结果判定摘要"
+            />
+          </section>
+          <section class="results-page__detail-section">
+            <h3>诊断</h3>
+            <CvDescriptionList
+              :items="stationDiagnosticItems(selectedStationResult)"
+              label="工作站结果诊断"
+            />
+          </section>
+          <details class="results-page__traceability">
+            <summary>技术追溯</summary>
+            <CvDescriptionList
+              :items="stationTraceabilityItems(selectedStationResult)"
+              label="工作站结果技术追溯"
+            />
+          </details>
         </template>
       </CvPanel>
     </section>
@@ -927,21 +1037,49 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .results-page { display: grid; max-width: 1720px; min-width: 0; gap: var(--cv-density-page-gap); }
-.results-page__layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.8fr); gap: var(--cv-space-4); align-items: start; }
-.results-page :deep(.cv-toolbar__primary) { flex: 1 1 100%; }
-.results-page__source { min-width: 116px; flex: 0 1 116px; }
-.results-page__project { min-width: 164px; flex: 1 1 164px; }
-.results-page__outcome { min-width: 116px; flex: 0 1 116px; }
-.results-page__diagnostic { min-width: 132px; flex: 0 1 132px; }
-.results-page__date { min-width: 152px; flex: 0 1 152px; }
-.results-page__page-size { min-width: 100px; flex: 0 1 100px; }
+.results-page__meta { align-self: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.results-page__filters { overflow: hidden; border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-lg); background: var(--cv-surface-raised); }
+.results-page__filter-heading { display: flex; align-items: center; justify-content: space-between; padding: var(--cv-space-3) var(--cv-density-panel-padding) var(--cv-space-2); }
+.results-page__filter-heading h2 { margin: 0; scroll-margin-top: calc(var(--cv-product-topbar-height) + var(--cv-space-3)); color: var(--cv-text-primary); font-size: var(--cv-font-size-lg); font-weight: var(--cv-font-weight-semibold); letter-spacing: var(--cv-letter-spacing-title); }
+.results-page__filter-heading p { margin: 2px 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.results-page__filter-toolbar { padding: var(--cv-space-2) var(--cv-density-panel-padding) var(--cv-space-3); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
+.results-page__filter-toolbar :deep(.cv-toolbar__primary) { flex: 1 1 100%; align-items: end; }
+.results-page__source { min-width: 124px; flex: 0 1 124px; }
+.results-page__project { min-width: 220px; flex: 1 1 260px; }
+.results-page__outcome { min-width: 132px; flex: 0 1 132px; }
+.results-page__diagnostic { min-width: 180px; flex: 1 1 220px; }
+.results-page__date { min-width: 206px; flex: 1 1 240px; }
+.results-page__page-size { min-width: 112px; flex: 0 1 112px; }
+.results-page__advanced-trigger { min-height: var(--cv-density-control-height); padding: 0 var(--cv-space-3); display: inline-flex; align-items: center; gap: var(--cv-space-2); border: 1px solid transparent; border-radius: var(--cv-radius-sm); background: transparent; color: var(--cv-color-link); cursor: pointer; font: inherit; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); touch-action: manipulation; }
+.results-page__advanced-trigger:hover { background: var(--cv-interactive-hover); }
+.results-page__advanced-trigger:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
+.results-page__filter-count { padding: 1px var(--cv-space-1); border-radius: var(--cv-radius-pill); background: var(--cv-color-status-info-soft); color: var(--cv-color-status-info-strong); font-size: var(--cv-font-size-2xs); }
+.results-page__advanced { display: flex; flex-wrap: wrap; align-items: start; gap: var(--cv-space-3); padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
+.results-page__layout { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(340px, 0.72fr); gap: var(--cv-space-4); align-items: start; }
 .results-page__notice { margin-bottom: var(--cv-space-3); }
 .results-page__outcome-cell { display: grid; justify-items: start; gap: var(--cv-space-1); }
 .results-page__outcome-cell small { color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-2xs); }
-.results-page__subheading { margin: var(--cv-space-5) 0 var(--cv-space-3); color: var(--cv-text-primary); font-size: var(--cv-font-size-md); }
+.results-page__detail-panel { position: sticky; top: calc(var(--cv-product-topbar-height) + var(--cv-density-page-padding)); }
+.results-page__detail-section { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
+.results-page__detail-section--summary { background: var(--cv-surface-page); }
+.results-page__detail-section h3 { margin: 0 0 var(--cv-space-2); color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); }
 .results-page__defects { display: grid; gap: var(--cv-space-2); margin: 0; padding: 0; list-style: none; }
-.results-page__defects li { display: grid; grid-template-columns: minmax(100px, 0.7fr) minmax(120px, 0.7fr) minmax(0, 1fr); gap: var(--cv-space-3); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.results-page__defects li { display: grid; grid-template-columns: minmax(96px, 0.62fr) minmax(116px, 0.72fr) minmax(0, 1fr); gap: var(--cv-space-3); padding: var(--cv-space-2) 0; border-bottom: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.results-page__defects li:last-child { border-bottom: 0; }
 .results-page__defects strong { color: var(--cv-text-primary); }
-@media (max-width: 1440px) { .results-page__layout { grid-template-columns: 1fr; } }
+.results-page__traceability { border-top: 1px solid var(--cv-border-subtle); }
+.results-page__traceability summary { padding: var(--cv-space-3) var(--cv-density-panel-padding); color: var(--cv-text-secondary); cursor: pointer; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); list-style-position: inside; }
+.results-page__traceability summary:hover { background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
+.results-page__traceability summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
+.results-page__traceability :deep(.cv-description-list) { padding: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
+.results-page :deep(.results-page__list-panel > .cv-panel__header),
+.results-page :deep(.results-page__detail-panel > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
+.results-page :deep(.results-page__list-panel .cv-inline-alert),
+.results-page :deep(.results-page__list-panel .cv-page-state),
+.results-page :deep(.results-page__detail-panel > .cv-panel__content > .cv-inline-alert),
+.results-page :deep(.results-page__detail-panel > .cv-panel__content > .cv-page-state) { margin: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
+.results-page :deep(.results-page__list-panel .cv-pagination) { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
+@media (max-width: 1240px) { .results-page__layout { grid-template-columns: minmax(0, 1fr) minmax(320px, 0.65fr); } }
+@media (max-width: 980px) { .results-page__layout { grid-template-columns: 1fr; } .results-page__detail-panel { position: static; } }
 @media (max-width: 640px) { .results-page__defects li { grid-template-columns: 1fr; } }
 </style>

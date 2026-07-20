@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import {
   CvButton,
@@ -40,18 +40,18 @@ const props = defineProps<{
 const router = useRouter();
 const runtime = useProjectsReadRuntime(props.runtime);
 const commands = runtime.projectLifecycle;
-const searchDraft = ref('');
-const activeSearch = ref('');
-const sort = ref<ProjectSort>('modified-desc');
-const page = ref(1);
+const searchDraft = shallowRef('');
+const activeSearch = shallowRef('');
+const sort = shallowRef<ProjectSort>('modified-desc');
+const page = shallowRef(1);
 const pageSize = 10;
 const listQuery = createProjectsListQuery(runtime.queries, () => activeSearch.value);
 const recentQuery = createRecentProjectsQuery(runtime.queries);
-const createOpen = ref(false);
-const createName = ref('');
-const createDescription = ref('');
-const createValidationError = ref<string | null>(null);
-const deleteTarget = ref<ProjectSummary | null>(null);
+const createOpen = shallowRef(false);
+const createName = shallowRef('');
+const createDescription = shallowRef('');
+const createValidationError = shallowRef<string | null>(null);
+const deleteTarget = shallowRef<ProjectSummary | null>(null);
 
 const listState = computed(() => listQuery.state.value);
 const recentState = computed(() => recentQuery.state.value);
@@ -62,6 +62,15 @@ const commandState = computed(() => commands?.projection ?? null);
 const commandBusy = computed(() => commandState.value?.phase === 'creating' ||
   commandState.value?.phase === 'updating' || commandState.value?.phase === 'deleting' ||
   commandState.value?.phase === 'reconciling');
+const projectCountLabel = computed(() => {
+  if (!listState.value.data) return '工程库';
+  return isSearching.value
+    ? `${sortedProjects.value.length} 个匹配工程`
+    : `${sortedProjects.value.length} 个工程`;
+});
+const recentCountLabel = computed(() => recentState.value.data?.length
+  ? `${recentState.value.data.length} 个最近工程`
+  : '暂无最近记录');
 const sortModel = computed({
   get: () => sort.value,
   set: value => { sort.value = value as ProjectSort; }
@@ -202,10 +211,13 @@ onBeforeUnmount(() => {
     data-capability="projects-read"
   >
     <CvPageHeader
-      eyebrow="工程管理"
       title="工程"
-      description="创建空白工程、查看服务端摘要，并通过权威 open/delete command 进入后续任务。"
+      description="管理工程库，快速返回最近工作，并进入流程工作区。"
     >
+      <template #meta>
+        <span class="projects-page__meta">{{ projectCountLabel }}</span>
+        <span class="projects-page__meta">{{ recentCountLabel }}</span>
+      </template>
       <template #actions>
         <CvButton
           v-if="commands"
@@ -263,20 +275,23 @@ onBeforeUnmount(() => {
 
     <div class="projects-page__layout">
       <CvPanel
+        class="projects-page__library"
         title="全部工程"
-        description="列表仅显示稳定摘要字段，不从列表数据推断流程信息。"
+        :padded="false"
       >
         <CvToolbar
+          class="projects-page__library-toolbar"
           interaction="group"
           label="工程列表工具栏"
         >
           <CvSearchField
             v-model="searchDraft"
             class="projects-page__search"
+            name="projectSearch"
             label="搜索工程"
-            placeholder="按名称或描述搜索"
+            placeholder="按名称或描述搜索…"
             clear-label="清除工程搜索"
-            :hide-label="false"
+            :hide-label="true"
             @search="submitSearch"
             @clear="clearSearch"
           />
@@ -291,6 +306,7 @@ onBeforeUnmount(() => {
             <CvSelect
               v-model="sortModel"
               class="projects-page__sort"
+              name="projectSort"
               label="排序"
               :options="sortOptions"
             />
@@ -299,14 +315,14 @@ onBeforeUnmount(() => {
 
         <CvInlineAlert
           v-if="listState.isRefreshing && listState.data"
-          class="projects-page__notice"
+          class="projects-page__notice projects-page__inset"
           tone="info"
         >
           正在刷新，暂时显示上次读取的数据。
         </CvInlineAlert>
         <CvInlineAlert
           v-if="(listState.phase === 'stale' || listState.phase === 'partial-failure') && listState.data"
-          class="projects-page__notice"
+          class="projects-page__notice projects-page__inset"
           tone="warning"
           title="刷新未完成"
         >
@@ -315,24 +331,28 @@ onBeforeUnmount(() => {
 
         <CvPageState
           v-if="listState.phase === 'loading' && !listState.data"
+          class="projects-page__state"
           kind="loading"
           title="正在读取工程列表"
           description="请稍候，正在读取后端工程摘要。"
         />
         <CvPageState
           v-else-if="listState.phase === 'unauthorized'"
+          class="projects-page__state"
           kind="unauthorized"
           title="当前会话不可用"
           description="请由宿主或测试环境预置有效会话后重试。"
         />
         <CvPageState
           v-else-if="listState.phase === 'forbidden'"
+          class="projects-page__state"
           kind="forbidden"
           title="无权读取工程"
           description="导航可见性不代表后端授权，请联系管理员核对权限。"
         />
         <CvPageState
           v-else-if="listState.phase === 'error' || listState.phase === 'not-found'"
+          class="projects-page__state"
           kind="error"
           title="工程列表读取失败"
           :description="listState.failure?.message ?? '本地服务未返回可用的工程列表。'"
@@ -348,10 +368,29 @@ onBeforeUnmount(() => {
         </CvPageState>
         <CvPageState
           v-else-if="listState.phase === 'empty'"
+          class="projects-page__state"
           kind="empty"
           :title="isSearching ? '没有匹配的工程' : '暂无工程'"
-          :description="isSearching ? '请调整关键词后重新搜索。' : '后端当前没有返回可浏览的工程。'"
-        />
+          :description="isSearching ? '调整关键词，或清除搜索返回完整工程库。' : '创建空白工程后，可从这里进入流程工作区。'"
+        >
+          <template #actions>
+            <CvButton
+              v-if="isSearching"
+              size="sm"
+              @click="clearSearch"
+            >
+              清除搜索
+            </CvButton>
+            <CvButton
+              v-else-if="commands"
+              size="sm"
+              variant="primary"
+              @click="showCreate"
+            >
+              创建第一个工程
+            </CvButton>
+          </template>
+        </CvPageState>
 
         <CvDataTable
           v-if="pageSlice.totalCount > 0"
@@ -414,9 +453,10 @@ onBeforeUnmount(() => {
       </CvPanel>
 
       <CvPanel
+        class="projects-page__recent"
         title="最近工程"
-        description="按服务端记录的最近打开时间排列。"
         :level="2"
+        :padded="false"
       >
         <CvPageState
           v-if="recentState.phase === 'loading' && !recentState.data"
@@ -444,10 +484,12 @@ onBeforeUnmount(() => {
             v-for="project in recentState.data"
             :key="project.id"
           >
-            <RouterLink :to="`/projects/${project.id}`">
-              {{ project.name }}
-            </RouterLink>
-            <span>{{ formatProjectDateTime(project.lastOpenedAt) }}</span>
+            <div class="projects-page__recent-copy">
+              <RouterLink :to="`/projects/${project.id}`">
+                {{ project.name }}
+              </RouterLink>
+              <span>{{ formatProjectDateTime(project.lastOpenedAt) }}</span>
+            </div>
             <CvButton
               v-if="commands"
               size="sm"
@@ -465,7 +507,7 @@ onBeforeUnmount(() => {
     <CvModal
       :open="createOpen"
       title="新建空白工程"
-      description="创建阶段只保存工程记录；不接受 initial Flow、模板或导入资源。"
+      description="创建空白工程记录，不添加模板、流程或导入资源。"
       :close-on-backdrop="!commandBusy"
       @close="closeCreate"
     >
@@ -475,6 +517,7 @@ onBeforeUnmount(() => {
       >
         <CvField
           v-model="createName"
+          name="projectName"
           label="工程名称"
           required
           autocomplete="off"
@@ -484,6 +527,7 @@ onBeforeUnmount(() => {
         />
         <CvField
           v-model="createDescription"
+          name="projectDescription"
           label="工程描述"
           autocomplete="off"
           :disabled="commandBusy"
@@ -514,13 +558,13 @@ onBeforeUnmount(() => {
     <CvModal
       :open="deleteTarget !== null"
       title="删除工程"
-      :description="deleteTarget ? `将删除“${deleteTarget.name}”。服务端 tombstone 成功后才会从列表移除。` : undefined"
+      :description="deleteTarget ? `将删除“${deleteTarget.name}”。服务端确认后才会从工程库移除。` : undefined"
       size="sm"
       :close-on-backdrop="!commandBusy"
       @close="closeDelete"
     >
       <CvInlineAlert tone="error">
-        此操作使用当前服务端 revision；冲突时不会自动覆盖或乐观移除。
+        将按当前服务端修订号删除；如果工程已被修改，系统会提示冲突且不会覆盖。
       </CvInlineAlert>
       <template #footer>
         <CvButton
@@ -548,17 +592,30 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.projects-page { display: grid; max-width: 1540px; gap: var(--cv-density-page-gap); min-width: 0; }
-.projects-page__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); gap: var(--cv-space-4); align-items: start; }
-.projects-page__search { flex: 1 1 320px; }
+.projects-page { display: grid; max-width: 1580px; gap: var(--cv-density-page-gap); min-width: 0; }
+.projects-page__meta { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-variant-numeric: tabular-nums lining-nums; }
+.projects-page__meta + .projects-page__meta::before { margin-right: var(--cv-space-2); color: var(--cv-border-strong); content: '·'; }
+.projects-page__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(244px, 288px); gap: var(--cv-space-4); align-items: start; }
+.projects-page__library { background: var(--cv-surface-raised); }
+.projects-page__library-toolbar { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
+.projects-page__library-toolbar :deep(.cv-toolbar__primary) { flex: 1 1 620px; }
+.projects-page__search { flex: 1 1 360px; max-width: 560px; }
 .projects-page__sort { min-width: 150px; }
 .projects-page__notice { margin-bottom: var(--cv-space-3); }
+.projects-page__inset { margin-inline: var(--cv-density-panel-padding); }
+.projects-page__state { margin: 0 var(--cv-density-panel-padding) var(--cv-density-panel-padding); }
 .projects-page__name { color: var(--cv-text-primary); font-weight: var(--cv-font-weight-semibold); }
 .projects-page__actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--cv-space-1); }
 .projects-page__form { display: grid; gap: var(--cv-space-4); }
 .projects-page__recent-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
-.projects-page__recent-list li { display: grid; gap: var(--cv-space-1); padding-block: var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); }
+.projects-page__recent-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-2); padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
 .projects-page__recent-list li:last-child { border-bottom: 0; }
-.projects-page__recent-list span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-@media (max-width: 900px) { .projects-page__layout { grid-template-columns: 1fr; } }
+.projects-page__recent-copy { display: grid; min-width: 0; gap: 2px; }
+.projects-page__recent-copy a { overflow: hidden; color: var(--cv-text-primary); font-weight: var(--cv-font-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
+.projects-page__recent-copy span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.projects-page :deep(.projects-page__library > .cv-panel__header),
+.projects-page :deep(.projects-page__recent > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
+.projects-page :deep(.projects-page__recent .cv-page-state) { margin: 0 var(--cv-density-panel-padding) var(--cv-density-panel-padding); }
+@media (max-width: 1040px) { .projects-page__layout { grid-template-columns: 1fr; } .projects-page__recent-list { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } .projects-page__recent-list li { border-right: 1px solid var(--cv-border-subtle); } }
+@media (max-width: 640px) { .projects-page__actions { flex-wrap: wrap; justify-content: flex-start; } }
 </style>
