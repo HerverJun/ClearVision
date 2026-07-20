@@ -99,6 +99,24 @@ function station(overrides: Record<string, unknown> = {}): Record<string, unknow
   };
 }
 
+function summary(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    totalStations: 1,
+    onlineStations: 1,
+    offlineStations: 0,
+    runningStations: 1,
+    faultedStations: 0,
+    alertCount: 0,
+    warningStations: 0,
+    criticalStations: 0,
+    outcomeStatistics: outcomeStatistics(),
+    averageExecutionTimeMs: 24.5,
+    offlineThresholdSeconds: 15,
+    updatedAtUtc: '2026-07-15T02:00:00Z',
+    ...overrides
+  };
+}
+
 function result(): Record<string, unknown> {
   return {
     schemaVersion: 2,
@@ -152,7 +170,8 @@ async function fulfill(route: Route, status: number, body: unknown): Promise<voi
 
 async function bootStations(
   page: Page,
-  listPayload: unknown = [station()]
+  listPayload: unknown = [station()],
+  summaryPayload: unknown = summary()
 ): Promise<F02MethodAuditEntry[]> {
   const audit: F02MethodAuditEntry[] = [];
   await installF02BrowserStartup(page, { 'Studio2.StationsRead': true });
@@ -174,20 +193,7 @@ async function bootStations(
       return;
     }
     if (url.pathname === '/api/stations/summary') {
-      await fulfill(route, 200, {
-        totalStations: 1,
-        onlineStations: 1,
-        offlineStations: 0,
-        runningStations: 1,
-        faultedStations: 0,
-        alertCount: 0,
-        warningStations: 0,
-        criticalStations: 0,
-        outcomeStatistics: outcomeStatistics(),
-        averageExecutionTimeMs: 24.5,
-        offlineThresholdSeconds: 15,
-        updatedAtUtc: '2026-07-15T02:00:00Z'
-      });
+      await fulfill(route, 200, summaryPayload);
       return;
     }
     if (url.pathname === '/api/stations/statistics') {
@@ -245,6 +251,9 @@ test('Station list uses URL filters, preserves nine outcomes and stays GET-only'
 });
 
 test('Station detail degrades only Admin 403 and keeps results and health visible', async ({ page }) => {
+  const viewport = { width: 1600, height: 1000 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF02RuntimeErrorAudit(page, [403]);
   const audit = await bootStations(page);
   await page.goto('/studio/index.html#/stations/station-a');
 
@@ -252,7 +261,12 @@ test('Station detail degrades only Admin 403 and keeps results and health visibl
   await expect(page.getByText('管理员增强信息不可用')).toBeVisible();
   await expect(page.getByText('判定 NG')).toBeVisible();
   await expect(page.getByText('进程运行时长')).toBeVisible();
-  await expect(page.getByText('Station 普通详情读取失败')).toHaveCount(0);
+  await expect(page.getByText('工作站详情读取失败')).toHaveCount(0);
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'station-detail-abnormal', viewport, runtimeErrors, requestAudit: audit
+    });
+  }
   expect(expectGetOnly(audit)).toBe(true);
   expect(audit.some(entry => entry.path.includes('/events'))).toBe(false);
   expect(audit.some(entry => /commands|logs|audit|packages|download/.test(entry.path))).toBe(false);
@@ -261,15 +275,17 @@ test('Station detail degrades only Admin 403 and keeps results and health visibl
 test('Station list surfaces frozen-contract malformed and empty responses', async ({ page }) => {
   await bootStations(page, { items: [] });
   await page.goto('/studio/index.html#/stations');
-  await expect(page.getByText('Station 列表读取失败')).toBeVisible();
+  await expect(page.getByText('工作站列表读取失败')).toBeVisible();
 
   await page.unrouteAll({ behavior: 'wait' });
   await bootStations(page, []);
   await page.reload();
-  await expect(page.getByText('暂无 Station')).toBeVisible();
+  await expect(page.getByText('暂无工作站')).toBeVisible();
 });
 
 for (const visual of [
+  { id: 'stations-wide-light-compact', width: 1920, height: 1080 },
+  { id: 'stations-mixed-light-compact', width: 1600, height: 1000 },
   { id: 'stations-light-compact', width: 1366, height: 768 },
   { id: 'stations-short-light-compact', width: 1366, height: 600 }
 ] as const) {
@@ -281,7 +297,51 @@ for (const visual of [
     await page.setViewportSize({ width: visual.width, height: visual.height });
     await installF02VisualPreferences(page, 'light', 'compact');
     const runtimeErrors = createF02RuntimeErrorAudit(page);
-    const audit = await bootStations(page);
+    const mixedStations = [
+      station({
+        lastExecutionOutcome: 'Succeeded',
+        lastDecisionOutcome: 'Ok',
+        lastDiagnosticCode: null,
+        lastDiagnosticMessage: null
+      }),
+      station({
+        stationId: 'station-b',
+        stationName: '二号检测站',
+        lineName: '二号线',
+        machineName: 'CV-STATION-B',
+        onlineState: 'Offline',
+        runtimeState: 'Faulted',
+        isOnline: false,
+        packageName: '端子检测包',
+        lastExecutionOutcome: 'Failed',
+        lastDecisionOutcome: 'Undetermined',
+        lastDiagnosticCode: 'CAMERA_DISCONNECTED',
+        lastDiagnosticMessage: '相机连接中断'
+      }),
+      station({
+        stationId: 'station-c',
+        stationName: '三号检测站',
+        lineName: '三号线',
+        machineName: 'CV-STATION-C',
+        onlineState: 'Degraded',
+        runtimeState: 'Paused',
+        packageName: '外观复检包',
+        lastExecutionOutcome: 'Succeeded',
+        lastDecisionOutcome: 'Ng',
+        lastDiagnosticCode: 'QUALITY_GATE',
+        lastDiagnosticMessage: '连续 NG，等待复核'
+      })
+    ];
+    const audit = await bootStations(page, mixedStations, summary({
+      totalStations: 3,
+      onlineStations: 1,
+      offlineStations: 1,
+      runningStations: 1,
+      faultedStations: 1,
+      alertCount: 2,
+      warningStations: 1,
+      criticalStations: 1
+    }));
     await page.goto('/studio/index.html#/stations');
     await expect(page.locator('[data-capability="stations-read"]')).toBeVisible();
     if (hasF02VisualEvidenceTarget()) {

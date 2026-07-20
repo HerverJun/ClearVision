@@ -142,7 +142,7 @@ describe('Station read pages', () => {
     expect(wrapper.text()).toContain('执行成功');
     expect(wrapper.text()).toContain('判定 NG');
     expect(wrapper.text()).toContain('进程运行时长');
-    expect(wrapper.text()).not.toContain('Station 普通详情读取失败');
+    expect(wrapper.text()).not.toContain('工作站详情读取失败');
 
     wrapper.unmount();
     queries.dispose();
@@ -163,7 +163,7 @@ describe('Station read pages', () => {
       global: { plugins: [router] }
     });
     await flushPromises();
-    expect(empty.text()).toContain('暂无 Station');
+    expect(empty.text()).toContain('暂无工作站');
     empty.unmount();
     emptyQueries.dispose();
 
@@ -177,7 +177,7 @@ describe('Station read pages', () => {
       global: { plugins: [router] }
     });
     await flushPromises();
-    expect(malformed.text()).toContain('Station 列表读取失败');
+    expect(malformed.text()).toContain('工作站列表读取失败');
     malformed.unmount();
     malformedQueries.dispose();
   });

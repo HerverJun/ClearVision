@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import {
   CvButton,
@@ -60,7 +60,7 @@ function initialTake(): number {
   return [25, 50, 100].includes(candidate) ? candidate : 50;
 }
 
-const take = ref(initialTake());
+const take = shallowRef(initialTake());
 const listSlot = createStationQuerySlot(() => createStationsQuery(runtime.queries));
 const resultsSlot = createStationQuerySlot(() => createStationResultsQuery(
   runtime.queries,
@@ -140,12 +140,12 @@ const ordinaryItems = computed<readonly CvDescriptionItem[]>(() => {
   const value = station.value;
   if (!value) return [];
   return [
-    { key: 'station-id', label: 'Station ID', value: value.stationId, span: 2 },
+    { key: 'station-id', label: '工作站标识', value: value.stationId, span: 2 },
     { key: 'machine', label: '机器名', value: value.machineName || '—' },
     { key: 'line', label: '产线', value: value.lineName || '—' },
     { key: 'last-seen', label: '最后心跳', value: formatStationDateTime(value.lastSeenAtUtc), span: 2 },
     { key: 'package', label: '当前运行包', value: value.packageName || '—' },
-    { key: 'run', label: '当前 Run ID', value: value.currentRunId || '—' },
+    { key: 'run', label: '当前运行标识', value: value.currentRunId || '—' },
     { key: 'average', label: '平均执行耗时', value: `${value.averageExecutionTimeMs.toFixed(1)} ms` },
     { key: 'spool', label: '待上报结果', value: value.spoolPendingCount },
     { key: 'camera', label: '相机摘要', value: value.cameraStatusSummary || '—' },
@@ -165,7 +165,7 @@ const adminItems = computed<readonly CvDescriptionItem[]>(() => {
     { key: 'workcell', label: '工作单元', value: value.workcellName || '—' },
     { key: 'node', label: '检测节点', value: value.inspectionNodeName || '—' },
     { key: 'camera', label: '相机别名', value: value.cameraAlias || '—' },
-    { key: 'role', label: 'Station 角色', value: value.stationRole || '—' },
+    { key: 'role', label: '工作站角色', value: value.stationRole || '—' },
     { key: 'owner', label: '负责人', value: value.owner || '—' },
     { key: 'revision', label: '工程修订', value: value.projectRevision ?? '—' },
     { key: 'mode', label: '执行模式', value: value.executionRunMode || '—' },
@@ -210,7 +210,7 @@ onBeforeUnmount(() => {
   >
     <CvPageHeader
       :title="station ? stationDisplayName(station) : '工作站详情'"
-      description="普通详情来自工作站列表；结果、健康快照与管理员增强信息分别保持独立权限和失败边界。"
+      description="核对当前状态、最近结果与健康快照。各区域保持独立权限和失败边界。"
     >
       <template #breadcrumbs>
         <RouterLink
@@ -224,6 +224,7 @@ onBeforeUnmount(() => {
         <CvSelect
           v-model="takeModel"
           class="station-detail__take"
+          name="stationDetailTake"
           label="明细数量"
           :options="takeOptions"
           @update:model-value="changeTake"
@@ -231,11 +232,28 @@ onBeforeUnmount(() => {
         <CvButton
           size="sm"
           :loading="listState.isRefreshing || resultsState.isRefreshing || healthState.isRefreshing || adminState.isRefreshing"
-          loading-label="正在刷新 Station 详情"
+          loading-label="正在刷新工作站详情"
           @click="polling.refreshNow()"
         >
           刷新
         </CvButton>
+      </template>
+      <template
+        v-if="station"
+        #meta
+      >
+        <CvStatusBadge :tone="stationOnlineTone(station.onlineState)">
+          {{ stationOnlineLabel(station.onlineState) }}
+        </CvStatusBadge>
+        <CvStatusBadge :tone="stationRuntimeTone(station.runtimeState)">
+          {{ stationRuntimeLabel(station.runtimeState) }}
+        </CvStatusBadge>
+        <CvStatusBadge
+          v-if="lastOutcome"
+          :tone="lastOutcome.tone"
+        >
+          {{ lastOutcome.label }}
+        </CvStatusBadge>
       </template>
     </CvPageHeader>
 
@@ -244,12 +262,12 @@ onBeforeUnmount(() => {
       tone="warning"
       title="普通详情刷新未完成"
     >
-      当前显示上次成功读取的 Station 列表投影。
+      当前显示上次成功读取的工作站列表数据。
     </CvInlineAlert>
     <CvPageState
       v-if="listState.phase === 'loading' && !listState.data"
       kind="loading"
-      title="正在读取 Station 普通详情"
+      title="正在读取工作站详情"
     />
     <CvPageState
       v-else-if="listState.phase === 'unauthorized'"
@@ -259,19 +277,19 @@ onBeforeUnmount(() => {
     <CvPageState
       v-else-if="listState.phase === 'forbidden'"
       kind="forbidden"
-      title="无权读取 Station 列表"
+      title="无权读取工作站列表"
     />
     <CvPageState
       v-else-if="listState.phase === 'error' || listState.phase === 'not-found'"
       kind="error"
-      title="Station 普通详情读取失败"
+      title="工作站详情读取失败"
       :description="listState.failure?.message"
     />
     <CvPageState
       v-else-if="(listState.phase === 'success' || listState.phase === 'empty') && !station"
       kind="not-found"
-      title="Station 不存在"
-      description="普通 Station 列表中没有该 Station，管理员增强接口不会替代普通详情 authority。"
+      title="工作站不存在"
+      description="工作站列表中没有该记录；管理信息不会替代普通详情。"
     />
 
     <div
@@ -279,32 +297,21 @@ onBeforeUnmount(() => {
       class="station-detail__grid"
     >
       <CvPanel
-        title="普通详情"
-        description="完全由普通工作站列表项构建。"
+        class="station-detail__overview-panel"
+        title="状态概览"
+        :padded="false"
       >
-        <div class="station-detail__status-row">
-          <CvStatusBadge :tone="stationOnlineTone(station.onlineState)">
-            {{ stationOnlineLabel(station.onlineState) }}
-          </CvStatusBadge>
-          <CvStatusBadge :tone="stationRuntimeTone(station.runtimeState)">
-            {{ stationRuntimeLabel(station.runtimeState) }}
-          </CvStatusBadge>
-          <CvStatusBadge
-            v-if="lastOutcome"
-            :tone="lastOutcome.tone"
-          >
-            {{ lastOutcome.label }}
-          </CvStatusBadge>
-        </div>
         <CvDescriptionList
           :items="ordinaryItems"
-          label="Station 普通详情"
+          :columns="1"
+          label="工作站普通详情"
         />
       </CvPanel>
 
       <CvPanel
-        title="管理员增强信息"
-        description="可选只读增强区；权限不足时仅降级本区域。"
+        class="station-detail__admin-panel"
+        title="管理信息"
+        :padded="false"
       >
         <CvInlineAlert
           v-if="(adminState.phase === 'stale' || adminState.phase === 'partial-failure') && adminState.data"
@@ -324,7 +331,7 @@ onBeforeUnmount(() => {
           compact
           kind="forbidden"
           title="管理员增强信息不可用"
-          description="当前账号没有 StationAdmin 权限；普通详情、结果与健康快照仍可继续使用。"
+          description="当前账号没有工作站管理员（StationAdmin）权限；普通详情、结果与健康快照仍可继续使用。"
         />
         <CvPageState
           v-else-if="adminState.phase === 'unauthorized'"
@@ -348,14 +355,16 @@ onBeforeUnmount(() => {
         <CvDescriptionList
           v-if="adminState.data"
           :items="adminItems"
-          label="Station 管理员增强信息"
+          :columns="1"
+          label="工作站管理员信息"
         />
       </CvPanel>
     </div>
 
     <CvPanel
+      class="station-detail__results-panel"
       title="最近结果"
-      description="严格保留执行状态与判定结果双轴；旧格式数据仅按当前后端映射读取。"
+      :padded="false"
     >
       <CvInlineAlert
         v-if="resultsState.isRefreshing && resultsState.data"
@@ -368,19 +377,19 @@ onBeforeUnmount(() => {
         tone="warning"
         title="结果刷新未完成"
       >
-        当前显示上次成功读取的 Station 结果。
+        当前显示上次成功读取的工作站结果。
       </CvInlineAlert>
       <CvPageState
         v-if="resultsState.phase === 'loading' && !resultsState.data"
         compact
         kind="loading"
-        title="正在读取 Station 结果"
+        title="正在读取工作站结果"
       />
       <CvPageState
         v-else-if="resultsState.phase === 'empty'"
         compact
         kind="empty"
-        title="暂无 Station 结果"
+        title="暂无工作站结果"
       />
       <CvPageState
         v-else-if="resultsState.phase === 'unauthorized'"
@@ -392,13 +401,13 @@ onBeforeUnmount(() => {
         v-else-if="resultsState.phase === 'forbidden'"
         compact
         kind="forbidden"
-        title="无权读取 Station 结果"
+        title="无权读取工作站结果"
       />
       <CvPageState
         v-else-if="resultsState.phase === 'error' || resultsState.phase === 'not-found'"
         compact
         kind="error"
-        title="Station 结果读取失败"
+        title="工作站结果读取失败"
         :description="resultsState.failure?.message"
       />
       <CvDataTable
@@ -406,7 +415,7 @@ onBeforeUnmount(() => {
         :rows="resultsState.data"
         :columns="resultColumns"
         :row-key="row => `${row.stationId}:${row.sequenceId}:${row.messageId}`"
-        caption="Station 最近结果"
+        caption="工作站最近结果"
         :busy="resultsState.isRefreshing"
       >
         <template #cell-completedAtUtc="{ row }">
@@ -436,8 +445,9 @@ onBeforeUnmount(() => {
     </CvPanel>
 
     <CvPanel
+      class="station-detail__health-panel"
       title="健康快照"
-      description="低频健康快照；不读取日志、命令或实时事件流。"
+      :padded="false"
     >
       <CvInlineAlert
         v-if="healthState.isRefreshing && healthState.data"
@@ -456,7 +466,7 @@ onBeforeUnmount(() => {
         v-if="healthState.phase === 'loading' && !healthState.data"
         compact
         kind="loading"
-        title="正在读取 Station health"
+        title="正在读取工作站健康快照"
       />
       <CvPageState
         v-else-if="healthState.phase === 'empty'"
@@ -474,13 +484,13 @@ onBeforeUnmount(() => {
         v-else-if="healthState.phase === 'forbidden'"
         compact
         kind="forbidden"
-        title="无权读取 Station 健康快照"
+        title="无权读取工作站健康快照"
       />
       <CvPageState
         v-else-if="healthState.phase === 'error' || healthState.phase === 'not-found'"
         compact
         kind="error"
-        title="Station 健康快照读取失败"
+        title="工作站健康快照读取失败"
         :description="healthState.failure?.message"
       />
       <CvDataTable
@@ -488,7 +498,7 @@ onBeforeUnmount(() => {
         :rows="healthState.data"
         :columns="healthColumns"
         :row-key="row => `${row.stationId}:${row.sequenceId}:${row.messageId}`"
-        caption="Station 健康快照"
+        caption="工作站健康快照"
         :busy="healthState.isRefreshing"
       >
         <template #cell-createdAtUtc="{ row }">
@@ -522,13 +532,37 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.station-detail { display: grid; min-width: 0; gap: var(--cv-space-5); }
+.station-detail { display: grid; min-width: 0; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); grid-auto-flow: row dense; gap: var(--cv-density-page-gap); align-items: start; }
+.station-detail :deep(.cv-page-header),
+.station-detail > :deep(.cv-inline-alert),
+.station-detail > :deep(.cv-page-state) { grid-column: 1 / -1; }
 .station-detail__back { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); text-decoration: none; }
 .station-detail__back:hover { color: var(--cv-color-link); text-decoration: underline; }
 .station-detail__take { min-width: 150px; }
-.station-detail__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-4); align-items: start; }
-.station-detail__status-row { display: flex; flex-wrap: wrap; gap: var(--cv-space-2); margin-bottom: var(--cv-space-4); }
+.station-detail__grid { display: contents; }
+.station-detail__overview-panel { grid-column: 1; }
+.station-detail__admin-panel { grid-column: 1; }
+.station-detail__results-panel { grid-column: 2; grid-row: span 2; }
+.station-detail__health-panel { grid-column: 1 / -1; }
 .station-detail__outcome { display: grid; justify-items: start; gap: var(--cv-space-1); }
 .station-detail__outcome span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
-@media (max-width: 860px) { .station-detail__grid { grid-template-columns: 1fr; } }
+.station-detail :deep(.station-detail__overview-panel > .cv-panel__header),
+.station-detail :deep(.station-detail__admin-panel > .cv-panel__header),
+.station-detail :deep(.station-detail__results-panel > .cv-panel__header),
+.station-detail :deep(.station-detail__health-panel > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
+.station-detail :deep(.station-detail__overview-panel .cv-description-list),
+.station-detail :deep(.station-detail__admin-panel .cv-description-list) { padding: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
+.station-detail :deep(.station-detail__admin-panel .cv-inline-alert),
+.station-detail :deep(.station-detail__admin-panel .cv-page-state),
+.station-detail :deep(.station-detail__results-panel .cv-inline-alert),
+.station-detail :deep(.station-detail__results-panel .cv-page-state),
+.station-detail :deep(.station-detail__health-panel .cv-inline-alert),
+.station-detail :deep(.station-detail__health-panel .cv-page-state) { margin: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
+@media (max-width: 1080px) {
+  .station-detail { grid-template-columns: 1fr; }
+  .station-detail__overview-panel,
+  .station-detail__admin-panel,
+  .station-detail__results-panel,
+  .station-detail__health-panel { grid-column: 1; grid-row: auto; }
+}
 </style>

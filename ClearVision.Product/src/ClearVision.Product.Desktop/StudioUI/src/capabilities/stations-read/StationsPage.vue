@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import {
   CvButton,
@@ -55,13 +55,13 @@ function queryText(key: string): string {
   return typeof value === 'string' ? value : '';
 }
 
-const searchDraft = ref(queryText('q'));
-const activeSearch = ref(queryText('q'));
-const onlineState = ref(queryText('online') || 'all');
-const runtimeState = ref(queryText('runtime') || 'all');
-const range = ref(queryText('range') || 'today');
-const outcome = ref(queryText('outcome') || 'all');
-const diagnosticCode = ref(queryText('diagnosticCode'));
+const searchDraft = shallowRef(queryText('q'));
+const activeSearch = shallowRef(queryText('q'));
+const onlineState = shallowRef(queryText('online') || 'all');
+const runtimeState = shallowRef(queryText('runtime') || 'all');
+const range = shallowRef(queryText('range') || 'today');
+const outcome = shallowRef(queryText('outcome') || 'all');
+const diagnosticCode = shallowRef(queryText('diagnosticCode'));
 
 const statisticsFilters = computed<StationStatisticsFilters>(() => ({
   range: range.value,
@@ -238,15 +238,28 @@ onBeforeUnmount(() => {
     data-capability="stations-read"
   >
     <CvPageHeader
-      eyebrow="现场监控"
-      title="工作站"
-      description="只读查看现场工作站的连接、运行、结果与健康状态。页面不提供命令、部署或身份修改。"
+      title="工作站监控"
+      description="查看连接与运行状态，定位异常，并进入工作站详情核对最近结果。"
     >
+      <template #meta>
+        <CvStatusBadge
+          tone="info"
+          :dot="false"
+        >
+          只读监控
+        </CvStatusBadge>
+        <span
+          v-if="summaryState.data"
+          class="stations-page__updated-at"
+        >
+          更新于 {{ formatStationDateTime(summaryState.data.updatedAtUtc) }}
+        </span>
+      </template>
       <template #actions>
         <CvButton
           size="sm"
           :loading="listState.isRefreshing || summaryState.isRefreshing || statisticsState.isRefreshing"
-          loading-label="正在刷新 Station"
+          loading-label="正在刷新工作站"
           @click="polling.refreshNow()"
         >
           刷新
@@ -255,21 +268,22 @@ onBeforeUnmount(() => {
     </CvPageHeader>
 
     <CvPanel
+      class="stations-page__summary-panel"
       title="运行摘要"
-      description="来自工作站摘要接口的只读聚合；页面可见时每 15 秒保守刷新。"
+      :padded="false"
     >
       <CvInlineAlert
         v-if="(summaryState.phase === 'stale' || summaryState.phase === 'partial-failure') && summaryState.data"
         tone="warning"
         title="摘要刷新未完成"
       >
-        当前显示上次成功读取的 Station 摘要。
+        当前显示上次成功读取的工作站摘要。
       </CvInlineAlert>
       <CvPageState
         v-if="summaryState.phase === 'loading' && !summaryState.data"
         compact
         kind="loading"
-        title="正在读取 Station 摘要"
+        title="正在读取工作站摘要"
       />
       <CvPageState
         v-else-if="summaryState.phase === 'unauthorized'"
@@ -281,20 +295,20 @@ onBeforeUnmount(() => {
         v-else-if="summaryState.phase === 'forbidden'"
         compact
         kind="forbidden"
-        title="无权读取 Station 摘要"
+        title="无权读取工作站摘要"
       />
       <CvPageState
         v-else-if="summaryState.phase === 'error' || summaryState.phase === 'not-found'"
         compact
         kind="error"
-        title="Station 摘要读取失败"
+        title="工作站摘要读取失败"
         :description="summaryState.failure?.message"
       />
       <CvPageState
         v-else-if="summaryState.data?.totalStations === 0"
         compact
         kind="empty"
-        title="暂无 Station 摘要数据"
+        title="暂无工作站摘要数据"
       />
       <dl
         v-if="summaryState.data && summaryState.data.totalStations > 0"
@@ -311,20 +325,23 @@ onBeforeUnmount(() => {
     </CvPanel>
 
     <CvPanel
+      class="stations-page__list-panel"
       title="工作站列表"
-      description="普通详情完全由列表项构建；管理员详情仅作为独立增强区域。"
+      :padded="false"
     >
       <CvToolbar
+        class="stations-page__list-toolbar"
         interaction="group"
         label="工作站列表筛选"
       >
         <CvSearchField
           v-model="searchDraft"
           class="stations-page__search"
+          name="stationSearch"
           label="搜索工作站"
-          placeholder="名称、ID、产线、运行包或诊断码"
+          placeholder="名称、ID、产线、运行包或诊断码…"
           clear-label="清除工作站搜索"
-          :hide-label="false"
+          :hide-label="true"
           @search="submitSearch"
           @clear="clearSearch"
         />
@@ -338,12 +355,14 @@ onBeforeUnmount(() => {
         <template #secondary>
           <CvSelect
             v-model="onlineState"
+            name="stationOnlineState"
             label="连接状态"
             :options="onlineOptions"
             @update:model-value="applyListFilters"
           />
           <CvSelect
             v-model="runtimeState"
+            name="stationRuntimeState"
             label="运行状态"
             :options="runtimeOptions"
             @update:model-value="applyListFilters"
@@ -355,7 +374,7 @@ onBeforeUnmount(() => {
         v-if="listState.isRefreshing && listState.data"
         tone="info"
       >
-        正在刷新，暂时显示上次读取的 Station 列表。
+        正在刷新，暂时显示上次读取的工作站列表。
       </CvInlineAlert>
       <CvInlineAlert
         v-if="(listState.phase === 'stale' || listState.phase === 'partial-failure') && listState.data"
@@ -367,7 +386,7 @@ onBeforeUnmount(() => {
       <CvPageState
         v-if="listState.phase === 'loading' && !listState.data"
         kind="loading"
-        title="正在读取 Station 列表"
+        title="正在读取工作站列表"
       />
       <CvPageState
         v-else-if="listState.phase === 'unauthorized'"
@@ -377,24 +396,24 @@ onBeforeUnmount(() => {
       <CvPageState
         v-else-if="listState.phase === 'forbidden'"
         kind="forbidden"
-        title="无权读取 Station 列表"
+        title="无权读取工作站列表"
       />
       <CvPageState
         v-else-if="listState.phase === 'error' || listState.phase === 'not-found'"
         kind="error"
-        title="Station 列表读取失败"
+        title="工作站列表读取失败"
         :description="listState.failure?.message"
       />
       <CvPageState
         v-else-if="listState.phase === 'empty'"
         kind="empty"
-        title="暂无 Station"
-        description="当前后端没有返回可查看的 Station。"
+        title="暂无工作站"
+        description="当前后端没有返回可查看的工作站。"
       />
       <CvPageState
         v-else-if="listState.data && visibleStations.length === 0"
         kind="empty"
-        title="没有匹配的 Station"
+        title="没有匹配的工作站"
         description="请调整搜索词或状态筛选。"
       />
 
@@ -410,6 +429,9 @@ onBeforeUnmount(() => {
           <div class="stations-page__station-name">
             <strong>{{ stationDisplayName(row) }}</strong>
             <span>{{ row.lineName || row.stationId }}</span>
+            <small v-if="row.lastDiagnosticCode">
+              {{ row.lastDiagnosticCode }}<template v-if="row.lastDiagnosticMessage"> · {{ row.lastDiagnosticMessage }}</template>
+            </small>
           </div>
         </template>
         <template #cell-onlineState="{ row }">
@@ -446,29 +468,35 @@ onBeforeUnmount(() => {
     </CvPanel>
 
     <CvPanel
+      class="stations-page__statistics-panel"
       title="结果统计"
-      description="九类标准结果分别呈现，不将未判定、无效或执行失败折叠为 NG。"
+      :padded="false"
     >
       <CvToolbar
+        class="stations-page__statistics-toolbar"
         interaction="group"
-        label="Station 结果统计筛选"
+        label="工作站结果统计筛选"
       >
         <CvSelect
           v-model="range"
+          name="stationStatisticsRange"
           label="时间范围"
           :options="rangeOptions"
           @update:model-value="applyStatisticsFilters"
         />
         <CvSelect
           v-model="outcome"
+          name="stationStatisticsOutcome"
           label="结果分类"
           :options="outcomeOptions"
           @update:model-value="applyStatisticsFilters"
         />
         <CvField
           v-model="diagnosticCode"
+          name="stationDiagnosticCode"
           label="诊断码"
-          placeholder="例如 WIRE_SWAP"
+          placeholder="例如 WIRE_SWAP…"
+          autocomplete="off"
           @keyup.enter="applyStatisticsFilters"
         />
         <CvButton
@@ -542,29 +570,62 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.stations-page { display: grid; max-width: 1620px; min-width: 0; gap: var(--cv-density-page-gap); }
-.stations-page__search { flex: 1 1 320px; }
-.stations-page__metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; margin: 0; overflow: hidden; border-block: 1px solid var(--cv-border-subtle); }
-.stations-page__metrics div { display: grid; gap: var(--cv-space-1); padding: var(--cv-space-2) var(--cv-space-3); border-right: 1px solid var(--cv-border-subtle); }
-.stations-page__metrics div:last-child { border-right: 0; }
+.stations-page { display: grid; max-width: 1660px; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(268px, 304px); gap: var(--cv-density-page-gap); align-items: start; }
+.stations-page :deep(.cv-page-header) { grid-column: 1 / -1; }
+.stations-page__updated-at { align-self: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-variant-numeric: tabular-nums lining-nums; }
+.stations-page__summary-panel { grid-column: 2; grid-row: 2; }
+.stations-page__list-panel { grid-column: 1; grid-row: 2 / span 2; }
+.stations-page__statistics-panel { grid-column: 2; grid-row: 3; }
+.stations-page__list-toolbar,
+.stations-page__statistics-toolbar { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
+.stations-page__statistics-toolbar :deep(.cv-toolbar__primary) { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
+.stations-page__statistics-toolbar :deep(.cv-select),
+.stations-page__statistics-toolbar :deep(.cv-field),
+.stations-page__statistics-toolbar :deep(.cv-button) { width: 100%; }
+.stations-page__statistics-toolbar :deep(.cv-field),
+.stations-page__statistics-toolbar :deep(.cv-button) { grid-column: 1 / -1; }
+.stations-page__search { flex: 1 1 360px; max-width: 560px; }
+.stations-page__metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 0; overflow: hidden; border-top: 1px solid var(--cv-border-subtle); }
+.stations-page__metrics div { display: grid; gap: 2px; padding: var(--cv-space-3); border-right: 1px solid var(--cv-border-subtle); border-bottom: 1px solid var(--cv-border-subtle); }
+.stations-page__metrics div:nth-child(3n) { border-right: 0; }
+.stations-page__metrics div:nth-last-child(-n + 3) { border-bottom: 0; }
 .stations-page__metrics dt { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-.stations-page__metrics dd { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-xl); font-weight: var(--cv-font-weight-medium); font-variant-numeric: tabular-nums lining-nums; }
+.stations-page__metrics dd { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-lg); font-weight: var(--cv-font-weight-semibold); font-variant-numeric: tabular-nums lining-nums; }
 .stations-page__station-name { display: grid; gap: var(--cv-space-1); }
 .stations-page__station-name span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-.stations-page__outcomes { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: var(--cv-space-2); }
-.stations-page__outcomes article { display: grid; justify-items: start; gap: var(--cv-space-2); padding: var(--cv-space-3); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); }
-.stations-page__outcomes strong { font-size: var(--cv-font-size-lg); }
-@media (max-width: 980px) {
-  .stations-page__metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .stations-page__metrics div { border-bottom: 1px solid var(--cv-border-subtle); }
-  .stations-page__metrics div:nth-child(3n) { border-right: 0; }
-  .stations-page__metrics div:nth-last-child(-n + 3) { border-bottom: 0; }
+.stations-page__station-name small { max-width: 34ch; overflow: hidden; color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
+.stations-page__outcomes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--cv-border-subtle); }
+.stations-page__outcomes article { display: grid; place-items: center; align-content: center; gap: 2px; min-height: 52px; padding: var(--cv-space-1); border-right: 1px solid var(--cv-border-subtle); border-bottom: 1px solid var(--cv-border-subtle); }
+.stations-page__outcomes article:nth-child(3n) { border-right: 0; }
+.stations-page__outcomes article:nth-last-child(-n + 3) { border-bottom: 0; }
+.stations-page__outcomes article:last-child { border-bottom: 0; }
+.stations-page__outcomes strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-md); font-variant-numeric: tabular-nums lining-nums; }
+.stations-page :deep(.stations-page__summary-panel > .cv-panel__header),
+.stations-page :deep(.stations-page__list-panel > .cv-panel__header),
+.stations-page :deep(.stations-page__statistics-panel > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
+.stations-page :deep(.stations-page__summary-panel .cv-inline-alert),
+.stations-page :deep(.stations-page__summary-panel .cv-page-state),
+.stations-page :deep(.stations-page__list-panel .cv-inline-alert),
+.stations-page :deep(.stations-page__list-panel .cv-page-state),
+.stations-page :deep(.stations-page__statistics-panel .cv-inline-alert),
+.stations-page :deep(.stations-page__statistics-panel .cv-page-state) { margin: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
+@media (max-width: 1080px) {
+  .stations-page { grid-template-columns: 1fr; }
+  .stations-page__summary-panel,
+  .stations-page__list-panel,
+  .stations-page__statistics-panel { grid-column: 1; grid-row: auto; }
+  .stations-page__summary-panel { order: 1; }
+  .stations-page__list-panel { order: 2; }
+  .stations-page__statistics-panel { order: 3; }
+  .stations-page__metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .stations-page__metrics div { border-right: 1px solid var(--cv-border-subtle); border-bottom: 0; }
+  .stations-page__metrics div:nth-child(2n) { border-right: 1px solid var(--cv-border-subtle); }
+  .stations-page__metrics div:last-child { border-right: 0; }
+  .stations-page__statistics-toolbar :deep(.cv-toolbar__primary) { display: flex; align-items: end; flex-direction: row; }
+  .stations-page__statistics-toolbar :deep(.cv-select),
+  .stations-page__statistics-toolbar :deep(.cv-field),
+  .stations-page__statistics-toolbar :deep(.cv-button) { width: auto; }
+  .stations-page__outcomes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-@media (max-width: 620px) {
-  .stations-page__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .stations-page__metrics div,
-  .stations-page__metrics div:nth-child(3n) { border-right: 1px solid var(--cv-border-subtle); border-bottom: 1px solid var(--cv-border-subtle); }
-  .stations-page__metrics div:nth-child(2n) { border-right: 0; }
-  .stations-page__metrics div:nth-last-child(-n + 2) { border-bottom: 0; }
-}
+@media (max-width: 720px) { .stations-page__metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } .stations-page__metrics div { border-bottom: 1px solid var(--cv-border-subtle); } .stations-page__metrics div:nth-child(3n) { border-right: 0; } .stations-page__outcomes { grid-template-columns: 1fr; } .stations-page__outcomes article { border-right: 0; border-bottom: 1px solid var(--cv-border-subtle); } .stations-page__outcomes article:last-child { border-bottom: 0; } }
 </style>
