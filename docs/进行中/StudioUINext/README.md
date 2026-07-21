@@ -55,7 +55,7 @@ F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision
   该 SHA 的交付回报记录。
 - F03：G1–G6 核心实现已经完成，`F03_G6_STATUS=DONE`；总体状态仍为 `PARTIAL`，唯一历史 evidence gap 是独立无 Node 目标机验证 `NOT_PERFORMED`。产品负责人已接受延期，该项在 F04 中为非阻塞治理项，不改写为 PASS 或 COMPLETE。
 - F04：历史执行权威是 [F04 完整开发计划](./Studio_UI_Next_F04_完整开发计划_PROPOSED_AUDITED.md)。G0–G6 工程实现与 final-SHA 证据已完成；Remote CI run `29666388675` attempt 1 和 Final Gate 均通过。`NEXT_PILOT_PROFILE_AVAILABLE=YES`，但产品层视觉结果后来在 F04.2 审计与用户反馈中被拒绝，不能据此切换默认入口。
-- F04-R：当前纠偏治理权威是 [F04-R 产品层重构完整计划](./Studio_UI_Next_F04_R_产品层重构完整计划_PROPOSED.md)。Prompt 1 已完成 G0 事实冻结和 G1 审计/提案；产品负责人尚未批准导航、Route/Role/Profile/Owner 与黄金旅程范围，状态为 `G1_STATUS=AWAITING_PRODUCT_OWNER_APPROVAL`、`G2_ENTRY=BLOCKED`、`IMPLEMENTATION=FORBIDDEN`。
+- F04-R：当前纠偏治理权威是 [F04-R 产品层重构完整计划](./Studio_UI_Next_F04_R_产品层重构完整计划_PROPOSED.md)。Prompt 2 已完成 G1 批准决策回写和 G2 黄金旅程、Legacy A/B、相机、变量/判定、Run/Result/Evidence、Runtime Package 与权限合同冻结；状态为 `G1_STATUS=DONE`、`G2_STATUS=DONE`、`G3_ENTRY=AWAITING_PRODUCT_OWNER_APPROVAL`、`IMPLEMENTATION=FORBIDDEN`。相机稳定线同步与 backend policy hardening 仍为 `PENDING`，不得开始实现。
 - `Studio:StudioUiEnabled=false` 保持不变；legacy 仍是默认入口。
 
 ## 阶段门禁
@@ -100,5 +100,11 @@ F04-R 纠偏期间以本目录链接的 F04-R 主计划与 G0/G1 受控文档为
 - [F04-R G1 产品域导航与能力真值矩阵](./F04R_G1_产品域导航与能力真值矩阵.md)
 - [F04-R G1 Route / Role / Profile / Owner 合同矩阵](./F04R_G1_RouteRoleProfileOwner合同矩阵.md)
 - [F04-R G1 黄金旅程范围提案](./F04R_G1_黄金旅程范围提案.md)
+- [F04-R G2 黄金旅程任务合同](./F04R_G2_黄金旅程任务合同.md)
+- [F04-R G2 旧版 / 新版 A/B 验收矩阵](./F04R_G2_旧版新版AB验收矩阵.md)
+- [F04-R G2 相机绑定与单帧捕获合同](./F04R_G2_相机绑定与单帧捕获合同.md)
+- [F04-R G2 GlobalVariables 与 FinalDecision 合同](./F04R_G2_GlobalVariables与FinalDecision合同.md)
+- [F04-R G2 Run、Result、Evidence 与 Runtime Package 合同](./F04R_G2_RunResultEvidence与RuntimePackage合同.md)
+- [F04-R G2 稳定线语义同步与权限 Hardening 方案](./F04R_G2_稳定线语义同步与权限Hardening方案.md)
 - [仓库级协作规则](../../../AGENTS.md)
 - [旧 Studio2 历史入口](../Studio2/README.md)（历史取证，不是新计划）

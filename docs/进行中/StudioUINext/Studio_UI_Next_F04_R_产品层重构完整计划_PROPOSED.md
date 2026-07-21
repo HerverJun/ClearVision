@@ -39,9 +39,22 @@ F05_ENTRY=BLOCKED_UNTIL_F04R_EXIT
 
 G0_STATUS=DONE
 G1_AUDIT_STATE=DONE
-G1_PROPOSAL_STATE=READY_FOR_PRODUCT_OWNER_REVIEW
-G1_STATUS=AWAITING_PRODUCT_OWNER_APPROVAL
-G2_ENTRY=BLOCKED
+G1_PROPOSAL_STATE=APPROVED
+G1_STATUS=DONE
+G2_ENTRY=APPROVED
+G2_STATUS=DONE
+GOLDEN_JOURNEY_TASK_SPEC=FROZEN
+LEGACY_SEMANTIC_BASELINE=FROZEN
+SPECIAL_EDITOR_DECISIONS=FROZEN
+GLOBAL_VARIABLES_CONTRACT=FROZEN
+FINAL_DECISION_CONTRACT=FROZEN
+RUN_RESULT_EVIDENCE_CONTRACT=FROZEN
+RUNTIME_PACKAGE_CONTRACT=FROZEN
+A_B_ACCEPTANCE_MATRIX=FROZEN
+STABLE_CAMERA_SEMANTIC_SYNC=PENDING
+BLOCKS_G3_IMPLEMENTATION=YES
+BACKEND_POLICY_HARDENING=PENDING
+G3_ENTRY=AWAITING_PRODUCT_OWNER_APPROVAL
 IMPLEMENTATION=FORBIDDEN
 ```
 
@@ -68,8 +81,9 @@ F04-R 的目标不是完成全部旧版能力迁移，也不是继续扩建一�
 
 - G0 已在 2026-07-20 完成 Git、flags、stable-line、retained assets、shared owner 和 blocker 冻结，详见 [G0 基线冻结](./F04R_G0_进入治理与实施基线冻结.md)。
 - `origin/codex初稿` 已前进到 `bea40439...`；相机单帧 Preview/图像 MIME/Legacy fallback 修复必须在实现前同步，但该提交混有延期 Modbus 和 `tmp/pdfs`，同步策略仍待批准。
-- G1 的产品域、导航、route/role/profile/owner 与黄金旅程仅形成提案，详见 [产品域真值矩阵](./F04R_G1_产品域导航与能力真值矩阵.md)、[合同矩阵](./F04R_G1_RouteRoleProfileOwner合同矩阵.md) 和 [黄金旅程范围](./F04R_G1_黄金旅程范围提案.md)。
-- 产品负责人尚未批准 G1，因此不得进入 G2，不得修改产品实现。
+- G1 的产品域、导航、route/role/profile/owner 与黄金旅程范围已按本轮批准决策冻结；G1 历史提案仍保留为输入，不被改写。
+- G2 已冻结真实黄金旅程、Legacy A/B、相机同步范围、GlobalVariables、FinalDecision、Run/Result/Evidence、Runtime Package 与权限 hardening 提案；合同冻结不授权产品实现。
+- 相机 stable semantic sync 与 backend policy hardening 仍为 Prompt 3 前置 pending；G3 入口等待产品负责人批准。
 
 ---
 
@@ -396,7 +410,7 @@ BLOCKS_DEFAULT_ENTRY
 输出低保真结构和操作流时，只允许使用真实字段和真实动作。
 可以使用现有 Vue route 建立无写入的结构验证，但不得制作脱离代码的假产品页面。
 
-产品负责人至少确认：
+本轮已确认并回写的 G1 决策：
 
 - 顶层导航；
 - 工程到流程的上下文关系；
@@ -409,15 +423,15 @@ BLOCKS_DEFAULT_ENTRY
 
 ```text
 G1_AUDIT_STATE=DONE
-G1_PROPOSAL_STATE=READY_FOR_PRODUCT_OWNER_REVIEW
-G1_STATUS=AWAITING_PRODUCT_OWNER_APPROVAL
-PRODUCT_DOMAIN_MAP=PROPOSED_NOT_APPROVED
-NAVIGATION_SEMANTICS=PROPOSED_NOT_APPROVED
-ROUTE_ROLE_PROFILE_MATRIX=PROPOSED_NOT_APPROVED
-OWNER_CONTRACT_MATRIX=PROPOSED_NOT_APPROVED
+G1_PROPOSAL_STATE=APPROVED
+G1_STATUS=DONE
+PRODUCT_DOMAIN_MAP=FROZEN
+NAVIGATION_SEMANTICS=FROZEN
+ROUTE_ROLE_PROFILE_MATRIX=FROZEN
+OWNER_CONTRACT_MATRIX=FROZEN
 MISLEADING_ENTRY_COUNT=6
-GOLDEN_JOURNEY_SCOPE=PROPOSED_NOT_APPROVED
-G2_ENTRY=BLOCKED
+GOLDEN_JOURNEY_SCOPE=FROZEN
+G2_ENTRY=APPROVED
 IMPLEMENTATION=FORBIDDEN
 ```
 
@@ -436,7 +450,7 @@ IMPLEMENTATION=FORBIDDEN
 | 步骤 | 旧版入口与动作 | 新版当前状态 | 目标交互 | 后端权威 | Owner | 错误与恢复 | A/B 指标 |
 |---|---|---|---|---|---|---|---|
 
-至少包含：
+本轮冻结的完整任务合同、owner、写入链、权限、状态和 Prompt 3 文件边界见 [G2 黄金旅程任务合同](./F04R_G2_黄金旅程任务合同.md)。旧版与新版的实际点击/切页/滚动/上下文基线见 [G2 A/B 验收矩阵](./F04R_G2_旧版新版AB验收矩阵.md)。至少包含：
 
 1. 创建空白工程；
 2. 从模板/示例或导入工程；
@@ -485,7 +499,7 @@ ERROR_RECOVERY>LEGACY
 - 如何处理取消、dirty、权限和错误；
 - 如何避免把所有能力塞进通用表单。
 
-不得把缺少合同的问题用纯前端字段补齐。
+不得把缺少合同的问题用纯前端字段补齐。相机绑定/单帧捕获的 stable sync 精确文件范围见 [相机合同](./F04R_G2_相机绑定与单帧捕获合同.md)；GlobalVariables 与 FinalDecision 的唯一 owner、dirty、校验、hash 和保存边界见 [变量与判定合同](./F04R_G2_GlobalVariables与FinalDecision合同.md)。
 
 ## 8.5 门禁
 
@@ -493,11 +507,34 @@ ERROR_RECOVERY>LEGACY
 G2_STATUS=DONE
 GOLDEN_JOURNEY_TASK_SPEC=FROZEN
 LEGACY_SEMANTIC_BASELINE=FROZEN
-SPECIAL_EDITOR_DECISIONS=APPROVED
-BACKEND_CONTRACT_GAPS=0_OR_SEPARATELY_APPROVED
+SPECIAL_EDITOR_DECISIONS=FROZEN
+GLOBAL_VARIABLES_CONTRACT=FROZEN
+FINAL_DECISION_CONTRACT=FROZEN
+RUN_RESULT_EVIDENCE_CONTRACT=FROZEN
+RUNTIME_PACKAGE_CONTRACT=FROZEN
+BACKEND_CONTRACT_GAPS=SEPARATELY_APPROVED_OR_PENDING_HARDENING
 A_B_ACCEPTANCE_MATRIX=FROZEN
-G3_ENTRY=APPROVED
+STABLE_CAMERA_SEMANTIC_SYNC=PENDING
+BLOCKS_G3_IMPLEMENTATION=YES
+BACKEND_POLICY_HARDENING=PENDING
+G3_ENTRY=AWAITING_PRODUCT_OWNER_APPROVAL
 ```
+
+## 8.6 G2 交付状态与 Prompt 3 入口
+
+本轮合同与矩阵完整，G2 可以标记完成；这不是 G3 实现批准。Prompt 3 只能按以下顺序进入：
+
+```text
+重新 fetch/审计远端
+→ stable camera/MIME/Preview/Legacy fallback 语义同步
+→ 串行同步测试
+→ 既有 endpoint policy hardening
+→ Next capability-local owner 实现
+→ Browser/Playwright 与 owner guard
+→ 真实 WebView2 / Windows 125% / 真实端点证据
+```
+
+Prompt 3 开始条件：G2 文档已提交；产品负责人批准 G3；稳定线同步方案获批准且不带入 Modbus/临时 pdf；GlobalVariables/FinalDecision 继续使用 ProjectSaveCoordinator；任何 capability 只有一个 mounted owner、订阅集合和 writer。`STABLE_CAMERA_SEMANTIC_SYNC=PENDING` 时 `BLOCKS_G3_IMPLEMENTATION=YES`。
 
 ---
 
@@ -835,8 +872,8 @@ F04R-B12  未完成 F04-R 即启动 F05 实现
 
 F04-R 分为 4 个 Prompt：
 
-- Prompt 1：只读 G0 + G1 审计与产品提案；状态停在产品负责人审查；
-- Prompt 2：在 G1 获批后细化 G2 黄金旅程合同、旧版语义与 A/B 基线；
+- Prompt 1：只读 G0 + G1 审计与产品提案；已完成并形成批准输入；
+- Prompt 2：G1 获批后冻结 G2 黄金旅程合同、旧版语义、相机方案、变量/判定、运行结果、运行包、权限与 A/B 基线；本轮完成；
 - Prompt 3：在 G2 获批后执行 G3 真实实现；
 - Prompt 4：G4 真实证据、用户验收准备与 G5 收口。
 
@@ -860,9 +897,22 @@ G3 内可使用最多 3 个子代理，但共享 Shell、Router、Workspace、To
 PLAN_APPROVAL=AWAITING_PRODUCT_OWNER
 G0_STATUS=DONE
 G1_AUDIT_STATE=DONE
-G1_PROPOSAL_STATE=READY_FOR_PRODUCT_OWNER_REVIEW
-G1_STATUS=AWAITING_PRODUCT_OWNER_APPROVAL
-G2_ENTRY=BLOCKED
+G1_PROPOSAL_STATE=APPROVED
+G1_STATUS=DONE
+G2_ENTRY=APPROVED
+G2_STATUS=DONE
+GOLDEN_JOURNEY_TASK_SPEC=FROZEN
+LEGACY_SEMANTIC_BASELINE=FROZEN
+SPECIAL_EDITOR_DECISIONS=FROZEN
+GLOBAL_VARIABLES_CONTRACT=FROZEN
+FINAL_DECISION_CONTRACT=FROZEN
+RUN_RESULT_EVIDENCE_CONTRACT=FROZEN
+RUNTIME_PACKAGE_CONTRACT=FROZEN
+A_B_ACCEPTANCE_MATRIX=FROZEN
+STABLE_CAMERA_SEMANTIC_SYNC=PENDING
+BLOCKS_G3_IMPLEMENTATION=YES
+BACKEND_POLICY_HARDENING=PENDING
+G3_ENTRY=AWAITING_PRODUCT_OWNER_APPROVAL
 IMPLEMENTATION=FORBIDDEN
 PRODUCT_VISUAL_CONFIRMATION=FAIL
 F05_ENTRY=BLOCKED
