@@ -726,6 +726,44 @@ public sealed class ProjectGlobalVariableEndpointsTests
     }
 
     [Fact]
+    public async Task ProjectPut_WhenGlobalVariablesAreInvalid_ShouldReturnStructuredFieldDiagnostics()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true));
+        var invalidSchema = CreateSchema(variableId, 1, manualWriteAllowed: true);
+        invalidSchema.Variables.Add(new ProjectGlobalVariableDefinition
+        {
+            Id = variableId,
+            Name = invalidSchema.Variables[0].Name,
+            DisplayName = "重复变量",
+            ValueType = ProjectGlobalVariableValueType.Int64,
+            InitialValue = JsonSerializer.SerializeToElement(2L)
+        });
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}",
+            new UpdateProjectRequest
+            {
+                Name = host.Project.Name,
+                GlobalVariables = invalidSchema,
+                ExpectedPersistenceRevision = host.Project.PersistenceRevision
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be("GV003");
+        var diagnostics = body.GetProperty("diagnostics").EnumerateArray().ToList();
+        diagnostics.Should().Contain(item =>
+            item.GetProperty("code").GetString() == "GV003" &&
+            item.GetProperty("field").GetString() == "globalVariables.variables.id" &&
+            item.GetProperty("variableId").GetGuid() == variableId);
+        diagnostics.Should().Contain(item =>
+            item.GetProperty("code").GetString() == "GV004" &&
+            item.GetProperty("field").GetString() == "globalVariables.variables.name");
+    }
+
+    [Fact]
     public async Task ProjectPut_WhenExpectedPersistenceRevisionIsStale_ShouldReturnStructuredConflictWithoutWrite()
     {
         var variableId = Guid.NewGuid();

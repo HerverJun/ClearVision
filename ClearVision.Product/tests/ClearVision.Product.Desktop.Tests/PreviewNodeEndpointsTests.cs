@@ -34,6 +34,26 @@ namespace ClearVision.Product.Desktop.Tests;
 public class PreviewNodeEndpointsTests
 {
     [Fact]
+    public async Task PreviewEndpoints_ShouldRejectOperatorRole()
+    {
+        await using var host = await PreviewNodeTestHost.CreateAsync(
+            _ => { },
+            role: UserRole.Operator);
+
+        using var preview = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = Guid.NewGuid(),
+            TargetNodeId = Guid.NewGuid()
+        });
+        using var artifactRead = await host.Client.GetAsync("/api/preview-artifacts/missing-artifact");
+        using var artifactDelete = await host.Client.DeleteAsync("/api/preview-artifacts/missing-artifact");
+
+        preview.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
+        artifactRead.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
+        artifactDelete.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task PreviewNode_UsesBreakAtOperatorAndReturnsTargetOutput()
     {
         var projectId = Guid.NewGuid();
@@ -3883,7 +3903,8 @@ public class PreviewNodeEndpointsTests
         public static async Task<PreviewNodeTestHost> CreateAsync(
             Action<IFlowExecutionService> configureFlowExecution,
             Action<IProjectRepository>? configureProjectRepository = null,
-            Action<IProjectFlowStorage>? configureFlowStorage = null)
+            Action<IProjectFlowStorage>? configureFlowStorage = null,
+            UserRole role = UserRole.Engineer)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -3909,6 +3930,16 @@ public class PreviewNodeEndpointsTests
             builder.Services.AddPreviewArtifactServices();
 
             var app = builder.Build();
+            app.Use(async (context, next) =>
+            {
+                context.Items["CurrentUser"] = new UserSession
+                {
+                    UserId = $"preview-{role.ToString().ToLowerInvariant()}",
+                    Username = $"preview-{role.ToString().ToLowerInvariant()}",
+                    Role = role.ToString()
+                };
+                await next();
+            });
             app.MapPreviewNodeEndpoints();
             app.MapPreviewArtifactEndpoints();
             await app.StartAsync();
@@ -3951,6 +3982,16 @@ public class PreviewNodeEndpointsTests
             builder.Services.AddPreviewArtifactServices();
 
             var app = builder.Build();
+            app.Use(async (context, next) =>
+            {
+                context.Items["CurrentUser"] = new UserSession
+                {
+                    UserId = "preview-engineer",
+                    Username = "preview-engineer",
+                    Role = UserRole.Engineer.ToString()
+                };
+                await next();
+            });
             app.MapPreviewNodeEndpoints();
             app.MapPreviewArtifactEndpoints();
             await app.StartAsync();

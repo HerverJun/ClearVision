@@ -480,7 +480,8 @@ public static class PreviewNodeEndpoints
                     await ReleaseProjectAccessAsync();
                 }
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         return app;
     }

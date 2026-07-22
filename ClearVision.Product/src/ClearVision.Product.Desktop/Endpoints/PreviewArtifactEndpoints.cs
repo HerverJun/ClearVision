@@ -29,7 +29,8 @@ public static class PreviewArtifactEndpoints
                 artifact.Bytes,
                 artifact.ContentType,
                 enableRangeProcessing: false);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         app.MapDelete("/api/preview-artifacts/{artifactId}", (
             string artifactId,
@@ -43,7 +44,8 @@ public static class PreviewArtifactEndpoints
             return artifactStore.Delete(artifactId)
                 ? Results.NoContent()
                 : Results.NotFound();
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         return app;
     }

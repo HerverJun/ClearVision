@@ -167,6 +167,18 @@ public sealed record ProjectGlobalVariableDiagnostic(
     Guid? ParameterId = null,
     ProjectGlobalVariableDiagnosticSeverity Severity = ProjectGlobalVariableDiagnosticSeverity.Error);
 
+public sealed class ProjectGlobalVariableSchemaValidationException : InvalidOperationException
+{
+    public ProjectGlobalVariableSchemaValidationException(
+        IReadOnlyList<ProjectGlobalVariableDiagnostic> diagnostics)
+        : base(string.Join(Environment.NewLine, diagnostics.Select(item => $"{item.Code}: {item.Message}")))
+    {
+        Diagnostics = diagnostics.ToArray();
+    }
+
+    public IReadOnlyList<ProjectGlobalVariableDiagnostic> Diagnostics { get; }
+}
+
 [JsonConverter(typeof(ProjectVariableNumericBoundJsonConverter))]
 public readonly struct ProjectVariableNumericBound
 {

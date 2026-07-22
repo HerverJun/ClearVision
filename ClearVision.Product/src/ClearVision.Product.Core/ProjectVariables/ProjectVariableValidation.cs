@@ -74,7 +74,7 @@ public static partial class ProjectGlobalVariableSchemaValidator
             .ToList();
         if (diagnostics.Count > 0)
         {
-            throw new InvalidOperationException(string.Join(Environment.NewLine, diagnostics.Select(d => $"{d.Code}: {d.Message}")));
+            throw new ProjectGlobalVariableSchemaValidationException(diagnostics);
         }
     }
 

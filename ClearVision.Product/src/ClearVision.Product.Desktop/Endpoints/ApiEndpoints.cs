@@ -397,7 +397,7 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return ToBadRequest(ex);
+                return ToProjectUpdateFailure(ex);
             }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
@@ -654,6 +654,7 @@ public static class ApiEndpoints
                     PackageId = exportResult.Manifest.PackageId,
                     PackageName = exportResult.Manifest.PackageName,
                     FlowHash = exportResult.Manifest.FlowHash,
+                    DecisionConfigurationHash = exportResult.Manifest.DecisionConfigurationHash,
                     RegisteredForStationDeployment = stationPackage != null,
                     StationPackageId = stationPackage?.PackageId,
                     StationPackage = stationPackage,
@@ -687,10 +688,11 @@ public static class ApiEndpoints
             return Results.Ok(new
             {
                 IsValid = issues.Count == 0,
-                Issues = issues,
+                Issues = issues.Select(ToDecisionConfigurationIssueResponse).ToList(),
                 EligibleOutputs = candidates
             });
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         // Admission is deliberately a projection of the persisted Project snapshot.
         // It does not create a Runtime session, reservation, or execute capability.
@@ -752,7 +754,8 @@ public static class ApiEndpoints
             {
                 return Results.NotFound(new { Code = "ADMISSION_PROJECT_NOT_FOUND", Error = "Project was not found." });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapPost("/api/inspection/stop", async (
             StudioInspectionRunIdentityRequest request,
@@ -766,7 +769,8 @@ public static class ApiEndpoints
 
             var reconciliation = await service.StopPersistedStudioRunAsync(identity, cancellationToken);
             return Results.Ok(ToInspectionRunReconciliationResponse(reconciliation));
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         app.MapPost("/api/inspection/reconcile", async (
             StudioInspectionRunIdentityRequest request,
@@ -780,7 +784,8 @@ public static class ApiEndpoints
 
             var reconciliation = await service.ReconcilePersistedStudioRunAsync(identity, cancellationToken);
             return Results.Ok(ToInspectionRunReconciliationResponse(reconciliation));
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         // 执行检测
         app.MapPost("/api/inspection/execute", async (
@@ -888,7 +893,8 @@ public static class ApiEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         // 获取检测历史
         app.MapGet("/api/inspection/history/{projectId:guid}", async (
@@ -1166,11 +1172,90 @@ public static class ApiEndpoints
             : Results.BadRequest(new { Error = ex.Message });
     }
 
+    private static object ToDecisionConfigurationIssueResponse(DecisionConfigurationIssue issue) => new
+    {
+        issue.Code,
+        issue.Message,
+        issue.OperatorId,
+        issue.OutputName,
+        Field = issue.Code switch
+        {
+            "DECISION_FLOW_REQUIRED" => "flow",
+            "DECISION_BINDING_REQUIRED" => "decisionConfiguration.finalDecisionBinding",
+            "DECISION_SOURCE_OPERATOR_NOT_FOUND" or "DECISION_SOURCE_OPERATOR_DISABLED" =>
+                "decisionConfiguration.finalDecisionBinding.sourceOperatorId",
+            "DECISION_SOURCE_OUTPUT_NOT_FOUND" or "DECISION_SOURCE_OUTPUT_MISMATCH" or
+                "DECISION_SOURCE_OUTPUT_INELIGIBLE" =>
+                "decisionConfiguration.finalDecisionBinding.sourceOutput",
+            "DECISION_SOURCE_TYPE_MISMATCH" => "decisionConfiguration.finalDecisionBinding.dataType",
+            "DECISION_RULE_CONTRACT_MISMATCH" or "DECISION_RULE_TYPE_MISMATCH" =>
+                "decisionConfiguration.finalDecisionBinding.rule",
+            "DECISION_STRING_MAP_VALUES_REQUIRED" or "DECISION_STRING_MAP_VALUES_CONFLICT" or
+                "DECISION_STRING_MAP_CONSTRAINT_MISMATCH" =>
+                "decisionConfiguration.finalDecisionBinding.stringMap",
+            "DECISION_NUMERIC_COMPARISON_REQUIRED" =>
+                "decisionConfiguration.finalDecisionBinding.numericComparison",
+            _ => "decisionConfiguration.finalDecisionBinding"
+        }
+    };
+
+    private static object ToGlobalVariableDiagnosticResponse(ProjectGlobalVariableDiagnostic diagnostic) => new
+    {
+        diagnostic.Code,
+        diagnostic.Message,
+        diagnostic.VariableId,
+        diagnostic.OperatorId,
+        diagnostic.PortId,
+        diagnostic.ParameterId,
+        Severity = diagnostic.Severity.ToString(),
+        Field = diagnostic.Code switch
+        {
+            "GV001" => "globalVariables.schemaVersion",
+            "GV002" or "GV003" => "globalVariables.variables.id",
+            "GV004" or "GV013" => "globalVariables.variables.name",
+            "GV005" or "GV014" or "GV015" => "globalVariables.variables.initialValue",
+            "GV018" => "globalVariables.variables.min",
+            "GV019" => "globalVariables.variables.max",
+            "GV021" => "globalVariables.variables.range",
+            "GV006" => "globalVariables.sourceBindings",
+            "GV007" => "globalVariables.targetBindings",
+            "GV008" => diagnostic.PortId.HasValue
+                ? "globalVariables.sourceBindings.variableId"
+                : "globalVariables.targetBindings.variableId",
+            "GV009" or "GV020" => diagnostic.PortId.HasValue
+                ? "globalVariables.sourceBindings.operatorId"
+                : "globalVariables.targetBindings.operatorId",
+            "GV010" => "globalVariables.sourceBindings.outputPortId",
+            "GV011" => "globalVariables.targetBindings.parameterId",
+            "GV017" or "GV022" => diagnostic.PortId.HasValue
+                ? "globalVariables.sourceBindings.conversionMode"
+                : "globalVariables.targetBindings.conversionMode",
+            "RP101" or "RP107" or "RP122" => "globalVariables.sourceBindings.resultPath",
+            "GV033" => diagnostic.PortId.HasValue
+                ? "globalVariables.sourceBindings.expression"
+                : "globalVariables.targetBindings.expression",
+            _ => "globalVariables"
+        }
+    };
+
     private static IResult ToProjectUpdateFailure(Exception ex)
     {
         if (ex is ProjectNotFoundException)
         {
             return Results.NotFound(new { Code = "PROJECT_NOT_FOUND", Error = "Project was not found." });
+        }
+
+        if (ex is ProjectGlobalVariableSchemaValidationException validation)
+        {
+            var diagnostics = validation.Diagnostics
+                .Select(ToGlobalVariableDiagnosticResponse)
+                .ToList();
+            return Results.BadRequest(new
+            {
+                Code = validation.Diagnostics[0].Code,
+                Error = "Project global variable validation failed.",
+                Diagnostics = diagnostics
+            });
         }
 
         if (ex is ProjectSaveRevisionConflictException conflict)

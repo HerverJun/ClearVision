@@ -30,6 +30,65 @@ namespace ClearVision.Product.Desktop.Tests;
 public sealed class InspectionRunEndpointsTests
 {
     [Fact]
+    public async Task InspectionMutationAndDecisionValidationEndpoints_ShouldRejectOperatorRole()
+    {
+        var service = Substitute.For<IInspectionService>();
+        await using var host = await InspectionRunEndpointHost.CreateAsync(service, UserRole.Operator);
+        var identity = new StudioInspectionRunIdentityRequest
+        {
+            ProjectId = Guid.NewGuid(),
+            ClientSnapshotId = Guid.NewGuid(),
+            ExpectedPersistenceRevision = 1,
+            ExpectedCanonicalFlowHash = "flow-hash",
+            ExpectedDecisionConfigurationHash = "decision-hash"
+        };
+
+        using var validation = await host.Client.PostAsJsonAsync(
+            "/api/inspection/decision-configuration/validate",
+            new OperatorFlowDto());
+        using var admission = await host.Client.PostAsJsonAsync("/api/inspection/admission", new StudioInspectionRunAdmissionRequest
+        {
+            ProjectId = identity.ProjectId,
+            ClientSnapshotId = identity.ClientSnapshotId,
+            ExpectedPersistenceRevision = identity.ExpectedPersistenceRevision
+        });
+        using var execute = await host.Client.PostAsJsonAsync("/api/inspection/execute", new ExecuteInspectionRequest
+        {
+            ProjectId = identity.ProjectId,
+            ClientSnapshotId = identity.ClientSnapshotId,
+            ExpectedPersistenceRevision = identity.ExpectedPersistenceRevision,
+            ExpectedCanonicalFlowHash = identity.ExpectedCanonicalFlowHash,
+            ExpectedDecisionConfigurationHash = identity.ExpectedDecisionConfigurationHash
+        });
+        using var stop = await host.Client.PostAsJsonAsync("/api/inspection/stop", identity);
+        using var reconcile = await host.Client.PostAsJsonAsync("/api/inspection/reconcile", identity);
+
+        validation.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        admission.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        execute.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        stop.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        reconcile.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await service.DidNotReceiveWithAnyArgs().AdmitPersistedStudioRunAsync(default, default, default, default);
+    }
+
+    [Fact]
+    public async Task DecisionValidation_ShouldReturnStableFieldKeys()
+    {
+        var service = Substitute.For<IInspectionService>();
+        await using var host = await InspectionRunEndpointHost.CreateAsync(service);
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/inspection/decision-configuration/validate",
+            new OperatorFlowDto());
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var issue = body.GetProperty("issues").EnumerateArray().Single();
+        issue.GetProperty("code").GetString().Should().Be("DECISION_BINDING_REQUIRED");
+        issue.GetProperty("field").GetString().Should().Be("decisionConfiguration.finalDecisionBinding");
+    }
+
+    [Fact]
     public async Task PersistedWorkspaceRun_AdmissionAndExecute_EnforceIdentityAndRejectRawFlow()
     {
         var projectId = Guid.NewGuid();
@@ -370,7 +429,9 @@ public sealed class InspectionRunEndpointsTests
 
         public HttpClient Client { get; }
 
-        public static async Task<InspectionRunEndpointHost> CreateAsync(IInspectionService service)
+        public static async Task<InspectionRunEndpointHost> CreateAsync(
+            IInspectionService service,
+            UserRole role = UserRole.Engineer)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -384,6 +445,16 @@ public sealed class InspectionRunEndpointsTests
 
             var app = builder.Build();
             app.UseDeveloperExceptionPage();
+            app.Use(async (context, next) =>
+            {
+                context.Items["CurrentUser"] = new UserSession
+                {
+                    UserId = $"run-{role.ToString().ToLowerInvariant()}",
+                    Username = $"run-{role.ToString().ToLowerInvariant()}",
+                    Role = role.ToString()
+                };
+                await next();
+            });
             MapInspectionEndpoints(app);
             await app.StartAsync();
             return new InspectionRunEndpointHost(app);
