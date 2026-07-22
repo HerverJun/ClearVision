@@ -13,8 +13,29 @@ namespace ClearVision.Product.Infrastructure.Operators;
     CategoryId = OperatorCategoryId.FlowControl,
     IconName = "result-judgment",
     Keywords = new[] { "judgment", "ok", "ng", "condition", "threshold" },
-    Version = "1.0.1"
+    Version = "1.0.2"
 )]
+[OperatorParameterRule(
+    "ExpectValue",
+    RequiredWhenAll = new[] { "Condition!=Range" },
+    EnabledWhenAll = new[] { "Condition!=Range" },
+    HiddenWhenAll = new[] { "Condition==Range" },
+    IgnoredWhenAll = new[] { "Condition==Range" },
+    ReasonCode = "RESULT_JUDGMENT_EXPECT_VALUE_ONLY_OUTSIDE_RANGE")]
+[OperatorParameterRule(
+    "ExpectValueMin",
+    RequiredWhenAll = new[] { "Condition==Range" },
+    EnabledWhenAll = new[] { "Condition==Range" },
+    HiddenWhenAll = new[] { "Condition!=Range" },
+    IgnoredWhenAll = new[] { "Condition!=Range" },
+    ReasonCode = "RESULT_JUDGMENT_RANGE_MIN_REQUIRED")]
+[OperatorParameterRule(
+    "ExpectValueMax",
+    RequiredWhenAll = new[] { "Condition==Range" },
+    EnabledWhenAll = new[] { "Condition==Range" },
+    HiddenWhenAll = new[] { "Condition!=Range" },
+    IgnoredWhenAll = new[] { "Condition!=Range" },
+    ReasonCode = "RESULT_JUDGMENT_RANGE_MAX_REQUIRED")]
 [InputPort("Value", "Value", PortDataType.Any, IsRequired = false)]
 [InputPort("Confidence", "Confidence", PortDataType.Float, IsRequired = false)]
 [OutputPort("JudgmentResult", "Judgment Result", PortDataType.String)]

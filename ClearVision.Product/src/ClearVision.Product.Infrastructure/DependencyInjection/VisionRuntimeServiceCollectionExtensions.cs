@@ -8,6 +8,7 @@ using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Cameras;
+using ClearVision.Product.Infrastructure.Communication.Gr;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Infrastructure.Events;
 using ClearVision.Product.Infrastructure.Logging;
@@ -75,7 +76,14 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<IOperatorExecutor, CameraCalibrationOperator>();
         services.AddSingleton<IOperatorExecutor, UndistortOperator>();
         services.AddSingleton<IOperatorExecutor, CoordinateTransformOperator>();
+        services.AddSingleton<GrRegisterMapCatalog>();
+        services.AddSingleton<GrStateDecoder>();
+        services.AddSingleton<JsonCommunicationProfileStore>();
         services.AddSingleton<IOperatorExecutor, ModbusCommunicationOperator>();
+        services.AddSingleton<ModbusCommunicationOperator>(provider => provider
+            .GetServices<IOperatorExecutor>()
+            .OfType<ModbusCommunicationOperator>()
+            .Single());
         services.AddSingleton<IOperatorExecutor, TcpCommunicationOperator>();
         services.AddSingleton<IOperatorExecutor, DatabaseWriteOperator>();
         services.AddSingleton<IOperatorExecutor, ConditionalBranchOperator>();

@@ -87,6 +87,10 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Communication\Gr\Templates\gr-v3.0-register-map.json" />
+  </ItemGroup>
+
   <!-- Huaray SDK native runtime dependencies: use Content + CopyToPublishDirectory
        so dotnet publish copies them alongside the single-file exe.
        ExcludeFromSingleFile keeps them as loose files instead of embedding. -->

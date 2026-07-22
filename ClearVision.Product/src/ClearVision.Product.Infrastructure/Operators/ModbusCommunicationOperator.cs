@@ -1,10 +1,12 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Infrastructure.Communication.Gr;
 using Microsoft.Extensions.Logging;
 using NModbus;
 
@@ -15,7 +17,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modbus RTU 通信。",
     CategoryId = OperatorCategoryId.Communication,
     IconName = "modbus",
-    Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "RTU", "TCP", "Industrial", "Modbus通信", "Modbus Communication" }
+    Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "RTU", "TCP", "Industrial", "Modbus通信", "Modbus Communication" },
+    Version = "1.1.0"
 )]
 [OperatorParameterRule("IpAddress", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcEndpoint, ReasonCode = "MODBUS_TCP_ENDPOINT_REQUIRED")]
 [OperatorParameterRule("RegisterAddress", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcAddress, ReasonCode = "MODBUS_REGISTER_ADDRESS_REQUIRED")]
@@ -24,7 +27,18 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [InputPort("Data", "Data", PortDataType.Any, IsRequired = false)]
 [OutputPort("Response", "Response", PortDataType.String)]
 [OutputPort("Status", "Status", PortDataType.Boolean)]
+[OutputPort("Values", "Values", PortDataType.Any)]
+[OutputPort("Registers", "Registers", PortDataType.Any)]
+[OutputPort("StartAddress", "Start Address", PortDataType.Integer)]
+[OutputPort("Count", "Count", PortDataType.Integer)]
+[OutputPort("Operation", "Operation", PortDataType.String)]
+[OutputPort("LatencyMs", "Latency (ms)", PortDataType.Integer)]
+[OutputPort("WriteReceipt", "Write Receipt", PortDataType.Any)]
 [OperatorParam("Protocol", "Protocol", "enum", Description = "当前仅支持 TCP；RTU 选项用于旧流程兼容，执行时返回不支持。", DefaultValue = "TCP", Options = new[] { "TCP|TCP", "RTU|RTU" })]
+[OperatorParam("ProfileId", "Device Profile", "string", Description = "Optional local Modbus device profile ID.", DefaultValue = "")]
+[OperatorParam("TemplateId", "Template ID", "string", DefaultValue = "")]
+[OperatorParam("TemplateVersion", "Template Version", "string", DefaultValue = "")]
+[OperatorParam("TemplateHash", "Template Hash", "string", DefaultValue = "")]
 [OperatorParam("IpAddress", "IP Address", "string", DefaultValue = "192.168.1.1")]
 [OperatorParam("Port", "Port", "int", DefaultValue = 502, Min = 1, Max = 65535)]
 [OperatorParam("SlaveId", "Slave ID", "int", DefaultValue = 1, Min = 1, Max = 255)]
@@ -46,9 +60,13 @@ public class ModbusCommunicationOperator : OperatorBase
     private static readonly ConcurrentDictionary<string, DateTimeOffset> ConnectionLastUsed = new();
     private static readonly ConcurrentDictionary<string, int> ActiveOperations = new();
     private static readonly IModbusFactory ModbusFactory = new ModbusFactory();
+    private readonly JsonCommunicationProfileStore? _profileStore;
 
-    public ModbusCommunicationOperator(ILogger<ModbusCommunicationOperator> logger) : base(logger)
+    public ModbusCommunicationOperator(
+        ILogger<ModbusCommunicationOperator> logger,
+        JsonCommunicationProfileStore? profileStore = null) : base(logger)
     {
+        _profileStore = profileStore;
     }
 
     public override OperatorType OperatorType => OperatorType.ModbusCommunication;
@@ -58,10 +76,17 @@ public class ModbusCommunicationOperator : OperatorBase
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
+        var profileId = GetStringParam(@operator, "ProfileId", string.Empty);
+        var profile = string.IsNullOrWhiteSpace(profileId) ? null : _profileStore?.Get(profileId);
+        if (!string.IsNullOrWhiteSpace(profileId) && profile == null)
+        {
+            return OperatorExecutionOutput.Failure($"Modbus profile '{profileId}' was not found.");
+        }
+
         var protocol = GetStringParam(@operator, "Protocol", "TCP");
-        var ipAddress = GetStringParam(@operator, "IpAddress", "192.168.1.1");
-        var port = GetIntParam(@operator, "Port", 502, 1, 65535);
-        var slaveId = GetIntParam(@operator, "SlaveId", 1, 1, 255);
+        var ipAddress = profile?.Host ?? GetStringParam(@operator, "IpAddress", "192.168.1.1");
+        var port = profile?.Port ?? GetIntParam(@operator, "Port", 502, 1, 65535);
+        var slaveId = profile?.UnitId ?? GetIntParam(@operator, "SlaveId", 1, 1, 255);
         var registerAddress = GetIntParam(@operator, "RegisterAddress", 0);
         var registerCount = GetIntParam(@operator, "RegisterCount", 1, 1, 125);
         var functionCode = GetStringParam(@operator, "FunctionCode", "ReadHolding");
@@ -69,12 +94,18 @@ public class ModbusCommunicationOperator : OperatorBase
         var writeValue = ResolveWriteValue(@operator, inputs);
         var timeoutMs = GetIntParam(@operator, "TimeoutMs", DefaultOperationTimeoutMs, 100, 60000);
 
+        if (profile?.ReadOnly == true && functionCode is "WriteSingle" or "WriteMultiple")
+        {
+            return OperatorExecutionOutput.Failure($"Modbus profile '{profile.Id}' is read-only.");
+        }
+
         if (!protocol.Equals("TCP", StringComparison.OrdinalIgnoreCase))
         {
             return OperatorExecutionOutput.Failure("Modbus RTU requires serial-port lifecycle configuration and is not supported by this package operator.");
         }
 
-        var (response, status) = await ExecuteTcpModbusAsync(
+        var stopwatch = Stopwatch.StartNew();
+        var operationResult = await ExecuteTcpModbusAsync(
             ipAddress,
             port,
             slaveId,
@@ -84,19 +115,31 @@ public class ModbusCommunicationOperator : OperatorBase
             writeValue,
             timeoutMs,
             cancellationToken);
+        stopwatch.Stop();
 
-        if (!status)
+        if (!operationResult.IsSuccess)
         {
-            return OperatorExecutionOutput.Failure(response);
+            return OperatorExecutionOutput.Failure(operationResult.Response);
         }
 
         return OperatorExecutionOutput.Success(new Dictionary<string, object>
         {
-            ["Response"] = response,
-            ["Status"] = status,
+            ["Response"] = operationResult.Response,
+            ["Status"] = true,
             ["Protocol"] = protocol,
             ["FunctionCode"] = functionCode,
-            ["SlaveId"] = slaveId
+            ["SlaveId"] = slaveId,
+            ["Values"] = operationResult.Values,
+            ["Registers"] = operationResult.Registers,
+            ["StartAddress"] = registerAddress,
+            ["Count"] = operationResult.Count,
+            ["Operation"] = functionCode,
+            ["LatencyMs"] = stopwatch.ElapsedMilliseconds,
+            ["WriteReceipt"] = (object?)operationResult.WriteReceipt ?? new Dictionary<string, object>(),
+            ["ProfileId"] = profile?.Id ?? profileId,
+            ["TemplateId"] = profile?.TemplateId ?? GetStringParam(@operator, "TemplateId", string.Empty),
+            ["TemplateVersion"] = profile?.TemplateVersion ?? GetStringParam(@operator, "TemplateVersion", string.Empty),
+            ["TemplateHash"] = profile?.TemplateHash ?? GetStringParam(@operator, "TemplateHash", string.Empty)
         });
     }
 
@@ -299,7 +342,7 @@ public class ModbusCommunicationOperator : OperatorBase
         client.SendTimeout = timeoutMs;
     }
 
-    private async Task<(string response, bool status)> ExecuteTcpModbusAsync(
+    private async Task<ModbusOperationResult> ExecuteTcpModbusAsync(
         string ipAddress,
         int port,
         int slaveId,
@@ -329,7 +372,7 @@ public class ModbusCommunicationOperator : OperatorBase
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return ("Communication was cancelled.", false);
+            return ModbusOperationResult.Failure("Communication was cancelled.");
         }
         catch (OperationCanceledException)
         {
@@ -338,31 +381,31 @@ public class ModbusCommunicationOperator : OperatorBase
                 PurgeConnection(key, force: true);
             }
 
-            return ("Communication timed out.", false);
+            return ModbusOperationResult.Failure("Communication timed out.");
         }
         catch (IOException ex)
         {
             PurgeConnection(key, force: true);
             Logger.LogError(ex, "Modbus IO communication failed: {Key}", key);
-            return ($"Communication failed: {ex.Message}", false);
+            return ModbusOperationResult.Failure($"Communication failed: {ex.Message}");
         }
         catch (SocketException ex)
         {
             PurgeConnection(key, force: true);
             Logger.LogError(ex, "Modbus socket communication failed: {Key}", key);
-            return ($"Communication failed: {ex.Message}", false);
+            return ModbusOperationResult.Failure($"Communication failed: {ex.Message}");
         }
         catch (TimeoutException ex)
         {
             PurgeConnection(key, force: true);
             Logger.LogError(ex, "Modbus communication timed out: {Key}", key);
-            return ($"Communication timed out: {ex.Message}", false);
+            return ModbusOperationResult.Failure($"Communication timed out: {ex.Message}");
         }
         catch (Exception ex)
         {
             PurgeConnection(key, force: true);
             Logger.LogError(ex, "Modbus communication failed: {Key}", key);
-            return ($"Communication failed: {ex.Message}", false);
+            return ModbusOperationResult.Failure($"Communication failed: {ex.Message}");
         }
         finally
         {
@@ -389,7 +432,7 @@ public class ModbusCommunicationOperator : OperatorBase
         }
     }
 
-    private static (string response, bool status) ExecuteModbusFunction(
+    private static ModbusOperationResult ExecuteModbusFunction(
         IModbusMaster master,
         int slaveId,
         string functionCode,
@@ -401,33 +444,76 @@ public class ModbusCommunicationOperator : OperatorBase
         {
             case "ReadCoils":
                 var coils = master.ReadCoils((byte)slaveId, (ushort)registerAddress, (ushort)registerCount);
-                return (string.Join(", ", coils), true);
+                return ModbusOperationResult.Read(
+                    string.Join(", ", coils),
+                    coils.Cast<object>().ToArray(),
+                    []);
 
             case "ReadHolding":
                 var registers = master.ReadHoldingRegisters((byte)slaveId, (ushort)registerAddress, (ushort)registerCount);
-                return (string.Join(", ", registers), true);
+                var registerValues = registers
+                    .Select((value, index) => new ModbusRegisterValue(registerAddress + index, value))
+                    .ToArray();
+                return ModbusOperationResult.Read(
+                    string.Join(", ", registers),
+                    registers.Cast<object>().ToArray(),
+                    registerValues);
 
             case "WriteSingle":
                 if (!ushort.TryParse(writeValue, out var singleValue))
                 {
-                    return ("WriteValue must be a valid unsigned 16-bit integer.", false);
+                    return ModbusOperationResult.Failure("WriteValue must be a valid unsigned 16-bit integer.");
                 }
 
                 master.WriteSingleRegister((byte)slaveId, (ushort)registerAddress, singleValue);
-                return ($"Write succeeded: {singleValue}", true);
+                return ModbusOperationResult.Write(
+                    $"Write succeeded: {singleValue}",
+                    [singleValue],
+                    new ModbusWriteReceipt(registerAddress, 1, [singleValue]));
 
             case "WriteMultiple":
                 if (!TryParseRegisterValues(writeValue, out var values))
                 {
-                    return ("WriteValue must be a comma-separated list of unsigned 16-bit integers.", false);
+                    return ModbusOperationResult.Failure("WriteValue must be a comma-separated list of unsigned 16-bit integers.");
                 }
 
                 master.WriteMultipleRegisters((byte)slaveId, (ushort)registerAddress, values);
-                return ($"Write succeeded: {values.Length} registers", true);
+                return ModbusOperationResult.Write(
+                    $"Write succeeded: {values.Length} registers",
+                    values.Cast<object>().ToArray(),
+                    new ModbusWriteReceipt(registerAddress, values.Length, values));
 
             default:
-                return ($"Unknown function code: {functionCode}", false);
+                return ModbusOperationResult.Failure($"Unknown function code: {functionCode}");
         }
+    }
+
+    private sealed record ModbusRegisterValue(int Address, ushort Value);
+
+    private sealed record ModbusWriteReceipt(int StartAddress, int Count, IReadOnlyList<ushort> Values);
+
+    private sealed record ModbusOperationResult(
+        bool IsSuccess,
+        string Response,
+        IReadOnlyList<object> Values,
+        IReadOnlyList<ModbusRegisterValue> Registers,
+        int Count,
+        ModbusWriteReceipt? WriteReceipt)
+    {
+        public static ModbusOperationResult Failure(string response) =>
+            new(false, response, [], [], 0, null);
+
+        public static ModbusOperationResult Read(
+            string response,
+            IReadOnlyList<object> values,
+            IReadOnlyList<ModbusRegisterValue> registers) =>
+            new(true, response, values, registers, values.Count, null);
+
+        public static ModbusOperationResult Write(
+            string response,
+            IReadOnlyList<object> values,
+            ModbusWriteReceipt receipt) =>
+            new(true, response, values, [], receipt.Count, receipt);
     }
 
     private static bool TryParseRegisterValues(string writeValue, out ushort[] values)

@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Tests.Runtime;
 
-[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
+[TestClassification(TestDomain.Runtime, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "runtime", Suites = "ServicesRegression")]
 public sealed class RuntimeDependencyBoundaryTests
 {
     [Fact]
@@ -47,6 +47,8 @@ public sealed class RuntimeDependencyBoundaryTests
 
         var executorImplementationTypes = GetRuntimeOperatorExecutorImplementationTypes();
         var executors = provider.GetServices<IOperatorExecutor>().ToList();
+        var modbusExecutor = executors.Single(executor => executor.OperatorType == OperatorType.ModbusCommunication);
+        Assert.Same(modbusExecutor, provider.GetRequiredService<ModbusCommunicationOperator>());
         var registeredTypes = executors.Select(executor => executor.GetType()).ToHashSet();
         var missingTypes = executorImplementationTypes
             .Where(type => !registeredTypes.Contains(type))

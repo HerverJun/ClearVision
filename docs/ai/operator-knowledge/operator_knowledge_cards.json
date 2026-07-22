@@ -27573,6 +27573,55 @@
         "DataType": "Boolean",
         "IsRequired": false,
         "Description": ""
+      },
+      {
+        "Name": "Values",
+        "DisplayName": "Values",
+        "DataType": "Any",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "Registers",
+        "DisplayName": "Registers",
+        "DataType": "Any",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "StartAddress",
+        "DisplayName": "Start Address",
+        "DataType": "Integer",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "Count",
+        "DisplayName": "Count",
+        "DataType": "Integer",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "Operation",
+        "DisplayName": "\u64CD\u4F5C",
+        "DataType": "String",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "LatencyMs",
+        "DisplayName": "Latency (ms)",
+        "DataType": "Integer",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "WriteReceipt",
+        "DisplayName": "Write Receipt",
+        "DataType": "Any",
+        "IsRequired": false,
+        "Description": ""
       }
     ],
     "Parameters": [
@@ -27589,6 +27638,50 @@
           "TCP",
           "RTU"
         ]
+      },
+      {
+        "Name": "ProfileId",
+        "DisplayName": "Device Profile",
+        "DataType": "string",
+        "Description": "Optional local Modbus device profile ID.",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "TemplateId",
+        "DisplayName": "Template ID",
+        "DataType": "string",
+        "Description": "",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "TemplateVersion",
+        "DisplayName": "Template Version",
+        "DataType": "string",
+        "Description": "",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "TemplateHash",
+        "DisplayName": "Template Hash",
+        "DataType": "string",
+        "Description": "",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
       },
       {
         "Name": "IpAddress",
@@ -27619,7 +27712,7 @@
         "Description": "",
         "DefaultValue": "1",
         "MinValue": "1",
-        "MaxValue": "247",
+        "MaxValue": "255",
         "IsRequired": true,
         "AllowedValues": []
       },
@@ -27871,7 +27964,7 @@
       }
     ],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "F44B9E02DAF4601B2B2D01922F1F62E7C6141FA1B4CF3DB7239783EC0BF9A468",
+    "GenerationFingerprint": "C3851C1AA073347BAD447A5CBFBFCD99D62736A4196D87FFF58F28A8B6E12414",
     "RequiredResources": [
       "ModbusCommunication.IpAddress",
       "ModbusCommunication.RegisterAddress"
@@ -37011,12 +37104,172 @@
         "AllowedValues": []
       }
     ],
-    "ParameterConditions": [],
+    "ParameterConditions": [
+      {
+        "Parameter": "ExpectValue",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": {
+          "All": [
+            {
+              "Parameter": "Condition",
+              "Comparison": "not-equals",
+              "Value": "Range"
+            }
+          ],
+          "Any": null
+        },
+        "EnabledWhen": {
+          "All": [
+            {
+              "Parameter": "Condition",
+              "Comparison": "not-equals",
+              "Value": "Range"
+            }
+          ],
+          "Any": null
+        },
+        "DisabledWhen": null,
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "RESULT_JUDGMENT_EXPECT_VALUE_ONLY_OUTSIDE_RANGE",
+        "VisibleWhen": null,
+        "HiddenWhen": {
+          "All": [
+            {
+              "Parameter": "Condition",
+              "Comparison": "equals",
+              "Value": "Range"
+            }
+          ],
+          "Any": null
+        },
+        "IgnoredWhen": {
+          "All": [
+            {
+              "Parameter": "Condition",
+              "Comparison": "equals",
+              "Value": "Range"
+            }
+          ],
+          "Any": null
+        },
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "ExpectValueMin",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": {
+          "All": [
+            {
+              "Parameter": "Condition",
+              "Comparison": "equals",
+              "Value": "Range"
+            }
+          ],
+          "Any": null
+        },
+        "EnabledWhen": {
+          "All": [
+            {
+              "Parameter": "Condition",
+              "Comparison": "equals",
+              "Value": "Range"
+            }
+          ],
+          "Any": null
+        },
+        "DisabledWhen": null,
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "RESULT_JUDGMENT_RANGE_MIN_REQUIRED",
+        "VisibleWhen": null,
+        "HiddenWhen": {
+          "All": [
+            {
+              "Parameter": "Condition",
+              "Comparison": "not-equals",
+              "Value": "Range"
+            }
+          ],
+          "Any": null
+        },
+        "IgnoredWhen": {
+          "All": [
+            {
+              "Parameter": "Condition",
+              "Comparison": "not-equals",
+              "Value": "Range"
+            }
+          ],
+          "Any": null
+        },
+        "SatisfiedByInputPorts": null
+      },
+      {
+        "Parameter": "ExpectValueMax",
+        "RequiredPolicy": "metadata",
+        "RequiredWhen": {
+          "All": [
+            {
+              "Parameter": "Condition",
+              "Comparison": "equals",
+              "Value": "Range"
+            }
+          ],
+          "Any": null
+        },
+        "EnabledWhen": {
+          "All": [
+            {
+              "Parameter": "Condition",
+              "Comparison": "equals",
+              "Value": "Range"
+            }
+          ],
+          "Any": null
+        },
+        "DisabledWhen": null,
+        "AtLeastOneGroup": null,
+        "MutuallyExclusiveGroup": null,
+        "AliasFor": null,
+        "Deprecated": false,
+        "ResourceKind": null,
+        "ReasonCode": "RESULT_JUDGMENT_RANGE_MAX_REQUIRED",
+        "VisibleWhen": null,
+        "HiddenWhen": {
+          "All": [
+            {
+              "Parameter": "Condition",
+              "Comparison": "not-equals",
+              "Value": "Range"
+            }
+          ],
+          "Any": null
+        },
+        "IgnoredWhen": {
+          "All": [
+            {
+              "Parameter": "Condition",
+              "Comparison": "not-equals",
+              "Value": "Range"
+            }
+          ],
+          "Any": null
+        },
+        "SatisfiedByInputPorts": null
+      }
+    ],
     "OutputConditions": [],
     "ImageInputContracts": [],
     "ResourceRequirements": [],
     "GenerationDependencies": [],
-    "GenerationFingerprint": "7333F779253445A60AE8E15A9A9E2A76D962FE2A568320FA96C2C102CC4CCDEF",
+    "GenerationFingerprint": "4B651029B0A939A65B71A8F5650560C2A88C48B8BB1273EFA581AB7565B1204C",
     "RequiredResources": [],
     "TypicalUpstream": [
       "TemplateMatching",

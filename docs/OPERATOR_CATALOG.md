@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-07-16 11:22:20 +08:00`
+> 生成时间 / Generated At: `2026-07-22 15:53:38 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
@@ -219,7 +219,7 @@
 | `OperatorType.Delay` | 延时 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 1 | `1.0.0` | 该算子用于等待指定时间后继续执行，常用于通信前等待下位机就绪。运行时从声明输入端口读… | [Delay](./operators/Delay.md) |
 | `OperatorType.ForEach` | ForEach 循环 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 1 | 4 | `1.0.0` | 该算子用于对集合中的每个元素执行子图。运行时从声明输入端口读取数据，按参数表解析配置… | [ForEach](./operators/ForEach.md) |
 | `OperatorType.FrameChangeTrigger` | 帧变化触发 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 10 | 20 | `1.0.0` | 该算子用于通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空… | [FrameChangeTrigger](./operators/FrameChangeTrigger.md) |
-| `OperatorType.ResultJudgment` | 结果判定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 5 | 8 | `1.0.1` | 该算子用于对数值、字符串等结果执行业务判定，输出条件检查结果。运行时从声明输入端口读… | [ResultJudgment](./operators/ResultJudgment.md) |
+| `OperatorType.ResultJudgment` | 结果判定 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 5 | 8 | `1.0.2` | 该算子用于对数值、字符串等结果执行业务判定，输出条件检查结果。运行时从声明输入端口读… | [ResultJudgment](./operators/ResultJudgment.md) |
 | `OperatorType.TriggerModule` | 触发模块 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 3 | 3 | `1.0.0` | 该算子用于生成软件、定时或外部触发信号。运行时从声明输入端口读取数据，按参数表解析配… | [TriggerModule](./operators/TriggerModule.md) |
 | `OperatorType.TryCatch` | Try分支透传 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 4 | 3 | `1.0.0` | 该算子用于将输入透传到 Try 分支并输出空 Catch/无错误状态；本算子不捕获下… | [TryCatch](./operators/TryCatch.md) |
 
@@ -228,7 +228,7 @@
 |------|------|------|------|------|------|------:|------:|------:|------|------|------|
 | `OperatorType.HttpRequest` | HTTP 请求 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 2 | 3 | 6 | `1.0.0` | 该算子用于调用外部 REST API。运行时从声明输入端口读取数据，按参数表解析配置… | [HttpRequest](./operators/HttpRequest.md) |
 | `OperatorType.MitsubishiMcCommunication` | 三菱MC通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 13 | `1.0.0` | 该算子用于三菱 MC 协议 PLC 读写通信。运行时从声明输入端口读取数据，按参数表… | [MitsubishiMcCommunication](./operators/MitsubishiMcCommunication.md) |
-| `OperatorType.ModbusCommunication` | Modbus TCP通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 9 | `1.0.0` | 该算子用于通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modb… | [ModbusCommunication](./operators/ModbusCommunication.md) |
+| `OperatorType.ModbusCommunication` | Modbus TCP通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 9 | 13 | `1.1.0` | 该算子用于通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modb… | [ModbusCommunication](./operators/ModbusCommunication.md) |
 | `OperatorType.MqttPublish` | MQTT 发布 | `Implemented` | `Unknown` | `Reference` | `NotValidated` | 2 | 1 | 6 | `0.1.0` | 该算子用于在启用可选 MQTT 集成时发布检测数据。运行时从声明输入端口读取数据，按… | [MqttPublish](./operators/MqttPublish.md) |
 | `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 2 | 13 | `1.0.0` | 该算子用于欧姆龙FINS/TCP协议PLC读写通信（CP1H/CJ2M/NJ/NX）… | [OmronFinsCommunication](./operators/OmronFinsCommunication.md) |
 | `OperatorType.SerialCommunication` | 串口通信 | `Implemented` | `Unknown` | `Unknown` | `NotValidated` | 1 | 1 | 9 | `1.0.0` | 该算子用于RS-232/485 串口数据收发。运行时从声明输入端口读取数据，按参数表… | [SerialCommunication](./operators/SerialCommunication.md) |

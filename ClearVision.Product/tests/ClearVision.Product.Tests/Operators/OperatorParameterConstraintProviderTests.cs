@@ -84,6 +84,45 @@ public sealed class OperatorParameterConstraintProviderTests
     }
 
     [Fact]
+    public void ResultJudgment_ShouldRequireOnlyParametersForTheSelectedCondition()
+    {
+        var metadata = _factory.GetMetadata(OperatorType.ResultJudgment)!;
+
+        var equalStates = States(metadata, new Dictionary<string, object?>
+        {
+            ["Condition"] = "Equal",
+            ["ExpectValue"] = "1",
+            ["ExpectValueMin"] = string.Empty,
+            ["ExpectValueMax"] = string.Empty
+        });
+        equalStates["ExpectValue"].EffectiveRequired.Should().BeTrue();
+        equalStates["ExpectValueMin"].EffectiveIgnored.Should().BeTrue();
+        equalStates["ExpectValueMax"].EffectiveIgnored.Should().BeTrue();
+        OperatorParameterConstraintEvaluator.Validate(
+                metadata,
+                new Dictionary<string, object?>
+                {
+                    ["Condition"] = "Equal",
+                    ["ExpectValue"] = "1",
+                    ["ExpectValueMin"] = string.Empty,
+                    ["ExpectValueMax"] = string.Empty
+                })
+            .Should().BeEmpty();
+
+        var rangeViolations = OperatorParameterConstraintEvaluator.Validate(
+            metadata,
+            new Dictionary<string, object?>
+            {
+                ["Condition"] = "Range",
+                ["ExpectValue"] = string.Empty,
+                ["ExpectValueMin"] = string.Empty,
+                ["ExpectValueMax"] = string.Empty
+            });
+        rangeViolations.SelectMany(item => item.ParameterNames)
+            .Should().BeEquivalentTo(["ExpectValueMin", "ExpectValueMax"]);
+    }
+
+    [Fact]
     public void Canonicalization_ShouldPreferCanonicalThenAliasThenMetadataDefault()
     {
         var metadata = _factory.GetMetadata(OperatorType.ImageAcquisition)!;

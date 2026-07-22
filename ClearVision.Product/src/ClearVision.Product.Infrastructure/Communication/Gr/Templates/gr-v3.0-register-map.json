@@ -1,0 +1,39 @@
+{
+  "templateId": "gr-robot",
+  "version": "3.0",
+  "displayName": "GR Robot Controller v3.0",
+  "protocol": "ModbusTcp",
+  "defaultPort": 502,
+  "defaultUnitId": 255,
+  "statusRange": { "startAddress": 437, "count": 23, "functionCode": "ReadHolding" },
+  "writePolicy": {
+    "enabledByDefault": false,
+    "allowedAddresses": [],
+    "disabledAddresses": [1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009]
+  },
+  "registers": [
+    { "address": 437, "key": "powered", "displayName": "Controller powered", "valueType": "boolean" },
+    { "address": 438, "key": "enabled", "displayName": "Robot enabled", "valueType": "boolean" },
+    { "address": 439, "key": "status439", "displayName": "Status 439", "valueType": "raw" },
+    { "address": 440, "key": "status440", "displayName": "Status 440", "valueType": "raw" },
+    { "address": 441, "key": "status441", "displayName": "Status 441", "valueType": "raw" },
+    { "address": 442, "key": "alarmCode", "displayName": "Alarm code", "valueType": "unsigned" },
+    { "address": 443, "key": "safetyDoor", "displayName": "Safety door", "valueType": "boolean" },
+    { "address": 444, "key": "emergencyStop", "displayName": "Emergency stop", "valueType": "boolean" },
+    { "address": 445, "key": "alarmActive", "displayName": "Alarm active", "valueType": "boolean" },
+    { "address": 446, "key": "status446", "displayName": "Status 446", "valueType": "raw" },
+    { "address": 447, "key": "status447", "displayName": "Status 447", "valueType": "raw" },
+    { "address": 448, "key": "status448", "displayName": "Status 448", "valueType": "raw" },
+    { "address": 449, "key": "operatingMode", "displayName": "Operating mode", "valueType": "enum", "enumValues": { "2": "ManualHigh" } },
+    { "address": 450, "key": "status450", "displayName": "Status 450", "valueType": "raw" },
+    { "address": 451, "key": "status451", "displayName": "Status 451", "valueType": "raw" },
+    { "address": 452, "key": "status452", "displayName": "Status 452", "valueType": "raw" },
+    { "address": 453, "key": "status453", "displayName": "Status 453", "valueType": "raw" },
+    { "address": 454, "key": "status454", "displayName": "Status 454", "valueType": "raw" },
+    { "address": 455, "key": "status455", "displayName": "Status 455", "valueType": "raw" },
+    { "address": 456, "key": "programState456", "displayName": "Program state 456", "valueType": "raw" },
+    { "address": 457, "key": "programState457", "displayName": "Program state 457", "valueType": "raw" },
+    { "address": 458, "key": "programState458", "displayName": "Program state 458", "valueType": "raw" },
+    { "address": 459, "key": "programState459", "displayName": "Program state 459", "valueType": "raw" }
+  ]
+}

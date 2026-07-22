@@ -366,6 +366,9 @@ public class CommunicationAnalysisCardMapper : IAnalysisCardMapper
             "StatusCode",
             "Response",
             "Value",
+            "Operation",
+            "StartAddress",
+            "Count",
             "Topic",
             "Address",
             "LatencyMs",
@@ -406,7 +409,11 @@ public class CommunicationAnalysisCardMapper : IAnalysisCardMapper
             Title = $"{@operator.Type} Communication",
             Status = AnalysisMapperHelpers.ResolveStatus(result),
             Priority = 85,
-            Fields = fields
+            Fields = fields,
+            Meta = AnalysisMapperHelpers.BuildMeta(
+                ("values", AnalysisMapperHelpers.TryReadObject(result.OutputData, "Values")),
+                ("registers", AnalysisMapperHelpers.TryReadObject(result.OutputData, "Registers")),
+                ("writeReceipt", AnalysisMapperHelpers.TryReadObject(result.OutputData, "WriteReceipt")))
         };
     }
 }

@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-07-16 11:22:20 +08:00`
+> 生成时间 / Generated At: `2026-07-22 15:53:38 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 当前版本快照 / Current Snapshot
@@ -148,12 +148,12 @@
 | `OperatorType.Delay` | 延时 | `FlowControl` | 流程控制 | `Stable` | `1.0.0` |
 | `OperatorType.ForEach` | ForEach 循环 | `FlowControl` | 流程控制 | `Stable` | `1.0.0` |
 | `OperatorType.FrameChangeTrigger` | 帧变化触发 | `FlowControl` | 流程控制 | `Stable` | `1.0.0` |
-| `OperatorType.ResultJudgment` | 结果判定 | `FlowControl` | 流程控制 | `Stable` | `1.0.1` |
+| `OperatorType.ResultJudgment` | 结果判定 | `FlowControl` | 流程控制 | `Stable` | `1.0.2` |
 | `OperatorType.TriggerModule` | 触发模块 | `FlowControl` | 流程控制 | `Stable` | `1.0.0` |
 | `OperatorType.TryCatch` | Try分支透传 | `FlowControl` | 流程控制 | `Stable` | `1.0.0` |
 | `OperatorType.HttpRequest` | HTTP 请求 | `Communication` | 通信 | `Stable` | `1.0.0` |
 | `OperatorType.MitsubishiMcCommunication` | 三菱MC通信 | `Communication` | 通信 | `Stable` | `1.0.0` |
-| `OperatorType.ModbusCommunication` | Modbus TCP通信 | `Communication` | 通信 | `Stable` | `1.0.0` |
+| `OperatorType.ModbusCommunication` | Modbus TCP通信 | `Communication` | 通信 | `Stable` | `1.1.0` |
 | `OperatorType.MqttPublish` | MQTT 发布 | `Communication` | 通信 | `Reference` | `0.1.0` |
 | `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | `Communication` | 通信 | `Stable` | `1.0.0` |
 | `OperatorType.SerialCommunication` | 串口通信 | `Communication` | 通信 | `Stable` | `1.0.0` |
@@ -1699,6 +1699,8 @@
 ### OperatorType.ModbusCommunication / Modbus TCP通信
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.1.0` | `2026-07-22T15:53:38.3920246+08:00` | `C3851C1AA073` | `operator-runtime-metadata-v2` |
+| `1.0.0` | `2026-07-22T15:52:22.5764765+08:00` | `7E3EA53C7969` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `F44B9E02DAF4` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-13T19:08:24.4997898+08:00` | `0E80FF1315C9` | `legacy-source-only` |
 | `1.0.0` | `2026-07-13T15:30:35.6120213+08:00` | `861C9C537804` | `legacy-source-only` |
@@ -2350,6 +2352,8 @@
 ### OperatorType.ResultJudgment / 结果判定
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.2` | `2026-07-22T15:53:38.3920246+08:00` | `4B651029B0A9` | `operator-runtime-metadata-v2` |
+| `1.0.1` | `2026-07-22T15:52:22.5764765+08:00` | `31ECFD230914` | `operator-runtime-metadata-v2` |
 | `1.0.1` | `2026-07-14T15:07:23.3198726+08:00` | `7333F7792534` | `operator-runtime-metadata-v2` |
 | `1.0.1` | `2026-07-06T21:35:46.7699945+08:00` | `DE9842D6D240` | `legacy-source-only` |
 | `1.0.1` | `2026-07-05T18:24:06.3177828+08:00` | `E3B0C44298FC` | `legacy-source-only` |

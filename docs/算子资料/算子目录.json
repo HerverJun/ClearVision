@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-16T11:22:20.7402589+08:00",
-  "generationFingerprint": "76148AD9A83D0089AF8B5AAF58850CB3087E2457E3443834F3B2F6D94AB70456",
+  "generatedAt": "2026-07-22T15:53:38.3920246+08:00",
+  "generationFingerprint": "9441406B2F08482F10D2A1ACF5E02A8EB89D085D8FCE45ABAD15F31A8FCD9A5E",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -42199,7 +42199,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.1",
+      "version": "1.0.2",
       "keywords": [
         "condition",
         "judgment",
@@ -42384,12 +42384,172 @@
           "options": null
         }
       ],
-      "parameterConditions": [],
+      "parameterConditions": [
+        {
+          "parameter": "ExpectValue",
+          "requiredPolicy": "metadata",
+          "requiredWhen": {
+            "all": [
+              {
+                "parameter": "Condition",
+                "comparison": "not-equals",
+                "value": "Range"
+              }
+            ],
+            "any": null
+          },
+          "enabledWhen": {
+            "all": [
+              {
+                "parameter": "Condition",
+                "comparison": "not-equals",
+                "value": "Range"
+              }
+            ],
+            "any": null
+          },
+          "disabledWhen": null,
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "RESULT_JUDGMENT_EXPECT_VALUE_ONLY_OUTSIDE_RANGE",
+          "visibleWhen": null,
+          "hiddenWhen": {
+            "all": [
+              {
+                "parameter": "Condition",
+                "comparison": "equals",
+                "value": "Range"
+              }
+            ],
+            "any": null
+          },
+          "ignoredWhen": {
+            "all": [
+              {
+                "parameter": "Condition",
+                "comparison": "equals",
+                "value": "Range"
+              }
+            ],
+            "any": null
+          },
+          "satisfiedByInputPorts": null
+        },
+        {
+          "parameter": "ExpectValueMax",
+          "requiredPolicy": "metadata",
+          "requiredWhen": {
+            "all": [
+              {
+                "parameter": "Condition",
+                "comparison": "equals",
+                "value": "Range"
+              }
+            ],
+            "any": null
+          },
+          "enabledWhen": {
+            "all": [
+              {
+                "parameter": "Condition",
+                "comparison": "equals",
+                "value": "Range"
+              }
+            ],
+            "any": null
+          },
+          "disabledWhen": null,
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "RESULT_JUDGMENT_RANGE_MAX_REQUIRED",
+          "visibleWhen": null,
+          "hiddenWhen": {
+            "all": [
+              {
+                "parameter": "Condition",
+                "comparison": "not-equals",
+                "value": "Range"
+              }
+            ],
+            "any": null
+          },
+          "ignoredWhen": {
+            "all": [
+              {
+                "parameter": "Condition",
+                "comparison": "not-equals",
+                "value": "Range"
+              }
+            ],
+            "any": null
+          },
+          "satisfiedByInputPorts": null
+        },
+        {
+          "parameter": "ExpectValueMin",
+          "requiredPolicy": "metadata",
+          "requiredWhen": {
+            "all": [
+              {
+                "parameter": "Condition",
+                "comparison": "equals",
+                "value": "Range"
+              }
+            ],
+            "any": null
+          },
+          "enabledWhen": {
+            "all": [
+              {
+                "parameter": "Condition",
+                "comparison": "equals",
+                "value": "Range"
+              }
+            ],
+            "any": null
+          },
+          "disabledWhen": null,
+          "atLeastOneGroup": null,
+          "mutuallyExclusiveGroup": null,
+          "aliasFor": null,
+          "deprecated": false,
+          "resourceKind": null,
+          "reasonCode": "RESULT_JUDGMENT_RANGE_MIN_REQUIRED",
+          "visibleWhen": null,
+          "hiddenWhen": {
+            "all": [
+              {
+                "parameter": "Condition",
+                "comparison": "not-equals",
+                "value": "Range"
+              }
+            ],
+            "any": null
+          },
+          "ignoredWhen": {
+            "all": [
+              {
+                "parameter": "Condition",
+                "comparison": "not-equals",
+                "value": "Range"
+              }
+            ],
+            "any": null
+          },
+          "satisfiedByInputPorts": null
+        }
+      ],
       "outputConditions": [],
       "imageInputContracts": [],
       "resourceRequirements": [],
       "generationDependencies": [],
-      "generationFingerprint": "7333F779253445A60AE8E15A9A9E2A76D962FE2A568320FA96C2C102CC4CCDEF",
+      "generationFingerprint": "4B651029B0A939A65B71A8F5650560C2A88C48B8BB1273EFA581AB7565B1204C",
       "docPath": "算子资料/算子名片/ResultJudgment.md"
     },
     {
@@ -43579,7 +43739,7 @@
         "evidenceIdentity": "clearvision-operator-quality-phase5-evidence@1.0.0:7ed1d600eead23e8185d6fef730b3995bec7db29c7d65a6cc3248a1ca95770cf",
         "modeEvidence": []
       },
-      "version": "1.0.0",
+      "version": "1.1.0",
       "keywords": [
         "Communication",
         "Industrial",
@@ -43622,6 +43782,48 @@
           "displayName": "Status",
           "dataType": "Boolean",
           "isRequired": false
+        },
+        {
+          "name": "Values",
+          "displayName": "Values",
+          "dataType": "Any",
+          "isRequired": false
+        },
+        {
+          "name": "Registers",
+          "displayName": "Registers",
+          "dataType": "Any",
+          "isRequired": false
+        },
+        {
+          "name": "StartAddress",
+          "displayName": "Start Address",
+          "dataType": "Integer",
+          "isRequired": false
+        },
+        {
+          "name": "Count",
+          "displayName": "Count",
+          "dataType": "Integer",
+          "isRequired": false
+        },
+        {
+          "name": "Operation",
+          "displayName": "操作",
+          "dataType": "String",
+          "isRequired": false
+        },
+        {
+          "name": "LatencyMs",
+          "displayName": "Latency (ms)",
+          "dataType": "Integer",
+          "isRequired": false
+        },
+        {
+          "name": "WriteReceipt",
+          "displayName": "Write Receipt",
+          "dataType": "Any",
+          "isRequired": false
         }
       ],
       "parameters": [
@@ -43644,6 +43846,50 @@
               "label": "RTU"
             }
           ]
+        },
+        {
+          "name": "ProfileId",
+          "displayName": "Device Profile",
+          "dataType": "string",
+          "description": "Optional local Modbus device profile ID.",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "TemplateId",
+          "displayName": "Template ID",
+          "dataType": "string",
+          "description": "",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "TemplateVersion",
+          "displayName": "Template Version",
+          "dataType": "string",
+          "description": "",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "TemplateHash",
+          "displayName": "Template Hash",
+          "dataType": "string",
+          "description": "",
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
         },
         {
           "name": "IpAddress",
@@ -43674,7 +43920,7 @@
           "description": "",
           "defaultValue": "1",
           "min": "1",
-          "max": "247",
+          "max": "255",
           "isRequired": true,
           "options": null
         },
@@ -43940,7 +44186,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "F44B9E02DAF4601B2B2D01922F1F62E7C6141FA1B4CF3DB7239783EC0BF9A468",
+      "generationFingerprint": "C3851C1AA073347BAD447A5CBFBFCD99D62736A4196D87FFF58F28A8B6E12414",
       "docPath": "算子资料/算子名片/ModbusCommunication.md"
     },
     {
