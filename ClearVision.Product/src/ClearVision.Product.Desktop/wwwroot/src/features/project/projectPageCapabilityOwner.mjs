@@ -55,8 +55,8 @@ export class ProjectPageCapabilityAdapter {
             : await this.projectManager.getProjectList();
     }
 
-    async createProject(name, description = '') {
-        return await this.projectManager.createProject(name, description);
+    async createProject(name, description = '', purpose = 'Inspection') {
+        return await this.projectManager.createProject(name, description, purpose);
     }
 
     async openProject(projectId) {
@@ -276,8 +276,22 @@ export class ProjectPageCapabilityOwner {
         descGroup.appendChild(descLabel);
         descGroup.appendChild(descInput);
 
+        const purposeGroup = document.createElement('div');
+        purposeGroup.className = 'form-group';
+        const purposeLabel = document.createElement('label');
+        purposeLabel.setAttribute('for', `${formId}-purpose`);
+        purposeLabel.textContent = '工程用途';
+        const purposeSelect = document.createElement('select');
+        purposeSelect.id = `${formId}-purpose`;
+        purposeSelect.className = 'cv-input';
+        purposeSelect.dataset.projectPurposeInput = '';
+        purposeSelect.innerHTML = '<option value="Inspection">视觉检测</option><option value="Commissioning">通信调试</option>';
+        purposeGroup.appendChild(purposeLabel);
+        purposeGroup.appendChild(purposeSelect);
+
         content.appendChild(nameGroup);
         content.appendChild(descGroup);
+        content.appendChild(purposeGroup);
 
         let modalOverlay = null;
         let createInFlight = false;
@@ -320,6 +334,7 @@ export class ProjectPageCapabilityOwner {
 
                 const name = nameInput.value.trim();
                 const description = descInput.value.trim();
+                const purpose = purposeSelect.value || 'Inspection';
                 if (!name) {
                     showNameError();
                     return;
@@ -330,7 +345,7 @@ export class ProjectPageCapabilityOwner {
                 btnCreate.disabled = true;
 
                 try {
-                    const project = await this.adapter.createProject(name, description);
+                    const project = await this.adapter.createProject(name, description, purpose);
                     this.showToast(`工程 "${project?.name || name}" 已创建`, 'success');
                     this.closeModal(modalOverlay);
                     await this.refresh();

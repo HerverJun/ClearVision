@@ -96,6 +96,7 @@ class FlowCanvas {
         this.nodes = new Map();
         this.connections = [];
         this.decisionConfiguration = null;
+        this.flowPurpose = 'Inspection';
         this.selectedNode = null;
         this.selectionRevision = 0;
         this.draggedNode = null;
@@ -2098,6 +2099,7 @@ class FlowCanvas {
         const result = {
             operators: operators,
             connections: connections,
+            purpose: this.flowPurpose || 'Inspection',
             decisionConfiguration: this.decisionConfiguration
                 ? JSON.parse(JSON.stringify(this.decisionConfiguration))
                 : null
@@ -2121,6 +2123,9 @@ class FlowCanvas {
 
         // 兼容项目包装结构和直接流程结构。
         const flowData = data.project?.flow || data.flow || data;
+        this.flowPurpose = flowData.purpose
+            ?? flowData.Purpose
+            ?? 'Inspection';
         this.decisionConfiguration = flowData.decisionConfiguration
             ?? flowData.DecisionConfiguration
             ?? null;
@@ -2828,6 +2833,7 @@ class FlowCanvas {
         this.nodes.clear();
         this.connections = [];
         this.decisionConfiguration = null;
+        this.flowPurpose = 'Inspection';
         this._connectionById.clear();
         this._connectionsByOutputPort.clear();
         this._connectionByInputPort.clear();

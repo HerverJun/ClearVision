@@ -928,7 +928,7 @@ class InspectionController {
     /**
      * 执行单次检测
      */
-    async executeSingle(imageData = null) {
+    async executeSingle(imageData = null, runMode = 'camera') {
         if (!this.projectId) {
             throw new Error('未选择工程');
         }
@@ -944,8 +944,22 @@ class InspectionController {
         try {
             let result;
             const flowData = this.getCurrentFlowData();
+            const normalizedPurpose = String(flowData?.purpose ?? flowData?.Purpose ?? '').trim().toLowerCase();
+            const isCommissioning = normalizedPurpose === 'commissioning' || normalizedPurpose === '1';
 
-            if (imageData) {
+            if (isCommissioning) {
+                result = await httpClient.post('/commissioning/execute', {
+                    projectId: this.projectId,
+                    flowData
+                });
+                const commissioningSucceeded = (result?.success ?? result?.Success) !== false;
+                result = {
+                    ...result,
+                    projectId: result?.projectId ?? result?.ProjectId ?? this.projectId,
+                    executionOutcome: commissioningSucceeded ? 'Succeeded' : 'Failed',
+                    decisionOutcome: 'NotApplicable'
+                };
+            } else if (imageData) {
                 const base64Data = imageData instanceof Uint8Array
                     ? encodeBytesToBase64(imageData)
                     : imageData;
@@ -955,7 +969,7 @@ class InspectionController {
                     imageBase64: base64Data,
                     flowData
                 });
-            } else if (this.cameraId) {
+            } else if (runMode === 'camera' && this.cameraId) {
                 result = await httpClient.post('/inspection/execute', {
                     projectId: this.projectId,
                     cameraId: this.cameraId,
@@ -1035,7 +1049,7 @@ class InspectionController {
 
             await httpClient.post('/inspection/realtime/start', {
                 projectId: this.projectId,
-                cameraId: this.cameraId || null,
+                cameraId: null,
                 runMode: 'flow',
                 flowData: flowData
             });

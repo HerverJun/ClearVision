@@ -34,6 +34,7 @@ class HttpClient {
         };
         this._discoveredPort = null;
         this._lastSuccessfulConnectionAt = null;
+        this._connectionOffline = false;
     }
 
     /**
@@ -126,6 +127,7 @@ class HttpClient {
     saveSuccessfulPort(url) {
         try {
             this._lastSuccessfulConnectionAt = new Date();
+            this.notifyConnectionState(true, { url });
             const match = url.match(/:(\d+)\/api/);
             if (match) {
                 saveApiPort(Number.parseInt(match[1], 10));
@@ -323,7 +325,7 @@ class HttpClient {
      * 发送 POST 请求
      */
     async post(url, data = null, options = {}) {
-        let fullUrl = this.buildRequestUrl(url);
+        const fullUrl = this.buildRequestUrl(url);
         console.log(`[HttpClient] POST ${fullUrl}`);
         const signal = options?.signal;
 
@@ -337,22 +339,6 @@ class HttpClient {
             this.saveSuccessfulPort(fullUrl);
             return this.handleResponse(response);
         } catch (error) {
-            // 如果是连接错误，尝试自动发现端口并重试
-            if (error.message?.includes('Failed to fetch') || error.name === 'TypeError') {
-                const discoveredPort = await this.discoverPort();
-                if (discoveredPort && discoveredPort !== DEFAULT_API_PORT) {
-                    console.log(`[HttpClient] 尝试使用发现的端口 ${discoveredPort} 重试...`);
-                    fullUrl = this.buildRequestUrl(url, null, buildLocalApiBaseUrl(discoveredPort));
-                    const response = await fetch(fullUrl, {
-                        method: 'POST',
-                        headers: this.defaultHeaders,
-                        body: data ? JSON.stringify(data) : null,
-                        signal
-                    });
-                    this.saveSuccessfulPort(fullUrl);
-                    return this.handleResponse(response);
-                }
-            }
             throw this.handleNetworkError(error, fullUrl);
         }
     }
@@ -361,7 +347,7 @@ class HttpClient {
      * 发送 POST 请求并接收 Blob 响应
      */
     async postForBlob(url, data = null, options = {}) {
-        let fullUrl = this.buildRequestUrl(url);
+        const fullUrl = this.buildRequestUrl(url);
         console.log(`[HttpClient] POST (blob) ${fullUrl}`);
         const signal = options?.signal;
 
@@ -375,22 +361,6 @@ class HttpClient {
             this.saveSuccessfulPort(fullUrl);
             return this.handleBlobResponse(response);
         } catch (error) {
-            // 如果是连接错误，尝试自动发现端口并重试
-            if (error.message?.includes('Failed to fetch') || error.name === 'TypeError') {
-                const discoveredPort = await this.discoverPort();
-                if (discoveredPort && discoveredPort !== DEFAULT_API_PORT) {
-                    console.log(`[HttpClient] 尝试使用发现的端口 ${discoveredPort} 重试...`);
-                    fullUrl = this.buildRequestUrl(url, null, buildLocalApiBaseUrl(discoveredPort));
-                    const response = await fetch(fullUrl, {
-                        method: 'POST',
-                        headers: this.defaultHeaders,
-                        body: data ? JSON.stringify(data) : null,
-                        signal
-                    });
-                    this.saveSuccessfulPort(fullUrl);
-                    return this.handleBlobResponse(response);
-                }
-            }
             throw this.handleNetworkError(error, fullUrl);
         }
     }
@@ -434,7 +404,7 @@ class HttpClient {
     }
 
     async put(url, data = null, options = {}) {
-        let fullUrl = this.buildRequestUrl(url);
+        const fullUrl = this.buildRequestUrl(url);
         console.log(`[HttpClient] PUT ${fullUrl}`);
         const signal = options?.signal;
 
@@ -448,21 +418,6 @@ class HttpClient {
             this.saveSuccessfulPort(fullUrl);
             return this.handleResponse(response);
         } catch (error) {
-            if (error.message?.includes('Failed to fetch') || error.name === 'TypeError') {
-                const discoveredPort = await this.discoverPort();
-                if (discoveredPort && discoveredPort !== DEFAULT_API_PORT) {
-                    console.log(`[HttpClient] 尝试使用发现的端口 ${discoveredPort} 重试...`);
-                    fullUrl = this.buildRequestUrl(url, null, buildLocalApiBaseUrl(discoveredPort));
-                    const response = await fetch(fullUrl, {
-                        method: 'PUT',
-                        headers: this.defaultHeaders,
-                        body: data ? JSON.stringify(data) : null,
-                        signal
-                    });
-                    this.saveSuccessfulPort(fullUrl);
-                    return this.handleResponse(response);
-                }
-            }
             throw this.handleNetworkError(error, fullUrl);
         }
     }
@@ -471,7 +426,7 @@ class HttpClient {
      * 发送 DELETE 请求
      */
     async delete(url, options = {}) {
-        let fullUrl = this.buildRequestUrl(url);
+        const fullUrl = this.buildRequestUrl(url);
         console.log(`[HttpClient] DELETE ${fullUrl}`);
         const signal = options?.signal;
 
@@ -487,23 +442,6 @@ class HttpClient {
             }
             return this.handleResponse(response);
         } catch (error) {
-            if (error.message?.includes('Failed to fetch') || error.name === 'TypeError') {
-                const discoveredPort = await this.discoverPort();
-                if (discoveredPort && discoveredPort !== DEFAULT_API_PORT) {
-                    console.log(`[HttpClient] 尝试使用发现的端口 ${discoveredPort} 重试 DELETE...`);
-                    fullUrl = this.buildRequestUrl(url, null, buildLocalApiBaseUrl(discoveredPort));
-                    const response = await fetch(fullUrl, {
-                        method: 'DELETE',
-                        headers: this.defaultHeaders,
-                        signal
-                    });
-                    this.saveSuccessfulPort(fullUrl);
-                    if (options?.ignoreNotFound && response.status === 404) {
-                        return null;
-                    }
-                    return this.handleResponse(response);
-                }
-            }
             throw this.handleNetworkError(error, fullUrl);
         }
     }
@@ -537,11 +475,29 @@ class HttpClient {
             }
 
             console.error('[HttpClient] 连接失败:', errorMessage);
+            this.notifyConnectionState(false, { url: apiUrl.toString(), message: errorMessage });
             const wrappedError = new Error(errorMessage);
             wrappedError.diagnosticInfo = errorMessage;
             return wrappedError;
         }
         return error;
+    }
+
+    notifyConnectionState(isOnline, detail = {}) {
+        if (isOnline && !this._connectionOffline) {
+            return;
+        }
+        this._connectionOffline = !isOnline;
+        try {
+            if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function'
+                && typeof CustomEvent === 'function') {
+                window.dispatchEvent(new CustomEvent(
+                    isOnline ? 'clearvision:backend-online' : 'clearvision:backend-offline',
+                    { detail }));
+            }
+        } catch (dispatchError) {
+            console.warn('[HttpClient] 广播后端连接状态失败:', dispatchError);
+        }
     }
 
     /**

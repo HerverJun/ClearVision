@@ -198,6 +198,94 @@ test('executeSingle encodes large Uint8Array images without expanding the whole 
   assert.equal(capturedRequest.imageBase64, originalBuffer.from(payloadBytes).toString('base64'));
 });
 
+test('executeSingle uses commissioning endpoint and canonical non-visual outcome', async (t) => {
+  const originalPost = httpClient.post;
+  const originalProjectId = inspectionController.projectId;
+  const originalCameraId = inspectionController.cameraId;
+  const originalFlowProvider = inspectionController.flowProvider;
+  let capturedRequest = null;
+
+  t.after(() => {
+    httpClient.post = originalPost;
+    inspectionController.projectId = originalProjectId;
+    inspectionController.cameraId = originalCameraId;
+    inspectionController.flowProvider = originalFlowProvider;
+  });
+
+  httpClient.post = async (url, body) => {
+    assert.equal(url, '/commissioning/execute');
+    capturedRequest = body;
+    return { success: true, purpose: 'Commissioning', outputData: { Values: [1] } };
+  };
+  inspectionController.setProject('commissioning-project');
+  inspectionController.setCamera('camera-must-not-be-sent');
+  inspectionController.setFlowProvider(() => ({
+    purpose: 'Commissioning',
+    operators: [{ type: 'ModbusCommunication' }],
+    connections: []
+  }));
+
+  const result = await inspectionController.executeSingle(null, 'flow');
+
+  assert.equal(capturedRequest.projectId, 'commissioning-project');
+  assert.equal(Object.hasOwn(capturedRequest, 'cameraId'), false);
+  assert.equal(result.executionOutcome, 'Succeeded');
+  assert.equal(result.decisionOutcome, 'NotApplicable');
+});
+
+test('executeSingle flow mode never sends the selected camera', async (t) => {
+  const originalPost = httpClient.post;
+  const originalProjectId = inspectionController.projectId;
+  const originalCameraId = inspectionController.cameraId;
+  const originalFlowProvider = inspectionController.flowProvider;
+  let capturedRequest = null;
+
+  t.after(() => {
+    httpClient.post = originalPost;
+    inspectionController.projectId = originalProjectId;
+    inspectionController.cameraId = originalCameraId;
+    inspectionController.flowProvider = originalFlowProvider;
+  });
+
+  httpClient.post = async (url, body) => {
+    assert.equal(url, '/inspection/execute');
+    capturedRequest = body;
+    return { id: 'flow-result', projectId: 'flow-project', status: 'OK' };
+  };
+  inspectionController.setProject('flow-project');
+  inspectionController.setCamera('stale-camera');
+  inspectionController.setFlowProvider(() => ({
+    purpose: 'Inspection',
+    operators: [{ type: 'Thresholding' }],
+    connections: []
+  }));
+
+  await inspectionController.executeSingle(null, 'flow');
+
+  assert.equal(Object.hasOwn(capturedRequest, 'cameraId'), false);
+});
+
+test('failed commissioning execution is normalized as an execution failure', async (t) => {
+  const originalPost = httpClient.post;
+  const originalProjectId = inspectionController.projectId;
+  const originalFlowProvider = inspectionController.flowProvider;
+
+  t.after(() => {
+    httpClient.post = originalPost;
+    inspectionController.projectId = originalProjectId;
+    inspectionController.flowProvider = originalFlowProvider;
+  });
+
+  httpClient.post = async () => ({ success: false, errorMessage: 'read failed' });
+  inspectionController.setProject('commissioning-project');
+  inspectionController.setFlowProvider(() => ({ purpose: 'Commissioning', operators: [] }));
+
+  const result = await inspectionController.executeSingle(null, 'flow');
+
+  assert.equal(result.executionOutcome, 'Failed');
+  assert.equal(result.decisionOutcome, 'NotApplicable');
+});
+
 test('createLightweightInspectionResult removes inline images while preserving metadata', () => {
   const original = {
     id: 'latest-result',

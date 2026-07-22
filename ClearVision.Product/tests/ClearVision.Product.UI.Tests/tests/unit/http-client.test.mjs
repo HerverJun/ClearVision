@@ -20,7 +20,7 @@ function createStorage(initial = {}) {
   };
 }
 
-test('HttpClient DELETE rediscovers backend port and retries after WebView connection failure', async () => {
+test('HttpClient DELETE never replays a write after a connection failure', async () => {
   const originalWindow = globalThis.window;
   const originalFetch = globalThis.fetch;
   const localStorage = createStorage();
@@ -45,38 +45,16 @@ test('HttpClient DELETE rediscovers backend port and retries after WebView conne
       throw new TypeError('Failed to fetch');
     }
 
-    if (String(url) === 'http://localhost:5000/health') {
-      return new Response('not found', { status: 404 });
-    }
-
-    if (String(url) === 'http://localhost:5001/health') {
-      return new Response('ok', { status: 200 });
-    }
-
-    if (String(url) === 'http://localhost:5001/api/projects/project-1' && options.method === 'DELETE') {
-      return new Response(JSON.stringify({ deleted: true }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' }
-      });
-    }
-
     return new Response('not found', { status: 404 });
   };
 
   try {
     const client = new HttpClient();
-    const result = await client.delete('/projects/project-1');
-
-    assert.deepEqual(result, { deleted: true });
-    assert.equal(localStorage.getItem('cv_api_port'), '5001');
+    await assert.rejects(() => client.delete('/projects/project-1'), /无法连接到 ClearVision 服务/);
+    assert.equal(localStorage.getItem('cv_api_port'), null);
     assert.deepEqual(
       requests.map(request => `${request.method} ${request.url}`),
-      [
-        'DELETE http://localhost:5000/api/projects/project-1',
-        'GET http://localhost:5000/health',
-        'GET http://localhost:5001/health',
-        'DELETE http://localhost:5001/api/projects/project-1'
-      ]
+      ['DELETE http://localhost:5000/api/projects/project-1']
     );
   } finally {
     globalThis.window = originalWindow;

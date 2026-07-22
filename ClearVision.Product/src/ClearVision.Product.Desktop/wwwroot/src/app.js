@@ -303,7 +303,8 @@ let aiPanelModulePromise = null;
 // Encoding cleanup: previous comment text was unreadable.
 let autoSaveInterval = null;
 const AUTO_SAVE_DELAY = 5 * 60 * 1000;
-const LOCAL_DRAFT_BACKUP_KEY = 'cv_autosave_backup';
+const LOCAL_DRAFT_BACKUP_KEY_PREFIX = 'cv.flow-draft.v2:';
+const LEGACY_LOCAL_DRAFT_BACKUP_KEY = 'cv_autosave_backup';
 const PROJECT_FLOW_SYNC_DEBOUNCE_MS = 250;
 const PROJECT_FLOW_SYNC_IDLE_TIMEOUT_MS = 1500;
 const promptedLocalDraftKeys = new Set();
@@ -321,10 +322,34 @@ function getLocalDraftBackupSignature(project, flow) {
     return `${projectId}:${modifiedAt}:${flowRevision}`;
 }
 
-function readLocalDraftBackup() {
+function getLocalDraftBackupKey(projectId) {
+    return `${LOCAL_DRAFT_BACKUP_KEY_PREFIX}${projectId}`;
+}
+
+function hashLocalDraftValue(value) {
+    const text = JSON.stringify(value ?? null);
+    let hash = 0x811c9dc5;
+    for (let index = 0; index < text.length; index += 1) {
+        hash ^= text.charCodeAt(index);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function readLocalDraftBackup(projectId) {
+    if (!projectId) {
+        return null;
+    }
+
     try {
-        const raw = localStorage.getItem(LOCAL_DRAFT_BACKUP_KEY);
-        return raw ? JSON.parse(raw) : null;
+        const raw = localStorage.getItem(getLocalDraftBackupKey(projectId));
+        if (raw) {
+            return JSON.parse(raw);
+        }
+
+        const legacyRaw = localStorage.getItem(LEGACY_LOCAL_DRAFT_BACKUP_KEY);
+        const legacyBackup = legacyRaw ? JSON.parse(legacyRaw) : null;
+        return legacyBackup?.projectId === projectId ? legacyBackup : null;
     } catch (error) {
         debugLogger.warn('[LocalDraftBackup] 本机草稿读取失败:', error);
         return null;
@@ -342,22 +367,34 @@ function saveLocalDraftBackup(project, flow, source = 'timer') {
         timestamp: new Date().toISOString(),
         source,
         nodeCount: getFlowNodeCount(flow),
+        basePersistenceRevision: project.persistenceRevision ?? project.PersistenceRevision ?? null,
+        baseFlowHash: hashLocalDraftValue(project.flow),
+        draftFlowHash: hashLocalDraftValue(flow),
         flow
     };
 
-    localStorage.setItem(LOCAL_DRAFT_BACKUP_KEY, JSON.stringify(backup));
+    localStorage.setItem(getLocalDraftBackupKey(project.id), JSON.stringify(backup));
     lastLocalDraftBackupSignature = getLocalDraftBackupSignature(project, flow);
     return backup;
 }
 
 function clearLocalDraftBackup(projectId = null) {
-    const backup = readLocalDraftBackup();
-    if (!backup) {
+    if (!projectId) {
+        localStorage.removeItem(LEGACY_LOCAL_DRAFT_BACKUP_KEY);
         return;
     }
 
-    if (!projectId || backup.projectId === projectId) {
-        localStorage.removeItem(LOCAL_DRAFT_BACKUP_KEY);
+    localStorage.removeItem(getLocalDraftBackupKey(projectId));
+    const legacyBackup = (() => {
+        try {
+            const raw = localStorage.getItem(LEGACY_LOCAL_DRAFT_BACKUP_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    })();
+    if (legacyBackup?.projectId === projectId) {
+        localStorage.removeItem(LEGACY_LOCAL_DRAFT_BACKUP_KEY);
     }
 }
 
@@ -575,7 +612,7 @@ function promptLocalDraftRestore(project) {
         return;
     }
 
-    const backup = readLocalDraftBackup();
+    const backup = readLocalDraftBackup(project.id);
     const promptKey = `${backup?.projectId || ''}:${backup?.timestamp || ''}`;
     if (!backup || backup.projectId !== project.id || promptedLocalDraftKeys.has(promptKey)) {
         return;
@@ -591,6 +628,10 @@ function promptLocalDraftRestore(project) {
     const backupTime = backup.timestamp ? new Date(backup.timestamp).toLocaleString() : '未知时间';
     const currentNodeCount = getFlowNodeCount(currentFlow);
     const backupNodeCount = Number.isFinite(backup.nodeCount) ? backup.nodeCount : getFlowNodeCount(backup.flow);
+    const currentRevision = project.persistenceRevision ?? project.PersistenceRevision ?? null;
+    const revisionChanged = backup.basePersistenceRevision !== null
+        && currentRevision !== null
+        && Number(backup.basePersistenceRevision) !== Number(currentRevision);
     const shouldRestore = window.confirm([
         '检测到本机草稿备份。',
         '',
@@ -598,6 +639,7 @@ function promptLocalDraftRestore(project) {
         `备份时间：${backupTime}`,
         `当前节点数：${currentNodeCount}`,
         `草稿节点数：${backupNodeCount}`,
+        revisionChanged ? '注意：正式工程在草稿创建后已发生修订，恢复后请检查冲突。' : '',
         '',
         '本机草稿仅保存在当前电脑浏览器缓存中，不等同于正式工程保存。',
         '是否恢复这份草稿到当前流程画布？'
@@ -1244,10 +1286,9 @@ function addOperatorFromPalette(operatorData) {
     const rect = flowCanvas.canvas.getBoundingClientRect();
     const scale = Number.isFinite(flowCanvas.scale) && flowCanvas.scale > 0 ? flowCanvas.scale : 1;
     const offset = flowCanvas.offset || { x: 0, y: 0 };
-    const existingCount = flowCanvas.nodes?.size || 0;
-    const stagger = (existingCount % 6) * 28;
-    const x = (rect.width * 0.5) / scale + offset.x + stagger;
-    const y = (rect.height * 0.42) / scale + offset.y + stagger;
+    const centerX = (rect.width * 0.5) / scale + offset.x;
+    const centerY = (rect.height * 0.42) / scale + offset.y;
+    const { x, y } = findFreeNodePosition(flowCanvas.nodes, centerX, centerY);
     const operatorTitle = operatorData.displayName || operatorData.name || operatorData.title || operatorData.type;
     const node = flowEditorInteraction.addOperatorNode(operatorData.type, x, y, operatorData);
 
@@ -1265,6 +1306,41 @@ function addOperatorFromPalette(operatorData) {
     syncCurrentProjectFlowFromCanvas();
     showToast(`已添加算子: ${operatorTitle}`, 'success');
     return node;
+}
+
+function findFreeNodePosition(nodes, centerX, centerY) {
+    const nodeWidth = 160;
+    const nodeHeight = 90;
+    const gap = 24;
+    const stepX = nodeWidth + gap;
+    const stepY = nodeHeight + gap;
+    const existingNodes = Array.from(nodes?.values?.() || []);
+    const isFree = (x, y) => existingNodes.every(node =>
+        x + nodeWidth + gap <= node.x
+        || x >= node.x + (Number(node.width) || 140) + gap
+        || y + nodeHeight + gap <= node.y
+        || y >= node.y + (Number(node.height) || 60) + gap);
+
+    if (isFree(centerX, centerY)) {
+        return { x: centerX, y: centerY };
+    }
+
+    for (let radius = 1; radius <= 20; radius += 1) {
+        for (let gridX = -radius; gridX <= radius; gridX += 1) {
+            for (const gridY of [-radius, radius]) {
+                const candidate = { x: centerX + gridX * stepX, y: centerY + gridY * stepY };
+                if (isFree(candidate.x, candidate.y)) return candidate;
+            }
+        }
+        for (let gridY = -radius + 1; gridY < radius; gridY += 1) {
+            for (const gridX of [-radius, radius]) {
+                const candidate = { x: centerX + gridX * stepX, y: centerY + gridY * stepY };
+                if (isFree(candidate.x, candidate.y)) return candidate;
+            }
+        }
+    }
+
+    return { x: centerX + stepX * 21, y: centerY };
 }
 
 function initializeImageViewer() {
@@ -2698,6 +2774,7 @@ async function initializeApp() {
     // 安装全局 401 处理：会话在运行期间失效时清理本地会话并引导用户重新登录，
     // 而不是让各功能把 Unauthorized 当作普通错误反复弹出。
     installUnauthorizedHandler();
+    initializeBackendConnectionBanner();
 
     const authState = await bootstrapAuthSession();
     if (!authState.ok) {
@@ -2738,6 +2815,17 @@ async function initializeApp() {
     debugLogger.debug('[App] 应用初始化完成');
     showToast('ClearVision 已就绪', 'success');
     return true;
+}
+
+function initializeBackendConnectionBanner() {
+    const banner = document.getElementById('backend-offline-banner');
+    if (!banner || banner.dataset.initialized === 'true') {
+        return;
+    }
+
+    banner.dataset.initialized = 'true';
+    window.addEventListener('clearvision:backend-offline', () => banner.classList.remove('hidden'));
+    window.addEventListener('clearvision:backend-online', () => banner.classList.add('hidden'));
 }
 
 async function bootstrapApp() {

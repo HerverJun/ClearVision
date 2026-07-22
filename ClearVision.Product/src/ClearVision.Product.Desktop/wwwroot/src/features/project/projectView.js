@@ -465,6 +465,13 @@ export class ProjectView {
                 <input type="text" id="new-project-desc" class="cv-input" placeholder="可选描述" />
             </div>
             <div class="form-group">
+                <label for="new-project-purpose">工程用途</label>
+                <select id="new-project-purpose" class="cv-input">
+                    <option value="Inspection">视觉检测</option>
+                    <option value="Commissioning">通信调试</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>创建方式</label>
                 <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
                     <label style="display:flex; align-items:center; gap:8px;">
@@ -504,6 +511,7 @@ export class ProjectView {
                 const descInput = document.getElementById('new-project-desc');
                 const modeInput = content.querySelector('input[name="new-project-mode"]:checked');
                 const mode = modeInput?.value || 'standard';
+                const purpose = document.getElementById('new-project-purpose')?.value || 'Inspection';
                 const name = nameInput?.value?.trim();
                 const desc = descInput?.value?.trim() || '';
                 
@@ -525,7 +533,7 @@ export class ProjectView {
                         ? await projectManager.createDemoProject('full')
                         : (mode === 'simple-demo'
                             ? await projectManager.createDemoProject('simple')
-                            : await projectManager.createProject(name, desc));
+                            : await projectManager.createProject(name, desc, purpose));
                     const displayName = project?.name || name || '示例工程';
                     showToast(`工程 "${displayName}" 已创建`, 'success');
                     closeModal(modalOverlay);

@@ -1786,3 +1786,16 @@ body.property-sidebar-resizing .sidebar-resizer::before {
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.15);
 }
+/* Backend connectivity is global because a disconnected service affects every workspace action. */
+.backend-offline-banner {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 10000;
+    padding: 10px 48px;
+    border-bottom: 1px solid #b42318;
+    background: #7a271a;
+    color: #fff;
+    font-size: 13px;
+    line-height: 20px;
+    text-align: center;
+}

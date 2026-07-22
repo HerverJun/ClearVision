@@ -134,13 +134,19 @@ class ProjectManager {
     /**
      * 创建新工程
      */
-    async createProject(name, description = '') {
+    async createProject(name, description = '', purpose = 'Inspection') {
         try {
             this.invalidateOpenProjectRequests();
             await this.prepareForProjectSwitch();
             const project = await httpClient.post('/projects', {
                 name,
-                description
+                description,
+                flow: {
+                    name: 'MainFlow',
+                    purpose: purpose === 'Commissioning' ? 'Commissioning' : 'Inspection',
+                    operators: [],
+                    connections: []
+                }
             });
             
             this.currentProject = project;
@@ -295,6 +301,11 @@ class ProjectManager {
             this.rememberProjectInCaches(this.currentProject);
             this.updateStatusBar(this.currentProject);
             this.updateTitle();
+            try {
+                localStorage.removeItem(`cv.flow-draft.v2:${targetProjectId}`);
+            } catch {
+                // Local draft cleanup is best-effort after the authoritative save succeeds.
+            }
 
             console.log('[ProjectManager] 工程保存成功:', targetProjectId);
             return true;

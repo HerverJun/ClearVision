@@ -65,7 +65,7 @@ class InspectionPanel {
         this.panelId = containerId;
         this.selectedCamera = null;
         this.isContinuous = false;
-        this.selectedRunMode = 'camera';
+        this.selectedRunMode = this.getDefaultRunMode();
         this.runtimeConfig = {
             autoRun: false,
             stopOnConsecutiveNg: 0,
@@ -165,6 +165,31 @@ class InspectionPanel {
         return getCurrentProject()?.flow || null;
     }
 
+    getDefaultRunMode() {
+        const project = getCurrentProject();
+        const flow = project?.flow;
+        const purpose = String(flow?.purpose ?? flow?.Purpose ?? project?.purpose ?? project?.Purpose ?? '')
+            .trim()
+            .toLowerCase();
+        if (purpose === 'commissioning' || purpose === '1') {
+            return 'flow';
+        }
+
+        const operators = flow?.operators ?? flow?.Operators ?? [];
+        const hasImageAcquisition = Array.isArray(operators) && operators.some(operator =>
+            String(operator?.type ?? operator?.Type ?? '').toLowerCase() === 'imageacquisition');
+        return hasImageAcquisition ? 'camera' : 'flow';
+    }
+
+    resolveRunModeForExecution() {
+        const defaultMode = this.getDefaultRunMode();
+        if (defaultMode === 'flow') {
+            return 'flow';
+        }
+
+        return this.selectedRunMode === 'flow' ? 'flow' : 'camera';
+    }
+
     syncAnalysisFlowContext() {
         if (!this.analysisCardsPanel || this.analysisCardsPanel.usesFlowContext !== true) {
             return;
@@ -207,6 +232,11 @@ class InspectionPanel {
         }
 
         this.projectId = normalizedProjectId;
+        this.selectedRunMode = this.getDefaultRunMode();
+        const runModeSelect = this.container?.querySelector?.('#run-mode');
+        if (runModeSelect) {
+            runModeSelect.value = this.selectedRunMode;
+        }
         this.reset();
         return true;
     }
@@ -324,7 +354,9 @@ class InspectionPanel {
                 inspectionController.setProject(project.id);
             }
 
-            await inspectionController.executeSingle();
+            const runMode = this.resolveRunModeForExecution();
+            this.selectedRunMode = runMode;
+            await inspectionController.executeSingle(null, runMode);
         } catch (error) {
             if (!this.isRunRequestActive(runRequestSeq)) {
                 return;
@@ -365,7 +397,8 @@ class InspectionPanel {
                 inspectionController.setProject(project.id);
             }
 
-            const runMode = this.selectedRunMode || 'camera';
+            const runMode = this.resolveRunModeForExecution();
+            this.selectedRunMode = runMode;
             debugInspectionPanelLog('[InspectionPanel] 启动连续检测，模式:', runMode);
 
             if (runMode === 'flow') {
@@ -914,6 +947,7 @@ class InspectionPanel {
         // 【第二优先级】运行模式选择
         const runModeSelect = this.container.querySelector('#run-mode');
         if (runModeSelect) {
+            runModeSelect.value = this.selectedRunMode;
             this.addDomListener(runModeSelect, 'change', (e) => {
                 this.selectedRunMode = e.target.value;
                 debugInspectionPanelLog('[InspectionPanel] 运行模式切换为:', this.selectedRunMode);

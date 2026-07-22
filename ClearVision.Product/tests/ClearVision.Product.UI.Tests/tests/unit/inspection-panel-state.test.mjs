@@ -293,17 +293,19 @@ test('handleRunSingle ignores completion after panel disposal', async (t) => {
 
 test('handleRunContinuous ignores failed startup after panel disposal', async (t) => {
   const originalStartRealtime = inspectionController.startRealtime;
+  const originalStartRealtimeFlowMode = inspectionController.startRealtimeFlowMode;
   const originalSetProject = inspectionController.setProject;
   let rejectStart;
 
   inspectionController.setProject = () => {};
-  inspectionController.startRealtime = () => new Promise((resolve, reject) => {
+  inspectionController.startRealtimeFlowMode = () => new Promise((resolve, reject) => {
     rejectStart = reject;
   });
   setCurrentProject({ id: 'project-current', name: 'Current project' });
 
   t.after(() => {
     inspectionController.startRealtime = originalStartRealtime;
+    inspectionController.startRealtimeFlowMode = originalStartRealtimeFlowMode;
     inspectionController.setProject = originalSetProject;
     setCurrentProject(null);
   });
@@ -330,6 +332,55 @@ test('handleRunContinuous ignores failed startup after panel disposal', async (t
     [true]
   );
   assert.equal(calls.some(([kind, status]) => kind === 'status' && status === 'error'), false);
+});
+
+test('run mode defaults follow flow purpose and acquisition topology', () => {
+  const panel = Object.create(InspectionPanel.prototype);
+
+  setCurrentProject({
+    id: 'commissioning-project',
+    flow: { purpose: 'Commissioning', operators: [{ type: 'ImageAcquisition' }] }
+  });
+  assert.equal(panel.getDefaultRunMode(), 'flow');
+
+  setCurrentProject({
+    id: 'flow-project',
+    flow: { purpose: 'Inspection', operators: [{ type: 'ModbusCommunication' }] }
+  });
+  assert.equal(panel.getDefaultRunMode(), 'flow');
+
+  setCurrentProject({
+    id: 'camera-project',
+    flow: { purpose: 'Inspection', operators: [{ type: 'ImageAcquisition' }] }
+  });
+  assert.equal(panel.getDefaultRunMode(), 'camera');
+
+  setCurrentProject(null);
+});
+
+test('setProjectContext recalculates and updates the visible run mode', () => {
+  const runModeSelect = { value: 'camera' };
+  const panel = Object.create(InspectionPanel.prototype);
+  setCurrentProject({
+    id: 'commissioning-project',
+    flow: { purpose: 'Commissioning', operators: [] }
+  });
+  Object.assign(panel, {
+    projectId: 'old-project',
+    selectedRunMode: 'camera',
+    container: {
+      querySelector(selector) {
+        return selector === '#run-mode' ? runModeSelect : null;
+      }
+    },
+    reset() {}
+  });
+
+  assert.equal(panel.setProjectContext('commissioning-project'), true);
+  assert.equal(panel.selectedRunMode, 'flow');
+  assert.equal(runModeSelect.value, 'flow');
+
+  setCurrentProject(null);
 });
 
 test('handleInspectionResult ignores stale project data but restores single-run buttons', () => {
