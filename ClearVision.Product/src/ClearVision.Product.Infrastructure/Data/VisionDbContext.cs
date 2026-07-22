@@ -4,6 +4,7 @@
 
 using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ValueObjects;
 using Microsoft.EntityFrameworkCore;
@@ -105,6 +106,10 @@ public class VisionDbContext : DbContext
 
             // 映射属性到指定列名 (保持与原来 OwnsOne 的命名习惯兼容)
             entity.Property(e => e.Name).HasColumnName("Flow_Name").IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Purpose)
+                .HasColumnName("Flow_Purpose")
+                .HasConversion<int>()
+                .HasDefaultValue(FlowPurpose.Inspection);
             entity.Property(e => e.DecisionConfiguration)
                 .HasColumnName("Flow_DecisionConfiguration")
                 .HasConversion(

@@ -3,6 +3,7 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Services;
 using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using NSubstitute;
@@ -267,6 +268,94 @@ public sealed class ExecutionAdmissionServiceTests
             ExecutionAdmissionSurface.NodePreview);
 
         result.IsAllowed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ValidateFlowDefinition_ResultJudgmentEqual_ShouldIgnoreEmptyRangeParameters()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var factory = new OperatorFactory();
+        var flow = new OperatorFlow("equal-judgment");
+        flow.AddOperator(factory.CreateOperator(OperatorType.ResultJudgment, "Equal", 0, 0));
+        var admission = new ExecutionAdmissionService(repository, operatorFactory: factory);
+
+        var result = admission.ValidateFlowDefinition(flow, ExecutionAdmissionSurface.NodePreview);
+
+        result.IsAllowed.Should().BeTrue(result.Message);
+    }
+
+    [Fact]
+    public void ValidateFlowDefinition_NodePreview_ShouldDeferImageResourceValidationToRuntimeContext()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var factory = new OperatorFactory();
+        var flow = new OperatorFlow("runtime-image-preview");
+        flow.AddOperator(factory.CreateOperator(OperatorType.ImageAcquisition, "Input", 0, 0));
+        var admission = new ExecutionAdmissionService(repository, operatorFactory: factory);
+
+        var result = admission.ValidateFlowDefinition(flow, ExecutionAdmissionSurface.NodePreview);
+
+        result.IsAllowed.Should().BeTrue(result.Message);
+    }
+
+    [Fact]
+    public void ValidateFlowDefinition_OfficialRun_ShouldRequireConfiguredImageResource()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var factory = new OperatorFactory();
+        var flow = new OperatorFlow("missing-official-image");
+        flow.AddOperator(factory.CreateOperator(OperatorType.ImageAcquisition, "Input", 0, 0));
+        var admission = new ExecutionAdmissionService(repository, operatorFactory: factory);
+
+        var result = admission.ValidateFlowDefinition(flow, ExecutionAdmissionSurface.StudioInspectionRun);
+
+        result.IsAllowed.Should().BeFalse();
+        result.Code.Should().Be("ADMISSION_FLOW_REQUIRED_PARAMETER_MISSING");
+        result.Violations.Should().Contain(item => item.ParameterName == "FilePath");
+    }
+
+    [Fact]
+    public void ValidateFlowDefinition_CommissioningRead_ShouldNotRequireDecisionBinding()
+    {
+        var flow = SingleOperatorFlow(
+            OperatorType.ModbusCommunication,
+            ("FunctionCode", "ReadHolding"));
+        flow.Purpose = FlowPurpose.Commissioning;
+
+        var result = CreateService().ValidateFlowDefinition(
+            flow,
+            ExecutionAdmissionSurface.CommissioningRun);
+
+        result.IsAllowed.Should().BeTrue(result.Message);
+    }
+
+    [Fact]
+    public void ValidateFlowDefinition_CommissioningWrite_ShouldRemainBlocked()
+    {
+        var flow = SingleOperatorFlow(
+            OperatorType.ModbusCommunication,
+            ("FunctionCode", "WriteSingle"));
+        flow.Purpose = FlowPurpose.Commissioning;
+
+        var result = CreateService().ValidateFlowDefinition(
+            flow,
+            ExecutionAdmissionSurface.CommissioningRun);
+
+        result.IsAllowed.Should().BeFalse();
+        result.Code.Should().Be("ADMISSION_PREVIEW_SIDE_EFFECT_BLOCKED");
+    }
+
+    [Fact]
+    public void ValidateFlowDefinition_CommissioningFlowOnInspectionSurface_ShouldRejectPurposeMismatch()
+    {
+        var flow = SingleOperatorFlow(OperatorType.Thresholding);
+        flow.Purpose = FlowPurpose.Commissioning;
+
+        var result = CreateService().ValidateFlowDefinition(
+            flow,
+            ExecutionAdmissionSurface.StudioInspectionRun);
+
+        result.Code.Should().Be("ADMISSION_FLOW_PURPOSE_MISMATCH");
     }
 
     [Theory]

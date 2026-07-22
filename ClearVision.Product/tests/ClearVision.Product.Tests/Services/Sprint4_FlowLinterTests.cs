@@ -137,7 +137,7 @@ public class Sprint4_FlowLinterTests
     #region 第二层：语义安全
 
     [Fact]
-    public void FlowLinter_SAFETY_001_CommOpWithoutGuardian_ReturnsError()
+    public void FlowLinter_SAFETY_001_ReadOnlyCommOpWithoutGuardian_DoesNotReturnError()
     {
         var flow = CreateTestFlow();
         var commOp = new Operator(Guid.NewGuid(), "ModbusRead", OperatorType.ModbusCommunication, 200, 200);
@@ -153,8 +153,25 @@ public class Sprint4_FlowLinterTests
 
         var result = _linter.Lint(flow);
 
-        Assert.True(result.HasErrors);
-        Assert.Contains(result.Issues, i => i.Code == "SAFETY_001");
+        Assert.DoesNotContain(result.Issues, i => i.Code == "SAFETY_001");
+    }
+
+    [Fact]
+    public void FlowLinter_SAFETY_001_WriteCommOpWithoutGuardian_ReturnsError()
+    {
+        var flow = CreateTestFlow();
+        var commOp = new Operator(Guid.NewGuid(), "ModbusWrite", OperatorType.ModbusCommunication, 200, 200);
+        commOp.AddParameter(new Parameter(Guid.NewGuid(), "FunctionCode", "Function Code", "", "string", "WriteSingle"));
+        commOp.LoadInputPort(Guid.NewGuid(), "Trigger", PortDataType.Image, true);
+        commOp.LoadOutputPort(Guid.NewGuid(), "Value", PortDataType.Integer);
+        flow.AddOperator(commOp);
+        flow.AddConnection(new OperatorConnection(
+            flow.Operators.First().Id, flow.Operators.First().OutputPorts.First().Id,
+            commOp.Id, commOp.InputPorts.First().Id));
+
+        var result = _linter.Lint(flow);
+
+        Assert.Contains(result.Issues, issue => issue.Code == "SAFETY_001");
     }
 
     [Fact]

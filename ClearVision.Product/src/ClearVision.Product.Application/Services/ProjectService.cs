@@ -347,6 +347,7 @@ public class ProjectService
         var flowDto = new OperatorFlowDto
         {
             Name = ResolveFlowName(request.Name, existingFlow?.Name, project.Flow?.Name),
+            Purpose = request.Purpose ?? existingFlow?.Purpose ?? project.Flow?.Purpose ?? FlowPurpose.Inspection,
             DecisionConfiguration = request.DecisionConfiguration ?? existingFlow?.DecisionConfiguration,
             Operators = request.Operators,
             Connections = request.Connections
@@ -391,7 +392,8 @@ public class ProjectService
     {
         var flow = new OperatorFlow(dto.Name)
         {
-            DecisionConfiguration = dto.DecisionConfiguration
+            DecisionConfiguration = dto.DecisionConfiguration,
+            Purpose = dto.Purpose
         };
 
         // 【关键修复】如果指定了 flowId (通常是 Project.Id)，强制设置它
@@ -713,6 +715,7 @@ public class ProjectService
         {
             Id = flow.Id,
             Name = flow.Name,
+            Purpose = flow.Purpose,
             DecisionConfiguration = flow.DecisionConfiguration,
             Operators = flow.Operators.Select(MapOperatorToDto).ToList(),
             Connections = flow.Connections.Select(MapConnectionToDto).ToList()

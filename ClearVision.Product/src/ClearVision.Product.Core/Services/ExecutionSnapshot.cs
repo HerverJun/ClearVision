@@ -30,7 +30,8 @@ public enum ExecutionRunMode
     Preview = 1,
     Debug = 2,
     ShadowCandidate = 3,
-    StationRuntime = 4
+    StationRuntime = 4,
+    Commissioning = 5
 }
 
 public enum ShadowExecutionRole
@@ -49,7 +50,8 @@ public enum ExecutionSideEffect
     FileWrite = 4,
     NetworkWrite = 8,
     DeviceWrite = 16,
-    StateWrite = 32
+    StateWrite = 32,
+    NetworkRead = 64
 }
 
 public sealed record ExecutionSideEffectViolation(
@@ -66,18 +68,20 @@ public sealed record ExecutionSideEffectViolation(
 /// </summary>
 public static class ExecutionSideEffectCatalog
 {
-    private static readonly HashSet<OperatorType> NetworkWriteOperators =
+    private static readonly HashSet<OperatorType> AlwaysNetworkWriteOperators =
     [
         OperatorType.HttpRequest,
         OperatorType.TcpCommunication,
         OperatorType.SerialCommunication,
-        OperatorType.ModbusCommunication,
-        OperatorType.ModbusRtuCommunication,
-        OperatorType.SiemensS7Communication,
-        OperatorType.MitsubishiMcCommunication,
-        OperatorType.OmronFinsCommunication,
         OperatorType.MqttPublish,
         OperatorType.DatabaseWrite
+    ];
+
+    private static readonly HashSet<OperatorType> ParameterizedPlcOperators =
+    [
+        OperatorType.SiemensS7Communication,
+        OperatorType.MitsubishiMcCommunication,
+        OperatorType.OmronFinsCommunication
     ];
 
     private static readonly HashSet<OperatorType> DeviceWriteOperators =
@@ -95,9 +99,25 @@ public static class ExecutionSideEffectCatalog
     public static ExecutionSideEffect GetCapabilities(Operator @operator)
     {
         var capabilities = ExecutionSideEffect.None;
-        if (NetworkWriteOperators.Contains(@operator.Type))
+        if (AlwaysNetworkWriteOperators.Contains(@operator.Type))
         {
             capabilities |= ExecutionSideEffect.NetworkWrite;
+        }
+
+        if (@operator.Type is OperatorType.ModbusCommunication or OperatorType.ModbusRtuCommunication)
+        {
+            var functionCode = NormalizeOption(ReadString(@operator, "FunctionCode") ?? "ReadHolding");
+            capabilities |= functionCode is "ReadCoils" or "ReadHolding"
+                ? ExecutionSideEffect.NetworkRead
+                : ExecutionSideEffect.NetworkWrite;
+        }
+
+        if (ParameterizedPlcOperators.Contains(@operator.Type))
+        {
+            var operation = NormalizeOption(ReadString(@operator, "Operation") ?? "Read");
+            capabilities |= operation.Equals("Read", StringComparison.OrdinalIgnoreCase)
+                ? ExecutionSideEffect.NetworkRead
+                : ExecutionSideEffect.NetworkWrite;
         }
 
         if (DeviceWriteOperators.Contains(@operator.Type))
@@ -200,8 +220,10 @@ public sealed class ExecutionSideEffectPolicy
     {
         ExecutionRunMode.FormalPrimary or ExecutionRunMode.StationRuntime =>
             new ExecutionSideEffectPolicy(runMode, ExecutionSideEffect.DeviceRead | ExecutionSideEffect.FileRead |
-                ExecutionSideEffect.FileWrite | ExecutionSideEffect.NetworkWrite | ExecutionSideEffect.DeviceWrite |
+                ExecutionSideEffect.FileWrite | ExecutionSideEffect.NetworkRead | ExecutionSideEffect.NetworkWrite | ExecutionSideEffect.DeviceWrite |
                 ExecutionSideEffect.StateWrite),
+        ExecutionRunMode.Commissioning =>
+            new ExecutionSideEffectPolicy(runMode, ExecutionSideEffect.FileRead | ExecutionSideEffect.NetworkRead),
         // Preview/debug may mutate variables only inside an isolated preview
         // session. GovernedFlowExecution verifies that context before invoking
         // the engine. External writes and device operations remain forbidden.
@@ -372,6 +394,7 @@ public static class ExecutionFlowIdentity
         ArgumentNullException.ThrowIfNull(flow);
         var canonical = new
         {
+            purpose = flow.Purpose.ToString(),
             operators = flow.Operators
                 .OrderBy(@operator => @operator.Id)
                 .Select(@operator => new
@@ -418,7 +441,8 @@ public static class ExecutionFlowIdentity
         ArgumentNullException.ThrowIfNull(source);
         var clone = new OperatorFlow(source.Id, source.Name)
         {
-            DecisionConfiguration = CloneDecisionConfiguration(source.DecisionConfiguration)
+            DecisionConfiguration = CloneDecisionConfiguration(source.DecisionConfiguration),
+            Purpose = source.Purpose
         };
 
         foreach (var sourceOperator in source.Operators)

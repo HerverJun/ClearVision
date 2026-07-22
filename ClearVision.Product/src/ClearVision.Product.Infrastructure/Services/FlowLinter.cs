@@ -452,8 +452,9 @@ public class FlowLinter
     /// </summary>
     private IEnumerable<LintIssue> CheckSemanticSafety(OperatorFlow flow)
     {
-        // SAFETY_001: 通信类算子上游必须有 ConditionalBranch 或 ResultJudgment
-        foreach (var commOp in flow.Operators.Where(op => IsCommunicationOperator(op.Type)))
+        // SAFETY_001: only external writes require an upstream guardian. Read-only
+        // communication is intentionally allowed in diagnostics and commissioning flows.
+        foreach (var commOp in flow.Operators.Where(RequiresNetworkWrite))
         {
             var hasGuardianUpstream = HasGuardianUpstream(flow, commOp);
             if (!hasGuardianUpstream)
@@ -464,8 +465,8 @@ public class FlowLinter
                     Severity = LintSeverity.Error,
                     OperatorId = commOp.Id,
                     OperatorName = commOp.Name,
-                    Message = $"通信算子 [{commOp.Name}] 上游没有 ConditionalBranch 或 ResultJudgment 保护。",
-                    Suggestion = "请在通信算子前添加条件分支或结果判定，防止无条件触发外部设备动作。"
+                    Message = $"外部写入算子 [{commOp.Name}] 上游没有 ConditionalBranch 或 ResultJudgment 保护。",
+                    Suggestion = "请在写入算子前添加条件分支或结果判定，防止无条件触发外部设备动作。"
                 };
             }
         }
@@ -539,7 +540,7 @@ public class FlowLinter
                 continue;
 
             var commOps = subGraph.Operators
-                .Where(op => IsCommunicationOperator(op.Type))
+                .Where(RequiresNetworkAccess)
                 .ToList();
 
             if (commOps.Count == 0)
@@ -566,22 +567,14 @@ public class FlowLinter
     /// <summary>
     /// 判断是否为通信算子
     /// </summary>
-    private bool IsCommunicationOperator(OperatorType type)
+    private static bool RequiresNetworkWrite(Operator op) =>
+        ExecutionSideEffectCatalog.GetCapabilities(op).HasFlag(ExecutionSideEffect.NetworkWrite);
+
+    private static bool RequiresNetworkAccess(Operator op)
     {
-        return type switch
-        {
-            OperatorType.ModbusCommunication => true,
-            OperatorType.TcpCommunication => true,
-            OperatorType.DatabaseWrite => true,
-            OperatorType.SerialCommunication => true,
-            OperatorType.SiemensS7Communication => true,
-            OperatorType.MitsubishiMcCommunication => true,
-            OperatorType.OmronFinsCommunication => true,
-            OperatorType.ModbusRtuCommunication => true,
-            OperatorType.HttpRequest => true,
-            OperatorType.MqttPublish => true,
-            _ => false
-        };
+        var effects = ExecutionSideEffectCatalog.GetCapabilities(op);
+        return effects.HasFlag(ExecutionSideEffect.NetworkRead) ||
+               effects.HasFlag(ExecutionSideEffect.NetworkWrite);
     }
 
     /// <summary>

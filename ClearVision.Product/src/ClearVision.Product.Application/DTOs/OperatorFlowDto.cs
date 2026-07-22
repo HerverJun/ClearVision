@@ -36,6 +36,8 @@ public class OperatorFlowDto
 
     public DecisionConfiguration? DecisionConfiguration { get; set; }
 
+    public FlowPurpose Purpose { get; set; } = FlowPurpose.Inspection;
+
     /// <summary>
     /// 转换为实体对象
     /// </summary>
@@ -44,7 +46,8 @@ public class OperatorFlowDto
         // 创建空流程
         var flow = new OperatorFlow(Name)
         {
-            DecisionConfiguration = DecisionConfiguration
+            DecisionConfiguration = DecisionConfiguration,
+            Purpose = Purpose
         };
 
         // 添加算子
@@ -122,6 +125,8 @@ public class UpdateFlowRequest
     public long? ExpectedPersistenceRevision { get; set; }
 
     public DecisionConfiguration? DecisionConfiguration { get; set; }
+
+    public FlowPurpose? Purpose { get; set; }
 
     public List<OperatorDto> Operators { get; set; } = new();
     public List<OperatorConnectionDto> Connections { get; set; } = new();

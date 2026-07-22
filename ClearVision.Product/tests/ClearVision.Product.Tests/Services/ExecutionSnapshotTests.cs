@@ -45,6 +45,17 @@ public sealed class ExecutionSnapshotTests
     }
 
     [Fact]
+    public void FlowHash_IncludesFlowPurpose()
+    {
+        var inspection = CreateFlow();
+        var commissioning = ExecutionFlowIdentity.CloneFlow(inspection);
+        commissioning.Purpose = FlowPurpose.Commissioning;
+
+        ExecutionFlowIdentity.ComputeFlowHash(commissioning)
+            .Should().NotBe(ExecutionFlowIdentity.ComputeFlowHash(inspection));
+    }
+
+    [Fact]
     public void ShadowPolicy_Rejects_External_Writes_And_Project_State_Writes()
     {
         var flow = new OperatorFlow("shadow");
@@ -81,6 +92,37 @@ public sealed class ExecutionSnapshotTests
             ExecutionSideEffect.FileWrite,
             ExecutionSideEffect.NetworkWrite,
             ExecutionSideEffect.DeviceWrite]);
+    }
+
+    [Theory]
+    [InlineData("ReadHolding", ExecutionSideEffect.NetworkRead)]
+    [InlineData("ReadCoils", ExecutionSideEffect.NetworkRead)]
+    [InlineData("WriteSingle", ExecutionSideEffect.NetworkWrite)]
+    [InlineData("WriteMultiple", ExecutionSideEffect.NetworkWrite)]
+    public void ModbusCapabilities_FollowConfiguredFunctionCode(
+        string functionCode,
+        ExecutionSideEffect expected)
+    {
+        var op = new Operator(Guid.NewGuid(), "modbus", OperatorType.ModbusCommunication, 0, 0);
+        op.AddParameter(new Parameter(Guid.NewGuid(), "FunctionCode", "Function Code", string.Empty, "string", functionCode));
+
+        var capabilities = ExecutionSideEffectCatalog.GetCapabilities(op);
+
+        capabilities.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(OperatorType.SiemensS7Communication)]
+    [InlineData(OperatorType.MitsubishiMcCommunication)]
+    [InlineData(OperatorType.OmronFinsCommunication)]
+    public void PlcCapabilities_FollowConfiguredOperation(OperatorType operatorType)
+    {
+        var op = new Operator(Guid.NewGuid(), "plc", operatorType, 0, 0);
+        op.AddParameter(new Parameter(Guid.NewGuid(), "Operation", "Operation", string.Empty, "string", "Read"));
+        ExecutionSideEffectCatalog.GetCapabilities(op).Should().Be(ExecutionSideEffect.NetworkRead);
+
+        op.UpdateParameter("Operation", "Write");
+        ExecutionSideEffectCatalog.GetCapabilities(op).Should().Be(ExecutionSideEffect.NetworkWrite);
     }
 
     private static OperatorFlow CreateFlow()

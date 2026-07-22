@@ -762,6 +762,17 @@ internal static class VisionDatabaseMaintenance
                 cancellationToken);
         }
 
+        if (!await ColumnExistsAsync(
+                dbContext.Database.GetDbConnection(),
+                "Projects",
+                "Flow_Purpose",
+                cancellationToken))
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "Projects" ADD COLUMN "Flow_Purpose" INTEGER NOT NULL DEFAULT 0;""",
+                cancellationToken);
+        }
+
         foreach (var statement in LegacyStationSyncSchemaStatements)
         {
             await dbContext.Database.ExecuteSqlRawAsync(statement, cancellationToken);

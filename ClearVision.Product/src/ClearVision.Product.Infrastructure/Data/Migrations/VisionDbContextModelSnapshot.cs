@@ -246,6 +246,12 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("Flow_Name");
 
+                    b.Property<int>("Purpose")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("Flow_Purpose")
+                        .HasDefaultValue(0);
+
                     b.HasKey("Id");
 
                     b.ToTable("Projects", (string)null);

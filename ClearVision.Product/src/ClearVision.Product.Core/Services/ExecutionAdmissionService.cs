@@ -42,7 +42,11 @@ public enum ExecutionAdmissionSurface
 
     ShadowCandidate = 7,
 
-    Debug = 8
+    Debug = 8,
+
+    CommissioningRun = 9,
+
+    CommissioningPreview = 10
 }
 
 public sealed record ExecutionAdmissionViolation(
@@ -122,15 +126,18 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
     private readonly IProjectRepository _projectRepository;
     private readonly IInspectionRuntimeCoordinator? _runtimeCoordinator;
     private readonly IFlowDefinitionValidator? _flowDefinitionValidator;
+    private readonly IOperatorFactory? _operatorFactory;
 
     public ExecutionAdmissionService(
         IProjectRepository projectRepository,
         IInspectionRuntimeCoordinator? runtimeCoordinator = null,
-        IFlowDefinitionValidator? flowDefinitionValidator = null)
+        IFlowDefinitionValidator? flowDefinitionValidator = null,
+        IOperatorFactory? operatorFactory = null)
     {
         _projectRepository = projectRepository;
         _runtimeCoordinator = runtimeCoordinator;
         _flowDefinitionValidator = flowDefinitionValidator;
+        _operatorFactory = operatorFactory;
     }
 
     /// <summary>
@@ -204,7 +211,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         OperatorFlow? flow,
         ExecutionAdmissionSurface surface)
     {
-        var admission = ValidateStandaloneFlow(flow, surface);
+        var admission = ValidateStandaloneFlow(flow, surface, _operatorFactory);
         if (!admission.IsAllowed || flow == null || _flowDefinitionValidator == null)
         {
             return admission;
@@ -226,7 +233,8 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
 
     public static ExecutionAdmissionResult ValidateStandaloneFlow(
         OperatorFlow? flow,
-        ExecutionAdmissionSurface surface)
+        ExecutionAdmissionSurface surface,
+        IOperatorFactory? operatorFactory = null)
     {
         if (!HasExecutableFlow(flow))
         {
@@ -235,7 +243,23 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
                 "An executable flow is required.");
         }
 
-        var structure = ValidateStructureAndRequiredParameters(flow!);
+        if (surface is ExecutionAdmissionSurface.CommissioningRun or ExecutionAdmissionSurface.CommissioningPreview)
+        {
+            if (flow!.Purpose != FlowPurpose.Commissioning)
+            {
+                return ExecutionAdmissionResult.Reject(
+                    "ADMISSION_FLOW_PURPOSE_MISMATCH",
+                    "Commissioning execution requires a flow whose Purpose is Commissioning.");
+            }
+        }
+        else if (IsOfficialExecutionSurface(surface) && flow!.Purpose == FlowPurpose.Commissioning)
+        {
+            return ExecutionAdmissionResult.Reject(
+                "ADMISSION_FLOW_PURPOSE_MISMATCH",
+                "A Commissioning flow must use the commissioning execution surface.");
+        }
+
+        var structure = ValidateStructureAndRequiredParameters(flow!, operatorFactory, surface);
         if (!structure.IsAllowed)
         {
             return structure;
@@ -375,7 +399,10 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
     private static bool HasExecutableFlow(OperatorFlow? flow) =>
         flow?.Operators?.Count > 0;
 
-    private static ExecutionAdmissionResult ValidateStructureAndRequiredParameters(OperatorFlow flow)
+    private static ExecutionAdmissionResult ValidateStructureAndRequiredParameters(
+        OperatorFlow flow,
+        IOperatorFactory? operatorFactory,
+        ExecutionAdmissionSurface surface)
     {
         var violations = new List<ExecutionAdmissionViolation>();
         var duplicateOperators = flow.Operators
@@ -408,11 +435,50 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
 
         foreach (var op in flow.Operators.Where(op => op.IsEnabled))
         {
-            foreach (var parameter in op.Parameters.Where(parameter => parameter.IsRequired))
+            var metadata = operatorFactory?.GetMetadata(op.Type);
+            if (metadata != null)
             {
-                var value = parameter.GetValue();
-                if (value == null)
+                var values = op.Parameters
+                    .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => (object?)group.Last().GetValue(),
+                        StringComparer.OrdinalIgnoreCase);
+                var explicitNames = values.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var violation in OperatorParameterConstraintEvaluator.Validate(
+                             metadata,
+                             values,
+                             explicitNames))
                 {
+                    if (surface == ExecutionAdmissionSurface.NodePreview &&
+                        !string.IsNullOrWhiteSpace(violation.ResourceKind))
+                    {
+                        // Node preview resolves resource constraints with its runtime image/input context.
+                        continue;
+                    }
+
+                    violations.Add(new(
+                        op.Id,
+                        op.Name,
+                        op.Type,
+                        BuildParameterViolationMessage(violation),
+                        violation.ParameterNames.FirstOrDefault(),
+                        "FLOW_REQUIRED_PARAMETER_MISSING"));
+                }
+
+                var governedNames = metadata.ParameterConstraints
+                    .Select(constraint => constraint.Parameter)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                foreach (var parameter in metadata.Parameters.Where(parameter =>
+                             parameter.IsRequired && !governedNames.Contains(parameter.Name)))
+                {
+                    values.TryGetValue(parameter.Name, out var value);
+                    if (!OperatorParameterConstraintEvaluator.IsMissing(value))
+                    {
+                        continue;
+                    }
+
                     violations.Add(new(
                         op.Id,
                         op.Name,
@@ -421,6 +487,24 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
                         parameter.Name,
                         "FLOW_REQUIRED_PARAMETER_MISSING"));
                 }
+
+                continue;
+            }
+
+            foreach (var parameter in op.Parameters.Where(parameter => parameter.IsRequired))
+            {
+                if (parameter.GetValue() != null)
+                {
+                    continue;
+                }
+
+                violations.Add(new(
+                    op.Id,
+                    op.Name,
+                    op.Type,
+                    $"Required parameter '{parameter.Name}' is missing.",
+                    parameter.Name,
+                    "FLOW_REQUIRED_PARAMETER_MISSING"));
             }
         }
 
@@ -431,6 +515,14 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
                 violations[0].Reason,
                 violations);
     }
+
+    private static string BuildParameterViolationMessage(OperatorParameterConstraintViolation violation) =>
+        violation.Code switch
+        {
+            "at-least-one" => $"At least one parameter is required: {string.Join(", ", violation.ParameterNames)}.",
+            "mutually-exclusive" => $"Parameters cannot be configured together: {string.Join(", ", violation.ParameterNames)}.",
+            _ => $"Required parameter '{violation.ParameterNames.FirstOrDefault() ?? "configuration"}' is missing."
+        };
 
     private static ExecutionAdmissionViolation? TryCreateViolation(
         Operator @operator,
@@ -446,6 +538,7 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
         {
             ExecutionAdmissionSurface.ShadowCandidate => ExecutionRunMode.ShadowCandidate,
             ExecutionAdmissionSurface.Debug => ExecutionRunMode.Debug,
+            ExecutionAdmissionSurface.CommissioningRun or ExecutionAdmissionSurface.CommissioningPreview => ExecutionRunMode.Commissioning,
             _ => ExecutionRunMode.Preview
         });
         var allowedCapabilities = policy.AllowedCapabilities;
@@ -491,6 +584,8 @@ public sealed class ExecutionAdmissionService : IExecutionAdmissionService
             ExecutionAdmissionSurface.OperatorPreview => "算子预览",
             ExecutionAdmissionSurface.NodePreview => "节点预览",
             ExecutionAdmissionSurface.AutoTunePreview => "线序预览",
+            ExecutionAdmissionSurface.CommissioningRun => "通信调试运行",
+            ExecutionAdmissionSurface.CommissioningPreview => "通信调试预览",
             _ => "预览"
         };
 

@@ -230,6 +230,13 @@ public class ExecuteInspectionRequest
     public OperatorFlowDto? FlowData { get; set; }
 }
 
+public sealed class ExecuteCommissioningRequest
+{
+    public Guid ProjectId { get; set; }
+
+    public OperatorFlowDto? FlowData { get; set; }
+}
+
 /// <summary>
 /// 启动实时检测请求
 /// 【第二优先级】支持相机驱动和流程驱动两种模式

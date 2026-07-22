@@ -584,6 +584,72 @@ public static class ApiEndpoints
             });
         });
 
+        app.MapPost("/api/commissioning/execute", async (
+            ExecuteCommissioningRequest request,
+            IExecutionAdmissionService admissionService,
+            IFlowExecutionService flowExecutionService,
+            IProjectRepository projectRepository,
+            CancellationToken cancellationToken) =>
+        {
+            if (request.ProjectId == Guid.Empty || request.FlowData == null)
+            {
+                return Results.BadRequest(new
+                {
+                    Code = "COMMISSIONING_FLOW_REQUIRED",
+                    Error = "ProjectId and FlowData are required."
+                });
+            }
+
+            var flow = request.FlowData.ToEntity();
+            var admission = await admissionService.ValidateFlowAsync(
+                request.ProjectId,
+                flow,
+                ExecutionAdmissionSurface.CommissioningRun,
+                cancellationToken);
+            if (!admission.IsAllowed)
+            {
+                return ToAdmissionFailure(admission);
+            }
+
+            var project = await projectRepository.GetByIdFreshAsync(request.ProjectId);
+            if (project == null)
+            {
+                return Results.NotFound(new
+                {
+                    Code = "ADMISSION_PROJECT_NOT_ACTIVE",
+                    Error = $"Project '{request.ProjectId}' does not exist or has been deleted."
+                });
+            }
+
+            var snapshot = new ExecutionSnapshot(
+                request.ProjectId,
+                flow,
+                project.PersistenceRevision,
+                ExecutionSnapshotSource.Draft,
+                ExecutionRunMode.Commissioning);
+            var result = await flowExecutionService.ExecuteWithSnapshotAsync(
+                snapshot,
+                cancellationToken: cancellationToken);
+
+            return Results.Ok(new
+            {
+                Success = result.IsSuccess,
+                Purpose = flow.Purpose.ToString(),
+                Capability = flow.Operators
+                    .Where(op => op.IsEnabled)
+                    .Aggregate(ExecutionSideEffect.None, (current, op) =>
+                        current | ExecutionSideEffectCatalog.GetCapabilities(op))
+                    .ToString(),
+                result.ExecutionTimeMs,
+                result.OutputData,
+                result.OperatorResults,
+                result.ErrorMessage,
+                SnapshotId = snapshot.SnapshotId,
+                snapshot.FlowHash
+            });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
+
         // 执行检测
         app.MapPost("/api/inspection/execute", async (
             ExecuteInspectionRequest request,

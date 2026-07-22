@@ -33,6 +33,9 @@ public class OperatorFlow : Entity
     [JsonInclude]
     public DecisionConfiguration? DecisionConfiguration { get; set; }
 
+    [JsonInclude]
+    public FlowPurpose Purpose { get; set; } = FlowPurpose.Inspection;
+
     [JsonConstructor]
     public OperatorFlow()
     {
