@@ -363,10 +363,8 @@
 @media (max-width: 1480px) {
   .product-layout--workspace .workspace-shell__commands {
     right: 310px;
-    max-width: 360px;
+    max-width: min(520px, 42vw);
   }
-  .product-layout--workspace .workspace-shell__commands .workspace-shell__results-link,
-  .product-layout--workspace .workspace-shell__commands [data-testid="global-variables"] { display: none; }
 }
 
 @media (max-width: 1320px) {

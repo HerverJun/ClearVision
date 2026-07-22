@@ -76,6 +76,16 @@ function boolean(value: unknown, fallback = false): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+function enumIdentity(value: unknown): string {
+  const projected = record(value);
+  return text(field(projected, 'value') ?? field(projected, 'persistenceValue') ?? value);
+}
+
+function isImageAcquisition(node: Readonly<Record<string, unknown>>): boolean {
+  const identity = enumIdentity(field(node, 'type')).toLowerCase();
+  return identity === 'imageacquisition' || identity === '0';
+}
+
 function parameterValue(node: Readonly<Record<string, unknown>>, name: string): unknown {
   const parameters = field(node, 'parameters');
   if (!Array.isArray(parameters)) return undefined;
@@ -91,7 +101,7 @@ function nodeId(node: Readonly<Record<string, unknown>>): string {
 
 function sourceSignature(node: Readonly<Record<string, unknown>>): string {
   const payload = JSON.stringify({
-    nodeType: text(field(node, 'type')),
+    nodeType: enumIdentity(field(node, 'type')),
     sourceType: text(parameterValue(node, 'SourceType')).toLowerCase(),
     cameraBindingId: text(parameterValue(node, 'CameraBindingId')),
     triggerMode: text(parameterValue(node, 'TriggerMode')),
@@ -197,7 +207,7 @@ export function createCameraBindingEditorOwner(options: {
   function syncSelection(): void {
     if (disposed) return;
     const node = selectedNode();
-    const isAcquisition = text(field(node ?? Object.freeze({}), 'type')).toLowerCase() === 'imageacquisition';
+    const isAcquisition = isImageAcquisition(node ?? Object.freeze({}));
     state.selectedNodeId = isAcquisition && node ? nodeId(node) : null;
     state.currentBindingId = isAcquisition && node ? text(parameterValue(node, 'CameraBindingId')) || null : null;
     const sourceType = isAcquisition && node ? text(parameterValue(node, 'SourceType')).toLowerCase() : '';
@@ -270,7 +280,7 @@ export function createCameraBindingEditorOwner(options: {
     selectBinding(parameterName: string, bindingId: string): boolean {
       if (disposed || options.flowOwner.projection.mutationGate !== 'editable') return false;
       const node = selectedNode();
-      if (!node || text(field(node, 'type')).toLowerCase() !== 'imageacquisition') return false;
+      if (!node || !isImageAcquisition(node)) return false;
       const binding = state.bindings.find(item => item.id === bindingId && item.isEnabled);
       if (!binding) {
         state.message = '所选相机绑定已失效，请刷新后重新选择。';
@@ -369,7 +379,7 @@ export function createCameraBindingEditorOwner(options: {
       const frame = state.frame;
       if (disposed || !frame || frame.projectId !== options.projectId) return null;
       const source = options.flowOwner.projection.draft.operators.find(item => nodeId(item) === frame.sourceNodeId);
-      if (!source || text(field(source, 'type')).toLowerCase() !== 'imageacquisition' ||
+      if (!source || !isImageAcquisition(source) ||
         field(source, 'isEnabled') === false || sourceSignature(source) !== frame.sourceSignature) {
         state.frame = null;
         state.capturePhase = 'idle';

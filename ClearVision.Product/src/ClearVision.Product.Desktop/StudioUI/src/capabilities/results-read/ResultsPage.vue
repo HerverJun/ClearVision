@@ -344,7 +344,8 @@ async function refreshActive(force = false): Promise<void> {
     await Promise.all([
       refreshProjects(force),
       refreshLocalList(force),
-      refreshLocalDetail(force)
+      refreshLocalDetail(force),
+      refreshEvidence()
     ]);
     return;
   }
