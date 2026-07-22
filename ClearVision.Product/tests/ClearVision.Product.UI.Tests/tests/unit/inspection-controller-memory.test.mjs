@@ -37,7 +37,8 @@ const {
   default: inspectionController,
   createLightweightInspectionResult,
   getInlineResultImageBase64,
-  loadImageUrlAsBase64
+  loadImageUrlAsBase64,
+  loadImageUrlAsBlob
 } = await import(
   '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionController.js'
 );
@@ -180,6 +181,7 @@ test('executeSingle encodes large Uint8Array images without expanding the whole 
       projectId: 'project-current',
       status: 'OK',
       imageId: 'image-1',
+      outputImageBase64: 'AQID',
       outputData: {}
     };
   };
@@ -312,18 +314,43 @@ test('handleInspectionCompleted keeps last result lightweight and stores latest 
   assert.equal(completedResults[0].outputImageBase64, 'BASE64_PAYLOAD');
 });
 
-test('handleResultEvent publishes cached image URL when inline image is omitted', (t) => {
+test('handleResultEvent fetches cached image with authorization and publishes a Blob', async (t) => {
   const publishedImages = [];
   const imageId = '00000000-0000-0000-0000-000000000123';
   const expectedUrl = `http://localhost:5000/api/images/${imageId}`;
   const completedResults = [];
+  const originalFetch = globalThis.fetch;
+  const originalHeaders = httpClient.defaultHeaders;
   const unsubscribe = inspectionController.onInspectionCompleted(result => completedResults.push(result));
+  const expectedBlob = new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' });
 
   inspectionController.setImageSinks([image => publishedImages.push(image)]);
   t.after(() => {
+    globalThis.fetch = originalFetch;
+    httpClient.defaultHeaders = originalHeaders;
+    inspectionController.cancelLastResultImageLoad();
+    inspectionController.lastResultImageBlob = null;
+    inspectionController.lastResultImageUrl = null;
     inspectionController.setImageSinks([]);
     unsubscribe();
   });
+
+  httpClient.defaultHeaders = {
+    ...originalHeaders,
+    Authorization: 'Bearer inspection-image-token'
+  };
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, expectedUrl);
+    assert.equal(options.method, 'GET');
+    assert.equal(options.headers.Authorization, 'Bearer inspection-image-token');
+    return {
+      ok: true,
+      status: 200,
+      async blob() {
+        return expectedBlob;
+      }
+    };
+  };
 
   inspectionController.handleResultEvent({
     resultId: `url-result-${Date.now()}`,
@@ -333,16 +360,179 @@ test('handleResultEvent publishes cached image URL when inline image is omitted'
     outputData: { Count: 2 }
   });
 
+  await inspectionController.ensureLastResultImageLoaded();
+
   const lastResult = inspectionController.getLastResult();
 
   assert.equal(lastResult.imageId, imageId);
   assert.equal(lastResult.outputImageBase64, null);
   assert.equal(inspectionController.getLastResultImageBase64(), null);
   assert.equal(inspectionController.getLastResultImageUrl(), expectedUrl);
-  assert.deepEqual(publishedImages, [expectedUrl]);
+  assert.equal(inspectionController.getLastResultImageBlob(), expectedBlob);
+  assert.deepEqual(publishedImages, [expectedBlob]);
   assert.equal(completedResults.length, 1);
   assert.equal(completedResults[0].imageId, imageId);
   assert.equal(completedResults[0].outputImageBase64, undefined);
+});
+
+test('cached inspection image failure is visible and retry publishes the recovered Blob', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalHeaders = httpClient.defaultHeaders;
+  const publishedImages = [];
+  const states = [];
+  const recoveredBlob = new Blob([new Uint8Array([4, 5, 6])], { type: 'image/png' });
+  const unsubscribeState = inspectionController.onInspectionImageState(state => states.push(state));
+  let requests = 0;
+
+  inspectionController.setImageSinks([image => publishedImages.push(image)]);
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    httpClient.defaultHeaders = originalHeaders;
+    inspectionController.cancelLastResultImageLoad();
+    inspectionController.lastResultImageBlob = null;
+    inspectionController.lastResultImageUrl = null;
+    inspectionController.setImageSinks([]);
+    unsubscribeState();
+  });
+
+  httpClient.defaultHeaders = {
+    ...originalHeaders,
+    Authorization: 'Bearer retry-token'
+  };
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.headers.Authorization, 'Bearer retry-token');
+    requests += 1;
+    if (requests === 1) {
+      return { ok: false, status: 401 };
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      async blob() {
+        return recoveredBlob;
+      }
+    };
+  };
+
+  inspectionController.handleResultEvent({
+    resultId: `retry-result-${Date.now()}`,
+    projectId: 'project-current',
+    imageId: '00000000-0000-0000-0000-000000000456',
+    status: 'OK'
+  });
+  await inspectionController.ensureLastResultImageLoaded();
+
+  assert.equal(inspectionController.getLastResultImageState().status, 'error');
+  assert.match(inspectionController.getLastResultImageState().message, /HTTP 401/);
+  assert.deepEqual(publishedImages, []);
+
+  await inspectionController.retryLastResultImage();
+
+  assert.equal(requests, 2);
+  assert.equal(inspectionController.getLastResultImageState().status, 'ready');
+  assert.deepEqual(publishedImages, [recoveredBlob]);
+  assert.equal(states.some(state => state.status === 'error'), true);
+});
+
+test('missing cached inspection image exposes a 404 load error', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalHeaders = httpClient.defaultHeaders;
+  const states = [];
+  const unsubscribeState = inspectionController.onInspectionImageState(state => states.push(state));
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    httpClient.defaultHeaders = originalHeaders;
+    inspectionController.cancelLastResultImageLoad();
+    inspectionController.lastResultImageBlob = null;
+    inspectionController.lastResultImageUrl = null;
+    unsubscribeState();
+  });
+
+  httpClient.defaultHeaders = {
+    ...originalHeaders,
+    Authorization: 'Bearer missing-image-token'
+  };
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.headers.Authorization, 'Bearer missing-image-token');
+    return { ok: false, status: 404 };
+  };
+
+  inspectionController.handleResultEvent({
+    resultId: `missing-image-${Date.now()}`,
+    projectId: 'project-current',
+    imageId: '00000000-0000-0000-0000-000000000457',
+    status: 'OK'
+  });
+  await inspectionController.ensureLastResultImageLoaded();
+
+  assert.equal(inspectionController.getLastResultImageState().status, 'error');
+  assert.match(inspectionController.getLastResultImageState().message, /HTTP 404/);
+  assert.equal(states.some(state => state.status === 'error'), true);
+});
+
+test('stale cached image loads cannot replace the newest result image', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalHeaders = httpClient.defaultHeaders;
+  const publishedImages = [];
+  const pendingRequests = [];
+  const firstBlob = new Blob([new Uint8Array([7])], { type: 'image/png' });
+  const secondBlob = new Blob([new Uint8Array([8])], { type: 'image/png' });
+
+  inspectionController.setImageSinks([image => publishedImages.push(image)]);
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    httpClient.defaultHeaders = originalHeaders;
+    inspectionController.cancelLastResultImageLoad();
+    inspectionController.lastResultImageBlob = null;
+    inspectionController.lastResultImageUrl = null;
+    inspectionController.setImageSinks([]);
+  });
+
+  httpClient.defaultHeaders = {
+    ...originalHeaders,
+    Authorization: 'Bearer stale-token'
+  };
+  globalThis.fetch = (_url, options) => new Promise(resolve => {
+    pendingRequests.push({ resolve, signal: options.signal });
+  });
+
+  inspectionController.handleResultEvent({
+    resultId: `stale-first-${Date.now()}`,
+    projectId: 'project-current',
+    imageId: '00000000-0000-0000-0000-000000000701',
+    status: 'OK'
+  });
+  inspectionController.handleResultEvent({
+    resultId: `stale-second-${Date.now()}`,
+    projectId: 'project-current',
+    imageId: '00000000-0000-0000-0000-000000000702',
+    status: 'OK'
+  });
+
+  assert.equal(pendingRequests.length, 2);
+  assert.equal(pendingRequests[0].signal.aborted, true);
+  pendingRequests[1].resolve({
+    ok: true,
+    status: 200,
+    async blob() {
+      return secondBlob;
+    }
+  });
+  await inspectionController.ensureLastResultImageLoaded();
+
+  pendingRequests[0].resolve({
+    ok: true,
+    status: 200,
+    async blob() {
+      return firstBlob;
+    }
+  });
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.equal(inspectionController.getLastResultImageBlob(), secondBlob);
+  assert.deepEqual(publishedImages, [secondBlob]);
 });
 
 test('duplicate result ids do not republish images or callbacks', (t) => {

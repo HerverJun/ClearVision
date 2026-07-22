@@ -2,12 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   NodePreviewCoordinator,
+  buildCameraPreviewSourceSignature,
+  createCameraPreviewInputContext,
   getOperatorPreviewCostPolicy,
-  previewObservationMatchesRequest
+  previewObservationMatchesRequest,
+  resolveCameraPreviewInputFrame
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js';
 import {
   normalizeAcquisitionSourceType
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/parameterDependencyRules.js';
+
+const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==';
 
 function waitFor(assertion, timeoutMs = 1000) {
   const startedAt = Date.now();
@@ -44,6 +49,7 @@ function createCoordinator(options = {}) {
       : (options.flowRevision ?? 1),
     getNodeById: () => node,
     getInputImageBase64: () => options.inputImageBase64 ?? 'INPUT_IMAGE',
+    getInputImageContext: options.getInputImageContext,
     getOperatorMetadata: () => ({ outputPorts: [{ dataType: 'image' }] }),
     artifactClient: options.artifactClient ?? {
       async getPreviewArtifactBlob() { return { blob: new Blob() }; },
@@ -712,6 +718,284 @@ test('NodePreviewCoordinator releases live camera artifact resources between byp
     globalThis.URL.revokeObjectURL = originalRevokeObjectUrl;
     coordinator.destroy();
   }
+});
+
+test('NodePreviewCoordinator publishes an explicitly captured camera frame without executing side-effect preview', () => {
+  const cameraNode = {
+    id: 'camera-capture-node',
+    type: 'ImageAcquisition',
+    title: '图像采集',
+    parameters: [
+      { name: 'SourceType', value: 'Camera' },
+      { name: 'CameraId', value: 'cam-1' },
+    ],
+    outputs: [{ type: 'image' }],
+  };
+  const { coordinator, getExecuteCount } = createCoordinator({
+    node: cameraNode,
+    getInputImageBase64: () => null,
+  });
+
+  try {
+    const state = coordinator.publishExternalFrame(cameraNode, {
+      imageBase64: PNG_BASE64,
+      cameraBindingId: 'cam-1',
+      triggerMode: 'Software',
+      width: 1920,
+      height: 1080,
+      capturedAtUtc: '2026-07-16T08:00:00Z',
+    });
+
+    assert.equal(getExecuteCount(), 0);
+    assert.equal(state.status, 'success');
+    assert.equal(state.activeNodeId, cameraNode.id);
+    assert.equal(state.inputImageBase64, PNG_BASE64);
+    assert.equal(state.outputImageBase64, PNG_BASE64);
+    assert.equal(state.outputData.CameraBindingId, 'cam-1');
+    assert.equal(state.outputData.Width, 1920);
+    assert.equal(state.presenter.outputImageSrc, `data:image/png;base64,${PNG_BASE64}`);
+  } finally {
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator forwards captured camera source identity and frame id to downstream preview', async () => {
+  const previewOptions = [];
+  let previewInput = {
+    imageBase64: PNG_BASE64,
+    sourceNodeId: 'camera-source-1',
+    frameId: 'frame-1'
+  };
+  const { coordinator, node, getExecuteCount } = createCoordinator({
+    getInputImageContext: () => previewInput,
+    onPreviewOptions: options => previewOptions.push(options)
+  });
+
+  try {
+    coordinator.setActiveNode(node);
+    await waitFor(() => assert.equal(coordinator.getState().status, 'success'));
+
+    assert.equal(getExecuteCount(), 1);
+    assert.equal(previewOptions[0].inputImageBase64, PNG_BASE64);
+    assert.equal(previewOptions[0].inputImageSourceNodeId, 'camera-source-1');
+    assert.equal(coordinator.getState().request.inputFrameId, 'frame-1');
+
+    coordinator.requestActivePreview({ immediate: true });
+    await Promise.resolve();
+    assert.equal(getExecuteCount(), 1);
+
+    node.parameters.push({ name: 'Threshold', value: 160 });
+    coordinator.invalidateActivePreview({ immediate: true, trigger: 'parameters' });
+    await waitFor(() => assert.equal(getExecuteCount(), 2));
+    assert.equal(previewOptions[1].inputImageSourceNodeId, 'camera-source-1');
+    assert.equal(coordinator.getState().request.inputFrameId, 'frame-1');
+
+    previewInput = { ...previewInput, frameId: 'frame-2' };
+    coordinator.requestActivePreview({ immediate: true });
+    await waitFor(() => assert.equal(getExecuteCount(), 3));
+    assert.equal(coordinator.getState().request.inputFrameId, 'frame-2');
+  } finally {
+    coordinator.destroy();
+  }
+});
+
+test('NodePreviewCoordinator only injects an external image into acquisition when it is bound to that node', async () => {
+  const cameraNode = {
+    id: 'camera-node',
+    type: 'ImageAcquisition',
+    title: '图像采集',
+    parameters: [
+      { name: 'SourceType', value: 'Camera' },
+      { name: 'CameraId', value: 'cam-1' }
+    ],
+    outputs: [{ type: 'image' }]
+  };
+  let previewInput = { imageBase64: PNG_BASE64, sourceNodeId: null, frameId: null };
+  const previewOptions = [];
+  const { coordinator } = createCoordinator({
+    node: cameraNode,
+    getInputImageContext: () => previewInput,
+    onPreviewOptions: options => previewOptions.push(options)
+  });
+
+  try {
+    coordinator.setActiveNode(cameraNode, { autoPreview: false });
+    coordinator.invalidateActivePreview({ immediate: true, force: true, trigger: 'manual' });
+    await waitFor(() => assert.equal(previewOptions.length, 1));
+    assert.equal(previewOptions[0].inputImageBase64, null);
+    assert.equal(previewOptions[0].inputImageSourceNodeId, null);
+
+    previewInput = { imageBase64: PNG_BASE64, sourceNodeId: cameraNode.id, frameId: 'frame-bound' };
+    coordinator.invalidateActivePreview({ immediate: true, force: true, trigger: 'manual' });
+    await waitFor(() => assert.equal(previewOptions.length, 2));
+    assert.equal(previewOptions[1].inputImageBase64, PNG_BASE64);
+    assert.equal(previewOptions[1].inputImageSourceNodeId, cameraNode.id);
+  } finally {
+    coordinator.destroy();
+  }
+});
+
+test('captured camera source signature changes only with acquisition-affecting parameters', () => {
+  const cameraNode = {
+    id: 'camera-node',
+    type: 'ImageAcquisition',
+    parameters: [
+      { name: 'SourceType', value: 'Camera' },
+      { name: 'CameraId', value: 'cam-1' },
+      { name: 'TriggerMode', value: 'Software' },
+      { name: 'ExposureTime', value: 5000 },
+      { name: 'Gain', value: 1 },
+      { name: 'UnrelatedPreviewValue', value: 10 }
+    ]
+  };
+  const original = buildCameraPreviewSourceSignature(cameraNode);
+
+  cameraNode.parameters.find(item => item.name === 'UnrelatedPreviewValue').value = 20;
+  assert.equal(buildCameraPreviewSourceSignature(cameraNode), original);
+
+  cameraNode.parameters.find(item => item.name === 'Gain').value = 2;
+  assert.notEqual(buildCameraPreviewSourceSignature(cameraNode), original);
+});
+
+test('camera preview input context records capture identity and metadata', () => {
+  const cameraNode = {
+    id: 'camera-node',
+    type: 'ImageAcquisition',
+    parameters: [
+      { name: 'SourceType', value: 'Camera' },
+      { name: 'CameraId', value: 'cam-1' },
+      { name: 'TriggerMode', value: 'Software' },
+      { name: 'ExposureTime', value: 5000 },
+      { name: 'Gain', value: 1 }
+    ]
+  };
+
+  const context = createCameraPreviewInputContext(cameraNode, {
+    imageBase64: PNG_BASE64,
+    projectId: 'project-1',
+    frameId: 'frame-1',
+    cameraBindingId: 'cam-1',
+    triggerMode: 'Software',
+    width: 1920,
+    height: 1080,
+    capturedAtUtc: '2026-07-18T08:00:00.000Z'
+  });
+
+  assert.equal(context.imageBase64, PNG_BASE64);
+  assert.equal(context.sourceNodeId, cameraNode.id);
+  assert.equal(context.projectId, 'project-1');
+  assert.equal(context.frameId, 'frame-1');
+  assert.equal(context.sourceSignature, buildCameraPreviewSourceSignature(cameraNode));
+  assert.equal(context.cameraBindingId, 'cam-1');
+  assert.equal(context.triggerMode, 'Software');
+  assert.equal(context.width, 1920);
+  assert.equal(context.height, 1080);
+  assert.equal(context.capturedAtUtc, '2026-07-18T08:00:00.000Z');
+
+  const contextWithoutDimensions = createCameraPreviewInputContext(cameraNode, {
+    imageBase64: PNG_BASE64,
+    frameId: 'frame-without-dimensions'
+  });
+  assert.equal(contextWithoutDimensions.width, null);
+  assert.equal(contextWithoutDimensions.height, null);
+});
+
+test('camera preview input frame is reused only in the matching project and downstream branch', () => {
+  const cameraNode = {
+    id: 'camera-node',
+    type: 'ImageAcquisition',
+    parameters: [
+      { name: 'SourceType', value: 'Camera' },
+      { name: 'CameraId', value: 'cam-1' },
+      { name: 'TriggerMode', value: 'Software' },
+      { name: 'ExposureTime', value: 5000 },
+      { name: 'Gain', value: 1 }
+    ]
+  };
+  const frame = createCameraPreviewInputContext(cameraNode, {
+    imageBase64: PNG_BASE64,
+    projectId: 'project-1',
+    frameId: 'frame-1'
+  });
+  const connections = [
+    { source: 'camera-node', target: 'equalization-node' },
+    { source: 'equalization-node', target: 'blob-node' }
+  ];
+
+  const downstream = resolveCameraPreviewInputFrame({
+    frame,
+    currentProjectId: 'project-1',
+    sourceNode: cameraNode,
+    targetNodeId: 'blob-node',
+    connections
+  });
+  assert.equal(downstream.frame, frame);
+  assert.equal(downstream.shouldInvalidate, false);
+
+  const unrelated = resolveCameraPreviewInputFrame({
+    frame,
+    currentProjectId: 'project-1',
+    sourceNode: cameraNode,
+    targetNodeId: 'unrelated-node',
+    connections
+  });
+  assert.equal(unrelated.frame, null);
+  assert.equal(unrelated.shouldInvalidate, false);
+
+  const projectChanged = resolveCameraPreviewInputFrame({
+    frame,
+    currentProjectId: 'project-2',
+    sourceNode: cameraNode,
+    targetNodeId: 'blob-node',
+    connections
+  });
+  assert.equal(projectChanged.frame, null);
+  assert.equal(projectChanged.shouldInvalidate, true);
+});
+
+test('camera preview input frame is invalidated when the source node disappears or capture settings change', () => {
+  const cameraNode = {
+    id: 'camera-node',
+    type: 'ImageAcquisition',
+    parameters: [
+      { name: 'SourceType', value: 'Camera' },
+      { name: 'CameraId', value: 'cam-1' },
+      { name: 'TriggerMode', value: 'Software' },
+      { name: 'ExposureTime', value: 5000 },
+      { name: 'Gain', value: 1 }
+    ]
+  };
+  const frame = createCameraPreviewInputContext(cameraNode, {
+    imageBase64: PNG_BASE64,
+    projectId: 'project-1',
+    frameId: 'frame-1'
+  });
+  const baseRequest = {
+    frame,
+    currentProjectId: 'project-1',
+    targetNodeId: 'camera-node'
+  };
+
+  for (const sourceNode of [null, { ...cameraNode, disabled: true }]) {
+    const resolution = resolveCameraPreviewInputFrame({ ...baseRequest, sourceNode });
+    assert.equal(resolution.frame, null);
+    assert.equal(resolution.shouldInvalidate, true);
+  }
+
+  const changedCameraNode = {
+    ...cameraNode,
+    parameters: cameraNode.parameters.map(parameter =>
+      parameter.name === 'ExposureTime'
+        ? { ...parameter, value: 6000 }
+        : parameter)
+  };
+  const settingsChanged = resolveCameraPreviewInputFrame({
+    ...baseRequest,
+    sourceNode: changedCameraNode
+  });
+  assert.equal(settingsChanged.frame, null);
+  assert.equal(settingsChanged.shouldInvalidate, true);
+  assert.match(settingsChanged.message, /采集配置已变更/);
 });
 
 test('NodePreviewCoordinator rolls back partial artifact URLs when later artifact read fails', async () => {

@@ -264,6 +264,34 @@ async function loadImageUrlAsBase64(imageUrl, options = {}) {
     }
 }
 
+async function loadImageUrlAsBlob(imageUrl, options = {}) {
+    if (!imageUrl) {
+        throw new Error('Inspection image URL is empty.');
+    }
+
+    const requestUrl = httpClient.buildRequestUrl(imageUrl);
+    const response = await fetch(requestUrl, {
+        method: 'GET',
+        headers: httpClient.defaultHeaders,
+        signal: options.signal
+    });
+
+    if (!response.ok) {
+        throw new Error(`Inspection image request failed: HTTP ${response.status}.`);
+    }
+
+    const blob = await response.blob();
+    if (!blob || blob.size <= 0) {
+        throw new Error('Inspection image response was empty.');
+    }
+
+    return blob;
+}
+
+function isAbortError(error) {
+    return error?.name === 'AbortError';
+}
+
 function debugInspectionLog(...args) {
     if (globalThis.CV_DEBUG_INSPECTION === true) {
         console.debug(...args);
@@ -281,6 +309,7 @@ class InspectionController {
         this.webMessageInitialized = false;
         this._onCompletedCallbacks = new Set();
         this._onErrorCallbacks = new Set();
+        this._onImageStateCallbacks = new Set();
         
         // 【架构修复 v2】SSE 相关
         this.eventSource = null;
@@ -302,6 +331,14 @@ class InspectionController {
         this.resultDedupeMaxEntries = 1000;
         this.lastResultImageBase64 = null;
         this.lastResultImageUrl = null;
+        this.lastResultImageBlob = null;
+        this.lastResultImageState = {
+            status: 'idle',
+            imageId: null,
+            resultId: null,
+            message: null
+        };
+        this._lastResultImageLoad = null;
         
         // 初始化监听
         this.initializeWebMessage();
@@ -359,6 +396,148 @@ class InspectionController {
         }
 
         this.publishImageData(`data:image/png;base64,${imageBase64}`);
+    }
+
+    updateLatestResultImage(result) {
+        this.cancelLastResultImageLoad();
+
+        const inlineImage = getInlineResultImageBase64(result);
+        const imageId = result?.imageId ?? result?.ImageId ?? null;
+        const resultId = result?.id ?? result?.resultId ?? result?.Id ?? result?.ResultId ?? null;
+
+        this.lastResultImageBase64 = inlineImage || null;
+        this.lastResultImageUrl = inlineImage ? null : getResultImageUrl(result);
+        this.lastResultImageBlob = null;
+
+        if (inlineImage) {
+            this.setLastResultImageState({
+                status: 'ready',
+                source: 'inline',
+                imageId,
+                resultId,
+                message: null
+            });
+            this.publishBase64Image(inlineImage);
+            return;
+        }
+
+        if (this.lastResultImageUrl) {
+            void this.ensureLastResultImageLoaded();
+            return;
+        }
+
+        this.setLastResultImageState({
+            status: 'empty',
+            imageId: null,
+            resultId,
+            message: '检测结果未提供可展示的图像。'
+        });
+    }
+
+    async ensureLastResultImageLoaded(options = {}) {
+        if (this.lastResultImageBase64) {
+            return this.lastResultImageBase64;
+        }
+
+        if (this.lastResultImageBlob && options.force !== true) {
+            return this.lastResultImageBlob;
+        }
+
+        const imageUrl = this.lastResultImageUrl;
+        if (!imageUrl) {
+            return null;
+        }
+
+        const result = getLastResult();
+        const imageId = result?.imageId ?? result?.ImageId ?? null;
+        const resultId = result?.id ?? result?.resultId ?? result?.Id ?? result?.ResultId ?? null;
+        const requestKey = `${resultId ?? 'result'}:${imageId ?? imageUrl}`;
+
+        if (options.force !== true && this._lastResultImageLoad?.key === requestKey) {
+            return this._lastResultImageLoad.promise;
+        }
+
+        this.cancelLastResultImageLoad();
+        const abortController = new AbortController();
+        this.setLastResultImageState({
+            status: 'loading',
+            imageId,
+            resultId,
+            message: '正在加载检测图像。'
+        });
+
+        const promise = (async () => {
+            try {
+                const blob = await loadImageUrlAsBlob(imageUrl, { signal: abortController.signal });
+                if (!this.isLatestResultImageLoad(requestKey, abortController)) {
+                    return null;
+                }
+
+                this.lastResultImageBlob = blob;
+                this.setLastResultImageState({
+                    status: 'ready',
+                    source: 'cache',
+                    imageId,
+                    resultId,
+                    message: null
+                });
+                this.publishImageData(blob);
+                return blob;
+            } catch (error) {
+                if (isAbortError(error) || !this.isLatestResultImageLoad(requestKey, abortController)) {
+                    return null;
+                }
+
+                const message = error?.message || '检测图像加载失败。';
+                console.warn('[InspectionController] Failed to load inspection result image:', message);
+                this.setLastResultImageState({
+                    status: 'error',
+                    imageId,
+                    resultId,
+                    message
+                });
+                return null;
+            } finally {
+                if (this.isLatestResultImageLoad(requestKey, abortController)) {
+                    this._lastResultImageLoad = null;
+                }
+            }
+        })();
+
+        this._lastResultImageLoad = { key: requestKey, abortController, promise };
+        return promise;
+    }
+
+    retryLastResultImage() {
+        return this.ensureLastResultImageLoaded({ force: true });
+    }
+
+    cancelLastResultImageLoad() {
+        this._lastResultImageLoad?.abortController?.abort?.();
+        this._lastResultImageLoad = null;
+    }
+
+    isLatestResultImageLoad(requestKey, abortController) {
+        return this._lastResultImageLoad?.key === requestKey &&
+            this._lastResultImageLoad?.abortController === abortController;
+    }
+
+    setLastResultImageState(nextState) {
+        this.lastResultImageState = {
+            status: nextState?.status || 'idle',
+            imageId: nextState?.imageId ?? null,
+            resultId: nextState?.resultId ?? null,
+            source: nextState?.source ?? null,
+            message: nextState?.message ?? null
+        };
+
+        [...this._onImageStateCallbacks].forEach(callback => {
+            try {
+                callback(this.lastResultImageState);
+            } catch (callbackError) {
+                console.error('[InspectionController] Image state callback failed:', callbackError);
+            }
+        });
     }
 
     /**
@@ -740,17 +919,8 @@ class InspectionController {
             return;
         }
 
-        const outputImage = getInlineResultImageBase64(result);
-        this.lastResultImageBase64 = outputImage || null;
-        this.lastResultImageUrl = outputImage ? null : getResultImageUrl(result);
         setLastResult(createLightweightInspectionResult(result));
-
-        // 如果有输出图像，显示它
-        if (outputImage) {
-            this.publishBase64Image(outputImage);
-        } else if (this.lastResultImageUrl) {
-            this.publishImageData(this.lastResultImageUrl);
-        }
+        this.updateLatestResultImage(result);
 
         this.notifyInspectionCompleted(result);
     }
@@ -916,6 +1086,7 @@ class InspectionController {
      * @param {Object} options - 预览选项
      * @param {string} options.debugSessionId - 调试会话ID（用于缓存复用）
      * @param {string} options.inputImageBase64 - 输入图像（可选）
+     * @param {string} options.inputImageSourceNodeId - 显式单帧所替代的相机采集节点（可选）
      * @param {Object} options.parameters - 覆盖参数（可选）
      * @param {AbortSignal} options.signal - 取消信号（可选）
      */
@@ -940,6 +1111,7 @@ class InspectionController {
                 flowRevision: options.flowRevision,
                 flowData: flowData,
                 inputImageBase64: options.inputImageBase64,
+                inputImageSourceNodeId: options.inputImageSourceNodeId,
                 parameters: options.parameters,
                 imageFormat: options.imageFormat || '.png',
                 timeoutMs: options.timeoutMs,
@@ -1064,16 +1236,8 @@ class InspectionController {
             return;
         }
 
-        const outputImage = getInlineResultImageBase64(normalizedResult);
-        this.lastResultImageBase64 = outputImage || null;
-        this.lastResultImageUrl = outputImage ? null : getResultImageUrl(normalizedResult);
         setLastResult(createLightweightInspectionResult(normalizedResult));
-
-        if (outputImage) {
-            this.publishBase64Image(outputImage);
-        } else if (this.lastResultImageUrl) {
-            this.publishImageData(this.lastResultImageUrl);
-        }
+        this.updateLatestResultImage(normalizedResult);
 
         this.notifyInspectionCompleted(normalizedResult);
     }
@@ -1193,6 +1357,16 @@ class InspectionController {
         };
     }
 
+    onInspectionImageState(callback) {
+        if (typeof callback !== 'function') {
+            return () => {};
+        }
+
+        this._onImageStateCallbacks.add(callback);
+        callback(this.lastResultImageState);
+        return () => this._onImageStateCallbacks.delete(callback);
+    }
+
     /**
      * 获取当前状态
      */
@@ -1226,6 +1400,14 @@ class InspectionController {
 
     getLastResultImageUrl() {
         return this.lastResultImageUrl;
+    }
+
+    getLastResultImageBlob() {
+        return this.lastResultImageBlob;
+    }
+
+    getLastResultImageState() {
+        return this.lastResultImageState;
     }
 
     /**
@@ -1475,9 +1657,18 @@ class InspectionController {
         this.setFlowProvider(null);
         this._onCompletedCallbacks.clear();
         this._onErrorCallbacks.clear();
+        this._onImageStateCallbacks.clear();
         this.recentCompletedResultKeys.clear();
+        this.cancelLastResultImageLoad();
         this.lastResultImageBase64 = null;
         this.lastResultImageUrl = null;
+        this.lastResultImageBlob = null;
+        this.lastResultImageState = {
+            status: 'idle',
+            imageId: null,
+            resultId: null,
+            message: null
+        };
     }
 }
 
@@ -1492,5 +1683,6 @@ export {
     getInlineResultImageBase64,
     createLightweightInspectionResult,
     getResultImageUrl,
-    loadImageUrlAsBase64
+    loadImageUrlAsBase64,
+    loadImageUrlAsBlob
 };

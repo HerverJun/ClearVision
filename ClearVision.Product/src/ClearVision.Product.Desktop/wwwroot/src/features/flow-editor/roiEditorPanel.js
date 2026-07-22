@@ -43,6 +43,7 @@ export class RoiEditorPanel {
         this.getOperator = options.getOperator ?? (() => null);
         this.getPreviewOperator = options.getPreviewOperator ?? this.getOperator;
         this.previewCoordinator = options.previewCoordinator ?? null;
+        this.getFallbackImageSource = options.getFallbackImageSource ?? (() => null);
         this.onRectChanged = options.onRectChanged ?? (() => {});
         this.onImageBoundsChanged = options.onImageBoundsChanged ?? (() => {});
         this.onRequestSyncFromParams = options.onRequestSyncFromParams ?? (() => {});
@@ -283,11 +284,14 @@ export class RoiEditorPanel {
     resolveInputImageSrc() {
         const activeNodeId = this.previewState?.activeNodeId;
         const operatorId = getPreviewOperatorId(this);
-        if (!operatorId || activeNodeId !== operatorId) {
-            return null;
+        if (operatorId && activeNodeId === operatorId) {
+            const previewInput = this.previewState?.presenter?.inputImageSrc || null;
+            if (previewInput) {
+                return previewInput;
+            }
         }
 
-        return this.previewState?.presenter?.inputImageSrc || null;
+        return this.getFallbackImageSource?.() || null;
     }
 
     shouldRetainCurrentImageDuringPreviewTransition() {

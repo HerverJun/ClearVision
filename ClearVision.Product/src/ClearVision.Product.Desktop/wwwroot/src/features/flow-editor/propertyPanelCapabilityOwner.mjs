@@ -7,6 +7,7 @@ import {
     normalizeAcquisitionSourceType
 } from '../../shared/parameterDependencyRules.js';
 import RoiEditorPanel from './roiEditorPanel.js';
+import { createCameraPreviewInputContext } from './previewCoordinator.js';
 import {
     getOperatorRoiConfig,
     isCircleSearchV2ToolEnabled,
@@ -204,6 +205,34 @@ function shouldRenderParameterSlider(parameter) {
 
 function isEmptyValue(value) {
     return value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
+}
+
+function normalizeCameraTriggerMode(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized.includes('continuous') || normalized.includes('连续')) {
+        return 'Continuous';
+    }
+    if (normalized.includes('external') || normalized.includes('外部') || normalized.includes('hardware')) {
+        return 'External';
+    }
+    return 'Software';
+}
+
+function blobToBase64(blob) {
+    if (!blob) {
+        return Promise.resolve(null);
+    }
+
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const result = String(reader.result || '');
+            const commaIndex = result.indexOf(',');
+            resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+        };
+        reader.onerror = () => reject(reader.error || new Error('读取单帧图像失败。'));
+        reader.readAsDataURL(blob);
+    });
 }
 
 function parseNumericValue(rawValue) {
@@ -456,6 +485,8 @@ export class PropertyPanelCapabilityOwner {
         previewCoordinator = null,
         previewResourcesEnabled = true,
         onOpenPreviewImage = () => {},
+        onCapturePreviewInput = () => {},
+        getPreviewInputImageSource = () => null,
         circleSearchV2ToolEnabled = undefined,
         nPointCalibrationWorkbenchEnabled = undefined
     } = {}) {
@@ -474,6 +505,12 @@ export class PropertyPanelCapabilityOwner {
         this.onOpenPreviewImage = typeof onOpenPreviewImage === 'function'
             ? onOpenPreviewImage
             : () => {};
+        this.onCapturePreviewInput = typeof onCapturePreviewInput === 'function'
+            ? onCapturePreviewInput
+            : () => {};
+        this.getPreviewInputImageSource = typeof getPreviewInputImageSource === 'function'
+            ? getPreviewInputImageSource
+            : () => null;
         this.circleSearchV2ToolEnabled = circleSearchV2ToolEnabled;
         this.nPointCalibrationWorkbenchEnabled = nPointCalibrationWorkbenchEnabled;
         this.currentOperator = null;
@@ -490,6 +527,9 @@ export class PropertyPanelCapabilityOwner {
         this.cameraBindingsLoadToken = 0;
         this.roiEditorPanel = null;
         this.geometryImageBounds = null;
+        this.cameraCapturePending = false;
+        this.cameraCaptureAbortController = null;
+        this.lastCameraCaptureMessage = '';
 
         this.handleContainerChange = this.handleContainerChange.bind(this);
         this.handleContainerClick = this.handleContainerClick.bind(this);
@@ -523,6 +563,8 @@ export class PropertyPanelCapabilityOwner {
             return;
         }
 
+        this.cancelCameraCapture();
+        this.lastCameraCaptureMessage = '';
         this.currentOperator = operator || null;
         this.currentNodeId = operator?.id || null;
         this.currentConnection = this.currentNodeId
@@ -590,6 +632,15 @@ export class PropertyPanelCapabilityOwner {
             event.preventDefault();
             if (!clearRoiButton.disabled) {
                 this.handleGeometryClearRoi();
+            }
+            return;
+        }
+
+        const captureFrameButton = event.target?.closest?.('[data-property-camera-capture-frame]');
+        if (captureFrameButton) {
+            event.preventDefault();
+            if (!isElementEffectivelyDisabled(captureFrameButton)) {
+                void this.captureSelectedCameraFrame();
             }
             return;
         }
@@ -786,6 +837,9 @@ export class PropertyPanelCapabilityOwner {
 
         const values = this.collectNormalizedFormValues(input.name);
         const parameterName = input.name;
+        if (['sourcetype', 'cameraid', 'camerabindingid'].includes(normalizeParameterName(parameterName))) {
+            this.lastCameraCaptureMessage = '';
+        }
         const errors = this.validateValues(values);
         const hasBlockingError = errors.some(error => isBlockingValidationErrorForParameter(error, parameterName));
         if (hasBlockingError) {
@@ -854,6 +908,170 @@ export class PropertyPanelCapabilityOwner {
 
     isImageAcquisitionOperator() {
         return String(this.currentOperator?.type || this.currentOperator?.operatorType || '').trim() === 'ImageAcquisition';
+    }
+
+    cancelCameraCapture() {
+        this.cameraCaptureAbortController?.abort?.();
+        this.cameraCaptureAbortController = null;
+        this.cameraCapturePending = false;
+    }
+
+    getImageAcquisitionCaptureContext(values = null) {
+        const currentValues = values || this.collectNormalizedFormValues();
+        const sourceEntry = Object.entries(currentValues)
+            .find(([name]) => normalizeParameterName(name) === 'sourcetype');
+        const cameraEntry = Object.entries(currentValues)
+            .find(([name]) => ['cameraid', 'camerabindingid'].includes(normalizeParameterName(name)) && !isEmptyValue(currentValues[name]));
+        const sourceType = normalizeAcquisitionSourceType(sourceEntry?.[1]);
+        const cameraBindingId = String(cameraEntry?.[1] || '').trim();
+        const binding = this.cameraBindingsCache.find(item =>
+            String(item?.id || '').trim().toLowerCase() === cameraBindingId.toLowerCase()) || null;
+        const triggerMode = normalizeCameraTriggerMode(binding?.triggerMode || binding?.TriggerMode);
+
+        return {
+            sourceType,
+            cameraBindingId,
+            binding,
+            triggerMode,
+            canCapture: this.isImageAcquisitionOperator() && sourceType === 'camera' && Boolean(cameraBindingId)
+        };
+    }
+
+    refreshImageAcquisitionCaptureControls() {
+        const section = this.container?.querySelector?.('[data-property-camera-capture-section]');
+        if (!section) {
+            return;
+        }
+
+        const context = this.getImageAcquisitionCaptureContext();
+        const button = section.querySelector('[data-property-camera-capture-frame]');
+        const bindingLabel = section.querySelector('[data-property-camera-capture-binding]');
+        const hint = section.querySelector('[data-property-camera-capture-hint]');
+
+        if (button) {
+            button.disabled = this.cameraCapturePending || !context.canCapture;
+            button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
+            button.textContent = this.cameraCapturePending ? '正在获取单帧...' : '获取单帧图像';
+        }
+        if (bindingLabel) {
+            bindingLabel.textContent = context.cameraBindingId
+                ? `${context.binding?.displayName || context.binding?.name || context.cameraBindingId} · ${context.triggerMode}`
+                : '尚未选择相机';
+        }
+        if (hint && !this.cameraCapturePending) {
+            hint.textContent = this.lastCameraCaptureMessage || (context.sourceType !== 'camera'
+                ? '将采集源切换为“相机”后可获取单帧。'
+                : (!context.cameraBindingId
+                    ? '请先选择相机绑定。'
+                    : '单帧会直接送往预览工作台，并作为后续 ROI/图像算子的预览输入。'));
+            hint.classList.toggle('is-error', this.lastCameraCaptureMessage.startsWith('获取单帧失败') || !context.canCapture);
+        }
+    }
+
+    async fetchCameraBindingFrame(context, signal) {
+        if (context.triggerMode === 'Continuous' || context.triggerMode === 'External') {
+            const session = await httpClient.post('/cameras/continuous-preview/start', {
+                cameraBindingId: context.cameraBindingId
+            }, { signal });
+            const sessionId = session?.sessionId || session?.SessionId;
+            if (!sessionId) {
+                throw new Error('相机共享帧会话启动失败。');
+            }
+
+            try {
+                return await httpClient.getForBlob(
+                    `/cameras/continuous-preview/frame/${encodeURIComponent(sessionId)}?_=${Date.now()}`,
+                    { signal, cache: 'no-store' });
+            } finally {
+                await httpClient.post('/cameras/continuous-preview/stop', { sessionId }).catch(() => {});
+            }
+        }
+
+        return await httpClient.postForBlob('/cameras/soft-trigger-capture', {
+            cameraBindingId: context.cameraBindingId
+        }, { signal });
+    }
+
+    async captureSelectedCameraFrame() {
+        if (this.cameraCapturePending || !this.currentNodeId || !this.currentOperator) {
+            return;
+        }
+
+        const context = this.getImageAcquisitionCaptureContext();
+        if (!context.canCapture) {
+            this.showToast(context.sourceType !== 'camera' ? '请先将采集源切换为相机' : '请先选择相机绑定', 'warning');
+            this.refreshImageAcquisitionCaptureControls();
+            return;
+        }
+
+        const captureNodeId = this.currentNodeId;
+        const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        this.cameraCaptureAbortController = abortController;
+        this.cameraCapturePending = true;
+        this.lastCameraCaptureMessage = '';
+        const hint = this.container.querySelector('[data-property-camera-capture-hint]');
+        if (hint) {
+            hint.textContent = `正在从 ${context.binding?.displayName || context.cameraBindingId} 获取单帧...`;
+            hint.classList.remove('is-error');
+        }
+        this.refreshImageAcquisitionCaptureControls();
+
+        try {
+            const { blob, headers } = await this.fetchCameraBindingFrame(context, abortController?.signal);
+            if (!blob || blob.size === 0) {
+                throw new Error('相机未返回图像数据。');
+            }
+            const imageBase64 = await blobToBase64(blob);
+            if (!imageBase64) {
+                throw new Error('相机图像转换失败。');
+            }
+            if (this.disposed || captureNodeId !== this.currentNodeId) {
+                return;
+            }
+
+            const width = Number(headers?.get?.('X-Image-Width')) || null;
+            const height = Number(headers?.get?.('X-Image-Height')) || null;
+            const frame = createCameraPreviewInputContext(this.currentOperator, {
+                imageBase64,
+                cameraBindingId: headers?.get?.('X-Camera-Id') || context.cameraBindingId,
+                triggerMode: headers?.get?.('X-Trigger-Mode') || context.triggerMode,
+                width,
+                height,
+                source: 'camera-single-frame',
+                capturedAtUtc: new Date().toISOString()
+            });
+
+            this.previewCoordinator?.publishExternalFrame?.(this.currentOperator, frame);
+            this.onCapturePreviewInput(frame);
+            const sizeText = width && height ? ` ${width}×${height}` : '';
+            this.statusMessage = `已获取单帧${sizeText}，已送往预览工作台`;
+            this.lastCameraCaptureMessage = `${this.statusMessage}；后续 ROI 算子可直接使用该图像进行区域选择。`;
+            this.showToast(this.statusMessage, 'success');
+            this.updateStatus();
+            if (hint) {
+                hint.textContent = this.lastCameraCaptureMessage;
+                hint.classList.remove('is-error');
+            }
+        } catch (error) {
+            if (error?.name === 'AbortError') {
+                return;
+            }
+            const message = error?.message || '未知错误';
+            this.statusMessage = `获取单帧失败：${message}`;
+            this.lastCameraCaptureMessage = this.statusMessage;
+            this.showToast(this.statusMessage, 'error');
+            this.updateStatus();
+            if (hint) {
+                hint.textContent = this.statusMessage;
+                hint.classList.add('is-error');
+            }
+        } finally {
+            if (this.cameraCaptureAbortController === abortController) {
+                this.cameraCaptureAbortController = null;
+            }
+            this.cameraCapturePending = false;
+            this.refreshImageAcquisitionCaptureControls();
+        }
     }
 
     findParamInput(...names) {
@@ -1052,6 +1270,7 @@ export class PropertyPanelCapabilityOwner {
 
     syncImageAcquisitionSourceControls(options = {}) {
         this.syncParameterDependencyControls(options);
+        this.refreshImageAcquisitionCaptureControls();
     }
 
     getFilePickerFilter(parameterName = '') {
@@ -1169,6 +1388,7 @@ export class PropertyPanelCapabilityOwner {
                 : 'No camera bindings are available.';
             hint.classList.add('error');
         });
+        this.refreshImageAcquisitionCaptureControls();
     }
 
     setOperator(operator) {
@@ -1495,6 +1715,7 @@ export class PropertyPanelCapabilityOwner {
                 return getOperatorRoiConfig(operator, this.getGeometryEditorOptions());
             },
             previewCoordinator: this.previewCoordinator,
+            getFallbackImageSource: () => this.getPreviewInputImageSource(this.currentNodeId),
             previewResourcesEnabled: this.previewResourcesEnabled,
             onOpenPreviewImage: this.onOpenPreviewImage,
             onRectChanged: (values, phase) => this.handleGeometryChanged(values, phase),
@@ -1522,6 +1743,29 @@ export class PropertyPanelCapabilityOwner {
                 </div>
                 ${config.description ? `<p class="property-geometry-description">${escapeHtml(config.description)}</p>` : ''}
                 <div data-property-geometry-editor-container></div>
+            </section>
+        `;
+    }
+
+    renderImageAcquisitionCaptureSection(operator) {
+        const type = String(operator?.type || operator?.operatorType || '').trim();
+        if (type !== 'ImageAcquisition') {
+            return '';
+        }
+
+        return `
+            <section class="property-summary-section property-camera-capture-section" data-property-camera-capture-section="true">
+                <div class="property-camera-capture-header">
+                    <h5>相机单帧预览</h5>
+                    <span data-property-camera-capture-binding>尚未选择相机</span>
+                </div>
+                <p class="property-camera-capture-description">显式抓取当前绑定的一帧图像，不执行完整检测流程，也不会放宽普通节点预览的设备访问安全策略。</p>
+                <button type="button"
+                        class="btn btn-primary btn-sm property-camera-capture-button"
+                        data-property-camera-capture-frame="true"
+                        disabled
+                        aria-disabled="true">获取单帧图像</button>
+                <p class="property-camera-capture-hint" data-property-camera-capture-hint>请先选择相机绑定。</p>
             </section>
         `;
     }
@@ -1802,6 +2046,7 @@ export class PropertyPanelCapabilityOwner {
                                 <button type="submit" class="hidden" aria-hidden="true" tabindex="-1">应用</button>
                             </form>`}
                     </section>
+                    ${this.renderImageAcquisitionCaptureSection(operator)}
                 </div>
                 <div class="property-capability-status" data-property-capability-status aria-live="polite">
                     ${escapeHtml(this.statusMessage)}
@@ -2073,7 +2318,10 @@ export class PropertyPanelCapabilityOwner {
             'is-error',
             isErrorStatus
         );
-        status.classList.toggle('is-success', this.statusMessage === '参数已更新');
+        status.classList.toggle(
+            'is-success',
+            this.statusMessage === '参数已更新' || this.statusMessage.startsWith('已获取单帧')
+        );
     }
 
     destroy() {
@@ -2087,6 +2335,7 @@ export class PropertyPanelCapabilityOwner {
 
         this.disposed = true;
         this.cameraBindingsLoadToken += 1;
+        this.cancelCameraCapture();
         this.unsubscribes.forEach(unsubscribe => {
             try {
                 unsubscribe?.();

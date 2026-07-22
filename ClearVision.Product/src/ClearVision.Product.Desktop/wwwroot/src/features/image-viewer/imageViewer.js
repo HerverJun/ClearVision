@@ -700,6 +700,50 @@ export class ImageViewerComponent {
         }
     }
 
+    setPlaceholderMessage(message, options = {}) {
+        const placeholder = this.container.querySelector(`#${this.placeholderId}`);
+        if (!placeholder) {
+            return;
+        }
+
+        const content = placeholder.querySelector('.placeholder-content');
+        const text = content?.querySelector('p');
+        if (text) {
+            text.textContent = message || '等待检测图像';
+        }
+
+        let retryButton = content?.querySelector('[data-image-retry]');
+        if (typeof options.onRetry === 'function') {
+            if (!retryButton && content) {
+                retryButton = document.createElement('button');
+                retryButton.type = 'button';
+                retryButton.className = 'cv-btn cv-btn-secondary';
+                retryButton.dataset.imageRetry = 'true';
+                retryButton.style.marginTop = '10px';
+                content.appendChild(retryButton);
+            }
+
+            if (retryButton) {
+                retryButton.textContent = options.retryLabel || '重试加载';
+                retryButton.onclick = () => options.onRetry();
+            }
+        } else if (retryButton) {
+            retryButton.remove();
+        }
+
+        this.showPlaceholder();
+    }
+
+    clearImage(message = '等待检测图像', options = {}) {
+        this.currentImage = null;
+        this.currentImageSource = null;
+        this.currentImageSourceKey = null;
+        this.imageCanvas?.clear?.();
+        this.resetAnnotations();
+        this.setPlaceholderMessage(message, options);
+        this.updateImageInfo();
+    }
+
     /**
      * 更新图像信息
      */
