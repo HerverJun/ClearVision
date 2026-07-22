@@ -5,9 +5,11 @@ import { CvIcon } from '@/design-system/icons';
 import WorkspacePaneHeader from '../WorkspacePaneHeader.vue';
 import type { InspectorOwner } from './inspectorOwner';
 import ParameterEditor from './ParameterEditor.vue';
+import { CameraBindingEditor, type CameraBindingEditorOwner } from '../camera';
 
 const props = defineProps<{
   owner: InspectorOwner;
+  cameraOwner: CameraBindingEditorOwner;
 }>();
 
 const projection = props.owner.projection;
@@ -283,14 +285,24 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
           {{ projection.node.metadataMessage ?? '正在读取参数定义…' }}
         </p>
         <div class="inspector-panel__parameter-list">
-          <ParameterEditor
+          <template
             v-for="parameter in projection.node.parameters"
             :key="parameter.id ?? parameter.name"
-            :parameter="parameter"
-            :disabled="editingDisabled || projection.node.metadataPhase !== 'ready'"
-            @commit="commitParameter(parameter.name, $event)"
-            @draft-active="owner.setDraftActive(`parameter:${parameter.name}`, $event)"
-          />
+          >
+            <CameraBindingEditor
+              v-if="parameter.visible && parameter.extensionSlot === 'camera-binding'"
+              :owner="cameraOwner"
+              :parameter-name="parameter.name"
+              :disabled="editingDisabled || projection.node.metadataPhase !== 'ready'"
+            />
+            <ParameterEditor
+              v-else
+              :parameter="parameter"
+              :disabled="editingDisabled || projection.node.metadataPhase !== 'ready'"
+              @commit="commitParameter(parameter.name, $event)"
+              @draft-active="owner.setDraftActive(`parameter:${parameter.name}`, $event)"
+            />
+          </template>
         </div>
       </section>
     </div>

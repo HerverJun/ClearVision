@@ -17,6 +17,8 @@ import {
   createWorkspacePersistenceOwner,
   type WorkspaceProjectPersistencePort
 } from '@/capabilities/project-workspace/persistence';
+import { createWorkspaceGlobalVariablesOwner } from '@/capabilities/project-workspace/global-variables';
+import type { ApiTransport } from '@/platform/api';
 
 const projectId = '11111111-1111-4111-8111-111111111111';
 const flowId = '22222222-2222-4222-8222-222222222222';
@@ -192,6 +194,11 @@ function createHarness(portOverrides: Partial<WorkspaceProjectPersistencePort> =
   const owner = createWorkspacePersistenceOwner({
     baseline: project,
     flowOwner: flow.owner,
+    globalVariablesOwner: createWorkspaceGlobalVariablesOwner({
+      projectId,
+      baseline: project.globalVariables,
+      api: { apiBaseUrl: 'http://127.0.0.1/api' } as ApiTransport
+    }),
     port,
     diagnostics,
     onBaselineChanged(value) { latestBaseline = value; }
@@ -212,7 +219,12 @@ describe('F03 G5 Workspace persistence owner', () => {
     expect(harness.putProject).toHaveBeenCalledTimes(1);
     expect(harness.putProject.mock.calls[0]?.[0]).toMatchObject({
       expectedPersistenceRevision: 3,
-      globalVariables: null,
+      globalVariables: {
+        schemaVersion: '1.0',
+        variables: [],
+        sourceBindings: [],
+        targetBindings: []
+      },
       flow: {
         futureFlowField: { keep: true },
         operators: [{

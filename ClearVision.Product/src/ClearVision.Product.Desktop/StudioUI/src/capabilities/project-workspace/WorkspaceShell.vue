@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 import { RouterLink } from 'vue-router';
 import {
   CvButton,
@@ -11,6 +11,9 @@ import type { WorkspaceProjectV1 } from './workspaceContracts';
 import type { WorkspaceOwner } from './workspaceOwner';
 import FlowWorkspace from './flow/FlowWorkspace.vue';
 import type { WorkspaceLifecycleDiagnostics } from './workspaceLifecycleDiagnostics';
+import { GlobalVariablesWorkbench, type WorkspaceGlobalVariablesOwner } from './global-variables';
+import { FinalDecisionWorkbench, type FinalDecisionOwner } from './final-decision';
+import type { FlowCanvasOwner } from './flow';
 
 export type WorkspaceShellState =
   | 'flag-off'
@@ -37,6 +40,22 @@ const emit = defineEmits<{
   retry: [];
   refreshSession: [];
 }>();
+const variablesOpen = ref(false);
+const decisionOpen = ref(false);
+const variablesOwner = shallowRef<WorkspaceGlobalVariablesOwner | null>(null);
+const decisionOwner = shallowRef<FinalDecisionOwner | null>(null);
+const modalFlowOwner = shallowRef<FlowCanvasOwner | null>(null);
+
+function openVariables(): void {
+  variablesOwner.value = props.workspaceOwner?.getGlobalVariablesOwner() ?? null;
+  modalFlowOwner.value = props.workspaceOwner?.getFlowCanvasOwner() ?? null;
+  variablesOpen.value = Boolean(variablesOwner.value && modalFlowOwner.value);
+}
+
+function openDecision(): void {
+  decisionOwner.value = props.workspaceOwner?.getFinalDecisionOwner() ?? null;
+  decisionOpen.value = decisionOwner.value !== null;
+}
 
 const pageStateKind = computed(() => {
   if (props.state === 'loading') return 'loading';
@@ -207,8 +226,9 @@ const runLabel = computed(() => {
           data-testid="final-decision"
           size="sm"
           variant="secondary"
-          disabled
-          title="最终判定 capability 尚未接入 Studio UI Next；未创建前端替代权威"
+          :disabled="!persistence || isReadonly"
+          title="配置正式运行使用的最终判定"
+          @click="openDecision"
         >
           <template #leading>
             <CvIcon
@@ -264,8 +284,9 @@ const runLabel = computed(() => {
           data-testid="global-variables"
           size="sm"
           variant="quiet"
-          disabled
-          title="全局变量 capability 尚未接入 Studio UI Next；工程合同仍由现有后端权威保存"
+          :disabled="!persistence || isReadonly"
+          title="管理本工程的变量定义与绑定"
+          @click="openVariables"
         >
           <template #leading>
             <CvIcon
@@ -470,6 +491,21 @@ const runLabel = computed(() => {
         </dl>
       </details>
     </footer>
+    <GlobalVariablesWorkbench
+      v-if="variablesOwner && modalFlowOwner"
+      :open="variablesOpen"
+      :owner="variablesOwner"
+      :flow-owner="modalFlowOwner"
+      :readonly="isReadonly || run?.phase === 'executing'"
+      @close="variablesOpen = false"
+    />
+    <FinalDecisionWorkbench
+      v-if="decisionOwner"
+      :open="decisionOpen"
+      :owner="decisionOwner"
+      :readonly="isReadonly || run?.phase === 'executing'"
+      @close="decisionOpen = false"
+    />
   </section>
 </template>
 

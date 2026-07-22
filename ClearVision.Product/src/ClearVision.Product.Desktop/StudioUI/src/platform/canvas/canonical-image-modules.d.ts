@@ -5,6 +5,9 @@ declare module '@clearvision/canonical-preview-coordinator' {
     readonly getNodeById: (nodeId: string) => Readonly<Record<string, unknown>> | null;
     readonly getOperatorMetadata: (type: string) => Readonly<Record<string, unknown>> | null;
     readonly getInputImageBase64: () => string | null | Promise<string | null>;
+    readonly getInputImageContext?: (
+      node: Readonly<Record<string, unknown>>
+    ) => unknown | Promise<unknown>;
     readonly previewExecutor: (
       nodeId: string,
       options: Readonly<Record<string, unknown>>

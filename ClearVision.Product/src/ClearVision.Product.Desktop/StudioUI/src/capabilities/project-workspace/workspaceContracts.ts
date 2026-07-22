@@ -1202,7 +1202,7 @@ export interface WorkspaceProjectUpdatePayloadV1 {
   readonly name: string;
   readonly description: string | null;
   readonly flow: WorkspaceJsonObject | null;
-  readonly globalVariables: null;
+  readonly globalVariables: WorkspaceJsonObject;
   readonly expectedPersistenceRevision: number;
 }
 
@@ -1420,14 +1420,77 @@ export function encodeWorkspaceFlowDraftUpdateV1(
 export function buildWorkspaceProjectUpdatePayloadV1(
   baseline: WorkspaceProjectV1,
   draft: WorkspaceFlowDraftV1,
-  options: WorkspaceFlowDraftEncodeOptions = {}
+  options: WorkspaceFlowDraftEncodeOptions & Readonly<{
+    globalVariables?: WorkspaceGlobalVariablesV1;
+  }> = {}
 ): WorkspaceProjectUpdatePayloadV1 {
   return Object.freeze({
     name: baseline.name,
     description: baseline.description,
     flow: encodeWorkspaceFlowDraftUpdateV1(baseline, draft, options),
-    globalVariables: null,
+    globalVariables: encodeWorkspaceGlobalVariablesV1(options.globalVariables ?? baseline.globalVariables),
     expectedPersistenceRevision: baseline.persistenceRevision
+  });
+}
+
+function encodeGlobalVariableDefinition(
+  variable: WorkspaceGlobalVariableDefinitionV1
+): WorkspaceJsonObject {
+  return Object.freeze({
+    id: variable.id,
+    name: variable.name,
+    displayName: variable.displayName,
+    description: variable.description,
+    valueType: encodeEnum(variable.valueType),
+    initialValue: variable.initialValue,
+    min: variable.min,
+    max: variable.max,
+    manualWriteAllowed: variable.manualWriteAllowed,
+    includeInResultMetadata: variable.includeInResultMetadata,
+    order: variable.order
+  });
+}
+
+function encodeGlobalVariableSourceBinding(
+  binding: WorkspaceGlobalVariableSourceBindingV1
+): WorkspaceJsonObject {
+  return Object.freeze({
+    id: binding.id,
+    variableId: binding.variableId,
+    operatorId: binding.operatorId,
+    outputPortId: binding.outputPortId,
+    operatorName: binding.operatorName,
+    outputPortName: binding.outputPortName,
+    resultPathVersion: binding.resultPathVersion,
+    resultPath: binding.resultPath,
+    conversionMode: encodeEnum(binding.conversionMode),
+    expression: binding.expression
+  });
+}
+
+function encodeGlobalVariableTargetBinding(
+  binding: WorkspaceGlobalVariableTargetBindingV1
+): WorkspaceJsonObject {
+  return Object.freeze({
+    id: binding.id,
+    variableId: binding.variableId,
+    operatorId: binding.operatorId,
+    parameterId: binding.parameterId,
+    operatorName: binding.operatorName,
+    parameterName: binding.parameterName,
+    conversionMode: encodeEnum(binding.conversionMode),
+    expression: binding.expression
+  });
+}
+
+export function encodeWorkspaceGlobalVariablesV1(
+  schema: WorkspaceGlobalVariablesV1
+): WorkspaceJsonObject {
+  return Object.freeze({
+    schemaVersion: schema.schemaVersion,
+    variables: Object.freeze(schema.variables.map(encodeGlobalVariableDefinition)),
+    sourceBindings: Object.freeze(schema.sourceBindings.map(encodeGlobalVariableSourceBinding)),
+    targetBindings: Object.freeze(schema.targetBindings.map(encodeGlobalVariableTargetBinding))
   });
 }
 

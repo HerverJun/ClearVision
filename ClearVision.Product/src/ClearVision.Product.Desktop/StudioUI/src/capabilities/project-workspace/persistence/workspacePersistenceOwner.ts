@@ -11,11 +11,13 @@ import {
   buildWorkspaceProjectUpdatePayloadV1,
   encodeWorkspaceFlowDraftUpdateV1,
   encodeWorkspaceFlowUpdateV1,
+  encodeWorkspaceGlobalVariablesV1,
   workspacePersistenceFingerprint,
   type WorkspaceJsonObject,
   type WorkspaceProjectUpdatePayloadV1,
   type WorkspaceProjectV1
 } from '../workspaceContracts';
+import type { WorkspaceGlobalVariablesOwner } from '../global-variables';
 import type {
   WorkspaceCapabilityDiagnosticsLease,
   WorkspaceLifecycleDiagnosticsOwner,
@@ -93,7 +95,7 @@ export interface WorkspacePersistenceOwner {
 interface SubmittedSave {
   readonly dirtyGeneration: number;
   readonly payload: WorkspaceProjectUpdatePayloadV1;
-  readonly flowFingerprint: string;
+  readonly contentFingerprint: string;
 }
 
 function zeroResources(): WorkspaceResourceSnapshot {
@@ -133,12 +135,16 @@ function sameProjectContent(
 ): boolean {
   return project.name === submitted.payload.name &&
     project.description === submitted.payload.description &&
-    workspacePersistenceFingerprint(encodeWorkspaceFlowUpdateV1(project)) === submitted.flowFingerprint;
+    workspacePersistenceFingerprint({
+      flow: encodeWorkspaceFlowUpdateV1(project),
+      globalVariables: encodeWorkspaceGlobalVariablesV1(project.globalVariables)
+    }) === submitted.contentFingerprint;
 }
 
 export function createWorkspacePersistenceOwner(options: {
   readonly baseline: WorkspaceProjectV1;
   readonly flowOwner: FlowCanvasOwner;
+  readonly globalVariablesOwner: WorkspaceGlobalVariablesOwner;
   readonly port: WorkspaceProjectPersistencePort;
   readonly diagnostics: WorkspaceLifecycleDiagnosticsOwner;
   readonly readonlyReason?: string | null;
@@ -147,10 +153,14 @@ export function createWorkspacePersistenceOwner(options: {
   const lease: WorkspaceCapabilityDiagnosticsLease =
     options.diagnostics.reservePersistence(options.baseline.id);
   let baseline = options.baseline;
-  let baselineFlowFingerprint = workspacePersistenceFingerprint(encodeWorkspaceFlowUpdateV1(baseline));
+  let baselineContentFingerprint = workspacePersistenceFingerprint({
+    flow: encodeWorkspaceFlowUpdateV1(baseline),
+    globalVariables: encodeWorkspaceGlobalVariablesV1(baseline.globalVariables)
+  });
   let materializedFlowId: string | null = baseline.flow?.id ?? null;
   let lastObservedDraftFingerprint = '';
   let lastObservedFlowRevision = options.flowOwner.projection.runtime?.flowRevision ?? 0;
+  let lastObservedVariablesRevision = options.globalVariablesOwner.projection.appliedRevision;
   let conflictServerProject: WorkspaceProjectV1 | null = null;
   let lastSubmitted: SubmittedSave | null = null;
   let disposed = false;
@@ -197,7 +207,10 @@ export function createWorkspacePersistenceOwner(options: {
   }
 
   function draftFingerprint(): string {
-    return workspacePersistenceFingerprint(encodedDraftFlow());
+    return workspacePersistenceFingerprint({
+      flow: encodedDraftFlow(),
+      globalVariables: encodeWorkspaceGlobalVariablesV1(options.globalVariablesOwner.getApplied())
+    });
   }
 
   function syncAvailability(): void {
@@ -238,8 +251,10 @@ export function createWorkspacePersistenceOwner(options: {
   function observeDraft(): void {
     if (disposed || suppressDraftObservation) return;
     const flowRevision = options.flowOwner.projection.runtime?.flowRevision ?? 0;
-    if (flowRevision === lastObservedFlowRevision) return;
+    const variablesRevision = options.globalVariablesOwner.projection.appliedRevision;
+    if (flowRevision === lastObservedFlowRevision && variablesRevision === lastObservedVariablesRevision) return;
     lastObservedFlowRevision = flowRevision;
+    lastObservedVariablesRevision = variablesRevision;
     let fingerprint: string;
     try {
       fingerprint = draftFingerprint();
@@ -255,7 +270,7 @@ export function createWorkspacePersistenceOwner(options: {
     if (fingerprint === lastObservedDraftFingerprint) return;
     lastObservedDraftFingerprint = fingerprint;
     state.dirtyGeneration += 1;
-    state.dirty = fingerprint !== baselineFlowFingerprint;
+    state.dirty = fingerprint !== baselineContentFingerprint;
     if (state.phase !== 'saving' && state.phase !== 'conflict' && state.phase !== 'unknown-outcome' &&
       state.phase !== 'readonly' && state.phase !== 'running') {
       state.phase = state.dirty ? 'dirty' : 'clean';
@@ -267,7 +282,7 @@ export function createWorkspacePersistenceOwner(options: {
 
   try {
     lastObservedDraftFingerprint = draftFingerprint();
-    state.dirty = lastObservedDraftFingerprint !== baselineFlowFingerprint;
+    state.dirty = lastObservedDraftFingerprint !== baselineContentFingerprint;
     if (state.dirty && !initiallyReadonly) {
       state.phase = 'dirty';
       state.message = '存在未保存修改。';
@@ -285,7 +300,8 @@ export function createWorkspacePersistenceOwner(options: {
   const stopDraftWatch = watch(
     () => [
       options.flowOwner.projection.draft,
-      options.flowOwner.projection.runtime?.flowRevision ?? 0
+      options.flowOwner.projection.runtime?.flowRevision ?? 0,
+      options.globalVariablesOwner.projection.appliedRevision
     ] as const,
     observeDraft,
     { flush: 'sync' }
@@ -305,7 +321,10 @@ export function createWorkspacePersistenceOwner(options: {
   function acceptServerBaseline(project: WorkspaceProjectV1): void {
     baseline = project;
     materializedFlowId = project.flow?.id ?? materializedFlowId;
-    baselineFlowFingerprint = workspacePersistenceFingerprint(encodeWorkspaceFlowUpdateV1(project));
+    baselineContentFingerprint = workspacePersistenceFingerprint({
+      flow: encodeWorkspaceFlowUpdateV1(project),
+      globalVariables: encodeWorkspaceGlobalVariablesV1(project.globalVariables)
+    });
     state.persistenceRevision = project.persistenceRevision;
     options.onBaselineChanged(project);
   }
@@ -315,8 +334,10 @@ export function createWorkspacePersistenceOwner(options: {
     submitted: SubmittedSave
   ): WorkspaceSaveAttemptResult {
     const currentDraft = options.flowOwner.projection.draft;
+    const currentVariables = options.globalVariablesOwner.getApplied();
     const editedDuringSave = state.dirtyGeneration !== submitted.dirtyGeneration;
     acceptServerBaseline(project);
+    options.globalVariablesOwner.acceptServerBaseline(project.globalVariables, editedDuringSave);
     conflictServerProject = null;
     state.conflictServerRevision = null;
     state.errorCode = null;
@@ -334,7 +355,11 @@ export function createWorkspacePersistenceOwner(options: {
         createFlowId: materializeFlowId
       });
       replaceFlow(replayed, project.name);
-      state.dirty = workspacePersistenceFingerprint(replayed) !== baselineFlowFingerprint;
+      options.globalVariablesOwner.replaceApplied(currentVariables);
+      state.dirty = workspacePersistenceFingerprint({
+        flow: replayed,
+        globalVariables: encodeWorkspaceGlobalVariablesV1(currentVariables)
+      }) !== baselineContentFingerprint;
       state.phase = state.dirty ? 'dirty' : 'saved';
       state.message = state.dirty
         ? `revision ${project.persistenceRevision} 已更新；保存期间的新修改仍未保存。`
@@ -395,10 +420,17 @@ export function createWorkspacePersistenceOwner(options: {
     const payload = buildWorkspaceProjectUpdatePayloadV1(
       baseline,
       options.flowOwner.projection.draft,
-      { materializedFlowId, createFlowId: materializeFlowId }
+      {
+        materializedFlowId,
+        createFlowId: materializeFlowId,
+        globalVariables: options.globalVariablesOwner.getApplied()
+      }
     );
-    const flowFingerprint = workspacePersistenceFingerprint(payload.flow);
-    if (flowFingerprint === baselineFlowFingerprint && payload.name === baseline.name &&
+    const contentFingerprint = workspacePersistenceFingerprint({
+      flow: payload.flow,
+      globalVariables: payload.globalVariables
+    });
+    if (contentFingerprint === baselineContentFingerprint && payload.name === baseline.name &&
       payload.description === baseline.description) {
       state.dirty = false;
       state.phase = 'clean';
@@ -411,7 +443,7 @@ export function createWorkspacePersistenceOwner(options: {
     const submitted: SubmittedSave = Object.freeze({
       dirtyGeneration: state.dirtyGeneration,
       payload,
-      flowFingerprint
+      contentFingerprint
     });
     lastSubmitted = submitted;
     state.phase = 'saving';
@@ -457,6 +489,7 @@ export function createWorkspacePersistenceOwner(options: {
       state.phase = 'error';
       state.errorCode = code ?? 'SAVE_FAILED';
       state.message = `保存失败：${errorMessage(error)} 本地 draft 已保留。`;
+      if (error instanceof ApiHttpError) options.globalVariablesOwner.setServerDiagnostics(error.payload);
       syncAvailability();
       return Object.freeze({ status: 'failed', project: null });
     } finally {
@@ -527,15 +560,21 @@ export function createWorkspacePersistenceOwner(options: {
     reapplyConflict(): void {
       if (disposed || state.phase !== 'conflict' || !conflictServerProject) return;
       const currentDraft = options.flowOwner.projection.draft;
+      const currentVariables = options.globalVariablesOwner.getApplied();
       const server = conflictServerProject;
       acceptServerBaseline(server);
+      options.globalVariablesOwner.acceptServerBaseline(server.globalVariables, true);
       const replayed = encodeWorkspaceFlowDraftUpdateV1(server, currentDraft, {
         materializedFlowId,
         createFlowId: materializeFlowId
       });
       replaceFlow(replayed, server.name);
+      options.globalVariablesOwner.replaceApplied(currentVariables);
       state.dirtyGeneration += 1;
-      state.dirty = workspacePersistenceFingerprint(replayed) !== baselineFlowFingerprint;
+      state.dirty = workspacePersistenceFingerprint({
+        flow: replayed,
+        globalVariables: encodeWorkspaceGlobalVariablesV1(currentVariables)
+      }) !== baselineContentFingerprint;
       state.phase = state.dirty ? 'dirty' : 'clean';
       state.errorCode = null;
       state.conflictServerRevision = null;
@@ -551,6 +590,7 @@ export function createWorkspacePersistenceOwner(options: {
       const server = conflictServerProject;
       acceptServerBaseline(server);
       replaceFlow(encodeWorkspaceFlowUpdateV1(server), server.name);
+      options.globalVariablesOwner.replaceApplied(server.globalVariables);
       state.dirty = false;
       state.phase = 'clean';
       state.errorCode = null;

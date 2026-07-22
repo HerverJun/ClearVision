@@ -52,6 +52,7 @@ export interface ApiTransport {
   ): void;
   get<T = unknown>(path: string, options?: ApiGetOptions): Promise<T | undefined>;
   post?<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined>;
+  postBlob?(path: string, body: unknown, options?: ApiWriteOptions): Promise<ApiBlobResponse>;
   put?<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined>;
   getBlob?(path: string, options?: ApiGetOptions): Promise<ApiBlobResponse>;
   delete?(path: string, options?: ApiWriteOptions): Promise<void>;
@@ -382,6 +383,50 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
         method: 'POST',
         path,
         suppressUnauthorizedHandler: requestOptions.suppressUnauthorizedHandler === true
+      });
+    },
+    async postBlob(
+      path: string,
+      body: unknown,
+      requestOptions: ApiWriteOptions = {}
+    ): Promise<ApiBlobResponse> {
+      const { response, url } = await send(
+        path,
+        'POST',
+        requestOptions,
+        JSON.stringify(body),
+        requestHeaders('application/octet-stream, image/*, application/json', {
+          'Content-Type': 'application/json',
+          ...requestOptions.headers
+        })
+      );
+      if (!response.ok) {
+        const responseBody = await readText(response, url, requestOptions.signal);
+        const error = createHttpError(response, url, responseBody);
+        if (response.status === 401 && !requestOptions.suppressUnauthorizedHandler && unauthorizedHandler) {
+          await unauthorizedHandler(Object.freeze({
+            method: 'POST',
+            path,
+            url,
+            sessionGeneration: sessionGenerationProvider()
+          }));
+        }
+        throw error;
+      }
+      let blob: Blob;
+      try {
+        blob = await response.blob();
+      } catch (error) {
+        if (isAbortFailure(error, requestOptions.signal)) throw new ApiAbortError(url, error);
+        throw new ApiNetworkError(url, error);
+      }
+      return Object.freeze({
+        blob,
+        contentType: response.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase() || blob.type,
+        contentLength: blob.size,
+        etag: response.headers.get('ETag'),
+        sha256: response.headers.get('X-Artifact-Sha256'),
+        headers: response.headers
       });
     },
     async put<T = unknown>(

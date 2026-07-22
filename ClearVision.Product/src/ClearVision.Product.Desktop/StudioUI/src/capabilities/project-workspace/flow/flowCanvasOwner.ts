@@ -23,6 +23,7 @@ import type { OperatorCatalogItem } from '@/capabilities/operators-read/operator
 import type { OperatorParameter } from '@/capabilities/operators-read/operatorContracts';
 import {
   encodeWorkspaceDecisionConfigurationV1,
+  type WorkspaceDecisionConfigurationV1,
   type WorkspaceFlowV1,
   type WorkspaceJsonValue,
   type WorkspaceProjectV1
@@ -40,6 +41,10 @@ import {
   createPreviewWorkbenchOwner,
   type PreviewWorkbenchOwner
 } from '../preview/previewWorkbenchOwner';
+import {
+  createCameraBindingEditorOwner,
+  type CameraBindingEditorOwner
+} from '../camera';
 
 export type FlowCanvasOwnerPhase = 'idle' | 'mounted' | 'error' | 'disposed';
 
@@ -89,6 +94,7 @@ export interface FlowCanvasCommands {
   patchNodeParameters(command: FlowNodeParametersPatch): CanonicalFlowCommandResult;
   upsertCaliperSearchRegion(command: FlowCaliperSearchRegionPatch): CanonicalFlowCommandResult;
   patchNodeProperties(command: FlowNodePropertiesPatch): CanonicalFlowCommandResult;
+  patchDecisionConfiguration(configuration: WorkspaceDecisionConfigurationV1 | null): CanonicalFlowCommandResult;
   zoomIn(): CanonicalFlowCommandResult;
   zoomOut(): CanonicalFlowCommandResult;
   resetView(): CanonicalFlowCommandResult;
@@ -126,6 +132,7 @@ export interface FlowCanvasOwner {
   mountCanvas(options: FlowCanvasMountOptions): void;
   replaceFlow(flow: Readonly<Record<string, unknown>> | null, projectName: string): void;
   openInspector(): InspectorOwner;
+  openCameraBindingEditor(): CameraBindingEditorOwner;
   openPreviewWorkbench(inspectorOwner: InspectorOwner): PreviewWorkbenchOwner;
   refreshOperators(force?: boolean): Promise<void>;
   setMutationGate(gate: FlowMutationGate): void;
@@ -319,6 +326,7 @@ export function createFlowCanvasOwner(options: {
   let disposed = false;
   let commandFeedbackSequence = 0;
   let inspectorOwner: InspectorOwner | undefined;
+  let cameraBindingEditorOwner: CameraBindingEditorOwner | undefined;
   let previewWorkbenchOwner: PreviewWorkbenchOwner | undefined;
 
   function assertActive(): void {
@@ -453,6 +461,12 @@ export function createFlowCanvasOwner(options: {
       const canonical: CanonicalNodePropertiesPatch = Object.freeze({ ...command });
       return applyCommandResult(host!.patchNodeProperties(canonical));
     },
+    patchDecisionConfiguration(configuration: WorkspaceDecisionConfigurationV1 | null) {
+      assertActive();
+      return applyCommandResult(host!.patchDecisionConfiguration(
+        encodeWorkspaceDecisionConfigurationV1(configuration)
+      ));
+    },
     zoomIn() { assertActive(); return applyCommandResult(host!.zoomBy(1.1)); },
     zoomOut() { assertActive(); return applyCommandResult(host!.zoomBy(0.9)); },
     resetView() { assertActive(); return applyCommandResult(host!.resetView()); },
@@ -475,6 +489,18 @@ export function createFlowCanvasOwner(options: {
       });
       return inspectorOwner;
     },
+    openCameraBindingEditor(): CameraBindingEditorOwner {
+      assertActive();
+      if (cameraBindingEditorOwner) {
+        throw new Error(`Camera binding editor owner already exists for project ${options.project.id}.`);
+      }
+      cameraBindingEditorOwner = createCameraBindingEditorOwner({
+        projectId: options.project.id,
+        flowOwner: owner,
+        api: options.api
+      });
+      return cameraBindingEditorOwner;
+    },
     openPreviewWorkbench(openedInspector: InspectorOwner): PreviewWorkbenchOwner {
       assertActive();
       if (openedInspector !== inspectorOwner) {
@@ -483,13 +509,17 @@ export function createFlowCanvasOwner(options: {
       if (previewWorkbenchOwner) {
         throw new Error(`Preview workbench owner already exists for project ${options.project.id}.`);
       }
+      if (!cameraBindingEditorOwner) {
+        throw new Error('Preview workbench requires the active Camera binding editor owner.');
+      }
       previewWorkbenchOwner = createPreviewWorkbenchOwner({
         projectId: options.project.id,
         flowOwner: owner,
         inspectorOwner: openedInspector,
         api: options.api,
         diagnostics: options.diagnostics,
-        featureFlags: options.featureFlags
+        featureFlags: options.featureFlags,
+        getInputImageContext: node => cameraBindingEditorOwner?.getPreviewInputContext(node) ?? null
       });
       return previewWorkbenchOwner;
     },
@@ -558,6 +588,12 @@ export function createFlowCanvasOwner(options: {
         disposalError = error;
       }
       previewWorkbenchOwner = undefined;
+      try {
+        cameraBindingEditorOwner?.dispose(reason);
+      } catch (error) {
+        disposalError ??= error;
+      }
+      cameraBindingEditorOwner = undefined;
       try {
         inspectorOwner?.dispose(reason);
       } catch (error) {

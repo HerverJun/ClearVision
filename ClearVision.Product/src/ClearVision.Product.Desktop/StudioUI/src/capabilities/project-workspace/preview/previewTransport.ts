@@ -20,6 +20,7 @@ export interface PreviewNodeCommand {
   readonly flowData: Readonly<Record<string, unknown>>;
   readonly clientSnapshotHash: string;
   readonly inputImageBase64?: string | null;
+  readonly inputImageSourceNodeId?: string | null;
   readonly parameters?: Readonly<Record<string, unknown>> | null;
   readonly imageFormat?: string;
   readonly timeoutMs?: number;
@@ -221,6 +222,7 @@ export function createPreviewTransportPort(api: ApiTransport): PreviewTransportP
           flowRevision: command.flowRevision,
           flowData: command.flowData,
           inputImageBase64: command.inputImageBase64 ?? null,
+          inputImageSourceNodeId: command.inputImageSourceNodeId ?? null,
           parameters: command.parameters ?? null,
           imageFormat: command.imageFormat ?? '.png',
           timeoutMs: command.timeoutMs,

@@ -21,6 +21,14 @@ import {
   type WorkspaceRunResultV1
 } from './run';
 import type { WorkspaceRunIdentityV1 } from './run/runContracts';
+import {
+  createWorkspaceGlobalVariablesOwner,
+  type WorkspaceGlobalVariablesOwner
+} from './global-variables';
+import {
+  createFinalDecisionOwner,
+  type FinalDecisionOwner
+} from './final-decision';
 import type {
   WorkspaceLifecycleDiagnosticsOwner,
   WorkspaceOwnerDiagnosticsLease
@@ -44,6 +52,9 @@ export interface WorkspaceOwner {
   readonly projectId: string;
   readonly projection: DeepReadonly<WorkspaceOwnerProjection>;
   openFlowCanvas(): FlowCanvasOwner;
+  getFlowCanvasOwner(): FlowCanvasOwner | null;
+  getGlobalVariablesOwner(): WorkspaceGlobalVariablesOwner | null;
+  getFinalDecisionOwner(): FinalDecisionOwner | null;
   save(): Promise<WorkspaceSaveAttemptResult>;
   retrySave(): Promise<WorkspaceSaveAttemptResult>;
   reconcileSave(): Promise<WorkspaceSaveAttemptResult>;
@@ -85,6 +96,8 @@ export function createWorkspaceOwner(
   let flowOwner: FlowCanvasOwner | undefined;
   let persistenceOwner: WorkspacePersistenceOwner | undefined;
   let runOwner: WorkspaceRunCommandOwner | undefined;
+  let globalVariablesOwner: WorkspaceGlobalVariablesOwner | undefined;
+  let finalDecisionOwner: FinalDecisionOwner | undefined;
 
   return Object.freeze({
     projectId: project.id,
@@ -101,9 +114,20 @@ export function createWorkspaceOwner(
         diagnostics,
         initialMutationGate: state.phase === 'readonly' ? 'readonly' : 'editable'
       });
+      globalVariablesOwner = createWorkspaceGlobalVariablesOwner({
+        projectId: project.id,
+        baseline: state.project.globalVariables,
+        api
+      });
+      finalDecisionOwner = createFinalDecisionOwner({
+        flowOwner,
+        api,
+        initial: state.project.flow?.decisionConfiguration ?? null
+      });
       persistenceOwner = createWorkspacePersistenceOwner({
         baseline: state.project,
         flowOwner,
+        globalVariablesOwner,
         port: createWorkspaceProjectPersistencePort(api, project.id),
         diagnostics,
         readonlyReason: state.phase === 'readonly' ? state.readonlyReason : null,
@@ -124,6 +148,15 @@ export function createWorkspaceOwner(
       });
       state.run = runOwner.projection;
       return flowOwner;
+    },
+    getFlowCanvasOwner(): FlowCanvasOwner | null {
+      return flowOwner ?? null;
+    },
+    getGlobalVariablesOwner(): WorkspaceGlobalVariablesOwner | null {
+      return globalVariablesOwner ?? null;
+    },
+    getFinalDecisionOwner(): FinalDecisionOwner | null {
+      return finalDecisionOwner ?? null;
     },
     save(): Promise<WorkspaceSaveAttemptResult> {
       if (!persistenceOwner) {
@@ -220,17 +253,27 @@ export function createWorkspaceOwner(
           persistenceOwner?.dispose(reason);
         } finally {
           try {
-            flowOwner?.dispose(reason);
+            finalDecisionOwner?.dispose();
           } finally {
             try {
-              lease.dispose(reason);
+              globalVariablesOwner?.dispose();
             } finally {
-              runOwner = undefined;
-              persistenceOwner = undefined;
-              flowOwner = undefined;
-              state.persistence = null;
-              state.run = null;
-              state.readonlyReason = null;
+              try {
+                flowOwner?.dispose(reason);
+              } finally {
+                try {
+                  lease.dispose(reason);
+                } finally {
+                  runOwner = undefined;
+                  persistenceOwner = undefined;
+                  finalDecisionOwner = undefined;
+                  globalVariablesOwner = undefined;
+                  flowOwner = undefined;
+                  state.persistence = null;
+                  state.run = null;
+                  state.readonlyReason = null;
+                }
+              }
             }
           }
         }

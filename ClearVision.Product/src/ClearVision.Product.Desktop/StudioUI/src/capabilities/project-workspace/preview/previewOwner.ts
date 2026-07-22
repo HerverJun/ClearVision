@@ -232,6 +232,9 @@ export function createPreviewOwner(options: {
   readonly flowOwner: FlowCanvasOwner;
   readonly api: ApiTransport;
   readonly diagnostics: WorkspaceLifecycleDiagnosticsOwner;
+  readonly getInputImageContext?: (
+    targetNode: Readonly<Record<string, unknown>>
+  ) => Readonly<Record<string, unknown>> | null;
 }): PreviewOwner {
   const lease: WorkspaceCapabilityDiagnosticsLease = options.diagnostics.reservePreview(options.projectId);
   const transport: PreviewTransportPort = createPreviewTransportPort(options.api);
@@ -268,6 +271,7 @@ export function createPreviewOwner(options: {
       text(operator.id ?? operator.Id) === nodeId) ?? null,
     getOperatorMetadata: type => operatorMetadata(options.flowOwner, type),
     getInputImageBase64: () => null,
+    getInputImageContext: node => options.getInputImageContext?.(node) ?? null,
     previewExecutor: async (nodeId, executorOptions) => {
       const flowRevision = number(executorOptions.flowRevision, -1);
       const runtimeRevision = options.flowOwner.projection.runtime?.flowRevision ?? 0;
@@ -286,6 +290,7 @@ export function createPreviewOwner(options: {
         flowData,
         clientSnapshotHash: latestSnapshotHash,
         inputImageBase64: text(executorOptions.inputImageBase64) || null,
+        inputImageSourceNodeId: text(executorOptions.inputImageSourceNodeId) || null,
         parameters: null,
         imageFormat: '.png',
         timeoutMs: number(executorOptions.timeoutMs, 15000)

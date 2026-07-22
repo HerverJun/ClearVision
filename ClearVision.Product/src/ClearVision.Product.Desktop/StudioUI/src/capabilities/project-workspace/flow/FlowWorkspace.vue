@@ -29,6 +29,7 @@ const props = defineProps<{
 
 const flowOwner = props.workspaceOwner.openFlowCanvas();
 const inspectorOwner = flowOwner.openInspector();
+const cameraBindingEditorOwner = flowOwner.openCameraBindingEditor();
 const previewWorkbenchOwner = flowOwner.openPreviewWorkbench(inspectorOwner);
 const projection = flowOwner.projection;
 const layoutOwner = createWorkspaceLayoutOwner();
@@ -168,7 +169,10 @@ onBeforeUnmount(() => layoutOwner.dispose());
       class="flow-workspace__inspector-host"
       tabindex="-1"
     >
-      <InspectorPanel :owner="inspectorOwner" />
+      <InspectorPanel
+        :owner="inspectorOwner"
+        :camera-owner="cameraBindingEditorOwner"
+      />
     </div>
 
     <CvSplitter

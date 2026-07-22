@@ -20,6 +20,9 @@ export function createPreviewWorkbenchOwner(options: {
   readonly api: ApiTransport;
   readonly diagnostics: WorkspaceLifecycleDiagnosticsOwner;
   readonly featureFlags: Readonly<Record<string, boolean>>;
+  readonly getInputImageContext?: (
+    targetNode: Readonly<Record<string, unknown>>
+  ) => Readonly<Record<string, unknown>> | null;
 }): PreviewWorkbenchOwner {
   const preview = createPreviewOwner(options);
   let image: ImageCanvasOwner | undefined;

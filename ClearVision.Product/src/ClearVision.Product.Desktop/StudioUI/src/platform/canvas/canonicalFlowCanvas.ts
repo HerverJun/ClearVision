@@ -212,6 +212,7 @@ export interface CanonicalFlowCanvasHost {
   patchNodeParameters(command: CanonicalNodeParametersPatch): CanonicalFlowCommandResult;
   upsertCaliperSearchRegion(command: CanonicalCaliperSearchRegionPatch): CanonicalFlowCommandResult;
   patchNodeProperties(command: CanonicalNodePropertiesPatch): CanonicalFlowCommandResult;
+  patchDecisionConfiguration(configuration: unknown): CanonicalFlowCommandResult;
   zoomBy(factor: number): CanonicalFlowCommandResult;
   resetView(): CanonicalFlowCommandResult;
   validateConnection(
@@ -293,6 +294,8 @@ interface CanonicalFlowCanvas {
   readonly selectionStateListeners?: ReadonlySet<unknown>;
   nodeRunEnabled?: boolean;
   nodeHelpEnabled?: boolean;
+  decisionConfiguration?: unknown;
+  markFlowStructureChanged?(reason?: string): void;
   getSelectionState?(): CanonicalSelectionState;
   getNodeScreenRect?(nodeId: string): Readonly<Record<string, unknown>> | null;
   getPortPosition?(nodeId: string, portIndex: number, isOutput: boolean): Readonly<Record<string, unknown>> | null;
@@ -1020,6 +1023,19 @@ export function createCanonicalFlowCanvasHost(
       }
       const code = result.reason === 'no_change' ? 'no-change' : result.reason;
       return commandResult(false, code, result.reason === 'node_not_found' ? '节点不存在。' : '节点属性未变化。');
+    },
+    patchDecisionConfiguration(configuration: unknown): CanonicalFlowCommandResult {
+      assertActive();
+      const rejected = rejectMutation('patch-decision-configuration');
+      if (rejected) return rejected;
+      const next = configuration === undefined ? null : structuredClone(configuration);
+      if (JSON.stringify(canvas.decisionConfiguration ?? null) === JSON.stringify(next)) {
+        return commandResult(false, 'no-change', '最终判定配置未变化。');
+      }
+      canvas.decisionConfiguration = next;
+      canvas.markFlowStructureChanged?.('decisionConfiguration');
+      ownedInteraction.saveState({ reason: 'patch-decision-configuration' });
+      return commandResult(true, 'decision-configuration-patched', '最终判定配置已更新。');
     },
     zoomBy(factor: number): CanonicalFlowCommandResult {
       assertActive();
