@@ -6,7 +6,7 @@ import {
   shallowRef,
   watch
 } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { useProductRuntime } from '@/app/productRuntime';
 import type { ProjectLifecycleCommandOwner } from '@/capabilities/project-lifecycle';
 import WorkspaceShell, { type WorkspaceShellState } from './WorkspaceShell.vue';
@@ -25,7 +25,6 @@ const props = defineProps<{
 }>();
 
 const route = useRoute();
-const router = useRouter();
 const productRuntime = props.runtime ? null : useProductRuntime();
 const runtime = props.runtime ?? productRuntime!.workspace;
 const projectLifecycle = props.projectLifecycle ?? productRuntime?.projectLifecycle ?? null;
@@ -193,26 +192,6 @@ watch(
   { immediate: true }
 );
 
-watch(
-  () => activeWorkspaceOwner.value?.projection.run?.result ?? null,
-  result => {
-    // Only a completed execution has a Results handoff. Cancelled and failed
-    // terminal results remain in Workspace so its mutation gate can settle.
-    if (!result || result.outcome.execution !== 'Succeeded' || result.projectId !== activeProjectId.value) return;
-    const currentOwner = workspaceOwner;
-    if (!currentOwner || currentOwner.projectId !== result.projectId ||
-      currentOwner.projection.run?.result?.executionSnapshotId !== result.executionSnapshotId) return;
-    void router.push({
-      path: '/results',
-      query: {
-        source: 'local',
-        projectId: result.projectId,
-        resultId: result.id
-      }
-    });
-  }
-);
-
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('keydown', handleSaveShortcut);
@@ -229,6 +208,7 @@ onBeforeUnmount(() => {
     :workspace-owner="activeWorkspaceOwner"
     :message="message"
     :diagnostics="runtime.diagnostics"
+    :user-role="runtime.session.user?.role"
     @retry="retry"
     @refresh-session="refreshSession"
   />

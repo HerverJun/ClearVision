@@ -19,7 +19,7 @@ const busy = computed(() => root.auth.projection.phase === 'authenticating' ||
 async function submit(): Promise<void> {
   const accepted = await root.auth.login({ username: username.value, password: password.value });
   if (accepted) {
-    await router.replace(resolveSafeReturnRoute(route.query.returnTo) ?? '/overview');
+    await router.replace(resolveSafeReturnRoute(route.query.returnTo) ?? '/projects');
     return;
   }
   await nextTick();
@@ -29,7 +29,7 @@ async function submit(): Promise<void> {
 async function retryRecovery(): Promise<void> {
   await root.auth.refreshSession();
   if (root.auth.projection.phase === 'authenticated') {
-    await router.replace(resolveSafeReturnRoute(route.query.returnTo) ?? '/overview');
+    await router.replace(resolveSafeReturnRoute(route.query.returnTo) ?? '/projects');
   }
 }
 </script>

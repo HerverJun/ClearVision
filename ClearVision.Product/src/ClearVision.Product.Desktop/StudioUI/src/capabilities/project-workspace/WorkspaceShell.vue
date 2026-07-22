@@ -14,6 +14,8 @@ import type { WorkspaceLifecycleDiagnostics } from './workspaceLifecycleDiagnost
 import { GlobalVariablesWorkbench, type WorkspaceGlobalVariablesOwner } from './global-variables';
 import { FinalDecisionWorkbench, type FinalDecisionOwner } from './final-decision';
 import type { FlowCanvasOwner } from './flow';
+import { RuntimePackageExportDialog, type RuntimePackageExportOwner } from './runtime-package';
+import { formatInspectionOutcome } from '@/shared/inspectionOutcome';
 
 export type WorkspaceShellState =
   | 'flag-off'
@@ -34,6 +36,7 @@ const props = defineProps<{
   workspaceOwner: WorkspaceOwner | null;
   message: string | null;
   diagnostics: WorkspaceLifecycleDiagnostics;
+  userRole?: string | null | undefined;
 }>();
 
 const emit = defineEmits<{
@@ -45,6 +48,8 @@ const decisionOpen = ref(false);
 const variablesOwner = shallowRef<WorkspaceGlobalVariablesOwner | null>(null);
 const decisionOwner = shallowRef<FinalDecisionOwner | null>(null);
 const modalFlowOwner = shallowRef<FlowCanvasOwner | null>(null);
+const packageOwner = shallowRef<RuntimePackageExportOwner | null>(null);
+const packageOpen = ref(false);
 
 function openVariables(): void {
   variablesOwner.value = props.workspaceOwner?.getGlobalVariablesOwner() ?? null;
@@ -55,6 +60,11 @@ function openVariables(): void {
 function openDecision(): void {
   decisionOwner.value = props.workspaceOwner?.getFinalDecisionOwner() ?? null;
   decisionOpen.value = decisionOwner.value !== null;
+}
+
+function openRuntimePackage(): void {
+  packageOwner.value = props.workspaceOwner?.getRuntimePackageExportOwner() ?? null;
+  packageOpen.value = packageOwner.value !== null;
 }
 
 const pageStateKind = computed(() => {
@@ -159,6 +169,12 @@ const runLabel = computed(() => {
     disposed: '正式运行已结束'
   }[projection.phase];
 });
+const runResultPresentation = computed(() => run.value?.result
+  ? formatInspectionOutcome(run.value.result.outcome)
+  : null);
+const showRunSummary = computed(() => Boolean(run.value && [
+  'succeeded', 'failed', 'cancelled', 'unknown-outcome'
+].includes(run.value.phase)));
 </script>
 
 <template>
@@ -296,6 +312,17 @@ const runLabel = computed(() => {
           </template>
           全局变量
         </CvButton>
+        <CvButton
+          v-if="userRole === 'Admin'"
+          data-testid="runtime-package-export"
+          size="sm"
+          variant="quiet"
+          :disabled="!persistence || run?.phase === 'executing'"
+          title="从已正式保存的工程导出运行包"
+          @click="openRuntimePackage"
+        >
+          运行包
+        </CvButton>
         <RouterLink
           class="workspace-shell__results-link"
           :to="{ path: '/results', query: { source: 'local', projectId } }"
@@ -345,6 +372,36 @@ const runLabel = computed(() => {
           放弃本地草稿
         </CvButton>
       </div>
+      <section
+        v-if="showRunSummary && run"
+        class="workspace-shell__run-summary"
+        :data-run-phase="run.phase"
+        role="status"
+      >
+        <CvStatusBadge
+          :tone="runResultPresentation?.tone ?? (run.phase === 'unknown-outcome' ? 'warning' : 'error')"
+          :label="runResultPresentation?.label ?? runLabel"
+        />
+        <span>{{ runResultPresentation?.executionLabel ?? run.message }}</span>
+        <span v-if="runResultPresentation">{{ runResultPresentation.decisionLabel }}</span>
+        <span v-if="run.result?.errorMessage">{{ run.result.errorMessage }}</span>
+        <span v-else-if="run.phase === 'failed' || run.phase === 'cancelled'">{{ run.message }}</span>
+        <RouterLink
+          v-if="run.result && run.result.outcome.execution === 'Succeeded'"
+          class="workspace-shell__run-result-link"
+          :to="{ path: '/results', query: { source: 'local', projectId: run.result.projectId, resultId: run.result.id } }"
+          data-testid="workspace-current-result"
+        >
+          查看本次结果
+        </RouterLink>
+        <button
+          v-if="run.phase === 'unknown-outcome' && run.canReconcile"
+          type="button"
+          @click="workspaceOwner?.reconcileFormalRun()"
+        >
+          核对运行结果
+        </button>
+      </section>
     </header>
 
     <div
@@ -506,6 +563,14 @@ const runLabel = computed(() => {
       :readonly="isReadonly || run?.phase === 'executing'"
       @close="decisionOpen = false"
     />
+    <RuntimePackageExportDialog
+      v-if="packageOwner && currentProject"
+      :open="packageOpen"
+      :project="currentProject"
+      :dirty="persistence?.dirty ?? false"
+      :owner="packageOwner"
+      @close="packageOpen = false"
+    />
   </section>
 </template>
 
@@ -516,7 +581,7 @@ const runLabel = computed(() => {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: var(--cv-workspace-toolbar-height, 44px) minmax(0, 1fr) var(--cv-workspace-status-height, 24px);
+  grid-template-rows: auto minmax(0, 1fr) var(--cv-workspace-status-height, 24px);
   overflow: hidden;
   background: var(--cv-surface-page);
 }
@@ -531,11 +596,17 @@ const runLabel = computed(() => {
 
 .workspace-shell__toolbar {
   min-width: 0;
+  min-height: var(--cv-workspace-toolbar-height, 44px);
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--cv-space-2);
   padding: 0 var(--cv-space-2);
   border-bottom: 1px solid var(--cv-border-subtle);
 }
+.workspace-shell__run-summary { flex: 1 0 100%; min-width: 0; min-height: 34px; margin-inline: calc(-1 * var(--cv-space-2)); padding: 0 var(--cv-space-3); display: flex; align-items: center; gap: var(--cv-space-2); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.workspace-shell__run-summary > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-shell__run-result-link,.workspace-shell__run-summary > button { margin-left: auto; white-space: nowrap; color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: 600; }
+.workspace-shell__run-summary > button { min-height: 26px; border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); cursor: pointer; }
 
 .workspace-shell__identity,
 .workspace-shell__commands {

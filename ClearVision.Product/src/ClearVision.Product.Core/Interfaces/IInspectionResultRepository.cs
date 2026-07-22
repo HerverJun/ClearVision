@@ -139,6 +139,8 @@ public class InspectionHistoryItem
     public string? FlowVersionHash { get; set; }
     public string? CalibrationBundleId { get; set; }
     public Guid? SessionId { get; set; }
+    public long? ProjectPersistenceRevision { get; set; }
+    public string? DecisionConfigurationHash { get; set; }
     public bool HasImage { get; set; }
     public bool HasOutputData { get; set; }
     public bool HasAnalysisData { get; set; }

@@ -23,7 +23,7 @@ async function submit(): Promise<void> {
     confirmPassword: confirmPassword.value
   });
   if (accepted) {
-    await router.replace('/overview');
+    await router.replace('/projects');
     return;
   }
   await nextTick();

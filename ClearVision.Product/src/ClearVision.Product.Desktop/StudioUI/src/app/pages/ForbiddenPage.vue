@@ -14,7 +14,7 @@ import { CvPageState } from '@/design-system/patterns';
       :heading-level="1"
     >
       <template #actions>
-        <RouterLink to="/overview">
+        <RouterLink to="/projects">
           返回安全产品入口
         </RouterLink>
       </template>

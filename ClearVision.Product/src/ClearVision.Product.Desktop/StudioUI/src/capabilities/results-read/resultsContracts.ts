@@ -61,6 +61,8 @@ export interface InspectionTraceability {
   readonly calibrationBundleId: string | null;
   readonly sessionId: string | null;
   readonly runId: string | null;
+  readonly projectPersistenceRevision: number | null;
+  readonly decisionConfigurationHash: string | null;
   readonly packageId: string | null;
   readonly stationId: string | null;
 }
@@ -68,6 +70,12 @@ export interface InspectionTraceability {
 export interface LocalInspectionResultDetail extends LocalInspectionResultSummary {
   readonly defects: readonly LocalInspectionDefectSummary[];
   readonly traceability: InspectionTraceability;
+  readonly hasEvidenceManifest: boolean;
+  readonly evidenceStatus: string;
+  readonly evidenceManifestReference: string | null;
+  readonly evidenceTotalBytes: number | null;
+  readonly retentionExpiresAtUtc: string | null;
+  readonly evidenceMessage: string | null;
 }
 
 export type LegacyStationRuntimeOutcome =
@@ -280,6 +288,13 @@ function decodeTraceability(value: unknown, path: string): InspectionTraceabilit
     ),
     sessionId: optionalNullableUuid(item.sessionId, `${path}.sessionId`),
     runId: optionalNullableUuid(item.runId, `${path}.runId`),
+    projectPersistenceRevision: item.projectPersistenceRevision === undefined || item.projectPersistenceRevision === null
+      ? null
+      : nonNegativeInteger(item.projectPersistenceRevision, `${path}.projectPersistenceRevision`),
+    decisionConfigurationHash: optionalNullableString(
+      item.decisionConfigurationHash,
+      `${path}.decisionConfigurationHash`
+    ),
     packageId: optionalNullableString(item.packageId, `${path}.packageId`),
     stationId: optionalNullableString(item.stationId, `${path}.stationId`)
   });
@@ -393,7 +408,17 @@ export function decodeLocalInspectionResultDetail(payload: unknown): LocalInspec
     defects: Object.freeze(
       array(item.defects, '$.defects').map((defect, index) => decodeDefect(defect, `$.defects[${index}]`))
     ),
-    traceability: decodeTraceability(item.traceability, '$.traceability')
+    traceability: decodeTraceability(item.traceability, '$.traceability'),
+    hasEvidenceManifest: boolean(item.hasEvidenceManifest, '$.hasEvidenceManifest'),
+    evidenceStatus: string(item.evidenceStatus, '$.evidenceStatus'),
+    evidenceManifestReference: optionalNullableString(item.evidenceManifestReference, '$.evidenceManifestReference'),
+    evidenceTotalBytes: item.evidenceTotalBytes === null || item.evidenceTotalBytes === undefined
+      ? null
+      : nonNegativeInteger(item.evidenceTotalBytes, '$.evidenceTotalBytes'),
+    retentionExpiresAtUtc: item.retentionExpiresAtUtc === null || item.retentionExpiresAtUtc === undefined
+      ? null
+      : dateTime(item.retentionExpiresAtUtc, '$.retentionExpiresAtUtc'),
+    evidenceMessage: optionalNullableString(item.evidenceMessage, '$.evidenceMessage')
   });
 }
 

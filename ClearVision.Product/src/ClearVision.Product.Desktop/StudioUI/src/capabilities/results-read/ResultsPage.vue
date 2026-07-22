@@ -50,6 +50,10 @@ import {
   useResultsReadRuntime,
   type ResultsReadRuntime
 } from './resultsReadRuntime';
+import {
+  createResultEvidenceOwner,
+  type ResultEvidenceOwner
+} from './resultEvidenceOwner';
 
 const props = defineProps<{
   runtime?: ResultsReadRuntime;
@@ -63,6 +67,7 @@ const projectsOwner = shallowRef<ReadQueryOwner<readonly ResultsProjectOption[]>
 const localListOwner = shallowRef<ReadQueryOwner<LocalInspectionResultPage> | null>(null);
 const localDetailOwner = shallowRef<ReadQueryOwner<LocalInspectionResultDetail> | null>(null);
 const stationListOwner = shallowRef<ReadQueryOwner<StationInspectionResultPage> | null>(null);
+const evidenceOwner = shallowRef<ResultEvidenceOwner | null>(null);
 const advancedFiltersOpen = shallowRef(
   Boolean(firstQueryValue(route.query.diagnosticCode) || firstQueryValue(route.query.from) || firstQueryValue(route.query.to))
 );
@@ -128,6 +133,7 @@ const projectsState = computed(() => projectsOwner.value?.state.value ?? idleSta
 const localListState = computed(() => localListOwner.value?.state.value ?? idleState<LocalInspectionResultPage>());
 const localDetailState = computed(() => localDetailOwner.value?.state.value ?? idleState<LocalInspectionResultDetail>());
 const stationListState = computed(() => stationListOwner.value?.state.value ?? idleState<StationInspectionResultPage>());
+const evidence = computed(() => evidenceOwner.value?.projection ?? null);
 const localItems = computed(() => {
   const items = localListState.value.data?.items ?? [];
   const code = diagnosticCode.value.trim().toLocaleLowerCase();
@@ -282,6 +288,23 @@ function disposeLocalDetail(): void {
   localDetailOwner.value = null;
 }
 
+function disposeEvidence(): void {
+  evidenceOwner.value?.dispose();
+  evidenceOwner.value = null;
+}
+
+async function refreshEvidence(): Promise<void> {
+  disposeEvidence();
+  if (!runtime.api || !projectId.value || !resultId.value) return;
+  const owner = createResultEvidenceOwner({
+    projectId: projectId.value,
+    resultId: resultId.value,
+    api: runtime.api
+  });
+  evidenceOwner.value = owner;
+  await owner.load();
+}
+
 function disposeStationList(): void {
   stationListOwner.value?.dispose();
   stationListOwner.value = null;
@@ -302,6 +325,7 @@ async function refreshLocalList(force = false): Promise<void> {
 async function refreshLocalDetail(force = false): Promise<void> {
   if (!projectId.value || !resultId.value) {
     disposeLocalDetail();
+    disposeEvidence();
     return;
   }
   await ensureLocalDetailOwner().refresh({ force });
@@ -378,6 +402,8 @@ function localTraceabilityItems(detail: LocalInspectionResultDetail): readonly C
     { key: 'flowVersionHash', label: '流程版本哈希', value: detail.traceability.flowVersionHash },
     { key: 'calibrationBundleId', label: '标定包', value: detail.traceability.calibrationBundleId },
     { key: 'runId', label: '运行标识', value: detail.traceability.runId },
+    { key: 'projectPersistenceRevision', label: '工程保存修订', value: detail.traceability.projectPersistenceRevision },
+    { key: 'decisionConfigurationHash', label: '判定配置哈希', value: detail.traceability.decisionConfigurationHash },
     { key: 'sessionId', label: '会话标识', value: detail.traceability.sessionId }
   ]);
 }
@@ -449,6 +475,7 @@ watch(
   () => {
     if (!mounted.value || source.value !== 'local') return;
     void refreshLocalDetail(true);
+    void refreshEvidence();
   }
 );
 
@@ -462,6 +489,7 @@ onBeforeUnmount(() => {
   disposeProjects();
   disposeLocalList();
   disposeLocalDetail();
+  disposeEvidence();
   disposeStationList();
 });
 </script>
@@ -855,6 +883,52 @@ onBeforeUnmount(() => {
               label="本机结果诊断"
             />
           </section>
+          <section
+            class="results-page__detail-section results-page__evidence"
+            data-capability="result-evidence"
+            :data-evidence-phase="evidence?.phase ?? localDetailState.data.evidenceStatus"
+          >
+            <div class="results-page__evidence-heading">
+              <div>
+                <h3>证据清单</h3>
+                <p>{{ evidence?.message ?? localDetailState.data.evidenceMessage ?? '证据状态未知。' }}</p>
+              </div>
+              <CvButton
+                v-if="evidence?.canExport"
+                size="sm"
+                :disabled="evidence.phase === 'exporting'"
+                data-testid="result-evidence-export"
+                @click="evidenceOwner?.exportEvidence()"
+              >
+                导出本条证据
+              </CvButton>
+            </div>
+            <dl
+              v-if="evidence?.manifest"
+              class="results-page__evidence-summary"
+            >
+              <div><dt>Manifest ID</dt><dd>{{ evidence.manifest.manifestId }}</dd></div>
+              <div><dt>状态</dt><dd>{{ evidence.phase }}</dd></div>
+              <div><dt>大小</dt><dd>{{ evidence.manifest.totalBytes.toLocaleString('zh-CN') }} B</dd></div>
+              <div><dt>保留</dt><dd>{{ evidence.manifest.retentionClass }} / {{ formatDateTime(evidence.manifest.retentionExpiresAtUtc) }}</dd></div>
+              <div><dt>Checksum</dt><dd>{{ evidence.manifest.checksum ?? '—' }}</dd></div>
+              <div><dt>脱敏</dt><dd>{{ evidence.manifest.redactionApplied ? '已应用' : '未应用' }}</dd></div>
+            </dl>
+            <table
+              v-if="evidence?.manifest?.items.length"
+              class="results-page__evidence-items"
+            >
+              <thead><tr><th>角色</th><th>类型</th><th>大小</th><th>可用性</th></tr></thead>
+              <tbody>
+                <tr
+                  v-for="item in evidence.manifest.items"
+                  :key="item.id"
+                >
+                  <td>{{ item.role }}</td><td>{{ item.contentType }}</td><td>{{ item.sizeBytes.toLocaleString('zh-CN') }} B</td><td>{{ item.available ? '可用' : item.missingReason ?? '缺失' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
           <details class="results-page__traceability">
             <summary>技术追溯</summary>
             <CvDescriptionList
@@ -1067,6 +1141,15 @@ onBeforeUnmount(() => {
 .results-page__defects li { display: grid; grid-template-columns: minmax(96px, 0.62fr) minmax(116px, 0.72fr) minmax(0, 1fr); gap: var(--cv-space-3); padding: var(--cv-space-2) 0; border-bottom: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .results-page__defects li:last-child { border-bottom: 0; }
 .results-page__defects strong { color: var(--cv-text-primary); }
+.results-page__evidence-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
+.results-page__evidence-heading h3 { margin-bottom: 2px; }
+.results-page__evidence-heading p { margin: 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.results-page__evidence-summary { margin: var(--cv-space-3) 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--cv-border-subtle); }
+.results-page__evidence-summary div { min-width: 0; padding: 6px 8px; border-bottom: 1px solid var(--cv-border-subtle); }
+.results-page__evidence-summary dt { color: var(--cv-text-muted); font-size: 9px; }
+.results-page__evidence-summary dd { margin: 2px 0 0; overflow: hidden; font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
+.results-page__evidence-items { width: 100%; margin-top: var(--cv-space-2); border-collapse: collapse; font-size: var(--cv-font-size-2xs); }
+.results-page__evidence-items th,.results-page__evidence-items td { padding: 5px 6px; text-align: left; border-bottom: 1px solid var(--cv-border-subtle); }
 .results-page__traceability { border-top: 1px solid var(--cv-border-subtle); }
 .results-page__traceability summary { padding: var(--cv-space-3) var(--cv-density-panel-padding); color: var(--cv-text-secondary); cursor: pointer; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); list-style-position: inside; }
 .results-page__traceability summary:hover { background: var(--cv-interactive-hover); color: var(--cv-text-primary); }

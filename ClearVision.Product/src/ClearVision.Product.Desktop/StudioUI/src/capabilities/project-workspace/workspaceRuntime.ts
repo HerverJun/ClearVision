@@ -125,6 +125,7 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
         getFlowCanvasOwner: inner.getFlowCanvasOwner,
         getGlobalVariablesOwner: inner.getGlobalVariablesOwner,
         getFinalDecisionOwner: inner.getFinalDecisionOwner,
+        getRuntimePackageExportOwner: inner.getRuntimePackageExportOwner,
         save: inner.save,
         retrySave: inner.retrySave,
         reconcileSave: inner.reconcileSave,

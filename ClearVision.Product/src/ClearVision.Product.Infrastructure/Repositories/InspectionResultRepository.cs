@@ -358,6 +358,8 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
                 FlowVersionHash = r.FlowVersionHash,
                 CalibrationBundleId = r.CalibrationBundleId,
                 SessionId = r.SessionId,
+                ProjectPersistenceRevision = r.ProjectPersistenceRevision,
+                DecisionConfigurationHash = r.DecisionConfigurationHash,
                 HasImage = r.ImageId != null || r.OutputImage != null,
                 HasOutputData = r.OutputDataJson != null && r.OutputDataJson != "",
                 HasAnalysisData = r.AnalysisDataJson != null && r.AnalysisDataJson != "",

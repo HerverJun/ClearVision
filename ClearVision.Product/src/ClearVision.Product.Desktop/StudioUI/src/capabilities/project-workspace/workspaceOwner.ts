@@ -29,6 +29,10 @@ import {
   createFinalDecisionOwner,
   type FinalDecisionOwner
 } from './final-decision';
+import {
+  createRuntimePackageExportOwner,
+  type RuntimePackageExportOwner
+} from './runtime-package';
 import type {
   WorkspaceLifecycleDiagnosticsOwner,
   WorkspaceOwnerDiagnosticsLease
@@ -55,6 +59,7 @@ export interface WorkspaceOwner {
   getFlowCanvasOwner(): FlowCanvasOwner | null;
   getGlobalVariablesOwner(): WorkspaceGlobalVariablesOwner | null;
   getFinalDecisionOwner(): FinalDecisionOwner | null;
+  getRuntimePackageExportOwner(): RuntimePackageExportOwner | null;
   save(): Promise<WorkspaceSaveAttemptResult>;
   retrySave(): Promise<WorkspaceSaveAttemptResult>;
   reconcileSave(): Promise<WorkspaceSaveAttemptResult>;
@@ -98,6 +103,7 @@ export function createWorkspaceOwner(
   let runOwner: WorkspaceRunCommandOwner | undefined;
   let globalVariablesOwner: WorkspaceGlobalVariablesOwner | undefined;
   let finalDecisionOwner: FinalDecisionOwner | undefined;
+  let runtimePackageExportOwner: RuntimePackageExportOwner | undefined;
 
   return Object.freeze({
     projectId: project.id,
@@ -140,6 +146,11 @@ export function createWorkspaceOwner(
         }
       });
       state.persistence = persistenceOwner.projection;
+      runtimePackageExportOwner = createRuntimePackageExportOwner({
+        projectId: project.id,
+        persistenceOwner,
+        api
+      });
       runOwner = createWorkspaceRunCommandOwner({
         projectId: project.id,
         persistenceOwner,
@@ -157,6 +168,9 @@ export function createWorkspaceOwner(
     },
     getFinalDecisionOwner(): FinalDecisionOwner | null {
       return finalDecisionOwner ?? null;
+    },
+    getRuntimePackageExportOwner(): RuntimePackageExportOwner | null {
+      return runtimePackageExportOwner ?? null;
     },
     save(): Promise<WorkspaceSaveAttemptResult> {
       if (!persistenceOwner) {
@@ -253,25 +267,30 @@ export function createWorkspaceOwner(
           persistenceOwner?.dispose(reason);
         } finally {
           try {
-            finalDecisionOwner?.dispose();
+            runtimePackageExportOwner?.dispose();
           } finally {
             try {
-              globalVariablesOwner?.dispose();
+              finalDecisionOwner?.dispose();
             } finally {
               try {
-                flowOwner?.dispose(reason);
+                globalVariablesOwner?.dispose();
               } finally {
                 try {
-                  lease.dispose(reason);
+                  flowOwner?.dispose(reason);
                 } finally {
-                  runOwner = undefined;
-                  persistenceOwner = undefined;
-                  finalDecisionOwner = undefined;
-                  globalVariablesOwner = undefined;
-                  flowOwner = undefined;
-                  state.persistence = null;
-                  state.run = null;
-                  state.readonlyReason = null;
+                  try {
+                    lease.dispose(reason);
+                  } finally {
+                    runOwner = undefined;
+                    persistenceOwner = undefined;
+                    runtimePackageExportOwner = undefined;
+                    finalDecisionOwner = undefined;
+                    globalVariablesOwner = undefined;
+                    flowOwner = undefined;
+                    state.persistence = null;
+                    state.run = null;
+                    state.readonlyReason = null;
+                  }
                 }
               }
             }

@@ -1688,6 +1688,8 @@ public static class ApiEndpoints
                 calibrationBundleId = result.CalibrationBundleId,
                 sessionId = result.SessionId,
                 runId = result.SessionId,
+                projectPersistenceRevision = result.ProjectPersistenceRevision,
+                decisionConfigurationHash = result.DecisionConfigurationHash,
                 packageId = (string?)null,
                 stationId = (string?)null
             },

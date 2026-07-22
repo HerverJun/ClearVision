@@ -85,7 +85,7 @@ async function submit(): Promise<void> {
         >
           修改密码并退出
         </CvButton>
-        <RouterLink to="/overview">
+        <RouterLink to="/projects">
           取消并返回概览
         </RouterLink>
       </div>

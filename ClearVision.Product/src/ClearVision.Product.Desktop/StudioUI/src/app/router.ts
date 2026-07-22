@@ -74,7 +74,7 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
         component: ProductLayout,
         meta: { title: 'ClearVision Studio', breadcrumb: 'Studio', requiresSession: true },
         children: [
-          { path: '', redirect: '/overview' },
+          { path: '', redirect: '/projects' },
           {
             path: 'overview',
             name: 'overview',
@@ -241,12 +241,12 @@ export function installAuthRouteGuard(
       return to.name === 'setup' ? true : { path: '/setup', replace: true };
     }
     if (to.name === 'setup') {
-      return projection.phase === 'authenticated' ? { path: '/overview', replace: true } :
+      return projection.phase === 'authenticated' ? { path: '/projects', replace: true } :
         { path: '/login', replace: true };
     }
     if (to.name === 'login') {
       if (projection.phase === 'authenticated') {
-        return { path: requestedReturnRoute(to) ?? '/overview', replace: true };
+        return { path: requestedReturnRoute(to) ?? '/projects', replace: true };
       }
       return true;
     }

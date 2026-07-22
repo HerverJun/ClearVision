@@ -16,7 +16,7 @@ import { CvPageState } from '@/design-system/patterns';
       <template #actions>
         <RouterLink
           class="product-page-state__action"
-          to="/overview"
+          to="/projects"
         >
           返回概览
         </RouterLink>

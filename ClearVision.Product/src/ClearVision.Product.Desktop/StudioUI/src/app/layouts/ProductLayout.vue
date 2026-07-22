@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
-import { visibleProductNavigation } from '@/app/navigation';
 import { useAuthLifecycleRoot } from '@/app/auth';
 import { useProductRuntime } from '@/app/productRuntime';
-import { useStudioPlatform } from '@/app/studioPlatform';
 import { CvBrand } from '@/design-system/patterns';
 import { CvButton, CvInlineAlert, CvModal, CvStatusBadge } from '@/design-system/primitives';
 import { CvIcon } from '@/design-system/icons';
@@ -14,17 +12,12 @@ import './product-layout.css';
 const route = useRoute();
 const runtime = useProductRuntime();
 const authRoot = useAuthLifecycleRoot();
-const platform = useStudioPlatform();
 const session = runtime.session.projection;
 const systemStatus = runtime.systemStatus.projection;
 const preferences = runtime.preferences.projection;
 const contentRoot = ref<HTMLElement>();
 const appearanceDetails = ref<HTMLDetailsElement>();
 const workspaceMode = computed(() => route.meta.workspaceMode === true);
-const navigation = computed(() => visibleProductNavigation(
-  session.user?.role,
-  platform.startup.featureFlags
-));
 const navigationIcons: Readonly<Record<string, CvIconName>> = Object.freeze({
   '/overview': 'overview',
   '/projects': 'projects',
@@ -44,45 +37,24 @@ interface ProductTopNavigationItem {
 }
 
 const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() => {
-  const available = new Set(navigation.value.map(item => item.to));
-  return Object.freeze([
-    {
-      label: '工程',
-      to: '/projects',
-      description: '工程管理',
-      current: !workspaceMode.value && route.path.startsWith('/projects')
-    },
-    workspaceMode.value
-      ? { label: '流程', to: route.fullPath, description: '当前工程流程', current: true }
-      : { label: '流程', description: '请先打开工程进入流程工作台', disabled: true },
-    { label: '检测', description: '检测工作台尚未接入 Studio UI Next', disabled: true },
-    {
-      label: '追溯',
-      to: '/results',
-      description: '正式检测结果与历史追溯',
-      current: route.path.startsWith('/results')
-    },
-    available.has('/stations')
-      ? {
-          label: '监控',
-          to: '/stations',
-          description: '工作站状态监控',
-          current: route.path.startsWith('/stations')
-        }
-      : { label: '监控', description: '当前启动配置未开放工作站监控', disabled: true },
-    { label: 'AI', description: 'AI 工作台尚未接入 Studio UI Next', disabled: true },
-    available.has('/diagnostics')
-      ? {
-          label: '设置',
-          to: '/diagnostics',
-          description: '系统诊断与运行环境',
-          current: route.path.startsWith('/diagnostics')
-        }
-      : { label: '设置', description: '当前账户不可访问系统诊断', disabled: true }
-  ]);
+  const items: ProductTopNavigationItem[] = [{
+    label: '工程',
+    to: '/projects',
+    description: '工程管理',
+    current: !workspaceMode.value && route.path.startsWith('/projects')
+  }];
+  if (workspaceMode.value) {
+    items.push({ label: '流程', to: route.fullPath, description: '当前工程流程', current: true });
+  }
+  items.push({
+    label: '检测结果',
+    to: '/results',
+    description: '正式检测结果与历史追溯',
+    current: route.path.startsWith('/results')
+  });
+  return Object.freeze(items);
 });
-const productMoreNavigation = computed(() => navigation.value.filter(item =>
-  ['/overview', '/operators', '/about'].includes(item.to)));
+const productMoreNavigation = computed<readonly Readonly<{ to: string; label: string }>[]>(() => Object.freeze([]));
 const statusTone = computed(() => {
   if (systemStatus.phase === 'online') return 'ok';
   if (systemStatus.phase === 'stale') return 'warning';
@@ -152,8 +124,8 @@ onMounted(() => runtime.preferences.apply());
         <div class="product-layout__workspace-chrome">
           <RouterLink
             class="product-layout__workspace-brand"
-            to="/overview"
-            aria-label="ClearVision Studio 概览"
+            to="/projects"
+            aria-label="ClearVision Studio 工程"
           >
             <CvBrand />
           </RouterLink>

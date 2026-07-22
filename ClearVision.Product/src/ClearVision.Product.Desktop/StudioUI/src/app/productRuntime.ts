@@ -18,6 +18,7 @@ import { createReadQueryClient, type ReadQueryClient } from '@/platform/query';
 import { createSystemStatusOwner, type SystemStatusOwner } from '@/platform/status';
 
 export interface ProductRuntime {
+  readonly api: StudioPlatform['api'];
   readonly queries: ReadQueryClient;
   readonly session: SessionProjectionOwner;
   readonly systemStatus: SystemStatusOwner;
@@ -69,6 +70,7 @@ export function createProductRuntime(
   systemStatus.start();
 
   return Object.freeze({
+    api: platform.api,
     queries,
     session,
     systemStatus,
