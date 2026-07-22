@@ -20,8 +20,10 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 
 $targetExe = Join-Path $RepoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\bin\Debug\net8.0-windows\win-x64\ClearVision.Product.Desktop.exe"
 $targetExe = [System.IO.Path]::GetFullPath($targetExe)
+$targetDll = Join-Path $RepoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\bin\Debug\net8.0-windows\win-x64\ClearVision.Product.Desktop.dll"
+$targetDll = [System.IO.Path]::GetFullPath($targetDll)
 
-$processes = Get-Process -Name "ClearVision.Product.Desktop" -ErrorAction SilentlyContinue |
+$desktopProcesses = Get-Process -Name "ClearVision.Product.Desktop" -ErrorAction SilentlyContinue |
     Where-Object {
         try {
             $_.Path -and ([System.IO.Path]::GetFullPath($_.Path) -ieq $targetExe)
@@ -31,8 +33,22 @@ $processes = Get-Process -Name "ClearVision.Product.Desktop" -ErrorAction Silent
         }
     }
 
+$debugHostProcesses = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe'" -ErrorAction SilentlyContinue |
+    Where-Object {
+        $normalizedCommandLine = $_.CommandLine -replace '/', '\'
+        $normalizedCommandLine -and
+            $normalizedCommandLine.IndexOf($targetDll, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    } |
+    ForEach-Object {
+        Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
+    }
+
+$processes = @($desktopProcesses) + @($debugHostProcesses) |
+    Where-Object { $_ } |
+    Sort-Object Id -Unique
+
 foreach ($process in $processes) {
-    Write-Host "Stopping stale ClearVision debug process $($process.Id)."
+    Write-Host "Stopping stale ClearVision debug process $($process.Id) ($($process.ProcessName))."
 
     $closed = $false
     if ($process.MainWindowHandle -ne [IntPtr]::Zero) {
