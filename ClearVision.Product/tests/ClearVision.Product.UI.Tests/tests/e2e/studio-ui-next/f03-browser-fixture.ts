@@ -72,6 +72,7 @@ export function isF03G4RequestAllowlist(
   return audit.every(entry => {
     if (entry.method === 'POST') {
       return entry.path === '/api/flows/preview-node' ||
+        entry.path === '/api/inspection/decision-configuration/validate' ||
         /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/open$/i
           .test(entry.path);
     }
@@ -79,6 +80,7 @@ export function isF03G4RequestAllowlist(
     if (entry.method !== 'GET') return false;
     return entry.path === '/api/auth/setup-status' || entry.path === '/api/auth/me' ||
       entry.path === '/api/operators/library?includeCompatibility=true' ||
+      entry.path === '/api/cameras/bindings' ||
       /^\/api\/operators\/(?:\d+|[A-Za-z][A-Za-z0-9_]*)\/metadata$/.test(entry.path) ||
       /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
         .test(entry.path) ||
@@ -104,6 +106,7 @@ export function isF03G6RequestAllowlist(
   return audit.every(entry => {
     if (entry.method === 'POST') {
       return entry.path === '/api/flows/preview-node' ||
+        entry.path === '/api/inspection/decision-configuration/validate' ||
         /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/open$/i
           .test(entry.path) || entry.path === '/api/inspection/admission' ||
         entry.path === '/api/inspection/execute' || entry.path === '/api/inspection/stop' ||

@@ -14,6 +14,7 @@ interface AuthFixtureState {
   loginCalls: number;
   logoutCalls: number;
   protected401Calls: number;
+  protectedFailuresEnabled: boolean;
   loginDelayMs: number;
 }
 
@@ -140,9 +141,13 @@ async function installAuthFixture(page: Page, state: AuthFixtureState): Promise<
       await json(route, 200, []);
       return;
     }
-    if (path === '/api/projects' || path.startsWith('/api/inspection/history')) {
+    if ((path === '/api/projects' || path.startsWith('/api/inspection/history')) && state.protectedFailuresEnabled) {
       state.protected401Calls += 1;
       await json(route, 401, { error: 'Unauthorized' });
+      return;
+    }
+    if (path === '/api/projects') {
+      await json(route, 200, []);
       return;
     }
     await json(route, 404, { error: 'NotFound' });
@@ -159,6 +164,7 @@ function freshState(overrides: Partial<AuthFixtureState> = {}): AuthFixtureState
     loginCalls: 0,
     logoutCalls: 0,
     protected401Calls: 0,
+    protectedFailuresEnabled: false,
     loginDelayMs: 0,
     ...overrides
   };
@@ -171,7 +177,7 @@ test('F04 auth lifecycle: setup auto-login, recovery, password invalidation, new
   const state = freshState();
   await installStartup(page);
   await installAuthFixture(page, state);
-  await page.goto('/studio/index.html#/overview');
+  await page.goto('/studio/index.html#/projects');
 
   await expect(page.locator('[data-auth-page="setup"]')).toBeVisible();
   if (hasF04VisualEvidenceTarget()) {
@@ -182,9 +188,9 @@ test('F04 auth lifecycle: setup auto-login, recovery, password invalidation, new
   await page.getByLabel('确认密码').fill('old-password');
   await page.getByRole('button', { name: '创建并进入 Studio' }).click();
   await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
-  await expect(page.locator('[data-capability="overview"]')).toBeVisible();
+  await expect(page.locator('[data-capability="projects-read"]')).toBeVisible();
   if (hasF04VisualEvidenceTarget()) {
-    await captureF04VisualEvidence(page, { scenario: 'overview', viewport, runtimeErrors });
+    await captureF04VisualEvidence(page, { scenario: 'projects', viewport, runtimeErrors });
   }
 
   await page.reload();
@@ -210,7 +216,7 @@ test('F04 auth lifecycle: setup auto-login, recovery, password invalidation, new
   await page.getByRole('button', { name: '退出', exact: true }).click();
   await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
   expect(state.logoutCalls).toBe(1);
-  await page.goto('/studio/index.html#/overview');
+  await page.goto('/studio/index.html#/projects');
   await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
   await page.goBack();
   await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
@@ -235,16 +241,15 @@ test('F04 auth guards reject role/profile and external return routes', async ({ 
   await page.goto('/studio/index.html#/stations');
   await expect(page.locator('[data-studio-page="forbidden"]')).toBeVisible();
 
-  await page.goto('/studio/index.html#/overview');
+  await page.goto('/studio/index.html#/projects');
   const navigation = page.getByRole('navigation', { name: '产品主导航' });
   for (const path of ['/projects', '/results']) {
     await expect(navigation.locator(`[data-product-nav="${path}"]`)).toBeVisible();
   }
-  const more = page.locator('[data-product-more]');
-  await more.locator('summary').click();
-  for (const path of ['/overview', '/operators', '/about']) {
-    await expect(more.locator(`[data-product-nav="${path}"]`)).toBeVisible();
-  }
+  await expect(page.locator('[data-product-more]')).toHaveCount(0);
+  await expect(page.locator('[data-product-nav="/overview"]')).toHaveCount(0);
+  await expect(page.locator('[data-product-nav="/operators"]')).toHaveCount(0);
+  await expect(page.locator('[data-product-nav="/about"]')).toHaveCount(0);
   await expect(page.locator('[data-product-nav="/diagnostics"]')).toHaveCount(0);
   await expect(page.locator('[data-product-nav="/stations"]')).toHaveCount(0);
   await page.getByRole('button', { name: '退出', exact: true }).click();
@@ -253,7 +258,7 @@ test('F04 auth guards reject role/profile and external return routes', async ({ 
   await page.getByLabel('用户名').fill('operator');
   await page.getByLabel('密码').fill('old-password');
   await page.getByRole('button', { name: '登录', exact: true }).click();
-  await expect(page).toHaveURL(/#\/overview$/);
+  await expect(page).toHaveURL(/#\/projects$/);
 });
 
 test('F04 product shell keeps the approved navigation stable across viewport and Browser DPR matrix', async ({ browser }) => {
@@ -274,9 +279,11 @@ test('F04 product shell keeps the approved navigation stable across viewport and
       state.validTokens.add(token);
       await installStartup(page, token);
       await installAuthFixture(page, state);
-      await page.goto('/studio/index.html#/overview');
+      await page.goto('/studio/index.html#/projects');
       await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
-      await expect(page.locator('[data-product-nav="/diagnostics"]')).toBeVisible();
+      await expect(page.locator('[data-product-nav="/projects"]')).toBeVisible();
+      await expect(page.locator('[data-product-nav="/results"]')).toBeVisible();
+      await expect(page.locator('[data-product-nav="/diagnostics"]')).toHaveCount(0);
 
       const projection = await page.evaluate(() => ({
         dpr: window.devicePixelRatio,
@@ -335,6 +342,7 @@ test('F04 auth deduplicates submit, ignores late response and collapses concurre
   await page.getByLabel('密码').fill('old-password');
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
+  state.protectedFailuresEnabled = true;
   await page.goto('/studio/index.html#/results?source=local&projectId=11111111-1111-4111-8111-111111111111');
   await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
   expect(state.protected401Calls).toBeGreaterThanOrEqual(2);

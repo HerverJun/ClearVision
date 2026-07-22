@@ -352,7 +352,12 @@ describe('F03 G1 Workspace persistence contracts', () => {
     expect(flow).not.toHaveProperty('operators.0.executionTimeMs');
     expect(flow).not.toHaveProperty('operators.0.errorMessage');
     expect(payload).toMatchObject({
-      globalVariables: null,
+      globalVariables: expect.objectContaining({
+        schemaVersion: '1.0',
+        variables: expect.arrayContaining([expect.objectContaining({ name: 'Counter' })]),
+        sourceBindings: expect.arrayContaining([expect.objectContaining({ outputPortName: 'Image' })]),
+        targetBindings: expect.arrayContaining([expect.objectContaining({ parameterName: 'Exposure' })])
+      }),
       expectedPersistenceRevision: 17,
       flow: { id: flowId }
     });

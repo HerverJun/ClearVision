@@ -510,6 +510,8 @@ public sealed class ApiEndpointsInspectionHistoryTests
             FlowVersionHash = "FLOW-HASH-2",
             CalibrationBundleId = "bundle-2",
             SessionId = Guid.NewGuid(),
+            ProjectPersistenceRevision = 23,
+            DecisionConfigurationHash = "DECISION-HASH-23",
             OutputDataJson = $$"""
             {
               "score": 42,
@@ -538,6 +540,9 @@ public sealed class ApiEndpointsInspectionHistoryTests
 
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
+        var traceability = root.GetProperty("traceability");
+        traceability.GetProperty("projectPersistenceRevision").GetInt64().Should().Be(23);
+        traceability.GetProperty("decisionConfigurationHash").GetString().Should().Be("DECISION-HASH-23");
         root.GetProperty("imageReference").GetString().Should().Be($"/api/images/{imageId:D}");
         root.GetProperty("outputDataPreview").GetProperty("wasTruncated").GetBoolean().Should().BeTrue();
         root.GetProperty("outputDataPreview").GetProperty("wasRedacted").GetBoolean().Should().BeTrue();

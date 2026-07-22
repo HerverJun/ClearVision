@@ -56,17 +56,17 @@ function createTestPlatform(): StudioPlatform {
 }
 
 describe('mountStudioApp', () => {
-  it('mounts the overview product shell once and disposes idempotently', async () => {
+  it('mounts the projects product shell once and disposes idempotently', async () => {
     document.body.innerHTML = '<div id="app"></div>';
     const router = createTestRouter();
     const platform = createTestPlatform();
 
     mountedApp = await mountStudioApp('#app', { router, platform });
 
-    expect(router.currentRoute.value.path).toBe('/overview');
+    expect(router.currentRoute.value.path).toBe('/projects');
     await vi.waitFor(() => {
       expect(document.querySelector('[data-product-shell="ready"]')).not.toBeNull();
-      expect(document.querySelector('[data-capability="overview"]')).not.toBeNull();
+      expect(document.querySelector('[data-capability="projects-read"]')).not.toBeNull();
     });
     expect(document.body.textContent).toContain('ClearVision');
     expect(document.body.textContent).toContain('tester');

@@ -26,11 +26,11 @@ describe('StudioUI router', () => {
     ]));
   });
 
-  it('redirects the root to overview and renders unknown routes as 404', async () => {
+  it('redirects the root to projects and renders unknown routes as 404', async () => {
     const router = createTestRouter();
 
     await router.push('/');
-    expect(router.currentRoute.value.path).toBe('/overview');
+    expect(router.currentRoute.value.path).toBe('/projects');
 
     await router.push('/unknown');
 

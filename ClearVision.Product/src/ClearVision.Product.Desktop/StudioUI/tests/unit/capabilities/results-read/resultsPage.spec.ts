@@ -84,9 +84,17 @@ function localDetail() {
       calibrationBundleId: null,
       sessionId: null,
       runId: null,
+      projectPersistenceRevision: 17,
+      decisionConfigurationHash: 'decision-hash',
       packageId: null,
       stationId: null
-    }
+    },
+    hasEvidenceManifest: false,
+    evidenceStatus: 'missing',
+    evidenceManifestReference: `/api/inspection/history/${projectId}/${resultId}/evidence/manifest`,
+    evidenceTotalBytes: null,
+    retentionExpiresAtUtc: null,
+    evidenceMessage: '证据清单缺失或已清理'
   };
 }
 
@@ -134,6 +142,12 @@ function apiWith(implementation: GetImplementation): ApiTransport {
     apiBaseUrl: 'http://localhost:5000/api',
     async get<T = unknown>(path: string, options?: ApiGetOptions): Promise<T | undefined> {
       return await implementation(path, options) as T | undefined;
+    },
+    async getBlob() {
+      return {
+        blob: new Blob([new Uint8Array([1])]), contentType: 'application/zip', contentLength: 1,
+        etag: null, sha256: null, headers: new Headers()
+      };
     }
   };
 }
@@ -147,7 +161,7 @@ async function mountResults(path: string, api: ApiTransport) {
   await router.isReady();
   const queries = createReadQueryClient(api);
   const wrapper = mount(ResultsPage, {
-    props: { runtime: { queries } },
+    props: { runtime: { queries, api } },
     global: { plugins: [router] }
   });
   await flushPromises();
@@ -171,11 +185,36 @@ describe('Results page', () => {
   });
 
   it('renders local Execution and Decision axes, scalar detail and defect summary', async () => {
+    const requested: string[] = [];
     const mounted = await mountResults(
       `/results?source=local&projectId=${projectId}&resultId=${resultId}`,
       apiWith(async path => {
+        requested.push(path);
         if (path === 'projects') return [project()];
         if (path === `inspection/history/${projectId}/${resultId}`) return localDetail();
+        if (path === `inspection/history/${projectId}/${resultId}/evidence/manifest`) return {
+          status: 'available',
+          message: '证据可用',
+          manifest: {
+            schemaVersion: 1,
+            manifestId: 'manifest-deep-link',
+            projectId,
+            inspectionResultId: resultId,
+            status: 'available',
+            outcome: 'NotApplicable',
+            createdAtUtc: '2026-07-15T01:00:02Z',
+            flowVersionHash: 'flow-hash',
+            calibrationBundleId: null,
+            sessionId: null,
+            runId: null,
+            retentionClass: 'standard',
+            retentionExpiresAtUtc: null,
+            totalBytes: 1,
+            checksum: 'sha',
+            redaction: { applied: true },
+            items: []
+          }
+        };
         if (path.startsWith(`inspection/history/${projectId}?`)) return localPage();
         throw new Error(`Unexpected request: ${path}`);
       })
@@ -186,6 +225,8 @@ describe('Results page', () => {
     expect(mounted.wrapper.text()).toContain('判定结果不适用');
     expect(mounted.wrapper.text()).toContain('轻微划痕');
     expect(mounted.wrapper.text()).toContain('流程版本哈希');
+    expect(mounted.wrapper.text()).toContain('manifest-deep-link');
+    expect(requested).toContain(`inspection/history/${projectId}/${resultId}/evidence/manifest`);
     expect(mounted.wrapper.text()).not.toContain('图像预览');
 
     mounted.wrapper.unmount();

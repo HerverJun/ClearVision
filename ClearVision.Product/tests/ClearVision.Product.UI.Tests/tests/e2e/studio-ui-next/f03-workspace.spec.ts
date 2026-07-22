@@ -22,6 +22,11 @@ const fixtureSchema = 'f03-g5-workspace.v1';
 const projectA = '11111111-1111-4111-8111-111111111111';
 const projectB = '22222222-2222-4222-8222-222222222222';
 const flowId = '33333333-3333-4333-8333-333333333333';
+const goldenSourceNodeId = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000c351';
+const goldenRoiNodeId = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000c352';
+const goldenJudgeNodeId = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000c353';
+const goldenJudgeOutputId = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000c3b5';
+const goldenResultId = 'aaaaaaaa-aaaa-4aaa-8aaa-000000015f91';
 const previewImage = Buffer.from(
   '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">' +
   '<rect width="100" height="100" fill="#203040"/><circle cx="50" cy="50" r="24" fill="#7dd3fc"/></svg>',
@@ -228,6 +233,20 @@ const operatorCatalog = Object.freeze([
     outputPorts: [{ name: 'Region', displayName: '区域', dataType: 13, isRequired: false, description: null }]
   }),
   operatorMetadata({
+    type: 8,
+    displayName: '宽度测量',
+    description: '测量 ROI 的密封宽度并输出浮点结果。',
+    categoryId: 3,
+    category: '测量',
+    keywords: ['宽度', 'measurement'],
+    inputPorts: [{ name: 'Region', displayName: '区域', dataType: 13, isRequired: true, description: null }],
+    outputPorts: [{ name: 'Width', displayName: '宽度', dataType: 2, isRequired: false, description: null }],
+    parameters: [{
+      name: 'Tolerance', displayName: '允许偏差', description: '密封宽度允许偏差。', dataType: 'double',
+      defaultValue: 12.5, minValue: 0, maxValue: 100, isRequired: true, options: null
+    }]
+  }),
+  operatorMetadata({
     type: 'RoiManager',
     displayName: 'ROI Manager',
     description: 'Editable rectangular ROI fixture.',
@@ -270,6 +289,7 @@ const operatorCatalog = Object.freeze([
 interface BootOptions {
   readonly workspaceEnabled?: boolean;
   readonly authStatus?: number;
+  readonly authRole?: 'Admin' | 'Engineer';
   readonly expectAuthShell?: boolean;
   readonly projectStatus?: number | (() => number);
   readonly projectBody?: unknown | ((projectId: string) => unknown);
@@ -328,8 +348,54 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
     if (url.pathname === '/api/auth/me') {
       const status = options.authStatus ?? 200;
       await fulfillF03Json(route, status, status === 200
-        ? { userId: 'f03-user', username: 'f03-engineer', role: 'Engineer' }
+        ? { userId: 'f03-user', username: 'f03-engineer', role: options.authRole ?? 'Engineer' }
         : { code: 'AUTH_REQUIRED' }, fixtureSchema);
+      return;
+    }
+    if (url.pathname === '/api/cameras/bindings' && request.method() === 'GET') {
+      await fulfillF03Json(route, 200, [{
+        id: 'camera-a',
+        displayName: '一号工位面阵相机',
+        deviceId: 'CAM-G3-001',
+        manufacturer: 'ClearVision Fixture',
+        modelName: 'CV-FRAME-01',
+        triggerMode: 'Software',
+        isEnabled: true,
+        connectionStatus: 'Connected'
+      }], fixtureSchema);
+      return;
+    }
+    if (url.pathname === '/api/cameras/soft-trigger-capture' && request.method() === 'POST') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/svg+xml',
+        headers: {
+          'Content-Length': String(previewImage.length),
+          'X-Camera-Id': 'camera-a',
+          'X-Trigger-Mode': 'Software',
+          'X-Image-Width': '100',
+          'X-Image-Height': '100',
+          'x-clearvision-fixture-schema': fixtureSchema
+        },
+        body: previewImage
+      });
+      return;
+    }
+    if (url.pathname === '/api/inspection/decision-configuration/validate' && request.method() === 'POST') {
+      const flow = request.postDataJSON() as Readonly<Record<string, unknown>>;
+      const configured = (flow.decisionConfiguration as Readonly<Record<string, unknown>> | null)
+        ?.finalDecisionBinding;
+      await fulfillF03Json(route, 200, {
+        isValid: Boolean(configured),
+        issues: configured ? [] : [{
+          code: 'DECISION_BINDING_REQUIRED',
+          message: '请选择最终判定输出。',
+          field: 'decisionConfiguration.finalDecisionBinding',
+          operatorId: null,
+          outputName: null
+        }],
+        eligibleOutputs: [goldenDecisionCandidate()]
+      }, fixtureSchema);
       return;
     }
     if (url.pathname === '/api/flows/preview-node' && request.method() === 'POST') {
@@ -451,6 +517,76 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
       }, fixtureSchema);
       return;
     }
+    const runtimeValuesMatch = url.pathname.match(
+      /^\/api\/projects\/([0-9a-f-]{36})\/global-variable-values$/i
+    );
+    if (runtimeValuesMatch && request.method() === 'GET') {
+      await fulfillF03Json(route, 200, [{
+        variableId: fixtureUuid(61_001),
+        name: 'SealWidth',
+        displayName: '密封宽度',
+        valueType: 'Double',
+        value: 12.8,
+        version: 4,
+        updatedAtUtc: '2026-07-22T01:02:03Z',
+        updatedBy: 'FormalRun',
+        runId: goldenResultId,
+        operatorId: goldenJudgeNodeId
+      }], fixtureSchema);
+      return;
+    }
+    const runtimePackageMatch = url.pathname.match(
+      /^\/api\/projects\/([0-9a-f-]{36})\/runtime-package\/export$/i
+    );
+    if (runtimePackageMatch && request.method() === 'POST') {
+      await fulfillF03Json(route, 200, {
+        packageRootPath: 'C:\\ClearVision\\Packages\\cvpkg-g3',
+        packageId: 'cvpkg-g3-golden',
+        packageName: '瓶盖检测 A',
+        flowHash: 'fixture-persisted-flow-hash',
+        decisionConfigurationHash: 'fixture-decision-hash',
+        registeredForStationDeployment: true,
+        stationPackageId: 'station-pkg-g3',
+        readmePath: 'C:\\ClearVision\\Packages\\cvpkg-g3\\README.txt'
+      }, fixtureSchema);
+      return;
+    }
+    if (url.pathname === '/api/projects' && request.method() === 'GET') {
+      await fulfillF03Json(route, 200, [projectPayload(projectA)], fixtureSchema);
+      return;
+    }
+    if (url.pathname === `/api/inspection/history/${projectA}/${goldenResultId}/evidence/manifest` &&
+        request.method() === 'GET') {
+      await fulfillF03Json(route, 200, goldenEvidenceManifest(), fixtureSchema);
+      return;
+    }
+    if (url.pathname === `/api/inspection/history/${projectA}/${goldenResultId}/evidence/export` &&
+        request.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/zip',
+        headers: {
+          'Content-Disposition': 'attachment; filename="g3-evidence.zip"',
+          'Content-Length': String(previewImage.length),
+          'x-clearvision-fixture-schema': fixtureSchema
+        },
+        body: previewImage
+      });
+      return;
+    }
+    if (url.pathname === `/api/inspection/history/${projectA}/${goldenResultId}` && request.method() === 'GET') {
+      await fulfillF03Json(route, 200, goldenResultDetail(), fixtureSchema);
+      return;
+    }
+    if (url.pathname === `/api/inspection/history/${projectA}` && request.method() === 'GET') {
+      await fulfillF03Json(route, 200, {
+        items: [goldenResultSummary()],
+        totalCount: 1,
+        pageIndex: Number(url.searchParams.get('pageIndex') ?? 0),
+        pageSize: Number(url.searchParams.get('pageSize') ?? 20)
+      }, fixtureSchema);
+      return;
+    }
     if (/^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname)) {
       if (request.method() === 'DELETE') {
         await route.fulfill({ status: 204, body: '' });
@@ -521,7 +657,7 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
           name: requestBody.name,
           description: requestBody.description,
           flow: requestBody.flow,
-          globalVariables: current.globalVariables,
+          globalVariables: requestBody.globalVariables,
           persistenceRevision: Number(current.persistenceRevision) + 1,
           modifiedAt: '2026-07-17T03:00:00Z'
         };
@@ -587,6 +723,200 @@ async function dragOperator(page: Page, name: string, x: number, y: number) {
 
 function fixtureUuid(seed: number): string {
   return `aaaaaaaa-aaaa-4aaa-8aaa-${seed.toString(16).padStart(12, '0')}`;
+}
+
+function goldenDecisionCandidate() {
+  return {
+    operatorId: goldenJudgeNodeId,
+    operatorName: '密封宽度判定',
+    outputPortId: goldenJudgeOutputId,
+    outputName: 'Width',
+    dataType: 'Float',
+    rule: 'NumericComparison',
+    defaultTrueMeansOk: null,
+    defaultOkValue: null,
+    defaultNgValue: null,
+    requiredOkValue: null,
+    requiredNgValue: null
+  };
+}
+
+function goldenJourneyFlow() {
+  const parameter = (seed: number, name: string, dataType: string, value: unknown, overrides: Record<string, unknown> = {}) => ({
+    id: fixtureUuid(seed),
+    name,
+    displayName: name,
+    description: `${name} G3 golden journey parameter`,
+    dataType,
+    value,
+    defaultValue: value,
+    minValue: null,
+    maxValue: null,
+    isRequired: false,
+    options: null,
+    ...overrides
+  });
+  const sourceOutputId = fixtureUuid(50_101);
+  const roiInputId = fixtureUuid(50_102);
+  const roiOutputId = fixtureUuid(50_103);
+  const judgeInputId = fixtureUuid(50_104);
+  return {
+    id: flowId,
+    name: 'G3 瓶盖密封黄金旅程',
+    operators: [{
+      id: goldenSourceNodeId,
+      name: '一号工位相机采集',
+      type: 0,
+      metadata: null,
+      x: 60,
+      y: 100,
+      inputPorts: [],
+      outputPorts: [{ id: sourceOutputId, name: 'Image', direction: 1, dataType: 0, isRequired: false }],
+      parameters: [
+        parameter(51_001, 'SourceType', 'string', 'Camera'),
+        parameter(51_002, 'CameraBindingId', 'CameraBinding', 'camera-a'),
+        parameter(51_003, 'TriggerMode', 'string', 'Software'),
+        parameter(51_004, 'ExposureTime', 'double', 1000),
+        parameter(51_005, 'Gain', 'double', 2)
+      ],
+      isEnabled: true,
+      executionStatus: 0,
+      executionTimeMs: null,
+      errorMessage: null
+    }, {
+      id: goldenRoiNodeId,
+      name: '瓶盖密封区域 ROI',
+      type: 'RoiManager',
+      metadata: null,
+      x: 280,
+      y: 100,
+      inputPorts: [{ id: roiInputId, name: 'Image', direction: 0, dataType: 0, isRequired: true }],
+      outputPorts: [{ id: roiOutputId, name: 'Roi', direction: 1, dataType: 13, isRequired: false }],
+      parameters: [
+        parameter(52_001, 'Shape', 'enum', 'Rectangle', { options: [{ label: '矩形', value: 'Rectangle' }] }),
+        parameter(52_002, 'X', 'double', 10, { minValue: 0, maxValue: 100, isRequired: true }),
+        parameter(52_003, 'Y', 'double', 10, { minValue: 0, maxValue: 100, isRequired: true }),
+        parameter(52_004, 'Width', 'double', 30, { minValue: 0, maxValue: 100, isRequired: true }),
+        parameter(52_005, 'Height', 'double', 20, { minValue: 0, maxValue: 100, isRequired: true })
+      ],
+      isEnabled: true,
+      executionStatus: 0,
+      executionTimeMs: null,
+      errorMessage: null
+    }, {
+      id: goldenJudgeNodeId,
+      name: '密封宽度判定',
+      type: 8,
+      metadata: null,
+      x: 480,
+      y: 100,
+      inputPorts: [{ id: judgeInputId, name: 'Region', direction: 0, dataType: 13, isRequired: true }],
+      outputPorts: [{ id: goldenJudgeOutputId, name: 'Width', direction: 1, dataType: 2, isRequired: false }],
+      parameters: [parameter(53_001, 'Tolerance', 'double', 12.5, { minValue: 0, maxValue: 100 })],
+      isEnabled: true,
+      executionStatus: 0,
+      executionTimeMs: null,
+      errorMessage: null
+    }],
+    connections: [{
+      id: fixtureUuid(54_001),
+      sourceOperatorId: goldenSourceNodeId,
+      sourcePortId: sourceOutputId,
+      targetOperatorId: goldenRoiNodeId,
+      targetPortId: roiInputId
+    }, {
+      id: fixtureUuid(54_002),
+      sourceOperatorId: goldenRoiNodeId,
+      sourcePortId: roiOutputId,
+      targetOperatorId: goldenJudgeNodeId,
+      targetPortId: judgeInputId
+    }],
+    decisionConfiguration: null
+  };
+}
+
+function goldenResultSummary() {
+  return {
+    id: goldenResultId,
+    resultId: goldenResultId,
+    projectId: projectA,
+    status: 'Completed',
+    executionOutcome: 'Succeeded',
+    decisionOutcome: 'Ok',
+    decisionSource: 'FinalDecision',
+    reasonCode: 'G3_OK',
+    hasJudgmentSignal: true,
+    defectCount: 0,
+    processingTimeMs: 18,
+    inspectionTime: '2026-07-22T01:02:03Z',
+    startedAt: '2026-07-22T01:02:02Z',
+    completedAt: '2026-07-22T01:02:03Z',
+    confidenceScore: 0.98,
+    flowVersionHash: 'fixture-persisted-flow-hash',
+    calibrationBundleId: null,
+    runId: goldenResultId,
+    diagnosticCode: 'G3_OK',
+    diagnosticMessage: '黄金旅程正式运行完成。',
+    errorMessage: null
+  };
+}
+
+function goldenResultDetail() {
+  return {
+    ...goldenResultSummary(),
+    defects: [],
+    traceability: {
+      flowVersionHash: 'fixture-persisted-flow-hash',
+      calibrationBundleId: null,
+      sessionId: null,
+      runId: goldenResultId,
+      packageId: 'cvpkg-g3-golden',
+      stationId: null,
+      projectPersistenceRevision: 8,
+      decisionConfigurationHash: 'fixture-decision-hash'
+    },
+    hasEvidenceManifest: true,
+    evidenceStatus: 'available',
+    evidenceManifestReference: 'manifest-g3',
+    evidenceTotalBytes: previewImage.length,
+    retentionExpiresAtUtc: null,
+    evidenceMessage: '本次结果证据完整，可导出。'
+  };
+}
+
+function goldenEvidenceManifest() {
+  return {
+    status: 'available',
+    message: '本次结果证据完整，可导出。',
+    manifest: {
+      schemaVersion: 1,
+      manifestId: 'manifest-g3',
+      projectId: projectA,
+      inspectionResultId: goldenResultId,
+      status: 'available',
+      outcome: 'OK',
+      createdAtUtc: '2026-07-22T01:02:03Z',
+      flowVersionHash: 'fixture-persisted-flow-hash',
+      calibrationBundleId: null,
+      sessionId: null,
+      runId: goldenResultId,
+      retentionClass: 'standard',
+      retentionExpiresAtUtc: null,
+      totalBytes: previewImage.length,
+      checksum: previewImageSha256,
+      redaction: { applied: true },
+      items: [{
+        id: 'output-image',
+        role: 'output-image',
+        contentType: 'image/svg+xml',
+        relativePath: 'output.svg',
+        sizeBytes: previewImage.length,
+        sha256: previewImageSha256,
+        available: true,
+        missingReason: null
+      }]
+    }
+  };
 }
 
 function formalRunFixtureResult(
@@ -1451,7 +1781,10 @@ test('G5 GET PUT GET saves one canonical payload and preserves null, falsy and o
   await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
 
   expect(captured).not.toBeNull();
-  expect(captured).toMatchObject({ expectedPersistenceRevision: 7, globalVariables: null });
+  expect(captured).toMatchObject({
+    expectedPersistenceRevision: 7,
+    globalVariables: { schemaVersion: '1.0', variables: [], sourceBindings: [], targetBindings: [] }
+  });
   const capturedFlow = captured!.flow as Readonly<Record<string, unknown>>;
   expect(capturedFlow).toMatchObject({ futureFlowField: { schema: 3 } });
   const capturedOperator = (capturedFlow.operators as Array<Record<string, unknown>>)[0]!;
@@ -1481,7 +1814,7 @@ test('G5 GET PUT GET saves one canonical payload and preserves null, falsy and o
   expect(audit.some(entry => /\/api\/(?:inspection\/execute|inspection\/admission|runs)/i.test(entry.path))).toBe(false);
 });
 
-test('G6 runs only the saved Project identity through admission, execute, and Results handoff', async ({ page }) => {
+test('G6 runs only the saved Project identity, stays in Workspace, and hands off the current result explicitly', async ({ page }) => {
   const requests: Array<{ stage: string; request: Readonly<Record<string, unknown>> }> = [];
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
@@ -1493,7 +1826,8 @@ test('G6 runs only the saved Project identity through admission, execute, and Re
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
   await expect(page.locator('[data-testid="workspace-run"]')).toBeEnabled();
   await page.locator('[data-testid="workspace-run"]').click();
-  await expect(page.locator('[data-capability="results-read"]')).toBeVisible();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'succeeded');
+  await expect(page.locator('[data-testid="workspace-current-result"]')).toHaveText('查看本次结果');
   expect(requests.map(item => item.stage)).toEqual(['admission', 'execute']);
   expect(requests[0]!.request).toMatchObject({ projectId: projectA, expectedPersistenceRevision: 7 });
   expect(requests[0]!.request).not.toHaveProperty('flowData');
@@ -1504,14 +1838,159 @@ test('G6 runs only the saved Project identity through admission, execute, and Re
     expectedDecisionConfigurationHash: 'fixture-decision-hash'
   });
   expect(requests[1]!.request.clientSnapshotId).toBe(requests[0]!.request.clientSnapshotId);
-  expect(audit.filter(item => item.method === 'POST' && item.path.startsWith('/api/inspection/'))
+  expect(audit.filter(item => item.method === 'POST' && item.path.startsWith('/api/inspection/') &&
+    item.path !== '/api/inspection/decision-configuration/validate')
     .map(item => item.path)).toEqual([
     '/api/inspection/admission',
     '/api/inspection/execute'
   ]);
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
-  await expect(shell).toHaveCount(0);
+  await page.locator('[data-testid="workspace-current-result"]').click();
+  await expect(page.locator('[data-capability="results-read"]')).toBeVisible();
 });
+
+for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 768 }] as const) {
+  test(`F04-R G3 golden journey closes Camera, Variables, Decision, Preview, Save, Run, Evidence and Package at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize(viewport);
+    const runtimeErrors = createF04RuntimeErrorAudit(page);
+    let savedPayload: Readonly<Record<string, unknown>> | null = null;
+    const audit = await bootWorkspace(page, {
+      authRole: 'Admin',
+      projectBody: projectId => projectPayload(projectId, { flow: goldenJourneyFlow() }),
+      projectPutScenario: (request, current) => {
+        savedPayload = request;
+        return {
+          body: {
+            ...current,
+            name: request.name,
+            description: request.description,
+            flow: request.flow,
+            globalVariables: request.globalVariables,
+            persistenceRevision: Number(current.persistenceRevision) + 1,
+            modifiedAt: '2026-07-22T01:02:01Z'
+          }
+        };
+      },
+      previewScenario: (request, call) => ({
+        body: previewPayload(request, call, {
+          outputData: { width: 12.8, tolerance: 12.5, outcome: 'OK' },
+          artifacts: [previewArtifactReference(call)]
+        })
+      })
+    });
+    const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+    await expect(page.locator('[data-testid="global-variables"]')).toBeVisible();
+    await expect(page.locator('[data-testid="runtime-package-export"]')).toBeVisible();
+
+    await selectInspectorNode(page, 120, 125);
+    const camera = page.locator('[data-capability="camera-binding-editor"]');
+    await expect(camera).toBeVisible();
+    await expect(camera.getByLabel('相机绑定')).toHaveValue('camera-a');
+    await camera.getByRole('button', { name: '捕获单帧' }).click();
+    await expect(camera).toHaveAttribute('data-capture-phase', 'captured');
+    await expect(camera).not.toHaveAttribute('data-frame-id', '');
+
+    await page.locator('[data-testid="global-variables"]').click();
+    const variables = page.locator('[data-capability="global-variables-workbench"]');
+    await variables.getByLabel('名称', { exact: true }).fill('SealWidth');
+    await variables.getByLabel('显示名称', { exact: true }).fill('密封宽度');
+    await variables.locator('.variables-workbench__form select').selectOption('Double');
+    await variables.getByLabel('默认 / 手动初始值').fill('12.5');
+    await variables.getByRole('button', { name: '添加定义' }).click();
+    await variables.getByRole('button', { name: '绑定', exact: true }).click();
+    const sourceBinding = variables.locator('.variables-workbench__bindings > div').nth(0);
+    await sourceBinding.locator('select').nth(0).selectOption({ label: '密封宽度' });
+    await sourceBinding.locator('select').nth(1).selectOption({ label: '密封宽度判定 / Width' });
+    await sourceBinding.getByRole('button', { name: '添加来源' }).click();
+    const targetBinding = variables.locator('.variables-workbench__bindings > div').nth(1);
+    await targetBinding.locator('select').nth(0).selectOption({ label: '密封宽度' });
+    await targetBinding.locator('select').nth(1).selectOption({ label: '密封宽度判定 / Tolerance' });
+    await targetBinding.getByRole('button', { name: '添加绑定' }).click();
+    await page.getByRole('button', { name: '应用到工程草稿' }).click();
+
+    await page.locator('[data-testid="final-decision"]').click();
+    const decision = page.locator('[data-capability="final-decision-workbench"]');
+    await decision.locator('select').first().selectOption(`${goldenJudgeNodeId}:${goldenJudgeOutputId}`);
+    await expect(decision.locator('input[type="number"]')).toBeVisible();
+    await decision.locator('input[type="number"]').fill('12.5');
+    await page.getByRole('button', { name: '校验并应用' }).click();
+    await expect(decision).toHaveCount(0);
+
+    await selectInspectorNode(page, 340, 125);
+    const preview = page.locator('[data-capability="preview-workbench"]');
+    const roi = page.locator('.preview-panel__roi');
+    await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+    await expect(roi).toHaveAttribute('data-roi-phase', 'ready');
+    await page.locator('[data-testid="roi-start"]').click();
+    await page.locator('[data-testid="image-canvas"]').focus();
+    await page.keyboard.press('ArrowRight');
+    await page.locator('[data-testid="roi-confirm"]').click();
+    await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+
+    await expect(page.locator('[data-testid="workspace-save"]')).toBeEnabled();
+    await page.locator('[data-testid="workspace-save"]').click();
+    await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'saved');
+    expect(savedPayload).toMatchObject({
+      expectedPersistenceRevision: 7,
+      globalVariables: {
+        schemaVersion: '1.0',
+        variables: [{ name: 'SealWidth', displayName: '密封宽度', valueType: 'Double', initialValue: 12.5 }]
+      },
+      flow: { decisionConfiguration: { finalDecisionBinding: { threshold: 12.5 } } }
+    });
+
+    await page.locator('[data-testid="workspace-run"]').click();
+    await expect(shell).toHaveAttribute('data-workspace-run-phase', 'succeeded');
+    await expect(page.locator('[data-testid="workspace-current-result"]')).toHaveText('查看本次结果');
+    await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+    if (hasF04VisualEvidenceTarget()) {
+      await captureF04VisualEvidence(page, {
+        scenario: `g3-workspace-completed-${viewport.width}`,
+        viewport,
+        runtimeErrors,
+        requestAudit: audit,
+        notes: ['BROWSER_FIXTURE camera frame; REAL_CAMERA=NOT_PERFORMED']
+      });
+    }
+
+    await page.locator('[data-testid="workspace-current-result"]').click();
+    const evidence = page.locator('[data-capability="result-evidence"]');
+    await expect(evidence).toHaveAttribute('data-evidence-phase', 'available');
+    await expect(evidence).toContainText('manifest-g3');
+    const download = page.waitForEvent('download');
+    await page.locator('[data-testid="result-evidence-export"]').click();
+    await download;
+    if (viewport.width === 1920 && hasF04VisualEvidenceTarget()) {
+      await captureF04VisualEvidence(page, {
+        scenario: 'g3-result-evidence', viewport, runtimeErrors, requestAudit: audit
+      });
+    }
+
+    await page.locator('[data-testid="results-return-workspace"]').click();
+    await expect(shell).toBeVisible();
+    await page.locator('[data-testid="runtime-package-export"]').click();
+    const packageDialog = page.locator('[data-capability="runtime-package-export"]');
+    await page.getByRole('button', { name: '导出运行包', exact: true }).click();
+    await expect(packageDialog).toHaveAttribute('data-phase', 'success');
+    await expect(packageDialog).toContainText('cvpkg-g3-golden');
+    if (viewport.width === 1920 && hasF04VisualEvidenceTarget()) {
+      await captureF04VisualEvidence(page, {
+        scenario: 'g3-admin-runtime-package', viewport, runtimeErrors, requestAudit: audit
+      });
+    }
+
+    expect(audit.some(entry => entry.method === 'POST' && entry.path === '/api/cameras/soft-trigger-capture')).toBe(true);
+    expect(audit.some(entry => entry.method === 'PUT' && entry.path === `/api/projects/${projectA}`)).toBe(true);
+    expect(audit.some(entry => entry.path === '/api/inspection/admission')).toBe(true);
+    expect(audit.some(entry => entry.path === '/api/inspection/execute')).toBe(true);
+    expect(audit.some(entry => entry.path.endsWith('/evidence/manifest'))).toBe(true);
+    expect(audit.some(entry => entry.path.endsWith('/evidence/export'))).toBe(true);
+    const packageRequest = audit.find(entry => entry.path.endsWith('/runtime-package/export'));
+    expect(packageRequest?.method).toBe('POST');
+    expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  });
+}
 
 test('G4 visual evidence holds Formal Run executing until the authoritative result settles', async ({ page }) => {
   const viewport = { width: 1600, height: 1000 } as const;
@@ -1531,7 +2010,8 @@ test('G4 visual evidence holds Formal Run executing until the authoritative resu
     });
   }
   execute.resolve({});
-  await expect(page.locator('[data-capability="results-read"]')).toBeVisible();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'succeeded');
+  await expect(page.locator('[data-testid="workspace-current-result"]')).toBeVisible();
 });
 
 test('G6 blocks execute after admission rejection and keeps the saved Workspace editable', async ({ page }) => {
@@ -1621,7 +2101,8 @@ test('G6 genuine running Stop cancels before execute completion and unlocks with
   expect(new URL(page.url()).hash).toContain(`/projects/${projectA}/workspace`);
   expect(stopObservedBeforeCompletion).toBe(true);
   expect(executeCompleted).toBe(true);
-  expect(audit.filter(entry => entry.method === 'POST' && entry.path.startsWith('/api/inspection/'))
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path.startsWith('/api/inspection/') &&
+    entry.path !== '/api/inspection/decision-configuration/validate')
     .map(entry => entry.path)).toEqual([
     '/api/inspection/admission',
     '/api/inspection/execute',
@@ -1666,7 +2147,8 @@ test('G6 explicit reconcile recovers a successful result after execute response 
   await page.locator('[data-testid="workspace-run"]').click();
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'unknown-outcome');
   await page.locator('[data-testid="workspace-run-reconcile"]').click();
-  await expect(page.locator('[data-capability="results-read"]')).toBeVisible();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'succeeded');
+  await expect(page.locator('[data-testid="workspace-current-result"]')).toBeVisible();
   expect(audit.some(entry => entry.path === '/api/inspection/reconcile')).toBe(true);
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
@@ -2413,7 +2895,8 @@ test('G6 passes 20 formal Run, Project switch, and route-leave cycles with a zer
     await expect(shell, `cycle ${cycle} Workspace ready`).toHaveAttribute('data-workspace-state', 'ready');
     await expect(page.locator('[data-testid="workspace-run"]'), `cycle ${cycle} Run enabled`).toBeEnabled();
     await page.locator('[data-testid="workspace-run"]').click();
-    await expect(page.locator('[data-capability="results-read"]'), `cycle ${cycle} Results handoff`).toBeVisible();
+    await expect(shell, `cycle ${cycle} Run succeeded`).toHaveAttribute('data-workspace-run-phase', 'succeeded');
+    await expect(page.locator('[data-testid="workspace-current-result"]'), `cycle ${cycle} result link`).toBeVisible();
 
     const nextProject = cycle % 2 === 0 ? projectB : projectA;
     await page.goto(`/studio/index.html#/projects/${nextProject}/workspace`);
@@ -2454,7 +2937,8 @@ test('G6 passes 20 formal Run, Project switch, and route-leave cycles with a zer
     totalRunDisposals: 21,
     ownerConflictCount: 0
   });
-  expect(audit.filter(entry => entry.method === 'POST' && !entry.path.endsWith('/open')))
+  expect(audit.filter(entry => entry.method === 'POST' &&
+    (entry.path === '/api/inspection/admission' || entry.path === '/api/inspection/execute')))
     .toHaveLength(40);
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
@@ -2505,7 +2989,8 @@ test('G6 passes 20 run, stop/reconcile, project, and route lifecycle cycles with
     } else {
       await expect(shell, `cycle ${cycle} unknown outcome`).toHaveAttribute('data-workspace-run-phase', 'unknown-outcome');
       await page.locator('[data-testid="workspace-run-reconcile"]').click();
-      await expect(page.locator('[data-capability="results-read"]'), `cycle ${cycle} Results handoff`).toBeVisible();
+      await expect(shell, `cycle ${cycle} reconciled result`).toHaveAttribute('data-workspace-run-phase', 'succeeded');
+      await expect(page.locator('[data-testid="workspace-current-result"]'), `cycle ${cycle} result link`).toBeVisible();
     }
 
     currentProject = currentProject === projectA ? projectB : projectA;
@@ -2540,7 +3025,9 @@ test('G6 passes 20 run, stop/reconcile, project, and route lifecycle cycles with
       });
   }
 
-  expect(audit.filter(entry => entry.method === 'POST' && !entry.path.endsWith('/open')))
+  expect(audit.filter(entry => entry.method === 'POST' && [
+    '/api/inspection/admission', '/api/inspection/execute', '/api/inspection/stop', '/api/inspection/reconcile'
+  ].includes(entry.path)))
     .toHaveLength(60);
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });

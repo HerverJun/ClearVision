@@ -153,8 +153,12 @@ public sealed class StudioUiArchitectureGuardTests
         {
             "src/app/auth/authLifecycleOwner.ts",
             "src/capabilities/project-lifecycle/projectLifecycleCommandOwner.ts",
+            "src/capabilities/project-workspace/camera/cameraBindingEditorOwner.ts",
+            "src/capabilities/project-workspace/final-decision/finalDecisionOwner.ts",
             "src/capabilities/project-workspace/preview/previewTransport.ts",
             "src/capabilities/project-workspace/run/runCommandOwner.ts",
+            "src/capabilities/project-workspace/runtime-package/runtimePackageExportOwner.ts",
+            "src/capabilities/results-read/resultEvidenceOwner.ts",
             "src/platform/diagnostics/runtimeDiagnostics.ts",
             "src/platform/query/readQuery.ts"
         });
@@ -461,7 +465,7 @@ public sealed class StudioUiArchitectureGuardTests
         router.Should().Contain("createWebHashHistory(import.meta.env.BASE_URL)");
         router.Should().Contain("component: ProductLayout");
         router.Should().Contain("component: InternalLabLayout");
-        router.Should().Contain("redirect: '/overview'");
+        router.Should().Contain("redirect: '/projects'");
         router.Should().Contain("path: 'overview'");
         router.Should().Contain("path: 'projects'");
         router.Should().Contain("path: 'projects/:id'");
@@ -485,13 +489,13 @@ public sealed class StudioUiArchitectureGuardTests
         router.Should().NotContain("/settings");
         router.Should().NotContain("/ai");
 
-        navigation.Should().Contain("to: '/overview'");
         navigation.Should().Contain("to: '/projects'");
-        navigation.Should().Contain("to: '/operators'");
-        navigation.Should().Contain("to: '/stations'");
         navigation.Should().Contain("to: '/results'");
-        navigation.Should().Contain("to: '/diagnostics'");
-        navigation.Should().Contain("to: '/about'");
+        navigation.Should().NotContain("to: '/overview'");
+        navigation.Should().NotContain("to: '/operators'");
+        navigation.Should().NotContain("to: '/stations'");
+        navigation.Should().NotContain("to: '/diagnostics'");
+        navigation.Should().NotContain("to: '/about'");
         navigation.Should().NotContain("/labs");
     }
 
@@ -529,7 +533,11 @@ public sealed class StudioUiArchitectureGuardTests
                 !relativePath.EndsWith("preview/previewWorkbenchOwner.ts", StringComparison.Ordinal) &&
                 !relativePath.EndsWith("preview/previewTransport.ts", StringComparison.Ordinal) &&
                 !relativePath.EndsWith("persistence/projectPersistencePort.ts", StringComparison.Ordinal) &&
-                !relativePath.EndsWith("run/runContracts.ts", StringComparison.Ordinal))
+                !relativePath.EndsWith("run/runContracts.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("camera/cameraBindingEditorOwner.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("global-variables/workspaceGlobalVariablesOwner.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("final-decision/finalDecisionOwner.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("runtime-package/runtimePackageExportOwner.ts", StringComparison.Ordinal))
             {
                 text.Should().NotContain("ApiTransport", $"{relativePath} must not hold the generic transport");
             }
@@ -605,7 +613,7 @@ public sealed class StudioUiArchitectureGuardTests
         persistenceSource.Should().Contain("GV031");
         persistenceSource.Should().Contain("unknown-outcome");
         persistenceSource.Should().NotContain("projects/${projectId}/flow");
-        persistenceSource.Should().NotContain("global-variables");
+        persistenceSource.Should().NotContain("projects/${projectId}/global-variables");
         persistenceSource.Should().NotContain("inspection/execute");
         persistenceSource.Should().NotContain("inspection/admission");
 
@@ -625,7 +633,7 @@ public sealed class StudioUiArchitectureGuardTests
 
         var workspaceContracts = File.ReadAllText(Path.Combine(workspaceRoot, "workspaceContracts.ts"));
         workspaceContracts.Should().Contain("expectedPersistenceRevision: baseline.persistenceRevision");
-        workspaceContracts.Should().Contain("globalVariables: null");
+        workspaceContracts.Should().Contain("globalVariables: encodeWorkspaceGlobalVariablesV1");
 
         var apiTransport = File.ReadAllText(Path.Combine(
             RepoPath(StudioUiRoot), "src", "platform", "api", "apiTransport.ts"));

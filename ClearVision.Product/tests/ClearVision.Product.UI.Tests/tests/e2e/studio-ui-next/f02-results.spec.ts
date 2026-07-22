@@ -93,9 +93,17 @@ function localDetail(kind = 'NotApplicable') {
       calibrationBundleId: null,
       sessionId: null,
       runId: null,
+      projectPersistenceRevision: 8,
+      decisionConfigurationHash: 'decision-hash',
       packageId: null,
       stationId: null
-    }
+    },
+    hasEvidenceManifest: true,
+    evidenceStatus: 'available',
+    evidenceManifestReference: `/api/inspection/history/${projectId}/${localResultId}/evidence/manifest`,
+    evidenceTotalBytes: 4,
+    retentionExpiresAtUtc: null,
+    evidenceMessage: '证据可用'
   };
 }
 
@@ -160,6 +168,32 @@ async function bootResults(page: Page, initialHash = '/results'): Promise<F02Met
     }
     if (url.pathname === '/api/projects') {
       await fulfillJson(route, 200, [project()]);
+      return;
+    }
+    if (url.pathname === `/api/inspection/history/${projectId}/${localResultId}/evidence/manifest`) {
+      await fulfillJson(route, 200, {
+        status: 'available',
+        message: '证据可用',
+        manifest: {
+          schemaVersion: 1,
+          manifestId: 'manifest-f02',
+          projectId,
+          inspectionResultId: localResultId,
+          status: 'available',
+          outcome: 'NotApplicable',
+          createdAtUtc: '2026-07-15T01:00:02Z',
+          flowVersionHash: 'flow-hash',
+          calibrationBundleId: null,
+          sessionId: null,
+          runId: null,
+          retentionClass: 'standard',
+          retentionExpiresAtUtc: null,
+          totalBytes: 4,
+          checksum: 'fixture-sha',
+          redaction: { applied: true },
+          items: []
+        }
+      });
       return;
     }
     if (url.pathname === `/api/inspection/history/${projectId}/${missingResultId}`) {

@@ -131,9 +131,8 @@ test('Product shell exposes one main landmark, skip navigation and disclosure fo
   await expect(appearance).not.toHaveAttribute('open', '');
   await expect(trigger).toBeFocused();
 
-  await page.locator('[data-product-more] > summary').click();
-  await page.locator('[data-product-nav="/about"]').click();
-  await expect(page.locator('[data-studio-page="about"]')).toBeVisible();
+  await page.locator('[data-product-nav="/projects"]').click();
+  await expect(page.locator('[data-capability="projects-read"]')).toBeVisible();
   await expect(page.getByRole('main')).toBeFocused();
 });
 
@@ -147,13 +146,12 @@ test('Product shell keeps reduced motion and short-viewport keyboard targets vis
   );
   expect(['0ms', '0s']).toContain(duration);
 
-  await page.locator('[data-product-more] > summary').click();
-  const aboutLink = page.locator('[data-product-nav="/about"]');
-  await aboutLink.focus();
-  const aboutBox = await aboutLink.boundingBox();
-  expect(aboutBox).not.toBeNull();
-  expect(aboutBox!.y).toBeGreaterThanOrEqual(0);
-  expect(aboutBox!.y + aboutBox!.height).toBeLessThanOrEqual(600);
+  const projectsLink = page.locator('[data-product-nav="/projects"]');
+  await projectsLink.focus();
+  const projectsBox = await projectsLink.boundingBox();
+  expect(projectsBox).not.toBeNull();
+  expect(projectsBox!.y).toBeGreaterThanOrEqual(0);
+  expect(projectsBox!.y + projectsBox!.height).toBeLessThanOrEqual(600);
 
   const appearance = page.locator('[data-product-appearance] > summary');
   await appearance.focus();

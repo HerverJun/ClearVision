@@ -17,6 +17,7 @@ import { createAuthLifecycleRoot } from '@/app/auth';
 
 function fakeRuntime(requiresPreservation = true): ProductRuntime {
   return {
+    api: {} as ProductRuntime['api'],
     queries: {} as ProductRuntime['queries'],
     session: {} as ProductRuntime['session'],
     systemStatus: {} as ProductRuntime['systemStatus'],

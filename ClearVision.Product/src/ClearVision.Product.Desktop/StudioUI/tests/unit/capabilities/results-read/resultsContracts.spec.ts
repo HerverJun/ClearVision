@@ -164,7 +164,7 @@ describe('Results contracts', () => {
     expect(numericKinds).toEqual(['Ok', 'Ng', 'Failed', 'Cancelled', 'Undetermined']);
   });
 
-  it('decodes scalar local detail and excludes image, ROI and evidence contracts', () => {
+  it('decodes scalar local detail and the evidence summary contract', () => {
     const detail = decodeLocalInspectionResultDetail({
       ...localSummary(),
       defects: [{
@@ -183,11 +183,18 @@ describe('Results contracts', () => {
         calibrationBundleId: null,
         sessionId: runId,
         runId,
+        projectPersistenceRevision: 17,
+        decisionConfigurationHash: 'decision-hash',
         packageId: null,
         stationId: null
       },
       imageReference: '/api/images/ignored',
-      evidenceManifestReference: '/api/evidence/ignored'
+      hasEvidenceManifest: true,
+      evidenceStatus: 'available',
+      evidenceManifestReference: '/api/inspection/history/project/result/evidence/manifest',
+      evidenceTotalBytes: 1024,
+      retentionExpiresAtUtc: '2026-08-15T01:00:02Z',
+      evidenceMessage: '证据清单可用'
     });
 
     expect(detail.defects).toEqual([{
@@ -197,7 +204,15 @@ describe('Results contracts', () => {
       description: '轻微划痕'
     }]);
     expect(detail).not.toHaveProperty('imageReference');
-    expect(detail).not.toHaveProperty('evidenceManifestReference');
+    expect(detail).toMatchObject({
+      hasEvidenceManifest: true,
+      evidenceStatus: 'available',
+      evidenceTotalBytes: 1024,
+      traceability: {
+        projectPersistenceRevision: 17,
+        decisionConfigurationHash: 'decision-hash'
+      }
+    });
   });
 
   it('rejects malformed, unknown and half-present outcome axes', () => {
