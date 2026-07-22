@@ -13,7 +13,6 @@ import {
   CvDescriptionList,
   CvField,
   CvInlineAlert,
-  CvPageHeader,
   CvPageState,
   CvPagination,
   CvPanel,
@@ -71,6 +70,24 @@ const evidenceOwner = shallowRef<ResultEvidenceOwner | null>(null);
 const advancedFiltersOpen = shallowRef(
   Boolean(firstQueryValue(route.query.diagnosticCode) || firstQueryValue(route.query.from) || firstQueryValue(route.query.to))
 );
+const copiedTechnicalField = shallowRef<string | null>(null);
+
+function evidencePhaseLabel(phase: string): string {
+  return ({
+    idle: '等待读取', loading: '读取中', available: '清单可用', partial: '部分可用',
+    missing: '证据缺失', expired: '已过保留期', disabled: '未启用', error: '读取失败',
+    exporting: '正在导出', disposed: '已关闭'
+  } as Readonly<Record<string, string>>)[phase] ?? '状态未知';
+}
+
+async function copyTechnicalField(key: string, value: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(value);
+    copiedTechnicalField.value = key;
+  } catch {
+    copiedTechnicalField.value = null;
+  }
+}
 
 function returnToWorkspace(): void {
   if (!projectId.value) return;
@@ -501,22 +518,20 @@ onBeforeUnmount(() => {
     data-capability="results-read"
     :data-results-source="source"
   >
-    <CvPageHeader
-      title="结果与追溯"
-      description="筛选检测历史，快速判断结果，并查看诊断与追溯标识。"
-    >
-      <template #meta>
+    <header class="results-page__commandbar">
+      <div class="results-page__title">
+        <h1>检测结果</h1>
         <CvStatusBadge
           tone="info"
           :dot="false"
         >
-          基础追溯 · 只读
+          只读
         </CvStatusBadge>
         <span class="results-page__meta">
           {{ source === 'local' ? '本机结果' : '工作站上报' }}
         </span>
-      </template>
-      <template #actions>
+      </div>
+      <div class="results-page__commands">
         <CvButton
           v-if="source === 'local' && projectId"
           size="sm"
@@ -534,21 +549,13 @@ onBeforeUnmount(() => {
         >
           刷新
         </CvButton>
-      </template>
-    </CvPageHeader>
+      </div>
+    </header>
 
     <section
       class="results-page__filters"
-      aria-labelledby="results-filter-heading"
+      aria-label="结果筛选"
     >
-      <div class="results-page__filter-heading">
-        <div>
-          <h2 id="results-filter-heading">
-            筛选结果
-          </h2>
-          <p>筛选条件会保留在当前地址中。</p>
-        </div>
-      </div>
       <CvToolbar
         class="results-page__filter-toolbar"
         interaction="group"
@@ -908,11 +915,9 @@ onBeforeUnmount(() => {
               v-if="evidence?.manifest"
               class="results-page__evidence-summary"
             >
-              <div><dt>Manifest ID</dt><dd>{{ evidence.manifest.manifestId }}</dd></div>
-              <div><dt>状态</dt><dd>{{ evidence.phase }}</dd></div>
+              <div><dt>证据状态</dt><dd>{{ evidencePhaseLabel(evidence.phase) }}</dd></div>
               <div><dt>大小</dt><dd>{{ evidence.manifest.totalBytes.toLocaleString('zh-CN') }} B</dd></div>
               <div><dt>保留</dt><dd>{{ evidence.manifest.retentionClass }} / {{ formatDateTime(evidence.manifest.retentionExpiresAtUtc) }}</dd></div>
-              <div><dt>Checksum</dt><dd>{{ evidence.manifest.checksum ?? '—' }}</dd></div>
               <div><dt>脱敏</dt><dd>{{ evidence.manifest.redactionApplied ? '已应用' : '未应用' }}</dd></div>
             </dl>
             <table
@@ -929,6 +934,39 @@ onBeforeUnmount(() => {
                 </tr>
               </tbody>
             </table>
+            <details
+              v-if="evidence?.manifest"
+              class="results-page__technical-details"
+            >
+              <summary>证据技术详情</summary>
+              <dl>
+                <div>
+                  <dt>清单标识 <span translate="no">Manifest ID</span></dt>
+                  <dd>
+                    <code translate="no">{{ evidence.manifest.manifestId }}</code><CvButton
+                      size="sm"
+                      variant="quiet"
+                      @click="copyTechnicalField('manifest', evidence.manifest.manifestId)"
+                    >
+                      {{ copiedTechnicalField === 'manifest' ? '已复制' : '复制' }}
+                    </CvButton>
+                  </dd>
+                </div>
+                <div>
+                  <dt>完整性校验 <span translate="no">Checksum</span></dt>
+                  <dd>
+                    <code translate="no">{{ evidence.manifest.checksum ?? '—' }}</code><CvButton
+                      v-if="evidence.manifest.checksum"
+                      size="sm"
+                      variant="quiet"
+                      @click="copyTechnicalField('checksum', evidence.manifest.checksum)"
+                    >
+                      {{ copiedTechnicalField === 'checksum' ? '已复制' : '复制' }}
+                    </CvButton>
+                  </dd>
+                </div>
+              </dl>
+            </details>
           </section>
           <details class="results-page__traceability">
             <summary>技术追溯</summary>
@@ -1111,13 +1149,13 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.results-page { display: grid; max-width: 1720px; min-width: 0; gap: var(--cv-density-page-gap); }
+.results-page { height: 100%; min-height: 0; display: flex; flex-direction: column; max-width: 1720px; min-width: 0; gap: var(--cv-space-2); overflow: hidden; }
+.results-page__commandbar { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); border-bottom: 1px solid var(--cv-border-subtle); }
+.results-page__title,.results-page__commands { min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); }
+.results-page__title h1 { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-md); font-weight: var(--cv-font-weight-semibold); letter-spacing: 0; }
 .results-page__meta { align-self: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-.results-page__filters { overflow: hidden; border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-lg); background: var(--cv-surface-raised); }
-.results-page__filter-heading { display: flex; align-items: center; justify-content: space-between; padding: var(--cv-space-3) var(--cv-density-panel-padding) var(--cv-space-2); }
-.results-page__filter-heading h2 { margin: 0; scroll-margin-top: calc(var(--cv-product-topbar-height) + var(--cv-space-3)); color: var(--cv-text-primary); font-size: var(--cv-font-size-lg); font-weight: var(--cv-font-weight-semibold); letter-spacing: var(--cv-letter-spacing-title); }
-.results-page__filter-heading p { margin: 2px 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-.results-page__filter-toolbar { padding: var(--cv-space-2) var(--cv-density-panel-padding) var(--cv-space-3); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
+.results-page__filters { overflow: hidden; border-block: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
+.results-page__filter-toolbar { padding: var(--cv-space-2); background: var(--cv-surface-raised); }
 .results-page__filter-toolbar :deep(.cv-toolbar__primary) { flex: 1 1 100%; align-items: end; }
 .results-page__source { min-width: 124px; flex: 0 1 124px; }
 .results-page__project { min-width: 220px; flex: 1 1 260px; }
@@ -1129,12 +1167,14 @@ onBeforeUnmount(() => {
 .results-page__advanced-trigger:hover { background: var(--cv-interactive-hover); }
 .results-page__advanced-trigger:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
 .results-page__filter-count { padding: 1px var(--cv-space-1); border-radius: var(--cv-radius-pill); background: var(--cv-color-status-info-soft); color: var(--cv-color-status-info-strong); font-size: var(--cv-font-size-2xs); }
-.results-page__advanced { display: flex; flex-wrap: wrap; align-items: start; gap: var(--cv-space-3); padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
-.results-page__layout { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(340px, 0.72fr); gap: var(--cv-space-4); align-items: start; }
+.results-page__advanced { display: flex; flex-wrap: wrap; align-items: start; gap: var(--cv-space-3); padding: var(--cv-space-2); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
+.results-page__layout { min-height: 0; flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(390px, 0.85fr); gap: var(--cv-space-2); align-items: stretch; overflow: hidden; }
+.results-page__list-panel,.results-page__detail-panel { height: 100%; min-height: 0; border-radius: var(--cv-radius-sm); }
+.results-page :deep(.results-page__list-panel > .cv-panel__content),.results-page :deep(.results-page__detail-panel > .cv-panel__content) { max-height: 100%; overflow: auto; overscroll-behavior: contain; }
 .results-page__notice { margin-bottom: var(--cv-space-3); }
 .results-page__outcome-cell { display: grid; justify-items: start; gap: var(--cv-space-1); }
 .results-page__outcome-cell small { color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-2xs); }
-.results-page__detail-panel { position: sticky; top: calc(var(--cv-product-topbar-height) + var(--cv-density-page-padding)); }
+.results-page__detail-panel { position: static; }
 .results-page__detail-section { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
 .results-page__detail-section--summary { background: var(--cv-surface-page); }
 .results-page__detail-section h3 { margin: 0 0 var(--cv-space-2); color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); }
@@ -1145,10 +1185,10 @@ onBeforeUnmount(() => {
 .results-page__evidence-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
 .results-page__evidence-heading h3 { margin-bottom: 2px; }
 .results-page__evidence-heading p { margin: 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
-.results-page__evidence-summary { margin: var(--cv-space-3) 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--cv-border-subtle); }
+.results-page__evidence-summary { margin: var(--cv-space-3) 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-block: 1px solid var(--cv-border-subtle); }
 .results-page__evidence-summary div { min-width: 0; padding: 6px 8px; border-bottom: 1px solid var(--cv-border-subtle); }
 .results-page__evidence-summary dt { color: var(--cv-text-muted); font-size: 9px; }
-.results-page__evidence-summary dd { margin: 2px 0 0; overflow: hidden; font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
+.results-page__evidence-summary dd { margin: 2px 0 0; font-size: var(--cv-font-size-2xs); overflow-wrap: anywhere; }
 .results-page__evidence-items { width: 100%; margin-top: var(--cv-space-2); border-collapse: collapse; font-size: var(--cv-font-size-2xs); }
 .results-page__evidence-items th,.results-page__evidence-items td { padding: 5px 6px; text-align: left; border-bottom: 1px solid var(--cv-border-subtle); }
 .results-page__traceability { border-top: 1px solid var(--cv-border-subtle); }
@@ -1156,6 +1196,15 @@ onBeforeUnmount(() => {
 .results-page__traceability summary:hover { background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
 .results-page__traceability summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
 .results-page__traceability :deep(.cv-description-list) { padding: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
+.results-page__technical-details { margin-top: var(--cv-space-2); border-top: 1px solid var(--cv-border-subtle); }
+.results-page__technical-details summary { min-height: 32px; display: flex; align-items: center; color: var(--cv-text-secondary); cursor: pointer; font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-semibold); }
+.results-page__technical-details summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
+.results-page__technical-details dl { margin: 0; display: grid; gap: var(--cv-space-2); }
+.results-page__technical-details dl > div { min-width: 0; padding: var(--cv-space-2); background: var(--cv-surface-page); }
+.results-page__technical-details dt { color: var(--cv-text-secondary); font-size: 9px; }
+.results-page__technical-details dt span { margin-left: var(--cv-space-1); color: var(--cv-text-muted); }
+.results-page__technical-details dd { margin: 2px 0 0; display: flex; align-items: flex-start; gap: var(--cv-space-2); }
+.results-page__technical-details code { min-width: 0; flex: 1; color: var(--cv-text-primary); font-size: 10px; overflow-wrap: anywhere; user-select: all; }
 .results-page :deep(.results-page__list-panel > .cv-panel__header),
 .results-page :deep(.results-page__detail-panel > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
 .results-page :deep(.results-page__list-panel .cv-inline-alert),
@@ -1163,7 +1212,7 @@ onBeforeUnmount(() => {
 .results-page :deep(.results-page__detail-panel > .cv-panel__content > .cv-inline-alert),
 .results-page :deep(.results-page__detail-panel > .cv-panel__content > .cv-page-state) { margin: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
 .results-page :deep(.results-page__list-panel .cv-pagination) { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
-@media (max-width: 1240px) { .results-page__layout { grid-template-columns: minmax(0, 1fr) minmax(320px, 0.65fr); } }
+@media (max-width: 1240px) { .results-page__layout { grid-template-columns: minmax(0, 1fr) minmax(340px, 0.72fr); } }
 @media (max-width: 980px) { .results-page__layout { grid-template-columns: 1fr; } .results-page__detail-panel { position: static; } }
 @media (max-width: 640px) { .results-page__defects li { grid-template-columns: 1fr; } }
 </style>

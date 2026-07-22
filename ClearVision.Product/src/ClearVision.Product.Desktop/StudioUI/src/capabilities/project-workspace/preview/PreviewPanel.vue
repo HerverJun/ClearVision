@@ -41,6 +41,16 @@ const phaseLabel = computed(() => ({
   error: '预览失败',
   disposed: '已关闭'
 }[preview.phase] ?? '等待预览'));
+const selectedNodeLabel = computed(() => {
+  const type = preview.selectedNodeType?.toLocaleLowerCase() ?? '';
+  if (type.includes('roimanager')) return '感兴趣区域管理';
+  if (type.includes('imageacquisition')) return '图像采集';
+  return preview.selectedNodeType ? '当前算子' : '未选择';
+});
+
+function outputLabel(key: string): string {
+  return ({ width: '宽度', height: '高度', tolerance: '容差', outcome: '判定输出' } as Readonly<Record<string, string>>)[key.toLocaleLowerCase()] ?? key;
+}
 const structuredText = computed(() => preview.outputData
   ? JSON.stringify(preview.outputData as unknown, null, 2)
   : null);
@@ -197,8 +207,8 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
           </div>
           <dl>
             <div>
-              <dt>节点类型</dt><dd translate="no">
-                {{ preview.selectedNodeType || '—' }}
+              <dt>当前算子</dt><dd :title="preview.selectedNodeType || undefined">
+                {{ selectedNodeLabel }}
               </dd>
             </div>
             <div>
@@ -288,7 +298,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
                 translate="no"
                 :title="item.key"
               >
-                {{ item.key }}
+                {{ outputLabel(item.key) }}
               </dt>
               <dd :title="item.value">
                 {{ item.value }}

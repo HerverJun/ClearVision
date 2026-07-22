@@ -48,27 +48,27 @@ describe('Workspace layout owner', () => {
 
     observer.resize(1290, 600);
     expect(owner.projection).toMatchObject({
-      inspectorMinWidth: 248,
-      inspectorMaxWidth: 338,
-      inspectorWidth: 296,
+      inspectorMinWidth: 240,
+      inspectorMaxWidth: 240,
+      inspectorWidth: 240,
       previewMinHeight: 160,
       previewMaxHeight: 240,
       previewHeight: 220,
-      previewWidth: 362
+      previewWidth: 300
     });
 
     owner.setInspectorWidth(999);
     owner.setPreviewHeight(999);
-    expect(owner.projection.inspectorWidth).toBe(338);
+    expect(owner.projection.inspectorWidth).toBe(240);
     expect(owner.projection.previewHeight).toBe(240);
-    expect(owner.projection.previewWidth).toBe(320);
+    expect(owner.projection.previewWidth).toBe(300);
 
     observer.resize(980, 520);
-    expect(owner.projection.inspectorMaxWidth).toBe(248);
-    expect(owner.projection.inspectorWidth).toBe(248);
+    expect(owner.projection.inspectorMaxWidth).toBe(240);
+    expect(owner.projection.inspectorWidth).toBe(240);
     expect(owner.projection.previewMaxHeight).toBe(160);
     expect(owner.projection.previewHeight).toBe(160);
-    expect(owner.projection.previewWidth).toBe(320);
+    expect(owner.projection.previewWidth).toBe(300);
 
     owner.dispose();
     expect(observer.disconnected).toBe(true);
@@ -89,7 +89,7 @@ describe('Workspace layout owner', () => {
 
     expect(JSON.parse(storage.read() ?? '{}')).toEqual({
       schemaVersion: 2,
-      inspectorWidth: 384,
+      inspectorWidth: 380,
       previewHeight: 320,
       previewWidth: 448,
       previewCollapsed: true
@@ -100,7 +100,7 @@ describe('Workspace layout owner', () => {
     second.attach(document.createElement('section'));
     secondObserver.resize(1860, 980);
     expect(second.projection).toMatchObject({
-      inspectorWidth: 384,
+      inspectorWidth: 380,
       previewHeight: 320,
       previewWidth: 448,
       previewCollapsed: true

@@ -281,16 +281,15 @@ const toggleDisabledLabel = computed(() => {
   right: 12px;
   left: 12px;
   min-width: 0;
-  height: 38px;
+  height: 36px;
   display: flex;
   align-items: center;
   gap: var(--cv-space-1);
   padding: 0 var(--cv-space-2);
   overflow: hidden;
   border: 1px solid var(--cv-border-subtle);
-  border-radius: var(--cv-radius-md);
-  background: color-mix(in srgb, var(--cv-surface-raised) 96%, transparent);
-  box-shadow: 0 2px 6px rgba(37, 55, 72, 0.09);
+  border-radius: var(--cv-radius-sm);
+  background: var(--cv-surface-raised);
 }
 .flow-canvas-surface__tool-group { min-width: 0; display: flex; align-items: center; gap: 2px; }
 .flow-canvas-surface__tool-group + .flow-canvas-surface__tool-group { margin-left: var(--cv-space-1); padding-left: var(--cv-space-1); border-left: 1px solid var(--cv-border-subtle); }
@@ -341,7 +340,8 @@ const toggleDisabledLabel = computed(() => {
 .flow-canvas-surface__feedback[data-tone="success"] { color: var(--cv-color-status-ok-strong); }
 .flow-canvas-surface__spacer { flex: 1; }
 .flow-canvas-surface__stage :deep(.flow-selection-box) { border: 1px solid var(--flow-canvas-selection-border); background: var(--flow-canvas-selection-background); }
-.flow-canvas-surface__stage :deep(.flow-minimap) { border: 1px solid var(--flow-canvas-minimap-border) !important; border-radius: var(--cv-radius-sm); background: var(--flow-canvas-minimap-background) !important; box-shadow: 0 2px 6px rgba(37, 55, 72, 0.13); }
+.flow-canvas-surface__stage :deep(.flow-minimap) { width: 168px !important; height: 112px !important; right: 14px !important; bottom: 14px !important; border: 1px solid var(--flow-canvas-minimap-border) !important; border-radius: var(--cv-radius-sm); background: var(--flow-canvas-minimap-background) !important; box-shadow: 0 1px 4px rgba(37, 55, 72, 0.12); }
+.flow-canvas-surface__stage :deep(.flow-minimap > canvas) { width: 168px !important; height: 112px !important; }
 .flow-canvas-surface__stage :deep(.flow-minimap-toggle) { border: 1px solid var(--flow-canvas-minimap-border) !important; background: var(--flow-canvas-minimap-background) !important; color: var(--flow-canvas-node-text) !important; }
 
 @media (max-width: 1360px) {

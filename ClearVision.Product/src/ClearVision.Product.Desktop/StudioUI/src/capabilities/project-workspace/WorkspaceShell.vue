@@ -232,104 +232,118 @@ const showRunSummary = computed(() => Boolean(run.value && [
           :title="`工程 ID：${projectId}${currentProject ? `；版本：${currentProject.version}；保存修订：${persistence?.persistenceRevision ?? currentProject.persistenceRevision}` : ''}`"
         >
           <strong>{{ currentProject?.name ?? '工程工作区' }}</strong>
-          <small v-if="currentProject">版本 {{ currentProject.version }}</small>
+          <small v-if="currentProject">流程编辑 · 版本 {{ currentProject.version }}</small>
         </div>
+        <CvStatusBadge
+          v-if="persistence"
+          class="workspace-shell__save-state"
+          :tone="persistence.dirty ? 'warning' : 'ok'"
+          :label="persistenceLabel"
+        />
       </div>
 
       <div class="workspace-shell__commands">
-        <CvButton
-          data-capability="final-decision"
-          data-testid="final-decision"
-          size="sm"
-          variant="secondary"
-          :disabled="!persistence || isReadonly"
-          title="配置正式运行使用的最终判定"
-          @click="openDecision"
-        >
-          <template #leading>
-            <CvIcon
-              name="decision"
-              size="sm"
-            />
-          </template>
-          最终判定
-        </CvButton>
-        <CvButton
-          v-if="persistence"
-          data-testid="workspace-save"
-          size="sm"
-          variant="secondary"
-          :disabled="!persistence.canSave"
-          @click="workspaceOwner?.save()"
-        >
-          <template #leading>
-            <CvIcon
-              name="save"
-              size="sm"
-            />
-          </template>
-          {{ persistence.phase === 'saving' ? '保存中…' : '保存' }}
-        </CvButton>
-        <CvButton
-          v-if="run"
-          data-testid="workspace-run"
-          size="sm"
-          variant="primary"
-          :disabled="!run.canRun"
-          @click="workspaceOwner?.runFormal()"
-        >
-          <template #leading>
-            <CvIcon
-              name="play"
-              size="sm"
-            />
-          </template>
-          运行
-        </CvButton>
-        <CvButton
-          v-if="run?.canStop"
-          data-testid="workspace-run-stop"
-          size="sm"
-          variant="danger"
-          @click="workspaceOwner?.stopFormal()"
-        >
-          停止运行
-        </CvButton>
-        <CvButton
-          data-capability="global-variables"
-          data-testid="global-variables"
-          size="sm"
-          variant="quiet"
-          :disabled="!persistence || isReadonly"
-          title="管理本工程的变量定义与绑定"
-          @click="openVariables"
-        >
-          <template #leading>
-            <CvIcon
-              name="variables"
-              size="sm"
-            />
-          </template>
-          全局变量
-        </CvButton>
-        <CvButton
-          v-if="userRole === 'Admin'"
-          data-testid="runtime-package-export"
-          size="sm"
-          variant="quiet"
-          :disabled="!persistence || run?.phase === 'executing'"
-          title="从已正式保存的工程导出运行包"
-          @click="openRuntimePackage"
-        >
-          运行包
-        </CvButton>
-        <RouterLink
-          class="workspace-shell__results-link"
-          :to="{ path: '/results', query: { source: 'local', projectId } }"
-          data-testid="workspace-results"
-        >
-          当前工程结果
-        </RouterLink>
+        <div class="workspace-shell__command-group workspace-shell__command-group--primary">
+          <CvButton
+            data-capability="final-decision"
+            data-testid="final-decision"
+            size="sm"
+            variant="secondary"
+            :disabled="!persistence || isReadonly"
+            title="配置正式运行使用的最终判定"
+            @click="openDecision"
+          >
+            <template #leading>
+              <CvIcon
+                name="decision"
+                size="sm"
+              />
+            </template>
+            最终判定
+          </CvButton>
+          <CvButton
+            v-if="persistence"
+            data-testid="workspace-save"
+            size="sm"
+            variant="secondary"
+            :disabled="!persistence.canSave"
+            @click="workspaceOwner?.save()"
+          >
+            <template #leading>
+              <CvIcon
+                name="save"
+                size="sm"
+              />
+            </template>
+            {{ persistence.phase === 'saving' ? '保存中…' : '保存' }}
+          </CvButton>
+          <CvButton
+            v-if="run"
+            data-testid="workspace-run"
+            size="sm"
+            variant="primary"
+            :disabled="!run.canRun"
+            @click="workspaceOwner?.runFormal()"
+          >
+            <template #leading>
+              <CvIcon
+                name="play"
+                size="sm"
+              />
+            </template>
+            正式运行
+          </CvButton>
+          <CvButton
+            v-if="run?.canStop"
+            data-testid="workspace-run-stop"
+            size="sm"
+            variant="danger"
+            @click="workspaceOwner?.stopFormal()"
+          >
+            停止
+          </CvButton>
+        </div>
+        <span
+          class="workspace-shell__command-divider"
+          aria-hidden="true"
+        />
+        <div class="workspace-shell__command-group workspace-shell__command-group--tools">
+          <CvButton
+            data-capability="global-variables"
+            data-testid="global-variables"
+            size="sm"
+            variant="quiet"
+            :disabled="!persistence || isReadonly"
+            title="管理本工程的变量定义与绑定"
+            @click="openVariables"
+          >
+            <template #leading>
+              <CvIcon
+                name="variables"
+                size="sm"
+              />
+            </template>
+            全局变量
+          </CvButton>
+          <CvButton
+            v-if="userRole === 'Admin'"
+            data-testid="runtime-package-export"
+            size="sm"
+            variant="quiet"
+            :disabled="!persistence || run?.phase === 'executing'"
+            title="从已正式保存的工程导出运行包"
+            @click="openRuntimePackage"
+          >
+            运行包
+          </CvButton>
+          <RouterLink
+            class="workspace-shell__results-link"
+            :to="{ path: '/results', query: { source: 'local', projectId } }"
+            data-testid="workspace-results"
+          >
+            本次结果
+          </RouterLink>
+        </div>
         <CvButton
           v-if="run?.canReconcile"
           data-testid="workspace-run-reconcile"
@@ -597,13 +611,13 @@ const showRunSummary = computed(() => Boolean(run.value && [
 .workspace-shell__toolbar {
   min-width: 0;
   min-height: var(--cv-workspace-toolbar-height, 44px);
-  flex-wrap: wrap;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(260px, auto) minmax(0, 1fr);
   gap: var(--cv-space-2);
-  padding: 0 var(--cv-space-2);
+  padding: 4px 10px;
   border-bottom: 1px solid var(--cv-border-subtle);
 }
-.workspace-shell__run-summary { flex: 1 0 100%; min-width: 0; min-height: 34px; margin-inline: calc(-1 * var(--cv-space-2)); padding: 0 var(--cv-space-3); display: flex; align-items: center; gap: var(--cv-space-2); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.workspace-shell__run-summary { grid-column: 1 / -1; min-width: 0; min-height: 32px; margin: 0 -10px -4px; padding: 0 var(--cv-space-3); display: flex; align-items: center; gap: var(--cv-space-2); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .workspace-shell__run-summary > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-shell__run-result-link,.workspace-shell__run-summary > button { margin-left: auto; white-space: nowrap; color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: 600; }
 .workspace-shell__run-summary > button { min-height: 26px; border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); cursor: pointer; }
@@ -626,6 +640,7 @@ const showRunSummary = computed(() => Boolean(run.value && [
 .workspace-shell__identity strong { font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); letter-spacing: -0.01em; }
 .workspace-shell__identity small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .workspace-shell__project { display: flex; align-items: baseline; gap: var(--cv-space-2); }
+.workspace-shell__save-state { flex: 0 0 auto; }
 .workspace-shell__back-nav { display: flex; align-items: center; gap: var(--cv-space-2); }
 .workspace-shell__back { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); text-decoration: none; white-space: nowrap; }
 .workspace-shell__back:hover { color: var(--cv-color-link); }
@@ -634,6 +649,8 @@ const showRunSummary = computed(() => Boolean(run.value && [
   overflow-x: auto;
   scrollbar-width: none;
 }
+.workspace-shell__command-group { display: flex; align-items: center; gap: 3px; }
+.workspace-shell__command-divider { width: 1px; height: 24px; flex: 0 0 auto; background: var(--cv-border-subtle); }
 .workspace-shell__commands::-webkit-scrollbar { display: none; }
 .workspace-shell__results-link {
   display: inline-flex;
@@ -801,6 +818,13 @@ const showRunSummary = computed(() => Boolean(run.value && [
 @media (max-width: 1220px) {
   .workspace-shell__work-area--state { grid-template-columns: 176px minmax(520px, 1fr) 248px; }
   .workspace-shell__project small { display: none; }
+}
+
+@media (max-width: 1420px) {
+  .workspace-shell__toolbar { grid-template-columns: minmax(210px, auto) minmax(0, 1fr); }
+  .workspace-shell__back-nav .workspace-shell__back:first-child,
+  .workspace-shell__project small,
+  .workspace-shell__save-state { display: none; }
 }
 
 @media (max-width: 920px) {

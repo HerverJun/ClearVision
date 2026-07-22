@@ -19,10 +19,6 @@ const nullSelected = shallowRef(false);
 const controlId = computed(() => `inspector-param-${props.parameter.id ?? props.parameter.name}`);
 const descriptionId = computed(() => `${controlId.value}-description`);
 const errorsId = computed(() => `${controlId.value}-errors`);
-const describedBy = computed(() => [
-  props.parameter.description ? descriptionId.value : null,
-  props.parameter.errors.length > 0 ? errorsId.value : null
-].filter(Boolean).join(' ') || undefined);
 const effectiveDisabled = computed(() =>
   props.disabled || props.parameter.disabledByConstraint || props.parameter.ignored ||
   props.parameter.editorKind === 'unsupported' || props.parameter.editorKind === 'extension');
@@ -33,6 +29,46 @@ const disabledReason = computed(() => {
   if (props.parameter.editorKind === 'extension') return '使用专用编辑器';
   return null;
 });
+const parameterLabels: Readonly<Record<string, string>> = Object.freeze({
+  shape: '区域形状',
+  x: 'X 坐标',
+  y: 'Y 坐标',
+  width: '宽度',
+  height: '高度',
+  tolerance: '容差',
+  threshold: '阈值',
+  exposuretime: '曝光时间',
+  exposuretimems: '曝光时间',
+  gain: '增益',
+  sourcetype: '图像来源',
+  camerabindingid: '相机绑定',
+  triggermode: '触发方式'
+});
+const parameterDescriptions: Readonly<Record<string, string>> = Object.freeze({
+  shape: '选择感兴趣区域的几何形状。',
+  x: '图像坐标系中的水平位置。',
+  y: '图像坐标系中的垂直位置。',
+  width: '感兴趣区域的水平尺寸。',
+  height: '感兴趣区域的垂直尺寸。',
+  tolerance: '允许结果偏离目标值的范围。',
+  threshold: '用于判定或筛选的临界值。'
+});
+const normalizedName = computed(() => props.parameter.name.replace(/[^a-z0-9]/gi, '').toLocaleLowerCase());
+const displayLabel = computed(() => parameterLabels[normalizedName.value] ?? props.parameter.label);
+const technicalLabel = computed(() => {
+  const source = props.parameter.name.trim();
+  return source && source.toLocaleLowerCase() !== displayLabel.value.toLocaleLowerCase() ? source : null;
+});
+const displayDescription = computed(() => {
+  const localized = parameterDescriptions[normalizedName.value];
+  if (localized) return localized;
+  const source = props.parameter.description?.trim() ?? '';
+  return /[一-鿿]/u.test(source) ? source : null;
+});
+const describedBy = computed(() => [
+  displayDescription.value ? descriptionId.value : null,
+  props.parameter.errors.length > 0 ? errorsId.value : null
+].filter(Boolean).join(' ') || undefined);
 
 function reset(): void {
   const value = props.parameter.value;
@@ -116,9 +152,9 @@ onBeforeUnmount(() => emit('draftActive', false));
     <div class="parameter-editor__label">
       <label
         :for="controlId"
-        :title="parameter.label"
+        :title="displayLabel"
       >
-        {{ parameter.label }}
+        {{ displayLabel }}
         <template v-if="parameter.isRequired">
           <span aria-hidden="true">*</span>
           <span class="parameter-editor__sr-only">必填</span>
@@ -138,13 +174,19 @@ onBeforeUnmount(() => emit('draftActive', false));
       </span>
     </div>
 
+    <small
+      v-if="technicalLabel"
+      class="parameter-editor__technical-label"
+      translate="no"
+    >{{ technicalLabel }}</small>
+
     <p
-      v-if="parameter.description"
+      v-if="displayDescription"
       :id="descriptionId"
       class="parameter-editor__description"
-      :title="parameter.description"
+      :title="displayDescription"
     >
-      {{ parameter.description }}
+      {{ displayDescription }}
     </p>
 
     <div
@@ -308,6 +350,7 @@ onBeforeUnmount(() => emit('draftActive', false));
 .parameter-editor__states small { color: var(--cv-text-muted); font-size: 9px; line-height: 1.3; }
 .parameter-editor__states small + small::before { content: "·"; margin-right: var(--cv-space-1); color: var(--cv-border-strong); }
 .parameter-editor__states small[data-tone="warning"] { color: var(--cv-color-status-warning-strong); }
+.parameter-editor__technical-label { color: var(--cv-text-muted); font-family: ui-monospace, "Cascadia Mono", monospace; font-size: 9px; line-height: 1.25; overflow-wrap: anywhere; }
 .parameter-editor__sr-only {
   position: absolute;
   width: 1px;

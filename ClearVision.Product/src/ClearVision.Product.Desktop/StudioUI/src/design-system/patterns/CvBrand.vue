@@ -42,7 +42,10 @@ withDefaults(defineProps<{
         />
       </g>
     </svg>
-    <span class="cv-brand__wordmark">ClearVision</span>
+    <span class="cv-brand__wordmark">
+      <strong>ClearVision</strong>
+      <small>STUDIO</small>
+    </span>
   </span>
 </template>
 
@@ -64,11 +67,25 @@ withDefaults(defineProps<{
 }
 
 .cv-brand__wordmark {
-  font-family: "Segoe Script", "Brush Script MT", cursive;
-  font-size: 25px;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   line-height: 1;
-  letter-spacing: -0.055em;
+}
+
+.cv-brand__wordmark strong {
+  color: var(--cv-text-primary);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.cv-brand__wordmark small {
+  color: var(--cv-text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
 }
 
 .cv-brand--compact { gap: 0; }

@@ -1,23 +1,23 @@
 import { reactive, readonly, type DeepReadonly } from 'vue';
 
 export const workspaceLayoutStorageKey = 'clearvision.studio-ui.workspace-layout.v1';
-export const workspaceInspectorMinWidth = 248;
-export const workspaceInspectorDefaultWidth = 296;
-export const workspaceInspectorMaxWidth = 420;
+export const workspaceInspectorMinWidth = 240;
+export const workspaceInspectorDefaultWidth = 280;
+export const workspaceInspectorMaxWidth = 380;
 export const workspacePreviewCollapsedHeight = 38;
 export const workspacePreviewMinHeight = 160;
 export const workspacePreviewDefaultHeight = 220;
 export const workspacePreviewMaxHeight = 420;
 export const workspacePreviewCollapsedWidth = 44;
-export const workspacePreviewMinWidth = 320;
-export const workspacePreviewDefaultWidth = 380;
-export const workspacePreviewMaxWidth = 520;
+export const workspacePreviewMinWidth = 300;
+export const workspacePreviewDefaultWidth = 340;
+export const workspacePreviewMaxWidth = 480;
 
 const workspaceSplitterSize = 8;
 const workspaceWideOperatorWidth = 56;
 const workspaceCompactOperatorWidth = 56;
-const workspaceWideCanvasMinWidth = 560;
-const workspaceCompactCanvasMinWidth = 500;
+const workspaceWideCanvasMinWidth = 680;
+const workspaceCompactCanvasMinWidth = 560;
 const workspaceCanvasSurfaceMinHeight = 352;
 
 export interface WorkspaceLayoutProjection {

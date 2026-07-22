@@ -1882,6 +1882,14 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 76
     const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
     await expect(page.locator('[data-testid="global-variables"]')).toBeVisible();
     await expect(page.locator('[data-testid="runtime-package-export"]')).toBeVisible();
+    if (hasF04VisualEvidenceTarget()) {
+      await captureF04VisualEvidence(page, {
+        scenario: `g4a-workspace-default-${viewport.width}`,
+        viewport,
+        runtimeErrors,
+        requestAudit: audit
+      });
+    }
 
     await selectInspectorNode(page, 120, 125);
     const camera = page.locator('[data-capability="camera-binding-editor"]');
@@ -1890,6 +1898,15 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 76
     await camera.getByRole('button', { name: '捕获单帧' }).click();
     await expect(camera).toHaveAttribute('data-capture-phase', 'captured');
     await expect(camera).not.toHaveAttribute('data-frame-id', '');
+    if (hasF04VisualEvidenceTarget()) {
+      await captureF04VisualEvidence(page, {
+        scenario: `g4a-camera-binding-${viewport.width}`,
+        viewport,
+        runtimeErrors,
+        requestAudit: audit,
+        notes: ['BROWSER_FIXTURE camera frame; REAL_CAMERA=NOT_PERFORMED']
+      });
+    }
 
     await page.locator('[data-testid="global-variables"]').click();
     const variables = page.locator('[data-capability="global-variables-workbench"]');
@@ -1907,6 +1924,14 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 76
     await targetBinding.locator('select').nth(0).selectOption({ label: '密封宽度' });
     await targetBinding.locator('select').nth(1).selectOption({ label: '密封宽度判定 / Tolerance' });
     await targetBinding.getByRole('button', { name: '添加绑定' }).click();
+    if (hasF04VisualEvidenceTarget()) {
+      await captureF04VisualEvidence(page, {
+        scenario: `g4a-global-variables-${viewport.width}`,
+        viewport,
+        runtimeErrors,
+        requestAudit: audit
+      });
+    }
     await page.getByRole('button', { name: '应用到工程草稿' }).click();
 
     await page.locator('[data-testid="final-decision"]').click();
@@ -1914,6 +1939,14 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 76
     await decision.locator('select').first().selectOption(`${goldenJudgeNodeId}:${goldenJudgeOutputId}`);
     await expect(decision.locator('input[type="number"]')).toBeVisible();
     await decision.locator('input[type="number"]').fill('12.5');
+    if (hasF04VisualEvidenceTarget()) {
+      await captureF04VisualEvidence(page, {
+        scenario: `g4a-final-decision-${viewport.width}`,
+        viewport,
+        runtimeErrors,
+        requestAudit: audit
+      });
+    }
     await page.getByRole('button', { name: '校验并应用' }).click();
     await expect(decision).toHaveCount(0);
 
@@ -1946,7 +1979,7 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 76
     await expect(preview).toHaveAttribute('data-preview-phase', 'success');
     if (hasF04VisualEvidenceTarget()) {
       await captureF04VisualEvidence(page, {
-        scenario: `g3-workspace-completed-${viewport.width}`,
+        scenario: `g4a-run-completed-${viewport.width}`,
         viewport,
         runtimeErrors,
         requestAudit: audit,
@@ -1961,9 +1994,9 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 76
     const download = page.waitForEvent('download');
     await page.locator('[data-testid="result-evidence-export"]').click();
     await download;
-    if (viewport.width === 1920 && hasF04VisualEvidenceTarget()) {
+    if (hasF04VisualEvidenceTarget()) {
       await captureF04VisualEvidence(page, {
-        scenario: 'g3-result-evidence', viewport, runtimeErrors, requestAudit: audit
+        scenario: `g4a-result-evidence-${viewport.width}`, viewport, runtimeErrors, requestAudit: audit
       });
     }
 
@@ -1974,9 +2007,9 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 76
     await page.getByRole('button', { name: '导出运行包', exact: true }).click();
     await expect(packageDialog).toHaveAttribute('data-phase', 'success');
     await expect(packageDialog).toContainText('cvpkg-g3-golden');
-    if (viewport.width === 1920 && hasF04VisualEvidenceTarget()) {
+    if (hasF04VisualEvidenceTarget()) {
       await captureF04VisualEvidence(page, {
-        scenario: 'g3-admin-runtime-package', viewport, runtimeErrors, requestAudit: audit
+        scenario: `g4a-admin-runtime-package-${viewport.width}`, viewport, runtimeErrors, requestAudit: audit
       });
     }
 
@@ -2591,7 +2624,7 @@ test('G4 unified leave prompt traps keyboard focus, Escape stays, and discard le
   await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '7');
   await expect(shell.getByRole('link', { name: '工程列表' })).toBeVisible();
   await expect(shell.getByRole('link', { name: '工程详情' })).toBeVisible();
-  await expect(shell.getByRole('link', { name: '当前工程结果' })).toBeVisible();
+  await expect(shell.getByRole('link', { name: '本次结果' })).toBeVisible();
   await selectInspectorNode(page, 120, 125);
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, { scenario: 'workspace-idle', viewport, runtimeErrors });
@@ -3180,11 +3213,11 @@ test('Workspace splitters preserve bounds, Preview recovery and layout preferenc
   const previewToggle = page.locator('[data-testid="preview-collapse-toggle"]');
 
   await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
-  await expect(workspace).toHaveAttribute('data-inspector-width', '296');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '280');
   await expect(workspace).toHaveAttribute('data-preview-height', '220');
-  await expect(workspace).toHaveAttribute('data-preview-width', '380');
-  await expect(inspectorSplitter).toHaveAttribute('aria-valuetext', '属性检查器宽度 296 像素');
-  await expect(previewSplitter).toHaveAttribute('aria-valuetext', '预览工作台宽度 380 像素');
+  await expect(workspace).toHaveAttribute('data-preview-width', '340');
+  await expect(inspectorSplitter).toHaveAttribute('aria-valuetext', '属性检查器宽度 280 像素');
+  await expect(previewSplitter).toHaveAttribute('aria-valuetext', '预览工作台宽度 340 像素');
 
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
@@ -3203,27 +3236,27 @@ test('Workspace splitters preserve bounds, Preview recovery and layout preferenc
   await page.mouse.down();
   await page.mouse.move(inspectorStartX + 40, inspectorStartY);
   await page.mouse.up();
-  await expect(workspace).toHaveAttribute('data-inspector-width', '336');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '320');
   await inspectorSplitter.dblclick();
-  await expect(workspace).toHaveAttribute('data-inspector-width', '296');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '280');
 
   await inspectorSplitter.focus();
   await page.keyboard.press('Home');
-  await expect(workspace).toHaveAttribute('data-inspector-width', '248');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '240');
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'workspace-inspector-min', viewport, runtimeErrors, requestAudit: audit
     });
   }
   await page.keyboard.press('End');
-  await expect(workspace).toHaveAttribute('data-inspector-width', '420');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '380');
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'workspace-inspector-max', viewport, runtimeErrors, requestAudit: audit
     });
   }
   await inspectorSplitter.dblclick();
-  await expect(workspace).toHaveAttribute('data-inspector-width', '296');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '280');
 
   const previewSplitterBounds = await previewSplitter.boundingBox();
   expect(previewSplitterBounds).not.toBeNull();
@@ -3236,34 +3269,34 @@ test('Workspace splitters preserve bounds, Preview recovery and layout preferenc
   await page.mouse.down();
   await page.mouse.move(previewStartX - 40, previewStartY);
   await page.mouse.up();
-  await expect(workspace).toHaveAttribute('data-preview-width', '420');
-  await previewSplitter.dblclick();
   await expect(workspace).toHaveAttribute('data-preview-width', '380');
+  await previewSplitter.dblclick();
+  await expect(workspace).toHaveAttribute('data-preview-width', '340');
 
   await previewSplitter.focus();
   await page.keyboard.press('Home');
-  await expect(workspace).toHaveAttribute('data-preview-width', '320');
+  await expect(workspace).toHaveAttribute('data-preview-width', '300');
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'workspace-preview-min', viewport, runtimeErrors, requestAudit: audit
     });
   }
   await page.keyboard.press('End');
-  await expect(workspace).toHaveAttribute('data-preview-width', '520');
+  await expect(workspace).toHaveAttribute('data-preview-width', '480');
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'workspace-preview-max', viewport, runtimeErrors, requestAudit: audit
     });
   }
   await previewSplitter.dblclick();
-  await expect(workspace).toHaveAttribute('data-preview-width', '380');
+  await expect(workspace).toHaveAttribute('data-preview-width', '340');
 
   await inspectorSplitter.focus();
   await page.keyboard.press('Shift+ArrowRight');
-  await expect(workspace).toHaveAttribute('data-inspector-width', '328');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '312');
   await previewSplitter.focus();
   await page.keyboard.press('Shift+ArrowLeft');
-  await expect(workspace).toHaveAttribute('data-preview-width', '412');
+  await expect(workspace).toHaveAttribute('data-preview-width', '372');
 
   await previewToggle.focus();
   await previewToggle.click();
@@ -3281,12 +3314,12 @@ test('Workspace splitters preserve bounds, Preview recovery and layout preferenc
 
   await page.goto('/studio/index.html#/about');
   await page.goto(`/studio/index.html#/projects/${projectA}/workspace`);
-  await expect(workspace).toHaveAttribute('data-inspector-width', '328');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '312');
   await expect(workspace).toHaveAttribute('data-preview-collapsed', 'true');
   await page.locator('[data-testid="preview-collapse-toggle"]').click();
   await expect(workspace).toHaveAttribute('data-preview-collapsed', 'false');
   await expect(workspace).toHaveAttribute('data-preview-height', '220');
-  await expect(workspace).toHaveAttribute('data-preview-width', '412');
+  await expect(workspace).toHaveAttribute('data-preview-width', '372');
   await expect(previewSplitter).toBeVisible();
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
@@ -3379,26 +3412,26 @@ test('Prompt 3 refines Operator Rail and populated Inspector across width and lo
   await expect(inspector).toHaveAttribute('data-inspector-mode', 'node');
   await expect(inspector).toContainText('上料工位瓶盖外观与密封完整性综合检测节点');
   await expect(inspector).toContainText('工艺切换备注与异常处置说明');
-  await expect(workspace).toHaveAttribute('data-inspector-width', '296');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '280');
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'workspace-prompt3-inspector-default-long-zh', viewport, runtimeErrors, requestAudit: audit,
-      notes: ['Prompt 3 populated Inspector at the 296px default width.']
+      notes: ['Prompt 3 populated Inspector at the 280px default width.']
     });
   }
 
   await inspectorSplitter.focus();
   await page.keyboard.press('Home');
-  await expect(workspace).toHaveAttribute('data-inspector-width', '248');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '240');
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'workspace-prompt3-inspector-min-long-zh', viewport, runtimeErrors, requestAudit: audit,
-      notes: ['Prompt 3 populated Inspector at the 248px minimum width.']
+      notes: ['Prompt 3 populated Inspector at the 240px minimum width.']
     });
   }
 
   await page.keyboard.press('End');
-  await expect(workspace).toHaveAttribute('data-inspector-width', '420');
+  await expect(workspace).toHaveAttribute('data-inspector-width', '380');
   const countInput = inspector.locator('[data-parameter-name="Count"] input[type="number"]');
   await countInput.fill('11');
   await countInput.blur();
@@ -3406,7 +3439,7 @@ test('Prompt 3 refines Operator Rail and populated Inspector across width and lo
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'workspace-prompt3-inspector-max-validation', viewport, runtimeErrors, requestAudit: audit,
-      notes: ['Prompt 3 populated Inspector at 420px with an inline validation error.']
+      notes: ['Prompt 3 populated Inspector at 380px with an inline validation error.']
     });
   }
 

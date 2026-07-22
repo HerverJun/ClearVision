@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
 import { CvStatusBadge, type CvStatusTone } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 import WorkspacePaneHeader from '../WorkspacePaneHeader.vue';
-import type { InspectorOwner } from './inspectorOwner';
+import type { InspectorOwner, InspectorParameterProjection } from './inspectorOwner';
 import ParameterEditor from './ParameterEditor.vue';
 import { CameraBindingEditor, type CameraBindingEditorOwner } from '../camera';
 
@@ -38,6 +38,27 @@ const executionPresentation = computed<Readonly<{ label: string; tone: CvStatusT
     default: return { label: '尚未执行', tone: 'idle' };
   }
 });
+const visibleParameters = computed(() => projection.node?.parameters.filter(parameter => parameter.visible) ?? []);
+const resourceParameters = computed(() => visibleParameters.value.filter(parameter => parameter.extensionSlot !== null));
+const advancedParameters = computed(() => visibleParameters.value.filter(parameter =>
+  parameter.extensionSlot === null && (
+    parameter.deprecated || parameter.ignored ||
+    parameter.disabledByConstraint || parameter.editorKind === 'unsupported' || parameter.editorKind === 'extension'
+  )));
+const commonParameters = computed(() => visibleParameters.value.filter(parameter =>
+  !resourceParameters.value.includes(parameter) && !advancedParameters.value.includes(parameter)));
+const nodeDescription = computed(() => {
+  const description = projection.node?.description?.trim() ?? '';
+  if (/[一-鿿]/u.test(description)) return description;
+  const type = projection.node?.type.toLocaleLowerCase() ?? '';
+  if (type.includes('roimanager')) return '配置感兴趣区域的位置与尺寸，并输出后续算子可用的区域。';
+  if (type.includes('imageacquisition')) return '选择图像采集资源，并管理节点预览使用的调试输入。';
+  return '配置当前算子的输入、输出与运行参数。';
+});
+
+function parameterKey(parameter: InspectorParameterProjection): string {
+  return parameter.id ?? parameter.name;
+}
 
 watch(
   () => [projection.node?.id, projection.node?.name, projection.selectionRevision],
@@ -192,16 +213,14 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
             :label="executionPresentation.label"
           />
         </div>
-        <code
-          translate="no"
-          :title="projection.node.type"
-        >{{ projection.node.type }}</code>
-        <p
-          v-if="projection.node.description"
-          :title="projection.node.description"
-        >
-          {{ projection.node.description }}
-        </p>
+        <div class="inspector-panel__technical-identity">
+          <small>算子类型</small>
+          <code
+            translate="no"
+            :title="projection.node.type"
+          >{{ projection.node.type }}</code>
+        </div>
+        <p>{{ nodeDescription }}</p>
         <p
           v-if="projection.node.executionTimeMs !== null"
           class="inspector-panel__metric"
@@ -271,26 +290,21 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
         </div>
       </section>
 
-      <section class="inspector-panel__section inspector-panel__parameters">
+      <section
+        v-if="resourceParameters.length"
+        class="inspector-panel__section inspector-panel__parameters inspector-panel__resources"
+      >
         <div class="inspector-panel__section-heading">
-          <h3>参数</h3>
-          <small>{{ projection.node.parameters.filter(parameter => parameter.visible).length }} 项</small>
+          <h3>资源绑定</h3>
+          <small>专用工作台 · {{ resourceParameters.length }} 项</small>
         </div>
-        <p
-          v-if="projection.node.metadataPhase !== 'ready'"
-          class="inspector-panel__metadata-message"
-          :data-phase="projection.node.metadataPhase"
-          role="status"
-        >
-          {{ projection.node.metadataMessage ?? '正在读取参数定义…' }}
-        </p>
         <div class="inspector-panel__parameter-list">
           <template
-            v-for="parameter in projection.node.parameters"
-            :key="parameter.id ?? parameter.name"
+            v-for="parameter in resourceParameters"
+            :key="parameterKey(parameter)"
           >
             <CameraBindingEditor
-              v-if="parameter.visible && parameter.extensionSlot === 'camera-binding'"
+              v-if="parameter.extensionSlot === 'camera-binding'"
               :owner="cameraOwner"
               :parameter-name="parameter.name"
               :disabled="editingDisabled || projection.node.metadataPhase !== 'ready'"
@@ -305,6 +319,54 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
           </template>
         </div>
       </section>
+
+      <section class="inspector-panel__section inspector-panel__parameters">
+        <div class="inspector-panel__section-heading">
+          <h3>常用参数</h3>
+          <small>{{ commonParameters.length }} 项</small>
+        </div>
+        <p
+          v-if="projection.node.metadataPhase !== 'ready'"
+          class="inspector-panel__metadata-message"
+          :data-phase="projection.node.metadataPhase"
+          role="status"
+        >
+          {{ projection.node.metadataMessage ?? '正在读取参数定义…' }}
+        </p>
+        <div class="inspector-panel__parameter-list">
+          <template
+            v-for="parameter in commonParameters"
+            :key="parameterKey(parameter)"
+          >
+            <ParameterEditor
+              :parameter="parameter"
+              :disabled="editingDisabled || projection.node.metadataPhase !== 'ready'"
+              @commit="commitParameter(parameter.name, $event)"
+              @draft-active="owner.setDraftActive(`parameter:${parameter.name}`, $event)"
+            />
+          </template>
+        </div>
+      </section>
+
+      <details
+        v-if="advancedParameters.length"
+        class="inspector-panel__advanced"
+      >
+        <summary>
+          <span>高级参数</span>
+          <small>{{ advancedParameters.length }} 项 · 按需展开</small>
+        </summary>
+        <div class="inspector-panel__parameter-list">
+          <ParameterEditor
+            v-for="parameter in advancedParameters"
+            :key="parameterKey(parameter)"
+            :parameter="parameter"
+            :disabled="editingDisabled || projection.node.metadataPhase !== 'ready'"
+            @commit="commitParameter(parameter.name, $event)"
+            @draft-active="owner.setDraftActive(`parameter:${parameter.name}`, $event)"
+          />
+        </div>
+      </details>
     </div>
 
     <section
@@ -389,6 +451,8 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.inspector-panel__technical-identity { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--cv-space-2); }
+.inspector-panel__technical-identity small { color: var(--cv-text-muted); font-size: 9px; }
 .inspector-panel__identity > p[title] {
   display: -webkit-box;
   overflow: hidden;
@@ -439,6 +503,13 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
 .inspector-panel__ports strong { overflow: hidden; font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .inspector-panel__parameters { gap: var(--cv-space-1); }
 .inspector-panel__parameter-list { display: grid; }
+.inspector-panel__resources { background: color-mix(in srgb, var(--cv-color-status-info-soft) 42%, var(--cv-surface-raised)); }
+.inspector-panel__advanced { border-top: 1px solid var(--cv-border-subtle); }
+.inspector-panel__advanced summary { min-height: 36px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-2); color: var(--cv-text-primary); cursor: pointer; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); list-style-position: inside; }
+.inspector-panel__advanced summary:hover { background: var(--cv-interactive-hover); }
+.inspector-panel__advanced summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
+.inspector-panel__advanced summary small { color: var(--cv-text-muted); font-size: 9px; font-weight: var(--cv-font-weight-normal); }
+.inspector-panel__advanced > .inspector-panel__parameter-list { padding: 0 14px var(--cv-space-2); }
 .inspector-panel__metadata-message { padding: var(--cv-space-2); border-radius: var(--cv-radius-sm); background: var(--cv-color-status-warning-soft); color: var(--cv-color-status-warning-strong) !important; }
 .inspector-panel__summary-node {
   width: 100%;

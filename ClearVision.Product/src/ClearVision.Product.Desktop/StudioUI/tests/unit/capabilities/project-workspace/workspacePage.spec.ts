@@ -312,8 +312,8 @@ describe('F03 G1 WorkspacePage', () => {
     await flushPromises();
 
     expect(executing.get('[data-testid="workspace-save"]').text()).toBe('保存');
-    expect(executing.get('[data-testid="workspace-run"]').text()).toBe('运行');
-    expect(executing.get('[data-testid="workspace-run-stop"]').text()).toBe('停止运行');
+    expect(executing.get('[data-testid="workspace-run"]').text()).toBe('正式运行');
+    expect(executing.get('[data-testid="workspace-run-stop"]').text()).toBe('停止');
     expect(executing.text()).not.toContain('Formal Run:');
     executing.unmount();
     executingHarness.runtime.dispose();
