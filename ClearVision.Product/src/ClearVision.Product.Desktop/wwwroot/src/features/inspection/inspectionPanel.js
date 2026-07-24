@@ -21,6 +21,32 @@ const PENDING_ANALYSIS_OBJECT_FIELD_LIMIT = 32;
 const PENDING_ANALYSIS_STRING_LIMIT = 512;
 const PENDING_ANALYSIS_MAX_DEPTH = 3;
 const PENDING_ANALYSIS_IMAGE_KEY_PATTERN = /(image|bitmap|preview|thumbnail|base64|mask)/i;
+const COMMISSIONING_REGISTER_CARD_SIZE = 12;
+const GR_REGISTER_LABELS = Object.freeze({
+    437: '系统通电状态',
+    438: '机器人使能',
+    439: '机器人运行状态',
+    440: '暂停状态',
+    441: '停止状态',
+    442: '报警编号',
+    443: '安全门状态',
+    444: '急停状态',
+    445: '报警状态',
+    446: '启动按钮',
+    447: '柜门使能按钮',
+    448: '报警清除操作',
+    449: '机器人模式',
+    450: '运行模式',
+    451: '保留状态',
+    452: '程序加载按钮 1',
+    453: '程序加载按钮 2',
+    454: '程序加载按钮 3',
+    455: '程序加载按钮 4',
+    456: '程序加载成功 1',
+    457: '程序加载成功 2',
+    458: '程序加载成功 3',
+    459: '程序加载成功 4'
+});
 
 function debugInspectionPanelLog(...args) {
     if (globalThis.CV_DEBUG_INSPECTION === true) {
@@ -92,6 +118,7 @@ class InspectionPanel {
         this.initialize();
         this.analysisCardsPanel = new AnalysisCardsPanel('analysis-cards-container');
         this.syncAnalysisFlowContext();
+        this.syncResultPresentation();
         
         // 设置订阅
         this.setupSubscriptions();
@@ -181,6 +208,43 @@ class InspectionPanel {
         return hasImageAcquisition ? 'camera' : 'flow';
     }
 
+    isCommissioningMode(result = null) {
+        const resultPurpose = result?.purpose ?? result?.Purpose;
+        const project = getCurrentProject();
+        const flow = project?.flow ?? project?.Flow;
+        const purpose = String(resultPurpose ?? flow?.purpose ?? flow?.Purpose ?? project?.purpose ?? project?.Purpose ?? '')
+            .trim()
+            .toLowerCase();
+        return purpose === 'commissioning' || purpose === '1';
+    }
+
+    syncResultPresentation() {
+        const isCommissioning = this.isCommissioningMode();
+        const analysisTitle = document.getElementById('inspection-analysis-title');
+        const recentTitle = document.getElementById('inspection-recent-results-title');
+        const viewAllButton = document.getElementById('inspection-view-all-results');
+        const historyNote = document.getElementById('inspection-commissioning-history-note');
+        const countersTitle = this.container?.querySelector?.('.counters-section .section-title');
+
+        if (analysisTitle) analysisTitle.textContent = isCommissioning ? '通信调试结果' : '检测分析';
+        if (recentTitle) recentTitle.textContent = isCommissioning ? '最近调试' : '最近结果';
+        if (countersTitle) countersTitle.textContent = isCommissioning ? '调试统计' : '检测统计';
+        if (viewAllButton) {
+            viewAllButton.hidden = isCommissioning;
+            viewAllButton.disabled = isCommissioning;
+            viewAllButton.dataset.openView = isCommissioning ? '' : 'results';
+        }
+        if (historyNote) historyNote.classList.toggle('hidden', !isCommissioning);
+
+        const okItem = this.container?.querySelector?.('.counter-ok');
+        const okLabel = okItem?.querySelector?.('.counter-label');
+        if (okLabel) okLabel.textContent = isCommissioning ? '执行成功' : 'OK';
+        ['.counter-ng', '.counter-undetermined', '.counter-yield', '.counter-coverage'].forEach((selector) => {
+            const item = this.container?.querySelector?.(selector);
+            if (item) item.hidden = isCommissioning;
+        });
+    }
+
     resolveRunModeForExecution() {
         const defaultMode = this.getDefaultRunMode();
         if (defaultMode === 'flow') {
@@ -238,6 +302,7 @@ class InspectionPanel {
             runModeSelect.value = this.selectedRunMode;
         }
         this.reset();
+        this.syncResultPresentation();
         return true;
     }
 
@@ -498,10 +563,16 @@ class InspectionPanel {
         }
 
         const canonicalOutcome = normalizeCanonicalOutcome(result);
-        const status = ['failed', 'timedOut', 'invalid'].includes(canonicalOutcome.category)
+        const isCommissioning = this.isCommissioningMode(result);
+        const commissioningSucceeded = String(canonicalOutcome.executionOutcome).toLowerCase() === 'succeeded';
+        const status = isCommissioning
+            ? (commissioningSucceeded ? 'ok' : 'error')
+            : (['failed', 'timedOut', 'invalid'].includes(canonicalOutcome.category)
             ? 'error'
-            : (canonicalOutcome.category === 'ok' ? 'ok' : (canonicalOutcome.category === 'ng' ? 'ng' : 'idle'));
-        const statusText = canonicalOutcome.label;
+            : (canonicalOutcome.category === 'ok' ? 'ok' : (canonicalOutcome.category === 'ng' ? 'ng' : 'idle')));
+        const statusText = isCommissioning
+            ? (commissioningSucceeded ? '通信读取成功' : '通信读取失败')
+            : canonicalOutcome.label;
         if (shouldRender) {
             this.updateStatus(status, statusText);
         }
@@ -1034,6 +1105,7 @@ class InspectionPanel {
     updateCounters() {
         const stats = getStats();
         const timing = getTimingStats();
+        const isCommissioning = this.isCommissioningMode();
         
         const okEl = this.container.querySelector('#counter-ok');
         const ngEl = this.container.querySelector('#counter-ng');
@@ -1043,7 +1115,7 @@ class InspectionPanel {
         const yieldEl = this.container.querySelector('#counter-yield');
         const coverageEl = this.container.querySelector('#counter-coverage');
         
-        if (okEl) okEl.textContent = stats.ok;
+        if (okEl) okEl.textContent = isCommissioning ? stats.executionSucceeded : stats.ok;
         if (ngEl) ngEl.textContent = stats.ng;
         if (totalEl) totalEl.textContent = stats.total;
         if (errorEl) errorEl.textContent = stats.executionFailure;
@@ -1079,6 +1151,8 @@ class InspectionPanel {
 
     createRecentResultSummary(result) {
         const outcome = normalizeCanonicalOutcome(result);
+        const isCommissioning = this.isCommissioningMode(result);
+        const executionSucceeded = String(outcome.executionOutcome).toLowerCase() === 'succeeded';
         return {
             id: result?.id ?? result?.Id ?? result?.resultId ?? result?.ResultId ?? null,
             status: result?.status ?? result?.Status ?? 'NG',
@@ -1086,8 +1160,12 @@ class InspectionPanel {
             decisionOutcome: outcome.decisionOutcome,
             outcomeCategory: outcome.category,
             outcomeLabel: outcome.label,
+            resultKind: isCommissioning ? 'commissioning' : 'inspection',
+            purpose: result?.purpose ?? result?.Purpose ?? null,
             timestamp: result?.timestamp ?? result?.inspectionTime ?? result?.Timestamp ?? result?.InspectionTime ?? null,
-            textPreview: this.extractTextPreview(
+            textPreview: isCommissioning
+                ? this.createCommissioningTextPreview(result, executionSucceeded)
+                : this.extractTextPreview(
                 result?.outputData
                     ?? result?.OutputData
                     ?? result?.analysisData
@@ -1095,6 +1173,18 @@ class InspectionPanel {
                     ?? result?.errorMessage
                     ?? result?.ErrorMessage)
         };
+    }
+
+    createCommissioningTextPreview(result, executionSucceeded = true) {
+        if (!executionSucceeded) {
+            return result?.errorMessage ?? result?.ErrorMessage ?? '通信读取失败';
+        }
+
+        const outputData = result?.outputData ?? result?.OutputData ?? {};
+        const count = Number(outputData?.Count ?? outputData?.count ?? outputData?.Registers?.length ?? outputData?.registers?.length ?? 0);
+        const latencyMs = Number(outputData?.LatencyMs ?? outputData?.latencyMs ?? result?.processingTimeMs ?? 0);
+        const countText = Number.isFinite(count) && count > 0 ? `读取 ${count} 个寄存器` : '通信读取成功';
+        return Number.isFinite(latencyMs) && latencyMs >= 0 ? `${countText} · ${latencyMs} ms` : countText;
     }
 
     renderRecentResults() {
@@ -1114,10 +1204,17 @@ class InspectionPanel {
 
         container.innerHTML = visibleResults.map((result) => {
             const outcome = normalizeCanonicalOutcome(result);
-            const status = outcome.label;
-            const statusClass = outcome.category === 'ok'
+            const isCommissioning = result?.resultKind === 'commissioning';
+            const executionSucceeded = String(result?.executionOutcome ?? outcome.executionOutcome).toLowerCase() === 'succeeded';
+            const status = isCommissioning
+                ? (executionSucceeded ? '执行成功' : '执行失败')
+                : outcome.label;
+            const outcomeCategory = isCommissioning
+                ? (executionSucceeded ? 'ok' : 'failed')
+                : outcome.category;
+            const statusClass = outcomeCategory === 'ok'
                 ? 'result-ok'
-                : (outcome.category === 'ng' ? 'result-ng' : (['failed', 'timedOut', 'invalid'].includes(outcome.category) ? 'result-error' : 'result-neutral'));
+                : (outcomeCategory === 'ng' ? 'result-ng' : (['failed', 'timedOut', 'invalid'].includes(outcomeCategory) ? 'result-error' : 'result-neutral'));
             const timestamp = result?.timestamp ?? result?.inspectionTime ?? result?.Timestamp ?? result?.InspectionTime;
             const timeText = timestamp
                 ? new Date(timestamp).toLocaleTimeString([], { hour12: false })
@@ -1223,7 +1320,61 @@ class InspectionPanel {
             return null;
         }
 
+        if (this.isCommissioningMode(result)) {
+            return this.buildCommissioningAnalysisData(result, outputData);
+        }
+
         return buildDiagnosticsAnalysisData(outputData, result.status ?? result.Status ?? 'OK') || outputData;
+    }
+
+    buildCommissioningAnalysisData(result, outputData) {
+        const succeeded = (result?.success ?? result?.Success) !== false;
+        const status = succeeded ? 'OK' : 'Error';
+        const registers = outputData?.Registers ?? outputData?.registers ?? [];
+        const normalizedRegisters = Array.isArray(registers)
+            ? registers.map(item => ({
+                address: Number(item?.Address ?? item?.address),
+                value: item?.Value ?? item?.value
+            })).filter(item => Number.isFinite(item.address))
+            : [];
+        const startAddress = outputData?.StartAddress ?? outputData?.startAddress;
+        const count = outputData?.Count ?? outputData?.count ?? normalizedRegisters.length;
+        const cards = [{
+            category: 'diagnostic',
+            title: 'Modbus TCP 读取',
+            status,
+            priority: 1000,
+            message: succeeded ? `已读取 ${count} 个保持寄存器` : (result?.errorMessage ?? result?.ErrorMessage ?? '通信读取失败'),
+            fields: [
+                { label: '协议', value: outputData?.Protocol ?? outputData?.protocol ?? 'TCP' },
+                { label: '功能码', value: outputData?.FunctionCode ?? outputData?.functionCode ?? 'ReadHolding' },
+                { label: 'Unit ID', value: outputData?.SlaveId ?? outputData?.slaveId },
+                { label: '起始地址', value: startAddress },
+                { label: '寄存器数量', value: count },
+                { label: '读取耗时', value: outputData?.LatencyMs ?? outputData?.latencyMs, unit: 'ms' },
+                { label: '设备配置', value: outputData?.ProfileId ?? outputData?.profileId }
+            ].filter(field => field.value !== undefined && field.value !== null && field.value !== '')
+        }];
+
+        for (let index = 0; index < normalizedRegisters.length; index += COMMISSIONING_REGISTER_CARD_SIZE) {
+            const chunk = normalizedRegisters.slice(index, index + COMMISSIONING_REGISTER_CARD_SIZE);
+            const firstAddress = chunk[0]?.address;
+            const lastAddress = chunk[chunk.length - 1]?.address;
+            cards.push({
+                category: 'structured',
+                title: `保持寄存器 ${firstAddress}-${lastAddress}`,
+                status,
+                priority: 900 - index,
+                fields: chunk.map(register => ({
+                    key: `R${register.address}`,
+                    label: `${register.address} · ${GR_REGISTER_LABELS[register.address] ?? '原始状态'}`,
+                    value: register.value,
+                    dataType: 'Integer'
+                }))
+            });
+        }
+
+        return { version: 1, cards };
     }
 
     escapeHtml(text) {
@@ -1251,6 +1402,7 @@ class InspectionPanel {
         const state = getInspectionState();
         this.isContinuous = state.isRealtime === true;
         this.syncAnalysisFlowContext();
+        this.syncResultPresentation();
         if (this._pendingAnalysisUpdate) {
             this.renderPendingAnalysisUpdate();
             this._pendingAnalysisUpdate = null;

@@ -288,7 +288,7 @@
                         >
                             <div class="panel">
                                 <!-- 分析卡片区 (新增) -->
-                                <h3 class="panel-title">检测分析</h3>
+                                <h3 class="panel-title" id="inspection-analysis-title">检测分析</h3>
                                 <div class="analysis-cards-container" id="analysis-cards-container">
                                     <p class="empty-text">等待检测结果...</p>
                                 </div>
@@ -296,6 +296,7 @@
                                 <!-- 最近结果 (移至右侧底部) -->
                                 <h3
                                     class="panel-title"
+                                    id="inspection-recent-results-title"
                                     style="margin-top: 24px"
                                 >
                                     最近结果
@@ -303,11 +304,19 @@
                                 <button
                                     type="button"
                                     class="btn btn-secondary"
+                                    id="inspection-view-all-results"
                                     data-open-view="results"
                                     style="width:100%; margin:8px 0 12px; padding:6px 10px; font-size:12px;"
                                 >
                                     查看全部结果
                                 </button>
+                                <p
+                                    class="empty-text hidden"
+                                    id="inspection-commissioning-history-note"
+                                    style="margin:8px 0 12px;"
+                                >
+                                    调试结果仅保留在当前会话，不写入检测追溯。
+                                </p>
                                 <div
                                     class="inspection-recent-results-grid"
                                     id="inspection-recent-results-grid"

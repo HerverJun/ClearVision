@@ -426,11 +426,15 @@ class InspectionController {
             return;
         }
 
+        const purpose = String(result?.purpose ?? result?.Purpose ?? '').trim().toLowerCase();
+        const isCommissioning = purpose === 'commissioning' || purpose === '1';
         this.setLastResultImageState({
             status: 'empty',
             imageId: null,
             resultId,
-            message: '检测结果未提供可展示的图像。'
+            message: isCommissioning
+                ? '通信调试不产生检测图像。'
+                : '检测结果未提供可展示的图像。'
         });
     }
 
@@ -956,6 +960,12 @@ class InspectionController {
                 result = {
                     ...result,
                     projectId: result?.projectId ?? result?.ProjectId ?? this.projectId,
+                    purpose: result?.purpose ?? result?.Purpose ?? 'Commissioning',
+                    status: commissioningSucceeded ? 'OK' : 'Error',
+                    processingTimeMs: result?.processingTimeMs
+                        ?? result?.ProcessingTimeMs
+                        ?? result?.executionTimeMs
+                        ?? result?.ExecutionTimeMs,
                     executionOutcome: commissioningSucceeded ? 'Succeeded' : 'Failed',
                     decisionOutcome: 'NotApplicable'
                 };

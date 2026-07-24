@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "clearvision/knowledge-unit-baseline.v1.json",
+  "title": "ClearVision Knowledge Unit (跨平台统一基准)",
+  "description": "泛化自 docs/ai/operator-knowledge/operator_knowledge_schema.json。所有知识域统一套用本元数据契约；算子域在 x-operator-extension 中向下兼容原 schema v2。",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "domain",
+    "doc_type",
+    "status",
+    "owner"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "全局唯一主键，跨平台去重键。算子=OperatorType.<Enum>；模型=model:<id>；文档=kb:<domain>/<slug>；质量报告=qr:<operator>:<dataset>:<variant>。分配后不可变更。",
+      "pattern": "^(OperatorType\\.[A-Za-z0-9]+|model:[A-Za-z0-9_\\-]+|kb:[a-z]+/[A-Za-z0-9_\\-]+|qr:[A-Za-z0-9]+:[A-Za-z0-9_]+:[A-Za-z0-9_]+)$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "展示标题，须与文件名主题一致；禁止写入状态时态词（最新/最终）。"
+    },
+    "domain": {
+      "type": "string",
+      "description": "知识域（§2.1 受控词表）。",
+      "enum": [
+        "operator", "plan", "audit", "reference", "template",
+        "model", "quality", "guide", "runtime", "scenario",
+        "archive", "temp"
+      ]
+    },
+    "doc_type": {
+      "type": "string",
+      "description": "文档类型（§2.2 受控词表）。",
+      "enum": [
+        "index", "plan", "task-list", "audit", "report",
+        "standard", "guide", "manual", "template", "record", "snapshot"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "description": "生命周期状态（§2.2 受控词表）。",
+      "enum": ["active", "needs-review", "closed", "archived", "deprecated", "snapshot"]
+    },
+    "category": {
+      "type": "string",
+      "description": "算子域填 14 类之一；其余域留空字符串。",
+      "enum": [
+        "", "Acquisition", "ImagePreprocessing", "SegmentationAndRegion",
+        "FeatureExtraction", "MatchingAndLocalization", "DefectDetection",
+        "Measurement", "CalibrationAndCoordinates", "AiInference",
+        "PointCloud3D", "DataProcessing", "FlowControl", "Communication",
+        "OutputAndAuxiliary"
+      ]
+    },
+    "maturity": {
+      "type": "string",
+      "description": "成熟度（§2.2 受控词表）。",
+      "enum": ["", "stable", "experimental", "reference", "compatibility-only", "deprecated"]
+    },
+    "evidence_level": {
+      "type": "string",
+      "description": "证据等级（§2.2 受控词表，由质量矩阵映射）。",
+      "enum": ["none", "contract", "golden", "dataset", "field-replay"]
+    },
+    "audience": {
+      "type": "array",
+      "description": "受众标签（§2.2 受控词表）。",
+      "items": {
+        "type": "string",
+        "enum": ["engineer", "tester", "auditor", "pm", "ai-agent", "external"]
+      }
+    },
+    "scenario": {
+      "type": "array",
+      "description": "场景标签（§2.2 受控词表）。",
+      "items": { "type": "string" }
+    },
+    "intent": {
+      "type": "array",
+      "description": "意图标签（§2.2 受控词表，算子域源自 IntentTags）。",
+      "items": { "type": "string" }
+    },
+    "tags": {
+      "type": "array",
+      "description": "受控补充说明标签。",
+      "items": { "type": "string" }
+    },
+    "created": { "type": "string", "format": "date" },
+    "updated": { "type": "string", "format": "date" },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "description": "责任人（人或 Agent），禁止空缺。"
+    },
+    "source_of_truth": {
+      "type": "boolean",
+      "description": "是否为正式事实源；镜像/平台副本填 false。",
+      "default": true
+    },
+    "aliases": {
+      "type": "array",
+      "description": "历史别名/旧显示名，仅用于检索兼容。",
+      "items": { "type": "string" }
+    },
+    "x-operator-extension": {
+      "type": "object",
+      "description": "算子域向下兼容 operator_knowledge_schema.json v2 的扩展字段。",
+      "properties": {
+        "OperatorType": { "type": "string" },
+        "DisplayName": { "type": "string" },
+        "CategoryId": { "type": "string" },
+        "CategoryOrder": { "type": "integer" },
+        "Lifecycle": { "type": "string" },
+        "DefaultAiRecommendation": { "type": "boolean" },
+        "RequiresLifecycleDisclosure": { "type": "boolean" },
+        "IntentTags": { "type": "array", "items": { "type": "string" } },
+        "ScenarioTags": { "type": "array", "items": { "type": "string" } },
+        "Inputs": { "type": "array" },
+        "Outputs": { "type": "array" },
+        "Parameters": { "type": "array" },
+        "KnownLimitations": { "type": "array", "items": { "type": "string" } },
+        "Evidence": { "type": "object" }
+      }
+    }
+  },
+  "additionalProperties": true
+}
