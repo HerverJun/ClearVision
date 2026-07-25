@@ -55,7 +55,7 @@ F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision
   该 SHA 的交付回报记录。
 - F03：G1–G6 核心实现已经完成，`F03_G6_STATUS=DONE`；总体状态仍为 `PARTIAL`，唯一历史 evidence gap 是独立无 Node 目标机验证 `NOT_PERFORMED`。产品负责人已接受延期，该项在 F04 中为非阻塞治理项，不改写为 PASS 或 COMPLETE。
 - F04：历史执行权威是 [F04 完整开发计划](./Studio_UI_Next_F04_完整开发计划_PROPOSED_AUDITED.md)。G0–G6 工程实现与 final-SHA 证据已完成；Remote CI run `29666388675` attempt 1 和 Final Gate 均通过。`NEXT_PILOT_PROFILE_AVAILABLE=YES`，但产品层视觉结果后来在 F04.2 审计与用户反馈中被拒绝，不能据此切换默认入口。
-- F04-R：当前纠偏治理权威是 [F04-R 产品层重构完整计划](./Studio_UI_Next_F04_R_产品层重构完整计划_PROPOSED.md)。G3 黄金旅程工程候选见 [G3 工程候选与证据](./F04R_G3_黄金旅程工程候选与证据.md)；G4A.2 整体风格与协调性精修已完成工程收口，见 [G4A.2 收口报告与视觉证据索引](./F04R_G4A_2_整体风格与协调性精修收口报告.md)。当前状态为 `G4A_2_ENGINEERING_STATE=DONE`、`GOLDEN_JOURNEY_REGRESSION=PASS`、`PRODUCT_VISUAL_CONFIRMATION=AWAITING_USER`、`G4B_ENTRY=BLOCKED_PENDING_PRODUCT_OWNER`、`F04R_STATUS=IN_PROGRESS`、`F05_ENTRY=BLOCKED`。
+- F04-R：`COMPLETE`。当前纠偏治理权威是 [F04-R 产品层重构完整计划](./Studio_UI_Next_F04_R_产品层重构完整计划_PROPOSED.md)；G4B 已完成真实 WebView2 Debug/Release、Windows 125% DPI、Release publish、Remote CI 与 Final Gate，详见 [G4B WebView2 / DPI / Release 证据索引](./F04R_G4B_WebView2_DPI_Release证据索引.md)和 [F04-R 完成报告](./F04R_完成报告.md)。状态为 `PRODUCT_VISUAL_CONFIRMATION=PASS`、`F04R_STATUS=COMPLETE`、`DEFAULT_ENTRY_CHANGE=NOT_AUTOMATIC`、`LEGACY_RETIREMENT=NOT_APPROVED`、`F05_ENTRY=READY_FOR_PLANNING`、`F05_STARTED=NO`。
 - `Studio:StudioUiEnabled=false` 保持不变；legacy 仍是默认入口。
 
 ## 阶段门禁
@@ -108,5 +108,7 @@ F04-R 纠偏期间以本目录链接的 F04-R 主计划与 G0/G1 受控文档为
 - [F04-R G2 稳定线语义同步与权限 Hardening 方案](./F04R_G2_稳定线语义同步与权限Hardening方案.md)
 - [F04-R G3 黄金旅程工程候选与证据](./F04R_G3_黄金旅程工程候选与证据.md)
 - [F04-R G4A.2 整体风格与协调性精修收口报告](./F04R_G4A_2_整体风格与协调性精修收口报告.md)
+- [F04-R G4B WebView2 / DPI / Release 证据索引](./F04R_G4B_WebView2_DPI_Release证据索引.md)
+- [F04-R 完成报告](./F04R_完成报告.md)
 - [仓库级协作规则](../../../AGENTS.md)
 - [旧 Studio2 历史入口](../Studio2/README.md)（历史取证，不是新计划）
