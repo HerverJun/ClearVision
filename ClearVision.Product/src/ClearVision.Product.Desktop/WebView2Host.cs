@@ -335,6 +335,8 @@ public sealed class WebView2Host : IAsyncDisposable
             ["Studio2.Settings"] = studioOptions.SettingsCapabilityEnabled,
             ["Studio2.ProjectPage"] = studioOptions.ProjectPageCapabilityEnabled,
             ["Studio2.Inspection"] = studioOptions.InspectionCapabilityEnabled,
+            ["Studio2.StationsRead"] = studioOptions.StationsReadCapabilityEnabled,
+            ["Studio2.InspectionRun"] = studioOptions.InspectionRunCapabilityEnabled,
             ["Studio2.ResultsReview"] = studioOptions.ResultsReviewCapabilityEnabled,
             ["Studio2.AiPanel"] = studioOptions.AiPanelCapabilityEnabled,
             ["Studio:CircleSearchV2ToolEnabled"] = studioOptions.CircleSearchV2ToolEnabled,

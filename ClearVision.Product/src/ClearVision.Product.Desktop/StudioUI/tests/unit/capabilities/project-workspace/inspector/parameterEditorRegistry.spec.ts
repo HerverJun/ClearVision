@@ -31,9 +31,17 @@ describe('G3 parameter editor registry', () => {
     }).kind).toBe('slider');
   });
 
-  it('keeps file, CameraBinding and image-backed editors as deferred extension slots', () => {
-    expect(editor({ dataType: 'file' })).toMatchObject({ kind: 'extension', extensionSlot: 'file-picker' });
-    expect(editor({ dataType: 'cameraBinding' })).toMatchObject({ kind: 'extension', extensionSlot: 'camera-binding' });
+  it('keeps file-picker deferred while describing the connected camera-binding editor accurately', () => {
+    expect(editor({ dataType: 'file' })).toMatchObject({
+      kind: 'extension',
+      extensionSlot: 'file-picker',
+      message: '文件选择器尚未接入当前工作区。'
+    });
+    expect(editor({ dataType: 'cameraBinding' })).toMatchObject({
+      kind: 'extension',
+      extensionSlot: 'camera-binding',
+      message: '请在相机绑定编辑器中选择工程使用的相机。'
+    });
     expect(editor({ dataType: 'Rectangle' })).toMatchObject({ kind: 'extension', extensionSlot: 'image-backed' });
   });
 

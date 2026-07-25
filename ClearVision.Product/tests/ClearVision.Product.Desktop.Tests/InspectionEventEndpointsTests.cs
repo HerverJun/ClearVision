@@ -385,6 +385,19 @@ public class InspectionEventEndpointsTests
             {
                 app.UseMiddleware<AuthMiddleware>();
             }
+            else
+            {
+                app.Use(async (context, next) =>
+                {
+                    context.Items["CurrentUser"] = new ClearVision.Product.Application.Services.UserSession
+                    {
+                        UserId = "event-admin",
+                        Username = "event-admin",
+                        Role = "Admin"
+                    };
+                    await next();
+                });
+            }
             app.MapInspectionEventEndpoints();
             await app.StartAsync();
 

@@ -37,9 +37,12 @@ function auth(phase: AuthLifecycleProjection['phase'], role: string | null = nul
 describe('G2 route guard', () => {
   it('accepts only allowlisted internal safe return routes', () => {
     expect(resolveSafeReturnRoute('/projects/a?tab=flow')).toBe('/projects/a?tab=flow');
+    expect(resolveSafeReturnRoute('/stations')).toBe('/stations');
+    expect(resolveSafeReturnRoute('/stations/station-1?tab=health')).toBe('/stations/station-1?tab=health');
     for (const attack of [
       'https://evil.example', '//evil.example', '/labs/design', '/login', '/unknown',
-      '/projects/%2f%2fevil', '/projects\\evil', '/projects/../login', '%2F%2Fevil.example'
+      '/projects/%2f%2fevil', '/projects\\evil', '/projects/../login',
+      '/stations/%2f%2fevil', '/stations\\evil', '/stations/../login', '%2F%2Fevil.example'
     ]) {
       expect(resolveSafeReturnRoute(attack), attack).toBeNull();
     }
@@ -58,6 +61,10 @@ describe('G2 route guard', () => {
     await router.push('/projects/abc');
     expect(router.currentRoute.value.path).toBe('/login');
     expect(router.currentRoute.value.query.returnTo).toBe('/projects/abc');
+
+    await router.push('/stations/station-1');
+    expect(router.currentRoute.value.path).toBe('/login');
+    expect(router.currentRoute.value.query.returnTo).toBe('/stations/station-1');
   });
 
   it('enforces role, product profile and internal route decisions on direct URLs', async () => {

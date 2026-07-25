@@ -1,6 +1,6 @@
 # Studio UI Next F05 完整开发计划（基于实际代码的只读审计）
 
-> 状态：`PROPOSED_AUDITED`｜F05 定义：**以前端产品化为主，附带最小 Host 真值链与安全加固**；不重造后端业务权威。G0/G0.1 仅做只读审计与计划修订，不授权任何 F05 实现。
+> 状态：`G1_DONE_WITH_PRE_EXISTING_BASELINE_DEBT`｜F05 定义：**以前端产品化为主，附带最小 Host 真值链与安全加固**；不重造后端业务权威。G0.1 已获批，G1 已在基线债务例外下完成并等待代码级复审；G2 仍未授权。
 
 ## 0. 审计基线与证据限制
 
@@ -9,9 +9,10 @@
 | 审计日期 | 2026-07-25 |
 | Next 工作树 | `C:\Users\HerverJun\Desktop\ClearVision-UI-Next`，分支 `studio-ui-next` |
 | F05 G0 源码审计基线 | `ac5815f16b40ce2d7ed7834f48e07f5f9a698d0e` |
-| G0.1 计划修订 / Next local HEAD | `59e2801f85ba03dab51650ba18588f8390214595` |
-| Next `origin/studio-ui-next` | `59e2801f85ba03dab51650ba18588f8390214595`（ahead 0 / behind 0） |
-| Next 未提交修改 | 仅 `ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json`（用户本地配置，本轮保持原状、未暂存、未提交） |
+| G0.1 修订输入 SHA | `59e2801f85ba03dab51650ba18588f8390214595` |
+| G0.1 获批计划 SHA | `ff9273b3c0e9b66e5b3aa3ec582826eb5298b280` |
+| G1 实施起点 / Next `origin/studio-ui-next` | `ff9273b3c0e9b66e5b3aa3ec582826eb5298b280`（ahead 0 / behind 0） |
+| G1 开始前 Next 未提交修改 | 仅 `ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json`（用户本地配置，本轮保持原状、未暂存、未提交） |
 | Legacy 工作树 | `C:\Users\HerverJun\Desktop\ClearVision`，分支 `codex初稿` |
 | Legacy local HEAD | `bea404394ac8cf403cca719c1990c426414a06c2` |
 | Legacy `origin/codex初稿` | `bea404394ac8cf403cca719c1990c426414a06c2`（ahead 0 / behind 0） |
@@ -387,10 +388,11 @@ P3/P4 拆分是因为检测 owner 的 SSE 生命周期与运行互斥是本波�
 
 **本次已冻结，不得在 G1 重新打开**：F05 为“前端产品化为主 + 最小 Host 真值链与安全加固”；G1 权限只覆盖 `inspection/realtime/start|stop|state|events|diagnostics`；检测 flag 固定为 `Studio2.InspectionRun` 与独立 `InspectionRunCapabilityEnabled`；`/inspection` 只入口/工程选择、`/projects/:id/inspection` 才运行；连续检测只用已保存 canonical Project snapshot；`IInspectionRuntimeCoordinator` 是唯一运行互斥权威；Station 控制区仅 Admin mounted；SaveCompatibility 语料归 F07/F08；F05 沿用 Quiet Precision；P6 先测量 manifest 再冻结更严预算。
 
-仍需产品负责人明确的只有：
+当前授权边界：
 
-1. **G0.1 计划复审批准**：批准前 `F05_IMPLEMENTATION=FORBIDDEN`，不得进入 G1。
-2. **真实硬件证据处置**：F05 完成时是否接受 `REAL_CAMERA/PLC/STATION=NOT_PERFORMED`，或要求现场验证作为 F05 完成门禁；无论何种选择，F08 默认入口切换仍需满足第 8 节的独立条件。
+1. **G0.1 已获批；G1 已在“candidate 无新增 format/build 失败”的基线债务例外下完成，等待代码级复审**；复审前不得进入 G2。
+2. **G2 未授权**：检测域合同冻结与后续实现仍为 `FORBIDDEN`。
+3. **真实硬件证据处置**：F05 完成时是否接受 `REAL_CAMERA/PLC/STATION=NOT_PERFORMED`，或要求现场验证作为 F05 完成门禁；无论何种选择，F08 默认入口切换仍需满足第 8 节的独立条件。
 
 ---
 
@@ -398,8 +400,11 @@ P3/P4 拆分是因为检测 owner 的 SSE 生命周期与运行互斥是本波�
 
 ```text
 F05_G0_AUDIT_STATE=DONE
-F05_PLAN_STATE=AWAITING_PRODUCT_OWNER_APPROVAL
-F05_IMPLEMENTATION=FORBIDDEN
+F05_G0_1_REVIEW=APPROVED
+F05_PLAN_STATE=G1_DONE_WITH_PRE_EXISTING_BASELINE_DEBT
+F05_G1_AUTHORIZATION=AUTHORIZED
+F05_G1_STATE=DONE_WITH_PRE_EXISTING_BASELINE_DEBT
+F05_G2_IMPLEMENTATION=FORBIDDEN
 DEFAULT_ENTRY_CHANGE=BLOCKED
 LEGACY_RETIREMENT=BLOCKED
 ```

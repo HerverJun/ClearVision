@@ -218,7 +218,8 @@ export function resolveSafeReturnRoute(value: unknown): string | null {
   const path = value.split(/[?#]/, 1)[0] ?? '';
   if (path === '/overview' || path === '/projects' || path.startsWith('/projects/') ||
       path === '/operators' || path.startsWith('/operators/') || path === '/results' ||
-      path === '/diagnostics' || path === '/about') {
+      path === '/stations' || path.startsWith('/stations/') || path === '/diagnostics' ||
+      path === '/about') {
     return value;
   }
   return null;

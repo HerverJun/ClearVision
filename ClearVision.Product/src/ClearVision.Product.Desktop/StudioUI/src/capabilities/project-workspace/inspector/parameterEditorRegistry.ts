@@ -48,7 +48,7 @@ export function resolveInspectorParameterEditor(
     return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'file-picker', message: '文件选择器尚未接入当前工作区。' });
   }
   if (dataType === 'camerabinding') {
-    return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'camera-binding', message: '相机绑定尚未接入当前工作区。' });
+    return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'camera-binding', message: '请在相机绑定编辑器中选择工程使用的相机。' });
   }
   if (['rectangle', 'circle', 'polygon', 'annulus', 'arc', 'circlesearch', 'npoint', 'caliper'].includes(dataType)) {
     return Object.freeze({ kind: 'extension', integer: false, nullable, extensionSlot: 'image-backed', message: '请在下方预览区使用“编辑 ROI”进行图上编辑。' });

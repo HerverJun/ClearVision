@@ -1099,7 +1099,8 @@ public static class ApiEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         // 【第二优先级】停止实时检测
         app.MapPost("/api/inspection/realtime/stop", async (
@@ -1119,7 +1120,8 @@ public static class ApiEndpoints
             {
                 return Results.BadRequest(new { Error = ex.Message });
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
     }
 
     private static object ToProjectVariableValueDtos(

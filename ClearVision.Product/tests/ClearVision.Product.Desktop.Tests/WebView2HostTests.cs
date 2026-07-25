@@ -135,8 +135,51 @@ public class WebView2HostTests
             new StudioOptions());
 
         script.Should().Contain("\"Studio2.Workspace\":false");
+        script.Should().Contain("\"Studio2.StationsRead\":false");
+        script.Should().Contain("\"Studio2.InspectionRun\":false");
         script.Should().Contain("Object.freeze(startup)");
         script.Should().NotContain("window.__API_BASE_URL__");
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public void BuildStudioUiStartupInjectionScript_ShouldMapF05OptionsOneToOneAndKeepLegacyInspectionIndependent(
+        bool stationsReadEnabled,
+        bool inspectionRunEnabled,
+        bool legacyInspectionEnabled)
+    {
+        var script = WebView2Host.BuildStudioUiStartupInjectionScript(
+            "http://localhost:5000/api",
+            new StudioOptions
+            {
+                StationsReadCapabilityEnabled = stationsReadEnabled,
+                InspectionRunCapabilityEnabled = inspectionRunEnabled,
+                InspectionCapabilityEnabled = legacyInspectionEnabled
+            });
+
+        script.Should().Contain($"\"Studio2.StationsRead\":{stationsReadEnabled.ToString().ToLowerInvariant()}");
+        script.Should().Contain($"\"Studio2.InspectionRun\":{inspectionRunEnabled.ToString().ToLowerInvariant()}");
+        script.Should().Contain($"\"Studio2.Inspection\":{legacyInspectionEnabled.ToString().ToLowerInvariant()}");
+    }
+
+    [Fact]
+    public void BuildLegacyStartupInjectionScript_ShouldNotReuseF05StudioUiFlags()
+    {
+        var script = WebView2Host.BuildStartupInjectionScript(
+            apiBaseUrl: "http://localhost:5000/api",
+            cssVersion: "123",
+            inspectionCapabilityEnabled: true);
+
+        script.Should().Contain("\"Studio2.Inspection\":true");
+        script.Should().NotContain("Studio2.InspectionRun");
+        script.Should().NotContain("Studio2.StationsRead");
     }
 
     [Fact]

@@ -33,14 +33,17 @@ public static class InspectionEventEndpoints
         app.MapGet("/api/inspection/realtime/{projectId:guid}/state", (
             Guid projectId,
             IInspectionRuntimeCoordinator coordinator) =>
-            Results.Ok(ToRuntimeStateDto(projectId, coordinator.GetState(projectId))));
-        app.MapGet("/api/inspection/realtime/{projectId:guid}/events", HandleSseEventsAsync);
+            Results.Ok(ToRuntimeStateDto(projectId, coordinator.GetState(projectId))))
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
+        app.MapGet("/api/inspection/realtime/{projectId:guid}/events", HandleSseEventsAsync)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
         app.MapGet("/api/inspection/realtime/diagnostics", () => Results.Ok(new
         {
             droppedMessages = Volatile.Read(ref _sseDroppedMessageCount),
             replayedMessages = Volatile.Read(ref _sseReplayedMessageCount),
             channelCapacity = ResolveSseChannelCapacity()
-        }));
+        }))
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
         return app;
     }
 

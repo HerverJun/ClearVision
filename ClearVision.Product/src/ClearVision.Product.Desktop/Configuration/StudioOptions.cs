@@ -13,6 +13,8 @@ public sealed class StudioOptions
     public bool SettingsCapabilityEnabled { get; set; }
     public bool ProjectPageCapabilityEnabled { get; set; }
     public bool InspectionCapabilityEnabled { get; set; }
+    public bool StationsReadCapabilityEnabled { get; set; } = false;
+    public bool InspectionRunCapabilityEnabled { get; set; } = false;
     public bool ResultsReviewCapabilityEnabled { get; set; }
     public bool AiPanelCapabilityEnabled { get; set; }
     public bool CircleSearchV2ToolEnabled { get; set; } = true;
