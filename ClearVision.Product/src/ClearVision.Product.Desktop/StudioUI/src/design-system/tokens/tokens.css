@@ -135,6 +135,13 @@
   --cv-density-page-padding: 20px;
   --cv-density-page-gap: 16px;
 
+  /* Professional workbench alignment. These aliases keep capability-local
+     editors on the shared density, spacing and surface vocabulary. */
+  --cv-workbench-control-height: var(--cv-density-control-height);
+  --cv-workbench-section-gap: var(--cv-space-3);
+  --cv-workbench-section-radius: var(--cv-radius-sm);
+  --cv-workbench-section-border: var(--cv-border-subtle);
+
   /* F03 Workspace shell geometry. These tokens describe layout only; no
      Flow/Project authority is stored in the design system. */
   --cv-workspace-toolbar-height: 38px;

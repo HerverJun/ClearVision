@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
-import { CvButton, CvModal } from '@/design-system';
+import { computed, reactive, shallowRef, watch } from 'vue';
+import { CvButton, CvModal, CvStatusBadge, type CvStatusTone } from '@/design-system';
 import type { FlowCanvasOwner } from '../flow';
 import type { WorkspaceGlobalVariableValueType, WorkspaceJsonValue } from '../workspaceContracts';
 import type { WorkspaceGlobalVariablesOwner } from './workspaceGlobalVariablesOwner';
@@ -13,14 +13,49 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ close: [] }>();
 
-const tab = ref<'definitions' | 'bindings' | 'runtime'>('definitions');
-const editingId = ref<string | null>(null);
+const tab = shallowRef<'definitions' | 'bindings' | 'runtime'>('definitions');
+const editingId = shallowRef<string | null>(null);
+const copiedField = shallowRef<string | null>(null);
 const definition = reactive({
   name: '', displayName: '', description: '', valueType: 'String' as WorkspaceGlobalVariableValueType,
   initialValue: '', min: '', max: '', manualWriteAllowed: false, includeInResultMetadata: false
 });
 const sourceDraft = reactive({ variableId: '', outputKey: '', resultPath: '', expression: '' });
 const targetDraft = reactive({ variableId: '', parameterKey: '', expression: '' });
+const selectedDefinition = computed(() => props.owner.projection.draft.variables.find(item => item.id === editingId.value) ?? null);
+const statusTone = computed<CvStatusTone>(() => {
+  if (props.owner.projection.phase === 'error' || props.owner.projection.fieldErrors.length > 0) return 'error';
+  if (props.readonly) return 'warning';
+  if (props.owner.projection.dirty) return 'warning';
+  return 'ok';
+});
+const statusLabel = computed(() => {
+  if (props.readonly) return '只读';
+  if (props.owner.projection.fieldErrors.length > 0) return '需要修正';
+  if (props.owner.projection.dirty) return '存在未应用修改';
+  return '已同步到工程草稿';
+});
+
+function valueTypeLabel(value: string): string {
+  return ({ String: '文本', Int64: '整数', Double: '数值', Boolean: '布尔值' } as Readonly<Record<string, string>>)[value] ?? value;
+}
+
+function formatTimestamp(value: string | null): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+  }).format(date);
+}
+
+async function copyField(key: string, value: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(value);
+    copiedField.value = key;
+  } catch {
+    copiedField.value = null;
+  }
+}
 
 function field(source: Readonly<Record<string, unknown>>, camel: string): unknown {
   if (Object.prototype.hasOwnProperty.call(source, camel)) return source[camel];
@@ -133,7 +168,7 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
     @close="emit('close')"
   >
     <div
-      class="variables-workbench"
+      class="variables-workbench cv-workbench"
       data-capability="global-variables-workbench"
       :data-dirty="owner.projection.dirty"
     >
@@ -161,7 +196,7 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
             :data-active="editingId === item.id"
             @click="editVariable(item.id)"
           >
-            <span><strong>{{ item.displayName }}</strong><small>{{ item.name }} · {{ item.valueType.value }}</small></span>
+            <span><strong>{{ item.displayName }}</strong><small>{{ valueTypeLabel(item.valueType.value) }}</small></span>
             <em>{{ item.initialValue }}</em>
           </button>
           <button
@@ -175,23 +210,22 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
           class="variables-workbench__form"
           @submit.prevent="saveDefinition"
         >
-          <label>名称<input
-            v-model="definition.name"
-            required
-            pattern="[A-Za-z_][A-Za-z0-9_]*"
-            :disabled="readonly"
-          ></label>
           <label>显示名称<input
             v-model="definition.displayName"
+            name="global-variable-display-name"
+            autocomplete="off"
             required
             :disabled="readonly"
           ></label>
           <label>类型<select
             v-model="definition.valueType"
+            name="global-variable-value-type"
             :disabled="readonly"
-          ><option>String</option><option>Int64</option><option>Double</option><option>Boolean</option></select></label>
+          ><option value="String">文本</option><option value="Int64">整数</option><option value="Double">数值</option><option value="Boolean">布尔值</option></select></label>
           <label>默认 / 手动初始值<input
             v-model="definition.initialValue"
+            name="global-variable-initial-value"
+            autocomplete="off"
             required
             :disabled="readonly"
           ></label>
@@ -202,18 +236,52 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
             <label>最小值<input
               v-model="definition.min"
               type="number"
+              name="global-variable-min"
               :disabled="readonly"
             ></label><label>最大值<input
               v-model="definition.max"
               type="number"
+              name="global-variable-max"
               :disabled="readonly"
             ></label>
           </div>
           <label>说明<textarea
             v-model="definition.description"
+            name="global-variable-description"
+            autocomplete="off"
             rows="2"
             :disabled="readonly"
           /></label>
+          <details
+            class="variables-workbench__technical cv-technical-detail"
+            :open="editingId === null"
+          >
+            <summary>技术详情</summary>
+            <div class="variables-workbench__technical-grid">
+              <label>名称<input
+                v-model="definition.name"
+                name="global-variable-name"
+                aria-label="名称"
+                autocomplete="off"
+                spellcheck="false"
+                required
+                pattern="[A-Za-z_][A-Za-z0-9_]*"
+                :disabled="readonly"
+              ><small>工程内部标识，仅允许字母、数字和下划线。</small></label>
+              <div v-if="selectedDefinition">
+                <span>变量标识</span>
+                <div class="cv-copyable-value">
+                  <code translate="no">{{ selectedDefinition.id }}</code><CvButton
+                    size="sm"
+                    variant="quiet"
+                    @click="copyField('variable', selectedDefinition.id)"
+                  >
+                    {{ copiedField === 'variable' ? '已复制' : '复制' }}
+                  </CvButton>
+                </div>
+              </div>
+            </div>
+          </details>
           <label class="variables-workbench__check"><input
             v-model="definition.manualWriteAllowed"
             type="checkbox"
@@ -252,6 +320,7 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
           <h3>输出来源</h3><div class="variables-workbench__binding-form">
             <select
               v-model="sourceDraft.variableId"
+              name="global-variable-source-variable"
               :disabled="readonly"
             >
               <option value="">
@@ -265,6 +334,7 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
               </option>
             </select><select
               v-model="sourceDraft.outputKey"
+              name="global-variable-source-output"
               :disabled="readonly"
             >
               <option value="">
@@ -278,11 +348,17 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
               </option>
             </select><input
               v-model="sourceDraft.resultPath"
-              placeholder="ResultPath（可选）"
+              name="global-variable-result-path"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="结果路径（可选）…"
               :disabled="readonly"
             ><input
               v-model="sourceDraft.expression"
-              placeholder="表达式（可选）"
+              name="global-variable-source-expression"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="转换表达式（可选）…"
               :disabled="readonly"
             ><CvButton
               size="sm"
@@ -310,6 +386,7 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
           <h3>目标参数</h3><div class="variables-workbench__binding-form">
             <select
               v-model="targetDraft.variableId"
+              name="global-variable-target-variable"
               :disabled="readonly"
             >
               <option value="">
@@ -323,6 +400,7 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
               </option>
             </select><select
               v-model="targetDraft.parameterKey"
+              name="global-variable-target-parameter"
               :disabled="readonly"
             >
               <option value="">
@@ -336,7 +414,10 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
               </option>
             </select><input
               v-model="targetDraft.expression"
-              placeholder="表达式（可选）"
+              name="global-variable-target-expression"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="转换表达式（可选）…"
               :disabled="readonly"
             ><CvButton
               size="sm"
@@ -367,7 +448,7 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
         class="variables-workbench__runtime"
       >
         <div class="variables-workbench__row">
-          <p>运行值来自当前 session，只读且不会成为工程初始值。</p><CvButton
+          <p>运行值来自当前运行会话，只读且不会成为工程初始值。</p><CvButton
             size="sm"
             :disabled="owner.projection.phase === 'loading-runtime'"
             @click="owner.refreshRuntimeValues"
@@ -381,7 +462,7 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
               v-for="item in owner.projection.runtimeValues"
               :key="item.variableId"
             >
-              <td>{{ item.displayName }}</td><td><code>{{ item.value }}</code></td><td>{{ item.version }}</td><td>{{ item.updatedBy }}</td><td>{{ item.updatedAtUtc ?? '—' }}</td>
+              <td>{{ item.displayName }}</td><td><code>{{ item.value }}</code></td><td>{{ item.version }}</td><td>{{ item.updatedBy }}</td><td>{{ formatTimestamp(item.updatedAtUtc) }}</td>
             </tr>
           </tbody>
         </table>
@@ -389,7 +470,7 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
 
       <div
         v-if="owner.projection.fieldErrors.length"
-        class="variables-workbench__errors"
+        class="variables-workbench__errors cv-workbench-error"
         role="alert"
       >
         <strong>字段校验未通过</strong><ul>
@@ -397,16 +478,26 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
             v-for="error in owner.projection.fieldErrors"
             :key="`${error.code}-${error.field}`"
           >
-            <code>{{ error.code }}</code> {{ error.message }} <small>{{ error.field }}</small>
+            <span>{{ error.message }}</span>
+            <details class="variables-workbench__error-detail">
+              <summary>诊断信息</summary>
+              <code translate="no">{{ error.code }} · {{ error.field }}</code>
+            </details>
           </li>
         </ul>
       </div>
-      <p
-        class="variables-workbench__status"
+      <div
+        class="variables-workbench__status cv-workbench-status"
         role="status"
+        aria-live="polite"
+        :data-tone="statusTone"
       >
-        {{ owner.projection.message }}
-      </p>
+        <CvStatusBadge
+          :tone="statusTone"
+          :label="statusLabel"
+        />
+        <span>{{ owner.projection.message }}</span>
+      </div>
     </div>
     <template #footer>
       <CvButton
@@ -426,7 +517,7 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
 </template>
 
 <style scoped>
-.variables-workbench { min-height: 420px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: var(--cv-space-3); }
+.variables-workbench { min-height: 420px; grid-template-rows: auto minmax(0, 1fr) auto auto; }
 .variables-workbench > nav { display: flex; border-bottom: 1px solid var(--cv-border-subtle); }
 .variables-workbench > nav button { min-height: 32px; padding: 0 var(--cv-space-3); border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--cv-text-secondary); cursor: pointer; }
 .variables-workbench > nav button[data-active="true"] { border-bottom-color: var(--cv-color-industrial-blue); color: var(--cv-color-industrial-blue); font-weight: 600; }
@@ -435,10 +526,11 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
 .variables-workbench__list > button { width: 100%; min-height: 48px; padding: var(--cv-space-2) var(--cv-space-3); display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-2); text-align: left; border: 0; border-bottom: 1px solid var(--cv-border-subtle); background: transparent; color: var(--cv-text-primary); cursor: pointer; }
 .variables-workbench__list > button[data-active="true"] { background: var(--cv-interactive-selected); }
 .variables-workbench__list span strong,.variables-workbench__list span small { display: block; }.variables-workbench__list small,.variables-workbench__list em { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); font-style: normal; }
-.variables-workbench__form { padding: var(--cv-space-3); display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-content: start; gap: var(--cv-space-3); }.variables-workbench__form > label { display: grid; gap: 4px; font-size: var(--cv-font-size-2xs); }.variables-workbench__form > label:nth-last-of-type(-n+3),.variables-workbench__form .variables-workbench__row { grid-column: 1/-1; }
-.variables-workbench input,.variables-workbench select,.variables-workbench textarea { width: 100%; min-width: 0; min-height: 30px; padding: 4px 8px; border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); color: var(--cv-text-primary); font: inherit; }.variables-workbench__range,.variables-workbench__row { display: flex; align-items: center; gap: var(--cv-space-2); }.variables-workbench__range label { flex: 1; display: grid; gap: 4px; font-size: var(--cv-font-size-2xs); }.variables-workbench__check { display: flex!important; align-items: center; }.variables-workbench__check input { width: auto; min-height: auto; }
+.variables-workbench__form { padding: var(--cv-space-3); display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-content: start; gap: var(--cv-space-3); }.variables-workbench__form > label { display: grid; gap: 4px; font-size: var(--cv-font-size-2xs); }.variables-workbench__form > label:nth-last-of-type(-n+3),.variables-workbench__form .variables-workbench__row,.variables-workbench__technical { grid-column: 1/-1; }
+.variables-workbench__range,.variables-workbench__row { display: flex; align-items: center; gap: var(--cv-space-2); }.variables-workbench__range label { flex: 1; display: grid; gap: 4px; font-size: var(--cv-font-size-2xs); }.variables-workbench__check { display: flex!important; align-items: center; }.variables-workbench__check input { width: auto; min-height: auto; }
+.variables-workbench__technical-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-3); padding-top: var(--cv-space-2); }.variables-workbench__technical-grid > label { display: grid; gap: var(--cv-space-1); color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }.variables-workbench__technical-grid small,.variables-workbench__technical-grid > div > span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .variables-workbench__bindings { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--cv-space-4); }.variables-workbench__bindings h3 { margin: 0 0 var(--cv-space-2); font-size: var(--cv-font-size-sm); }.variables-workbench__binding-form { display: grid; gap: var(--cv-space-2); }.variables-workbench__bindings ul { margin: var(--cv-space-3) 0 0; padding: 0; list-style: none; }.variables-workbench__bindings li { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); font-size: var(--cv-font-size-xs); }.variables-workbench__bindings li button { border: 0; background: transparent; color: var(--cv-color-status-ng-strong); cursor: pointer; }
 .variables-workbench__runtime table { width: 100%; border-collapse: collapse; font-size: var(--cv-font-size-xs); }.variables-workbench__runtime th,.variables-workbench__runtime td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--cv-border-subtle); }.variables-workbench__runtime p { margin: 0; flex: 1; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
-.variables-workbench__errors { padding: var(--cv-space-2); border: 1px solid var(--cv-color-status-ng-border); background: var(--cv-color-status-ng-soft); color: var(--cv-color-status-ng-strong); font-size: var(--cv-font-size-xs); }.variables-workbench__errors ul { margin: 4px 0 0; padding-left: 18px; }.variables-workbench__errors small { color: var(--cv-text-muted); }.variables-workbench__status { margin: 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-@media(max-width:720px){.variables-workbench__split,.variables-workbench__bindings{grid-template-columns:1fr}.variables-workbench__list{max-height:160px;border-right:0;border-bottom:1px solid var(--cv-border-subtle)}}
+.variables-workbench__errors ul { margin: 4px 0 0; padding-left: 18px; }.variables-workbench__errors li { margin-top: var(--cv-space-1); }.variables-workbench__error-detail summary { cursor: pointer; color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }.variables-workbench__error-detail code { overflow-wrap: anywhere; font-size: 10px; }.variables-workbench__status > span { min-width: 0; overflow-wrap: anywhere; }
+@media(max-width:720px){.variables-workbench__split,.variables-workbench__bindings,.variables-workbench__technical-grid{grid-template-columns:1fr}.variables-workbench__list{max-height:160px;border-right:0;border-bottom:1px solid var(--cv-border-subtle)}}
 </style>

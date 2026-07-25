@@ -41,7 +41,7 @@ async function copyField(key: string, value: string): Promise<void> {
     @close="emit('close')"
   >
     <div
-      class="package-dialog"
+      class="package-dialog cv-workbench"
       data-capability="runtime-package-export"
       :data-phase="owner.projection.phase"
     >
@@ -66,8 +66,9 @@ async function copyField(key: string, value: string): Promise<void> {
         </dl>
       </section>
       <div
-        class="package-dialog__status"
+        class="package-dialog__status cv-workbench-status"
         :data-phase="owner.projection.phase"
+        :data-tone="statusTone"
         role="status"
         aria-live="polite"
       >
@@ -98,11 +99,11 @@ async function copyField(key: string, value: string): Promise<void> {
           <div><dt>工作站注册</dt><dd>{{ owner.projection.result.registeredForStationDeployment ? '已注册，可供部署' : '未注册' }}</dd></div>
         </dl>
       </section>
-      <details class="package-dialog__technical">
+      <details class="package-dialog__technical cv-technical-detail">
         <summary>技术详情</summary>
         <dl>
           <div>
-            <dt>工程标识</dt><dd>
+            <dt>工程标识</dt><dd class="cv-copyable-value">
               <code translate="no">{{ project.id }}</code><CvButton
                 size="sm"
                 variant="quiet"
@@ -114,7 +115,7 @@ async function copyField(key: string, value: string): Promise<void> {
           </div>
           <template v-if="owner.projection.result">
             <div>
-              <dt>流程哈希</dt><dd>
+              <dt>流程哈希</dt><dd class="cv-copyable-value">
                 <code translate="no">{{ owner.projection.result.flowHash }}</code><CvButton
                   size="sm"
                   variant="quiet"
@@ -125,7 +126,7 @@ async function copyField(key: string, value: string): Promise<void> {
               </dd>
             </div>
             <div>
-              <dt>判定哈希</dt><dd>
+              <dt>判定哈希</dt><dd class="cv-copyable-value">
                 <code translate="no">{{ owner.projection.result.decisionConfigurationHash }}</code><CvButton
                   size="sm"
                   variant="quiet"
@@ -136,7 +137,7 @@ async function copyField(key: string, value: string): Promise<void> {
               </dd>
             </div>
             <div>
-              <dt>输出位置</dt><dd>
+              <dt>输出位置</dt><dd class="cv-copyable-value">
                 <code translate="no">{{ owner.projection.result.packageRootPath }}</code><CvButton
                   size="sm"
                   variant="quiet"
@@ -180,7 +181,6 @@ async function copyField(key: string, value: string): Promise<void> {
 </template>
 
 <style scoped>
-.package-dialog { display: grid; gap: var(--cv-space-3); }
 .package-dialog h3 { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); }
 .package-dialog__section-heading { min-height: 28px; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
 .package-dialog__section-heading > span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
@@ -188,17 +188,9 @@ async function copyField(key: string, value: string): Promise<void> {
 .package-dialog dl div { min-width: 0; padding: var(--cv-space-2) var(--cv-space-3); border-bottom: 1px solid var(--cv-border-subtle); }
 .package-dialog dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .package-dialog dd { margin: 2px 0 0; overflow-wrap: anywhere; font-size: var(--cv-font-size-xs); }
-.package-dialog__status { min-height: 38px; padding: var(--cv-space-2); display: flex; align-items: center; gap: var(--cv-space-2); background: var(--cv-surface-page); }
-.package-dialog__status[data-phase="error"] { background: var(--cv-color-status-error-soft); }
-.package-dialog__status[data-phase="forbidden"],.package-dialog__status[data-phase="unknown-outcome"] { background: var(--cv-color-status-warning-soft); }
 .package-dialog__status p { margin: 0; min-width: 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
 .package-dialog__result { background: color-mix(in srgb, var(--cv-color-status-ok-soft) 62%, var(--cv-surface-raised)); }
 .package-dialog__result strong { color: var(--cv-color-status-ok-strong); }
-.package-dialog__technical { border-top: 1px solid var(--cv-border-subtle); }
-.package-dialog__technical summary { min-height: 34px; display: flex; align-items: center; color: var(--cv-text-secondary); cursor: pointer; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
-.package-dialog__technical summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
 .package-dialog__technical dl { grid-template-columns: 1fr; }
-.package-dialog__technical dd { display: flex; align-items: flex-start; gap: var(--cv-space-2); }
-.package-dialog__technical code { min-width: 0; flex: 1; font-size: 10px; overflow-wrap: anywhere; user-select: all; }
 .package-dialog__warning { margin: 0; padding: var(--cv-space-2); border: 1px solid var(--cv-color-status-warning-border); background: var(--cv-color-status-warning-soft); color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-xs); line-height: 1.45; }
 </style>
