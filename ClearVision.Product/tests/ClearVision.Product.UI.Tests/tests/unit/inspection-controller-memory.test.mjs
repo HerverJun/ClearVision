@@ -59,6 +59,10 @@ const INSPECTION_WEB_MESSAGE_TYPES = [
   'progressNotification'
 ];
 
+function bearerAuthorization(token) {
+  return ['Bearer', token].join(' ');
+}
+
 function createTextStreamResponse(chunks, options = {}) {
   const encodedChunks = chunks.map(chunk => new TextEncoder().encode(chunk));
   let index = 0;
@@ -337,12 +341,12 @@ test('handleResultEvent fetches cached image with authorization and publishes a 
 
   httpClient.defaultHeaders = {
     ...originalHeaders,
-    Authorization: 'Bearer inspection-image-token'
+    Authorization: bearerAuthorization('inspection-image-token')
   };
   globalThis.fetch = async (url, options) => {
     assert.equal(url, expectedUrl);
     assert.equal(options.method, 'GET');
-    assert.equal(options.headers.Authorization, 'Bearer inspection-image-token');
+    assert.equal(options.headers.Authorization, bearerAuthorization('inspection-image-token'));
     return {
       ok: true,
       status: 200,
@@ -397,10 +401,10 @@ test('cached inspection image failure is visible and retry publishes the recover
 
   httpClient.defaultHeaders = {
     ...originalHeaders,
-    Authorization: 'Bearer retry-token'
+    Authorization: bearerAuthorization('retry-token')
   };
   globalThis.fetch = async (_url, options) => {
-    assert.equal(options.headers.Authorization, 'Bearer retry-token');
+    assert.equal(options.headers.Authorization, bearerAuthorization('retry-token'));
     requests += 1;
     if (requests === 1) {
       return { ok: false, status: 401 };
@@ -452,10 +456,10 @@ test('missing cached inspection image exposes a 404 load error', async (t) => {
 
   httpClient.defaultHeaders = {
     ...originalHeaders,
-    Authorization: 'Bearer missing-image-token'
+    Authorization: bearerAuthorization('missing-image-token')
   };
   globalThis.fetch = async (_url, options) => {
-    assert.equal(options.headers.Authorization, 'Bearer missing-image-token');
+    assert.equal(options.headers.Authorization, bearerAuthorization('missing-image-token'));
     return { ok: false, status: 404 };
   };
 
@@ -492,7 +496,7 @@ test('stale cached image loads cannot replace the newest result image', async (t
 
   httpClient.defaultHeaders = {
     ...originalHeaders,
-    Authorization: 'Bearer stale-token'
+    Authorization: bearerAuthorization('stale-token')
   };
   globalThis.fetch = (_url, options) => new Promise(resolve => {
     pendingRequests.push({ resolve, signal: options.signal });
