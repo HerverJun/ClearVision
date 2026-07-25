@@ -33,6 +33,7 @@ param(
     [switch]$WorkspaceCapabilityEnabled,
     [switch]$SeedWorkspace,
     [switch]$FormalRun,
+    [switch]$GoldenJourney,
     [switch]$DpiOnly,
     [ValidateSet("LEGACY_DEFAULT", "NEXT_PILOT", "NEXT_FULL_CANDIDATE")]
     [string]$StartupProfile,
@@ -204,6 +205,9 @@ if ($SeedWorkspace -and -not $WorkspaceCapabilityEnabled) {
 if ($FormalRun -and -not $SeedWorkspace) {
     throw "FormalRun requires SeedWorkspace so the runner can execute a persisted Project authority."
 }
+if ($GoldenJourney -and ($Expectation -ne "studio-product" -or -not $SeedWorkspace -or -not $FormalRun)) {
+    throw "GoldenJourney requires studio-product plus SeedWorkspace and FormalRun."
+}
 if ($DpiOnly -and ($Expectation -ne "studio-product" -or -not $SeedWorkspace)) {
     throw "DpiOnly requires studio-product plus SeedWorkspace."
 }
@@ -338,6 +342,7 @@ $customEnvironment = [ordered]@{
     "CV_STUDIO_UI_DEEP_CANVAS" = if ($DeepCanvas) { "true" } else { "false" }
     "CV_STUDIO_UI_SEED_WORKSPACE" = if ($SeedWorkspace) { "true" } else { "false" }
     "CV_STUDIO_UI_FORMAL_RUN" = if ($FormalRun) { "true" } else { "false" }
+    "CV_STUDIO_UI_G4B_GOLDEN_JOURNEY" = if ($GoldenJourney) { "true" } else { "false" }
     "CV_STUDIO_UI_DPI_ONLY" = if ($DpiOnly) { "true" } else { "false" }
     "CV_STUDIO_UI_PROFILE" = if ([string]::IsNullOrWhiteSpace($StartupProfile)) { "" } else { $StartupProfile }
     "CV_STUDIO_UI_AUTH_MODE" = $AuthMode.Trim().ToUpperInvariant()

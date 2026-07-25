@@ -12,10 +12,10 @@ function node(id: string, type: string | number, parameters: unknown[] = []) {
   return { id, name: type, type, isEnabled: true, parameters, inputPorts: [], outputPorts: [] };
 }
 
-function harness() {
+function harness(cameraParameterName = 'CameraBindingId') {
   const source = node(sourceId, 0, [
     { id: crypto.randomUUID(), name: 'SourceType', value: 'Camera' },
-    { id: crypto.randomUUID(), name: 'CameraBindingId', value: 'camera-a' },
+    { id: crypto.randomUUID(), name: cameraParameterName, value: 'camera-a' },
     { id: crypto.randomUUID(), name: 'ExposureTime', value: 1000 },
     { id: crypto.randomUUID(), name: 'Gain', value: 2 }
   ]);
@@ -43,6 +43,22 @@ function harness() {
 }
 
 describe('cameraBindingEditorOwner', () => {
+  it('projects the real ImageAcquisition CameraId alias without creating a second binding owner', async () => {
+    const value = harness('CameraId');
+    const owner = createCameraBindingEditorOwner({ projectId, flowOwner: value.flowOwner, api: value.api });
+    await vi.waitFor(() => expect(owner.projection.phase).toBe('ready'));
+
+    expect(owner.projection.currentBindingId).toBe('camera-a');
+    expect(owner.projection.canCapture).toBe(true);
+    expect(owner.selectBinding('CameraId', 'camera-a')).toBe(true);
+    expect(value.flowOwner.commands.patchNodeParameter).toHaveBeenCalledWith({
+      nodeId: sourceId,
+      parameterName: 'CameraId',
+      value: 'camera-a'
+    });
+    owner.dispose();
+  });
+
   it('captures an identified frame, exposes it only to reachable targets, and invalidates on config change', async () => {
     const value = harness();
     const owner = createCameraBindingEditorOwner({ projectId, flowOwner: value.flowOwner, api: value.api });

@@ -11,10 +11,14 @@ const historicalRequiredRoutes = Object.freeze([
 ]);
 
 const f04RequiredRoutes = Object.freeze([
-  '/overview',
   '/projects',
+  '/results'
+]);
+
+const f04ForbiddenRoutes = Object.freeze([
+  '/overview',
   '/operators',
-  '/results',
+  '/stations',
   '/diagnostics',
   '/about'
 ]);
@@ -35,20 +39,10 @@ function resolveProductNavigationContract(phase, featureFlags = {}) {
 
   return Object.freeze({
     phase: normalizedPhase,
-    requiredRoutes: Object.freeze(stationsReadEnabled
-      ? [
-          '/overview',
-          '/projects',
-          '/operators',
-          '/stations',
-          '/results',
-          '/diagnostics',
-          '/about'
-        ]
-      : [...f04RequiredRoutes]),
-    forbiddenRoutes: Object.freeze(stationsReadEnabled ? [] : ['/stations']),
+    requiredRoutes: f04RequiredRoutes,
+    forbiddenRoutes: f04ForbiddenRoutes,
     stationsReadEnabled,
-    stationsRule: stationsReadEnabled ? 'feature-required' : 'feature-forbidden'
+    stationsRule: 'pilot-not-exposed'
   });
 }
 

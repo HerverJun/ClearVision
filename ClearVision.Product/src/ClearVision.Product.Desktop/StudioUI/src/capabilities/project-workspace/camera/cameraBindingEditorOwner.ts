@@ -99,11 +99,15 @@ function nodeId(node: Readonly<Record<string, unknown>>): string {
   return text(field(node, 'id'));
 }
 
+function cameraBindingId(node: Readonly<Record<string, unknown>>): string {
+  return text(parameterValue(node, 'CameraBindingId')) || text(parameterValue(node, 'CameraId'));
+}
+
 function sourceSignature(node: Readonly<Record<string, unknown>>): string {
   const payload = JSON.stringify({
     nodeType: enumIdentity(field(node, 'type')),
     sourceType: text(parameterValue(node, 'SourceType')).toLowerCase(),
-    cameraBindingId: text(parameterValue(node, 'CameraBindingId')),
+    cameraBindingId: cameraBindingId(node),
     triggerMode: text(parameterValue(node, 'TriggerMode')),
     exposureTime: parameterValue(node, 'ExposureTime'),
     gain: parameterValue(node, 'Gain')
@@ -209,7 +213,7 @@ export function createCameraBindingEditorOwner(options: {
     const node = selectedNode();
     const isAcquisition = isImageAcquisition(node ?? Object.freeze({}));
     state.selectedNodeId = isAcquisition && node ? nodeId(node) : null;
-    state.currentBindingId = isAcquisition && node ? text(parameterValue(node, 'CameraBindingId')) || null : null;
+    state.currentBindingId = isAcquisition && node ? cameraBindingId(node) || null : null;
     const sourceType = isAcquisition && node ? text(parameterValue(node, 'SourceType')).toLowerCase() : '';
     const binding = state.bindings.find(item => item.id === state.currentBindingId);
     state.canCapture = options.flowOwner.projection.mutationGate === 'editable' && sourceType === 'camera' &&

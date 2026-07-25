@@ -196,7 +196,7 @@ function instantiateOperator(definition, operatorType, name, x, y, values = {}) 
   };
 }
 
-async function seedWorkspaceProject(webPort, token, runName, formalRun = false) {
+async function seedWorkspaceProject(webPort, token, runName, formalRun = false, goldenJourney = false) {
   const evidenceDirectory = path.resolve(requiredEnvironment('CV_EVIDENCE_DIR'));
   const imageEvidence = createPreviewPpm(path.join(evidenceDirectory, 'g4-preview-input.ppm'));
   const catalogPayload = await readAuthorizedJson(webPort, token, '/api/operators/library?includeCompatibility=true');
@@ -228,6 +228,15 @@ async function seedWorkspaceProject(webPort, token, runName, formalRun = false) 
   const imageOutput = image.outputPorts.find(port => port.name === 'Image');
   const roiInput = roi.inputPorts.find(port => port.name === 'Image');
   assert(imageOutput && roiInput, 'The G4 seed operators did not expose the expected Image ports.');
+  const camera = goldenJourney
+    ? instantiateOperator(imageDefinition, 0, 'G4B Camera Binding', 60, 180, {
+        SourceType: 'Camera',
+        CameraBindingId: ''
+      })
+    : null;
+  const cameraBindingParameter = camera?.parameters.find(parameter =>
+    String(parameter.dataType).toLowerCase() === 'camerabinding' ||
+      ['cameraid', 'camerabindingid'].includes(String(parameter.name).toLowerCase())) ?? null;
   let formalRunSeed = null;
   if (formalRun) {
     const judgment = instantiateOperator(
@@ -274,7 +283,7 @@ async function seedWorkspaceProject(webPort, token, runName, formalRun = false) 
       flow: {
         id: crypto.randomUUID(),
         name: 'F03 G4 WebView2 Flow',
-        operators: [image, roi],
+        operators: [image, roi, ...(camera ? [camera] : []), ...(goldenJourney && formalRunSeed ? [formalRunSeed.operator] : [])],
         connections: [{
           id: crypto.randomUUID(),
           sourceOperatorId: image.id,
@@ -299,7 +308,15 @@ async function seedWorkspaceProject(webPort, token, runName, formalRun = false) 
     runtimeAuditStartedAfterSeed: true,
     imageEvidence,
     roiNodeId: roi.id,
-    formalRunSeed
+    formalRunSeed,
+    goldenJourneySeed: goldenJourney && camera && formalRunSeed ? {
+      cameraNodeId: camera.id,
+      cameraBindingParameterName: cameraBindingParameter?.name ?? 'CameraId',
+      cameraBindingId: 'g4b-camera-fixture',
+      judgmentNodeId: formalRunSeed.operator.id,
+      judgmentOutputId: formalRunSeed.binding.sourceOutputPortId,
+      judgmentParameterId: formalRunSeed.operator.parameters.find(parameter => parameter.name === 'ExpectValue')?.id ?? null
+    } : null
   };
 }
 
@@ -848,6 +865,276 @@ async function waitForSeededPreview(page) {
       ?.getAttribute('data-roi-phase') === 'ready', null, { timeout: 30_000 });
 }
 
+async function installG4BGoldenJourneyHarness(page, evidenceDirectory, imageEvidence) {
+  const frame = fs.readFileSync(imageEvidence.filePath);
+  const checksum = crypto.createHash('sha256').update(frame).digest('hex');
+  const binding = {
+    id: 'g4b-camera-fixture',
+    displayName: 'G4B 宿主验证相机',
+    deviceId: 'G4B-NO-HARDWARE',
+    serialNumber: 'G4B-NO-HARDWARE',
+    ipAddress: '',
+    manufacturer: 'Evidence Harness',
+    modelName: 'Fixture Frame',
+    interfaceType: 'Harness',
+    isEnabled: true,
+    exposureTimeUs: 5000,
+    gainDb: 1,
+    pixelFormat: 'Mono8',
+    triggerMode: 'Software',
+    connectionStatus: 'Connected'
+  };
+  await page.route('**/api/cameras/bindings', async route => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([binding]) });
+  });
+  await page.route('**/api/cameras/soft-trigger-capture', async route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/x-portable-pixmap',
+      headers: {
+        'X-Camera-Id': binding.id,
+        'X-Trigger-Mode': 'Software',
+        'X-Image-Width': String(imageEvidence.width),
+        'X-Image-Height': String(imageEvidence.height),
+        'X-G4B-Harness': 'camera-frame'
+      },
+      body: frame
+    });
+  });
+  await page.route(/\/api\/inspection\/history\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/evidence\/manifest$/i, async route => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const parts = new URL(route.request().url()).pathname.split('/');
+    const projectId = parts[4];
+    const resultId = parts[5];
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'available',
+        message: 'G4B 宿主证据可用。',
+        manifest: {
+          schemaVersion: 1,
+          manifestId: `g4b-${resultId}`,
+          projectId,
+          inspectionResultId: resultId,
+          status: 'available',
+          outcome: 'OK',
+          createdAtUtc: new Date().toISOString(),
+          flowVersionHash: 'g4b-host-authority',
+          calibrationBundleId: null,
+          sessionId: null,
+          runId: resultId,
+          retentionClass: 'evidence-harness',
+          retentionExpiresAtUtc: null,
+          totalBytes: frame.length,
+          checksum,
+          redaction: { applied: true },
+          items: [{
+            id: 'g4b-camera-frame',
+            role: 'input-image',
+            contentType: 'image/x-portable-pixmap',
+            relativePath: 'g4b-camera-frame.ppm',
+            sizeBytes: frame.length,
+            sha256: checksum,
+            available: true,
+            missingReason: null
+          }]
+        }
+      })
+    });
+  });
+  await page.route(/\/api\/inspection\/history\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/evidence\/export$/i, async route => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/zip',
+      headers: {
+        'Content-Disposition': 'attachment; filename="g4b-webview2-evidence.zip"',
+        'X-G4B-Harness': 'evidence-export'
+      },
+      body: frame
+    });
+  });
+  return {
+    cameraBinding: binding,
+    cameraFrame: { path: imageEvidence.filePath, sha256: checksum, bytes: frame.length },
+    evidenceManifest: 'HARNESS_PROJECTION_OVER_REAL_WEBVIEW2_RESULT_ROUTE',
+    realCamera: 'NOT_PERFORMED'
+  };
+}
+
+async function captureG4BScene(page, evidenceDirectory, runName, scene, sourceSha) {
+  await waitForDoubleAnimationFrame(page);
+  const projection = await page.evaluate(() => ({
+    route: window.location.hash.replace(/^#/, ''),
+    theme: document.documentElement.dataset.theme || null,
+    density: document.documentElement.dataset.density || null,
+    viewport: { width: window.innerWidth, height: window.innerHeight, dpr: window.devicePixelRatio },
+    overflow: {
+      horizontal: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      vertical: document.documentElement.scrollHeight - document.documentElement.clientHeight
+    },
+    activeElement: document.activeElement instanceof HTMLElement ? {
+      tagName: document.activeElement.tagName,
+      testId: document.activeElement.dataset.testid || null,
+      ariaLabel: document.activeElement.getAttribute('aria-label')
+    } : null,
+    modalTitle: document.querySelector('[role="dialog"] h2')?.textContent?.trim() || null,
+    capabilities: [...document.querySelectorAll('[data-capability]')]
+      .map(element => element.getAttribute('data-capability')).filter(Boolean),
+    hostBridgeAvailable: Boolean(window.chrome?.webview),
+    ownerCount: Number(document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
+      ?.getAttribute('data-workspace-owner-count') ?? 0)
+  }));
+  assert(projection.theme === 'light' && projection.density === 'compact',
+    `G4B scene did not retain light/compact: ${JSON.stringify(projection)}`);
+  assert(projection.overflow.horizontal <= 1,
+    `G4B scene overflowed horizontally: ${JSON.stringify(projection)}`);
+  assert(projection.hostBridgeAvailable, 'G4B scene did not run inside the real WebView2 HostBridge surface.');
+  const buffer = await page.screenshot({ type: 'png', animations: 'disabled' });
+  const png = writePngEvidence(evidenceDirectory, `g4b-${safeFileName(runName)}-${scene}.png`, buffer);
+  return { scene, sourceSha, projection, screenshot: png };
+}
+
+async function verifyWorkspaceG4B(page, seed, evidenceDirectory, runName, sourceSha) {
+  assert(seed?.cameraNodeId && seed?.judgmentNodeId && seed?.judgmentOutputId && seed?.judgmentParameterId,
+    `G4B seed is incomplete: ${JSON.stringify(seed)}`);
+  const scenes = [];
+  scenes.push(await captureG4BScene(page, evidenceDirectory, runName, 'workspace', sourceSha));
+
+  const canvas = page.locator('[data-testid="flow-canvas"]');
+  const canvasBox = await canvas.boundingBox();
+  assert(canvasBox, 'G4B camera selection could not resolve the Flow Canvas bounds.');
+  await page.mouse.click(canvasBox.x + 100, canvasBox.y + 225);
+  const camera = page.locator('[data-capability="camera-binding-editor"]');
+  await camera.waitFor({ state: 'visible', timeout: 30_000 });
+  await camera.getByLabel('相机绑定').selectOption(seed.cameraBindingId);
+  await waitForDoubleAnimationFrame(page);
+  const cameraSelection = await page.evaluate(() => ({
+    value: document.querySelector('[data-capability="camera-binding-editor"] select')?.value || null,
+    message: document.querySelector('[data-capability="camera-binding-editor"] [role="status"]')?.textContent?.trim() || null,
+    mutationGate: document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]')
+      ?.getAttribute('data-mutation-gate') || null,
+    inspectorName: document.querySelector('.inspector-panel__field input')?.value || null
+  }));
+  assert(cameraSelection.value === seed.cameraBindingId || cameraSelection.message?.includes('已绑定相机'),
+    `G4B Camera Binding selection failed: ${JSON.stringify(cameraSelection)}`);
+  await page.locator('[data-flow-command="toggle-disabled"]').click();
+  await waitForFlowSurfaceNumber(page, 'data-selected-disabled-count', 1);
+  scenes.push(await captureG4BScene(page, evidenceDirectory, runName, 'camera-binding', sourceSha));
+
+  await page.locator('[data-testid="global-variables"]').click();
+  const variables = page.locator('[data-capability="global-variables-workbench"]');
+  await variables.waitFor({ state: 'visible', timeout: 30_000 });
+  await variables.getByLabel('名称', { exact: true }).fill('G4BDecision');
+  await variables.getByLabel('显示名称', { exact: true }).fill('G4B 判定文本');
+  await variables.locator('select[name="global-variable-value-type"]').selectOption('String');
+  await variables.getByLabel('默认 / 手动初始值').fill('OK');
+  await variables.getByRole('button', { name: '添加定义' }).click();
+  await variables.getByRole('button', { name: '绑定', exact: true }).click();
+  await variables.locator('select[name="global-variable-source-variable"]').selectOption({ label: 'G4B 判定文本' });
+  await variables.locator('select[name="global-variable-source-output"]')
+    .selectOption(`${seed.judgmentNodeId}:${seed.judgmentOutputId}`);
+  await variables.getByRole('button', { name: '添加来源' }).click();
+  await variables.locator('select[name="global-variable-target-variable"]').selectOption({ label: 'G4B 判定文本' });
+  await variables.locator('select[name="global-variable-target-parameter"]')
+    .selectOption(`${seed.judgmentNodeId}:${seed.judgmentParameterId}`);
+  await variables.getByRole('button', { name: '添加绑定' }).click();
+  scenes.push(await captureG4BScene(page, evidenceDirectory, runName, 'global-variables', sourceSha));
+  await page.getByRole('button', { name: '应用到工程草稿' }).click();
+
+  await page.locator('[data-testid="final-decision"]').click();
+  const decision = page.locator('[data-capability="final-decision-workbench"]');
+  await decision.locator('select[name="final-decision-candidate"]')
+    .selectOption(`${seed.judgmentNodeId}:${seed.judgmentOutputId}`);
+  await decision.locator('input[name="final-decision-ok-value"]').fill('OK');
+  await decision.locator('input[name="final-decision-ng-value"]').fill('NG');
+  scenes.push(await captureG4BScene(page, evidenceDirectory, runName, 'final-decision', sourceSha));
+  await page.getByRole('button', { name: '校验并应用' }).click();
+  await decision.waitFor({ state: 'detached', timeout: 30_000 });
+
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const initialPersistenceRevision = Number(await shell.getAttribute('data-workspace-persistence-revision'));
+  await selectSeededRoiNode(page);
+  await waitForSeededPreview(page);
+  await page.locator('[data-testid="roi-start"]').click();
+  await page.locator('[data-testid="image-canvas"]').focus();
+  await page.keyboard.press('ArrowRight');
+  await page.locator('[data-testid="roi-confirm"]').click();
+  await waitForSeededPreview(page);
+  scenes.push(await captureG4BScene(page, evidenceDirectory, runName, 'preview-roi', sourceSha));
+
+  await page.locator('[data-testid="workspace-save"]').click();
+  await page.waitForFunction(() => {
+    const surface = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+    return surface?.getAttribute('data-workspace-persistence-phase') === 'saved' &&
+      surface.getAttribute('data-workspace-dirty') === 'false';
+  }, null, { timeout: 30_000 });
+  const savedPersistenceRevision = Number(await shell.getAttribute('data-workspace-persistence-revision'));
+  assert(savedPersistenceRevision > initialPersistenceRevision,
+    `G4B save did not advance PersistenceRevision: ${initialPersistenceRevision} -> ${savedPersistenceRevision}`);
+  const persisted = await page.evaluate(async projectId => {
+    const token = sessionStorage.getItem('cv_auth_token');
+    const response = await fetch(`/api/projects/${projectId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      cache: 'no-store'
+    });
+    return { status: response.status, body: await response.json() };
+  }, await shell.getAttribute('data-workspace-project-id'));
+  const persistedCamera = persisted.body.flow.operators.find(operator => operator.id === seed.cameraNodeId);
+  const persistedCameraBinding = persistedCamera?.parameters.find(
+    parameter => parameter.name === seed.cameraBindingParameterName
+  )?.value;
+  assert(persisted.status === 200 && persistedCameraBinding === seed.cameraBindingId,
+    `G4B camera binding was not persisted: ${JSON.stringify(persisted)}`);
+  assert(persisted.body.globalVariables?.variables?.some(variable => variable.name === 'G4BDecision') &&
+    persisted.body.globalVariables?.sourceBindings?.length === 1 &&
+    persisted.body.globalVariables?.targetBindings?.length === 1,
+  `G4B GlobalVariables were not persisted: ${JSON.stringify(persisted.body.globalVariables)}`);
+  assert(persisted.body.flow.decisionConfiguration?.finalDecisionBinding?.sourceOperatorId === seed.judgmentNodeId,
+    `G4B FinalDecision was not persisted: ${JSON.stringify(persisted.body.flow.decisionConfiguration)}`);
+  scenes.push(await captureG4BScene(page, evidenceDirectory, runName, 'saved', sourceSha));
+  return { scenes, initialPersistenceRevision, savedPersistenceRevision, persistedProjectStatus: persisted.status };
+}
+
+async function verifyG4BResultAndPackage(page, workspaceG6, evidenceDirectory, runName, sourceSha) {
+  const origin = new URL(page.url()).origin;
+  await page.goto(`${origin}/studio/index.html#/results?source=local&projectId=${workspaceG6.projectId}&resultId=${workspaceG6.resultId}`, {
+    waitUntil: 'domcontentloaded', timeout: 45_000
+  });
+  const evidence = page.locator('[data-capability="result-evidence"]');
+  await evidence.waitFor({ state: 'visible', timeout: 45_000 });
+  await page.waitForFunction(() =>
+    document.querySelector('[data-capability="result-evidence"]')
+      ?.getAttribute('data-evidence-phase') === 'available', null, { timeout: 30_000 });
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('[data-testid="result-evidence-export"]').click();
+  const download = await downloadPromise;
+  const resultScene = await captureG4BScene(page, evidenceDirectory, runName, 'result-evidence', sourceSha);
+
+  await page.locator('[data-testid="results-return-workspace"]').click();
+  await page.locator('[data-evidence-surface="f03-workspace-shell"]').waitFor({ state: 'visible', timeout: 45_000 });
+  await page.locator('[data-testid="runtime-package-export"]').click();
+  const packageDialog = page.locator('[data-capability="runtime-package-export"]');
+  await packageDialog.waitFor({ state: 'visible', timeout: 30_000 });
+  const responsePromise = page.waitForResponse(response =>
+    response.request().method() === 'POST' &&
+      /\/api\/projects\/[0-9a-f-]{36}\/runtime-package\/export$/i.test(new URL(response.url()).pathname));
+  await page.getByRole('button', { name: '导出运行包', exact: true }).click();
+  const response = await responsePromise;
+  await page.waitForFunction(() =>
+    document.querySelector('[data-capability="runtime-package-export"]')?.getAttribute('data-phase') === 'success',
+  null, { timeout: 45_000 });
+  const packageScene = await captureG4BScene(page, evidenceDirectory, runName, 'runtime-package', sourceSha);
+  return {
+    evidenceExportSuggestedName: download.suggestedFilename(),
+    runtimePackageStatus: response.status(),
+    scenes: [resultScene, packageScene]
+  };
+}
+
 async function verifyWorkspaceG4(page) {
   await page.waitForSelector('[data-capability="flow-workspace"]', { state: 'visible', timeout: 30_000 });
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
@@ -1011,6 +1298,18 @@ async function installFormalRunDecision(page, formalRunSeed) {
     if (!projectResponse.ok || !project?.flow) {
       return { getStatus: projectResponse.status, putStatus: null, project };
     }
+    const operatorExists = project.flow.operators.some(operator => operator.id === seed.operator.id);
+    const binding = project.flow.decisionConfiguration?.finalDecisionBinding;
+    if (operatorExists && binding?.sourceOperatorId === seed.binding.sourceOperatorId &&
+      binding?.sourceOutputPortId === seed.binding.sourceOutputPortId) {
+      return {
+        getStatus: projectResponse.status,
+        putStatus: 200,
+        previousPersistenceRevision: project.persistenceRevision,
+        project,
+        reused: true
+      };
+    }
     const response = await fetch(`/api/projects/${projectId}`, {
       method: 'PUT',
       headers: { ...headers, 'Content-Type': 'application/json' },
@@ -1020,13 +1319,13 @@ async function installFormalRunDecision(page, formalRunSeed) {
         expectedPersistenceRevision: project.persistenceRevision,
         flow: {
           ...project.flow,
-          operators: [...project.flow.operators, seed.operator],
+          operators: operatorExists ? project.flow.operators : [...project.flow.operators, seed.operator],
           decisionConfiguration: {
             finalDecisionBinding: seed.binding,
             missingDecisionPolicy: 'Undetermined'
           }
         },
-        globalVariables: null
+        globalVariables: project.globalVariables ?? null
       })
     });
     const text = await response.text();
@@ -1040,14 +1339,16 @@ async function installFormalRunDecision(page, formalRunSeed) {
       getStatus: projectResponse.status,
       putStatus: response.status,
       previousPersistenceRevision: project.persistenceRevision,
-      project: body
+      project: body,
+      reused: false
     };
   }, formalRunSeed);
   assert(installed.getStatus === 200, `Formal Run decision Project GET returned ${installed.getStatus}.`);
   assert(installed.putStatus === 200,
     `Formal Run decision Project PUT returned ${installed.putStatus}: ${JSON.stringify(installed.project)}`);
-  assert(Number(installed.project?.persistenceRevision) > Number(installed.previousPersistenceRevision),
-    `Formal Run decision PUT did not advance PersistenceRevision: ${JSON.stringify(installed)}`);
+  assert(installed.reused === true ||
+    Number(installed.project?.persistenceRevision) > Number(installed.previousPersistenceRevision),
+  `Formal Run decision PUT did not advance PersistenceRevision: ${JSON.stringify(installed)}`);
   assert(installed.project?.flow?.decisionConfiguration?.finalDecisionBinding?.sourceOperatorId ===
     formalRunSeed.binding.sourceOperatorId,
   `Formal Run decision PUT did not persist the configured source identity: ${JSON.stringify(installed.project)}`);
@@ -1153,6 +1454,14 @@ async function setFormalRunSlowFixture(page, formalRunSeed, enabled) {
 }
 
 async function readFormalResultsHandoff(page, projectId) {
+  await page.waitForFunction(() =>
+    Boolean(document.querySelector('[data-capability="results-read"]')) ||
+      Boolean(document.querySelector('[data-testid="workspace-current-result"]')),
+  null, { timeout: 45_000 });
+  const currentResult = page.locator('[data-testid="workspace-current-result"]');
+  if (await currentResult.isVisible()) {
+    await currentResult.click();
+  }
   await waitForSelectorWithoutHandle(
     page,
     '[data-capability="results-read"]',
@@ -1563,7 +1872,11 @@ async function verifyProductPage(
   webPort = null,
   token = null,
   phase = 'full',
-  workspaceSeedRoiNodeId = null
+  workspaceSeedRoiNodeId = null,
+  goldenJourneySeed = null,
+  evidenceDirectory = null,
+  runName = 'g4b',
+  sourceSha = 'unknown'
 ) {
   await page.waitForSelector('[data-product-shell="ready"]', { state: 'visible', timeout: 30_000 });
   const isWorkspaceRoute = /^\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/workspace$/i
@@ -1697,6 +2010,7 @@ async function verifyProductPage(
   const preferenceWriteRequests = preferenceRequests.filter(item => item.method !== 'GET');
   const seededWorkspace = parseBooleanEnvironment('CV_STUDIO_UI_SEED_WORKSPACE');
   const formalRun = parseBooleanEnvironment('CV_STUDIO_UI_FORMAL_RUN');
+  const goldenJourney = parseBooleanEnvironment('CV_STUDIO_UI_G4B_GOLDEN_JOURNEY');
   const dpiOnly = parseBooleanEnvironment('CV_STUDIO_UI_DPI_ONLY');
   const rollbackPhase = String(process.env.CV_STUDIO_UI_ROLLBACK_PHASE || '').trim().toUpperCase();
   const workspaceReady = isWorkspaceRoute && ['ready', 'empty'].includes(projection.workspaceState);
@@ -1704,7 +2018,14 @@ async function verifyProductPage(
     'Formal Run evidence requires a seeded, ready Workspace route.');
   assert(!dpiOnly || (seededWorkspace && workspaceReady && !formalRun),
     'DPI-only evidence requires a seeded, ready Workspace without Formal Run.');
-  const workspaceG4 = workspaceReady && seededWorkspace && !dpiOnly ? await verifyWorkspaceG4(page) : null;
+  assert(!goldenJourney || (formalRun && goldenJourneySeed && evidenceDirectory),
+    'G4B Golden Journey requires Formal Run, the dedicated seed, and an evidence directory.');
+  const workspaceG4B = workspaceReady && goldenJourney
+    ? await verifyWorkspaceG4B(page, goldenJourneySeed, evidenceDirectory, runName, sourceSha)
+    : null;
+  const workspaceG4 = workspaceReady && seededWorkspace && !dpiOnly && !goldenJourney
+    ? await verifyWorkspaceG4(page)
+    : null;
   const workspaceG3 = workspaceReady && !seededWorkspace && rollbackPhase !== 'NEXT_REOPEN'
     ? await verifyWorkspaceG3(page)
     : null;
@@ -1793,8 +2114,8 @@ async function verifyProductPage(
     let disposed = null;
     let remounted = null;
     for (let cycle = 0; cycle < 20; cycle += 1) {
-      await page.locator('[data-product-nav="/about"]').click();
-      await page.waitForSelector('[data-studio-page="about"]', { state: 'visible', timeout: 30_000 });
+      await page.locator('[data-product-nav="/projects"]').click();
+      await page.waitForSelector('[data-capability="projects-read"]', { state: 'visible', timeout: 30_000 });
       const confirmSnapshots = await page.evaluate(() => [...window.__g5LifecycleConfirmSnapshots]);
       assert(confirmSnapshots.length === 0,
         `Clean Workspace navigation unexpectedly prompted: ${JSON.stringify(confirmSnapshots)}`);
@@ -1870,7 +2191,7 @@ async function verifyProductPage(
       `Workspace did not remain inside the single Product main: ${JSON.stringify(mounted)}`);
     assert(mounted.ownerCount >= 0 && mounted.ownerCount <= 1,
       `Workspace owner count escaped 0/1: ${JSON.stringify(mounted)}`);
-    if (workspaceG3 || workspaceG4) {
+    if (workspaceG3 || workspaceG4 || workspaceG4B) {
       assert(mounted.ownerCount === 1 && mounted.flowCanvasOwnerCount === 1 && mounted.inspectorOwnerCount === 1 &&
         mounted.previewOwnerCount === 1 && mounted.imageCanvasOwnerCount === 1 && mounted.roiOwnerCount === 1 &&
         mounted.persistenceOwnerCount === 1,
@@ -1899,7 +2220,7 @@ async function verifyProductPage(
     `Workspace resources survived route leave: ${JSON.stringify(disposed)}`);
     assert(remounted.ownerCount >= 0 && remounted.ownerCount <= 1,
       `Workspace remount owner count escaped 0/1: ${JSON.stringify(remounted)}`);
-    if (workspaceG3 || workspaceG4) {
+    if (workspaceG3 || workspaceG4 || workspaceG4B) {
       assert(remounted.ownerCount === 1 && remounted.flowCanvasOwnerCount === 1 && remounted.inspectorOwnerCount === 1 &&
         remounted.previewOwnerCount === 1 && remounted.imageCanvasOwnerCount === 1 && remounted.roiOwnerCount === 1 &&
         remounted.persistenceOwnerCount === 1,
@@ -1914,7 +2235,7 @@ async function verifyProductPage(
     `Workspace 20-cycle lifecycle ledger failed: ${JSON.stringify(lifecycleCycles)}`);
     assert(remounted.horizontalOverflow <= 1 && remounted.verticalOverflow <= 1,
       `Workspace remount overflowed globally: ${JSON.stringify(remounted)}`);
-      if (workspaceG4) {
+      if (workspaceG4 || workspaceG4B) {
         await selectSeededRoiNode(page);
         await waitForSeededPreview(page);
       }
@@ -1929,6 +2250,9 @@ async function verifyProductPage(
   const formalRunInstallation = formalRun ? await installFormalRunDecision(page, formalRunSeed) : null;
   const workspaceG6 = formalRun
     ? await verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, token)
+    : null;
+  const workspaceG4BCompletion = goldenJourney && workspaceG6
+    ? await verifyG4BResultAndPackage(page, workspaceG6, evidenceDirectory, runName, sourceSha)
     : null;
   const productRequests = runtimeErrors.requests.filter(isProductRequest);
   const writeRequests = productRequests.filter(item => item.method !== 'GET');
@@ -1957,7 +2281,11 @@ async function verifyProductPage(
     if (!isWorkspaceRoute) return true;
     const url = new URL(item.url);
     return !(isF04Evidence && isProjectOpenRequest(item)) &&
+      !(item.method === 'POST' && url.pathname === '/api/inspection/decision-configuration/validate') &&
       !(item.method === 'POST' && url.pathname === '/api/flows/preview-node') &&
+      !(goldenJourney && item.method === 'POST' && url.pathname === '/api/cameras/soft-trigger-capture') &&
+      !(goldenJourney && item.method === 'POST' &&
+        /^\/api\/projects\/[0-9a-f-]{36}\/runtime-package\/export$/i.test(url.pathname)) &&
       !(item.method === 'PUT' && /^\/api\/projects\/[0-9a-f-]{36}$/i.test(url.pathname)) &&
       !(item.method === 'DELETE' && /^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname)) &&
       !(formalRun && item.method === 'POST' && expectedRunPaths.includes(url.pathname));
@@ -2004,8 +2332,8 @@ async function verifyProductPage(
     assert(forbiddenRunRequests.length === 0,
       `G5 emitted Run/Admission/Execute requests: ${JSON.stringify(forbiddenRunRequests)}`);
   }
-  if (workspaceG4) {
-    const expectedProjectPutCount = formalRun ? 4 : 1;
+  if (workspaceG4 || workspaceG4B) {
+    const expectedProjectPutCount = workspaceG4B ? 3 : formalRun ? 4 : 1;
     assert(projectPutRequests.length === expectedProjectPutCount,
       `G5/G6 real WebView2 expected ${expectedProjectPutCount} Project PUT request(s): ${JSON.stringify(projectPutRequests)}`);
   }
@@ -2025,15 +2353,25 @@ async function verifyProductPage(
       return url.pathname !== '/health' &&
         !(isF04Evidence && item.method === 'GET' && url.pathname === '/api/auth/setup-status') &&
         url.pathname !== '/api/auth/me' &&
+        !(item.method === 'GET' && url.pathname === '/api/cameras/bindings') &&
+        !(item.method === 'GET' && url.pathname === '/api/projects/recent' && url.search === '?count=5') &&
         !(url.pathname === '/api/operators/library' && url.search === '?includeCompatibility=true') &&
         !/^\/api\/operators\/[^/]+\/metadata$/i.test(url.pathname) &&
         !(isF04Evidence && isProjectOpenRequest(item)) &&
+        !(item.method === 'POST' && url.pathname === '/api/inspection/decision-configuration/validate') &&
+        !(goldenJourney && item.method === 'POST' && url.pathname === '/api/cameras/soft-trigger-capture') &&
+        !(goldenJourney && item.method === 'POST' &&
+          /^\/api\/projects\/[0-9a-f-]{36}\/runtime-package\/export$/i.test(url.pathname)) &&
         url.pathname !== '/api/flows/preview-node' &&
         !/^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname) &&
         !/^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
           .test(url.pathname) &&
         !(formalRun && url.pathname === '/api/projects') &&
         !(formalRun && expectedRunPaths.includes(url.pathname)) &&
+        !(formalRun && item.method === 'GET' &&
+          /^\/api\/inspection\/history\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/evidence\/manifest$/i.test(url.pathname)) &&
+        !(goldenJourney && item.method === 'GET' &&
+          /^\/api\/inspection\/history\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/evidence\/export$/i.test(url.pathname)) &&
         !(formalRun && /^\/api\/inspection\/history\/[0-9a-f-]{36}(?:\/[0-9a-f-]{36})?$/i.test(url.pathname));
     });
     assert(unexpectedWorkspaceRequests.length === 0,
@@ -2061,9 +2399,11 @@ async function verifyProductPage(
     resultsFilterLayout,
     workspaceG3,
     workspaceG4,
+    workspaceG4B,
     workspaceCanvasDpi,
     formalRunInstallation,
     workspaceG6,
+    workspaceG4BCompletion,
     workspaceLifecycle
   };
 }
@@ -3728,6 +4068,7 @@ async function main() {
   const sanitizedDesktopPath = parseBooleanEnvironment('CV_STUDIO_UI_SANITIZED_PATH');
   const deepCanvas = parseBooleanEnvironment('CV_STUDIO_UI_DEEP_CANVAS', scale === 1);
   const formalRun = parseBooleanEnvironment('CV_STUDIO_UI_FORMAL_RUN');
+  const goldenJourney = parseBooleanEnvironment('CV_STUDIO_UI_G4B_GOLDEN_JOURNEY');
   const dpiOnly = parseBooleanEnvironment('CV_STUDIO_UI_DPI_ONLY');
   const startupProfileRequested = String(process.env.CV_STUDIO_UI_PROFILE || '').trim().toUpperCase();
   const authMode = String(process.env.CV_STUDIO_UI_AUTH_MODE || 'UNRECORDED').trim().toUpperCase();
@@ -3746,6 +4087,8 @@ async function main() {
   assert(Number.isFinite(scale) && scale > 0, 'CV_DPI_SCALE must be a positive number.');
   assert(!formalRun || (expectation === 'studio-product' && seedWorkspace),
     'CV_STUDIO_UI_FORMAL_RUN requires studio-product plus a seeded Workspace.');
+  assert(!goldenJourney || (expectation === 'studio-product' && seedWorkspace && formalRun && !dpiOnly),
+    'CV_STUDIO_UI_G4B_GOLDEN_JOURNEY requires studio-product, seeded Workspace, and Formal Run.');
   assert(!dpiOnly || (expectation === 'studio-product' && seedWorkspace && !formalRun),
     'CV_STUDIO_UI_DPI_ONLY requires studio-product plus a seeded Workspace without Formal Run.');
   assert(['', 'NEXT_CREATE', 'LEGACY_VERIFY', 'NEXT_REOPEN'].includes(rollbackPhase),
@@ -3771,6 +4114,7 @@ async function main() {
     deepCanvas,
     seedWorkspace,
     formalRun,
+    goldenJourney,
     dpiOnly,
     startupProfileRequested: startupProfileRequested || null,
     authMode,
@@ -3878,7 +4222,7 @@ async function main() {
       assert(expectation === 'studio-product', 'Workspace seeding requires studio-product evidence.');
       assert(route === '/projects/seeded/workspace',
         'Workspace seeding requires the /projects/seeded/workspace route placeholder.');
-      evidence.workspaceSeed = await seedWorkspaceProject(webPort, token, runName, formalRun);
+      evidence.workspaceSeed = await seedWorkspaceProject(webPort, token, runName, formalRun, goldenJourney);
       route = evidence.workspaceSeed.route;
       evidence.route = route;
     }
@@ -3895,6 +4239,13 @@ async function main() {
       } else {
         await seedAuthenticatedSession(page, webPort, token, user);
         runtimeErrors = captureRuntimeErrors(page);
+      }
+      if (goldenJourney) {
+        evidence.g4bHarness = await installG4BGoldenJourneyHarness(
+          page,
+          evidenceDirectory,
+          evidence.workspaceSeed.imageEvidence
+        );
       }
       evidence.targetUrl = await navigateWithAuthenticatedSession(
         page,
@@ -3920,7 +4271,11 @@ async function main() {
             webPort,
             token,
             phase,
-            evidence.workspaceSeed?.roiNodeId ?? null
+            evidence.workspaceSeed?.roiNodeId ?? null,
+            evidence.workspaceSeed?.goldenJourneySeed ?? null,
+            evidenceDirectory,
+            runName,
+            evidence.sourceSha
           );
         } else if (expectation === 'studio-design') {
           evidence.designPage = await verifyDesignPage(page);
