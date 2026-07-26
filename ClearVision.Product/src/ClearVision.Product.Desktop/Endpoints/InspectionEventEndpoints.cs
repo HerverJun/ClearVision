@@ -58,7 +58,12 @@ public static class InspectionEventEndpoints
                 IsBusy = false,
                 SessionId = (Guid?)null,
                 StartedAt = (DateTime?)null,
-                StoppedAt = (DateTime?)null
+                StoppedAt = (DateTime?)null,
+                ClientSnapshotId = (Guid?)null,
+                PersistenceRevision = (long?)null,
+                CanonicalFlowHash = (string?)null,
+                DecisionConfigurationHash = (string?)null,
+                ExecutionSource = (string?)null
             };
         }
 
@@ -70,7 +75,12 @@ public static class InspectionEventEndpoints
             IsBusy = isBusy,
             SessionId = (Guid?)state.SessionId,
             state.StartedAt,
-            state.StoppedAt
+            state.StoppedAt,
+            ClientSnapshotId = state.ExecutionSnapshotId,
+            PersistenceRevision = state.ProjectRevision,
+            CanonicalFlowHash = state.FlowHash,
+            state.DecisionConfigurationHash,
+            state.ExecutionSource
         };
     }
 

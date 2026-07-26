@@ -104,6 +104,16 @@ public interface IInspectionService
         Action<InspectionResult>? onResultReady = null);
 
     /// <summary>
+    /// Starts continuous inspection from the verified persisted canonical
+    /// Project snapshot. Browser draft FlowData is never accepted.
+    /// </summary>
+    Task<StudioInspectionRunAdmission> StartPersistedRealtimeInspectionAsync(
+        StudioInspectionRunIdentity identity,
+        string? cameraId,
+        CancellationToken cancellationToken,
+        Action<InspectionResult>? onResultReady = null);
+
+    /// <summary>
     /// 开始实时检测（流程驱动模式）
     /// 流程将循环执行，直到调用 StopRealtimeInspectionAsync
     /// 适用于PLC触发等工业场景
@@ -124,6 +134,8 @@ public interface IInspectionService
     /// </summary>
     /// <param name="projectId">工程ID</param>
     Task StopRealtimeInspectionAsync(Guid projectId);
+
+    Task StopPersistedRealtimeInspectionAsync(StudioInspectionRunIdentity identity);
 
     /// <summary>
     /// 获取检测历史

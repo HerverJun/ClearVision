@@ -46,6 +46,24 @@ public class InspectionRuntimeCoordinatorTests
     }
 
     [Fact]
+    public async Task FormalRunAndContinuousInspection_ForSameProject_ShareOneCoordinatorMutex()
+    {
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var projectId = Guid.NewGuid();
+        var formalSnapshot = new ExecutionSnapshot(
+            projectId, new OperatorFlow("formal"), 3,
+            ExecutionSnapshotSource.PersistedProject, ExecutionRunMode.FormalPrimary);
+        var continuousSnapshot = new ExecutionSnapshot(
+            projectId, new OperatorFlow("continuous"), 3,
+            ExecutionSnapshotSource.PersistedProject, ExecutionRunMode.FormalPrimary);
+
+        (await coordinator.TryStartAsync(formalSnapshot, Guid.NewGuid(), CancellationToken.None))
+            .Should().Be(StartResult.Success);
+        (await coordinator.TryStartAsync(continuousSnapshot, Guid.NewGuid(), CancellationToken.None))
+            .Should().Be(StartResult.AlreadyRunning);
+    }
+
+    [Fact]
     public async Task MarkAsStopped_RemovesStateAfterScheduledCleanup()
     {
         var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);

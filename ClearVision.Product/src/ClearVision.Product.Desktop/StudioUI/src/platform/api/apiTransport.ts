@@ -44,6 +44,11 @@ export interface ApiBlobResponse {
   readonly headers: Headers;
 }
 
+export interface ApiTextStreamResponse {
+  readonly stream: ReadableStream<Uint8Array>;
+  readonly headers: Headers;
+}
+
 export interface ApiTransport {
   readonly apiBaseUrl: string;
   setUnauthorizedHandler?(
@@ -51,6 +56,7 @@ export interface ApiTransport {
     sessionGenerationProvider?: () => number
   ): void;
   get<T = unknown>(path: string, options?: ApiGetOptions): Promise<T | undefined>;
+  getTextStream?(path: string, options?: ApiGetOptions): Promise<ApiTextStreamResponse>;
   post?<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined>;
   postBlob?(path: string, body: unknown, options?: ApiWriteOptions): Promise<ApiBlobResponse>;
   put?<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined>;
@@ -363,6 +369,35 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
         path,
         suppressUnauthorizedHandler: requestOptions.suppressUnauthorizedHandler === true
       });
+    },
+    async getTextStream(
+      path: string,
+      requestOptions: ApiGetOptions = {}
+    ): Promise<ApiTextStreamResponse> {
+      const { response, url } = await send(
+        path,
+        'GET',
+        requestOptions,
+        undefined,
+        requestHeaders('text/event-stream')
+      );
+      if (!response.ok) {
+        const body = await readText(response, url, requestOptions.signal);
+        const error = createHttpError(response, url, body);
+        if (response.status === 401 && !requestOptions.suppressUnauthorizedHandler && unauthorizedHandler) {
+          await unauthorizedHandler(Object.freeze({
+            method: 'GET',
+            path,
+            url,
+            sessionGeneration: sessionGenerationProvider()
+          }));
+        }
+        throw error;
+      }
+      if (!response.body) {
+        throw new ApiNetworkError(url, new Error('The response did not provide a readable stream.'));
+      }
+      return Object.freeze({ stream: response.body, headers: response.headers });
     },
     async post<T = unknown>(
       path: string,

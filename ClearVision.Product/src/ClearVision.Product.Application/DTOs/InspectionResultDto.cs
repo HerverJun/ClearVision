@@ -297,6 +297,18 @@ public class StartRealtimeInspectionRequest
     /// 流程数据（流程驱动模式下需要）
     /// </summary>
     public OperatorFlowDto? FlowData { get; set; }
+
+    /// <summary>
+    /// Studio UI Next persisted-snapshot identity. When any identity field is
+    /// supplied, all fields are required and FlowData is rejected.
+    /// </summary>
+    public Guid? ClientSnapshotId { get; set; }
+
+    public long? ExpectedPersistenceRevision { get; set; }
+
+    public string? ExpectedCanonicalFlowHash { get; set; }
+
+    public string? ExpectedDecisionConfigurationHash { get; set; }
 }
 
 /// <summary>
@@ -308,4 +320,12 @@ public class StopRealtimeInspectionRequest
     /// 工程ID
     /// </summary>
     public Guid ProjectId { get; set; }
+
+    public Guid? ClientSnapshotId { get; set; }
+
+    public long? ExpectedPersistenceRevision { get; set; }
+
+    public string? ExpectedCanonicalFlowHash { get; set; }
+
+    public string? ExpectedDecisionConfigurationHash { get; set; }
 }

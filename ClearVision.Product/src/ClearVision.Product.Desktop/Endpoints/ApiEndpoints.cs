@@ -1024,6 +1024,57 @@ public static class ApiEndpoints
         {
             try
             {
+                var hasPersistedIdentity = request.ClientSnapshotId.HasValue ||
+                    request.ExpectedPersistenceRevision.HasValue ||
+                    !string.IsNullOrWhiteSpace(request.ExpectedCanonicalFlowHash) ||
+                    !string.IsNullOrWhiteSpace(request.ExpectedDecisionConfigurationHash);
+                if (hasPersistedIdentity)
+                {
+                    if (request.ProjectId == Guid.Empty ||
+                        request.ClientSnapshotId is not { } clientSnapshotId || clientSnapshotId == Guid.Empty ||
+                        request.ExpectedPersistenceRevision is not { } expectedRevision || expectedRevision < 0 ||
+                        string.IsNullOrWhiteSpace(request.ExpectedCanonicalFlowHash) ||
+                        string.IsNullOrWhiteSpace(request.ExpectedDecisionConfigurationHash))
+                    {
+                        return Results.BadRequest(new
+                        {
+                            Code = "ADMISSION_IDENTITY_INVALID",
+                            Error = "Continuous inspection requires a complete persisted Project identity."
+                        });
+                    }
+
+                    if (request.FlowData != null)
+                    {
+                        return Results.BadRequest(new
+                        {
+                            Code = "ADMISSION_PERSISTED_SNAPSHOT_REQUIRED",
+                            Error = "Studio UI Next continuous inspection does not accept FlowData."
+                        });
+                    }
+
+                    var admission = await service.StartPersistedRealtimeInspectionAsync(
+                        new StudioInspectionRunIdentity(
+                            request.ProjectId,
+                            clientSnapshotId,
+                            expectedRevision,
+                            request.ExpectedCanonicalFlowHash,
+                            request.ExpectedDecisionConfigurationHash),
+                        request.CameraId,
+                        cancellationToken,
+                        result => webMessageHandler.NotifyInspectionResult(result, request.ProjectId));
+                    return Results.Ok(new
+                    {
+                        message = "Persisted Project continuous inspection started.",
+                        projectId = admission.ProjectId,
+                        clientSnapshotId = admission.ClientSnapshotId,
+                        persistenceRevision = admission.PersistenceRevision,
+                        canonicalFlowHash = admission.CanonicalFlowHash,
+                        decisionConfigurationHash = admission.DecisionConfigurationHash,
+                        runMode = "canonical-project",
+                        cameraId = request.CameraId
+                    });
+                }
+
                 // 根据运行模式选择启动方式
                 var runMode = request.RunMode?.ToLower() ?? "camera";
                 var requestFlow = request.FlowData?.ToEntity();
@@ -1086,6 +1137,10 @@ public static class ApiEndpoints
             {
                 return ToAdmissionFailure(ex.Admission);
             }
+            catch (StudioInspectionRunIdentityException ex)
+            {
+                return Results.Conflict(new { Code = ex.Code, Error = ex.Message });
+            }
             catch (InvalidOperationException ex)
             {
                 if (TryParseStableError(ex.Message, out var code, out var message))
@@ -1109,12 +1164,37 @@ public static class ApiEndpoints
         {
             try
             {
-                await service.StopRealtimeInspectionAsync(request.ProjectId);
+                var hasPersistedIdentity = request.ClientSnapshotId.HasValue ||
+                    request.ExpectedPersistenceRevision.HasValue ||
+                    !string.IsNullOrWhiteSpace(request.ExpectedCanonicalFlowHash) ||
+                    !string.IsNullOrWhiteSpace(request.ExpectedDecisionConfigurationHash);
+                if (hasPersistedIdentity)
+                {
+                    if (request.ProjectId == Guid.Empty ||
+                        request.ClientSnapshotId is not { } clientSnapshotId || clientSnapshotId == Guid.Empty ||
+                        request.ExpectedPersistenceRevision is not { } expectedRevision || expectedRevision < 0 ||
+                        string.IsNullOrWhiteSpace(request.ExpectedCanonicalFlowHash) ||
+                        string.IsNullOrWhiteSpace(request.ExpectedDecisionConfigurationHash))
+                    {
+                        return Results.BadRequest(new { Code = "RUN_IDENTITY_INVALID", Error = "A complete continuous inspection identity is required." });
+                    }
+                    await service.StopPersistedRealtimeInspectionAsync(new StudioInspectionRunIdentity(
+                        request.ProjectId, clientSnapshotId, expectedRevision,
+                        request.ExpectedCanonicalFlowHash, request.ExpectedDecisionConfigurationHash));
+                }
+                else
+                {
+                    await service.StopRealtimeInspectionAsync(request.ProjectId);
+                }
                 return Results.Ok(new
                 {
                     Message = "实时检测已停止",
                     ProjectId = request.ProjectId
                 });
+            }
+            catch (StudioInspectionRunIdentityException ex)
+            {
+                return Results.Conflict(new { Code = ex.Code, Error = ex.Message });
             }
             catch (Exception ex)
             {

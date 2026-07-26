@@ -529,6 +529,33 @@ public class InspectionService : IInspectionService
         await StartRealtimeInspectionFlowCoreAsync(snapshot, cameraId, cancellationToken, onResultReady);
     }
 
+    public async Task<StudioInspectionRunAdmission> StartPersistedRealtimeInspectionAsync(
+        StudioInspectionRunIdentity identity,
+        string? cameraId,
+        CancellationToken cancellationToken,
+        Action<InspectionResult>? onResultReady = null)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        var (snapshot, _) = await ResolveExecutionFlowAsync(
+            identity.ProjectId,
+            flow: null,
+            ExecutionAdmissionSurface.StudioInspectionRun,
+            cancellationToken,
+            identity.ClientSnapshotId);
+        EnsurePersistedStudioRunIdentity(
+            snapshot,
+            identity.PersistenceRevision,
+            identity.CanonicalFlowHash,
+            identity.DecisionConfigurationHash);
+        await StartRealtimeInspectionFlowCoreAsync(snapshot, cameraId, cancellationToken, onResultReady);
+        return new StudioInspectionRunAdmission(
+            snapshot.ProjectId,
+            snapshot.SnapshotId,
+            snapshot.PersistenceRevision,
+            snapshot.FlowHash,
+            snapshot.DecisionConfigurationHash);
+    }
+
     /// <summary>
     /// 【架构修复 v2】实时检测启动入口
     /// 1. 调用 Coordinator 注册会话
@@ -911,6 +938,20 @@ public class InspectionService : IInspectionService
         {
             _coordinator.MarkAsStopped(projectId, sessionId);
         }
+    }
+
+    public async Task StopPersistedRealtimeInspectionAsync(StudioInspectionRunIdentity identity)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        var state = _coordinator.GetState(identity.ProjectId);
+        if (state == null || !MatchesRuntimeIdentity(state, identity))
+        {
+            throw new StudioInspectionRunIdentityException(
+                "RUN_IDENTITY_MISMATCH",
+                "The active runtime does not match the continuous inspection identity.");
+        }
+
+        await StopRealtimeInspectionAsync(identity.ProjectId);
     }
 
     private async Task<InspectionResult> PersistCancelledStudioRunAsync(ExecutionSnapshot snapshot)

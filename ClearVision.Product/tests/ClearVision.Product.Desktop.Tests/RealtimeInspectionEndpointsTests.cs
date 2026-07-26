@@ -26,6 +26,68 @@ namespace ClearVision.Product.Desktop.Tests;
 public sealed class RealtimeInspectionEndpointsTests
 {
     [Fact]
+    public async Task PersistedRealtimeStart_ShouldUseCompleteIdentity_WithoutDraftFlow()
+    {
+        await using var host = await RealtimeInspectionEndpointHost.CreateAsync(UserRole.Engineer);
+        var projectId = Guid.NewGuid();
+        var snapshotId = Guid.NewGuid();
+
+        var response = await host.Client.PostAsJsonAsync("/api/inspection/realtime/start", new
+        {
+            projectId,
+            clientSnapshotId = snapshotId,
+            expectedPersistenceRevision = 4,
+            expectedCanonicalFlowHash = "sha256:flow",
+            expectedDecisionConfigurationHash = "sha256:decision",
+            cameraId = "camera-1",
+            runMode = "canonical-project"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        await host.Service.Received(1).StartPersistedRealtimeInspectionAsync(
+            Arg.Is<StudioInspectionRunIdentity>(identity =>
+                identity.ProjectId == projectId && identity.ClientSnapshotId == snapshotId &&
+                identity.PersistenceRevision == 4 && identity.CanonicalFlowHash == "sha256:flow" &&
+                identity.DecisionConfigurationHash == "sha256:decision"),
+            "camera-1",
+            Arg.Any<CancellationToken>(),
+            Arg.Any<Action<ClearVision.Product.Core.Entities.InspectionResult>?>());
+        await host.Service.DidNotReceive().StartRealtimeInspectionFlowAsync(
+            Arg.Any<Guid>(), Arg.Any<ClearVision.Product.Core.Entities.OperatorFlow>(), Arg.Any<string?>(),
+            Arg.Any<CancellationToken>(), Arg.Any<Action<ClearVision.Product.Core.Entities.InspectionResult>?>());
+
+        var stopResponse = await host.Client.PostAsJsonAsync("/api/inspection/realtime/stop", new
+        {
+            projectId,
+            clientSnapshotId = snapshotId,
+            expectedPersistenceRevision = 4,
+            expectedCanonicalFlowHash = "sha256:flow",
+            expectedDecisionConfigurationHash = "sha256:decision"
+        });
+        stopResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        await host.Service.Received(1).StopPersistedRealtimeInspectionAsync(
+            Arg.Is<StudioInspectionRunIdentity>(identity => identity.ProjectId == projectId &&
+                identity.ClientSnapshotId == snapshotId && identity.PersistenceRevision == 4));
+    }
+
+    [Fact]
+    public async Task PersistedRealtimeStart_WithDraftFlow_ShouldRejectBeforeRuntime()
+    {
+        await using var host = await RealtimeInspectionEndpointHost.CreateAsync(UserRole.Engineer);
+        var response = await host.Client.PostAsJsonAsync("/api/inspection/realtime/start", new
+        {
+            projectId = Guid.NewGuid(), clientSnapshotId = Guid.NewGuid(), expectedPersistenceRevision = 4,
+            expectedCanonicalFlowHash = "sha256:flow", expectedDecisionConfigurationHash = "sha256:decision",
+            flowData = new { operators = Array.Empty<object>() }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await host.Service.DidNotReceive().StartPersistedRealtimeInspectionAsync(
+            Arg.Any<StudioInspectionRunIdentity>(), Arg.Any<string?>(), Arg.Any<CancellationToken>(),
+            Arg.Any<Action<ClearVision.Product.Core.Entities.InspectionResult>?>());
+    }
+
+    [Fact]
     public async Task RealtimeSurfaces_ShouldRejectAuthenticatedOperator()
     {
         await using var host = await RealtimeInspectionEndpointHost.CreateAsync(UserRole.Operator);
@@ -90,15 +152,18 @@ public sealed class RealtimeInspectionEndpointsTests
 
         private RealtimeInspectionEndpointHost(
             WebApplication app,
-            IInspectionRuntimeCoordinator coordinator)
+            IInspectionRuntimeCoordinator coordinator,
+            IInspectionService service)
         {
             this.app = app;
             Coordinator = coordinator;
+            Service = service;
             Client = app.GetTestClient();
         }
 
         public HttpClient Client { get; }
         public IInspectionRuntimeCoordinator Coordinator { get; }
+        public IInspectionService Service { get; }
 
         public static async Task<RealtimeInspectionEndpointHost> CreateAsync(UserRole role)
         {
@@ -116,6 +181,21 @@ public sealed class RealtimeInspectionEndpointsTests
                     Arg.Any<Action<ClearVision.Product.Core.Entities.InspectionResult>?>())
                 .Returns(Task.CompletedTask);
             service.StopRealtimeInspectionAsync(Arg.Any<Guid>()).Returns(Task.CompletedTask);
+            service.StartPersistedRealtimeInspectionAsync(
+                    Arg.Any<StudioInspectionRunIdentity>(),
+                    Arg.Any<string?>(),
+                    Arg.Any<CancellationToken>(),
+                    Arg.Any<Action<ClearVision.Product.Core.Entities.InspectionResult>?>())
+                .Returns(call =>
+                {
+                    var identity = call.ArgAt<StudioInspectionRunIdentity>(0);
+                    return Task.FromResult(new StudioInspectionRunAdmission(
+                        identity.ProjectId,
+                        identity.ClientSnapshotId,
+                        identity.PersistenceRevision,
+                        identity.CanonicalFlowHash,
+                        identity.DecisionConfigurationHash));
+                });
 
             var eventStore = new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance);
             var eventBus = new InMemoryInspectionEventBus(
@@ -144,7 +224,7 @@ public sealed class RealtimeInspectionEndpointsTests
             MapInspectionEndpoints(app);
             app.MapInspectionEventEndpoints();
             await app.StartAsync();
-            return new RealtimeInspectionEndpointHost(app, coordinator);
+            return new RealtimeInspectionEndpointHost(app, coordinator, service);
         }
 
         public async ValueTask DisposeAsync()
