@@ -269,8 +269,10 @@ async function main() {
   const evidenceDirectory = requiredEnvironment('CV_EVIDENCE_DIR');
   const sourceSha = requiredEnvironment('CV_STUDIO_UI_SOURCE_SHA');
   const runName = String(process.env.CV_STUDIO_UI_RUN_NAME || 'f05-e2e').trim();
+  const stationRoleScope = String(process.env.CV_F05_STATION_ROLE || 'Engineer').trim().toLowerCase();
+  assert(['admin', 'engineer'].includes(stationRoleScope), 'CV_F05_STATION_ROLE must be Admin or Engineer.');
   const outputName = `studio-ui-webview2-f05-${runName.replace(/[^a-z0-9_.-]+/gi, '-')}.json`;
-  const state = { role: 'Engineer', runMode: 'formal', requests: [], stationWrites: [], stopRequests: 0, sseConnections: 0 };
+  const state = { role: stationRoleScope === 'admin' ? 'Admin' : 'Engineer', runMode: 'formal', requests: [], stationWrites: [], stopRequests: 0, sseConnections: 0 };
   const evidence = {
     schemaVersion: 1, status: 'running', runName, sourceSha, dataSource: 'REAL_WEBVIEW2_WITH_LOCAL_F05_FIXTURE',
     FIELD_ACCEPTANCE: 'NOT_A_FIELD_ACCEPTANCE', capturedAtUtc: new Date().toISOString(), scenarios: {}, fixture: {
@@ -329,35 +331,33 @@ async function main() {
       screenshot: await captureScene(page, evidenceDirectory, 'results-handoff', sourceSha, ['results-redirect', 'leave-guard-stop'])
     };
 
-    state.role = 'Engineer';
-    const writeCountBeforeEngineer = state.stationWrites.length;
     await setHash(page, `/stations/${stationId}`, '[data-capability="stations-read-detail"]');
-    assert(await page.locator('[data-capability="station-admin-control"]').count() === 0,
-      'Engineer route mounted the Station Admin control domain.');
-    assert(state.stationWrites.length === writeCountBeforeEngineer, 'Engineer station route emitted a write.');
-    evidence.scenarios.stationEngineerReadOnly = {
-      adminControls: await page.locator('[data-capability="station-admin-control"]').count(),
-      writes: state.stationWrites.length - writeCountBeforeEngineer,
-      screenshot: await captureScene(page, evidenceDirectory, 'stations-engineer', sourceSha, ['station-engineer-read-only', 'deep-hash'])
-    };
-
-    state.role = 'Admin';
-    await page.reload({ waitUntil: 'domcontentloaded', timeout: 45_000 });
-    await page.waitForSelector('[data-capability="station-admin-control"]', { state: 'visible', timeout: 30_000 });
-    const admin = page.locator('[data-capability="station-admin-control"]');
-    await admin.getByTestId('station-issue-command').click();
-    await admin.getByLabel('工作站名称').fill('F05 隔离工作站（Admin）');
-    await admin.getByTestId('station-save-identity').click();
-    await admin.getByLabel('生产运行包').selectOption('pkg-f05');
-    await admin.getByTestId('station-deploy-package').click();
-    assert(state.stationWrites.some(item => item.method === 'POST' && item.path.endsWith('/commands')) &&
-      state.stationWrites.some(item => item.method === 'PATCH' && item.path.endsWith('/identity')) &&
-      state.stationWrites.some(item => item.method === 'POST' && item.path.endsWith('/deploy-package')),
-    `Admin Station journey did not issue the three authority writes: ${JSON.stringify(state.stationWrites)}`);
-    evidence.scenarios.stationAdmin = {
-      writes: state.stationWrites,
-      screenshot: await captureScene(page, evidenceDirectory, 'stations-admin', sourceSha, ['station-admin-command', 'identity', 'package-deploy'])
-    };
+    if (stationRoleScope === 'engineer') {
+      assert(await page.locator('[data-capability="station-admin-control"]').count() === 0,
+        'Engineer route mounted the Station Admin control domain.');
+      assert(state.stationWrites.length === 0, 'Engineer station route emitted a write.');
+      evidence.scenarios.stationEngineerReadOnly = {
+        adminControls: await page.locator('[data-capability="station-admin-control"]').count(),
+        writes: state.stationWrites.length,
+        screenshot: await captureScene(page, evidenceDirectory, 'stations-engineer', sourceSha, ['station-engineer-read-only', 'deep-hash'])
+      };
+    } else {
+      await page.waitForSelector('[data-capability="station-admin-control"]', { state: 'visible', timeout: 30_000 });
+      const admin = page.locator('[data-capability="station-admin-control"]');
+      await admin.getByTestId('station-issue-command').click();
+      await admin.getByLabel('工作站名称').fill('F05 隔离工作站（Admin）');
+      await admin.getByTestId('station-save-identity').click();
+      await admin.getByLabel('生产运行包').selectOption('pkg-f05');
+      await admin.getByTestId('station-deploy-package').click();
+      assert(state.stationWrites.some(item => item.method === 'POST' && item.path.endsWith('/commands')) &&
+        state.stationWrites.some(item => item.method === 'PATCH' && item.path.endsWith('/identity')) &&
+        state.stationWrites.some(item => item.method === 'POST' && item.path.endsWith('/deploy-package')),
+      `Admin Station journey did not issue the three authority writes: ${JSON.stringify(state.stationWrites)}`);
+      evidence.scenarios.stationAdmin = {
+        writes: state.stationWrites,
+        screenshot: await captureScene(page, evidenceDirectory, 'stations-admin', sourceSha, ['station-admin-command', 'identity', 'package-deploy', 'deep-hash'])
+      };
+    }
 
     const afterLeaveRequestIndex = state.requests.length;
     await setHash(page, '/results?source=local&projectId=' + projectId, '[data-capability="results-read"]');
