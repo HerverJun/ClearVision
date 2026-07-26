@@ -2911,6 +2911,16 @@ async function saveWorkspaceThroughUi(page) {
   return Number(await shell.getAttribute('data-workspace-persistence-revision'));
 }
 
+async function revealInspectorControl(control) {
+  const advanced = control.locator('xpath=ancestor::details[1]');
+  if (await advanced.count()) {
+    const isOpen = await advanced.evaluate(element => element.open);
+    if (!isOpen) await advanced.locator('summary').click();
+  }
+  await control.scrollIntoViewIfNeeded();
+  await control.waitFor({ state: 'visible', timeout: 30_000 });
+}
+
 async function addConfigureAndSaveAcquisition(page) {
   await waitForFunctionWithoutHandle(page, () =>
     document.querySelector('[data-evidence-surface="f03-g2-operator-rail"]')
@@ -2925,9 +2935,10 @@ async function addConfigureAndSaveAcquisition(page) {
   await selectWorkspaceNode(page, position);
   const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
   const sourceType = inspector.locator('[data-parameter-name="SourceType"] select');
+  await revealInspectorControl(sourceType);
   await sourceType.selectOption('Camera');
   const exposure = inspector.locator('[data-parameter-name="ExposureTime"] input[type="number"]');
-  await exposure.waitFor({ state: 'visible', timeout: 30_000 });
+  await revealInspectorControl(exposure);
   await waitForFunctionWithoutHandle(page, () => {
     const input = document.querySelector('[data-parameter-name="ExposureTime"] input[type="number"]');
     return input && !input.disabled;
