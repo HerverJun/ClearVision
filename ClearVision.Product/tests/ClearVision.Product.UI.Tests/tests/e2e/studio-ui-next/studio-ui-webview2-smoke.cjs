@@ -2736,6 +2736,12 @@ async function loginThroughUi(page, webPort, username, password, captureScene) {
 }
 
 async function logoutThroughUi(page) {
+  if (await page.locator('[data-product-shell]').getAttribute('data-workspace-mode') === 'true') {
+    await page.locator('[data-product-nav="/projects"]').click();
+    await waitForSelectorWithoutHandle(page, '[data-capability="projects-read"]', {
+      state: 'visible', timeout: 45_000
+    });
+  }
   await page.getByRole('button', { name: '退出', exact: true }).click();
   await waitForSelectorWithoutHandle(
     page,
