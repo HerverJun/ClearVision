@@ -333,9 +333,15 @@ test('drag, selection, pan, zoom and browser resize stay in canonical logical co
 
 test('twenty route mount/unmount cycles retain one owner and release every resource', async ({ page }) => {
   const runtimeErrors = await installStudioStartup(page);
+  // The diagnostics getter is installed with the lazy Canvas route chunk.
+  await page.goto('/studio/index.html#/labs/canvas');
+  await expect(page.locator('[data-canvas-lab="ready"]')).toBeVisible();
+  expect((await readDiagnostics(page)).ownerCount).toBe(1);
   await page.goto('/studio/index.html#/labs/design');
   await expect(page.locator('[data-design-lab="ready"]')).toBeVisible();
   const baseline = await readDiagnostics(page);
+  expect(baseline.ownerCount).toBe(0);
+  expect(baseline.status).toBe('disposed');
 
   for (let cycle = 0; cycle < 20; cycle += 1) {
     await page.evaluate(() => {

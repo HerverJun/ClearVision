@@ -1644,8 +1644,9 @@ test('G3 Inspector is fully unmounted when a later Project read is forbidden', a
   const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
   await selectInspectorNode(page, 120, 125);
   projectStatus = 403;
-  await page.goto('/studio/index.html#/about');
-  await page.goto(`/studio/index.html#/projects/${projectA}/workspace`);
+  await page.evaluate(projectId => {
+    window.location.hash = `#/projects/${projectId}/workspace`;
+  }, projectB);
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
   await expect(shell).toHaveAttribute('data-workspace-state', 'forbidden');
   await expect(shell).toHaveAttribute('data-workspace-inspector-owner-count', '0');
