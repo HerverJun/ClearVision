@@ -308,7 +308,10 @@ onBeforeUnmount(() => layoutOwner.dispose());
   cursor: pointer;
 }
 .flow-workspace__narrow-pane-toggle--rail { left: var(--cv-space-2); }
-.flow-workspace__narrow-pane-toggle--inspector { right: var(--cv-space-2); }
+.flow-workspace__narrow-pane-toggle--inspector {
+  top: calc(var(--cv-space-1) + 32px);
+  right: var(--cv-space-2);
+}
 
 @media (max-width: 1180px) {
   .flow-workspace {
