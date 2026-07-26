@@ -2932,6 +2932,7 @@ async function addConfigureAndSaveAcquisition(page) {
   const position = { x: 64, y: 64 };
   await dragOperatorToCanvas(page, ['ImageAcquisition', '0'], position);
   await waitForFlowSurfaceNumber(page, 'data-node-count', 1);
+  await page.locator('[data-capability="operator-flyout"] [aria-label="关闭算子面板"]').click();
   await selectWorkspaceNode(page, position);
   const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
   const sourceType = inspector.locator('[data-parameter-name="SourceType"] select');
