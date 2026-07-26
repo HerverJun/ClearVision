@@ -2808,7 +2808,6 @@ function projectIdFromHash(pageUrl) {
 
 async function createBlankProjectThroughUi(page, runName, options = {}) {
   const responseLoss = options.responseLoss === true;
-  await page.locator('[data-product-nav="/projects"]').click();
   await waitForSelectorWithoutHandle(
     page,
     '[data-capability="projects-read"]',
@@ -3135,7 +3134,7 @@ async function verifyFinalJourneyCreateRunLogout(
     projectAfterCreate.flow?.operators?.length === 0 &&
     projectAfterCreate.flow?.connections?.length === 0,
   `UI blank create did not return the canonical empty Project: ${JSON.stringify(projectAfterCreate)}`);
-  await page.locator('[data-product-nav="/projects"]').click();
+  await page.locator('.project-details__back').click();
   await page.waitForSelector('[data-capability="projects-read"]', { state: 'visible', timeout: 45_000 });
   await page.getByText(created.name, { exact: true }).first().waitFor({ state: 'visible', timeout: 30_000 });
   await captureScene('projects-populated');
