@@ -8,8 +8,8 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Operators;
-using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Outcomes;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Services;
@@ -90,6 +90,39 @@ public class InspectionServiceSingleRunTests
 
         var failure = await act.Should().ThrowAsync<StudioInspectionRunIdentityException>();
         failure.Which.Code.Should().Be("ADMISSION_PERSISTENCE_REVISION_MISMATCH");
+        await coordinator.DidNotReceiveWithAnyArgs().TryStartAsync(
+            default(ExecutionSnapshot)!, default, default);
+    }
+
+    [Fact]
+    public async Task PersistedRealtimeRun_RejectsCanonicalHashMismatchBeforeCoordinatorAdmission()
+    {
+        var project = new Project("persisted-realtime-hash-mismatch");
+        project.SetPersistenceRevision(6);
+        var projectId = project.Id;
+        var snapshotId = Guid.NewGuid();
+        var flowJson = SerializeFlowDto("persisted-realtime-flow");
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        projectRepository.GetWithFlowAsync(projectId).Returns(project);
+        flowStorage.LoadFlowJsonAsync(projectId).Returns(flowJson);
+        flowStorage.LoadMetadataAsync(projectId).Returns(new ProjectFlowStorageMetadata(
+            1, projectId, 6, ComputeStoredFlowArtifactHash(flowJson), DateTimeOffset.UtcNow));
+        var service = new InspectionService(
+            Substitute.For<IInspectionResultRepository>(), projectRepository, Substitute.For<IFlowExecutionService>(),
+            Substitute.For<IImageAcquisitionService>(), Substitute.For<IConfigurationService>(), coordinator,
+            Substitute.For<IInspectionWorker>(), Substitute.For<IImageCacheRepository>(), new AnalysisDataBuilder(), flowStorage,
+            NullLogger<InspectionService>.Instance);
+        var admission = await service.AdmitPersistedStudioRunAsync(projectId, 6, snapshotId);
+
+        var act = async () => await service.StartPersistedRealtimeInspectionAsync(
+            new StudioInspectionRunIdentity(projectId, snapshotId, 6, "sha256:stale", admission.DecisionConfigurationHash),
+            null,
+            CancellationToken.None);
+
+        var failure = await act.Should().ThrowAsync<StudioInspectionRunIdentityException>();
+        failure.Which.Code.Should().Be("ADMISSION_SNAPSHOT_MISMATCH");
         await coordinator.DidNotReceiveWithAnyArgs().TryStartAsync(
             default(ExecutionSnapshot)!, default, default);
     }

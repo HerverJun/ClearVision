@@ -17,7 +17,7 @@ function parseFrame(frame: string): Readonly<{ type: string; id: string | null; 
   let type = 'message';
   let id: string | null = null;
   const data: string[] = [];
-  for (const line of frame.split('\n')) {
+  for (const line of frame.split(/\r\n|\r|\n/)) {
     if (!line || line.startsWith(':')) continue;
     const separator = line.indexOf(':');
     const field = separator < 0 ? line : line.slice(0, separator);
@@ -29,6 +29,16 @@ function parseFrame(frame: string): Readonly<{ type: string; id: string | null; 
   }
   if (data.length === 0) return null;
   return Object.freeze({ type, id, payload: JSON.parse(data.join('\n')) as unknown });
+}
+
+function findFrameBoundary(buffer: string): Readonly<{ index: number; length: number }> | null {
+  const candidates = [
+    { index: buffer.indexOf('\r\n\r\n'), length: 4 },
+    { index: buffer.indexOf('\n\n'), length: 2 },
+    { index: buffer.indexOf('\r\r'), length: 2 }
+  ].filter(candidate => candidate.index >= 0);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((earliest, candidate) => candidate.index < earliest.index ? candidate : earliest);
 }
 
 export function createInspectionSseAdapter(api: ApiTransport): InspectionSsePort {
@@ -49,16 +59,16 @@ export function createInspectionSseAdapter(api: ApiTransport): InspectionSsePort
         while (!options.signal.aborted) {
           const chunk = await reader.read();
           if (chunk.done) break;
-          buffer += decoder.decode(chunk.value, { stream: true }).replaceAll('\r\n', '\n');
-          let boundary = buffer.indexOf('\n\n');
-          while (boundary >= 0) {
-            const frame = parseFrame(buffer.slice(0, boundary));
-            buffer = buffer.slice(boundary + 2);
+          buffer += decoder.decode(chunk.value, { stream: true });
+          let boundary = findFrameBoundary(buffer);
+          while (boundary) {
+            const frame = parseFrame(buffer.slice(0, boundary.index));
+            buffer = buffer.slice(boundary.index + boundary.length);
             if (frame) {
               const event = decodeInspectionSseEvent(frame.type, frame.id, frame.payload);
               if (event) options.onEvent(event);
             }
-            boundary = buffer.indexOf('\n\n');
+            boundary = findFrameBoundary(buffer);
           }
         }
       } finally {

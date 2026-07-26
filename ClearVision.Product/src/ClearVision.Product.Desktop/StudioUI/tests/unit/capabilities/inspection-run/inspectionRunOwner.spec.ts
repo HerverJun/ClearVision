@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createInspectionRunOwner, type InspectionRunApiPort, type InspectionRunIdentity, type InspectionRunState, type InspectionSseEvent, type InspectionSsePort } from '@/capabilities/inspection-run';
+import { ApiConflictError, ApiNetworkError } from '@/platform/api';
 
 const projectId = '11111111-1111-1111-1111-111111111111';
 const identity: InspectionRunIdentity = { projectId, clientSnapshotId: '22222222-2222-2222-2222-222222222222',
@@ -56,7 +57,68 @@ describe('inspectionRunOwner', () => {
     expect(connections[1]?.lastEventId).toBe('12');
     connections[1]?.onEvent({ type: 'stateChanged', id: '13', state: { projectId, sessionId: 's', oldState: 'Running', newState: 'Stopped',
       errorMessage: null, timestamp: new Date().toISOString(), isSnapshot: false, startedAt: null, stoppedAt: new Date().toISOString() } });
-    expect(owner.projection.phase).toBe('idle'); owner.dispose(); await owner.settle(); vi.useRealTimers();
+    expect(owner.projection.phase).toBe('idle');
+    expect(owner.projection.runtime).toMatchObject({ status: 'Stopped', isBusy: false });
+    owner.dispose(); await owner.settle(); vi.useRealTimers();
+  });
+
+  it('preserves stable backend rejection codes without guessing a runtime state', async () => {
+    const h = harness();
+    vi.mocked(h.api.start).mockRejectedValueOnce(new ApiConflictError({
+      url: 'http://localhost/api/inspection/realtime/start', status: 409, statusText: 'Conflict',
+      payload: { Code: 'ADMISSION_SNAPSHOT_MISMATCH' }, responseBody: ''
+    }));
+    const owner = createInspectionRunOwner({ projectId, api: h.api, sse: h.sse });
+
+    expect(await owner.start(identity)).toBe(false);
+    expect(owner.projection.phase).toBe('faulted');
+    expect(owner.projection.errorCode).toBe('ADMISSION_SNAPSHOT_MISMATCH');
+    expect(h.api.hydrate).not.toHaveBeenCalled();
+    owner.dispose();
+  });
+
+  it('reconciles an unknown stop outcome against authoritative state', async () => {
+    const h = harness(); const owner = createInspectionRunOwner({ projectId, api: h.api, sse: h.sse });
+    await owner.start(identity);
+    h.setState(running);
+    vi.mocked(h.api.stop).mockRejectedValueOnce(new ApiNetworkError('http://localhost/api/inspection/realtime/stop', new Error('offline')));
+
+    expect(await owner.stop()).toBe(false);
+    expect(h.api.hydrate).toHaveBeenCalledWith(projectId, expect.anything());
+    expect(owner.projection.phase).toBe('running');
+    expect(owner.projection.errorCode).toBe('INSPECTION_STOP_FAILED');
+    owner.dispose(); await owner.settle();
+  });
+
+  it('recovers a response-less start from authoritative state', async () => {
+    const h = harness(running);
+    vi.mocked(h.api.start).mockRejectedValueOnce(new ApiNetworkError('http://localhost/api/inspection/realtime/start', new Error('offline')));
+    const owner = createInspectionRunOwner({ projectId, api: h.api, sse: h.sse });
+
+    expect(await owner.start(identity)).toBe(false);
+    expect(owner.projection.phase).toBe('running');
+    expect(owner.projection.runtime).toEqual(running);
+    expect(owner.projection.message).toContain('状态已恢复');
+    owner.dispose(); await owner.settle();
+  });
+
+  it('backs off across repeated disconnects until a valid event resets the attempt', async () => {
+    vi.useFakeTimers(); const h = harness(); let calls = 0;
+    const sse: InspectionSsePort = { connect: vi.fn(async options => {
+      calls += 1; options.onOpen();
+      if (calls === 1) options.onEvent({ type: 'heartbeat', id: '1' });
+      if (calls < 3) throw new Error('disconnected');
+      await new Promise<void>(resolve => options.signal.addEventListener('abort', () => resolve(), { once: true }));
+    }) };
+    const owner = createInspectionRunOwner({ projectId, api: h.api, sse, retryDelaysMs: [10, 20] });
+
+    await owner.start(identity); await Promise.resolve(); await Promise.resolve();
+    expect(owner.projection.reconnectAttempt).toBe(1);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(owner.projection.reconnectAttempt).toBe(2);
+    await vi.advanceTimersByTimeAsync(20);
+    expect(sse.connect).toHaveBeenCalledTimes(3);
+    owner.dispose(); await owner.settle(); vi.useRealTimers();
   });
 
   it('disposes every resource and survives 20 mount/unmount cycles without leaks', async () => {

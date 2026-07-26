@@ -85,6 +85,19 @@ function number(value: unknown, label: string): number {
   return value;
 }
 
+function nonNegativeInteger(value: unknown, label: string): number {
+  const decoded = number(value, label);
+  if (!Number.isSafeInteger(decoded) || decoded < 0) {
+    throw new InspectionRunDecodeError(`${label} must be a non-negative safe integer.`);
+  }
+  return decoded;
+}
+
+function boolean(value: unknown, label: string): boolean {
+  if (typeof value !== 'boolean') throw new InspectionRunDecodeError(`${label} must be a boolean.`);
+  return value;
+}
+
 const runtimeStatuses = new Set<InspectionRuntimeStatus>(['Idle', 'Starting', 'Running', 'Stopping', 'Stopped', 'Faulted']);
 function status(value: unknown): InspectionRuntimeStatus {
   const decoded = string(value, 'status') as InspectionRuntimeStatus;
@@ -98,12 +111,12 @@ export function decodeInspectionRunState(value: unknown): InspectionRunState {
   return Object.freeze({
     projectId: string(data.projectId, 'projectId'),
     status: decodedStatus,
-    isBusy: data.isBusy === true,
+    isBusy: boolean(data.isBusy, 'isBusy'),
     sessionId: nullableString(data.sessionId, 'sessionId'),
     startedAt: nullableString(data.startedAt, 'startedAt'),
     stoppedAt: nullableString(data.stoppedAt, 'stoppedAt'),
     clientSnapshotId: nullableString(data.clientSnapshotId, 'clientSnapshotId'),
-    persistenceRevision: data.persistenceRevision == null ? null : number(data.persistenceRevision, 'persistenceRevision'),
+    persistenceRevision: data.persistenceRevision == null ? null : nonNegativeInteger(data.persistenceRevision, 'persistenceRevision'),
     canonicalFlowHash: nullableString(data.canonicalFlowHash, 'canonicalFlowHash'),
     decisionConfigurationHash: nullableString(data.decisionConfigurationHash, 'decisionConfigurationHash'),
     executionSource: nullableString(data.executionSource, 'executionSource')
@@ -112,7 +125,7 @@ export function decodeInspectionRunState(value: unknown): InspectionRunState {
 
 export function decodeInspectionRunStart(value: unknown): InspectionRunStartResult {
   const data = record(value, 'inspection run start');
-  const persistenceRevision = number(data.persistenceRevision, 'persistenceRevision');
+  const persistenceRevision = nonNegativeInteger(data.persistenceRevision, 'persistenceRevision');
   const canonicalFlowHash = string(data.canonicalFlowHash, 'canonicalFlowHash');
   const decisionConfigurationHash = string(data.decisionConfigurationHash, 'decisionConfigurationHash');
   if (data.runMode !== 'canonical-project') throw new InspectionRunDecodeError('runMode must be canonical-project.');
@@ -138,7 +151,7 @@ export function decodeInspectionSseEvent(type: string, id: string | null, value:
       projectId: string(data.projectId, 'projectId'), sessionId: string(data.sessionId, 'sessionId'),
       oldState: nullableString(data.oldState, 'oldState'), newState: status(data.newState),
       errorMessage: nullableString(data.errorMessage, 'errorMessage'), timestamp: string(data.timestamp, 'timestamp'),
-      isSnapshot: data.isSnapshot === true, startedAt: nullableString(data.startedAt, 'startedAt'),
+      isSnapshot: boolean(data.isSnapshot, 'isSnapshot'), startedAt: nullableString(data.startedAt, 'startedAt'),
       stoppedAt: nullableString(data.stoppedAt, 'stoppedAt')
     }) });
   }
@@ -148,8 +161,8 @@ export function decodeInspectionSseEvent(type: string, id: string | null, value:
     projectId: string(data.projectId, 'projectId'), sessionId: string(data.sessionId, 'sessionId'),
     resultId: string(data.resultId, 'resultId'), status: string(data.status, 'status'),
     executionOutcome: nullableString(data.executionOutcome, 'executionOutcome'),
-    decisionOutcome: nullableString(data.decisionOutcome, 'decisionOutcome'), defectCount: number(data.defectCount, 'defectCount'),
-    processingTimeMs: number(data.processingTimeMs, 'processingTimeMs'),
+    decisionOutcome: nullableString(data.decisionOutcome, 'decisionOutcome'), defectCount: nonNegativeInteger(data.defectCount, 'defectCount'),
+    processingTimeMs: nonNegativeInteger(data.processingTimeMs, 'processingTimeMs'),
     errorMessage: nullableString(data.errorMessage, 'errorMessage'), timestamp: string(data.timestamp, 'timestamp')
   }) });
   return null;

@@ -1,10 +1,10 @@
-import type { ApiGetOptions, ApiTransport } from '@/platform/api';
+import type { ApiGetOptions, ApiTransport, ApiWriteOptions } from '@/platform/api';
 import { decodeInspectionRunStart, decodeInspectionRunState, type InspectionRunIdentity, type InspectionRunStartResult, type InspectionRunState } from './contracts';
 
 export interface InspectionRunApiPort {
   hydrate(projectId: string, options?: ApiGetOptions): Promise<InspectionRunState>;
-  start(identity: InspectionRunIdentity, cameraId: string | null, options?: ApiGetOptions): Promise<InspectionRunStartResult>;
-  stop(identity: InspectionRunIdentity, options?: ApiGetOptions): Promise<void>;
+  start(identity: InspectionRunIdentity, cameraId: string | null, options?: ApiWriteOptions): Promise<InspectionRunStartResult>;
+  stop(identity: InspectionRunIdentity, options?: ApiWriteOptions): Promise<void>;
 }
 
 export function createInspectionRunApiAdapter(api: ApiTransport): InspectionRunApiPort {

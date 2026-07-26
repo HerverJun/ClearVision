@@ -1,5 +1,5 @@
 import { readonly, reactive } from 'vue';
-import { ApiAbortError } from '@/platform/api';
+import { ApiAbortError, ApiHttpError, ApiNetworkError } from '@/platform/api';
 import type { InspectionRunApiPort } from './realtimeApiAdapter';
 import type { InspectionRunIdentity, InspectionRunResult, InspectionRunState, InspectionSseEvent } from './contracts';
 import type { InspectionSsePort } from './sseAdapter';
@@ -57,12 +57,55 @@ export function createInspectionRunOwner(options: {
   function clearReconnect(): void { if (reconnectTimer != null) clearTimer(reconnectTimer); reconnectTimer = null; }
   function closeStream(): void { streamController?.abort(); streamController = null; state.connected = false; clearReconnect(); }
   function terminal(status: string): boolean { return status === 'Stopped' || status === 'Faulted' || status === 'Idle'; }
+  function isBusy(status: InspectionRunState['status']): boolean {
+    return status === 'Starting' || status === 'Running' || status === 'Stopping';
+  }
+  function phaseForRuntime(runtime: InspectionRunState): InspectionRunPhase {
+    if (runtime.status === 'Faulted') return 'faulted';
+    if (runtime.status === 'Stopping') return 'stopping';
+    return runtime.isBusy ? 'running' : 'idle';
+  }
+  function errorCode(error: unknown): string | null {
+    if (!(error instanceof ApiHttpError) || typeof error.payload !== 'object' || error.payload === null) return null;
+    const payload = error.payload as Record<string, unknown>;
+    const code = payload.Code ?? payload.code;
+    return typeof code === 'string' && code.trim() ? code : null;
+  }
+  function shouldRecoverAuthority(error: unknown): boolean {
+    return error instanceof ApiAbortError || error instanceof ApiNetworkError ||
+      error instanceof ApiHttpError && (error.status === 409 && errorCode(error) === null || error.status >= 500);
+  }
+  function projectRuntime(event: Extract<InspectionSseEvent, { type: 'stateChanged' }>['state']): void {
+    const current = state.runtime;
+    state.runtime = Object.freeze({
+      projectId: options.projectId,
+      status: event.newState,
+      isBusy: isBusy(event.newState),
+      sessionId: event.sessionId,
+      startedAt: event.startedAt ?? current?.startedAt ?? null,
+      stoppedAt: event.stoppedAt,
+      clientSnapshotId: current?.clientSnapshotId ?? activeIdentity?.clientSnapshotId ?? null,
+      persistenceRevision: current?.persistenceRevision ?? activeIdentity?.expectedPersistenceRevision ?? null,
+      canonicalFlowHash: current?.canonicalFlowHash ?? activeIdentity?.expectedCanonicalFlowHash ?? null,
+      decisionConfigurationHash: current?.decisionConfigurationHash ?? activeIdentity?.expectedDecisionConfigurationHash ?? null,
+      executionSource: current?.executionSource ?? (activeIdentity ? 'PersistedProject' : null)
+    });
+  }
   function applyEvent(event: InspectionSseEvent): void {
     if (disposed) return;
+    if (event.type === 'resultProduced' && event.result.projectId !== options.projectId) return;
+    if (event.type === 'faulted' && event.projectId !== options.projectId) return;
+    if (event.type === 'stateChanged' && event.state.projectId !== options.projectId) return;
     if (event.id) lastEventId = event.id;
+    state.reconnectAttempt = 0;
     if (event.type === 'resultProduced') state.latestResult = event.result;
-    if (event.type === 'faulted') { state.phase = 'faulted'; state.errorCode = 'INSPECTION_RUNTIME_FAULTED'; state.message = event.errorMessage ?? '连续检测运行故障。'; closeStream(); }
+    if (event.type === 'faulted') {
+      if (state.runtime) state.runtime = Object.freeze({ ...state.runtime, status: 'Faulted', isBusy: false });
+      activeIdentity = null; state.phase = 'faulted'; state.errorCode = 'INSPECTION_RUNTIME_FAULTED';
+      state.message = event.errorMessage ?? '连续检测运行故障。'; closeStream();
+    }
     if (event.type === 'stateChanged') {
+      projectRuntime(event.state);
       state.message = `连续检测状态：${event.state.newState}`;
       if (event.state.newState === 'Running' || event.state.newState === 'Starting') state.phase = 'running';
       if (event.state.newState === 'Stopping') state.phase = 'stopping';
@@ -79,7 +122,7 @@ export function createInspectionRunOwner(options: {
     if (disposed || ownerGeneration !== generation || streamController) return;
     const controller = new AbortController(); streamController = controller;
     const flight = options.sse.connect({ projectId: options.projectId, lastEventId, signal: controller.signal,
-      onOpen: () => { if (!disposed && ownerGeneration === generation) { state.connected = true; state.reconnectAttempt = 0; if (state.phase === 'reconnecting') state.phase = 'running'; } },
+      onOpen: () => { if (!disposed && ownerGeneration === generation) { state.connected = true; if (state.phase === 'reconnecting') state.phase = state.runtime ? phaseForRuntime(state.runtime) : 'running'; } },
       onEvent: applyEvent });
     track(flight).catch(() => {
       if (!controller.signal.aborted && !disposed) { state.errorCode = 'INSPECTION_SSE_DISCONNECTED'; scheduleReconnect(ownerGeneration); }
@@ -96,7 +139,8 @@ export function createInspectionRunOwner(options: {
     try {
       const runtime = await options.api.hydrate(options.projectId, { signal: requestController.signal });
       if (disposed || current !== generation) return;
-      state.runtime = runtime; state.phase = runtime.isBusy ? 'running' : runtime.status === 'Faulted' ? 'faulted' : 'idle';
+      if (runtime.projectId !== options.projectId) throw new Error('Hydrated runtime project identity mismatch.');
+      state.runtime = runtime; state.phase = phaseForRuntime(runtime);
       activeIdentity = runtime.isBusy && runtime.clientSnapshotId && runtime.persistenceRevision != null &&
         runtime.canonicalFlowHash && runtime.decisionConfigurationHash ? {
           projectId: options.projectId,
@@ -114,6 +158,7 @@ export function createInspectionRunOwner(options: {
   async function start(identity: InspectionRunIdentity, cameraId: string | null = null): Promise<boolean> {
     if (disposed || identity.projectId !== options.projectId) return false;
     const current = ++generation; closeStream(); requestController?.abort(); requestController = new AbortController();
+    activeIdentity = identity;
     state.phase = 'starting'; state.errorCode = null; state.latestResult = null; state.message = '正在校验已保存工程并启动连续检测。';
     try {
       const result = await options.api.start(identity, cameraId, { signal: requestController.signal });
@@ -121,9 +166,24 @@ export function createInspectionRunOwner(options: {
       if (result.projectId !== identity.projectId || result.clientSnapshotId !== identity.clientSnapshotId ||
         result.persistenceRevision !== identity.expectedPersistenceRevision || result.canonicalFlowHash !== identity.expectedCanonicalFlowHash ||
         result.decisionConfigurationHash !== identity.expectedDecisionConfigurationHash) throw new Error('Start identity mismatch.');
-      activeIdentity = identity; state.phase = 'running'; state.message = '连续检测已启动。'; connect(current); return true;
+      state.runtime = Object.freeze({ projectId: options.projectId, status: 'Starting', isBusy: true, sessionId: null,
+        startedAt: null, stoppedAt: null, clientSnapshotId: identity.clientSnapshotId,
+        persistenceRevision: identity.expectedPersistenceRevision, canonicalFlowHash: identity.expectedCanonicalFlowHash,
+        decisionConfigurationHash: identity.expectedDecisionConfigurationHash, executionSource: 'PersistedProject' });
+      state.phase = 'running'; state.message = '连续检测已启动。'; connect(current); return true;
     } catch (error) {
-      if (!disposed && current === generation && !(error instanceof ApiAbortError)) { state.phase = 'faulted'; state.errorCode = 'INSPECTION_START_REJECTED'; state.message = '连续检测启动被后端拒绝，请保存或重新加载工程后重试。'; }
+      if (!disposed && current === generation) {
+        const code = errorCode(error) ?? 'INSPECTION_START_REJECTED';
+        if (shouldRecoverAuthority(error)) {
+          await hydrate();
+          state.errorCode = code;
+          if (state.runtime?.isBusy) state.message = '后端已有工程运行，会话状态已恢复。';
+          else if (state.runtime) { state.phase = 'faulted'; state.message = '启动结果未知，后端未确认存在运行会话。'; }
+        } else {
+          activeIdentity = null; state.phase = 'faulted'; state.errorCode = code;
+          state.message = '连续检测启动被后端拒绝，请保存或重新加载工程后重试。';
+        }
+      }
       return false;
     } finally { if (current === generation) requestController = null; }
   }
@@ -132,7 +192,16 @@ export function createInspectionRunOwner(options: {
     const stoppingIdentity = activeIdentity;
     const current = ++generation; closeStream(); requestController?.abort(); requestController = new AbortController(); state.phase = 'stopping'; state.message = '正在停止连续检测。';
     try { await options.api.stop(stoppingIdentity, { signal: requestController.signal }); if (disposed || current !== generation) return false; await hydrate(); return true; }
-    catch (error) { if (!disposed && !(error instanceof ApiAbortError)) { state.phase = 'faulted'; state.errorCode = 'INSPECTION_STOP_FAILED'; state.message = '停止结果未知，正在恢复后端状态。'; await hydrate(); } return false; }
+    catch (error) {
+      if (!disposed && current === generation) {
+        const code = errorCode(error) ?? 'INSPECTION_STOP_FAILED';
+        await hydrate();
+        state.errorCode = code;
+        if (state.runtime?.isBusy) state.message = '停止尚未由后端确认，已恢复当前运行状态。';
+        else if (state.runtime) state.message = '后端已确认连续检测不再运行。';
+      }
+      return false;
+    }
   }
   const owner: InspectionRunOwner = Object.freeze({ projectId: options.projectId, projection: readonly(state), hydrate, start, stop,
     reconcile: hydrate, resources: () => Object.freeze({ streams: streamController ? 1 : 0, timers: reconnectTimer == null ? 0 : 1,
