@@ -152,6 +152,7 @@ function updateCompatibility(event: Event): void {
           :class="{ 'is-dragging': draggingOperatorType === operator.operatorType }"
           :data-type="operator.operatorType"
           :data-name="operator.displayName"
+          :data-operator="JSON.stringify(operator)"
           :data-dragging="draggingOperatorType === operator.operatorType"
           :draggable="!readonly"
           :disabled="readonly"
