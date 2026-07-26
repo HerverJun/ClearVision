@@ -2669,7 +2669,7 @@ async function readUiSessionAuthority(page, webPort) {
   };
 }
 
-async function assertProductOverview(page) {
+async function assertProductLanding(page) {
   await waitForSelectorWithoutHandle(
     page,
     '[data-product-shell="ready"]',
@@ -2677,7 +2677,7 @@ async function assertProductOverview(page) {
   );
   await waitForSelectorWithoutHandle(
     page,
-    '[data-capability="overview"]',
+    '[data-capability="projects-read"]',
     { state: 'visible', timeout: 45_000 }
   );
   const projection = await page.evaluate(() => ({
@@ -2687,7 +2687,7 @@ async function assertProductOverview(page) {
     projectLifecycleOwnerCount: Number(window.__STUDIO_UI_PROJECT_LIFECYCLE_DIAGNOSTICS__?.ownerCount ?? -1),
     leaveGuardOwnerCount: Number(window.__STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__?.ownerCount ?? -1)
   }));
-  assert(projection.route === '#/overview' && projection.productShellCount === 1 &&
+  assert(projection.route === '#/projects' && projection.productShellCount === 1 &&
     projection.authShellCount === 0 && projection.projectLifecycleOwnerCount === 1 &&
     projection.leaveGuardOwnerCount === 1,
   `UI authentication did not settle on one ProductRuntime owner chain: ${JSON.stringify(projection)}`);
@@ -2708,7 +2708,7 @@ async function setupAdminThroughUi(page, webPort, username, password, captureSce
   await page.getByLabel('密码', { exact: true }).fill(password);
   await page.getByLabel('确认密码').fill(password);
   await page.getByRole('button', { name: '创建并进入 Studio' }).click();
-  const product = await assertProductOverview(page);
+  const product = await assertProductLanding(page);
   const session = await readUiSessionAuthority(page, webPort);
   assert(session.user.username === username,
     `Setup auto-login authenticated ${session.user.username}, expected ${username}.`);
@@ -2728,7 +2728,7 @@ async function loginThroughUi(page, webPort, username, password, captureScene) {
   await page.getByLabel('用户名').fill(username);
   await page.getByLabel('密码').fill(password);
   await page.getByRole('button', { name: '登录', exact: true }).click();
-  const product = await assertProductOverview(page);
+  const product = await assertProductLanding(page);
   const session = await readUiSessionAuthority(page, webPort);
   assert(session.user.username === username,
     `Restart login authenticated ${session.user.username}, expected ${username}.`);
@@ -3124,8 +3124,8 @@ async function verifyFinalJourneyCreateRunLogout(
   const captureScene = async scene => screenshots.push(await captureFinalJourneyScene(
     page, evidenceDirectory, 'create-run-logout', scene, sourceSha));
   const auth = await setupAdminThroughUi(page, webPort, username, password, captureScene);
-  const studio = await verifyStudioFoundation(page, webPort, '/overview');
-  await captureScene('overview');
+  const studio = await verifyStudioFoundation(page, webPort, '/projects');
+  await captureScene('projects');
   const created = await createBlankProjectThroughUi(page, runName, {
     responseLoss: true,
     captureScene
@@ -3238,10 +3238,10 @@ async function verifyFinalJourneyReopenDelete(
   const auth = await loginThroughUi(page, webPort, username, password, captureScene);
   assert(auth.session.user.userId === state.user.userId && auth.session.user.username === state.user.username,
     'Final journey restart authenticated a different user identity.');
-  const studio = await verifyStudioFoundation(page, webPort, '/overview');
+  const studio = await verifyStudioFoundation(page, webPort, '/projects');
   const recentLink = page.getByRole('link', { name: state.project.projectName, exact: true }).first();
   await recentLink.waitFor({ state: 'visible', timeout: 45_000 });
-  await captureScene('overview-recent-project');
+  await captureScene('projects-recent-project');
   await recentLink.click();
   await page.waitForSelector('[data-capability="projects-read-detail"]', { state: 'visible', timeout: 30_000 });
   const beforeRename = await readRollbackAuthority(
@@ -3565,7 +3565,7 @@ async function verifyFinalJourneySoak(
   const captureScene = async scene => screenshots.push(await captureFinalJourneyScene(
     page, evidenceDirectory, 'soak', scene, sourceSha));
   const setup = await setupAdminThroughUi(page, webPort, username, password, captureScene);
-  const studio = await verifyStudioFoundation(page, webPort, '/overview');
+  const studio = await verifyStudioFoundation(page, webPort, '/projects');
   const created = await createBlankProjectThroughUi(page, `${runName} Soak`, {
     responseLoss: false,
     captureScene: null
