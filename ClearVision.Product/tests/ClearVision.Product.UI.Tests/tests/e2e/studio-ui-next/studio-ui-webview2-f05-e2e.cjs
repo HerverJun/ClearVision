@@ -35,7 +35,9 @@ function project() {
     persistenceRevision: 12,
     createdAt: '2026-07-26T00:00:00Z',
     modifiedAt: '2026-07-26T01:00:00Z',
-    lastOpenedAt: '2026-07-26T01:00:00Z'
+    lastOpenedAt: '2026-07-26T01:00:00Z',
+    flow: null,
+    assets: { schemaVersion: 1, calibrationAssets: [], spatialAssets: [] }
   };
 }
 
