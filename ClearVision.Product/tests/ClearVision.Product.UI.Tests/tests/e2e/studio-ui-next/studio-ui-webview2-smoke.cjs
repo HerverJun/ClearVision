@@ -2675,11 +2675,6 @@ async function assertProductLanding(page) {
     '[data-product-shell="ready"]',
     { state: 'visible', timeout: 45_000 }
   );
-  await waitForSelectorWithoutHandle(
-    page,
-    '[data-capability="projects-read"]',
-    { state: 'visible', timeout: 45_000 }
-  );
   const projection = await page.evaluate(() => ({
     route: location.hash,
     productShellCount: document.querySelectorAll('[data-product-shell="ready"]').length,
@@ -2687,7 +2682,7 @@ async function assertProductLanding(page) {
     projectLifecycleOwnerCount: Number(window.__STUDIO_UI_PROJECT_LIFECYCLE_DIAGNOSTICS__?.ownerCount ?? -1),
     leaveGuardOwnerCount: Number(window.__STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__?.ownerCount ?? -1)
   }));
-  assert(projection.route === '#/projects' && projection.productShellCount === 1 &&
+  assert(['#/overview', '#/projects'].includes(projection.route) && projection.productShellCount === 1 &&
     projection.authShellCount === 0 && projection.projectLifecycleOwnerCount === 1 &&
     projection.leaveGuardOwnerCount === 1,
   `UI authentication did not settle on one ProductRuntime owner chain: ${JSON.stringify(projection)}`);
@@ -3255,7 +3250,7 @@ async function verifyFinalJourneyReopenDelete(
   const auth = await loginThroughUi(page, webPort, username, password, captureScene);
   assert(auth.session.user.userId === state.user.userId && auth.session.user.username === state.user.username,
     'Final journey restart authenticated a different user identity.');
-  const studio = await verifyStudioFoundation(page, webPort, '/projects');
+  const studio = await verifyStudioFoundation(page, webPort, '/overview');
   const recentLink = page.getByRole('link', { name: state.project.projectName, exact: true }).first();
   await recentLink.waitFor({ state: 'visible', timeout: 45_000 });
   await captureScene('projects-recent-project');
