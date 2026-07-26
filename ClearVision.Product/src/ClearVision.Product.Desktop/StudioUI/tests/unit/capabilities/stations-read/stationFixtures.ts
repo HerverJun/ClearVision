@@ -181,3 +181,81 @@ export function stationStatistics(overrides: Record<string, unknown> = {}): Reco
     ...overrides
   };
 }
+
+export function stationCommand(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    schemaVersion: 2,
+    commandId: 'command-a',
+    stationId: 'station-a',
+    commandType: 'Ping',
+    payloadJson: '{}',
+    createdAtUtc: '2026-07-15T02:00:00Z',
+    expiresAtUtc: '2026-07-15T02:05:00Z',
+    issuedBy: 'admin',
+    correlationId: 'correlation-a',
+    status: 'Created',
+    progressPercent: 0,
+    deliveredAtUtc: null,
+    acceptedAtUtc: null,
+    startedAtUtc: null,
+    completedAtUtc: null,
+    resultMessage: null,
+    errorCode: null,
+    ...overrides
+  };
+}
+
+export function stationLog(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    schemaVersion: 2,
+    stationId: 'station-a',
+    sequenceId: 11,
+    messageId: 'log-11',
+    timestampUtc: '2026-07-15T02:00:00Z',
+    level: 'WARN',
+    source: 'RuntimeHost',
+    eventId: 'runtime-warning',
+    messageTemplate: null,
+    renderedMessage: '运行包健康状态降级',
+    exceptionType: null,
+    exceptionMessage: null,
+    correlationId: null,
+    runId: 'run-a',
+    packageId: 'pkg-a',
+    createdAtUtc: '2026-07-15T02:00:01Z',
+    ...overrides
+  };
+}
+
+export function stationAudit(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    auditId: 'audit-a',
+    userName: 'admin',
+    action: 'StationCommandCreated',
+    targetStationId: 'station-a',
+    commandId: 'command-a',
+    payloadSummary: 'Ping',
+    createdAtUtc: '2026-07-15T02:00:00Z',
+    result: 'Created',
+    clientIp: '127.0.0.1',
+    ...overrides
+  };
+}
+
+export function stationPackage(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    schemaVersion: 2,
+    packageId: 'pkg-a',
+    packageName: '瓶盖检测包',
+    packageVersion: '1.0.0',
+    packageKind: 'Production',
+    flowHash: 'sha256:package',
+    createdBy: 'admin',
+    minStationVersion: '2.0.0',
+    requiredOperators: ['Threshold'],
+    sizeBytes: 4096,
+    sha256: 'a'.repeat(64),
+    createdAtUtc: '2026-07-15T01:00:00Z',
+    ...overrides
+  };
+}

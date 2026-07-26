@@ -5,14 +5,22 @@ import type {
 } from '@/platform/query';
 import {
   decodeStationAdminDetails,
+  decodeStationAudits,
+  decodeStationCommands,
   decodeStationHealth,
   decodeStationList,
+  decodeStationLogs,
+  decodeStationPackages,
   decodeStationResults,
   decodeStationResultsPage,
   decodeStationStatistics,
   decodeStationSummary,
   type StationAdminDetails,
+  type StationAudit,
+  type StationCommand,
   type StationHealthSnapshot,
+  type StationLog,
+  type StationPackage,
   type StationResult,
   type StationResultsPage,
   type StationStatistics,
@@ -123,6 +131,22 @@ export function createStationAdminDetailsPath(stationId: string): string {
   return `stations/${encodeURIComponent(requireStationId(stationId))}`;
 }
 
+export function createStationLogsPath(stationId: string, take = defaultStationDetailTake): string {
+  return `stations/${encodeURIComponent(requireStationId(stationId))}/logs?take=${requireTake(take)}`;
+}
+
+export function createStationCommandsPath(stationId: string, take = defaultStationDetailTake): string {
+  return `stations/${encodeURIComponent(requireStationId(stationId))}/commands?take=${requireTake(take)}`;
+}
+
+export function createStationAuditPath(stationId: string, take = defaultStationDetailTake): string {
+  return `stations/audit?stationId=${encodeURIComponent(requireStationId(stationId))}&take=${requireTake(take)}`;
+}
+
+export function createStationPackagesPath(): string {
+  return 'station-packages';
+}
+
 export function createStationsDefinition(): ReadQueryDefinition<readonly StationStatus[]> {
   return Object.freeze({
     key: 'stations:list',
@@ -209,6 +233,59 @@ export function createStationAdminDetailsDefinition(
   });
 }
 
+export function createStationLogsDefinition(
+  stationId: () => string,
+  take: () => number
+): ReadQueryDefinition<readonly StationLog[]> {
+  return Object.freeze({
+    key: () => `stations:admin-logs:${requireStationId(stationId())}:${requireTake(take())}`,
+    path: () => createStationLogsPath(stationId(), take()),
+    decode: decodeStationLogs,
+    isEmpty: (logs: readonly StationLog[]) => logs.length === 0,
+    protected: true,
+    cacheTimeMs: 5_000
+  });
+}
+
+export function createStationCommandsDefinition(
+  stationId: () => string,
+  take: () => number
+): ReadQueryDefinition<readonly StationCommand[]> {
+  return Object.freeze({
+    key: () => `stations:admin-commands:${requireStationId(stationId())}:${requireTake(take())}`,
+    path: () => createStationCommandsPath(stationId(), take()),
+    decode: decodeStationCommands,
+    isEmpty: (commands: readonly StationCommand[]) => commands.length === 0,
+    protected: true,
+    cacheTimeMs: 2_000
+  });
+}
+
+export function createStationAuditsDefinition(
+  stationId: () => string,
+  take: () => number
+): ReadQueryDefinition<readonly StationAudit[]> {
+  return Object.freeze({
+    key: () => `stations:admin-audit:${requireStationId(stationId())}:${requireTake(take())}`,
+    path: () => createStationAuditPath(stationId(), take()),
+    decode: decodeStationAudits,
+    isEmpty: (audits: readonly StationAudit[]) => audits.length === 0,
+    protected: true,
+    cacheTimeMs: 5_000
+  });
+}
+
+export function createStationPackagesDefinition(): ReadQueryDefinition<readonly StationPackage[]> {
+  return Object.freeze({
+    key: 'stations:admin-packages',
+    path: createStationPackagesPath(),
+    decode: decodeStationPackages,
+    isEmpty: (packages: readonly StationPackage[]) => packages.length === 0,
+    protected: true,
+    cacheTimeMs: 5_000
+  });
+}
+
 export function createStationsQuery(client: ReadQueryClient): ReadQueryOwner<readonly StationStatus[]> {
   return client.createQuery(createStationsDefinition());
 }
@@ -252,4 +329,32 @@ export function createStationAdminDetailsQuery(
   stationId: () => string
 ): ReadQueryOwner<StationAdminDetails> {
   return client.createQuery(createStationAdminDetailsDefinition(stationId));
+}
+
+export function createStationLogsQuery(
+  client: ReadQueryClient,
+  stationId: () => string,
+  take: () => number
+): ReadQueryOwner<readonly StationLog[]> {
+  return client.createQuery(createStationLogsDefinition(stationId, take));
+}
+
+export function createStationCommandsQuery(
+  client: ReadQueryClient,
+  stationId: () => string,
+  take: () => number
+): ReadQueryOwner<readonly StationCommand[]> {
+  return client.createQuery(createStationCommandsDefinition(stationId, take));
+}
+
+export function createStationAuditsQuery(
+  client: ReadQueryClient,
+  stationId: () => string,
+  take: () => number
+): ReadQueryOwner<readonly StationAudit[]> {
+  return client.createQuery(createStationAuditsDefinition(stationId, take));
+}
+
+export function createStationPackagesQuery(client: ReadQueryClient): ReadQueryOwner<readonly StationPackage[]> {
+  return client.createQuery(createStationPackagesDefinition());
 }

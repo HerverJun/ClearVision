@@ -117,4 +117,21 @@ describe('visible Station polling lifecycle owner', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(owner.getDiagnostics().timerScheduled).toBe(false);
   });
+
+  it('returns visibility listeners and timers to zero across 20 mount/unmount cycles', async () => {
+    const visibility = new FakeVisibility();
+    for (let cycle = 0; cycle < 20; cycle += 1) {
+      const owner = createVisibleStationPollingOwner({
+        visibility,
+        refresh: vi.fn(async () => undefined),
+        pause: vi.fn()
+      });
+      owner.start();
+      await flushMicrotasks();
+      expect(visibility.listenerCount).toBe(1);
+      owner.dispose();
+      expect(visibility.listenerCount).toBe(0);
+      expect(owner.getDiagnostics()).toMatchObject({ disposed: true, refreshing: false, timerScheduled: false });
+    }
+  });
 });

@@ -24,7 +24,14 @@ const stationFixture = Object.freeze({
     'GET /api/stations/statistics',
     'GET /api/stations/{stationId}',
     'GET /api/stations/{stationId}/results',
-    'GET /api/stations/{stationId}/health'
+    'GET /api/stations/{stationId}/health',
+    'GET /api/stations/{stationId}/logs',
+    'GET /api/stations/{stationId}/commands',
+    'GET /api/stations/audit',
+    'GET /api/station-packages',
+    'POST /api/stations/{stationId}/commands',
+    'PATCH /api/stations/{stationId}/identity',
+    'POST /api/stations/{stationId}/deploy-package'
   ]),
   sourceSha: f02BrowserFixture.sourceSha,
   dataSource: f02BrowserFixture.dataSource
@@ -164,6 +171,29 @@ function health(): Record<string, unknown> {
   };
 }
 
+function command(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    schemaVersion: 2, commandId: 'command-a', stationId: 'station-a', commandType: 'Ping', payloadJson: '{}',
+    createdAtUtc: new Date().toISOString(), expiresAtUtc: '2026-07-26T03:00:00Z', issuedBy: 'fixture-admin',
+    correlationId: 'correlation-a', status: 'Created', progressPercent: 0, deliveredAtUtc: null,
+    acceptedAtUtc: null, startedAtUtc: null, completedAtUtc: null, resultMessage: null, errorCode: null,
+    ...overrides
+  };
+}
+
+const stationLog = {
+  schemaVersion: 2, stationId: 'station-a', sequenceId: 11, messageId: 'log-11', timestampUtc: '2026-07-15T02:00:00Z',
+  level: 'WARN', source: 'RuntimeHost', eventId: 'runtime-warning', messageTemplate: null,
+  renderedMessage: '运行包健康状态降级', exceptionType: null, exceptionMessage: null,
+  correlationId: null, runId: 'run-a', packageId: 'pkg-a', createdAtUtc: '2026-07-15T02:00:01Z'
+};
+
+const stationPackage = {
+  schemaVersion: 2, packageId: 'pkg-a', packageName: '瓶盖检测包', packageVersion: '1.0.0', packageKind: 'Production',
+  flowHash: 'sha256:package', createdBy: 'fixture-admin', minStationVersion: '2.0.0', requiredOperators: ['Threshold'],
+  sizeBytes: 4096, sha256: 'a'.repeat(64), createdAtUtc: '2026-07-15T01:00:00Z'
+};
+
 async function fulfill(route: Route, status: number, body: unknown): Promise<void> {
   await fulfillF02Json(route, status, body, stationFixture.schemaVersion);
 }
@@ -171,9 +201,12 @@ async function fulfill(route: Route, status: number, body: unknown): Promise<voi
 async function bootStations(
   page: Page,
   listPayload: unknown = [station()],
-  summaryPayload: unknown = summary()
+  summaryPayload: unknown = summary(),
+  role: 'Admin' | 'Engineer' = 'Engineer'
 ): Promise<F02MethodAuditEntry[]> {
   const audit: F02MethodAuditEntry[] = [];
+  const commands = [command()];
+  let identity = station();
   await installF02BrowserStartup(page, { 'Studio2.StationsRead': true });
   await page.route('**/health', route => fulfill(route, 200, { status: 'Healthy', port: 5177 }));
   await page.route('**/api/**', async route => {
@@ -185,7 +218,7 @@ async function bootStations(
       return;
     }
     if (url.pathname === '/api/auth/me') {
-      await fulfill(route, 200, { userId: 'fixture-user', username: 'fixture-engineer', role: 'Engineer' });
+      await fulfill(route, 200, { userId: 'fixture-user', username: `fixture-${role.toLowerCase()}`, role });
       return;
     }
     if (url.pathname === '/api/stations') {
@@ -217,7 +250,43 @@ async function bootStations(
       return;
     }
     if (url.pathname === '/api/stations/station-a') {
-      await fulfill(route, 403, { error: 'StationAdminRequired' });
+      await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? identity : { error: 'StationAdminRequired' });
+      return;
+    }
+    if (url.pathname === '/api/stations/station-a/logs') {
+      await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? [stationLog] : { error: 'StationAdminRequired' });
+      return;
+    }
+    if (url.pathname === '/api/stations/station-a/commands') {
+      if (request.method() === 'POST') {
+        const created = command({ commandId: `command-${commands.length + 1}`, commandType: request.postDataJSON().commandType, payloadJson: request.postDataJSON().payloadJson });
+        commands.unshift(created);
+        await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? created : { error: 'StationAdminRequired' });
+      } else {
+        await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? commands : { error: 'StationAdminRequired' });
+      }
+      return;
+    }
+    if (url.pathname === '/api/stations/audit') {
+      await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? [{
+        auditId: 'audit-a', userName: 'fixture-admin', action: 'StationCommandCreated', targetStationId: 'station-a',
+        commandId: 'command-a', payloadSummary: 'Ping', createdAtUtc: '2026-07-15T02:00:00Z', result: 'Created', clientIp: '127.0.0.1'
+      }] : { error: 'StationAdminRequired' });
+      return;
+    }
+    if (url.pathname === '/api/station-packages') {
+      await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? [stationPackage] : { error: 'StationAdminRequired' });
+      return;
+    }
+    if (url.pathname === '/api/stations/station-a/identity') {
+      identity = { ...identity, ...request.postDataJSON() };
+      await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? identity : { error: 'StationAdminRequired' });
+      return;
+    }
+    if (url.pathname === '/api/stations/station-a/deploy-package') {
+      const created = command({ commandId: `deploy-${commands.length + 1}`, commandType: 'DeployPackage', payloadJson: JSON.stringify({ packageId: 'pkg-a' }) });
+      commands.unshift(created);
+      await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? created : { error: 'StationAdminRequired' });
       return;
     }
     await fulfill(route, 404, { error: 'NotFound' });
@@ -250,15 +319,15 @@ test('Station list uses URL filters, preserves nine outcomes and stays GET-only'
   expect(expectGetOnly(audit)).toBe(true);
 });
 
-test('Station detail degrades only Admin 403 and keeps results and health visible', async ({ page }) => {
+test('Engineer Station journey remains read-only and never mounts the Admin control domain', async ({ page }) => {
   const viewport = { width: 1600, height: 1000 } as const;
   await page.setViewportSize(viewport);
-  const runtimeErrors = createF02RuntimeErrorAudit(page, [403]);
+  const runtimeErrors = createF02RuntimeErrorAudit(page);
   const audit = await bootStations(page);
   await page.goto('/studio/index.html#/stations/station-a');
 
   await expect(page.locator('[data-capability="stations-read-detail"]')).toBeVisible();
-  await expect(page.getByText('管理员增强信息不可用')).toBeVisible();
+  await expect(page.locator('[data-capability="station-admin-control"]')).toHaveCount(0);
   await expect(page.getByText('判定 NG')).toBeVisible();
   await expect(page.getByText('进程运行时长')).toBeVisible();
   await expect(page.getByText('工作站详情读取失败')).toHaveCount(0);
@@ -270,6 +339,30 @@ test('Station detail degrades only Admin 403 and keeps results and health visibl
   expect(expectGetOnly(audit)).toBe(true);
   expect(audit.some(entry => entry.path.includes('/events'))).toBe(false);
   expect(audit.some(entry => /commands|logs|audit|packages|download/.test(entry.path))).toBe(false);
+});
+
+test('Admin Station journey mounts controls and completes command, identity and package submission', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const runtimeErrors = createF02RuntimeErrorAudit(page);
+  const audit = await bootStations(page, [station()], summary(), 'Admin');
+  await page.goto('/studio/index.html#/stations/station-a');
+
+  const admin = page.locator('[data-capability="station-admin-control"]');
+  await expect(admin).toBeVisible();
+  await expect(admin.getByText('运行包健康状态降级')).toBeVisible();
+  await admin.getByTestId('station-issue-command').click();
+  await expect(admin.getByText('工作站命令已由后端受理。')).toBeVisible();
+  await admin.getByLabel('工作站名称').fill('一号检测站（修订）');
+  await admin.getByTestId('station-save-identity').click();
+  await expect(admin.getByText('工作站身份已由后端修订。')).toBeVisible();
+  await admin.getByLabel('生产运行包').selectOption('pkg-a');
+  await admin.getByTestId('station-deploy-package').click();
+  await expect(admin.getByText('运行包下发命令已由后端受理。')).toBeVisible();
+
+  expect(audit.some(entry => entry.method === 'POST' && entry.path === '/api/stations/station-a/commands')).toBe(true);
+  expect(audit.some(entry => entry.method === 'PATCH' && entry.path === '/api/stations/station-a/identity')).toBe(true);
+  expect(audit.some(entry => entry.method === 'POST' && entry.path === '/api/stations/station-a/deploy-package')).toBe(true);
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
 });
 
 test('Station list surfaces frozen-contract malformed and empty responses', async ({ page }) => {

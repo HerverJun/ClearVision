@@ -146,6 +146,22 @@ describe('createApiTransport', () => {
     expect(headers.get('Authorization')).toBe('Bearer save-token');
   });
 
+  it('sends Station identity PATCH through the same transport without retrying', async () => {
+    const fetchMock = createFetchMock();
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ stationId: 'station-a' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    }));
+    const transport = createApiTransport({ apiBaseUrl, expectedOrigin, tokenProvider: () => 'station-token' });
+    const body = { stationName: '一号站', isEnabled: true };
+
+    await expect(transport.patch?.('stations/station-a/identity', body)).resolves.toEqual({ stationId: 'station-a' });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('http://localhost:5000/api/stations/station-a/identity');
+    expect(init).toMatchObject({ method: 'PATCH', body: JSON.stringify(body) });
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer station-token');
+  });
+
   it('reads binary artifacts with content metadata and deletes them through the shared transport', async () => {
     const fetchMock = createFetchMock();
     const bytes = new Uint8Array([1, 2, 3, 4]);

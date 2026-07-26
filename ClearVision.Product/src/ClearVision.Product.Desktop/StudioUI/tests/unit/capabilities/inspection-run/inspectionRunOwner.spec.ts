@@ -88,6 +88,8 @@ describe('inspectionRunOwner', () => {
     await owner.hydrate();
 
     expect(owner.projection.phase).toBe('occupied');
+    expect(owner.projection.message).toContain('当前会话不属于连续检测');
+    expect(owner.projection.message).not.toContain('已恢复后端连续检测运行状态');
     expect(owner.resources()).toEqual({ streams: 0, timers: 0, abortControllers: 0, subscriptions: 0 });
     expect(await owner.stop()).toBe(false);
     expect(h.api.stop).not.toHaveBeenCalled();

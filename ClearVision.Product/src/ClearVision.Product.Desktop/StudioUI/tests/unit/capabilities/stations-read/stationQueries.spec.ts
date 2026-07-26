@@ -11,7 +11,11 @@ import { createReadQueryClient } from '@/platform/query';
 import {
   createStationAdminDetailsPath,
   createStationAdminDetailsQuery,
+  createStationAuditPath,
+  createStationCommandsPath,
   createStationHealthPath,
+  createStationLogsPath,
+  createStationPackagesPath,
   createStationResultsPagePath,
   createStationResultsPath,
   createStationStatisticsPath,
@@ -54,6 +58,10 @@ describe('Station query definitions', () => {
     expect(createStationResultsPath('station A/B', 25)).toBe('stations/station%20A%2FB/results?take=25');
     expect(createStationHealthPath('station-a', 50)).toBe('stations/station-a/health?take=50');
     expect(createStationAdminDetailsPath('station-a')).toBe('stations/station-a');
+    expect(createStationLogsPath('station-a', 25)).toBe('stations/station-a/logs?take=25');
+    expect(createStationCommandsPath('station-a', 50)).toBe('stations/station-a/commands?take=50');
+    expect(createStationAuditPath('station A/B', 100)).toBe('stations/audit?stationId=station%20A%2FB&take=100');
+    expect(createStationPackagesPath()).toBe('station-packages');
     expect(() => createStationResultsPath('', 50)).toThrow(TypeError);
     expect(() => createStationHealthPath('station-a', 501)).toThrow(RangeError);
     expect(() => createStationResultsPagePath({ pageIndex: -1 })).toThrow(RangeError);

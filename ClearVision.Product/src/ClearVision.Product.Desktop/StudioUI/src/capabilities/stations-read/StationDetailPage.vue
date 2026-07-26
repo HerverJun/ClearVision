@@ -18,7 +18,11 @@ import {
 import { formatInspectionOutcome } from '@/shared/inspectionOutcome';
 import {
   createStationAdminDetailsQuery,
+  createStationAuditsQuery,
+  createStationCommandsQuery,
   createStationHealthQuery,
+  createStationLogsQuery,
+  createStationPackagesQuery,
   createStationResultsQuery,
   createStationsQuery
 } from './stationQueries';
@@ -26,6 +30,8 @@ import {
   createStationQuerySlot,
   createVisibleStationPollingOwner
 } from './stationLifecycleOwner';
+import { createStationAdminCommandOwner } from './stationAdminCommandOwner';
+import StationAdminPanel from './StationAdminPanel.vue';
 import type {
   StationHealthSnapshot,
   StationResult
@@ -54,6 +60,7 @@ const route = useRoute();
 const router = useRouter();
 const runtime = useStationsReadRuntime(props.runtime);
 const activeStationId = computed(() => props.stationId ?? String(route.params.stationId ?? ''));
+const isStationAdmin = runtime.session?.projection.user?.role === 'Admin';
 
 function initialTake(): number {
   const candidate = Number(route.query.take);
@@ -72,15 +79,32 @@ const healthSlot = createStationQuerySlot(() => createStationHealthQuery(
   () => activeStationId.value,
   () => take.value
 ));
-const adminSlot = createStationQuerySlot(() => createStationAdminDetailsQuery(
-  runtime.queries,
-  () => activeStationId.value
-));
+const adminSlot = isStationAdmin ? createStationQuerySlot(() => createStationAdminDetailsQuery(
+  runtime.queries, () => activeStationId.value
+)) : undefined;
+const logsSlot = isStationAdmin ? createStationQuerySlot(() => createStationLogsQuery(
+  runtime.queries, () => activeStationId.value, () => take.value
+)) : undefined;
+const commandsSlot = isStationAdmin ? createStationQuerySlot(() => createStationCommandsQuery(
+  runtime.queries, () => activeStationId.value, () => take.value
+)) : undefined;
+const auditsSlot = isStationAdmin ? createStationQuerySlot(() => createStationAuditsQuery(
+  runtime.queries, () => activeStationId.value, () => take.value
+)) : undefined;
+const packagesSlot = isStationAdmin ? createStationQuerySlot(() => createStationPackagesQuery(runtime.queries)) : undefined;
+const adminCommandOwner = isStationAdmin && runtime.api ? createStationAdminCommandOwner({
+  api: runtime.api,
+  stationId: () => activeStationId.value
+}) : undefined;
 
 const listState = listSlot.state;
 const resultsState = resultsSlot.state;
 const healthState = healthSlot.state;
-const adminState = adminSlot.state;
+const adminState = adminSlot?.state ?? null;
+const logsState = logsSlot?.state ?? null;
+const commandsState = commandsSlot?.state ?? null;
+const auditsState = auditsSlot?.state ?? null;
+const packagesState = packagesSlot?.state ?? null;
 const station = computed(() => listState.value.data?.find(
   item => item.stationId.toLocaleLowerCase() === activeStationId.value.toLocaleLowerCase()
 ) ?? null);
@@ -89,12 +113,22 @@ const lastOutcome = computed(() => station.value?.lastOutcome
   : null);
 
 async function refreshAll(): Promise<void> {
-  await Promise.allSettled([
+  const refreshes: Promise<unknown>[] = [
     listSlot.refresh({ force: true }),
     resultsSlot.refresh({ force: true }),
-    healthSlot.refresh({ force: true }),
-    adminSlot.refresh({ force: true })
-  ]);
+    healthSlot.refresh({ force: true })
+  ];
+  for (const slot of [adminSlot, logsSlot, commandsSlot, auditsSlot, packagesSlot]) {
+    if (slot) refreshes.push(slot.refresh({ force: true }));
+  }
+  await Promise.allSettled(refreshes);
+}
+
+async function refreshAdmin(): Promise<void> {
+  const refreshes = [adminSlot, logsSlot, commandsSlot, auditsSlot, packagesSlot]
+    .filter(slot => slot !== undefined)
+    .map(slot => slot.refresh({ force: true }));
+  await Promise.allSettled(refreshes);
 }
 
 const polling = createVisibleStationPollingOwner({
@@ -103,7 +137,11 @@ const polling = createVisibleStationPollingOwner({
     listSlot.pause();
     resultsSlot.pause();
     healthSlot.pause();
-    adminSlot.pause();
+    adminSlot?.pause();
+    logsSlot?.pause();
+    commandsSlot?.pause();
+    auditsSlot?.pause();
+    packagesSlot?.pause();
   }
 });
 
@@ -155,24 +193,6 @@ const ordinaryItems = computed<readonly CvDescriptionItem[]>(() => {
   ];
 });
 
-const adminItems = computed<readonly CvDescriptionItem[]>(() => {
-  const value = adminState.value.data;
-  if (!value) return [];
-  return [
-    { key: 'version', label: '客户端版本', value: value.clientVersion || '—' },
-    { key: 'enabled', label: '启用状态', value: value.isEnabled ? '已启用' : '已禁用' },
-    { key: 'area', label: '区域', value: value.areaName || '—' },
-    { key: 'workcell', label: '工作单元', value: value.workcellName || '—' },
-    { key: 'node', label: '检测节点', value: value.inspectionNodeName || '—' },
-    { key: 'camera', label: '相机别名', value: value.cameraAlias || '—' },
-    { key: 'role', label: '工作站角色', value: value.stationRole || '—' },
-    { key: 'owner', label: '负责人', value: value.owner || '—' },
-    { key: 'revision', label: '工程修订', value: value.projectRevision ?? '—' },
-    { key: 'mode', label: '执行模式', value: value.executionRunMode || '—' },
-    { key: 'remark', label: '备注', value: value.remark || '—', span: 2 }
-  ];
-});
-
 function resultPresentation(result: StationResult) {
   return formatInspectionOutcome(result.outcome);
 }
@@ -199,7 +219,12 @@ onBeforeUnmount(() => {
   listSlot.dispose();
   resultsSlot.dispose();
   healthSlot.dispose();
-  adminSlot.dispose();
+  adminSlot?.dispose();
+  logsSlot?.dispose();
+  commandsSlot?.dispose();
+  auditsSlot?.dispose();
+  packagesSlot?.dispose();
+  adminCommandOwner?.dispose();
 });
 </script>
 
@@ -231,7 +256,7 @@ onBeforeUnmount(() => {
         />
         <CvButton
           size="sm"
-          :loading="listState.isRefreshing || resultsState.isRefreshing || healthState.isRefreshing || adminState.isRefreshing"
+          :loading="Boolean(listState.isRefreshing || resultsState.isRefreshing || healthState.isRefreshing || adminState?.isRefreshing || logsState?.isRefreshing || commandsState?.isRefreshing)"
           loading-label="正在刷新工作站详情"
           @click="polling.refreshNow()"
         >
@@ -305,58 +330,6 @@ onBeforeUnmount(() => {
           :items="ordinaryItems"
           :columns="1"
           label="工作站普通详情"
-        />
-      </CvPanel>
-
-      <CvPanel
-        class="station-detail__admin-panel"
-        title="管理信息"
-        :padded="false"
-      >
-        <CvInlineAlert
-          v-if="(adminState.phase === 'stale' || adminState.phase === 'partial-failure') && adminState.data"
-          tone="warning"
-          title="增强信息刷新未完成"
-        >
-          当前显示上次成功读取的管理员增强信息。
-        </CvInlineAlert>
-        <CvPageState
-          v-if="adminState.phase === 'loading' && !adminState.data"
-          compact
-          kind="loading"
-          title="正在读取管理员增强信息"
-        />
-        <CvPageState
-          v-else-if="adminState.phase === 'forbidden'"
-          compact
-          kind="forbidden"
-          title="管理员增强信息不可用"
-          description="当前账号没有工作站管理员（StationAdmin）权限；普通详情、结果与健康快照仍可继续使用。"
-        />
-        <CvPageState
-          v-else-if="adminState.phase === 'unauthorized'"
-          compact
-          kind="unauthorized"
-          title="管理员增强信息需要有效会话"
-        />
-        <CvPageState
-          v-else-if="adminState.phase === 'not-found'"
-          compact
-          kind="empty"
-          title="暂无管理员增强信息"
-        />
-        <CvPageState
-          v-else-if="adminState.phase === 'error'"
-          compact
-          kind="error"
-          title="管理员增强信息读取失败"
-          :description="adminState.failure?.message"
-        />
-        <CvDescriptionList
-          v-if="adminState.data"
-          :items="adminItems"
-          :columns="1"
-          label="工作站管理员信息"
         />
       </CvPanel>
     </div>
@@ -528,6 +501,18 @@ onBeforeUnmount(() => {
         </template>
       </CvDataTable>
     </CvPanel>
+
+    <StationAdminPanel
+      v-if="adminCommandOwner && adminState && logsState && commandsState && auditsState && packagesState"
+      class="station-detail__admin-control"
+      :details-state="adminState"
+      :logs-state="logsState"
+      :commands-state="commandsState"
+      :audits-state="auditsState"
+      :packages-state="packagesState"
+      :owner="adminCommandOwner"
+      @changed="refreshAdmin"
+    />
   </section>
 </template>
 
@@ -541,19 +526,15 @@ onBeforeUnmount(() => {
 .station-detail__take { min-width: 150px; }
 .station-detail__grid { display: contents; }
 .station-detail__overview-panel { grid-column: 1; }
-.station-detail__admin-panel { grid-column: 1; }
 .station-detail__results-panel { grid-column: 2; grid-row: span 2; }
 .station-detail__health-panel { grid-column: 1 / -1; }
+.station-detail__admin-control { grid-column: 1 / -1; }
 .station-detail__outcome { display: grid; justify-items: start; gap: var(--cv-space-1); }
 .station-detail__outcome span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .station-detail :deep(.station-detail__overview-panel > .cv-panel__header),
-.station-detail :deep(.station-detail__admin-panel > .cv-panel__header),
 .station-detail :deep(.station-detail__results-panel > .cv-panel__header),
 .station-detail :deep(.station-detail__health-panel > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
-.station-detail :deep(.station-detail__overview-panel .cv-description-list),
-.station-detail :deep(.station-detail__admin-panel .cv-description-list) { padding: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
-.station-detail :deep(.station-detail__admin-panel .cv-inline-alert),
-.station-detail :deep(.station-detail__admin-panel .cv-page-state),
+.station-detail :deep(.station-detail__overview-panel .cv-description-list) { padding: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
 .station-detail :deep(.station-detail__results-panel .cv-inline-alert),
 .station-detail :deep(.station-detail__results-panel .cv-page-state),
 .station-detail :deep(.station-detail__health-panel .cv-inline-alert),
@@ -561,7 +542,6 @@ onBeforeUnmount(() => {
 @media (max-width: 1080px) {
   .station-detail { grid-template-columns: 1fr; }
   .station-detail__overview-panel,
-  .station-detail__admin-panel,
   .station-detail__results-panel,
   .station-detail__health-panel { grid-column: 1; grid-row: auto; }
 }

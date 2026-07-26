@@ -156,7 +156,11 @@ export function createInspectionRunOwner(options: {
           expectedCanonicalFlowHash: runtime.canonicalFlowHash,
           expectedDecisionConfigurationHash: runtime.decisionConfigurationHash
         } : null;
-      state.message = runtime.isBusy ? '已恢复后端连续检测运行状态。' : '连续检测未运行。';
+      state.message = runtime.isBusy
+        ? runtime.sessionType === 'ContinuousInspection'
+          ? '已恢复后端连续检测运行状态。'
+          : '已读取后端运行占用状态；当前会话不属于连续检测。'
+        : '连续检测未运行。';
       if (runtime.isBusy && runtime.sessionType === 'ContinuousInspection') connect(current);
     } catch (error) {
       if (!disposed && current === generation && !(error instanceof ApiAbortError)) { state.phase = 'faulted'; state.errorCode = 'INSPECTION_HYDRATE_FAILED'; state.message = '无法加载连续检测状态。'; }

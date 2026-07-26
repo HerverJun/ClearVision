@@ -49,7 +49,7 @@ describe('F03 G1-G5 architecture guards', () => {
 
     expect(workspaceSource).not.toMatch(/\b(?:globalThis\.)?fetch\s*\(/);
     expect(workspaceSource).not.toMatch(/\.\s*(?:put|patch)\s*\(/i);
-    expect(transport).toContain("method: 'GET' | 'POST' | 'PUT' | 'DELETE'");
+    expect(transport).toContain("method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'");
     const previewTransport = read(join(workspaceRoot, 'preview/previewTransport.ts'));
     expect(previewTransport).toContain("'flows/preview-node'");
     expect(previewTransport).toContain('preview-artifacts/');

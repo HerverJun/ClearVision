@@ -73,8 +73,10 @@ describe('F04 G4 product shell and leave protection architecture guards', () => 
     expect(visibleProductNavigation('Engineer', {}).map(item => item.to)).toEqual(['/projects', '/results']);
     expect(visibleProductNavigation('Engineer', { 'Studio2.InspectionRun': true }).map(item => item.to))
       .toEqual(['/inspection', '/projects', '/results']);
+    expect(visibleProductNavigation('Engineer', { 'Studio2.StationsRead': true }).map(item => item.to))
+      .toEqual(['/projects', '/results', '/stations']);
     expect(visibleProductNavigation('Admin', { 'Studio2.StationsRead': true }).map(item => item.to))
-      .toEqual(['/projects', '/results']);
+      .toEqual(['/projects', '/results', '/stations']);
     expect(productNavigation.some(item => item.to.startsWith('/labs'))).toBe(false);
   });
 

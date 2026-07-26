@@ -2,15 +2,23 @@ import { describe, expect, it } from 'vitest';
 import {
   StationContractDecodeError,
   decodeStationAdminDetails,
+  decodeStationAudits,
+  decodeStationCommands,
   decodeStationHealth,
   decodeStationList,
+  decodeStationLogs,
+  decodeStationPackages,
   decodeStationResults,
   decodeStationStatistics,
   decodeStationSummary
 } from '@/capabilities/stations-read';
 import {
   outcomeStatistics,
+  stationAudit,
+  stationCommand,
   stationHealth,
+  stationLog,
+  stationPackage,
   stationResult,
   stationStatistics,
   stationStatus,
@@ -28,6 +36,10 @@ describe('Station response decoders', () => {
     const statistics = decodeStationStatistics(stationStatistics());
     const health = decodeStationHealth([stationHealth()]);
     const admin = decodeStationAdminDetails(stationStatus({ recentCommands: 'ignored' }));
+    const commands = decodeStationCommands([stationCommand({ commandType: 6, status: 5 })]);
+    const logs = decodeStationLogs([stationLog()]);
+    const audits = decodeStationAudits([stationAudit()]);
+    const packages = decodeStationPackages([stationPackage({ packageKind: 0 })]);
 
     expect(stations[0]).toMatchObject({
       stationId: 'station-a',
@@ -40,6 +52,10 @@ describe('Station response decoders', () => {
     expect(statistics.byDiagnosticCode).toEqual([{ diagnosticCode: 'WIRE_SWAP', count: 1 }]);
     expect(health[0]).toMatchObject({ stationId: 'station-a', runtimeState: 'Running' });
     expect(admin).toMatchObject({ stationId: 'station-a', owner: '生产一组' });
+    expect(commands[0]).toMatchObject({ commandType: 'CollectLogs', status: 'Succeeded' });
+    expect(logs[0]).toMatchObject({ source: 'RuntimeHost' });
+    expect(audits[0]).toMatchObject({ action: 'StationCommandCreated' });
+    expect(packages[0]).toMatchObject({ packageKind: 'Production' });
     expect(admin).not.toHaveProperty('recentCommands');
   });
 

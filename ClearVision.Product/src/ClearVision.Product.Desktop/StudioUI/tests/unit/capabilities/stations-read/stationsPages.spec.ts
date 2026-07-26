@@ -2,23 +2,28 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { createMemoryHistory, createRouter, type Router } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  getStationAdminCommandOwnerActiveCount,
   StationDetailPage,
   StationsPage
 } from '@/capabilities/stations-read';
 import {
-  ApiForbiddenError,
   ApiServerError,
   type ApiGetOptions,
   type ApiTransport
 } from '@/platform/api';
 import { createReadQueryClient } from '@/platform/query';
 import {
+  stationAudit,
+  stationCommand,
   stationHealth,
+  stationLog,
+  stationPackage,
   stationResult,
   stationStatistics,
   stationStatus,
   stationSummary
 } from './stationFixtures';
+import type { SessionProjectionOwner } from '@/app/session';
 
 type GetImplementation = (path: string, options?: ApiGetOptions) => Promise<unknown>;
 
@@ -49,6 +54,21 @@ function createTestRouter(): Router {
       { path: '/stations/:stationId', component: { template: '<div />' } }
     ]
   });
+}
+
+function session(role: 'Admin' | 'Engineer'): SessionProjectionOwner {
+  return {
+    projection: {
+      phase: 'authenticated',
+      user: { userId: `${role.toLowerCase()}-id`, username: role.toLowerCase(), role },
+      sessionGeneration: 1,
+      message: 'test',
+      updatedAt: Date.now()
+    },
+    start: vi.fn(),
+    refresh: vi.fn(async () => undefined),
+    dispose: vi.fn()
+  };
 }
 
 describe('Station read pages', () => {
@@ -117,34 +137,76 @@ describe('Station read pages', () => {
     queries.dispose();
   });
 
-  it('keeps an Admin 403 inside the enhancement panel while ordinary detail, results and health remain usable', async () => {
+  it('does not create Admin queries, control components or command owner for Engineer', async () => {
     const get = vi.fn(async (path: string) => {
       if (path === 'stations') return [stationStatus()];
       if (path === 'stations/station-a/results?take=50') return [stationResult()];
       if (path === 'stations/station-a/health?take=50') return [stationHealth()];
-      if (path === 'stations/station-a') throw new ApiForbiddenError(details(403));
       throw new Error(`Unexpected path ${path}`);
     });
-    const queries = createReadQueryClient(apiWith(get));
+    const api = apiWith(get);
+    const queries = createReadQueryClient(api);
     const router = createTestRouter();
     await router.push('/stations/station-a');
     await router.isReady();
 
     const wrapper = mount(StationDetailPage, {
-      props: { stationId: 'station-a', runtime: { queries } },
+      props: { stationId: 'station-a', runtime: { queries, api, session: session('Engineer') } },
       global: { plugins: [router] }
     });
     await flushPromises();
 
-    expect(wrapper.text()).toContain('普通详情');
+    expect(wrapper.text()).toContain('状态概览');
     expect(wrapper.text()).toContain('一号检测站');
-    expect(wrapper.text()).toContain('管理员增强信息不可用');
     expect(wrapper.text()).toContain('执行成功');
     expect(wrapper.text()).toContain('判定 NG');
     expect(wrapper.text()).toContain('进程运行时长');
     expect(wrapper.text()).not.toContain('工作站详情读取失败');
+    expect(wrapper.find('[data-capability="station-admin-control"]').exists()).toBe(false);
+    expect(get.mock.calls.some(([path]) => path === 'stations/station-a' || path.includes('/logs') || path.includes('/commands') || path.startsWith('stations/audit') || path === 'station-packages')).toBe(false);
+    expect(getStationAdminCommandOwnerActiveCount()).toBe(0);
 
     wrapper.unmount();
+    queries.dispose();
+  });
+
+  it('mounts the real Admin control domain and reads logs, commands, audit and packages', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === 'stations') return [stationStatus()];
+      if (path === 'stations/station-a/results?take=50') return [stationResult()];
+      if (path === 'stations/station-a/health?take=50') return [stationHealth()];
+      if (path === 'stations/station-a') return stationStatus();
+      if (path === 'stations/station-a/logs?take=50') return [stationLog()];
+      if (path === 'stations/station-a/commands?take=50') return [stationCommand()];
+      if (path === 'stations/audit?stationId=station-a&take=50') return [stationAudit()];
+      if (path === 'station-packages') return [stationPackage()];
+      throw new Error(`Unexpected path ${path}`);
+    });
+    const api = {
+      ...apiWith(get),
+      post: vi.fn(async () => stationCommand()),
+      patch: vi.fn(async () => stationStatus())
+    } as ApiTransport;
+    const queries = createReadQueryClient(api);
+    const router = createTestRouter();
+    await router.push('/stations/station-a');
+    await router.isReady();
+
+    const wrapper = mount(StationDetailPage, {
+      props: { stationId: 'station-a', runtime: { queries, api, session: session('Admin') } },
+      global: { plugins: [router] }
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-capability="station-admin-control"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('运行控制');
+    expect(wrapper.text()).toContain('身份修订');
+    expect(wrapper.text()).toContain('运行包健康状态降级');
+    expect(wrapper.text()).toContain('StationCommandCreated');
+    expect(getStationAdminCommandOwnerActiveCount()).toBe(1);
+
+    wrapper.unmount();
+    expect(getStationAdminCommandOwnerActiveCount()).toBe(0);
     queries.dispose();
   });
 

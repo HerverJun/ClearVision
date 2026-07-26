@@ -83,6 +83,8 @@ export interface StationStatus {
 
 export interface StationAdminDetails {
   readonly stationId: string;
+  readonly stationName: string;
+  readonly lineName: string | null;
   readonly clientVersion: string;
   readonly areaName: string | null;
   readonly workcellName: string | null;
@@ -97,6 +99,77 @@ export interface StationAdminDetails {
   readonly projectRevision: number | null;
   readonly decisionConfigurationHash: string | null;
   readonly executionRunMode: string | null;
+}
+
+export const stationCommandTypes = Object.freeze([
+  'Ping', 'StartRuntime', 'StopRuntime', 'ReloadPackage', 'DeployPackage', 'ApplySiteProfile', 'CollectLogs'
+] as const);
+export const stationCommandStatuses = Object.freeze([
+  'Created', 'Delivered', 'Accepted', 'Rejected', 'Running', 'Succeeded', 'Failed', 'TimedOut', 'Cancelled'
+] as const);
+export type StationCommandType = (typeof stationCommandTypes)[number];
+export type StationCommandStatus = (typeof stationCommandStatuses)[number];
+
+export interface StationCommand {
+  readonly schemaVersion: number;
+  readonly commandId: string;
+  readonly stationId: string;
+  readonly commandType: StationCommandType;
+  readonly payloadJson: string;
+  readonly createdAtUtc: string;
+  readonly expiresAtUtc: string;
+  readonly issuedBy: string;
+  readonly correlationId: string;
+  readonly status: StationCommandStatus;
+  readonly progressPercent: number;
+  readonly completedAtUtc: string | null;
+  readonly resultMessage: string | null;
+  readonly errorCode: string | null;
+}
+
+export interface StationLog {
+  readonly schemaVersion: number;
+  readonly stationId: string;
+  readonly sequenceId: number;
+  readonly messageId: string;
+  readonly timestampUtc: string;
+  readonly level: string;
+  readonly source: string;
+  readonly eventId: string | null;
+  readonly renderedMessage: string;
+  readonly exceptionType: string | null;
+  readonly exceptionMessage: string | null;
+  readonly correlationId: string | null;
+  readonly runId: string | null;
+  readonly packageId: string | null;
+}
+
+export interface StationAudit {
+  readonly auditId: string;
+  readonly userName: string | null;
+  readonly action: string;
+  readonly targetStationId: string | null;
+  readonly commandId: string | null;
+  readonly payloadSummary: string | null;
+  readonly createdAtUtc: string;
+  readonly result: string | null;
+  readonly clientIp: string | null;
+}
+
+export type StationPackageKind = 'Production' | 'Test';
+export interface StationPackage {
+  readonly schemaVersion: number;
+  readonly packageId: string;
+  readonly packageName: string;
+  readonly packageVersion: string;
+  readonly packageKind: StationPackageKind;
+  readonly flowHash: string;
+  readonly createdBy: string;
+  readonly minStationVersion: string;
+  readonly requiredOperators: readonly string[];
+  readonly sizeBytes: number;
+  readonly sha256: string;
+  readonly createdAtUtc: string;
 }
 
 export interface StationSummary {
@@ -455,6 +528,8 @@ export function decodeStationAdminDetails(payload: unknown): StationAdminDetails
   const record = decodeRecord(payload, '$');
   return Object.freeze({
     stationId: decodeString(record.stationId, '$.stationId'),
+    stationName: decodeString(record.stationName, '$.stationName', true),
+    lineName: decodeNullableString(record.lineName, '$.lineName'),
     clientVersion: decodeString(record.clientVersion, '$.clientVersion', true),
     areaName: decodeNullableString(record.areaName, '$.areaName'),
     workcellName: decodeNullableString(record.workcellName, '$.workcellName'),
@@ -473,6 +548,94 @@ export function decodeStationAdminDetails(payload: unknown): StationAdminDetails
     ),
     executionRunMode: decodeNullableString(record.executionRunMode, '$.executionRunMode')
   });
+}
+
+export function decodeStationCommands(payload: unknown): readonly StationCommand[] {
+  return Object.freeze(decodeArray(payload, '$').map((item, index) => {
+    const path = `$[${index}]`;
+    const record = decodeRecord(item, path);
+    return Object.freeze({
+      schemaVersion: decodeNumber(record.schemaVersion, `${path}.schemaVersion`, true),
+      commandId: decodeString(record.commandId, `${path}.commandId`),
+      stationId: decodeString(record.stationId, `${path}.stationId`),
+      commandType: decodeNumericOrStringEnum(record.commandType, `${path}.commandType`, stationCommandTypes),
+      payloadJson: decodeString(record.payloadJson, `${path}.payloadJson`, true),
+      createdAtUtc: decodeDateTime(record.createdAtUtc, `${path}.createdAtUtc`),
+      expiresAtUtc: decodeDateTime(record.expiresAtUtc, `${path}.expiresAtUtc`),
+      issuedBy: decodeString(record.issuedBy, `${path}.issuedBy`, true),
+      correlationId: decodeString(record.correlationId, `${path}.correlationId`, true),
+      status: decodeNumericOrStringEnum(record.status, `${path}.status`, stationCommandStatuses),
+      progressPercent: decodeNumber(record.progressPercent, `${path}.progressPercent`, true),
+      completedAtUtc: decodeNullableDateTime(record.completedAtUtc, `${path}.completedAtUtc`),
+      resultMessage: decodeNullableString(record.resultMessage, `${path}.resultMessage`),
+      errorCode: decodeNullableString(record.errorCode, `${path}.errorCode`)
+    });
+  }));
+}
+
+export function decodeStationLogs(payload: unknown): readonly StationLog[] {
+  return Object.freeze(decodeArray(payload, '$').map((item, index) => {
+    const path = `$[${index}]`;
+    const record = decodeRecord(item, path);
+    return Object.freeze({
+      schemaVersion: decodeNumber(record.schemaVersion, `${path}.schemaVersion`, true),
+      stationId: decodeString(record.stationId, `${path}.stationId`),
+      sequenceId: decodeNumber(record.sequenceId, `${path}.sequenceId`, true),
+      messageId: decodeString(record.messageId, `${path}.messageId`),
+      timestampUtc: decodeDateTime(record.timestampUtc, `${path}.timestampUtc`),
+      level: decodeString(record.level, `${path}.level`, true),
+      source: decodeString(record.source, `${path}.source`, true),
+      eventId: decodeNullableString(record.eventId, `${path}.eventId`),
+      renderedMessage: decodeString(record.renderedMessage, `${path}.renderedMessage`, true),
+      exceptionType: decodeNullableString(record.exceptionType, `${path}.exceptionType`),
+      exceptionMessage: decodeNullableString(record.exceptionMessage, `${path}.exceptionMessage`),
+      correlationId: decodeNullableString(record.correlationId, `${path}.correlationId`),
+      runId: decodeNullableString(record.runId, `${path}.runId`),
+      packageId: decodeNullableString(record.packageId, `${path}.packageId`)
+    });
+  }));
+}
+
+export function decodeStationAudits(payload: unknown): readonly StationAudit[] {
+  return Object.freeze(decodeArray(payload, '$').map((item, index) => {
+    const path = `$[${index}]`;
+    const record = decodeRecord(item, path);
+    return Object.freeze({
+      auditId: decodeString(record.auditId, `${path}.auditId`),
+      userName: decodeNullableString(record.userName, `${path}.userName`),
+      action: decodeString(record.action, `${path}.action`, true),
+      targetStationId: decodeNullableString(record.targetStationId, `${path}.targetStationId`),
+      commandId: decodeNullableString(record.commandId, `${path}.commandId`),
+      payloadSummary: decodeNullableString(record.payloadSummary, `${path}.payloadSummary`),
+      createdAtUtc: decodeDateTime(record.createdAtUtc, `${path}.createdAtUtc`),
+      result: decodeNullableString(record.result, `${path}.result`),
+      clientIp: decodeNullableString(record.clientIp, `${path}.clientIp`)
+    });
+  }));
+}
+
+export function decodeStationPackages(payload: unknown): readonly StationPackage[] {
+  const kinds = ['Production', 'Test'] as const;
+  return Object.freeze(decodeArray(payload, '$').map((item, index) => {
+    const path = `$[${index}]`;
+    const record = decodeRecord(item, path);
+    return Object.freeze({
+      schemaVersion: decodeNumber(record.schemaVersion, `${path}.schemaVersion`, true),
+      packageId: decodeString(record.packageId, `${path}.packageId`),
+      packageName: decodeString(record.packageName, `${path}.packageName`, true),
+      packageVersion: decodeString(record.packageVersion, `${path}.packageVersion`, true),
+      packageKind: decodeNumericOrStringEnum(record.packageKind, `${path}.packageKind`, kinds),
+      flowHash: decodeString(record.flowHash, `${path}.flowHash`, true),
+      createdBy: decodeString(record.createdBy, `${path}.createdBy`, true),
+      minStationVersion: decodeString(record.minStationVersion, `${path}.minStationVersion`, true),
+      requiredOperators: Object.freeze(decodeArray(record.requiredOperators, `${path}.requiredOperators`).map(
+        (value, operatorIndex) => decodeString(value, `${path}.requiredOperators[${operatorIndex}]`, true)
+      )),
+      sizeBytes: decodeNumber(record.sizeBytes, `${path}.sizeBytes`, true),
+      sha256: decodeString(record.sha256, `${path}.sha256`, true),
+      createdAtUtc: decodeDateTime(record.createdAtUtc, `${path}.createdAtUtc`)
+    });
+  }));
 }
 
 export function decodeStationResults(payload: unknown): readonly StationResult[] {

@@ -18,7 +18,7 @@ import {
 export type ApiTokenProvider = () => string | null | undefined;
 
 export interface ApiUnauthorizedContext {
-  readonly method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  readonly method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   readonly path: string;
   readonly url: string;
   readonly sessionGeneration: number;
@@ -60,6 +60,7 @@ export interface ApiTransport {
   post?<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined>;
   postBlob?(path: string, body: unknown, options?: ApiWriteOptions): Promise<ApiBlobResponse>;
   put?<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined>;
+  patch?<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined>;
   getBlob?(path: string, options?: ApiGetOptions): Promise<ApiBlobResponse>;
   delete?(path: string, options?: ApiWriteOptions): Promise<void>;
 }
@@ -273,7 +274,7 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
 
   async function send(
     path: string,
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     requestOptions: ApiGetOptions = {},
     body?: BodyInit,
     headers: Readonly<Record<string, string>> = {}
@@ -481,6 +482,27 @@ export function createApiTransport(options: CreateApiTransportOptions): ApiTrans
       );
       return readJson<T>(response, url, requestOptions.signal, {
         method: 'PUT',
+        path,
+        suppressUnauthorizedHandler: requestOptions.suppressUnauthorizedHandler === true
+      });
+    },
+    async patch<T = unknown>(
+      path: string,
+      body: unknown,
+      requestOptions: ApiWriteOptions = {}
+    ): Promise<T | undefined> {
+      const { response, url } = await send(
+        path,
+        'PATCH',
+        requestOptions,
+        JSON.stringify(body),
+        requestHeaders('application/json', {
+          'Content-Type': 'application/json',
+          ...requestOptions.headers
+        })
+      );
+      return readJson<T>(response, url, requestOptions.signal, {
+        method: 'PATCH',
         path,
         suppressUnauthorizedHandler: requestOptions.suppressUnauthorizedHandler === true
       });
