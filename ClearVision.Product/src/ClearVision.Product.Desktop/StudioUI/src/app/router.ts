@@ -15,22 +15,26 @@ import SetupPage from '@/app/pages/auth/SetupPage.vue';
 import ChangePasswordPage from '@/app/pages/auth/ChangePasswordPage.vue';
 import ForbiddenPage from '@/app/pages/ForbiddenPage.vue';
 import NotFoundPage from '@/app/pages/NotFoundPage.vue';
-import AboutPage from '@/capabilities/about/AboutPage.vue';
-import OverviewPage from '@/capabilities/overview/OverviewPage.vue';
-import OperatorDetailPage from '@/capabilities/operators-read/OperatorDetailPage.vue';
-import OperatorsPage from '@/capabilities/operators-read/OperatorsPage.vue';
-import WorkspacePage from '@/capabilities/project-workspace/WorkspacePage.vue';
-import ProjectDetailPage from '@/capabilities/projects-read/ProjectDetailPage.vue';
-import ProjectsPage from '@/capabilities/projects-read/ProjectsPage.vue';
-import ResultsPage from '@/capabilities/results-read/ResultsPage.vue';
-import InspectionProjectsPage from '@/capabilities/inspection-run/InspectionProjectsPage.vue';
-import InspectionRunPage from '@/capabilities/inspection-run/InspectionRunPage.vue';
-import StationDetailPage from '@/capabilities/stations-read/StationDetailPage.vue';
-import StationsPage from '@/capabilities/stations-read/StationsPage.vue';
-import CanvasLabPlaceholder from '@/labs/canvas/CanvasLabPlaceholder.vue';
-import DesignLabPlaceholder from '@/labs/design/DesignLabPlaceholder.vue';
-import DiagnosticsPage from '@/platform/diagnostics/DiagnosticsPage.vue';
+import { isRouteChunkLoadError } from '@/platform/diagnostics/bootstrapDiagnostic';
 import type { StudioStartupConfigV1 } from '@/platform/startup';
+
+export { isRouteChunkLoadError } from '@/platform/diagnostics/bootstrapDiagnostic';
+
+const AboutPage = () => import('@/capabilities/about/AboutPage.vue');
+const OverviewPage = () => import('@/capabilities/overview/OverviewPage.vue');
+const OperatorDetailPage = () => import('@/capabilities/operators-read/OperatorDetailPage.vue');
+const OperatorsPage = () => import('@/capabilities/operators-read/OperatorsPage.vue');
+const WorkspacePage = () => import('@/capabilities/project-workspace/WorkspacePage.vue');
+const ProjectDetailPage = () => import('@/capabilities/projects-read/ProjectDetailPage.vue');
+const ProjectsPage = () => import('@/capabilities/projects-read/ProjectsPage.vue');
+const ResultsPage = () => import('@/capabilities/results-read/ResultsPage.vue');
+const InspectionProjectsPage = () => import('@/capabilities/inspection-run/InspectionProjectsPage.vue');
+const InspectionRunPage = () => import('@/capabilities/inspection-run/InspectionRunPage.vue');
+const StationDetailPage = () => import('@/capabilities/stations-read/StationDetailPage.vue');
+const StationsPage = () => import('@/capabilities/stations-read/StationsPage.vue');
+const CanvasLabPlaceholder = () => import('@/labs/canvas/CanvasLabPlaceholder.vue');
+const DesignLabPlaceholder = () => import('@/labs/design/DesignLabPlaceholder.vue');
+const DiagnosticsPage = () => import('@/platform/diagnostics/DiagnosticsPage.vue');
 
 const editorRoles = Object.freeze(['Admin', 'Engineer']);
 const stationFlagKey = 'Studio2.StationsRead';
@@ -250,6 +254,25 @@ function requestedReturnRoute(to: RouteLocationNormalized): string | null {
   return resolveSafeReturnRoute(to.query.returnTo);
 }
 
+export function installRouteChunkErrorHandler(router: Router): () => void {
+  let recoveryNavigationPending = false;
+  return router.onError((error, to) => {
+    if (!isRouteChunkLoadError(error) || recoveryNavigationPending || to.name === 'not-found') return;
+
+    recoveryNavigationPending = true;
+    const returnTo = resolveSafeReturnRoute(to.fullPath);
+    void router.replace({
+      name: 'not-found',
+      query: {
+        reason: 'route-load',
+        ...(returnTo ? { returnTo } : {})
+      }
+    }).finally(() => {
+      recoveryNavigationPending = false;
+    });
+  });
+}
+
 export function installAuthRouteGuard(
   router: Router,
   auth: AuthLifecycleOwner,
@@ -308,6 +331,7 @@ export function createStudioRouter(
   history: RouterHistory = createWebHashHistory(import.meta.env.BASE_URL)
 ): Router {
   const router = createRouter({ history, routes: [...studioRoutes] });
+  installRouteChunkErrorHandler(router);
   router.afterEach(to => {
     if (typeof document !== 'undefined') {
       document.title = `${to.meta.title ?? 'ClearVision Studio'} · ClearVision`;

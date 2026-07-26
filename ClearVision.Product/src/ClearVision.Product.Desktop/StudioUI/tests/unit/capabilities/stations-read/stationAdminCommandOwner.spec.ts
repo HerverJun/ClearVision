@@ -114,6 +114,39 @@ describe('stationAdminCommandOwner', () => {
     owner.dispose();
   });
 
+  it('keeps package deployment unknown when command history has multiple matching candidates', async () => {
+    const post = vi.fn(async () => {
+      throw new ApiNetworkError('http://localhost/api/stations/station-a/deploy-package', new Error('lost'));
+    });
+    const matchingCommand = () => stationCommand({
+      commandType: 'DeployPackage',
+      createdAtUtc: new Date().toISOString(),
+      payloadJson: JSON.stringify({ packageId: 'pkg-a' })
+    });
+    const api = {
+      apiBaseUrl: 'http://localhost/api',
+      get: vi.fn(async () => [matchingCommand(), matchingCommand()]),
+      post,
+      patch: vi.fn()
+    } as ApiTransport;
+    const owner = createStationAdminCommandOwner({
+      api,
+      stationId: () => 'station-a',
+      createRequestId: () => 'request-a'
+    });
+
+    await owner.deployPackage('pkg-a');
+    await expect(owner.recover()).resolves.toBe(false);
+
+    expect(owner.projection).toMatchObject({
+      phase: 'unknown-outcome',
+      canRecover: true,
+      command: null
+    });
+    expect(owner.projection.message).toContain('多个可能对应');
+    owner.dispose();
+  });
+
   it('releases all command resources across 20 mount/dispose cycles', () => {
     const api = { apiBaseUrl: 'http://localhost/api', get: vi.fn(), post: vi.fn(), patch: vi.fn() } as ApiTransport;
     for (let index = 0; index < 20; index += 1) {

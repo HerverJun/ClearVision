@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "initialEntryKey": "index.html",
+  "hardInitialMaxBytes": 963630,
+  "targets": {
+    "inspection": {
+      "label": "Inspection",
+      "roots": [
+        "src/capabilities/inspection-run/InspectionProjectsPage.vue",
+        "src/capabilities/inspection-run/InspectionRunPage.vue"
+      ],
+      "maxBytes": 790000
+    },
+    "results": {
+      "label": "Results",
+      "roots": [
+        "src/capabilities/results-read/ResultsPage.vue"
+      ],
+      "maxBytes": 820000
+    },
+    "shell": {
+      "label": "Shell",
+      "roots": [
+        "index.html"
+      ],
+      "maxBytes": 850000
+    },
+    "stations": {
+      "label": "Stations",
+      "roots": [
+        "src/capabilities/stations-read/StationsPage.vue",
+        "src/capabilities/stations-read/StationDetailPage.vue"
+      ],
+      "maxBytes": 820000
+    },
+    "workspace": {
+      "label": "Workspace",
+      "roots": [
+        "src/capabilities/project-workspace/WorkspacePage.vue"
+      ],
+      "maxBytes": 900000
+    }
+  }
+}

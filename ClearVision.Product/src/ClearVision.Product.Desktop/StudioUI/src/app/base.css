@@ -129,6 +129,22 @@ textarea {
   white-space: pre-wrap;
 }
 
+.bootstrap-diagnostic button {
+  min-height: var(--cv-density-control-height);
+  padding: 0 var(--cv-space-4);
+  border: 1px solid var(--cv-control-border);
+  border-radius: var(--cv-radius-sm);
+  background: var(--cv-surface-raised);
+  color: var(--cv-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.bootstrap-diagnostic button:hover {
+  border-color: var(--cv-control-border-hover);
+  background: var(--cv-interactive-hover);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

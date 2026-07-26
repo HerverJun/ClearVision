@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { createMemoryHistory, createRouter } from 'vue-router';
+import {
+  installRouteChunkErrorHandler,
+  isRouteChunkLoadError,
+  studioRoutes
+} from '@/app/router';
 import { createTestRouter } from '@/test-support/createTestRouter';
 
 describe('StudioUI router', () => {
@@ -51,5 +57,54 @@ describe('StudioUI router', () => {
       .toMatchObject({ workspaceMode: true, requiresSession: true });
     expect(routes.find(route => route.path === '/projects/:id')?.meta.workspaceMode)
       .not.toBe(true);
+  });
+
+  it('lazy loads product capabilities and Labs while keeping shell and errors eager', () => {
+    const router = createTestRouter();
+    const lazyRouteNames = [
+      'overview', 'projects', 'project-detail', 'project-workspace', 'operators', 'operator-detail',
+      'stations', 'station-detail', 'inspection-projects', 'project-inspection', 'results', 'diagnostics',
+      'about', 'design-lab-placeholder', 'canvas-lab-placeholder'
+    ];
+
+    for (const name of lazyRouteNames) {
+      expect(router.getRoutes().find(route => route.name === name)?.components?.default)
+        .toEqual(expect.any(Function));
+    }
+
+    expect(router.getRoutes().find(route => route.name === 'not-found')?.components?.default)
+      .not.toEqual(expect.any(Function));
+    expect(studioRoutes).toBeDefined();
+  });
+
+  it('recognizes route chunk failures and redirects them to the eager recovery route', async () => {
+    expect(isRouteChunkLoadError(new TypeError('Failed to fetch dynamically imported module: /studio/assets/x.js')))
+      .toBe(true);
+    expect(isRouteChunkLoadError(new TypeError('Unable to preload CSS for /studio/assets/x.css'))).toBe(true);
+    expect(isRouteChunkLoadError(new Error('ordinary route error'))).toBe(false);
+
+    const router = createRouter({
+      history: createMemoryHistory('/studio/'),
+      routes: [
+        { path: '/', name: 'home', component: { template: '<div />' } },
+        {
+          path: '/broken',
+          name: 'broken',
+          component: () => Promise.reject(new TypeError('Failed to fetch dynamically imported module: broken.js'))
+        },
+        { path: '/not-found', name: 'not-found', component: { template: '<div />' } }
+      ]
+    });
+    const removeHandler = installRouteChunkErrorHandler(router);
+
+    await router.push('/');
+    await expect(router.push('/broken')).rejects.toThrow('Failed to fetch dynamically imported module');
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(router.currentRoute.value).toMatchObject({
+      name: 'not-found',
+      query: { reason: 'route-load' }
+    });
+    removeHandler();
   });
 });

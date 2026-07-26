@@ -1,5 +1,14 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
 import { CvPageState } from '@/design-system/patterns';
+
+const route = useRoute();
+const isRouteLoadFailure = computed(() => route.query.reason === 'route-load');
+
+function reloadApplication(): void {
+  window.location.reload();
+}
 </script>
 
 <template>
@@ -8,13 +17,24 @@ import { CvPageState } from '@/design-system/patterns';
     data-studio-page="not-found"
   >
     <CvPageState
-      kind="not-found"
-      title="未找到此页面"
-      description="错误代码 404。该地址不属于当前 StudioUI 产品路由。"
+      :kind="isRouteLoadFailure ? 'error' : 'not-found'"
+      :title="isRouteLoadFailure ? '页面资源加载失败' : '未找到此页面'"
+      :description="isRouteLoadFailure
+        ? '页面代码未能从本机资源中加载。请刷新 Studio；若问题仍在，请重新启动应用。'
+        : '错误代码 404。该地址不属于当前 StudioUI 产品路由。'"
       :heading-level="1"
     >
       <template #actions>
+        <button
+          v-if="isRouteLoadFailure"
+          class="product-page-state__action"
+          type="button"
+          @click="reloadApplication"
+        >
+          刷新 Studio
+        </button>
         <RouterLink
+          v-else
           class="product-page-state__action"
           to="/projects"
         >

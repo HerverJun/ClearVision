@@ -8,7 +8,8 @@ export default tseslint.config(
     ignores: [
       'node_modules/**',
       'dist/**',
-      'coverage/**'
+      'coverage/**',
+      '.tmp/**'
     ]
   },
   eslint.configs.recommended,
@@ -32,6 +33,14 @@ export default tseslint.config(
   },
   {
     files: ['*.config.{js,ts}'],
+    languageOptions: {
+      globals: {
+        ...globals.node
+      }
+    }
+  },
+  {
+    files: ['scripts/**/*.mjs', 'tests/**/*.mjs'],
     languageOptions: {
       globals: {
         ...globals.node

@@ -264,20 +264,22 @@ export function createStationAdminCommandOwner(options: {
       } else {
         const payload = await options.api.get(createStationCommandsPath(stationId(), 100), { signal: controller.signal });
         const commands = decodeStationCommands(payload);
-        const command = commands.find(item => {
+        const candidates = commands.filter(item => {
           if (Date.parse(item.createdAtUtc) < target.startedAtMs - 2_000) return false;
           const body = payloadRecord(item);
           return target.operation === 'deploy-package'
             ? item.commandType === 'DeployPackage' && body.packageId === target.packageId
             : item.commandType === target.commandType && body.studioRequestId === target.requestId;
         });
-        if (!command) {
+        if (candidates.length !== 1) {
           state.phase = 'unknown-outcome';
           state.canRecover = true;
-          state.message = '命令记录中尚未找到对应操作；不要重复提交，可稍后再次恢复。';
+          state.message = candidates.length === 0
+            ? '命令记录中尚未找到对应操作；不要重复提交，可稍后再次恢复。'
+            : '命令记录中存在多个可能对应的操作，无法唯一确认结果；不要重复提交，请核对后端记录。';
           return false;
         }
-        state.command = command;
+        state.command = candidates[0] ?? null;
       }
       pending = null;
       state.phase = 'succeeded';

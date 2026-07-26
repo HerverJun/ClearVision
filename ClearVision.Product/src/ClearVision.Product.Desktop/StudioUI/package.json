@@ -11,7 +11,12 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.vitest.json && tsc --noEmit -p tsconfig.node.json",
     "test:unit": "vitest run",
-    "build": "vite build"
+    "build": "vite build",
+    "build:production": "node scripts/bundle-build.mjs",
+    "bundle:report": "node scripts/bundle-report.mjs --dist .tmp/bundle/dist --output .tmp/bundle/report --budgets bundle-budgets.json",
+    "bundle:gate": "node scripts/bundle-report.mjs --dist .tmp/bundle/dist --output .tmp/bundle/report --budgets bundle-budgets.json --gate",
+    "bundle:verify": "node scripts/bundle-reproducibility.mjs --budgets bundle-budgets.json",
+    "bundle:ci": "npm run build:production && npm run bundle:gate"
   },
   "dependencies": {
     "pinia": "3.0.4",
