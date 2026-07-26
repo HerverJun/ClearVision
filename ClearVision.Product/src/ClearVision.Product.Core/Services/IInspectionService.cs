@@ -196,7 +196,9 @@ public sealed record StudioInspectionRunAdmission(
     Guid ClientSnapshotId,
     long PersistenceRevision,
     string CanonicalFlowHash,
-    string DecisionConfigurationHash);
+    string DecisionConfigurationHash,
+    Guid? RuntimeSessionId = null,
+    RuntimeSessionType? RuntimeSessionType = null);
 
 public sealed record StudioInspectionRunIdentity(
     Guid ProjectId,

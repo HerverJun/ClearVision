@@ -9,6 +9,7 @@ declare module 'vue-router' {
     readonly setupOnly?: boolean;
     readonly allowedRoles?: readonly string[];
     readonly productProfile?: 'default' | 'stations-read';
+    readonly requiredFeatureFlag?: string;
     readonly internal?: boolean;
     readonly workspaceMode?: boolean;
   }

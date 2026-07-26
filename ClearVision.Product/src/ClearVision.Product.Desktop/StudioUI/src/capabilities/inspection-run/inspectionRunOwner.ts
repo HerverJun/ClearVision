@@ -4,7 +4,7 @@ import type { InspectionRunApiPort } from './realtimeApiAdapter';
 import type { InspectionRunIdentity, InspectionRunResult, InspectionRunState, InspectionSseEvent } from './contracts';
 import type { InspectionSsePort } from './sseAdapter';
 
-export type InspectionRunPhase = 'idle' | 'hydrating' | 'starting' | 'running' | 'stopping' | 'reconnecting' | 'faulted' | 'disposed';
+export type InspectionRunPhase = 'idle' | 'hydrating' | 'starting' | 'running' | 'stopping' | 'reconnecting' | 'occupied' | 'faulted' | 'disposed';
 export interface InspectionRunProjection {
   readonly projectId: string;
   readonly phase: InspectionRunPhase;
@@ -63,6 +63,7 @@ export function createInspectionRunOwner(options: {
   function phaseForRuntime(runtime: InspectionRunState): InspectionRunPhase {
     if (runtime.status === 'Faulted') return 'faulted';
     if (runtime.status === 'Stopping') return 'stopping';
+    if (runtime.isBusy && runtime.sessionType !== 'ContinuousInspection') return 'occupied';
     return runtime.isBusy ? 'running' : 'idle';
   }
   function errorCode(error: unknown): string | null {
@@ -88,7 +89,8 @@ export function createInspectionRunOwner(options: {
       persistenceRevision: current?.persistenceRevision ?? activeIdentity?.expectedPersistenceRevision ?? null,
       canonicalFlowHash: current?.canonicalFlowHash ?? activeIdentity?.expectedCanonicalFlowHash ?? null,
       decisionConfigurationHash: current?.decisionConfigurationHash ?? activeIdentity?.expectedDecisionConfigurationHash ?? null,
-      executionSource: current?.executionSource ?? (activeIdentity ? 'PersistedProject' : null)
+      executionSource: current?.executionSource ?? (activeIdentity ? 'PersistedProject' : null),
+      sessionType: event.sessionType ?? current?.sessionType ?? (activeIdentity ? 'ContinuousInspection' : null)
     });
   }
   function applyEvent(event: InspectionSseEvent): void {
@@ -96,6 +98,10 @@ export function createInspectionRunOwner(options: {
     if (event.type === 'resultProduced' && event.result.projectId !== options.projectId) return;
     if (event.type === 'faulted' && event.projectId !== options.projectId) return;
     if (event.type === 'stateChanged' && event.state.projectId !== options.projectId) return;
+    const authoritativeSessionId = state.runtime?.sessionId;
+    const eventSessionId = event.type === 'stateChanged' ? event.state.sessionId :
+      event.type === 'resultProduced' ? event.result.sessionId : event.type === 'faulted' ? event.sessionId : null;
+    if (eventSessionId && authoritativeSessionId && eventSessionId !== authoritativeSessionId) return;
     if (event.id) lastEventId = event.id;
     state.reconnectAttempt = 0;
     if (event.type === 'resultProduced') state.latestResult = event.result;
@@ -141,7 +147,8 @@ export function createInspectionRunOwner(options: {
       if (disposed || current !== generation) return;
       if (runtime.projectId !== options.projectId) throw new Error('Hydrated runtime project identity mismatch.');
       state.runtime = runtime; state.phase = phaseForRuntime(runtime);
-      activeIdentity = runtime.isBusy && runtime.clientSnapshotId && runtime.persistenceRevision != null &&
+      activeIdentity = runtime.isBusy && runtime.sessionType === 'ContinuousInspection' &&
+        runtime.clientSnapshotId && runtime.persistenceRevision != null &&
         runtime.canonicalFlowHash && runtime.decisionConfigurationHash ? {
           projectId: options.projectId,
           clientSnapshotId: runtime.clientSnapshotId,
@@ -150,7 +157,7 @@ export function createInspectionRunOwner(options: {
           expectedDecisionConfigurationHash: runtime.decisionConfigurationHash
         } : null;
       state.message = runtime.isBusy ? '已恢复后端连续检测运行状态。' : '连续检测未运行。';
-      if (runtime.isBusy) connect(current);
+      if (runtime.isBusy && runtime.sessionType === 'ContinuousInspection') connect(current);
     } catch (error) {
       if (!disposed && current === generation && !(error instanceof ApiAbortError)) { state.phase = 'faulted'; state.errorCode = 'INSPECTION_HYDRATE_FAILED'; state.message = '无法加载连续检测状态。'; }
     } finally { if (current === generation) requestController = null; }
@@ -158,6 +165,7 @@ export function createInspectionRunOwner(options: {
   async function start(identity: InspectionRunIdentity, cameraId: string | null = null): Promise<boolean> {
     if (disposed || identity.projectId !== options.projectId) return false;
     const current = ++generation; closeStream(); requestController?.abort(); requestController = new AbortController();
+    lastEventId = null;
     activeIdentity = identity;
     state.phase = 'starting'; state.errorCode = null; state.latestResult = null; state.message = '正在校验已保存工程并启动连续检测。';
     try {
@@ -166,10 +174,11 @@ export function createInspectionRunOwner(options: {
       if (result.projectId !== identity.projectId || result.clientSnapshotId !== identity.clientSnapshotId ||
         result.persistenceRevision !== identity.expectedPersistenceRevision || result.canonicalFlowHash !== identity.expectedCanonicalFlowHash ||
         result.decisionConfigurationHash !== identity.expectedDecisionConfigurationHash) throw new Error('Start identity mismatch.');
-      state.runtime = Object.freeze({ projectId: options.projectId, status: 'Starting', isBusy: true, sessionId: null,
+      state.runtime = Object.freeze({ projectId: options.projectId, status: 'Starting', isBusy: true, sessionId: result.sessionId,
         startedAt: null, stoppedAt: null, clientSnapshotId: identity.clientSnapshotId,
         persistenceRevision: identity.expectedPersistenceRevision, canonicalFlowHash: identity.expectedCanonicalFlowHash,
-        decisionConfigurationHash: identity.expectedDecisionConfigurationHash, executionSource: 'PersistedProject' });
+        decisionConfigurationHash: identity.expectedDecisionConfigurationHash, executionSource: 'PersistedProject',
+        sessionType: result.sessionType });
       state.phase = 'running'; state.message = '连续检测已启动。'; connect(current); return true;
     } catch (error) {
       if (!disposed && current === generation) {

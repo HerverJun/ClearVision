@@ -19,10 +19,24 @@ public interface IInspectionRuntimeCoordinator
     /// <param name="sessionId">会话ID（由调用方生成）</param>
     /// <param name="ct">取消令牌（仅用于等待锁，不影响已启动的会话）</param>
     /// <returns>启动结果</returns>
-    Task<StartResult> TryStartAsync(Guid projectId, Guid sessionId, CancellationToken ct);
+    Task<StartResult> TryStartAsync(
+        Guid projectId,
+        Guid sessionId,
+        RuntimeSessionType sessionType,
+        CancellationToken ct);
+
+    Task<StartResult> TryStartAsync(Guid projectId, Guid sessionId, CancellationToken ct) =>
+        TryStartAsync(projectId, sessionId, RuntimeSessionType.LegacyRealtime, ct);
+
+    Task<StartResult> TryStartAsync(
+        ExecutionSnapshot snapshot,
+        Guid sessionId,
+        RuntimeSessionType sessionType,
+        CancellationToken ct) =>
+        TryStartAsync(snapshot.ProjectId, sessionId, sessionType, ct);
 
     Task<StartResult> TryStartAsync(ExecutionSnapshot snapshot, Guid sessionId, CancellationToken ct) =>
-        TryStartAsync(snapshot.ProjectId, sessionId, ct);
+        TryStartAsync(snapshot, sessionId, RuntimeSessionType.LegacyRealtime, ct);
 
     /// <summary>
     /// 尝试获取项目级配置变更租约。成功后调用方必须释放租约。
@@ -36,6 +50,12 @@ public interface IInspectionRuntimeCoordinator
     /// <param name="ct">取消令牌</param>
     /// <returns>是否成功停止</returns>
     Task<bool> TryStopAsync(Guid projectId, CancellationToken ct);
+
+    Task<bool> TryStopAsync(
+        Guid projectId,
+        Guid expectedSessionId,
+        RuntimeSessionType expectedSessionType,
+        CancellationToken ct);
 
     /// <summary>
     /// 获取会话状态
@@ -129,6 +149,7 @@ public class RuntimeState
     public required Guid ProjectId { get; init; }
     public required Guid SessionId { get; init; }
     public required RuntimeStatus Status { get; set; }
+    public RuntimeSessionType SessionType { get; init; } = RuntimeSessionType.LegacyRealtime;
     public required DateTime StartedAt { get; init; }
     public DateTime? StoppedAt { get; set; }
     public string? ErrorMessage { get; set; }
@@ -137,6 +158,13 @@ public class RuntimeState
     public long? ProjectRevision { get; init; }
     public string? DecisionConfigurationHash { get; init; }
     public string? ExecutionSource { get; init; }
+}
+
+public enum RuntimeSessionType
+{
+    LegacyRealtime,
+    WorkspaceFormalRun,
+    ContinuousInspection
 }
 
 /// <summary>
@@ -160,6 +188,7 @@ public class StateChangedEventArgs : EventArgs
     public required Guid SessionId { get; init; }
     public required RuntimeStatus NewStatus { get; init; }
     public required RuntimeStatus OldStatus { get; init; }
+    public required RuntimeSessionType SessionType { get; init; }
     public string? ErrorMessage { get; init; }
     public DateTimeOffset Timestamp { get; } = DateTimeOffset.UtcNow;
 }

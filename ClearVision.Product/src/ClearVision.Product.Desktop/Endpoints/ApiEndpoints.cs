@@ -1062,6 +1062,15 @@ public static class ApiEndpoints
                         request.CameraId,
                         cancellationToken,
                         result => webMessageHandler.NotifyInspectionResult(result, request.ProjectId));
+                    if (admission.RuntimeSessionId is not { } runtimeSessionId ||
+                        admission.RuntimeSessionType != RuntimeSessionType.ContinuousInspection)
+                    {
+                        return Results.Conflict(new
+                        {
+                            Code = "RUN_IDENTITY_MISMATCH",
+                            Error = "Continuous inspection started without a matching authoritative runtime identity."
+                        });
+                    }
                     return Results.Ok(new
                     {
                         message = "Persisted Project continuous inspection started.",
@@ -1071,7 +1080,9 @@ public static class ApiEndpoints
                         canonicalFlowHash = admission.CanonicalFlowHash,
                         decisionConfigurationHash = admission.DecisionConfigurationHash,
                         runMode = "canonical-project",
-                        cameraId = request.CameraId
+                        cameraId = request.CameraId,
+                        sessionId = runtimeSessionId,
+                        sessionType = admission.RuntimeSessionType.ToString()
                     });
                 }
 

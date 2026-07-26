@@ -7,6 +7,7 @@ export interface ProductNavigationItem {
 }
 
 export const productNavigation: readonly ProductNavigationItem[] = Object.freeze([
+  { to: '/inspection', label: '连续检测', description: '选择工程并运行连续检测', allowedRoles: ['Admin', 'Engineer'], requiredFeatureFlag: 'Studio2.InspectionRun' },
   { to: '/projects', label: '工程', description: '创建、打开、编辑与删除工程' },
   { to: '/results', label: '检测结果', description: '正式运行结果与证据追溯' }
 ]);

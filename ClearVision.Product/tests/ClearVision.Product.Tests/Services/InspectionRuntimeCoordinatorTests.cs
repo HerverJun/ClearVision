@@ -20,7 +20,11 @@ public class InspectionRuntimeCoordinatorTests
             ExecutionSnapshotSource.PersistedProject,
             ExecutionRunMode.FormalPrimary);
 
-        (await coordinator.TryStartAsync(snapshot, Guid.NewGuid(), CancellationToken.None))
+        (await coordinator.TryStartAsync(
+            snapshot,
+            Guid.NewGuid(),
+            RuntimeSessionType.WorkspaceFormalRun,
+            CancellationToken.None))
             .Should().Be(StartResult.Success);
 
         var state = coordinator.GetState(projectId)!;
@@ -29,6 +33,7 @@ public class InspectionRuntimeCoordinatorTests
         state.ProjectRevision.Should().Be(41);
         state.DecisionConfigurationHash.Should().Be(snapshot.DecisionConfigurationHash);
         state.ExecutionSource.Should().Be(ExecutionSnapshotSource.PersistedProject.ToString());
+        state.SessionType.Should().Be(RuntimeSessionType.WorkspaceFormalRun);
     }
 
     [Fact]
@@ -57,10 +62,52 @@ public class InspectionRuntimeCoordinatorTests
             projectId, new OperatorFlow("continuous"), 3,
             ExecutionSnapshotSource.PersistedProject, ExecutionRunMode.FormalPrimary);
 
-        (await coordinator.TryStartAsync(formalSnapshot, Guid.NewGuid(), CancellationToken.None))
+        (await coordinator.TryStartAsync(
+            formalSnapshot,
+            Guid.NewGuid(),
+            RuntimeSessionType.WorkspaceFormalRun,
+            CancellationToken.None))
             .Should().Be(StartResult.Success);
-        (await coordinator.TryStartAsync(continuousSnapshot, Guid.NewGuid(), CancellationToken.None))
+        (await coordinator.TryStartAsync(
+            continuousSnapshot,
+            Guid.NewGuid(),
+            RuntimeSessionType.ContinuousInspection,
+            CancellationToken.None))
             .Should().Be(StartResult.AlreadyRunning);
+    }
+
+    [Fact]
+    public async Task ContinuousInspection_BlocksFormalRun_AndCannotBeStoppedAsFormalRun()
+    {
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var projectId = Guid.NewGuid();
+        var continuousSessionId = Guid.NewGuid();
+        var snapshot = new ExecutionSnapshot(
+            projectId,
+            new OperatorFlow("continuous"),
+            9,
+            ExecutionSnapshotSource.PersistedProject,
+            ExecutionRunMode.FormalPrimary);
+
+        (await coordinator.TryStartAsync(
+            snapshot,
+            continuousSessionId,
+            RuntimeSessionType.ContinuousInspection,
+            CancellationToken.None)).Should().Be(StartResult.Success);
+
+        (await coordinator.TryStartAsync(
+            snapshot,
+            Guid.NewGuid(),
+            RuntimeSessionType.WorkspaceFormalRun,
+            CancellationToken.None)).Should().Be(StartResult.AlreadyRunning);
+
+        (await coordinator.TryStopAsync(
+            projectId,
+            continuousSessionId,
+            RuntimeSessionType.WorkspaceFormalRun,
+            CancellationToken.None)).Should().BeFalse();
+        coordinator.GetState(projectId)!.Status.Should().Be(RuntimeStatus.Starting);
+        coordinator.GetState(projectId)!.SessionType.Should().Be(RuntimeSessionType.ContinuousInspection);
     }
 
     [Fact]

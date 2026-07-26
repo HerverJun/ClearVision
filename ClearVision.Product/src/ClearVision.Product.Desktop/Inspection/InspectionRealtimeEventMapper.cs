@@ -22,7 +22,8 @@ public static class InspectionRealtimeEventMapper
                     timestamp: DateTimeOffset.UtcNow,
                     isSnapshot: true,
                     startedAt: state.StartedAt,
-                    stoppedAt: state.StoppedAt))
+                    stoppedAt: state.StoppedAt,
+                    sessionType: state.SessionType.ToString()))
         };
 
         if (state.Status == RuntimeStatus.Faulted)
@@ -39,11 +40,13 @@ public static class InspectionRealtimeEventMapper
         return messages;
     }
 
-    public static IReadOnlyList<InspectionRealtimeMessage> Map(IInspectionEvent evt)
+    public static IReadOnlyList<InspectionRealtimeMessage> Map(
+        IInspectionEvent evt,
+        RuntimeSessionType? sessionType = null)
     {
         return evt switch
         {
-            InspectionStateChangedEvent stateChanged => MapStateChanged(stateChanged),
+            InspectionStateChangedEvent stateChanged => MapStateChanged(stateChanged, sessionType),
             InspectionResultEvent result => new[]
             {
                 new InspectionRealtimeMessage(
@@ -101,7 +104,9 @@ public static class InspectionRealtimeEventMapper
         };
     }
 
-    private static IReadOnlyList<InspectionRealtimeMessage> MapStateChanged(InspectionStateChangedEvent evt)
+    private static IReadOnlyList<InspectionRealtimeMessage> MapStateChanged(
+        InspectionStateChangedEvent evt,
+        RuntimeSessionType? sessionType)
     {
         var messages = new List<InspectionRealtimeMessage>
         {
@@ -116,7 +121,8 @@ public static class InspectionRealtimeEventMapper
                     evt.Timestamp,
                     isSnapshot: false,
                     startedAt: null,
-                    stoppedAt: null))
+                    stoppedAt: null,
+                    sessionType: sessionType?.ToString()))
         };
 
         if (string.Equals(evt.NewState, "Faulted", StringComparison.OrdinalIgnoreCase))
@@ -142,7 +148,8 @@ public static class InspectionRealtimeEventMapper
         DateTimeOffset timestamp,
         bool isSnapshot,
         DateTime? startedAt,
-        DateTime? stoppedAt)
+        DateTime? stoppedAt,
+        string? sessionType)
     {
         return new
         {
@@ -154,7 +161,8 @@ public static class InspectionRealtimeEventMapper
             timestamp,
             isSnapshot,
             startedAt,
-            stoppedAt
+            stoppedAt,
+            sessionType
         };
     }
 

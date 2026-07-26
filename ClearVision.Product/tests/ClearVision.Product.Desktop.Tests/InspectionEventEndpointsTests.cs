@@ -34,6 +34,7 @@ public class InspectionEventEndpointsTests
         state.GetProperty("status").GetString().Should().Be("Idle");
         state.GetProperty("isBusy").GetBoolean().Should().BeFalse();
         state.GetProperty("sessionId").ValueKind.Should().Be(JsonValueKind.Null);
+        state.GetProperty("sessionType").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Theory]
@@ -46,7 +47,11 @@ public class InspectionEventEndpointsTests
         var projectId = Guid.NewGuid();
         var sessionId = Guid.NewGuid();
 
-        await host.Coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None);
+        await host.Coordinator.TryStartAsync(
+            projectId,
+            sessionId,
+            RuntimeSessionType.ContinuousInspection,
+            CancellationToken.None);
         if (status is RuntimeStatus.Running or RuntimeStatus.Stopping)
         {
             host.Coordinator.UpdateSessionStatus(projectId, sessionId, status);
@@ -60,6 +65,7 @@ public class InspectionEventEndpointsTests
         state.GetProperty("status").GetString().Should().Be(status.ToString());
         state.GetProperty("isBusy").GetBoolean().Should().BeTrue();
         state.GetProperty("sessionId").GetGuid().Should().Be(sessionId);
+        state.GetProperty("sessionType").GetString().Should().Be("ContinuousInspection");
     }
 
     [Theory]
@@ -141,21 +147,58 @@ public class InspectionEventEndpointsTests
     }
 
     [Fact]
+    public async Task EventsEndpoint_IgnoresEventsFromOlderSession()
+    {
+        await using var host = await InspectionEventTestHost.CreateAsync();
+        var projectId = Guid.NewGuid();
+        var currentSessionId = Guid.NewGuid();
+        await host.Coordinator.TryStartAsync(
+            projectId,
+            currentSessionId,
+            RuntimeSessionType.ContinuousInspection,
+            CancellationToken.None);
+
+        using var response = await host.Client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/inspection/realtime/{projectId}/events"),
+            HttpCompletionOption.ResponseHeadersRead);
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        await ReadUntilContainsAsync(stream, "event: stateChanged", TimeSpan.FromSeconds(2));
+
+        await host.EventBus.PublishAsync(new InspectionProgressEvent
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            ProcessedCount = 99
+        });
+        await host.EventBus.PublishAsync(new InspectionProgressEvent
+        {
+            ProjectId = projectId,
+            SessionId = currentSessionId,
+            ProcessedCount = 2
+        });
+
+        var eventChunk = await ReadUntilContainsAsync(stream, "\"processedCount\":2", TimeSpan.FromSeconds(2));
+        eventChunk.Should().NotContain("\"processedCount\":99");
+    }
+
+    [Fact]
     public async Task EventsEndpoint_ReplaysStoredEvents_UsingStableSequenceIds()
     {
         await using var host = await InspectionEventTestHost.CreateAsync();
         var projectId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        await host.Coordinator.TryStartAsync(projectId, sessionId, RuntimeSessionType.ContinuousInspection, CancellationToken.None);
 
         var firstSequence = host.EventStore.Append(projectId, new InspectionProgressEvent
         {
             ProjectId = projectId,
-            SessionId = Guid.NewGuid(),
+            SessionId = sessionId,
             ProcessedCount = 1
         });
         var secondSequence = host.EventStore.Append(projectId, new InspectionProgressEvent
         {
             ProjectId = projectId,
-            SessionId = Guid.NewGuid(),
+            SessionId = sessionId,
             ProcessedCount = 2
         });
 
@@ -184,17 +227,19 @@ public class InspectionEventEndpointsTests
     {
         await using var host = await InspectionEventTestHost.CreateAsync();
         var projectId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        await host.Coordinator.TryStartAsync(projectId, sessionId, RuntimeSessionType.ContinuousInspection, CancellationToken.None);
 
         var firstSequence = host.EventStore.Append(projectId, new InspectionProgressEvent
         {
             ProjectId = projectId,
-            SessionId = Guid.NewGuid(),
+            SessionId = sessionId,
             ProcessedCount = 1
         });
         var secondSequence = host.EventStore.Append(projectId, new InspectionProgressEvent
         {
             ProjectId = projectId,
-            SessionId = Guid.NewGuid(),
+            SessionId = sessionId,
             ProcessedCount = 2
         });
 
@@ -219,19 +264,25 @@ public class InspectionEventEndpointsTests
     public async Task EventsEndpoint_DoesNotDropLiveEventsPublishedWhileReplayCompletes()
     {
         var projectId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
         var eventStore = new PublishOnReplayCompletedEventStore();
         var firstSequence = eventStore.Append(projectId, new InspectionProgressEvent
         {
             ProjectId = projectId,
-            SessionId = Guid.NewGuid(),
+            SessionId = sessionId,
             ProcessedCount = 1
         });
 
         await using var host = await InspectionEventTestHost.CreateAsync(eventStore: eventStore);
+        await host.Coordinator.TryStartAsync(
+            projectId,
+            sessionId,
+            RuntimeSessionType.ContinuousInspection,
+            CancellationToken.None);
         eventStore.PublishWhenReplayEnumerationCompletes = () => host.EventBus.PublishAsync(new InspectionProgressEvent
         {
             ProjectId = projectId,
-            SessionId = Guid.NewGuid(),
+            SessionId = sessionId,
             ProcessedCount = 2
         });
 

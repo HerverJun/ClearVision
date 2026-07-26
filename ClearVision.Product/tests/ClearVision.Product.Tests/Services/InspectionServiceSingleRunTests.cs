@@ -34,12 +34,31 @@ public class InspectionServiceSingleRunTests
         var flowStorage = Substitute.For<IProjectFlowStorage>();
         var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
         var worker = Substitute.For<IInspectionWorker>();
+        var runtimeSessionId = Guid.NewGuid();
+        RuntimeState? runtimeState = null;
         projectRepository.GetWithFlowAsync(projectId).Returns(project);
         flowStorage.LoadFlowJsonAsync(projectId).Returns(flowJson);
         flowStorage.LoadMetadataAsync(projectId).Returns(new ProjectFlowStorageMetadata(
             1, projectId, 5, ComputeStoredFlowArtifactHash(flowJson), DateTimeOffset.UtcNow));
-        coordinator.TryStartAsync(Arg.Any<ExecutionSnapshot>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(StartResult.Success);
+        coordinator.TryStartAsync(
+                Arg.Any<ExecutionSnapshot>(),
+                Arg.Any<Guid>(),
+                RuntimeSessionType.ContinuousInspection,
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                runtimeState = new RuntimeState
+                {
+                    ProjectId = projectId,
+                    SessionId = runtimeSessionId,
+                    Status = RuntimeStatus.Starting,
+                    SessionType = RuntimeSessionType.ContinuousInspection,
+                    StartedAt = DateTime.UtcNow,
+                    ExecutionSnapshotId = call.ArgAt<ExecutionSnapshot>(0).SnapshotId
+                };
+                return StartResult.Success;
+            });
+        coordinator.GetState(projectId).Returns(_ => runtimeState);
         worker.TryStartRunAsync(Arg.Any<Guid>(), Arg.Any<ExecutionSnapshot>(), Arg.Any<string?>(), Arg.Any<ExecutionSnapshot?>())
             .Returns(true);
         var service = new InspectionService(
@@ -307,6 +326,7 @@ public class InspectionServiceSingleRunTests
             ProjectId = projectId,
             SessionId = Guid.NewGuid(),
             Status = RuntimeStatus.Running,
+            SessionType = RuntimeSessionType.WorkspaceFormalRun,
             StartedAt = DateTime.UtcNow,
             ExecutionSnapshotId = snapshot.SnapshotId,
             FlowHash = snapshot.FlowHash,
@@ -349,6 +369,7 @@ public class InspectionServiceSingleRunTests
             ProjectId = projectId,
             SessionId = Guid.NewGuid(),
             Status = RuntimeStatus.Running,
+            SessionType = RuntimeSessionType.WorkspaceFormalRun,
             StartedAt = DateTime.UtcNow,
             ExecutionSnapshotId = snapshot.SnapshotId,
             FlowHash = snapshot.FlowHash,
@@ -356,7 +377,11 @@ public class InspectionServiceSingleRunTests
             DecisionConfigurationHash = snapshot.DecisionConfigurationHash,
             ExecutionSource = snapshot.Source.ToString()
         });
-        coordinator.TryStopAsync(projectId, Arg.Any<CancellationToken>()).Returns(true);
+        coordinator.TryStopAsync(
+            projectId,
+            Arg.Any<Guid>(),
+            RuntimeSessionType.WorkspaceFormalRun,
+            Arg.Any<CancellationToken>()).Returns(true);
         var service = CreateMinimalInspectionService(
             Substitute.For<IInspectionResultRepository>(),
             Substitute.For<IProjectRepository>(),
@@ -371,7 +396,11 @@ public class InspectionServiceSingleRunTests
         var reconciliation = await service.StopPersistedStudioRunAsync(identity);
 
         reconciliation.Status.Should().Be(StudioInspectionRunReconciliationStatus.StillRunning);
-        await coordinator.Received(1).TryStopAsync(projectId, Arg.Any<CancellationToken>());
+        await coordinator.Received(1).TryStopAsync(
+            projectId,
+            Arg.Any<Guid>(),
+            RuntimeSessionType.WorkspaceFormalRun,
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

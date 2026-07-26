@@ -1,5 +1,6 @@
 import { reactive, readonly, type DeepReadonly } from 'vue';
 import type { ProjectLifecycleCommandOwner } from '@/capabilities/project-lifecycle';
+import type { InspectionRunOwner } from '@/capabilities/inspection-run';
 import type {
   WorkspaceLeaveProtectionSnapshot,
   WorkspaceRuntime
@@ -30,6 +31,7 @@ export type ProductLeaveProtectionKind =
   | 'project-command-active'
   | 'project-command-unknown'
   | 'project-update-conflict'
+  | 'continuous-inspection-active'
   | null;
 
 export interface ProductLeaveGuardProjection {
@@ -69,6 +71,7 @@ export interface ProductLeaveGuardOwner {
   confirmPrompt(): void;
   cancelPrompt(): void;
   suspendForSessionExpiration(): void;
+  attachInspectionRun(owner: InspectionRunOwner): () => void;
   dispose(reason?: string): void;
 }
 
@@ -131,6 +134,8 @@ function messageFor(kind: ProductLeaveProtectionKind): string {
       return '工程操作结果未知，必须先查询服务端 operation authority；当前禁止离开。';
     case 'project-update-conflict':
       return '工程信息更新存在 revision 冲突。继续离开会放弃当前页面中的未解决编辑。';
+    case 'continuous-inspection-active':
+      return '连续检测仍由当前页面持有，停止后端会话并确认释放前不能离开。';
     default:
       return '当前可以安全离开。';
   }
@@ -164,6 +169,7 @@ export function createProductLeaveGuardOwner(
   let blockedCount = 0;
   let lifecycleGeneration = 0;
   let publishedWindow: ProductLeaveGuardDiagnosticsWindow | undefined;
+  let inspectionRunOwner: InspectionRunOwner | undefined;
 
   const diagnostics: ProductLeaveGuardDiagnostics = Object.freeze({
     get ownerCount() { return disposed ? 0 : 1; },
@@ -204,6 +210,13 @@ export function createProductLeaveGuardOwner(
 
   function currentWorkspaceProtection(projectId?: string): ProductLeaveProtectionKind {
     return workspaceProtection(options.workspace.getLeaveProtectionSnapshot(projectId));
+  }
+
+  function currentInspectionProtection(): ProductLeaveProtectionKind {
+    const runtime = inspectionRunOwner?.projection.runtime;
+    return runtime?.isBusy && runtime.sessionType === 'ContinuousInspection'
+      ? 'continuous-inspection-active'
+      : null;
   }
 
   function isCurrent(generation: number): boolean {
@@ -267,6 +280,15 @@ export function createProductLeaveGuardOwner(
     if (projectAfter === 'project-update-conflict') return await prompt(projectAfter, reason, generation);
     if (projectAfter) return block(projectAfter, generation);
 
+    if (currentInspectionProtection()) {
+      const stopped = await inspectionRunOwner!.stop();
+      if (!isCurrent(generation)) return false;
+      await inspectionRunOwner!.reconcile();
+      if (!stopped || currentInspectionProtection()) {
+        return block('continuous-inspection-active', generation);
+      }
+    }
+
     const workspaceSettled = await options.workspace.prepareForLeave(
       `product-${reason}`,
       targetProjectId
@@ -310,7 +332,8 @@ export function createProductLeaveGuardOwner(
     },
     hasProtection(targetProjectId?: string): boolean {
       if (disposed) return false;
-      return currentProjectProtection() !== null || currentWorkspaceProtection(targetProjectId) !== null;
+      return currentProjectProtection() !== null || currentInspectionProtection() !== null ||
+        currentWorkspaceProtection(targetProjectId) !== null;
     },
     confirmPrompt(): void {
       pendingPrompt?.settle(true);
@@ -329,6 +352,16 @@ export function createProductLeaveGuardOwner(
       state.message = '会话失效；leave prompt 已取消，保留 reconcile authority。';
       state.forceCloseAllowed = false;
     },
+    attachInspectionRun(owner: InspectionRunOwner): () => void {
+      if (disposed) throw new Error('Cannot attach inspection run to a disposed leave guard.');
+      if (inspectionRunOwner && inspectionRunOwner !== owner) {
+        throw new Error('Product leave guard already has a mounted inspection run owner.');
+      }
+      inspectionRunOwner = owner;
+      return () => {
+        if (inspectionRunOwner === owner) inspectionRunOwner = undefined;
+      };
+    },
     dispose(reason = 'product-leave-guard-disposed'): void {
       void reason;
       if (disposed) return;
@@ -337,6 +370,7 @@ export function createProductLeaveGuardOwner(
       pendingPrompt?.settle(false);
       pendingPrompt = undefined;
       activeRequest = undefined;
+      inspectionRunOwner = undefined;
       state.phase = 'disposed';
       state.reason = null;
       state.protectionKind = null;

@@ -21,6 +21,7 @@ const workspaceMode = computed(() => route.meta.workspaceMode === true);
 const navigationIcons: Readonly<Record<string, CvIconName>> = Object.freeze({
   '/overview': 'overview',
   '/projects': 'projects',
+  '/inspection': 'results',
   '/operators': 'operators',
   '/stations': 'stations',
   '/results': 'results',
@@ -41,7 +42,7 @@ const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() =>
     label: '工程',
     to: '/projects',
     description: '工程管理',
-    current: !workspaceMode.value && route.path.startsWith('/projects')
+    current: !workspaceMode.value && route.path.startsWith('/projects') && !route.path.endsWith('/inspection')
   }];
   if (workspaceMode.value) {
     items.push({ label: '流程', to: route.fullPath, description: '当前工程流程', current: true });
@@ -52,6 +53,15 @@ const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() =>
     description: '正式检测结果与历史追溯',
     current: route.path.startsWith('/results')
   });
+  if (session.user && ['Admin', 'Engineer'].includes(session.user.role) &&
+      runtime.featureFlags['Studio2.InspectionRun'] === true) {
+    items.splice(1, 0, {
+      label: '连续检测',
+      to: '/inspection',
+      description: '选择工程并运行连续检测',
+      current: route.path === '/inspection' || route.path.endsWith('/inspection')
+    });
+  }
   return Object.freeze(items);
 });
 const productMoreNavigation = computed<readonly Readonly<{ to: string; label: string }>[]>(() => Object.freeze([]));

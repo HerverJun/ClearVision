@@ -173,6 +173,7 @@ public sealed class RealtimeInspectionEndpointsTests
             });
             builder.WebHost.UseTestServer();
 
+            var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
             var service = Substitute.For<IInspectionService>();
             service.StartRealtimeInspectionAsync(
                     Arg.Any<Guid>(),
@@ -186,23 +187,35 @@ public sealed class RealtimeInspectionEndpointsTests
                     Arg.Any<string?>(),
                     Arg.Any<CancellationToken>(),
                     Arg.Any<Action<ClearVision.Product.Core.Entities.InspectionResult>?>())
-                .Returns(call =>
+                .Returns(async call =>
                 {
                     var identity = call.ArgAt<StudioInspectionRunIdentity>(0);
-                    return Task.FromResult(new StudioInspectionRunAdmission(
+                    var snapshot = new ClearVision.Product.Core.Services.ExecutionSnapshot(
+                        identity.ProjectId,
+                        new ClearVision.Product.Core.Entities.OperatorFlow("endpoint-test"),
+                        identity.PersistenceRevision,
+                        ClearVision.Product.Core.Services.ExecutionSnapshotSource.PersistedProject,
+                        ClearVision.Product.Core.Services.ExecutionRunMode.FormalPrimary,
+                        snapshotId: identity.ClientSnapshotId);
+                    await coordinator.TryStartAsync(
+                        snapshot,
+                        Guid.NewGuid(),
+                        RuntimeSessionType.ContinuousInspection,
+                        CancellationToken.None);
+                    return new StudioInspectionRunAdmission(
                         identity.ProjectId,
                         identity.ClientSnapshotId,
                         identity.PersistenceRevision,
                         identity.CanonicalFlowHash,
-                        identity.DecisionConfigurationHash));
+                        identity.DecisionConfigurationHash,
+                        coordinator.GetState(identity.ProjectId)!.SessionId,
+                        RuntimeSessionType.ContinuousInspection);
                 });
 
             var eventStore = new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance);
             var eventBus = new InMemoryInspectionEventBus(
                 NullLogger<InMemoryInspectionEventBus>.Instance,
                 eventStore);
-            var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
-
             builder.Services.AddSingleton(service);
             builder.Services.AddSingleton<IOperatorFactory>(Substitute.For<IOperatorFactory>());
             builder.Services.AddSingleton<IEventStore>(eventStore);

@@ -1,4 +1,5 @@
 export type InspectionRuntimeStatus = 'Idle' | 'Starting' | 'Running' | 'Stopping' | 'Stopped' | 'Faulted';
+export type InspectionRuntimeSessionType = 'WorkspaceFormalRun' | 'ContinuousInspection' | 'LegacyRealtime';
 
 export interface InspectionRunIdentity {
   readonly projectId: string;
@@ -20,6 +21,7 @@ export interface InspectionRunState {
   readonly canonicalFlowHash: string | null;
   readonly decisionConfigurationHash: string | null;
   readonly executionSource: string | null;
+  readonly sessionType: InspectionRuntimeSessionType | null;
 }
 
 export interface InspectionRunStartResult extends InspectionRunIdentity {
@@ -28,6 +30,8 @@ export interface InspectionRunStartResult extends InspectionRunIdentity {
   readonly decisionConfigurationHash: string;
   readonly runMode: 'canonical-project';
   readonly cameraId: string | null;
+  readonly sessionId: string;
+  readonly sessionType: 'ContinuousInspection';
 }
 
 export interface InspectionRunResult {
@@ -59,6 +63,7 @@ export interface InspectionRunStateEvent {
   readonly isSnapshot: boolean;
   readonly startedAt: string | null;
   readonly stoppedAt: string | null;
+  readonly sessionType: InspectionRuntimeSessionType | null;
 }
 
 export class InspectionRunDecodeError extends Error {}
@@ -99,9 +104,17 @@ function boolean(value: unknown, label: string): boolean {
 }
 
 const runtimeStatuses = new Set<InspectionRuntimeStatus>(['Idle', 'Starting', 'Running', 'Stopping', 'Stopped', 'Faulted']);
+const runtimeSessionTypes = new Set<InspectionRuntimeSessionType>(['WorkspaceFormalRun', 'ContinuousInspection', 'LegacyRealtime']);
 function status(value: unknown): InspectionRuntimeStatus {
   const decoded = string(value, 'status') as InspectionRuntimeStatus;
   if (!runtimeStatuses.has(decoded)) throw new InspectionRunDecodeError(`Unsupported runtime status: ${decoded}.`);
+  return decoded;
+}
+
+function nullableSessionType(value: unknown): InspectionRuntimeSessionType | null {
+  if (value == null) return null;
+  const decoded = string(value, 'sessionType') as InspectionRuntimeSessionType;
+  if (!runtimeSessionTypes.has(decoded)) throw new InspectionRunDecodeError(`Unsupported runtime session type: ${decoded}.`);
   return decoded;
 }
 
@@ -119,7 +132,8 @@ export function decodeInspectionRunState(value: unknown): InspectionRunState {
     persistenceRevision: data.persistenceRevision == null ? null : nonNegativeInteger(data.persistenceRevision, 'persistenceRevision'),
     canonicalFlowHash: nullableString(data.canonicalFlowHash, 'canonicalFlowHash'),
     decisionConfigurationHash: nullableString(data.decisionConfigurationHash, 'decisionConfigurationHash'),
-    executionSource: nullableString(data.executionSource, 'executionSource')
+    executionSource: nullableString(data.executionSource, 'executionSource'),
+    sessionType: nullableSessionType(data.sessionType)
   });
 }
 
@@ -139,7 +153,11 @@ export function decodeInspectionRunStart(value: unknown): InspectionRunStartResu
     canonicalFlowHash,
     decisionConfigurationHash,
     runMode: 'canonical-project',
-    cameraId: nullableString(data.cameraId, 'cameraId')
+    cameraId: nullableString(data.cameraId, 'cameraId'),
+    sessionId: string(data.sessionId, 'sessionId'),
+    sessionType: data.sessionType === 'ContinuousInspection'
+      ? 'ContinuousInspection'
+      : (() => { throw new InspectionRunDecodeError('sessionType must be ContinuousInspection.'); })()
   });
 }
 
@@ -152,7 +170,7 @@ export function decodeInspectionSseEvent(type: string, id: string | null, value:
       oldState: nullableString(data.oldState, 'oldState'), newState: status(data.newState),
       errorMessage: nullableString(data.errorMessage, 'errorMessage'), timestamp: string(data.timestamp, 'timestamp'),
       isSnapshot: boolean(data.isSnapshot, 'isSnapshot'), startedAt: nullableString(data.startedAt, 'startedAt'),
-      stoppedAt: nullableString(data.stoppedAt, 'stoppedAt')
+      stoppedAt: nullableString(data.stoppedAt, 'stoppedAt'), sessionType: nullableSessionType(data.sessionType)
     }) });
   }
   if (type === 'faulted') return Object.freeze({ type, id, projectId: string(data.projectId, 'projectId'),

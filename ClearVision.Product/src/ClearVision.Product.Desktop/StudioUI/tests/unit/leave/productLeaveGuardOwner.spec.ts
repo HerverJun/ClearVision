@@ -5,6 +5,7 @@ import {
   type ProductLeaveGuardOwner
 } from '@/app/leave';
 import type { ProjectLifecycleCommandOwner } from '@/capabilities/project-lifecycle';
+import type { InspectionRunOwner } from '@/capabilities/inspection-run';
 import type {
   WorkspaceLeaveProtectionSnapshot,
   WorkspaceRuntime
@@ -149,6 +150,36 @@ describe('productLeaveGuardOwner', () => {
       phase: 'blocked',
       protectionKind: 'project-command-unknown'
     });
+  });
+
+  it('stops its mounted continuous inspection and authoritatively rereads before leaving', async () => {
+    const h = harness();
+    const runtime = reactive({ isBusy: true, sessionType: 'ContinuousInspection' as const });
+    const inspection = {
+      projection: reactive({ runtime }),
+      stop: vi.fn(async () => { runtime.isBusy = false; return true; }),
+      reconcile: vi.fn(async () => undefined)
+    } as unknown as InspectionRunOwner;
+    h.owner.attachInspectionRun(inspection);
+
+    await expect(h.owner.request('route-leave')).resolves.toBe(true);
+
+    expect(inspection.stop).toHaveBeenCalledOnce();
+    expect(inspection.reconcile).toHaveBeenCalledOnce();
+    expect(h.owner.projection.phase).toBe('allowed');
+  });
+
+  it('blocks leave when continuous inspection remains busy after stop and reread', async () => {
+    const h = harness();
+    const inspection = {
+      projection: reactive({ runtime: { isBusy: true, sessionType: 'ContinuousInspection' as const } }),
+      stop: vi.fn(async () => false),
+      reconcile: vi.fn(async () => undefined)
+    } as unknown as InspectionRunOwner;
+    h.owner.attachInspectionRun(inspection);
+
+    await expect(h.owner.request('route-leave')).resolves.toBe(false);
+    expect(h.owner.projection).toMatchObject({ phase: 'blocked', protectionKind: 'continuous-inspection-active' });
   });
 
   it('allows leave only after active Project and Workspace authority settle', async () => {

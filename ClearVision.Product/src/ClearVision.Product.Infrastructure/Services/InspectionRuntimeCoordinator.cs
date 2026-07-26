@@ -39,7 +39,14 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
 
     public event EventHandler<StateChangedEventArgs>? StateChanged;
 
-    public Task<StartResult> TryStartAsync(Guid projectId, Guid sessionId, CancellationToken ct)
+    public Task<StartResult> TryStartAsync(Guid projectId, Guid sessionId, CancellationToken ct) =>
+        TryStartAsync(projectId, sessionId, RuntimeSessionType.LegacyRealtime, ct);
+
+    public Task<StartResult> TryStartAsync(
+        Guid projectId,
+        Guid sessionId,
+        RuntimeSessionType sessionType,
+        CancellationToken ct)
     {
         if (_isShuttingDown)
         {
@@ -47,10 +54,17 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             return Task.FromResult(StartResult.ShutdownInProgress);
         }
 
-        return StartAsyncInternal(projectId, sessionId, null, ct);
+        return StartAsyncInternal(projectId, sessionId, sessionType, null, ct);
     }
 
-    public Task<StartResult> TryStartAsync(ExecutionSnapshot snapshot, Guid sessionId, CancellationToken ct)
+    public Task<StartResult> TryStartAsync(ExecutionSnapshot snapshot, Guid sessionId, CancellationToken ct) =>
+        TryStartAsync(snapshot, sessionId, RuntimeSessionType.LegacyRealtime, ct);
+
+    public Task<StartResult> TryStartAsync(
+        ExecutionSnapshot snapshot,
+        Guid sessionId,
+        RuntimeSessionType sessionType,
+        CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         if (_isShuttingDown)
@@ -58,12 +72,13 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             return Task.FromResult(StartResult.ShutdownInProgress);
         }
 
-        return StartAsyncInternal(snapshot.ProjectId, sessionId, snapshot, ct);
+        return StartAsyncInternal(snapshot.ProjectId, sessionId, sessionType, snapshot, ct);
     }
 
     private async Task<StartResult> StartAsyncInternal(
         Guid projectId,
         Guid sessionId,
+        RuntimeSessionType sessionType,
         ExecutionSnapshot? snapshot,
         CancellationToken ct)
     {
@@ -91,12 +106,12 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
                     {
                         // 清理旧会话状态
                         CleanupSessionCore(projectId, existing.SessionId);
-                        result = TryCreateSessionLocked(projectId, sessionId, snapshot, out stateChanged);
+                        result = TryCreateSessionLocked(projectId, sessionId, sessionType, snapshot, out stateChanged);
                     }
                 }
                 else
                 {
-                    result = TryCreateSessionLocked(projectId, sessionId, snapshot, out stateChanged);
+                    result = TryCreateSessionLocked(projectId, sessionId, sessionType, snapshot, out stateChanged);
                 }
             }
         }
@@ -148,6 +163,20 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
     {
         if (!_sessions.TryGetValue(projectId, out var session))
         {
+            return false;
+        }
+
+        return await TryStopAsync(projectId, session.SessionId, session.SessionType, ct);
+    }
+
+    public async Task<bool> TryStopAsync(
+        Guid projectId,
+        Guid expectedSessionId,
+        RuntimeSessionType expectedSessionType,
+        CancellationToken ct)
+    {
+        if (!_sessions.TryGetValue(projectId, out var session))
+        {
             _logger.LogWarning("[Coordinator] 尝试停止不存在的会话: {ProjectId}", projectId);
             return false;
         }
@@ -161,6 +190,18 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             if (!_sessions.TryGetValue(projectId, out session))
                 return false;
 
+            if (session.SessionId != expectedSessionId || session.SessionType != expectedSessionType)
+            {
+                _logger.LogWarning(
+                    "[Coordinator] Refused stop for mismatched runtime identity: {ProjectId}, ExpectedSession={ExpectedSessionId}, ExpectedType={ExpectedType}, ActualSession={ActualSessionId}, ActualType={ActualType}",
+                    projectId,
+                    expectedSessionId,
+                    expectedSessionType,
+                    session.SessionId,
+                    session.SessionType);
+                return false;
+            }
+
             if (session.Status != RuntimeStatus.Running && session.Status != RuntimeStatus.Starting)
             {
                 _logger.LogWarning("[Coordinator] 会话不在运行状态: {ProjectId}, Status: {Status}",
@@ -171,7 +212,12 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             // 更新状态
             var oldStatus = session.Status;
             session.Status = RuntimeStatus.Stopping;
-            stateChanged = CreateStateChangedEventArgs(projectId, session.SessionId, RuntimeStatus.Stopping, oldStatus);
+            stateChanged = CreateStateChangedEventArgs(
+                projectId,
+                session.SessionId,
+                session.SessionType,
+                RuntimeStatus.Stopping,
+                oldStatus);
             workerCts = session.CancellationTokenSource;
         }
         finally
@@ -208,6 +254,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             ProjectId = session.ProjectId,
             SessionId = session.SessionId,
             Status = session.Status,
+            SessionType = session.SessionType,
             StartedAt = session.StartedAt,
             StoppedAt = session.StoppedAt,
             ErrorMessage = session.ErrorMessage,
@@ -256,7 +303,13 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
         _logger.LogError("[Coordinator] 会话故障: {ProjectId}, Error: {Error}",
             projectId, errorMessage);
 
-        RaiseStateChanged(CreateStateChangedEventArgs(projectId, session!.SessionId, RuntimeStatus.Faulted, oldStatus, errorMessage));
+        RaiseStateChanged(CreateStateChangedEventArgs(
+            projectId,
+            session!.SessionId,
+            session.SessionType,
+            RuntimeStatus.Faulted,
+            oldStatus,
+            errorMessage));
         ScheduleCleanup(projectId, sessionId);
     }
 
@@ -288,7 +341,12 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
 
         _logger.LogInformation("[Coordinator] 会话已停止: {ProjectId}", projectId);
 
-        RaiseStateChanged(CreateStateChangedEventArgs(projectId, session!.SessionId, RuntimeStatus.Stopped, oldStatus));
+        RaiseStateChanged(CreateStateChangedEventArgs(
+            projectId,
+            session!.SessionId,
+            session.SessionType,
+            RuntimeStatus.Stopped,
+            oldStatus));
         ScheduleCleanup(projectId, sessionId);
     }
 
@@ -319,7 +377,12 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
         _logger.LogInformation("[Coordinator] 会话状态更新: {ProjectId}, {OldStatus} -> {NewStatus}",
             projectId, oldStatus, status);
 
-        RaiseStateChanged(CreateStateChangedEventArgs(projectId, session!.SessionId, status, oldStatus));
+        RaiseStateChanged(CreateStateChangedEventArgs(
+            projectId,
+            session!.SessionId,
+            session.SessionType,
+            status,
+            oldStatus));
     }
 
     public IEnumerable<RuntimeState> GetActiveSessions()
@@ -331,6 +394,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
                 ProjectId = kvp.Value.ProjectId,
                 SessionId = kvp.Value.SessionId,
                 Status = kvp.Value.Status,
+                SessionType = kvp.Value.SessionType,
                 StartedAt = kvp.Value.StartedAt
             })
             .ToList();
@@ -348,6 +412,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
     private StartResult TryCreateSessionLocked(
         Guid projectId,
         Guid sessionId,
+        RuntimeSessionType sessionType,
         ExecutionSnapshot? snapshot,
         out StateChangedEventArgs? stateChanged)
     {
@@ -368,6 +433,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
             ProjectId = projectId,
             SessionId = sessionId,
             Status = RuntimeStatus.Starting,
+            SessionType = sessionType,
             StartedAt = DateTime.UtcNow,
             CancellationTokenSource = cts,
             ExecutionSnapshot = snapshot
@@ -378,13 +444,19 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
         _logger.LogInformation("[Coordinator] 会话已启动: {ProjectId}, Session: {SessionId}",
             projectId, sessionId);
 
-        stateChanged = CreateStateChangedEventArgs(projectId, sessionId, RuntimeStatus.Starting, RuntimeStatus.Stopped);
+        stateChanged = CreateStateChangedEventArgs(
+            projectId,
+            sessionId,
+            sessionType,
+            RuntimeStatus.Starting,
+            RuntimeStatus.Stopped);
         return StartResult.Success;
     }
 
     private static StateChangedEventArgs CreateStateChangedEventArgs(
         Guid projectId,
         Guid sessionId,
+        RuntimeSessionType sessionType,
         RuntimeStatus newStatus,
         RuntimeStatus oldStatus,
         string? errorMessage = null)
@@ -393,6 +465,7 @@ public class InspectionRuntimeCoordinator : IInspectionRuntimeCoordinator, IDisp
         {
             ProjectId = projectId,
             SessionId = sessionId,
+            SessionType = sessionType,
             NewStatus = newStatus,
             OldStatus = oldStatus,
             ErrorMessage = errorMessage
@@ -580,6 +653,7 @@ public class RuntimeSession
     public required Guid ProjectId { get; init; }
     public required Guid SessionId { get; init; }
     public required RuntimeStatus Status { get; set; }
+    public required RuntimeSessionType SessionType { get; init; }
     public required DateTime StartedAt { get; init; }
     public DateTime? StoppedAt { get; set; }
     public string? ErrorMessage { get; set; }

@@ -7,7 +7,8 @@ describe('inspection realtime API adapter', () => {
     const post = vi.fn(async (path: string, body: unknown) => {
       void path; void body;
       return { projectId: 'p', clientSnapshotId: 's', persistenceRevision: 3,
-        canonicalFlowHash: 'flow', decisionConfigurationHash: 'decision', runMode: 'canonical-project', cameraId: null };
+        canonicalFlowHash: 'flow', decisionConfigurationHash: 'decision', runMode: 'canonical-project', cameraId: null,
+        sessionId: 'runtime-session', sessionType: 'ContinuousInspection' };
     });
     const api = { apiBaseUrl: 'http://localhost/api', get: vi.fn(), post } as ApiTransport;
     const identity: InspectionRunIdentity = { projectId: 'p', clientSnapshotId: 's', expectedPersistenceRevision: 3,

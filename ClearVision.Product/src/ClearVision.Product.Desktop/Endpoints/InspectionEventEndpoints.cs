@@ -63,7 +63,8 @@ public static class InspectionEventEndpoints
                 PersistenceRevision = (long?)null,
                 CanonicalFlowHash = (string?)null,
                 DecisionConfigurationHash = (string?)null,
-                ExecutionSource = (string?)null
+                ExecutionSource = (string?)null,
+                SessionType = (string?)null
             };
         }
 
@@ -80,7 +81,8 @@ public static class InspectionEventEndpoints
             PersistenceRevision = state.ProjectRevision,
             CanonicalFlowHash = state.FlowHash,
             state.DecisionConfigurationHash,
-            state.ExecutionSource
+            state.ExecutionSource,
+            SessionType = state.SessionType.ToString()
         };
     }
 
@@ -100,6 +102,7 @@ public static class InspectionEventEndpoints
 
         var lastSequenceId = ParseLastEventId(context.Request);
         var currentState = coordinator.GetState(projectId);
+        var authoritativeSessionId = currentState?.SessionId;
         var replayWatermark = lastSequenceId;
 
         var channel = Channel.CreateBounded<SseMessage>(new BoundedChannelOptions(ResolveSseChannelCapacity())
@@ -111,13 +114,15 @@ public static class InspectionEventEndpoints
 
         using var subscription = eventBus.SubscribeInterface<IInspectionEvent>((evt, _) =>
         {
-            if (evt.ProjectId != projectId)
+            if (evt.ProjectId != projectId ||
+                authoritativeSessionId is null ||
+                GetSessionId(evt) != authoritativeSessionId)
             {
                 return Task.CompletedTask;
             }
 
             var sequenceId = eventStore.Append(projectId, evt);
-            foreach (var mappedEvent in InspectionRealtimeEventMapper.Map(evt))
+            foreach (var mappedEvent in InspectionRealtimeEventMapper.Map(evt, currentState?.SessionType))
             {
                 if (!channel.Writer.TryWrite(new SseMessage(sequenceId, mappedEvent.EventType, mappedEvent.Payload)))
                 {
@@ -145,7 +150,14 @@ public static class InspectionEventEndpoints
             foreach (var storedEvent in eventStore.GetEventsAfter(projectId, lastSequenceId))
             {
                 replayWatermark = Math.Max(replayWatermark, storedEvent.SequenceId);
-                foreach (var mappedEvent in InspectionRealtimeEventMapper.Map(storedEvent.Event))
+                if (authoritativeSessionId is null || GetSessionId(storedEvent.Event) != authoritativeSessionId)
+                {
+                    continue;
+                }
+
+                foreach (var mappedEvent in InspectionRealtimeEventMapper.Map(
+                    storedEvent.Event,
+                    currentState?.SessionType))
                 {
                     Interlocked.Increment(ref _sseReplayedMessageCount);
                     await context.Response.WriteSseMessageAsync(
@@ -209,6 +221,14 @@ public static class InspectionEventEndpoints
             ? afterSequence
             : 0;
     }
+
+    private static Guid? GetSessionId(IInspectionEvent evt) => evt switch
+    {
+        InspectionStateChangedEvent stateChanged => stateChanged.SessionId,
+        InspectionResultEvent result => result.SessionId,
+        InspectionProgressEvent progress => progress.SessionId,
+        _ => null
+    };
 
     private static int ResolveSseChannelCapacity()
     {

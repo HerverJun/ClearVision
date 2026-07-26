@@ -23,6 +23,8 @@ import WorkspacePage from '@/capabilities/project-workspace/WorkspacePage.vue';
 import ProjectDetailPage from '@/capabilities/projects-read/ProjectDetailPage.vue';
 import ProjectsPage from '@/capabilities/projects-read/ProjectsPage.vue';
 import ResultsPage from '@/capabilities/results-read/ResultsPage.vue';
+import InspectionProjectsPage from '@/capabilities/inspection-run/InspectionProjectsPage.vue';
+import InspectionRunPage from '@/capabilities/inspection-run/InspectionRunPage.vue';
 import StationDetailPage from '@/capabilities/stations-read/StationDetailPage.vue';
 import StationsPage from '@/capabilities/stations-read/StationsPage.vue';
 import CanvasLabPlaceholder from '@/labs/canvas/CanvasLabPlaceholder.vue';
@@ -32,6 +34,7 @@ import type { StudioStartupConfigV1 } from '@/platform/startup';
 
 const editorRoles = Object.freeze(['Admin', 'Engineer']);
 const stationFlagKey = 'Studio2.StationsRead';
+const inspectionRunFlagKey = 'Studio2.InspectionRun';
 
 export const studioRoutes: readonly RouteRecordRaw[] = [
   {
@@ -140,6 +143,24 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
             }
           },
           {
+            path: 'inspection',
+            name: 'inspection-projects',
+            component: InspectionProjectsPage,
+            meta: {
+              title: '连续检测', breadcrumb: '连续检测', requiresSession: true,
+              allowedRoles: editorRoles, requiredFeatureFlag: inspectionRunFlagKey
+            }
+          },
+          {
+            path: 'projects/:id/inspection',
+            name: 'project-inspection',
+            component: InspectionRunPage,
+            meta: {
+              title: '连续检测运行', breadcrumb: '连续检测', requiresSession: true,
+              allowedRoles: editorRoles, requiredFeatureFlag: inspectionRunFlagKey
+            }
+          },
+          {
             path: 'results',
             name: 'results',
             component: ResultsPage,
@@ -217,7 +238,7 @@ export function resolveSafeReturnRoute(value: unknown): string | null {
   if (typeof value !== 'string' || containsUnsafeReturnSyntax(value)) return null;
   const path = value.split(/[?#]/, 1)[0] ?? '';
   if (path === '/overview' || path === '/projects' || path.startsWith('/projects/') ||
-      path === '/operators' || path.startsWith('/operators/') || path === '/results' ||
+      path === '/operators' || path.startsWith('/operators/') || path === '/inspection' || path === '/results' ||
       path === '/stations' || path.startsWith('/stations/') || path === '/diagnostics' ||
       path === '/about') {
     return value;
@@ -270,6 +291,10 @@ export function installAuthRouteGuard(
     }
     if (to.matched.some(record => record.meta.productProfile === 'stations-read') &&
         startup.featureFlags[stationFlagKey] !== true) {
+      return { path: '/forbidden', replace: true };
+    }
+    const requiredFlags = to.matched.flatMap(record => record.meta.requiredFeatureFlag ?? []);
+    if (requiredFlags.some(flag => startup.featureFlags[flag] !== true)) {
       return { path: '/forbidden', replace: true };
     }
     if (to.matched.some(record => record.meta.internal === true) && startup.hostKind !== 'browser-test') {

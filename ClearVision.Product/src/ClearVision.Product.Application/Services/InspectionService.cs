@@ -228,7 +228,8 @@ public class InspectionService : IInspectionService
                     sessionId,
                     executionCancellationToken),
                 CancellationToken.None,
-                useRuntimeCancellationToken: true);
+                useRuntimeCancellationToken: true,
+                sessionType: RuntimeSessionType.WorkspaceFormalRun);
         }
         catch (OperationCanceledException)
         {
@@ -249,14 +250,19 @@ public class InspectionService : IInspectionService
         }
 
         var state = _coordinator.GetState(normalized.ProjectId);
-        if (state != null && !MatchesRuntimeIdentity(state, normalized))
+        if (state != null &&
+            (state.SessionType != RuntimeSessionType.WorkspaceFormalRun || !MatchesRuntimeIdentity(state, normalized)))
         {
             return IdentityMismatch(normalized, "RUN_IDENTITY_MISMATCH", "The active runtime session does not match the requested formal run.");
         }
 
         if (state?.Status is RuntimeStatus.Starting or RuntimeStatus.Running)
         {
-            await _coordinator.TryStopAsync(normalized.ProjectId, CancellationToken.None);
+            await _coordinator.TryStopAsync(
+                normalized.ProjectId,
+                state.SessionId,
+                RuntimeSessionType.WorkspaceFormalRun,
+                CancellationToken.None);
         }
 
         return await ReconcilePersistedStudioRunAsync(normalized, cancellationToken);
@@ -284,7 +290,8 @@ public class InspectionService : IInspectionService
         var runtimeState = _coordinator.GetState(normalized.ProjectId);
         if (runtimeState != null)
         {
-            if (!MatchesRuntimeIdentity(runtimeState, normalized))
+            if (runtimeState.SessionType != RuntimeSessionType.WorkspaceFormalRun ||
+                !MatchesRuntimeIdentity(runtimeState, normalized))
             {
                 return IdentityMismatch(normalized, "RUN_IDENTITY_MISMATCH", "The active runtime session does not match the requested formal run.");
             }
@@ -548,12 +555,22 @@ public class InspectionService : IInspectionService
             identity.CanonicalFlowHash,
             identity.DecisionConfigurationHash);
         await StartRealtimeInspectionFlowCoreAsync(snapshot, cameraId, cancellationToken, onResultReady);
+        var runtimeState = _coordinator.GetState(snapshot.ProjectId);
+        if (runtimeState == null || runtimeState.ExecutionSnapshotId != snapshot.SnapshotId ||
+            runtimeState.SessionType != RuntimeSessionType.ContinuousInspection)
+        {
+            throw new StudioInspectionRunIdentityException(
+                "RUN_IDENTITY_MISMATCH",
+                "Continuous inspection started without a matching authoritative runtime identity.");
+        }
         return new StudioInspectionRunAdmission(
             snapshot.ProjectId,
             snapshot.SnapshotId,
             snapshot.PersistenceRevision,
             snapshot.FlowHash,
-            snapshot.DecisionConfigurationHash);
+            snapshot.DecisionConfigurationHash,
+            runtimeState.SessionId,
+            runtimeState.SessionType);
     }
 
     /// <summary>
@@ -600,7 +617,11 @@ public class InspectionService : IInspectionService
             projectId, sessionId, effectiveCameraId ?? "(流程内)");
 
         // 步骤 1：注册会话（Coordinator 保证原子性）
-        var startResult = await _coordinator.TryStartAsync(snapshot, sessionId, cancellationToken);
+        var startResult = await _coordinator.TryStartAsync(
+            snapshot,
+            sessionId,
+            RuntimeSessionType.ContinuousInspection,
+            cancellationToken);
 
         switch (startResult)
         {
@@ -641,7 +662,11 @@ public class InspectionService : IInspectionService
         try
         {
             using var rollbackCts = new CancellationTokenSource(RealtimeStartRollbackTimeout);
-            var stopRequested = await _coordinator.TryStopAsync(projectId, rollbackCts.Token);
+            var stopRequested = await _coordinator.TryStopAsync(
+                projectId,
+                sessionId,
+                RuntimeSessionType.ContinuousInspection,
+                rollbackCts.Token);
             if (stopRequested)
             {
                 _coordinator.MarkAsStopped(projectId, sessionId);
@@ -673,7 +698,12 @@ public class InspectionService : IInspectionService
     {
         _logger.LogInformation("[InspectionService] 请求停止实时检测: {ProjectId}", projectId);
 
-        var stopped = await _coordinator.TryStopAsync(projectId, CancellationToken.None);
+        var runtimeState = _coordinator.GetState(projectId);
+        var stopped = runtimeState != null && await _coordinator.TryStopAsync(
+            projectId,
+            runtimeState.SessionId,
+            RuntimeSessionType.ContinuousInspection,
+            CancellationToken.None);
 
         if (stopped)
         {
@@ -903,11 +933,12 @@ public class InspectionService : IInspectionService
         ExecutionSnapshot snapshot,
         Func<Guid, CancellationToken, Task<InspectionResult>> executeAsync,
         CancellationToken cancellationToken,
-        bool useRuntimeCancellationToken = false)
+        bool useRuntimeCancellationToken = false,
+        RuntimeSessionType sessionType = RuntimeSessionType.LegacyRealtime)
     {
         var projectId = snapshot.ProjectId;
         var sessionId = Guid.NewGuid();
-        var startResult = await _coordinator.TryStartAsync(snapshot, sessionId, cancellationToken);
+        var startResult = await _coordinator.TryStartAsync(snapshot, sessionId, sessionType, cancellationToken);
         if (startResult != StartResult.Success)
         {
             throw new InvalidOperationException(startResult is StartResult.AlreadyRunning or StartResult.MutationInProgress
@@ -944,14 +975,34 @@ public class InspectionService : IInspectionService
     {
         ArgumentNullException.ThrowIfNull(identity);
         var state = _coordinator.GetState(identity.ProjectId);
-        if (state == null || !MatchesRuntimeIdentity(state, identity))
+        if (state == null || state.SessionType != RuntimeSessionType.ContinuousInspection ||
+            !MatchesRuntimeIdentity(state, identity))
         {
             throw new StudioInspectionRunIdentityException(
                 "RUN_IDENTITY_MISMATCH",
                 "The active runtime does not match the continuous inspection identity.");
         }
 
-        await StopRealtimeInspectionAsync(identity.ProjectId);
+        var stopped = await _coordinator.TryStopAsync(
+            identity.ProjectId,
+            state.SessionId,
+            RuntimeSessionType.ContinuousInspection,
+            CancellationToken.None);
+        if (!stopped)
+        {
+            throw new StudioInspectionRunIdentityException(
+                "RUN_IDENTITY_MISMATCH",
+                "The active runtime no longer matches the continuous inspection identity.");
+        }
+
+        var workerExited = await _worker.WaitForRunExitAsync(
+            identity.ProjectId,
+            TimeSpan.FromSeconds(3),
+            CancellationToken.None);
+        if (!workerExited || !await WaitForStateReleaseAsync(identity.ProjectId, TimeSpan.FromSeconds(3)))
+        {
+            throw new InvalidOperationException("Continuous inspection stop was not authoritatively confirmed.");
+        }
     }
 
     private async Task<InspectionResult> PersistCancelledStudioRunAsync(ExecutionSnapshot snapshot)

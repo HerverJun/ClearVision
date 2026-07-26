@@ -6,16 +6,18 @@ const projectId = '11111111-1111-1111-1111-111111111111';
 const identity: InspectionRunIdentity = { projectId, clientSnapshotId: '22222222-2222-2222-2222-222222222222',
   expectedPersistenceRevision: 7, expectedCanonicalFlowHash: 'sha256:flow', expectedDecisionConfigurationHash: 'sha256:decision' };
 const idle: InspectionRunState = { projectId, status: 'Idle', isBusy: false, sessionId: null, startedAt: null, stoppedAt: null,
-  clientSnapshotId: null, persistenceRevision: null, canonicalFlowHash: null, decisionConfigurationHash: null, executionSource: null };
+  clientSnapshotId: null, persistenceRevision: null, canonicalFlowHash: null, decisionConfigurationHash: null, executionSource: null,
+  sessionType: null };
 const running: InspectionRunState = { ...idle, status: 'Running', isBusy: true, sessionId: '33333333-3333-3333-3333-333333333333',
   clientSnapshotId: identity.clientSnapshotId, persistenceRevision: 7, canonicalFlowHash: 'sha256:flow',
-  decisionConfigurationHash: 'sha256:decision', executionSource: 'PersistedProject' };
+  decisionConfigurationHash: 'sha256:decision', executionSource: 'PersistedProject', sessionType: 'ContinuousInspection' };
 
 function harness(initial = idle) {
   let state = initial;
   let connection: Parameters<InspectionSsePort['connect']>[0] | null = null;
-  const api: InspectionRunApiPort = { hydrate: vi.fn(async () => state), start: vi.fn(async () => ({ ...identity,
-    persistenceRevision: 7, canonicalFlowHash: 'sha256:flow', decisionConfigurationHash: 'sha256:decision', runMode: 'canonical-project' as const, cameraId: null })),
+  const api: InspectionRunApiPort = { hydrate: vi.fn(async () => state), start: vi.fn(async requested => ({ ...requested,
+    persistenceRevision: 7, canonicalFlowHash: 'sha256:flow', decisionConfigurationHash: 'sha256:decision', runMode: 'canonical-project' as const, cameraId: null,
+    sessionId: running.sessionId!, sessionType: 'ContinuousInspection' as const })),
     stop: vi.fn(async () => { state = idle; }) };
   const sse: InspectionSsePort = { connect: vi.fn(options => { connection = options; options.onOpen();
     return new Promise<void>(resolve => options.signal.addEventListener('abort', () => resolve(), { once: true })); }) };
@@ -35,7 +37,7 @@ describe('inspectionRunOwner', () => {
     const h = harness(); const owner = createInspectionRunOwner({ projectId, api: h.api, sse: h.sse });
     expect(await owner.start(identity)).toBe(true);
     expect(h.api.start).toHaveBeenCalledWith(identity, null, expect.anything());
-    const event: InspectionSseEvent = { type: 'resultProduced', id: '9', result: { projectId, sessionId: 's', resultId: 'r', status: 'OK',
+    const event: InspectionSseEvent = { type: 'resultProduced', id: '9', result: { projectId, sessionId: running.sessionId!, resultId: 'r', status: 'OK',
       executionOutcome: 'Succeeded', decisionOutcome: 'OK', defectCount: 0, processingTimeMs: 4, errorMessage: null, timestamp: new Date().toISOString() } };
     h.connection()?.onEvent(event); expect(owner.projection.latestResult?.resultId).toBe('r');
     h.setState(idle); expect(await owner.stop()).toBe(true); expect(h.api.stop).toHaveBeenCalledWith(identity, expect.anything());
@@ -55,8 +57,9 @@ describe('inspectionRunOwner', () => {
     expect(owner.projection.phase).toBe('reconnecting');
     await vi.advanceTimersByTimeAsync(10);
     expect(connections[1]?.lastEventId).toBe('12');
-    connections[1]?.onEvent({ type: 'stateChanged', id: '13', state: { projectId, sessionId: 's', oldState: 'Running', newState: 'Stopped',
-      errorMessage: null, timestamp: new Date().toISOString(), isSnapshot: false, startedAt: null, stoppedAt: new Date().toISOString() } });
+    connections[1]?.onEvent({ type: 'stateChanged', id: '13', state: { projectId, sessionId: running.sessionId!, oldState: 'Running', newState: 'Stopped',
+      errorMessage: null, timestamp: new Date().toISOString(), isSnapshot: false, startedAt: null, stoppedAt: new Date().toISOString(),
+      sessionType: 'ContinuousInspection' } });
     expect(owner.projection.phase).toBe('idle');
     expect(owner.projection.runtime).toMatchObject({ status: 'Stopped', isBusy: false });
     owner.dispose(); await owner.settle(); vi.useRealTimers();
@@ -75,6 +78,43 @@ describe('inspectionRunOwner', () => {
     expect(owner.projection.errorCode).toBe('ADMISSION_SNAPSHOT_MISMATCH');
     expect(h.api.hydrate).not.toHaveBeenCalled();
     owner.dispose();
+  });
+
+  it('hydrates formal-run occupancy without restoring stop authority or an SSE subscription', async () => {
+    const formal: InspectionRunState = { ...running, sessionType: 'WorkspaceFormalRun' };
+    const h = harness(formal);
+    const owner = createInspectionRunOwner({ projectId, api: h.api, sse: h.sse });
+
+    await owner.hydrate();
+
+    expect(owner.projection.phase).toBe('occupied');
+    expect(owner.resources()).toEqual({ streams: 0, timers: 0, abortControllers: 0, subscriptions: 0 });
+    expect(await owner.stop()).toBe(false);
+    expect(h.api.stop).not.toHaveBeenCalled();
+    owner.dispose();
+  });
+
+  it('ignores replay events from an older session and resets the cursor for an explicit new start', async () => {
+    const h = harness();
+    const connections: Array<Parameters<InspectionSsePort['connect']>[0]> = [];
+    const sse: InspectionSsePort = { connect: vi.fn(options => {
+      connections.push(options); options.onOpen();
+      return new Promise<void>(resolve => options.signal.addEventListener('abort', () => resolve(), { once: true }));
+    }) };
+    const owner = createInspectionRunOwner({ projectId, api: h.api, sse });
+
+    await owner.start(identity);
+    connections[0]?.onEvent({ type: 'resultProduced', id: '40', result: {
+      projectId, sessionId: 'old-session', resultId: 'old-result', status: 'NG', executionOutcome: 'Succeeded',
+      decisionOutcome: 'NG', defectCount: 1, processingTimeMs: 5, errorMessage: null, timestamp: new Date().toISOString()
+    } });
+    expect(owner.projection.latestResult).toBeNull();
+
+    h.setState(idle);
+    await owner.stop();
+    await owner.start({ ...identity, clientSnapshotId: '44444444-4444-4444-4444-444444444444' });
+    expect(connections.at(-1)?.lastEventId).toBeNull();
+    owner.dispose(); await owner.settle();
   });
 
   it('reconciles an unknown stop outcome against authoritative state', async () => {
