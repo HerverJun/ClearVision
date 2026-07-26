@@ -182,9 +182,9 @@ async function installFixture(page, state) {
     if (url.pathname === `/api/inspection/realtime/${projectId}/events`) {
       state.sseConnections += 1;
       return fulfill(route, 200, [
-        `id: 1\nevent: stateChanged\ndata: ${JSON.stringify({ projectId, sessionId, oldState: 'Starting', newState: 'Running', errorMessage: null, timestamp: '2026-07-26T02:00:01Z', isSnapshot: false, startedAt: '2026-07-26T02:00:00Z', stoppedAt: null, sessionType: 'ContinuousInspection' })}\n`,
-        `id: 2\nevent: resultProduced\ndata: ${JSON.stringify({ projectId, sessionId, resultId, status: 'OK', executionOutcome: 'Succeeded', decisionOutcome: 'OK', defectCount: 0, processingTimeMs: 18, errorMessage: null, timestamp: '2026-07-26T02:00:02Z' })}\n`
-      ].join('\n'), 'text/event-stream');
+        `id: 1\nevent: stateChanged\ndata: ${JSON.stringify({ projectId, sessionId, oldState: 'Starting', newState: 'Running', errorMessage: null, timestamp: '2026-07-26T02:00:01Z', isSnapshot: false, startedAt: '2026-07-26T02:00:00Z', stoppedAt: null, sessionType: 'ContinuousInspection' })}\n\n`,
+        `id: 2\nevent: resultProduced\ndata: ${JSON.stringify({ projectId, sessionId, resultId, status: 'OK', executionOutcome: 'Succeeded', decisionOutcome: 'OK', defectCount: 0, processingTimeMs: 18, errorMessage: null, timestamp: '2026-07-26T02:00:02Z' })}\n\n`
+      ].join(''), 'text/event-stream');
     }
     if (url.pathname === '/api/inspection/realtime/stop') {
       state.stopRequests += 1; state.runMode = 'idle'; return fulfill(route, 200, { projectId, message: 'stopped' });
