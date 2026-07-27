@@ -64,7 +64,7 @@ public sealed class StudioUiArchitectureGuardTests
     }
 
     [Fact]
-    public void StudioUiProductionSource_ShouldRespectF02AuthorityBoundaries()
+    public void StudioUiProductionSource_ShouldRespectApprovedAuthorityBoundaries()
     {
         var sourceFiles = GetStudioUiProductionFiles();
         var forbiddenTokens = new[]
@@ -128,8 +128,8 @@ public sealed class StudioUiArchitectureGuardTests
         Regex.Matches(apiTransport, @"\basync\s+get<").Count.Should().Be(1);
         Regex.Matches(apiTransport, @"\basync\s+post<").Count.Should().Be(1);
         Regex.Matches(apiTransport, @"\basync\s+put<").Count.Should().Be(1);
+        Regex.Matches(apiTransport, @"\basync\s+patch<").Count.Should().Be(1);
         Regex.Matches(apiTransport, @"\basync\s+delete\s*\(").Count.Should().Be(1);
-        apiTransport.Should().NotContain("'PATCH'");
         apiTransport.Should().NotContain("EventSource");
         apiTransport.Should().NotContain("localStorage");
 
@@ -152,6 +152,8 @@ public sealed class StudioUiArchitectureGuardTests
         abortControllerOwners.Should().BeEquivalentTo(new[]
         {
             "src/app/auth/authLifecycleOwner.ts",
+            "src/capabilities/inspection-run/inspectionRunOwner.ts",
+            "src/capabilities/inspection-run/inspectionRunPageOwner.ts",
             "src/capabilities/project-lifecycle/projectLifecycleCommandOwner.ts",
             "src/capabilities/project-workspace/camera/cameraBindingEditorOwner.ts",
             "src/capabilities/project-workspace/final-decision/finalDecisionOwner.ts",
@@ -159,6 +161,7 @@ public sealed class StudioUiArchitectureGuardTests
             "src/capabilities/project-workspace/run/runCommandOwner.ts",
             "src/capabilities/project-workspace/runtime-package/runtimePackageExportOwner.ts",
             "src/capabilities/results-read/resultEvidenceOwner.ts",
+            "src/capabilities/stations-read/stationAdminCommandOwner.ts",
             "src/platform/diagnostics/runtimeDiagnostics.ts",
             "src/platform/query/readQuery.ts"
         });
@@ -457,7 +460,7 @@ public sealed class StudioUiArchitectureGuardTests
     }
 
     [Fact]
-    public void StudioUiRouter_ShouldFreezeF02ProductAndInternalLabRoutes()
+    public void StudioUiRouter_ShouldFreezeApprovedProductAndInternalLabRoutes()
     {
         var router = File.ReadAllText(Path.Combine(RepoPath(StudioUiRoot), "src", "app", "router.ts"));
         var navigation = File.ReadAllText(Path.Combine(RepoPath(StudioUiRoot), "src", "app", "navigation.ts"));
@@ -473,6 +476,8 @@ public sealed class StudioUiArchitectureGuardTests
         router.Should().Contain("path: 'operators/:operatorType'");
         router.Should().Contain("path: 'stations'");
         router.Should().Contain("path: 'stations/:stationId'");
+        router.Should().Contain("path: 'inspection'");
+        router.Should().Contain("path: 'projects/:id/inspection'");
         router.Should().Contain("path: 'results'");
         router.Should().Contain("path: 'diagnostics'");
         router.Should().Contain("path: 'about'");
@@ -485,15 +490,15 @@ public sealed class StudioUiArchitectureGuardTests
         router.Should().Contain("path: '/login'");
         router.Should().Contain("path: '/setup'");
         router.Should().Contain("path: '/forbidden'");
-        router.Should().NotContain("/inspection");
         router.Should().NotContain("/settings");
         router.Should().NotContain("/ai");
 
         navigation.Should().Contain("to: '/projects'");
+        navigation.Should().Contain("to: '/inspection'");
         navigation.Should().Contain("to: '/results'");
+        navigation.Should().Contain("to: '/stations'");
         navigation.Should().NotContain("to: '/overview'");
         navigation.Should().NotContain("to: '/operators'");
-        navigation.Should().NotContain("to: '/stations'");
         navigation.Should().NotContain("to: '/diagnostics'");
         navigation.Should().NotContain("to: '/about'");
         navigation.Should().NotContain("/labs");
