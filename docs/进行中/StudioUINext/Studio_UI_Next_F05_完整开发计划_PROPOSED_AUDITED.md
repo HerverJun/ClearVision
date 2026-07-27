@@ -1,6 +1,6 @@
 # Studio UI Next F05 完整开发计划（基于实际代码的只读审计）
 
-> 状态：`G1_DONE_WITH_PRE_EXISTING_BASELINE_DEBT`｜F05 定义：**以前端产品化为主，附带最小 Host 真值链与安全加固**；不重造后端业务权威。G0.1 已获批，G1 已在基线债务例外下完成并等待代码级复审；G2 仍未授权。
+> 状态：`DONE`｜F05 定义：**以前端产品化为主，附带最小 Host 真值链与安全加固**；不重造后端业务权威。G1-G6 本地、Browser、WebView2、DPI、publish、Remote CI 与 Final Gate 已完成；生产现场验收、默认入口变更、Legacy 退役和 F06 仍未授权。
 
 ## 0. 审计基线与证据限制
 
@@ -384,15 +384,16 @@ P3/P4 拆分是因为检测 owner 的 SSE 生命周期与运行互斥是本波�
 
 ---
 
-## 13. 产品负责人复审与剩余裁决
+## 13. 已执行授权与剩余裁决
 
 **本次已冻结，不得在 G1 重新打开**：F05 为“前端产品化为主 + 最小 Host 真值链与安全加固”；G1 权限只覆盖 `inspection/realtime/start|stop|state|events|diagnostics`；检测 flag 固定为 `Studio2.InspectionRun` 与独立 `InspectionRunCapabilityEnabled`；`/inspection` 只入口/工程选择、`/projects/:id/inspection` 才运行；连续检测只用已保存 canonical Project snapshot；`IInspectionRuntimeCoordinator` 是唯一运行互斥权威；Station 控制区仅 Admin mounted；SaveCompatibility 语料归 F07/F08；F05 沿用 Quiet Precision；P6 先测量 manifest 再冻结更严预算。
 
 当前授权边界：
 
-1. **G0.1 已获批；G1 已在“candidate 无新增 format/build 失败”的基线债务例外下完成，等待代码级复审**；复审前不得进入 G2。
-2. **G2 未授权**：检测域合同冻结与后续实现仍为 `FORBIDDEN`。
-3. **真实硬件证据处置**：F05 完成时是否接受 `REAL_CAMERA/PLC/STATION=NOT_PERFORMED`，或要求现场验证作为 F05 完成门禁；无论何种选择，F08 默认入口切换仍需满足第 8 节的独立条件。
+1. **G1-G5 已完成**：检测域、Station 控制、lazy loading 与 bundle gate 已按冻结合同实现；不再以 G0 审计时的“G2 未授权”描述当前状态。
+2. **G6 工程门禁已完成**：本地、Browser、真实 WebView2 Debug/Release、Windows 125% DPI、Release publish、Final code SHA 的 Remote CI 与 Final Gate 已通过；初次 Remote CI 暴露的两个旧架构守卫已做最小测试修复。
+3. **真实硬件证据不冒充工程证据**：`REAL_CAMERA/PLC/STATION=NOT_PERFORMED`，因此生产现场验收继续 `BLOCKED`。
+4. **F06 未授权**：不得因 F05 工程门禁完成而自动修改默认入口、退役 Legacy 或启动 F06。
 
 ---
 
@@ -401,15 +402,24 @@ P3/P4 拆分是因为检测 owner 的 SSE 生命周期与运行互斥是本波�
 ```text
 F05_G0_AUDIT_STATE=DONE
 F05_G0_1_REVIEW=APPROVED
-F05_PLAN_STATE=G5_DONE
+F05_PLAN_STATE=DONE
 F05_G1_AUTHORIZATION=AUTHORIZED
 F05_G1_STATE=DONE_WITH_PRE_EXISTING_BASELINE_DEBT
 F05_G2_STATE=DONE
-F05_G3_STATE=DONE_BROWSER_FIXTURE_ONLY
-F05_G4_STATE=DONE_BROWSER_FIXTURE_ONLY
+F05_G3_STATE=DONE
+F05_G4_STATE=DONE
 F05_G5_AUTHORIZATION=AUTHORIZED
 F05_G5_STATE=DONE
-F05_G6_ENTRY=READY
+F05_G6_STATE=DONE
+F05_ENGINEERING_STATE=DONE
+F05_FINAL_GATE=PASS
+F05_REAL_WEBVIEW2_DEBUG=PASS
+F05_REAL_WEBVIEW2_RELEASE=PASS
+F05_WINDOWS_125_DPI=PASS
+F05_RELEASE_PUBLISH=PASS
+F05_REMOTE_CI=PASS
+PRODUCTION_ACCEPTANCE=BLOCKED
 DEFAULT_ENTRY_CHANGE=BLOCKED
 LEGACY_RETIREMENT=BLOCKED
+F06_IMPLEMENTATION=FORBIDDEN
 ```
