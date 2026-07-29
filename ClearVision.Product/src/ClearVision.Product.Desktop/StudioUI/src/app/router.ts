@@ -35,10 +35,12 @@ const StationsPage = () => import('@/capabilities/stations-read/StationsPage.vue
 const CanvasLabPlaceholder = () => import('@/labs/canvas/CanvasLabPlaceholder.vue');
 const DesignLabPlaceholder = () => import('@/labs/design/DesignLabPlaceholder.vue');
 const DiagnosticsPage = () => import('@/platform/diagnostics/DiagnosticsPage.vue');
+const AiWorkbenchPage = () => import('@/capabilities/ai-workbench/AiWorkbenchPage.vue');
 
 const editorRoles = Object.freeze(['Admin', 'Engineer']);
 const stationFlagKey = 'Studio2.StationsRead';
 const inspectionRunFlagKey = 'Studio2.InspectionRun';
+const aiWorkbenchFlagKey = 'Studio2.AiWorkbench';
 
 export const studioRoutes: readonly RouteRecordRaw[] = [
   {
@@ -95,6 +97,15 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
             meta: { title: '工程', breadcrumb: '工程', requiresSession: true }
           },
           {
+            path: 'ai',
+            name: 'ai-workbench',
+            component: AiWorkbenchPage,
+            meta: {
+              title: 'AI 工程工作台', breadcrumb: 'AI 工程工作台', requiresSession: true,
+              allowedRoles: editorRoles, requiredFeatureFlag: aiWorkbenchFlagKey
+            }
+          },
+          {
             path: 'projects/:id',
             name: 'project-detail',
             component: ProjectDetailPage,
@@ -110,6 +121,15 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
               requiresSession: true,
               allowedRoles: editorRoles,
               workspaceMode: true
+            }
+          },
+          {
+            path: 'projects/:id/ai',
+            name: 'project-ai-workbench',
+            component: AiWorkbenchPage,
+            meta: {
+              title: 'AI 工程工作台', breadcrumb: 'AI 工程工作台', requiresSession: true,
+              allowedRoles: editorRoles, requiredFeatureFlag: aiWorkbenchFlagKey
             }
           },
           {
@@ -242,6 +262,7 @@ export function resolveSafeReturnRoute(value: unknown): string | null {
   if (typeof value !== 'string' || containsUnsafeReturnSyntax(value)) return null;
   const path = value.split(/[?#]/, 1)[0] ?? '';
   if (path === '/overview' || path === '/projects' || path.startsWith('/projects/') ||
+      path === '/ai' ||
       path === '/operators' || path.startsWith('/operators/') || path === '/inspection' || path === '/results' ||
       path === '/stations' || path.startsWith('/stations/') || path === '/diagnostics' ||
       path === '/about') {

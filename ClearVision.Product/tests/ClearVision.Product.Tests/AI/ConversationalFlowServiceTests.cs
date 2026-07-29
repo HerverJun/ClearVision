@@ -728,6 +728,66 @@ public class ConversationalFlowServiceTests : IDisposable
             .ContainSingle();
     }
 
+    [Fact]
+    public void OwnedSessions_ShouldIsolateUsersAndPersistOwnerIdentity()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+        var ownerA = "usr_" + new string('a', 64);
+        var ownerB = "usr_" + new string('b', 64);
+
+        var sessionA = service.GetOrCreateOwnedSession(ownerA, null).Session!;
+        var sessionB = service.GetOrCreateOwnedSession(ownerB, null).Session!;
+
+        service.GetOwnedSession(ownerA, sessionA.SessionId).Should().NotBeNull();
+        service.GetOwnedSession(ownerA, sessionB.SessionId).Should().BeNull();
+        service.GetOwnedSession(ownerB, sessionA.SessionId).Should().BeNull();
+        service.ListOwnedSessions(ownerA).Select(item => item.SessionId).Should().Equal(sessionA.SessionId);
+
+        var reloaded = new ConversationalFlowService(_tempRoot);
+        reloaded.GetOwnedSession(ownerA, sessionA.SessionId)!.OwnerHash.Should().Be(ownerA);
+        reloaded.GetOwnedSession(ownerB, sessionB.SessionId)!.OwnerHash.Should().Be(ownerB);
+    }
+
+    [Fact]
+    public void LegacySession_ShouldRemainUnownedAndCannotBeClaimedByNext()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+        var legacy = service.PrepareContext(new AiFlowGenerationRequest("legacy", SessionId: "legacy-session"));
+        service.RecordAssistantResponse(legacy.SessionId, "legacy response", null);
+
+        var result = service.GetOrCreateOwnedSession("usr_" + new string('a', 64), "legacy-session");
+
+        result.Status.Should().Be(ConversationOwnedSessionStatus.NotFound);
+        service.GetSession("legacy-session")!.OwnerHash.Should().BeNull();
+    }
+
+    [Fact]
+    public void OwnedWorkspaceMutation_StaleRevisionShouldReturnLatestSnapshot()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+        var owner = "usr_" + new string('a', 64);
+        var session = service.GetOrCreateOwnedSession(owner, null).Session!;
+        var first = service.TryUpdateOwnedWorkspaceSnapshot(owner, session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = 0,
+            ClientMutationId = Guid.NewGuid().ToString("D"),
+            LifecycleState = "planning"
+        });
+
+        var conflict = service.TryUpdateOwnedWorkspaceSnapshot(owner, session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = 0,
+            ClientMutationId = Guid.NewGuid().ToString("D"),
+            LifecycleState = "building"
+        });
+
+        first.Success.Should().BeTrue();
+        conflict.Conflict.Should().BeTrue();
+        conflict.ErrorCode.Should().Be("workspace_revision_conflict");
+        conflict.Snapshot!.Revision.Should().Be(first.Snapshot!.Revision);
+        conflict.Snapshot.LifecycleState.Should().Be("planning");
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempRoot))

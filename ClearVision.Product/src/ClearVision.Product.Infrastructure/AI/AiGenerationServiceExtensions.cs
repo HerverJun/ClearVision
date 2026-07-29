@@ -69,6 +69,7 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<AgentPromptBuilder>();
         services.AddSingleton<AgentRunEventRedactor>();
         services.AddSingleton<AgentRunEventStore>();
+        services.AddSingleton<IAiOperationReceiptStore, AiOperationReceiptStore>();
         services.AddSingleton<IAgentRunEventStreamService, AgentRunEventStreamService>();
         services.AddScoped<IAgentRunEventSink, AgentRunEventSink>();
         services.AddScoped<AgentPlannerPromptBuilder>();

@@ -40,6 +40,7 @@ describe('G2 route guard', () => {
     expect(resolveSafeReturnRoute('/stations')).toBe('/stations');
     expect(resolveSafeReturnRoute('/stations/station-1?tab=health')).toBe('/stations/station-1?tab=health');
     expect(resolveSafeReturnRoute('/inspection')).toBe('/inspection');
+    expect(resolveSafeReturnRoute('/ai?sessionId=session_01')).toBe('/ai?sessionId=session_01');
     for (const attack of [
       'https://evil.example', '//evil.example', '/labs/design', '/login', '/unknown',
       '/projects/%2f%2fevil', '/projects\\evil', '/projects/../login',
@@ -80,6 +81,8 @@ describe('G2 route guard', () => {
     expect(router.currentRoute.value.path).toBe('/forbidden');
     await router.push('/inspection');
     expect(router.currentRoute.value.path).toBe('/forbidden');
+    await router.push('/ai');
+    expect(router.currentRoute.value.path).toBe('/forbidden');
 
     const engineer = auth('authenticated', 'Engineer');
     const browserRouter = createStudioRouter(createMemoryHistory());
@@ -95,6 +98,13 @@ describe('G2 route guard', () => {
     expect(inspectionRouter.currentRoute.value.path).toBe('/inspection');
     await inspectionRouter.push('/projects/11111111-1111-1111-1111-111111111111/inspection');
     expect(inspectionRouter.currentRoute.value.name).toBe('project-inspection');
+
+    const aiRouter = createStudioRouter(createMemoryHistory());
+    installAuthRouteGuard(aiRouter, engineer.owner, startup({ 'Studio2.AiWorkbench': true }));
+    await aiRouter.push('/ai');
+    expect(aiRouter.currentRoute.value.name).toBe('ai-workbench');
+    await aiRouter.push('/projects/11111111-1111-1111-1111-111111111111/ai');
+    expect(aiRouter.currentRoute.value.name).toBe('project-ai-workbench');
   });
 
   it('re-evaluates browser navigation after logout and never restores protected routes', async () => {

@@ -287,6 +287,7 @@ public sealed record AiDecisionTrace
 
 public sealed record VisionAgentPlanModeRequest
 {
+    public Guid ClientOperationId { get; init; }
     public string Description { get; init; } = string.Empty;
     public string? OriginalUserPrompt { get; init; }
     public string? AdditionalContext { get; init; }

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -33,6 +34,8 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
         {
+            clientOperationId = Guid.NewGuid(),
+            target = new { targetKind = "new" },
             description = "Detect scratches on a metal part",
             mode = "new",
             useVisionAgentGenerateFlow = true,
@@ -73,6 +76,8 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
         {
+            clientOperationId = Guid.NewGuid(),
+            target = new { targetKind = "new" },
             description = "Detect scratches on a metal part",
             sessionId,
             mode = "new",
@@ -227,6 +232,7 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan", new VisionAgentPlanModeRequest
         {
+            ClientOperationId = Guid.NewGuid(),
             Description = "detect scratches on metal",
             OriginalUserPrompt = "detect scratches on metal",
             SessionId = "session-plan-create-primary-fail"
@@ -237,8 +243,8 @@ public sealed class AgentRunEndpointsTests
         var root = document.RootElement;
         root.GetProperty("errorCode").GetString().Should().Be("session_persistence_failed");
         root.GetProperty("publicMessage").GetString().Should().Contain("模型规划未启动");
-        root.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeFalse();
-        root.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        root.TryGetProperty("persistenceStatus", out _).Should().BeFalse();
+        root.TryGetProperty("metadataOnly", out _).Should().BeFalse();
         plannerCalled.Should().BeFalse();
         host.ConversationService.GetSession("session-plan-create-primary-fail").Should().BeNull();
     }
@@ -264,6 +270,7 @@ public sealed class AgentRunEndpointsTests
 
         var responseTask = host.Client.PostAsJsonAsync("/api/ai/agent-plan", new VisionAgentPlanModeRequest
         {
+            ClientOperationId = Guid.NewGuid(),
             Description = "detect scratches on metal",
             OriginalUserPrompt = "detect scratches on metal",
             SessionId = "session-plan-create-terminal-fail"
@@ -385,6 +392,7 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new
         {
+            clientOperationId = Guid.NewGuid(),
             description = "stream plan progress",
             originalUserPrompt = "stream plan progress",
             currentFlowSnapshot = "{\"operators\":[]}",
@@ -481,6 +489,7 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
         {
+            ClientOperationId = Guid.NewGuid(),
             Description = "classify strawberry maturity",
             OriginalUserPrompt = "classify strawberry maturity",
             SemanticExtraction = semantic
@@ -525,6 +534,7 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
         {
+            ClientOperationId = Guid.NewGuid(),
             Description = "detect scratches on metal",
             OriginalUserPrompt = "detect scratches on metal",
             RequirementMode = AiRequirementModes.Draft
@@ -580,6 +590,7 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
         {
+            ClientOperationId = Guid.NewGuid(),
             Description = "detect scratches on metal",
             OriginalUserPrompt = "detect scratches on metal",
             SessionId = "session-plan-primary-fail"
@@ -590,13 +601,10 @@ public sealed class AgentRunEndpointsTests
         var root = document.RootElement;
         root.GetProperty("errorCode").GetString().Should().Be("session_persistence_failed");
         root.GetProperty("publicMessage").GetString().Should().Contain("模型规划未启动");
-        var runId = root.GetProperty("runId").GetString()!;
-        root.GetProperty("events").EnumerateArray()
-            .Should()
-            .Contain(evt => evt.GetProperty("eventType").GetString() == AgentRunEventTypes.RunFailed);
-        JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("session_persistence_failed");
+        root.TryGetProperty("runId", out _).Should().BeFalse();
+        root.GetProperty("operation").GetProperty("status").GetString().Should().Be(AiOperationStatuses.Failed);
         plannerCalled.Should().BeFalse();
-        host.StreamService.Replay(runId)!.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
+        host.StreamService.ReplayLatest(ResolveOwnerHashForTest("user-default")).Should().BeNull();
         host.ConversationService.GetSession("session-plan-primary-fail").Should().BeNull();
     }
 
@@ -612,6 +620,7 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
         {
+            ClientOperationId = Guid.NewGuid(),
             Description = "detect scratches on metal",
             OriginalUserPrompt = "detect scratches on metal",
             SessionId = "session-plan-terminal-fail"
@@ -1200,6 +1209,8 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
         {
+            clientOperationId = Guid.NewGuid(),
+            target = new { targetKind = "new" },
             description = "Modify current flow",
             additionalContext = "keep thresholds",
             sessionId = "session-1",
@@ -1251,6 +1262,8 @@ public sealed class AgentRunEndpointsTests
 
         using var firstResponse = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
         {
+            ClientOperationId = Guid.NewGuid(),
+            Target = NewProjectTarget(),
             Description = "Detect scratches first",
             SessionId = sessionId,
             Mode = "new",
@@ -1266,6 +1279,8 @@ public sealed class AgentRunEndpointsTests
 
         using var secondResponse = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
         {
+            ClientOperationId = Guid.NewGuid(),
+            Target = NewProjectTarget(),
             Description = "Detect scratches second",
             SessionId = sessionId,
             Mode = "new",
@@ -1317,6 +1332,8 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
         {
+            ClientOperationId = Guid.NewGuid(),
+            Target = NewProjectTarget(),
             Description = "start build from confirmed plan",
             Mode = "new",
             RequirementMode = AiRequirementModes.Strict,
@@ -1354,6 +1371,8 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
         {
+            clientOperationId = Guid.NewGuid(),
+            target = new { targetKind = "new" },
             description = "Detect scratches on a metal part with Tool Loop experimental build",
             useVisionAgentGenerateFlow = true,
             agentGenerateFlowMode = "tool_loop"
@@ -1376,6 +1395,8 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
         {
+            clientOperationId = Guid.NewGuid(),
+            target = new { targetKind = "new" },
             description = "帮我做一个金属表面划痕检测流程",
             sessionId = "session-plan-build",
             templateSelection = new
@@ -1566,6 +1587,8 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
         {
+            ClientOperationId = Guid.NewGuid(),
+            Target = NewProjectTarget(),
             Description = "Build from persisted plan",
             SessionId = "session-build-primary-fail",
             Mode = "new",
@@ -1577,13 +1600,11 @@ public sealed class AgentRunEndpointsTests
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var root = document.RootElement;
         root.GetProperty("errorCode").GetString().Should().Be("session_persistence_failed");
-        var runId = root.GetProperty("runId").GetString()!;
-        root.GetProperty("events").EnumerateArray()
-            .Should()
-            .Contain(evt => evt.GetProperty("eventType").GetString() == AgentRunEventTypes.RunFailed);
-        JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("session_persistence_failed");
+        root.TryGetProperty("runId", out _).Should().BeFalse();
+        root.TryGetProperty("events", out _).Should().BeFalse();
+        root.GetProperty("operation").GetProperty("status").GetString().Should().Be(AiOperationStatuses.Failed);
         host.Generation.LastCommand.Should().BeNull();
-        host.StreamService.Replay(runId)!.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
+        host.StreamService.ReplayLatest(ResolveOwnerHashForTest("user-default")).Should().BeNull();
         host.ConversationService.GetSession("session-build-primary-fail").Should().BeNull();
     }
 
@@ -1591,7 +1612,11 @@ public sealed class AgentRunEndpointsTests
     public async Task CreateRun_BuildFromPlanStaleWorkspaceRevision_ShouldNotStartBackgroundRun()
     {
         await using var host = await AgentRunEndpointTestHost.CreateAsync();
-        var initial = host.ConversationService.UpdateWorkspaceSnapshot(
+        var ownerHash = ResolveOwnerHashForTest("user-default");
+        host.ConversationService.GetOrCreateOwnedSession(ownerHash, "session-build-stale-revision")
+            .Status.Should().Be(ConversationOwnedSessionStatus.Ready);
+        var initial = host.ConversationService.TryUpdateOwnedWorkspaceSnapshot(
+            ownerHash,
             "session-build-stale-revision",
             new VisionAgentWorkspaceSnapshotUpdate
             {
@@ -1601,13 +1626,15 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
         {
+            ClientOperationId = Guid.NewGuid(),
+            Target = NewProjectTarget(),
             Description = "Build from stale persisted plan",
             SessionId = "session-build-stale-revision",
             Mode = "new",
             UseVisionAgentGenerateFlow = true,
             BuildFromPlan = BuildableAgentRunBuildFromPlanRequest() with
             {
-                WorkspaceExpectedRevision = initial.WorkspaceSnapshot!.Revision - 1
+                WorkspaceExpectedRevision = initial.Snapshot!.Revision - 1
             }
         });
 
@@ -1616,7 +1643,7 @@ public sealed class AgentRunEndpointsTests
         var root = document.RootElement;
         root.GetProperty("errorCode").GetString().Should().Be("workspace_revision_conflict");
         root.GetProperty("workspaceSnapshot").GetProperty("revision").GetInt64()
-            .Should().Be(initial.WorkspaceSnapshot.Revision);
+            .Should().Be(initial.Snapshot.Revision);
         JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("workspace_revision_conflict");
         host.Generation.LastCommand.Should().BeNull();
         host.ConversationService.GetSession("session-build-stale-revision")!
@@ -1629,7 +1656,11 @@ public sealed class AgentRunEndpointsTests
     public async Task CreateRun_BuildFromPlanMissingWorkspaceRevision_ShouldNotStartBackgroundRun()
     {
         await using var host = await AgentRunEndpointTestHost.CreateAsync();
-        var initial = host.ConversationService.UpdateWorkspaceSnapshot(
+        var ownerHash = ResolveOwnerHashForTest("user-default");
+        host.ConversationService.GetOrCreateOwnedSession(ownerHash, "session-build-missing-revision")
+            .Status.Should().Be(ConversationOwnedSessionStatus.Ready);
+        var initial = host.ConversationService.TryUpdateOwnedWorkspaceSnapshot(
+            ownerHash,
             "session-build-missing-revision",
             new VisionAgentWorkspaceSnapshotUpdate
             {
@@ -1639,6 +1670,8 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
         {
+            ClientOperationId = Guid.NewGuid(),
+            Target = NewProjectTarget(),
             Description = "Build from persisted plan without revision",
             SessionId = "session-build-missing-revision",
             Mode = "new",
@@ -1651,7 +1684,7 @@ public sealed class AgentRunEndpointsTests
         var root = document.RootElement;
         root.GetProperty("errorCode").GetString().Should().Be("workspace_revision_required");
         root.GetProperty("workspaceSnapshot").GetProperty("revision").GetInt64()
-            .Should().Be(initial.WorkspaceSnapshot!.Revision);
+            .Should().Be(initial.Snapshot!.Revision);
         JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("workspace_revision_required");
         host.Generation.LastCommand.Should().BeNull();
         host.ConversationService.GetSession("session-build-missing-revision")!
@@ -1665,6 +1698,9 @@ public sealed class AgentRunEndpointsTests
     {
         await using var host = await AgentRunEndpointTestHost.CreateAsync();
         var sessionId = "session-build-concurrent-missing-revision";
+        var ownerHash = ResolveOwnerHashForTest("user-default");
+        host.ConversationService.GetOrCreateOwnedSession(ownerHash, sessionId)
+            .Status.Should().Be(ConversationOwnedSessionStatus.Ready);
         var updateEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseUpdate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var firstWrite = 1;
@@ -1679,7 +1715,8 @@ public sealed class AgentRunEndpointsTests
             releaseUpdate.Task.GetAwaiter().GetResult();
         };
 
-        var workspaceTask = Task.Run(() => host.ConversationService.TryUpdateWorkspaceSnapshot(
+        var workspaceTask = Task.Run(() => host.ConversationService.TryUpdateOwnedWorkspaceSnapshot(
+            ownerHash,
             sessionId,
             new VisionAgentWorkspaceSnapshotUpdate
             {
@@ -1690,6 +1727,8 @@ public sealed class AgentRunEndpointsTests
 
         var buildTask = host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
         {
+            ClientOperationId = Guid.NewGuid(),
+            Target = NewProjectTarget(),
             Description = "Build from concurrently persisted plan without revision",
             SessionId = sessionId,
             Mode = "new",
@@ -1722,6 +1761,8 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
         {
+            ClientOperationId = Guid.NewGuid(),
+            Target = NewProjectTarget(),
             Description = "Build from persisted plan",
             SessionId = "session-build-backup-fail",
             Mode = "new",
@@ -1791,6 +1832,8 @@ public sealed class AgentRunEndpointsTests
         var plan = LegacyBlockedAgentRunBuildFromPlanSnapshot();
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
         {
+            ClientOperationId = Guid.NewGuid(),
+            Target = NewProjectTarget(),
             Description = "start build from blocked canonical plan",
             BuildFromPlan = new VisionAgentBuildFromPlanRequest
             {
@@ -2106,9 +2149,9 @@ public sealed class AgentRunEndpointsTests
             using var cancel = await host.Client.PostAsync($"/api/ai/agent-runs/{runId}/cancel", content: null);
             using var token = await host.Client.PostAsync($"/api/ai/agent-runs/{runId}/stream-token", content: null);
 
-            replay.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-            cancel.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-            token.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+            replay.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            cancel.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            token.StatusCode.Should().Be(HttpStatusCode.NotFound);
         }
         finally
         {
@@ -2129,7 +2172,7 @@ public sealed class AgentRunEndpointsTests
         var streamToken = await host.CreateStreamTokenAsync(runId);
 
         using var wrongRun = await host.Client.GetAsync($"/api/ai/agent-runs/ar_wrong/events?streamToken={Uri.EscapeDataString(streamToken)}", HttpCompletionOption.ResponseHeadersRead);
-        wrongRun.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        wrongRun.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         using var authorized = await host.CreateAnonymousClient().GetAsync($"/api/ai/agent-runs/{runId}/events?streamToken={Uri.EscapeDataString(streamToken)}", HttpCompletionOption.ResponseHeadersRead);
         authorized.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -2141,6 +2184,247 @@ public sealed class AgentRunEndpointsTests
         now = now.AddSeconds(61);
         using var expired = await host.CreateAnonymousClient().GetAsync($"/api/ai/agent-runs/{runId}/events?streamToken={Uri.EscapeDataString(expiringToken)}", HttpCompletionOption.ResponseHeadersRead);
         expired.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact(DisplayName = "AI Session HTTP isolates owners and hides session operation existence")]
+    public async Task AiSessionEndpoints_ShouldIsolateOwnersAndHideExistence()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(useAuth: true);
+        var clientOperationId = Guid.NewGuid();
+        host.AuthorizeAs("owner-a-token");
+        using var create = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId });
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        using var createDocument = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
+        var sessionId = createDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString()!;
+
+        using var ownerList = await host.Client.GetAsync("/api/ai/sessions");
+        ownerList.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ownerList.Content.ReadAsStringAsync()).Should().Contain(sessionId);
+
+        host.AuthorizeAs("owner-b-token");
+        using var otherList = await host.Client.GetAsync("/api/ai/sessions");
+        using var otherListDocument = JsonDocument.Parse(await otherList.Content.ReadAsStringAsync());
+        otherListDocument.RootElement.GetProperty("total").GetInt32().Should().Be(0);
+
+        using var get = await host.Client.GetAsync($"/api/ai/sessions/{sessionId}");
+        using var update = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = 0,
+            clientMutationId = Guid.NewGuid().ToString("D"),
+            lifecycleState = "plan_ready"
+        });
+        using var delete = await host.Client.DeleteAsync(
+            $"/api/ai/sessions/{sessionId}?expectedRevision=0&clientMutationId={Guid.NewGuid():D}");
+        using var operation = await host.Client.GetAsync(
+            $"/api/ai/operations/{clientOperationId:D}?kind={AiOperationKinds.SessionCreate}");
+
+        get.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        update.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        delete.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        operation.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        host.AuthorizeAs("owner-a-token");
+        using var ownerOperation = await host.Client.GetAsync(
+            $"/api/ai/operations/{clientOperationId:D}?kind={AiOperationKinds.SessionCreate}");
+        ownerOperation.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact(DisplayName = "AI endpoints allow Admin and Engineer but reject Operator and unauthenticated users")]
+    public async Task AiEndpoints_ShouldEnforceRoleAndAuthenticationMatrix()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(useAuth: true);
+
+        host.AuthorizeAs("owner-a-token");
+        using var admin = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        admin.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        host.AuthorizeAs("engineer-token");
+        using var engineer = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        engineer.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        host.AuthorizeAs("operator-token");
+        using var operatorSession = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        using var operatorBuild = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            target = new { targetKind = "new" },
+            description = "operator must not build"
+        });
+        operatorSession.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        operatorBuild.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        using var anonymous = host.CreateAnonymousClient();
+        using var unauthenticated = await anonymous.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        unauthenticated.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact(DisplayName = "AI Session revision conflict returns only the latest public snapshot")]
+    public async Task AiSessionMutationConflict_ShouldReturnStrictPublicSnapshot()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        using var create = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        using var createDocument = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
+        var sessionId = createDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString()!;
+
+        using var update = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = 0,
+            clientMutationId = Guid.NewGuid().ToString("D"),
+            lifecycleState = "plan_ready",
+            planQuestionSelections = new Dictionary<string, string>
+            {
+                ["authorization"] = "Bearer secret-token"
+            }
+        });
+        update.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var conflict = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = 0,
+            clientMutationId = Guid.NewGuid().ToString("D"),
+            lifecycleState = "building"
+        });
+        conflict.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var conflictJson = await conflict.Content.ReadAsStringAsync();
+        using var conflictDocument = JsonDocument.Parse(conflictJson);
+        var root = conflictDocument.RootElement;
+        root.GetProperty("errorCode").GetString().Should().Be("workspace_revision_conflict");
+        var latest = root.GetProperty("latestSnapshot");
+        latest.GetProperty("revision").GetInt64().Should().Be(1);
+        var allowedSnapshotKeys = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "schemaVersion", "revision", "projectId", "lifecycleState", "planRunId", "planRunStatus",
+            "buildRunId", "buildRunStatus", "buildClientOperationId", "projectBaseline", "updatedAtUtc"
+        };
+        foreach (var property in latest.EnumerateObject())
+        {
+            allowedSnapshotKeys.Should().Contain(property.Name);
+        }
+        var normalizedConflictJson = conflictJson.ToLowerInvariant();
+        normalizedConflictJson.Should().NotContain("authorization");
+        normalizedConflictJson.Should().NotContain("secret-token");
+        normalizedConflictJson.Should().NotContain("reasoning");
+        normalizedConflictJson.Should().NotContain("rawpayload");
+    }
+
+    [Fact(DisplayName = "AI operation identity replays matching requests rejects conflicts and supports lookup")]
+    public async Task AiOperationIdentity_ShouldReplayRejectConflictAndSupportLookup()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        var clientOperationId = Guid.NewGuid();
+        using var first = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId });
+        first.StatusCode.Should().Be(HttpStatusCode.Created);
+        using var firstDocument = JsonDocument.Parse(await first.Content.ReadAsStringAsync());
+        var sessionId = firstDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString();
+
+        using var replay = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId });
+        replay.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var replayDocument = JsonDocument.Parse(await replay.Content.ReadAsStringAsync());
+        replayDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString().Should().Be(sessionId);
+        replayDocument.RootElement.GetProperty("operation").GetProperty("status").GetString()
+            .Should().Be(AiOperationStatuses.Created);
+
+        using var conflict = await host.Client.PostAsJsonAsync("/api/ai/sessions", new
+        {
+            clientOperationId,
+            projectId = Guid.Empty
+        });
+        conflict.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var conflictDocument = JsonDocument.Parse(await conflict.Content.ReadAsStringAsync());
+        conflictDocument.RootElement.GetProperty("errorCode").GetString().Should().Be("operation_identity_conflict");
+
+        using var lookup = await host.Client.GetAsync(
+            $"/api/ai/operations/{clientOperationId:D}?kind={AiOperationKinds.SessionCreate}");
+        lookup.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var lookupDocument = JsonDocument.Parse(await lookup.Content.ReadAsStringAsync());
+        lookupDocument.RootElement.GetProperty("sessionId").GetString().Should().Be(sessionId);
+        lookupDocument.RootElement.GetProperty("payloadFingerprint").GetString().Should().StartWith("sha256:");
+
+        using var list = await host.Client.GetAsync("/api/ai/sessions");
+        using var listDocument = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
+        listDocument.RootElement.GetProperty("total").GetInt32().Should().Be(1);
+    }
+
+    [Fact(DisplayName = "Existing Project Build validates authoritative revision hash and canonical server flow")]
+    public async Task ExistingProjectBuild_ShouldValidateCanonicalBaselineAndIgnoreClientDraft()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        var canonicalFlow = new OperatorFlowDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "canonical-server-flow"
+        };
+        var project = new ProjectDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "authoritative-project",
+            PersistenceRevision = 41,
+            Flow = canonicalFlow
+        };
+        host.Projects.Project = project;
+        var canonicalHash = ExecutionFlowIdentity.ComputeFlowHash(canonicalFlow.ToEntity());
+
+        using var staleRevision = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            target = new
+            {
+                targetKind = "existing",
+                projectId = project.Id,
+                persistenceRevision = 40,
+                canonicalFlowHash = canonicalHash
+            },
+            description = "stale project build",
+            existingFlowJson = "{\"name\":\"untrusted-client-draft\"}"
+        });
+        staleRevision.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var staleDocument = JsonDocument.Parse(await staleRevision.Content.ReadAsStringAsync());
+        staleDocument.RootElement.GetProperty("errorCode").GetString().Should().Be("project_revision_conflict");
+        staleDocument.RootElement.GetProperty("currentBaseline").GetProperty("persistenceRevision").GetInt64()
+            .Should().Be(project.PersistenceRevision);
+
+        using var staleHash = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            target = new
+            {
+                targetKind = "existing",
+                projectId = project.Id,
+                persistenceRevision = project.PersistenceRevision,
+                canonicalFlowHash = "sha256:stale"
+            },
+            description = "stale flow build"
+        });
+        staleHash.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var staleHashDocument = JsonDocument.Parse(await staleHash.Content.ReadAsStringAsync());
+        staleHashDocument.RootElement.GetProperty("errorCode").GetString().Should().Be("canonical_flow_hash_conflict");
+
+        using var accepted = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            target = new
+            {
+                targetKind = "existing",
+                projectId = project.Id,
+                persistenceRevision = project.PersistenceRevision,
+                canonicalFlowHash = canonicalHash
+            },
+            description = "authoritative project build",
+            existingFlowJson = "{\"name\":\"untrusted-client-draft\"}",
+            useVisionAgentGenerateFlow = true
+        });
+        accepted.StatusCode.Should().Be(HttpStatusCode.OK);
+        await host.Generation.WaitForCallAsync();
+        host.Projects.GetByIdCallCount.Should().Be(3);
+        host.Projects.LastRequestedId.Should().Be(project.Id);
+        host.Generation.LastRequest!.ExistingFlowJson.Should().Be(JsonSerializer.Serialize(canonicalFlow));
+        host.Generation.LastRequest.ExistingFlowJson.Should().NotContain("untrusted-client-draft");
+
+        using var acceptedDocument = JsonDocument.Parse(await accepted.Content.ReadAsStringAsync());
+        var baseline = acceptedDocument.RootElement.GetProperty("operation").GetProperty("projectBaseline");
+        baseline.GetProperty("projectId").GetGuid().Should().Be(project.Id);
+        baseline.GetProperty("persistenceRevision").GetInt64().Should().Be(project.PersistenceRevision);
+        baseline.GetProperty("canonicalFlowHash").GetString().Should().Be(canonicalHash);
     }
 
     [Fact(DisplayName = "POST AgentRun cancel emits run.cancelled and cancels background request")]
@@ -2240,6 +2524,8 @@ public sealed class AgentRunEndpointsTests
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"agent-run-owner:{userId.Trim()}"));
         return "usr_" + Convert.ToHexString(bytes).ToLowerInvariant();
     }
+
+    private static AiProjectTargetRequest NewProjectTarget() => new() { TargetKind = "new" };
 
     private static VisionAgentPlanModeResult LegacyBlockedAgentRunBuildFromPlanSnapshot()
     {
@@ -2437,6 +2723,7 @@ public sealed class AgentRunEndpointsTests
             FakeAiFlowGenerationService generation,
             IAgentRunEventStreamService streamService,
             IConversationalFlowService conversationService,
+            FakeProjectApplicationService projects,
             IVisionAgentBuildTerminalProjector terminalProjector)
         {
             _app = app;
@@ -2445,6 +2732,7 @@ public sealed class AgentRunEndpointsTests
             StreamService = streamService;
             ConversationService = conversationService;
             ConcreteConversationService = (ConversationalFlowService)conversationService;
+            Projects = projects;
             TerminalProjector = terminalProjector;
             Client = app.GetTestClient();
         }
@@ -2460,6 +2748,8 @@ public sealed class AgentRunEndpointsTests
         public IConversationalFlowService ConversationService { get; }
 
         public ConversationalFlowService ConcreteConversationService { get; }
+
+        public FakeProjectApplicationService Projects { get; }
 
         public IVisionAgentBuildTerminalProjector TerminalProjector { get; }
 
@@ -2482,6 +2772,8 @@ public sealed class AgentRunEndpointsTests
             var store = new AgentRunEventStore(directory, redactor);
             var streamService = new AgentRunEventStreamService(store, redactor);
             var conversationService = new ConversationalFlowService(Path.Combine(directory, "sessions"));
+            var operationStore = new AiOperationReceiptStore(Path.Combine(directory, "operations"));
+            var projects = new FakeProjectApplicationService();
             if (utcNowProvider != null)
             {
                 streamService.UtcNowProvider = utcNowProvider;
@@ -2494,6 +2786,8 @@ public sealed class AgentRunEndpointsTests
             builder.Services.AddSingleton(store);
             builder.Services.AddSingleton<IVisionAgentBuildProjectionJournal, VisionAgentBuildProjectionJournal>();
             builder.Services.AddSingleton<IConversationalFlowService>(conversationService);
+            builder.Services.AddSingleton<IAiOperationReceiptStore>(operationStore);
+            builder.Services.AddSingleton<IProjectApplicationService>(projects);
             builder.Services.AddSingleton<IAgentRunEventStreamService>(streamService);
             builder.Services.AddSingleton<IAiFlowGenerationService>(generation);
             builder.Services.AddSingleton<IVisionAgentBuildApplicationService>(generation);
@@ -2518,6 +2812,20 @@ public sealed class AgentRunEndpointsTests
             {
                 app.UseMiddleware<AuthMiddleware>();
             }
+            else
+            {
+                app.Use(async (context, next) =>
+                {
+                    context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [
+                        new Claim(ClaimTypes.NameIdentifier, "user-default"),
+                        new Claim(ClaimTypes.Name, "default-engineer"),
+                        new Claim(ClaimTypes.Role, "Admin")
+                    ], "Test"));
+                    await next(context);
+                });
+            }
+            app.MapAiSessionEndpoints();
             app.MapAgentRunEndpoints();
             await app.StartAsync();
             var terminalProjector = app.Services.GetRequiredService<IVisionAgentBuildTerminalProjector>();
@@ -2528,6 +2836,7 @@ public sealed class AgentRunEndpointsTests
                 generation,
                 streamService,
                 conversationService,
+                projects,
                 terminalProjector);
         }
 
@@ -2550,6 +2859,8 @@ public sealed class AgentRunEndpointsTests
         {
             using var response = await Client.PostAsJsonAsync("/api/ai/agent-runs", new
             {
+                clientOperationId = Guid.NewGuid(),
+                target = new { targetKind = "new" },
                 description,
                 additionalContext = "Detect scratches on a metal part.",
                 useVisionAgentGenerateFlow = true
@@ -2563,6 +2874,7 @@ public sealed class AgentRunEndpointsTests
         {
             using var response = await Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
             {
+                ClientOperationId = Guid.NewGuid(),
                 Description = description,
                 OriginalUserPrompt = description,
                 SessionId = sessionId
@@ -2928,6 +3240,22 @@ public sealed class AgentRunEndpointsTests
         }
     }
 
+    private sealed class FakeProjectApplicationService : IProjectApplicationService
+    {
+        public ProjectDto? Project { get; set; }
+
+        public int GetByIdCallCount { get; private set; }
+
+        public Guid? LastRequestedId { get; private set; }
+
+        public Task<ProjectDto?> GetByIdAsync(Guid id)
+        {
+            GetByIdCallCount++;
+            LastRequestedId = id;
+            return Task.FromResult(Project?.Id == id ? Project : null);
+        }
+    }
+
     private sealed class FakeAuthService : IAuthService
     {
         public Task<AuthResult> LoginAsync(string username, string password)
@@ -2958,10 +3286,17 @@ public sealed class AgentRunEndpointsTests
                 {
                     "owner-a-token" => "user-owner-a",
                     "owner-b-token" => "user-owner-b",
+                    "engineer-token" => "user-engineer",
+                    "operator-token" => "user-operator",
                     _ => "user-default"
                 },
                 Username = token,
-                Role = "Admin",
+                Role = token switch
+                {
+                    "engineer-token" => "Engineer",
+                    "operator-token" => "Operator",
+                    _ => "Admin"
+                },
                 ExpiresAt = DateTime.UtcNow.AddMinutes(30)
             });
         }
@@ -2983,7 +3318,8 @@ public sealed class AgentRunEndpointsTests
 
         private static bool IsKnownToken(string token)
         {
-            return token is "owner-a-token" or "owner-b-token" or "owner-default-token";
+            return token is "owner-a-token" or "owner-b-token" or "owner-default-token" or
+                "engineer-token" or "operator-token";
         }
     }
 

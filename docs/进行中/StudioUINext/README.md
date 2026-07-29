@@ -57,7 +57,7 @@ F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision
 - F04：历史执行权威是 [F04 完整开发计划](./Studio_UI_Next_F04_完整开发计划_PROPOSED_AUDITED.md)。G0–G6 工程实现与 final-SHA 证据已完成；Remote CI run `29666388675` attempt 1 和 Final Gate 均通过。`NEXT_PILOT_PROFILE_AVAILABLE=YES`，但产品层视觉结果后来在 F04.2 审计与用户反馈中被拒绝，不能据此切换默认入口。
 - F04-R：`COMPLETE`。当前纠偏治理权威是 [F04-R 产品层重构完整计划](./Studio_UI_Next_F04_R_产品层重构完整计划_PROPOSED.md)；G4B 已完成真实 WebView2 Debug/Release、Windows 125% DPI、Release publish、Remote CI 与 Final Gate，详见 [G4B WebView2 / DPI / Release 证据索引](./F04R_G4B_WebView2_DPI_Release证据索引.md)和 [F04-R 完成报告](./F04R_完成报告.md)。状态为 `PRODUCT_VISUAL_CONFIRMATION=PASS`、`F04R_STATUS=COMPLETE`、`DEFAULT_ENTRY_CHANGE=NOT_AUTOMATIC`、`LEGACY_RETIREMENT=NOT_APPROVED`、`F05_ENTRY=READY_FOR_PLANNING`、`F05_STARTED=NO`。
 - F05：`DONE`，唯一当前状态入口是 [F05 完成报告](./F05_完成报告.md)。G1-G6 的本地、Browser、真实 WebView2 Debug/Release、Windows 125% DPI、Release publish、Remote CI 与 Final Gate 已通过。`PRODUCTION_ACCEPTANCE=BLOCKED`、`DEFAULT_ENTRY_CHANGE=BLOCKED`、`F06_IMPLEMENTATION=FORBIDDEN`。
-- F06：G0 双工作树只读审计与完整计划已形成，当前唯一计划入口是 [F06 AI 工程工作台完整开发计划](./Studio_UI_Next_F06_AI工程工作台完整开发计划_PROPOSED_AUDITED.md)。状态保持 `F06_PLAN_STATE=PROPOSED_AUDITED`、`F06_IMPLEMENTATION=FORBIDDEN`、`DEFAULT_ENTRY_CHANGE=BLOCKED`、`LEGACY_AI_RETIREMENT=NOT_APPROVED`；计划复审批准前不得进入 G1 实现。
+- F06：G1 合同、安全身份与唯一 Owner 地基已完成本地实现/门禁，当前唯一状态入口是 [F06 G1 阶段报告](./F06_G1_AI合同安全身份与唯一Owner地基.md)。B1-B5 本地关闭；[Handoff Artifact ADR](./ADR-F06-G1-Workspace-Handoff-Artifact.md) 状态为 `ADR_APPROVED_IMPLEMENTATION_DEFERRED_TO_G4`。Remote CI 通过前保持 `F06_G1_STATE=REMOTE_CI_PENDING`、`F06_G2_IMPLEMENTATION=FORBIDDEN`、`DEFAULT_ENTRY_CHANGE=BLOCKED`、`LEGACY_AI_RETIREMENT=NOT_APPROVED`。
 - `Studio:StudioUiEnabled=false` 保持不变；legacy 仍是默认入口。
 
 ## 阶段门禁
@@ -115,6 +115,9 @@ F04-R 纠偏期间以本目录链接的 F04-R 主计划与 G0/G1 受控文档为
 - [F05 完整开发计划（权威计划与阶段门禁）](./Studio_UI_Next_F05_完整开发计划_PROPOSED_AUDITED.md)
 - [F05 G6 隔离 E2E 与 Final Evidence 闭环](./F05_G6_隔离E2E与FinalEvidence闭环.md)
 - [F05 完成报告（唯一当前状态入口）](./F05_完成报告.md)
-- [F06 AI 工程工作台完整开发计划（G0 只读审计，待复审）](./Studio_UI_Next_F06_AI工程工作台完整开发计划_PROPOSED_AUDITED.md)
+- [F06 AI 工程工作台完整开发计划（G1 执行权威）](./Studio_UI_Next_F06_AI工程工作台完整开发计划_PROPOSED_AUDITED.md)
+- [ADR F06-G1：AI 合同、安全身份与唯一 Owner](./ADR-F06-G1-AI合同安全身份与唯一Owner.md)
+- [ADR F06-G1：AI Workspace Handoff Artifact](./ADR-F06-G1-Workspace-Handoff-Artifact.md)
+- [F06 G1 阶段报告（唯一当前状态入口）](./F06_G1_AI合同安全身份与唯一Owner地基.md)
 - [仓库级协作规则](../../../AGENTS.md)
 - [旧 Studio2 历史入口](../Studio2/README.md)（历史取证，不是新计划）

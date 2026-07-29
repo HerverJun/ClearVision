@@ -76,7 +76,8 @@ public sealed class WebView2Host : IAsyncDisposable
         bool resultsReviewCapabilityEnabled = false,
         bool aiPanelCapabilityEnabled = false,
         bool circleSearchV2ToolEnabled = true,
-        bool nPointCalibrationWorkbenchEnabled = true)
+        bool nPointCalibrationWorkbenchEnabled = true,
+        bool aiWorkbenchCapabilityEnabled = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(apiBaseUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(cssVersion);
@@ -97,6 +98,7 @@ public sealed class WebView2Host : IAsyncDisposable
                 ["Studio2.Inspection"] = inspectionCapabilityEnabled,
                 ["Studio2.ResultsReview"] = resultsReviewCapabilityEnabled,
                 ["Studio2.AiPanel"] = aiPanelCapabilityEnabled,
+                ["Studio2.AiWorkbench"] = aiWorkbenchCapabilityEnabled,
                 ["Studio:CircleSearchV2ToolEnabled"] = circleSearchV2ToolEnabled,
                 ["Studio:NPointCalibrationWorkbenchEnabled"] = nPointCalibrationWorkbenchEnabled
             }
@@ -220,7 +222,8 @@ public sealed class WebView2Host : IAsyncDisposable
                 studioOptions.ResultsReviewCapabilityEnabled,
                 studioOptions.AiPanelCapabilityEnabled,
                 studioOptions.CircleSearchV2ToolEnabled,
-                studioOptions.NPointCalibrationWorkbenchEnabled),
+                studioOptions.NPointCalibrationWorkbenchEnabled,
+                studioOptions.AiWorkbenchCapabilityEnabled),
             StudioStartupPageKind.StudioUi => BuildStudioUiStartupInjectionScript(
                 apiBaseUrl,
                 studioOptions),
@@ -339,6 +342,7 @@ public sealed class WebView2Host : IAsyncDisposable
             ["Studio2.InspectionRun"] = studioOptions.InspectionRunCapabilityEnabled,
             ["Studio2.ResultsReview"] = studioOptions.ResultsReviewCapabilityEnabled,
             ["Studio2.AiPanel"] = studioOptions.AiPanelCapabilityEnabled,
+            ["Studio2.AiWorkbench"] = studioOptions.AiWorkbenchCapabilityEnabled,
             ["Studio:CircleSearchV2ToolEnabled"] = studioOptions.CircleSearchV2ToolEnabled,
             ["Studio:NPointCalibrationWorkbenchEnabled"] = studioOptions.NPointCalibrationWorkbenchEnabled
         };

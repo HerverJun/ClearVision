@@ -277,6 +277,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IAutoTuneService, AutoTuneService>();
 
         services.AddScoped<ProjectService>();
+        services.AddScoped<IProjectApplicationService>(services => services.GetRequiredService<ProjectService>());
         services.AddScoped<ProjectLifecycleCoordinator>();
         services.AddSingleton<IAnalysisDataBuilder, AnalysisDataBuilder>();
         services.AddScoped<IInspectionEvidenceManifestService, InspectionEvidenceManifestService>();

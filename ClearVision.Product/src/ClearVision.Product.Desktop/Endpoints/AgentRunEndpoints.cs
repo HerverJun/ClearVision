@@ -1,8 +1,8 @@
-using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
@@ -54,17 +54,25 @@ public static class AgentRunEndpoints
 
     public static IEndpointRouteBuilder MapAgentRunEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/ai/agent-plan", HandleCreatePlanAsync);
-        app.MapPost("/api/ai/sessions/{sessionId}/workspace-snapshot", HandleUpdateWorkspaceSnapshot);
-        app.MapPost("/api/ai/agent-plan/readiness-preview", HandlePreviewPlanReadinessAsync);
-        app.MapPost("/api/ai/agent-intent-router-runs", HandleCreateIntentRouterRunAsync);
-        app.MapPost("/api/ai/agent-plan-runs", HandleCreatePlanRunAsync);
-        app.MapPost("/api/ai/agent-runs", HandleCreateRunAsync);
-        app.MapGet("/api/ai/agent-runs/latest", HandleReplayLatestRun);
-        app.MapGet("/api/ai/agent-runs/{runId}", HandleReplayRun);
+        app.MapPost("/api/ai/agent-plan", HandleCreatePlanAsync)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
+        app.MapPost("/api/ai/agent-plan/readiness-preview", HandlePreviewPlanReadinessAsync)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
+        app.MapPost("/api/ai/agent-intent-router-runs", HandleCreateIntentRouterRunAsync)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
+        app.MapPost("/api/ai/agent-plan-runs", HandleCreatePlanRunAsync)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
+        app.MapPost("/api/ai/agent-runs", HandleCreateRunAsync)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
+        app.MapGet("/api/ai/agent-runs/latest", HandleReplayLatestRun)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
+        app.MapGet("/api/ai/agent-runs/{runId}", HandleReplayRun)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
         app.MapGet("/api/ai/agent-runs/{runId}/events", HandleRunEventsAsync);
-        app.MapPost("/api/ai/agent-runs/{runId}/stream-token", HandleCreateStreamToken);
-        app.MapPost("/api/ai/agent-runs/{runId}/cancel", HandleCancelRun);
+        app.MapPost("/api/ai/agent-runs/{runId}/stream-token", HandleCreateStreamToken)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
+        app.MapPost("/api/ai/agent-runs/{runId}/cancel", HandleCancelRun)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
         return app;
     }
 
@@ -96,6 +104,7 @@ public static class AgentRunEndpoints
 
     private static async Task<IResult> HandleCreatePlanAsync(
         VisionAgentPlanModeRequest request,
+        HttpContext context,
         IConversationalFlowService conversationService,
         IVisionAgentOrchestrator orchestrator,
         CancellationToken ct)
@@ -108,9 +117,23 @@ public static class AgentRunEndpoints
             });
         }
 
-        var session = conversationService.GetOrCreateSession(request.SessionId);
+        var ownerHash = AiOwnerIdentity.Resolve(context);
+        var owned = conversationService.GetOrCreateOwnedSession(ownerHash, request.SessionId);
+        if (owned.Status == ConversationOwnedSessionStatus.NotFound)
+        {
+            return Results.NotFound(new { errorCode = "session_not_found", publicMessage = "会话不存在或当前用户无权访问。" });
+        }
+        if (owned.Status != ConversationOwnedSessionStatus.Ready || owned.Session == null)
+        {
+            return Results.Json(new
+            {
+                errorCode = "session_persistence_failed",
+                publicMessage = "会话未能安全保存，模型规划未启动。"
+            }, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+        var session = owned.Session;
         request = request with { SessionId = session.SessionId };
-        var initialPersistence = conversationService.TryUpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var initialPersistence = conversationService.TryUpdateOwnedWorkspaceSnapshot(ownerHash, session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             LifecycleState = "planning",
             RequirementMode = request.RequirementMode,
@@ -127,7 +150,7 @@ public static class AgentRunEndpoints
                     : "session_persistence_failed",
                 publicMessage = "Plan 创建失败：会话状态未能保存，模型规划未启动。",
                 sessionId = session.SessionId,
-                workspaceSnapshot = initialPersistence.Snapshot,
+                workspaceSnapshot = AiPublicContractMapper.ToSnapshot(initialPersistence.Snapshot),
                 persistenceStatus = initialPersistence.PersistenceStatus,
                 metadataOnly = true
             }, statusCode: initialPersistence.Conflict
@@ -136,7 +159,7 @@ public static class AgentRunEndpoints
         }
 
         var result = await orchestrator.CreatePlanAsync(request, ct);
-        var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var terminalPersistence = conversationService.TryUpdateOwnedWorkspaceSnapshot(ownerHash, session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             LifecycleState = result.CanBuild ? "plan_ready" : "plan_blocked",
             PendingPlanSnapshot = BuildReplaySafePlanResult(result),
@@ -154,49 +177,11 @@ public static class AgentRunEndpoints
         {
             sessionId = session.SessionId,
             planResult = BuildReplaySafePlanResult(result),
-            workspaceSnapshot = terminalPersistence.Snapshot,
+            workspaceSnapshot = AiPublicContractMapper.ToSnapshot(terminalPersistence.Snapshot),
             persistenceStatus = terminalPersistence.PersistenceStatus,
             persistenceWarning,
             metadataOnly = true
         });
-    }
-
-    private static IResult HandleUpdateWorkspaceSnapshot(
-        string sessionId,
-        VisionAgentWorkspaceSnapshotDeltaRequest request,
-        IConversationalFlowService conversationService)
-    {
-        if (string.IsNullOrWhiteSpace(sessionId))
-        {
-            return Results.BadRequest(new { error = "sessionId is required." });
-        }
-
-        var result = conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
-        {
-            ExpectedRevision = request.ExpectedRevision,
-            ClientMutationId = request.ClientMutationId,
-            ProjectId = request.ProjectId,
-            LifecycleState = request.LifecycleState,
-            PlanQuestionSelections = request.PlanQuestionSelections,
-            ConfirmedPlanAnswers = request.ConfirmedPlanAnswers,
-            OptimisticPlanAnswers = request.OptimisticPlanAnswers,
-            AnswerRevision = request.AnswerRevision,
-            ReadinessPreview = request.ReadinessPreview,
-            ResourceDecisions = request.ResourceDecisions,
-            RequirementMode = request.RequirementMode,
-            WorkspaceViewMode = request.WorkspaceViewMode,
-            PlanAcceptedRecommendedDefaults = request.PlanAcceptedRecommendedDefaults,
-            SubmittedBuildFingerprint = request.SubmittedBuildFingerprint
-        });
-
-        if (result.Conflict)
-        {
-            return Results.Conflict(result);
-        }
-
-        return result.Success
-            ? Results.Ok(result)
-            : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
     }
 
     private static Task<IResult> HandleCreatePlanRunAsync(
@@ -204,6 +189,7 @@ public static class AgentRunEndpoints
         HttpContext context,
         IAgentRunEventStreamService streamService,
         IConversationalFlowService conversationService,
+        IAiOperationReceiptStore operations,
         IVisionAgentBuildRunService buildRunService,
         IServiceScopeFactory scopeFactory,
         ILoggerFactory loggerFactory)
@@ -216,15 +202,62 @@ public static class AgentRunEndpoints
             }));
         }
 
-        var session = conversationService.GetOrCreateSession(request.SessionId);
+        if (request.ClientOperationId == Guid.Empty)
+        {
+            return Task.FromResult<IResult>(Results.BadRequest(new
+            {
+                errorCode = "client_operation_id_required",
+                publicMessage = "Plan Run 必须提供 clientOperationId。"
+            }));
+        }
+
+        var ownerHash = AiOwnerIdentity.Resolve(context);
+        var reservation = operations.Reserve(
+            ownerHash,
+            AiOperationKinds.PlanRun,
+            request.ClientOperationId,
+            AiSessionEndpoints.ComputeFingerprint(request with { ClientOperationId = Guid.Empty }),
+            request.SessionId);
+        var reservationError = AiSessionEndpoints.BuildReservationError(reservation);
+        if (reservationError != null) return Task.FromResult(reservationError);
+        if (reservation.Outcome == AiOperationReservationOutcome.Existing)
+        {
+            return Task.FromResult(BuildExistingOperationResponse(
+                reservation.Receipt!, ownerHash, streamService, conversationService));
+        }
+
+        var owned = conversationService.GetOrCreateOwnedSession(ownerHash, request.SessionId);
+        if (owned.Status == ConversationOwnedSessionStatus.NotFound)
+        {
+            var rejected = operations.MarkFailed(ownerHash, AiOperationKinds.PlanRun, request.ClientOperationId,
+                "session_not_found", "会话不存在或当前用户无权访问。", rejected: true);
+            return Task.FromResult<IResult>(Results.NotFound(new
+            {
+                errorCode = "session_not_found",
+                publicMessage = "会话不存在或当前用户无权访问。",
+                operation = rejected == null ? null : AiPublicContractMapper.ToOperation(rejected)
+            }));
+        }
+        if (owned.Status != ConversationOwnedSessionStatus.Ready || owned.Session == null)
+        {
+            var failedOperation = operations.MarkFailed(ownerHash, AiOperationKinds.PlanRun, request.ClientOperationId,
+                "session_persistence_failed", "会话未能安全保存，Plan Run 没有启动。");
+            return Task.FromResult<IResult>(Results.Json(new
+            {
+                errorCode = "session_persistence_failed",
+                publicMessage = "会话未能安全保存，Plan Run 没有启动，模型规划未启动。",
+                operation = failedOperation == null ? null : AiPublicContractMapper.ToOperation(failedOperation)
+            }, statusCode: StatusCodes.Status503ServiceUnavailable));
+        }
+
+        var session = owned.Session;
         request = request with { SessionId = session.SessionId };
 
-        var ownerHash = ResolveCurrentOwnerHash(context);
         var createResult = streamService.CreateRun(
             request.Description,
             BuildPlanCreatePayload(request),
             ownerHash);
-        var initialPersistence = conversationService.TryUpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var initialPersistence = conversationService.TryUpdateOwnedWorkspaceSnapshot(ownerHash, session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             ClientMutationId = $"plan-start:{createResult.RunId}",
             LifecycleState = "planning",
@@ -242,6 +275,14 @@ public static class AgentRunEndpoints
                 ? initialPersistence.ErrorCode
                 : "session_persistence_failed";
             var publicMessage = "Plan Run 创建失败：会话状态未能保存，模型规划未启动。";
+            var failedOperation = operations.MarkFailed(
+                ownerHash,
+                AiOperationKinds.PlanRun,
+                request.ClientOperationId,
+                failureCode,
+                publicMessage,
+                sessionId: session.SessionId,
+                runId: createResult.RunId);
             streamService.Fail(
                 createResult.RunId,
                 publicMessage,
@@ -262,11 +303,32 @@ public static class AgentRunEndpoints
                 sessionId = session.SessionId,
                 brief = createResult.Brief,
                 events = failedReplay?.Events ?? createResult.Events,
-                workspaceSnapshot,
+                workspaceSnapshot = AiPublicContractMapper.ToSnapshot(workspaceSnapshot),
+                operation = failedOperation == null ? null : AiPublicContractMapper.ToOperation(failedOperation),
                 persistenceStatus = initialPersistence.PersistenceStatus
             }, statusCode: initialPersistence.Conflict
                 ? StatusCodes.Status409Conflict
                 : StatusCodes.Status503ServiceUnavailable));
+        }
+
+        var operation = operations.MarkCreated(
+            ownerHash,
+            AiOperationKinds.PlanRun,
+            request.ClientOperationId,
+            session.SessionId,
+            createResult.RunId);
+        if (operation == null)
+        {
+            streamService.Fail(
+                createResult.RunId,
+                "Plan Run 操作回执未能确认，规划未启动。",
+                "请通过会话列表恢复状态后重试。",
+                new { failureCode = "operation_receipt_persistence_failed", metadataOnly = true });
+            return Task.FromResult<IResult>(Results.Json(new
+            {
+                errorCode = "operation_receipt_persistence_failed",
+                publicMessage = "Plan Run 操作回执未能确认，规划未启动。"
+            }, statusCode: StatusCodes.Status503ServiceUnavailable));
         }
 
         AppendPlanEvent(streamService, createResult.RunId, AgentRunEventTypes.PlanCreated, "plan", "规划已创建",
@@ -300,34 +362,130 @@ public static class AgentRunEndpoints
             sessionId = session.SessionId,
             brief = createResult.Brief,
             events = replay?.Events ?? createResult.Events,
-            workspaceSnapshot,
+            workspaceSnapshot = AiPublicContractMapper.ToSnapshot(workspaceSnapshot),
+            operation = AiPublicContractMapper.ToOperation(operation),
             persistenceStatus = initialPersistence.PersistenceStatus
         }));
     }
 
-    private static Task<IResult> HandleCreateRunAsync(
+    private static async Task<IResult> HandleCreateRunAsync(
         AgentRunCreateRequest request,
         HttpContext context,
         IAgentRunEventStreamService streamService,
         IConversationalFlowService conversationService,
+        IAiOperationReceiptStore operations,
+        IProjectApplicationService projects,
         IVisionAgentBuildRunService buildRunService,
         IServiceScopeFactory scopeFactory,
         ILoggerFactory loggerFactory)
     {
         if (string.IsNullOrWhiteSpace(request.Description))
         {
-            return Task.FromResult<IResult>(Results.BadRequest(new
+            return Results.BadRequest(new
             {
                 error = "Description is required."
-            }));
+            });
+        }
+        if (request.ClientOperationId == Guid.Empty)
+        {
+            return Results.BadRequest(new
+            {
+                errorCode = "client_operation_id_required",
+                publicMessage = "Build Run 必须提供 clientOperationId。"
+            });
         }
 
-        var sessionId = request.BuildFromPlan == null
-            ? conversationService.GetOrCreateSession(request.SessionId).SessionId
-            : NormalizeAgentRunSessionId(request.SessionId);
-        request = request with { SessionId = sessionId };
+        var ownerHash = AiOwnerIdentity.Resolve(context);
+        var reservation = operations.Reserve(
+            ownerHash,
+            AiOperationKinds.BuildRun,
+            request.ClientOperationId,
+            AiSessionEndpoints.ComputeFingerprint(request with
+            {
+                ClientOperationId = Guid.Empty,
+                ConfirmedProjectBaseline = null
+            }),
+            request.SessionId);
+        var reservationError = AiSessionEndpoints.BuildReservationError(reservation);
+        if (reservationError != null) return reservationError;
+        if (reservation.Outcome == AiOperationReservationOutcome.Existing)
+        {
+            return BuildExistingOperationResponse(
+                reservation.Receipt!, ownerHash, streamService, conversationService);
+        }
 
-        var ownerHash = ResolveCurrentOwnerHash(context);
+        var baseline = await AiProjectBaselineValidator.ValidateAsync(request.Target, projects);
+        if (!baseline.Success || baseline.Identity == null)
+        {
+            var rejected = operations.MarkFailed(
+                ownerHash,
+                AiOperationKinds.BuildRun,
+                request.ClientOperationId,
+                baseline.ErrorCode,
+                baseline.PublicMessage,
+                rejected: true,
+                sessionId: request.SessionId,
+                projectBaseline: baseline.Identity);
+            return Results.Json(new
+            {
+                errorCode = baseline.ErrorCode,
+                publicMessage = baseline.PublicMessage,
+                currentBaseline = baseline.Identity,
+                operation = rejected == null ? null : AiPublicContractMapper.ToOperation(rejected)
+            }, statusCode: baseline.FailureStatusCode);
+        }
+
+        request = request with
+        {
+            ExistingFlowJson = baseline.CanonicalFlowJson ?? request.ExistingFlowJson,
+            ConfirmedProjectBaseline = baseline.Identity
+        };
+        var owned = conversationService.GetOrCreateOwnedSession(
+            ownerHash,
+            request.SessionId,
+            baseline.Identity.ProjectId?.ToString("D"));
+        if (owned.Status == ConversationOwnedSessionStatus.NotFound)
+        {
+            var rejected = operations.MarkFailed(ownerHash, AiOperationKinds.BuildRun, request.ClientOperationId,
+                "session_not_found", "会话不存在或当前用户无权访问。", rejected: true,
+                projectBaseline: baseline.Identity);
+            return Results.NotFound(new
+            {
+                errorCode = "session_not_found",
+                publicMessage = "会话不存在或当前用户无权访问。",
+                operation = rejected == null ? null : AiPublicContractMapper.ToOperation(rejected)
+            });
+        }
+        if (owned.Status != ConversationOwnedSessionStatus.Ready || owned.Session == null)
+        {
+            var failedOperation = operations.MarkFailed(ownerHash, AiOperationKinds.BuildRun, request.ClientOperationId,
+                "session_persistence_failed", "会话未能安全保存，Build Run 没有启动。",
+                projectBaseline: baseline.Identity);
+            return Results.Json(new
+            {
+                errorCode = "session_persistence_failed",
+                publicMessage = "会话未能安全保存，Build Run 没有启动。",
+                operation = failedOperation == null ? null : AiPublicContractMapper.ToOperation(failedOperation)
+            }, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        var sessionId = owned.Session.SessionId;
+        var boundProjectId = owned.Session.WorkspaceSnapshot?.ProjectId;
+        if (baseline.Identity.ProjectId.HasValue && !string.IsNullOrWhiteSpace(boundProjectId) &&
+            !string.Equals(boundProjectId, baseline.Identity.ProjectId.Value.ToString("D"), StringComparison.OrdinalIgnoreCase))
+        {
+            var rejected = operations.MarkFailed(ownerHash, AiOperationKinds.BuildRun, request.ClientOperationId,
+                "session_project_conflict", "会话已绑定其他工程，不能创建本次 Build。", rejected: true,
+                sessionId: sessionId, projectBaseline: baseline.Identity);
+            return Results.Json(new
+            {
+                errorCode = "session_project_conflict",
+                publicMessage = "会话已绑定其他工程，不能创建本次 Build。",
+                operation = rejected == null ? null : AiPublicContractMapper.ToOperation(rejected)
+            }, statusCode: StatusCodes.Status409Conflict);
+        }
+
+        request = request with { SessionId = sessionId };
         var createResult = streamService.CreateRun(
             request.Description,
             BuildCreatePayload(request),
@@ -349,6 +507,16 @@ public static class AgentRunEndpoints
                 var statusCode = associationResult.Conflict
                     ? StatusCodes.Status409Conflict
                     : StatusCodes.Status503ServiceUnavailable;
+                var failedOperation = operations.MarkFailed(
+                    ownerHash,
+                    AiOperationKinds.BuildRun,
+                    request.ClientOperationId,
+                    failureCode,
+                    associationResult.PublicMessage,
+                    rejected: associationResult.Conflict,
+                    sessionId: sessionId,
+                    runId: createResult.RunId,
+                    projectBaseline: baseline.Identity);
                 streamService.Fail(
                     createResult.RunId,
                     associationResult.PublicMessage,
@@ -368,6 +536,8 @@ public static class AgentRunEndpoints
                             request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
                             request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
                             ComputeSubmittedBuildFingerprint(request)),
+                        clientOperationId = request.ClientOperationId,
+                        projectBaseline = baseline.Identity,
                         status = AiFlowGenerationResult.CompletionStatusFailed,
                         sessionId,
                         failureCode,
@@ -376,7 +546,7 @@ public static class AgentRunEndpoints
                     });
 
                 var failedReplay = streamService.Replay(createResult.RunId);
-                return Task.FromResult<IResult>(Results.Json(new
+                return Results.Json(new
                 {
                     errorCode = failureCode,
                     publicMessage = associationResult.PublicMessage,
@@ -384,20 +554,24 @@ public static class AgentRunEndpoints
                     sessionId,
                     brief = createResult.Brief,
                     events = failedReplay?.Events ?? createResult.Events,
-                    workspaceSnapshot,
+                    workspaceSnapshot = AiPublicContractMapper.ToSnapshot(workspaceSnapshot),
+                    operation = failedOperation == null ? null : AiPublicContractMapper.ToOperation(failedOperation),
                     persistenceStatus
-                }, statusCode: statusCode));
+                }, statusCode: statusCode);
             }
 
             buildAssociationPrepared = true;
         }
         else
         {
-            var beginResult = conversationService.TryBeginAgentRun(
+            var beginResult = conversationService.TryBeginOwnedAgentRun(
+                ownerHash,
                 sessionId,
                 createResult.RunId,
                 VisionAgentRunKindResolver.Build,
-                $"agent-run-begin:{createResult.RunId}");
+                $"agent-run-begin:{createResult.RunId}",
+                request.ClientOperationId.ToString("D"),
+                baseline.Identity);
             workspaceSnapshot = beginResult.Snapshot;
             persistenceStatus = beginResult.PersistenceStatus;
             if (!beginResult.Success)
@@ -411,6 +585,16 @@ public static class AgentRunEndpoints
                 var publicMessage = string.IsNullOrWhiteSpace(beginResult.PublicMessage)
                     ? "The same conversation already has an Agent run in progress."
                     : beginResult.PublicMessage;
+                var failedOperation = operations.MarkFailed(
+                    ownerHash,
+                    AiOperationKinds.BuildRun,
+                    request.ClientOperationId,
+                    failureCode,
+                    publicMessage,
+                    rejected: beginResult.Conflict || beginResult.NotFound,
+                    sessionId: sessionId,
+                    runId: createResult.RunId,
+                    projectBaseline: baseline.Identity);
                 streamService.Fail(
                     createResult.RunId,
                     publicMessage,
@@ -425,13 +609,13 @@ public static class AgentRunEndpoints
                         sessionId,
                         failureCode,
                         publicMessage,
-                        workspaceSnapshot,
+                        workspaceSnapshot = AiPublicContractMapper.ToSnapshot(workspaceSnapshot),
                         persistenceStatus,
                         metadataOnly = true
                     });
 
                 var failedReplay = streamService.Replay(createResult.RunId);
-                return Task.FromResult<IResult>(Results.Json(new
+                return Results.Json(new
                 {
                     errorCode = failureCode,
                     publicMessage,
@@ -439,13 +623,35 @@ public static class AgentRunEndpoints
                     sessionId,
                     brief = createResult.Brief,
                     events = failedReplay?.Events ?? createResult.Events,
-                    workspaceSnapshot,
+                    workspaceSnapshot = AiPublicContractMapper.ToSnapshot(workspaceSnapshot),
+                    operation = failedOperation == null ? null : AiPublicContractMapper.ToOperation(failedOperation),
                     persistenceStatus,
                     metadataOnly = true
-                }, statusCode: statusCode));
+                }, statusCode: statusCode);
             }
 
             buildAssociationPrepared = true;
+        }
+
+        var operation = operations.MarkCreated(
+            ownerHash,
+            AiOperationKinds.BuildRun,
+            request.ClientOperationId,
+            sessionId,
+            createResult.RunId,
+            baseline.Identity);
+        if (operation == null)
+        {
+            streamService.Fail(
+                createResult.RunId,
+                "Build Run 操作回执未能确认，构建未启动。",
+                "请通过会话列表恢复状态后重试。",
+                new { failureCode = "operation_receipt_persistence_failed", metadataOnly = true });
+            return Results.Json(new
+            {
+                errorCode = "operation_receipt_persistence_failed",
+                publicMessage = "Build Run 操作回执未能确认，构建未启动。"
+            }, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
         _ = Task.Run(async () =>
         {
@@ -457,15 +663,16 @@ public static class AgentRunEndpoints
                 loggerFactory.CreateLogger("AgentRunGenerateFlow"));
         });
 
-        return Task.FromResult<IResult>(Results.Ok(new
+        return Results.Ok(new
         {
             runId = createResult.RunId,
             sessionId,
             brief = createResult.Brief,
             events = streamService.Replay(createResult.RunId)?.Events ?? createResult.Events,
-            workspaceSnapshot,
+            workspaceSnapshot = AiPublicContractMapper.ToSnapshot(workspaceSnapshot),
+            operation = AiPublicContractMapper.ToOperation(operation),
             persistenceStatus
-        }));
+        });
     }
 
     private static IResult HandleReplayRun(
@@ -479,16 +686,43 @@ public static class AgentRunEndpoints
             return Results.NotFound(new { error = "Agent run not found." });
         }
 
-        return streamService.IsRunOwner(runId, ResolveCurrentOwnerHash(context))
+        return streamService.IsRunOwner(runId, AiOwnerIdentity.Resolve(context))
             ? Results.Ok(replay)
-            : Results.StatusCode(StatusCodes.Status403Forbidden);
+            : Results.NotFound(new { errorCode = "run_not_found", publicMessage = "运行记录不存在或当前用户无权访问。" });
+    }
+
+    private static IResult BuildExistingOperationResponse(
+        AiOperationReceipt receipt,
+        string ownerHash,
+        IAgentRunEventStreamService streamService,
+        IConversationalFlowService conversationService)
+    {
+        var replay = string.IsNullOrWhiteSpace(receipt.RunId) ? null : streamService.Replay(receipt.RunId);
+        var session = string.IsNullOrWhiteSpace(receipt.SessionId)
+            ? null
+            : conversationService.GetOwnedSession(ownerHash, receipt.SessionId);
+        var payload = new
+        {
+            operation = AiPublicContractMapper.ToOperation(receipt),
+            runId = string.IsNullOrWhiteSpace(receipt.RunId) ? null : receipt.RunId,
+            sessionId = string.IsNullOrWhiteSpace(receipt.SessionId) ? null : receipt.SessionId,
+            brief = replay?.Summary?.Summary,
+            events = replay?.Events ?? [],
+            workspaceSnapshot = session == null
+                ? null
+                : AiPublicContractMapper.ToSnapshot(session.WorkspaceSnapshot),
+            metadataOnly = true
+        };
+        return Results.Json(payload, statusCode: receipt.Status == AiOperationStatuses.Pending
+            ? StatusCodes.Status202Accepted
+            : StatusCodes.Status200OK);
     }
 
     private static IResult HandleReplayLatestRun(
         HttpContext context,
         IAgentRunEventStreamService streamService)
     {
-        var replay = streamService.ReplayLatest(ResolveCurrentOwnerHash(context));
+        var replay = streamService.ReplayLatest(AiOwnerIdentity.Resolve(context));
         return replay == null
             ? Results.NotFound(new { error = "No Agent run replay is available." })
             : Results.Ok(replay);
@@ -506,9 +740,9 @@ public static class AgentRunEndpoints
             return Results.NotFound(new { error = "Agent run not found." });
         }
 
-        if (!streamService.IsRunOwner(runId, ResolveCurrentOwnerHash(context)))
+        if (!streamService.IsRunOwner(runId, AiOwnerIdentity.Resolve(context)))
         {
-            return Results.StatusCode(StatusCodes.Status403Forbidden);
+            return Results.NotFound(new { errorCode = "run_not_found", publicMessage = "运行记录不存在或当前用户无权访问。" });
         }
 
         if (ReplayHasMode(replayBeforeCancel, "plan"))
@@ -694,10 +928,10 @@ public static class AgentRunEndpoints
             return Results.NotFound(new { error = "Agent run not found." });
         }
 
-        var ownerHash = ResolveCurrentOwnerHash(context);
+        var ownerHash = AiOwnerIdentity.Resolve(context);
         var token = streamService.IssueStreamToken(runId, ownerHash);
         return string.IsNullOrWhiteSpace(token)
-            ? Results.StatusCode(StatusCodes.Status403Forbidden)
+            ? Results.NotFound(new { errorCode = "run_not_found", publicMessage = "运行记录不存在或当前用户无权访问。" })
             : Results.Ok(new
             {
                 runId,
@@ -718,17 +952,15 @@ public static class AgentRunEndpoints
             var validation = streamService.ValidateStreamToken(runId, token, consume: true);
             if (!validation.Authorized)
             {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.Response.WriteAsJsonAsync(new { error = "Agent run stream token rejected." }, ct);
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                await context.Response.WriteAsJsonAsync(new { errorCode = "run_not_found", publicMessage = "运行记录不存在或当前用户无权访问。" }, ct);
                 return;
             }
         }
-        else if (!streamService.IsRunOwner(runId, ResolveCurrentOwnerHash(context)))
+        else if (!streamService.IsRunOwner(runId, AiOwnerIdentity.Resolve(context)))
         {
-            context.Response.StatusCode = streamService.Replay(runId) == null
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status403Forbidden;
-            await context.Response.WriteAsJsonAsync(new { error = "Agent run access denied." }, ct);
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            await context.Response.WriteAsJsonAsync(new { errorCode = "run_not_found", publicMessage = "运行记录不存在或当前用户无权访问。" }, ct);
             return;
         }
 
@@ -1080,7 +1312,9 @@ public static class AgentRunEndpoints
             mode = request.Mode ?? request.BuildFromPlan?.BuildIntent ?? "auto",
             useVisionAgentGenerateFlow = request.UseVisionAgentGenerateFlow ?? true,
             agentGenerateFlowMode = request.AgentGenerateFlowMode ?? AiAgentGenerateFlowModes.Scripted,
+            clientOperationId = request.ClientOperationId,
             sessionId = request.SessionId,
+            projectBaseline = request.ConfirmedProjectBaseline,
             attachmentCount = request.BuildFromPlan?.AttachmentSummary.Count ?? request.AttachmentCount ?? request.Attachments?.Count ?? 0,
             planId = request.BuildFromPlan?.PlanId ?? string.Empty,
             planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
@@ -1138,6 +1372,7 @@ public static class AgentRunEndpoints
         {
             runKind = VisionAgentRunKindResolver.Plan,
             mode = "plan",
+            clientOperationId = request.ClientOperationId,
             sessionId = request.SessionId,
             hasCurrentFlowSnapshot = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),
             hasCurrentResultSnapshot = !string.IsNullOrWhiteSpace(request.CurrentResultSnapshot),
@@ -1858,18 +2093,6 @@ public static class AgentRunEndpoints
             : 0;
     }
 
-    private static string ResolveCurrentOwnerHash(HttpContext context)
-    {
-        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            return string.Empty;
-        }
-
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"agent-run-owner:{userId.Trim()}"));
-        return "usr_" + Convert.ToHexString(bytes).ToLowerInvariant();
-    }
-
     private static string NormalizeAgentRunSessionId(string? sessionId) =>
         string.IsNullOrWhiteSpace(sessionId)
             ? Guid.NewGuid().ToString("N")
@@ -1890,6 +2113,8 @@ public static class AgentRunEndpoints
 
 public sealed record AgentRunCreateRequest
 {
+    public Guid ClientOperationId { get; init; }
+    public AiProjectTargetRequest? Target { get; init; }
     public string Description { get; init; } = string.Empty;
     public string? AdditionalContext { get; init; }
     public string? SessionId { get; init; }
@@ -1933,7 +2158,9 @@ public sealed record AgentRunCreateRequest
             AgentGenerateFlowMode = AiAgentGenerateFlowModes.Normalize(AgentGenerateFlowMode),
             RuntimePreviewConsent = RuntimePreviewConsent,
             AgentRunId = runId,
-            BuildFromPlan = BuildFromPlan
+            BuildFromPlan = BuildFromPlan,
+            ClientOperationId = ClientOperationId,
+            ProjectBaseline = ConfirmedProjectBaseline
         };
     }
 
@@ -1946,6 +2173,8 @@ public sealed record AgentRunCreateRequest
             BuildCommandTransports.AgentRun,
             persistResult);
     }
+
+    internal AiProjectBaselineIdentity? ConfirmedProjectBaseline { get; init; }
 }
 
 public sealed record VisionAgentWorkspaceSnapshotDeltaRequest

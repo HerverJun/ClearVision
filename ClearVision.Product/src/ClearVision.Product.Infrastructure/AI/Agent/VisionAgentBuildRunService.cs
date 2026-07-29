@@ -60,6 +60,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             ExpectedRevision = build.WorkspaceExpectedRevision,
             RequireExpectedRevisionWhenWorkspaceExists = true,
             ClientMutationId = $"build-association:{runId}",
+            ProjectId = request.ProjectBaseline?.ProjectId?.ToString("D"),
             LifecycleState = "building",
             BuildRunId = runId,
             BuildRunStatus = AgentRunEventStatuses.Running,
@@ -69,7 +70,9 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             ConfirmedPlanAnswers = build.ConfirmedAnswers,
             RequirementMode = request.RequirementMode,
             PlanAcceptedRecommendedDefaults = build.AcceptedRecommendedDefaults,
-            SubmittedBuildFingerprint = ComputeSubmittedBuildFingerprint(request)
+            SubmittedBuildFingerprint = ComputeSubmittedBuildFingerprint(request),
+            BuildClientOperationId = request.ClientOperationId?.ToString("D"),
+            ProjectBaseline = request.ProjectBaseline
         });
     }
 
@@ -293,6 +296,8 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             planHash = terminalBasis.PlanHash,
             answerSetFingerprint = terminalBasis.AnswerSetFingerprint,
             buildIdentity = terminalBasis.BuildIdentity,
+            clientOperationId = request.ClientOperationId,
+            projectBaseline = request.ProjectBaseline,
             status = result.CompletionStatus,
             sessionId = FirstNonBlank(result.SessionId, request.SessionId),
             generationMode = result.GenerationMode,
@@ -364,6 +369,8 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             planHash = terminalBasis.PlanHash,
             answerSetFingerprint = terminalBasis.AnswerSetFingerprint,
             buildIdentity = terminalBasis.BuildIdentity,
+            clientOperationId = request.ClientOperationId,
+            projectBaseline = request.ProjectBaseline,
             status = result.CompletionStatus,
             sessionId = FirstNonBlank(result.SessionId, request.SessionId),
             failureType = result.FailureType,

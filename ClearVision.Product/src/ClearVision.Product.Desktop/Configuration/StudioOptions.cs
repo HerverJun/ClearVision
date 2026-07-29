@@ -17,6 +17,7 @@ public sealed class StudioOptions
     public bool InspectionRunCapabilityEnabled { get; set; } = false;
     public bool ResultsReviewCapabilityEnabled { get; set; }
     public bool AiPanelCapabilityEnabled { get; set; }
+    public bool AiWorkbenchCapabilityEnabled { get; set; } = false;
     public bool CircleSearchV2ToolEnabled { get; set; } = true;
     public bool NPointCalibrationWorkbenchEnabled { get; set; } = true;
 }

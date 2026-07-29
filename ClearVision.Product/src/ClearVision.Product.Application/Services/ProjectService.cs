@@ -15,10 +15,15 @@ using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Application.Services;
 
+public interface IProjectApplicationService
+{
+    Task<ProjectDto?> GetByIdAsync(Guid id);
+}
+
 /// <summary>
 /// 工程应用服务
 /// </summary>
-public class ProjectService
+public class ProjectService : IProjectApplicationService
 {
     private readonly IProjectRepository _projectRepository;
     private readonly IProjectFlowStorage _flowStorage;

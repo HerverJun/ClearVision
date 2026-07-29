@@ -1,10 +1,12 @@
 # Studio UI Next F06 AI 工程工作台完整开发计划（基于双工作树代码审计）
 
-> 状态：`PROPOSED_AUDITED`
-> 阶段：F06 G0，只读审计与完整计划
+> 状态：`G1_LOCAL_GATES_PASS_REMOTE_CI_PENDING`
+> 阶段：F06 G1，合同、安全身份与唯一 Owner 地基
 > 审计日期：2026-07-29
 > 产品定义：**工业视觉任务工作台，工作台主导，会话辅助；不迁移旧 AI 页面结构。**
-> 当前授权：只允许计划复审；F06 产品实现、默认入口变更和 Legacy AI 退役均未授权。
+> 当前授权：G1 已获授权并完成本地实现/门禁；Remote CI 通过前不得进入 G2。默认入口变更和 Legacy AI 退役均未授权。
+
+G1 当前实施证据见 [F06 G1 阶段报告](./F06_G1_AI合同安全身份与唯一Owner地基.md)、[G1 安全合同 ADR](./ADR-F06-G1-AI合同安全身份与唯一Owner.md) 与 [Handoff Artifact ADR](./ADR-F06-G1-Workspace-Handoff-Artifact.md)。B1-B5 已由本地合同/测试关闭；B6 仅批准 ADR，产品实现延期到 G4。
 
 ## 0. 审计基线、工作树保护与证据限制
 
@@ -763,20 +765,18 @@ REAL_CAMERA_PLC_STATION
 - 默认入口切换、Legacy AI 删除或退役；
 - 把 `FrontendV2`、旧 Studio2 Goal 或 Legacy AI UI 当新前端地基。
 
-## 20. 进入 G1 的复审结论
+## 20. G1 复审与实施结论
 
-**G0 已具备提交计划的条件，但尚不具备直接实施 G1 的授权。** 推荐产品形态、单一 Owner、独立 flag、endpoint hardening 与 handoff authority 已给出明确结论；没有需要再拆 G0.1 的纯审计事项。
+G1 已按获批范围实施。owner-bound Session、窄 HTTP/DTO、Admin/Engineer policy、durable operation identity、existing Project baseline、独立 flag、两个 route 与 route-scoped owner 已完成本地门禁；未实现 G2 产品页或 G4 Handoff 产品代码。
 
-进入 G1 前只需一次正式复审并批准：
+进入 G2 前必须复审：
 
-1. `Studio2.AiWorkbench` 与两个 route 的产品/回滚语义；
-2. B1-B5 的 owner、权限、operation identity 合同；
-3. B6 的 backend handoff artifact 方向与 G4 停止边界；
-4. Admin/Engineer 可 mutation，Operator 在 F06 fail closed；
-5. 稳定线 AI committed drift 的 Git 单向同步策略；
-6. G1 共享文件由主协调代理独占。
+1. G1 Final/Remote SHA 的 CI 与 Final Gate；
+2. B1-B5 的 owner、权限、operation identity 与 Project baseline 实现；
+3. B6 `ADR_APPROVED_IMPLEMENTATION_DEFERRED_TO_G4` 边界；
+4. G2 只允许 Intent/Plan/Clarification，不扩权实现 Build 或 Handoff。
 
-批准后可直接进入 G1，不再追加形式化 G0.1；未批准时保持实现禁止。
+Remote CI 通过后，G2 仍只进入 `AWAITING_REVIEW`；未获得新的明确授权时，G2 实现保持禁止。
 
 ## 21. 当前状态
 
@@ -784,8 +784,15 @@ REAL_CAMERA_PLC_STATION
 F05_STATE=DONE
 F06_G0_STATE=DONE
 F06_PLAN_STATE=PROPOSED_AUDITED
-F06_G1_ENTRY=BLOCKED_PENDING_PLAN_APPROVAL
-F06_IMPLEMENTATION=FORBIDDEN
+F06_G1_STATE=LOCAL_GATES_PASS_REMOTE_CI_PENDING
+F06_B1_OWNER_BOUND_SESSION=CLOSED_LOCAL
+F06_B2_SESSION_HTTP=CLOSED_LOCAL
+F06_B3_MUTATION_POLICY=CLOSED_LOCAL
+F06_B4_OPERATION_IDENTITY=CLOSED_LOCAL
+F06_B5_PROJECT_BASELINE=CLOSED_LOCAL
+F06_B6_HANDOFF_ADR=APPROVED_IMPLEMENTATION_DEFERRED
+F06_G2_ENTRY=BLOCKED_PENDING_G1_REMOTE_CI
+F06_G2_IMPLEMENTATION=FORBIDDEN
 DEFAULT_ENTRY_CHANGE=BLOCKED
 LEGACY_AI_RETIREMENT=NOT_APPROVED
 PRODUCTION_ACCEPTANCE=BLOCKED

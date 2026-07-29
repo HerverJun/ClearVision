@@ -42,7 +42,8 @@ const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() =>
     label: '工程',
     to: '/projects',
     description: '工程管理',
-    current: !workspaceMode.value && route.path.startsWith('/projects') && !route.path.endsWith('/inspection')
+    current: !workspaceMode.value && route.path.startsWith('/projects') &&
+      !route.path.endsWith('/inspection') && !route.path.endsWith('/ai')
   }];
   if (workspaceMode.value) {
     items.push({ label: '流程', to: route.fullPath, description: '当前工程流程', current: true });
@@ -60,6 +61,17 @@ const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() =>
       to: '/inspection',
       description: '选择工程并运行连续检测',
       current: route.path === '/inspection' || route.path.endsWith('/inspection')
+    });
+  }
+  if (session.user && ['Admin', 'Engineer'].includes(session.user.role) &&
+      runtime.featureFlags['Studio2.AiWorkbench'] === true) {
+    const boundProjectId = typeof route.params.id === 'string' ? route.params.id : null;
+    const aiPath = boundProjectId ? `/projects/${encodeURIComponent(boundProjectId)}/ai` : '/ai';
+    items.push({
+      label: 'AI',
+      to: aiPath,
+      description: 'AI 工程工作台',
+      current: route.path === '/ai' || route.path.endsWith('/ai')
     });
   }
   return Object.freeze(items);

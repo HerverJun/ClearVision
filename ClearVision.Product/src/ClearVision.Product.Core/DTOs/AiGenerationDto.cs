@@ -31,6 +31,18 @@ public record AiFlowGenerationRequest(
     public string? AgentRunId { get; init; }
 
     public VisionAgentBuildFromPlanRequest? BuildFromPlan { get; init; }
+
+    public Guid? ClientOperationId { get; init; }
+
+    public AiProjectBaselineIdentity? ProjectBaseline { get; init; }
+}
+
+public sealed record AiProjectBaselineIdentity
+{
+    public string TargetKind { get; init; } = "new";
+    public Guid? ProjectId { get; init; }
+    public long? PersistenceRevision { get; init; }
+    public string CanonicalFlowHash { get; init; } = string.Empty;
 }
 
 public sealed record RuntimePreviewConsent(

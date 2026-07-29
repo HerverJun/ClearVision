@@ -1,0 +1,81 @@
+using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
+using FluentAssertions;
+
+namespace ClearVision.Product.Tests.AI;
+
+public sealed class AiOperationReceiptStoreTests : IDisposable
+{
+    private readonly string _tempRoot = Path.Combine(
+        Path.GetTempPath(),
+        "clearvision-ai-operation-test-" + Guid.NewGuid().ToString("N"));
+
+    [Fact]
+    public void Reserve_ShouldBeOwnerKindScopedIdempotentAndDetectPayloadConflict()
+    {
+        var store = new AiOperationReceiptStore(_tempRoot);
+        var operationId = Guid.NewGuid();
+        var owner = "usr_" + new string('a', 64);
+
+        var first = store.Reserve(owner, AiOperationKinds.PlanRun, operationId, "sha256:" + new string('1', 64));
+        var replay = store.Reserve(owner, AiOperationKinds.PlanRun, operationId, "sha256:" + new string('1', 64));
+        var conflict = store.Reserve(owner, AiOperationKinds.PlanRun, operationId, "sha256:" + new string('2', 64));
+        var otherKind = store.Reserve(owner, AiOperationKinds.BuildRun, operationId, "sha256:" + new string('2', 64));
+        var otherOwner = store.Reserve("usr_" + new string('b', 64), AiOperationKinds.PlanRun,
+            operationId, "sha256:" + new string('2', 64));
+
+        first.Outcome.Should().Be(AiOperationReservationOutcome.Reserved);
+        replay.Outcome.Should().Be(AiOperationReservationOutcome.Existing);
+        replay.Receipt.Should().Be(first.Receipt);
+        conflict.Outcome.Should().Be(AiOperationReservationOutcome.IdentityConflict);
+        conflict.ErrorCode.Should().Be("operation_identity_conflict");
+        otherKind.Outcome.Should().Be(AiOperationReservationOutcome.Reserved);
+        otherOwner.Outcome.Should().Be(AiOperationReservationOutcome.Reserved);
+    }
+
+    [Fact]
+    public void CreatedReceipt_ShouldSurviveReloadWithConfirmedProjectBaseline()
+    {
+        var store = new AiOperationReceiptStore(_tempRoot);
+        var operationId = Guid.NewGuid();
+        var owner = "usr_" + new string('a', 64);
+        var baseline = new AiProjectBaselineIdentity
+        {
+            TargetKind = "existing",
+            ProjectId = Guid.NewGuid(),
+            PersistenceRevision = 8,
+            CanonicalFlowHash = new string('A', 64)
+        };
+        store.Reserve(owner, AiOperationKinds.BuildRun, operationId, "sha256:" + new string('3', 64));
+        store.MarkCreated(owner, AiOperationKinds.BuildRun, operationId, "session-1", "ar_1", baseline)
+            .Should().NotBeNull();
+
+        var reloaded = new AiOperationReceiptStore(_tempRoot);
+        var receipt = reloaded.Get(owner, AiOperationKinds.BuildRun, operationId);
+
+        receipt!.Status.Should().Be(AiOperationStatuses.Created);
+        receipt.SessionId.Should().Be("session-1");
+        receipt.RunId.Should().Be("ar_1");
+        receipt.ProjectBaseline.Should().BeEquivalentTo(baseline);
+    }
+
+    [Fact]
+    public async Task ConcurrentReserve_ShouldHaveExactlyOneWinner()
+    {
+        var store = new AiOperationReceiptStore(_tempRoot);
+        var operationId = Guid.NewGuid();
+        var owner = "usr_" + new string('a', 64);
+        var tasks = Enumerable.Range(0, 20).Select(_ => Task.Run(() =>
+            store.Reserve(owner, AiOperationKinds.PlanRun, operationId, "sha256:" + new string('4', 64))));
+
+        var results = await Task.WhenAll(tasks);
+
+        results.Should().ContainSingle(result => result.Outcome == AiOperationReservationOutcome.Reserved);
+        results.Count(result => result.Outcome == AiOperationReservationOutcome.Existing).Should().Be(19);
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, recursive: true);
+    }
+}
