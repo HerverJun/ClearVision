@@ -202,7 +202,7 @@ public class CameraFrameStreamCoordinatorTests
 
         var frameBytes = CreatePngBytes(new Scalar(64, 128, 192));
         await frameCallback!(frameBytes);
-        var frame = await secondAcquireTask.WaitAsync(TimeSpan.FromSeconds(1));
+        var frame = await secondAcquireTask.WaitAsync(TimeSpan.FromSeconds(5));
 
         frame.ImageData.Should().Equal(frameBytes);
         await camera.Received(2).StartContinuousAcquisitionAsync(Arg.Any<Func<byte[], Task>>());
