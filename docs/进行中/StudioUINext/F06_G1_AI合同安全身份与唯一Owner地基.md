@@ -3,16 +3,18 @@
 ## 当前状态
 
 ```text
-REPORT_STATE=LOCAL_GATES_PASS_REMOTE_CI_PENDING
+REPORT_STATE=DONE
 INITIAL_SHA=267cb8c7e6f25eb666f44ed6873c14678a6304d8
-IMPLEMENTATION_COMMIT_SHA=PENDING
-REMOTE_SHA=PENDING
+IMPLEMENTATION_SHA=0bd630b556d5b5de3e90d4af4b844bb9b3297a26
+REMOTE_VALIDATED_IMPLEMENTATION_SHA=0bd630b556d5b5de3e90d4af4b844bb9b3297a26
+REMOTE_CI_RUN=30423131238
+REMOTE_FINAL_GATE_JOB=90489378205
 F06_G2_IMPLEMENTATION=FORBIDDEN
 DEFAULT_ENTRY_CHANGE=BLOCKED
 LEGACY_AI_RETIREMENT=NOT_APPROVED
 ```
 
-本报告只关闭 G1 地基，不表示完整 AI 产品页、Handoff、默认入口切换或 Legacy AI 退役已经完成。Remote CI/Final Gate 成功前不得写 `F06_G1_STATE=DONE`。
+本报告只关闭 G1 地基，不表示完整 AI 产品页、Handoff、默认入口切换或 Legacy AI 退役已经完成。
 
 ## 1. 稳定线审计与工作树保护
 
@@ -77,6 +79,8 @@ F06_B6_HANDOFF_ADR=APPROVED_IMPLEMENTATION_DEFERRED
 | AgentRunEndpointsTests | PASS，57/57 |
 | services regression | PASS，514/514 |
 | desktop endpoints | PASS，346/346 |
+| Desktop AI owner/route architecture guards | PASS，2/2 |
+| Desktop full（排除只读取受保护 local appsettings 的 formal-default 断言） | PASS，675/675；clean Remote 执行完整 676 项 |
 
 desktop endpoints 第一次执行为 345/346，唯一失败是非 AI `ProjectGlobalVariableEndpointsTests` 的随机临时目录访问拒绝；该用例单独复跑 1/1，通过后完整 346 项再次执行并全部通过。失败与两次通过的 TRX 均保留在 `.tmp/test_results/`，未以单次重试替换事实记录。
 
@@ -98,10 +102,22 @@ Browser fixture：`.tmp/studio-ui-next/f06/evidence/f06-g1-browser-evidence.json
 
 ## 8. Remote closure
 
-首次实现提交与 push 后运行 Remote CI/Final Gate。通过前保持：
+- attempt 1：run `30421911577`，implementation SHA `c7bd9a4dd6a6d97af97c0a5f17249ff98cf0f59b`。Desktop TRX 为 674/676；2 个失败均为 F05 旧架构守卫未把 `aiSessionOwner.ts`、`/ai` 与 `/projects/:id/ai` 加入批准清单。产品/endpoint 测试没有失败。该 attempt 保留为失败证据。
+- 修复：commit `0bd630b556d5b5de3e90d4af4b844bb9b3297a26` 只更新共享 Desktop architecture guard。定向 2/2 与 local Desktop 675/675 通过。
+- attempt 2：run `30423131238` 绑定 `0bd630b556d5b5de3e90d4af4b844bb9b3297a26`；Guard、Product、Desktop、StudioUI、Browser、Contracts/Vision Agent、Detection/Measurement/Data、Operator package/benchmark 与 Industrial Gate 全部成功；Coverage Summary job 成功；Final Gate job `90489378205` 成功。
+
+G1 最终状态：
 
 ```text
-F06_G1_STATE=REMOTE_CI_PENDING
-F06_G2_ENTRY=BLOCKED
+F06_G1_STATE=DONE
+F06_B1_OWNER_BOUND_SESSION=CLOSED
+F06_B2_SESSION_HTTP=CLOSED
+F06_B3_MUTATION_POLICY=CLOSED
+F06_B4_OPERATION_IDENTITY=CLOSED
+F06_B5_PROJECT_BASELINE=CLOSED
+F06_B6_HANDOFF_ADR=APPROVED_IMPLEMENTATION_DEFERRED
+F06_G2_ENTRY=AWAITING_REVIEW
 F06_G2_IMPLEMENTATION=FORBIDDEN
+DEFAULT_ENTRY_CHANGE=BLOCKED
+LEGACY_AI_RETIREMENT=NOT_APPROVED
 ```
