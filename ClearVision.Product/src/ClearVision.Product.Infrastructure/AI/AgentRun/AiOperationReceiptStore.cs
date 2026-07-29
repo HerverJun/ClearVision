@@ -98,6 +98,7 @@ public sealed class AiOperationReceiptStore : IAiOperationReceiptStore
 {
     public const string StorageRootEnvironmentVariable = "CV_AI_OPERATION_STORE_ROOT";
     private const int MaxReceipts = 1000;
+    private const int MaxPersistenceAttempts = 5;
     private static readonly TimeSpan Retention = TimeSpan.FromDays(7);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -286,38 +287,50 @@ public sealed class AiOperationReceiptStore : IAiOperationReceiptStore
 
     private bool Persist(IReadOnlyDictionary<OperationKey, AiOperationReceipt> candidate)
     {
-        string? tempPath = null;
-        try
+        for (var attempt = 1; attempt <= MaxPersistenceAttempts; attempt++)
         {
-            var document = new AiOperationReceiptDocument
+            string? tempPath = null;
+            try
             {
-                Receipts = candidate.Values
-                    .OrderByDescending(receipt => receipt.UpdatedAtUtc)
-                    .Take(MaxReceipts)
-                    .ToList()
-            };
-            var directory = Path.GetDirectoryName(_storagePath) ?? AppContext.BaseDirectory;
-            Directory.CreateDirectory(directory);
-            tempPath = Path.Combine(directory, $"{Path.GetFileName(_storagePath)}.{Guid.NewGuid():N}.tmp");
-            WriteAllTextDurably(tempPath, JsonSerializer.Serialize(document, JsonOptions));
-            if (File.Exists(_storagePath))
-            {
-                File.Replace(tempPath, _storagePath, null, ignoreMetadataErrors: true);
+                var document = new AiOperationReceiptDocument
+                {
+                    Receipts = candidate.Values
+                        .OrderByDescending(receipt => receipt.UpdatedAtUtc)
+                        .Take(MaxReceipts)
+                        .ToList()
+                };
+                var directory = Path.GetDirectoryName(_storagePath) ?? AppContext.BaseDirectory;
+                Directory.CreateDirectory(directory);
+                tempPath = Path.Combine(directory, $"{Path.GetFileName(_storagePath)}.{Guid.NewGuid():N}.tmp");
+                WriteAllTextDurably(tempPath, JsonSerializer.Serialize(document, JsonOptions));
+                if (File.Exists(_storagePath))
+                {
+                    File.Replace(tempPath, _storagePath, null, ignoreMetadataErrors: true);
+                }
+                else
+                {
+                    File.Move(tempPath, _storagePath);
+                }
+                return true;
             }
-            else
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
             {
-                File.Move(tempPath, _storagePath);
+                if (tempPath != null && File.Exists(tempPath))
+                {
+                    try { File.Delete(tempPath); }
+                    catch (Exception cleanupError) when (cleanupError is IOException or UnauthorizedAccessException) { }
+                }
+
+                if (attempt == MaxPersistenceAttempts || error is UnauthorizedAccessException or JsonException)
+                {
+                    return false;
+                }
+
+                Thread.Sleep(TimeSpan.FromMilliseconds(25 * (1 << (attempt - 1))));
             }
-            return true;
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
-        {
-            if (tempPath != null && File.Exists(tempPath))
-            {
-                try { File.Delete(tempPath); } catch (IOException) { }
-            }
-            return false;
-        }
+
+        return false;
     }
 
     private void Load()

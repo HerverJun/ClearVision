@@ -74,6 +74,37 @@ public sealed class AiOperationReceiptStoreTests : IDisposable
         results.Count(result => result.Outcome == AiOperationReservationOutcome.Existing).Should().Be(19);
     }
 
+    [Fact]
+    public async Task Reserve_ShouldRetryTransientDestinationSharingViolation()
+    {
+        var store = new AiOperationReceiptStore(_tempRoot);
+        var owner = "usr_" + new string('a', 64);
+        store.Reserve(
+                owner,
+                AiOperationKinds.SessionCreate,
+                Guid.NewGuid(),
+                "sha256:" + new string('5', 64))
+            .Outcome.Should().Be(AiOperationReservationOutcome.Reserved);
+
+        var storagePath = Path.Combine(_tempRoot, "ai_operation_receipts.json");
+        using var destinationLock = new FileStream(
+            storagePath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.None);
+        var reserveTask = Task.Run(() => store.Reserve(
+            owner,
+            AiOperationKinds.PlanRun,
+            Guid.NewGuid(),
+            "sha256:" + new string('6', 64)));
+
+        await Task.Delay(90);
+        destinationLock.Dispose();
+        var result = await reserveTask;
+
+        result.Outcome.Should().Be(AiOperationReservationOutcome.Reserved);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempRoot)) Directory.Delete(_tempRoot, recursive: true);

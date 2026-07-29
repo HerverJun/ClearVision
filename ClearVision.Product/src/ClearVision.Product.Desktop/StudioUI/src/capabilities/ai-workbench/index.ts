@@ -1,4 +1,5 @@
 export * from './actionModel';
+export * from './agentRunStreamAdapter';
 export * from './aiSessionOwner';
 export * from './apiAdapter';
 export * from './contracts';

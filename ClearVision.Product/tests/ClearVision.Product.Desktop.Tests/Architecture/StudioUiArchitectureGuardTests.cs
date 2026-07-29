@@ -152,6 +152,7 @@ public sealed class StudioUiArchitectureGuardTests
         abortControllerOwners.Should().BeEquivalentTo(new[]
         {
             "src/app/auth/authLifecycleOwner.ts",
+            "src/capabilities/ai-workbench/agentRunStreamAdapter.ts",
             "src/capabilities/ai-workbench/aiSessionOwner.ts",
             "src/capabilities/inspection-run/inspectionRunOwner.ts",
             "src/capabilities/inspection-run/inspectionRunPageOwner.ts",

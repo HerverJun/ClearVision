@@ -77,7 +77,8 @@ describe('F06 G1 AI contract security and single owner architecture guards', () 
     expect(ownerConsumers).toEqual(['src/capabilities/ai-workbench/AiWorkbenchPage.vue']);
 
     const page = read(join(capabilityRoot, 'AiWorkbenchPage.vue'));
-    expect(page).toContain('onUnmounted(() => owner.dispose())');
+    expect(page).toContain('owner.value?.dispose()');
+    expect(page).toContain('watch(routeIdentity, replaceOwner');
     expect(page).not.toMatch(/v-show|display:\s*none/);
   });
 
@@ -85,7 +86,7 @@ describe('F06 G1 AI contract security and single owner architecture guards', () 
     const combined = capabilityFiles.map(path => read(path)).join('\n');
     const apiAdapter = read(join(capabilityRoot, 'apiAdapter.ts'));
 
-    expect(apiAdapter).toContain("import type { ApiTransport } from '@/platform/api'");
+    expect(apiAdapter).toContain("from '@/platform/api'");
     expect(combined).not.toMatch(/\bfetch\s*\(|new\s+EventSource\s*\(|window\.chrome\.webview|postMessage\s*\(/);
     expect(combined).not.toMatch(/\/api\/ai\/agent-plan(?:["'/?]|$)/);
     expect(combined).not.toMatch(/localStorage|defineStore\s*\(|createPinia\s*\(|EventBus|ServiceRegistry/);

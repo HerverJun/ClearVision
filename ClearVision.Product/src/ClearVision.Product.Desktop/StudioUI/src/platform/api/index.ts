@@ -2,6 +2,7 @@ export {
   createApiTransport,
   type ApiBlobResponse,
   type ApiGetOptions,
+  type ApiTextStreamResponse,
   type ApiTokenProvider,
   type ApiTransport,
   type ApiUnauthorizedContext,

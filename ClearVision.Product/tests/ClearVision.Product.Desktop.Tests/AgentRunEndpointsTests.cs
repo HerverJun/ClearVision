@@ -2294,7 +2294,9 @@ public sealed class AgentRunEndpointsTests
         var allowedSnapshotKeys = new HashSet<string>(StringComparer.Ordinal)
         {
             "schemaVersion", "revision", "projectId", "lifecycleState", "planRunId", "planRunStatus",
-            "buildRunId", "buildRunStatus", "buildClientOperationId", "projectBaseline", "updatedAtUtc"
+            "buildRunId", "buildRunStatus", "buildClientOperationId", "projectBaseline", "requirementMode",
+            "planQuestionSelections", "confirmedPlanAnswers", "optimisticPlanAnswers", "answerRevision",
+            "readinessPreview", "planAcceptedRecommendedDefaults", "planTerminalSequence", "updatedAtUtc"
         };
         foreach (var property in latest.EnumerateObject())
         {
@@ -2305,6 +2307,8 @@ public sealed class AgentRunEndpointsTests
         normalizedConflictJson.Should().NotContain("secret-token");
         normalizedConflictJson.Should().NotContain("reasoning");
         normalizedConflictJson.Should().NotContain("rawpayload");
+        normalizedConflictJson.Should().NotContain("pendingplansnapshot");
+        normalizedConflictJson.Should().NotContain("mutationreceipts");
     }
 
     [Fact(DisplayName = "AI operation identity replays matching requests rejects conflicts and supports lookup")]

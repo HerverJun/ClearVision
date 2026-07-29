@@ -1,34 +1,74 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, shallowRef, watch, type WatchStopHandle } from 'vue';
 import { useRoute } from 'vue-router';
 import { useProductRuntime } from '@/app/productRuntime';
-import { CvPageHeader } from '@/design-system/patterns';
-import { CvStatusBadge } from '@/design-system/primitives';
-import AiWorkbenchStatus from './AiWorkbenchStatus.vue';
-import { createAiSessionOwner } from './aiSessionOwner';
-import type { AiWorkbenchActionId } from './actionModel';
+import { CvPageHeader, CvPageState } from '@/design-system/patterns';
+import { CvInlineAlert, CvStatusBadge } from '@/design-system/primitives';
+import AiClarificationPanel from './AiClarificationPanel.vue';
+import AiPlanProgress from './AiPlanProgress.vue';
+import AiPlanWorkspace from './AiPlanWorkspace.vue';
+import AiProjectContext from './AiProjectContext.vue';
+import AiTaskComposer from './AiTaskComposer.vue';
+import AiWorkbenchStage from './AiWorkbenchStage.vue';
+import { aiWorkbenchActionModel, type AiWorkbenchActionId } from './actionModel';
+import { createAiSessionOwner, type AiSessionOwner } from './aiSessionOwner';
+import type { AiRequirementMode } from './contracts';
+import { projectAiWorkbench } from './projection';
+import { initialAiWorkbenchState } from './reducer';
 
 const route = useRoute();
 const runtime = useProductRuntime();
-const requestedSessionId = computed(() => typeof route.query.sessionId === 'string'
-  ? route.query.sessionId
-  : null);
-const projectId = computed(() => typeof route.params.id === 'string' ? route.params.id : null);
-const owner = createAiSessionOwner({
-  api: runtime.api,
-  requestedSessionId: requestedSessionId.value,
-  projectId: projectId.value
-});
-const state = computed(() => owner.state.value);
-const diagnostics = computed(() => owner.diagnostics());
+const owner = shallowRef<AiSessionOwner | null>(null);
+let stopRouteWatch: WatchStopHandle | null = null;
 
-function handleAction(actionId: AiWorkbenchActionId): void {
-  if (actionId === 'retry-session') void owner.retry();
-  if (actionId === 'refresh-session') void owner.refresh();
+const state = computed(() => owner.value?.state.value ?? initialAiWorkbenchState);
+const projection = computed(() => owner.value?.projection.value ?? projectAiWorkbench(state.value));
+const actionModel = computed(() => owner.value?.actionModel.value ?? aiWorkbenchActionModel(state.value));
+const diagnostics = computed(() => owner.value?.diagnostics() ?? {
+  requestCount: 0, streamCount: 0, timerCount: 0, subscriptionCount: 0, disposed: true
+});
+const requestedSessionId = computed(() => typeof route.query.sessionId === 'string' ? route.query.sessionId : null);
+const projectId = computed(() => typeof route.params.id === 'string' ? route.params.id : null);
+const routeIdentity = computed(() => `${String(route.name)}|${projectId.value ?? ''}|${requestedSessionId.value ?? ''}`);
+const showComposer = computed(() => state.value.phase === 'idle');
+const showProgress = computed(() => ['intent-routing', 'planning', 'cancelling', 'recovering'].includes(state.value.phase) && !state.value.plan);
+
+function replaceOwner(): void {
+  owner.value?.dispose();
+  const next = createAiSessionOwner({
+    api: runtime.api,
+    requestedSessionId: requestedSessionId.value,
+    projectId: projectId.value
+  });
+  owner.value = next;
+  void next.start();
 }
 
-onMounted(() => void owner.start());
-onUnmounted(() => owner.dispose());
+function handleAction(actionId: AiWorkbenchActionId): void {
+  const current = owner.value;
+  if (!current) return;
+  if (actionId === 'retryIntent') void current.retryIntent();
+  if (actionId === 'startPlan') void current.startPlan();
+  if (actionId === 'cancelPlan') void current.cancelPlan();
+  if (actionId === 'previewReadiness') void current.previewReadiness();
+  if (actionId === 'reconcile') void current.reconcile();
+  if (actionId === 'startNewTask') current.startNewTask();
+}
+
+function submitTask(description: string, mode: AiRequirementMode): void {
+  void owner.value?.submitTask(description, mode);
+}
+
+onMounted(() => {
+  stopRouteWatch = watch(routeIdentity, replaceOwner, { immediate: true });
+});
+
+onUnmounted(() => {
+  stopRouteWatch?.();
+  stopRouteWatch = null;
+  owner.value?.dispose();
+  owner.value = null;
+});
 </script>
 
 <template>
@@ -43,41 +83,98 @@ onUnmounted(() => owner.dispose());
     <CvPageHeader title="AI 工程工作台">
       <template #meta>
         <CvStatusBadge
-          :tone="owner.projection.value.statusTone"
-          :label="owner.projection.value.statusLabel"
+          :tone="projection.statusTone"
+          :label="projection.statusLabel"
         />
-        <span class="ai-workbench-page__scope">
-          {{ projectId ? '工程会话' : '新工程会话' }}
-        </span>
+        <span class="ai-workbench-page__scope">{{ projectId ? '工程方案' : '独立方案' }}</span>
       </template>
     </CvPageHeader>
 
-    <AiWorkbenchStatus
-      :state="state"
-      :projection="owner.projection.value"
-      @action="handleAction"
+    <div
+      v-if="state.session"
+      class="ai-workbench-page__context"
+    >
+      <AiProjectContext
+        :project="state.project"
+        :session="state.session"
+      />
+    </div>
+
+    <CvPageState
+      v-if="projection.pageState && !state.session"
+      :kind="projection.pageState"
+      :title="projection.pageStateTitle"
+      :description="projection.pageStateDescription"
+      data-ai-session-state
     />
+
+    <template v-else>
+      <AiWorkbenchStage
+        :projection="projection"
+        :action-model="actionModel"
+        @action="handleAction"
+      />
+
+      <main class="ai-workbench-page__main">
+        <AiTaskComposer
+          v-if="showComposer"
+          :initial-description="state.taskDescription"
+          :initial-mode="state.requirementMode"
+          :busy="projection.busy"
+          @submit="submitTask"
+        />
+
+        <CvInlineAlert
+          v-if="state.intent && !state.plan && !showProgress"
+          :tone="state.phase === 'plan-failed' ? 'error' : 'warning'"
+          title="任务理解结果"
+        >
+          {{ state.intent.publicReason || state.intent.assistantReply }}
+        </CvInlineAlert>
+
+        <AiPlanProgress
+          v-if="showProgress"
+          :events="state.run.events"
+        />
+
+        <div
+          v-if="state.plan && state.session"
+          class="ai-workbench-page__workspace"
+        >
+          <AiPlanWorkspace
+            :plan="state.plan"
+            :readiness="state.readiness"
+            :session="state.session"
+            :events="state.run.events"
+          />
+          <AiClarificationPanel
+            v-if="projection.clarificationQuestions.length"
+            :questions="projection.clarificationQuestions"
+            :selections="state.session.snapshot.planQuestionSelections"
+            :confirmed-answers="state.session.snapshot.confirmedPlanAnswers"
+            :optimistic-answers="state.session.snapshot.optimisticPlanAnswers"
+            :busy="projection.busy"
+            @submit="answers => owner?.answerClarification(answers)"
+            @accept-recommended="owner?.acceptRecommendedAnswers()"
+          />
+        </div>
+      </main>
+    </template>
   </section>
 </template>
 
 <style scoped>
-.ai-workbench-page {
-  display: grid;
-  min-width: 0;
-  align-content: start;
-  gap: var(--cv-density-page-gap);
-  padding: var(--cv-density-page-padding);
-}
+.ai-workbench-page { display: grid; min-width: 0; align-content: start; }
+.ai-workbench-page__scope { display: inline-flex; min-height: 22px; align-items: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.ai-workbench-page__context { padding: 0 var(--cv-density-page-padding) var(--cv-space-3); }
+.ai-workbench-page__main { display: grid; min-width: 0; gap: var(--cv-density-page-gap); padding: var(--cv-density-page-gap) var(--cv-density-page-padding) var(--cv-density-page-padding); }
+.ai-workbench-page__workspace { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(340px, 0.85fr); min-width: 0; align-items: start; gap: var(--cv-density-page-gap); }
 
-.ai-workbench-page__scope {
-  display: inline-flex;
-  min-height: 22px;
-  align-items: center;
-  color: var(--cv-text-secondary);
-  font-size: var(--cv-font-size-xs);
+@media (max-width: 1180px) {
+  .ai-workbench-page__workspace { grid-template-columns: 1fr; }
 }
-
 @media (max-width: 640px) {
-  .ai-workbench-page { padding: var(--cv-space-4); }
+  .ai-workbench-page__context { padding-inline: var(--cv-space-4); }
+  .ai-workbench-page__main { padding: var(--cv-space-4); }
 }
 </style>
