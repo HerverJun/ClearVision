@@ -1,12 +1,14 @@
 # Studio UI Next F06 G2 AI 任务入口、Intent、Plan 与 Clarification 完成报告
 
-> 状态：`LOCAL_COMPLETE_REMOTE_PENDING`
+> 状态：`DONE`
 >
 > Initial SHA：`b393b9e7e3693708a3bd09e61cf8eaf6a08e754d`
 >
 > Implementation SHA：`a1af5f5bc1b493487f7ecb6bb9adb2368068d8a6`
 >
-> Final / Remote SHA：待 Remote CI 后补充
+> Final / Remote SHA：`44bfd479e7d3e538de066e49abe91a8828372aa8`
+>
+> Final Remote CI：run `30447730377`，Final Gate job `90570574269`，`PASS`
 >
 > 模型证据口径：`MODEL_MODE=RULE_FALLBACK`，`REAL_LLM_PRODUCT_QUALITY=NOT_EVALUATED`
 
@@ -118,6 +120,8 @@ create / operation lookup
 | F06 Playwright | PASS，5/5 |
 | Product AI directed | PASS，235/235 |
 | `AiOperationReceiptStoreTests` | PASS，4/4 |
+| Camera restart targeted | PASS，1/1，131 ms |
+| Desktop full coverage（受保护 dirty tree） | 675/676；唯一失败为本地正式默认值守卫，目标 camera test 119 ms PASS |
 | `AgentRunEndpointsTests` | PASS，57/57 |
 | Desktop endpoint regression | PASS，346/346 |
 | Desktop G2-related architecture guards | PASS，3/3 |
@@ -127,6 +131,8 @@ create / operation lookup
 | bundle reproducibility | PASS |
 
 工作树 full Vitest 观测为 550 PASS / 4 FAIL；4 个失败只读取受保护的本地 `appsettings.json`，该文件由用户设置 `StudioUiEnabled=true`，而 committed formal-default 断言要求 `false`。因此正式 full Vitest 从 implementation commit 导出的干净归档执行，结果为 94 files / 554 tests 全部通过；没有把工作树配置差异伪装成产品失败或篡改用户配置。
+
+Desktop full coverage 在本地受保护 dirty tree 上执行 676 个测试，675 PASS / 1 FAIL；唯一失败同样是 `DesktopStartupDefaultsAndDpiAuthority_ShouldRemainExplicit` 读取用户本地 `appsettings.json`。本轮新增的 camera restart 用例在该全量负载下 119 ms PASS。最终远端 committed tree 为 676/676 PASS。
 
 ## 8. Bundle
 
@@ -151,7 +157,7 @@ F06 Playwright 覆盖：
 - keyboard/focus、零横向溢出、零 console/page error；
 - 无 Build、Handoff、Apply 或 Workspace save 请求。
 
-截图输出到 `.tmp/studio-ui-next/f06-g2/browser/a1af5f5bc1b4/`，每张 PNG 配套 JSON，source SHA 均为 `a1af5f5bc1b493487f7ecb6bb9adb2368068d8a6`：
+截图输出到 `.tmp/studio-ui-next/f06-g2/browser/fc75f752461f/`，每张 PNG 配套 JSON，source SHA 均为 `fc75f752461f4da104f67a58026a72a14806274c`。后续提交只修改测试与报告，PNG 哈希和产品像素未变化：
 
 | 场景 | Viewport / density | PNG SHA-256 |
 |---|---|---|
@@ -194,24 +200,48 @@ F06 Playwright 覆盖：
 - `ClearVision.Product/tests/ClearVision.Product.UI.Tests/playwright-report/`；
 - 其他与 G2 无关的本地临时内容。
 
-提交前会再次以显式路径清单暂存，并核对 staged diff，禁止上述文件进入 commit。
+所有提交均使用显式路径清单暂存并核对 staged diff；上述文件未进入任何 G2 commit。
 
 ## 11. Remote closure
 
-`PENDING`。
+最终 Remote CI：run `30447730377`，head SHA `44bfd479e7d3e538de066e49abe91a8828372aa8`，`PASS`。
 
-- attempt 1：run `30441105088`，head SHA `0b6fdba9e01a5a1de5155451b8e94ca48664dfb4`；Guard job `90540374610` 的 Secret Scan 把 CSS class 中由 `task` 尾部和长后缀形成的 token-like 子串识别为 compatible token，命中模板和样式两行。文件中没有 secret；其余 jobs 因 Guard 依赖被跳过，Final Gate job `90540523342` 随之失败。
-- 修复：局部类名改为 `ai-composer-supporting-text`，不再形成 token-like 子串，也不改变 DOM 语义或视觉。工作区 lint、typecheck 与 F06 Playwright 5/5 已通过；修复提交后的同一 Secret Scan 与完整 Remote CI 待执行。
+### 11.1 Attempts
+
+| Attempt | Run / SHA | 结果与处理 |
+|---|---|---|
+| 1 | `30441105088` / `0b6fdba9e01a5a1de5155451b8e94ca48664dfb4` | Guard job `90540374610` 的 Secret Scan 将 CSS class 中的 token-like 子串误报为 compatible token；文件无 secret。类名局部改为 `ai-composer-supporting-text`，不改变 DOM 语义或视觉。 |
+| 2 | `30441924658` / `a079b2ba5e61b00e233ae5f77b2aacb56dba0f5b` | Guard、StudioUI、Product、Browser 等通过；Desktop job `90543902418` 为 675/676，camera restart 测试在 1 秒有限等待处 timeout。failed-only rerun（run attempt 2，job `90550186380`）复现同一失败。基线同日成功记录已耗时 780 ms，因此把该测试有限等待统一为同文件既有的 5 秒；生产 camera 逻辑不变。 |
+| 3 | `30445054790` / `9e8239c9bda919fab335cafd5ae5540391f0c14a` | Desktop 676/676、Browser 与其余主体 jobs 通过；Product job `90554064709` 为 3845 PASS / 1 FAIL / 2 skipped。失败测试用 `Task.Delay` continuation 释放独占文件锁，在全量 suite 线程池压力下晚于 store 的有限退避窗口。改为专用后台线程释放锁，保留真实 sharing violation，生产 retry budget 与 fail-closed 语义不变。 |
+| 4 | `30447730377` / `44bfd479e7d3e538de066e49abe91a8828372aa8` | 所有要求门禁与 Final Gate 通过。 |
+
+### 11.2 Final jobs
+
+| Job | ID | 结果 |
+|---|---:|---|
+| Guard & Operator Catalog | `90562130713` | PASS |
+| StudioUI Quality Gates | `90563055199` | PASS |
+| Product Tests | `90563055234` | PASS；3848 total / 3846 passed / 2 skipped；performance budget 10/10 |
+| Desktop Tests | `90563055153` | PASS；676/676；camera restart 625 ms |
+| Legacy UI & StudioUI Browser | `90563055162` | PASS |
+| Contracts & Vision Agent | `90563055262` | PASS |
+| Detection / Measurement / Data | `90563055227` | PASS |
+| Operator Industrial Gate | `90563055161` | PASS |
+| OperatorLibrary Package & Benchmark | `90563055147` | PASS |
+| Coverage Summary | `90570363653` | PASS |
+| Final Gate | `90570574269` | PASS |
+
+`Code Quality` 按 `workflow_dispatch` 条件正常 skipped；未提供 release version，因此 `Release Build` 与 `Create Release` 正常 skipped，不属于 G2 门禁失败。
 
 ## 12. 当前阶段状态
 
-Remote 门禁尚未完成，因此本报告此刻不宣告最终 `DONE`：
+G2 本地、真实链路、Browser、bundle 与 Remote Final Gate 已完成。进入 G3 仍需独立评审，不授权本轮继续实现：
 
 ```text
-F06_G2_STATE=LOCAL_COMPLETE_REMOTE_PENDING
-F06_INTENT_PLAN_CLARIFICATION=LOCAL_COMPLETE
+F06_G2_STATE=DONE
+F06_INTENT_PLAN_CLARIFICATION=COMPLETE
 F06_REAL_LLM_PRODUCT_QUALITY=NOT_EVALUATED
-F06_G3_ENTRY=BLOCKED_PENDING_REMOTE_AND_REVIEW
+F06_G3_ENTRY=AWAITING_REVIEW
 F06_G3_IMPLEMENTATION=FORBIDDEN
 F06_HANDOFF_IMPLEMENTATION=FORBIDDEN
 DEFAULT_ENTRY_CHANGE=BLOCKED
