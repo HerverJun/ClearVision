@@ -198,7 +198,10 @@ F06 Playwright 覆盖：
 
 ## 11. Remote closure
 
-`PENDING`。推送前执行 `git fetch origin --prune` 并确认 `studio-ui-next` 无分叉；Remote CI、Coverage Summary 与 Final Gate 的 run/job/SHA 将在通过后补入本节。
+`PENDING`。
+
+- attempt 1：run `30441105088`，head SHA `0b6fdba9e01a5a1de5155451b8e94ca48664dfb4`；Guard job `90540374610` 的 Secret Scan 把 CSS class `ai-task-composer__description` 中的 `sk-` 子串识别为 compatible token，命中模板和样式两行。文件中没有 secret；其余 jobs 因 Guard 依赖被跳过，Final Gate job `90540523342` 随之失败。
+- 修复：局部类名改为不含 `sk-` 的 `ai-composer-supporting-text`，不改变 DOM 语义或视觉。工作区 lint、typecheck 与 F06 Playwright 5/5 已通过；修复提交后的同一 Secret Scan 与完整 Remote CI 待执行。
 
 ## 12. 当前阶段状态
 

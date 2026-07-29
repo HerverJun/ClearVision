@@ -62,7 +62,7 @@ function submit(): void {
         <h2 class="ai-task-composer__title">
           描述视觉检测任务
         </h2>
-        <p class="ai-task-composer__description">
+        <p class="ai-composer-supporting-text">
           说明检测对象、缺陷或测量目标，以及期望的判定和输出。
         </p>
       </div>
@@ -142,7 +142,7 @@ function submit(): void {
 }
 .ai-task-composer__heading { display: flex; align-items: start; justify-content: space-between; gap: var(--cv-space-4); }
 .ai-task-composer__title { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-type-section-title-size); line-height: var(--cv-line-height-tight); }
-.ai-task-composer__description { margin: var(--cv-space-1) 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); line-height: var(--cv-line-height-normal); }
+.ai-composer-supporting-text { margin: var(--cv-space-1) 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); line-height: var(--cv-line-height-normal); }
 .ai-task-composer__count { flex: 0 0 auto; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); font-variant-numeric: tabular-nums; }
 .ai-task-composer__field { display: grid; gap: var(--cv-space-2); }
 .ai-task-composer__label { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
