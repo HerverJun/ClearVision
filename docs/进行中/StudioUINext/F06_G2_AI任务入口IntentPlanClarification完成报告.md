@@ -4,7 +4,9 @@
 >
 > Initial SHA：`b393b9e7e3693708a3bd09e61cf8eaf6a08e754d`
 >
-> Implementation / Final / Remote SHA：待提交与 Remote CI 后补充
+> Implementation SHA：`a1af5f5bc1b493487f7ecb6bb9adb2368068d8a6`
+>
+> Final / Remote SHA：待 Remote CI 后补充
 >
 > 模型证据口径：`MODEL_MODE=RULE_FALLBACK`，`REAL_LLM_PRODUCT_QUALITY=NOT_EVALUATED`
 
@@ -112,6 +114,7 @@ create / operation lookup
 | StudioUI lint | PASS |
 | StudioUI typecheck | PASS |
 | AI / F06 architecture targeted Vitest | PASS，6 files / 24 tests |
+| StudioUI full unit（committed tree 干净归档） | PASS，94 files / 554 tests |
 | F06 Playwright | PASS，5/5 |
 | Product AI directed | PASS，235/235 |
 | `AiOperationReceiptStoreTests` | PASS，4/4 |
@@ -123,7 +126,7 @@ create / operation lookup
 | bundle gate | PASS |
 | bundle reproducibility | PASS |
 
-工作树 full Vitest 观测为 550 PASS / 4 FAIL；4 个失败只读取受保护的本地 `appsettings.json`，该文件由用户设置 `StudioUiEnabled=true`，而 committed formal-default 断言要求 `false`。本报告不把该工作树结果写成全量 PASS；提交后从 committed tree 导出的干净归档会执行正式 full Vitest。
+工作树 full Vitest 观测为 550 PASS / 4 FAIL；4 个失败只读取受保护的本地 `appsettings.json`，该文件由用户设置 `StudioUiEnabled=true`，而 committed formal-default 断言要求 `false`。因此正式 full Vitest 从 implementation commit 导出的干净归档执行，结果为 94 files / 554 tests 全部通过；没有把工作树配置差异伪装成产品失败或篡改用户配置。
 
 ## 8. Bundle
 
@@ -148,7 +151,17 @@ F06 Playwright 覆盖：
 - keyboard/focus、零横向溢出、零 console/page error；
 - 无 Build、Handoff、Apply 或 Workspace save 请求。
 
-提交后截图输出到 `.tmp/studio-ui-next/f06-g2/browser/`，每张 PNG 配套 JSON，记录 source SHA、viewport、density、像素尺寸、SHA-256 与错误审计。
+截图输出到 `.tmp/studio-ui-next/f06-g2/browser/a1af5f5bc1b4/`，每张 PNG 配套 JSON，source SHA 均为 `a1af5f5bc1b493487f7ecb6bb9adb2368068d8a6`：
+
+| 场景 | Viewport / density | PNG SHA-256 |
+|---|---|---|
+| unbound idle | 1920×1080 / comfortable | `de2caa66166a95da10d6aa5944557a335a08185e9301c3dbfd5fed8851f84cd7` |
+| unbound clarifying | 1920×1080 / comfortable | `82e1c4b41a426aee4c38d4b3ee7fe0b9222665f619e1b5835551c67d2e6da71f` |
+| unbound plan ready | 1920×1080 / comfortable | `79b7a29b4212d39b6ba9ce61f41c3058cc6c2ad33123c368257bb4c9310bacf8` |
+| project-bound long Chinese clarifying | 1366×768 / compact | `d08400adb378975c248bbcb86003dd510d7527fd6cae88b9749f2bc4b8c3d7bf` |
+| service unavailable | 1366×768 / comfortable | `1ad38dc420f694bc805fa635b29ebd612346337a4a9a0a49eb3ef28f67933534` |
+
+所有场景均为 `overflow=0`、零 console/page error、零 forbidden G3 request。
 
 ### 9.2 真实 Debug Desktop / ASP.NET Core
 
