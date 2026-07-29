@@ -152,6 +152,7 @@ public sealed class StudioUiArchitectureGuardTests
         abortControllerOwners.Should().BeEquivalentTo(new[]
         {
             "src/app/auth/authLifecycleOwner.ts",
+            "src/capabilities/ai-workbench/aiSessionOwner.ts",
             "src/capabilities/inspection-run/inspectionRunOwner.ts",
             "src/capabilities/inspection-run/inspectionRunPageOwner.ts",
             "src/capabilities/project-lifecycle/projectLifecycleCommandOwner.ts",
@@ -471,7 +472,9 @@ public sealed class StudioUiArchitectureGuardTests
         router.Should().Contain("redirect: '/projects'");
         router.Should().Contain("path: 'overview'");
         router.Should().Contain("path: 'projects'");
+        router.Should().Contain("path: 'ai'");
         router.Should().Contain("path: 'projects/:id'");
+        router.Should().Contain("path: 'projects/:id/ai'");
         router.Should().Contain("path: 'operators'");
         router.Should().Contain("path: 'operators/:operatorType'");
         router.Should().Contain("path: 'stations'");
@@ -491,8 +494,8 @@ public sealed class StudioUiArchitectureGuardTests
         router.Should().Contain("path: '/setup'");
         router.Should().Contain("path: '/forbidden'");
         router.Should().NotContain("/settings");
-        router.Should().NotContain("/ai");
 
+        navigation.Should().Contain("to: '/ai'");
         navigation.Should().Contain("to: '/projects'");
         navigation.Should().Contain("to: '/inspection'");
         navigation.Should().Contain("to: '/results'");
