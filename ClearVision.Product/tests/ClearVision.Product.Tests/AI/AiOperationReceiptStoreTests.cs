@@ -75,7 +75,7 @@ public sealed class AiOperationReceiptStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task Reserve_ShouldRetryTransientDestinationSharingViolation()
+    public void Reserve_ShouldRetryTransientDestinationSharingViolation()
     {
         var store = new AiOperationReceiptStore(_tempRoot);
         var owner = "usr_" + new string('a', 64);
@@ -92,17 +92,24 @@ public sealed class AiOperationReceiptStoreTests : IDisposable
             FileMode.Open,
             FileAccess.Read,
             FileShare.None);
-        var reserveTask = Task.Run(() => store.Reserve(
+        var lockReleaser = new Thread(() =>
+        {
+            Thread.Sleep(90);
+            destinationLock.Dispose();
+        })
+        {
+            IsBackground = true
+        };
+        lockReleaser.Start();
+
+        var result = store.Reserve(
             owner,
             AiOperationKinds.PlanRun,
             Guid.NewGuid(),
-            "sha256:" + new string('6', 64)));
-
-        await Task.Delay(90);
-        destinationLock.Dispose();
-        var result = await reserveTask;
+            "sha256:" + new string('6', 64));
 
         result.Outcome.Should().Be(AiOperationReservationOutcome.Reserved);
+        lockReleaser.Join(TimeSpan.FromSeconds(5)).Should().BeTrue();
     }
 
     public void Dispose()
