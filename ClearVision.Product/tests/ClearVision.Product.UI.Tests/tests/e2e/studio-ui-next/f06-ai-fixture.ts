@@ -19,7 +19,12 @@ export interface F06BrowserAudit {
   readonly requests: Array<{ method: string; path: string; body: unknown }>;
   readonly consoleErrors: string[];
   readonly pageErrors: string[];
+  readonly releaseBuildStream: () => void;
+  readonly releaseRevalidation: () => void;
 }
+
+export type F06InitialBuildState = 'ready' | 'building' | 'validating' | 'failed' | 'cancelled' |
+  'baseline-conflict' | 'stale';
 
 export interface F06BrowserFixtureOptions {
   readonly role?: 'Admin' | 'Engineer' | 'Operator';
@@ -28,6 +33,9 @@ export interface F06BrowserFixtureOptions {
   readonly failSession?: boolean;
   readonly longContent?: boolean;
   readonly recoveredBuild?: boolean;
+  readonly initialBuildState?: F06InitialBuildState;
+  readonly buildUnknownOutcome?: boolean;
+  readonly holdRevalidation?: boolean;
 }
 
 function answer(field = 'defect_definition', value = '2 mm') {
@@ -303,7 +311,37 @@ function buildRunEvent(sequence: number, build: ReturnType<typeof buildResult>, 
   };
 }
 
-function buildReplay(events: readonly Record<string, unknown>[], status: 'running' | 'completed') {
+function buildProgressEvent(sequence: number, stage: 'build' | 'validation') {
+  return {
+    runId: f06BuildRunId, sequence, timestamp,
+    eventType: stage === 'validation' ? 'build.validation.started' : 'build.started',
+    stage, title: stage === 'validation' ? '开始校验' : '开始构建',
+    summary: stage === 'validation' ? '正在执行结构校验与运行预演。' : '正在生成候选流程。',
+    status: 'running',
+    payload: { sessionId: f06SessionId, planId: f06PlanId, planHash: f06PlanHash, metadataOnly: true },
+    metadataOnly: true, redactionPass: true
+  };
+}
+
+function buildOutcomeEvent(eventType: 'run.failed' | 'run.cancelled') {
+  return {
+    runId: f06BuildRunId, sequence: 1, timestamp, eventType, stage: 'build',
+    title: eventType === 'run.failed' ? '构建失败' : '构建已取消',
+    summary: eventType === 'run.failed' ? '候选构建未完成。' : '候选构建已安全停止。',
+    status: eventType === 'run.failed' ? 'failed' : 'cancelled',
+    payload: {
+      sessionId: f06SessionId, planId: f06PlanId, planHash: f06PlanHash,
+      publicMessage: eventType === 'run.failed' ? '公开校验发现不可恢复错误，请检查后重新构建。' : '',
+      metadataOnly: true
+    },
+    metadataOnly: true, redactionPass: true
+  };
+}
+
+function buildReplay(
+  events: readonly Record<string, unknown>[],
+  status: 'running' | 'completed' | 'failed' | 'cancelled'
+) {
   return {
     summary: {
       runId: f06BuildRunId, createdAt: timestamp, updatedAt: timestamp, status,
@@ -332,18 +370,47 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
   const activePlan = plan(options.longContent ?? false);
   let snapshot = sessionSnapshot(projectBound);
   let activeBuildOperationId = '44444444-4444-4444-8444-444444444444';
-  if (options.recoveredBuild) {
-    const recovered = buildResult(projectBound, true, true, activeBuildOperationId);
+  const initialBuildState = options.initialBuildState ?? (options.recoveredBuild ? 'ready' : null);
+  if (initialBuildState) {
+    const currentBaseline = projectBaseline(projectBound);
+    const recoveredBaseline = initialBuildState === 'baseline-conflict'
+      ? { ...currentBaseline, persistenceRevision: 17, canonicalFlowHash: '8'.repeat(64) }
+      : currentBaseline;
+    const recovered = {
+      ...buildResult(projectBound, true, true, activeBuildOperationId),
+      projectBaseline: recoveredBaseline
+    };
+    const hasTerminalBuild = ['ready', 'baseline-conflict', 'stale'].includes(initialBuildState);
+    const hasResolvedInputs = hasTerminalBuild;
     snapshot = sessionSnapshot(projectBound, {
-      revision: 8, lifecycleState: 'build_ready', buildRunId: f06BuildRunId,
-      buildRunStatus: 'completed', buildTerminalSequence: 1,
+      revision: 8,
+      lifecycleState: initialBuildState === 'stale' ? 'build_inputs_changed' :
+        initialBuildState === 'ready' ? 'build_ready' : initialBuildState,
+      buildRunId: f06BuildRunId,
+      buildRunStatus: ['failed', 'cancelled'].includes(initialBuildState) ? initialBuildState :
+        hasTerminalBuild ? 'completed' : 'running',
+      buildTerminalSequence: hasTerminalBuild || ['failed', 'cancelled'].includes(initialBuildState) ? 1 : null,
       buildClientOperationId: activeBuildOperationId, submittedBuildFingerprint: f06BuildFingerprint,
-      projectBaseline: projectBaseline(projectBound), answerRevision: 2, resourceRevision: 1,
-      buildParameterValues: { 'threshold_1.Threshold': 128 },
-      resourceDecisions: [], missingResources: [], buildResult: recovered
+      projectBaseline: recoveredBaseline,
+      answerRevision: initialBuildState === 'stale' ? 3 : hasResolvedInputs ? 2 : 1,
+      resourceRevision: hasResolvedInputs ? 1 : 0,
+      buildParameterValues: hasResolvedInputs ? { 'threshold_1.Threshold': 128 } : {},
+      resourceDecisions: hasResolvedInputs ? [{
+        canonicalId: cameraResource().canonicalId, status: 'bound', resourceKey: '55555555-5555-4555-8555-555555555555',
+        resourceType: 'camera_binding', operatorKey: 'imageacquisition#1', operatorId: 'acquire_1',
+        operatorType: 'ImageAcquisition', operatorIndex: 0, parameterName: 'CameraBindingId',
+        valueSummary: '顶视检测相机 A', source: 'camera_binding_authority'
+      }] : [],
+      missingResources: [], buildResult: hasTerminalBuild ? recovered : null
     });
   }
-  const audit: F06BrowserAudit = { requests: [], consoleErrors: [], pageErrors: [] };
+  let releaseBuildStream = () => {};
+  let releaseRevalidation = () => {};
+  const buildStreamGate = new Promise<void>(resolve => { releaseBuildStream = resolve; });
+  const revalidationGate = new Promise<void>(resolve => { releaseRevalidation = resolve; });
+  const audit: F06BrowserAudit = {
+    requests: [], consoleErrors: [], pageErrors: [], releaseBuildStream, releaseRevalidation
+  };
   await installF02BrowserStartup(page, { 'Studio2.AiWorkbench': flag });
   page.on('console', message => { if (message.type() === 'error') audit.consoleErrors.push(message.text()); });
   page.on('pageerror', error => audit.pageErrors.push(error.stack ?? error.message));
@@ -379,6 +446,13 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
         sessionId: null
       });
     }
+    if (options.buildUnknownOutcome && url.pathname.startsWith('/api/ai/operations/') &&
+        url.searchParams.get('kind') === 'build_run') {
+      const clientOperationId = url.pathname.split('/').at(-1)!;
+      return json(200, {
+        ...operation('build_run', clientOperationId, projectBound), status: 'pending', runId: null
+      });
+    }
     if (url.pathname === '/api/ai/agent-intent-router-runs') return json(200, intent());
     if (url.pathname === '/api/ai/agent-plan-runs') {
       snapshot = sessionSnapshot(projectBound, { revision: 2, lifecycleState: 'planning', planRunId: f06RunId, planRunStatus: 'running' });
@@ -391,6 +465,14 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
     }
     if (url.pathname === '/api/ai/agent-runs' && request.method() === 'POST') {
       activeBuildOperationId = String((body as { clientOperationId: string }).clientOperationId);
+      if (options.buildUnknownOutcome) {
+        return json(200, {
+          runId: f06BuildRunId, sessionId: 'other_session', brief: '正在构建', events: [],
+          workspaceSnapshot: snapshot,
+          operation: operation('build_run', activeBuildOperationId, projectBound),
+          persistenceStatus: {}, metadataOnly: true
+        });
+      }
       snapshot = sessionSnapshot(projectBound, {
         ...snapshot, revision: Number(snapshot.revision) + 1, lifecycleState: 'building',
         buildRunId: f06BuildRunId, buildRunStatus: 'running',
@@ -422,23 +504,29 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
       });
     }
     if (url.pathname === `/api/ai/agent-runs/${f06BuildRunId}`) {
+      if (initialBuildState === 'building') return json(200, buildReplay([buildProgressEvent(1, 'build')], 'running'));
+      if (initialBuildState === 'validating') return json(200, buildReplay([buildProgressEvent(1, 'validation')], 'running'));
+      if (initialBuildState === 'failed') return json(200, buildReplay([buildOutcomeEvent('run.failed')], 'failed'));
+      if (initialBuildState === 'cancelled') return json(200, buildReplay([buildOutcomeEvent('run.cancelled')], 'cancelled'));
       return json(200, buildReplay([], 'running'));
     }
     if (url.pathname === `/api/ai/agent-runs/${f06BuildRunId}/events`) {
+      if (initialBuildState === 'building' || initialBuildState === 'validating') await buildStreamGate;
       const build = buildResult(projectBound, false, false, activeBuildOperationId);
+      const terminalSequence = initialBuildState === 'building' || initialBuildState === 'validating' ? 2 : 1;
       snapshot = sessionSnapshot(projectBound, {
         ...snapshot, revision: Number(snapshot.revision) + 1, lifecycleState: 'parameters_pending',
-        buildRunId: f06BuildRunId, buildRunStatus: 'completed', buildTerminalSequence: 1,
+        buildRunId: f06BuildRunId, buildRunStatus: 'completed', buildTerminalSequence: terminalSequence,
         buildClientOperationId: activeBuildOperationId, submittedBuildFingerprint: f06BuildFingerprint,
         projectBaseline: projectBaseline(projectBound), missingResources: build.missingResources,
         buildResult: build
       });
-      const terminal = buildRunEvent(1, build, snapshot);
+      const terminal = buildRunEvent(terminalSequence, build, snapshot);
       return route.fulfill({
         status: 200,
         contentType: 'text/event-stream',
         headers: { 'x-clearvision-fixture-schema': 'f06-g3-ai.v1' },
-        body: `id: 1\nevent: run.completed\ndata: ${JSON.stringify(terminal)}\n\n`
+        body: `id: ${terminalSequence}\nevent: run.completed\ndata: ${JSON.stringify(terminal)}\n\n`
       });
     }
     if (url.pathname === '/api/ai/resource-candidates/camera-bindings') return json(200, [{
@@ -446,6 +534,7 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
       isEnabled: true
     }]);
     if (url.pathname === `/api/ai/agent-runs/${f06BuildRunId}/revalidate`) {
+      if (options.holdRevalidation) await revalidationGate;
       const parameterConfirmed = Object.prototype.hasOwnProperty.call(
         snapshot.buildParameterValues as Record<string, unknown>, 'threshold_1.Threshold'
       );
@@ -531,7 +620,9 @@ export async function captureF06Evidence(
     schemaVersion: 'f06-g3-browser-evidence.v1', sourceSha: process.env.CV_F06_SOURCE_SHA ?? 'WORKTREE',
     MODEL_MODE: 'RULE_FALLBACK', DATA_SOURCE: 'DETERMINISTIC_BROWSER_FIXTURE', scenario,
     url: page.url(), viewport, observed: projection, density, requestCount: audit.requests.length,
-    forbiddenRequests: audit.requests.filter(item => /handoff|apply-to-canvas|workspace\/consume|project\/save/i.test(item.path)),
+    forbiddenRequests: audit.requests.filter(item =>
+      /handoff|apply-to-canvas|workspace\/consume|project\/save|flow-canvas|image-canvas/i.test(item.path) ||
+      item.method === 'PUT' && /^\/api\/projects(?:\/|$)/i.test(item.path)),
     consoleErrors: audit.consoleErrors, pageErrors: audit.pageErrors,
     screenshot: { sha256: createHash('sha256').update(screenshot).digest('hex'), bytes: screenshot.byteLength },
     WINDOWS_DPI: 'NOT_PERFORMED', REAL_LLM_PRODUCT_QUALITY: 'NOT_EVALUATED'

@@ -148,6 +148,12 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     state.value = reduceAiWorkbench(state.value, event);
   }
 
+  function freezeAuthorization(): void {
+    if (authorizationFrozen) return;
+    authorizationFrozen = true;
+    ledger.dispose();
+  }
+
   async function request<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
     if (authorizationFrozen) throw new Error('AI owner is frozen after authentication failure.');
     const controller = new AbortController();
@@ -155,7 +161,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     try {
       return await run(controller.signal);
     } catch (error) {
-      if (error instanceof ApiUnauthorizedError) authorizationFrozen = true;
+      if (error instanceof ApiUnauthorizedError) freezeAuthorization();
       throw error;
     } finally {
       release();
@@ -164,6 +170,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
 
   function fail(error: unknown, fallbackPhase: PublicFailure['phase'] = 'offline-or-service-unavailable'): void {
     if (disposed || error instanceof ApiAbortError) return;
+    if (error instanceof ApiUnauthorizedError) freezeAuthorization();
     const failure = publicFailure(error, fallbackPhase);
     dispatch({ type: 'failed', ...failure, at: now() });
   }
@@ -209,13 +216,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
   function validateBuildSnapshot(snapshot: AiSessionSnapshotV1): void {
     const build = snapshot.buildResult;
     if (!build) return;
-    const baseline = state.value.projectBaseline;
-    const sameBaseline = baseline &&
-      build.projectBaseline.targetKind === baseline.targetKind &&
-      build.projectBaseline.projectId === baseline.projectId &&
-      build.projectBaseline.persistenceRevision === baseline.persistenceRevision &&
-      build.projectBaseline.canonicalFlowHash === baseline.canonicalFlowHash;
-    if (!sameBaseline || snapshot.buildRunId !== build.runId ||
+    if (snapshot.buildRunId !== build.runId ||
         snapshot.buildClientOperationId !== build.clientOperationId ||
         snapshot.submittedBuildFingerprint !== build.submittedBuildFingerprint ||
         snapshot.buildTerminalSequence === null) {
@@ -258,8 +259,8 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
           eventSnapshot.submittedBuildFingerprint !== event.build.submittedBuildFingerprint ||
           eventSnapshot.answerRevision !== event.build.answerRevision ||
           eventSnapshot.resourceRevision !== event.build.resourceRevision ||
-          !state.value.plan || event.build.planId !== state.value.plan.planId ||
-          event.build.planHash !== state.value.plan.planHash ||
+          (state.value.plan && (event.build.planId !== state.value.plan.planId ||
+            event.build.planHash !== state.value.plan.planHash)) ||
           (buildOperationId && event.build.clientOperationId !== buildOperationId) ||
           !baseline || event.build.projectBaseline.targetKind !== baseline.targetKind ||
           event.build.projectBaseline.projectId !== baseline.projectId ||
@@ -871,10 +872,18 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
   async function reconcile(): Promise<void> {
     if (disposed || authorizationFrozen) return;
     try {
+      if (projectId) await loadProjectBaseline();
+      if (state.value.phase === 'baseline-conflict') {
+        if (currentSessionId) {
+          const session = await request(signal => api.getSession(currentSessionId!, signal));
+          validateSessionRoute(session);
+          dispatch({ type: 'snapshot-ready', snapshot: session.snapshot, at: now() });
+        }
+        return;
+      }
       if (state.value.run.runId) await streamAdapter.reconcile();
       else if (buildOperationId && await reconcileBuildOperation()) return;
       else if (planOperationId && await reconcilePlanOperation()) return;
-      if (projectId) await loadProjectBaseline();
       if (currentSessionId) {
         const session = await request(signal => api.getSession(currentSessionId!, signal));
         validateSessionRoute(session);

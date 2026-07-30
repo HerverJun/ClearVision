@@ -12,6 +12,21 @@ const props = defineProps<{
 const checks = computed(() => [props.build.validation.structural, props.build.validation.dryRun, props.build.validation.manifest]);
 const changeCount = computed(() => props.build.workflowDiff.addedNodes.length +
   props.build.workflowDiff.modifiedNodes.length + props.build.workflowDiff.removedNodes.length);
+const validationBlockers = computed(() => [...new Set([
+  ...props.build.validation.applyGate.applyBlockers,
+  ...props.build.workflowDiff.validationFailures
+])]);
+const publicWarnings = computed(() => [...new Set(props.build.publicWarnings)]);
+const deploymentBlockers = computed(() => [...new Set([
+  ...props.build.validation.applyGate.deploymentBlockers,
+  ...props.build.workflowDiff.deploymentBlockers
+])]);
+const candidateReviewReady = computed(() => !props.stale && props.build.validation.handoffEligible);
+const canvasCandidateReady = computed(() => !props.stale && props.build.validation.applyGate.canvasApplyReady);
+const runtimeDraftReady = computed(() => !props.stale && props.build.validation.applyGate.runtimeDraftReady);
+const deploymentReady = computed(() => !props.stale && props.build.validation.applyGate.deploymentReady);
+const warningCount = computed(() => publicWarnings.value.length +
+  checks.value.reduce((total, check) => total + check.warningCount, 0));
 
 function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvStatusTone }> {
   if (check.status === 'passed') return Object.freeze({ label: '通过', tone: 'ok' });
@@ -31,7 +46,7 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
         tone="warning"
         title="当前结果已过期"
       >
-        参数、资源、Plan 或工程基线已变化；以下候选仅供查看，旧 Validation 与 ApplyGate 不再有效。
+        参数、资源、方案或工程基线已变化；以下候选仅供查看，旧校验与候选就绪结论不再有效。
       </CvInlineAlert>
 
       <section
@@ -58,11 +73,11 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
       >
         <header>
           <h3 id="ai-build-validation-title">
-            Validation / DryRun
+            校验与运行预演
           </h3>
           <CvStatusBadge
-            :tone="build.validation.handoffEligible ? 'ok' : 'warning'"
-            :label="build.validation.handoffEligible ? '具备交接条件' : '尚未就绪'"
+            :tone="candidateReviewReady ? 'ok' : 'warning'"
+            :label="stale ? '结论已失效' : candidateReviewReady ? '具备交接条件' : '尚未就绪'"
           />
         </header>
         <ul class="ai-build-workspace__checks">
@@ -78,6 +93,43 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
       </section>
 
       <section
+        v-if="validationBlockers.length || publicWarnings.length"
+        class="ai-build-workspace__section"
+        aria-labelledby="ai-build-issues-title"
+      >
+        <header>
+          <h3 id="ai-build-issues-title">
+            公开问题
+          </h3>
+          <span class="ai-build-workspace__issue-count">{{ validationBlockers.length }} 阻断 / {{ warningCount }} 警告</span>
+        </header>
+        <div class="ai-build-workspace__issues">
+          <section v-if="validationBlockers.length">
+            <h4>阻断</h4>
+            <ul>
+              <li
+                v-for="blocker in validationBlockers"
+                :key="blocker"
+              >
+                {{ blocker }}
+              </li>
+            </ul>
+          </section>
+          <section v-if="publicWarnings.length">
+            <h4>警告</h4>
+            <ul>
+              <li
+                v-for="warning in publicWarnings"
+                :key="warning"
+              >
+                {{ warning }}
+              </li>
+            </ul>
+          </section>
+        </div>
+      </section>
+
+      <section
         class="ai-build-workspace__section"
         aria-labelledby="ai-build-gate-title"
       >
@@ -87,20 +139,48 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
           </h3>
         </header>
         <CvInlineAlert
-          :tone="build.validation.handoffEligible ? 'success' : build.validation.applyGate.blocked ? 'error' : 'warning'"
-          :title="build.validation.handoffEligible ? '候选已具备交接条件' : '候选尚未具备交接条件'"
+          :tone="stale ? 'warning' : candidateReviewReady ? 'success' : build.validation.applyGate.blocked ? 'error' : 'warning'"
+          :title="stale ? '候选结论已失效' : candidateReviewReady ? '候选已具备交接条件' : '候选尚未具备交接条件'"
         >
-          {{ build.validation.firstFixRecommendation }}
-          <template v-if="build.validation.handoffEligible">
-            下一阶段将交接到工作区审核。
+          <template v-if="stale">
+            请基于最新参数、资源、方案和工程基线重新构建并校验候选。
+          </template>
+          <template v-else>
+            {{ build.validation.firstFixRecommendation }}
+            <template v-if="candidateReviewReady">
+              下一阶段将交接到工作区审核。
+            </template>
           </template>
         </CvInlineAlert>
+        <ul class="ai-build-workspace__boundaries">
+          <li>
+            <div><strong>工作区候选</strong><p>仅表示候选具备下一阶段审核条件。</p></div>
+            <CvStatusBadge
+              :tone="canvasCandidateReady ? 'ok' : 'warning'"
+              :label="stale ? '结论已失效' : canvasCandidateReady ? '候选就绪' : '阻断'"
+            />
+          </li>
+          <li>
+            <div><strong>运行草稿</strong><p>仍需后续工作区审核，不写入正式工程。</p></div>
+            <CvStatusBadge
+              :tone="runtimeDraftReady ? 'ok' : 'warning'"
+              :label="stale ? '结论已失效' : runtimeDraftReady ? '候选就绪' : '阻断'"
+            />
+          </li>
+          <li>
+            <div><strong>部署</strong><p>本阶段不执行交接、保存或部署。</p></div>
+            <CvStatusBadge
+              :tone="deploymentReady ? 'ok' : stale ? 'warning' : 'idle'"
+              :label="stale ? '结论已失效' : deploymentReady ? '就绪' : '未就绪'"
+            />
+          </li>
+        </ul>
         <ul
-          v-if="build.validation.applyGate.applyBlockers.length"
-          class="ai-build-workspace__blockers"
+          v-if="deploymentBlockers.length"
+          class="ai-build-workspace__deployment-blockers"
         >
           <li
-            v-for="blocker in build.validation.applyGate.applyBlockers"
+            v-for="blocker in deploymentBlockers"
             :key="blocker"
           >
             {{ blocker }}
@@ -158,7 +238,13 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
 .ai-build-workspace__checks strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); }
 .ai-build-workspace__checks p { margin: 2px 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }
 .ai-build-workspace__checks > li > span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); white-space: nowrap; }
-.ai-build-workspace__blockers { margin: var(--cv-space-3) 0 0; padding-inline-start: var(--cv-space-5); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.ai-build-workspace__issue-count { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); white-space: nowrap; }
+.ai-build-workspace__issues { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-5); }
+.ai-build-workspace__issues ul, .ai-build-workspace__deployment-blockers { display: grid; gap: var(--cv-space-1); margin: var(--cv-space-2) 0 0; padding-inline-start: var(--cv-space-5); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.ai-build-workspace__boundaries { display: grid; margin: var(--cv-space-3) 0 0; padding: 0; list-style: none; }
+.ai-build-workspace__boundaries li { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-4); padding-block: var(--cv-space-2); border-block-start: 1px solid var(--cv-border-subtle); }
+.ai-build-workspace__boundaries strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); }
+.ai-build-workspace__boundaries p { margin: 2px 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }
 .ai-build-workspace__details { padding-block: var(--cv-space-3); border-block-start: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .ai-build-workspace__details summary { width: fit-content; cursor: pointer; color: var(--cv-color-link); font-weight: var(--cv-font-weight-medium); }
 .ai-build-workspace__details summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 2px; }
@@ -171,6 +257,7 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
 .ai-build-workspace__detail-grid li strong { color: var(--cv-text-primary); font-weight: var(--cv-font-weight-medium); }
 @media (max-width: 900px) {
   .ai-build-workspace__summary { align-items: stretch; flex-direction: column; }
+  .ai-build-workspace__issues { grid-template-columns: 1fr; }
   .ai-build-workspace__detail-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 620px) {

@@ -1,4 +1,4 @@
-import { ApiAbortError } from '@/platform/api';
+import { ApiAbortError, ApiUnauthorizedError } from '@/platform/api';
 import type { AiAgentRunEventV1, AiAgentRunReplayV1 } from './contracts';
 import { decodeAiAgentRunEventV1 } from './decoder';
 import type { AiWorkbenchApi } from './apiAdapter';
@@ -30,14 +30,18 @@ export function createAgentRunStreamAdapter(options: CreateAgentRunStreamAdapter
   let disposed = false;
   let reconnectAttempt = 0;
   let reconnectRelease: (() => void) | null = null;
-  let reconciling: Promise<void> | null = null;
+  let replayAbort: (() => void) | null = null;
+  let activeConnection: Readonly<{ generation: number; cancel: () => void }> | null = null;
 
-  async function request<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  async function requestReplay<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
     const controller = new AbortController();
     const release = options.ledger.trackRequest(controller);
+    const abort = () => controller.abort('ai-run-replay-replaced');
+    replayAbort = abort;
     try {
       return await run(controller.signal);
     } finally {
+      if (replayAbort === abort) replayAbort = null;
       release();
     }
   }
@@ -51,6 +55,11 @@ export function createAgentRunStreamAdapter(options: CreateAgentRunStreamAdapter
   function cancelReconnect(): void {
     reconnectRelease?.();
     reconnectRelease = null;
+  }
+
+  function cancelActiveConnection(): void {
+    activeConnection?.cancel();
+    activeConnection = null;
   }
 
   function scheduleReconnect(): void {
@@ -69,13 +78,11 @@ export function createAgentRunStreamAdapter(options: CreateAgentRunStreamAdapter
   async function consumeSse(
     stream: ReadableStream<Uint8Array>,
     controller: AbortController,
-    expectedConnection: number
+    expectedConnection: number,
+    setReader: (reader: ReadableStreamDefaultReader<Uint8Array>) => void
   ): Promise<void> {
     const reader = stream.getReader();
-    const releaseStream = options.ledger.trackStream(() => {
-      controller.abort('ai-plan-stream-disposed');
-      void reader.cancel('ai-plan-stream-disposed');
-    });
+    setReader(reader);
     const decoder = new TextDecoder();
     let buffer = '';
     try {
@@ -111,7 +118,6 @@ export function createAgentRunStreamAdapter(options: CreateAgentRunStreamAdapter
       }
       scheduleReconnect();
     } finally {
-      releaseStream();
       reader.releaseLock();
     }
   }
@@ -119,53 +125,57 @@ export function createAgentRunStreamAdapter(options: CreateAgentRunStreamAdapter
   async function openStream(expectedConnection: number): Promise<void> {
     if (disposed || !runId || options.isTerminal() || expectedConnection !== connectionGeneration) return;
     const controller = new AbortController();
-    const releasePendingStream = options.ledger.trackStream(() => controller.abort('ai-plan-stream-disposed'));
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    const cancel = () => {
+      controller.abort('ai-plan-stream-disposed');
+      void reader?.cancel('ai-plan-stream-disposed');
+    };
+    activeConnection = Object.freeze({ generation: expectedConnection, cancel });
+    const releaseStream = options.ledger.trackStream(cancel);
     try {
       const response = await options.api.openRunEvents(runId, options.getAfterSequence(), controller.signal);
-      releasePendingStream();
       if (disposed || expectedConnection !== connectionGeneration) {
-        controller.abort('ai-plan-stream-stale');
+        cancel();
         return;
       }
       reconnectAttempt = 0;
-      await consumeSse(response.stream, controller, expectedConnection);
+      await consumeSse(response.stream, controller, expectedConnection, nextReader => { reader = nextReader; });
     } catch (error) {
       if (disposed || expectedConnection !== connectionGeneration || error instanceof ApiAbortError || controller.signal.aborted) {
         return;
       }
-      scheduleReconnect();
+      if (error instanceof ApiUnauthorizedError) options.onFailure(error);
+      else scheduleReconnect();
     } finally {
-      releasePendingStream();
+      releaseStream();
+      if (activeConnection?.generation === expectedConnection) activeConnection = null;
     }
   }
 
   async function reconcile(): Promise<void> {
-    if (reconciling) return reconciling;
     if (disposed || !runId) return;
     const expectedConnection = ++connectionGeneration;
     cancelReconnect();
-    reconciling = (async () => {
-      try {
-        const replay = await request(signal => options.api.getRunReplay(runId!, signal));
-        if (disposed || expectedConnection !== connectionGeneration) return;
-        options.onReplay(replay, generation);
-        for (const event of replay.events) {
-          const outcome = consume(event, expectedConnection);
-          if (outcome === 'gap') {
-            throw new Error('AgentRun replay did not close the sequence gap.');
-          }
+    replayAbort?.();
+    replayAbort = null;
+    cancelActiveConnection();
+    try {
+      const replay = await requestReplay(signal => options.api.getRunReplay(runId!, signal));
+      if (disposed || expectedConnection !== connectionGeneration) return;
+      options.onReplay(replay, generation);
+      for (const event of replay.events) {
+        const outcome = consume(event, expectedConnection);
+        if (outcome === 'gap') {
+          throw new Error('AgentRun replay did not close the sequence gap.');
         }
-        if (!options.isTerminal() && replay.summary.status === 'running') {
-          await openStream(expectedConnection);
-        }
-      } catch (error) {
-        if (disposed || expectedConnection !== connectionGeneration || error instanceof ApiAbortError) return;
-        options.onFailure(error);
-      } finally {
-        reconciling = null;
       }
-    })();
-    return reconciling;
+      if (!options.isTerminal() && replay.summary.status === 'running') {
+        void openStream(expectedConnection);
+      }
+    } catch (error) {
+      if (disposed || expectedConnection !== connectionGeneration || error instanceof ApiAbortError) return;
+      options.onFailure(error);
+    }
   }
 
   return Object.freeze({
@@ -181,6 +191,9 @@ export function createAgentRunStreamAdapter(options: CreateAgentRunStreamAdapter
       disposed = true;
       connectionGeneration += 1;
       cancelReconnect();
+      replayAbort?.();
+      replayAbort = null;
+      cancelActiveConnection();
     }
   });
 }

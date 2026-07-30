@@ -163,10 +163,33 @@ function buildProgressPhase(event: AiAgentRunEventV1): AiWorkbenchPhase {
   return 'building';
 }
 
-function snapshotBuildStale(snapshot: AiSessionSnapshotV1, build: AiBuildResultV1 | null): boolean {
+function sameProjectBaseline(
+  left: AiProjectBaselineV1 | null,
+  right: AiProjectBaselineV1 | null
+): boolean {
+  return left !== null && right !== null &&
+    left.targetKind === right.targetKind &&
+    left.projectId === right.projectId &&
+    left.persistenceRevision === right.persistenceRevision &&
+    left.canonicalFlowHash === right.canonicalFlowHash;
+}
+
+function buildBaselineConflicts(
+  baseline: AiProjectBaselineV1 | null,
+  build: AiBuildResultV1 | null
+): boolean {
+  return build !== null && baseline !== null && !sameProjectBaseline(baseline, build.projectBaseline);
+}
+
+function snapshotBuildStale(
+  snapshot: AiSessionSnapshotV1,
+  build: AiBuildResultV1 | null,
+  baseline: AiProjectBaselineV1 | null = null
+): boolean {
   return build !== null && (
     build.answerRevision !== snapshot.answerRevision ||
-    build.resourceRevision !== snapshot.resourceRevision
+    build.resourceRevision !== snapshot.resourceRevision ||
+    buildBaselineConflicts(baseline, build)
   );
 }
 
@@ -179,7 +202,7 @@ function withSnapshot(state: AiWorkbenchState, snapshot: AiSessionSnapshotV1): A
     session,
     readiness: snapshot.readinessPreview ?? state.readiness,
     build,
-    buildStale: snapshotBuildStale(snapshot, build),
+    buildStale: snapshotBuildStale(snapshot, build, state.projectBaseline),
     requirementMode: snapshot.requirementMode,
     updatedAt: state.updatedAt
   });
@@ -208,34 +231,53 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
         message: event.mode === 'hydrate' ? '正在恢复服务端会话与公开规划状态。' : '正在建立安全会话。',
         updatedAt: event.at
       });
-    case 'session-ready':
+    case 'session-ready': {
+      const build = event.session.snapshot.buildResult;
+      const baseline = state.projectBaseline ?? event.session.snapshot.projectBaseline;
+      const baselineConflict = buildBaselineConflicts(baseline, build);
+      const buildStale = snapshotBuildStale(event.session.snapshot, build, baseline);
       return Object.freeze({
         ...state,
-        phase: snapshotBuildStale(event.session.snapshot, event.session.snapshot.buildResult)
-          ? 'build-blocked'
-          : event.session.snapshot.buildResult
-            ? buildPhase(event.session.snapshot.buildResult)
-            : 'idle',
+        phase: baselineConflict ? 'baseline-conflict' : buildStale ? 'build-blocked' : build ? buildPhase(build) : 'idle',
         session: event.session,
         project: event.project,
-        projectBaseline: event.session.snapshot.projectBaseline ?? state.projectBaseline,
-        build: event.session.snapshot.buildResult,
-        buildStale: snapshotBuildStale(event.session.snapshot, event.session.snapshot.buildResult),
+        projectBaseline: baseline,
+        build,
+        buildStale,
         replayDiagnostics: null,
         readiness: event.session.snapshot.readinessPreview,
         requirementMode: event.session.snapshot.requirementMode,
         operation: event.operation ?? state.operation,
-        errorCode: null,
-        message: event.project ? '工程上下文与会话已由服务端确认。' : '会话已就绪，当前尚未绑定工程。',
+        errorCode: baselineConflict ? 'project_baseline_changed' : null,
+        message: baselineConflict
+          ? '工程保存版本或流程内容已更新；当前候选基于旧工程基线，仅供查看。'
+          : event.project ? '工程上下文与会话已由服务端确认。' : '会话已就绪，当前尚未绑定工程。',
         updatedAt: event.at
       });
-    case 'baseline-ready':
+    }
+    case 'baseline-ready': {
+      const baselineConflict = buildBaselineConflicts(event.baseline, state.build);
+      const buildStale = state.session
+        ? snapshotBuildStale(state.session.snapshot, state.build, event.baseline)
+        : state.buildStale || baselineConflict;
       return Object.freeze({
         ...state,
+        phase: baselineConflict
+          ? 'baseline-conflict'
+          : state.phase === 'baseline-conflict' && state.build
+            ? buildStale ? 'build-blocked' : buildPhase(state.build)
+            : state.phase,
         projectBaseline: event.baseline,
-        errorCode: null,
+        buildStale,
+        errorCode: baselineConflict
+          ? 'project_baseline_changed'
+          : state.errorCode === 'project_baseline_changed' ? null : state.errorCode,
+        message: baselineConflict
+          ? '工程保存版本或流程内容已更新；当前候选基于旧工程基线，仅供查看。'
+          : state.message,
         updatedAt: event.at
       });
+    }
     case 'intent-start':
       return Object.freeze({
         ...state,
@@ -460,15 +502,20 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
       });
     case 'snapshot-ready': {
       const next = withSnapshot(Object.freeze({ ...state, updatedAt: event.at }), event.snapshot);
+      const baselineConflict = buildBaselineConflicts(next.projectBaseline, next.build);
       return Object.freeze({
         ...next,
-        phase: next.build && next.buildStale
+        phase: baselineConflict
+          ? 'baseline-conflict'
+          : next.build && next.buildStale
           ? 'build-blocked'
           : event.snapshot.buildResult && !next.buildStale
           ? buildPhase(event.snapshot.buildResult)
           : next.plan ? planPhase(next.plan, event.snapshot.readinessPreview) : next.phase,
-        message: '会话状态已与服务端最新版本协调。',
-        errorCode: null,
+        message: baselineConflict
+          ? '工程保存版本或流程内容已更新；当前候选基于旧工程基线，仅供查看。'
+          : '会话状态已与服务端最新版本协调。',
+        errorCode: baselineConflict ? 'project_baseline_changed' : null,
         updatedAt: event.at
       });
     }

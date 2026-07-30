@@ -53,12 +53,52 @@ describe('AgentRun stream adapter', () => {
 
     await adapter.start('run_plan_01', 1);
     expect(lastSequence).toBe(1);
+    await vi.advanceTimersByTimeAsync(0);
     expect(recovering).toBeGreaterThan(0);
     await vi.advanceTimersByTimeAsync(250);
     await Promise.resolve();
 
     expect(lastSequence).toBe(3);
     expect(terminal).toBe(true);
+    adapter.dispose();
+    ledger.dispose();
+    expect(ledger.diagnostics()).toMatchObject({ requestCount: 0, streamCount: 0, timerCount: 0, disposed: true });
+  });
+
+  it('cancels an active SSE connection and performs a fresh replay on explicit reconcile', async () => {
+    const runningReplay = replayFixture([]);
+    runningReplay.summary.status = 'running';
+    let cancelledStreams = 0;
+    const transport = {
+      apiBaseUrl: 'http://localhost:5000/api',
+      get: vi.fn(async () => runningReplay),
+      getTextStream: vi.fn(async () => ({
+        stream: new ReadableStream<Uint8Array>({
+          cancel() { cancelledStreams += 1; }
+        }),
+        headers: new Headers()
+      }))
+    } as unknown as ApiTransport;
+    const ledger = createAiResourceLedger();
+    const adapter = createAgentRunStreamAdapter({
+      api: createAiWorkbenchApi(transport),
+      ledger,
+      getAfterSequence: () => 0,
+      isTerminal: () => false,
+      onEvent: () => 'accepted',
+      onReplay: vi.fn(),
+      onRecovering: vi.fn(),
+      onFailure: vi.fn()
+    });
+
+    await adapter.start('run_plan_01', 1);
+    await vi.waitFor(() => expect(ledger.diagnostics().streamCount).toBe(1));
+    await adapter.reconcile();
+    await vi.waitFor(() => expect(transport.getTextStream).toHaveBeenCalledTimes(2));
+
+    expect(transport.get).toHaveBeenCalledTimes(2);
+    expect(cancelledStreams).toBe(1);
+    expect(ledger.diagnostics()).toMatchObject({ requestCount: 0, streamCount: 1, timerCount: 0 });
     adapter.dispose();
     ledger.dispose();
     expect(ledger.diagnostics()).toMatchObject({ requestCount: 0, streamCount: 0, timerCount: 0, disposed: true });

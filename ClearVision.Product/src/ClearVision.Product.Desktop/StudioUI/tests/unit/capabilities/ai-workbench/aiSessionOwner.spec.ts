@@ -160,6 +160,9 @@ describe('route-scoped AiSessionOwner', () => {
     await blocked.retry();
     expect(blockedApi.get).toHaveBeenCalledTimes(1);
     expect(blocked.state.value.phase).toBe('offline-or-service-unavailable');
+    expect(blocked.diagnostics()).toEqual({
+      requestCount: 0, streamCount: 0, timerCount: 0, subscriptionCount: 0, disposed: true
+    });
     blocked.dispose();
 
     const resumedApi = {
@@ -300,6 +303,30 @@ describe('route-scoped AiSessionOwner', () => {
     owner.dispose();
   });
 
+  it('accepts a terminal Build replay for a restored run without recreating a local Plan projection', async () => {
+    const build = buildResultFixture();
+    const runningSession = sessionFixture({
+      lifecycleState: 'building', buildRunId: build.runId, buildRunStatus: 'running',
+      buildClientOperationId: build.clientOperationId, submittedBuildFingerprint: build.submittedBuildFingerprint,
+      projectBaseline: build.projectBaseline, answerRevision: build.answerRevision,
+      resourceRevision: build.resourceRevision
+    });
+    const api = {
+      apiBaseUrl: 'http://localhost:5000/api',
+      get: vi.fn(async (path: string) => path === 'ai/sessions/session_01'
+        ? runningSession
+        : buildReplayFixture(build))
+    } as unknown as ApiTransport;
+    const owner = createAiSessionOwner({ api, requestedSessionId: 'session_01' });
+
+    await owner.start();
+
+    expect(owner.state.value.plan).toBeNull();
+    expect(owner.state.value.build?.buildId).toBe(build.buildId);
+    expect(owner.state.value.phase).toBe('parameters-pending');
+    owner.dispose();
+  });
+
   it('invalidates Validation after confirmed parameter and canonical resource mutations', async () => {
     const resource = resourceRequirementFixture();
     const parameter = buildParameterFixture({ pending: false, value: 128, hasExplicitValue: true, valueSummary: '128' });
@@ -402,7 +429,7 @@ describe('route-scoped AiSessionOwner', () => {
     owner.dispose();
   });
 
-  it('rejects a recovered Build Snapshot whose Project baseline changed', async () => {
+  it('projects a recovered Build Snapshot against an updated Project baseline as a stale conflict', async () => {
     const staleBaseline = {
       ...existingProjectBaselineFixture(), persistenceRevision: 13, canonicalFlowHash: '8'.repeat(64)
     };
@@ -424,9 +451,66 @@ describe('route-scoped AiSessionOwner', () => {
 
     await owner.start();
 
-    expect(owner.state.value.phase).toBe('offline-or-service-unavailable');
-    expect(owner.state.value.build).toBeNull();
+    expect(owner.state.value.phase, owner.state.value.message).toBe('baseline-conflict');
+    expect(owner.state.value.errorCode).toBe('project_baseline_changed');
+    expect(owner.state.value.build?.buildId).toBe(staleBuild.buildId);
+    expect(owner.state.value.buildStale).toBe(true);
     expect(owner.state.value.projectBaseline).toEqual(existingProjectBaselineFixture());
+    owner.dispose();
+  });
+
+  it('marks an existing Build stale as soon as reconcile observes a newer Project baseline', async () => {
+    const baseline = existingProjectBaselineFixture();
+    const changedBaseline = {
+      ...baseline, persistenceRevision: baseline.persistenceRevision + 1, canonicalFlowHash: '8'.repeat(64)
+    };
+    const build = buildResultFixture({ projectBaseline: baseline });
+    let baselineRead = 0;
+    const api = {
+      apiBaseUrl: 'http://localhost:5000/api',
+      get: vi.fn(async (path: string) => {
+        if (path === `projects/${aiProjectId}`) return projectFixture();
+        if (path === `ai/projects/${aiProjectId}/baseline`) return baselineRead++ === 0 ? baseline : changedBaseline;
+        if (path === 'ai/sessions/session_01') return buildSessionFixture(build, { projectId: aiProjectId });
+        throw new Error(`Unexpected GET ${path}`);
+      })
+    } as unknown as ApiTransport;
+    const owner = createAiSessionOwner({ api, requestedSessionId: 'session_01', projectId: aiProjectId });
+
+    await owner.start();
+    expect(owner.state.value.phase).not.toBe('baseline-conflict');
+    await owner.reconcile();
+
+    expect(owner.state.value.phase, owner.state.value.message).toBe('baseline-conflict');
+    expect(owner.state.value.buildStale).toBe(true);
+    expect(owner.state.value.projectBaseline).toEqual(changedBaseline);
+    owner.dispose();
+  });
+
+  it('returns replay, stream, timer and request resources to zero immediately when SSE authentication expires', async () => {
+    const unauthorized = new ApiUnauthorizedError({
+      url: 'http://localhost/api/ai/agent-runs/run_build_01/events', status: 401,
+      statusText: 'Unauthorized', payload: null, responseBody: ''
+    });
+    const runningSession = sessionFixture({
+      lifecycleState: 'building', buildRunId: 'run_build_01', buildRunStatus: 'running',
+      buildClientOperationId: aiBuildOperationId, projectBaseline: buildResultFixture().projectBaseline
+    });
+    const api = {
+      apiBaseUrl: 'http://localhost:5000/api',
+      get: vi.fn(async (path: string) => path === 'ai/sessions/session_01'
+        ? runningSession
+        : runningBuildReplayFixture()),
+      getTextStream: vi.fn(async () => { throw unauthorized; })
+    } as unknown as ApiTransport;
+    const owner = createAiSessionOwner({ api, requestedSessionId: 'session_01' });
+
+    await owner.start();
+    await vi.waitFor(() => expect(owner.state.value.phase).toBe('offline-or-service-unavailable'));
+
+    expect(owner.diagnostics()).toEqual({
+      requestCount: 0, streamCount: 0, timerCount: 0, subscriptionCount: 0, disposed: true
+    });
     owner.dispose();
   });
 

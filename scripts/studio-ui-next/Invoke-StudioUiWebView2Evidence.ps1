@@ -14,7 +14,7 @@ param(
     [string]$Configuration = "Debug",
     [ValidateSet("debug", "publish", "missing-assets")]
     [string]$RuntimeKind = "debug",
-    [ValidateSet("f01", "f02", "f03", "f04")]
+    [ValidateSet("f01", "f02", "f03", "f04", "f06")]
     [string]$EvidencePhase = "f01",
     [string]$DesktopExecutablePath,
     [string]$NodeExecutablePath,
@@ -31,6 +31,7 @@ param(
     [switch]$SanitizeDesktopPath,
     [switch]$DeepCanvas,
     [switch]$WorkspaceCapabilityEnabled,
+    [switch]$AiWorkbenchCapabilityEnabled,
     [switch]$SeedWorkspace,
     [switch]$FormalRun,
     [switch]$GoldenJourney,
@@ -330,6 +331,7 @@ $resolvedRoute = if (-not [string]::IsNullOrWhiteSpace($Route)) {
 $customEnvironment = [ordered]@{
     "Studio__StudioUiEnabled" = if ($studioUiEnabled) { "true" } else { "false" }
     "Studio__WorkspaceCapabilityEnabled" = if ($WorkspaceCapabilityEnabled) { "true" } else { "false" }
+    "Studio__AiWorkbenchCapabilityEnabled" = if ($AiWorkbenchCapabilityEnabled) { "true" } else { "false" }
     "CV_STUDIO_UI_EXPECTATION" = $Expectation
     "CV_STUDIO_UI_ROUTE" = $resolvedRoute
     "CV_STUDIO_UI_DESKTOP_EXECUTABLE" = $desktopExe
@@ -594,7 +596,8 @@ $startupRecordPassed = $startupRecord -and
     [bool]$startupRecord.configurationRequiresRestart -and
     [bool]$startupRecord.flags.'Studio:StudioUiEnabled' -eq $studioUiEnabled -and
     [bool]$startupRecord.flags.'Studio:WorkspaceCapabilityEnabled' -eq [bool]$WorkspaceCapabilityEnabled -and
-    [bool]$startupRecord.flags.'Studio2.Workspace' -eq [bool]$WorkspaceCapabilityEnabled
+    [bool]$startupRecord.flags.'Studio2.Workspace' -eq [bool]$WorkspaceCapabilityEnabled -and
+    [bool]$startupRecord.flags.'Studio2.AiWorkbench' -eq [bool]$AiWorkbenchCapabilityEnabled
 $cleanup = [pscustomobject]@{
     schemaVersion = 1
     runName = $RunName
@@ -606,6 +609,7 @@ $cleanup = [pscustomobject]@{
     runnerError = if ($runnerError) { [string]$runnerError.Exception.Message } else { $null }
     studioUiEnabled = $studioUiEnabled
     workspaceCapabilityEnabled = [bool]$WorkspaceCapabilityEnabled
+    aiWorkbenchCapabilityEnabled = [bool]$AiWorkbenchCapabilityEnabled
     workspaceSeededByHarness = [bool]$SeedWorkspace
     formalRun = [bool]$FormalRun
     dpiOnly = [bool]$DpiOnly
