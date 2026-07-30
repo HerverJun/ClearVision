@@ -356,6 +356,7 @@ static class Program
         app.MapSettingsEndpoints();
         app.MapAiSessionEndpoints();
         app.MapAgentRunEndpoints();
+        app.MapAiWorkspaceHandoffEndpoints();
         app.MapPlcEndpoints();
         app.MapTcpEndpoints();
         app.MapStationCommunicationEndpoints();

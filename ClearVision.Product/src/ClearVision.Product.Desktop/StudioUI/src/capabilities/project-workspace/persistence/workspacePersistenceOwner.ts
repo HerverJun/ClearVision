@@ -159,8 +159,6 @@ export function createWorkspacePersistenceOwner(options: {
   });
   let materializedFlowId: string | null = baseline.flow?.id ?? null;
   let lastObservedDraftFingerprint = '';
-  let lastObservedFlowRevision = options.flowOwner.projection.runtime?.flowRevision ?? 0;
-  let lastObservedVariablesRevision = options.globalVariablesOwner.projection.appliedRevision;
   let conflictServerProject: WorkspaceProjectV1 | null = null;
   let lastSubmitted: SubmittedSave | null = null;
   let disposed = false;
@@ -250,11 +248,6 @@ export function createWorkspacePersistenceOwner(options: {
 
   function observeDraft(): void {
     if (disposed || suppressDraftObservation) return;
-    const flowRevision = options.flowOwner.projection.runtime?.flowRevision ?? 0;
-    const variablesRevision = options.globalVariablesOwner.projection.appliedRevision;
-    if (flowRevision === lastObservedFlowRevision && variablesRevision === lastObservedVariablesRevision) return;
-    lastObservedFlowRevision = flowRevision;
-    lastObservedVariablesRevision = variablesRevision;
     let fingerprint: string;
     try {
       fingerprint = draftFingerprint();
@@ -311,8 +304,7 @@ export function createWorkspacePersistenceOwner(options: {
     suppressDraftObservation = true;
     try {
       options.flowOwner.replaceFlow(flow, projectName);
-      lastObservedDraftFingerprint = workspacePersistenceFingerprint(flow);
-      lastObservedFlowRevision = options.flowOwner.projection.runtime?.flowRevision ?? 0;
+      lastObservedDraftFingerprint = draftFingerprint();
     } finally {
       suppressDraftObservation = false;
     }

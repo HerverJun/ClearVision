@@ -14,6 +14,8 @@ export type AiWorkbenchActionId =
   | 'answerClarification'
   | 'acceptRecommendedAnswers'
   | 'previewReadiness'
+  | 'prepareHandoff'
+  | 'reconcileHandoff'
   | 'reconcile'
   | 'startNewTask';
 
@@ -96,9 +98,20 @@ export function aiWorkbenchActionModel(state: AiWorkbenchState): AiWorkbenchActi
       return Object.freeze({ primary: null, secondary: Object.freeze([]),
         statusHint: '候选结构保持不变，服务端正在重新计算 Validation 与 ApplyGate。', nextStagePlaceholder: null });
     case 'build-ready':
-      return Object.freeze({ primary: null, secondary: Object.freeze([action('recheckReadiness', '重新校验', false)]),
-        statusHint: '候选已具备交接条件。',
-        nextStagePlaceholder: Object.freeze({ label: '工作区审核', disabledReason: '下一阶段将交接到工作区审核；G4 尚未获准。' }) });
+      return Object.freeze({ primary: action('prepareHandoff', '交接到工作区审核', true),
+        secondary: Object.freeze([action('recheckReadiness', '重新校验', false)]),
+        statusHint: '交接只会创建短期候选工件，不会自动保存或运行。',
+        nextStagePlaceholder: null });
+    case 'handoff-creating':
+      return Object.freeze({ primary: null, secondary: Object.freeze([]),
+        statusHint: '服务端正在重新证明 Build、revision、baseline 与 candidate fingerprint。',
+        nextStagePlaceholder: null });
+    case 'handoff-unknown-outcome':
+      return Object.freeze({ primary: action('reconcileHandoff', '查询交接结果', true),
+        secondary: Object.freeze([]), statusHint: state.message, nextStagePlaceholder: null });
+    case 'handoff-created':
+      return Object.freeze({ primary: null, secondary: Object.freeze([]),
+        statusHint: 'AI owner 即将释放；Workspace owner 挂载后才会读取候选。', nextStagePlaceholder: null });
     case 'build-failed':
     case 'build-cancelled':
       return Object.freeze({ primary: action('rebuild', '重新构建', true),

@@ -17,6 +17,8 @@ import {
   type AiClarificationOptionV1,
   type AiClarificationQuestionV1,
   type AiDefaultAssumptionV1,
+  type AiHandoffArtifactIdentityV1,
+  type AiHandoffStatus,
   type AiIntentResultV1,
   type AiOperationKind,
   type AiOperationProjectionV1,
@@ -54,11 +56,16 @@ const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const sessionPattern = /^[a-z0-9_-]{1,80}$/i;
 const hashPattern = /^(?:sha256:)?[0-9a-f]{64}$/i;
 const tokenPattern = /^[a-z0-9_.:-]{1,128}$/i;
+const buildIdentityPattern = /^[a-z0-9_.:-]{1,512}$/i;
 const resourceIdentityPattern = /^resource:v1\|[a-z0-9_]+\|(?:[a-z0-9_]+(?:#[1-9][0-9]*)?|global)\|[a-z0-9_]+$/;
 const operatorKeyPattern = /^[a-z0-9_]+(?:#[1-9][0-9]*)?$/;
 const resourceKeyPattern = /^[a-z0-9_.:-]{0,256}$/i;
-const operationKinds = new Set<AiOperationKind>(['session_create', 'session_delete', 'plan_run', 'build_run']);
+const artifactPattern = /^[0-9a-f]{32}$/i;
+const operationKinds = new Set<AiOperationKind>([
+  'session_create', 'session_delete', 'plan_run', 'build_run', 'handoff_create'
+]);
 const operationStatuses = new Set<AiOperationStatus>(['pending', 'created', 'failed', 'rejected']);
+const handoffStatuses = new Set<AiHandoffStatus>(['available', 'consuming', 'consumed', 'expired', 'rejected']);
 const runStatuses = new Set<AiRunStatus>([
   'pending', 'running', 'completed', 'failed', 'cancelled', 'blocked', 'warning'
 ]);
@@ -718,7 +725,7 @@ export function decodeAiSessionDetailV1(value: unknown, path = '$'): AiSessionDe
 export function decodeAiOperationProjectionV1(value: unknown, path = '$'): AiOperationProjectionV1 {
   const source = record(value, path);
   exact(source, [
-    'clientOperationId', 'kind', 'status', 'sessionId', 'runId', 'payloadFingerprint',
+    'clientOperationId', 'kind', 'status', 'sessionId', 'runId', 'artifactId', 'payloadFingerprint',
     'projectBaseline', 'errorCode', 'publicMessage', 'createdAtUtc', 'updatedAtUtc', 'expiresAtUtc'
   ], path);
   const kind = string(required(source, 'kind', path), `${path}.kind`) as AiOperationKind;
@@ -731,6 +738,7 @@ export function decodeAiOperationProjectionV1(value: unknown, path = '$'): AiOpe
     status,
     sessionId: nullableString(required(source, 'sessionId', path), `${path}.sessionId`, sessionPattern),
     runId: nullableString(required(source, 'runId', path), `${path}.runId`, tokenPattern),
+    artifactId: nullableString(required(source, 'artifactId', path), `${path}.artifactId`, artifactPattern),
     payloadFingerprint: string(required(source, 'payloadFingerprint', path), `${path}.payloadFingerprint`, hashPattern),
     projectBaseline: baseline(required(source, 'projectBaseline', path), `${path}.projectBaseline`),
     errorCode: nullableString(required(source, 'errorCode', path), `${path}.errorCode`, tokenPattern),
@@ -738,6 +746,88 @@ export function decodeAiOperationProjectionV1(value: unknown, path = '$'): AiOpe
     createdAtUtc: timestamp(required(source, 'createdAtUtc', path), `${path}.createdAtUtc`),
     updatedAtUtc: timestamp(required(source, 'updatedAtUtc', path), `${path}.updatedAtUtc`),
     expiresAtUtc: timestamp(required(source, 'expiresAtUtc', path), `${path}.expiresAtUtc`)
+  });
+}
+
+export function decodeAiHandoffArtifactIdentityV1(
+  value: unknown,
+  path = '$'
+): AiHandoffArtifactIdentityV1 {
+  const source = record(value, path);
+  exact(source, [
+    'schemaVersion', 'artifactId', 'clientOperationId', 'sessionId', 'sessionRevision',
+    'planRunId', 'planId', 'planHash', 'buildRunId', 'buildClientOperationId',
+    'buildIdentity', 'targetKind', 'projectBaseline', 'candidateFlow',
+    'candidateFlowFingerprint', 'build', 'createdAtUtc', 'expiresAtUtc', 'status',
+    'consumeClientOperationId', 'consumeReceipt'
+  ], path);
+  if (required(source, 'schemaVersion', path) !== 1) {
+    throw new AiContractDecodeError(`${path}.schemaVersion`, '1');
+  }
+  const targetKind = string(required(source, 'targetKind', path), `${path}.targetKind`);
+  if (targetKind !== 'new' && targetKind !== 'existing') {
+    throw new AiContractDecodeError(`${path}.targetKind`, 'new or existing');
+  }
+  const status = string(required(source, 'status', path), `${path}.status`) as AiHandoffStatus;
+  if (!handoffStatuses.has(status)) {
+    throw new AiContractDecodeError(`${path}.status`, 'a supported handoff status');
+  }
+  const projectBaseline = baseline(required(source, 'projectBaseline', path), `${path}.projectBaseline`);
+  if (!projectBaseline || projectBaseline.targetKind !== targetKind) {
+    throw new AiContractDecodeError(`${path}.projectBaseline`, 'the artifact target baseline');
+  }
+  record(required(source, 'candidateFlow', path), `${path}.candidateFlow`);
+  const build = decodeAiBuildResultV1(required(source, 'build', path), `${path}.build`);
+  const candidateFlowFingerprint = string(
+    required(source, 'candidateFlowFingerprint', path),
+    `${path}.candidateFlowFingerprint`,
+    hashPattern
+  );
+  if (build.candidateFlowFingerprint !== candidateFlowFingerprint) {
+    throw new AiContractDecodeError(`${path}.build.candidateFlowFingerprint`, 'the artifact candidate fingerprint');
+  }
+  const consumeIdentity = required(source, 'consumeClientOperationId', path);
+  if (consumeIdentity !== null) string(consumeIdentity, `${path}.consumeClientOperationId`, guidPattern);
+  const receipt = required(source, 'consumeReceipt', path);
+  if (receipt !== null) {
+    const consumeReceipt = record(receipt, `${path}.consumeReceipt`);
+    exact(consumeReceipt, [
+      'clientOperationId', 'targetProjectId', 'result', 'acknowledgedAtUtc', 'projectSaved'
+    ], `${path}.consumeReceipt`);
+    string(required(consumeReceipt, 'clientOperationId', `${path}.consumeReceipt`),
+      `${path}.consumeReceipt.clientOperationId`, guidPattern);
+    const targetProjectId = required(consumeReceipt, 'targetProjectId', `${path}.consumeReceipt`);
+    if (targetProjectId !== null) string(targetProjectId, `${path}.consumeReceipt.targetProjectId`, guidPattern);
+    string(required(consumeReceipt, 'result', `${path}.consumeReceipt`), `${path}.consumeReceipt.result`, tokenPattern);
+    timestamp(required(consumeReceipt, 'acknowledgedAtUtc', `${path}.consumeReceipt`),
+      `${path}.consumeReceipt.acknowledgedAtUtc`);
+    if (boolean(required(consumeReceipt, 'projectSaved', `${path}.consumeReceipt`),
+      `${path}.consumeReceipt.projectSaved`)) {
+      throw new AiContractDecodeError(`${path}.consumeReceipt.projectSaved`, 'false for a Workspace receipt');
+    }
+  }
+  return Object.freeze({
+    schemaVersion: 1,
+    artifactId: string(required(source, 'artifactId', path), `${path}.artifactId`, artifactPattern),
+    clientOperationId: string(required(source, 'clientOperationId', path), `${path}.clientOperationId`, guidPattern),
+    sessionId: string(required(source, 'sessionId', path), `${path}.sessionId`, sessionPattern),
+    sessionRevision: integer(required(source, 'sessionRevision', path), `${path}.sessionRevision`),
+    planRunId: string(required(source, 'planRunId', path), `${path}.planRunId`, tokenPattern),
+    planId: string(required(source, 'planId', path), `${path}.planId`, tokenPattern),
+    planHash: string(required(source, 'planHash', path), `${path}.planHash`, hashPattern),
+    buildRunId: string(required(source, 'buildRunId', path), `${path}.buildRunId`, tokenPattern),
+    buildClientOperationId: string(
+      required(source, 'buildClientOperationId', path), `${path}.buildClientOperationId`, guidPattern
+    ),
+    buildIdentity: string(
+      required(source, 'buildIdentity', path), `${path}.buildIdentity`, buildIdentityPattern
+    ),
+    targetKind,
+    projectBaseline,
+    candidateFlowFingerprint,
+    createdAtUtc: timestamp(required(source, 'createdAtUtc', path), `${path}.createdAtUtc`),
+    expiresAtUtc: timestamp(required(source, 'expiresAtUtc', path), `${path}.expiresAtUtc`),
+    status
   });
 }
 

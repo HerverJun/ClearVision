@@ -5,6 +5,7 @@ using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
+using ClearVision.Product.Infrastructure.AI.Handoff;
 using Microsoft.AspNetCore.Http;
 
 namespace ClearVision.Product.Desktop.Endpoints;
@@ -33,6 +34,66 @@ public sealed record AiProjectTargetRequest
     public long? PersistenceRevision { get; init; }
     public string? CanonicalFlowHash { get; init; }
 }
+
+public sealed record AiWorkspaceHandoffCreateRequestV1
+{
+    public Guid ClientOperationId { get; init; }
+    public string SessionId { get; init; } = string.Empty;
+    public long ExpectedSessionRevision { get; init; }
+    public string PlanRunId { get; init; } = string.Empty;
+    public string PlanId { get; init; } = string.Empty;
+    public string PlanHash { get; init; } = string.Empty;
+    public string BuildRunId { get; init; } = string.Empty;
+    public Guid BuildClientOperationId { get; init; }
+    public string BuildIdentity { get; init; } = string.Empty;
+    public string CandidateFlowFingerprint { get; init; } = string.Empty;
+    public int AnswerRevision { get; init; }
+    public int ResourceRevision { get; init; }
+    public AiProjectTargetRequest? ProjectBaseline { get; init; }
+}
+
+public sealed record AiWorkspaceHandoffConsumeRequestV1
+{
+    public Guid ClientOperationId { get; init; }
+    public Guid? TargetProjectId { get; init; }
+    public string CandidateFlowFingerprint { get; init; } = string.Empty;
+}
+
+public sealed record AiWorkspaceHandoffRejectRequestV1
+{
+    public Guid ClientOperationId { get; init; }
+    public string RejectionCode { get; init; } = "workspace_discarded";
+}
+
+public sealed record AiWorkspaceHandoffConsumeReceiptProjectionV1(
+    Guid ClientOperationId,
+    Guid? TargetProjectId,
+    string Result,
+    DateTimeOffset AcknowledgedAtUtc,
+    bool ProjectSaved);
+
+public sealed record AiWorkspaceHandoffArtifactProjectionV1(
+    int SchemaVersion,
+    string ArtifactId,
+    Guid ClientOperationId,
+    string SessionId,
+    long SessionRevision,
+    string PlanRunId,
+    string PlanId,
+    string PlanHash,
+    string BuildRunId,
+    Guid BuildClientOperationId,
+    string BuildIdentity,
+    string TargetKind,
+    AiProjectBaselineIdentity? ProjectBaseline,
+    JsonElement CandidateFlow,
+    string CandidateFlowFingerprint,
+    VisionAgentPublicBuildResultV1 Build,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset ExpiresAtUtc,
+    string Status,
+    Guid? ConsumeClientOperationId,
+    AiWorkspaceHandoffConsumeReceiptProjectionV1? ConsumeReceipt);
 
 public sealed record AiSessionSummaryV1(
     string SessionId,
@@ -86,6 +147,7 @@ public sealed record AiOperationProjectionV1(
     string Status,
     string? SessionId,
     string? RunId,
+    string? ArtifactId,
     string PayloadFingerprint,
     AiProjectBaselineIdentity? ProjectBaseline,
     string? ErrorCode,
@@ -148,6 +210,7 @@ internal static class AiPublicContractMapper
             receipt.Status,
             NormalizeOptional(receipt.SessionId),
             NormalizeOptional(receipt.RunId),
+            NormalizeOptional(receipt.ArtifactId),
             receipt.PayloadFingerprint,
             receipt.ProjectBaseline is null ? null : receipt.ProjectBaseline with { },
             NormalizeOptional(receipt.PublicErrorCode),
@@ -155,6 +218,41 @@ internal static class AiPublicContractMapper
             receipt.CreatedAtUtc,
             receipt.UpdatedAtUtc,
             receipt.ExpiresAtUtc);
+
+    public static AiWorkspaceHandoffArtifactProjectionV1 ToHandoffArtifact(
+        AiWorkspaceHandoffArtifactV1 artifact)
+    {
+        var candidate = JsonSerializer.Deserialize<JsonElement>(artifact.CandidateFlowJson, AgentRunEventJson.Options);
+        return new AiWorkspaceHandoffArtifactProjectionV1(
+            artifact.SchemaVersion,
+            artifact.ArtifactId,
+            artifact.ClientOperationId,
+            artifact.SessionId,
+            artifact.SessionRevision,
+            artifact.PlanRunId,
+            artifact.PlanId,
+            artifact.PlanHash,
+            artifact.BuildRunId,
+            artifact.BuildClientOperationId,
+            artifact.BuildIdentity,
+            artifact.TargetKind,
+            artifact.ProjectBaseline is null ? null : artifact.ProjectBaseline with { },
+            candidate,
+            artifact.CandidateFlowFingerprint,
+            ToPublicBuildResult(artifact.PublicBuild) ?? new VisionAgentPublicBuildResultV1(),
+            artifact.CreatedAtUtc,
+            artifact.ExpiresAtUtc,
+            artifact.Status,
+            artifact.ConsumeClientOperationId,
+            artifact.ConsumeReceipt is null
+                ? null
+                : new AiWorkspaceHandoffConsumeReceiptProjectionV1(
+                    artifact.ConsumeReceipt.ClientOperationId,
+                    artifact.ConsumeReceipt.TargetProjectId,
+                    artifact.ConsumeReceipt.Result,
+                    artifact.ConsumeReceipt.AcknowledgedAtUtc,
+                    false));
+    }
 
     private static Guid? ParseProjectId(string? value) => Guid.TryParse(value, out var parsed) ? parsed : null;
 

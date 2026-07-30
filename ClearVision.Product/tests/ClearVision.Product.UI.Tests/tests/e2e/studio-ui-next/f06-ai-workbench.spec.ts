@@ -81,8 +81,9 @@ test('unbound AI journey closes Build parameters resources Validation and read-o
   await expect(page.locator('[data-ai-owner-phase="build-blocked"]')).toBeVisible();
   await page.getByRole('button', { name: '重新校验' }).click();
   await expect(page.locator('[data-ai-owner-phase="build-ready"]')).toBeVisible();
-  await expect(page.getByText('候选已具备交接条件', { exact: true })).toBeVisible();
-  await expect(page.getByText('工作区审核', { exact: true })).toBeVisible();
+  await expect(page.locator('[data-ai-apply-preview]')).toBeVisible();
+  await expect(page.getByText('未保存的新工程', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '交接到工作区审核' })).toBeVisible();
   await captureF06Evidence(page, audit, 'ai-build-ready-readonly-gate', viewport, 'comfortable');
 
   expect(audit.requests.some(item => item.path === '/api/ai/agent-intent-router-runs')).toBe(true);
@@ -180,9 +181,9 @@ test('terminal Build recovery renders the candidate without restoring a Plan own
     recoveredBuild: true
   });
   await expect(page.locator('[data-ai-owner-phase="build-ready"]')).toBeVisible();
-  await expect(page.locator('[data-ai-build-workspace]')).toBeVisible();
+  await expect(page.locator('[data-ai-apply-preview]')).toBeVisible();
   await expect(page.locator('[data-ai-plan-workspace]')).toHaveCount(0);
-  await expect(page.getByText('工作区审核', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '交接到工作区审核' })).toBeVisible();
   await captureF06Evidence(page, audit, 'ai-build-terminal-recovery', viewport, 'compact');
   expectNoRuntimeErrors(audit);
   await expectNoHorizontalOverflow(page);

@@ -16,6 +16,7 @@ param(
     [string]$WebView2UserDataDirectory,
     [string]$ConversationStoreRoot,
     [string]$AgentRunStoreRoot,
+    [string]$HandoffArtifactStoreRoot,
     [string]$RuntimeCleanupRoot,
     [string]$DatabasePath,
     [int]$WindowWidth = 1920,
@@ -85,6 +86,11 @@ $agentRunRoot = if ([string]::IsNullOrWhiteSpace($AgentRunStoreRoot)) {
 } else {
     [System.IO.Path]::GetFullPath($AgentRunStoreRoot)
 }
+$handoffArtifactRoot = if ([string]::IsNullOrWhiteSpace($HandoffArtifactStoreRoot)) {
+    Join-Path $runtimeIsolationRoot "handoffs"
+} else {
+    [System.IO.Path]::GetFullPath($HandoffArtifactStoreRoot)
+}
 
 $environmentNames = @(
     "Database__Path",
@@ -93,6 +99,7 @@ $environmentNames = @(
     "CV_WEBVIEW2_USER_DATA_FOLDER",
     "CV_CONVERSATION_STORE_ROOT",
     "CV_AGENT_RUN_EVENT_STORE",
+    "CV_AI_HANDOFF_STORE_ROOT",
     "CV_DESKTOP_LOG_PATH",
     "CV_CDP_PORT",
     "CV_WEB_PORT",
@@ -103,6 +110,8 @@ $environmentNames = @(
     "CV_SMOKE_USERNAME",
     "CV_SMOKE_PASSWORD",
     "CV_EVIDENCE_DIR",
+    "CV_DESKTOP_HOST_CLOSE_SIGNAL",
+    "CV_NODE_COMPLETION_SIGNAL",
     "PATH"
 )
 $previousEnvironment = @{}
@@ -229,6 +238,7 @@ if ($AllowInitialAdminSetup -and [string]::IsNullOrWhiteSpace($DatabasePath)) {
 Set-ProcessEnvironment -Name "CV_DESKTOP_HTTP_PORT" -Value ([string]$WebPort)
 Set-ProcessEnvironment -Name "CV_CONVERSATION_STORE_ROOT" -Value $conversationRoot
 Set-ProcessEnvironment -Name "CV_AGENT_RUN_EVENT_STORE" -Value $agentRunRoot
+Set-ProcessEnvironment -Name "CV_AI_HANDOFF_STORE_ROOT" -Value $handoffArtifactRoot
 
 $databaseDirectory = Split-Path -Parent $isolatedDatabase
 if ($useIsolatedAuth -or -not [string]::IsNullOrWhiteSpace($DatabasePath)) {
@@ -256,6 +266,7 @@ New-Item -ItemType Directory -Force -Path $hostLogs | Out-Null
 New-Item -ItemType Directory -Force -Path $webView2UserDataRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $conversationRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $agentRunRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $handoffArtifactRoot | Out-Null
 
 if (-not $NoBuild) {
     & dotnet build $project -c $Configuration --no-restore
@@ -396,8 +407,20 @@ function Get-AuthSession {
 }
 
 function Invoke-WebViewSmoke {
-    param([int]$CdpPort, [double]$Scale, [string]$Phase)
+    param(
+        [int]$CdpPort,
+        [double]$Scale,
+        [string]$Phase,
+        [string]$RunName,
+        [System.Diagnostics.Process]$DesktopProcess
+    )
     $login = if ($DeferAuthToScenario) { $null } else { Get-AuthSession }
+    $closeSignal = Join-Path $hostLogs "$RunName-host-close-ready.signal"
+    $closeAcknowledgement = "$closeSignal.closed"
+    $nodeCompletionSignal = "$closeSignal.node-complete"
+    $nodeStdout = Join-Path $hostLogs "$RunName-node.stdout.log"
+    $nodeStderr = Join-Path $hostLogs "$RunName-node.stderr.log"
+    Remove-Item -LiteralPath $closeSignal, $closeAcknowledgement, $nodeCompletionSignal -Force -ErrorAction SilentlyContinue
     $env:CV_CDP_PORT = [string]$CdpPort
     $env:CV_WEB_PORT = [string]$WebPort
     $env:CV_DPI_SCALE = [string]$Scale
@@ -412,16 +435,67 @@ function Invoke-WebViewSmoke {
     $env:CV_SMOKE_USERNAME = $Username
     $env:CV_SMOKE_PASSWORD = $Password
     $env:CV_EVIDENCE_DIR = $evidence
-    Push-Location $uiTests
+    $env:CV_DESKTOP_HOST_CLOSE_SIGNAL = $closeSignal
+    $env:CV_NODE_COMPLETION_SIGNAL = $nodeCompletionSignal
+    $nodeProcess = $null
     try {
-        & $nodeExe $nodeSmoke
-        if ($LASTEXITCODE -ne 0) { throw "WebView2 smoke phase '$Phase' at scale $Scale failed with exit code $LASTEXITCODE." }
+        $nodeProcess = Start-Process -FilePath $nodeExe `
+            -ArgumentList @("`"$nodeSmoke`"") `
+            -WorkingDirectory $uiTests `
+            -RedirectStandardOutput $nodeStdout `
+            -RedirectStandardError $nodeStderr `
+            -WindowStyle Hidden `
+            -PassThru
+        $deadline = [DateTime]::UtcNow.AddMinutes(10)
+        $shutdownRequested = $false
+        while (-not $nodeProcess.HasExited) {
+            if (-not $shutdownRequested -and (Test-Path -LiteralPath $closeSignal -PathType Leaf)) {
+                $requested = [ClearVisionReleaseSmoke.NativeWindow]::RequestClose(
+                    [uint32]$DesktopProcess.Id)
+                if (-not $requested) {
+                    throw "Could not request coordinated close for Desktop Host PID $($DesktopProcess.Id)."
+                }
+                $shutdownRequested = $true
+                if (-not $DesktopProcess.WaitForExit(75000)) {
+                    Stop-Process -Id $DesktopProcess.Id -Force -ErrorAction SilentlyContinue
+                    throw "Desktop Host did not complete its coordinated close/flush path within 75 seconds."
+                }
+                [pscustomobject]@{
+                    ProcessId = $DesktopProcess.Id
+                    ExitedAtUtc = [DateTime]::UtcNow.ToString("O")
+                } | ConvertTo-Json -Compress | Set-Content -LiteralPath $closeAcknowledgement -Encoding utf8
+            }
+            if ([DateTime]::UtcNow -ge $deadline) {
+                throw "WebView2 smoke phase '$Phase' at scale $Scale exceeded 10 minutes."
+            }
+            Start-Sleep -Milliseconds 50
+        }
+        $nodeProcess.WaitForExit()
+        $nodeProcess.Refresh()
+        $nodeExitCode = $nodeProcess.ExitCode
+        if ($null -eq $nodeExitCode -and (Test-Path -LiteralPath $nodeCompletionSignal -PathType Leaf)) {
+            $nodeExitCode = 0
+        }
+        if ($nodeExitCode -ne 0) {
+            throw "WebView2 smoke phase '$Phase' at scale $Scale failed with exit code $nodeExitCode."
+        }
     } finally {
-        Pop-Location
+        if ($nodeProcess -and -not $nodeProcess.HasExited) {
+            Stop-Process -Id $nodeProcess.Id -Force -ErrorAction SilentlyContinue
+        }
+        if (Test-Path -LiteralPath $nodeStdout -PathType Leaf) {
+            Get-Content -LiteralPath $nodeStdout
+        }
+        if (Test-Path -LiteralPath $nodeStderr -PathType Leaf) {
+            Get-Content -LiteralPath $nodeStderr | Write-Error -ErrorAction Continue
+        }
+        Remove-Item -LiteralPath $closeSignal, $closeAcknowledgement, $nodeCompletionSignal -Force -ErrorAction SilentlyContinue
         Remove-Item Env:CV_SMOKE_TOKEN -ErrorAction SilentlyContinue
         Remove-Item Env:CV_SMOKE_USER -ErrorAction SilentlyContinue
         Remove-Item Env:CV_SMOKE_USERNAME -ErrorAction SilentlyContinue
         Remove-Item Env:CV_SMOKE_PASSWORD -ErrorAction SilentlyContinue
+        Remove-Item Env:CV_DESKTOP_HOST_CLOSE_SIGNAL -ErrorAction SilentlyContinue
+        Remove-Item Env:CV_NODE_COMPLETION_SIGNAL -ErrorAction SilentlyContinue
     }
 }
 
@@ -443,7 +517,12 @@ try {
         $process = $null
         try {
             $process = Start-DesktopHost -CdpPort $run.Port -Scale $run.Scale -RunName $run.Name
-            Invoke-WebViewSmoke -CdpPort $run.Port -Scale $run.Scale -Phase $run.Phase
+            Invoke-WebViewSmoke `
+                -CdpPort $run.Port `
+                -Scale $run.Scale `
+                -Phase $run.Phase `
+                -RunName $run.Name `
+                -DesktopProcess $process
         } finally {
             if ($process) { Stop-DesktopHost -Process $process }
         }
@@ -462,6 +541,7 @@ try {
     Remove-RepositoryTemporaryDirectory -Path $webView2UserDataRoot
     Remove-RepositoryTemporaryDirectory -Path $conversationRoot
     Remove-RepositoryTemporaryDirectory -Path $agentRunRoot
+    Remove-RepositoryTemporaryDirectory -Path $handoffArtifactRoot
 }
 
 [pscustomobject]@{

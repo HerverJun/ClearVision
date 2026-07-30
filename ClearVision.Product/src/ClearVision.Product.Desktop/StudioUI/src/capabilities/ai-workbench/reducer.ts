@@ -3,6 +3,7 @@ import type {
   AiAgentRunReplayDiagnosticsV1,
   AiBuildResultV1,
   AiCameraBindingOptionV1,
+  AiHandoffArtifactIdentityV1,
   AiIntentResultV1,
   AiOperationProjectionV1,
   AiPlanV1,
@@ -31,6 +32,9 @@ export type AiWorkbenchPhase =
   | 'resources-pending'
   | 'revalidating'
   | 'build-ready'
+  | 'handoff-creating'
+  | 'handoff-unknown-outcome'
+  | 'handoff-created'
   | 'build-failed'
   | 'build-cancelling'
   | 'build-cancelled'
@@ -68,6 +72,7 @@ export interface AiWorkbenchState {
   readonly readiness: AiReadinessPreviewV1 | null;
   readonly operation: AiOperationProjectionV1 | null;
   readonly build: AiBuildResultV1 | null;
+  readonly handoff: AiHandoffArtifactIdentityV1 | null;
   readonly buildStale: boolean;
   readonly replayDiagnostics: AiAgentRunReplayDiagnosticsV1 | null;
   readonly cameraBindings: readonly AiCameraBindingOptionV1[];
@@ -91,6 +96,9 @@ export type AiWorkbenchEvent =
   | Readonly<{ type: 'inputs-updated'; snapshot: AiSessionSnapshotV1; message: string; at: number }>
   | Readonly<{ type: 'revalidation-start'; at: number }>
   | Readonly<{ type: 'revalidation-ready'; build: AiBuildResultV1; snapshot: AiSessionSnapshotV1; at: number }>
+  | Readonly<{ type: 'handoff-start'; at: number }>
+  | Readonly<{ type: 'handoff-created'; artifact: AiHandoffArtifactIdentityV1; at: number }>
+  | Readonly<{ type: 'handoff-unknown'; message: string; at: number }>
   | Readonly<{ type: 'camera-bindings-ready'; bindings: readonly AiCameraBindingOptionV1[]; at: number }>
   | Readonly<{ type: 'run-event'; event: AiAgentRunEventV1; generation: number; at: number }>
   | Readonly<{ type: 'replay-observed'; diagnostics: AiAgentRunReplayDiagnosticsV1; generation: number; at: number }>
@@ -130,6 +138,7 @@ export const initialAiWorkbenchState: AiWorkbenchState = Object.freeze({
   readiness: null,
   operation: null,
   build: null,
+  handoff: null,
   buildStale: false,
   replayDiagnostics: null,
   cameraBindings: Object.freeze([]),
@@ -413,6 +422,33 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
         updatedAt: event.at
       });
     }
+    case 'handoff-start':
+      return Object.freeze({
+        ...state,
+        phase: 'handoff-creating',
+        handoff: null,
+        errorCode: null,
+        message: '正在由服务端重新核对 Build、工程基线与候选指纹。',
+        updatedAt: event.at
+      });
+    case 'handoff-created':
+      return Object.freeze({
+        ...state,
+        phase: 'handoff-created',
+        handoff: event.artifact,
+        errorCode: null,
+        message: '交接工件已创建，正在安全释放 AI 工作台。',
+        updatedAt: event.at
+      });
+    case 'handoff-unknown':
+      return Object.freeze({
+        ...state,
+        phase: 'handoff-unknown-outcome',
+        handoff: null,
+        errorCode: 'handoff_create_unknown_outcome',
+        message: event.message,
+        updatedAt: event.at
+      });
     case 'camera-bindings-ready':
       return Object.freeze({ ...state, cameraBindings: Object.freeze([...event.bindings]), updatedAt: event.at });
     case 'replay-observed':

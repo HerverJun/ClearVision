@@ -238,6 +238,38 @@ describe('F03 G1 Workspace persistence contracts', () => {
     ]);
   });
 
+  it('keeps an untouched server port contract clean when Canvas projects numeric enums', () => {
+    const decoded = decodeWorkspaceProjectV1(projectFixture());
+    const encodedBaseline = encodeWorkspaceFlowUpdateV1(decoded)!;
+    const draft = structuredClone(encodedBaseline) as Record<string, unknown>;
+    const operator = (draft.operators as Array<Record<string, unknown>>)[0]!;
+    const input = (operator.inputPorts as Array<Record<string, unknown>>)[0]!;
+    const output = (operator.outputPorts as Array<Record<string, unknown>>)[0]!;
+    input.direction = 0;
+    input.dataType = 3;
+    input.displayName = 'Trigger';
+    input.description = '';
+    output.direction = 1;
+    output.dataType = 0;
+    output.displayName = 'Image';
+    output.description = '';
+    output.isRequired = false;
+
+    const encodedDraft = encodeWorkspaceFlowDraftUpdateV1(decoded, {
+      id: decoded.flow!.id,
+      name: decoded.flow!.name,
+      operators: draft.operators as readonly Readonly<Record<string, unknown>>[],
+      connections: draft.connections as readonly Readonly<Record<string, unknown>>[],
+      decisionConfiguration: draft.decisionConfiguration ?? null,
+      opaquePassthrough: {}
+    });
+
+    expect(encodedDraft).toEqual(encodedBaseline);
+    expect(workspacePersistenceFingerprint(encodedDraft)).toBe(
+      workspacePersistenceFingerprint(encodedBaseline)
+    );
+  });
+
   it('merges the typed G2-G4 draft with the G1 baseline without losing null, falsy, ROI, structure or opaque fields', () => {
     const sourceFlow = flowFixture({ futureFlowPolicy: { mode: 'strict' } });
     const sourceOperator = (sourceFlow.operators as Array<Record<string, unknown>>)[0]!;

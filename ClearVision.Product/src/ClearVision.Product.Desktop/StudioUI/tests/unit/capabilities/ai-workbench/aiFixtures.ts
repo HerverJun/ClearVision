@@ -327,6 +327,7 @@ export function operationFixture(kind: 'session_create' | 'plan_run' = 'session_
     status: 'created',
     sessionId: 'session_01',
     runId: kind === 'plan_run' ? 'run_plan_01' : null,
+    artifactId: null,
     payloadFingerprint: `sha256:${'c'.repeat(64)}`,
     projectBaseline: null,
     errorCode: null,

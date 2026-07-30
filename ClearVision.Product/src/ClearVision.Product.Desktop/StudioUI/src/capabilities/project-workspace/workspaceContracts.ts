@@ -283,6 +283,18 @@ export interface WorkspaceProjectV1 {
   readonly saveCompatibility: WorkspaceSaveCompatibility;
 }
 
+export interface WorkspaceCanvasProjectV1 {
+  readonly id: string | null;
+  readonly name: string;
+  readonly description: string | null;
+  readonly flow: WorkspaceFlowV1 | null;
+}
+
+export interface WorkspaceFlowEncodingBaselineV1 {
+  readonly flow: WorkspaceFlowV1 | null;
+  readonly saveCompatibility: WorkspaceSaveCompatibility;
+}
+
 export const workspacePersistenceFieldsV1 = Object.freeze({
   flow: Object.freeze(['id', 'name', 'decisionConfiguration', 'operators', 'connections']),
   operator: Object.freeze([
@@ -800,6 +812,21 @@ function decodeFlow(
   });
 }
 
+export function decodeWorkspaceHandoffFlowV1(value: unknown): WorkspaceFlowV1 {
+  const accumulator: CompatibilityAccumulator = {
+    opaquePassthroughPaths: new Set<string>(),
+    blockedPaths: new Set<string>(),
+    readOnlyUnknownPaths: new Set<string>()
+  };
+  const flow = decodeFlow(value, '$.candidateFlow', accumulator);
+  if (flow === null) throw new WorkspaceContractDecodeError('$.candidateFlow', 'a canonical Flow');
+  const compatibility = createSaveCompatibility(accumulator);
+  if (!compatibility.canEncode) {
+    throw new WorkspaceSaveCompatibilityError(compatibility.blockedPaths);
+  }
+  return flow;
+}
+
 function decodeNumericBound(value: unknown, path: string): string | number | null {
   if (value === null) return null;
   if (typeof value === 'string') return value;
@@ -1173,12 +1200,23 @@ export function encodeWorkspaceDecisionConfigurationV1(
   });
 }
 
-export function encodeWorkspaceFlowUpdateV1(project: WorkspaceProjectV1): WorkspaceJsonObject | null {
+export function encodeWorkspaceFlowUpdateV1(project: WorkspaceFlowEncodingBaselineV1): WorkspaceJsonObject | null {
   if (!project.saveCompatibility.canEncode) {
     throw new WorkspaceSaveCompatibilityError(project.saveCompatibility.blockedPaths);
   }
   const flow = project.flow;
   if (flow === null) return null;
+  return Object.freeze({
+    ...flow.opaquePassthrough,
+    id: flow.id,
+    name: flow.name,
+    operators: Object.freeze(flow.operators.map(encodeOperator)),
+    connections: Object.freeze(flow.connections.map(encodeConnection)),
+    decisionConfiguration: encodeWorkspaceDecisionConfigurationV1(flow.decisionConfiguration)
+  });
+}
+
+export function encodeWorkspaceHandoffFlowV1(flow: WorkspaceFlowV1): WorkspaceJsonObject {
   return Object.freeze({
     ...flow.opaquePassthrough,
     id: flow.id,
@@ -1261,6 +1299,10 @@ function mergePortDraft(
   baseline: WorkspaceJsonObject | undefined,
   draft: WorkspaceJsonObject
 ): WorkspaceJsonObject {
+  // Existing port contracts are not editable Canvas state. The legacy Canvas serializes
+  // enum values as numbers, so accepting its projection here would make an untouched
+  // string-enum server baseline appear dirty after mount.
+  if (baseline) return Object.freeze({ ...baseline });
   return Object.freeze(mergeKnownFields(baseline, draft, workspacePersistenceFieldsV1.port));
 }
 
@@ -1376,7 +1418,7 @@ function createFlowId(options: WorkspaceFlowDraftEncodeOptions): string {
 }
 
 export function encodeWorkspaceFlowDraftUpdateV1(
-  baseline: WorkspaceProjectV1,
+  baseline: WorkspaceFlowEncodingBaselineV1,
   draft: WorkspaceFlowDraftV1,
   options: WorkspaceFlowDraftEncodeOptions = {}
 ): WorkspaceJsonObject | null {

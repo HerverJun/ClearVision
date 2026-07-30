@@ -9,7 +9,7 @@ import { CameraBindingEditor, type CameraBindingEditorOwner } from '../camera';
 
 const props = defineProps<{
   owner: InspectorOwner;
-  cameraOwner: CameraBindingEditorOwner;
+  cameraOwner: CameraBindingEditorOwner | null;
 }>();
 
 const projection = props.owner.projection;
@@ -304,11 +304,17 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
             :key="parameterKey(parameter)"
           >
             <CameraBindingEditor
-              v-if="parameter.extensionSlot === 'camera-binding'"
+              v-if="parameter.extensionSlot === 'camera-binding' && cameraOwner"
               :owner="cameraOwner"
               :parameter-name="parameter.name"
               :disabled="editingDisabled || projection.node.metadataPhase !== 'ready'"
             />
+            <p
+              v-else-if="parameter.extensionSlot === 'camera-binding'"
+              class="inspector-panel__resource-unavailable"
+            >
+              已保留候选资源标识；创建工程后才能访问相机绑定服务。
+            </p>
             <ParameterEditor
               v-else
               :parameter="parameter"

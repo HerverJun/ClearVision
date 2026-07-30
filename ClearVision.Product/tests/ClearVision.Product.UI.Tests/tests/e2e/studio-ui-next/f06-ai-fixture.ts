@@ -13,6 +13,10 @@ export const f06PlanHash = 'a'.repeat(64);
 export const f06BuildId = 'build_f06_01';
 export const f06BuildFingerprint = 'd'.repeat(64);
 export const f06CandidateFingerprint = 'e'.repeat(64);
+export const f06HandoffArtifactId = '0123456789abcdef0123456789abcdef';
+export const f06SecondHandoffArtifactId = 'fedcba9876543210fedcba9876543210';
+export const f06CreatedProjectId = '77777777-7777-4777-8777-777777777777';
+const f06CandidateFlowId = '66666666-6666-4666-8666-666666666666';
 const timestamp = '2026-07-29T08:00:00.000Z';
 
 export interface F06BrowserAudit {
@@ -36,6 +40,58 @@ export interface F06BrowserFixtureOptions {
   readonly initialBuildState?: F06InitialBuildState;
   readonly buildUnknownOutcome?: boolean;
   readonly holdRevalidation?: boolean;
+  readonly enableHandoff?: boolean;
+  readonly artifactStatus?: 'available' | 'consuming' | 'consumed' | 'expired' | 'rejected';
+  readonly artifactBaselineRevision?: number;
+  readonly handoffCreateUnknownOutcome?: boolean;
+  readonly saveUnknownOutcome?: boolean;
+}
+
+function candidateFlow() {
+  return {
+    id: f06CandidateFlowId,
+    name: 'AI 候选流程',
+    operators: [],
+    connections: [],
+    decisionConfiguration: null
+  };
+}
+
+function workspaceProject(
+  id: string,
+  revision: number,
+  flow: ReturnType<typeof candidateFlow> | null,
+  name = '新能源托盘超长中文名称外观检测工程',
+  description: string | null = '高反光表面缺陷检测'
+) {
+  return {
+    id, name, description, version: '2.3.0', persistenceRevision: revision,
+    createdAt: timestamp, modifiedAt: revision > 0 ? timestamp : null, lastOpenedAt: timestamp,
+    flow, globalSettings: {},
+    globalVariables: { schemaVersion: '1.0', variables: [], sourceBindings: [], targetBindings: [] },
+    assets: {
+      schemaVersion: 1,
+      calibrationAssetCount: 0,
+      spatialAssetCount: 0,
+      calibrationAssets: [],
+      spatialAssets: []
+    }
+  };
+}
+
+function projectDetails(project: ReturnType<typeof workspaceProject>) {
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description,
+    version: project.version,
+    persistenceRevision: project.persistenceRevision,
+    createdAt: project.createdAt,
+    modifiedAt: project.modifiedAt,
+    lastOpenedAt: project.lastOpenedAt,
+    flow: project.flow,
+    assets: { schemaVersion: 1, calibrationAssets: [], spatialAssets: [] }
+  };
 }
 
 function answer(field = 'defect_definition', value = '2 mm') {
@@ -99,6 +155,7 @@ function operation(kind: 'session_create' | 'plan_run' | 'build_run', clientOper
   return {
     clientOperationId, kind, status: 'created', sessionId: f06SessionId,
     runId: kind === 'plan_run' ? f06RunId : kind === 'build_run' ? f06BuildRunId : null,
+    artifactId: null,
     payloadFingerprint: `sha256:${'c'.repeat(64)}`,
     projectBaseline: kind === 'build_run' ? projectBaseline(projectBound) : null,
     errorCode: null, publicMessage: null,
@@ -368,6 +425,13 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
   const flag = options.flag ?? true;
   const projectBound = options.projectBound ?? false;
   const activePlan = plan(options.longContent ?? false);
+  const projects = new Map<string, ReturnType<typeof workspaceProject>>([
+    [f06ProjectId, workspaceProject(f06ProjectId, 18, null)]
+  ]);
+  const consumeOperations = new Map<string, string>();
+  let handoffOperationId = '11111111-1111-4111-8111-111111111111';
+  let handoffCreateFailed = false;
+  let saveResponseLost = false;
   let snapshot = sessionSnapshot(projectBound);
   let activeBuildOperationId = '44444444-4444-4444-8444-444444444444';
   const initialBuildState = options.initialBuildState ?? (options.recoveredBuild ? 'ready' : null);
@@ -387,6 +451,9 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
       lifecycleState: initialBuildState === 'stale' ? 'build_inputs_changed' :
         initialBuildState === 'ready' ? 'build_ready' : initialBuildState,
       buildRunId: f06BuildRunId,
+      planRunId: f06RunId,
+      planRunStatus: 'completed',
+      planTerminalSequence: 3,
       buildRunStatus: ['failed', 'cancelled'].includes(initialBuildState) ? initialBuildState :
         hasTerminalBuild ? 'completed' : 'running',
       buildTerminalSequence: hasTerminalBuild || ['failed', 'cancelled'].includes(initialBuildState) ? 1 : null,
@@ -411,10 +478,72 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
   const audit: F06BrowserAudit = {
     requests: [], consoleErrors: [], pageErrors: [], releaseBuildStream, releaseRevalidation
   };
-  await installF02BrowserStartup(page, { 'Studio2.AiWorkbench': flag });
-  page.on('console', message => { if (message.type() === 'error') audit.consoleErrors.push(message.text()); });
+  function handoffArtifact(
+    id: string,
+    status = options.artifactStatus ?? 'available',
+    consumeClientOperationId = consumeOperations.get(id) ?? null
+  ) {
+    const baseline = projectBound
+      ? {
+          ...projectBaseline(true),
+          persistenceRevision: options.artifactBaselineRevision ?? 18
+        }
+      : projectBaseline(false);
+    const build = {
+      ...buildResult(projectBound, true, true, activeBuildOperationId),
+      projectBaseline: baseline
+    };
+    return {
+      schemaVersion: 1,
+      artifactId: id,
+      clientOperationId: handoffOperationId,
+      sessionId: f06SessionId,
+      sessionRevision: Number(snapshot.revision),
+      planRunId: f06RunId,
+      planId: f06PlanId,
+      planHash: f06PlanHash,
+      buildRunId: f06BuildRunId,
+      buildClientOperationId: activeBuildOperationId,
+      buildIdentity: build.buildIdentity,
+      targetKind: projectBound ? 'existing' : 'new',
+      projectBaseline: baseline,
+      candidateFlow: candidateFlow(),
+      candidateFlowFingerprint: f06CandidateFingerprint,
+      build,
+      createdAtUtc: timestamp,
+      expiresAtUtc: '2026-07-29T08:30:00.000Z',
+      status,
+      consumeClientOperationId,
+      consumeReceipt: status === 'consumed' ? {
+        clientOperationId: consumeClientOperationId ?? '55555555-5555-4555-8555-555555555555',
+        targetProjectId: projectBound ? f06ProjectId : null,
+        result: 'workspace_staged',
+        acknowledgedAtUtc: '2026-07-29T08:05:00.000Z',
+        projectSaved: false
+      } : null
+    };
+  }
+  await installF02BrowserStartup(page, {
+    'Studio2.AiWorkbench': flag,
+    'Studio2.Workspace': true,
+    'Studio2.ProjectPage': true,
+    'Studio2.PropertyPanel': true,
+    'Studio2.PreviewPanel': true,
+    'Studio2.GlobalVariables': true
+  });
+  page.on('console', message => {
+    if (message.type() !== 'error') return;
+    const location = message.location();
+    const source = location.url ? ` [${location.url}:${location.lineNumber + 1}]` : '';
+    audit.consoleErrors.push(`${message.text()}${source}`);
+  });
   page.on('pageerror', error => audit.pageErrors.push(error.stack ?? error.message));
-  await page.route('**/health', route => fulfillF02Json(route, 200, { status: 'Healthy' }, 'f06-g2-ai.v1'));
+  await page.route('**/health', route => fulfillF02Json(
+    route,
+    200,
+    { status: 'Healthy', port: 50_012 },
+    'f06-g2-ai.v1'
+  ));
   await page.route('**/api/**', async route => {
     const request = route.request();
     const url = new URL(request.url());
@@ -423,11 +552,118 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
     const json = (status: number, value: unknown) => fulfillF02Json(route, status, value, 'f06-g2-ai.v1');
     if (url.pathname === '/api/auth/setup-status') return json(200, { requiresInitialAdminSetup: false, usernameMinLength: 3, passwordMinLength: 6, requiresUppercase: false, requiresLowercase: false, requiresDigit: false });
     if (url.pathname === '/api/auth/me') return json(200, { userId: 'f06-user', username: 'f06-engineer', role });
-    if (url.pathname === `/api/projects/${f06ProjectId}`) return json(200, {
-      id: f06ProjectId, name: '新能源托盘超长中文名称外观检测工程', description: '高反光表面缺陷检测',
-      version: '2.3.0', persistenceRevision: 18, createdAt: timestamp, modifiedAt: timestamp,
-      lastOpenedAt: timestamp, flow: null, assets: { schemaVersion: 1, calibrationAssets: [], spatialAssets: [] }
-    });
+    if (url.pathname === '/api/operators/library') return json(200, []);
+    if (url.pathname === '/api/cameras/bindings') {
+      return json(200, []);
+    }
+    if (url.pathname === '/api/inspection/decision-configuration/validate' && request.method() === 'POST') {
+      return json(200, {
+        isValid: false,
+        issues: [{
+          code: 'DECISION_BINDING_REQUIRED',
+          message: '请选择最终判定输出。',
+          field: 'decisionConfiguration.finalDecisionBinding',
+          operatorId: null,
+          outputName: null
+        }],
+        eligibleOutputs: []
+      });
+    }
+    if (url.pathname === '/api/projects' && request.method() === 'POST') {
+      const create = body as { clientOperationId: string; name: string; description: string | null };
+      const created = workspaceProject(f06CreatedProjectId, 0, null, create.name, create.description);
+      projects.set(f06CreatedProjectId, created);
+      const details = projectDetails(created);
+      return json(201, {
+        projectId: f06CreatedProjectId,
+        project: details,
+        operationReplayed: false,
+        operation: {
+          clientOperationId: create.clientOperationId,
+          kind: 'create',
+          status: 'completed',
+          projectId: f06CreatedProjectId,
+          result: {
+            project: details,
+            projectDeleted: false,
+            deleted: false,
+            alreadyDeleted: false,
+            cleanupStatus: 'not-required'
+          },
+          errorCode: null,
+          createdAtUtc: timestamp,
+          updatedAtUtc: timestamp,
+          expiresAtUtc: null
+        }
+      });
+    }
+    const projectOpen = url.pathname.match(/^\/api\/projects\/([0-9a-f-]+)\/open$/i);
+    if (projectOpen && request.method() === 'POST') {
+      return json(200, { projectId: projectOpen[1], lastOpenedAtUtc: timestamp });
+    }
+    const projectRequest = url.pathname.match(/^\/api\/projects\/([0-9a-f-]+)$/i);
+    if (projectRequest && request.method() === 'GET') {
+      const current = projects.get(projectRequest[1]);
+      return current
+        ? json(200, page.url().includes('/workspace') ? current : projectDetails(current))
+        : json(404, { errorCode: 'project_not_found', publicMessage: '工程不存在。' });
+    }
+    if (projectRequest && request.method() === 'PUT') {
+      const current = projects.get(projectRequest[1]);
+      if (!current) return json(404, { errorCode: 'project_not_found', publicMessage: '工程不存在。' });
+      const update = body as {
+        name: string;
+        description: string | null;
+        flow: ReturnType<typeof candidateFlow> | null;
+        expectedPersistenceRevision: number;
+      };
+      if (update.expectedPersistenceRevision !== current.persistenceRevision) {
+        return json(409, { errorCode: 'PSV011', publicMessage: '工程保存修订已变化。' });
+      }
+      const saved = workspaceProject(
+        current.id,
+        current.persistenceRevision + 1,
+        update.flow,
+        update.name,
+        update.description
+      );
+      projects.set(current.id, saved);
+      if (options.saveUnknownOutcome && !saveResponseLost) {
+        saveResponseLost = true;
+        return route.abort('connectionfailed');
+      }
+      return json(200, saved);
+    }
+    if (options.enableHandoff && url.pathname === '/api/ai/handoffs' && request.method() === 'POST') {
+      handoffOperationId = String((body as { clientOperationId: string }).clientOperationId);
+      if (options.handoffCreateUnknownOutcome && !handoffCreateFailed) {
+        handoffCreateFailed = true;
+        return route.abort('connectionfailed');
+      }
+      return json(201, handoffArtifact(f06HandoffArtifactId, 'available'));
+    }
+    if (options.enableHandoff && url.pathname === `/api/ai/handoffs/by-build/${f06BuildRunId}`) {
+      return json(200, handoffArtifact(f06HandoffArtifactId, 'available'));
+    }
+    const handoffRequest = options.enableHandoff
+      ? url.pathname.match(/^\/api\/ai\/handoffs\/([0-9a-f]{32})(?:\/(consume|acknowledge|reject))?$/i)
+      : null;
+    if (handoffRequest) {
+      const id = handoffRequest[1];
+      const action = handoffRequest[2];
+      if (!action && request.method() === 'GET') {
+        return json(200, handoffArtifact(id, options.artifactStatus ?? 'available'));
+      }
+      const operationId = String((body as { clientOperationId: string }).clientOperationId);
+      if (action === 'consume') {
+        consumeOperations.set(id, operationId);
+        return json(200, handoffArtifact(id, 'consuming', operationId));
+      }
+      if (action === 'acknowledge') {
+        return json(200, handoffArtifact(id, 'consumed', operationId));
+      }
+      if (action === 'reject') return json(200, handoffArtifact(id, 'rejected', operationId));
+    }
     if (url.pathname === `/api/ai/projects/${f06ProjectId}/baseline`) {
       return json(200, projectBaseline(true));
     }

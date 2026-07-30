@@ -1,4 +1,4 @@
-import type { Router } from 'vue-router';
+import type { LocationQuery, Router } from 'vue-router';
 import type { AuthLifecycleRoot } from '@/app/auth';
 import type { ProductLeaveReason } from './productLeaveGuardOwner';
 
@@ -19,6 +19,12 @@ function routeLeaveReason(toPath: string, fromPath: string): ProductLeaveReason 
     : 'route-leave';
 }
 
+function sameQueryExceptHandoff(to: LocationQuery, from: LocationQuery): boolean {
+  const keys = new Set([...Object.keys(to), ...Object.keys(from)]);
+  keys.delete('handoff');
+  return [...keys].every(key => JSON.stringify(to[key]) === JSON.stringify(from[key]));
+}
+
 export function installProductLeaveGuardBridge(
   router: Router,
   authRoot: AuthLifecycleRoot,
@@ -29,6 +35,10 @@ export function installProductLeaveGuardBridge(
   }
   const removeRouteGuard = router.beforeEach(async (to, from) => {
     if (to.fullPath === from.fullPath) return true;
+    if (to.name === 'project-workspace' && from.name === 'project-workspace' &&
+        to.path === from.path && sameQueryExceptHandoff(to.query, from.query)) {
+      return true;
+    }
     if (to.path === '/login' && authRoot.auth.projection.phase === 'expired') return true;
     const guard = authRoot.getProductLeaveGuard();
     if (!guard) return true;

@@ -15,9 +15,17 @@ import {
 import { createWorkspaceOwner, type WorkspaceOwner } from './workspaceOwner';
 import type { WorkspaceSessionReconcileIdentity } from './workspaceOwner';
 import {
+  createWorkspaceNewDraftOwner,
+  type WorkspaceNewDraftOwner
+} from './workspaceNewDraftOwner';
+import {
   createWorkspaceProjectReadPort,
   type WorkspaceProjectReadPort
 } from './workspaceQueries';
+import {
+  createWorkspaceHandoffReceivePort,
+  type WorkspaceHandoffReceivePort
+} from './handoff/handoffReceivePort';
 
 export const workspaceCapabilityFlagKey = 'Studio2.Workspace';
 
@@ -37,6 +45,8 @@ export interface WorkspaceRuntime {
   refreshSession(): Promise<void>;
   openProject(projectId: string): WorkspaceProjectReadPort;
   mountProject(project: WorkspaceProjectV1): WorkspaceOwner;
+  mountNewHandoffDraft(artifactId: string): WorkspaceNewDraftOwner;
+  openHandoffReceiver(): WorkspaceHandoffReceivePort;
   getLeaveProtectionSnapshot(projectId?: string): WorkspaceLeaveProtectionSnapshot | null;
   prepareForLeave(reason: string, projectId?: string): Promise<boolean>;
   prepareForProjectTransition(projectId: string, reason: 'project-delete'): Promise<boolean>;
@@ -65,6 +75,8 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
   const enabled = options.featureFlags[workspaceCapabilityFlagKey] === true;
   const activeReads = new Set<WorkspaceProjectReadPort>();
   const activeOwners = new Set<WorkspaceOwner>();
+  const activeNewDraftOwners = new Set<WorkspaceNewDraftOwner>();
+  const activeHandoffReceivers = new Set<WorkspaceHandoffReceivePort>();
   let disposed = false;
 
   function assertActive(): void {
@@ -138,6 +150,10 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
         quarantineForSessionExpiration: inner.quarantineForSessionExpiration,
         reconcileAfterReauthentication: inner.reconcileAfterReauthentication,
         setReadonly: inner.setReadonly,
+        stageHandoffDraft: inner.stageHandoffDraft,
+        adoptNewHandoffDraft: inner.adoptNewHandoffDraft,
+        confirmHandoff: inner.confirmHandoff,
+        discardHandoffDraft: inner.discardHandoffDraft,
         dispose(reason = 'workspace-owner-disposed'): void {
           if (ownerDisposed) return;
           ownerDisposed = true;
@@ -147,6 +163,60 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
       });
       activeOwners.add(owner);
       return owner;
+    },
+    mountNewHandoffDraft(artifactId: string): WorkspaceNewDraftOwner {
+      assertActive();
+      if (!enabled || !options.api) throw new Error('Workspace handoff requires the shared ApiTransport.');
+      const inner = createWorkspaceNewDraftOwner({
+        artifactId,
+        diagnostics: diagnosticsOwner,
+        queries: options.queries,
+        api: options.api,
+        featureFlags: options.featureFlags
+      });
+      let ownerDisposed = false;
+      const owner: WorkspaceNewDraftOwner = Object.freeze({
+        projectId: null,
+        projection: inner.projection,
+        openFlowCanvas: inner.openFlowCanvas,
+        getFlowCanvasOwner: inner.getFlowCanvasOwner,
+        isDirty: inner.isDirty,
+        setMetadata: inner.setMetadata,
+        stageHandoffDraft: inner.stageHandoffDraft,
+        confirmHandoff: inner.confirmHandoff,
+        createSaveIntent: inner.createSaveIntent,
+        markProjectCreating: inner.markProjectCreating,
+        markSaveUnknown: inner.markSaveUnknown,
+        markSaveFailed: inner.markSaveFailed,
+        discardHandoffDraft: inner.discardHandoffDraft,
+        dispose(reason = 'workspace-new-draft-disposed'): void {
+          if (ownerDisposed) return;
+          ownerDisposed = true;
+          activeNewDraftOwners.delete(owner);
+          inner.dispose(reason);
+        }
+      });
+      activeNewDraftOwners.add(owner);
+      return owner;
+    },
+    openHandoffReceiver(): WorkspaceHandoffReceivePort {
+      assertActive();
+      if (!enabled || !options.api) throw new Error('Workspace handoff requires the shared ApiTransport.');
+      const inner = createWorkspaceHandoffReceivePort({ api: options.api });
+      let receiverDisposed = false;
+      const receiver: WorkspaceHandoffReceivePort = Object.freeze({
+        projection: inner.projection,
+        receive: inner.receive,
+        reject: inner.reject,
+        dispose(reason = 'workspace-handoff-receiver-disposed'): void {
+          if (receiverDisposed) return;
+          receiverDisposed = true;
+          activeHandoffReceivers.delete(receiver);
+          inner.dispose(reason);
+        }
+      });
+      activeHandoffReceivers.add(receiver);
+      return receiver;
     },
     getLeaveProtectionSnapshot(projectId?: string): WorkspaceLeaveProtectionSnapshot | null {
       assertActive();
@@ -189,9 +259,13 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
       if (disposed) return;
       disposed = true;
       for (const read of [...activeReads]) read.dispose('workspace-runtime-disposed');
+      for (const receiver of [...activeHandoffReceivers]) receiver.dispose('workspace-runtime-disposed');
       for (const owner of [...activeOwners]) owner.dispose('workspace-runtime-disposed');
+      for (const owner of [...activeNewDraftOwners]) owner.dispose('workspace-runtime-disposed');
       activeReads.clear();
       activeOwners.clear();
+      activeNewDraftOwners.clear();
+      activeHandoffReceivers.clear();
       diagnosticsOwner.dispose();
     }
   });

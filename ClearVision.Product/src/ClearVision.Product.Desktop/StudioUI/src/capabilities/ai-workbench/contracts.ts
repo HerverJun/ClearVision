@@ -1,4 +1,4 @@
-export type AiOperationKind = 'session_create' | 'session_delete' | 'plan_run' | 'build_run';
+export type AiOperationKind = 'session_create' | 'session_delete' | 'plan_run' | 'build_run' | 'handoff_create';
 export type AiOperationStatus = 'pending' | 'created' | 'failed' | 'rejected';
 export type AiRequirementMode = 'strict' | 'draft';
 export type AiRunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'blocked' | 'warning';
@@ -176,6 +176,7 @@ export interface AiOperationProjectionV1 {
   readonly status: AiOperationStatus;
   readonly sessionId: string | null;
   readonly runId: string | null;
+  readonly artifactId: string | null;
   readonly payloadFingerprint: string;
   readonly projectBaseline: AiProjectBaselineV1 | null;
   readonly errorCode: string | null;
@@ -183,6 +184,44 @@ export interface AiOperationProjectionV1 {
   readonly createdAtUtc: string;
   readonly updatedAtUtc: string;
   readonly expiresAtUtc: string;
+}
+
+export type AiHandoffStatus = 'available' | 'consuming' | 'consumed' | 'expired' | 'rejected';
+
+export interface AiHandoffArtifactIdentityV1 {
+  readonly schemaVersion: 1;
+  readonly artifactId: string;
+  readonly clientOperationId: string;
+  readonly sessionId: string;
+  readonly sessionRevision: number;
+  readonly planRunId: string;
+  readonly planId: string;
+  readonly planHash: string;
+  readonly buildRunId: string;
+  readonly buildClientOperationId: string;
+  readonly buildIdentity: string;
+  readonly targetKind: 'new' | 'existing';
+  readonly projectBaseline: AiProjectBaselineV1;
+  readonly candidateFlowFingerprint: string;
+  readonly createdAtUtc: string;
+  readonly expiresAtUtc: string;
+  readonly status: AiHandoffStatus;
+}
+
+export interface AiHandoffCreateCommandV1 {
+  readonly clientOperationId: string;
+  readonly sessionId: string;
+  readonly expectedSessionRevision: number;
+  readonly planRunId: string;
+  readonly planId: string;
+  readonly planHash: string;
+  readonly buildRunId: string;
+  readonly buildClientOperationId: string;
+  readonly buildIdentity: string;
+  readonly candidateFlowFingerprint: string;
+  readonly answerRevision: number;
+  readonly resourceRevision: number;
+  readonly projectBaseline: AiProjectBaselineV1;
 }
 
 export interface AiSessionCreateResponseV1 {

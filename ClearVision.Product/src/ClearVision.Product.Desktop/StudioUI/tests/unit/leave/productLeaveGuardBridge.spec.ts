@@ -9,14 +9,37 @@ function router() {
     history: createMemoryHistory(),
     routes: [
       { path: '/overview', component: { template: '<div />' } },
-      { path: '/projects/:id/workspace', component: { template: '<div />' } },
+      { name: 'project-workspace', path: '/projects/:id/workspace', component: { template: '<div />' } },
       { path: '/change-password', component: { template: '<div />' } },
       { path: '/login', component: { template: '<div />' } }
     ]
   });
+
 }
 
 describe('product leave guard bridge', () => {
+  it('keeps the mounted Workspace owner when only the handoff query changes', async () => {
+    const request = vi.fn(async () => true);
+    const guard = {
+      request,
+      hasProtection: vi.fn(() => true)
+    } as unknown as ProductLeaveGuardOwner;
+    const authRoot = {
+      auth: { projection: { phase: 'authenticated' } },
+      getProductLeaveGuard: vi.fn(() => guard)
+    } as unknown as AuthLifecycleRoot;
+    const testRouter = router();
+    const dispose = installProductLeaveGuardBridge(testRouter, authRoot);
+    const projectId = '11111111-1111-4111-8111-111111111111';
+
+    await testRouter.push(`/projects/${projectId}/workspace?handoff=${'a'.repeat(32)}`);
+    request.mockClear();
+    await testRouter.push(`/projects/${projectId}/workspace?handoff=${'b'.repeat(32)}`);
+
+    expect(request).not.toHaveBeenCalled();
+    dispose();
+  });
+
   it('installs the one route/host adapter and removes it on app unmount', async () => {
     const request = vi.fn(async () => true);
     const hasProtection = vi.fn(() => true);

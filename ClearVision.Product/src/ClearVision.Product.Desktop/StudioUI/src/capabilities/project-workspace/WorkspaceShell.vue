@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef } from 'vue';
+import { computed, ref, shallowRef, type DeepReadonly } from 'vue';
 import { RouterLink } from 'vue-router';
 import {
   CvButton,
+  CvField,
   CvPageState,
-  CvStatusBadge
+  CvStatusBadge,
+  type CvStatusTone
 } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 import type { WorkspaceProjectV1 } from './workspaceContracts';
 import type { WorkspaceOwner } from './workspaceOwner';
+import type { WorkspaceNewDraftOwner } from './workspaceNewDraftOwner';
 import FlowWorkspace from './flow/FlowWorkspace.vue';
 import type { WorkspaceLifecycleDiagnostics } from './workspaceLifecycleDiagnostics';
 import { GlobalVariablesWorkbench, type WorkspaceGlobalVariablesOwner } from './global-variables';
@@ -16,6 +19,8 @@ import { FinalDecisionWorkbench, type FinalDecisionOwner } from './final-decisio
 import type { FlowCanvasOwner } from './flow';
 import { RuntimePackageExportDialog, type RuntimePackageExportOwner } from './runtime-package';
 import { formatInspectionOutcome } from '@/shared/inspectionOutcome';
+import WorkspaceHandoffBanner from './handoff/WorkspaceHandoffBanner.vue';
+import type { WorkspaceHandoffReceiveProjection } from './handoff/handoffContracts';
 
 export type WorkspaceShellState =
   | 'flag-off'
@@ -34,14 +39,17 @@ const props = defineProps<{
   projectId: string;
   project: WorkspaceProjectV1 | null;
   workspaceOwner: WorkspaceOwner | null;
+  newDraftOwner?: WorkspaceNewDraftOwner | null;
   message: string | null;
   diagnostics: WorkspaceLifecycleDiagnostics;
+  handoffReceive?: DeepReadonly<WorkspaceHandoffReceiveProjection> | null;
   userRole?: string | null | undefined;
 }>();
 
 const emit = defineEmits<{
   retry: [];
   refreshSession: [];
+  requestSave: [];
 }>();
 const variablesOpen = ref(false);
 const decisionOpen = ref(false);
@@ -107,8 +115,47 @@ const isReadySurface = computed(() =>
   props.state === 'ready' || props.state === 'empty' || props.state === 'readonly');
 const isReadonly = computed(() => props.state === 'forbidden' || props.state === 'readonly');
 const currentProject = computed(() => props.workspaceOwner?.projection.project ?? props.project);
+const newDraft = computed(() => props.newDraftOwner?.projection ?? null);
+const canvasProject = computed(() => currentProject.value ?? newDraft.value?.project ?? null);
+const canvasOwner = computed(() => props.workspaceOwner ?? props.newDraftOwner ?? null);
+const effectiveProjectId = computed(() => props.workspaceOwner?.projectId ?? props.projectId);
 const persistence = computed(() => props.workspaceOwner?.projection.persistence ?? null);
 const run = computed(() => props.workspaceOwner?.projection.run ?? null);
+const handoff = computed(() => props.workspaceOwner?.projection.handoff ?? newDraft.value?.handoff ?? null);
+const showHandoffReceive = computed(() => Boolean(props.handoffReceive && ![
+  'idle', 'workspace-staged-unsaved', 'disposed'
+].includes(props.handoffReceive.phase)));
+const handoffReceiveTone = computed<CvStatusTone>(() => {
+  const phase = props.handoffReceive?.phase;
+  if (phase === 'workspace-loading-artifact' || phase === 'workspace-staging') return 'info';
+  if (phase === 'workspace-dirty-conflict' || phase === 'artifact-baseline-conflict') return 'warning';
+  return 'ng';
+});
+const handoffReceiveLabel = computed(() => {
+  const labels: Partial<Record<WorkspaceHandoffReceiveProjection['phase'], string>> = {
+    'workspace-loading-artifact': '正在读取 AI 候选',
+    'workspace-dirty-conflict': '本地草稿冲突',
+    'artifact-expired': '候选已过期',
+    'artifact-consumed': '候选已接收',
+    'artifact-baseline-conflict': '工程基线冲突',
+    'workspace-staging': '正在装载候选',
+    error: '候选接收失败'
+  };
+  return props.handoffReceive ? labels[props.handoffReceive.phase] ?? '候选交接' : '候选交接';
+});
+
+async function discardHandoff(): Promise<void> {
+  const owner = props.workspaceOwner ?? props.newDraftOwner;
+  if (!owner || !handoff.value) return;
+  if (typeof window !== 'undefined' && !window.confirm('放弃 AI 候选并恢复交接前的安全状态？此操作不会修改已保存工程。')) return;
+  await owner.discardHandoffDraft();
+}
+function updateNewDraftName(value: string): void {
+  props.newDraftOwner?.setMetadata({ name: value });
+}
+function updateNewDraftDescription(value: string): void {
+  props.newDraftOwner?.setMetadata({ description: value });
+}
 const saveCompatibilityTone = computed(() => {
   const status = currentProject.value?.saveCompatibility.status;
   if (status === 'blocked') return 'ng';
@@ -183,7 +230,7 @@ const showRunSummary = computed(() => Boolean(run.value && [
     data-capability="project-workspace"
     data-evidence-surface="f03-workspace-shell"
     :data-workspace-state="state"
-    :data-workspace-project-id="projectId"
+    :data-workspace-project-id="effectiveProjectId"
     :data-workspace-readonly="isReadonly"
     :data-workspace-owner-count="diagnostics.workspaceOwnerCount"
     :data-workspace-inspector-owner-count="diagnostics.inspectorOwnerCount"
@@ -198,8 +245,9 @@ const showRunSummary = computed(() => Boolean(run.value && [
     :data-workspace-run-owner-count="diagnostics.runOwnerCount"
     :data-workspace-run-phase="run?.phase ?? 'unavailable'"
     :data-workspace-run-snapshot-id="run?.clientSnapshotId ?? ''"
-    :data-workspace-persistence-phase="persistence?.phase ?? 'unavailable'"
-    :data-workspace-dirty="persistence?.dirty ?? false"
+    :data-workspace-persistence-phase="persistence?.phase ?? newDraft?.savePhase ?? 'unavailable'"
+    :data-workspace-dirty="persistence?.dirty ?? newDraftOwner?.isDirty() ?? false"
+    :data-workspace-handoff-phase="handoff?.phase ?? 'none'"
     :data-workspace-dirty-generation="persistence?.dirtyGeneration ?? 0"
     :data-workspace-persistence-revision="persistence?.persistenceRevision ?? currentProject?.persistenceRevision ?? -1"
     :data-workspace-save-compatibility="currentProject?.saveCompatibility.status ?? 'unavailable'"
@@ -217,8 +265,9 @@ const showRunSummary = computed(() => Boolean(run.value && [
             工程列表
           </RouterLink>
           <RouterLink
+            v-if="!newDraftOwner"
             class="workspace-shell__back"
-            :to="`/projects/${projectId}`"
+            :to="`/projects/${effectiveProjectId}`"
           >
             工程详情
           </RouterLink>
@@ -229,16 +278,23 @@ const showRunSummary = computed(() => Boolean(run.value && [
         />
         <div
           class="workspace-shell__project"
-          :title="`工程 ID：${projectId}${currentProject ? `；版本：${currentProject.version}；保存修订：${persistence?.persistenceRevision ?? currentProject.persistenceRevision}` : ''}`"
+          :title="newDraftOwner ? '未落库的新工程草稿' : `工程 ID：${effectiveProjectId}${currentProject ? `；版本：${currentProject.version}；保存修订：${persistence?.persistenceRevision ?? currentProject.persistenceRevision}` : ''}`"
         >
-          <strong>{{ currentProject?.name ?? '工程工作区' }}</strong>
+          <strong>{{ currentProject?.name ?? newDraft?.project.name ?? '工程工作区' }}</strong>
           <small v-if="currentProject">流程编辑 · 版本 {{ currentProject.version }}</small>
+          <small v-else-if="newDraft">新工程草稿 · 尚未创建 Project</small>
         </div>
         <CvStatusBadge
           v-if="persistence"
           class="workspace-shell__save-state"
           :tone="persistence.dirty ? 'warning' : 'ok'"
           :label="persistenceLabel"
+        />
+        <CvStatusBadge
+          v-else-if="newDraft"
+          class="workspace-shell__save-state"
+          tone="warning"
+          :label="newDraft.savePhase === 'workspace-project-creating' ? '正在创建工程' : newDraft.savePhase === 'workspace-save-unknown-outcome' ? '创建结果未知' : '未保存'"
         />
       </div>
 
@@ -262,12 +318,12 @@ const showRunSummary = computed(() => Boolean(run.value && [
             最终判定
           </CvButton>
           <CvButton
-            v-if="persistence"
+            v-if="persistence || newDraft"
             data-testid="workspace-save"
             size="sm"
             variant="secondary"
-            :disabled="!persistence.canSave"
-            @click="workspaceOwner?.save()"
+            :disabled="persistence ? !persistence.canSave : !newDraft?.canSave"
+            @click="emit('requestSave')"
           >
             <template #leading>
               <CvIcon
@@ -275,7 +331,7 @@ const showRunSummary = computed(() => Boolean(run.value && [
                 size="sm"
               />
             </template>
-            {{ persistence.phase === 'saving' ? '保存中…' : '保存' }}
+            {{ persistence?.phase === 'saving' || newDraft?.savePhase === 'workspace-project-creating' ? '保存中…' : newDraft?.savePhase === 'workspace-save-unknown-outcome' ? '核对创建结果' : '保存' }}
           </CvButton>
           <CvButton
             v-if="run"
@@ -337,8 +393,9 @@ const showRunSummary = computed(() => Boolean(run.value && [
             运行包
           </CvButton>
           <RouterLink
+            v-if="!newDraftOwner"
             class="workspace-shell__results-link"
-            :to="{ path: '/results', query: { source: 'local', projectId } }"
+            :to="{ path: '/results', query: { source: 'local', projectId: effectiveProjectId } }"
             data-testid="workspace-results"
           >
             本次结果
@@ -418,14 +475,63 @@ const showRunSummary = computed(() => Boolean(run.value && [
       </section>
     </header>
 
+    <section
+      v-if="newDraft"
+      class="workspace-shell__new-project"
+      data-testid="workspace-new-project-metadata"
+    >
+      <div>
+        <strong>新工程信息</strong>
+        <span>{{ newDraft.message }}</span>
+      </div>
+      <CvField
+        name="newProjectName"
+        label="工程名称"
+        required
+        :model-value="newDraft.project.name"
+        :disabled="newDraft.metadataLocked"
+        @update:model-value="updateNewDraftName"
+      />
+      <CvField
+        name="newProjectDescription"
+        label="工程描述"
+        :model-value="newDraft.project.description ?? ''"
+        :disabled="newDraft.metadataLocked"
+        @update:model-value="updateNewDraftDescription"
+      />
+    </section>
+
+    <section
+      v-if="showHandoffReceive && handoffReceive"
+      class="workspace-shell__handoff-receive"
+      :data-handoff-receive-phase="handoffReceive.phase"
+      role="status"
+    >
+      <CvStatusBadge
+        :tone="handoffReceiveTone"
+        :label="handoffReceiveLabel"
+      />
+      <div>
+        <strong>{{ handoffReceive.message }}</strong>
+        <span v-if="handoffReceive.blocker">阻断：{{ handoffReceive.blocker }}</span>
+        <span>{{ handoffReceive.nextStep }}</span>
+      </div>
+    </section>
+
+    <WorkspaceHandoffBanner
+      v-if="handoff"
+      :handoff="handoff"
+      @discard="discardHandoff"
+    />
+
     <div
-      v-if="isReadySurface && currentProject && workspaceOwner"
+      v-if="isReadySurface && canvasProject && canvasOwner"
       class="workspace-shell__work-area"
     >
       <FlowWorkspace
-        :key="projectId"
-        :workspace-owner="workspaceOwner"
-        :project="currentProject"
+        :key="effectiveProjectId"
+        :workspace-owner="canvasOwner"
+        :project="canvasProject"
       />
     </div>
 
@@ -595,7 +701,7 @@ const showRunSummary = computed(() => Boolean(run.value && [
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) var(--cv-workspace-status-height, 24px);
+  grid-template-rows: auto auto minmax(0, 1fr) var(--cv-workspace-status-height, 24px);
   overflow: hidden;
   background: var(--cv-surface-page);
 }
@@ -777,6 +883,14 @@ const showRunSummary = computed(() => Boolean(run.value && [
   white-space: nowrap;
 }
 .workspace-shell__project-status { max-width: 240px; overflow: hidden; color: var(--cv-text-secondary); text-overflow: ellipsis; }
+.workspace-shell__handoff-receive { display: flex; min-width: 0; align-items: center; gap: var(--cv-space-4); padding: var(--cv-space-3) var(--cv-density-page-padding); border-block-end: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
+.workspace-shell__new-project { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(220px, 320px) minmax(240px, 380px); gap: var(--cv-space-4); align-items: end; padding: var(--cv-space-3) var(--cv-density-page-padding); border-block-end: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
+.workspace-shell__new-project > div { display: grid; gap: 2px; min-width: 0; }
+.workspace-shell__new-project span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.workspace-shell__handoff-receive > div { display: grid; min-width: 0; gap: 2px; }
+.workspace-shell__handoff-receive strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); }
+.workspace-shell__handoff-receive span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); line-height: var(--cv-line-height-normal); }
+@media (max-width: 980px) { .workspace-shell__new-project { grid-template-columns: 1fr 1fr; } .workspace-shell__new-project > div { grid-column: 1 / -1; } }
 .workspace-shell__status-divider { width: 1px; height: 12px; flex: 0 0 auto; background: var(--cv-border-subtle); }
 .workspace-shell__statusbar :deep(.cv-status-badge) {
   min-height: 18px;

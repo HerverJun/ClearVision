@@ -18,6 +18,9 @@ const preferences = runtime.preferences.projection;
 const contentRoot = ref<HTMLElement>();
 const appearanceDetails = ref<HTMLDetailsElement>();
 const workspaceMode = computed(() => route.meta.workspaceMode === true);
+const routeViewKey = computed(() => route.name === 'project-workspace'
+  ? 'project-workspace'
+  : route.path);
 const navigationIcons: Readonly<Record<string, CvIconName>> = Object.freeze({
   '/overview': 'overview',
   '/projects': 'projects',
@@ -388,7 +391,7 @@ onMounted(() => runtime.preferences.apply());
         <RouterView v-slot="{ Component }">
           <component
             :is="Component"
-            :key="route.path"
+            :key="routeViewKey"
           />
         </RouterView>
       </main>

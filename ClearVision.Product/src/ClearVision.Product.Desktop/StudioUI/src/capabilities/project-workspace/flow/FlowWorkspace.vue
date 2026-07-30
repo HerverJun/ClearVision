@@ -10,8 +10,9 @@ import {
   type CSSProperties
 } from 'vue';
 import { CvSplitter } from '@/design-system';
-import type { WorkspaceProjectV1 } from '../workspaceContracts';
+import type { WorkspaceCanvasProjectV1 } from '../workspaceContracts';
 import type { WorkspaceOwner } from '../workspaceOwner';
+import type { WorkspaceNewDraftOwner } from '../workspaceNewDraftOwner';
 import FlowCanvasSurface from './FlowCanvasSurface.vue';
 import OperatorRail from './OperatorRail.vue';
 import InspectorPanel from '../inspector/InspectorPanel.vue';
@@ -23,14 +24,16 @@ import {
 } from './workspaceLayoutOwner';
 
 const props = defineProps<{
-  workspaceOwner: WorkspaceOwner;
-  project: WorkspaceProjectV1;
+  workspaceOwner: WorkspaceOwner | WorkspaceNewDraftOwner;
+  project: WorkspaceCanvasProjectV1;
 }>();
 
-const flowOwner = props.workspaceOwner.openFlowCanvas();
+const flowOwner = props.workspaceOwner.getFlowCanvasOwner() ?? props.workspaceOwner.openFlowCanvas();
 const inspectorOwner = flowOwner.openInspector();
-const cameraBindingEditorOwner = flowOwner.openCameraBindingEditor();
-const previewWorkbenchOwner = flowOwner.openPreviewWorkbench(inspectorOwner);
+const cameraBindingEditorOwner = props.project.id ? flowOwner.openCameraBindingEditor() : null;
+const previewWorkbenchOwner = cameraBindingEditorOwner
+  ? flowOwner.openPreviewWorkbench(inspectorOwner)
+  : null;
 const projection = flowOwner.projection;
 const layoutOwner = createWorkspaceLayoutOwner();
 const layout = layoutOwner.projection;
@@ -41,7 +44,9 @@ const narrowRailToggle = useTemplateRef<HTMLButtonElement>('narrowRailToggle');
 const narrowInspectorToggle = useTemplateRef<HTMLButtonElement>('narrowInspectorToggle');
 const narrowRailOpen = shallowRef(false);
 const narrowInspectorOpen = shallowRef(false);
-const canvasId = `flow-canvas-${props.project.id.replaceAll('-', '')}`;
+const canvasId = props.project.id
+  ? `flow-canvas-${props.project.id.replaceAll('-', '')}`
+  : 'flow-canvas-new-handoff-draft';
 const isReadonly = computed(() => projection.mutationGate !== 'editable');
 const workspaceStyle = computed(() => ({
   '--workspace-inspector-width': `${layout.inspectorWidth}px`,
@@ -131,7 +136,7 @@ onBeforeUnmount(() => layoutOwner.dispose());
     }"
     :style="workspaceStyle"
     data-capability="flow-workspace"
-    :data-project-id="project.id"
+    :data-project-id="project.id ?? 'new'"
     :data-flow-owner-phase="projection.phase"
     :data-flow-owner-count="projection.runtime ? 1 : 0"
     :data-flow-revision="projection.runtime?.flowRevision ?? 0"
@@ -211,6 +216,7 @@ onBeforeUnmount(() => layoutOwner.dispose());
     </div>
 
     <CvSplitter
+      v-if="previewWorkbenchOwner"
       v-show="!layout.previewCollapsed"
       class="flow-workspace__preview-splitter"
       data-workspace-splitter="preview"
@@ -228,11 +234,20 @@ onBeforeUnmount(() => layoutOwner.dispose());
     />
 
     <PreviewPanel
+      v-if="previewWorkbenchOwner"
       class="flow-workspace__preview"
       :owner="previewWorkbenchOwner"
       :collapsed="layout.previewCollapsed"
       @toggle-collapsed="layoutOwner.togglePreviewCollapsed"
     />
+    <aside
+      v-else
+      class="flow-workspace__preview flow-workspace__preview--unavailable"
+      data-testid="new-draft-preview-unavailable"
+    >
+      <strong>预览暂不可用</strong>
+      <span>候选仍未创建正式工程；保存后才能访问相机与执行预览。</span>
+    </aside>
 
     <button
       ref="narrowRailToggle"
@@ -285,6 +300,8 @@ onBeforeUnmount(() => layoutOwner.dispose());
 }
 .flow-workspace__canvas { width: 100%; height: 100%; }
 .flow-workspace__preview { border-left: 1px solid var(--cv-border-subtle); }
+.flow-workspace__preview--unavailable { display: grid; align-content: start; gap: var(--cv-space-2); padding: var(--cv-space-4); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
+.flow-workspace__preview--unavailable strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .flow-workspace__preview-splitter,
 .flow-workspace__inspector-splitter { z-index: 2; align-self: stretch; }
 .flow-workspace__inspector-host > :deep(.inspector-panel) { width: 100%; height: 100%; }

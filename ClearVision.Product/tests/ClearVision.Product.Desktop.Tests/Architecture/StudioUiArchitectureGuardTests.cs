@@ -159,6 +159,7 @@ public sealed class StudioUiArchitectureGuardTests
             "src/capabilities/project-lifecycle/projectLifecycleCommandOwner.ts",
             "src/capabilities/project-workspace/camera/cameraBindingEditorOwner.ts",
             "src/capabilities/project-workspace/final-decision/finalDecisionOwner.ts",
+            "src/capabilities/project-workspace/handoff/handoffReceivePort.ts",
             "src/capabilities/project-workspace/preview/previewTransport.ts",
             "src/capabilities/project-workspace/run/runCommandOwner.ts",
             "src/capabilities/project-workspace/runtime-package/runtimePackageExportOwner.ts",
@@ -537,6 +538,8 @@ public sealed class StudioUiArchitectureGuardTests
                 $"{relativePath} must consume only the narrow Workspace read port");
             if (!relativePath.EndsWith("workspaceRuntime.ts", StringComparison.Ordinal) &&
                 !relativePath.EndsWith("workspaceOwner.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("workspaceNewDraftOwner.ts", StringComparison.Ordinal) &&
+                !relativePath.EndsWith("handoff/handoffReceivePort.ts", StringComparison.Ordinal) &&
                 !relativePath.EndsWith("flow/flowCanvasOwner.ts", StringComparison.Ordinal) &&
                 !relativePath.EndsWith("preview/previewOwner.ts", StringComparison.Ordinal) &&
                 !relativePath.EndsWith("preview/previewWorkbenchOwner.ts", StringComparison.Ordinal) &&

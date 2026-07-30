@@ -1,7 +1,16 @@
 import { computed, readonly, shallowRef, type ComputedRef, type DeepReadonly, type ShallowRef } from 'vue';
-import { ApiAbortError, ApiConflictError, ApiHttpError, ApiUnauthorizedError, type ApiTransport } from '@/platform/api';
+import {
+  ApiAbortError,
+  ApiConflictError,
+  ApiHttpError,
+  ApiNetworkError,
+  ApiServerError,
+  ApiUnauthorizedError,
+  type ApiTransport
+} from '@/platform/api';
 import type {
   AiAgentRunEventV1,
+  AiHandoffArtifactIdentityV1,
   AiResourceDecisionSelectionV1,
   AiScalarValue,
   AiOperationProjectionV1,
@@ -53,6 +62,8 @@ export interface AiSessionOwner {
   answerClarification(answers: Readonly<Record<string, string>>, acceptRecommended?: boolean): Promise<void>;
   acceptRecommendedAnswers(): Promise<void>;
   previewReadiness(): Promise<void>;
+  prepareHandoff(): Promise<AiHandoffArtifactIdentityV1 | null>;
+  reconcileHandoff(): Promise<AiHandoffArtifactIdentityV1 | null>;
   reconcile(): Promise<void>;
   startNewTask(): void;
   retry(): Promise<void>;
@@ -139,6 +150,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
   let createOperationId: string | null = null;
   let planOperationId: string | null = null;
   let buildOperationId: string | null = null;
+  let handoffOperationId: string | null = null;
   let ownerGeneration = 0;
   let planGeneration = 0;
   let disposed = false;
@@ -221,6 +233,38 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
         snapshot.submittedBuildFingerprint !== build.submittedBuildFingerprint ||
         snapshot.buildTerminalSequence === null) {
       throw new Error('Build Snapshot identity mismatch.');
+    }
+  }
+
+  function validateHandoffArtifact(artifact: AiHandoffArtifactIdentityV1): void {
+    const session = state.value.session;
+    const build = state.value.build;
+    const baseline = state.value.projectBaseline;
+    if (!session || !build || !baseline ||
+        artifact.sessionId !== session.sessionId ||
+        artifact.sessionRevision !== session.snapshot.revision ||
+        artifact.planRunId !== session.snapshot.planRunId ||
+        artifact.planId !== build.planId ||
+        artifact.planHash !== build.planHash ||
+        artifact.buildRunId !== build.runId ||
+        artifact.buildClientOperationId !== build.clientOperationId ||
+        artifact.buildIdentity !== build.buildIdentity ||
+        artifact.candidateFlowFingerprint !== build.candidateFlowFingerprint ||
+        artifact.targetKind !== baseline.targetKind ||
+        artifact.projectBaseline.projectId !== baseline.projectId ||
+        artifact.projectBaseline.persistenceRevision !== baseline.persistenceRevision ||
+        artifact.projectBaseline.canonicalFlowHash !== baseline.canonicalFlowHash ||
+        artifact.status !== 'available') {
+      throw new ApiConflictError({
+        status: 409,
+        statusText: 'Conflict',
+        url: '',
+        payload: {
+          errorCode: 'handoff_artifact_identity_conflict',
+          publicMessage: '交接工件与当前 terminal Build 或工程基线不一致。'
+        },
+        responseBody: ''
+      });
     }
   }
 
@@ -898,9 +942,89 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     }
   }
 
+  async function prepareHandoff(): Promise<AiHandoffArtifactIdentityV1 | null> {
+    if (disposed || authorizationFrozen || state.value.phase !== 'build-ready') return null;
+    const session = state.value.session;
+    const build = state.value.build;
+    const baseline = state.value.projectBaseline;
+    const planRunId = session?.snapshot.planRunId;
+    if (!session || !build || !baseline || !planRunId || !build.clientOperationId ||
+        !build.validation.handoffEligible || build.validation.applyGate.blocked ||
+        !build.validation.applyGate.canvasApplyReady || !build.validation.applyGate.runtimeDraftReady) {
+      dispatch({
+        type: 'failed',
+        phase: 'session-conflict',
+        errorCode: 'handoff_not_eligible',
+        message: '当前 terminal Build 未满足服务端交接身份与 ApplyGate 条件。',
+        at: now()
+      });
+      return null;
+    }
+    handoffOperationId ??= operationIdFactory();
+    dispatch({ type: 'handoff-start', at: now() });
+    try {
+      const artifact = await request(signal => api.createHandoff({
+        clientOperationId: handoffOperationId!,
+        sessionId: session.sessionId,
+        expectedSessionRevision: session.snapshot.revision,
+        planRunId,
+        planId: build.planId,
+        planHash: build.planHash,
+        buildRunId: build.runId,
+        buildClientOperationId: build.clientOperationId,
+        buildIdentity: build.buildIdentity,
+        candidateFlowFingerprint: build.candidateFlowFingerprint,
+        answerRevision: build.answerRevision,
+        resourceRevision: build.resourceRevision,
+        projectBaseline: baseline
+      }, signal));
+      validateHandoffArtifact(artifact);
+      dispatch({ type: 'handoff-created', artifact, at: now() });
+      return artifact;
+    } catch (error) {
+      if (disposed || error instanceof ApiAbortError) return null;
+      const payload = error instanceof ApiHttpError && typeof error.payload === 'object' && error.payload !== null
+        ? error.payload as Record<string, unknown>
+        : null;
+      if (error instanceof ApiNetworkError || error instanceof ApiServerError ||
+          payload?.errorCode === 'handoff_create_unknown_outcome') {
+        dispatch({
+          type: 'handoff-unknown',
+          message: '交接响应未能确认；请查询当前 Build 的既有工件，禁止重复创建。',
+          at: now()
+        });
+        return null;
+      }
+      fail(error);
+      return null;
+    }
+  }
+
+  async function reconcileHandoff(): Promise<AiHandoffArtifactIdentityV1 | null> {
+    if (disposed || authorizationFrozen) return null;
+    const buildRunId = state.value.build?.runId;
+    if (!buildRunId) return null;
+    dispatch({ type: 'handoff-start', at: now() });
+    try {
+      const artifact = await request(signal => api.getHandoffByBuild(buildRunId, signal));
+      validateHandoffArtifact(artifact);
+      handoffOperationId = artifact.clientOperationId;
+      dispatch({ type: 'handoff-created', artifact, at: now() });
+      return artifact;
+    } catch (error) {
+      if (disposed || error instanceof ApiAbortError) return null;
+      fail(error);
+      return null;
+    }
+  }
+
   async function reconcile(): Promise<void> {
     if (disposed || authorizationFrozen) return;
     try {
+      if (state.value.phase === 'handoff-unknown-outcome') {
+        await reconcileHandoff();
+        return;
+      }
       if (projectId) await loadProjectBaseline();
       if (state.value.phase === 'baseline-conflict') {
         if (currentSessionId) {
@@ -935,6 +1059,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     if (disposed) return;
     planOperationId = null;
     buildOperationId = null;
+    handoffOperationId = null;
     planGeneration += 1;
     dispatch({ type: 'new-task', at: now() });
   }
@@ -972,6 +1097,8 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     answerClarification,
     acceptRecommendedAnswers,
     previewReadiness,
+    prepareHandoff,
+    reconcileHandoff,
     reconcile,
     startNewTask,
     retry,

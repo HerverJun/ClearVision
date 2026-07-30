@@ -1,5 +1,15 @@
-import { readonly, reactive, type DeepReadonly } from 'vue';
-import type { WorkspaceProjectV1 } from './workspaceContracts';
+import { nextTick, readonly, reactive, type DeepReadonly } from 'vue';
+import {
+  encodeWorkspaceFlowUpdateV1,
+  encodeWorkspaceHandoffFlowV1,
+  type WorkspaceJsonObject,
+  type WorkspaceProjectV1
+} from './workspaceContracts';
+import type {
+  WorkspaceHandoffArtifactV1,
+  WorkspaceHandoffBuildSummaryV1,
+  WorkspaceHandoffSourceV1
+} from './handoff/handoffContracts';
 import type { ReadQueryClient } from '@/platform/query';
 import type { ApiTransport } from '@/platform/api';
 import {
@@ -46,6 +56,21 @@ export interface WorkspaceOwnerProjection {
   readonly readonlyReason: string | null;
   readonly persistence: DeepReadonly<WorkspacePersistenceProjection> | null;
   readonly run: DeepReadonly<WorkspaceRunCommandOwner['projection']> | null;
+  readonly handoff: WorkspaceHandoffOwnerProjection | null;
+}
+
+export type WorkspaceHandoffOwnerPhase =
+  | 'workspace-staging'
+  | 'workspace-staged-unsaved'
+  | 'workspace-save-conflict'
+  | 'workspace-save-unknown-outcome'
+  | 'workspace-saved';
+
+export interface WorkspaceHandoffOwnerProjection {
+  readonly phase: WorkspaceHandoffOwnerPhase;
+  readonly source: WorkspaceHandoffSourceV1 | null;
+  readonly build: WorkspaceHandoffBuildSummaryV1;
+  readonly message: string;
 }
 
 type MutableWorkspaceOwnerProjection = {
@@ -72,6 +97,14 @@ export interface WorkspaceOwner {
   quarantineForSessionExpiration(): WorkspaceSessionReconcileIdentity | null;
   reconcileAfterReauthentication(): Promise<boolean>;
   setReadonly(reason: string): void;
+  stageHandoffDraft(artifact: WorkspaceHandoffArtifactV1): Promise<void>;
+  adoptNewHandoffDraft(input: Readonly<{
+    flow: WorkspaceJsonObject;
+    source: WorkspaceHandoffSourceV1;
+    build: WorkspaceHandoffBuildSummaryV1;
+  }>): Promise<void>;
+  confirmHandoff(source: WorkspaceHandoffSourceV1): void;
+  discardHandoffDraft(): Promise<void>;
   dispose(reason?: string): void;
 }
 
@@ -95,7 +128,8 @@ export function createWorkspaceOwner(
     project,
     readonlyReason: null,
     persistence: null,
-    run: null
+    run: null,
+    handoff: null
   });
   let disposed = false;
   let flowOwner: FlowCanvasOwner | undefined;
@@ -104,6 +138,30 @@ export function createWorkspaceOwner(
   let globalVariablesOwner: WorkspaceGlobalVariablesOwner | undefined;
   let finalDecisionOwner: FinalDecisionOwner | undefined;
   let runtimePackageExportOwner: RuntimePackageExportOwner | undefined;
+
+  function projectHandoffSave(result: WorkspaceSaveAttemptResult): WorkspaceSaveAttemptResult {
+    if (!state.handoff) return result;
+    if (result.status === 'saved' || result.status === 'no-op') {
+      state.handoff = Object.freeze({
+        ...state.handoff,
+        phase: 'workspace-saved',
+        message: 'AI 候选已通过现有工程保存链正式保存。'
+      });
+    } else if (result.status === 'conflict') {
+      state.handoff = Object.freeze({
+        ...state.handoff,
+        phase: 'workspace-save-conflict',
+        message: '工程版本已变化；候选仍保留在本地草稿，禁止盲目覆盖。'
+      });
+    } else if (result.status === 'unknown-outcome') {
+      state.handoff = Object.freeze({
+        ...state.handoff,
+        phase: 'workspace-save-unknown-outcome',
+        message: '保存响应结果未知；请使用现有保存协调操作，禁止重复提交。'
+      });
+    }
+    return result;
+  }
 
   return Object.freeze({
     projectId: project.id,
@@ -172,23 +230,23 @@ export function createWorkspaceOwner(
     getRuntimePackageExportOwner(): RuntimePackageExportOwner | null {
       return runtimePackageExportOwner ?? null;
     },
-    save(): Promise<WorkspaceSaveAttemptResult> {
+    async save(): Promise<WorkspaceSaveAttemptResult> {
       if (!persistenceOwner) {
-        return Promise.resolve(Object.freeze({ status: 'failed', project: null }));
+        return Object.freeze({ status: 'failed', project: null });
       }
-      return persistenceOwner.save();
+      return projectHandoffSave(await persistenceOwner.save());
     },
-    retrySave(): Promise<WorkspaceSaveAttemptResult> {
+    async retrySave(): Promise<WorkspaceSaveAttemptResult> {
       if (!persistenceOwner) {
-        return Promise.resolve(Object.freeze({ status: 'failed', project: null }));
+        return Object.freeze({ status: 'failed', project: null });
       }
-      return persistenceOwner.retry();
+      return projectHandoffSave(await persistenceOwner.retry());
     },
-    reconcileSave(): Promise<WorkspaceSaveAttemptResult> {
+    async reconcileSave(): Promise<WorkspaceSaveAttemptResult> {
       if (!persistenceOwner) {
-        return Promise.resolve(Object.freeze({ status: 'failed', project: null }));
+        return Object.freeze({ status: 'failed', project: null });
       }
-      return persistenceOwner.reconcile();
+      return projectHandoffSave(await persistenceOwner.reconcile());
     },
     reapplyConflict(): void {
       persistenceOwner?.reapplyConflict();
@@ -256,6 +314,81 @@ export function createWorkspaceOwner(
       flowOwner?.setMutationGate('readonly');
       persistenceOwner?.setReadonly(state.readonlyReason);
     },
+    async stageHandoffDraft(artifact: WorkspaceHandoffArtifactV1): Promise<void> {
+      if (disposed) throw new Error('Workspace owner has been disposed.');
+      if (artifact.targetKind !== 'existing' || artifact.projectBaseline.projectId !== project.id ||
+          artifact.projectBaseline.persistenceRevision !== state.project.persistenceRevision) {
+        throw new Error('Artifact baseline does not match the mounted Workspace project.');
+      }
+      if (persistenceOwner?.projection.dirty) {
+        throw new Error('Workspace has an unsaved draft and cannot stage an AI candidate.');
+      }
+      if (!flowOwner || flowOwner.projection.phase !== 'mounted') {
+        throw new Error('Canonical FlowCanvas must be mounted before staging a handoff candidate.');
+      }
+      state.handoff = Object.freeze({
+        phase: 'workspace-staging',
+        source: null,
+        build: artifact.build,
+        message: '正在把 AI 候选装载到唯一 Workspace owner。'
+      });
+      flowOwner.replaceFlow(encodeWorkspaceHandoffFlowV1(artifact.candidateFlow), state.project.name);
+      await nextTick();
+    },
+    async adoptNewHandoffDraft(input: Readonly<{
+      flow: WorkspaceJsonObject;
+      source: WorkspaceHandoffSourceV1;
+      build: WorkspaceHandoffBuildSummaryV1;
+    }>): Promise<void> {
+      if (disposed) throw new Error('Workspace owner has been disposed.');
+      if (input.source.targetKind !== 'new') {
+        throw new Error('Only a new-project handoff draft can be adopted after Project creation.');
+      }
+      if (persistenceOwner?.projection.dirty) {
+        throw new Error('The created Project Workspace is no longer at its blank baseline.');
+      }
+      if (!flowOwner || flowOwner.projection.phase !== 'mounted') {
+        throw new Error('Canonical FlowCanvas must be mounted before adopting a new-project draft.');
+      }
+      state.handoff = Object.freeze({
+        phase: 'workspace-staging',
+        source: input.source,
+        build: input.build,
+        message: '正在把未落库候选接管到正式 Project Workspace。'
+      });
+      flowOwner.replaceFlow(input.flow, state.project.name);
+      await nextTick();
+      state.handoff = Object.freeze({
+        phase: 'workspace-staged-unsaved',
+        source: input.source,
+        build: input.build,
+        message: 'AI 候选已进入正式工程的本地草稿，尚未保存。'
+      });
+    },
+    confirmHandoff(source: WorkspaceHandoffSourceV1): void {
+      if (disposed || !state.handoff || state.handoff.phase !== 'workspace-staging') {
+        throw new Error('Workspace has no staged handoff awaiting confirmation.');
+      }
+      state.handoff = Object.freeze({
+        ...state.handoff,
+        phase: 'workspace-staged-unsaved',
+        source,
+        message: 'AI 候选，尚未保存。请检查画布、参数和资源后显式保存。'
+      });
+    },
+    async discardHandoffDraft(): Promise<void> {
+      if (disposed || !state.handoff) return;
+      if (!flowOwner || flowOwner.projection.phase !== 'mounted') {
+        throw new Error('Canonical FlowCanvas is not available.');
+      }
+      if (persistenceOwner?.projection.phase === 'saving' ||
+          persistenceOwner?.projection.phase === 'unknown-outcome') {
+        throw new Error('保存结果尚未协调，不能放弃本地候选。');
+      }
+      flowOwner.replaceFlow(encodeWorkspaceFlowUpdateV1(state.project), state.project.name);
+      await nextTick();
+      state.handoff = null;
+    },
     dispose(reason = 'workspace-owner-disposed'): void {
       if (disposed) return;
       disposed = true;
@@ -289,6 +422,7 @@ export function createWorkspaceOwner(
                     flowOwner = undefined;
                     state.persistence = null;
                     state.run = null;
+                    state.handoff = null;
                     state.readonlyReason = null;
                   }
                 }

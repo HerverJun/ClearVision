@@ -36,13 +36,15 @@ describe('F06 G2 Intent Plan Clarification architecture guards', () => {
     expect(components).not.toMatch(/ApiTransport|createAiWorkbenchApi|getTextStream/);
   });
 
-  it('allows the approved G3 Build route while keeping G4 Handoff Canvas and Project save forbidden', () => {
+  it('allows the approved G4 Apply Preview and Handoff while keeping Canvas and Project save outside AI', () => {
     expect(combined).not.toMatch(/FlowCanvas|ImageCanvas|replaceFlow|ProjectSaveCoordinator|WebMessage|window\.chrome\.webview/);
-    expect(combined).not.toMatch(/applyPreview|resourceBinding/i);
-    expect(combined).not.toMatch(/ai\/handoff|handoff-artifact|workspace\/consume|saveProject|applyToCanvas/i);
+    expect(combined).toMatch(/AiApplyPreview|prepareHandoff/);
+    expect(combined).not.toMatch(/workspace\/consume|saveProject|applyToCanvas/i);
     expect(read(join(capabilityRoot, 'actionModel.ts'))).toContain("| 'startBuild'");
-    expect(read(join(capabilityRoot, 'actionModel.ts'))).not.toMatch(/\|\s*['"](?:handoff|saveProject|applyToCanvas)['"]/i);
+    expect(read(join(capabilityRoot, 'actionModel.ts'))).toContain("| 'prepareHandoff'");
+    expect(read(join(capabilityRoot, 'actionModel.ts'))).not.toMatch(/\|\s*['"](?:saveProject|applyToCanvas)['"]/i);
     expect(read(join(capabilityRoot, 'apiAdapter.ts'))).toContain("requirePost()('ai/agent-runs'");
+    expect(read(join(capabilityRoot, 'apiAdapter.ts'))).toContain("requirePost()('ai/handoffs'");
   });
 
   it('persists clarification through expected revision and client mutation identity', () => {

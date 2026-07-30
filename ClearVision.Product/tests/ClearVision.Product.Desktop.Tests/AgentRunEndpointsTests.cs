@@ -18,6 +18,7 @@ using ClearVision.Product.Desktop.Middleware;
 using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
+using ClearVision.Product.Infrastructure.AI.Handoff;
 using ClearVision.Product.Infrastructure.AI.Tools;
 using ClearVision.Product.Infrastructure.Cameras;
 using FluentAssertions;
@@ -3025,6 +3026,153 @@ public sealed class AgentRunEndpointsTests
         normalized.Should().NotContain("reasoningcontent");
     }
 
+    [Fact(DisplayName = "Handoff create is canonical idempotent redacted and consumed in two phases")]
+    public async Task HandoffCreateAndConsume_ShouldPreserveCanonicalAuthority()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(
+            handler: HandoffReadyBuildResultAsync,
+            useAuth: true,
+            planHandler: HandoffReadyPlanAsync);
+        host.AuthorizeAs("owner-a-token");
+        var candidate = await CreateHandoffReadyCandidateAsync(host);
+        var handoffOperationId = Guid.NewGuid();
+        object CreateRequest(string? candidateFingerprint = null) => new
+        {
+            clientOperationId = handoffOperationId,
+            sessionId = candidate.SessionId,
+            expectedSessionRevision = candidate.Revision,
+            planRunId = candidate.PlanRunId,
+            planId = candidate.Build.PlanId,
+            planHash = candidate.Build.PlanHash,
+            buildRunId = candidate.BuildRunId,
+            buildClientOperationId = candidate.BuildClientOperationId,
+            buildIdentity = candidate.Build.BuildIdentity,
+            candidateFlowFingerprint = candidateFingerprint ?? candidate.Build.CandidateFlowFingerprint,
+            answerRevision = candidate.Build.AnswerRevision,
+            resourceRevision = candidate.Build.ResourceRevision,
+            projectBaseline = new { targetKind = "new" }
+        };
+
+        using var created = await host.Client.PostAsJsonAsync("/api/ai/handoffs", CreateRequest());
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        var createdJson = await created.Content.ReadAsStringAsync();
+        using var createdDocument = JsonDocument.Parse(createdJson);
+        var artifact = createdDocument.RootElement;
+        var artifactId = artifact.GetProperty("artifactId").GetString()!;
+        artifact.GetProperty("status").GetString().Should().Be(AiWorkspaceHandoffStatuses.Available);
+        artifact.GetProperty("targetKind").GetString().Should().Be("new");
+        artifact.GetProperty("candidateFlow").GetProperty("operators").GetArrayLength().Should().Be(1);
+        artifact.GetProperty("build").GetProperty("validation").GetProperty("handoffEligible")
+            .GetBoolean().Should().BeTrue();
+        createdJson.Should().NotContain("ownerHash");
+        createdJson.Should().NotContain("systemPrompt");
+        createdJson.ToLowerInvariant().Should().NotContain("reasoning");
+        createdJson.ToLowerInvariant().Should().NotContain("authorization");
+
+        using var replay = await host.Client.PostAsJsonAsync("/api/ai/handoffs", CreateRequest());
+        replay.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var conflict = await host.Client.PostAsJsonAsync(
+            "/api/ai/handoffs",
+            CreateRequest(new string('F', 64)));
+        conflict.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        using var lookupByBuild = await host.Client.GetAsync(
+            $"/api/ai/handoffs/by-build/{candidate.BuildRunId}");
+        lookupByBuild.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await lookupByBuild.Content.ReadAsStringAsync()).Should().Contain(artifactId);
+
+        var consumeOperationId = Guid.NewGuid();
+        var consume = new
+        {
+            clientOperationId = consumeOperationId,
+            targetProjectId = (Guid?)null,
+            candidateFlowFingerprint = candidate.Build.CandidateFlowFingerprint
+        };
+        using var reserved = await host.Client.PostAsJsonAsync(
+            $"/api/ai/handoffs/{artifactId}/consume", consume);
+        reserved.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await reserved.Content.ReadAsStringAsync()).Should().Contain("consuming");
+
+        using var competing = await host.Client.PostAsJsonAsync(
+            $"/api/ai/handoffs/{artifactId}/consume",
+            new
+            {
+                clientOperationId = Guid.NewGuid(),
+                targetProjectId = (Guid?)null,
+                candidateFlowFingerprint = candidate.Build.CandidateFlowFingerprint
+            });
+        competing.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        using var acknowledged = await host.Client.PostAsJsonAsync(
+            $"/api/ai/handoffs/{artifactId}/acknowledge", consume);
+        using var acknowledgeReplay = await host.Client.PostAsJsonAsync(
+            $"/api/ai/handoffs/{artifactId}/acknowledge", consume);
+        acknowledged.StatusCode.Should().Be(HttpStatusCode.OK);
+        acknowledgeReplay.StatusCode.Should().Be(HttpStatusCode.OK);
+        var acknowledgedJson = await acknowledged.Content.ReadAsStringAsync();
+        acknowledgedJson.Should().Contain("consumed");
+        acknowledgedJson.Should().Contain("\"projectSaved\":false");
+    }
+
+    [Theory(DisplayName = "Handoff candidate public policy distinguishes schema identities from private values")]
+    [InlineData(
+        "{\"id\":\"aaaaaaaa-d123-4aaa-8aaa-aaaaaaaaaaaa\",\"operators\":[{\"parameters\":[{\"name\":\"FilePath\",\"displayName\":\"文件路径\",\"value\":\"\"}]}]}",
+        true)]
+    [InlineData("{\"operators\":[{\"parameters\":[{\"name\":\"FilePath\",\"value\":\"C:\\\\factory\\\\secret.png\"}]}]}", false)]
+    [InlineData("{\"operators\":[{\"parameters\":[{\"name\":\"CameraAddress\",\"value\":\"192.168.1.8\"}]}]}", false)]
+    [InlineData("{\"operators\":[{\"parameters\":[{\"name\":\"PlcRegister\",\"value\":\"D100\"}]}]}", false)]
+    [InlineData("{\"operators\":[],\"apiKey\":\"not-public\"}", false)]
+    public void HandoffCandidatePublicPolicy_ShouldFailClosedWithoutRejectingGuidSegments(
+        string candidateJson,
+        bool expected)
+    {
+        var actual = AiWorkspaceHandoffEndpoints.IsPublicCandidate(candidateJson, out var message);
+
+        actual.Should().Be(expected);
+        message.Should().Be(expected ? string.Empty :
+            "候选流程包含 secret、私有路径、地址、附件或非 public 状态，不能创建交接工件。");
+    }
+
+    [Fact(DisplayName = "Handoff endpoints enforce authentication role and owner scope")]
+    public async Task HandoffLookup_ShouldEnforceRoleAndOwner()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(
+            handler: HandoffReadyBuildResultAsync,
+            useAuth: true,
+            planHandler: HandoffReadyPlanAsync);
+        host.AuthorizeAs("owner-a-token");
+        var candidate = await CreateHandoffReadyCandidateAsync(host);
+        using var created = await host.Client.PostAsJsonAsync("/api/ai/handoffs", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            sessionId = candidate.SessionId,
+            expectedSessionRevision = candidate.Revision,
+            planRunId = candidate.PlanRunId,
+            planId = candidate.Build.PlanId,
+            planHash = candidate.Build.PlanHash,
+            buildRunId = candidate.BuildRunId,
+            buildClientOperationId = candidate.BuildClientOperationId,
+            buildIdentity = candidate.Build.BuildIdentity,
+            candidateFlowFingerprint = candidate.Build.CandidateFlowFingerprint,
+            answerRevision = candidate.Build.AnswerRevision,
+            resourceRevision = candidate.Build.ResourceRevision,
+            projectBaseline = new { targetKind = "new" }
+        });
+        using var document = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var artifactId = document.RootElement.GetProperty("artifactId").GetString();
+
+        host.AuthorizeAs("owner-b-token");
+        using var nonOwner = await host.Client.GetAsync($"/api/ai/handoffs/{artifactId}");
+        nonOwner.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        host.AuthorizeAs("operator-token");
+        using var operatorResponse = await host.Client.GetAsync($"/api/ai/handoffs/{artifactId}");
+        operatorResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        using var anonymous = await host.CreateAnonymousClient().GetAsync($"/api/ai/handoffs/{artifactId}");
+        anonymous.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     [Fact(DisplayName = "Build revalidation binds run session candidate revisions and persists the latest ApplyGate")]
     public async Task BuildRevalidation_ShouldEnforceIdentityAndPersistReadiness()
     {
@@ -3494,6 +3642,206 @@ public sealed class AgentRunEndpointsTests
         return (sessionId, runId, snapshot.PublicBuildResult!, snapshot.Revision);
     }
 
+    private static async Task<(
+        string SessionId,
+        string PlanRunId,
+        string BuildRunId,
+        Guid BuildClientOperationId,
+        VisionAgentPublicBuildResultV1 Build,
+        long Revision)> CreateHandoffReadyCandidateAsync(AgentRunEndpointTestHost host)
+    {
+        using var sessionResponse = await host.Client.PostAsJsonAsync("/api/ai/sessions", new
+        {
+            clientOperationId = Guid.NewGuid()
+        });
+        sessionResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        using var sessionDocument = JsonDocument.Parse(await sessionResponse.Content.ReadAsStringAsync());
+        var sessionId = sessionDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString()!;
+
+        using var planResponse = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+        {
+            ClientOperationId = Guid.NewGuid(),
+            Description = "Create a handoff-ready inspection flow",
+            OriginalUserPrompt = "Create a handoff-ready inspection flow",
+            SessionId = sessionId,
+            RequirementMode = AiRequirementModes.Strict
+        });
+        planResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var planDocument = JsonDocument.Parse(await planResponse.Content.ReadAsStringAsync());
+        var planRunId = planDocument.RootElement.GetProperty("runId").GetString()!;
+        await host.WaitForTerminalAsync(planRunId);
+        await WaitForPlanRunBackgroundSettleAsync(host, planRunId, sessionId);
+
+        var planSnapshot = host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!;
+        var plan = planSnapshot.PendingPlanSnapshot!;
+        var buildOperationId = Guid.NewGuid();
+        using var buildResponse = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
+        {
+            ClientOperationId = buildOperationId,
+            Target = new AiProjectTargetRequest { TargetKind = "new" },
+            Description = "Build the approved handoff candidate",
+            SessionId = sessionId,
+            RequirementMode = AiRequirementModes.Strict,
+            BuildFromPlan = new VisionAgentBuildFromPlanRequest
+            {
+                PlanId = plan.PlanId,
+                PlanHash = plan.PlanHash,
+                PlanSnapshot = plan,
+                WorkspaceExpectedRevision = planSnapshot.Revision,
+                AnswerRevision = planSnapshot.AnswerRevision,
+                ResourceRevision = planSnapshot.ResourceRevision,
+                BuildIntent = "new",
+                OriginalUserPrompt = "Build the approved handoff candidate",
+                MetadataOnly = true
+            },
+            UseVisionAgentGenerateFlow = true,
+            AgentGenerateFlowMode = AiAgentGenerateFlowModes.Scripted
+        });
+        buildResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var buildDocument = JsonDocument.Parse(await buildResponse.Content.ReadAsStringAsync());
+        var buildRunId = buildDocument.RootElement.GetProperty("runId").GetString()!;
+        await host.WaitForTerminalAsync(buildRunId);
+        await host.WaitForWorkspaceBuildStatusAsync(sessionId, AgentRunEventStatuses.Completed);
+        var terminalSnapshot = host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!;
+        terminalSnapshot.PublicBuildResult!.Validation.HandoffEligible.Should().BeTrue();
+        using var revalidated = await host.Client.PostAsJsonAsync(
+            $"/api/ai/agent-runs/{buildRunId}/revalidate",
+            new
+            {
+                sessionId,
+                expectedRevision = terminalSnapshot.Revision,
+                clientMutationId = Guid.NewGuid(),
+                buildId = terminalSnapshot.PublicBuildResult.BuildId,
+                candidateFlowFingerprint = terminalSnapshot.PublicBuildResult.CandidateFlowFingerprint,
+                answerRevision = terminalSnapshot.AnswerRevision,
+                resourceRevision = terminalSnapshot.ResourceRevision
+            });
+        revalidated.StatusCode.Should().Be(HttpStatusCode.OK);
+        var snapshot = host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!;
+        snapshot.LifecycleState.Should().Be("build_ready");
+        snapshot.PublicBuildResult!.Validation.HandoffEligible.Should().BeTrue();
+        return (
+            sessionId,
+            planRunId,
+            buildRunId,
+            buildOperationId,
+            snapshot.PublicBuildResult,
+            snapshot.Revision);
+    }
+
+    private static Task<VisionAgentPlanModeResult> HandoffReadyPlanAsync(
+        VisionAgentPlanModeRequest request,
+        VisionAgentPlanModeResult baseline,
+        CancellationToken cancellationToken)
+    {
+        var plan = baseline with
+        {
+            PlanId = "plan_handoff_ready",
+            Goal = "创建可交接的视觉检测流程",
+            CanBuild = true,
+            CurrentPhase = VisionAgentPlanPhases.ReadyToBuild,
+            BlockingReasons = [],
+            ClarificationQuestions = [],
+            RemainingPlanFields = [],
+            BuildReadiness = new VisionAgentBuildReadinessSnapshot
+            {
+                CanBuild = true,
+                ContractVersion = VisionAgentPlanContractVersions.V2,
+                Blockers = [],
+                RemainingFields = []
+            },
+            MetadataOnly = true
+        };
+        return Task.FromResult(plan with { PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan) });
+    }
+
+    private static Task<AiFlowGenerationResult> HandoffReadyBuildResultAsync(
+        AiFlowGenerationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var operatorId = Guid.NewGuid();
+        var flow = new OperatorFlowDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "AI 候选流程",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = operatorId,
+                    Name = "阈值判断",
+                    Type = OperatorType.Thresholding,
+                    X = 160,
+                    Y = 120,
+                    IsEnabled = true,
+                    Parameters =
+                    [
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Threshold",
+                            DisplayName = "阈值",
+                            DataType = "double",
+                            Value = 128d,
+                            MinValue = 0d,
+                            MaxValue = 255d,
+                            IsRequired = true
+                        }
+                    ]
+                }
+            ],
+            Connections = []
+        };
+        var plan = request.BuildFromPlan?.PlanSnapshot;
+        var build = new VisionAgentBuildResult
+        {
+            BuildId = "build_handoff_ready",
+            PlanId = plan?.PlanId ?? string.Empty,
+            PlanHash = plan?.PlanHash ?? string.Empty,
+            ContractVersion = VisionAgentPlanContractVersions.V2,
+            BuildIntent = "new",
+            AnswerSetFingerprint = "sha256:" + new string('A', 64),
+            Flow = flow,
+            WorkflowDraft = flow,
+            OperatorPipeline =
+            [
+                new VisionAgentOperatorPipelineStep
+                {
+                    TempId = operatorId.ToString("D"),
+                    OperatorType = "Thresholding",
+                    Source = "rule_fallback",
+                    Status = "ready"
+                }
+            ],
+            ValidationPreview = new { isValid = true, blockingIssues = Array.Empty<string>(), warnings = Array.Empty<string>() },
+            DryRunResult = new { dryRunSucceeded = true, blockingIssues = Array.Empty<string>(), warnings = Array.Empty<string>() },
+            ReadinessReport = new { readyForDeployment = true },
+            WorkflowDiff = new VisionAgentWorkflowDiff { AddedNodes = ["Thresholding"] },
+            ApplyGate = new VisionAgentApplyGate
+            {
+                CanvasApplyReady = true,
+                RuntimeDraftReady = true,
+                DeploymentReady = false,
+                Blocked = false,
+                Status = "ready_for_handoff",
+                FirstFixRecommendation = "候选已具备工作区审核条件。",
+                MetadataOnly = true
+            },
+            MetadataOnly = true
+        };
+        return Task.FromResult(new AiFlowGenerationResult
+        {
+            Success = true,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
+            GenerationMode = "rule_fallback",
+            AiExplanation = "Generated a public canonical handoff candidate.",
+            Flow = flow,
+            BuildResult = build,
+            PendingParameters = [],
+            MissingResources = []
+        });
+    }
+
     private static List<VisionAgentPlanAnswer> ConfirmedAgentRunBuildFromPlanAnswers()
     {
         return
@@ -3653,6 +4001,7 @@ public sealed class AgentRunEndpointsTests
             var streamService = new AgentRunEventStreamService(store, redactor);
             var conversationService = new ConversationalFlowService(Path.Combine(directory, "sessions"));
             var operationStore = new AiOperationReceiptStore(Path.Combine(directory, "operations"));
+            var handoffStore = new AiWorkspaceHandoffArtifactStore(Path.Combine(directory, "handoffs"));
             var projects = new FakeProjectApplicationService();
             var cameraManager = new CameraManager(NullLoggerFactory.Instance);
             cameraManager.LoadBindings(
@@ -3675,6 +4024,7 @@ public sealed class AgentRunEndpointsTests
             builder.Services.AddSingleton<IVisionAgentBuildProjectionJournal, VisionAgentBuildProjectionJournal>();
             builder.Services.AddSingleton<IConversationalFlowService>(conversationService);
             builder.Services.AddSingleton<IAiOperationReceiptStore>(operationStore);
+            builder.Services.AddSingleton<IAiWorkspaceHandoffArtifactStore>(handoffStore);
             builder.Services.AddSingleton<ICameraManager>(cameraManager);
             builder.Services.AddSingleton<IProjectApplicationService>(projects);
             builder.Services.AddSingleton<IAgentRunEventStreamService>(streamService);
@@ -3716,6 +4066,7 @@ public sealed class AgentRunEndpointsTests
             }
             app.MapAiSessionEndpoints();
             app.MapAgentRunEndpoints();
+            app.MapAiWorkspaceHandoffEndpoints();
             await app.StartAsync();
             var terminalProjector = app.Services.GetRequiredService<IVisionAgentBuildTerminalProjector>();
 

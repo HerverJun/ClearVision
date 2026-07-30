@@ -13,7 +13,7 @@ import type {
 import type {
   WorkspaceJsonValue,
   WorkspaceOperatorV1,
-  WorkspaceProjectV1
+  WorkspaceCanvasProjectV1
 } from '../workspaceContracts';
 import type {
   WorkspaceInspectorDiagnosticsLease,
@@ -112,7 +112,7 @@ export interface InspectorConnectionProjection {
 export interface InspectorOwnerProjection {
   readonly phase: 'active' | 'disposed';
   readonly mode: InspectorMode;
-  readonly projectId: string;
+  readonly projectId: string | null;
   readonly flowRevision: number;
   readonly selectionRevision: number;
   readonly mutationGate: FlowMutationGate;
@@ -132,7 +132,7 @@ export interface InspectorMutationResult extends CanonicalFlowCommandResult {
 }
 
 export interface InspectorOwner {
-  readonly projectId: string;
+  readonly projectId: string | null;
   readonly projection: DeepReadonly<InspectorOwnerProjection>;
   patchNodeParameter(parameterName: string, value: unknown): InspectorMutationResult;
   patchNodeProperties(patch: Readonly<{ name?: string; isEnabled?: boolean }>): InspectorMutationResult;
@@ -190,7 +190,7 @@ function metadataForType(
   return catalog.find(item => normalized(item.operatorType) === identity) ?? null;
 }
 
-function persistedOperator(project: WorkspaceProjectV1, nodeId: string): WorkspaceOperatorV1 | null {
+function persistedOperator(project: WorkspaceCanvasProjectV1, nodeId: string): WorkspaceOperatorV1 | null {
   return project.flow?.operators.find(item => item.id === nodeId) ?? null;
 }
 
@@ -389,7 +389,7 @@ function metadataState(
 }
 
 function buildNode(
-  project: WorkspaceProjectV1,
+  project: WorkspaceCanvasProjectV1,
   flowOwner: FlowCanvasOwner,
   node: Readonly<Record<string, unknown>>,
   errors: ReadonlyMap<string, readonly InspectorValidationError[]>
@@ -460,11 +460,14 @@ function commandResult(
 }
 
 export function createInspectorOwner(options: {
-  readonly project: WorkspaceProjectV1;
+  readonly project: WorkspaceCanvasProjectV1;
   readonly flowOwner: FlowCanvasOwner;
   readonly diagnostics: WorkspaceLifecycleDiagnosticsOwner;
+  readonly diagnosticsKey?: string;
 }): InspectorOwner {
-  const lease: WorkspaceInspectorDiagnosticsLease = options.diagnostics.reserveInspector(options.project.id);
+  const diagnosticsKey = options.project.id ?? options.diagnosticsKey;
+  if (!diagnosticsKey?.trim()) throw new Error('An unsaved Inspector owner requires a diagnostics key.');
+  const lease: WorkspaceInspectorDiagnosticsLease = options.diagnostics.reserveInspector(diagnosticsKey);
   const state = reactive<MutableInspectorOwnerProjection>({
     phase: 'active',
     mode: 'empty',

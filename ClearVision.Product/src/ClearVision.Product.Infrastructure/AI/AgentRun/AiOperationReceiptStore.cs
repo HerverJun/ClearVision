@@ -9,9 +9,10 @@ public static class AiOperationKinds
     public const string SessionDelete = "session_delete";
     public const string PlanRun = "plan_run";
     public const string BuildRun = "build_run";
+    public const string HandoffCreate = "handoff_create";
 
     public static bool IsSupported(string? value) => value?.Trim().ToLowerInvariant() is
-        SessionCreate or SessionDelete or PlanRun or BuildRun;
+        SessionCreate or SessionDelete or PlanRun or BuildRun or HandoffCreate;
 
     public static string Normalize(string value) => value.Trim().ToLowerInvariant();
 }
@@ -33,6 +34,7 @@ public sealed record AiOperationReceipt
     public string Status { get; init; } = AiOperationStatuses.Pending;
     public string SessionId { get; init; } = string.Empty;
     public string RunId { get; init; } = string.Empty;
+    public string ArtifactId { get; init; } = string.Empty;
     public AiProjectBaselineIdentity? ProjectBaseline { get; init; }
     public string PublicErrorCode { get; init; } = string.Empty;
     public string PublicMessage { get; init; } = string.Empty;
@@ -67,6 +69,7 @@ public interface IAiOperationReceiptStore
 
     AiOperationReceipt? Get(string ownerHash, string kind, Guid clientOperationId);
     IReadOnlyList<AiOperationReceipt> Find(string ownerHash, Guid clientOperationId);
+    AiOperationReceipt? FindByRun(string ownerHash, string kind, string runId);
 
     AiOperationReceipt? MarkCreated(
         string ownerHash,
@@ -74,7 +77,8 @@ public interface IAiOperationReceiptStore
         Guid clientOperationId,
         string? sessionId = null,
         string? runId = null,
-        AiProjectBaselineIdentity? projectBaseline = null);
+        AiProjectBaselineIdentity? projectBaseline = null,
+        string? artifactId = null);
 
     AiOperationReceipt? MarkFailed(
         string ownerHash,
@@ -209,19 +213,38 @@ public sealed class AiOperationReceiptStore : IAiOperationReceiptStore
         }
     }
 
+    public AiOperationReceipt? FindByRun(string ownerHash, string kind, string runId)
+    {
+        var normalizedOwner = NormalizeRequired(ownerHash, nameof(ownerHash));
+        var normalizedKind = NormalizeKind(kind);
+        var normalizedRunId = NormalizeRequired(runId, nameof(runId));
+        lock (_gate)
+        {
+            PruneExpiredUnderLock(DateTimeOffset.UtcNow);
+            return _receipts.Values
+                .Where(receipt => receipt.OwnerHash == normalizedOwner &&
+                    receipt.Kind == normalizedKind &&
+                    string.Equals(receipt.RunId, normalizedRunId, StringComparison.Ordinal))
+                .OrderByDescending(receipt => receipt.UpdatedAtUtc)
+                .FirstOrDefault();
+        }
+    }
+
     public AiOperationReceipt? MarkCreated(
         string ownerHash,
         string kind,
         Guid clientOperationId,
         string? sessionId = null,
         string? runId = null,
-        AiProjectBaselineIdentity? projectBaseline = null)
+        AiProjectBaselineIdentity? projectBaseline = null,
+        string? artifactId = null)
     {
         return Update(ownerHash, kind, clientOperationId, receipt => receipt with
         {
             Status = AiOperationStatuses.Created,
             SessionId = FirstNonBlank(sessionId, receipt.SessionId),
             RunId = FirstNonBlank(runId, receipt.RunId),
+            ArtifactId = FirstNonBlank(artifactId, receipt.ArtifactId),
             ProjectBaseline = CloneBaseline(projectBaseline) ?? receipt.ProjectBaseline,
             PublicErrorCode = string.Empty,
             PublicMessage = string.Empty,

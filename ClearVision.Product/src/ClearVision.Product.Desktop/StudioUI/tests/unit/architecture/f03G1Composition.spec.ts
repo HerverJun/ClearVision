@@ -21,7 +21,10 @@ describe('F03 G1 composition and startup flag guards', () => {
     expect(router).toContain("name: 'project-workspace'");
     expect(router).toContain('workspaceMode: true');
     expect(layout.match(/<main(?:\s|>)/g)).toHaveLength(1);
-    expect(layout).toContain(':key="route.path"');
+    expect(layout).toContain("const routeViewKey = computed(() => route.name === 'project-workspace'");
+    expect(layout).toContain("? 'project-workspace'");
+    expect(layout).toContain(': route.path);');
+    expect(layout).toContain(':key="routeViewKey"');
     expect(layout).toContain("route.meta.workspaceMode === true");
     expect(layout).not.toContain('item.label.slice(0, 1)');
     expect(layout).toContain(':name="navigationIcons[item.to]');

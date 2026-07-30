@@ -4,6 +4,8 @@ import type {
   AiBuildRevalidationResponseV1,
   AiBuildRunCommandV1,
   AiCameraBindingOptionV1,
+  AiHandoffArtifactIdentityV1,
+  AiHandoffCreateCommandV1,
   AiIntentResultV1,
   AiOperationKind,
   AiOperationProjectionV1,
@@ -24,6 +26,7 @@ import {
   decodeAiAgentRunReplayV1,
   decodeAiBuildRevalidationResponseV1,
   decodeAiCameraBindingOptionsV1,
+  decodeAiHandoffArtifactIdentityV1,
   decodeAiIntentResultV1,
   decodeAiOperationProjectionV1,
   decodeAiPlanRunResponseV1,
@@ -79,6 +82,8 @@ export interface AiWorkbenchApi {
     mutation: AiWorkspaceSnapshotMutationV1,
     signal?: AbortSignal
   ): Promise<AiSessionSnapshotV1>;
+  createHandoff(command: AiHandoffCreateCommandV1, signal?: AbortSignal): Promise<AiHandoffArtifactIdentityV1>;
+  getHandoffByBuild(buildRunId: string, signal?: AbortSignal): Promise<AiHandoffArtifactIdentityV1>;
 }
 
 const identifierPattern = /^[a-z0-9_.:-]{1,128}$/i;
@@ -219,6 +224,17 @@ export function createAiWorkbenchApi(api: ApiTransport): AiWorkbenchApi {
       );
       if (!payload || !('snapshot' in payload)) throw new Error('Workspace snapshot response is malformed.');
       return decodeAiSessionSnapshotV1(payload.snapshot, '$.snapshot');
+    },
+    async createHandoff(command: AiHandoffCreateCommandV1, signal?: AbortSignal) {
+      return decodeAiHandoffArtifactIdentityV1(
+        await requirePost()('ai/handoffs', command, signalOptions(signal))
+      );
+    },
+    async getHandoffByBuild(buildRunId: string, signal?: AbortSignal) {
+      const safeBuildRunId = encodeURIComponent(identifier(buildRunId, 'buildRunId'));
+      return decodeAiHandoffArtifactIdentityV1(
+        await api.get(`ai/handoffs/by-build/${safeBuildRunId}`, signalOptions(signal))
+      );
     }
   });
 }

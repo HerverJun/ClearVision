@@ -47,7 +47,14 @@ public sealed class AiOperationReceiptStoreTests : IDisposable
             CanonicalFlowHash = new string('A', 64)
         };
         store.Reserve(owner, AiOperationKinds.BuildRun, operationId, "sha256:" + new string('3', 64));
-        store.MarkCreated(owner, AiOperationKinds.BuildRun, operationId, "session-1", "ar_1", baseline)
+        store.MarkCreated(
+                owner,
+                AiOperationKinds.BuildRun,
+                operationId,
+                "session-1",
+                "ar_1",
+                baseline,
+                "artifact-1")
             .Should().NotBeNull();
 
         var reloaded = new AiOperationReceiptStore(_tempRoot);
@@ -56,7 +63,9 @@ public sealed class AiOperationReceiptStoreTests : IDisposable
         receipt!.Status.Should().Be(AiOperationStatuses.Created);
         receipt.SessionId.Should().Be("session-1");
         receipt.RunId.Should().Be("ar_1");
+        receipt.ArtifactId.Should().Be("artifact-1");
         receipt.ProjectBaseline.Should().BeEquivalentTo(baseline);
+        reloaded.FindByRun(owner, AiOperationKinds.BuildRun, "ar_1").Should().Be(receipt);
     }
 
     [Fact]

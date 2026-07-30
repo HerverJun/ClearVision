@@ -171,12 +171,16 @@ function createFlowOwner(project: WorkspaceProjectV1) {
     projection.draft = { ...projection.draft, operators } as unknown as typeof projection.draft;
     projection.runtime.flowRevision += 1;
   };
-  const emitNonRevisionDraftRefresh = () => {
+  const emitEquivalentDraftRefresh = () => {
+    const operators = JSON.parse(JSON.stringify(projection.draft.operators)) as Array<Record<string, unknown>>;
+    projection.draft = { ...projection.draft, operators } as unknown as typeof projection.draft;
+  };
+  const replaceDraftWithoutRevision = () => {
     const operators = JSON.parse(JSON.stringify(projection.draft.operators)) as Array<Record<string, unknown>>;
     operators[0]!.x = Number(operators[0]!.x) + 0.25;
     projection.draft = { ...projection.draft, operators } as unknown as typeof projection.draft;
   };
-  return { owner, projection, editParameter, emitNonRevisionDraftRefresh };
+  return { owner, projection, editParameter, emitEquivalentDraftRefresh, replaceDraftWithoutRevision };
 }
 
 function createHarness(portOverrides: Partial<WorkspaceProjectPersistencePort> = {}) {
@@ -243,15 +247,30 @@ describe('F03 G5 Workspace persistence owner', () => {
     harness.diagnostics.dispose();
   });
 
-  it('ignores non-edit Canvas draft refreshes when flowRevision does not advance', async () => {
+  it('keeps an equivalent Canvas draft refresh clean when flowRevision does not advance', async () => {
     const harness = createHarness();
     harness.flow.editParameter(11);
     await expect(harness.owner.save()).resolves.toMatchObject({ status: 'saved' });
     expect(harness.owner.projection).toMatchObject({ phase: 'saved', dirty: false });
 
-    harness.flow.emitNonRevisionDraftRefresh();
+    harness.flow.emitEquivalentDraftRefresh();
     expect(harness.flow.projection.runtime.flowRevision).toBe(0);
     expect(harness.owner.projection).toMatchObject({ phase: 'saved', dirty: false, canSave: false });
+
+    harness.owner.dispose();
+    await harness.owner.settle();
+    harness.diagnostics.dispose();
+  });
+
+  it('marks an externally replaced draft dirty even when flowRevision does not advance', async () => {
+    const harness = createHarness();
+    harness.flow.editParameter(11);
+    await expect(harness.owner.save()).resolves.toMatchObject({ status: 'saved' });
+    expect(harness.owner.projection).toMatchObject({ phase: 'saved', dirty: false });
+
+    harness.flow.replaceDraftWithoutRevision();
+    expect(harness.flow.projection.runtime.flowRevision).toBe(0);
+    expect(harness.owner.projection).toMatchObject({ phase: 'dirty', dirty: true, canSave: true });
 
     harness.flow.editParameter(12);
     expect(harness.owner.projection).toMatchObject({ phase: 'dirty', dirty: true, canSave: true });

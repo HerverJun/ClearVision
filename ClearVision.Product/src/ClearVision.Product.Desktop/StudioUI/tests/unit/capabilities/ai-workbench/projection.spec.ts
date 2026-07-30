@@ -171,8 +171,8 @@ describe('AI Workbench reducer, projection and action model', () => {
     });
     expect(state.phase).toBe('build-ready');
     expect(state.buildStale).toBe(false);
-    expect(aiWorkbenchActionModel(state).primary).toBeNull();
-    expect(aiWorkbenchActionModel(state).nextStagePlaceholder?.disabledReason).toContain('G4');
+    expect(aiWorkbenchActionModel(state).primary?.id).toBe('prepareHandoff');
+    expect(aiWorkbenchActionModel(state).nextStagePlaceholder).toBeNull();
   });
 
   it('keeps the first terminal outcome and retains the previous candidate read-only', () => {
@@ -204,24 +204,25 @@ describe('AI Workbench reducer, projection and action model', () => {
     expect(afterLateCancel).toBe(state);
   });
 
-  it('defines one action-model owner for every G3 phase without executable G4 actions', () => {
+  it('defines one action-model owner for every Build and handoff phase without Canvas or save actions', () => {
     const expectedPrimary = new Map([
       ['build-starting', 'cancelBuild'], ['building', 'cancelBuild'], ['validating', 'cancelBuild'],
       ['parameters-pending', 'confirmParameters'], ['resources-pending', 'updateResourceDecision'],
       ['build-blocked', 'recheckReadiness'], ['build-failed', 'rebuild'],
-      ['build-cancelled', 'rebuild'], ['baseline-conflict', 'reconcile'], ['unknown-outcome', 'reconcile']
+      ['build-cancelled', 'rebuild'], ['baseline-conflict', 'reconcile'], ['unknown-outcome', 'reconcile'],
+      ['build-ready', 'prepareHandoff'], ['handoff-unknown-outcome', 'reconcileHandoff']
     ]);
     for (const [phase, actionId] of expectedPrimary) {
       const model = aiWorkbenchActionModel({ ...readyState(), phase: phase as never });
       expect(model.primary?.id, phase).toBe(actionId);
       expect(model.secondary.filter(action => action.primary), phase).toHaveLength(0);
     }
-    for (const phase of ['revalidating', 'build-cancelling', 'build-ready'] as const) {
+    for (const phase of ['revalidating', 'build-cancelling', 'handoff-creating', 'handoff-created'] as const) {
       const model = aiWorkbenchActionModel({ ...readyState(), phase });
       expect(model.primary, phase).toBeNull();
     }
     const actionIds = [...expectedPrimary.values(), 'recheckReadiness'];
-    expect(actionIds).not.toContain('handoff');
+    expect(actionIds).toContain('prepareHandoff');
     expect(actionIds).not.toContain('applyToCanvas');
     expect(actionIds).not.toContain('saveProject');
   });

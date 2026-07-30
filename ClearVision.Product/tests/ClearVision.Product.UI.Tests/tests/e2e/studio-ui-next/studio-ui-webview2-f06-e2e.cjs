@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('node:fs');
+
 const {
   assert,
   captureRuntimeErrors,
@@ -14,6 +16,43 @@ const {
 
 function metadata(value, name) {
   return value?.[name] ?? value?.[name[0].toUpperCase() + name.slice(1)];
+}
+
+function waitForBrowserDisconnect(browser, timeout = 30_000) {
+  if (!browser.isConnected()) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('Desktop Host did not dispose WebView2 within the shutdown timeout.'));
+    }, timeout);
+    browser.once('disconnected', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+}
+
+async function waitForFile(filePath, timeout = 80_000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (fs.existsSync(filePath)) return;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  throw new Error(`Desktop Host did not acknowledge clean process exit: ${filePath}`);
+}
+
+async function coordinateDesktopHostShutdown(browser, processId) {
+  const signalPath = requiredEnvironment('CV_DESKTOP_HOST_CLOSE_SIGNAL');
+  const acknowledgementPath = `${signalPath}.closed`;
+  const disconnected = waitForBrowserDisconnect(browser);
+  fs.writeFileSync(signalPath, `${JSON.stringify({ processId, requestedAtUtc: new Date().toISOString() })}\n`, 'utf8');
+  await disconnected;
+  await waitForFile(acknowledgementPath);
+  return {
+    mode: 'winforms-wm-close',
+    processId,
+    webView2Disconnected: true,
+    desktopProcessExited: true
+  };
 }
 
 const replayIdentityKeys = new Set([
@@ -165,17 +204,18 @@ async function main() {
   const evidenceDirectory = requiredEnvironment('CV_EVIDENCE_DIR');
   const sourceSha = requiredEnvironment('CV_STUDIO_UI_SOURCE_SHA');
   const executable = requiredEnvironment('CV_STUDIO_UI_DESKTOP_EXECUTABLE');
-  const runName = String(process.env.CV_STUDIO_UI_RUN_NAME || 'f06-g3-debug').trim();
+  const runName = String(process.env.CV_STUDIO_UI_RUN_NAME || 'f06-g4-debug').trim();
   const evidence = {
-    schemaVersion: 'f06-g3-real-webview2.v1', status: 'running', runName, sourceSha,
+    schemaVersion: 'f06-g4-real-webview2.v1', status: 'running', runName, sourceSha,
     MODEL_MODE: 'RULE_FALLBACK', REAL_LLM_PRODUCT_QUALITY: 'NOT_EVALUATED',
-    DATA_SOURCE: 'REAL_ASPNETCORE_WEBVIEW2_WITH_RESPONSE_LOSS_FAULT_INJECTION',
+    DATA_SOURCE: 'REAL_ASPNETCORE_WEBVIEW2_WITH_HANDOFF_AND_RESPONSE_LOSS_FAULT_INJECTION',
     capturedAtUtc: new Date().toISOString(), authority: {}, requests: {}, screenshots: {}, runtime: {}
   };
   let browser;
   let page;
   let runtimeErrors;
   const apiResponses = [];
+  const httpFailures = [];
   try {
     const connected = await connectToDesktopWebView2(cdpPort);
     browser = connected.browser;
@@ -184,7 +224,14 @@ async function main() {
     runtimeErrors = captureRuntimeErrors(page);
     page.on('response', async response => {
       const url = new URL(response.url());
-      if (!/^\/api\/ai\/(?:sessions(?:\/[^/]+)?|agent-plan-runs|agent-runs(?:\/[^/]+)?|operations\/)/.test(url.pathname) ||
+      if (response.status() >= 400) {
+        httpFailures.push({
+          method: response.request().method(),
+          path: url.pathname + url.search,
+          status: response.status()
+        });
+      }
+      if (!/^\/api\/(?:ai\/(?:sessions(?:\/[^/]+)?|agent-plan-runs|agent-runs(?:\/[^/]+)?|operations\/|handoffs(?:\/.*)?)|projects(?:\/.*)?)/.test(url.pathname) ||
           /\/events$/.test(url.pathname)) return;
       const text = await response.text().catch(error => `RESPONSE_READ_FAILED: ${error.message}`);
       let body = null;
@@ -241,9 +288,10 @@ async function main() {
 
     const origin = `http://localhost:${webPort}`;
     await page.goto(`${origin}/studio/index.html#/ai`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
-    await page.waitForSelector('[data-ai-owner-phase="idle"]', { state: 'visible', timeout: 30_000 });
     const startup = await page.evaluate(() => ({ ...window.__CLEARVISION_STARTUP__?.featureFlags }));
     assert(startup['Studio2.AiWorkbench'] === true, `AI feature flag was not enabled: ${JSON.stringify(startup)}`);
+    assert(startup['Studio2.Workspace'] === true, `Workspace feature flag was not enabled: ${JSON.stringify(startup)}`);
+    await page.waitForSelector('[data-ai-owner-phase="idle"]', { state: 'visible', timeout: 30_000 });
     const task = page.getByRole('textbox', { name: '任务描述' });
     assert(await task.evaluate(element => element === document.activeElement), 'Task composer did not receive initial focus.');
     await task.fill('使用已配置顶视相机检测金属冲压件表面划伤，划伤长度超过 2 毫米判定 NG，输出缺陷位置、长度和 OK/NG。');
@@ -274,6 +322,58 @@ async function main() {
     evidence.screenshots.ready = writePngEvidence(
       evidenceDirectory, `f06-${runName}-ready.png`, await page.screenshot({ type: 'png', animations: 'disabled' }));
 
+    const requestPath = item => {
+      const url = new URL(item.url);
+      return url.pathname + url.search;
+    };
+    const isProjectWrite = item =>
+      item.method === 'POST' && requestPath(item) === '/api/projects' ||
+      item.method === 'PUT' && /^\/api\/projects\/[0-9a-f-]{36}$/i.test(requestPath(item));
+    assert(runtimeErrors.requests.filter(isProjectWrite).length === 0,
+      'The ready Build wrote a Project before the user requested handoff and save.');
+
+    await page.getByRole('button', { name: '交接到工作区审核' }).click();
+    await page.waitForURL(url =>
+      /#\/projects\/new\/workspace\?handoff=[0-9a-f]{32}$/i.test(url.href),
+    { timeout: 60_000 });
+    assert(!/candidateFlow|fingerprint/i.test(page.url()),
+      `The Workspace route leaked candidate content: ${page.url()}`);
+    await page.waitForSelector('[data-workspace-handoff-phase="workspace-staged-unsaved"]', {
+      state: 'visible', timeout: 60_000
+    });
+    assert(await page.locator('[data-ai-owner-phase]').count() === 0,
+      'The AI owner remained mounted after navigating to Workspace.');
+    assert(await page.locator('[data-workspace-project-id="new"]').count() === 1,
+      'The new handoff target acquired a Project id before explicit save.');
+    assert(runtimeErrors.requests.filter(isProjectWrite).length === 0,
+      'Workspace handoff staged a candidate by writing a Project before explicit save.');
+    evidence.screenshots.staged = writePngEvidence(
+      evidenceDirectory, `f06-${runName}-workspace-staged.png`,
+      await page.screenshot({ type: 'png', animations: 'disabled' }));
+
+    await page.getByLabel('工程名称').fill('F06 G4 真实 WebView2 交接工程');
+    await page.getByLabel('工程描述').fill('真实 artifact 接收后由用户显式创建并保存。');
+    await page.getByTestId('workspace-save').click();
+    await page.waitForURL(url =>
+      /#\/projects\/[0-9a-f-]{36}\/workspace$/i.test(url.href),
+    { timeout: 60_000 });
+    const createdProjectId = new URL(page.url()).hash.match(
+      /^#\/projects\/([0-9a-f-]{36})\/workspace$/i)?.[1];
+    assert(createdProjectId, `Explicit save did not navigate to a server-issued Project: ${page.url()}`);
+    await page.waitForSelector(`[data-workspace-project-id="${createdProjectId}"]`, {
+      state: 'visible', timeout: 60_000
+    });
+    await page.waitForSelector(
+      `[data-workspace-project-id="${createdProjectId}"]` +
+      '[data-workspace-persistence-phase="saved"]' +
+      '[data-workspace-dirty="false"]' +
+      '[data-workspace-handoff-phase="workspace-saved"]',
+      { state: 'visible', timeout: 60_000 }
+    );
+    evidence.screenshots.saved = writePngEvidence(
+      evidenceDirectory, `f06-${runName}-workspace-saved.png`,
+      await page.screenshot({ type: 'png', animations: 'disabled' }));
+
     const sessionRequests = runtimeErrors.requests.filter(item => /\/api\/ai\/sessions$/.test(new URL(item.url).pathname));
     const sessionResponse = await page.request.get(`${origin}/api/ai/sessions`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -291,20 +391,40 @@ async function main() {
     assert(Number(metadata(snapshot, 'resourceRevision')) >= 1,
       `Server-managed resourceRevision did not advance: ${JSON.stringify(snapshot)}`);
 
-    const apiRequests = runtimeErrors.requests.map(item => ({ method: item.method, path: new URL(item.url).pathname + new URL(item.url).search }));
-    const forbidden = apiRequests.filter(item =>
-      /handoff|apply-to-canvas|workspace\/consume|project\/save|flow-canvas|image-canvas/i.test(item.path) ||
-      item.method === 'PUT' && /^\/api\/projects(?:\/|$)/i.test(item.path));
+    const apiRequests = runtimeErrors.requests.map(item => ({ method: item.method, path: requestPath(item) }));
+    const authorityViolations = apiRequests.filter(item =>
+      /apply-to-canvas|workspace\/consume|project\/save|save-project|flow-canvas|image-canvas/i.test(item.path));
     const operationLookups = apiRequests.filter(item => /\/api\/ai\/operations\/.+kind=build_run/.test(item.path));
     const replays = apiRequests.filter(item => /^\/api\/ai\/agent-runs\/[^/]+$/.test(item.path) && item.method === 'GET');
     const streams = apiRequests.filter(item => /\/api\/ai\/agent-runs\/[^/]+\/events/.test(item.path));
+    const handoffCreates = apiRequests.filter(item => item.method === 'POST' && item.path === '/api/ai/handoffs');
+    const handoffReads = apiRequests.filter(item => item.method === 'GET' && /^\/api\/ai\/handoffs\/[0-9a-f]{32}$/i.test(item.path));
+    const handoffConsumes = apiRequests.filter(item => item.method === 'POST' && /\/consume$/.test(item.path));
+    const handoffAcknowledgements = apiRequests.filter(item => item.method === 'POST' && /\/acknowledge$/.test(item.path));
+    const projectCreates = apiRequests.filter(item => item.method === 'POST' && item.path === '/api/projects');
+    const projectPuts = apiRequests.filter(item => item.method === 'PUT' &&
+      item.path === `/api/projects/${createdProjectId}`);
     assert(buildPostCount === 2, `Expected two real Build creates, observed ${buildPostCount}.`);
     assert(operationLookups.length >= 1, 'Response-loss simulation did not trigger durable Build operation lookup.');
     assert(replays.length >= 2 && streams.length >= 1,
       `Real replay/SSE evidence was incomplete: ${JSON.stringify({ replays, streams })}`);
-    assert(forbidden.length === 0, `Forbidden G4/Canvas/Project writes were observed: ${JSON.stringify(forbidden)}`);
+    assert(handoffCreates.length === 1 && handoffReads.length >= 1 &&
+      handoffConsumes.length === 1 && handoffAcknowledgements.length === 1,
+    `Real artifact create/receive trace was incomplete: ${JSON.stringify({
+      handoffCreates, handoffReads, handoffConsumes, handoffAcknowledgements
+    })}`);
+    assert(projectCreates.length === 1 && projectPuts.length === 1,
+      `Explicit new-Project save must use one create and one existing Project PUT: ${JSON.stringify({
+        projectCreates, projectPuts
+      })}`);
+    assert(authorityViolations.length === 0,
+      `Forbidden Canvas/Project authority paths were observed: ${JSON.stringify(authorityViolations)}`);
     assert(runtimeErrors.consoleErrors.length === 0 && runtimeErrors.pageErrors.length === 0,
       `WebView2 runtime errors were observed: ${JSON.stringify(runtimeErrors)}`);
+    assert(runtimeErrors.requestFailures.length === 0,
+      `WebView2 request failures were observed: ${JSON.stringify(runtimeErrors.requestFailures)}`);
+    assert(httpFailures.length === 0,
+      `WebView2 HTTP failures were observed: ${JSON.stringify(httpFailures)}`);
     const overflow = await page.evaluate(() => Math.max(
       document.documentElement.scrollWidth - document.documentElement.clientWidth,
       document.body.scrollWidth - document.body.clientWidth));
@@ -318,23 +438,48 @@ async function main() {
       lifecycleState: metadata(snapshot, 'lifecycleState')
     };
     evidence.authority.builds = realBuildResponses;
+    evidence.authority.handoff = {
+      route: page.url(),
+      createdProjectId,
+      createCount: handoffCreates.length,
+      readCount: handoffReads.length,
+      consumeCount: handoffConsumes.length,
+      acknowledgeCount: handoffAcknowledgements.length,
+      projectCreateCount: projectCreates.length,
+      projectPutCount: projectPuts.length
+    };
     evidence.requests = {
       total: apiRequests.length, sessionCreates: sessionRequests.length, buildPosts: buildPostCount,
-      operationLookups, replays, streams, forbidden
+      operationLookups, replays, streams, handoffCreates, handoffReads,
+      handoffConsumes, handoffAcknowledgements, projectCreates, projectPuts, authorityViolations
     };
+    const native = runDesktopRuntimeProbe(executable);
     evidence.runtime = {
       consoleErrors: runtimeErrors.consoleErrors, pageErrors: runtimeErrors.pageErrors,
-      requestFailures: runtimeErrors.requestFailures, horizontalOverflow: overflow,
-      dpi: await readBrowserDpiEvidence(page, context), native: runDesktopRuntimeProbe(executable)
+      requestFailures: runtimeErrors.requestFailures, httpFailures, horizontalOverflow: overflow,
+      dpi: await readBrowserDpiEvidence(page, context), native
     };
+    evidence.runtime.hostShutdown = await coordinateDesktopHostShutdown(
+      browser,
+      native.desktop.processId);
+    browser = null;
     evidence.status = 'PASS';
     evidence.capturedAtUtc = new Date().toISOString();
-    writeJsonEvidence(evidenceDirectory, `studio-ui-webview2-f06-${runName}.json`, evidence);
+    writeJsonEvidence(evidenceDirectory, `studio-ui-webview2-f06-g4-${runName}.json`, evidence);
+    fs.writeFileSync(
+      requiredEnvironment('CV_NODE_COMPLETION_SIGNAL'),
+      `${JSON.stringify({ status: 'PASS', capturedAtUtc: evidence.capturedAtUtc })}\n`,
+      'utf8');
   } catch (error) {
     evidence.status = 'FAIL';
     evidence.error = error?.stack || error?.message || String(error);
     evidence.runtime = {
       ownerPhase: page ? await page.locator('[data-ai-owner-phase]').getAttribute('data-ai-owner-phase').catch(() => null) : null,
+      pageUrl: page?.url() ?? null,
+      startupFlags: page ? await page.evaluate(() => window.__CLEARVISION_STARTUP__?.featureFlags ?? null).catch(() => null) : null,
+      workspaceAttributes: page ? await page.locator('[data-capability="project-workspace"]').evaluate(element =>
+        Object.fromEntries([...element.attributes].map(attribute => [attribute.name, attribute.value]))
+      ).catch(() => null) : null,
       consoleErrors: runtimeErrors?.consoleErrors ?? [],
       pageErrors: runtimeErrors?.pageErrors ?? [],
       requestFailures: runtimeErrors?.requestFailures ?? [],
@@ -342,13 +487,14 @@ async function main() {
         method: item.method,
         path: new URL(item.url).pathname + new URL(item.url).search
       })) ?? [],
-      apiResponses
+      apiResponses,
+      httpFailures
     };
     evidence.capturedAtUtc = new Date().toISOString();
-    writeJsonEvidence(evidenceDirectory, `studio-ui-webview2-f06-${runName}.json`, evidence);
+    writeJsonEvidence(evidenceDirectory, `studio-ui-webview2-f06-g4-${runName}.json`, evidence);
     throw error;
   } finally {
-    if (browser) await browser.close();
+    if (browser?.isConnected()) await browser.close();
   }
 }
 

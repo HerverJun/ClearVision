@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef, watch, type WatchStopHandle } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useProductRuntime } from '@/app/productRuntime';
 import { CvPageHeader, CvPageState } from '@/design-system/patterns';
 import { CvInlineAlert, CvStatusBadge } from '@/design-system/primitives';
 import AiClarificationPanel from './AiClarificationPanel.vue';
 import AiBuildProgress from './AiBuildProgress.vue';
 import AiBuildWorkspace from './AiBuildWorkspace.vue';
+import AiApplyPreview from './AiApplyPreview.vue';
 import AiPendingParametersPanel from './AiPendingParametersPanel.vue';
 import AiResourceDecisionPanel from './AiResourceDecisionPanel.vue';
 import AiPlanProgress from './AiPlanProgress.vue';
@@ -21,6 +22,7 @@ import { projectAiWorkbench } from './projection';
 import { initialAiWorkbenchState } from './reducer';
 
 const route = useRoute();
+const router = useRouter();
 const runtime = useProductRuntime();
 const owner = shallowRef<AiSessionOwner | null>(null);
 let stopRouteWatch: WatchStopHandle | null = null;
@@ -40,6 +42,9 @@ const showBuildProgress = computed(() => state.value.run.kind === 'build' && [
   'build-starting', 'building', 'validating', 'build-cancelling', 'recovering'
 ].includes(state.value.phase));
 const buildReadonly = computed(() => state.value.buildStale || ['build-failed', 'build-cancelled'].includes(state.value.phase));
+const showApplyPreview = computed(() => state.value.build !== null && [
+  'build-ready', 'handoff-creating', 'handoff-unknown-outcome', 'handoff-created'
+].includes(state.value.phase));
 
 function replaceOwner(): void {
   owner.value?.dispose();
@@ -50,6 +55,28 @@ function replaceOwner(): void {
   });
   owner.value = next;
   void next.start();
+}
+
+async function handoffAndOpenWorkspace(reconcile: boolean): Promise<void> {
+  const current = owner.value;
+  if (!current) return;
+  const artifact = reconcile
+    ? await current.reconcileHandoff()
+    : await current.prepareHandoff();
+  if (!artifact || owner.value !== current) return;
+  const targetId = artifact.targetKind === 'new' ? 'new' : artifact.projectBaseline.projectId;
+  if (!targetId) return;
+  current.dispose();
+  owner.value = null;
+  const released = current.diagnostics();
+  if (released.requestCount || released.streamCount || released.timerCount || released.subscriptionCount) {
+    throw new Error('AI owner resources were not released before Workspace navigation.');
+  }
+  await router.push({
+    name: 'project-workspace',
+    params: { id: targetId },
+    query: { handoff: artifact.artifactId }
+  });
 }
 
 function handleAction(actionId: AiWorkbenchActionId): void {
@@ -64,6 +91,8 @@ function handleAction(actionId: AiWorkbenchActionId): void {
   if (actionId === 'rebuild') void current.rebuild();
   if (actionId === 'previewReadiness') void current.previewReadiness();
   if (actionId === 'reconcile') void current.reconcile();
+  if (actionId === 'prepareHandoff') void handoffAndOpenWorkspace(false);
+  if (actionId === 'reconcileHandoff') void handoffAndOpenWorkspace(true);
   if (actionId === 'startNewTask') current.startNewTask();
 }
 
@@ -159,10 +188,16 @@ onUnmounted(() => {
           class="ai-workbench-page__workspace"
         >
           <AiBuildWorkspace
-            v-if="state.build"
+            v-if="state.build && !showApplyPreview"
             :build="state.build"
             :stale="buildReadonly"
             :diagnostics="state.replayDiagnostics"
+          />
+          <AiApplyPreview
+            v-else-if="state.build && showApplyPreview"
+            :build="state.build"
+            :project="state.project"
+            :stale="buildReadonly"
           />
           <AiPlanWorkspace
             v-else-if="state.plan"

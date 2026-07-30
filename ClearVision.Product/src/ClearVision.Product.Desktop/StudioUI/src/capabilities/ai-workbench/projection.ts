@@ -111,7 +111,19 @@ export function projectAiWorkbench(state: AiWorkbenchState): AiWorkbenchProjecti
     case 'build-ready':
       return Object.freeze({ ...base, statusLabel: '候选已就绪', statusTone: 'ok', currentStage: '候选具备交接条件',
         stageDescription: '结构校验、运行预演和当前输入条件已通过。', blockerCount: 0,
-        nextHint: '下一阶段将交接到工作区审核；本轮不执行交接、保存或 Canvas 写入。', busy: false });
+        nextHint: '可交接到工作区审核；交接不会自动保存或运行。', busy: false });
+    case 'handoff-creating':
+      return Object.freeze({ ...base, statusLabel: '正在创建交接', statusTone: 'info', currentStage: '创建候选交接',
+        stageDescription: state.message, blockerCount: 0,
+        nextHint: '服务端确认后将先释放 AI owner，再进入工作区。', busy: true });
+    case 'handoff-unknown-outcome':
+      return Object.freeze({ ...base, statusLabel: '交接结果待确认', statusTone: 'warning', currentStage: '查询交接结果',
+        stageDescription: state.message, blockerCount: 0,
+        nextHint: '按当前 Build 查询已有工件，禁止盲目重复创建。', busy: false });
+    case 'handoff-created':
+      return Object.freeze({ ...base, statusLabel: '交接已创建', statusTone: 'ok', currentStage: '释放 AI 工作台',
+        stageDescription: state.message, blockerCount: 0,
+        nextHint: 'Workspace owner 挂载后将独立获取并校验候选。', busy: true });
     case 'build-failed':
       return Object.freeze({ ...base, statusLabel: '构建失败', statusTone: 'error', currentStage: '构建未完成',
         stageDescription: state.message || '服务端没有产生新的可操作候选。',

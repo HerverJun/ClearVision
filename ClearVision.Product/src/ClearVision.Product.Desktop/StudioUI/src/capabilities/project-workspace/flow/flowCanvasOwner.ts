@@ -23,10 +23,10 @@ import type { OperatorCatalogItem } from '@/capabilities/operators-read/operator
 import type { OperatorParameter } from '@/capabilities/operators-read/operatorContracts';
 import {
   encodeWorkspaceDecisionConfigurationV1,
+  type WorkspaceCanvasProjectV1,
   type WorkspaceDecisionConfigurationV1,
   type WorkspaceFlowV1,
-  type WorkspaceJsonValue,
-  type WorkspaceProjectV1
+  type WorkspaceJsonValue
 } from '../workspaceContracts';
 import type {
   WorkspaceFlowCanvasDiagnosticsLease,
@@ -57,7 +57,7 @@ export interface OperatorCatalogProjection {
 
 export interface FlowCanvasOwnerProjection {
   readonly phase: FlowCanvasOwnerPhase;
-  readonly projectId: string;
+  readonly projectId: string | null;
   readonly mutationGate: FlowMutationGate;
   readonly draft: CanonicalFlowDraft;
   readonly runtime: CanonicalCanvasRuntimeSnapshot | null;
@@ -126,7 +126,7 @@ export interface FlowCaliperSearchRegionPatch {
 }
 
 export interface FlowCanvasOwner {
-  readonly projectId: string;
+  readonly projectId: string | null;
   readonly projection: DeepReadonly<FlowCanvasOwnerProjection>;
   readonly commands: FlowCanvasCommands;
   mountCanvas(options: FlowCanvasMountOptions): void;
@@ -295,16 +295,21 @@ function zeroResources(): WorkspaceResourceSnapshot {
 }
 
 export function createFlowCanvasOwner(options: {
-  readonly project: WorkspaceProjectV1;
+  readonly project: WorkspaceCanvasProjectV1;
+  readonly diagnosticsKey?: string;
   readonly queries: ReadQueryClient;
   readonly api: ApiTransport;
   readonly featureFlags: Readonly<Record<string, boolean>>;
   readonly diagnostics: WorkspaceLifecycleDiagnosticsOwner;
   readonly initialMutationGate?: FlowMutationGate;
 }): FlowCanvasOwner {
+  const diagnosticsKey = options.project.id ?? options.diagnosticsKey;
+  if (!diagnosticsKey?.trim()) {
+    throw new Error('An unsaved FlowCanvas owner requires a diagnostics key.');
+  }
   const catalogQuery = createOperatorCatalogQuery(options.queries);
   const diagnosticsLease: WorkspaceFlowCanvasDiagnosticsLease =
-    options.diagnostics.reserveFlowCanvas(options.project.id);
+    options.diagnostics.reserveFlowCanvas(diagnosticsKey);
   const canvasFlow = toCanvasFlow(options.project.flow, options.project.name);
   const state = reactive<MutableProjection>({
     phase: 'idle',
@@ -481,16 +486,20 @@ export function createFlowCanvasOwner(options: {
     commands,
     openInspector(): InspectorOwner {
       assertActive();
-      if (inspectorOwner) throw new Error(`Inspector owner already exists for project ${options.project.id}.`);
+      if (inspectorOwner) throw new Error(`Inspector owner already exists for ${diagnosticsKey}.`);
       inspectorOwner = createInspectorOwner({
         project: options.project,
         flowOwner: owner,
-        diagnostics: options.diagnostics
+        diagnostics: options.diagnostics,
+        diagnosticsKey
       });
       return inspectorOwner;
     },
     openCameraBindingEditor(): CameraBindingEditorOwner {
       assertActive();
+      if (!options.project.id) {
+        throw new Error('Camera binding requires a persisted Project authority.');
+      }
       if (cameraBindingEditorOwner) {
         throw new Error(`Camera binding editor owner already exists for project ${options.project.id}.`);
       }
@@ -503,6 +512,9 @@ export function createFlowCanvasOwner(options: {
     },
     openPreviewWorkbench(openedInspector: InspectorOwner): PreviewWorkbenchOwner {
       assertActive();
+      if (!options.project.id) {
+        throw new Error('Preview execution requires a persisted Project authority.');
+      }
       if (openedInspector !== inspectorOwner) {
         throw new Error('Preview workbench requires the Flow owner\'s active Inspector owner.');
       }
@@ -525,7 +537,7 @@ export function createFlowCanvasOwner(options: {
     },
     mountCanvas(mountOptions: FlowCanvasMountOptions): void {
       assertActive();
-      if (host) throw new FlowCanvasOwnerConflictError(options.project.id);
+      if (host) throw new FlowCanvasOwnerConflictError(diagnosticsKey);
       try {
         host = createCanonicalFlowCanvasHost({
           canvasId: mountOptions.canvasId,
