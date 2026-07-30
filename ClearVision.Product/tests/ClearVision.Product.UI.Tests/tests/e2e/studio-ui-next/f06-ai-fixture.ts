@@ -228,7 +228,7 @@ function buildParameter(confirmed: boolean) {
     valueSummary: confirmed ? '128' : '128（建议）', source: confirmed ? 'user_confirmed_parameter' : 'suggested',
     pending: !confirmed, impact: '影响划伤和压痕边界。', suggestedReason: '依据当前样本对比度给出。',
     defaultValue: 128, minValue: 0, maxValue: 255, options: [], requiredPolicy: 'required',
-    atLeastOneGroup: '', mutuallyExclusiveGroup: '', requiredWhen: [], enabledWhen: [],
+    atLeastOneGroup: '', mutuallyExclusiveGroup: '', requiredWhen: null, enabledWhen: null, disabledWhen: null,
     resourceKind: '', resourceCanonicalId: '', resourceDependent: false
   };
 }
@@ -441,10 +441,9 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
         body: `id: 1\nevent: run.completed\ndata: ${JSON.stringify(terminal)}\n\n`
       });
     }
-    if (url.pathname === '/api/cameras/bindings') return json(200, [{
+    if (url.pathname === '/api/ai/resource-candidates/camera-bindings') return json(200, [{
       id: '55555555-5555-4555-8555-555555555555', displayName: '顶视检测相机 A',
-      deviceId: 'camera-a', manufacturer: 'ClearVision', modelName: 'CV-Line', triggerMode: 'software',
-      isEnabled: true, connectionStatus: 'connected'
+      isEnabled: true
     }]);
     if (url.pathname === `/api/ai/agent-runs/${f06BuildRunId}/revalidate`) {
       const parameterConfirmed = Object.prototype.hasOwnProperty.call(
@@ -462,7 +461,26 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
     }
     if (url.pathname === `/api/ai/sessions/${f06SessionId}/workspace-snapshot`) {
       const mutation = body as Record<string, unknown>;
-      snapshot = { ...snapshot, ...mutation, revision: Number(snapshot.revision) + 1, updatedAtUtc: timestamp };
+      const selections = Array.isArray(mutation.resourceDecisions)
+        ? mutation.resourceDecisions as Array<Record<string, unknown>>
+        : null;
+      const canonicalDecisions = selections?.map(selection => ({
+        canonicalId: String(selection.canonicalId), status: 'bound',
+        resourceKey: String(selection.resourceKey), resourceType: 'camera_binding',
+        operatorKey: 'imageacquisition#1', operatorId: 'acquire_1',
+        operatorType: 'ImageAcquisition', operatorIndex: 0, parameterName: 'CameraBindingId',
+        valueSummary: '顶视检测相机 A', source: 'camera_binding_authority'
+      }));
+      snapshot = {
+        ...snapshot,
+        ...mutation,
+        ...(canonicalDecisions ? {
+          resourceDecisions: canonicalDecisions,
+          resourceRevision: Number(snapshot.resourceRevision) + 1
+        } : {}),
+        revision: Number(snapshot.revision) + 1,
+        updatedAtUtc: timestamp
+      };
       delete (snapshot as Record<string, unknown>).expectedRevision;
       delete (snapshot as Record<string, unknown>).clientMutationId;
       return json(200, { snapshot });
