@@ -133,18 +133,7 @@ public class ImageAcquisitionOperator : OperatorBase
                 return OperatorExecutionOutput.Failure($"图像文件不存在: {filePath}");
             }
 
-            var mat = Cv2.ImRead(filePath, ImreadModes.Color);
-            if (mat.Empty())
-            {
-                return OperatorExecutionOutput.Failure("无法加载图像文件，格式可能不受支持");
-            }
-
-            return OperatorExecutionOutput.Success(CreateImageOutput(mat, new Dictionary<string, object>
-            {
-                { "Channels", mat.Channels() },
-                { "Source", "file" },
-                { "FilePath", filePath }
-            }));
+            return await LoadFileImageAsync(filePath, cancellationToken);
         }
 
         if (isCameraSource)
@@ -292,6 +281,52 @@ public class ImageAcquisitionOperator : OperatorBase
         }
 
         return normalized;
+    }
+
+    private async Task<OperatorExecutionOutput> LoadFileImageAsync(
+        string filePath,
+        CancellationToken cancellationToken)
+    {
+        byte[] encodedImage;
+        try
+        {
+            encodedImage = await File.ReadAllBytesAsync(filePath, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return OperatorExecutionOutput.Failure($"无法读取图像文件: {ex.Message}");
+        }
+
+        Mat? mat = null;
+        try
+        {
+            mat = Cv2.ImDecode(encodedImage, ImreadModes.Color);
+            if (mat == null || mat.Empty())
+            {
+                return OperatorExecutionOutput.Failure("无法加载图像文件，格式可能不受支持");
+            }
+
+            var output = OperatorExecutionOutput.Success(CreateImageOutput(mat, new Dictionary<string, object>
+            {
+                { "Channels", mat.Channels() },
+                { "Source", "file" },
+                { "FilePath", filePath }
+            }));
+            mat = null;
+            return output;
+        }
+        catch (Exception ex)
+        {
+            return OperatorExecutionOutput.Failure($"无法解码图像文件: {ex.Message}");
+        }
+        finally
+        {
+            mat?.Dispose();
+        }
     }
 
     private static string? TryGetStringInput(Dictionary<string, object>? inputs, string key)

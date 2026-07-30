@@ -56,7 +56,7 @@ public class ImageAcquisitionOperatorTests
     public async Task ExecuteAsync_WithUnicodeFilePath_ShouldLoadImage()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"ClearVision-图像采集-{Guid.NewGuid():N}");
-        var filePath = Path.Combine(directory, "菠萝苑LOGO样张.png");
+        var filePath = Path.Combine(directory, "菠萝苑 LOGO 样张.png");
         Directory.CreateDirectory(directory);
 
         try
@@ -72,9 +72,10 @@ public class ImageAcquisitionOperatorTests
 
             result.IsSuccess.Should().BeTrue(result.ErrorMessage);
             result.OutputData.Should().NotBeNull();
-            result.OutputData!["Image"].Should().BeOfType<ImageWrapper>();
+            using var image = result.OutputData!["Image"].Should().BeOfType<ImageWrapper>().Subject;
             result.OutputData["Width"].Should().Be(15);
             result.OutputData["Height"].Should().Be(9);
+            result.OutputData["Channels"].Should().Be(3);
             result.OutputData["Source"].Should().Be("file");
             result.OutputData["FilePath"].Should().Be(filePath);
         }
@@ -107,8 +108,10 @@ public class ImageAcquisitionOperatorTests
 
             result.IsSuccess.Should().BeTrue(result.ErrorMessage);
             result.OutputData.Should().NotBeNull();
+            using var image = result.OutputData!["Image"].Should().BeOfType<ImageWrapper>().Subject;
             result.OutputData!["Width"].Should().Be(10);
             result.OutputData["Height"].Should().Be(6);
+            result.OutputData["Channels"].Should().Be(3);
             result.OutputData["Source"].Should().Be("file");
             result.OutputData["FilePath"].Should().Be(filePath);
         }
@@ -117,6 +120,71 @@ public class ImageAcquisitionOperatorTests
             if (Directory.Exists(directory))
             {
                 Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithAsciiFilePath_ShouldLoadImageAndReleaseOutput()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"clearvision-acquisition-{Guid.NewGuid():N}.png");
+
+        try
+        {
+            using var source = new Mat(8, 12, MatType.CV_8UC3, new Scalar(20, 80, 160));
+            File.WriteAllBytes(filePath, source.ToBytes(".png"));
+
+            var op = CreateTestOperator();
+            op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "File"));
+            op.AddParameter(new Parameter(Guid.NewGuid(), "FilePath", "FilePath", string.Empty, "file", filePath));
+
+            var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>());
+
+            result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+            result.OutputData.Should().NotBeNull();
+            var image = result.OutputData!["Image"].Should().BeOfType<ImageWrapper>().Subject;
+            result.OutputData["Width"].Should().Be(12);
+            result.OutputData["Height"].Should().Be(8);
+            result.OutputData["Channels"].Should().Be(3);
+            result.OutputData["Source"].Should().Be("file");
+            result.OutputData["FilePath"].Should().Be(filePath);
+
+            image.Dispose();
+            Action readDisposedImage = () => _ = image.Width;
+            readDisposedImage.Should().Throw<ObjectDisposedException>();
+        }
+        finally
+        {
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithUndecodableFile_ShouldReturnControlledFailure()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"clearvision-invalid-image-{Guid.NewGuid():N}.png");
+
+        try
+        {
+            await File.WriteAllTextAsync(filePath, "not an encoded image");
+            var op = CreateTestOperator();
+            op.AddParameter(new Parameter(Guid.NewGuid(), "SourceType", "SourceType", string.Empty, "enum", "File"));
+            op.AddParameter(new Parameter(Guid.NewGuid(), "FilePath", "FilePath", string.Empty, "file", filePath));
+
+            var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>());
+
+            result.IsSuccess.Should().BeFalse();
+            result.ErrorMessage.Should().Be("无法加载图像文件，格式可能不受支持");
+            result.OutputData.Should().BeNull();
+        }
+        finally
+        {
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
             }
         }
     }
