@@ -1,10 +1,10 @@
 ﻿# Vision Agent Executable Business Benchmark
 
 - Benchmark: `vision_agent_executable_business_benchmark`
-- Generated UTC: `2026-06-14T09:23:58.3753856+00:00`
-- Commit SHA: `local`
-- Branch: `local`
-- Workflow run: `local` attempt `local`
+- Generated UTC: `2026-07-30T16:52:25.9744873+00:00`
+- Commit SHA: `5887387c0f9bc03489df994adbda5b0f2f6b039d`
+- Branch: `t01-g01a-r1`
+- Workflow run: `local-r2-quality` attempt `1`
 - Mode: `offline_metadata_only`
 - Cases: 120
 - Accepted: True
@@ -25,8 +25,17 @@
 | structuralValidationPassRate | 98.33% | 90.00% | True |
 | dryRunPassRate | 97.50% | 85.00% | True |
 | previewReadyRate | 95.65% | 70.00% | True |
-| parameterCompletionRate | 75.00% | 70.00% | True |
+| parameterCompletionRate | 76.67% | 70.00% | True |
 | userApplicableRate | 98.33% | 90.00% | True |
+
+## Resource Semantics
+
+- Ready cases: 92
+- Ready cases parameter-complete: 92
+- Intentional missing-resource cases: 28
+- Intentional missing-resource cases still blocked: 28
+- Ready flows use canonical CameraId parameters and stable resource identities.
+- Intentional missing-resource flows do not receive confirmations for the missing identity.
 
 ## Task Set
 

@@ -1,7 +1,9 @@
 using System.Text.Encodings.Web;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ClearVision.Product.Core.AI.Tools;
+using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.Tools;
 
@@ -11,6 +13,7 @@ options.Output.Directory?.Create();
 options.Report.Directory?.Create();
 await WriteAllTextWithRetryAsync(options.Output.FullName, JsonSerializer.Serialize(result, VisionAgentBusinessBenchmark.JsonOptions) + Environment.NewLine);
 await WriteAllTextWithRetryAsync(options.Report.FullName, VisionAgentBusinessBenchmarkMarkdown.Create(result, options.Output), Encoding.UTF8);
+await VerifyWrittenArtifactsAsync(options, result);
 Console.WriteLine($"wrote {VisionAgentBusinessBenchmark.RepoRelative(options.Output)}");
 Console.WriteLine($"wrote {VisionAgentBusinessBenchmark.RepoRelative(options.Report)}");
 return result.Summary.Accepted ? 0 : 1;
@@ -40,8 +43,30 @@ static async Task WriteAllTextWithRetryAsync(string path, string contents, Encod
     }
 }
 
+static async Task VerifyWrittenArtifactsAsync(RunnerOptions options, BenchmarkDocument result)
+{
+    using var json = JsonDocument.Parse(await File.ReadAllTextAsync(options.Output.FullName));
+    var root = json.RootElement;
+    if (root.GetProperty("generatedAtUtc").GetString() != result.GeneratedAtUtc ||
+        root.GetProperty("summary").GetProperty("caseCount").GetInt32() != result.Summary.CaseCount)
+    {
+        throw new InvalidOperationException("Benchmark JSON is not the artifact produced by the current run.");
+    }
+
+    var markdown = await File.ReadAllTextAsync(options.Report.FullName, Encoding.UTF8);
+    if (!markdown.Contains($"Generated UTC: `{result.GeneratedAtUtc}`", StringComparison.Ordinal) ||
+        !markdown.Contains($"Commit SHA: `{result.WorkflowRun.CommitSha}`", StringComparison.Ordinal) ||
+        !markdown.Contains($"Cases: {result.Summary.CaseCount}", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("Benchmark Markdown is not bound to the current JSON run metadata.");
+    }
+}
+
 internal static class VisionAgentBusinessBenchmark
 {
+    private const int ExpectedCaseCount = 120;
+    private const int ExpectedIntentionalMissingCaseCount = 28;
+
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
@@ -69,6 +94,7 @@ internal static class VisionAgentBusinessBenchmark
             .Select(item => item.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var cases = CreateCases();
+        ValidateDatasetInvariants(cases);
         var invalidToolCases = cases
             .SelectMany(item => item.ExpectedToolCalls
                 .Where(tool => !knownToolNames.Contains(tool))
@@ -87,6 +113,8 @@ internal static class VisionAgentBusinessBenchmark
             results.Add(await RunCaseAsync(registry, benchmarkCase, cancellationToken));
         }
 
+        ValidateExecutionInvariants(cases, results);
+
         var metrics = BuildMetrics(results);
         var thresholdResults = Thresholds.ToDictionary(
             item => item.Key,
@@ -100,6 +128,21 @@ internal static class VisionAgentBusinessBenchmark
                        thresholdResults.Values.All(item => item.Passed) &&
                        safety.Violations.Count == 0;
         var workflowRun = VisionAgentWorkflowRunMetadata.FromEnvironment();
+        var readyCaseIds = cases
+            .Where(item => item.ShouldBeResourceComplete)
+            .Select(item => item.CaseId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var intentionalMissingCaseIds = cases
+            .Where(item => !item.ShouldBeResourceComplete)
+            .Select(item => item.CaseId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var resourceSummary = new BenchmarkResourceSummary(
+            readyCaseIds.Count,
+            results.Count(item => readyCaseIds.Contains(item.CaseId) && item.Metrics.ParametersComplete),
+            intentionalMissingCaseIds.Count,
+            results.Count(item =>
+                intentionalMissingCaseIds.Contains(item.CaseId) &&
+                ReadBool(item.ActualPrecheckResult, "readyForDeployment") == false));
 
         return new BenchmarkDocument(
             "2026-06-05.vision-agent-executable-business-benchmark.v1",
@@ -122,6 +165,7 @@ internal static class VisionAgentBusinessBenchmark
                 .GroupBy(item => item.TaskType)
                 .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(group => group.Key, group => group.Count()),
+            resourceSummary,
             safety,
             results);
     }
@@ -137,6 +181,7 @@ internal static class VisionAgentBusinessBenchmark
         VisionAgentToolResult? precheckResult = null;
         VisionAgentToolResult? runtimePreviewResult = null;
         VisionAgentToolResult? captureResult = null;
+        var manualResourceConfirmations = ManualConfirmationsFor(benchmarkCase.Flow);
 
         var context = new VisionAgentToolContext
         {
@@ -161,7 +206,8 @@ internal static class VisionAgentBusinessBenchmark
                 toolName,
                 validationResult,
                 dryRunResult,
-                captureResult);
+                captureResult,
+                manualResourceConfirmations);
             var result = await registry.ExecuteAsync(toolName, context, arguments, cancellationToken);
             actualToolCalls.Add(new BenchmarkToolCallResult(
                 toolName,
@@ -245,6 +291,11 @@ internal static class VisionAgentBusinessBenchmark
             benchmarkCase.Category,
             benchmarkCase.TaskType,
             benchmarkCase.UserRequest,
+            benchmarkCase.ExpectedPrecheckReady,
+            benchmarkCase.ExpectedRuntimePreviewReady,
+            benchmarkCase.Flow,
+            manualResourceConfirmations,
+            benchmarkCase.ShouldBeResourceComplete,
             benchmarkCase.ExpectedBusinessActions,
             benchmarkCase.ExpectedToolCalls,
             actualToolCalls,
@@ -262,7 +313,8 @@ internal static class VisionAgentBusinessBenchmark
         string toolName,
         VisionAgentToolResult? validationResult,
         VisionAgentToolResult? dryRunResult,
-        VisionAgentToolResult? captureResult)
+        VisionAgentToolResult? captureResult,
+        IReadOnlyList<BenchmarkManualResourceConfirmation> manualResourceConfirmations)
     {
         if (string.Equals(toolName, "match_flow_template", StringComparison.OrdinalIgnoreCase))
         {
@@ -315,7 +367,7 @@ internal static class VisionAgentBusinessBenchmark
             {
                 ["flow"] = benchmarkCase.Flow,
                 ["validationSummary"] = validationResult?.Data,
-                ["manualResourceConfirmations"] = ManualConfirmationsFor(benchmarkCase.Flow),
+                ["manualResourceConfirmations"] = manualResourceConfirmations,
                 ["targetStationId"] = benchmarkCase.TargetStationId
             };
             if (dryRunResult?.Data != null)
@@ -357,9 +409,24 @@ internal static class VisionAgentBusinessBenchmark
                 {
                     enabled = true,
                     mode = RuntimePreviewModes.MetadataOnly,
-                    allowedCameraBindingIds = new[] { benchmarkCase.CameraBindingId },
-                    allowedTemplateIds = new[] { "template-a", "catalog-template-a", "catalog-template-b" },
-                    allowedModelIds = new[] { "model-a", "model-catalog-a" },
+                    allowedCameraBindingIds = benchmarkCase.Flow.Operators
+                        .Where(op => IsOperatorType(op, "ImageAcquisition"))
+                        .Select(op => ReadParameter(op, "CameraId"))
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray(),
+                    allowedTemplateIds = benchmarkCase.Flow.Operators
+                        .Where(op => IsOperatorType(op, "TemplateMatching"))
+                        .Select(op => ReadParameter(op, "TemplateId"))
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray(),
+                    allowedModelIds = benchmarkCase.Flow.Operators
+                        .Where(op => IsDeepLearningOperator(op.OperatorType))
+                        .Select(op => ReadParameter(op, "ModelId"))
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray(),
                     allowedFlowIds = Array.Empty<string>(),
                     allowedResourceRoots = Array.Empty<string>(),
                     fallbackToOffline = true,
@@ -523,6 +590,149 @@ internal static class VisionAgentBusinessBenchmark
         }
 
         return 0;
+    }
+
+    private static void ValidateDatasetInvariants(IReadOnlyList<BenchmarkCase> cases)
+    {
+        if (cases.Count != ExpectedCaseCount ||
+            cases.Select(item => item.CaseId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != ExpectedCaseCount)
+        {
+            throw new InvalidOperationException($"Benchmark dataset must contain exactly {ExpectedCaseCount} unique cases.");
+        }
+
+        var intentionalMissingCases = cases.Where(item => !item.ShouldBeResourceComplete).ToList();
+        if (intentionalMissingCases.Count != ExpectedIntentionalMissingCaseCount)
+        {
+            throw new InvalidOperationException(
+                $"Intentional missing-resource case count changed from {ExpectedIntentionalMissingCaseCount} to {intentionalMissingCases.Count}.");
+        }
+
+        foreach (var benchmarkCase in cases)
+        {
+            var deprecatedAliases = benchmarkCase.Flow.Operators
+                .SelectMany(op => op.Parameters.Keys.Select(parameter => $"{op.TempId}.{parameter}"))
+                .Where(parameter =>
+                    parameter.EndsWith(".CameraBindingId", StringComparison.OrdinalIgnoreCase) ||
+                    parameter.EndsWith(".cameraId", StringComparison.Ordinal) ||
+                    parameter.EndsWith(".sourceType", StringComparison.Ordinal))
+                .ToList();
+            if (deprecatedAliases.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"{benchmarkCase.CaseId} uses deprecated ImageAcquisition aliases: {string.Join(", ", deprecatedAliases)}");
+            }
+
+            var confirmations = ManualConfirmationsFor(benchmarkCase.Flow);
+            var confirmationIds = confirmations
+                .Select(item => item.CanonicalId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!benchmarkCase.ShouldBeResourceComplete)
+            {
+                if (benchmarkCase.ExpectedPrecheckReady != false)
+                {
+                    throw new InvalidOperationException(
+                        $"{benchmarkCase.CaseId} is intentionally missing resources but does not expect precheck blocking.");
+                }
+
+                var injectedMissingConfirmation = benchmarkCase.Flow.IntentionallyMissingResources
+                    .FirstOrDefault(item => confirmationIds.Contains(item.CanonicalId));
+                if (injectedMissingConfirmation != null)
+                {
+                    throw new InvalidOperationException(
+                        $"{benchmarkCase.CaseId} injects a confirmation for missing resource {injectedMissingConfirmation.CanonicalId}.");
+                }
+
+                continue;
+            }
+
+            foreach (var requiredIdentity in RequiredConfirmationIdentitiesFor(benchmarkCase.Flow))
+            {
+                if (!confirmationIds.Contains(requiredIdentity.CanonicalId))
+                {
+                    throw new InvalidOperationException(
+                        $"{benchmarkCase.CaseId} lacks a canonical confirmation for {requiredIdentity.CanonicalId}.");
+                }
+            }
+        }
+    }
+
+    private static void ValidateExecutionInvariants(
+        IReadOnlyList<BenchmarkCase> cases,
+        IReadOnlyList<ExecutableBenchmarkCaseResult> results)
+    {
+        var casesById = cases.ToDictionary(item => item.CaseId, StringComparer.OrdinalIgnoreCase);
+        foreach (var result in results)
+        {
+            var benchmarkCase = casesById[result.CaseId];
+            var validationIdentities = MissingResourceIdentities(result.ActualValidationResult, benchmarkCase.Flow);
+            var precheckIdentities = MissingResourceIdentities(result.ActualPrecheckResult, benchmarkCase.Flow);
+
+            foreach (var validationIdentity in validationIdentities)
+            {
+                var matchingPrecheck = precheckIdentities.FirstOrDefault(item =>
+                    string.Equals(item.ContractResourceType, validationIdentity.ContractResourceType, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(item.OperatorId, validationIdentity.OperatorId, StringComparison.OrdinalIgnoreCase));
+                if (matchingPrecheck != null &&
+                    !string.Equals(matchingPrecheck.CanonicalId, validationIdentity.CanonicalId, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"{result.CaseId} resource identity drifted between validation and precheck: " +
+                        $"{validationIdentity.CanonicalId} != {matchingPrecheck.CanonicalId}.");
+                }
+            }
+
+            if (benchmarkCase.ShouldBeResourceComplete)
+            {
+                if (!result.Metrics.ParametersComplete)
+                {
+                    throw new InvalidOperationException(
+                        $"{result.CaseId} is a ready case but still has unresolved canonical resources.");
+                }
+
+                continue;
+            }
+
+            if (ReadBool(result.ActualPrecheckResult, "readyForDeployment") != false)
+            {
+                throw new InvalidOperationException(
+                    $"{result.CaseId} is intentionally missing resources but precheck did not remain blocked.");
+            }
+
+            var observedIds = validationIdentities
+                .Concat(precheckIdentities)
+                .Select(item => item.CanonicalId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var expectedMissing in benchmarkCase.Flow.IntentionallyMissingResources)
+            {
+                if (!observedIds.Contains(expectedMissing.CanonicalId))
+                {
+                    throw new InvalidOperationException(
+                        $"{result.CaseId} did not expose intentional missing resource {expectedMissing.CanonicalId}.");
+                }
+            }
+        }
+    }
+
+    private static IReadOnlyList<BenchmarkResourceIdentity> MissingResourceIdentities(
+        JsonElement? element,
+        BenchmarkFlow flow)
+    {
+        if (element == null ||
+            element.Value.ValueKind != JsonValueKind.Object ||
+            !element.Value.TryGetProperty("missingResources", out var resources) ||
+            resources.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        return resources.EnumerateArray()
+            .Where(item => item.ValueKind == JsonValueKind.Object)
+            .Select(item => ResourceIdentityFor(
+                flow,
+                ReadString(item, "resourceKind") ?? ReadString(item, "resourceType") ?? "resource",
+                ReadString(item, "tempId") ?? string.Empty,
+                ReadString(item, "parameterName") ?? "resource"))
+            .ToList();
     }
 
     private static double Rate(int numerator, int denominator)
@@ -774,12 +984,19 @@ internal static class VisionAgentBusinessBenchmark
         bool? expectedPrecheckReady = true,
         bool? expectedRuntimePreviewReady = null)
     {
-        var effectiveCameraBindingId = cameraBindingId ?? "mock-camera-binding";
+        var effectiveCameraBindingId = cameraBindingId ?? "benchmark-camera-primary";
         var normalizedFlow = NormalizeExecutableFlow(
             flow,
             expectedStructurallyValid,
             expectedPrecheckReady,
             effectiveCameraBindingId);
+        var entryOperatorTempId = expectedStructurallyValid &&
+                                  normalizedFlow.Operators.Count(op => IsOperatorType(op, "ImageAcquisition")) > 1
+            ? normalizedFlow.Operators.First(op =>
+                IsOperatorType(op, "ImageAcquisition") &&
+                string.Equals(ReadParameter(op, "SourceType"), "Camera", StringComparison.OrdinalIgnoreCase)).TempId
+            : null;
+        normalizedFlow = normalizedFlow with { EntryOperatorTempId = entryOperatorTempId };
         return new BenchmarkCase
         {
             CaseId = caseId,
@@ -796,7 +1013,9 @@ internal static class VisionAgentBusinessBenchmark
                 ? null
                 : NormalizeExecutableFlow(existingFlow, expectedStructurallyValid: true, expectedPrecheckReady: true, effectiveCameraBindingId),
             TargetStationId = targetStationId,
-            CameraBindingId = cameraBindingId ?? "mock-camera-binding",
+            EntryOperatorTempId = entryOperatorTempId,
+            CameraBindingId = ReadCameraId(normalizedFlow) ?? effectiveCameraBindingId,
+            ShouldBeResourceComplete = normalizedFlow.IntentionallyMissingResources.Count == 0,
             ExpectedStructurallyValid = expectedStructurallyValid,
             ExpectsDryRun = expectsDryRun,
             ExpectedDryRunSucceeded = expectedDryRunSucceeded,
@@ -814,149 +1033,105 @@ internal static class VisionAgentBusinessBenchmark
         bool? expectedPrecheckReady,
         string cameraBindingId)
     {
-        if (!expectedStructurallyValid)
-        {
-            return flow;
-        }
-
-        if (expectedPrecheckReady == false)
-        {
-            return MissingExecutableFlow(flow, cameraBindingId);
-        }
-
-        if (HasOperator(flow, "DeepLearning") ||
-            HasOperator(flow, "OnnxInference") ||
-            HasOperator(flow, "SemanticSegmentation") ||
-            HasOperator(flow, "AnomalyDetection"))
-        {
-            return ModelExecutableFlow(cameraBindingId, includeModel: true);
-        }
-
-        if (HasOperator(flow, "CircleMeasurement") ||
-            HasOperator(flow, "Measurement") ||
-            HasOperator(flow, "MeasureDistance"))
-        {
-            return MeasurementExecutableFlow(cameraBindingId);
-        }
-
-        return TemplateExecutableFlow(cameraBindingId, includeCamera: true, includeTemplate: true);
+        _ = expectedStructurallyValid;
+        _ = expectedPrecheckReady;
+        _ = cameraBindingId;
+        return flow;
     }
 
-    private static BenchmarkFlow MissingExecutableFlow(BenchmarkFlow flow, string cameraBindingId)
+    private static IReadOnlyList<BenchmarkManualResourceConfirmation> ManualConfirmationsFor(BenchmarkFlow flow)
     {
-        if (flow.Operators.Any(op =>
-                IsOperatorType(op, "ImageAcquisition") &&
-                !HasAnyParameter(op, "CameraBindingId", "CameraId", "FilePath")))
-        {
-            return TemplateExecutableFlow(cameraBindingId, includeCamera: false, includeTemplate: true);
-        }
-
-        if (flow.Operators.Any(op =>
-                IsDeepLearningOperator(op.OperatorType) &&
-                !HasAnyParameter(op, "ModelPath", "ModelId", "ModelCatalogPath")))
-        {
-            return ModelExecutableFlow(cameraBindingId, includeModel: false);
-        }
-
-        if (flow.Operators.Any(op =>
-                IsOperatorType(op, "TemplateMatching") &&
-                !HasAnyParameter(op, "Template", "TemplateId", "TemplatePath")))
-        {
-            return TemplateExecutableFlow(cameraBindingId, includeCamera: true, includeTemplate: false);
-        }
-
-        return TemplateExecutableFlow(cameraBindingId, includeCamera: true, includeTemplate: false);
-    }
-
-    private static BenchmarkFlow TemplateExecutableFlow(
-        string cameraBindingId,
-        bool includeCamera,
-        bool includeTemplate)
-    {
-        var cameraParameters = includeCamera
-            ? new[] { ("SourceType", "Camera"), ("CameraBindingId", cameraBindingId) }
-            : [("SourceType", "Camera")];
-        var templateParameters = includeTemplate
-            ? new[] { ("TemplateId", "catalog-template-a") }
-            : [];
-
-        return Flow(
-            [
-                Op("op_cam", "ImageAcquisition", cameraParameters),
-                Op("op_match", "TemplateMatching", templateParameters)
-            ],
-            [
-                Link("op_cam", "Image", "op_match", "Image")
-            ]);
-    }
-
-    private static BenchmarkFlow ModelExecutableFlow(string cameraBindingId, bool includeModel)
-    {
-        var modelParameters = includeModel
-            ? new[] { ("ModelId", "model-catalog-a") }
-            : [];
-
-        return Flow(
-            [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", cameraBindingId)),
-                Op("op_detect", "DeepLearning", modelParameters)
-            ],
-            [
-                Link("op_cam", "Image", "op_detect", "Image")
-            ]);
-    }
-
-    private static BenchmarkFlow MeasurementExecutableFlow(string cameraBindingId)
-    {
-        return Flow(
-            [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", cameraBindingId)),
-                Op(
-                    "op_measure",
-                    "Measurement",
-                    ("X1", "80"),
-                    ("Y1", "110"),
-                    ("X2", "420"),
-                    ("Y2", "360"),
-                    ("MeasureType", "PointToPoint"))
-            ],
-            [
-                Link("op_cam", "Image", "op_measure", "Image")
-            ]);
-    }
-
-    private static IReadOnlyList<object> ManualConfirmationsFor(BenchmarkFlow flow)
-    {
-        var confirmations = new List<object>();
+        var confirmations = new List<BenchmarkManualResourceConfirmation>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var op in flow.Operators)
         {
-            if (IsOperatorType(op, "ImageAcquisition"))
+            if (IsOperatorType(op, "ImageAcquisition") &&
+                string.Equals(ReadParameter(op, "SourceType"), "Camera", StringComparison.OrdinalIgnoreCase))
             {
-                AddManualConfirmation(confirmations, seen, op, "camera_binding", "CameraBindingId", "CameraId");
+                AddManualConfirmation(flow, confirmations, seen, op, "camera_binding", "CameraId");
             }
 
             if (IsDeepLearningOperator(op.OperatorType))
             {
-                AddManualConfirmation(confirmations, seen, op, "model_resource", "ModelPath", "ModelId", "ModelCatalogPath");
+                AddManualConfirmation(flow, confirmations, seen, op, "model_resource", "ModelId", "ModelPath", "ModelCatalogPath");
             }
 
             if (IsOperatorType(op, "TemplateMatching"))
             {
-                AddManualConfirmation(confirmations, seen, op, "template_artifact", "TemplatePath", "TemplateId", "Template");
+                AddManualConfirmation(flow, confirmations, seen, op, "template_artifact", "TemplateId", "Template");
             }
 
-            if (IsOperatorType(op, "ResultOutput"))
+            if (IsOperatorType(op, "ResultOutput") &&
+                string.Equals(ReadParameter(op, "SaveToFile"), "true", StringComparison.OrdinalIgnoreCase))
             {
-                AddManualConfirmation(confirmations, seen, op, "output_channel", "OutputChannelId", "OutputChannel", "Channel");
+                AddManualConfirmation(flow, confirmations, seen, op, "output_file", "SaveToFile");
+            }
+
+            if (IsOperatorType(op, "MitsubishiMcCommunication"))
+            {
+                AddManualConfirmation(flow, confirmations, seen, op, "plc_address", "Address");
             }
         }
 
         return confirmations;
     }
 
+    private static IReadOnlyList<BenchmarkResourceIdentity> RequiredConfirmationIdentitiesFor(BenchmarkFlow flow)
+    {
+        var identities = new List<BenchmarkResourceIdentity>();
+        foreach (var op in flow.Operators)
+        {
+            if (IsOperatorType(op, "ImageAcquisition") &&
+                string.Equals(ReadParameter(op, "SourceType"), "Camera", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(ReadParameter(op, "CameraId")))
+            {
+                identities.Add(ResourceIdentityFor(flow, "camera_binding", op.TempId, "CameraId"));
+            }
+
+            if (IsDeepLearningOperator(op.OperatorType))
+            {
+                var parameterName = new[] { "ModelId", "ModelPath", "ModelCatalogPath" }
+                    .FirstOrDefault(name => !string.IsNullOrWhiteSpace(ReadParameter(op, name)));
+                if (parameterName != null)
+                {
+                    identities.Add(ResourceIdentityFor(flow, "model_resource", op.TempId, parameterName));
+                }
+            }
+
+            if (IsOperatorType(op, "TemplateMatching") &&
+                !string.IsNullOrWhiteSpace(ReadParameter(op, "TemplateId")))
+            {
+                var templateBound = flow.Connections.Any(connection =>
+                    string.Equals(connection.TargetTempId, op.TempId, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(connection.TargetPortName, "Template", StringComparison.OrdinalIgnoreCase));
+                if (!templateBound)
+                {
+                    throw new InvalidOperationException(
+                        $"{op.TempId}.TemplateId is configured without the canonical Template input binding.");
+                }
+
+                identities.Add(ResourceIdentityFor(flow, "template_artifact", op.TempId, "TemplateId"));
+            }
+
+            if (IsOperatorType(op, "ResultOutput") &&
+                string.Equals(ReadParameter(op, "SaveToFile"), "true", StringComparison.OrdinalIgnoreCase))
+            {
+                identities.Add(ResourceIdentityFor(flow, "output_file", op.TempId, "SaveToFile"));
+            }
+
+            if (IsOperatorType(op, "MitsubishiMcCommunication") &&
+                !string.IsNullOrWhiteSpace(ReadParameter(op, "Address")))
+            {
+                identities.Add(ResourceIdentityFor(flow, "plc_address", op.TempId, "Address"));
+            }
+        }
+
+        return identities;
+    }
+
     private static void AddManualConfirmation(
-        List<object> confirmations,
+        BenchmarkFlow flow,
+        List<BenchmarkManualResourceConfirmation> confirmations,
         HashSet<string> seen,
         BenchmarkOperator op,
         string resourceType,
@@ -964,31 +1139,96 @@ internal static class VisionAgentBusinessBenchmark
     {
         foreach (var parameterName in parameterNames)
         {
-            if (!op.Parameters.TryGetValue(parameterName, out var value) ||
-                string.IsNullOrWhiteSpace(value) ||
+            var value = ReadParameter(op, parameterName);
+            if (string.IsNullOrWhiteSpace(value) ||
                 value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            var resourceKey = $"{op.TempId}.{parameterName}";
-            if (!seen.Add($"{resourceType}|{resourceKey}"))
+            var identity = ResourceIdentityFor(flow, resourceType, op.TempId, parameterName);
+            if (flow.IntentionallyMissingResources.Any(item =>
+                    string.Equals(item.CanonicalId, identity.CanonicalId, StringComparison.OrdinalIgnoreCase)))
             {
                 return;
             }
 
-            confirmations.Add(new
+            if (!seen.Add(identity.CanonicalId))
             {
-                actor = "vision_agent_business_benchmark",
+                return;
+            }
+
+            confirmations.Add(new BenchmarkManualResourceConfirmation(
+                "vision_agent_business_benchmark",
                 resourceType,
-                operatorId = op.TempId,
+                op.TempId,
                 parameterName,
-                resourceKey,
-                metadataOnly = true
-            });
+                identity.ResourceKey,
+                identity.CanonicalId,
+                VisionAgentResourceStatuses.Bound,
+                value,
+                MetadataOnly: true));
             return;
         }
     }
+
+    private static BenchmarkResourceIdentity ResourceIdentityFor(
+        BenchmarkFlow flow,
+        string resourceType,
+        string operatorId,
+        string parameterName)
+    {
+        var op = flow.Operators.FirstOrDefault(item =>
+            string.Equals(item.TempId, operatorId, StringComparison.OrdinalIgnoreCase));
+        var operatorType = op?.OperatorType ?? string.Empty;
+        var operatorIndex = op == null
+            ? 0
+            : flow.Operators
+                .TakeWhile(item => !ReferenceEquals(item, op))
+                .Count(item => IsOperatorType(item, operatorType));
+        var operatorKey = VisionAgentResourceIdentity.OperatorKey(operatorType, operatorIndex);
+        var canonicalParameter = CanonicalResourceParameter(resourceType, parameterName);
+        return new BenchmarkResourceIdentity(
+            VisionAgentResourceIdentity.CreateCanonicalId(resourceType, operatorKey, canonicalParameter, operatorId),
+            VisionAgentResourceIdentity.NormalizeResourceType(resourceType),
+            resourceType,
+            operatorId,
+            canonicalParameter,
+            $"{operatorId}.{parameterName}");
+    }
+
+    private static string CanonicalResourceParameter(string resourceType, string parameterName)
+    {
+        var canonicalResourceType = VisionAgentResourceIdentity.NormalizeResourceType(resourceType);
+        if (canonicalResourceType == "camera_binding") return "CameraId";
+        if (canonicalResourceType == "template_artifact") return "Template";
+        return parameterName;
+    }
+
+    private static BenchmarkFlow WithIntentionalMissingResource(
+        BenchmarkFlow flow,
+        string resourceType,
+        string operatorId,
+        string parameterName)
+    {
+        return flow with
+        {
+            IntentionallyMissingResources =
+            [
+                .. flow.IntentionallyMissingResources,
+                ResourceIdentityFor(flow, resourceType, operatorId, parameterName)
+            ]
+        };
+    }
+
+    private static string? ReadParameter(BenchmarkOperator op, string parameterName) =>
+        op.Parameters.TryGetValue(parameterName, out var value) ? value : null;
+
+    private static string? ReadCameraId(BenchmarkFlow flow) =>
+        flow.Operators
+            .Where(op => IsOperatorType(op, "ImageAcquisition"))
+            .Select(op => ReadParameter(op, "CameraId"))
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
     private static bool HasOperator(BenchmarkFlow flow, string operatorType)
     {
@@ -1023,32 +1263,30 @@ internal static class VisionAgentBusinessBenchmark
 
     private static BenchmarkFlow ValidWireFlow(string outputChannelId = "qa-wire")
     {
+        _ = outputChannelId;
         return Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-wire")),
-                Op("op_roi", "RoiManager", ("RoiName", "terminal_strip")),
-                Op("op_detect", "DeepLearning", ("ModelId", "mock-wire-sequence-model")),
-                Op("op_judge", "ResultJudgment", ("Rule", "wire_order_matches_expected")),
-                Op("op_out", "ResultOutput", ("OutputChannelId", outputChannelId))
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-wire")),
+                Op("op_detect", "DeepLearning", ("ModelId", "model-wire-sequence-v1")),
+                Op("op_out", "ResultOutput", ("Format", "JSON"))
             ],
             [
-                Link("op_cam", "Image", "op_roi", "Image"),
-                Link("op_roi", "RoiImage", "op_detect", "Image"),
-                Link("op_detect", "Detections", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_cam", "Image", "op_detect", "Image"),
+                Link("op_detect", "DetectionList", "op_out", "Data")
             ]);
     }
 
     private static BenchmarkFlow MissingCameraWireFlow()
     {
         var flow = ValidWireFlow();
-        return flow with
+        var missing = flow with
         {
             Operators = flow.Operators.Select(op =>
                 op.TempId == "op_cam"
                     ? Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"))
                     : op).ToList()
         };
+        return WithIntentionalMissingResource(missing, "camera_binding", "op_cam", "CameraId");
     }
 
     private static BenchmarkFlow ValidTemplateFlow(
@@ -1056,33 +1294,18 @@ internal static class VisionAgentBusinessBenchmark
         bool useRoi = false,
         string? templateId = null,
         string? outputChannelId = "qa-template",
-        string cameraParameterName = "CameraBindingId",
+        string cameraParameterName = "CameraId",
         bool includeUnusedFilePath = false)
     {
-        var cameraParams = new List<(string Key, string Value)>
+        _ = outputChannelId;
+        _ = cameraParameterName;
+        _ = includeUnusedFilePath;
+        var stableTemplateId = templateId ?? "catalog-template-a";
+        var templateParams = new List<(string Key, string Value)>
         {
-            ("SourceType", "Camera"),
-            (cameraParameterName, cameraParameterName == "CameraId" ? "mock-camera-id" : "mock-cam-template")
+            ("TemplateId", stableTemplateId),
+            ("Threshold", minScore ?? "0.82")
         };
-        if (includeUnusedFilePath)
-        {
-            cameraParams.Add(("FilePath", "mock://unused/file-path"));
-        }
-
-        var templateParams = new List<(string Key, string Value)>();
-        if (!string.IsNullOrWhiteSpace(templateId))
-        {
-            templateParams.Add(("TemplateId", templateId));
-        }
-        else
-        {
-            templateParams.Add(("TemplatePath", "mock://templates/bracket-a.template"));
-        }
-
-        if (!string.IsNullOrWhiteSpace(minScore))
-        {
-            templateParams.Add(("MinScore", minScore));
-        }
 
         if (useRoi)
         {
@@ -1098,103 +1321,98 @@ internal static class VisionAgentBusinessBenchmark
 
         return Flow(
             [
-                Op("op_cam", "ImageAcquisition", cameraParams.ToArray()),
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-template")),
+                Op("op_template_source", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-template-source")),
                 Op("op_match", "TemplateMatching", templateParams.ToArray()),
-                Op("op_judge", "ResultJudgment", ("MinScore", minScore ?? "0.82")),
-                Op("op_out", "ResultOutput", ("OutputChannelId", outputChannelId ?? "qa-template"))
+                Op("op_out", "ResultOutput", ("Format", "JSON"))
             ],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
-                Link("op_match", "Score", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_template_source", "Image", "op_match", "Template"),
+                Link("op_match", "Score", "op_out", "Result")
             ]);
     }
 
     private static BenchmarkFlow MissingTemplateFlow()
     {
-        return Flow(
+        var flow = Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-template")),
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-template")),
                 Op("op_match", "TemplateMatching"),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-template"))
+                Op("op_out", "ResultOutput", ("Format", "JSON"))
             ],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
-                Link("op_match", "Score", "op_out", "Input")
+                Link("op_match", "Score", "op_out", "Result")
             ]);
+        return WithIntentionalMissingResource(flow, "template_artifact", "op_match", "Template");
     }
 
     private static BenchmarkFlow MissingCameraTemplateFlow()
     {
-        return Flow(
-            [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera")),
-                Op("op_match", "TemplateMatching", ("TemplatePath", "mock://templates/part.template")),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-template"))
-            ],
-            [
-                Link("op_cam", "Image", "op_match", "Image"),
-                Link("op_match", "Score", "op_out", "Input")
-            ]);
+        var flow = ValidTemplateFlow();
+        var missing = flow with
+        {
+            Operators = flow.Operators.Select(op =>
+                op.TempId == "op_cam"
+                    ? Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"))
+                    : op).ToList()
+        };
+        return WithIntentionalMissingResource(missing, "camera_binding", "op_cam", "CameraId");
     }
 
     private static BenchmarkFlow MissingOutputFlow()
     {
-        return Flow(
+        var flow = Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-output")),
-                Op("op_match", "TemplateMatching", ("TemplatePath", "mock://templates/output.template")),
-                Op("op_out", "ResultOutput")
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-output")),
+                Op("op_out", "ResultOutput", ("SaveToFile", "true"), ("Format", "JSON"))
             ],
             [
-                Link("op_cam", "Image", "op_match", "Image"),
-                Link("op_match", "Score", "op_out", "Input")
+                Link("op_cam", "Image", "op_out", "Image")
             ]);
+        return WithIntentionalMissingResource(flow, "output_file", "op_out", "SaveToFile");
     }
 
     private static BenchmarkFlow MissingPlcOutputFlow()
     {
-        return Flow(
+        var flow = Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-plc")),
-                Op("op_judge", "ResultJudgment"),
-                Op("op_out", "ResultOutput", ("Channel", "plc"))
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-plc")),
+                Op("op_plc", "MitsubishiMcCommunication", ("UseGlobalFallback", "true"), ("Address", "D100"))
             ],
             [
-                Link("op_cam", "Image", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_cam", "Image", "op_plc", "Data")
             ]);
+        return WithIntentionalMissingResource(flow, "plc_address", "op_plc", "Address");
     }
 
     private static BenchmarkFlow MissingModelFlow()
     {
-        return Flow(
+        var flow = Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-model")),
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-model")),
                 Op("op_detect", "DeepLearning"),
-                Op("op_judge", "ResultJudgment"),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-model"))
+                Op("op_out", "ResultOutput", ("Format", "JSON"))
             ],
             [
                 Link("op_cam", "Image", "op_detect", "Image"),
-                Link("op_detect", "Detections", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_detect", "DetectionList", "op_out", "Data")
             ]);
+        return WithIntentionalMissingResource(flow, "model_resource", "op_detect", "ModelPath");
     }
 
     private static BenchmarkFlow ValidModelIdFlow()
     {
         return Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-model")),
-                Op("op_detect", "DeepLearning", ("ModelId", "mock-model-catalog-item")),
-                Op("op_judge", "ResultJudgment"),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-model"))
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-model")),
+                Op("op_detect", "DeepLearning", ("ModelId", "model-catalog-a")),
+                Op("op_out", "ResultOutput", ("Format", "JSON"))
             ],
             [
                 Link("op_cam", "Image", "op_detect", "Image"),
-                Link("op_detect", "Detections", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_detect", "DetectionList", "op_out", "Data")
             ]);
     }
 
@@ -1202,17 +1420,18 @@ internal static class VisionAgentBusinessBenchmark
     {
         return Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-combo")),
-                Op("op_match", "TemplateMatching", ("TemplatePath", "mock://templates/combo.template")),
-                Op("op_detect", "DeepLearning", ("ModelId", "mock-combo-model")),
-                Op("op_judge", "ResultJudgment"),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-combo"))
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-composite")),
+                Op("op_template_source", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-template-source")),
+                Op("op_match", "TemplateMatching", ("TemplateId", "catalog-template-a"), ("Threshold", "0.82")),
+                Op("op_detect", "DeepLearning", ("ModelId", "model-catalog-a")),
+                Op("op_out", "ResultOutput", ("Format", "JSON"))
             ],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
+                Link("op_template_source", "Image", "op_match", "Template"),
                 Link("op_cam", "Image", "op_detect", "Image"),
-                Link("op_match", "Score", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_match", "Score", "op_out", "Result"),
+                Link("op_detect", "DetectionList", "op_out", "Data")
             ]);
     }
 
@@ -1221,22 +1440,23 @@ internal static class VisionAgentBusinessBenchmark
         string roiB = "hole_b",
         string tolerance = "+/-0.05")
     {
+        _ = roiA;
+        _ = roiB;
+        _ = tolerance;
         return Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-hole")),
-                Op("op_circle_a", "CircleMeasurement", ("Roi", roiA)),
-                Op("op_circle_b", "CircleMeasurement", ("Roi", roiB)),
-                Op("op_distance", "MeasureDistance", ("Unit", "mm"), ("Tolerance", tolerance)),
-                Op("op_judge", "ResultJudgment", ("Tolerance", tolerance)),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-hole"))
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-measurement")),
+                Op(
+                    "op_measure",
+                    "Measurement",
+                    ("X1", "80"),
+                    ("Y1", "110"),
+                    ("X2", "420"),
+                    ("Y2", "360"),
+                    ("MeasureType", "PointToPoint"))
             ],
             [
-                Link("op_cam", "Image", "op_circle_a", "Image"),
-                Link("op_cam", "Image", "op_circle_b", "Image"),
-                Link("op_circle_a", "Center", "op_distance", "PointA"),
-                Link("op_circle_b", "Center", "op_distance", "PointB"),
-                Link("op_distance", "Distance", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_cam", "Image", "op_measure", "Image")
             ]);
     }
 
@@ -1244,16 +1464,10 @@ internal static class VisionAgentBusinessBenchmark
     {
         return Flow(
             [
-                Op("op_cam_top", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-top")),
-                Op("op_cam_side", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-side")),
-                Op("op_join", "ImageCompose", ("Mode", "side_by_side")),
-                Op("op_out", "ResultOutput", ("OutputChannelId", "qa-multi"))
+                Op("op_cam_top", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-top")),
+                Op("op_cam_side", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "camera-binding-side"))
             ],
-            [
-                Link("op_cam_top", "Image", "op_join", "ImageA"),
-                Link("op_cam_side", "Image", "op_join", "ImageB"),
-                Link("op_join", "Image", "op_out", "Input")
-            ]);
+            []);
     }
 
     private static BenchmarkFlow Flow(
@@ -1346,6 +1560,15 @@ internal static class VisionAgentBusinessBenchmarkMarkdown
         lines.AddRange(
         [
             "",
+            "## Resource Semantics",
+            "",
+            $"- Ready cases: {document.ResourceSummary.ReadyCaseCount}",
+            $"- Ready cases parameter-complete: {document.ResourceSummary.ReadyCaseParameterCompleteCount}",
+            $"- Intentional missing-resource cases: {document.ResourceSummary.IntentionalMissingCaseCount}",
+            $"- Intentional missing-resource cases still blocked: {document.ResourceSummary.IntentionalMissingCasesStillBlocked}",
+            "- Ready flows use canonical CameraId parameters and stable resource identities.",
+            "- Intentional missing-resource flows do not receive confirmations for the missing identity.",
+            "",
             "## Task Set",
             "",
             "| Case | Category | Type | Business Actions | Expected Tools | Actual Tools | Passed |",
@@ -1429,7 +1652,8 @@ internal sealed record BenchmarkCase
     public string SchemaOperatorType { get; init; } = "ImageAcquisition";
     public string? TargetStationId { get; init; }
     public string? EntryOperatorTempId { get; init; }
-    public string CameraBindingId { get; init; } = "mock-camera-binding";
+    public string CameraBindingId { get; init; } = "benchmark-camera-primary";
+    public bool ShouldBeResourceComplete { get; init; } = true;
     public bool ExpectedStructurallyValid { get; init; } = true;
     public bool ExpectsDryRun { get; init; } = true;
     public bool ExpectedDryRunSucceeded { get; init; } = true;
@@ -1439,7 +1663,13 @@ internal sealed record BenchmarkCase
 
 internal sealed record BenchmarkFlow(
     IReadOnlyList<BenchmarkOperator> Operators,
-    IReadOnlyList<BenchmarkConnection> Connections);
+    IReadOnlyList<BenchmarkConnection> Connections)
+{
+    public string? EntryOperatorTempId { get; init; }
+
+    [JsonIgnore]
+    public IReadOnlyList<BenchmarkResourceIdentity> IntentionallyMissingResources { get; init; } = [];
+}
 
 internal sealed record BenchmarkOperator(
     string TempId,
@@ -1452,6 +1682,25 @@ internal sealed record BenchmarkConnection(
     string TargetTempId,
     string TargetPortName);
 
+internal sealed record BenchmarkResourceIdentity(
+    string CanonicalId,
+    string ResourceType,
+    string ContractResourceType,
+    string OperatorId,
+    string ParameterName,
+    string ResourceKey);
+
+internal sealed record BenchmarkManualResourceConfirmation(
+    string Actor,
+    string ResourceType,
+    string OperatorId,
+    string ParameterName,
+    string ResourceKey,
+    string CanonicalId,
+    string Status,
+    string ValueSummary,
+    bool MetadataOnly);
+
 internal sealed record BenchmarkDocument(
     string SchemaVersion,
     string BenchmarkId,
@@ -1463,6 +1712,7 @@ internal sealed record BenchmarkDocument(
     IReadOnlyDictionary<string, BenchmarkThresholdResult> ThresholdResults,
     IReadOnlyDictionary<string, int> CategoryCounts,
     IReadOnlyDictionary<string, int> TaskTypeCounts,
+    BenchmarkResourceSummary ResourceSummary,
     BenchmarkSafety Safety,
     IReadOnlyList<ExecutableBenchmarkCaseResult> Cases);
 
@@ -1471,6 +1721,12 @@ internal sealed record BenchmarkSummary(
     int RuntimePreviewCaseCount,
     int PassedCaseCount,
     bool Accepted);
+
+internal sealed record BenchmarkResourceSummary(
+    int ReadyCaseCount,
+    int ReadyCaseParameterCompleteCount,
+    int IntentionalMissingCaseCount,
+    int IntentionalMissingCasesStillBlocked);
 
 internal sealed record BenchmarkThresholdResult(
     double Actual,
@@ -1493,6 +1749,11 @@ internal sealed record ExecutableBenchmarkCaseResult(
     string Category,
     string TaskType,
     string UserRequest,
+    bool? ExpectedPrecheckReady,
+    bool? ExpectedRuntimePreviewReady,
+    BenchmarkFlow Flow,
+    IReadOnlyList<BenchmarkManualResourceConfirmation> ManualResourceConfirmations,
+    bool ShouldBeResourceComplete,
     IReadOnlyList<string> ExpectedBusinessActions,
     IReadOnlyList<string> ExpectedToolCalls,
     IReadOnlyList<BenchmarkToolCallResult> ActualToolCalls,
