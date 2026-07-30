@@ -113,6 +113,7 @@ public sealed class VisionAgentGenerateFlowTests
     public async Task BuildFromPlanGenerateFlow_ShouldUseDedicatedBuildPipeline_WhenUseFlagIsFalse()
     {
         var agent = new FakeAgentGenerateFlowService(_ => throw new InvalidOperationException("agent generate should not run"));
+        var extractor = Substitute.For<IRequirementBriefExtractor>();
         var build = new FakeBuildOrchestrator(_ => Task.FromResult(new AiFlowGenerationResult
         {
             Success = true,
@@ -123,18 +124,25 @@ public sealed class VisionAgentGenerateFlowTests
         var service = CreateAiFlowGenerationService(
             agent,
             new AgentGenerateFlowOptions { Enabled = true, FallbackToLegacyOnFailure = true },
+            requirementBriefExtractor: extractor,
             serviceProvider: ServiceProviderFor(build));
+        var buildFromPlan = BuildFromPlanRequest();
+        AssertCanonicalCameraBindingDecision(buildFromPlan);
 
         var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest("start from plan")
         {
             UseVisionAgentGenerateFlow = false,
-            BuildFromPlan = BuildFromPlanRequest()
+            BuildFromPlan = buildFromPlan
         });
 
         result.Success.Should().BeTrue();
         result.GenerationMode.Should().Be("dedicated_build");
+        result.BuildReadiness.Should().NotBeNull();
+        result.BuildReadiness!.CanBuild.Should().BeTrue();
+        result.BuildReadiness.MissingResources.Should().BeEmpty();
         build.CallCount.Should().Be(1);
         agent.CallCount.Should().Be(0);
+        extractor.DidNotReceiveWithAnyArgs().Extract(default, default, default);
     }
 
     [Fact(DisplayName = "BuildFromPlan service chain should build confirmed plan without legacy RequirementBrief")]
@@ -149,13 +157,15 @@ public sealed class VisionAgentGenerateFlowTests
             new AgentGenerateFlowOptions { Enabled = true, FallbackToLegacyOnFailure = true },
             requirementBriefExtractor: extractor,
             serviceProvider: ServiceProviderFor(buildOrchestrator));
+        var buildFromPlan = BuildableLesionBuildFromPlanRequest();
+        AssertCanonicalCameraBindingDecision(buildFromPlan);
 
         var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest("病灶检测")
         {
             AgentRunId = "ar_real_build_chain",
             UseVisionAgentGenerateFlow = false,
             RequirementMode = AiRequirementModes.Strict,
-            BuildFromPlan = BuildableLesionBuildFromPlanRequest()
+            BuildFromPlan = buildFromPlan
         });
 
         result.Success.Should().BeTrue(
@@ -165,6 +175,7 @@ public sealed class VisionAgentGenerateFlowTests
         result.BuildResult.Should().NotBeNull();
         result.BuildReadiness.Should().NotBeNull();
         result.BuildReadiness!.CanBuild.Should().BeTrue();
+        result.BuildReadiness.MissingResources.Should().BeEmpty();
         result.ClarificationRequired.Should().BeFalse();
         result.RequirementBrief.Should().BeNull();
         result.FailureType.Should().BeNull();
@@ -253,11 +264,13 @@ public sealed class VisionAgentGenerateFlowTests
             new AgentGenerateFlowOptions { Enabled = true, FallbackToLegacyOnFailure = true },
             requirementBriefExtractor: extractor,
             serviceProvider: ServiceProviderFor(build));
+        var buildFromPlan = BuildFromPlanRequest();
+        AssertCanonicalCameraBindingDecision(buildFromPlan);
 
         var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest("start from plan")
         {
             UseVisionAgentGenerateFlow = true,
-            BuildFromPlan = BuildFromPlanRequest()
+            BuildFromPlan = buildFromPlan
         });
 
         result.Success.Should().BeFalse();
@@ -279,11 +292,13 @@ public sealed class VisionAgentGenerateFlowTests
             new AgentGenerateFlowOptions { Enabled = true, FallbackToLegacyOnFailure = true },
             requirementBriefExtractor: extractor,
             serviceProvider: ServiceProviderFor(build));
+        var buildFromPlan = BuildFromPlanRequest();
+        AssertCanonicalCameraBindingDecision(buildFromPlan);
 
         var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest("start from plan")
         {
             UseVisionAgentGenerateFlow = true,
-            BuildFromPlan = BuildFromPlanRequest()
+            BuildFromPlan = buildFromPlan
         });
 
         result.Success.Should().BeFalse();
@@ -294,6 +309,7 @@ public sealed class VisionAgentGenerateFlowTests
         result.ClarificationRequired.Should().BeFalse();
         result.BuildReadiness.Should().NotBeNull();
         result.BuildReadiness!.CanBuild.Should().BeTrue();
+        result.BuildReadiness.MissingResources.Should().BeEmpty();
         build.CallCount.Should().Be(1);
         agent.CallCount.Should().Be(0);
         extractor.DidNotReceiveWithAnyArgs().Extract(default, default, default);
@@ -448,6 +464,11 @@ public sealed class VisionAgentGenerateFlowTests
 
         result.Success.Should().BeFalse();
         result.FailureSummary!.Code.Should().Be(VisionAgentBuildFailureCodes.ReadinessBlocked);
+        result.BuildReadiness.Should().NotBeNull();
+        result.BuildReadiness!.CanBuild.Should().BeFalse();
+        result.BuildReadiness.MissingResources.Should().ContainSingle(resource =>
+            resource.ResourceType == "camera_binding" &&
+            resource.CanonicalId == CameraBindingCanonicalId());
         capturedRequest.Should().BeNull();
         plan.Intent.Should().Be("surface_defect");
         plan.RecommendedRoute.RouteId.Should().Be("surface_defect_detection");
@@ -1133,6 +1154,7 @@ public sealed class VisionAgentGenerateFlowTests
             },
             AcceptedDefaults = ["metadata_only"],
             AcceptedRecommendedDefaults = true,
+            ResourceDecisions = [BoundCameraBindingDecision()],
             OperatorCatalogVersion = plan.OperatorCatalogVersion,
             StationBoundarySummary = plan.StationBoundarySummary,
             PlcOutputPolicy = plan.PlcOutputPolicy,
@@ -1202,6 +1224,7 @@ public sealed class VisionAgentGenerateFlowTests
                     Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
                 }
             ],
+            ResourceDecisions = [BoundCameraBindingDecision()],
             MetadataOnly = true
         };
         var hash = VisionAgentOrchestrator.ComputePlanHash(request.PlanSnapshot);
@@ -1210,6 +1233,50 @@ public sealed class VisionAgentGenerateFlowTests
             PlanHash = hash,
             PlanSnapshot = request.PlanSnapshot! with { PlanHash = hash }
         };
+    }
+
+    private static VisionAgentResourceDecision BoundCameraBindingDecision()
+    {
+        var operatorKey = VisionAgentResourceIdentity.OperatorKey("ImageAcquisition", 0);
+        return new VisionAgentResourceDecision
+        {
+            CanonicalId = CameraBindingCanonicalId(),
+            Status = VisionAgentResourceStatuses.Bound,
+            ResourceKey = $"{operatorKey}.CameraBindingId",
+            ResourceType = "camera_binding",
+            OperatorKey = operatorKey,
+            OperatorType = "ImageAcquisition",
+            OperatorIndex = 0,
+            ParameterName = "CameraBindingId",
+            ValueSummary = "fixture-camera-binding",
+            Source = "resource_binding"
+        };
+    }
+
+    private static string CameraBindingCanonicalId() =>
+        VisionAgentResourceIdentity.CreateCanonicalId(
+            "camera_binding",
+            VisionAgentResourceIdentity.OperatorKey("ImageAcquisition", 0),
+            "CameraBindingId");
+
+    private static void AssertCanonicalCameraBindingDecision(VisionAgentBuildFromPlanRequest request)
+    {
+        request.PlanSnapshot.Should().NotBeNull();
+        request.ConfirmedAnswers.Should().Contain(answer =>
+            answer.Field == VisionAgentPlanAnswerFields.ImageSource &&
+            answer.Value == "camera" &&
+            answer.Resolved);
+        request.ResourceDecisions.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            CanonicalId = CameraBindingCanonicalId(),
+            Status = VisionAgentResourceStatuses.Bound,
+            ResourceType = "camera_binding",
+            OperatorKey = VisionAgentResourceIdentity.OperatorKey("ImageAcquisition", 0),
+            OperatorType = "ImageAcquisition",
+            OperatorIndex = 0,
+            ParameterName = "CameraBindingId",
+            Source = "resource_binding"
+        });
     }
 
     private static IServiceProvider ServiceProviderFor(IVisionAgentBuildOrchestrator buildOrchestrator)
