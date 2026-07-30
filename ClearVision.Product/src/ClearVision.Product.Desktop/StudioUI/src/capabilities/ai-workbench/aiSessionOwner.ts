@@ -286,6 +286,24 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     onReplay: (replay, generation) => dispatch({
       type: 'replay-observed', diagnostics: replay.diagnostics, generation, at: now()
     }),
+    onTerminalReplayUnresolved: async (replay, generation) => {
+      const recoverableTerminal = replay.events.find(event =>
+        (event.eventType === 'run.completed' || event.eventType === 'run.failed' ||
+          event.eventType === 'run.cancelled') && event.build && !event.workspaceSnapshot);
+      if (disposed || generation !== planGeneration || state.value.run.kind !== 'build' ||
+          state.value.run.runId !== replay.summary.runId || !currentSessionId || !recoverableTerminal) return;
+      const session = await request(signal => api.getSession(currentSessionId!, signal));
+      if (disposed || generation !== planGeneration || state.value.run.runId !== replay.summary.runId) return;
+      validateSessionRoute(session);
+      validateBuildSnapshot(session.snapshot);
+      if (!session.snapshot.buildResult || session.snapshot.buildRunId !== replay.summary.runId ||
+          session.snapshot.buildTerminalSequence !== replay.summary.lastSequence ||
+          session.snapshot.buildRunStatus !== replay.summary.status) {
+        throw new Error('Terminal Build replay is not confirmed by the canonical Session Snapshot.');
+      }
+      dispatch({ type: 'snapshot-ready', snapshot: session.snapshot, at: now() });
+      await loadCameraBindings();
+    },
     onRecovering: message => dispatch({ type: 'recovery-start', reason: message, at: now() }),
     onFailure: error => fail(error, 'offline-or-service-unavailable')
   });
@@ -626,10 +644,14 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
       .filter(item => item.pending && !item.resourceDependent)
       .map(item => item.canonicalKey));
     const submitted = Object.fromEntries(Object.entries(values).filter(([key]) => allowed.has(key)));
+    const candidateContext = Object.fromEntries(build.parameterMapping
+      .filter(item => !item.pending && !item.resourceDependent && item.hasExplicitValue)
+      .map(item => [item.canonicalKey, item.value]));
     const validation = validateBuildParameterValues(
       build.parameterMapping,
       submitted,
-      session.snapshot.buildParameterValues
+      { ...candidateContext, ...session.snapshot.buildParameterValues },
+      [...allowed]
     );
     if (Object.keys(submitted).length === 0 || !validation.valid) {
       dispatch({
@@ -693,6 +715,8 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
   async function rebuild(): Promise<void> {
     if (disposed || authorizationFrozen) return;
     buildOperationId = null;
+    await refreshSessionSnapshot();
+    if (disposed || authorizationFrozen) return;
     await startBuild();
   }
 
@@ -757,11 +781,16 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     for (const question of plan.clarificationQuestions) {
       const value = answersByField[question.field]?.trim();
       if (!value) continue;
+      const origin = acceptRecommended
+        ? 'accepted_recommended_default'
+        : question.options.some(option => option.value === value)
+          ? 'explicit_user_selection'
+          : 'explicit_user_text';
       normalized.set(question.field.toLowerCase(), Object.freeze({
         questionId: question.id,
         field: question.field.toLowerCase(),
         value,
-        origin: 'user',
+        origin,
         confidence: 1,
         resolved: true
       }));

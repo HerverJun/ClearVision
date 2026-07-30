@@ -16,6 +16,49 @@ function metadata(value, name) {
   return value?.[name] ?? value?.[name[0].toUpperCase() + name.slice(1)];
 }
 
+const replayIdentityKeys = new Set([
+  'sessionId', 'projectId', 'planId', 'planHash', 'planRunId', 'planTerminalSequence',
+  'runId', 'buildId', 'buildRunId', 'buildRunStatus', 'buildTerminalSequence',
+  'clientOperationId', 'buildClientOperationId', 'operationId', 'submittedBuildFingerprint',
+  'answerRevision', 'resourceRevision', 'revision', 'persistenceRevision',
+  'canonicalFlowHash', 'targetKind', 'resourceKey', 'canonicalId'
+]);
+
+function compactIdentity(value, depth = 0, target = {}) {
+  if (!value || typeof value !== 'object' || depth > 8) return target;
+  if (Array.isArray(value)) {
+    for (const item of value) compactIdentity(item, depth + 1, target);
+    return target;
+  }
+  for (const [key, nested] of Object.entries(value)) {
+    if (replayIdentityKeys.has(key) && ['string', 'number', 'boolean'].includes(typeof nested)) {
+      const values = target[key] ??= [];
+      if (!values.includes(nested)) values.push(nested);
+    }
+    compactIdentity(nested, depth + 1, target);
+  }
+  return target;
+}
+
+function compactReplayAudit(body) {
+  if (!body || !Array.isArray(body.events)) return null;
+  return {
+    summary: body.summary ? {
+      runId: metadata(body.summary, 'runId'),
+      status: metadata(body.summary, 'status'),
+      lastSequence: metadata(body.summary, 'lastSequence'),
+      eventCount: metadata(body.summary, 'eventCount')
+    } : null,
+    events: body.events.map(event => ({
+      sequence: metadata(event, 'sequence'),
+      eventType: metadata(event, 'eventType'),
+      stage: metadata(event, 'stage'),
+      status: metadata(event, 'status'),
+      identity: compactIdentity(metadata(event, 'payload'))
+    }))
+  };
+}
+
 async function requestJson(webPort, token, requestPath, options = {}) {
   const method = String(options.method || 'GET').toUpperCase();
   const response = await fetch(`http://127.0.0.1:${webPort}${requestPath}`, {
@@ -37,7 +80,21 @@ async function requestJson(webPort, token, requestPath, options = {}) {
 
 async function waitForOwnerPhase(page, phases, timeout = 60_000) {
   const selector = phases.map(phase => `[data-ai-owner-phase="${phase}"]`).join(',');
-  await page.waitForSelector(selector, { state: 'visible', timeout });
+  try {
+    await page.waitForSelector(selector, { state: 'visible', timeout });
+  } catch (error) {
+    const owner = page.locator('[data-ai-owner-phase]');
+    const actualPhase = await owner.getAttribute('data-ai-owner-phase').catch(() => null);
+    const diagnostics = await owner.evaluate(element => Object.fromEntries(
+      [...element.attributes]
+        .filter(attribute => attribute.name.startsWith('data-ai-owner-'))
+        .map(attribute => [attribute.name, attribute.value]))).catch(() => ({}));
+    const publicText = await owner.innerText().catch(() => 'AI owner projection unavailable.');
+    throw new Error(
+      `Timed out waiting for AI phase ${phases.join(', ')}; actual phase is ${actualPhase || 'missing'}. ` +
+      `Owner diagnostics: ${JSON.stringify(diagnostics)}. Public projection: ${publicText.slice(0, 1_500)}`,
+      { cause: error });
+  }
   return page.locator('[data-ai-owner-phase]').getAttribute('data-ai-owner-phase');
 }
 
@@ -116,11 +173,28 @@ async function main() {
     capturedAtUtc: new Date().toISOString(), authority: {}, requests: {}, screenshots: {}, runtime: {}
   };
   let browser;
+  let page;
+  let runtimeErrors;
+  const apiResponses = [];
   try {
     const connected = await connectToDesktopWebView2(cdpPort);
     browser = connected.browser;
-    const { context, page } = connected;
-    const runtimeErrors = captureRuntimeErrors(page);
+    const { context } = connected;
+    page = connected.page;
+    runtimeErrors = captureRuntimeErrors(page);
+    page.on('response', async response => {
+      const url = new URL(response.url());
+      if (!/^\/api\/ai\/(?:sessions(?:\/[^/]+)?|agent-plan-runs|agent-runs(?:\/[^/]+)?|operations\/)/.test(url.pathname) ||
+          /\/events$/.test(url.pathname)) return;
+      const text = await response.text().catch(error => `RESPONSE_READ_FAILED: ${error.message}`);
+      let body = null;
+      try { body = JSON.parse(text); } catch { /* Raw response evidence remains available below. */ }
+      apiResponses.push({
+        method: response.request().method(), path: url.pathname + url.search,
+        status: response.status(), body: text.slice(0, 200_000),
+        replayAudit: compactReplayAudit(body)
+      });
+    });
     await seedAuthenticatedSession(page, webPort, token, user);
 
     const cameraId = 'f06-evidence-camera-01';
@@ -176,9 +250,12 @@ async function main() {
     await page.getByRole('button', { name: '理解并规划任务' }).click();
     let phase = await waitForOwnerPhase(page, ['clarifying', 'plan-ready', 'plan-blocked']);
     if (phase !== 'plan-ready') {
-      const recommended = page.getByRole('button', { name: '采用推荐答案' });
-      assert(await recommended.count() === 1, `Real Plan stopped in ${phase} without recommended answers.`);
-      await recommended.click();
+      const resolvableStrategy = page.locator(
+        '[data-ai-clarification-panel] input[type="radio"][value="traditional_rule"]');
+      assert(await resolvableStrategy.count() === 1,
+        `Real Plan stopped in ${phase} without the resolvable strategy answer.`);
+      await resolvableStrategy.check();
+      await page.getByRole('button', { name: '确认回答并重新检查' }).click();
       phase = await waitForOwnerPhase(page, ['plan-ready', 'plan-blocked']);
     }
     assert(phase === 'plan-ready', `Real Plan did not reach ready: ${phase}.`);
@@ -256,6 +333,17 @@ async function main() {
   } catch (error) {
     evidence.status = 'FAIL';
     evidence.error = error?.stack || error?.message || String(error);
+    evidence.runtime = {
+      ownerPhase: page ? await page.locator('[data-ai-owner-phase]').getAttribute('data-ai-owner-phase').catch(() => null) : null,
+      consoleErrors: runtimeErrors?.consoleErrors ?? [],
+      pageErrors: runtimeErrors?.pageErrors ?? [],
+      requestFailures: runtimeErrors?.requestFailures ?? [],
+      requests: runtimeErrors?.requests?.map(item => ({
+        method: item.method,
+        path: new URL(item.url).pathname + new URL(item.url).search
+      })) ?? [],
+      apiResponses
+    };
     evidence.capturedAtUtc = new Date().toISOString();
     writeJsonEvidence(evidenceDirectory, `studio-ui-webview2-f06-${runName}.json`, evidence);
     throw error;

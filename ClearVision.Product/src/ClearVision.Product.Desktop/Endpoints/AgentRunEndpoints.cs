@@ -24,6 +24,9 @@ public static class AgentRunEndpoints
     private static readonly Regex PlanSecretMarkerRegex = new(
         @"(?i)\b(authorization|x-api-key|api[-_ ]?key|token|secret|bearer)\b\s*[:=]\s*[""']?[^""'\s,;}]+",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex PlanForbiddenPublicTermRegex = new(
+        @"(?i)\b(authorization|x-api-key|api[-_ ]?key|bearer)\b",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex PlanWindowsPathRegex = new(
         @"(?i)(?:[a-z]:\\|\\\\)[^\s""'<>|]+",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -1641,7 +1644,9 @@ public static class AgentRunEndpoints
             canBuild = replaySafePlan.CanBuild,
             questionCount = replaySafePlan.ClarificationQuestions.Count,
             publicEventCount = replaySafePlan.PublicEvents.Count,
-            workspaceSnapshot,
+            workspaceSnapshot = workspaceSnapshot == null
+                ? null
+                : AiPublicContractMapper.ToSnapshot(workspaceSnapshot),
             persistenceStatus,
             persistenceWarning,
             metadataOnly = true
@@ -1664,7 +1669,9 @@ public static class AgentRunEndpoints
             sessionId,
             planRunId = runId,
             publicMessage,
-            workspaceSnapshot,
+            workspaceSnapshot = workspaceSnapshot == null
+                ? null
+                : AiPublicContractMapper.ToSnapshot(workspaceSnapshot),
             persistenceStatus,
             persistenceWarning,
             metadataOnly = true
@@ -1673,10 +1680,10 @@ public static class AgentRunEndpoints
 
     private static VisionAgentPlanModeResult BuildReplaySafePlanResult(VisionAgentPlanModeResult result)
     {
-        return result with
+        var replaySafePlan = result with
         {
             PlanId = SanitizePlanToken(result.PlanId),
-            PlanHash = SanitizePlanToken(result.PlanHash),
+            PlanHash = string.Empty,
             PlanSource = SanitizePlanToken(result.PlanSource),
             FallbackReason = SanitizePlanToken(result.FallbackReason),
             PlannerFailureStage = SanitizePlanToken(result.PlannerFailureStage),
@@ -1724,6 +1731,29 @@ public static class AgentRunEndpoints
             ExecutablePlan = SanitizePlanList(result.ExecutablePlan),
             BlockingReasons = SanitizePlanList(result.BlockingReasons).Select(SanitizePlanToken).ToList(),
             BuildReadiness = SanitizeBuildReadiness(result.BuildReadiness),
+            SemanticExtraction = result.SemanticExtraction == null
+                ? null
+                : result.SemanticExtraction with
+                {
+                    Intent = SanitizePlanToken(result.SemanticExtraction.Intent),
+                    TaskType = SanitizePlanToken(result.SemanticExtraction.TaskType),
+                    InspectionObject = SanitizePlanText(result.SemanticExtraction.InspectionObject),
+                    TargetAttribute = SanitizePlanText(result.SemanticExtraction.TargetAttribute),
+                    DefectType = SanitizePlanText(result.SemanticExtraction.DefectType),
+                    MeasurementTarget = SanitizePlanText(result.SemanticExtraction.MeasurementTarget),
+                    ImageSource = SanitizePlanText(result.SemanticExtraction.ImageSource),
+                    OkCondition = SanitizePlanText(result.SemanticExtraction.OkCondition),
+                    NgCondition = SanitizePlanText(result.SemanticExtraction.NgCondition),
+                    OutputTarget = SanitizePlanText(result.SemanticExtraction.OutputTarget),
+                    SuggestedRoute = SanitizePlanText(result.SemanticExtraction.SuggestedRoute),
+                    ObjectSignals = SanitizePlanList(result.SemanticExtraction.ObjectSignals),
+                    TaskSignals = SanitizePlanList(result.SemanticExtraction.TaskSignals),
+                    MissingFields = SanitizePlanList(result.SemanticExtraction.MissingFields).Select(SanitizePlanToken).ToList(),
+                    ClarificationQuestions = SanitizePlanList(result.SemanticExtraction.ClarificationQuestions),
+                    Source = SanitizePlanToken(result.SemanticExtraction.Source),
+                    FailureCode = SanitizePlanToken(result.SemanticExtraction.FailureCode),
+                    SanitizedErrorMessage = SanitizePlanText(result.SemanticExtraction.SanitizedErrorMessage)
+                },
             RequirementMaturity = result.RequirementMaturity == null
                 ? null
                 : result.RequirementMaturity with
@@ -1736,22 +1766,7 @@ public static class AgentRunEndpoints
                     BlockingReasons = SanitizePlanList(result.RequirementMaturity.BlockingReasons).Select(SanitizePlanToken).ToList(),
                     PublicReason = SanitizePlanText(result.RequirementMaturity.PublicReason)
                 },
-            DecisionTrace = result.DecisionTrace == null
-                ? null
-                : result.DecisionTrace with
-                {
-                    RawUserText = SanitizePlanText(result.DecisionTrace.RawUserText),
-                    TurnIntent = SanitizePlanToken(result.DecisionTrace.TurnIntent),
-                    InteractionState = SanitizePlanToken(result.DecisionTrace.InteractionState),
-                    BusinessSignalsHit = SanitizePlanList(result.DecisionTrace.BusinessSignalsHit),
-                    NewFlowSignalsHit = SanitizePlanList(result.DecisionTrace.NewFlowSignalsHit),
-                    TaskTypeSignalsHit = SanitizePlanList(result.DecisionTrace.TaskTypeSignalsHit),
-                    ObjectSignalsHit = SanitizePlanList(result.DecisionTrace.ObjectSignalsHit),
-                    MaturityLevel = SanitizePlanToken(result.DecisionTrace.MaturityLevel),
-                    TaskType = SanitizePlanToken(result.DecisionTrace.TaskType),
-                    FallbackReason = SanitizePlanToken(result.DecisionTrace.FallbackReason),
-                    BlockingReasons = SanitizePlanList(result.DecisionTrace.BlockingReasons).Select(SanitizePlanToken).ToList()
-                },
+            DecisionTrace = null,
             NextAction = SanitizePlanText(result.NextAction),
             ContextSummary = result.ContextSummary with
             {
@@ -1786,6 +1801,18 @@ public static class AgentRunEndpoints
                     StringComparer.OrdinalIgnoreCase)
             }).ToList(),
             MetadataOnly = true
+        };
+
+        var redactedPlan = new AgentRunEventRedactor().RedactObject(replaySafePlan);
+        var canonicalPublicPlan = redactedPlan == null
+            ? replaySafePlan
+            : JsonSerializer.Deserialize<VisionAgentPlanModeResult>(
+                JsonSerializer.Serialize(redactedPlan, AgentRunEventJson.Options),
+                AgentRunEventJson.Options) ?? replaySafePlan;
+
+        return canonicalPublicPlan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(canonicalPublicPlan)
         };
     }
 
@@ -1870,6 +1897,7 @@ public static class AgentRunEndpoints
         var text = value.Trim();
         text = PlanPrivateMarkerRegex.Replace(text, "[redacted:private-planning]");
         text = PlanSecretMarkerRegex.Replace(text, "[redacted:secret]");
+        text = PlanForbiddenPublicTermRegex.Replace(text, "[redacted:security-term]");
         text = PlanDataImageRegex.Replace(text, "[redacted:image-bytes]");
         text = PlanLongBase64Regex.Replace(text, "[redacted:base64]");
         text = PlanWindowsPathRegex.Replace(text, "[redacted:path]");
@@ -2047,9 +2075,10 @@ public static class AgentRunEndpoints
 
     private static string NormalizePlanStatus(string status)
     {
-        return string.IsNullOrWhiteSpace(status)
+        var normalized = string.IsNullOrWhiteSpace(status)
             ? AgentRunEventStatuses.Completed
             : status.Trim().ToLowerInvariant();
+        return normalized == "started" ? AgentRunEventStatuses.Running : normalized;
     }
 
     private static void EmitPlanStage(

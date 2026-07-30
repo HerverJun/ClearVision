@@ -3,9 +3,14 @@ import { ApiConflictError, ApiUnauthorizedError, type ApiTransport } from '@/pla
 import { createAiSessionOwner } from '@/capabilities/ai-workbench/aiSessionOwner';
 import {
   aiBuildOperationId,
+  aiBuildRunId,
   aiOperationId,
+  aiPlanHash,
+  aiPlanId,
   aiPlanOperationId,
   aiProjectId,
+  aiTimestamp,
+  answerFixture,
   buildOperationFixture,
   buildParameterFixture,
   buildReplayFixture,
@@ -14,6 +19,7 @@ import {
   buildSessionFixture,
   existingProjectBaselineFixture,
   intentFixture,
+  newProjectBaselineFixture,
   operationFixture,
   planRunResponseFixture,
   projectFixture,
@@ -113,7 +119,7 @@ describe('route-scoped AiSessionOwner', () => {
       revision: 9,
       confirmedPlanAnswers: [{
         questionId: 'q_defect_definition', field: 'defect_definition', value: '3 mm',
-        origin: 'user', confidence: 1, resolved: true
+        origin: 'explicit_user_selection', confidence: 1, resolved: true
       }],
       answerRevision: 4
     });
@@ -124,13 +130,17 @@ describe('route-scoped AiSessionOwner', () => {
       payload: { errorCode: 'workspace_revision_conflict', publicMessage: 'conflict', latestSnapshot: latest },
       responseBody: ''
     });
+    const workspaceBodies: unknown[] = [];
     const api = {
       apiBaseUrl: 'http://localhost:5000/api',
       get: vi.fn(async (path: string) => path === 'ai/sessions/session_01'
         ? sessionFixture({ planRunId: 'run_plan_01', planRunStatus: 'completed' })
         : replayFixture()),
-      post: vi.fn(async (path: string) => {
-        if (path.includes('workspace-snapshot')) throw conflict;
+      post: vi.fn(async (path: string, body?: unknown) => {
+        if (path.includes('workspace-snapshot')) {
+          workspaceBodies.push(body);
+          throw conflict;
+        }
         throw new Error(`Unexpected POST ${path}`);
       })
     } as unknown as ApiTransport;
@@ -142,7 +152,15 @@ describe('route-scoped AiSessionOwner', () => {
     expect(owner.state.value.phase).toBe('session-conflict');
     expect(owner.state.value.session?.snapshot.revision).toBe(9);
     expect(owner.state.value.session?.snapshot.confirmedPlanAnswers[0]?.value).toBe('3 mm');
-    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(workspaceBodies[0]).toMatchObject({
+      optimisticPlanAnswers: [{ origin: 'explicit_user_selection', value: '2 mm' }]
+    });
+
+    await owner.answerClarification({ defect_definition: '3.5 mm' });
+    expect(workspaceBodies[1]).toMatchObject({
+      optimisticPlanAnswers: [{ origin: 'explicit_user_text', value: '3.5 mm' }]
+    });
+    expect(api.post).toHaveBeenCalledTimes(2);
     owner.dispose();
   });
 
@@ -201,11 +219,15 @@ describe('route-scoped AiSessionOwner', () => {
   });
 
   it('reconciles a lost Build create response without issuing a duplicate POST', async () => {
-    const post = vi.fn(async (path: string) => {
+    let buildCommand: Record<string, unknown> | null = null;
+    const post = vi.fn(async (path: string, body?: unknown) => {
       if (path === 'ai/sessions') return createResponse();
       if (path === 'ai/agent-intent-router-runs') return intentFixture();
       if (path === 'ai/agent-plan-runs') return planRunResponseFixture();
-      if (path === 'ai/agent-runs') throw new Error('Build create response lost');
+      if (path === 'ai/agent-runs') {
+        buildCommand = body as Record<string, unknown>;
+        throw new Error('Build create response lost');
+      }
       throw new Error(`Unexpected POST ${path}`);
     });
     const api = {
@@ -232,6 +254,223 @@ describe('route-scoped AiSessionOwner', () => {
     expect(api.get).toHaveBeenCalledWith(
       `ai/operations/${aiBuildOperationId}?kind=build_run`, expect.anything()
     );
+    expect(buildCommand).toMatchObject({
+      buildFromPlan: {
+        planSnapshot: {
+          requirementMaturity: null,
+          decisionTrace: null,
+          contextSummary: {
+            hasCurrentFlow: false,
+            operatorCatalogTools: ['定位', '图像增强']
+          },
+          templateSelection: null,
+          contractRepairNotes: [],
+          metadataOnly: true
+        }
+      }
+    });
+    owner.dispose();
+  });
+
+  it('closes a terminal Build replay from the canonical Session when the public event lacks its Snapshot', async () => {
+    const resource = resourceRequirementFixture();
+    const build = buildResultFixture({ missingResources: [resource] });
+    const replay = buildReplayFixture(build);
+    const terminal = replay.events[0]!;
+    const terminalPayload = { ...(terminal.payload as Record<string, unknown>) };
+    delete terminalPayload.workspaceSnapshot;
+    const terminalWithoutSnapshot = { ...terminal, payload: terminalPayload };
+    const terminalReplay = {
+      ...replay,
+      events: [terminalWithoutSnapshot],
+      snapshot: { ...replay.snapshot, events: [terminalWithoutSnapshot] }
+    };
+    const post = vi.fn(async (path: string) => {
+      if (path === 'ai/sessions') return createResponse();
+      if (path === 'ai/agent-intent-router-runs') return intentFixture();
+      if (path === 'ai/agent-plan-runs') return planRunResponseFixture();
+      if (path === 'ai/agent-runs') throw new Error('Build create response lost');
+      throw new Error(`Unexpected POST ${path}`);
+    });
+    const api = {
+      apiBaseUrl: 'http://localhost:5000/api',
+      post,
+      get: vi.fn(async (path: string) => {
+        if (path === 'ai/agent-runs/run_plan_01') return readyPlanReplayFixture();
+        if (path === `ai/operations/${aiBuildOperationId}?kind=build_run`) return buildOperationFixture();
+        if (path === `ai/agent-runs/${aiBuildRunId}`) return terminalReplay;
+        if (path === 'ai/sessions/session_01') {
+          return buildSessionFixture(build, { revision: 6, missingResources: [resource] });
+        }
+        if (path === 'ai/resource-candidates/camera-bindings') {
+          return [{ id: 'camera-binding-01', displayName: 'Line camera', isEnabled: true }];
+        }
+        throw new Error(`Unexpected GET ${path}`);
+      })
+    } as unknown as ApiTransport;
+    const owner = createAiSessionOwner({ api, operationIdFactory: operationIds(), now: () => 1 });
+
+    await owner.start();
+    await owner.submitTask('Detect surface scratches and report their locations.', 'strict');
+    await owner.startBuild();
+
+    expect(owner.state.value.phase).toBe('parameters-pending');
+    expect(owner.state.value.run.lastSequence).toBe(1);
+    expect(owner.state.value.run.terminalSequence).toBe(1);
+    expect(owner.state.value.run.replayRequired).toBe(false);
+    expect(owner.state.value.build?.runId).toBe(aiBuildRunId);
+    expect(owner.state.value.cameraBindings).toEqual([
+      { id: 'camera-binding-01', displayName: 'Line camera', isEnabled: true }
+    ]);
+    expect(api.get).toHaveBeenCalledWith('ai/sessions/session_01', expect.anything());
+    expect(post.mock.calls.filter(([path]) => path === 'ai/agent-runs')).toHaveLength(1);
+    owner.dispose();
+  });
+
+  it('retains a cancelled Build terminal and refreshes the Session revision before rebuilding', async () => {
+    const events = [{
+      runId: aiBuildRunId,
+      sequence: 1,
+      timestamp: aiTimestamp,
+      eventType: 'run.started',
+      stage: 'run',
+      title: 'Build started',
+      summary: 'Build started.',
+      status: 'running',
+      payload: {
+        runKind: 'build',
+        sessionId: 'session_01',
+        planId: aiPlanId,
+        planHash: aiPlanHash,
+        metadataOnly: true
+      },
+      metadataOnly: true,
+      redactionPass: true
+    }, {
+      runId: aiBuildRunId,
+      sequence: 2,
+      timestamp: aiTimestamp,
+      eventType: 'run.cancelled',
+      stage: 'run',
+      title: 'Run cancelled',
+      summary: 'Vision Agent run cancelled by user.',
+      status: 'cancelled',
+      payload: { firstFixRecommendation: 'Submit the request again when you are ready to continue.' },
+      metadataOnly: true,
+      redactionPass: true
+    }];
+    const cancelledReplay = {
+      summary: {
+        runId: aiBuildRunId,
+        createdAt: aiTimestamp,
+        updatedAt: aiTimestamp,
+        status: 'cancelled',
+        title: 'Run cancelled',
+        summary: 'Vision Agent run cancelled by user.',
+        firstFixRecommendation: 'Submit the request again when you are ready to continue.',
+        lastSequence: 2,
+        eventCount: 2,
+        duplicateEventCount: 0,
+        droppedEventCount: 0,
+        staleEventCount: 0,
+        ownerHash: 'redacted-owner',
+        terminalIntent: null,
+        metadataOnly: true,
+        redactionPass: true,
+        payload: null
+      },
+      events,
+      snapshot: {
+        storageVersion: 'agent-run-events.jsonl.v1',
+        runId: aiBuildRunId,
+        generatedAt: aiTimestamp,
+        firstSequence: 1,
+        lastSequence: 2,
+        eventCount: 2,
+        metadataOnly: true,
+        redactionPass: true,
+        events
+      },
+      diagnostics: {
+        runId: aiBuildRunId,
+        eventCount: 2,
+        duplicateEventCount: 0,
+        droppedEventCount: 0,
+        staleEventCount: 0,
+        metadataOnly: true,
+        redactionPass: true
+      }
+    };
+    const cancelledSession = sessionFixture({
+      revision: 4,
+      lifecycleState: 'plan_ready',
+      planRunId: 'run_plan_01',
+      planRunStatus: 'completed',
+      planTerminalSequence: 3,
+      confirmedPlanAnswers: [answerFixture()],
+      answerRevision: 2
+    });
+    const refreshedCancelledSession = sessionFixture({
+      revision: 6,
+      lifecycleState: 'build_cancelled',
+      planRunId: 'run_plan_01',
+      planRunStatus: 'completed',
+      planTerminalSequence: 3,
+      buildRunId: aiBuildRunId,
+      buildRunStatus: 'cancelled',
+      buildTerminalSequence: 2,
+      buildClientOperationId: aiBuildOperationId,
+      projectBaseline: newProjectBaselineFixture(),
+      confirmedPlanAnswers: [answerFixture()],
+      answerRevision: 2
+    });
+    const buildCommands: Record<string, unknown>[] = [];
+    const post = vi.fn(async (path: string, body?: Record<string, unknown>) => {
+      if (path === 'ai/sessions') return createResponse();
+      if (path === 'ai/agent-intent-router-runs') return intentFixture();
+      if (path === 'ai/agent-plan-runs') return planRunResponseFixture();
+      if (path === 'ai/agent-runs') {
+        buildCommands.push(body ?? {});
+        if (buildCommands.length === 1) return buildRunResponseFixture();
+        throw new Error('Second Build response lost after command capture.');
+      }
+      throw new Error(`Unexpected POST ${path}`);
+    });
+    let sessionReadCount = 0;
+    const api = {
+      apiBaseUrl: 'http://localhost:5000/api',
+      post,
+      get: vi.fn(async (path: string) => {
+        if (path === 'ai/agent-runs/run_plan_01') return readyPlanReplayFixture();
+        if (path === `ai/agent-runs/${aiBuildRunId}`) return cancelledReplay;
+        if (path === 'ai/sessions/session_01') {
+          sessionReadCount += 1;
+          return sessionReadCount === 1 ? cancelledSession : refreshedCancelledSession;
+        }
+        if (path === `ai/operations/${aiBuildOperationId}?kind=build_run`) {
+          return buildOperationFixture({ status: 'rejected', runId: null, publicMessage: 'Stopped after command capture.' });
+        }
+        throw new Error(`Unexpected GET ${path}`);
+      })
+    } as unknown as ApiTransport;
+    const owner = createAiSessionOwner({ api, operationIdFactory: operationIds(), now: () => 1 });
+
+    await owner.start();
+    await owner.submitTask('Detect surface scratches and report their locations.', 'strict');
+    await owner.startBuild();
+
+    expect(owner.state.value.phase).toBe('build-cancelled');
+    expect(owner.state.value.run.terminalSequence).toBe(2);
+    expect(owner.state.value.session?.snapshot.buildRunStatus).toBeNull();
+    expect(owner.state.value.message).toContain('已取消');
+    expect(post.mock.calls.filter(([path]) => path === 'ai/agent-runs')).toHaveLength(1);
+
+    await owner.rebuild();
+
+    expect(buildCommands[1]).toMatchObject({
+      buildFromPlan: { workspaceExpectedRevision: 6 }
+    });
+    expect(sessionReadCount).toBe(2);
     owner.dispose();
   });
 

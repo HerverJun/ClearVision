@@ -119,4 +119,51 @@ describe('AI Build parameter contract validation', () => {
       buildParameterFixture({ operatorType: '' })
     ] as never, {}).valid).toBe(false);
   });
+
+  it('recognizes camera binding as a resource-only contract without accepting it as a scalar input', () => {
+    const scalar = buildParameterFixture({
+      canonicalKey: 'acquire_1.exposure', tempId: 'acquire_1', parameterName: 'exposure', dataType: 'int',
+      minValue: 1, maxValue: 100
+    });
+    const camera = buildParameterFixture({
+      canonicalKey: 'acquire_1.cameraId', tempId: 'acquire_1', parameterName: 'cameraId', dataType: 'camerabinding',
+      value: null, defaultValue: null, minValue: null, maxValue: null,
+      resourceDependent: true, resourceKind: 'camera_binding', pending: true
+    });
+
+    const result = validateBuildParameterValues([scalar, camera] as never, {
+      'acquire_1.exposure': 20,
+      'acquire_1.cameraId': 'untrusted-client-binding'
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.activeKeys).toEqual(['acquire_1.exposure']);
+  });
+
+  it('validates pending values against full contract context without reconfirming candidate defaults', () => {
+    const configured = buildParameterFixture({
+      canonicalKey: 'threshold_1.mode', parameterName: 'mode', dataType: 'enum',
+      value: 'fast', hasExplicitValue: true, pending: false,
+      options: [{ label: 'Fast', value: 'fast' }], minValue: null, maxValue: null
+    });
+    const pending = buildParameterFixture({
+      canonicalKey: 'threshold_1.threshold', parameterName: 'threshold', dataType: 'int',
+      requiredWhen: {
+        allConditions: [{ parameter: 'mode', comparison: 'equals', value: 'fast' }],
+        anyConditions: []
+      },
+      minValue: 1,
+      maxValue: 10
+    });
+
+    const result = validateBuildParameterValues(
+      [configured, pending] as never,
+      { 'threshold_1.threshold': 5 },
+      { 'threshold_1.mode': 'fast' },
+      ['threshold_1.threshold']
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.activeKeys).toEqual(['threshold_1.threshold']);
+  });
 });

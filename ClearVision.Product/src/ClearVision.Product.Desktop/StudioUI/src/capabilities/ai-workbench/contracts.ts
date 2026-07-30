@@ -106,6 +106,35 @@ export interface AiReadinessPreviewV1 {
   readonly metadataOnly: true;
 }
 
+export interface AiRequirementMaturityV1 {
+  readonly maturity: string;
+  readonly taskType: string;
+  readonly canPlan: boolean;
+  readonly canBuild: boolean;
+  readonly objectSignals: readonly string[];
+  readonly taskSignals: readonly string[];
+  readonly missingFields: readonly string[];
+  readonly blockingReasons: readonly string[];
+  readonly publicReason: string;
+  readonly metadataOnly: true;
+}
+
+export interface AiPlanContextSummaryV1 {
+  readonly hasCurrentFlow: boolean;
+  readonly hasCurrentResult: boolean;
+  readonly attachmentCount: number;
+  readonly templateSelectionMode: string;
+  readonly templateId: string;
+  readonly contextKinds: readonly string[];
+  readonly operatorCatalogTools: readonly string[];
+}
+
+export interface AiTemplateSelectionV1 {
+  readonly mode: string;
+  readonly templateId: string | null;
+  readonly scenarioKey: string | null;
+}
+
 export interface AiSessionSnapshotV1 {
   readonly schemaVersion: number;
   readonly revision: number;
@@ -298,13 +327,19 @@ export interface AiPlanV1 {
   readonly blockingReasons: readonly string[];
   readonly buildReadiness: AiBuildReadinessV1;
   readonly semanticExtraction: AiSemanticExtractionV1 | null;
+  readonly requirementMaturity: AiRequirementMaturityV1 | null;
+  readonly decisionTrace: null;
   readonly nextAction: string;
+  readonly contextSummary: AiPlanContextSummaryV1;
   readonly operatorCatalogVersion: string;
   readonly templateCatalogVersion: string;
+  readonly templateSelection: AiTemplateSelectionV1 | null;
   readonly stationBoundarySummary: string;
   readonly plcOutputPolicy: string;
   readonly planWarnings: readonly string[];
+  readonly contractRepairNotes: readonly string[];
   readonly publicEvents: readonly AiPlanPublicEventV1[];
+  readonly metadataOnly: true;
 }
 
 export interface AiAgentRunEventV1 {

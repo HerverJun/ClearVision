@@ -1185,6 +1185,15 @@ public sealed class AgentRunEndpointsTests
             {
                 PlanSource = "planner",
                 OriginalUserPrompt = @"inspect C:\factory\secret.png token=abc123",
+                SanitizedErrorMessage = "Semantic extraction model authorization failed; rule fallback is active.",
+                SemanticExtraction = new VisionAgentSemanticExtractionResult
+                {
+                    IsVisionRequest = true,
+                    Intent = "new_flow",
+                    TaskType = AiVisionTaskTypes.SurfaceDefect,
+                    SanitizedErrorMessage = "Semantic extraction model authorization failed; rule fallback is active.",
+                    MetadataOnly = true
+                },
                 PlanWarnings =
                 [
                     "rawPrompt=hidden prompt",
@@ -1193,8 +1202,16 @@ public sealed class AgentRunEndpointsTests
                     @"model path C:\factory\models\secret.onnx",
                     $"station 192.168.10.45 DB1.DBW0 {syntheticImageDataUri}"
                 ],
+                DecisionTrace = new AiDecisionTrace
+                {
+                    RawUserText = @"inspect C:\factory\secret.png token=abc123",
+                    TurnIntent = "create_plan",
+                    InteractionState = "planning",
+                    MetadataOnly = true
+                },
                 PublicEvents =
                 [
+                    PlanEvent("planning_with_model", "started", "模型规划已开始", "模型正在生成公开结构化规划候选。"),
                     PlanEvent("planning_with_model", "completed", "模型规划完成", "模型已返回公开结构化规划候选。")
                 ],
                 MetadataOnly = true
@@ -1205,7 +1222,15 @@ public sealed class AgentRunEndpointsTests
             });
         });
 
-        var runId = await host.CreatePlanRunAsync(@"inspect C:\factory\secret.png token=abc123");
+        using var sessionResponse = await host.Client.PostAsJsonAsync("/api/ai/sessions", new
+        {
+            clientOperationId = Guid.NewGuid()
+        });
+        sessionResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        using var sessionDocument = JsonDocument.Parse(await sessionResponse.Content.ReadAsStringAsync());
+        var sessionId = sessionDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString()!;
+
+        var runId = await host.CreatePlanRunAsync(@"inspect C:\factory\secret.png token=abc123", sessionId);
         await host.WaitForTerminalAsync(runId);
 
         using var response = await host.Client.GetAsync($"/api/ai/agent-runs/{runId}");
@@ -1213,6 +1238,10 @@ public sealed class AgentRunEndpointsTests
         var replayJson = await response.Content.ReadAsStringAsync();
 
         replayJson.Should().Contain("\"planResult\"");
+        replayJson.Should().Contain("\"decisionTrace\":null");
+        replayJson.Should().NotContain("\"eventTypeRedacted\":true");
+        replayJson.Should().NotContain("\"pendingPlanSnapshot\"");
+        replayJson.ToLowerInvariant().Should().NotContain("authorization");
         replayJson.Should().NotContain("rawPrompt");
         replayJson.Should().NotContain("systemPrompt");
         replayJson.Should().NotContain("chainOfThought");
@@ -1222,6 +1251,17 @@ public sealed class AgentRunEndpointsTests
         replayJson.Should().NotContain("DB1.DBW0");
         replayJson.Should().NotContain("data:image/png;base64");
         replayJson.Should().NotContain("abc123");
+        using var replayDocument = JsonDocument.Parse(replayJson);
+        var startedEvent = replayDocument.RootElement.GetProperty("events").EnumerateArray()
+            .Single(evt => evt.GetProperty("eventType").GetString() == AgentRunEventTypes.PlanModelStarted);
+        startedEvent.GetProperty("status").GetString().Should().Be(AgentRunEventStatuses.Running);
+        var completedEvent = replayDocument.RootElement.GetProperty("events").EnumerateArray()
+            .Single(evt => evt.GetProperty("eventType").GetString() == AgentRunEventTypes.PlanCompleted);
+        var publicPlan = JsonSerializer.Deserialize<VisionAgentPlanModeResult>(
+            completedEvent.GetProperty("payload").GetProperty("planResult").GetRawText(),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        publicPlan.Should().NotBeNull();
+        publicPlan!.PlanHash.Should().Be(VisionAgentOrchestrator.ComputePlanHash(publicPlan));
     }
 
     [Fact(DisplayName = "AgentRun background GenerateFlow receives safe metadata-only request")]
@@ -2708,6 +2748,200 @@ public sealed class AgentRunEndpointsTests
         ]);
         var invalidEnum = await Revalidate(mode, "unsupported");
         invalidEnum.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("enum_value_invalid"));
+    }
+
+    [Fact(DisplayName = "Build revalidation projects canonical topology and clears trusted camera mapping blockers")]
+    public async Task BuildRevalidator_ShouldProjectCanonicalTopologyAndApplyTrustedCameraAuthority()
+    {
+        var cameraId = Guid.NewGuid();
+        var cameraOutputId = Guid.NewGuid();
+        var thresholdId = Guid.NewGuid();
+        var thresholdInputId = Guid.NewGuid();
+        var flow = new OperatorFlowDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "camera-authority-revalidation-flow",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = cameraId,
+                    Name = "Image acquisition",
+                    Type = OperatorType.ImageAcquisition,
+                    Metadata = new Dictionary<string, object?> { ["agentTempId"] = "op_cam" },
+                    OutputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = cameraOutputId,
+                            Name = "Image",
+                            Direction = PortDirection.Output,
+                            DataType = PortDataType.Image
+                        }
+                    ],
+                    Parameters =
+                    [
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "SourceType",
+                            DisplayName = "采集来源",
+                            DataType = "string",
+                            Value = "Camera",
+                            IsRequired = true
+                        },
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "CameraId",
+                            DisplayName = "相机绑定",
+                            DataType = "string",
+                            Value = "<pending-camera-binding>",
+                            IsRequired = true
+                        }
+                    ]
+                },
+                new OperatorDto
+                {
+                    Id = thresholdId,
+                    Name = "Thresholding",
+                    Type = OperatorType.Thresholding,
+                    Metadata = new Dictionary<string, object?> { ["agentTempId"] = "op_threshold" },
+                    InputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = thresholdInputId,
+                            Name = "Image",
+                            Direction = PortDirection.Input,
+                            DataType = PortDataType.Image,
+                            IsRequired = true
+                        }
+                    ],
+                    Parameters =
+                    [
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Threshold",
+                            DisplayName = "阈值",
+                            DataType = "double",
+                            Value = 128d,
+                            MinValue = 0d,
+                            MaxValue = 255d,
+                            IsRequired = true
+                        }
+                    ]
+                }
+            ],
+            Connections =
+            [
+                new OperatorConnectionDto
+                {
+                    Id = Guid.NewGuid(),
+                    SourceOperatorId = cameraId,
+                    SourcePortId = cameraOutputId,
+                    TargetOperatorId = thresholdId,
+                    TargetPortId = thresholdInputId
+                }
+            ]
+        };
+        var candidateFingerprint = ExecutionFlowIdentity.ComputeFlowHash(flow.ToEntity());
+        const string cameraResourceKey = "f06-evidence-camera-01";
+        var canonicalId = VisionAgentResourceIdentity.CreateCanonicalId(
+            "camera_binding", "imageacquisition#1", "CameraId", cameraResourceKey);
+        var mapping = new VisionAgentParameterMapping
+        {
+            CanonicalKey = "op_cam.CameraId",
+            TempId = "op_cam",
+            OperatorType = "ImageAcquisition",
+            OperatorDisplayName = "图像采集",
+            ParameterName = "CameraId",
+            ParameterDisplayName = "相机绑定",
+            DataType = "camerabinding",
+            IsRequired = true,
+            Value = "<pending-camera-binding>",
+            HasExplicitValue = true,
+            ValueSummary = "等待绑定",
+            Source = "pending_metadata",
+            Pending = true,
+            ResourceKind = "camera_binding",
+            ResourceCanonicalId = canonicalId,
+            ResourceDependent = true
+        };
+        var missingResource = new AiMissingResourceInfo
+        {
+            CanonicalId = canonicalId,
+            ResourceType = "camera_binding",
+            ResourceName = "相机绑定",
+            ResourceKey = "op_cam.CameraId",
+            OperatorKey = "imageacquisition#1",
+            OperatorId = "op_cam",
+            OperatorType = "ImageAcquisition",
+            OperatorIndex = 0,
+            ParameterName = "CameraId",
+            Status = VisionAgentResourceStatuses.Pending,
+            Source = "operator_contract"
+        };
+        var result = await new VisionAgentBuildRevalidator().RevalidateAsync(
+            new VisionAgentBuildRevalidationRequest
+            {
+                CandidateFlowJson = JsonSerializer.Serialize(flow),
+                Build = new VisionAgentPublicBuildResultV1
+                {
+                    RunId = "ar_camera_authority_revalidation",
+                    BuildId = "build_camera_authority_revalidation",
+                    BuildIdentity = "build-identity",
+                    PlanId = "plan_camera_authority_revalidation",
+                    PlanHash = new string('b', 64),
+                    AnswerSetFingerprint = new string('c', 64),
+                    CandidateFlowFingerprint = candidateFingerprint,
+                    OperatorCount = 2,
+                    ConnectionCount = 1,
+                    ParameterMapping = [mapping],
+                    MissingResources = [missingResource],
+                    WorkflowDiff = new VisionAgentWorkflowDiff
+                    {
+                        PendingParameters = [mapping.CanonicalKey],
+                        MissingResources = [canonicalId],
+                        DeploymentBlockers = [$"parameter:{mapping.CanonicalKey}", $"resource:{canonicalId}"]
+                    }
+                },
+                ResourceDecisions =
+                [
+                    new VisionAgentResourceDecision
+                    {
+                        CanonicalId = canonicalId,
+                        Status = VisionAgentResourceStatuses.Bound,
+                        ResourceKey = cameraResourceKey,
+                        ResourceType = "camera_binding",
+                        OperatorKey = "imageacquisition#1",
+                        OperatorId = "op_cam",
+                        OperatorType = "ImageAcquisition",
+                        OperatorIndex = 0,
+                        ParameterName = "CameraId",
+                        ValueSummary = "F06 evidence camera",
+                        Source = VisionAgentResourceAuthority.CameraBindingSource
+                    }
+                ],
+                AnswerRevision = 2,
+                ResourceRevision = 1
+            },
+            CancellationToken.None);
+
+        var applied = result.ParameterMapping.Should().ContainSingle().Subject;
+        applied.Pending.Should().BeFalse();
+        applied.Value.Should().Be(cameraResourceKey);
+        applied.ValueSummary.Should().Be("F06 evidence camera");
+        applied.Source.Should().Be(VisionAgentResourceAuthority.CameraBindingSource);
+        result.MissingResources.Should().BeEmpty();
+        result.WorkflowDiff.PendingParameters.Should().BeEmpty();
+        result.WorkflowDiff.DeploymentBlockers.Should().BeEmpty();
+        result.Validation.Structural.BlockerCount.Should().Be(0);
+        result.Validation.DryRun.BlockerCount.Should().Be(0);
+        result.Validation.Manifest.Status.Should().Be("passed");
+        result.Validation.HandoffEligible.Should().BeTrue();
+        result.Validation.ApplyGate.Blocked.Should().BeFalse();
     }
 
     [Fact(DisplayName = "AI operation identity replays matching requests rejects conflicts and supports lookup")]

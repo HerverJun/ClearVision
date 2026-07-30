@@ -25,6 +25,7 @@ import {
   type AiParameterConditionSetV1,
   type AiParameterConditionV1,
   type AiPlanAnswerV1,
+  type AiPlanContextSummaryV1,
   type AiPlanPublicEventV1,
   type AiPlanRunResponseV1,
   type AiPlanV1,
@@ -33,6 +34,7 @@ import {
   type AiReadinessPreviewV1,
   type AiRecommendedRouteV1,
   type AiRequirementMode,
+  type AiRequirementMaturityV1,
   type AiResourceRequirementV1,
   type AiResourceDecisionV1,
   type AiScalarValue,
@@ -42,7 +44,8 @@ import {
   type AiSemanticExtractionV1,
   type AiSessionCreateResponseV1,
   type AiSessionDetailV1,
-  type AiSessionSnapshotV1
+  type AiSessionSnapshotV1,
+  type AiTemplateSelectionV1
 } from './contracts';
 
 type JsonRecord = Record<string, unknown>;
@@ -895,19 +898,60 @@ function decodePublicEvent(value: unknown, path: string): AiPlanPublicEventV1 {
   });
 }
 
-function validatePlanContext(value: unknown, path: string): void {
+function decodeRequirementMaturity(value: unknown, path: string): AiRequirementMaturityV1 | null {
+  if (value === null) return null;
+  const source = record(value, path);
+  exact(source, [
+    'maturity', 'taskType', 'canPlan', 'canBuild', 'objectSignals', 'taskSignals',
+    'missingFields', 'blockingReasons', 'publicReason', 'metadataOnly'
+  ], path);
+  if (required(source, 'metadataOnly', path) !== true) {
+    throw new AiContractDecodeError(`${path}.metadataOnly`, 'true');
+  }
+  return Object.freeze({
+    maturity: string(required(source, 'maturity', path), `${path}.maturity`),
+    taskType: string(required(source, 'taskType', path), `${path}.taskType`),
+    canPlan: boolean(required(source, 'canPlan', path), `${path}.canPlan`),
+    canBuild: boolean(required(source, 'canBuild', path), `${path}.canBuild`),
+    objectSignals: strings(required(source, 'objectSignals', path), `${path}.objectSignals`),
+    taskSignals: strings(required(source, 'taskSignals', path), `${path}.taskSignals`),
+    missingFields: strings(required(source, 'missingFields', path), `${path}.missingFields`),
+    blockingReasons: strings(required(source, 'blockingReasons', path), `${path}.blockingReasons`),
+    publicReason: string(required(source, 'publicReason', path), `${path}.publicReason`),
+    metadataOnly: true
+  });
+}
+
+function decodePlanContext(value: unknown, path: string): AiPlanContextSummaryV1 {
   const source = record(value, path);
   exact(source, [
     'hasCurrentFlow', 'hasCurrentResult', 'attachmentCount', 'templateSelectionMode', 'templateId',
     'contextKinds', 'operatorCatalogTools'
   ], path);
-  boolean(required(source, 'hasCurrentFlow', path), `${path}.hasCurrentFlow`);
-  boolean(required(source, 'hasCurrentResult', path), `${path}.hasCurrentResult`);
-  integer(required(source, 'attachmentCount', path), `${path}.attachmentCount`);
-  string(required(source, 'templateSelectionMode', path), `${path}.templateSelectionMode`);
-  string(required(source, 'templateId', path), `${path}.templateId`);
-  strings(required(source, 'contextKinds', path), `${path}.contextKinds`);
-  strings(required(source, 'operatorCatalogTools', path), `${path}.operatorCatalogTools`);
+  return Object.freeze({
+    hasCurrentFlow: boolean(required(source, 'hasCurrentFlow', path), `${path}.hasCurrentFlow`),
+    hasCurrentResult: boolean(required(source, 'hasCurrentResult', path), `${path}.hasCurrentResult`),
+    attachmentCount: integer(required(source, 'attachmentCount', path), `${path}.attachmentCount`),
+    templateSelectionMode: string(
+      required(source, 'templateSelectionMode', path), `${path}.templateSelectionMode`
+    ),
+    templateId: string(required(source, 'templateId', path), `${path}.templateId`),
+    contextKinds: strings(required(source, 'contextKinds', path), `${path}.contextKinds`),
+    operatorCatalogTools: strings(
+      required(source, 'operatorCatalogTools', path), `${path}.operatorCatalogTools`
+    )
+  });
+}
+
+function decodeTemplateSelection(value: unknown, path: string): AiTemplateSelectionV1 | null {
+  if (value === null) return null;
+  const source = record(value, path);
+  exact(source, ['mode', 'templateId', 'scenarioKey'], path);
+  return Object.freeze({
+    mode: string(required(source, 'mode', path), `${path}.mode`),
+    templateId: nullableString(required(source, 'templateId', path), `${path}.templateId`),
+    scenarioKey: nullableString(required(source, 'scenarioKey', path), `${path}.scenarioKey`)
+  });
 }
 
 export function decodeAiPlanV1(value: unknown, path = '$'): AiPlanV1 {
@@ -929,11 +973,7 @@ export function decodeAiPlanV1(value: unknown, path = '$'): AiPlanV1 {
   if (!Array.isArray(questions) || !Array.isArray(defaults) || !Array.isArray(publicEvents)) {
     throw new AiContractDecodeError(path, 'a Plan with array fields');
   }
-  validateOptionalPublicRecord(source.requirementMaturity, `${path}.requirementMaturity`);
   if (source.decisionTrace !== null) throw new AiContractDecodeError(`${path}.decisionTrace`, 'null in replay-safe Plan');
-  if (source.templateSelection !== null) record(source.templateSelection, `${path}.templateSelection`);
-  validatePlanContext(required(source, 'contextSummary', path), `${path}.contextSummary`);
-  strings(required(source, 'contractRepairNotes', path), `${path}.contractRepairNotes`);
   if (required(source, 'metadataOnly', path) !== true) throw new AiContractDecodeError(`${path}.metadataOnly`, 'true');
   return Object.freeze({
     planContractVersion: string(required(source, 'planContractVersion', path), `${path}.planContractVersion`),
@@ -972,15 +1012,21 @@ export function decodeAiPlanV1(value: unknown, path = '$'): AiPlanV1 {
     blockingReasons: strings(required(source, 'blockingReasons', path), `${path}.blockingReasons`),
     buildReadiness: decodeAiBuildReadinessV1(required(source, 'buildReadiness', path), `${path}.buildReadiness`),
     semanticExtraction: decodeSemantic(source.semanticExtraction, `${path}.semanticExtraction`),
+    requirementMaturity: decodeRequirementMaturity(source.requirementMaturity, `${path}.requirementMaturity`),
+    decisionTrace: null,
     nextAction: string(required(source, 'nextAction', path), `${path}.nextAction`),
+    contextSummary: decodePlanContext(required(source, 'contextSummary', path), `${path}.contextSummary`),
     operatorCatalogVersion: string(required(source, 'operatorCatalogVersion', path), `${path}.operatorCatalogVersion`),
     templateCatalogVersion: string(required(source, 'templateCatalogVersion', path), `${path}.templateCatalogVersion`),
+    templateSelection: decodeTemplateSelection(source.templateSelection, `${path}.templateSelection`),
     stationBoundarySummary: string(required(source, 'stationBoundarySummary', path), `${path}.stationBoundarySummary`),
     plcOutputPolicy: string(required(source, 'plcOutputPolicy', path), `${path}.plcOutputPolicy`),
     planWarnings: strings(required(source, 'planWarnings', path), `${path}.planWarnings`),
+    contractRepairNotes: strings(required(source, 'contractRepairNotes', path), `${path}.contractRepairNotes`),
     publicEvents: Object.freeze(
       publicEvents.map((item, index) => decodePublicEvent(item, `${path}.publicEvents[${index}]`))
-    )
+    ),
+    metadataOnly: true
   });
 }
 

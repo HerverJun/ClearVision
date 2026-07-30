@@ -163,6 +163,13 @@ function buildProgressPhase(event: AiAgentRunEventV1): AiWorkbenchPhase {
   return 'building';
 }
 
+function runStatus(value: string | null): AiRunStatus | null {
+  return value === 'pending' || value === 'running' || value === 'completed' || value === 'failed' ||
+    value === 'cancelled' || value === 'blocked' || value === 'warning'
+    ? value
+    : null;
+}
+
 function sameProjectBaseline(
   left: AiProjectBaselineV1 | null,
   right: AiProjectBaselineV1 | null
@@ -501,12 +508,42 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
         updatedAt: event.at
       });
     case 'snapshot-ready': {
-      const next = withSnapshot(Object.freeze({ ...state, updatedAt: event.at }), event.snapshot);
+      if (!state.session || event.snapshot.revision <= state.session.snapshot.revision) return state;
+      let next = withSnapshot(Object.freeze({ ...state, updatedAt: event.at }), event.snapshot);
+      const recoveredBuildTerminalSequence = next.run.kind === 'build' &&
+        event.snapshot.buildRunId === next.run.runId &&
+        event.snapshot.buildTerminalSequence !== null
+        ? event.snapshot.buildTerminalSequence
+        : null;
+      if (recoveredBuildTerminalSequence !== null) {
+        next = Object.freeze({
+          ...next,
+          run: Object.freeze({
+            ...next.run,
+            status: runStatus(event.snapshot.buildRunStatus) ?? next.run.status,
+            lastSequence: Math.max(next.run.lastSequence, recoveredBuildTerminalSequence),
+            terminalSequence: recoveredBuildTerminalSequence,
+            replayRequired: false
+          })
+        });
+      }
       const baselineConflict = buildBaselineConflicts(next.projectBaseline, next.build);
+      const terminalPhase = recoveredBuildTerminalSequence !== null && event.snapshot.buildRunStatus === 'cancelled'
+        ? 'build-cancelled'
+        : recoveredBuildTerminalSequence !== null && event.snapshot.buildRunStatus === 'failed'
+          ? 'build-failed'
+          : next.run.kind === 'build' && next.run.terminalSequence !== null &&
+            event.snapshot.buildRunId === next.run.runId &&
+            event.snapshot.buildTerminalSequence === next.run.terminalSequence &&
+            (next.phase === 'build-cancelled' || next.phase === 'build-failed')
+            ? next.phase
+            : null;
       return Object.freeze({
         ...next,
         phase: baselineConflict
           ? 'baseline-conflict'
+          : terminalPhase
+          ? terminalPhase
           : next.build && next.buildStale
           ? 'build-blocked'
           : event.snapshot.buildResult && !next.buildStale
@@ -514,8 +551,14 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
           : next.plan ? planPhase(next.plan, event.snapshot.readinessPreview) : next.phase,
         message: baselineConflict
           ? '工程保存版本或流程内容已更新；当前候选基于旧工程基线，仅供查看。'
+          : terminalPhase === 'build-cancelled'
+          ? '本次构建已取消，上一版候选仅供查看。'
+          : terminalPhase === 'build-failed'
+          ? '构建失败，请查看公开诊断后重试。'
           : '会话状态已与服务端最新版本协调。',
-        errorCode: baselineConflict ? 'project_baseline_changed' : null,
+        errorCode: baselineConflict
+          ? 'project_baseline_changed'
+          : terminalPhase === 'build-failed' ? 'build_run_failed' : null,
         updatedAt: event.at
       });
     }

@@ -103,4 +103,37 @@ describe('AgentRun stream adapter', () => {
     ledger.dispose();
     expect(ledger.diagnostics()).toMatchObject({ requestCount: 0, streamCount: 0, timerCount: 0, disposed: true });
   });
+
+  it('recovers a terminal replay whose terminal event is rejected by strict identity validation', async () => {
+    const terminalReplay = replayFixture();
+    const transport = {
+      apiBaseUrl: 'http://localhost:5000/api',
+      get: vi.fn(async () => terminalReplay),
+      getTextStream: vi.fn()
+    } as unknown as ApiTransport;
+    const ledger = createAiResourceLedger();
+    let terminal = false;
+    const recoverTerminal = vi.fn(async () => { terminal = true; });
+    const adapter = createAgentRunStreamAdapter({
+      api: createAiWorkbenchApi(transport),
+      ledger,
+      getAfterSequence: () => 0,
+      isTerminal: () => terminal,
+      onEvent: () => 'stale',
+      onReplay: vi.fn(),
+      onTerminalReplayUnresolved: recoverTerminal,
+      onRecovering: vi.fn(),
+      onFailure: vi.fn()
+    });
+
+    await adapter.start('run_plan_01', 1);
+
+    expect(recoverTerminal).toHaveBeenCalledOnce();
+    expect(recoverTerminal).toHaveBeenCalledWith(expect.objectContaining({
+      summary: expect.objectContaining({ status: 'completed' })
+    }), 1);
+    expect(transport.getTextStream).not.toHaveBeenCalled();
+    adapter.dispose();
+    ledger.dispose();
+  });
 });

@@ -3,6 +3,7 @@ using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.Tools;
 
@@ -39,8 +40,10 @@ internal sealed class VisionAgentBuildRevalidator
             .Where(group => group.Count() == 1)
             .ToDictionary(group => group.Key, group => group.Single(), StringComparer.OrdinalIgnoreCase);
         var appliedDecisionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var mapping in mappings.Where(item => item.ResourceDependent))
+        for (var index = 0; index < mappings.Count; index++)
         {
+            var mapping = mappings[index];
+            if (!mapping.ResourceDependent) continue;
             if (decisions.TryGetValue(mapping.ResourceCanonicalId, out var decision))
             {
                 if (!decision.ResourceType.Equals(mapping.ResourceKind, StringComparison.OrdinalIgnoreCase) ||
@@ -52,6 +55,16 @@ internal sealed class VisionAgentBuildRevalidator
                     continue;
                 }
                 appliedDecisionIds.Add(decision.CanonicalId);
+                mappings[index] = mapping with
+                {
+                    Value = decision.ResourceKey,
+                    HasExplicitValue = true,
+                    ValueSummary = decision.ValueSummary,
+                    Source = VisionAgentResourceAuthority.CameraBindingSource,
+                    Pending = false,
+                    SuggestedReason = "已由相机绑定权威确认。",
+                    Impact = "权威绑定仅用于当前 AI 候选重新校验，尚未写入正式工程。"
+                };
             }
         }
 
@@ -61,7 +74,7 @@ internal sealed class VisionAgentBuildRevalidator
             AgentRunId = request.Build.RunId,
             ExistingFlowJson = JsonSerializer.Serialize(flow, JsonOptions)
         };
-        var arguments = JsonSerializer.SerializeToElement(new { flow }, JsonOptions);
+        var arguments = BuildValidationArguments(flow);
         var validationTool = new FlowValidationTool();
         var dryRunTool = new DryRunFlowTool();
         var validation = await validationTool.ExecuteAsync(context, arguments, cancellationToken);
@@ -273,6 +286,58 @@ internal sealed class VisionAgentBuildRevalidator
         if (parameter == null) return false;
         parameter.Value = value;
         return true;
+    }
+
+    private static JsonElement BuildValidationArguments(OperatorFlowDto flow)
+    {
+        var tempIds = flow.Operators.ToDictionary(
+            op => op.Id,
+            ReadValidationTempId);
+        var operators = flow.Operators.Select(op => new
+        {
+            tempId = tempIds[op.Id],
+            operatorType = OperatorTypeAliasResolver.Resolve(op.Type).ToString(),
+            parameters = op.Parameters
+                .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Last().HasExplicitValue
+                        ? group.Last().Value
+                        : group.Last().DefaultValue,
+                    StringComparer.OrdinalIgnoreCase)
+        }).ToList();
+        var connections = flow.Connections.Select(connection =>
+        {
+            tempIds.TryGetValue(connection.SourceOperatorId, out var sourceTempId);
+            tempIds.TryGetValue(connection.TargetOperatorId, out var targetTempId);
+            var source = flow.Operators.FirstOrDefault(op => op.Id == connection.SourceOperatorId);
+            var target = flow.Operators.FirstOrDefault(op => op.Id == connection.TargetOperatorId);
+            return new
+            {
+                sourceTempId = sourceTempId ?? string.Empty,
+                sourcePortName = source?.OutputPorts.FirstOrDefault(port => port.Id == connection.SourcePortId)?.Name ?? string.Empty,
+                targetTempId = targetTempId ?? string.Empty,
+                targetPortName = target?.InputPorts.FirstOrDefault(port => port.Id == connection.TargetPortId)?.Name ?? string.Empty
+            };
+        }).ToList();
+        var entryOperatorTempId = operators.FirstOrDefault()?.tempId ?? string.Empty;
+
+        return JsonSerializer.SerializeToElement(new
+        {
+            flow = new
+            {
+                operators,
+                connections,
+                entryOperatorTempId
+            },
+            entryOperatorTempId
+        }, JsonOptions);
+    }
+
+    private static string ReadValidationTempId(OperatorDto op)
+    {
+        var tempId = ReadTempId(op);
+        return string.IsNullOrWhiteSpace(tempId) ? op.Id.ToString("D") : tempId;
     }
 
     private static string ReadTempId(OperatorDto op)

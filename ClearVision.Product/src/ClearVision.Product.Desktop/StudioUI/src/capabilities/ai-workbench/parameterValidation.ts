@@ -59,7 +59,9 @@ function validateParameterContracts(
   const namesByOperator = new Map<string, Set<string>>();
   const operatorTypes = new Map<string, string>();
   const canonicalKeys = new Set<string>();
-  const supportedDataTypes = new Set(['bool', 'double', 'enum', 'file', 'guid', 'int', 'number', 'string', 'text']);
+  const supportedDataTypes = new Set([
+    'bool', 'camerabinding', 'double', 'enum', 'file', 'guid', 'int', 'number', 'string', 'text'
+  ]);
   const supportedComparisons = new Set(['equals', 'not-equals', 'empty', 'not-empty']);
 
   for (const parameter of parameters) {
@@ -100,15 +102,20 @@ function validateParameterContracts(
 export function validateBuildParameterValues(
   parameters: readonly AiBuildParameterV1[],
   submittedValues: Readonly<Record<string, AiScalarValue>>,
-  confirmedValues: Readonly<Record<string, AiScalarValue>> = {}
+  confirmedValues: Readonly<Record<string, AiScalarValue>> = {},
+  validationKeys: readonly string[] | null = null
 ): AiParameterValidationResult {
   const values = Object.freeze({ ...confirmedValues, ...submittedValues });
   const errors = validateParameterContracts(parameters);
-  const active = parameters.filter(parameter => !errors[parameter.canonicalKey] &&
+  const validationScope = validationKeys ? new Set(validationKeys) : null;
+  const active = parameters.filter(parameter => !parameter.resourceDependent && !errors[parameter.canonicalKey] &&
     (parameter.enabledWhen === null || conditionsMatch(parameter.enabledWhen, parameter, values)) &&
     !(parameter.disabledWhen !== null && conditionsMatch(parameter.disabledWhen, parameter, values)));
+  const validated = validationScope
+    ? active.filter(parameter => validationScope.has(parameter.canonicalKey))
+    : active;
 
-  for (const parameter of active) {
+  for (const parameter of validated) {
     const key = parameter.canonicalKey;
     const hasValue = Object.prototype.hasOwnProperty.call(values, key);
     const value = values[key];
@@ -169,18 +176,26 @@ export function validateBuildParameterValues(
   }
   for (const members of atLeastOneGroups.values()) {
     if (members.some(parameter => !isMissing(values[parameter.canonicalKey]))) continue;
-    for (const parameter of members) errors[parameter.canonicalKey] = '此组参数至少需要确认一项。';
+    for (const parameter of members) {
+      if (!validationScope || validationScope.has(parameter.canonicalKey)) {
+        errors[parameter.canonicalKey] = '此组参数至少需要确认一项。';
+      }
+    }
   }
   for (const members of mutuallyExclusiveGroups.values()) {
     const configured = members.filter(parameter => !isMissing(values[parameter.canonicalKey]));
     if (configured.length > 1) {
-      for (const parameter of configured) errors[parameter.canonicalKey] = '互斥参数只能确认其中一项。';
+      for (const parameter of configured) {
+        if (!validationScope || validationScope.has(parameter.canonicalKey)) {
+          errors[parameter.canonicalKey] = '互斥参数只能确认其中一项。';
+        }
+      }
     }
   }
 
   return Object.freeze({
     valid: Object.keys(errors).length === 0,
     errors: Object.freeze(errors),
-    activeKeys: Object.freeze(active.map(parameter => parameter.canonicalKey))
+    activeKeys: Object.freeze(validated.map(parameter => parameter.canonicalKey))
   });
 }

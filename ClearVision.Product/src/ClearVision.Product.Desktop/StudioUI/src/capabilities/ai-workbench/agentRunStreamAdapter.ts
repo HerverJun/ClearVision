@@ -13,6 +13,7 @@ export interface CreateAgentRunStreamAdapterOptions {
   readonly isTerminal: () => boolean;
   readonly onEvent: (event: AiAgentRunEventV1, generation: number) => AiStreamEventOutcome;
   readonly onReplay: (replay: AiAgentRunReplayV1, generation: number) => void;
+  readonly onTerminalReplayUnresolved?: (replay: AiAgentRunReplayV1, generation: number) => Promise<void>;
   readonly onRecovering: (message: string) => void;
   readonly onFailure: (error: unknown) => void;
 }
@@ -168,6 +169,9 @@ export function createAgentRunStreamAdapter(options: CreateAgentRunStreamAdapter
         if (outcome === 'gap') {
           throw new Error('AgentRun replay did not close the sequence gap.');
         }
+      }
+      if (!options.isTerminal() && replay.summary.status !== 'running') {
+        await options.onTerminalReplayUnresolved?.(replay, generation);
       }
       if (!options.isTerminal() && replay.summary.status === 'running') {
         void openStream(expectedConnection);
