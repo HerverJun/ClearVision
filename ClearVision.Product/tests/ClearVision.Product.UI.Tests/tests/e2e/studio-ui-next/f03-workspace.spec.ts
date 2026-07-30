@@ -1383,6 +1383,9 @@ test('Operator Rail supports search, category, click-add and drag-add', async ({
 
 test('node selection, move, copy/paste, undo/redo, delete and focus/IME gates stay scoped', async ({ page }) => {
   await bootWorkspace(page);
+  const topStateStack = page.locator('[data-testid="workspace-top-state-stack"]');
+  await expect(topStateStack).toHaveCount(1);
+  expect(await topStateStack.evaluate((element) => element.getBoundingClientRect().height)).toBe(0);
   const surface = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
   const canvas = page.locator('[data-testid="flow-canvas"]');
   const threshold = await searchOperator(page, '二值化');

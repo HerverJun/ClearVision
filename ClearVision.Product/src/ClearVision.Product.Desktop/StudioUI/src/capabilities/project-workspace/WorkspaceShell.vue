@@ -475,54 +475,59 @@ const showRunSummary = computed(() => Boolean(run.value && [
       </section>
     </header>
 
-    <section
-      v-if="newDraft"
-      class="workspace-shell__new-project"
-      data-testid="workspace-new-project-metadata"
+    <div
+      class="workspace-shell__top-state-stack"
+      data-testid="workspace-top-state-stack"
     >
-      <div>
-        <strong>新工程信息</strong>
-        <span>{{ newDraft.message }}</span>
-      </div>
-      <CvField
-        name="newProjectName"
-        label="工程名称"
-        required
-        :model-value="newDraft.project.name"
-        :disabled="newDraft.metadataLocked"
-        @update:model-value="updateNewDraftName"
-      />
-      <CvField
-        name="newProjectDescription"
-        label="工程描述"
-        :model-value="newDraft.project.description ?? ''"
-        :disabled="newDraft.metadataLocked"
-        @update:model-value="updateNewDraftDescription"
-      />
-    </section>
+      <section
+        v-if="newDraft"
+        class="workspace-shell__new-project"
+        data-testid="workspace-new-project-metadata"
+      >
+        <div>
+          <strong>新工程信息</strong>
+          <span>{{ newDraft.message }}</span>
+        </div>
+        <CvField
+          name="newProjectName"
+          label="工程名称"
+          required
+          :model-value="newDraft.project.name"
+          :disabled="newDraft.metadataLocked"
+          @update:model-value="updateNewDraftName"
+        />
+        <CvField
+          name="newProjectDescription"
+          label="工程描述"
+          :model-value="newDraft.project.description ?? ''"
+          :disabled="newDraft.metadataLocked"
+          @update:model-value="updateNewDraftDescription"
+        />
+      </section>
 
-    <section
-      v-if="showHandoffReceive && handoffReceive"
-      class="workspace-shell__handoff-receive"
-      :data-handoff-receive-phase="handoffReceive.phase"
-      role="status"
-    >
-      <CvStatusBadge
-        :tone="handoffReceiveTone"
-        :label="handoffReceiveLabel"
-      />
-      <div>
-        <strong>{{ handoffReceive.message }}</strong>
-        <span v-if="handoffReceive.blocker">阻断：{{ handoffReceive.blocker }}</span>
-        <span>{{ handoffReceive.nextStep }}</span>
-      </div>
-    </section>
+      <section
+        v-if="showHandoffReceive && handoffReceive"
+        class="workspace-shell__handoff-receive"
+        :data-handoff-receive-phase="handoffReceive.phase"
+        role="status"
+      >
+        <CvStatusBadge
+          :tone="handoffReceiveTone"
+          :label="handoffReceiveLabel"
+        />
+        <div>
+          <strong>{{ handoffReceive.message }}</strong>
+          <span v-if="handoffReceive.blocker">阻断：{{ handoffReceive.blocker }}</span>
+          <span>{{ handoffReceive.nextStep }}</span>
+        </div>
+      </section>
 
-    <WorkspaceHandoffBanner
-      v-if="handoff"
-      :handoff="handoff"
-      @discard="discardHandoff"
-    />
+      <WorkspaceHandoffBanner
+        v-if="handoff"
+        :handoff="handoff"
+        @discard="discardHandoff"
+      />
+    </div>
 
     <div
       v-if="isReadySurface && canvasProject && canvasOwner"
@@ -883,6 +888,7 @@ const showRunSummary = computed(() => Boolean(run.value && [
   white-space: nowrap;
 }
 .workspace-shell__project-status { max-width: 240px; overflow: hidden; color: var(--cv-text-secondary); text-overflow: ellipsis; }
+.workspace-shell__top-state-stack { min-width: 0; min-height: 0; display: grid; }
 .workspace-shell__handoff-receive { display: flex; min-width: 0; align-items: center; gap: var(--cv-space-4); padding: var(--cv-space-3) var(--cv-density-page-padding); border-block-end: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
 .workspace-shell__new-project { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(220px, 320px) minmax(240px, 380px); gap: var(--cv-space-4); align-items: end; padding: var(--cv-space-3) var(--cv-density-page-padding); border-block-end: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
 .workspace-shell__new-project > div { display: grid; gap: 2px; min-width: 0; }
