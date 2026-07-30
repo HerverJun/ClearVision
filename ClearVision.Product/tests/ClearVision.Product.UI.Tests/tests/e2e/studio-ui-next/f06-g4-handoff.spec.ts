@@ -91,7 +91,9 @@ test('new target remains id-less until explicit save then uses create authority 
   ));
   await expect(page.locator('[data-workspace-project-id="new"]')).toBeVisible();
   await expect(page.getByTestId('workspace-new-project-metadata')).toBeVisible();
-  await expect(page.getByTestId('new-draft-preview-unavailable')).toBeVisible();
+  const unavailablePreview = page.getByTestId('new-draft-preview-unavailable');
+  await expect(unavailablePreview).toBeVisible();
+  expect((await unavailablePreview.boundingBox())?.width).toBeGreaterThanOrEqual(200);
   await expect(page.locator('[data-workspace-handoff-phase="workspace-staged-unsaved"]')).toBeVisible();
   expect(projectWrites(audit)).toEqual([]);
   await captureF06Evidence(page, audit, 'g4-new-staged-unsaved', viewport, 'compact');
