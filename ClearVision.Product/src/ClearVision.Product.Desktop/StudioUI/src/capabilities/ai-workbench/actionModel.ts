@@ -5,6 +5,12 @@ export type AiWorkbenchActionId =
   | 'retryIntent'
   | 'startPlan'
   | 'cancelPlan'
+  | 'startBuild'
+  | 'cancelBuild'
+  | 'confirmParameters'
+  | 'updateResourceDecision'
+  | 'recheckReadiness'
+  | 'rebuild'
   | 'answerClarification'
   | 'acceptRecommendedAnswers'
   | 'previewReadiness'
@@ -61,9 +67,50 @@ export function aiWorkbenchActionModel(state: AiWorkbenchState): AiWorkbenchActi
         nextStagePlaceholder: null
       });
     case 'plan-ready':
-      return Object.freeze({ primary: null, secondary: Object.freeze([action('startNewTask', '开始新任务', false)]),
+      return Object.freeze({ primary: action('startBuild', '开始构建', true),
+        secondary: Object.freeze([action('startNewTask', '开始新任务', false)]),
         statusHint: '方案已具备构建条件。',
-        nextStagePlaceholder: Object.freeze({ label: '进入下一阶段', disabledReason: '构建与资源绑定将在 G3 开放。' }) });
+        nextStagePlaceholder: null });
+    case 'build-starting':
+    case 'building':
+    case 'validating':
+      return Object.freeze({
+        primary: action('cancelBuild', '取消构建', false, state.run.runId !== null,
+          state.run.runId ? '' : 'Build Run 尚未由服务端确认。'),
+        secondary: Object.freeze([]),
+        statusHint: '公开阶段通过 replay 与 SSE 恢复。',
+        nextStagePlaceholder: null
+      });
+    case 'parameters-pending':
+      return Object.freeze({ primary: action('confirmParameters', '确认参数', true), secondary: Object.freeze([]),
+        statusHint: '建议值不会自动视为已确认；确认后必须重新校验。', nextStagePlaceholder: null });
+    case 'resources-pending':
+      return Object.freeze({ primary: action('updateResourceDecision', '保存资源决策', true), secondary: Object.freeze([]),
+        statusHint: '只接受当前 Build 返回的 canonical 资源身份。', nextStagePlaceholder: null });
+    case 'build-blocked':
+      return Object.freeze({ primary: action('recheckReadiness', '重新校验', true),
+        secondary: Object.freeze([action('rebuild', '重新构建', false)]),
+        statusHint: state.buildStale ? '输入已更新，旧验证与就绪结论已失效。' : state.message,
+        nextStagePlaceholder: null });
+    case 'revalidating':
+      return Object.freeze({ primary: null, secondary: Object.freeze([]),
+        statusHint: '候选结构保持不变，服务端正在重新计算 Validation 与 ApplyGate。', nextStagePlaceholder: null });
+    case 'build-ready':
+      return Object.freeze({ primary: null, secondary: Object.freeze([action('recheckReadiness', '重新校验', false)]),
+        statusHint: '候选已具备交接条件。',
+        nextStagePlaceholder: Object.freeze({ label: '工作区审核', disabledReason: '下一阶段将交接到工作区审核；G4 尚未获准。' }) });
+    case 'build-failed':
+    case 'build-cancelled':
+      return Object.freeze({ primary: action('rebuild', '重新构建', true),
+        secondary: Object.freeze([action('reconcile', '协调服务端状态', false)]),
+        statusHint: state.build ? '上一版候选仅供查看，不能继续操作。' : state.message, nextStagePlaceholder: null });
+    case 'baseline-conflict':
+    case 'unknown-outcome':
+      return Object.freeze({ primary: action('reconcile', '协调服务端状态', true), secondary: Object.freeze([]),
+        statusHint: state.message, nextStagePlaceholder: null });
+    case 'build-cancelling':
+      return Object.freeze({ primary: null, secondary: Object.freeze([]),
+        statusHint: '正在等待后端终态 reservation。', nextStagePlaceholder: null });
     case 'cancelled':
       return Object.freeze({ primary: action('startNewTask', '开始新任务', true), secondary: Object.freeze([]),
         statusHint: '规划终态已由服务端确认。', nextStagePlaceholder: null });

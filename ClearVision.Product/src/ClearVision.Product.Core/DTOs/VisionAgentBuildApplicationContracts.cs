@@ -59,6 +59,8 @@ public sealed record CanonicalBuildOutcome
 
 public sealed record VisionAgentBuildReadinessPreviewRequest
 {
+    public string SessionId { get; init; } = string.Empty;
+    public long ExpectedRevision { get; init; }
     public string PlanId { get; init; } = string.Empty;
     public string PlanHash { get; init; } = string.Empty;
     public VisionAgentPlanModeResult? PlanSnapshot { get; init; }

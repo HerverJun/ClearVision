@@ -2,9 +2,12 @@ import { computed, readonly, shallowRef, type ComputedRef, type DeepReadonly, ty
 import { ApiAbortError, ApiConflictError, ApiHttpError, ApiUnauthorizedError, type ApiTransport } from '@/platform/api';
 import type {
   AiAgentRunEventV1,
+  AiResourceDecisionSelectionV1,
+  AiScalarValue,
   AiOperationProjectionV1,
   AiPlanAnswerV1,
   AiProjectContextV1,
+  AiProjectBaselineV1,
   AiRequirementMode,
   AiSessionDetailV1,
   AiSessionSnapshotV1
@@ -15,6 +18,7 @@ import { createAgentRunStreamAdapter, type AgentRunStreamAdapter } from './agent
 import { projectAiWorkbench, type AiWorkbenchProjection } from './projection';
 import { aiWorkbenchActionModel, type AiWorkbenchActionModel } from './actionModel';
 import { createAiResourceLedger, type AiResourceLedgerDiagnostics } from './resourceLedger';
+import { validateBuildParameterValues } from './parameterValidation';
 import {
   eventRequiresReplay,
   initialAiWorkbenchState,
@@ -40,6 +44,12 @@ export interface AiSessionOwner {
   retryIntent(): Promise<void>;
   startPlan(): Promise<void>;
   cancelPlan(): Promise<void>;
+  startBuild(): Promise<void>;
+  cancelBuild(): Promise<void>;
+  confirmParameters(values: Readonly<Record<string, AiScalarValue>>): Promise<void>;
+  updateResourceDecisions(decisions: readonly AiResourceDecisionSelectionV1[]): Promise<void>;
+  recheckReadiness(): Promise<void>;
+  rebuild(): Promise<void>;
   answerClarification(answers: Readonly<Record<string, string>>, acceptRecommended?: boolean): Promise<void>;
   acceptRecommendedAnswers(): Promise<void>;
   previewReadiness(): Promise<void>;
@@ -52,7 +62,8 @@ export interface AiSessionOwner {
 }
 
 interface PublicFailure {
-  readonly phase: 'session-conflict' | 'plan-failed' | 'offline-or-service-unavailable';
+  readonly phase: 'session-conflict' | 'plan-failed' | 'build-failed' | 'baseline-conflict' |
+    'unknown-outcome' | 'offline-or-service-unavailable';
   readonly errorCode: string;
   readonly message: string;
 }
@@ -75,16 +86,22 @@ function publicFailure(error: unknown, fallbackPhase: PublicFailure['phase'] = '
             ? '服务端状态已经更新，请协调最新状态后继续。'
             : '本地服务未能完成请求，请稍后重试。';
     return Object.freeze({
-      phase: error.status === 409 ? 'session-conflict' : fallbackPhase,
+      phase: error.status === 409 && ['project_revision_conflict', 'canonical_flow_hash_conflict',
+        'candidate_fingerprint_conflict'].includes(errorCode)
+        ? 'baseline-conflict'
+        : error.status === 409 ? 'session-conflict' : fallbackPhase,
       errorCode,
       message
     });
   }
   return Object.freeze({
     phase: fallbackPhase,
-    errorCode: fallbackPhase === 'plan-failed' ? 'plan_request_failed' : 'service_unavailable',
+    errorCode: fallbackPhase === 'plan-failed' ? 'plan_request_failed' :
+      fallbackPhase === 'build-failed' ? 'build_request_failed' : 'service_unavailable',
     message: fallbackPhase === 'plan-failed'
       ? '规划未能完成，请检查公开诊断后重试。'
+      : fallbackPhase === 'build-failed'
+        ? '构建未能完成，请检查公开诊断后重试。'
       : '本地服务暂时不可用，请检查服务状态后重试。'
   });
 }
@@ -121,6 +138,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
   let currentSessionId = requestedSessionId;
   let createOperationId: string | null = null;
   let planOperationId: string | null = null;
+  let buildOperationId: string | null = null;
   let ownerGeneration = 0;
   let planGeneration = 0;
   let disposed = false;
@@ -183,8 +201,39 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     operation: AiOperationProjectionV1 | null = null
   ): void {
     validateSessionRoute(session);
+    validateBuildSnapshot(session.snapshot);
     currentSessionId = session.sessionId;
     dispatch({ type: 'session-ready', session, project, operation, at: now() });
+  }
+
+  function validateBuildSnapshot(snapshot: AiSessionSnapshotV1): void {
+    const build = snapshot.buildResult;
+    if (!build) return;
+    const baseline = state.value.projectBaseline;
+    const sameBaseline = baseline &&
+      build.projectBaseline.targetKind === baseline.targetKind &&
+      build.projectBaseline.projectId === baseline.projectId &&
+      build.projectBaseline.persistenceRevision === baseline.persistenceRevision &&
+      build.projectBaseline.canonicalFlowHash === baseline.canonicalFlowHash;
+    if (!sameBaseline || snapshot.buildRunId !== build.runId ||
+        snapshot.buildClientOperationId !== build.clientOperationId ||
+        snapshot.submittedBuildFingerprint !== build.submittedBuildFingerprint ||
+        snapshot.buildTerminalSequence === null) {
+      throw new Error('Build Snapshot identity mismatch.');
+    }
+  }
+
+  async function loadProjectBaseline(): Promise<AiProjectBaselineV1> {
+    const baseline = projectId
+      ? await request(signal => api.getProjectBaseline(projectId, signal))
+      : Object.freeze({
+          targetKind: 'new' as const,
+          projectId: null,
+          persistenceRevision: null,
+          canonicalFlowHash: ''
+        });
+    dispatch({ type: 'baseline-ready', baseline, at: now() });
+    return baseline;
   }
 
   function acceptRunEvent(event: AiAgentRunEventV1, generation: number): 'accepted' | 'gap' | 'stale' {
@@ -193,6 +242,32 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     if (event.plan && (event.planId !== event.plan.planId || event.planHash !== event.plan.planHash)) return 'stale';
     if (state.value.plan && event.planId && event.planId !== state.value.plan.planId) return 'stale';
     if (state.value.plan && event.planHash && event.planHash !== state.value.plan.planHash) return 'stale';
+    const eventSnapshot = event.workspaceSnapshot;
+    if (eventSnapshot) {
+      if (!event.sessionId || event.sessionId !== currentSessionId ||
+          eventSnapshot.projectId !== state.value.session?.snapshot.projectId ||
+          (state.value.run.kind === 'plan' && eventSnapshot.planRunId !== event.runId) ||
+          (state.value.run.kind === 'build' && eventSnapshot.buildRunId !== event.runId)) return 'stale';
+    }
+    if (event.build) {
+      const baseline = state.value.projectBaseline;
+      const snapshot = state.value.session?.snapshot;
+      if (!eventSnapshot || eventSnapshot.buildResult?.buildId !== event.build.buildId ||
+          eventSnapshot.buildRunId !== event.build.runId ||
+          eventSnapshot.buildClientOperationId !== event.build.clientOperationId ||
+          eventSnapshot.submittedBuildFingerprint !== event.build.submittedBuildFingerprint ||
+          eventSnapshot.answerRevision !== event.build.answerRevision ||
+          eventSnapshot.resourceRevision !== event.build.resourceRevision ||
+          !state.value.plan || event.build.planId !== state.value.plan.planId ||
+          event.build.planHash !== state.value.plan.planHash ||
+          (buildOperationId && event.build.clientOperationId !== buildOperationId) ||
+          !baseline || event.build.projectBaseline.targetKind !== baseline.targetKind ||
+          event.build.projectBaseline.projectId !== baseline.projectId ||
+          event.build.projectBaseline.persistenceRevision !== baseline.persistenceRevision ||
+          event.build.projectBaseline.canonicalFlowHash !== baseline.canonicalFlowHash ||
+          (snapshot && (event.build.answerRevision !== snapshot.answerRevision ||
+            event.build.resourceRevision !== snapshot.resourceRevision))) return 'stale';
+    }
     if (eventRequiresReplay(state.value, event, generation)) {
       dispatch({ type: 'recovery-start', reason: '规划进度存在缺口，正在从服务端回放补齐。', at: now() });
       return 'gap';
@@ -207,6 +282,9 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     getAfterSequence: () => state.value.run.lastSequence,
     isTerminal: () => state.value.run.terminalSequence !== null,
     onEvent: acceptRunEvent,
+    onReplay: (replay, generation) => dispatch({
+      type: 'replay-observed', diagnostics: replay.diagnostics, generation, at: now()
+    }),
     onRecovering: message => dispatch({ type: 'recovery-start', reason: message, at: now() }),
     onFailure: error => fail(error, 'offline-or-service-unavailable')
   });
@@ -215,10 +293,13 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     runId: string,
     operation: AiOperationProjectionV1 | null,
     snapshot: AiSessionSnapshotV1 | null,
-    initialEvents: readonly AiAgentRunEventV1[] = []
+    initialEvents: readonly AiAgentRunEventV1[] = [],
+    kind: 'plan' | 'build' = 'plan'
   ): Promise<void> {
-    if (!currentSessionId) throw new Error('A confirmed Session is required before attaching a Plan Run.');
-    dispatch({ type: 'plan-attached', runId, operation, snapshot, at: now() });
+    if (!currentSessionId) throw new Error('A confirmed Session is required before attaching a run.');
+    dispatch(kind === 'build'
+      ? { type: 'build-attached', runId, operation, snapshot, at: now() }
+      : { type: 'plan-attached', runId, operation, snapshot, at: now() });
     for (const event of initialEvents) acceptRunEvent(event, planGeneration);
     await streamAdapter.start(runId, planGeneration);
   }
@@ -245,11 +326,46 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     return true;
   }
 
+  async function reconcileBuildOperation(): Promise<boolean> {
+    if (!buildOperationId) return false;
+    dispatch({ type: 'recovery-start', reason: '正在查询此前构建操作的服务端结果。', at: now() });
+    const operation = await request(signal => api.getOperation(buildOperationId!, 'build_run', signal));
+    if (operation.status === 'pending') {
+      dispatch({ type: 'build-unknown', message: '构建创建结果尚未确认，请继续协调服务端状态。', at: now() });
+      return false;
+    }
+    if (operation.status !== 'created' || !operation.runId || operation.sessionId !== currentSessionId) {
+      throw new Error(operation.publicMessage || 'Build operation was not created.');
+    }
+    await attachRun(operation.runId, operation, null, [], 'build');
+    return true;
+  }
+
   async function restorePlanRun(snapshot: AiSessionSnapshotV1): Promise<void> {
     if (!snapshot.planRunId) return;
     planGeneration += 1;
     dispatch({ type: 'plan-start', clientOperationId: planOperationId ?? operationIdFactory(), generation: planGeneration, at: now() });
     await attachRun(snapshot.planRunId, null, snapshot);
+  }
+
+  async function restoreBuildRun(snapshot: AiSessionSnapshotV1): Promise<boolean> {
+    if (!snapshot.buildRunId) return false;
+    buildOperationId = snapshot.buildClientOperationId;
+    if (snapshot.buildResult && snapshot.buildTerminalSequence !== null) {
+      await loadCameraBindings();
+      return true;
+    }
+    planGeneration += 1;
+    dispatch({
+      type: 'build-start',
+      clientOperationId: buildOperationId ?? operationIdFactory(),
+      generation: planGeneration,
+      at: now()
+    });
+    await attachRun(snapshot.buildRunId, null, snapshot, [], 'build');
+    await refreshSessionSnapshot();
+    await loadCameraBindings();
+    return true;
   }
 
   async function start(): Promise<void> {
@@ -261,11 +377,14 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
       const project = projectId ? await request(signal => api.getProject(projectId, signal)) : null;
       if (disposed || runGeneration !== ownerGeneration) return;
       if (projectId && project?.id !== projectId) throw new Error('Canonical Project identity mismatch.');
+      await loadProjectBaseline();
+      if (disposed || runGeneration !== ownerGeneration) return;
 
       if (currentSessionId) {
         const session = await request(signal => api.getSession(currentSessionId!, signal));
         if (disposed || runGeneration !== ownerGeneration) return;
         acceptSession(session, project);
+        if (await restoreBuildRun(session.snapshot)) return;
         await restorePlanRun(session.snapshot);
         return;
       }
@@ -278,6 +397,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
       if (disposed || runGeneration !== ownerGeneration) return;
       if (response.session) {
         acceptSession(response.session, project, response.operation);
+        await restoreBuildRun(response.session.snapshot);
         return;
       }
       if (await reconcileCreate(createOperationId)) return;
@@ -327,6 +447,73 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
         }
       }
       fail(error, 'plan-failed');
+    }
+  }
+
+  async function startBuild(): Promise<void> {
+    const session = state.value.session;
+    const plan = state.value.plan;
+    const baseline = state.value.projectBaseline;
+    if (disposed || authorizationFrozen || !currentSessionId || !session || !plan || !baseline ||
+        !(state.value.readiness?.buildReadiness.canBuild ?? plan.buildReadiness.canBuild)) return;
+    buildOperationId ??= operationIdFactory();
+    planGeneration += 1;
+    const generation = planGeneration;
+    dispatch({ type: 'build-start', clientOperationId: buildOperationId, generation, at: now() });
+    try {
+      const response = await request(signal => api.createBuildRun({
+        clientOperationId: buildOperationId!,
+        target: baseline,
+        description: state.value.taskDescription || plan.originalUserPrompt || plan.goal,
+        sessionId: currentSessionId!,
+        requirementMode: state.value.requirementMode,
+        buildFromPlan: {
+          planId: plan.planId,
+          planHash: plan.planHash,
+          workspaceExpectedRevision: session.snapshot.revision,
+          planSnapshot: plan,
+          confirmedAnswers: session.snapshot.confirmedPlanAnswers,
+          userSelections: session.snapshot.planQuestionSelections,
+          acceptedDefaults: plan.recommendedDefaults.map(item => item.id),
+          operatorCatalogVersion: plan.operatorCatalogVersion,
+          stationBoundarySummary: plan.stationBoundarySummary,
+          plcOutputPolicy: plan.plcOutputPolicy,
+          buildIntent: baseline.targetKind === 'existing' ? 'modify' : 'new',
+          originalUserPrompt: state.value.taskDescription || plan.originalUserPrompt,
+          acceptedRecommendedDefaults: session.snapshot.planAcceptedRecommendedDefaults,
+          answerRevision: session.snapshot.answerRevision,
+          resourceRevision: session.snapshot.resourceRevision,
+          parameterValues: session.snapshot.buildParameterValues,
+          resourceDecisions: session.snapshot.resourceDecisions,
+          metadataOnly: true
+        }
+      }, signal));
+      if (disposed || generation !== planGeneration) return;
+      if (!response.runId || response.sessionId !== currentSessionId || response.operation.kind !== 'build_run') {
+        throw new Error('Build Run response identity mismatch.');
+      }
+      await attachRun(response.runId, response.operation, response.workspaceSnapshot, response.events, 'build');
+      await refreshSessionSnapshot();
+      await loadCameraBindings();
+    } catch (error) {
+      if (disposed || generation !== planGeneration || error instanceof ApiAbortError) return;
+      if (!(error instanceof ApiUnauthorizedError) && buildOperationId) {
+        try {
+          if (await reconcileBuildOperation()) return;
+        } catch (reconcileError) {
+          if (reconcileError instanceof ApiAbortError || disposed) return;
+        }
+      }
+      const failure = publicFailure(error, 'build-failed');
+      if (failure.phase === 'baseline-conflict' || error instanceof ApiConflictError) {
+        dispatch({ type: 'failed', ...failure, at: now() });
+      } else {
+        dispatch({
+          type: 'build-unknown',
+          message: '构建创建响应未能确认；请先查询 operation 状态，系统不会盲目重复创建。',
+          at: now()
+        });
+      }
     }
   }
 
@@ -383,6 +570,139 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
         return;
       }
       fail(error, 'plan-failed');
+    }
+  }
+
+  async function cancelBuild(): Promise<void> {
+    await cancelPlan();
+  }
+
+  async function persistBuildInputs(
+    parameterValues: Readonly<Record<string, AiScalarValue>> | null,
+    resourceDecisions: readonly AiResourceDecisionSelectionV1[] | null,
+    message: string
+  ): Promise<void> {
+    const session = state.value.session;
+    const build = state.value.build;
+    if (disposed || authorizationFrozen || !session || !build) return;
+    try {
+      const snapshot = await request(signal => api.updateWorkspaceSnapshot(session.sessionId, {
+        expectedRevision: session.snapshot.revision,
+        clientMutationId: operationIdFactory(),
+        projectId: session.snapshot.projectId,
+        lifecycleState: 'build_inputs_changed',
+        ...(parameterValues ? {
+          buildParameterValues: Object.freeze({ ...session.snapshot.buildParameterValues, ...parameterValues }),
+          answerRevision: session.snapshot.answerRevision + 1
+        } : {}),
+        ...(resourceDecisions ? {
+          resourceDecisions
+        } : {})
+      }, signal));
+      dispatch({ type: 'inputs-updated', snapshot, message, at: now() });
+    } catch (error) {
+      const latest = latestSnapshotFromConflict(error);
+      if (latest) {
+        dispatch({ type: 'snapshot-ready', snapshot: latest, at: now() });
+        dispatch({
+          type: 'failed',
+          phase: 'session-conflict',
+          errorCode: 'workspace_revision_conflict',
+          message: '参数或资源已在其他位置更新；已加载最新状态，请核对后再次提交。',
+          at: now()
+        });
+        return;
+      }
+      fail(error, 'build-failed');
+    }
+  }
+
+  async function confirmParameters(values: Readonly<Record<string, AiScalarValue>>): Promise<void> {
+    const build = state.value.build;
+    const session = state.value.session;
+    if (!build || !session) return;
+    const allowed = new Set(build.parameterMapping
+      .filter(item => item.pending && !item.resourceDependent)
+      .map(item => item.canonicalKey));
+    const submitted = Object.fromEntries(Object.entries(values).filter(([key]) => allowed.has(key)));
+    const validation = validateBuildParameterValues(
+      build.parameterMapping,
+      submitted,
+      session.snapshot.buildParameterValues
+    );
+    if (Object.keys(submitted).length === 0 || !validation.valid) {
+      dispatch({
+        type: 'failed',
+        phase: 'build-failed',
+        errorCode: Object.keys(submitted).length === 0
+          ? 'parameter_confirmation_empty'
+          : 'parameter_confirmation_invalid',
+        message: Object.values(validation.errors)[0] ?? '没有可确认的参数值，请先完成必填项和合同校验。',
+        at: now()
+      });
+      return;
+    }
+    const activeKeys = new Set(validation.activeKeys);
+    const activeSubmitted = Object.freeze(Object.fromEntries(
+      Object.entries(submitted).filter(([key]) => activeKeys.has(key))
+    ));
+    await persistBuildInputs(activeSubmitted, null, '参数已确认，旧验证与就绪结论已失效。');
+  }
+
+  async function updateResourceDecisions(decisions: readonly AiResourceDecisionSelectionV1[]): Promise<void> {
+    const build = state.value.build;
+    if (!state.value.session || !build) return;
+    const missingById = new Map(build.missingResources.map(resource => [resource.canonicalId, resource]));
+    const valid = decisions.filter(decision => {
+      const resource = missingById.get(decision.canonicalId);
+      return resource?.resourceType === 'camera_binding' && /^[a-z0-9_.:-]{1,160}$/i.test(decision.resourceKey);
+    });
+    if (valid.length === 0) return;
+    await persistBuildInputs(null, Object.freeze(valid), '资源决策已保存，旧验证与就绪结论已失效。');
+  }
+
+  async function recheckReadiness(): Promise<void> {
+    const session = state.value.session;
+    const build = state.value.build;
+    if (disposed || authorizationFrozen || !session || !build) return;
+    dispatch({ type: 'revalidation-start', at: now() });
+    try {
+      const response = await request(signal => api.revalidateBuild({
+        runId: build.runId,
+        sessionId: session.sessionId,
+        expectedRevision: session.snapshot.revision,
+        clientMutationId: operationIdFactory(),
+        buildId: build.buildId,
+        candidateFlowFingerprint: build.candidateFlowFingerprint,
+        answerRevision: session.snapshot.answerRevision,
+        resourceRevision: session.snapshot.resourceRevision
+      }, signal));
+      if (response.build.runId !== build.runId || response.build.buildId !== build.buildId ||
+          response.build.candidateFlowFingerprint !== build.candidateFlowFingerprint) {
+        throw new Error('Build revalidation response identity mismatch.');
+      }
+      dispatch({ type: 'revalidation-ready', build: response.build, snapshot: response.snapshot, at: now() });
+    } catch (error) {
+      const latest = latestSnapshotFromConflict(error);
+      if (latest) dispatch({ type: 'snapshot-ready', snapshot: latest, at: now() });
+      fail(error, error instanceof ApiConflictError ? 'baseline-conflict' : 'build-failed');
+    }
+  }
+
+  async function rebuild(): Promise<void> {
+    if (disposed || authorizationFrozen) return;
+    buildOperationId = null;
+    await startBuild();
+  }
+
+  async function loadCameraBindings(): Promise<void> {
+    if (!state.value.build?.missingResources.some(resource => resource.resourceType === 'camera_binding')) return;
+    try {
+      const bindings = await request(signal => api.listCameraBindings(signal));
+      dispatch({ type: 'camera-bindings-ready', bindings, at: now() });
+    } catch (error) {
+      if (error instanceof ApiAbortError || error instanceof ApiUnauthorizedError) return;
+      dispatch({ type: 'camera-bindings-ready', bindings: Object.freeze([]), at: now() });
     }
   }
 
@@ -483,6 +803,8 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
       : session.snapshot.confirmedPlanAnswers;
     try {
       const readiness = await request(signal => api.previewReadiness({
+        sessionId: session.sessionId,
+        expectedRevision: session.snapshot.revision,
         planId: plan.planId,
         planHash: plan.planHash,
         planSnapshot: plan,
@@ -492,15 +814,29 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
         acceptedDefaults: plan.recommendedDefaults.map(item => item.id),
         acceptedRecommendedDefaults: session.snapshot.planAcceptedRecommendedDefaults,
         answerRevision: session.snapshot.answerRevision,
-        resourceRevision: 0,
+        resourceRevision: session.snapshot.resourceRevision,
         originalUserPrompt: state.value.taskDescription || plan.originalUserPrompt,
         metadataOnly: true
       }, signal));
-      if (readiness.planId !== plan.planId || readiness.planHash !== plan.planHash) {
+      if (readiness.planId !== plan.planId || readiness.planHash !== plan.planHash ||
+          readiness.answerRevision !== session.snapshot.answerRevision ||
+          readiness.resourceRevision !== session.snapshot.resourceRevision) {
         throw new Error('Readiness response identity mismatch.');
       }
       const latestSession = state.value.session;
-      if (!latestSession) return;
+      if (!latestSession || latestSession.sessionId !== session.sessionId ||
+          latestSession.snapshot.revision !== session.snapshot.revision ||
+          latestSession.snapshot.answerRevision !== session.snapshot.answerRevision ||
+          latestSession.snapshot.resourceRevision !== session.snapshot.resourceRevision) {
+        dispatch({
+          type: 'failed',
+          phase: 'session-conflict',
+          errorCode: 'readiness_response_stale',
+          message: '就绪检查返回时会话已更新；旧响应未应用，请重新检查。',
+          at: now()
+        });
+        return;
+      }
       const snapshot = await request(signal => api.updateWorkspaceSnapshot(latestSession.sessionId, {
         expectedRevision: latestSession.snapshot.revision,
         clientMutationId: operationIdFactory(),
@@ -536,7 +872,9 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     if (disposed || authorizationFrozen) return;
     try {
       if (state.value.run.runId) await streamAdapter.reconcile();
+      else if (buildOperationId && await reconcileBuildOperation()) return;
       else if (planOperationId && await reconcilePlanOperation()) return;
+      if (projectId) await loadProjectBaseline();
       if (currentSessionId) {
         const session = await request(signal => api.getSession(currentSessionId!, signal));
         validateSessionRoute(session);
@@ -547,9 +885,18 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     }
   }
 
+  async function refreshSessionSnapshot(): Promise<void> {
+    if (!currentSessionId) return;
+    const session = await request(signal => api.getSession(currentSessionId!, signal));
+    validateSessionRoute(session);
+    validateBuildSnapshot(session.snapshot);
+    dispatch({ type: 'snapshot-ready', snapshot: session.snapshot, at: now() });
+  }
+
   function startNewTask(): void {
     if (disposed) return;
     planOperationId = null;
+    buildOperationId = null;
     planGeneration += 1;
     dispatch({ type: 'new-task', at: now() });
   }
@@ -559,6 +906,10 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     if (!state.value.session) {
       dispatch({ type: 'retry', at: now() });
       await start();
+      return;
+    }
+    if (['build-failed', 'build-cancelled', 'baseline-conflict'].includes(state.value.phase)) {
+      await rebuild();
       return;
     }
     if (state.value.taskDescription) await retryIntent();
@@ -574,6 +925,12 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     retryIntent,
     startPlan,
     cancelPlan,
+    startBuild,
+    cancelBuild,
+    confirmParameters,
+    updateResourceDecisions,
+    recheckReadiness,
+    rebuild,
     answerClarification,
     acceptRecommendedAnswers,
     previewReadiness,

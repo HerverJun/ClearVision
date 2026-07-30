@@ -7,8 +7,12 @@ import { fulfillF02Json, installF02BrowserStartup } from './f02-browser-fixture'
 export const f06ProjectId = '22222222-2222-4222-8222-222222222222';
 export const f06SessionId = 'session_f06_01';
 export const f06RunId = 'run_plan_f06_01';
+export const f06BuildRunId = 'run_build_f06_01';
 export const f06PlanId = 'plan_f06_01';
 export const f06PlanHash = 'a'.repeat(64);
+export const f06BuildId = 'build_f06_01';
+export const f06BuildFingerprint = 'd'.repeat(64);
+export const f06CandidateFingerprint = 'e'.repeat(64);
 const timestamp = '2026-07-29T08:00:00.000Z';
 
 export interface F06BrowserAudit {
@@ -23,6 +27,7 @@ export interface F06BrowserFixtureOptions {
   readonly projectBound?: boolean;
   readonly failSession?: boolean;
   readonly longContent?: boolean;
+  readonly recoveredBuild?: boolean;
 }
 
 function answer(field = 'defect_definition', value = '2 mm') {
@@ -63,9 +68,11 @@ function sessionSnapshot(projectBound: boolean, overrides: Record<string, unknow
   return {
     schemaVersion: 1, revision: 1, projectId: projectBound ? f06ProjectId : null, lifecycleState: 'idle',
     planRunId: null, planRunStatus: null, buildRunId: null, buildRunStatus: null,
-    buildClientOperationId: null, projectBaseline: null, requirementMode: 'strict',
+    buildClientOperationId: null, buildTerminalSequence: null, submittedBuildFingerprint: null,
+    projectBaseline: null, requirementMode: 'strict',
     planQuestionSelections: {}, confirmedPlanAnswers: [], optimisticPlanAnswers: [], answerRevision: 0,
-    readinessPreview: null, planAcceptedRecommendedDefaults: false, planTerminalSequence: null,
+    buildParameterValues: {}, readinessPreview: null, missingResources: [], resourceDecisions: [],
+    resourceRevision: 0, buildResult: null, planAcceptedRecommendedDefaults: false, planTerminalSequence: null,
     updatedAtUtc: timestamp, ...overrides
   };
 }
@@ -74,11 +81,19 @@ function session(projectBound: boolean, snapshot: Record<string, unknown>) {
   return { sessionId: f06SessionId, snapshot, updatedAtUtc: timestamp };
 }
 
-function operation(kind: 'session_create' | 'plan_run', clientOperationId: string) {
+function projectBaseline(projectBound: boolean) {
+  return projectBound
+    ? { targetKind: 'existing', projectId: f06ProjectId, persistenceRevision: 18, canonicalFlowHash: '9'.repeat(64) }
+    : { targetKind: 'new', projectId: null, persistenceRevision: null, canonicalFlowHash: '' };
+}
+
+function operation(kind: 'session_create' | 'plan_run' | 'build_run', clientOperationId: string, projectBound = false) {
   return {
     clientOperationId, kind, status: 'created', sessionId: f06SessionId,
-    runId: kind === 'plan_run' ? f06RunId : null, payloadFingerprint: `sha256:${'c'.repeat(64)}`,
-    projectBaseline: null, errorCode: null, publicMessage: null,
+    runId: kind === 'plan_run' ? f06RunId : kind === 'build_run' ? f06BuildRunId : null,
+    payloadFingerprint: `sha256:${'c'.repeat(64)}`,
+    projectBaseline: kind === 'build_run' ? projectBaseline(projectBound) : null,
+    errorCode: null, publicMessage: null,
     createdAtUtc: timestamp, updatedAtUtc: timestamp, expiresAtUtc: timestamp
   };
 }
@@ -179,7 +194,134 @@ function replay(events: readonly Record<string, unknown>[], status: 'running' | 
       eventCount: events.length, duplicateEventCount: 0, droppedEventCount: 0, staleEventCount: 0,
       ownerHash: 'redacted-owner', terminalIntent: null, metadataOnly: true, redactionPass: true, payload: null
     },
-    events, snapshot: {}, diagnostics: {}
+    events,
+    snapshot: {
+      storageVersion: 'agent-run-events.jsonl.v1', runId: f06RunId, generatedAt: timestamp,
+      firstSequence: events[0]?.sequence ?? 0, lastSequence: events.at(-1)?.sequence ?? 0,
+      eventCount: events.length, metadataOnly: true, redactionPass: true, events
+    },
+    diagnostics: {
+      runId: f06RunId, eventCount: events.length, duplicateEventCount: 0, droppedEventCount: 0,
+      staleEventCount: 0, metadataOnly: true, redactionPass: true
+    }
+  };
+}
+
+function cameraResource() {
+  return {
+    canonicalId: 'resource:v1|camera_binding|imageacquisition#1|camera_binding_id',
+    resourceType: 'camera_binding', resourceName: '顶视检测相机',
+    resourceKey: 'acquire_1.CameraBindingId', operatorKey: 'imageacquisition#1',
+    operatorId: 'acquire_1', operatorType: 'ImageAcquisition', operatorIndex: 0,
+    parameterName: 'CameraBindingId', status: 'pending', blockingScope: 'deploy_run',
+    resolutionTarget: 'camera_settings', draftPolicy: 'draft_allowed',
+    description: '请选择已配置且可用的相机绑定。', source: 'operator_contract', aliases: []
+  };
+}
+
+function buildParameter(confirmed: boolean) {
+  return {
+    canonicalKey: 'threshold_1.Threshold', tempId: 'threshold_1', operatorType: 'Thresholding',
+    operatorDisplayName: '阈值分割', parameterName: 'Threshold', parameterDisplayName: '分割阈值',
+    purpose: '控制高反光表面缺陷的分割灵敏度。', dataType: 'number', isRequired: true,
+    value: confirmed ? 128 : null, hasExplicitValue: confirmed,
+    valueSummary: confirmed ? '128' : '128（建议）', source: confirmed ? 'user_confirmed_parameter' : 'suggested',
+    pending: !confirmed, impact: '影响划伤和压痕边界。', suggestedReason: '依据当前样本对比度给出。',
+    defaultValue: 128, minValue: 0, maxValue: 255, options: [], requiredPolicy: 'required',
+    atLeastOneGroup: '', mutuallyExclusiveGroup: '', requiredWhen: [], enabledWhen: [],
+    resourceKind: '', resourceCanonicalId: '', resourceDependent: false
+  };
+}
+
+function buildResult(
+  projectBound: boolean,
+  parameterConfirmed = false,
+  resourceBound = false,
+  clientOperationId = '44444444-4444-4444-8444-444444444444'
+) {
+  const ready = parameterConfirmed && resourceBound;
+  const missingResources = resourceBound ? [] : [cameraResource()];
+  const check = (id: string, label: string) => ({
+    id, label, status: ready ? 'passed' : 'pending',
+    summary: ready ? '已通过。' : '等待参数与资源处理。', blockerCount: ready ? 0 : 1, warningCount: 0
+  });
+  return {
+    schemaVersion: 1, runId: f06BuildRunId, buildId: f06BuildId,
+    clientOperationId,
+    buildIdentity: `${f06PlanId}:${f06BuildId}`, submittedBuildFingerprint: f06BuildFingerprint,
+    planId: f06PlanId, planHash: f06PlanHash, answerSetFingerprint: `sha256:${'b'.repeat(64)}`,
+    answerRevision: parameterConfirmed ? 2 : 1, resourceRevision: resourceBound ? 1 : 0,
+    projectBaseline: projectBaseline(projectBound), candidateFlowFingerprint: f06CandidateFingerprint,
+    operatorCount: 3, connectionCount: 2,
+    operatorPipeline: [
+      { tempId: 'acquire_1', operatorType: 'ImageAcquisition', source: 'plan', status: 'mapped', repairNote: '' },
+      { tempId: 'threshold_1', operatorType: 'Thresholding', source: 'plan', status: 'mapped', repairNote: '' },
+      { tempId: 'judge_1', operatorType: 'ResultJudgment', source: 'plan', status: 'mapped', repairNote: '' }
+    ],
+    parameterMapping: [buildParameter(parameterConfirmed)], missingResources,
+    workflowDiff: {
+      addedNodes: ['ImageAcquisition', 'Thresholding', 'ResultJudgment'], modifiedNodes: [],
+      preservedNodes: [], removedNodes: [], addedOrChangedParameters: ['threshold_1.Threshold'],
+      pendingParameters: parameterConfirmed ? [] : ['threshold_1.Threshold'],
+      missingResources: missingResources.map(item => item.canonicalId), validationFailures: [], autoRepairs: [],
+      deploymentBlockers: ready ? [] : ['AI 候选仍需人工输入。'], metadataOnly: true
+    },
+    validation: {
+      structural: check('structural', '结构校验'), dryRun: check('dry_run', '运行预演'),
+      manifest: check('manifest', '清单预检'),
+      applyGate: {
+        canvasApplyReady: ready, runtimeDraftReady: ready, deploymentReady: false, blocked: !ready,
+        status: ready ? 'ready_for_handoff' : 'blocked',
+        applyBlockers: ready ? [] : ['参数或资源尚未处理。'], deploymentBlockers: ['工作区审核尚未执行。'],
+        firstFixRecommendation: ready ? '' : parameterConfirmed ? '请选择顶视检测相机。' : '请确认分割阈值。',
+        metadataOnly: true
+      },
+      handoffEligible: ready, readinessStatus: ready ? 'ready' : 'blocked',
+      firstFixRecommendation: ready ? '' : parameterConfirmed ? '请选择顶视检测相机。' : '请确认分割阈值。',
+      metadataOnly: true
+    },
+    publicTimeline: [{
+      stage: 'validation', toolName: 'FlowValidationTool', source: 'existing_tool',
+      inputSummary: '候选流程元数据', outputSummary: ready ? '验证通过。' : '等待人工输入。',
+      status: ready ? 'completed' : 'pending', durationMs: 12, evidenceId: 'evidence_f06_01',
+      repairAction: '', warningCode: '', applyImpact: ready ? 'ready' : 'blocked',
+      deploymentImpact: 'workspace_review_required', metadataOnly: true, redactionPass: true
+    }],
+    publicWarnings: [], metadataOnly: true, redactionPass: true
+  };
+}
+
+function buildRunEvent(sequence: number, build: ReturnType<typeof buildResult>, snapshot: Record<string, unknown>) {
+  return {
+    runId: f06BuildRunId, sequence, timestamp, eventType: 'run.completed', stage: 'build',
+    title: '构建完成', summary: '候选流程与公开验证已生成。', status: 'completed',
+    payload: {
+      sessionId: f06SessionId, planId: f06PlanId, planHash: f06PlanHash,
+      publicBuildResult: build, workspaceSnapshot: snapshot, metadataOnly: true
+    },
+    metadataOnly: true, redactionPass: true
+  };
+}
+
+function buildReplay(events: readonly Record<string, unknown>[], status: 'running' | 'completed') {
+  return {
+    summary: {
+      runId: f06BuildRunId, createdAt: timestamp, updatedAt: timestamp, status,
+      title: 'AI 构建', summary: '公开构建状态', firstFixRecommendation: '请确认分割阈值。',
+      lastSequence: events.at(-1)?.sequence ?? 0, eventCount: events.length,
+      duplicateEventCount: 0, droppedEventCount: 0, staleEventCount: 0,
+      ownerHash: 'redacted-owner', terminalIntent: null, metadataOnly: true, redactionPass: true, payload: null
+    },
+    events,
+    snapshot: {
+      storageVersion: 'agent-run-events.jsonl.v1', runId: f06BuildRunId, generatedAt: timestamp,
+      firstSequence: events[0]?.sequence ?? 0, lastSequence: events.at(-1)?.sequence ?? 0,
+      eventCount: events.length, metadataOnly: true, redactionPass: true, events
+    },
+    diagnostics: {
+      runId: f06BuildRunId, eventCount: events.length, duplicateEventCount: 0, droppedEventCount: 0,
+      staleEventCount: 0, metadataOnly: true, redactionPass: true
+    }
   };
 }
 
@@ -189,6 +331,18 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
   const projectBound = options.projectBound ?? false;
   const activePlan = plan(options.longContent ?? false);
   let snapshot = sessionSnapshot(projectBound);
+  let activeBuildOperationId = '44444444-4444-4444-8444-444444444444';
+  if (options.recoveredBuild) {
+    const recovered = buildResult(projectBound, true, true, activeBuildOperationId);
+    snapshot = sessionSnapshot(projectBound, {
+      revision: 8, lifecycleState: 'build_ready', buildRunId: f06BuildRunId,
+      buildRunStatus: 'completed', buildTerminalSequence: 1,
+      buildClientOperationId: activeBuildOperationId, submittedBuildFingerprint: f06BuildFingerprint,
+      projectBaseline: projectBaseline(projectBound), answerRevision: 2, resourceRevision: 1,
+      buildParameterValues: { 'threshold_1.Threshold': 128 },
+      resourceDecisions: [], missingResources: [], buildResult: recovered
+    });
+  }
   const audit: F06BrowserAudit = { requests: [], consoleErrors: [], pageErrors: [] };
   await installF02BrowserStartup(page, { 'Studio2.AiWorkbench': flag });
   page.on('console', message => { if (message.type() === 'error') audit.consoleErrors.push(message.text()); });
@@ -207,9 +361,15 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
       version: '2.3.0', persistenceRevision: 18, createdAt: timestamp, modifiedAt: timestamp,
       lastOpenedAt: timestamp, flow: null, assets: { schemaVersion: 1, calibrationAssets: [], spatialAssets: [] }
     });
+    if (url.pathname === `/api/ai/projects/${f06ProjectId}/baseline`) {
+      return json(200, projectBaseline(true));
+    }
     if (url.pathname === '/api/ai/sessions' && request.method() === 'POST') {
       if (options.failSession) return json(200, { malformedPublicContract: true });
       return json(201, { operation: operation('session_create', String((body as { clientOperationId: string }).clientOperationId)), session: session(projectBound, snapshot) });
+    }
+    if (url.pathname === `/api/ai/sessions/${f06SessionId}` && request.method() === 'GET') {
+      return json(200, session(projectBound, snapshot));
     }
     if (options.failSession && url.pathname.startsWith('/api/ai/operations/')) {
       const clientOperationId = url.pathname.split('/').at(-1)!;
@@ -229,6 +389,21 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
         persistenceStatus: {}
       });
     }
+    if (url.pathname === '/api/ai/agent-runs' && request.method() === 'POST') {
+      activeBuildOperationId = String((body as { clientOperationId: string }).clientOperationId);
+      snapshot = sessionSnapshot(projectBound, {
+        ...snapshot, revision: Number(snapshot.revision) + 1, lifecycleState: 'building',
+        buildRunId: f06BuildRunId, buildRunStatus: 'running',
+        buildClientOperationId: activeBuildOperationId, projectBaseline: projectBaseline(projectBound),
+        submittedBuildFingerprint: f06BuildFingerprint
+      });
+      return json(200, {
+        runId: f06BuildRunId, sessionId: f06SessionId, brief: '正在构建', events: [],
+        workspaceSnapshot: snapshot,
+        operation: operation('build_run', activeBuildOperationId, projectBound),
+        persistenceStatus: {}, metadataOnly: true
+      });
+    }
     if (url.pathname === `/api/ai/agent-runs/${f06RunId}`) {
       return json(200, replay([runEvent(1, 'plan.started', activePlan, snapshot)], 'running'));
     }
@@ -245,6 +420,45 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
         headers: { 'x-clearvision-fixture-schema': 'f06-g2-ai.v1' },
         body: streamEvents.map(event => `id: ${event.sequence}\nevent: ${event.eventType}\ndata: ${JSON.stringify(event)}\n\n`).join('')
       });
+    }
+    if (url.pathname === `/api/ai/agent-runs/${f06BuildRunId}`) {
+      return json(200, buildReplay([], 'running'));
+    }
+    if (url.pathname === `/api/ai/agent-runs/${f06BuildRunId}/events`) {
+      const build = buildResult(projectBound, false, false, activeBuildOperationId);
+      snapshot = sessionSnapshot(projectBound, {
+        ...snapshot, revision: Number(snapshot.revision) + 1, lifecycleState: 'parameters_pending',
+        buildRunId: f06BuildRunId, buildRunStatus: 'completed', buildTerminalSequence: 1,
+        buildClientOperationId: activeBuildOperationId, submittedBuildFingerprint: f06BuildFingerprint,
+        projectBaseline: projectBaseline(projectBound), missingResources: build.missingResources,
+        buildResult: build
+      });
+      const terminal = buildRunEvent(1, build, snapshot);
+      return route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        headers: { 'x-clearvision-fixture-schema': 'f06-g3-ai.v1' },
+        body: `id: 1\nevent: run.completed\ndata: ${JSON.stringify(terminal)}\n\n`
+      });
+    }
+    if (url.pathname === '/api/cameras/bindings') return json(200, [{
+      id: '55555555-5555-4555-8555-555555555555', displayName: '顶视检测相机 A',
+      deviceId: 'camera-a', manufacturer: 'ClearVision', modelName: 'CV-Line', triggerMode: 'software',
+      isEnabled: true, connectionStatus: 'connected'
+    }]);
+    if (url.pathname === `/api/ai/agent-runs/${f06BuildRunId}/revalidate`) {
+      const parameterConfirmed = Object.prototype.hasOwnProperty.call(
+        snapshot.buildParameterValues as Record<string, unknown>, 'threshold_1.Threshold'
+      );
+      const resourceBound = (snapshot.resourceDecisions as unknown[]).length > 0;
+      const build = buildResult(projectBound, parameterConfirmed, resourceBound, activeBuildOperationId);
+      snapshot = sessionSnapshot(projectBound, {
+        ...snapshot, revision: Number(snapshot.revision) + 1,
+        lifecycleState: build.validation.handoffEligible ? 'build_ready' : 'resources_pending',
+        answerRevision: build.answerRevision, resourceRevision: build.resourceRevision,
+        missingResources: build.missingResources, buildResult: build
+      });
+      return json(200, { build, snapshot, metadataOnly: true });
     }
     if (url.pathname === `/api/ai/sessions/${f06SessionId}/workspace-snapshot`) {
       const mutation = body as Record<string, unknown>;
@@ -263,11 +477,11 @@ function evidenceRoot(): string | null {
   const configured = process.env.CV_F06_EVIDENCE_DIR?.trim();
   if (!configured) return null;
   const repositoryRoot = resolve(process.cwd(), '..', '..', '..');
-  const allowedRoot = resolve(repositoryRoot, '.tmp', 'studio-ui-next', 'f06-g2');
+  const allowedRoot = resolve(repositoryRoot, '.tmp', 'studio-ui-next', 'f06-g3');
   const output = isAbsolute(configured) ? resolve(configured) : resolve(repositoryRoot, configured);
   const relativeOutput = relative(allowedRoot, output);
   if (relativeOutput.startsWith('..') || isAbsolute(relativeOutput)) {
-    throw new Error('CV_F06_EVIDENCE_DIR must remain under .tmp/studio-ui-next/f06-g2.');
+    throw new Error('CV_F06_EVIDENCE_DIR must remain under .tmp/studio-ui-next/f06-g3.');
   }
   return output;
 }
@@ -296,10 +510,10 @@ export async function captureF06Evidence(
   const stem = `${safeScenario}-${viewport.width}x${viewport.height}-${density}`;
   await writeFile(resolve(root, `${stem}.png`), screenshot);
   await writeFile(resolve(root, `${stem}.json`), `${JSON.stringify({
-    schemaVersion: 'f06-g2-browser-evidence.v1', sourceSha: process.env.CV_F06_SOURCE_SHA ?? 'WORKTREE',
+    schemaVersion: 'f06-g3-browser-evidence.v1', sourceSha: process.env.CV_F06_SOURCE_SHA ?? 'WORKTREE',
     MODEL_MODE: 'RULE_FALLBACK', DATA_SOURCE: 'DETERMINISTIC_BROWSER_FIXTURE', scenario,
     url: page.url(), viewport, observed: projection, density, requestCount: audit.requests.length,
-    forbiddenRequests: audit.requests.filter(item => /build|handoff|apply|workspace\/save/i.test(item.path)),
+    forbiddenRequests: audit.requests.filter(item => /handoff|apply-to-canvas|workspace\/consume|project\/save/i.test(item.path)),
     consoleErrors: audit.consoleErrors, pageErrors: audit.pageErrors,
     screenshot: { sha256: createHash('sha256').update(screenshot).digest('hex'), bytes: screenshot.byteLength },
     WINDOWS_DPI: 'NOT_PERFORMED', REAL_LLM_PRODUCT_QUALITY: 'NOT_EVALUATED'

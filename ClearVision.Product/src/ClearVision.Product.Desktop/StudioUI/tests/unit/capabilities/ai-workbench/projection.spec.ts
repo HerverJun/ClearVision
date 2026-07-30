@@ -1,9 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { aiWorkbenchActionModel } from '@/capabilities/ai-workbench/actionModel';
-import { decodeAiAgentRunEventV1, decodeAiIntentResultV1, decodeAiSessionDetailV1 } from '@/capabilities/ai-workbench/decoder';
+import {
+  decodeAiAgentRunEventV1,
+  decodeAiBuildResultV1,
+  decodeAiIntentResultV1,
+  decodeAiSessionDetailV1,
+  decodeAiSessionSnapshotV1
+} from '@/capabilities/ai-workbench/decoder';
 import { projectAiWorkbench } from '@/capabilities/ai-workbench/projection';
-import { initialAiWorkbenchState, reduceAiWorkbench } from '@/capabilities/ai-workbench/reducer';
-import { intentFixture, planFixture, runEventFixture, sessionFixture } from './aiFixtures';
+import {
+  initialAiWorkbenchState,
+  reduceAiWorkbench,
+  type AiWorkbenchState
+} from '@/capabilities/ai-workbench/reducer';
+import {
+  aiBuildOperationId,
+  aiBuildRunId,
+  buildResultFixture,
+  buildTerminalEventFixture,
+  intentFixture,
+  planFixture,
+  readinessFixture,
+  runEventFixture,
+  sessionFixture,
+  snapshotFixture,
+  validationFixture
+} from './aiFixtures';
 
 function readyState() {
   return reduceAiWorkbench(initialAiWorkbenchState, {
@@ -81,12 +103,126 @@ describe('AI Workbench reducer, projection and action model', () => {
     expect(late).toBe(state);
   });
 
-  it('never exposes a Build action when readiness is ready', () => {
-    const state = { ...readyState(), phase: 'plan-ready' as const, plan: planFixture() as never };
+  it('exposes exactly one Build action when readiness is ready', () => {
+    const state = {
+      ...readyState(),
+      phase: 'plan-ready' as const,
+      plan: planFixture({ canBuild: true, buildReadiness: readinessFixture(true) }) as never
+    };
     const model = aiWorkbenchActionModel(state);
-    expect(model.primary).toBeNull();
-    expect(model.nextStagePlaceholder?.label).toBe('进入下一阶段');
-    expect([model.primary, ...model.secondary].filter(Boolean).map(action => action?.id))
-      .not.toContain('startBuild');
+    expect(model.primary?.id).toBe('startBuild');
+    expect(model.nextStagePlaceholder).toBeNull();
+    expect([model.primary, ...model.secondary].filter(action => action?.id === 'startBuild')).toHaveLength(1);
+  });
+
+  it('projects G3 Build progress, invalidation and read-only ApplyGate states', () => {
+    const plan = planFixture({ canBuild: true, buildReadiness: readinessFixture(true) });
+    let state: AiWorkbenchState = {
+      ...readyState(), phase: 'plan-ready', plan: plan as never,
+      projectBaseline: buildResultFixture().projectBaseline
+    };
+    state = reduceAiWorkbench(state, {
+      type: 'build-start', clientOperationId: aiBuildOperationId, generation: 4, at: 2
+    });
+    expect(state.phase).toBe('build-starting');
+    state = reduceAiWorkbench(state, { type: 'build-attached', runId: aiBuildRunId, operation: null, at: 3 });
+    expect(state.phase).toBe('building');
+    state = reduceAiWorkbench(state, {
+      type: 'run-event', generation: 4, at: 4,
+      event: decodeAiAgentRunEventV1({
+        ...buildTerminalEventFixture(1), eventType: 'build.validation.started', stage: 'validation',
+        status: 'running', payload: { sessionId: 'session_01', planId: plan.planId, planHash: plan.planHash }
+      })
+    });
+    expect(state.phase).toBe('validating');
+    state = reduceAiWorkbench(state, {
+      type: 'run-event', generation: 4, at: 5,
+      event: decodeAiAgentRunEventV1(buildTerminalEventFixture(2))
+    });
+    expect(state.phase).toBe('parameters-pending');
+    expect(aiWorkbenchActionModel(state).primary?.id).toBe('confirmParameters');
+
+    const changedSnapshot = decodeAiSessionSnapshotV1(snapshotFixture({
+      revision: 4, answerRevision: 3, buildParameterValues: { 'threshold_1.threshold': 128 },
+      buildResult: buildResultFixture(), submittedBuildFingerprint: 'd'.repeat(64)
+    }));
+    state = reduceAiWorkbench(state, {
+      type: 'inputs-updated', snapshot: changedSnapshot, message: 'Inputs changed.', at: 6
+    });
+    expect(state.phase).toBe('build-blocked');
+    expect(state.buildStale).toBe(true);
+    expect(aiWorkbenchActionModel(state).primary?.id).toBe('recheckReadiness');
+
+    const parameter = buildResultFixture().parameterMapping[0];
+    const readyBuild = decodeAiBuildResultV1(buildResultFixture({
+      parameterMapping: [{
+        ...parameter, value: 128, hasExplicitValue: true, valueSummary: '128', pending: false
+      }],
+      validation: validationFixture(true)
+    }));
+    const readySnapshot = decodeAiSessionSnapshotV1(snapshotFixture({
+      revision: 5, answerRevision: 3, buildParameterValues: { 'threshold_1.threshold': 128 },
+      buildResult: readyBuild, submittedBuildFingerprint: 'd'.repeat(64)
+    }));
+    state = reduceAiWorkbench(state, { type: 'revalidation-start', at: 7 });
+    expect(state.phase).toBe('revalidating');
+    state = reduceAiWorkbench(state, {
+      type: 'revalidation-ready', build: readyBuild, snapshot: readySnapshot, at: 8
+    });
+    expect(state.phase).toBe('build-ready');
+    expect(state.buildStale).toBe(false);
+    expect(aiWorkbenchActionModel(state).primary).toBeNull();
+    expect(aiWorkbenchActionModel(state).nextStagePlaceholder?.disabledReason).toContain('G4');
+  });
+
+  it('keeps the first terminal outcome and retains the previous candidate read-only', () => {
+    const previousBuild = decodeAiBuildResultV1(buildResultFixture({ validation: validationFixture(true) }));
+    let state: AiWorkbenchState = {
+      ...readyState(), phase: 'build-ready', plan: planFixture() as never, build: previousBuild
+    };
+    state = reduceAiWorkbench(state, {
+      type: 'build-start', clientOperationId: aiBuildOperationId, generation: 5, at: 2
+    });
+    state = reduceAiWorkbench(state, { type: 'build-attached', runId: aiBuildRunId, operation: null, at: 3 });
+    state = reduceAiWorkbench(state, { type: 'cancel-start', at: 4 });
+    const failed = decodeAiAgentRunEventV1({
+      ...buildTerminalEventFixture(1), eventType: 'run.failed', status: 'failed',
+      payload: { sessionId: 'session_01', publicMessage: 'Build failed.' }
+    });
+    state = reduceAiWorkbench(state, { type: 'run-event', event: failed, generation: 5, at: 5 });
+    expect(state.phase).toBe('build-failed');
+    expect(state.build).toBe(previousBuild);
+    expect(state.buildStale).toBe(true);
+
+    const lateCancel = decodeAiAgentRunEventV1({
+      ...buildTerminalEventFixture(2), eventType: 'run.cancelled', status: 'cancelled',
+      payload: { sessionId: 'session_01' }
+    });
+    const afterLateCancel = reduceAiWorkbench(state, {
+      type: 'run-event', event: lateCancel, generation: 5, at: 6
+    });
+    expect(afterLateCancel).toBe(state);
+  });
+
+  it('defines one action-model owner for every G3 phase without executable G4 actions', () => {
+    const expectedPrimary = new Map([
+      ['build-starting', 'cancelBuild'], ['building', 'cancelBuild'], ['validating', 'cancelBuild'],
+      ['parameters-pending', 'confirmParameters'], ['resources-pending', 'updateResourceDecision'],
+      ['build-blocked', 'recheckReadiness'], ['build-failed', 'rebuild'],
+      ['build-cancelled', 'rebuild'], ['baseline-conflict', 'reconcile'], ['unknown-outcome', 'reconcile']
+    ]);
+    for (const [phase, actionId] of expectedPrimary) {
+      const model = aiWorkbenchActionModel({ ...readyState(), phase: phase as never });
+      expect(model.primary?.id, phase).toBe(actionId);
+      expect(model.secondary.filter(action => action.primary), phase).toHaveLength(0);
+    }
+    for (const phase of ['revalidating', 'build-cancelling', 'build-ready'] as const) {
+      const model = aiWorkbenchActionModel({ ...readyState(), phase });
+      expect(model.primary, phase).toBeNull();
+    }
+    const actionIds = [...expectedPrimary.values(), 'recheckReadiness'];
+    expect(actionIds).not.toContain('handoff');
+    expect(actionIds).not.toContain('applyToCanvas');
+    expect(actionIds).not.toContain('saveProject');
   });
 });

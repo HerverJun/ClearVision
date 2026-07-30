@@ -1,5 +1,6 @@
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.Tools;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
@@ -535,6 +536,27 @@ public sealed class OperatorParameterConstraintProviderTests
         catalog.TryGet("DeepLearning", out var deepLearning).Should().BeTrue();
         deepLearning.ParameterConstraints.Should().BeEquivalentTo(
             _factory.GetMetadata(OperatorType.DeepLearning)!.ParameterConstraints);
+    }
+
+    [Fact]
+    public void VisionAgentConditionProjection_ShouldPreserveAllAndAnyGroups()
+    {
+        var constraint = OperatorParameterConstraintProvider.Instance
+            .GetConstraints(OperatorType.TcpCommunication)
+            .Single(item => item.Parameter == "ResponseFieldNames");
+
+        var projected = ParameterMappingService.ProjectConditionSet(constraint.EnabledWhen);
+
+        projected.Should().NotBeNull();
+        projected!.AllConditions.Should().ContainSingle(item =>
+            item.Parameter == "WaitResponse" && item.Comparison == OperatorParameterConditionComparisons.Equal);
+        projected.AnyConditions.Should().HaveCount(2);
+        projected.AnyConditions.Select(item => item.Value)
+            .Should().BeEquivalentTo(new[] { "Delimited", "FixedWidth" });
+        ParameterMappingService.ProjectConditionSet(null).Should().BeNull();
+        var empty = ParameterMappingService.ProjectConditionSet(new OperatorParameterConditionSet([], []));
+        empty!.AllConditions.Should().BeEmpty();
+        empty.AnyConditions.Should().BeEmpty();
     }
 
     private static Dictionary<string, OperatorParameterConstraintState> States(

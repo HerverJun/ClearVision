@@ -1,12 +1,16 @@
 import type { ApiTextStreamResponse, ApiTransport } from '@/platform/api';
 import type {
   AiAgentRunReplayV1,
+  AiBuildRevalidationResponseV1,
+  AiBuildRunCommandV1,
+  AiCameraBindingOptionV1,
   AiIntentResultV1,
   AiOperationKind,
   AiOperationProjectionV1,
   AiPlanAnswerV1,
   AiPlanRunResponseV1,
   AiProjectContextV1,
+  AiProjectBaselineV1,
   AiReadinessPreviewCommandV1,
   AiReadinessPreviewV1,
   AiRequirementMode,
@@ -18,10 +22,13 @@ import type {
 } from './contracts';
 import {
   decodeAiAgentRunReplayV1,
+  decodeAiBuildRevalidationResponseV1,
+  decodeAiCameraBindingOptionsV1,
   decodeAiIntentResultV1,
   decodeAiOperationProjectionV1,
   decodeAiPlanRunResponseV1,
   decodeAiProjectContextV1,
+  decodeAiProjectBaselineV1,
   decodeAiReadinessPreviewV1,
   decodeAiSessionCreateResponseV1,
   decodeAiSessionDetailV1,
@@ -33,6 +40,7 @@ export interface AiWorkbenchApi {
   getSession(sessionId: string, signal?: AbortSignal): Promise<AiSessionDetailV1>;
   getOperation(clientOperationId: string, kind: AiOperationKind, signal?: AbortSignal): Promise<AiOperationProjectionV1>;
   getProject(projectId: string, signal?: AbortSignal): Promise<AiProjectContextV1>;
+  getProjectBaseline(projectId: string, signal?: AbortSignal): Promise<AiProjectBaselineV1>;
   routeIntent(command: Readonly<{
     description: string;
     sessionId: string;
@@ -50,9 +58,21 @@ export interface AiWorkbenchApi {
     resolvedPlanFields: readonly string[];
     remainingPlanFields: readonly string[];
   }>, signal?: AbortSignal): Promise<AiPlanRunResponseV1>;
+  createBuildRun(command: AiBuildRunCommandV1, signal?: AbortSignal): Promise<AiPlanRunResponseV1>;
   getRunReplay(runId: string, signal?: AbortSignal): Promise<AiAgentRunReplayV1>;
   openRunEvents(runId: string, afterSequence: number, signal?: AbortSignal): Promise<ApiTextStreamResponse>;
   cancelPlanRun(runId: string, signal?: AbortSignal): Promise<void>;
+  revalidateBuild(command: Readonly<{
+    runId: string;
+    sessionId: string;
+    expectedRevision: number;
+    clientMutationId: string;
+    buildId: string;
+    candidateFlowFingerprint: string;
+    answerRevision: number;
+    resourceRevision: number;
+  }>, signal?: AbortSignal): Promise<AiBuildRevalidationResponseV1>;
+  listCameraBindings(signal?: AbortSignal): Promise<readonly AiCameraBindingOptionV1[]>;
   previewReadiness(command: AiReadinessPreviewCommandV1, signal?: AbortSignal): Promise<AiReadinessPreviewV1>;
   updateWorkspaceSnapshot(
     sessionId: string,
@@ -97,6 +117,12 @@ export function createAiWorkbenchApi(api: ApiTransport): AiWorkbenchApi {
       const safeProjectId = encodeURIComponent(identifier(projectId, 'projectId', guidPattern));
       return decodeAiProjectContextV1(await api.get(`projects/${safeProjectId}`, signalOptions(signal)));
     },
+    async getProjectBaseline(projectId: string, signal?: AbortSignal) {
+      const safeProjectId = encodeURIComponent(identifier(projectId, 'projectId', guidPattern));
+      return decodeAiProjectBaselineV1(
+        await api.get(`ai/projects/${safeProjectId}/baseline`, signalOptions(signal))
+      );
+    },
     async routeIntent(command: Parameters<AiWorkbenchApi['routeIntent']>[0], signal?: AbortSignal) {
       const payload = await requirePost()('ai/agent-intent-router-runs', {
         description: command.description,
@@ -127,6 +153,16 @@ export function createAiWorkbenchApi(api: ApiTransport): AiWorkbenchApi {
       }, signalOptions(signal));
       return decodeAiPlanRunResponseV1(payload);
     },
+    async createBuildRun(command: AiBuildRunCommandV1, signal?: AbortSignal) {
+      const payload = await requirePost()('ai/agent-runs', {
+        ...command,
+        mode: command.buildFromPlan.buildIntent,
+        useVisionAgentGenerateFlow: true,
+        agentGenerateFlowMode: 'scripted',
+        runtimePreviewConsent: false
+      }, signalOptions(signal));
+      return decodeAiPlanRunResponseV1(payload);
+    },
     async getRunReplay(runId: string, signal?: AbortSignal) {
       const safeRunId = encodeURIComponent(identifier(runId, 'runId'));
       return decodeAiAgentRunReplayV1(await api.get(`ai/agent-runs/${safeRunId}`, signalOptions(signal)));
@@ -143,6 +179,27 @@ export function createAiWorkbenchApi(api: ApiTransport): AiWorkbenchApi {
     async cancelPlanRun(runId: string, signal?: AbortSignal) {
       const safeRunId = encodeURIComponent(identifier(runId, 'runId'));
       await requirePost()(`ai/agent-runs/${safeRunId}/cancel`, {}, signalOptions(signal));
+    },
+    async revalidateBuild(command: Parameters<AiWorkbenchApi['revalidateBuild']>[0], signal?: AbortSignal) {
+      const safeRunId = encodeURIComponent(identifier(command.runId, 'runId'));
+      return decodeAiBuildRevalidationResponseV1(await requirePost()(
+        `ai/agent-runs/${safeRunId}/revalidate`,
+        {
+          sessionId: command.sessionId,
+          expectedRevision: command.expectedRevision,
+          clientMutationId: command.clientMutationId,
+          buildId: command.buildId,
+          candidateFlowFingerprint: command.candidateFlowFingerprint,
+          answerRevision: command.answerRevision,
+          resourceRevision: command.resourceRevision
+        },
+        signalOptions(signal)
+      ));
+    },
+    async listCameraBindings(signal?: AbortSignal) {
+      return decodeAiCameraBindingOptionsV1(
+        await api.get('ai/resource-candidates/camera-bindings', signalOptions(signal))
+      );
     },
     async previewReadiness(command: AiReadinessPreviewCommandV1, signal?: AbortSignal) {
       return decodeAiReadinessPreviewV1(

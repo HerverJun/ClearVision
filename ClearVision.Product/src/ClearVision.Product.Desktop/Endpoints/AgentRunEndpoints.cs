@@ -58,6 +58,8 @@ public static class AgentRunEndpoints
             .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
         app.MapPost("/api/ai/agent-plan/readiness-preview", HandlePreviewPlanReadinessAsync)
             .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
+        app.MapPost("/api/ai/agent-runs/{runId}/revalidate", HandleRevalidateBuildAsync)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
         app.MapPost("/api/ai/agent-intent-router-runs", HandleCreateIntentRouterRunAsync)
             .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
         app.MapPost("/api/ai/agent-plan-runs", HandleCreatePlanRunAsync)
@@ -78,11 +80,178 @@ public static class AgentRunEndpoints
 
     private static async Task<IResult> HandlePreviewPlanReadinessAsync(
         VisionAgentBuildReadinessPreviewRequest request,
+        HttpContext context,
+        IConversationalFlowService conversationService,
         IVisionAgentBuildApplicationService buildApplication,
         CancellationToken ct)
     {
-        var result = await buildApplication.PreviewBuildReadinessAsync(request, ct);
+        if (string.IsNullOrWhiteSpace(request.SessionId))
+        {
+            return Results.BadRequest(new
+            {
+                errorCode = "readiness_session_required",
+                publicMessage = "就绪检查必须绑定当前 AI 会话。"
+            });
+        }
+        var session = conversationService.GetOwnedSession(AiOwnerIdentity.Resolve(context), request.SessionId);
+        var snapshot = session?.WorkspaceSnapshot;
+        if (session == null || snapshot == null)
+        {
+            return Results.NotFound(new { errorCode = "session_not_found", publicMessage = "会话不存在或当前用户无权访问。" });
+        }
+        var plan = snapshot.PendingPlanSnapshot;
+        if (plan == null || snapshot.Revision != request.ExpectedRevision ||
+            !string.Equals(plan.PlanId, request.PlanId, StringComparison.Ordinal) ||
+            !string.Equals(plan.PlanHash, request.PlanHash, StringComparison.OrdinalIgnoreCase) ||
+            snapshot.AnswerRevision != request.AnswerRevision ||
+            snapshot.ResourceRevision != request.ResourceRevision)
+        {
+            return Results.Json(new
+            {
+                errorCode = "readiness_snapshot_stale",
+                publicMessage = "Plan、答案或资源版本已经更新，请加载最新会话状态后重新检查。",
+                latestSnapshot = AiPublicContractMapper.ToSnapshot(snapshot)
+            }, statusCode: StatusCodes.Status409Conflict);
+        }
+
+        var canonicalRequest = request with
+        {
+            PlanSnapshot = plan,
+            RequirementMode = snapshot.RequirementMode,
+            ConfirmedAnswers = snapshot.OptimisticPlanAnswers.Count > 0
+                ? snapshot.OptimisticPlanAnswers.ToList()
+                : snapshot.ConfirmedPlanAnswers.ToList(),
+            UserSelections = snapshot.PlanQuestionSelections
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
+            AcceptedRecommendedDefaults = snapshot.PlanAcceptedRecommendedDefaults,
+            AnswerRevision = snapshot.AnswerRevision,
+            ResourceRevision = snapshot.ResourceRevision,
+            ResourceDecisions = ReadTrustedResourceDecisions(snapshot)
+        };
+        var result = await buildApplication.PreviewBuildReadinessAsync(canonicalRequest, ct);
         return Results.Ok(result);
+    }
+
+    private static async Task<IResult> HandleRevalidateBuildAsync(
+        string runId,
+        VisionAgentBuildRevalidationCommand request,
+        HttpContext context,
+        IAgentRunEventStreamService streamService,
+        IConversationalFlowService conversationService,
+        IVisionAgentBuildApplicationService buildApplication,
+        CancellationToken ct)
+    {
+        if (request.ClientMutationId == Guid.Empty || string.IsNullOrWhiteSpace(request.SessionId))
+        {
+            return Results.BadRequest(new
+            {
+                errorCode = "build_revalidation_identity_required",
+                publicMessage = "重新校验必须提供 sessionId 和 clientMutationId。"
+            });
+        }
+        var ownerHash = AiOwnerIdentity.Resolve(context);
+        var replay = streamService.Replay(runId);
+        if (replay == null || !streamService.IsRunOwner(runId, ownerHash))
+        {
+            return Results.NotFound(new { errorCode = "run_not_found", publicMessage = "运行记录不存在或当前用户无权访问。" });
+        }
+        var session = conversationService.GetOwnedSession(ownerHash, request.SessionId);
+        var snapshot = session?.WorkspaceSnapshot;
+        var build = snapshot?.PublicBuildResult;
+        if (session == null || snapshot == null || build == null)
+        {
+            return Results.NotFound(new { errorCode = "build_candidate_not_found", publicMessage = "当前会话没有可重新校验的候选。" });
+        }
+        if (!string.Equals(build.RunId, runId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(build.BuildId, request.BuildId, StringComparison.Ordinal) ||
+            !string.Equals(build.CandidateFlowFingerprint, request.CandidateFlowFingerprint, StringComparison.OrdinalIgnoreCase) ||
+            snapshot.Revision != request.ExpectedRevision ||
+            snapshot.AnswerRevision != request.AnswerRevision ||
+            snapshot.ResourceRevision != request.ResourceRevision)
+        {
+            return Results.Json(new
+            {
+                errorCode = "build_revalidation_stale",
+                publicMessage = "候选、参数、资源或会话版本已更新，请加载最新状态后重新校验。",
+                latestSnapshot = AiPublicContractMapper.ToSnapshot(snapshot)
+            }, statusCode: StatusCodes.Status409Conflict);
+        }
+        if (string.IsNullOrWhiteSpace(session.CurrentCanvasFlowJson))
+        {
+            return Results.Json(new
+            {
+                errorCode = "candidate_flow_unavailable",
+                publicMessage = "候选流程已不可用，需要重新构建。"
+            }, statusCode: StatusCodes.Status409Conflict);
+        }
+
+        var decisions = ReadTrustedResourceDecisions(snapshot);
+        VisionAgentPublicBuildResultV1 revalidated;
+        try
+        {
+            revalidated = await buildApplication.RevalidateAsync(new VisionAgentBuildRevalidationRequest
+            {
+                CandidateFlowJson = session.CurrentCanvasFlowJson,
+                Build = build,
+                ParameterValues = snapshot.BuildParameterValues,
+                ResourceDecisions = decisions,
+                AnswerRevision = snapshot.AnswerRevision,
+                ResourceRevision = snapshot.ResourceRevision
+            }, ct);
+        }
+        catch (InvalidOperationException)
+        {
+            return Results.Json(new
+            {
+                errorCode = "candidate_fingerprint_conflict",
+                publicMessage = "候选流程身份已变化，需要重新构建。"
+            }, statusCode: StatusCodes.Status409Conflict);
+        }
+
+        var persisted = conversationService.TryUpdateOwnedWorkspaceSnapshot(ownerHash, request.SessionId,
+            new VisionAgentWorkspaceSnapshotUpdate
+            {
+                ExpectedRevision = snapshot.Revision,
+                ClientMutationId = request.ClientMutationId.ToString("D"),
+                LifecycleState = revalidated.Validation.HandoffEligible ? "build_ready" :
+                    revalidated.ParameterMapping.Any(item => item.Pending && !item.ResourceDependent) ? "parameters_pending" :
+                    revalidated.MissingResources.Count > 0 ? "resources_pending" : "build_blocked",
+                PublicBuildResult = revalidated,
+                MissingResources = revalidated.MissingResources.Select(resource => new VisionAgentResourceRequirement
+                {
+                    CanonicalId = resource.CanonicalId,
+                    ResourceType = resource.ResourceType,
+                    ResourceName = resource.ResourceName,
+                    ResourceKey = resource.ResourceKey,
+                    OperatorKey = resource.OperatorKey,
+                    OperatorId = resource.OperatorId,
+                    OperatorType = resource.OperatorType,
+                    OperatorIndex = resource.OperatorIndex,
+                    ParameterName = resource.ParameterName,
+                    Status = resource.Status,
+                    BlockingScope = resource.BlockingScope,
+                    Source = resource.Source,
+                    ResolutionTarget = resource.ResolutionTarget,
+                    DraftPolicy = resource.DraftPolicy,
+                    Description = resource.Description,
+                    Aliases = resource.Aliases.ToList()
+                }).ToList()
+            });
+        if (!persisted.Success)
+        {
+            return Results.Json(new
+            {
+                errorCode = persisted.Conflict ? persisted.ErrorCode : "session_persistence_failed",
+                publicMessage = persisted.PublicMessage,
+                latestSnapshot = persisted.Conflict ? AiPublicContractMapper.ToSnapshot(persisted.Snapshot) : null
+            }, statusCode: persisted.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status503ServiceUnavailable);
+        }
+        return Results.Ok(new
+        {
+            build = revalidated,
+            snapshot = AiPublicContractMapper.ToSnapshot(persisted.Snapshot),
+            metadataOnly = true
+        });
     }
 
     private static async Task<IResult> HandleCreateIntentRouterRunAsync(
@@ -486,6 +655,17 @@ public static class AgentRunEndpoints
         }
 
         request = request with { SessionId = sessionId };
+        if (request.BuildFromPlan != null && owned.Session.WorkspaceSnapshot is { } canonicalSnapshot)
+        {
+            request = request with
+            {
+                BuildFromPlan = request.BuildFromPlan with
+                {
+                    ResourceRevision = canonicalSnapshot.ResourceRevision,
+                    ResourceDecisions = ReadTrustedResourceDecisions(canonicalSnapshot)
+                }
+            };
+        }
         var createResult = streamService.CreateRun(
             request.Description,
             BuildCreatePayload(request),
@@ -1335,10 +1515,36 @@ public static class AgentRunEndpoints
             request.BuildFromPlan?.AcceptedRecommendedDefaults,
             request.BuildFromPlan?.AcceptedDefaults,
             request.BuildFromPlan?.ConfirmedAnswers,
-            request.BuildFromPlan?.UserSelections
+            request.BuildFromPlan?.UserSelections,
+            request.BuildFromPlan?.AnswerRevision,
+            request.BuildFromPlan?.ResourceRevision,
+            request.BuildFromPlan?.ParameterValues,
+            request.BuildFromPlan?.ResourceDecisions
         });
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(json));
         return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static List<VisionAgentResourceDecision> ReadTrustedResourceDecisions(
+        VisionAgentWorkspaceSnapshot snapshot)
+    {
+        var decisions = new List<VisionAgentResourceDecision>();
+        foreach (var value in snapshot.ResourceDecisions.Values)
+        {
+            try
+            {
+                var decision = value.Deserialize<VisionAgentResourceDecision>(AgentRunEventJson.Options);
+                if (VisionAgentResourceAuthority.IsTrustedCameraBindingDecision(decision))
+                {
+                    decisions.Add(decision!);
+                }
+            }
+            catch (JsonException)
+            {
+                // Legacy or corrupt decisions remain blocked and never enter a Build request.
+            }
+        }
+        return decisions;
     }
 
     private static string BuildBuildIdentity(
@@ -2187,10 +2393,23 @@ public sealed record VisionAgentWorkspaceSnapshotDeltaRequest
     public List<VisionAgentPlanAnswer>? ConfirmedPlanAnswers { get; init; }
     public List<VisionAgentPlanAnswer>? OptimisticPlanAnswers { get; init; }
     public int? AnswerRevision { get; init; }
+    public Dictionary<string, JsonElement>? BuildParameterValues { get; init; }
     public VisionAgentBuildReadinessPreviewResult? ReadinessPreview { get; init; }
-    public Dictionary<string, JsonElement>? ResourceDecisions { get; init; }
+    public List<AiResourceDecisionSelectionV1>? ResourceDecisions { get; init; }
+    public int? ResourceRevision { get; init; }
     public string? RequirementMode { get; init; }
     public string? WorkspaceViewMode { get; init; }
     public bool? PlanAcceptedRecommendedDefaults { get; init; }
     public string? SubmittedBuildFingerprint { get; init; }
+}
+
+public sealed record VisionAgentBuildRevalidationCommand
+{
+    public string SessionId { get; init; } = string.Empty;
+    public long ExpectedRevision { get; init; }
+    public Guid ClientMutationId { get; init; }
+    public string BuildId { get; init; } = string.Empty;
+    public string CandidateFlowFingerprint { get; init; } = string.Empty;
+    public int AnswerRevision { get; init; }
+    public int ResourceRevision { get; init; }
 }

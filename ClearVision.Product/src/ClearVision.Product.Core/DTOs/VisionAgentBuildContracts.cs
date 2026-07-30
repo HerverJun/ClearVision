@@ -75,13 +75,54 @@ public sealed record VisionAgentOperatorPipelineStep
 
 public sealed record VisionAgentParameterMapping
 {
+    public string CanonicalKey { get; init; } = string.Empty;
     public string TempId { get; init; } = string.Empty;
     public string OperatorType { get; init; } = string.Empty;
+    public string OperatorDisplayName { get; init; } = string.Empty;
     public string ParameterName { get; init; } = string.Empty;
+    public string ParameterDisplayName { get; init; } = string.Empty;
+    public string Purpose { get; init; } = string.Empty;
+    public string DataType { get; init; } = "string";
+    public bool IsRequired { get; init; }
+    public object? Value { get; init; }
+    public bool HasExplicitValue { get; init; }
     public string ValueSummary { get; init; } = string.Empty;
     public string Source { get; init; } = string.Empty;
     public bool Pending { get; init; }
     public string Impact { get; init; } = string.Empty;
+    public string SuggestedReason { get; init; } = string.Empty;
+    public object? DefaultValue { get; init; }
+    public object? MinValue { get; init; }
+    public object? MaxValue { get; init; }
+    public List<VisionAgentParameterOption> Options { get; init; } = [];
+    public string RequiredPolicy { get; init; } = string.Empty;
+    public string AtLeastOneGroup { get; init; } = string.Empty;
+    public string MutuallyExclusiveGroup { get; init; } = string.Empty;
+    public VisionAgentParameterConditionSet? RequiredWhen { get; init; }
+    public VisionAgentParameterConditionSet? EnabledWhen { get; init; }
+    public VisionAgentParameterConditionSet? DisabledWhen { get; init; }
+    public string ResourceKind { get; init; } = string.Empty;
+    public string ResourceCanonicalId { get; init; } = string.Empty;
+    public bool ResourceDependent { get; init; }
+}
+
+public sealed record VisionAgentParameterOption
+{
+    public string Label { get; init; } = string.Empty;
+    public string Value { get; init; } = string.Empty;
+}
+
+public sealed record VisionAgentParameterCondition
+{
+    public string Parameter { get; init; } = string.Empty;
+    public string Comparison { get; init; } = string.Empty;
+    public object? Value { get; init; }
+}
+
+public sealed record VisionAgentParameterConditionSet
+{
+    public List<VisionAgentParameterCondition> AllConditions { get; init; } = [];
+    public List<VisionAgentParameterCondition> AnyConditions { get; init; } = [];
 }
 
 public sealed record VisionAgentGlobalVariableDraft
@@ -162,4 +203,65 @@ public sealed record VisionAgentBuildRepairRecord
     public string DiffSummary { get; init; } = string.Empty;
     public string ResultStatus { get; init; } = string.Empty;
     public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record VisionAgentBuildCheckV1
+{
+    public string Id { get; init; } = string.Empty;
+    public string Label { get; init; } = string.Empty;
+    public string Status { get; init; } = "pending";
+    public string Summary { get; init; } = string.Empty;
+    public int BlockerCount { get; init; }
+    public int WarningCount { get; init; }
+}
+
+public sealed record VisionAgentBuildValidationV1
+{
+    public VisionAgentBuildCheckV1 Structural { get; init; } = new();
+    public VisionAgentBuildCheckV1 DryRun { get; init; } = new();
+    public VisionAgentBuildCheckV1 Manifest { get; init; } = new();
+    public VisionAgentApplyGate ApplyGate { get; init; } = new();
+    public bool HandoffEligible { get; init; }
+    public string ReadinessStatus { get; init; } = "blocked";
+    public string FirstFixRecommendation { get; init; } = string.Empty;
+    public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record VisionAgentPublicBuildResultV1
+{
+    public int SchemaVersion { get; init; } = 1;
+    public string RunId { get; init; } = string.Empty;
+    public string BuildId { get; init; } = string.Empty;
+    public Guid? ClientOperationId { get; init; }
+    public string BuildIdentity { get; init; } = string.Empty;
+    public string SubmittedBuildFingerprint { get; init; } = string.Empty;
+    public string PlanId { get; init; } = string.Empty;
+    public string PlanHash { get; init; } = string.Empty;
+    public string AnswerSetFingerprint { get; init; } = string.Empty;
+    public int AnswerRevision { get; init; }
+    public int ResourceRevision { get; init; }
+    public AiProjectBaselineIdentity? ProjectBaseline { get; init; }
+    public string CandidateFlowFingerprint { get; init; } = string.Empty;
+    public int OperatorCount { get; init; }
+    public int ConnectionCount { get; init; }
+    public List<VisionAgentOperatorPipelineStep> OperatorPipeline { get; init; } = [];
+    public List<VisionAgentParameterMapping> ParameterMapping { get; init; } = [];
+    public List<AiMissingResourceInfo> MissingResources { get; init; } = [];
+    public VisionAgentWorkflowDiff WorkflowDiff { get; init; } = new();
+    public VisionAgentBuildValidationV1 Validation { get; init; } = new();
+    public List<VisionAgentToolEvidence> PublicTimeline { get; init; } = [];
+    public List<string> PublicWarnings { get; init; } = [];
+    public bool MetadataOnly { get; init; } = true;
+    public bool RedactionPass { get; init; } = true;
+}
+
+public sealed record VisionAgentBuildRevalidationRequest
+{
+    public string CandidateFlowJson { get; init; } = string.Empty;
+    public VisionAgentPublicBuildResultV1 Build { get; init; } = new();
+    public Dictionary<string, System.Text.Json.JsonElement> ParameterValues { get; init; } =
+        new(StringComparer.OrdinalIgnoreCase);
+    public List<VisionAgentResourceDecision> ResourceDecisions { get; init; } = [];
+    public int AnswerRevision { get; init; }
+    public int ResourceRevision { get; init; }
 }

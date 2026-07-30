@@ -1,10 +1,19 @@
 import {
   AiContractDecodeError,
   type AiAgentRunEventV1,
+  type AiAgentRunReplayDiagnosticsV1,
+  type AiAgentRunReplaySnapshotV1,
   type AiAgentRunReplayV1,
   type AiAgentRunSummaryV1,
   type AiBuildBlockerV1,
+  type AiBuildCheckV1,
+  type AiBuildParameterV1,
   type AiBuildReadinessV1,
+  type AiBuildResultV1,
+  type AiBuildTimelineItemV1,
+  type AiBuildValidationV1,
+  type AiBuildRevalidationResponseV1,
+  type AiCameraBindingOptionV1,
   type AiClarificationOptionV1,
   type AiClarificationQuestionV1,
   type AiDefaultAssumptionV1,
@@ -12,6 +21,9 @@ import {
   type AiOperationKind,
   type AiOperationProjectionV1,
   type AiOperationStatus,
+  type AiOperatorPipelineStepV1,
+  type AiParameterConditionSetV1,
+  type AiParameterConditionV1,
   type AiPlanAnswerV1,
   type AiPlanPublicEventV1,
   type AiPlanRunResponseV1,
@@ -22,6 +34,10 @@ import {
   type AiRecommendedRouteV1,
   type AiRequirementMode,
   type AiResourceRequirementV1,
+  type AiResourceDecisionV1,
+  type AiScalarValue,
+  type AiWorkflowDiffV1,
+  type AiApplyGateV1,
   type AiRunStatus,
   type AiSemanticExtractionV1,
   type AiSessionCreateResponseV1,
@@ -35,10 +51,16 @@ const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const sessionPattern = /^[a-z0-9_-]{1,80}$/i;
 const hashPattern = /^(?:sha256:)?[0-9a-f]{64}$/i;
 const tokenPattern = /^[a-z0-9_.:-]{1,128}$/i;
+const resourceIdentityPattern = /^resource:v1\|[a-z0-9_]+\|(?:[a-z0-9_]+(?:#[1-9][0-9]*)?|global)\|[a-z0-9_]+$/;
+const operatorKeyPattern = /^[a-z0-9_]+(?:#[1-9][0-9]*)?$/;
+const resourceKeyPattern = /^[a-z0-9_.:-]{0,256}$/i;
 const operationKinds = new Set<AiOperationKind>(['session_create', 'session_delete', 'plan_run', 'build_run']);
 const operationStatuses = new Set<AiOperationStatus>(['pending', 'created', 'failed', 'rejected']);
 const runStatuses = new Set<AiRunStatus>([
   'pending', 'running', 'completed', 'failed', 'cancelled', 'blocked', 'warning'
+]);
+const parameterComparisons = new Set<AiParameterConditionV1['comparison']>([
+  'equals', 'not-equals', 'empty', 'not-empty'
 ]);
 
 function record(value: unknown, path: string): JsonRecord {
@@ -121,6 +143,22 @@ function stringMap(value: unknown, path: string): Readonly<Record<string, string
   return Object.freeze(result);
 }
 
+function scalar(value: unknown, path: string): AiScalarValue {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  throw new AiContractDecodeError(path, 'a JSON scalar');
+}
+
+function scalarMap(value: unknown, path: string): Readonly<Record<string, AiScalarValue>> {
+  const source = record(value, path);
+  const result: Record<string, AiScalarValue> = {};
+  for (const [key, item] of Object.entries(source)) {
+    if (!tokenPattern.test(key)) throw new AiContractDecodeError(`${path}.${key}`, 'a canonical parameter key');
+    result[key] = scalar(item, `${path}.${key}`);
+  }
+  return Object.freeze(result);
+}
+
 function requirementMode(value: unknown, path: string): AiRequirementMode {
   const decoded = string(value, path);
   if (decoded !== 'strict' && decoded !== 'draft') {
@@ -151,6 +189,12 @@ function baseline(value: unknown, path: string): AiProjectBaselineV1 | null {
   return Object.freeze({ targetKind, projectId, persistenceRevision, canonicalFlowHash });
 }
 
+export function decodeAiProjectBaselineV1(value: unknown, path = '$'): AiProjectBaselineV1 {
+  const decoded = baseline(value, path);
+  if (!decoded) throw new AiContractDecodeError(path, 'a Project baseline');
+  return decoded;
+}
+
 function decodePlanAnswer(value: unknown, path: string): AiPlanAnswerV1 {
   const source = record(value, path);
   exact(source, ['questionId', 'field', 'value', 'origin', 'confidence', 'resolved'], path);
@@ -179,15 +223,58 @@ function decodeResource(value: unknown, path: string): AiResourceRequirementV1 {
   signedInteger(required(source, 'operatorIndex', path), `${path}.operatorIndex`);
   strings(required(source, 'aliases', path), `${path}.aliases`);
   return Object.freeze({
-    canonicalId: string(required(source, 'canonicalId', path), `${path}.canonicalId`),
+    canonicalId: string(required(source, 'canonicalId', path), `${path}.canonicalId`, resourceIdentityPattern),
     resourceType: string(required(source, 'resourceType', path), `${path}.resourceType`),
     resourceName: string(required(source, 'resourceName', path), `${path}.resourceName`),
+    resourceKey: string(required(source, 'resourceKey', path), `${path}.resourceKey`, resourceKeyPattern),
+    operatorKey: string(required(source, 'operatorKey', path), `${path}.operatorKey`, operatorKeyPattern),
+    operatorId: string(required(source, 'operatorId', path), `${path}.operatorId`),
+    operatorType: string(required(source, 'operatorType', path), `${path}.operatorType`),
+    operatorIndex: signedInteger(required(source, 'operatorIndex', path), `${path}.operatorIndex`),
+    parameterName: string(required(source, 'parameterName', path), `${path}.parameterName`),
     status: string(required(source, 'status', path), `${path}.status`),
     blockingScope: string(required(source, 'blockingScope', path), `${path}.blockingScope`),
     resolutionTarget: string(required(source, 'resolutionTarget', path), `${path}.resolutionTarget`),
     draftPolicy: string(required(source, 'draftPolicy', path), `${path}.draftPolicy`),
-    description: string(required(source, 'description', path), `${path}.description`)
+    description: string(required(source, 'description', path), `${path}.description`),
+    source: string(required(source, 'source', path), `${path}.source`),
+    aliases: strings(required(source, 'aliases', path), `${path}.aliases`)
   });
+}
+
+function decodeResourceDecision(value: unknown, path: string): AiResourceDecisionV1 {
+  const source = record(value, path);
+  exact(source, [
+    'canonicalId', 'status', 'resourceKey', 'resourceType', 'operatorKey', 'operatorId',
+    'operatorType', 'operatorIndex', 'parameterName', 'valueSummary', 'source'
+  ], path);
+  const status = string(required(source, 'status', path), `${path}.status`);
+  if (status !== 'bound') throw new AiContractDecodeError(`${path}.status`, 'a server-authorized bound decision');
+  const resourceType = string(required(source, 'resourceType', path), `${path}.resourceType`);
+  const sourceName = string(required(source, 'source', path), `${path}.source`);
+  if (resourceType !== 'camera_binding' || sourceName !== 'camera_binding_authority') {
+    throw new AiContractDecodeError(path, 'a server-authorized camera binding decision');
+  }
+  const resourceKey = string(required(source, 'resourceKey', path), `${path}.resourceKey`, resourceKeyPattern);
+  if (!resourceKey) throw new AiContractDecodeError(`${path}.resourceKey`, 'a canonical resource key');
+  return Object.freeze({
+    canonicalId: string(required(source, 'canonicalId', path), `${path}.canonicalId`, resourceIdentityPattern),
+    status,
+    resourceKey,
+    resourceType,
+    operatorKey: string(required(source, 'operatorKey', path), `${path}.operatorKey`, operatorKeyPattern),
+    operatorId: string(required(source, 'operatorId', path), `${path}.operatorId`),
+    operatorType: string(required(source, 'operatorType', path), `${path}.operatorType`),
+    operatorIndex: signedInteger(required(source, 'operatorIndex', path), `${path}.operatorIndex`),
+    parameterName: string(required(source, 'parameterName', path), `${path}.parameterName`),
+    valueSummary: string(required(source, 'valueSummary', path), `${path}.valueSummary`),
+    source: sourceName
+  });
+}
+
+function resourceDecisions(value: unknown, path: string): readonly AiResourceDecisionV1[] {
+  if (!Array.isArray(value)) throw new AiContractDecodeError(path, 'an array of resource decisions');
+  return Object.freeze(value.map((item, index) => decodeResourceDecision(item, `${path}[${index}]`)));
 }
 
 function resources(value: unknown, path: string): readonly AiResourceRequirementV1[] {
@@ -261,15 +348,318 @@ export function decodeAiReadinessPreviewV1(value: unknown, path = '$'): AiReadin
   });
 }
 
+function decodeParameterCondition(value: unknown, path: string): AiParameterConditionV1 {
+  const source = record(value, path);
+  exact(source, ['parameter', 'comparison', 'value'], path);
+  const comparison = string(required(source, 'comparison', path), `${path}.comparison`) as AiParameterConditionV1['comparison'];
+  if (!parameterComparisons.has(comparison)) {
+    throw new AiContractDecodeError(`${path}.comparison`, 'a canonical parameter comparison');
+  }
+  return Object.freeze({
+    parameter: string(required(source, 'parameter', path), `${path}.parameter`, tokenPattern),
+    comparison,
+    value: scalar(required(source, 'value', path), `${path}.value`)
+  });
+}
+
+function decodeParameterConditionSet(value: unknown, path: string): AiParameterConditionSetV1 {
+  const source = record(value, path);
+  exact(source, ['allConditions', 'anyConditions'], path);
+  const allConditions = required(source, 'allConditions', path);
+  const anyConditions = required(source, 'anyConditions', path);
+  if (!Array.isArray(allConditions) || !Array.isArray(anyConditions)) {
+    throw new AiContractDecodeError(path, 'allConditions and anyConditions arrays');
+  }
+  return Object.freeze({
+    allConditions: Object.freeze(allConditions.map((item, index) =>
+      decodeParameterCondition(item, `${path}.allConditions[${index}]`))),
+    anyConditions: Object.freeze(anyConditions.map((item, index) =>
+      decodeParameterCondition(item, `${path}.anyConditions[${index}]`)))
+  });
+}
+
+function decodeBuildParameter(value: unknown, path: string): AiBuildParameterV1 {
+  const source = record(value, path);
+  exact(source, [
+    'canonicalKey', 'tempId', 'operatorType', 'operatorDisplayName', 'parameterName',
+    'parameterDisplayName', 'purpose', 'dataType', 'isRequired', 'value', 'hasExplicitValue',
+    'valueSummary', 'source', 'pending', 'impact', 'suggestedReason', 'defaultValue', 'minValue',
+    'maxValue', 'options', 'requiredPolicy', 'atLeastOneGroup', 'mutuallyExclusiveGroup',
+    'requiredWhen', 'enabledWhen', 'disabledWhen', 'resourceKind', 'resourceCanonicalId', 'resourceDependent'
+  ], path);
+  const options = required(source, 'options', path);
+  if (!Array.isArray(options)) {
+    throw new AiContractDecodeError(path, 'parameter options array');
+  }
+  const resourceDependent = boolean(required(source, 'resourceDependent', path), `${path}.resourceDependent`);
+  const resourceCanonicalId = string(
+    required(source, 'resourceCanonicalId', path), `${path}.resourceCanonicalId`
+  );
+  if (resourceDependent && !resourceIdentityPattern.test(resourceCanonicalId)) {
+    throw new AiContractDecodeError(`${path}.resourceCanonicalId`, 'a canonical resource identity');
+  }
+  return Object.freeze({
+    canonicalKey: string(required(source, 'canonicalKey', path), `${path}.canonicalKey`, tokenPattern),
+    tempId: string(required(source, 'tempId', path), `${path}.tempId`, tokenPattern),
+    operatorType: string(required(source, 'operatorType', path), `${path}.operatorType`, tokenPattern),
+    operatorDisplayName: string(required(source, 'operatorDisplayName', path), `${path}.operatorDisplayName`),
+    parameterName: string(required(source, 'parameterName', path), `${path}.parameterName`, tokenPattern),
+    parameterDisplayName: string(required(source, 'parameterDisplayName', path), `${path}.parameterDisplayName`),
+    purpose: string(required(source, 'purpose', path), `${path}.purpose`),
+    dataType: string(required(source, 'dataType', path), `${path}.dataType`),
+    isRequired: boolean(required(source, 'isRequired', path), `${path}.isRequired`),
+    value: scalar(required(source, 'value', path), `${path}.value`),
+    hasExplicitValue: boolean(required(source, 'hasExplicitValue', path), `${path}.hasExplicitValue`),
+    valueSummary: string(required(source, 'valueSummary', path), `${path}.valueSummary`),
+    source: string(required(source, 'source', path), `${path}.source`),
+    pending: boolean(required(source, 'pending', path), `${path}.pending`),
+    impact: string(required(source, 'impact', path), `${path}.impact`),
+    suggestedReason: string(required(source, 'suggestedReason', path), `${path}.suggestedReason`),
+    defaultValue: scalar(required(source, 'defaultValue', path), `${path}.defaultValue`),
+    minValue: scalar(required(source, 'minValue', path), `${path}.minValue`),
+    maxValue: scalar(required(source, 'maxValue', path), `${path}.maxValue`),
+    options: Object.freeze(options.map((item, index) => {
+      const option = record(item, `${path}.options[${index}]`);
+      exact(option, ['label', 'value'], `${path}.options[${index}]`);
+      return Object.freeze({
+        label: string(required(option, 'label', `${path}.options[${index}]`), `${path}.options[${index}].label`),
+        value: string(required(option, 'value', `${path}.options[${index}]`), `${path}.options[${index}].value`)
+      });
+    })),
+    requiredPolicy: string(required(source, 'requiredPolicy', path), `${path}.requiredPolicy`),
+    atLeastOneGroup: string(required(source, 'atLeastOneGroup', path), `${path}.atLeastOneGroup`),
+    mutuallyExclusiveGroup: string(required(source, 'mutuallyExclusiveGroup', path), `${path}.mutuallyExclusiveGroup`),
+    requiredWhen: source.requiredWhen === null
+      ? null
+      : decodeParameterConditionSet(required(source, 'requiredWhen', path), `${path}.requiredWhen`),
+    enabledWhen: source.enabledWhen === null
+      ? null
+      : decodeParameterConditionSet(required(source, 'enabledWhen', path), `${path}.enabledWhen`),
+    disabledWhen: source.disabledWhen === null
+      ? null
+      : decodeParameterConditionSet(required(source, 'disabledWhen', path), `${path}.disabledWhen`),
+    resourceKind: string(required(source, 'resourceKind', path), `${path}.resourceKind`),
+    resourceCanonicalId,
+    resourceDependent
+  });
+}
+
+function decodeWorkflowDiff(value: unknown, path: string): AiWorkflowDiffV1 {
+  const source = record(value, path);
+  const keys = ['addedNodes', 'modifiedNodes', 'preservedNodes', 'removedNodes', 'addedOrChangedParameters',
+    'pendingParameters', 'missingResources', 'validationFailures', 'autoRepairs', 'deploymentBlockers'] as const;
+  exact(source, [...keys, 'metadataOnly'], path);
+  if (required(source, 'metadataOnly', path) !== true) throw new AiContractDecodeError(`${path}.metadataOnly`, 'true');
+  return Object.freeze({
+    ...Object.fromEntries(keys.map(key => [key, strings(required(source, key, path), `${path}.${key}`)])) as unknown as Omit<AiWorkflowDiffV1, 'metadataOnly'>,
+    metadataOnly: true
+  });
+}
+
+function decodeApplyGate(value: unknown, path: string): AiApplyGateV1 {
+  const source = record(value, path);
+  exact(source, [
+    'canvasApplyReady', 'runtimeDraftReady', 'deploymentReady', 'blocked', 'status',
+    'applyBlockers', 'deploymentBlockers', 'firstFixRecommendation', 'metadataOnly'
+  ], path);
+  if (required(source, 'metadataOnly', path) !== true) throw new AiContractDecodeError(`${path}.metadataOnly`, 'true');
+  return Object.freeze({
+    canvasApplyReady: boolean(required(source, 'canvasApplyReady', path), `${path}.canvasApplyReady`),
+    runtimeDraftReady: boolean(required(source, 'runtimeDraftReady', path), `${path}.runtimeDraftReady`),
+    deploymentReady: boolean(required(source, 'deploymentReady', path), `${path}.deploymentReady`),
+    blocked: boolean(required(source, 'blocked', path), `${path}.blocked`),
+    status: string(required(source, 'status', path), `${path}.status`),
+    applyBlockers: strings(required(source, 'applyBlockers', path), `${path}.applyBlockers`),
+    deploymentBlockers: strings(required(source, 'deploymentBlockers', path), `${path}.deploymentBlockers`),
+    firstFixRecommendation: string(required(source, 'firstFixRecommendation', path), `${path}.firstFixRecommendation`),
+    metadataOnly: true
+  });
+}
+
+function decodeBuildCheck(value: unknown, path: string): AiBuildCheckV1 {
+  const source = record(value, path);
+  exact(source, ['id', 'label', 'status', 'summary', 'blockerCount', 'warningCount'], path);
+  const status = string(required(source, 'status', path), `${path}.status`);
+  if (!['passed', 'failed', 'pending'].includes(status)) throw new AiContractDecodeError(`${path}.status`, 'a build check status');
+  return Object.freeze({
+    id: string(required(source, 'id', path), `${path}.id`),
+    label: string(required(source, 'label', path), `${path}.label`),
+    status: status as AiBuildCheckV1['status'],
+    summary: string(required(source, 'summary', path), `${path}.summary`),
+    blockerCount: integer(required(source, 'blockerCount', path), `${path}.blockerCount`),
+    warningCount: integer(required(source, 'warningCount', path), `${path}.warningCount`)
+  });
+}
+
+function decodeBuildValidation(value: unknown, path: string): AiBuildValidationV1 {
+  const source = record(value, path);
+  exact(source, [
+    'structural', 'dryRun', 'manifest', 'applyGate', 'handoffEligible', 'readinessStatus',
+    'firstFixRecommendation', 'metadataOnly'
+  ], path);
+  if (required(source, 'metadataOnly', path) !== true) throw new AiContractDecodeError(`${path}.metadataOnly`, 'true');
+  return Object.freeze({
+    structural: decodeBuildCheck(required(source, 'structural', path), `${path}.structural`),
+    dryRun: decodeBuildCheck(required(source, 'dryRun', path), `${path}.dryRun`),
+    manifest: decodeBuildCheck(required(source, 'manifest', path), `${path}.manifest`),
+    applyGate: decodeApplyGate(required(source, 'applyGate', path), `${path}.applyGate`),
+    handoffEligible: boolean(required(source, 'handoffEligible', path), `${path}.handoffEligible`),
+    readinessStatus: string(required(source, 'readinessStatus', path), `${path}.readinessStatus`),
+    firstFixRecommendation: string(required(source, 'firstFixRecommendation', path), `${path}.firstFixRecommendation`),
+    metadataOnly: true
+  });
+}
+
+function decodeTimelineItem(value: unknown, path: string): AiBuildTimelineItemV1 {
+  const source = record(value, path);
+  exact(source, [
+    'stage', 'toolName', 'source', 'inputSummary', 'outputSummary', 'status', 'durationMs',
+    'evidenceId', 'repairAction', 'warningCode', 'applyImpact', 'deploymentImpact', 'metadataOnly', 'redactionPass'
+  ], path);
+  if (required(source, 'metadataOnly', path) !== true || required(source, 'redactionPass', path) !== true) {
+    throw new AiContractDecodeError(path, 'redacted metadata-only build evidence');
+  }
+  return Object.freeze({
+    stage: string(required(source, 'stage', path), `${path}.stage`),
+    toolName: string(required(source, 'toolName', path), `${path}.toolName`),
+    source: string(required(source, 'source', path), `${path}.source`),
+    inputSummary: string(required(source, 'inputSummary', path), `${path}.inputSummary`),
+    outputSummary: string(required(source, 'outputSummary', path), `${path}.outputSummary`),
+    status: string(required(source, 'status', path), `${path}.status`),
+    durationMs: integer(required(source, 'durationMs', path), `${path}.durationMs`),
+    evidenceId: string(required(source, 'evidenceId', path), `${path}.evidenceId`),
+    repairAction: string(required(source, 'repairAction', path), `${path}.repairAction`),
+    warningCode: string(required(source, 'warningCode', path), `${path}.warningCode`),
+    applyImpact: string(required(source, 'applyImpact', path), `${path}.applyImpact`),
+    deploymentImpact: string(required(source, 'deploymentImpact', path), `${path}.deploymentImpact`),
+    metadataOnly: true,
+    redactionPass: true
+  });
+}
+
+function assertParameterMappingAuthority(
+  pipeline: readonly AiOperatorPipelineStepV1[],
+  parameters: readonly AiBuildParameterV1[],
+  path: string
+): void {
+  const pipelineByTempId = new Map<string, AiOperatorPipelineStepV1>();
+  for (const operator of pipeline) {
+    const key = operator.tempId.toLowerCase();
+    if (pipelineByTempId.has(key)) {
+      throw new AiContractDecodeError(`${path}.operatorPipeline`, 'unique operator tempId values');
+    }
+    pipelineByTempId.set(key, operator);
+  }
+
+  const parametersByOperator = new Map<string, Set<string>>();
+  const canonicalKeys = new Set<string>();
+  for (const parameter of parameters) {
+    const operatorKey = parameter.tempId.toLowerCase();
+    const operator = pipelineByTempId.get(operatorKey);
+    if (!operator || operator.operatorType.toLowerCase() !== parameter.operatorType.toLowerCase()) {
+      throw new AiContractDecodeError(`${path}.parameterMapping`, 'a parameter owned by a declared operator');
+    }
+    if (parameter.canonicalKey.toLowerCase() !== `${parameter.tempId}.${parameter.parameterName}`.toLowerCase()) {
+      throw new AiContractDecodeError(`${path}.parameterMapping`, 'a canonical tempId.parameterName key');
+    }
+    const canonicalKey = parameter.canonicalKey.toLowerCase();
+    if (canonicalKeys.has(canonicalKey)) {
+      throw new AiContractDecodeError(`${path}.parameterMapping`, 'unique canonical parameter keys');
+    }
+    canonicalKeys.add(canonicalKey);
+    const names = parametersByOperator.get(operatorKey) ?? new Set<string>();
+    names.add(parameter.parameterName.toLowerCase());
+    parametersByOperator.set(operatorKey, names);
+  }
+
+  for (const parameter of parameters) {
+    const knownParameters = parametersByOperator.get(parameter.tempId.toLowerCase()) ?? new Set<string>();
+    const conditionSets = [parameter.requiredWhen, parameter.enabledWhen, parameter.disabledWhen]
+      .filter((conditionSet): conditionSet is AiParameterConditionSetV1 => conditionSet !== null);
+    for (const conditionSet of conditionSets) {
+      for (const condition of [...conditionSet.allConditions, ...conditionSet.anyConditions]) {
+        if (!knownParameters.has(condition.parameter.toLowerCase())) {
+          throw new AiContractDecodeError(`${path}.parameterMapping`, 'conditions that reference declared parameters');
+        }
+      }
+    }
+  }
+}
+
+export function decodeAiBuildResultV1(value: unknown, path = '$'): AiBuildResultV1 {
+  const source = record(value, path);
+  exact(source, [
+    'schemaVersion', 'runId', 'buildId', 'clientOperationId', 'buildIdentity', 'submittedBuildFingerprint',
+    'planId', 'planHash', 'answerSetFingerprint', 'answerRevision', 'resourceRevision', 'projectBaseline',
+    'candidateFlowFingerprint', 'operatorCount', 'connectionCount', 'operatorPipeline', 'parameterMapping',
+    'missingResources', 'workflowDiff', 'validation', 'publicTimeline', 'publicWarnings', 'metadataOnly', 'redactionPass'
+  ], path);
+  if (required(source, 'schemaVersion', path) !== 1 || required(source, 'metadataOnly', path) !== true ||
+      required(source, 'redactionPass', path) !== true) {
+    throw new AiContractDecodeError(path, 'Build result schema v1 with redaction markers');
+  }
+  const pipeline = required(source, 'operatorPipeline', path);
+  const parameters = required(source, 'parameterMapping', path);
+  const timeline = required(source, 'publicTimeline', path);
+  if (!Array.isArray(pipeline) || !Array.isArray(parameters) || !Array.isArray(timeline)) {
+    throw new AiContractDecodeError(path, 'Build result arrays');
+  }
+  const projectBaseline = baseline(required(source, 'projectBaseline', path), `${path}.projectBaseline`);
+  if (!projectBaseline) throw new AiContractDecodeError(`${path}.projectBaseline`, 'a confirmed Project baseline');
+  const decodedPipeline = Object.freeze(pipeline.map((item, index) => {
+    const step = record(item, `${path}.operatorPipeline[${index}]`);
+    exact(step, ['tempId', 'operatorType', 'source', 'status', 'repairNote'], `${path}.operatorPipeline[${index}]`);
+    return Object.freeze({
+      tempId: string(required(step, 'tempId', path), `${path}.operatorPipeline[${index}].tempId`, tokenPattern),
+      operatorType: string(required(step, 'operatorType', path), `${path}.operatorPipeline[${index}].operatorType`, tokenPattern),
+      source: string(required(step, 'source', path), `${path}.operatorPipeline[${index}].source`),
+      status: string(required(step, 'status', path), `${path}.operatorPipeline[${index}].status`),
+      repairNote: string(required(step, 'repairNote', path), `${path}.operatorPipeline[${index}].repairNote`)
+    });
+  }));
+  const decodedParameters = Object.freeze(parameters.map((item, index) =>
+    decodeBuildParameter(item, `${path}.parameterMapping[${index}]`)));
+  assertParameterMappingAuthority(decodedPipeline, decodedParameters, path);
+  return Object.freeze({
+    schemaVersion: 1,
+    runId: string(required(source, 'runId', path), `${path}.runId`, tokenPattern),
+    buildId: string(required(source, 'buildId', path), `${path}.buildId`, tokenPattern),
+    clientOperationId: string(required(source, 'clientOperationId', path), `${path}.clientOperationId`, guidPattern),
+    buildIdentity: string(required(source, 'buildIdentity', path), `${path}.buildIdentity`),
+    submittedBuildFingerprint: string(required(source, 'submittedBuildFingerprint', path), `${path}.submittedBuildFingerprint`, hashPattern),
+    planId: string(required(source, 'planId', path), `${path}.planId`),
+    planHash: string(required(source, 'planHash', path), `${path}.planHash`),
+    answerSetFingerprint: string(required(source, 'answerSetFingerprint', path), `${path}.answerSetFingerprint`),
+    answerRevision: integer(required(source, 'answerRevision', path), `${path}.answerRevision`),
+    resourceRevision: integer(required(source, 'resourceRevision', path), `${path}.resourceRevision`),
+    projectBaseline,
+    candidateFlowFingerprint: string(required(source, 'candidateFlowFingerprint', path), `${path}.candidateFlowFingerprint`, hashPattern),
+    operatorCount: integer(required(source, 'operatorCount', path), `${path}.operatorCount`),
+    connectionCount: integer(required(source, 'connectionCount', path), `${path}.connectionCount`),
+    operatorPipeline: decodedPipeline,
+    parameterMapping: decodedParameters,
+    missingResources: resources(required(source, 'missingResources', path), `${path}.missingResources`),
+    workflowDiff: decodeWorkflowDiff(required(source, 'workflowDiff', path), `${path}.workflowDiff`),
+    validation: decodeBuildValidation(required(source, 'validation', path), `${path}.validation`),
+    publicTimeline: Object.freeze(timeline.map((item, index) => decodeTimelineItem(item, `${path}.publicTimeline[${index}]`))),
+    publicWarnings: strings(required(source, 'publicWarnings', path), `${path}.publicWarnings`),
+    metadataOnly: true,
+    redactionPass: true
+  });
+}
+
 export function decodeAiSessionSnapshotV1(value: unknown, path = '$'): AiSessionSnapshotV1 {
   const source = record(value, path);
   exact(source, [
     'schemaVersion', 'revision', 'projectId', 'lifecycleState', 'planRunId', 'planRunStatus',
-    'buildRunId', 'buildRunStatus', 'buildClientOperationId', 'projectBaseline', 'requirementMode',
+    'buildRunId', 'buildRunStatus', 'buildTerminalSequence', 'buildClientOperationId',
+    'submittedBuildFingerprint', 'projectBaseline', 'requirementMode',
     'planQuestionSelections', 'confirmedPlanAnswers', 'optimisticPlanAnswers', 'answerRevision',
-    'readinessPreview', 'planAcceptedRecommendedDefaults', 'planTerminalSequence', 'updatedAtUtc'
+    'buildParameterValues', 'readinessPreview', 'missingResources', 'resourceDecisions', 'resourceRevision',
+    'buildResult', 'planAcceptedRecommendedDefaults', 'planTerminalSequence', 'updatedAtUtc'
   ], path);
   const terminalSequence = required(source, 'planTerminalSequence', path);
+  const buildTerminalSequence = required(source, 'buildTerminalSequence', path);
   return Object.freeze({
     schemaVersion: integer(required(source, 'schemaVersion', path), `${path}.schemaVersion`),
     revision: integer(required(source, 'revision', path), `${path}.revision`),
@@ -279,8 +669,14 @@ export function decodeAiSessionSnapshotV1(value: unknown, path = '$'): AiSession
     planRunStatus: nullableString(required(source, 'planRunStatus', path), `${path}.planRunStatus`, tokenPattern),
     buildRunId: nullableString(required(source, 'buildRunId', path), `${path}.buildRunId`, tokenPattern),
     buildRunStatus: nullableString(required(source, 'buildRunStatus', path), `${path}.buildRunStatus`, tokenPattern),
+    buildTerminalSequence: buildTerminalSequence === null
+      ? null
+      : integer(buildTerminalSequence, `${path}.buildTerminalSequence`),
     buildClientOperationId: nullableString(
       required(source, 'buildClientOperationId', path), `${path}.buildClientOperationId`, guidPattern
+    ),
+    submittedBuildFingerprint: nullableString(
+      required(source, 'submittedBuildFingerprint', path), `${path}.submittedBuildFingerprint`, hashPattern
     ),
     projectBaseline: baseline(required(source, 'projectBaseline', path), `${path}.projectBaseline`),
     requirementMode: requirementMode(required(source, 'requirementMode', path), `${path}.requirementMode`),
@@ -288,9 +684,16 @@ export function decodeAiSessionSnapshotV1(value: unknown, path = '$'): AiSession
     confirmedPlanAnswers: planAnswers(required(source, 'confirmedPlanAnswers', path), `${path}.confirmedPlanAnswers`),
     optimisticPlanAnswers: planAnswers(required(source, 'optimisticPlanAnswers', path), `${path}.optimisticPlanAnswers`),
     answerRevision: integer(required(source, 'answerRevision', path), `${path}.answerRevision`),
+    buildParameterValues: scalarMap(required(source, 'buildParameterValues', path), `${path}.buildParameterValues`),
     readinessPreview: source.readinessPreview === null
       ? null
       : decodeAiReadinessPreviewV1(required(source, 'readinessPreview', path), `${path}.readinessPreview`),
+    missingResources: resources(required(source, 'missingResources', path), `${path}.missingResources`),
+    resourceDecisions: resourceDecisions(required(source, 'resourceDecisions', path), `${path}.resourceDecisions`),
+    resourceRevision: integer(required(source, 'resourceRevision', path), `${path}.resourceRevision`),
+    buildResult: source.buildResult === null
+      ? null
+      : decodeAiBuildResultV1(required(source, 'buildResult', path), `${path}.buildResult`),
     planAcceptedRecommendedDefaults: boolean(
       required(source, 'planAcceptedRecommendedDefaults', path), `${path}.planAcceptedRecommendedDefaults`
     ),
@@ -591,9 +994,9 @@ function decodeEventPayload(
   value: unknown,
   eventType: string,
   path: string
-): Pick<AiAgentRunEventV1, 'sessionId' | 'planId' | 'planHash' | 'publicMessage' | 'plan' | 'workspaceSnapshot'> {
+): Pick<AiAgentRunEventV1, 'sessionId' | 'planId' | 'planHash' | 'publicMessage' | 'plan' | 'build' | 'workspaceSnapshot'> {
   if (value === null) return Object.freeze({
-    sessionId: null, planId: null, planHash: null, publicMessage: null, plan: null, workspaceSnapshot: null
+    sessionId: null, planId: null, planHash: null, publicMessage: null, plan: null, build: null, workspaceSnapshot: null
   });
   const source = record(value, path);
   const sessionId = typeof source.sessionId === 'string'
@@ -603,6 +1006,7 @@ function decodeEventPayload(
   const planHash = typeof source.planHash === 'string' ? source.planHash : null;
   const publicMessage = typeof source.publicMessage === 'string' ? source.publicMessage : null;
   let plan: AiPlanV1 | null = null;
+  let build: AiBuildResultV1 | null = null;
   if (eventType === 'plan.completed') {
     exact(source, [
       'status', 'generationMode', 'sessionId', 'planRunId', 'planSource', 'fallbackReason',
@@ -619,12 +1023,20 @@ function decodeEventPayload(
       throw new AiContractDecodeError(path, 'matching outer and inner Plan identity');
     }
   }
+  const diagnostic = optionalRecord(source.diagnostic, `${path}.diagnostic`);
+  const buildValue = source.publicBuildResult ?? diagnostic?.publicBuildResult;
+  if (buildValue !== undefined && buildValue !== null) {
+    build = decodeAiBuildResultV1(buildValue, `${path}.publicBuildResult`);
+    if (planId && build.planId !== planId) throw new AiContractDecodeError(path, 'matching Build plan identity');
+    if (planHash && build.planHash !== planHash) throw new AiContractDecodeError(path, 'matching Build plan hash');
+  }
   return Object.freeze({
     sessionId,
     planId,
     planHash,
     publicMessage,
     plan,
+    build,
     workspaceSnapshot: source.workspaceSnapshot === null || source.workspaceSnapshot === undefined
       ? null
       : decodeAiSessionSnapshotV1(source.workspaceSnapshot, `${path}.workspaceSnapshot`)
@@ -642,8 +1054,12 @@ export function decodeAiAgentRunEventV1(value: unknown, path = '$'): AiAgentRunE
   }
   const eventType = string(required(source, 'eventType', path), `${path}.eventType`, tokenPattern);
   const payload = decodeEventPayload(required(source, 'payload', path), eventType, `${path}.payload`);
+  const runId = string(required(source, 'runId', path), `${path}.runId`, tokenPattern);
+  if (payload.build && payload.build.runId !== runId) {
+    throw new AiContractDecodeError(`${path}.payload.publicBuildResult.runId`, 'the outer runId');
+  }
   return Object.freeze({
-    runId: string(required(source, 'runId', path), `${path}.runId`, tokenPattern),
+    runId,
     sequence: integer(required(source, 'sequence', path), `${path}.sequence`),
     timestamp: timestamp(required(source, 'timestamp', path), `${path}.timestamp`),
     eventType,
@@ -688,16 +1104,81 @@ function decodeSummary(value: unknown, path: string): AiAgentRunSummaryV1 {
   });
 }
 
+function decodeReplaySnapshot(value: unknown, path: string): AiAgentRunReplaySnapshotV1 {
+  const source = record(value, path);
+  exact(source, [
+    'storageVersion', 'runId', 'generatedAt', 'firstSequence', 'lastSequence', 'eventCount',
+    'metadataOnly', 'redactionPass', 'events'
+  ], path);
+  if (required(source, 'metadataOnly', path) !== true || required(source, 'redactionPass', path) !== true) {
+    throw new AiContractDecodeError(path, 'a redacted metadata-only replay snapshot');
+  }
+  const events = required(source, 'events', path);
+  if (!Array.isArray(events)) throw new AiContractDecodeError(`${path}.events`, 'an array');
+  return Object.freeze({
+    storageVersion: string(required(source, 'storageVersion', path), `${path}.storageVersion`, tokenPattern),
+    runId: string(required(source, 'runId', path), `${path}.runId`, tokenPattern),
+    generatedAt: timestamp(required(source, 'generatedAt', path), `${path}.generatedAt`),
+    firstSequence: integer(required(source, 'firstSequence', path), `${path}.firstSequence`),
+    lastSequence: integer(required(source, 'lastSequence', path), `${path}.lastSequence`),
+    eventCount: integer(required(source, 'eventCount', path), `${path}.eventCount`),
+    metadataOnly: true,
+    redactionPass: true,
+    events: Object.freeze(events.map((item, index) =>
+      decodeAiAgentRunEventV1(item, `${path}.events[${index}]`)))
+  });
+}
+
+function decodeReplayDiagnostics(value: unknown, path: string): AiAgentRunReplayDiagnosticsV1 {
+  const source = record(value, path);
+  exact(source, [
+    'runId', 'eventCount', 'duplicateEventCount', 'droppedEventCount', 'staleEventCount',
+    'metadataOnly', 'redactionPass'
+  ], path);
+  if (required(source, 'metadataOnly', path) !== true || required(source, 'redactionPass', path) !== true) {
+    throw new AiContractDecodeError(path, 'redacted metadata-only replay diagnostics');
+  }
+  return Object.freeze({
+    runId: string(required(source, 'runId', path), `${path}.runId`, tokenPattern),
+    eventCount: integer(required(source, 'eventCount', path), `${path}.eventCount`),
+    duplicateEventCount: integer(required(source, 'duplicateEventCount', path), `${path}.duplicateEventCount`),
+    droppedEventCount: integer(required(source, 'droppedEventCount', path), `${path}.droppedEventCount`),
+    staleEventCount: integer(required(source, 'staleEventCount', path), `${path}.staleEventCount`),
+    metadataOnly: true,
+    redactionPass: true
+  });
+}
+
 export function decodeAiAgentRunReplayV1(value: unknown, path = '$'): AiAgentRunReplayV1 {
   const source = record(value, path);
   exact(source, ['summary', 'events', 'snapshot', 'diagnostics'], path);
-  const events = required(source, 'events', path);
-  if (!Array.isArray(events)) throw new AiContractDecodeError(`${path}.events`, 'an array');
-  record(required(source, 'snapshot', path), `${path}.snapshot`);
-  record(required(source, 'diagnostics', path), `${path}.diagnostics`);
+  const rawEvents = required(source, 'events', path);
+  if (!Array.isArray(rawEvents)) throw new AiContractDecodeError(`${path}.events`, 'an array');
+  const summary = decodeSummary(required(source, 'summary', path), `${path}.summary`);
+  const events = Object.freeze(rawEvents.map((item, index) =>
+    decodeAiAgentRunEventV1(item, `${path}.events[${index}]`)));
+  const snapshot = decodeReplaySnapshot(required(source, 'snapshot', path), `${path}.snapshot`);
+  const diagnostics = decodeReplayDiagnostics(required(source, 'diagnostics', path), `${path}.diagnostics`);
+  const firstSequence = events.length === 0 ? 0 : Math.min(...events.map(event => event.sequence));
+  const lastSequence = events.length === 0 ? 0 : Math.max(...events.map(event => event.sequence));
+  const ordered = events.every((event, index) => index === 0 || event.sequence > events[index - 1]!.sequence);
+  const snapshotMatches = snapshot.events.length === events.length && snapshot.events.every((event, index) =>
+    JSON.stringify(event) === JSON.stringify(events[index]));
+  if (summary.runId !== snapshot.runId || summary.runId !== diagnostics.runId ||
+      summary.eventCount !== events.length || snapshot.eventCount !== events.length ||
+      diagnostics.eventCount !== events.length || summary.lastSequence !== lastSequence ||
+      snapshot.firstSequence !== firstSequence || snapshot.lastSequence !== lastSequence ||
+      summary.duplicateEventCount !== diagnostics.duplicateEventCount ||
+      summary.droppedEventCount !== diagnostics.droppedEventCount ||
+      summary.staleEventCount !== diagnostics.staleEventCount || !ordered || !snapshotMatches ||
+      events.some(event => event.runId !== summary.runId)) {
+    throw new AiContractDecodeError(path, 'internally consistent replay identities, counts, sequences, and events');
+  }
   return Object.freeze({
-    summary: decodeSummary(required(source, 'summary', path), `${path}.summary`),
-    events: Object.freeze(events.map((item, index) => decodeAiAgentRunEventV1(item, `${path}.events[${index}]`)))
+    summary,
+    events,
+    snapshot,
+    diagnostics
   });
 }
 
@@ -743,4 +1224,42 @@ export function decodeAiProjectContextV1(value: unknown, path = '$'): AiProjectC
     persistenceRevision: integer(required(source, 'persistenceRevision', path), `${path}.persistenceRevision`),
     modifiedAt: source.modifiedAt === null ? null : timestamp(source.modifiedAt, `${path}.modifiedAt`)
   });
+}
+
+export function decodeAiBuildRevalidationResponseV1(
+  value: unknown,
+  path = '$'
+): AiBuildRevalidationResponseV1 {
+  const source = record(value, path);
+  exact(source, ['build', 'snapshot', 'metadataOnly'], path);
+  if (required(source, 'metadataOnly', path) !== true) throw new AiContractDecodeError(`${path}.metadataOnly`, 'true');
+  const build = decodeAiBuildResultV1(required(source, 'build', path), `${path}.build`);
+  const snapshot = decodeAiSessionSnapshotV1(required(source, 'snapshot', path), `${path}.snapshot`);
+  if (snapshot.buildRunId !== build.runId ||
+      snapshot.buildClientOperationId !== build.clientOperationId ||
+      snapshot.submittedBuildFingerprint !== build.submittedBuildFingerprint ||
+      snapshot.buildResult?.buildId !== build.buildId ||
+      snapshot.buildResult.candidateFlowFingerprint !== build.candidateFlowFingerprint) {
+    throw new AiContractDecodeError(path, 'matching Build revalidation identities');
+  }
+  return Object.freeze({
+    build,
+    snapshot,
+    metadataOnly: true
+  });
+}
+
+export function decodeAiCameraBindingOptionsV1(value: unknown, path = '$'): readonly AiCameraBindingOptionV1[] {
+  if (!Array.isArray(value)) throw new AiContractDecodeError(path, 'an array of camera bindings');
+  return Object.freeze(value.map((item, index) => {
+    const source = record(item, `${path}[${index}]`);
+    exact(source, ['id', 'displayName', 'isEnabled'], `${path}[${index}]`);
+    const id = string(required(source, 'id', path), `${path}[${index}].id`, resourceKeyPattern);
+    if (!id) throw new AiContractDecodeError(`${path}[${index}].id`, 'a canonical camera binding identity');
+    return Object.freeze({
+      id,
+      displayName: string(required(source, 'displayName', path), `${path}[${index}].displayName`),
+      isEnabled: boolean(required(source, 'isEnabled', path), `${path}[${index}].isEnabled`)
+    });
+  }));
 }

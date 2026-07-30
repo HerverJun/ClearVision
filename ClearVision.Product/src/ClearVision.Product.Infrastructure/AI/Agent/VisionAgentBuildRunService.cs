@@ -46,7 +46,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(command.Request);
-        var request = command.Request;
+        var request = BindCanonicalResourceInputs(command.Request);
         var build = request.BuildFromPlan;
         var runId = FirstNonBlank(command.RunId, request.AgentRunId);
         var sessionId = request.SessionId?.Trim() ?? string.Empty;
@@ -68,6 +68,15 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             PendingPlanSnapshot = build.PlanSnapshot,
             PlanQuestionSelections = build.UserSelections,
             ConfirmedPlanAnswers = build.ConfirmedAnswers,
+            AnswerRevision = build.AnswerRevision,
+            BuildParameterValues = build.ParameterValues,
+            ResourceDecisions = build.ResourceDecisions
+                .Where(decision => !string.IsNullOrWhiteSpace(decision.CanonicalId))
+                .ToDictionary(
+                    decision => decision.CanonicalId,
+                    decision => JsonSerializer.SerializeToElement(decision, AgentRunEventJson.Options),
+                    StringComparer.OrdinalIgnoreCase),
+            ResourceRevision = build.ResourceRevision,
             RequirementMode = request.RequirementMode,
             PlanAcceptedRecommendedDefaults = build.AcceptedRecommendedDefaults,
             SubmittedBuildFingerprint = ComputeSubmittedBuildFingerprint(request),
@@ -92,6 +101,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
         var request = string.Equals(command.Request.AgentRunId, runId, StringComparison.OrdinalIgnoreCase)
             ? command.Request
             : command.Request with { AgentRunId = runId };
+        request = BindCanonicalResourceInputs(request);
         var runCommand = command with
         {
             Request = request,
@@ -285,6 +295,12 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
         BuildAssociationProjectionBasis projectionBasis)
     {
         var terminalBasis = BuildTerminalBasis(result, request, projectionBasis);
+        var publicBuildResult = VisionAgentPublicBuildProjector.Project(
+            result,
+            request,
+            runId,
+            terminalBasis.SubmittedBuildFingerprint,
+            terminalBasis.BuildIdentity);
         return new
         {
             runKind = VisionAgentRunKindResolver.Build,
@@ -317,6 +333,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             dryRunResult = result.DryRunResult,
             toolTrace = result.ToolTrace,
             buildResult = result.BuildResult,
+            publicBuildResult,
             buildReadiness = result.BuildReadiness,
             contractVersion = result.ContractVersion,
             requestedMode = result.RequestedMode,
@@ -358,6 +375,12 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
         string runId)
     {
         var terminalBasis = BuildTerminalBasis(result, request, projectionBasis);
+        var publicBuildResult = VisionAgentPublicBuildProjector.Project(
+            result,
+            request,
+            runId,
+            terminalBasis.SubmittedBuildFingerprint,
+            terminalBasis.BuildIdentity);
         return new
         {
             runKind = VisionAgentRunKindResolver.Build,
@@ -378,6 +401,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             failureSummary = result.FailureSummary,
             diagnostics = result.LastAttemptDiagnostics,
             buildReadiness = result.BuildReadiness,
+            publicBuildResult,
             contractVersion = result.ContractVersion,
             requestedMode = result.RequestedMode,
             effectiveMode = result.EffectiveMode,
@@ -419,6 +443,10 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             buildIntent = buildFromPlan.BuildIntent,
             originalUserPrompt = buildFromPlan.OriginalUserPrompt,
             acceptedRecommendedDefaults = buildFromPlan.AcceptedRecommendedDefaults,
+            answerRevision = buildFromPlan.AnswerRevision,
+            resourceRevision = buildFromPlan.ResourceRevision,
+            parameterValues = buildFromPlan.ParameterValues,
+            resourceDecisions = buildFromPlan.ResourceDecisions,
             requirementMaturity = buildFromPlan.RequirementMaturity,
             decisionTrace = buildFromPlan.DecisionTrace,
             metadataOnly = true
@@ -670,8 +698,55 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             request.BuildFromPlan?.AcceptedRecommendedDefaults,
             request.BuildFromPlan?.AcceptedDefaults,
             request.BuildFromPlan?.ConfirmedAnswers,
-            request.BuildFromPlan?.UserSelections
+            request.BuildFromPlan?.UserSelections,
+            request.BuildFromPlan?.AnswerRevision,
+            request.BuildFromPlan?.ResourceRevision,
+            request.BuildFromPlan?.ParameterValues,
+            request.BuildFromPlan?.ResourceDecisions
         });
+
+    private AiFlowGenerationRequest BindCanonicalResourceInputs(AiFlowGenerationRequest request)
+    {
+        var build = request.BuildFromPlan;
+        var sessionId = request.SessionId?.Trim();
+        if (build is null || string.IsNullOrWhiteSpace(sessionId)) return request;
+        var snapshot = _conversationService.GetSession(sessionId)?.WorkspaceSnapshot;
+        if (snapshot is null) return request with
+        {
+            BuildFromPlan = build with { ResourceRevision = 0, ResourceDecisions = [] }
+        };
+
+        return request with
+        {
+            BuildFromPlan = build with
+            {
+                ResourceRevision = snapshot.ResourceRevision,
+                ResourceDecisions = ReadTrustedResourceDecisions(snapshot)
+            }
+        };
+    }
+
+    private static List<VisionAgentResourceDecision> ReadTrustedResourceDecisions(
+        VisionAgentWorkspaceSnapshot snapshot)
+    {
+        var decisions = new List<VisionAgentResourceDecision>();
+        foreach (var value in snapshot.ResourceDecisions.Values)
+        {
+            try
+            {
+                var decision = value.Deserialize<VisionAgentResourceDecision>(AgentRunEventJson.Options);
+                if (VisionAgentResourceAuthority.IsTrustedCameraBindingDecision(decision))
+                {
+                    decisions.Add(decision!);
+                }
+            }
+            catch (JsonException)
+            {
+                // Legacy or malformed decisions stay blocked.
+            }
+        }
+        return decisions;
+    }
 
     private static string ComputeJsonFingerprint(object value)
     {

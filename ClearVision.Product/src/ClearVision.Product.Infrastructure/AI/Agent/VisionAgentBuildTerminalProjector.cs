@@ -88,6 +88,13 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
         var result = projection.Result;
         var terminal = projection.TerminalEvent;
         var basis = BuildProjectionBasis(terminalSource, result, projection.Request);
+        var publicBuildResult = TryDeserializeProperty<VisionAgentPublicBuildResultV1>(terminalSource, "publicBuildResult") ??
+            VisionAgentPublicBuildProjector.Project(
+                result,
+                projection.Request,
+                runId,
+                basis.SubmittedBuildFingerprint,
+                basis.BuildIdentity);
         var existingCheckpoint = projection.Recovered
             ? _journal.TryGetLatest(runId, terminal.Sequence, terminal.EventType)
             : null;
@@ -157,6 +164,35 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             PendingPlanSnapshot = projection.Request.BuildFromPlan?.PlanSnapshot,
             PlanQuestionSelections = projection.Request.BuildFromPlan?.UserSelections,
             ConfirmedPlanAnswers = projection.Request.BuildFromPlan?.ConfirmedAnswers,
+            AnswerRevision = projection.Request.BuildFromPlan?.AnswerRevision,
+            BuildParameterValues = projection.Request.BuildFromPlan?.ParameterValues,
+            MissingResources = result.MissingResources
+                .Select(resource => new VisionAgentResourceRequirement
+                {
+                    CanonicalId = resource.CanonicalId,
+                    ResourceType = resource.ResourceType,
+                    ResourceName = resource.ResourceName,
+                    ResourceKey = resource.ResourceKey,
+                    OperatorKey = resource.OperatorKey,
+                    OperatorId = resource.OperatorId,
+                    OperatorType = resource.OperatorType,
+                    OperatorIndex = resource.OperatorIndex,
+                    ParameterName = resource.ParameterName,
+                    Status = resource.Status,
+                    BlockingScope = resource.BlockingScope,
+                    Source = resource.Source,
+                    ResolutionTarget = resource.ResolutionTarget,
+                    DraftPolicy = resource.DraftPolicy,
+                    Description = resource.Description,
+                    Aliases = resource.Aliases.ToList()
+                }).ToList(),
+            ResourceDecisions = projection.Request.BuildFromPlan?.ResourceDecisions
+                .Where(decision => !string.IsNullOrWhiteSpace(decision.CanonicalId))
+                .ToDictionary(
+                    decision => decision.CanonicalId,
+                    decision => JsonSerializer.SerializeToElement(decision, JsonOptions),
+                    StringComparer.OrdinalIgnoreCase),
+            ResourceRevision = projection.Request.BuildFromPlan?.ResourceRevision,
             RequirementMode = projection.Request.RequirementMode,
             PlanAcceptedRecommendedDefaults = projection.Request.BuildFromPlan?.AcceptedRecommendedDefaults,
             BuildRunId = runId,
@@ -166,7 +202,8 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
                     ? AgentRunEventStatuses.Cancelled
                     : AgentRunEventStatuses.Failed),
             BuildTerminalSequence = terminal.Sequence,
-            SubmittedBuildFingerprint = basis.SubmittedBuildFingerprint
+            SubmittedBuildFingerprint = basis.SubmittedBuildFingerprint,
+            PublicBuildResult = publicBuildResult
         };
         var projectionRequest = new VisionAgentTerminalProjectionRequest
         {

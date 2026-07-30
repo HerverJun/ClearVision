@@ -90,6 +90,8 @@ public sealed class BuildPlanContextLoader
             RequirementAnswers = validatedAnswers.RequirementAnswers,
             BuildDecisions = validatedAnswers.BuildDecisions,
             ParameterSelections = validatedAnswers.ParameterSelections,
+            ParameterValues = build?.ParameterValues ??
+                new Dictionary<string, System.Text.Json.JsonElement>(StringComparer.OrdinalIgnoreCase),
             ResolvedFields = effectiveRequirement.ResolvedFields
                 .Concat(validatedAnswers.ResolvedFields)
                 .Distinct(StringComparer.OrdinalIgnoreCase)

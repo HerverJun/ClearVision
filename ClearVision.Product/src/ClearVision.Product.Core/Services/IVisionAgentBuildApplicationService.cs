@@ -11,4 +11,8 @@ public interface IVisionAgentBuildApplicationService
     Task<CanonicalBuildOutcome> BuildAsync(
         BuildCommand command,
         CancellationToken cancellationToken);
+
+    Task<VisionAgentPublicBuildResultV1> RevalidateAsync(
+        VisionAgentBuildRevalidationRequest request,
+        CancellationToken cancellationToken);
 }

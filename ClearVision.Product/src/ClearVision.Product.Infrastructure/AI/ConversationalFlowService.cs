@@ -94,6 +94,8 @@ public sealed class VisionAgentWorkspaceSnapshot
     public List<VisionAgentPlanAnswer> ConfirmedPlanAnswers { get; set; } = new();
     public List<VisionAgentPlanAnswer> OptimisticPlanAnswers { get; set; } = new();
     public int AnswerRevision { get; set; }
+    public Dictionary<string, JsonElement> BuildParameterValues { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
     public VisionAgentBuildReadinessPreviewResult? ReadinessPreview { get; set; }
     public List<VisionAgentResourceRequirement> MissingResources { get; set; } = new();
     public Dictionary<string, JsonElement> ResourceDecisions { get; set; } =
@@ -110,6 +112,7 @@ public sealed class VisionAgentWorkspaceSnapshot
     public long? BuildTerminalSequence { get; set; }
     public string? SubmittedBuildFingerprint { get; set; }
     public string? BuildClientOperationId { get; set; }
+    public VisionAgentPublicBuildResultV1? PublicBuildResult { get; set; }
     public AiProjectBaselineIdentity? ProjectBaseline { get; set; }
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }
@@ -125,6 +128,7 @@ public sealed class VisionAgentWorkspaceSnapshotUpdate
     public List<VisionAgentPlanAnswer>? ConfirmedPlanAnswers { get; set; }
     public List<VisionAgentPlanAnswer>? OptimisticPlanAnswers { get; set; }
     public int? AnswerRevision { get; set; }
+    public Dictionary<string, JsonElement>? BuildParameterValues { get; set; }
     public VisionAgentBuildReadinessPreviewResult? ReadinessPreview { get; set; }
     public List<VisionAgentResourceRequirement>? MissingResources { get; set; }
     public Dictionary<string, JsonElement>? ResourceDecisions { get; set; }
@@ -140,6 +144,7 @@ public sealed class VisionAgentWorkspaceSnapshotUpdate
     public long? BuildTerminalSequence { get; set; }
     public string? SubmittedBuildFingerprint { get; set; }
     public string? BuildClientOperationId { get; set; }
+    public VisionAgentPublicBuildResultV1? PublicBuildResult { get; set; }
     public AiProjectBaselineIdentity? ProjectBaseline { get; set; }
     public string? UserTurnId { get; set; }
     public string? UserMessage { get; set; }
@@ -1407,11 +1412,13 @@ public class ConversationalFlowService : IConversationalFlowService
             .ToList();
         var hasV2WorkspaceFields = update.OptimisticPlanAnswers != null ||
             update.AnswerRevision.HasValue ||
+            update.BuildParameterValues != null ||
             update.ReadinessPreview != null ||
             update.MissingResources != null ||
             update.ResourceDecisions != null ||
             update.ResourceRevision.HasValue ||
-            update.WorkspaceViewMode != null;
+            update.WorkspaceViewMode != null ||
+            update.PublicBuildResult != null;
 
         if (!hasV2WorkspaceFields)
         {
@@ -1448,6 +1455,11 @@ public class ConversationalFlowService : IConversationalFlowService
             update.ConfirmedPlanAnswers,
             update.OptimisticPlanAnswers,
             update.AnswerRevision,
+            BuildParameterValues = update.BuildParameterValues?
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+                .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(pair => new { Key = pair.Key.Trim(), Value = pair.Value })
+                .ToList(),
             update.ReadinessPreview,
             update.MissingResources,
             ResourceDecisions = update.ResourceDecisions?
@@ -1467,6 +1479,7 @@ public class ConversationalFlowService : IConversationalFlowService
             update.BuildTerminalSequence,
             update.SubmittedBuildFingerprint,
             update.BuildClientOperationId,
+            update.PublicBuildResult,
             update.ProjectBaseline,
             update.UserTurnId,
             update.UserMessage
@@ -1972,6 +1985,15 @@ public class ConversationalFlowService : IConversationalFlowService
             snapshot.OptimisticPlanAnswers = ClonePlanAnswers(update.OptimisticPlanAnswers);
         if (update.AnswerRevision.HasValue)
             snapshot.AnswerRevision = Math.Max(0, update.AnswerRevision.Value);
+        if (update.BuildParameterValues != null)
+        {
+            snapshot.BuildParameterValues = update.BuildParameterValues
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+                .ToDictionary(
+                    pair => pair.Key.Trim(),
+                    pair => pair.Value.Clone(),
+                    StringComparer.OrdinalIgnoreCase);
+        }
         if (update.ReadinessPreview != null)
             snapshot.ReadinessPreview = CloneReadinessPreview(update.ReadinessPreview);
         if (update.MissingResources != null)
@@ -2013,6 +2035,8 @@ public class ConversationalFlowService : IConversationalFlowService
             snapshot.SubmittedBuildFingerprint = NormalizeOptionalSnapshotString(update.SubmittedBuildFingerprint);
         if (update.BuildClientOperationId != null)
             snapshot.BuildClientOperationId = NormalizeOptionalSnapshotString(update.BuildClientOperationId);
+        if (update.PublicBuildResult != null)
+            snapshot.PublicBuildResult = ClonePublicBuildResult(update.PublicBuildResult);
         if (update.ProjectBaseline != null)
             snapshot.ProjectBaseline = update.ProjectBaseline with { };
     }
@@ -2078,6 +2102,8 @@ public class ConversationalFlowService : IConversationalFlowService
             ConfirmedPlanAnswers = ClonePlanAnswers(snapshot.ConfirmedPlanAnswers),
             OptimisticPlanAnswers = ClonePlanAnswers(snapshot.OptimisticPlanAnswers),
             AnswerRevision = snapshot.AnswerRevision,
+            BuildParameterValues = snapshot.BuildParameterValues
+                .ToDictionary(pair => pair.Key, pair => pair.Value.Clone(), StringComparer.OrdinalIgnoreCase),
             ReadinessPreview = CloneReadinessPreview(snapshot.ReadinessPreview),
             MissingResources = snapshot.MissingResources.Select(resource => resource with { Aliases = resource.Aliases.ToList() }).ToList(),
             ResourceDecisions = snapshot.ResourceDecisions
@@ -2094,6 +2120,7 @@ public class ConversationalFlowService : IConversationalFlowService
             BuildTerminalSequence = snapshot.BuildTerminalSequence,
             SubmittedBuildFingerprint = snapshot.SubmittedBuildFingerprint,
             BuildClientOperationId = snapshot.BuildClientOperationId,
+            PublicBuildResult = ClonePublicBuildResult(snapshot.PublicBuildResult),
             ProjectBaseline = snapshot.ProjectBaseline is null ? null : snapshot.ProjectBaseline with { },
             UpdatedAtUtc = snapshot.UpdatedAtUtc
         };
@@ -2116,6 +2143,16 @@ public class ConversationalFlowService : IConversationalFlowService
 
         var json = JsonSerializer.Serialize(preview, _jsonOptions);
         return JsonSerializer.Deserialize<VisionAgentBuildReadinessPreviewResult>(json, _jsonOptions);
+    }
+
+    private static VisionAgentPublicBuildResultV1? ClonePublicBuildResult(
+        VisionAgentPublicBuildResultV1? build)
+    {
+        if (build == null)
+            return null;
+
+        var json = JsonSerializer.Serialize(build, _jsonOptions);
+        return JsonSerializer.Deserialize<VisionAgentPublicBuildResultV1>(json, _jsonOptions);
     }
 
     private static List<VisionAgentPlanAnswer> ClonePlanAnswers(IEnumerable<VisionAgentPlanAnswer>? answers)

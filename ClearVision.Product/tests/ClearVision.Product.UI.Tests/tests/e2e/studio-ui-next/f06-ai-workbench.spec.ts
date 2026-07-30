@@ -35,7 +35,7 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   expect(overflow).toBeLessThanOrEqual(1);
 }
 
-test('unbound AI journey reaches Plan Ready through Intent Plan SSE and confirmed answers', async ({ page }) => {
+test('unbound AI journey closes Build parameters resources Validation and read-only ApplyGate', async ({ page }) => {
   const viewport = { width: 1920, height: 1080 };
   const audit = await boot(page, viewport, 'comfortable', '/ai');
   const task = page.getByRole('textbox', { name: '任务描述' });
@@ -54,13 +54,51 @@ test('unbound AI journey reaches Plan Ready through Intent Plan SSE and confirme
   await page.getByRole('button', { name: '采用推荐答案' }).click();
   await expect(page.locator('[data-ai-owner-phase="plan-ready"]')).toBeVisible();
   await expect(page.getByText('方案已具备构建条件。', { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: '进入下一阶段' })).toBeDisabled();
   await captureF06Evidence(page, audit, 'ai-plan-ready-unbound', viewport, 'comfortable');
+
+  await page.getByRole('button', { name: '开始构建' }).click();
+  await expect(page.locator('[data-ai-owner-phase="parameters-pending"]')).toBeVisible();
+  await expect(page.locator('[data-ai-build-workspace]')).toBeVisible();
+  await expect(page.locator('[data-ai-pending-parameters]')).toBeVisible();
+  await captureF06Evidence(page, audit, 'ai-build-parameters-pending', viewport, 'comfortable');
+
+  await page.getByLabel('分割阈值').fill('128');
+  await page.getByRole('button', { name: '确认全部参数' }).click();
+  await expect(page.locator('[data-ai-owner-phase="build-blocked"]')).toBeVisible();
+  await page.getByRole('button', { name: '重新校验' }).click();
+  await expect(page.locator('[data-ai-owner-phase="resources-pending"]')).toBeVisible();
+  await expect(page.locator('[data-ai-resource-decisions]')).toBeVisible();
+  await captureF06Evidence(page, audit, 'ai-build-resources-pending', viewport, 'comfortable');
+
+  await page.getByLabel('选择已配置相机').selectOption('55555555-5555-4555-8555-555555555555');
+  await page.getByRole('button', { name: '保存资源决策' }).click();
+  await expect(page.locator('[data-ai-owner-phase="build-blocked"]')).toBeVisible();
+  await page.getByRole('button', { name: '重新校验' }).click();
+  await expect(page.locator('[data-ai-owner-phase="build-ready"]')).toBeVisible();
+  await expect(page.getByText('候选已具备交接条件', { exact: true })).toBeVisible();
+  await expect(page.getByText('工作区审核', { exact: true })).toBeVisible();
+  await captureF06Evidence(page, audit, 'ai-build-ready-readonly-gate', viewport, 'comfortable');
 
   expect(audit.requests.some(item => item.path === '/api/ai/agent-intent-router-runs')).toBe(true);
   expect(audit.requests.some(item => item.path === '/api/ai/agent-plan-runs')).toBe(true);
   expect(audit.requests.some(item => item.path.startsWith('/api/ai/agent-runs/run_plan_f06_01/events'))).toBe(true);
-  expect(audit.requests.filter(item => /build|handoff|apply|workspace\/save/i.test(item.path))).toEqual([]);
+  expect(audit.requests.filter(item => item.method === 'POST' && item.path === '/api/ai/agent-runs')).toHaveLength(1);
+  expect(audit.requests.filter(item => item.path.endsWith('/revalidate'))).toHaveLength(2);
+  expect(audit.requests.filter(item => /handoff|apply-to-canvas|workspace\/consume|project\/save/i.test(item.path))).toEqual([]);
+  expectNoRuntimeErrors(audit);
+  await expectNoHorizontalOverflow(page);
+});
+
+test('terminal Build recovery renders the candidate without restoring a Plan owner', async ({ page }) => {
+  const viewport = { width: 1366, height: 768 };
+  const audit = await boot(page, viewport, 'compact', '/ai?sessionId=session_f06_01', {
+    recoveredBuild: true
+  });
+  await expect(page.locator('[data-ai-owner-phase="build-ready"]')).toBeVisible();
+  await expect(page.locator('[data-ai-build-workspace]')).toBeVisible();
+  await expect(page.locator('[data-ai-plan-workspace]')).toHaveCount(0);
+  await expect(page.getByText('工作区审核', { exact: true })).toBeVisible();
+  await captureF06Evidence(page, audit, 'ai-build-terminal-recovery', viewport, 'compact');
   expectNoRuntimeErrors(audit);
   await expectNoHorizontalOverflow(page);
 });

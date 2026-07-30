@@ -1,5 +1,5 @@
 import { ApiAbortError } from '@/platform/api';
-import type { AiAgentRunEventV1 } from './contracts';
+import type { AiAgentRunEventV1, AiAgentRunReplayV1 } from './contracts';
 import { decodeAiAgentRunEventV1 } from './decoder';
 import type { AiWorkbenchApi } from './apiAdapter';
 import type { AiResourceLedger } from './resourceLedger';
@@ -12,6 +12,7 @@ export interface CreateAgentRunStreamAdapterOptions {
   readonly getAfterSequence: () => number;
   readonly isTerminal: () => boolean;
   readonly onEvent: (event: AiAgentRunEventV1, generation: number) => AiStreamEventOutcome;
+  readonly onReplay: (replay: AiAgentRunReplayV1, generation: number) => void;
   readonly onRecovering: (message: string) => void;
   readonly onFailure: (error: unknown) => void;
 }
@@ -147,6 +148,7 @@ export function createAgentRunStreamAdapter(options: CreateAgentRunStreamAdapter
       try {
         const replay = await request(signal => options.api.getRunReplay(runId!, signal));
         if (disposed || expectedConnection !== connectionGeneration) return;
+        options.onReplay(replay, generation);
         for (const event of replay.events) {
           const outcome = consume(event, expectedConnection);
           if (outcome === 'gap') {

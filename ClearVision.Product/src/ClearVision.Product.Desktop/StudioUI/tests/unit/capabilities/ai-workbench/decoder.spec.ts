@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { AiContractDecodeError } from '@/capabilities/ai-workbench/contracts';
 import {
   decodeAiAgentRunEventV1,
+  decodeAiAgentRunReplayV1,
+  decodeAiBuildResultV1,
+  decodeAiBuildRevalidationResponseV1,
   decodeAiIntentResultV1,
   decodeAiOperationProjectionV1,
   decodeAiPlanV1,
@@ -9,11 +12,16 @@ import {
 } from '@/capabilities/ai-workbench/decoder';
 import {
   aiProjectId,
+  buildParameterFixture,
+  buildResultFixture,
   intentFixture,
   operationFixture,
   planFixture,
+  replayFixture,
+  resourceRequirementFixture,
   runEventFixture,
-  sessionFixture
+  sessionFixture,
+  snapshotFixture
 } from './aiFixtures';
 
 describe('AI workbench public decoders', () => {
@@ -53,6 +61,30 @@ describe('AI workbench public decoders', () => {
     })).toThrow(AiContractDecodeError);
   });
 
+  it('preserves replay snapshot and diagnostics while rejecting malformed or private projections', () => {
+    const replay = replayFixture();
+    const decoded = decodeAiAgentRunReplayV1(replay);
+    expect(decoded.snapshot.storageVersion).toBe('agent-run-events.jsonl.v1');
+    expect(decoded.snapshot.events).toHaveLength(3);
+    expect(decoded.diagnostics).toMatchObject({ eventCount: 3, redactionPass: true });
+    expect(() => decodeAiAgentRunReplayV1({
+      ...replay,
+      diagnostics: { ...replay.diagnostics, rawReasoning: 'private' }
+    })).toThrow(AiContractDecodeError);
+    expect(() => decodeAiAgentRunReplayV1({
+      ...replay,
+      snapshot: { ...replay.snapshot, events: replay.snapshot.events.slice(0, 2) }
+    })).toThrow(AiContractDecodeError);
+    expect(() => decodeAiAgentRunReplayV1({
+      ...replay,
+      diagnostics: { ...replay.diagnostics, redactionPass: false }
+    })).toThrow(AiContractDecodeError);
+    expect(() => decodeAiAgentRunReplayV1({
+      ...replay,
+      snapshot: { ...replay.snapshot, runId: 'run_other' }
+    })).toThrow(AiContractDecodeError);
+  });
+
   it('fails closed on malformed operation and baseline projections', () => {
     const operation = {
       ...operationFixture('plan_run'),
@@ -68,5 +100,94 @@ describe('AI workbench public decoders', () => {
     })).toThrow(AiContractDecodeError);
     expect(() => decodeAiOperationProjectionV1({ ...operation, privatePayload: 'secret' }))
       .toThrow(AiContractDecodeError);
+  });
+
+  it('decodes the redacted Build DTO while preserving null and empty scalar values', () => {
+    const emptyString = buildParameterFixture({
+      canonicalKey: 'threshold_1.label', parameterName: 'label', parameterDisplayName: 'Label',
+      dataType: 'string', isRequired: false, value: '', hasExplicitValue: true,
+      valueSummary: '', pending: false, defaultValue: '', minValue: null, maxValue: null
+    });
+    const build = buildResultFixture({
+      parameterMapping: [buildParameterFixture(), emptyString]
+    });
+    const decoded = decodeAiBuildResultV1(build);
+    expect(decoded.parameterMapping[0]?.value).toBeNull();
+    expect(decoded.parameterMapping[1]?.value).toBe('');
+    expect(decoded.validation.applyGate.blocked).toBe(true);
+    expect(() => decodeAiBuildResultV1({ ...build, flow: { nodes: [] } }))
+      .toThrow(AiContractDecodeError);
+    expect(() => decodeAiBuildResultV1({ ...build, rawTrace: 'private' }))
+      .toThrow(AiContractDecodeError);
+  });
+
+  it('preserves all/any condition sets and rejects unknown condition identities', () => {
+    const mode = buildParameterFixture({
+      canonicalKey: 'threshold_1.mode', parameterName: 'mode', dataType: 'string',
+      requiredWhen: { allConditions: [], anyConditions: [] }
+    });
+    const value = buildParameterFixture({
+      canonicalKey: 'threshold_1.value', parameterName: 'value', dataType: 'string',
+      requiredWhen: {
+        allConditions: [{ parameter: 'mode', comparison: 'not-empty', value: null }],
+        anyConditions: [
+          { parameter: 'mode', comparison: 'equals', value: 'a' },
+          { parameter: 'mode', comparison: 'equals', value: 'b' }
+        ]
+      },
+      enabledWhen: { allConditions: [], anyConditions: [] },
+      disabledWhen: null
+    });
+    const decoded = decodeAiBuildResultV1(buildResultFixture({ parameterMapping: [mode, value] }));
+    expect(decoded.parameterMapping[1]?.requiredWhen?.allConditions).toHaveLength(1);
+    expect(decoded.parameterMapping[1]?.requiredWhen?.anyConditions).toHaveLength(2);
+
+    expect(() => decodeAiBuildResultV1(buildResultFixture({
+      parameterMapping: [{ ...value, requiredWhen: {
+        allConditions: [{ parameter: 'missing', comparison: 'equals', value: true }],
+        anyConditions: []
+      } }]
+    }))).toThrow(AiContractDecodeError);
+    expect(() => decodeAiBuildResultV1(buildResultFixture({
+      parameterMapping: [{ ...value, requiredWhen: {
+        allConditions: [{ parameter: 'value', comparison: 'contains', value: 'x' }],
+        anyConditions: []
+      } }]
+    }))).toThrow(AiContractDecodeError);
+    expect(() => decodeAiBuildResultV1(buildResultFixture({
+      parameterMapping: [{ ...value, operatorType: 'UnknownOperator' }]
+    }))).toThrow(AiContractDecodeError);
+  });
+
+  it('requires canonical resource identities and rejects free-text paths', () => {
+    const resource = resourceRequirementFixture();
+    const decoded = decodeAiBuildResultV1(buildResultFixture({ missingResources: [resource] }));
+    expect(decoded.missingResources[0]?.canonicalId)
+      .toBe('resource:v1|camera_binding|acquireimage#1|camera_binding_id');
+    expect(() => decodeAiBuildResultV1(buildResultFixture({
+      missingResources: [{ ...resource, canonicalId: 'camera:C:\\line\\camera.json' }]
+    }))).toThrow(AiContractDecodeError);
+    expect(() => decodeAiBuildResultV1(buildResultFixture({
+      missingResources: [{ ...resource, resourceKey: '../camera.json' }]
+    }))).toThrow(AiContractDecodeError);
+  });
+
+  it('fails closed on malformed revalidation identities and private fields', () => {
+    const build = buildResultFixture();
+    const response = {
+      build,
+      snapshot: snapshotFixture({
+        buildRunId: build.runId, buildRunStatus: 'completed', buildClientOperationId: build.clientOperationId,
+        submittedBuildFingerprint: build.submittedBuildFingerprint, buildResult: build
+      }),
+      metadataOnly: true
+    };
+    expect(decodeAiBuildRevalidationResponseV1(response).build.buildId).toBe(build.buildId);
+    expect(() => decodeAiBuildRevalidationResponseV1({ ...response, privateCandidate: {} }))
+      .toThrow(AiContractDecodeError);
+    expect(() => decodeAiBuildRevalidationResponseV1({
+      ...response,
+      snapshot: { ...response.snapshot, buildRunId: 'different_run' }
+    })).toThrow(AiContractDecodeError);
   });
 });

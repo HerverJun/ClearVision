@@ -5,6 +5,10 @@ import { useProductRuntime } from '@/app/productRuntime';
 import { CvPageHeader, CvPageState } from '@/design-system/patterns';
 import { CvInlineAlert, CvStatusBadge } from '@/design-system/primitives';
 import AiClarificationPanel from './AiClarificationPanel.vue';
+import AiBuildProgress from './AiBuildProgress.vue';
+import AiBuildWorkspace from './AiBuildWorkspace.vue';
+import AiPendingParametersPanel from './AiPendingParametersPanel.vue';
+import AiResourceDecisionPanel from './AiResourceDecisionPanel.vue';
 import AiPlanProgress from './AiPlanProgress.vue';
 import AiPlanWorkspace from './AiPlanWorkspace.vue';
 import AiProjectContext from './AiProjectContext.vue';
@@ -32,6 +36,10 @@ const projectId = computed(() => typeof route.params.id === 'string' ? route.par
 const routeIdentity = computed(() => `${String(route.name)}|${projectId.value ?? ''}|${requestedSessionId.value ?? ''}`);
 const showComposer = computed(() => state.value.phase === 'idle');
 const showProgress = computed(() => ['intent-routing', 'planning', 'cancelling', 'recovering'].includes(state.value.phase) && !state.value.plan);
+const showBuildProgress = computed(() => state.value.run.kind === 'build' && [
+  'build-starting', 'building', 'validating', 'build-cancelling', 'recovering'
+].includes(state.value.phase));
+const buildReadonly = computed(() => state.value.buildStale || ['build-failed', 'build-cancelled'].includes(state.value.phase));
 
 function replaceOwner(): void {
   owner.value?.dispose();
@@ -50,6 +58,10 @@ function handleAction(actionId: AiWorkbenchActionId): void {
   if (actionId === 'retryIntent') void current.retryIntent();
   if (actionId === 'startPlan') void current.startPlan();
   if (actionId === 'cancelPlan') void current.cancelPlan();
+  if (actionId === 'startBuild') void current.startBuild();
+  if (actionId === 'cancelBuild') void current.cancelBuild();
+  if (actionId === 'recheckReadiness') void current.recheckReadiness();
+  if (actionId === 'rebuild') void current.rebuild();
   if (actionId === 'previewReadiness') void current.previewReadiness();
   if (actionId === 'reconcile') void current.reconcile();
   if (actionId === 'startNewTask') current.startNewTask();
@@ -137,11 +149,23 @@ onUnmounted(() => {
           :events="state.run.events"
         />
 
+        <AiBuildProgress
+          v-if="showBuildProgress"
+          :events="state.run.events"
+        />
+
         <div
-          v-if="state.plan && state.session"
+          v-if="(state.plan || state.build) && state.session"
           class="ai-workbench-page__workspace"
         >
+          <AiBuildWorkspace
+            v-if="state.build"
+            :build="state.build"
+            :stale="buildReadonly"
+            :diagnostics="state.replayDiagnostics"
+          />
           <AiPlanWorkspace
+            v-else-if="state.plan"
             :plan="state.plan"
             :readiness="state.readiness"
             :session="state.session"
@@ -156,6 +180,20 @@ onUnmounted(() => {
             :busy="projection.busy"
             @submit="answers => owner?.answerClarification(answers)"
             @accept-recommended="owner?.acceptRecommendedAnswers()"
+          />
+          <AiPendingParametersPanel
+            v-else-if="state.build && state.phase === 'parameters-pending'"
+            :parameters="state.build.parameterMapping"
+            :confirmed-values="state.session.snapshot.buildParameterValues"
+            :busy="projection.busy"
+            @confirm="values => owner?.confirmParameters(values)"
+          />
+          <AiResourceDecisionPanel
+            v-else-if="state.build && state.phase === 'resources-pending'"
+            :resources="state.build.missingResources"
+            :camera-bindings="state.cameraBindings"
+            :busy="projection.busy"
+            @save="decisions => owner?.updateResourceDecisions(decisions)"
           />
         </div>
       </main>

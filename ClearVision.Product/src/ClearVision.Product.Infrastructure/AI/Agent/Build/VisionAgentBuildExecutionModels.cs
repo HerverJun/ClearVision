@@ -1,6 +1,7 @@
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
+using System.Text.Json;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
@@ -38,6 +39,8 @@ internal sealed record BuildPlanLoad
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyDictionary<string, string> ParameterSelections { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyDictionary<string, JsonElement> ParameterValues { get; init; } =
+        new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyList<string> ResolvedFields { get; init; } = [];
     public IReadOnlyList<string> RemainingFields { get; init; } = [];
     public string AnswerSetFingerprint { get; init; } = string.Empty;

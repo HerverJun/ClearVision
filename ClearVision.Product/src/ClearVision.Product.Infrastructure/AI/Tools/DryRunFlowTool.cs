@@ -40,7 +40,7 @@ public sealed class DryRunFlowTool : VisionAgentToolBase
         return Task.FromResult(VisionAgentToolResult.Ok(dryrun));
     }
 
-    private static object BuildDryRun(VisionAgentFlowValidation validation)
+    internal static object BuildDryRun(VisionAgentFlowValidation validation)
     {
         var executedOperators = new List<object>();
         var skippedOperators = new List<object>();

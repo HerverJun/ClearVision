@@ -8,7 +8,10 @@ using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Core.AI.Tools;
+using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Desktop.Middleware;
@@ -16,12 +19,14 @@ using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.Tools;
+using ClearVision.Product.Infrastructure.Cameras;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Desktop.Tests;
 
@@ -295,14 +300,31 @@ public sealed class AgentRunEndpointsTests
             .BeNull();
     }
 
-    [Fact(DisplayName = "POST Agent plan readiness preview returns canonical readiness without creating AgentRun")]
-    public async Task PreviewPlanReadiness_ShouldNotCreateRunOrProjectSession()
+    [Fact(DisplayName = "POST Agent plan readiness preview uses owner-bound canonical snapshot without creating AgentRun")]
+    public async Task PreviewPlanReadiness_ShouldUseCanonicalSessionSnapshotWithoutCreatingRun()
     {
         await using var host = await AgentRunEndpointTestHost.CreateAsync();
         var plan = LegacyBlockedAgentRunBuildFromPlanSnapshot();
+        using var create = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        using var createDocument = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
+        var sessionId = createDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString()!;
+        var seeded = host.ConversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = 0,
+            ClientMutationId = Guid.NewGuid().ToString("D"),
+            PendingPlanSnapshot = plan,
+            ConfirmedPlanAnswers = ConfirmedAgentRunBuildFromPlanAnswers(),
+            PlanQuestionSelections = new Dictionary<string, string> { ["defect_definition"] = "scratch_or_blob" },
+            AnswerRevision = 12,
+            ResourceRevision = 4,
+            RequirementMode = AiRequirementModes.Strict
+        });
+        seeded.Success.Should().BeTrue();
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan/readiness-preview", new
         {
+            sessionId,
+            expectedRevision = seeded.Revision,
             planId = plan.PlanId,
             planHash = plan.PlanHash,
             planSnapshot = plan,
@@ -330,7 +352,7 @@ public sealed class AgentRunEndpointsTests
         root.TryGetProperty("runId", out _).Should().BeFalse();
         host.StreamService.ReplayLatest(string.Empty).Should().BeNull();
         host.Generation.LastCommand.Should().BeNull();
-        host.ConversationService.GetSession("agent-ui-contract").Should().BeNull();
+        host.ConversationService.GetSession(sessionId).Should().NotBeNull();
     }
 
     [Fact(DisplayName = "POST Agent intent router returns public route decision")]
@@ -2233,14 +2255,41 @@ public sealed class AgentRunEndpointsTests
     public async Task AiEndpoints_ShouldEnforceRoleAndAuthenticationMatrix()
     {
         await using var host = await AgentRunEndpointTestHost.CreateAsync(useAuth: true);
+        host.Projects.Project = new ProjectDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "auth-matrix-project",
+            PersistenceRevision = 1,
+            Flow = new OperatorFlowDto { Id = Guid.NewGuid(), Name = "auth-flow" }
+        };
 
         host.AuthorizeAs("owner-a-token");
         using var admin = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        using var adminBaseline = await host.Client.GetAsync($"/api/ai/projects/{host.Projects.Project.Id:D}/baseline");
+        using var adminRevalidate = await host.Client.PostAsJsonAsync("/api/ai/agent-runs/ar_missing/revalidate", new
+        {
+            sessionId = "missing",
+            clientMutationId = Guid.NewGuid(),
+            buildId = "build_missing",
+            candidateFlowFingerprint = new string('a', 64)
+        });
         admin.StatusCode.Should().Be(HttpStatusCode.Created);
+        adminBaseline.StatusCode.Should().Be(HttpStatusCode.OK);
+        adminRevalidate.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         host.AuthorizeAs("engineer-token");
         using var engineer = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        using var engineerBaseline = await host.Client.GetAsync($"/api/ai/projects/{host.Projects.Project.Id:D}/baseline");
+        using var engineerRevalidate = await host.Client.PostAsJsonAsync("/api/ai/agent-runs/ar_missing/revalidate", new
+        {
+            sessionId = "missing",
+            clientMutationId = Guid.NewGuid(),
+            buildId = "build_missing",
+            candidateFlowFingerprint = new string('a', 64)
+        });
         engineer.StatusCode.Should().Be(HttpStatusCode.Created);
+        engineerBaseline.StatusCode.Should().Be(HttpStatusCode.OK);
+        engineerRevalidate.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         host.AuthorizeAs("operator-token");
         using var operatorSession = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
@@ -2250,12 +2299,28 @@ public sealed class AgentRunEndpointsTests
             target = new { targetKind = "new" },
             description = "operator must not build"
         });
+        using var operatorBaseline = await host.Client.GetAsync($"/api/ai/projects/{host.Projects.Project.Id:D}/baseline");
+        using var operatorRevalidate = await host.Client.PostAsJsonAsync("/api/ai/agent-runs/ar_missing/revalidate", new
+        {
+            sessionId = "missing",
+            clientMutationId = Guid.NewGuid()
+        });
         operatorSession.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         operatorBuild.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        operatorBaseline.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        operatorRevalidate.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         using var anonymous = host.CreateAnonymousClient();
         using var unauthenticated = await anonymous.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        using var anonymousBaseline = await anonymous.GetAsync($"/api/ai/projects/{host.Projects.Project.Id:D}/baseline");
+        using var anonymousRevalidate = await anonymous.PostAsJsonAsync("/api/ai/agent-runs/ar_missing/revalidate", new
+        {
+            sessionId = "missing",
+            clientMutationId = Guid.NewGuid()
+        });
         unauthenticated.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        anonymousBaseline.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        anonymousRevalidate.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact(DisplayName = "AI Session revision conflict returns only the latest public snapshot")]
@@ -2294,9 +2359,11 @@ public sealed class AgentRunEndpointsTests
         var allowedSnapshotKeys = new HashSet<string>(StringComparer.Ordinal)
         {
             "schemaVersion", "revision", "projectId", "lifecycleState", "planRunId", "planRunStatus",
-            "buildRunId", "buildRunStatus", "buildClientOperationId", "projectBaseline", "requirementMode",
+            "buildRunId", "buildRunStatus", "buildTerminalSequence", "buildClientOperationId",
+            "submittedBuildFingerprint", "projectBaseline", "requirementMode",
             "planQuestionSelections", "confirmedPlanAnswers", "optimisticPlanAnswers", "answerRevision",
-            "readinessPreview", "planAcceptedRecommendedDefaults", "planTerminalSequence", "updatedAtUtc"
+            "buildParameterValues", "readinessPreview", "missingResources", "resourceDecisions",
+            "resourceRevision", "buildResult", "planAcceptedRecommendedDefaults", "planTerminalSequence", "updatedAtUtc"
         };
         foreach (var property in latest.EnumerateObject())
         {
@@ -2309,6 +2376,338 @@ public sealed class AgentRunEndpointsTests
         normalizedConflictJson.Should().NotContain("rawpayload");
         normalizedConflictJson.Should().NotContain("pendingplansnapshot");
         normalizedConflictJson.Should().NotContain("mutationreceipts");
+    }
+
+    [Fact(DisplayName = "AI Session resolves camera identities through backend authority and advances canonical resource revision")]
+    public async Task AiSessionResourceDecision_ShouldUseBackendAuthorityAndCanonicalRevision()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        using var create = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        using var createDocument = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
+        var sessionId = createDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString()!;
+
+        static VisionAgentResourceRequirement Missing(
+            string resourceType,
+            string operatorKey,
+            string operatorId,
+            string parameterName) => new()
+        {
+            CanonicalId = VisionAgentResourceIdentity.CreateCanonicalId(resourceType, operatorKey, parameterName),
+            ResourceType = resourceType,
+            ResourceName = resourceType == "camera_binding" ? "相机绑定" : "模型资源",
+            ResourceKey = $"{operatorId}.{parameterName}",
+            OperatorKey = operatorKey,
+            OperatorId = operatorId,
+            OperatorType = "ImageAcquisition",
+            OperatorIndex = 0,
+            ParameterName = parameterName,
+            Status = VisionAgentResourceStatuses.Pending,
+            BlockingScope = VisionAgentResourceBlockingScopes.DeployRun,
+            ResolutionTarget = VisionAgentResourceResolutionTargets.CameraSettings,
+            DraftPolicy = VisionAgentResourceDraftPolicies.DraftAllowed,
+            Description = "请选择权威资源。",
+            Source = "operator_contract"
+        };
+        var primary = Missing("camera_binding", "imageacquisition#1", "acquire_1", "CameraBindingId");
+        var secondary = Missing("camera_binding", "imageacquisition#2", "acquire_2", "SecondaryCameraBindingId");
+        var unsupported = Missing("model_resource", "imageacquisition#3", "acquire_3", "ModelId");
+        var seeded = host.ConversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = 0,
+            ClientMutationId = Guid.NewGuid().ToString("D"),
+            LifecycleState = "resources_pending",
+            MissingResources = [primary, secondary, unsupported]
+        });
+        seeded.Success.Should().BeTrue();
+
+        using var candidates = await host.Client.GetAsync("/api/ai/resource-candidates/camera-bindings");
+        candidates.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var candidatesDocument = JsonDocument.Parse(await candidates.Content.ReadAsStringAsync());
+        candidatesDocument.RootElement.EnumerateArray().Should().Contain(item =>
+            item.GetProperty("id").GetString() == "camera-binding-01" &&
+            item.GetProperty("displayName").GetString() == "Line camera" &&
+            item.GetProperty("isEnabled").GetBoolean());
+        var candidateFields = candidatesDocument.RootElement[0].EnumerateObject()
+            .Select(property => property.Name)
+            .ToArray();
+        candidateFields.Should().BeEquivalentTo("id", "displayName", "isEnabled");
+
+        using var clientRevision = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = seeded.Revision,
+            clientMutationId = Guid.NewGuid().ToString("D"),
+            resourceRevision = 1,
+            resourceDecisions = new[] { new { canonicalId = primary.CanonicalId, resourceKey = "camera-binding-01" } }
+        });
+        clientRevision.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await clientRevision.Content.ReadAsStringAsync()).Should().Contain("resource_revision_server_managed");
+
+        using var unknown = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = seeded.Revision,
+            clientMutationId = Guid.NewGuid().ToString("D"),
+            resourceDecisions = new[] { new { canonicalId = primary.CanonicalId, resourceKey = "missing-camera" } }
+        });
+        unknown.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await unknown.Content.ReadAsStringAsync()).Should().Contain("resource_not_found");
+
+        using var disabled = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = seeded.Revision,
+            clientMutationId = Guid.NewGuid().ToString("D"),
+            resourceDecisions = new[] { new { canonicalId = primary.CanonicalId, resourceKey = "camera-binding-disabled" } }
+        });
+        disabled.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await disabled.Content.ReadAsStringAsync()).Should().Contain("resource_disabled");
+
+        using var unsupportedResponse = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = seeded.Revision,
+            clientMutationId = Guid.NewGuid().ToString("D"),
+            resourceDecisions = new[] { new { canonicalId = unsupported.CanonicalId, resourceKey = "camera-binding-01" } }
+        });
+        unsupportedResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await unsupportedResponse.Content.ReadAsStringAsync()).Should().Contain("resource_type_unsupported");
+
+        var firstMutationId = Guid.NewGuid().ToString("D");
+        using var accepted = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = seeded.Revision,
+            clientMutationId = firstMutationId,
+            lifecycleState = "build_inputs_changed",
+            resourceDecisions = new[]
+            {
+                new
+                {
+                    canonicalId = primary.CanonicalId,
+                    resourceKey = "camera-binding-01",
+                    valueSummary = @"C:\forged\camera.json"
+                }
+            }
+        });
+        accepted.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var acceptedDocument = JsonDocument.Parse(await accepted.Content.ReadAsStringAsync());
+        var snapshot = acceptedDocument.RootElement.GetProperty("snapshot");
+        snapshot.GetProperty("resourceRevision").GetInt32().Should().Be(1);
+        var acceptedRevision = snapshot.GetProperty("revision").GetInt64();
+        var decision = snapshot.GetProperty("resourceDecisions")[0];
+        decision.GetProperty("canonicalId").GetString().Should().Be(primary.CanonicalId);
+        decision.GetProperty("resourceKey").GetString().Should().Be("camera-binding-01");
+        decision.GetProperty("valueSummary").GetString().Should().Be("Line camera");
+        decision.GetProperty("source").GetString().Should().Be(VisionAgentResourceAuthority.CameraBindingSource);
+
+        using var responseLossRetry = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = seeded.Revision,
+            clientMutationId = firstMutationId,
+            lifecycleState = "build_inputs_changed",
+            resourceDecisions = new[] { new { canonicalId = primary.CanonicalId, resourceKey = "camera-binding-01" } }
+        });
+        responseLossRetry.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var retryDocument = JsonDocument.Parse(await responseLossRetry.Content.ReadAsStringAsync());
+        retryDocument.RootElement.GetProperty("snapshot").GetProperty("revision").GetInt64().Should().Be(acceptedRevision);
+        retryDocument.RootElement.GetProperty("snapshot").GetProperty("resourceRevision").GetInt32().Should().Be(1);
+
+        using var second = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = acceptedRevision,
+            clientMutationId = Guid.NewGuid().ToString("D"),
+            resourceDecisions = new[] { new { canonicalId = secondary.CanonicalId, resourceKey = "camera-binding-02" } }
+        });
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var secondDocument = JsonDocument.Parse(await second.Content.ReadAsStringAsync());
+        var secondSnapshot = secondDocument.RootElement.GetProperty("snapshot");
+        secondSnapshot.GetProperty("resourceRevision").GetInt32().Should().Be(2);
+        secondSnapshot.GetProperty("resourceDecisions").GetArrayLength().Should().Be(2);
+
+        using var stale = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = acceptedRevision,
+            clientMutationId = Guid.NewGuid().ToString("D"),
+            resourceDecisions = new[] { new { canonicalId = primary.CanonicalId, resourceKey = "camera-binding-02" } }
+        });
+        stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var staleDocument = JsonDocument.Parse(await stale.Content.ReadAsStringAsync());
+        staleDocument.RootElement.GetProperty("latestSnapshot").GetProperty("resourceRevision").GetInt32().Should().Be(2);
+    }
+
+    [Fact(DisplayName = "AI Session Build parameter mutation preserves JSON scalars and rejects structured values")]
+    public async Task AiSessionBuildParameters_ShouldPreserveNullEmptyAndScalarValues()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        using var create = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        using var createDocument = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
+        var sessionId = createDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString()!;
+
+        using var accepted = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = 0,
+            clientMutationId = Guid.NewGuid().ToString("D"),
+            answerRevision = 1,
+            buildParameterValues = new Dictionary<string, object?>
+            {
+                ["op.optional"] = null,
+                ["op.empty"] = string.Empty,
+                ["op.threshold"] = 128.5,
+                ["op.enabled"] = true
+            }
+        });
+        accepted.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var acceptedDocument = JsonDocument.Parse(await accepted.Content.ReadAsStringAsync());
+        var values = acceptedDocument.RootElement.GetProperty("snapshot").GetProperty("buildParameterValues");
+        values.GetProperty("op.optional").ValueKind.Should().Be(JsonValueKind.Null);
+        values.GetProperty("op.empty").GetString().Should().BeEmpty();
+        values.GetProperty("op.threshold").GetDouble().Should().Be(128.5);
+        values.GetProperty("op.enabled").GetBoolean().Should().BeTrue();
+
+        using var structured = await host.Client.PostAsJsonAsync($"/api/ai/sessions/{sessionId}/workspace-snapshot", new
+        {
+            expectedRevision = 1,
+            clientMutationId = Guid.NewGuid().ToString("D"),
+            answerRevision = 2,
+            buildParameterValues = new { invalid = new { nested = true } }
+        });
+        structured.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await structured.Content.ReadAsStringAsync()).Should().Contain("build_parameter_value_invalid");
+    }
+
+    [Fact(DisplayName = "Build revalidation enforces scalar type range enum null and empty-string contracts")]
+    public async Task BuildRevalidator_ShouldEnforceParameterContractsWithoutChangingCandidateIdentity()
+    {
+        var flow = new OperatorFlowDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "parameter-revalidation-flow",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Thresholding",
+                    Type = OperatorType.Thresholding,
+                    Metadata = new Dictionary<string, object?> { ["agentTempId"] = "threshold_1" },
+                    Parameters =
+                    [
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Threshold",
+                            DisplayName = "阈值",
+                            DataType = "double",
+                            Value = 128d,
+                            MinValue = 0d,
+                            MaxValue = 255d,
+                            IsRequired = true
+                        },
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Label",
+                            DisplayName = "标签",
+                            DataType = "string",
+                            Value = string.Empty,
+                            IsRequired = false
+                        },
+                        new ParameterDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Mode",
+                            DisplayName = "模式",
+                            DataType = "string",
+                            Value = "fast",
+                            IsRequired = true
+                        }
+                    ]
+                }
+            ]
+        };
+        var candidateFingerprint = ExecutionFlowIdentity.ComputeFlowHash(flow.ToEntity());
+
+        VisionAgentParameterMapping Mapping(
+            string name,
+            string dataType,
+            bool required,
+            object? min = null,
+            object? max = null,
+            List<VisionAgentParameterOption>? options = null) => new()
+        {
+            CanonicalKey = $"threshold_1.{name}",
+            TempId = "threshold_1",
+            OperatorType = "Thresholding",
+            OperatorDisplayName = "阈值",
+            ParameterName = name,
+            ParameterDisplayName = name,
+            DataType = dataType,
+            IsRequired = required,
+            RequiredPolicy = required ? OperatorParameterRequiredPolicies.Required : OperatorParameterRequiredPolicies.Optional,
+            Pending = true,
+            MinValue = min,
+            MaxValue = max,
+            Options = options ?? []
+        };
+
+        VisionAgentPublicBuildResultV1 Build(VisionAgentParameterMapping mapping) => new()
+        {
+            RunId = "ar_parameter_revalidation",
+            BuildId = "build_parameter_revalidation",
+            ClientOperationId = Guid.NewGuid(),
+            BuildIdentity = "build-identity",
+            SubmittedBuildFingerprint = new string('a', 64),
+            PlanId = "plan_parameter_revalidation",
+            PlanHash = new string('b', 64),
+            AnswerSetFingerprint = new string('c', 64),
+            ProjectBaseline = new AiProjectBaselineIdentity(),
+            CandidateFlowFingerprint = candidateFingerprint,
+            OperatorCount = 1,
+            ParameterMapping = [mapping],
+            WorkflowDiff = new VisionAgentWorkflowDiff()
+        };
+
+        async Task<VisionAgentPublicBuildResultV1> Revalidate(
+            VisionAgentParameterMapping mapping,
+            object? value)
+        {
+            return await new VisionAgentBuildRevalidator().RevalidateAsync(new VisionAgentBuildRevalidationRequest
+            {
+                CandidateFlowJson = JsonSerializer.Serialize(flow),
+                Build = Build(mapping),
+                ParameterValues = new Dictionary<string, JsonElement>
+                {
+                    [mapping.CanonicalKey] = JsonSerializer.SerializeToElement(value)
+                },
+                AnswerRevision = 2,
+                ResourceRevision = 0
+            }, CancellationToken.None);
+        }
+
+        var threshold = Mapping("Threshold", "number", true, 0d, 255d);
+        var valid = await Revalidate(threshold, 200d);
+        valid.CandidateFlowFingerprint.Should().Be(candidateFingerprint);
+        valid.ParameterMapping.Single().Pending.Should().BeFalse();
+        valid.ParameterMapping.Single().Value.Should().Be(200d);
+
+        var nullRequired = await Revalidate(threshold, null);
+        nullRequired.ParameterMapping.Single().Pending.Should().BeTrue();
+        nullRequired.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("required_value_missing"));
+
+        var wrongType = await Revalidate(threshold, "200");
+        wrongType.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("number_required"));
+
+        var outOfRange = await Revalidate(threshold, 300d);
+        outOfRange.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("above_maximum"));
+
+        var label = Mapping("Label", "string", false);
+        var emptyString = await Revalidate(label, string.Empty);
+        emptyString.ParameterMapping.Single().Pending.Should().BeFalse();
+        emptyString.ParameterMapping.Single().Value.Should().Be(string.Empty);
+
+        var mode = Mapping("Mode", "string", true, options:
+        [
+            new VisionAgentParameterOption { Label = "快速", Value = "fast" },
+            new VisionAgentParameterOption { Label = "精确", Value = "accurate" }
+        ]);
+        var invalidEnum = await Revalidate(mode, "unsupported");
+        invalidEnum.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("enum_value_invalid"));
     }
 
     [Fact(DisplayName = "AI operation identity replays matching requests rejects conflicts and supports lookup")]
@@ -2347,6 +2746,211 @@ public sealed class AgentRunEndpointsTests
         using var list = await host.Client.GetAsync("/api/ai/sessions");
         using var listDocument = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
         listDocument.RootElement.GetProperty("total").GetInt32().Should().Be(1);
+    }
+
+    [Fact(DisplayName = "Build terminal replay exposes only the G3 public DTO")]
+    public async Task BuildTerminalReplay_ShouldExposeRedactedPublicBuildResult()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        var candidate = await CreateG3BuildCandidateAsync(host);
+
+        using var response = await host.Client.GetAsync($"/api/ai/agent-runs/{candidate.RunId}");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(json);
+        JsonElement publicBuild = default;
+        foreach (var evt in document.RootElement.GetProperty("events").EnumerateArray().Reverse())
+        {
+            var payload = evt.GetProperty("payload");
+            if (payload.TryGetProperty("publicBuildResult", out publicBuild)) break;
+            if (payload.TryGetProperty("diagnostic", out var diagnostic) &&
+                diagnostic.TryGetProperty("publicBuildResult", out publicBuild)) break;
+        }
+        publicBuild.ValueKind.Should().Be(JsonValueKind.Object);
+        var expectedKeys = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "schemaVersion", "runId", "buildId", "clientOperationId", "buildIdentity",
+            "submittedBuildFingerprint", "planId", "planHash", "answerSetFingerprint",
+            "answerRevision", "resourceRevision", "projectBaseline", "candidateFlowFingerprint",
+            "operatorCount", "connectionCount", "operatorPipeline", "parameterMapping",
+            "missingResources", "workflowDiff", "validation", "publicTimeline", "publicWarnings",
+            "metadataOnly", "redactionPass"
+        };
+        publicBuild.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(expectedKeys);
+        publicBuild.GetProperty("runId").GetString().Should().Be(candidate.RunId);
+        publicBuild.GetProperty("validation").GetProperty("applyGate").ValueKind.Should().Be(JsonValueKind.Object);
+        publicBuild.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        publicBuild.GetProperty("redactionPass").GetBoolean().Should().BeTrue();
+
+        var normalized = publicBuild.GetRawText().ToLowerInvariant();
+        normalized.Should().NotContain("\"flow\"");
+        normalized.Should().NotContain("existingflowjson");
+        normalized.Should().NotContain("currentcanvasflowjson");
+        normalized.Should().NotContain("tooltrace");
+        normalized.Should().NotContain("rawprompt");
+        normalized.Should().NotContain("reasoningcontent");
+    }
+
+    [Fact(DisplayName = "Build revalidation binds run session candidate revisions and persists the latest ApplyGate")]
+    public async Task BuildRevalidation_ShouldEnforceIdentityAndPersistReadiness()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(
+            useAuth: true,
+            revalidateHandler: (request, _) => Task.FromResult(request.Build with
+            {
+                AnswerRevision = request.AnswerRevision,
+                ResourceRevision = request.ResourceRevision,
+                Validation = request.Build.Validation with
+                {
+                    HandoffEligible = true,
+                    ReadinessStatus = "ready",
+                    FirstFixRecommendation = string.Empty,
+                    ApplyGate = request.Build.Validation.ApplyGate with
+                    {
+                        CanvasApplyReady = true,
+                        RuntimeDraftReady = true,
+                        Blocked = false,
+                        Status = "ready_for_handoff",
+                        ApplyBlockers = []
+                    }
+                }
+            }));
+        host.AuthorizeAs("owner-a-token");
+        var candidate = await CreateG3BuildCandidateAsync(host);
+        object Command(
+            string? sessionId = null,
+            string? buildId = null,
+            string? fingerprint = null,
+            long? revision = null,
+            int? answerRevision = null,
+            int? resourceRevision = null) => new
+        {
+            sessionId = sessionId ?? candidate.SessionId,
+            expectedRevision = revision ?? candidate.Revision,
+            clientMutationId = Guid.NewGuid(),
+            buildId = buildId ?? candidate.Build.BuildId,
+            candidateFlowFingerprint = fingerprint ?? candidate.Build.CandidateFlowFingerprint,
+            answerRevision = answerRevision ?? candidate.Build.AnswerRevision,
+            resourceRevision = resourceRevision ?? candidate.Build.ResourceRevision
+        };
+
+        using var wrongSession = await host.Client.PostAsJsonAsync(
+            $"/api/ai/agent-runs/{candidate.RunId}/revalidate", Command(sessionId: "other_session"));
+        wrongSession.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        using var wrongBuild = await host.Client.PostAsJsonAsync(
+            $"/api/ai/agent-runs/{candidate.RunId}/revalidate", Command(buildId: "other_build"));
+        using var wrongCandidate = await host.Client.PostAsJsonAsync(
+            $"/api/ai/agent-runs/{candidate.RunId}/revalidate", Command(fingerprint: new string('f', 64)));
+        using var wrongRevision = await host.Client.PostAsJsonAsync(
+            $"/api/ai/agent-runs/{candidate.RunId}/revalidate", Command(revision: candidate.Revision + 1));
+        using var wrongAnswer = await host.Client.PostAsJsonAsync(
+            $"/api/ai/agent-runs/{candidate.RunId}/revalidate", Command(answerRevision: candidate.Build.AnswerRevision + 1));
+        using var wrongResource = await host.Client.PostAsJsonAsync(
+            $"/api/ai/agent-runs/{candidate.RunId}/revalidate", Command(resourceRevision: candidate.Build.ResourceRevision + 1));
+        foreach (var conflict in new[] { wrongBuild, wrongCandidate, wrongRevision, wrongAnswer, wrongResource })
+        {
+            conflict.StatusCode.Should().Be(HttpStatusCode.Conflict);
+            (await conflict.Content.ReadAsStringAsync()).Should().Contain("build_revalidation_stale");
+        }
+
+        var otherRunId = await host.CreateRunAsync("Other owned Build run");
+        using var wrongRun = await host.Client.PostAsJsonAsync(
+            $"/api/ai/agent-runs/{otherRunId}/revalidate", Command());
+        wrongRun.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        using var accepted = await host.Client.PostAsJsonAsync(
+            $"/api/ai/agent-runs/{candidate.RunId}/revalidate", Command());
+        accepted.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var acceptedDocument = JsonDocument.Parse(await accepted.Content.ReadAsStringAsync());
+        var root = acceptedDocument.RootElement;
+        root.GetProperty("build").GetProperty("candidateFlowFingerprint").GetString()
+            .Should().Be(candidate.Build.CandidateFlowFingerprint);
+        root.GetProperty("build").GetProperty("validation").GetProperty("handoffEligible").GetBoolean().Should().BeTrue();
+        root.GetProperty("build").GetProperty("validation").GetProperty("applyGate")
+            .GetProperty("status").GetString().Should().Be("ready_for_handoff");
+        root.GetProperty("snapshot").GetProperty("revision").GetInt64().Should().Be(candidate.Revision + 1);
+        root.GetProperty("snapshot").GetProperty("lifecycleState").GetString().Should().Be("build_ready");
+
+        using var staleRetry = await host.Client.PostAsJsonAsync(
+            $"/api/ai/agent-runs/{candidate.RunId}/revalidate", Command());
+        staleRetry.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        host.AuthorizeAs("owner-b-token");
+        using var nonOwner = await host.Client.PostAsJsonAsync(
+            $"/api/ai/agent-runs/{candidate.RunId}/revalidate", Command(revision: candidate.Revision + 1));
+        nonOwner.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact(DisplayName = "Build operation identity includes answer parameter and resource revisions")]
+    public async Task BuildOperationIdentity_ShouldReplayAndRejectInputRevisionConflicts()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        using var sessionResponse = await host.Client.PostAsJsonAsync("/api/ai/sessions", new
+        {
+            clientOperationId = Guid.NewGuid()
+        });
+        using var sessionDocument = JsonDocument.Parse(await sessionResponse.Content.ReadAsStringAsync());
+        var sessionId = sessionDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString()!;
+        var operationId = Guid.NewGuid();
+        var buildFromPlan = BuildableAgentRunBuildFromPlanRequest() with
+        {
+            WorkspaceExpectedRevision = 0,
+            AnswerRevision = 0,
+            ResourceRevision = 0
+        };
+        var request = new AgentRunCreateRequest
+        {
+            ClientOperationId = operationId,
+            Target = new AiProjectTargetRequest { TargetKind = "new" },
+            Description = "Idempotent G3 Build",
+            SessionId = sessionId,
+            BuildFromPlan = buildFromPlan,
+            UseVisionAgentGenerateFlow = true
+        };
+
+        using var first = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", request);
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var firstDocument = JsonDocument.Parse(await first.Content.ReadAsStringAsync());
+        var runId = firstDocument.RootElement.GetProperty("runId").GetString();
+
+        using var replay = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", request);
+        replay.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var replayDocument = JsonDocument.Parse(await replay.Content.ReadAsStringAsync());
+        replayDocument.RootElement.GetProperty("runId").GetString().Should().Be(runId);
+
+        using var conflict = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", request with
+        {
+            BuildFromPlan = buildFromPlan with
+            {
+                AnswerRevision = 1,
+                ResourceRevision = 1,
+                ParameterValues = new Dictionary<string, JsonElement>
+                {
+                    ["threshold_1.threshold"] = JsonSerializer.SerializeToElement(128)
+                },
+                ResourceDecisions =
+                [
+                    new VisionAgentResourceDecision
+                    {
+                        CanonicalId = VisionAgentResourceIdentity.CreateCanonicalId(
+                            "camera_binding", "imageacquisition#1", "CameraBindingId"),
+                        Status = VisionAgentResourceStatuses.Bound,
+                        ResourceKey = "acquire_1.CameraBindingId",
+                        ResourceType = "camera_binding",
+                        OperatorKey = "imageacquisition#1",
+                        OperatorId = "acquire_1",
+                        OperatorType = "ImageAcquisition",
+                        ParameterName = "CameraBindingId",
+                        ValueSummary = "55555555-5555-4555-8555-555555555555",
+                        Source = "camera_binding_catalog"
+                    }
+                ]
+            }
+        });
+        conflict.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await conflict.Content.ReadAsStringAsync()).Should().Contain("operation_identity_conflict");
+        host.Generation.BuildCallCount.Should().Be(1);
     }
 
     [Fact(DisplayName = "Existing Project Build validates authoritative revision hash and canonical server flow")]
@@ -2619,6 +3223,43 @@ public sealed class AgentRunEndpointsTests
         };
     }
 
+    private static async Task<(string SessionId, string RunId, VisionAgentPublicBuildResultV1 Build, long Revision)>
+        CreateG3BuildCandidateAsync(AgentRunEndpointTestHost host)
+    {
+        using var sessionResponse = await host.Client.PostAsJsonAsync("/api/ai/sessions", new
+        {
+            clientOperationId = Guid.NewGuid()
+        });
+        sessionResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        using var sessionDocument = JsonDocument.Parse(await sessionResponse.Content.ReadAsStringAsync());
+        var sessionId = sessionDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString()!;
+        var buildFromPlan = BuildableAgentRunBuildFromPlanRequest() with
+        {
+            WorkspaceExpectedRevision = 0,
+            AnswerRevision = 0,
+            ResourceRevision = 0
+        };
+        using var buildResponse = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            target = new { targetKind = "new" },
+            description = "Build a candidate for G3 validation",
+            sessionId,
+            requirementMode = AiRequirementModes.Strict,
+            buildFromPlan,
+            useVisionAgentGenerateFlow = true,
+            agentGenerateFlowMode = AiAgentGenerateFlowModes.Scripted
+        });
+        buildResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var buildDocument = JsonDocument.Parse(await buildResponse.Content.ReadAsStringAsync());
+        var runId = buildDocument.RootElement.GetProperty("runId").GetString()!;
+        await host.WaitForTerminalAsync(runId);
+        await host.WaitForWorkspaceBuildStatusAsync(sessionId, AgentRunEventStatuses.Completed);
+        var snapshot = host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!;
+        snapshot.PublicBuildResult.Should().NotBeNull();
+        return (sessionId, runId, snapshot.PublicBuildResult!, snapshot.Revision);
+    }
+
     private static List<VisionAgentPlanAnswer> ConfirmedAgentRunBuildFromPlanAnswers()
     {
         return
@@ -2762,7 +3403,8 @@ public sealed class AgentRunEndpointsTests
             bool useAuth = false,
             Func<DateTimeOffset>? utcNowProvider = null,
             Func<VisionAgentPlanModeRequest, VisionAgentPlanModeResult, CancellationToken, Task<VisionAgentPlanModeResult>>? planHandler = null,
-            Func<VisionAgentIntentRouterRequest, CancellationToken, Task<VisionAgentIntentRouterResult>>? intentRouterHandler = null)
+            Func<VisionAgentIntentRouterRequest, CancellationToken, Task<VisionAgentIntentRouterResult>>? intentRouterHandler = null,
+            Func<VisionAgentBuildRevalidationRequest, CancellationToken, Task<VisionAgentPublicBuildResultV1>>? revalidateHandler = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -2778,19 +3420,28 @@ public sealed class AgentRunEndpointsTests
             var conversationService = new ConversationalFlowService(Path.Combine(directory, "sessions"));
             var operationStore = new AiOperationReceiptStore(Path.Combine(directory, "operations"));
             var projects = new FakeProjectApplicationService();
+            var cameraManager = new CameraManager(NullLoggerFactory.Instance);
+            cameraManager.LoadBindings(
+            [
+                new CameraBindingConfig { Id = "camera-binding-01", DisplayName = "Line camera", IsEnabled = true },
+                new CameraBindingConfig { Id = "camera-binding-02", DisplayName = "Backup camera", IsEnabled = true },
+                new CameraBindingConfig { Id = "camera-binding-disabled", DisplayName = "Disabled camera", IsEnabled = false }
+            ], string.Empty);
             if (utcNowProvider != null)
             {
                 streamService.UtcNowProvider = utcNowProvider;
             }
             var generation = new FakeAiFlowGenerationService(
                 handler ?? ((_, _) => Task.FromResult(SuccessResult())),
-                streamService);
+                streamService,
+                revalidateHandler);
 
             builder.Services.AddSingleton(redactor);
             builder.Services.AddSingleton(store);
             builder.Services.AddSingleton<IVisionAgentBuildProjectionJournal, VisionAgentBuildProjectionJournal>();
             builder.Services.AddSingleton<IConversationalFlowService>(conversationService);
             builder.Services.AddSingleton<IAiOperationReceiptStore>(operationStore);
+            builder.Services.AddSingleton<ICameraManager>(cameraManager);
             builder.Services.AddSingleton<IProjectApplicationService>(projects);
             builder.Services.AddSingleton<IAgentRunEventStreamService>(streamService);
             builder.Services.AddSingleton<IAiFlowGenerationService>(generation);
@@ -3021,14 +3672,17 @@ public sealed class AgentRunEndpointsTests
     {
         private readonly Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>> _handler;
         private readonly IAgentRunEventStreamService _streamService;
+        private readonly Func<VisionAgentBuildRevalidationRequest, CancellationToken, Task<VisionAgentPublicBuildResultV1>>? _revalidateHandler;
         private readonly TaskCompletionSource _called = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public FakeAiFlowGenerationService(
             Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>> handler,
-            IAgentRunEventStreamService streamService)
+            IAgentRunEventStreamService streamService,
+            Func<VisionAgentBuildRevalidationRequest, CancellationToken, Task<VisionAgentPublicBuildResultV1>>? revalidateHandler = null)
         {
             _handler = handler;
             _streamService = streamService;
+            _revalidateHandler = revalidateHandler;
         }
 
         public AiFlowGenerationRequest? LastRequest { get; private set; }
@@ -3117,6 +3771,19 @@ public sealed class AgentRunEndpointsTests
             });
         }
 
+        public Task<VisionAgentPublicBuildResultV1> RevalidateAsync(
+            VisionAgentBuildRevalidationRequest request,
+            CancellationToken cancellationToken)
+        {
+            LastCancellationToken = cancellationToken;
+            if (_revalidateHandler != null) return _revalidateHandler(request, cancellationToken);
+            return Task.FromResult(request.Build with
+            {
+                AnswerRevision = request.AnswerRevision,
+                ResourceRevision = request.ResourceRevision
+            });
+        }
+
         public async Task WaitForCallAsync()
         {
             await _called.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -3156,6 +3823,9 @@ public sealed class AgentRunEndpointsTests
             result.BuildResult ??= new VisionAgentBuildResult();
             result.BuildResult = result.BuildResult with
             {
+                BuildId = string.IsNullOrWhiteSpace(result.BuildResult.BuildId)
+                    ? $"build_{request.AgentRunId}"
+                    : result.BuildResult.BuildId,
                 PlanId = planId,
                 PlanHash = planHash,
                 ContractVersion = contractVersion,

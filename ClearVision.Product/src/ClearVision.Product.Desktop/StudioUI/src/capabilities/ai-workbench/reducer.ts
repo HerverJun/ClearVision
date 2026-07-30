@@ -1,9 +1,13 @@
 import type {
   AiAgentRunEventV1,
+  AiAgentRunReplayDiagnosticsV1,
+  AiBuildResultV1,
+  AiCameraBindingOptionV1,
   AiIntentResultV1,
   AiOperationProjectionV1,
   AiPlanV1,
   AiProjectContextV1,
+  AiProjectBaselineV1,
   AiReadinessPreviewV1,
   AiRequirementMode,
   AiRunStatus,
@@ -19,6 +23,19 @@ export type AiWorkbenchPhase =
   | 'clarifying'
   | 'plan-blocked'
   | 'plan-ready'
+  | 'build-starting'
+  | 'building'
+  | 'validating'
+  | 'build-blocked'
+  | 'parameters-pending'
+  | 'resources-pending'
+  | 'revalidating'
+  | 'build-ready'
+  | 'build-failed'
+  | 'build-cancelling'
+  | 'build-cancelled'
+  | 'baseline-conflict'
+  | 'unknown-outcome'
   | 'cancelling'
   | 'cancelled'
   | 'recovering'
@@ -28,6 +45,7 @@ export type AiWorkbenchPhase =
   | 'disposed';
 
 export interface AiPlanRunState {
+  readonly kind: 'plan' | 'build' | null;
   readonly clientOperationId: string | null;
   readonly runId: string | null;
   readonly status: AiRunStatus | null;
@@ -42,12 +60,17 @@ export interface AiWorkbenchState {
   readonly phase: AiWorkbenchPhase;
   readonly session: AiSessionDetailV1 | null;
   readonly project: AiProjectContextV1 | null;
+  readonly projectBaseline: AiProjectBaselineV1 | null;
   readonly taskDescription: string;
   readonly requirementMode: AiRequirementMode;
   readonly intent: AiIntentResultV1 | null;
   readonly plan: AiPlanV1 | null;
   readonly readiness: AiReadinessPreviewV1 | null;
   readonly operation: AiOperationProjectionV1 | null;
+  readonly build: AiBuildResultV1 | null;
+  readonly buildStale: boolean;
+  readonly replayDiagnostics: AiAgentRunReplayDiagnosticsV1 | null;
+  readonly cameraBindings: readonly AiCameraBindingOptionV1[];
   readonly run: AiPlanRunState;
   readonly errorCode: string | null;
   readonly message: string;
@@ -57,22 +80,34 @@ export interface AiWorkbenchState {
 export type AiWorkbenchEvent =
   | Readonly<{ type: 'session-start'; mode: 'create' | 'hydrate'; at: number }>
   | Readonly<{ type: 'session-ready'; session: AiSessionDetailV1; project: AiProjectContextV1 | null; operation?: AiOperationProjectionV1 | null; at: number }>
+  | Readonly<{ type: 'baseline-ready'; baseline: AiProjectBaselineV1; at: number }>
   | Readonly<{ type: 'intent-start'; description: string; requirementMode: AiRequirementMode; at: number }>
   | Readonly<{ type: 'intent-ready'; intent: AiIntentResultV1; at: number }>
   | Readonly<{ type: 'plan-start'; clientOperationId: string; generation: number; at: number }>
   | Readonly<{ type: 'plan-attached'; runId: string; operation: AiOperationProjectionV1 | null; snapshot?: AiSessionSnapshotV1 | null; at: number }>
+  | Readonly<{ type: 'build-start'; clientOperationId: string; generation: number; at: number }>
+  | Readonly<{ type: 'build-attached'; runId: string; operation: AiOperationProjectionV1 | null; snapshot?: AiSessionSnapshotV1 | null; at: number }>
+  | Readonly<{ type: 'build-unknown'; message: string; at: number }>
+  | Readonly<{ type: 'inputs-updated'; snapshot: AiSessionSnapshotV1; message: string; at: number }>
+  | Readonly<{ type: 'revalidation-start'; at: number }>
+  | Readonly<{ type: 'revalidation-ready'; build: AiBuildResultV1; snapshot: AiSessionSnapshotV1; at: number }>
+  | Readonly<{ type: 'camera-bindings-ready'; bindings: readonly AiCameraBindingOptionV1[]; at: number }>
   | Readonly<{ type: 'run-event'; event: AiAgentRunEventV1; generation: number; at: number }>
+  | Readonly<{ type: 'replay-observed'; diagnostics: AiAgentRunReplayDiagnosticsV1; generation: number; at: number }>
   | Readonly<{ type: 'recovery-start'; reason: string; at: number }>
   | Readonly<{ type: 'snapshot-ready'; snapshot: AiSessionSnapshotV1; at: number }>
   | Readonly<{ type: 'readiness-start'; at: number }>
   | Readonly<{ type: 'readiness-ready'; readiness: AiReadinessPreviewV1; snapshot: AiSessionSnapshotV1; at: number }>
   | Readonly<{ type: 'cancel-start'; at: number }>
-  | Readonly<{ type: 'failed'; phase: Extract<AiWorkbenchPhase, 'plan-blocked' | 'session-conflict' | 'plan-failed' | 'offline-or-service-unavailable'>; errorCode: string; message: string; at: number }>
+  | Readonly<{ type: 'failed'; phase: Extract<AiWorkbenchPhase,
+      'plan-blocked' | 'session-conflict' | 'plan-failed' | 'build-failed' | 'baseline-conflict' |
+      'unknown-outcome' | 'offline-or-service-unavailable'>; errorCode: string; message: string; at: number }>
   | Readonly<{ type: 'retry'; at: number }>
   | Readonly<{ type: 'new-task'; at: number }>
   | Readonly<{ type: 'dispose'; at: number }>;
 
 const initialRunState: AiPlanRunState = Object.freeze({
+  kind: null,
   clientOperationId: null,
   runId: null,
   status: null,
@@ -87,12 +122,17 @@ export const initialAiWorkbenchState: AiWorkbenchState = Object.freeze({
   phase: 'idle',
   session: null,
   project: null,
+  projectBaseline: null,
   taskDescription: '',
   requirementMode: 'strict',
   intent: null,
   plan: null,
   readiness: null,
   operation: null,
+  build: null,
+  buildStale: false,
+  replayDiagnostics: null,
+  cameraBindings: Object.freeze([]),
   run: initialRunState,
   errorCode: null,
   message: '',
@@ -108,13 +148,38 @@ function planPhase(plan: AiPlanV1, readiness: AiReadinessPreviewV1 | null): AiWo
   return 'plan-blocked';
 }
 
+function buildPhase(build: AiBuildResultV1): AiWorkbenchPhase {
+  if (build.validation.handoffEligible) return 'build-ready';
+  if (build.parameterMapping.some(item => item.pending && !item.resourceDependent)) return 'parameters-pending';
+  if (build.missingResources.length > 0) return 'resources-pending';
+  return 'build-blocked';
+}
+
+function buildProgressPhase(event: AiAgentRunEventV1): AiWorkbenchPhase {
+  const stage = event.stage.toLowerCase();
+  if (stage.includes('validat') || stage.includes('dry_run') || stage.includes('dryrun') ||
+      stage.includes('readiness') || stage.includes('contract') || stage.includes('release_review') ||
+      stage.includes('apply_gate')) return 'validating';
+  return 'building';
+}
+
+function snapshotBuildStale(snapshot: AiSessionSnapshotV1, build: AiBuildResultV1 | null): boolean {
+  return build !== null && (
+    build.answerRevision !== snapshot.answerRevision ||
+    build.resourceRevision !== snapshot.resourceRevision
+  );
+}
+
 function withSnapshot(state: AiWorkbenchState, snapshot: AiSessionSnapshotV1): AiWorkbenchState {
-  if (!state.session) return state;
+  if (!state.session || snapshot.revision <= state.session.snapshot.revision) return state;
+  const build = snapshot.buildResult ?? state.build;
   const session = Object.freeze({ ...state.session, snapshot, updatedAtUtc: snapshot.updatedAtUtc });
   return Object.freeze({
     ...state,
     session,
     readiness: snapshot.readinessPreview ?? state.readiness,
+    build,
+    buildStale: snapshotBuildStale(snapshot, build),
     requirementMode: snapshot.requirementMode,
     updatedAt: state.updatedAt
   });
@@ -146,14 +211,29 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
     case 'session-ready':
       return Object.freeze({
         ...state,
-        phase: 'idle',
+        phase: snapshotBuildStale(event.session.snapshot, event.session.snapshot.buildResult)
+          ? 'build-blocked'
+          : event.session.snapshot.buildResult
+            ? buildPhase(event.session.snapshot.buildResult)
+            : 'idle',
         session: event.session,
         project: event.project,
+        projectBaseline: event.session.snapshot.projectBaseline ?? state.projectBaseline,
+        build: event.session.snapshot.buildResult,
+        buildStale: snapshotBuildStale(event.session.snapshot, event.session.snapshot.buildResult),
+        replayDiagnostics: null,
         readiness: event.session.snapshot.readinessPreview,
         requirementMode: event.session.snapshot.requirementMode,
         operation: event.operation ?? state.operation,
         errorCode: null,
         message: event.project ? '工程上下文与会话已由服务端确认。' : '会话已就绪，当前尚未绑定工程。',
+        updatedAt: event.at
+      });
+    case 'baseline-ready':
+      return Object.freeze({
+        ...state,
+        projectBaseline: event.baseline,
+        errorCode: null,
         updatedAt: event.at
       });
     case 'intent-start':
@@ -166,6 +246,9 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
         plan: null,
         readiness: null,
         operation: null,
+        build: null,
+        buildStale: false,
+        replayDiagnostics: null,
         run: initialRunState,
         errorCode: null,
         message: '正在识别检测对象、任务类型和关键条件。',
@@ -184,8 +267,10 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
         ...state,
         phase: 'planning',
         operation: null,
+        replayDiagnostics: null,
         run: Object.freeze({
           ...initialRunState,
+          kind: 'plan',
           clientOperationId: event.clientOperationId,
           generation: event.generation,
           status: 'pending'
@@ -206,23 +291,103 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
       if (event.snapshot) next = withSnapshot(next, event.snapshot);
       return next;
     }
+    case 'build-start':
+      return Object.freeze({
+        ...state,
+        phase: 'build-starting',
+        operation: null,
+        buildStale: state.build !== null,
+        replayDiagnostics: null,
+        run: Object.freeze({
+          ...initialRunState,
+          kind: 'build',
+          clientOperationId: event.clientOperationId,
+          generation: event.generation,
+          status: 'pending'
+        }),
+        errorCode: null,
+        message: '正在创建可恢复的构建任务。',
+        updatedAt: event.at
+      });
+    case 'build-attached': {
+      let next: AiWorkbenchState = Object.freeze({
+        ...state,
+        phase: 'building',
+        operation: event.operation ?? state.operation,
+        run: Object.freeze({ ...state.run, kind: 'build', runId: event.runId, status: 'running', replayRequired: false }),
+        message: '构建任务已建立，正在接收公开阶段。',
+        updatedAt: event.at
+      });
+      if (event.snapshot) next = withSnapshot(next, event.snapshot);
+      return next;
+    }
+    case 'build-unknown':
+      return Object.freeze({
+        ...state,
+        phase: 'unknown-outcome',
+        errorCode: 'build_create_unknown_outcome',
+        message: event.message,
+        updatedAt: event.at
+      });
+    case 'inputs-updated': {
+      const next = withSnapshot(Object.freeze({ ...state, buildStale: true, updatedAt: event.at }), event.snapshot);
+      return Object.freeze({
+        ...next,
+        phase: 'build-blocked',
+        buildStale: true,
+        message: event.message,
+        errorCode: null,
+        updatedAt: event.at
+      });
+    }
+    case 'revalidation-start':
+      return Object.freeze({
+        ...state,
+        phase: 'revalidating',
+        message: '正在使用最新参数和资源重新计算验证与就绪条件。',
+        errorCode: null,
+        updatedAt: event.at
+      });
+    case 'revalidation-ready': {
+      const next = withSnapshot(Object.freeze({
+        ...state,
+        build: event.build,
+        buildStale: false,
+        updatedAt: event.at
+      }), event.snapshot);
+      return Object.freeze({
+        ...next,
+        phase: buildPhase(event.build),
+        build: event.build,
+        buildStale: false,
+        message: event.build.validation.firstFixRecommendation,
+        updatedAt: event.at
+      });
+    }
+    case 'camera-bindings-ready':
+      return Object.freeze({ ...state, cameraBindings: Object.freeze([...event.bindings]), updatedAt: event.at });
+    case 'replay-observed':
+      if (state.run.generation !== event.generation || state.run.runId !== event.diagnostics.runId) return state;
+      return Object.freeze({ ...state, replayDiagnostics: event.diagnostics, updatedAt: event.at });
     case 'run-event': {
       if (state.run.runId !== event.event.runId || state.run.generation !== event.generation) return state;
       if (event.event.sequence <= state.run.lastSequence) return state;
+      if (state.run.terminalSequence !== null) return state;
       if (eventRequiresReplay(state, event.event, event.generation)) {
         return Object.freeze({
           ...state,
           phase: 'recovering',
           run: Object.freeze({ ...state.run, replayRequired: true }),
-          message: '规划进度存在缺口，正在从服务端回放补齐。',
+          message: state.run.kind === 'build'
+            ? '构建进度存在缺口，正在从服务端回放补齐。'
+            : '规划进度存在缺口，正在从服务端回放补齐。',
           updatedAt: event.at
         });
       }
       const isTerminal = terminalEvents.has(event.event.eventType);
-      if (state.run.terminalSequence !== null && !isTerminal) return state;
       let next: AiWorkbenchState = Object.freeze({
         ...state,
-        phase: 'planning',
+        phase: state.run.kind === 'build' ? buildProgressPhase(event.event) : 'planning',
         run: Object.freeze({
           ...state.run,
           status: event.event.status,
@@ -235,6 +400,17 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
         updatedAt: event.at
       });
       if (event.event.workspaceSnapshot) next = withSnapshot(next, event.event.workspaceSnapshot);
+      if (event.event.build) {
+        const build = event.event.build;
+        next = Object.freeze({
+          ...next,
+          build,
+          buildStale: false,
+          phase: buildPhase(build),
+          message: build.validation.firstFixRecommendation || event.event.summary,
+          updatedAt: event.at
+        });
+      }
       if (event.event.eventType === 'plan.completed' && event.event.plan) {
         const plan = event.event.plan;
         next = Object.freeze({
@@ -249,14 +425,28 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
       } else if (event.event.eventType === 'run.failed') {
         next = Object.freeze({
           ...next,
-          phase: 'plan-failed',
-          errorCode: 'plan_run_failed',
-          message: event.event.publicMessage || event.event.summary || '规划失败，请查看公开诊断后重试。'
+          phase: state.run.kind === 'build' ? 'build-failed' : 'plan-failed',
+          buildStale: state.run.kind === 'build' && next.build !== null,
+          errorCode: state.run.kind === 'build' ? 'build_run_failed' : 'plan_run_failed',
+          message: event.event.publicMessage || event.event.summary ||
+            (state.run.kind === 'build' ? '构建失败，请查看公开诊断后重试。' : '规划失败，请查看公开诊断后重试。')
         });
       } else if (event.event.eventType === 'run.cancelled') {
-        next = Object.freeze({ ...next, phase: 'cancelled', message: '本次规划已取消，可修改任务后重新开始。' });
+        next = Object.freeze({
+          ...next,
+          phase: state.run.kind === 'build' ? 'build-cancelled' : 'cancelled',
+          buildStale: state.run.kind === 'build' && next.build !== null,
+          message: state.run.kind === 'build'
+            ? '本次构建已取消，上一版候选仅供查看。'
+            : '本次规划已取消，可修改任务后重新开始。'
+        });
       } else if (event.event.eventType === 'run.completed' && next.plan) {
-        next = Object.freeze({ ...next, phase: planPhase(next.plan, next.readiness) });
+        next = Object.freeze({
+          ...next,
+          phase: state.run.kind === 'build' && next.build
+            ? buildPhase(next.build)
+            : planPhase(next.plan, next.readiness)
+        });
       }
       return next;
     }
@@ -272,7 +462,11 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
       const next = withSnapshot(Object.freeze({ ...state, updatedAt: event.at }), event.snapshot);
       return Object.freeze({
         ...next,
-        phase: next.plan ? planPhase(next.plan, event.snapshot.readinessPreview) : next.phase,
+        phase: next.build && next.buildStale
+          ? 'build-blocked'
+          : event.snapshot.buildResult && !next.buildStale
+          ? buildPhase(event.snapshot.buildResult)
+          : next.plan ? planPhase(next.plan, event.snapshot.readinessPreview) : next.phase,
         message: '会话状态已与服务端最新版本协调。',
         errorCode: null,
         updatedAt: event.at
@@ -298,7 +492,14 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
       });
     }
     case 'cancel-start':
-      return Object.freeze({ ...state, phase: 'cancelling', message: '正在取消规划并等待服务端确认终态。', updatedAt: event.at });
+      return Object.freeze({
+        ...state,
+        phase: state.run.kind === 'build' ? 'build-cancelling' : 'cancelling',
+        message: state.run.kind === 'build'
+          ? '正在取消构建并等待服务端确认终态。'
+          : '正在取消规划并等待服务端确认终态。',
+        updatedAt: event.at
+      });
     case 'failed':
       return Object.freeze({
         ...state,
@@ -314,6 +515,8 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
         ...initialAiWorkbenchState,
         session: state.session,
         project: state.project,
+        projectBaseline: state.projectBaseline,
+        cameraBindings: state.cameraBindings,
         requirementMode: state.requirementMode,
         phase: state.session ? 'idle' : 'session-loading',
         updatedAt: event.at

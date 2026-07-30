@@ -15,6 +15,17 @@ public sealed record AiSessionCreateRequest
     public Guid? ProjectId { get; init; }
 }
 
+public sealed record AiResourceDecisionSelectionV1
+{
+    public string CanonicalId { get; init; } = string.Empty;
+    public string ResourceKey { get; init; } = string.Empty;
+}
+
+public sealed record AiCameraBindingCandidateV1(
+    string Id,
+    string DisplayName,
+    bool IsEnabled);
+
 public sealed record AiProjectTargetRequest
 {
     public string TargetKind { get; init; } = string.Empty;
@@ -39,14 +50,21 @@ public sealed record AiSessionSnapshotV1(
     string? PlanRunStatus,
     string? BuildRunId,
     string? BuildRunStatus,
+    long? BuildTerminalSequence,
     Guid? BuildClientOperationId,
+    string? SubmittedBuildFingerprint,
     AiProjectBaselineIdentity? ProjectBaseline,
     string RequirementMode,
     IReadOnlyDictionary<string, string> PlanQuestionSelections,
     IReadOnlyList<VisionAgentPlanAnswer> ConfirmedPlanAnswers,
     IReadOnlyList<VisionAgentPlanAnswer> OptimisticPlanAnswers,
     int AnswerRevision,
+    IReadOnlyDictionary<string, JsonElement> BuildParameterValues,
     VisionAgentBuildReadinessPreviewResult? ReadinessPreview,
+    IReadOnlyList<AiMissingResourceInfo> MissingResources,
+    IReadOnlyList<VisionAgentResourceDecision> ResourceDecisions,
+    int ResourceRevision,
+    VisionAgentPublicBuildResultV1? BuildResult,
     bool PlanAcceptedRecommendedDefaults,
     long? PlanTerminalSequence,
     DateTime UpdatedAtUtc);
@@ -104,14 +122,21 @@ internal static class AiPublicContractMapper
             NormalizeOptional(snapshot?.PlanRunStatus),
             NormalizeOptional(snapshot?.BuildRunId),
             NormalizeOptional(snapshot?.BuildRunStatus),
+            snapshot?.BuildTerminalSequence,
             Guid.TryParse(snapshot?.BuildClientOperationId, out var operationId) ? operationId : null,
+            NormalizeOptional(snapshot?.SubmittedBuildFingerprint),
             snapshot?.ProjectBaseline is null ? null : snapshot.ProjectBaseline with { },
             NormalizeRequirementMode(snapshot?.RequirementMode),
             ToPublicSelections(snapshot?.PlanQuestionSelections),
             ToPublicAnswers(snapshot?.ConfirmedPlanAnswers),
             ToPublicAnswers(snapshot?.OptimisticPlanAnswers),
             Math.Max(0, snapshot?.AnswerRevision ?? 0),
+            ToPublicParameterValues(snapshot?.BuildParameterValues),
             ToPublicReadinessPreview(snapshot?.ReadinessPreview),
+            ToPublicResources(snapshot?.MissingResources),
+            ToPublicResourceDecisions(snapshot?.ResourceDecisions),
+            Math.Max(0, snapshot?.ResourceRevision ?? 0),
+            ToPublicBuildResult(snapshot?.PublicBuildResult),
             snapshot?.PlanAcceptedRecommendedDefaults == true,
             snapshot?.PlanTerminalSequence,
             snapshot?.UpdatedAtUtc ?? DateTime.UnixEpoch);
@@ -179,6 +204,63 @@ internal static class AiPublicContractMapper
             AgentRunEventJson.Options);
     }
 
+    private static IReadOnlyDictionary<string, JsonElement> ToPublicParameterValues(
+        IReadOnlyDictionary<string, JsonElement>? values)
+    {
+        var result = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in values ?? new Dictionary<string, JsonElement>())
+        {
+            if (!IsSafePublicIdentifier(pair.Key)) continue;
+            result[pair.Key] = pair.Value.ValueKind == JsonValueKind.String
+                ? JsonSerializer.SerializeToElement(PublicRedactor.RedactText(pair.Value.GetString()))
+                : pair.Value.ValueKind is JsonValueKind.Null or JsonValueKind.True or JsonValueKind.False or JsonValueKind.Number
+                    ? pair.Value.Clone()
+                    : JsonSerializer.SerializeToElement<object?>(null);
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<AiMissingResourceInfo> ToPublicResources(
+        IReadOnlyList<VisionAgentResourceRequirement>? resources)
+    {
+        if (resources == null || resources.Count == 0) return [];
+        var redacted = PublicRedactor.RedactObject(resources);
+        return JsonSerializer.Deserialize<List<AiMissingResourceInfo>>(
+            JsonSerializer.Serialize(redacted, AgentRunEventJson.Options), AgentRunEventJson.Options) ?? [];
+    }
+
+    private static IReadOnlyList<VisionAgentResourceDecision> ToPublicResourceDecisions(
+        IReadOnlyDictionary<string, JsonElement>? decisions)
+    {
+        var result = new List<VisionAgentResourceDecision>();
+        foreach (var pair in decisions ?? new Dictionary<string, JsonElement>())
+        {
+            if (!VisionAgentResourceIdentity.IsCanonicalId(pair.Key)) continue;
+            try
+            {
+                var decision = pair.Value.Deserialize<VisionAgentResourceDecision>(AgentRunEventJson.Options);
+                if (VisionAgentResourceAuthority.IsTrustedCameraBindingDecision(decision) &&
+                    decision!.CanonicalId.Equals(pair.Key, StringComparison.OrdinalIgnoreCase))
+                {
+                    result.Add(decision with { ValueSummary = PublicRedactor.RedactText(decision.ValueSummary) });
+                }
+            }
+            catch (JsonException)
+            {
+                // Corrupt or legacy private decisions fail closed from the public projection.
+            }
+        }
+        return result;
+    }
+
+    private static VisionAgentPublicBuildResultV1? ToPublicBuildResult(VisionAgentPublicBuildResultV1? build)
+    {
+        if (build == null) return null;
+        var redacted = PublicRedactor.RedactObject(build);
+        return JsonSerializer.Deserialize<VisionAgentPublicBuildResultV1>(
+            JsonSerializer.Serialize(redacted, AgentRunEventJson.Options), AgentRunEventJson.Options);
+    }
+
     private static bool IsSafeCanonicalField(string? value)
     {
         return IsSafePublicIdentifier(value, allowColon: false);
@@ -225,6 +307,38 @@ internal sealed record AiProjectBaselineValidation(
 
 internal static class AiProjectBaselineValidator
 {
+    public static async Task<AiProjectBaselineValidation> ReadAsync(
+        Guid projectId,
+        IProjectApplicationService projects)
+    {
+        if (projectId == Guid.Empty)
+        {
+            return AiProjectBaselineValidation.Rejected(
+                StatusCodes.Status400BadRequest,
+                "project_id_required",
+                "工程标识不能为空。");
+        }
+
+        var project = await projects.GetByIdAsync(projectId);
+        if (project == null)
+        {
+            return AiProjectBaselineValidation.Rejected(
+                StatusCodes.Status404NotFound,
+                "project_not_found",
+                "工程不存在或当前用户无权访问。");
+        }
+
+        var canonicalFlow = project.Flow ?? new OperatorFlowDto { Name = "MainFlow" };
+        var identity = new AiProjectBaselineIdentity
+        {
+            TargetKind = "existing",
+            ProjectId = project.Id,
+            PersistenceRevision = project.PersistenceRevision,
+            CanonicalFlowHash = ExecutionFlowIdentity.ComputeFlowHash(canonicalFlow.ToEntity())
+        };
+        return AiProjectBaselineValidation.Accepted(identity, JsonSerializer.Serialize(canonicalFlow));
+    }
+
     public static async Task<AiProjectBaselineValidation> ValidateAsync(
         AiProjectTargetRequest? target,
         IProjectApplicationService projects)
@@ -265,27 +379,12 @@ internal static class AiProjectBaselineValidator
             );
         }
 
-        var project = await projects.GetByIdAsync(target.ProjectId.Value);
-        if (project == null)
-        {
-            return AiProjectBaselineValidation.Rejected(
-                StatusCodes.Status404NotFound,
-                "project_not_found",
-                "工程不存在或当前用户无权访问。"
-            );
-        }
+        var currentResult = await ReadAsync(target.ProjectId.Value, projects);
+        if (!currentResult.Success || currentResult.Identity == null) return currentResult;
+        var current = currentResult.Identity;
+        var canonicalHash = current.CanonicalFlowHash;
 
-        var canonicalFlow = project.Flow ?? new OperatorFlowDto { Name = "MainFlow" };
-        var canonicalHash = ExecutionFlowIdentity.ComputeFlowHash(canonicalFlow.ToEntity());
-        var current = new AiProjectBaselineIdentity
-        {
-            TargetKind = "existing",
-            ProjectId = project.Id,
-            PersistenceRevision = project.PersistenceRevision,
-            CanonicalFlowHash = canonicalHash
-        };
-
-        if (target.PersistenceRevision.Value != project.PersistenceRevision)
+        if (target.PersistenceRevision.Value != current.PersistenceRevision)
         {
             return AiProjectBaselineValidation.Rejected(
                 StatusCodes.Status409Conflict,
@@ -303,9 +402,7 @@ internal static class AiProjectBaselineValidator
                 current);
         }
 
-        return AiProjectBaselineValidation.Accepted(
-            current,
-            JsonSerializer.Serialize(canonicalFlow));
+        return AiProjectBaselineValidation.Accepted(current, currentResult.CanonicalFlowJson);
     }
 
     private static string NormalizeHash(string value)

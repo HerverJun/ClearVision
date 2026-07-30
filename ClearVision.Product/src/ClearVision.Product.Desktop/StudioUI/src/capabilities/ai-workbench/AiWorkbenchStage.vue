@@ -15,7 +15,9 @@ const emit = defineEmits<{
 
 const visibleActions = computed(() => {
   const actions = [props.actionModel.primary, ...props.actionModel.secondary].filter(action => action !== null);
-  return actions.filter(action => !['submitTask', 'answerClarification', 'acceptRecommendedAnswers'].includes(action.id));
+  return actions.filter(action => ![
+    'submitTask', 'answerClarification', 'acceptRecommendedAnswers', 'confirmParameters', 'updateResourceDecision'
+  ].includes(action.id));
 });
 </script>
 
@@ -66,15 +68,13 @@ const visibleActions = computed(() => {
       >
         {{ action.label }}
       </CvButton>
-      <CvButton
+      <span
         v-if="actionModel.nextStagePlaceholder"
-        size="sm"
-        variant="primary"
-        disabled
+        class="ai-workbench-stage__next-boundary"
         :title="actionModel.nextStagePlaceholder.disabledReason"
       >
         {{ actionModel.nextStagePlaceholder.label }}
-      </CvButton>
+      </span>
     </div>
   </section>
 </template>
@@ -100,6 +100,7 @@ const visibleActions = computed(() => {
 .ai-workbench-stage__facts dd { margin: 2px 0 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
 .ai-workbench-stage__facts div:first-child dd { font-size: var(--cv-font-size-sm); font-variant-numeric: tabular-nums; font-weight: var(--cv-font-weight-semibold); }
 .ai-workbench-stage__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--cv-space-2); }
+.ai-workbench-stage__next-boundary { align-self: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 
 @media (max-width: 1120px) {
   .ai-workbench-stage { grid-template-columns: minmax(0, 1fr) auto; }

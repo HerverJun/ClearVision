@@ -31,6 +31,11 @@ function uniqueQuestions(state: AiWorkbenchState): readonly AiClarificationQuest
 }
 
 function blockers(state: AiWorkbenchState): number {
+  if (state.build) {
+    return state.build.parameterMapping.filter(item => item.pending && !item.resourceDependent).length +
+      state.build.missingResources.length +
+      state.build.validation.structural.blockerCount + state.build.validation.dryRun.blockerCount;
+  }
   const readiness = state.readiness?.buildReadiness ?? state.plan?.buildReadiness;
   if (readiness) return readiness.blockers.filter(item => item.blocksBuild).length;
   return state.intent?.remainingPlanFields.length ?? 0;
@@ -73,7 +78,57 @@ export function projectAiWorkbench(state: AiWorkbenchState): AiWorkbenchProjecti
     case 'plan-ready':
       return Object.freeze({ ...base, statusLabel: '方案已就绪', statusTone: 'ok', currentStage: '方案就绪',
         stageDescription: '方案已具备构建条件。', blockerCount: 0,
-        nextHint: '进入下一阶段将在 G3 开放；本页面不会启动构建。', busy: false });
+        nextHint: '开始构建后将生成流程候选并执行结构校验与运行预演。', busy: false });
+    case 'build-starting':
+      return Object.freeze({ ...base, statusLabel: '正在启动构建', statusTone: 'info', currentStage: '构建准备',
+        stageDescription: '正在绑定 Plan、会话、工程基线和 durable operation identity。',
+        nextHint: '服务端确认 Build Run 后开始生成候选。', busy: true });
+    case 'building':
+      return Object.freeze({ ...base, statusLabel: '正在构建', statusTone: 'info', currentStage: '生成流程候选',
+        stageDescription: state.message || '正在映射算子、参数和资源声明。',
+        nextHint: '候选生成后将自动进入结构校验和运行预演。', busy: true });
+    case 'validating':
+      return Object.freeze({ ...base, statusLabel: '正在验证', statusTone: 'info', currentStage: '验证与预演',
+        stageDescription: state.message || '正在执行结构校验、运行预演和清单预检。',
+        nextHint: '完成后将列出需要人工处理的参数和资源。', busy: true });
+    case 'parameters-pending':
+      return Object.freeze({ ...base, statusLabel: '参数待确认', statusTone: 'warning', currentStage: '确认人工参数',
+        stageDescription: '候选已生成，但仍有普通参数需要按真实算子合同确认。',
+        nextHint: '完成类型、范围、枚举和互斥校验后确认参数。', busy: false });
+    case 'resources-pending':
+      return Object.freeze({ ...base, statusLabel: '资源待处理', statusTone: 'warning', currentStage: '处理资源依赖',
+        stageDescription: '候选仍缺少相机、模型、模板或其他声明资源。',
+        nextHint: '只使用安全查询返回的 canonical 资源身份；无法安全选择的资源保持阻断。', busy: false });
+    case 'build-blocked':
+      return Object.freeze({ ...base, statusLabel: state.buildStale ? '等待重新校验' : '候选受阻', statusTone: 'warning',
+        currentStage: state.buildStale ? '输入已更新' : '候选验证未通过',
+        stageDescription: state.buildStale ? '参数或资源已改变，旧 Validation 与 ApplyGate 已失效。' : state.message,
+        nextHint: state.buildStale ? '重新校验会保持候选结构不变。' : '按首要修复建议处理后重新校验。', busy: false });
+    case 'revalidating':
+      return Object.freeze({ ...base, statusLabel: '正在重新校验', statusTone: 'info', currentStage: '重新计算就绪条件',
+        stageDescription: '候选结构不变，正在使用最新参数和资源重新计算 Validation、DryRun 与 ApplyGate。',
+        nextHint: '完成后只以后端 canonical 结论更新就绪状态。', busy: true });
+    case 'build-ready':
+      return Object.freeze({ ...base, statusLabel: '候选已就绪', statusTone: 'ok', currentStage: '候选具备交接条件',
+        stageDescription: '结构校验、运行预演和当前输入条件已通过。', blockerCount: 0,
+        nextHint: '下一阶段将交接到工作区审核；本轮不执行交接、保存或 Canvas 写入。', busy: false });
+    case 'build-failed':
+      return Object.freeze({ ...base, statusLabel: '构建失败', statusTone: 'error', currentStage: '构建未完成',
+        stageDescription: state.message || '服务端没有产生新的可操作候选。',
+        nextHint: state.build ? '上一版候选仅供查看；修复后重新构建会创建新 Build identity。' : '查看首要修复建议后重新构建。', busy: false });
+    case 'build-cancelling':
+      return Object.freeze({ ...base, statusLabel: '正在取消构建', statusTone: 'warning', currentStage: '取消构建',
+        stageDescription: '正在等待服务端确认终态，期间不会创建第二个 Build。',
+        nextHint: '终态确认后可重新构建。', busy: true });
+    case 'build-cancelled':
+      return Object.freeze({ ...base, statusLabel: '构建已取消', statusTone: 'idle', currentStage: '构建已安全停止',
+        stageDescription: state.message, nextHint: '重新构建将使用新的 operation 与 Build identity。', busy: false });
+    case 'baseline-conflict':
+      return Object.freeze({ ...base, statusLabel: '工程基线冲突', statusTone: 'warning', currentStage: '重新确认工程基线',
+        stageDescription: state.message, nextHint: '协调服务端最新 PersistenceRevision 与流程 Hash 后重新构建。', busy: false });
+    case 'unknown-outcome':
+      return Object.freeze({ ...base, statusLabel: '构建结果待确认', statusTone: 'warning', currentStage: '查询构建操作',
+        stageDescription: state.message, nextHint: '先按 clientOperationId 查询，禁止盲目重复创建。', busy: false });
     case 'cancelling':
       return Object.freeze({ ...base, statusLabel: '正在取消', statusTone: 'warning', currentStage: '取消规划',
         stageDescription: '正在等待服务端确认终态，期间不会创建新的规划任务。',

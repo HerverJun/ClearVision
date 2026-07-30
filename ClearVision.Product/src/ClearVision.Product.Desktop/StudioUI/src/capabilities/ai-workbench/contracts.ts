@@ -2,6 +2,7 @@ export type AiOperationKind = 'session_create' | 'session_delete' | 'plan_run' |
 export type AiOperationStatus = 'pending' | 'created' | 'failed' | 'rejected';
 export type AiRequirementMode = 'strict' | 'draft';
 export type AiRunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'blocked' | 'warning';
+export type AiScalarValue = string | number | boolean | null;
 
 export interface AiProjectBaselineV1 {
   readonly targetKind: 'new' | 'existing';
@@ -31,11 +32,38 @@ export interface AiResourceRequirementV1 {
   readonly canonicalId: string;
   readonly resourceType: string;
   readonly resourceName: string;
+  readonly resourceKey: string;
+  readonly operatorKey: string;
+  readonly operatorId: string;
+  readonly operatorType: string;
+  readonly operatorIndex: number;
+  readonly parameterName: string;
   readonly status: string;
   readonly blockingScope: string;
   readonly resolutionTarget: string;
   readonly draftPolicy: string;
   readonly description: string;
+  readonly source: string;
+  readonly aliases: readonly string[];
+}
+
+export interface AiResourceDecisionV1 {
+  readonly canonicalId: string;
+  readonly status: 'bound';
+  readonly resourceKey: string;
+  readonly resourceType: string;
+  readonly operatorKey: string;
+  readonly operatorId: string;
+  readonly operatorType: string;
+  readonly operatorIndex: number;
+  readonly parameterName: string;
+  readonly valueSummary: string;
+  readonly source: string;
+}
+
+export interface AiResourceDecisionSelectionV1 {
+  readonly canonicalId: string;
+  readonly resourceKey: string;
 }
 
 export interface AiBuildBlockerV1 {
@@ -94,9 +122,16 @@ export interface AiSessionSnapshotV1 {
   readonly confirmedPlanAnswers: readonly AiPlanAnswerV1[];
   readonly optimisticPlanAnswers: readonly AiPlanAnswerV1[];
   readonly answerRevision: number;
+  readonly buildParameterValues: Readonly<Record<string, AiScalarValue>>;
   readonly readinessPreview: AiReadinessPreviewV1 | null;
+  readonly missingResources: readonly AiResourceRequirementV1[];
+  readonly resourceDecisions: readonly AiResourceDecisionV1[];
+  readonly resourceRevision: number;
+  readonly buildResult: AiBuildResultV1 | null;
   readonly planAcceptedRecommendedDefaults: boolean;
   readonly planTerminalSequence: number | null;
+  readonly buildTerminalSequence: number | null;
+  readonly submittedBuildFingerprint: string | null;
   readonly updatedAtUtc: string;
 }
 
@@ -140,7 +175,9 @@ export interface AiWorkspaceSnapshotMutationV1 {
   readonly confirmedPlanAnswers?: readonly AiPlanAnswerV1[];
   readonly optimisticPlanAnswers?: readonly AiPlanAnswerV1[];
   readonly answerRevision?: number;
+  readonly buildParameterValues?: Readonly<Record<string, AiScalarValue>>;
   readonly readinessPreview?: AiReadinessPreviewV1;
+  readonly resourceDecisions?: readonly AiResourceDecisionSelectionV1[];
   readonly requirementMode?: AiRequirementMode;
   readonly planAcceptedRecommendedDefaults?: boolean;
 }
@@ -284,6 +321,7 @@ export interface AiAgentRunEventV1 {
   readonly planHash: string | null;
   readonly publicMessage: string | null;
   readonly plan: AiPlanV1 | null;
+  readonly build: AiBuildResultV1 | null;
   readonly workspaceSnapshot: AiSessionSnapshotV1 | null;
   readonly metadataOnly: true;
   readonly redactionPass: true;
@@ -302,9 +340,33 @@ export interface AiAgentRunSummaryV1 {
   readonly staleEventCount: number;
 }
 
+export interface AiAgentRunReplaySnapshotV1 {
+  readonly storageVersion: string;
+  readonly runId: string;
+  readonly generatedAt: string;
+  readonly firstSequence: number;
+  readonly lastSequence: number;
+  readonly eventCount: number;
+  readonly metadataOnly: true;
+  readonly redactionPass: true;
+  readonly events: readonly AiAgentRunEventV1[];
+}
+
+export interface AiAgentRunReplayDiagnosticsV1 {
+  readonly runId: string;
+  readonly eventCount: number;
+  readonly duplicateEventCount: number;
+  readonly droppedEventCount: number;
+  readonly staleEventCount: number;
+  readonly metadataOnly: true;
+  readonly redactionPass: true;
+}
+
 export interface AiAgentRunReplayV1 {
   readonly summary: AiAgentRunSummaryV1;
   readonly events: readonly AiAgentRunEventV1[];
+  readonly snapshot: AiAgentRunReplaySnapshotV1;
+  readonly diagnostics: AiAgentRunReplayDiagnosticsV1;
 }
 
 export interface AiPlanRunResponseV1 {
@@ -317,6 +379,8 @@ export interface AiPlanRunResponseV1 {
 }
 
 export interface AiReadinessPreviewCommandV1 {
+  readonly sessionId: string;
+  readonly expectedRevision: number;
   readonly planId: string;
   readonly planHash: string;
   readonly planSnapshot: AiPlanV1;
@@ -329,6 +393,192 @@ export interface AiReadinessPreviewCommandV1 {
   readonly resourceRevision: number;
   readonly originalUserPrompt: string;
   readonly metadataOnly: true;
+}
+
+export interface AiParameterOptionV1 {
+  readonly label: string;
+  readonly value: string;
+}
+
+export interface AiParameterConditionV1 {
+  readonly parameter: string;
+  readonly comparison: 'equals' | 'not-equals' | 'empty' | 'not-empty';
+  readonly value: AiScalarValue;
+}
+
+export interface AiParameterConditionSetV1 {
+  readonly allConditions: readonly AiParameterConditionV1[];
+  readonly anyConditions: readonly AiParameterConditionV1[];
+}
+
+export interface AiBuildParameterV1 {
+  readonly canonicalKey: string;
+  readonly tempId: string;
+  readonly operatorType: string;
+  readonly operatorDisplayName: string;
+  readonly parameterName: string;
+  readonly parameterDisplayName: string;
+  readonly purpose: string;
+  readonly dataType: string;
+  readonly isRequired: boolean;
+  readonly value: AiScalarValue;
+  readonly hasExplicitValue: boolean;
+  readonly valueSummary: string;
+  readonly source: string;
+  readonly pending: boolean;
+  readonly impact: string;
+  readonly suggestedReason: string;
+  readonly defaultValue: AiScalarValue;
+  readonly minValue: AiScalarValue;
+  readonly maxValue: AiScalarValue;
+  readonly options: readonly AiParameterOptionV1[];
+  readonly requiredPolicy: string;
+  readonly atLeastOneGroup: string;
+  readonly mutuallyExclusiveGroup: string;
+  readonly requiredWhen: AiParameterConditionSetV1 | null;
+  readonly enabledWhen: AiParameterConditionSetV1 | null;
+  readonly disabledWhen: AiParameterConditionSetV1 | null;
+  readonly resourceKind: string;
+  readonly resourceCanonicalId: string;
+  readonly resourceDependent: boolean;
+}
+
+export interface AiOperatorPipelineStepV1 {
+  readonly tempId: string;
+  readonly operatorType: string;
+  readonly source: string;
+  readonly status: string;
+  readonly repairNote: string;
+}
+
+export interface AiWorkflowDiffV1 {
+  readonly addedNodes: readonly string[];
+  readonly modifiedNodes: readonly string[];
+  readonly preservedNodes: readonly string[];
+  readonly removedNodes: readonly string[];
+  readonly addedOrChangedParameters: readonly string[];
+  readonly pendingParameters: readonly string[];
+  readonly missingResources: readonly string[];
+  readonly validationFailures: readonly string[];
+  readonly autoRepairs: readonly string[];
+  readonly deploymentBlockers: readonly string[];
+  readonly metadataOnly: true;
+}
+
+export interface AiApplyGateV1 {
+  readonly canvasApplyReady: boolean;
+  readonly runtimeDraftReady: boolean;
+  readonly deploymentReady: boolean;
+  readonly blocked: boolean;
+  readonly status: string;
+  readonly applyBlockers: readonly string[];
+  readonly deploymentBlockers: readonly string[];
+  readonly firstFixRecommendation: string;
+  readonly metadataOnly: true;
+}
+
+export interface AiBuildCheckV1 {
+  readonly id: string;
+  readonly label: string;
+  readonly status: 'passed' | 'failed' | 'pending';
+  readonly summary: string;
+  readonly blockerCount: number;
+  readonly warningCount: number;
+}
+
+export interface AiBuildValidationV1 {
+  readonly structural: AiBuildCheckV1;
+  readonly dryRun: AiBuildCheckV1;
+  readonly manifest: AiBuildCheckV1;
+  readonly applyGate: AiApplyGateV1;
+  readonly handoffEligible: boolean;
+  readonly readinessStatus: string;
+  readonly firstFixRecommendation: string;
+  readonly metadataOnly: true;
+}
+
+export interface AiBuildTimelineItemV1 {
+  readonly stage: string;
+  readonly toolName: string;
+  readonly source: string;
+  readonly inputSummary: string;
+  readonly outputSummary: string;
+  readonly status: string;
+  readonly durationMs: number;
+  readonly evidenceId: string;
+  readonly repairAction: string;
+  readonly warningCode: string;
+  readonly applyImpact: string;
+  readonly deploymentImpact: string;
+  readonly metadataOnly: true;
+  readonly redactionPass: true;
+}
+
+export interface AiBuildResultV1 {
+  readonly schemaVersion: 1;
+  readonly runId: string;
+  readonly buildId: string;
+  readonly clientOperationId: string;
+  readonly buildIdentity: string;
+  readonly submittedBuildFingerprint: string;
+  readonly planId: string;
+  readonly planHash: string;
+  readonly answerSetFingerprint: string;
+  readonly answerRevision: number;
+  readonly resourceRevision: number;
+  readonly projectBaseline: AiProjectBaselineV1;
+  readonly candidateFlowFingerprint: string;
+  readonly operatorCount: number;
+  readonly connectionCount: number;
+  readonly operatorPipeline: readonly AiOperatorPipelineStepV1[];
+  readonly parameterMapping: readonly AiBuildParameterV1[];
+  readonly missingResources: readonly AiResourceRequirementV1[];
+  readonly workflowDiff: AiWorkflowDiffV1;
+  readonly validation: AiBuildValidationV1;
+  readonly publicTimeline: readonly AiBuildTimelineItemV1[];
+  readonly publicWarnings: readonly string[];
+  readonly metadataOnly: true;
+  readonly redactionPass: true;
+}
+
+export interface AiBuildRunCommandV1 {
+  readonly clientOperationId: string;
+  readonly target: AiProjectBaselineV1;
+  readonly description: string;
+  readonly sessionId: string;
+  readonly requirementMode: AiRequirementMode;
+  readonly buildFromPlan: Readonly<{
+    planId: string;
+    planHash: string;
+    workspaceExpectedRevision: number;
+    planSnapshot: AiPlanV1;
+    confirmedAnswers: readonly AiPlanAnswerV1[];
+    userSelections: Readonly<Record<string, string>>;
+    acceptedDefaults: readonly string[];
+    operatorCatalogVersion: string;
+    stationBoundarySummary: string;
+    plcOutputPolicy: string;
+    buildIntent: string;
+    originalUserPrompt: string;
+    acceptedRecommendedDefaults: boolean;
+    answerRevision: number;
+    resourceRevision: number;
+    parameterValues: Readonly<Record<string, AiScalarValue>>;
+    resourceDecisions: readonly AiResourceDecisionV1[];
+    metadataOnly: true;
+  }>;
+}
+
+export interface AiBuildRevalidationResponseV1 {
+  readonly build: AiBuildResultV1;
+  readonly snapshot: AiSessionSnapshotV1;
+  readonly metadataOnly: true;
+}
+
+export interface AiCameraBindingOptionV1 {
+  readonly id: string;
+  readonly displayName: string;
+  readonly isEnabled: boolean;
 }
 
 export class AiContractDecodeError extends Error {

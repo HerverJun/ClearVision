@@ -4,6 +4,16 @@ namespace ClearVision.Product.Core.DTOs;
 
 public static partial class VisionAgentResourceIdentity
 {
+    public static bool IsCanonicalId(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) && value.Length <= 192 && CanonicalIdRegex().IsMatch(value);
+    }
+
+    public static bool IsSafeResourceKey(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) && value.Length <= 160 && ResourceKeyRegex().IsMatch(value);
+    }
+
     public static string NormalizeResourceType(string? value)
     {
         var normalized = NormalizeToken(value);
@@ -77,4 +87,10 @@ public static partial class VisionAgentResourceIdentity
 
     [GeneratedRegex("[^a-z0-9_]+", RegexOptions.CultureInvariant)]
     private static partial Regex UnsafeTokenRegex();
+
+    [GeneratedRegex("^resource:v1\\|[a-z0-9_]+\\|(?:[a-z0-9_]+(?:#[1-9][0-9]*)?|global)\\|[a-z0-9_]+$", RegexOptions.CultureInvariant)]
+    private static partial Regex CanonicalIdRegex();
+
+    [GeneratedRegex("^[A-Za-z0-9_.:-]+$", RegexOptions.CultureInvariant)]
+    private static partial Regex ResourceKeyRegex();
 }

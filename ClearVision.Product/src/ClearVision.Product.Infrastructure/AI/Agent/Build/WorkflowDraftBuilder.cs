@@ -157,7 +157,10 @@ public sealed class WorkflowDraftBuilder
             var mappedParameters = parameters.Mappings
                 .Where(item => string.Equals(item.TempId, step.TempId, StringComparison.OrdinalIgnoreCase))
                 .Where(item => allowedParameters.Contains(item.ParameterName))
-                .ToDictionary(item => item.ParameterName, item => item.ValueSummary, StringComparer.OrdinalIgnoreCase);
+                .ToDictionary(
+                    item => item.ParameterName,
+                    item => item.HasExplicitValue ? item.Value : item.DefaultValue,
+                    StringComparer.OrdinalIgnoreCase);
 
             return new
             {
@@ -266,7 +269,7 @@ public sealed class WorkflowDraftBuilder
 
         var mapped = parameters.Mappings
             .Where(item => string.Equals(item.TempId, step.TempId, StringComparison.OrdinalIgnoreCase))
-            .ToDictionary(item => item.ParameterName, item => item.ValueSummary, StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(item => item.ParameterName, item => item, StringComparer.OrdinalIgnoreCase);
         return new OperatorDto
         {
             Id = Guid.NewGuid(),
@@ -294,9 +297,9 @@ public sealed class WorkflowDraftBuilder
             Parameters = contract.Parameters.Select(parameter =>
             {
                 mapped.TryGetValue(parameter.Name, out var mappedValue);
-                var value = string.IsNullOrWhiteSpace(mappedValue)
-                    ? parameter.DefaultValue
-                    : mappedValue;
+                var value = mappedValue?.HasExplicitValue == true
+                    ? mappedValue.Value
+                    : parameter.DefaultValue;
                 return new ParameterDto
                 {
                     Id = Guid.NewGuid(),

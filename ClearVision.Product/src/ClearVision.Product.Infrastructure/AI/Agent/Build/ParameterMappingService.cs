@@ -2,6 +2,7 @@ using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.Tools;
+using System.Text.Json;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
@@ -47,7 +48,12 @@ public sealed class ParameterMappingService
 
             foreach (var parameter in schema.Parameters)
             {
-                var mapped = MapParameterValue(op, parameter, load, parameterStrategy);
+                var mapped = EnrichMapping(
+                    MapParameterValue(op, parameter, load, parameterStrategy),
+                    op,
+                    schema,
+                    parameter,
+                    operatorKey);
                 mappings.Add(mapped);
                 if (mapped.Pending)
                 {
@@ -165,6 +171,24 @@ public sealed class ParameterMappingService
         string parameterStrategy)
     {
         var key = $"{op.OperatorType}.{parameter.Name}";
+        var canonicalKey = $"{op.TempId}.{parameter.Name}";
+        if (load.ParameterValues.TryGetValue(canonicalKey, out var confirmed) ||
+            load.ParameterValues.TryGetValue(key, out confirmed))
+        {
+            return new VisionAgentParameterMapping
+            {
+                TempId = op.TempId,
+                OperatorType = op.OperatorType,
+                ParameterName = parameter.Name,
+                Value = JsonScalar(confirmed),
+                HasExplicitValue = true,
+                ValueSummary = JsonScalarSummary(confirmed),
+                Source = "user_confirmed_parameter",
+                Pending = false,
+                Impact = "用户确认值只写入当前 AI Build 输入，正式工程尚未修改。",
+                SuggestedReason = "已由用户明确确认。"
+            };
+        }
         if (!IsTraditionalNumericRuleProtectedParameter(op.OperatorType, parameter.Name, parameterStrategy) &&
             (load.ParameterSelections.TryGetValue(parameter.Name, out var direct) ||
              load.ParameterSelections.TryGetValue(key, out direct)))
@@ -174,10 +198,13 @@ public sealed class ParameterMappingService
                 TempId = op.TempId,
                 OperatorType = op.OperatorType,
                 ParameterName = parameter.Name,
+                Value = direct,
+                HasExplicitValue = true,
                 ValueSummary = VisionAgentBuildSupport.CleanValue(direct),
                 Source = "user_selection",
                 Pending = false,
-                Impact = "用户选择已写入草稿参数元数据。"
+                Impact = "用户选择已写入草稿参数元数据。",
+                SuggestedReason = "来自当前会话已确认答案。"
             };
         }
 
@@ -188,12 +215,121 @@ public sealed class ParameterMappingService
             TempId = op.TempId,
             OperatorType = op.OperatorType,
             ParameterName = parameter.Name,
+            Value = string.IsNullOrWhiteSpace(fallback) ? parameter.DefaultValue : fallback,
+            HasExplicitValue = !string.IsNullOrWhiteSpace(fallback),
             ValueSummary = fallback,
             Source = pending ? "pending_metadata" : "accepted_default",
             Pending = pending,
             Impact = pending
                 ? "画布可继续应用草稿，但部署就绪会保持阻断，直到该元数据完成绑定。"
-                : "默认元数据会让草稿保持可编辑。"
+                : "默认元数据会让草稿保持可编辑。",
+            SuggestedReason = pending
+                ? "真实算子合同要求确认，系统未自动采用建议。"
+                : "来自真实算子合同默认值或已确认的业务规则。"
+        };
+    }
+
+    private static VisionAgentParameterMapping EnrichMapping(
+        VisionAgentParameterMapping mapping,
+        VisionAgentOperatorPipelineStep op,
+        VisionAgentOperatorContract schema,
+        VisionAgentParameterContract parameter,
+        string operatorKey)
+    {
+        var constraint = schema.ParameterConstraints?.FirstOrDefault(item =>
+            item.Parameter.Equals(parameter.Name, StringComparison.OrdinalIgnoreCase));
+        var resourceKind = VisionAgentResourceClassifier.Classify(op.OperatorType, parameter.Name, parameter.DataType);
+        var resourceDependent = !string.IsNullOrWhiteSpace(resourceKind) &&
+            IsPreferredResourceParameter(op.OperatorType, parameter.Name, resourceKind);
+        return mapping with
+        {
+            CanonicalKey = $"{op.TempId}.{parameter.Name}",
+            OperatorDisplayName = string.IsNullOrWhiteSpace(schema.DisplayName) ? op.OperatorType : schema.DisplayName,
+            ParameterDisplayName = string.IsNullOrWhiteSpace(parameter.DisplayName) ? parameter.Name : parameter.DisplayName,
+            Purpose = parameter.Description,
+            DataType = NormalizeDataType(parameter.DataType),
+            IsRequired = parameter.IsRequired ||
+                string.Equals(constraint?.RequiredPolicy, OperatorParameterRequiredPolicies.Required, StringComparison.OrdinalIgnoreCase),
+            DefaultValue = parameter.DefaultValue,
+            MinValue = parameter.MinValue,
+            MaxValue = parameter.MaxValue,
+            Options = parameter.Options?.Select(option => new VisionAgentParameterOption
+            {
+                Label = option.Label,
+                Value = VisionAgentBuildSupport.CleanValue(option.Value)
+            }).ToList() ?? [],
+            RequiredPolicy = constraint?.RequiredPolicy ??
+                (parameter.IsRequired ? OperatorParameterRequiredPolicies.Required : OperatorParameterRequiredPolicies.Optional),
+            AtLeastOneGroup = constraint?.AtLeastOneGroup ?? string.Empty,
+            MutuallyExclusiveGroup = constraint?.MutuallyExclusiveGroup ?? string.Empty,
+            RequiredWhen = ProjectConditionSet(constraint?.RequiredWhen),
+            EnabledWhen = ProjectConditionSet(constraint?.EnabledWhen),
+            DisabledWhen = ProjectConditionSet(constraint?.DisabledWhen),
+            ResourceKind = resourceKind,
+            ResourceCanonicalId = resourceDependent
+                ? VisionAgentResourceIdentity.CreateCanonicalId(resourceKind, operatorKey, parameter.Name)
+                : string.Empty,
+            ResourceDependent = resourceDependent
+        };
+    }
+
+    internal static VisionAgentParameterConditionSet? ProjectConditionSet(OperatorParameterConditionSet? set)
+    {
+        if (set is null) return null;
+
+        static List<VisionAgentParameterCondition> Project(
+            IReadOnlyList<OperatorParameterCondition>? conditions)
+        {
+            return (conditions ?? [])
+                .Select(condition => new VisionAgentParameterCondition
+                {
+                    Parameter = condition.Parameter,
+                    Comparison = condition.Comparison,
+                    Value = condition.Value
+                })
+                .ToList();
+        }
+
+        return new VisionAgentParameterConditionSet
+        {
+            AllConditions = Project(set.All),
+            AnyConditions = Project(set.Any)
+        };
+    }
+
+    private static string NormalizeDataType(string? value)
+    {
+        var normalized = value?.Trim().ToLowerInvariant() ?? string.Empty;
+        return normalized switch
+        {
+            "integer" or "int32" or "int64" => "int",
+            "float" or "single" or "decimal" => "double",
+            "boolean" => "bool",
+            _ => string.IsNullOrWhiteSpace(normalized) ? "string" : normalized
+        };
+    }
+
+    private static object? JsonScalar(JsonElement value)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.Null => null,
+            JsonValueKind.String => value.GetString(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Number when value.TryGetInt64(out var integer) => integer,
+            JsonValueKind.Number when value.TryGetDouble(out var number) => number,
+            _ => value.GetRawText()
+        };
+    }
+
+    private static string JsonScalarSummary(JsonElement value)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.Null => "null",
+            JsonValueKind.String => value.GetString() ?? string.Empty,
+            _ => value.GetRawText()
         };
     }
 

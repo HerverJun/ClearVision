@@ -138,6 +138,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         {
             SessionId = "session-legacy"
         };
+        request = SeedCanonicalCameraDecision(harness, request);
 
         var entry = await RunAgentRunEntryAsync(harness, request);
 
@@ -153,21 +154,24 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         using var harness = CreateHarness();
         var plan = BuildPlan();
 
-        var agentRun = await RunAgentRunEntryAsync(harness, BuildRequest(plan) with
+        var agentRequest = SeedCanonicalCameraDecision(harness, BuildRequest(plan) with
         {
             SessionId = "session-tool-agent",
             AgentGenerateFlowMode = AiAgentGenerateFlowModes.ToolLoop
         });
-        var webMessage = await RunWebMessageEntryAsync(harness, BuildRequest(plan) with
+        var webRequest = SeedCanonicalCameraDecision(harness, BuildRequest(plan) with
         {
             SessionId = "session-tool-web",
             AgentGenerateFlowMode = AiAgentGenerateFlowModes.ToolLoop
         });
-        var internalEntry = await RunInternalEntryAsync(harness, BuildRequest(plan) with
+        var internalRequest = SeedCanonicalCameraDecision(harness, BuildRequest(plan) with
         {
             SessionId = "session-tool-internal",
             AgentGenerateFlowMode = AiAgentGenerateFlowModes.ToolLoop
         });
+        var agentRun = await RunAgentRunEntryAsync(harness, agentRequest);
+        var webMessage = await RunWebMessageEntryAsync(harness, webRequest);
+        var internalEntry = await RunInternalEntryAsync(harness, internalRequest);
 
         var expected = TerminalBusinessProjection(agentRun.Replay);
         expected.RequestedMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
@@ -1327,14 +1331,45 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
                 "imageacquisition#1",
                 "CameraId"),
             Status = VisionAgentResourceStatuses.Bound,
-            ResourceKey = "imageacquisition#1.CameraId",
+            ResourceKey = "camera-binding-01",
             ResourceType = "camera_binding",
             OperatorKey = "imageacquisition#1",
             OperatorType = "ImageAcquisition",
             OperatorIndex = 0,
             ParameterName = "CameraId",
             ValueSummary = "test-camera-binding",
-            Source = "test_fixture"
+            Source = VisionAgentResourceAuthority.CameraBindingSource
+        };
+    }
+
+    private static AiFlowGenerationRequest SeedCanonicalCameraDecision(
+        BuildHarness harness,
+        AiFlowGenerationRequest request)
+    {
+        var build = request.BuildFromPlan!;
+        var decision = BoundCameraResourceDecision();
+        var seeded = harness.Conversation.TryUpdateWorkspaceSnapshot(request.SessionId!,
+            new VisionAgentWorkspaceSnapshotUpdate
+            {
+                ExpectedRevision = 0,
+                ClientMutationId = $"seed-resource:{request.SessionId}",
+                LifecycleState = "plan_ready",
+                PendingPlanSnapshot = build.PlanSnapshot,
+                ConfirmedPlanAnswers = build.ConfirmedAnswers,
+                ResourceDecisions = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase)
+                {
+                    [decision.CanonicalId] = JsonSerializer.SerializeToElement(decision, AgentRunEventJson.Options)
+                },
+                ResourceRevision = 1
+            });
+        seeded.Success.Should().BeTrue();
+        return request with
+        {
+            BuildFromPlan = build with
+            {
+                WorkspaceExpectedRevision = seeded.Revision,
+                ResourceRevision = 1
+            }
         };
     }
 

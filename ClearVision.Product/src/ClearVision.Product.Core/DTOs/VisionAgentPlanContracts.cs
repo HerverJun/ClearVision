@@ -172,6 +172,33 @@ public sealed record VisionAgentResourceDecision
     public string Source { get; init; } = string.Empty;
 }
 
+public static class VisionAgentResourceAuthority
+{
+    public const string CameraBindingSource = "camera_binding_authority";
+
+    public static bool IsTrustedCameraBindingDecision(VisionAgentResourceDecision? decision)
+    {
+        if (decision is null ||
+            !decision.Status.Equals(VisionAgentResourceStatuses.Bound, StringComparison.OrdinalIgnoreCase) ||
+            !decision.ResourceType.Equals("camera_binding", StringComparison.OrdinalIgnoreCase) ||
+            !decision.Source.Equals(CameraBindingSource, StringComparison.Ordinal) ||
+            !VisionAgentResourceIdentity.IsCanonicalId(decision.CanonicalId) ||
+            !VisionAgentResourceIdentity.IsSafeResourceKey(decision.ResourceKey) ||
+            string.IsNullOrWhiteSpace(decision.OperatorKey) ||
+            string.IsNullOrWhiteSpace(decision.ParameterName))
+        {
+            return false;
+        }
+
+        return VisionAgentResourceIdentity.CreateCanonicalId(
+                decision.ResourceType,
+                decision.OperatorKey,
+                decision.ParameterName,
+                decision.ResourceKey)
+            .Equals(decision.CanonicalId, StringComparison.OrdinalIgnoreCase);
+    }
+}
+
 public sealed record VisionAgentPlanAnswer
 {
     public string QuestionId { get; init; } = string.Empty;
@@ -504,6 +531,10 @@ public sealed record VisionAgentBuildFromPlanRequest
     public string BuildIntent { get; init; } = "new";
     public string OriginalUserPrompt { get; init; } = string.Empty;
     public bool AcceptedRecommendedDefaults { get; init; }
+    public int AnswerRevision { get; init; }
+    public int ResourceRevision { get; init; }
+    public Dictionary<string, System.Text.Json.JsonElement> ParameterValues { get; init; } =
+        new(StringComparer.OrdinalIgnoreCase);
     public List<VisionAgentResourceDecision> ResourceDecisions { get; init; } = [];
     public AiRequirementMaturityResult? RequirementMaturity { get; init; }
     public AiDecisionTrace? DecisionTrace { get; init; }

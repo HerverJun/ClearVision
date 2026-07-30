@@ -46,6 +46,7 @@ describe('AgentRun stream adapter', () => {
         terminal = event.eventType === 'run.completed';
         return 'accepted';
       },
+      onReplay: vi.fn(),
       onRecovering: () => { recovering += 1; },
       onFailure: error => { throw error; }
     });
