@@ -349,6 +349,70 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     }
 
     [Fact]
+    public void StartupReconciliation_LegacyRecoveryMutationWithDifferentPayload_ShouldNotCrash()
+    {
+        using var harness = CreateHarness();
+        const string sessionId = "session-legacy-recovery-conflict";
+        var run = harness.Stream.CreateRun("legacy recovery conflict", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            sessionId,
+            metadataOnly = true
+        });
+        var request = BuildRequest(BuildPlan()) with
+        {
+            AgentRunId = run.RunId,
+            SessionId = sessionId
+        };
+        PrepareAssociatedBuild(harness, request, run.RunId);
+        var current = harness.Conversation.GetSession(sessionId)!.WorkspaceSnapshot!;
+        harness.Conversation.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = current.Revision,
+            ClientMutationId = $"recovery-conflict:{run.RunId}",
+            LifecycleState = "recovery_conflict",
+            BuildRunId = run.RunId,
+            BuildRunStatus = AgentRunEventStatuses.Running
+        }).Success.Should().BeTrue();
+
+        var result = SuccessResult(request);
+        harness.Stream.Complete(run.RunId, "done", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            projectionDisposition = VisionAgentBuildProjectionDispositionResolver.Project,
+            associationCommitted = true,
+            status = result.CompletionStatus,
+            sessionId,
+            flow = result.Flow,
+            buildResult = result.BuildResult,
+            buildReadiness = result.BuildReadiness,
+            metadataOnly = true
+        }).Should().NotBeNull();
+
+        var reloadedConversation = new ConversationalFlowService(Path.Combine(harness.Directory, "sessions"));
+        var reloadedProjector = new VisionAgentBuildTerminalProjector(
+            reloadedConversation,
+            new VisionAgentBuildProjectionJournal(harness.Store, harness.Redactor),
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector>>());
+        var replay = new AgentRunEventStreamService(harness.Store, harness.Redactor).ReplayRaw(run.RunId)!;
+        var projected = true;
+        var recovery = () => projected = reloadedProjector.ProjectRecovered(replay);
+
+        recovery.Should().NotThrow();
+        projected.Should().BeFalse();
+
+        var recovered = reloadedConversation.GetSession(sessionId)!;
+        recovered.WorkspaceSnapshot!.LifecycleState.Should().Be("recovery_conflict");
+        recovered.WorkspaceSnapshot.BuildRunStatus.Should().Be(AgentRunEventStatuses.Completed);
+        recovered.MutationReceipts.Should().Contain(receipt =>
+            receipt.MutationId.StartsWith($"recovery-conflict:{run.RunId}:", StringComparison.OrdinalIgnoreCase));
+        var revision = recovered.WorkspaceSnapshot.Revision;
+
+        recovery.Should().NotThrow();
+        reloadedConversation.GetSession(sessionId)!.WorkspaceSnapshot!.Revision.Should().Be(revision);
+    }
+
+    [Fact]
     public async Task StartupReconciliation_AssociationFailure_ShouldSkipWithoutCheckpointHistoryOrConflict()
     {
         using var harness = CreateHarness();

@@ -370,22 +370,23 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             return;
         }
 
-        if (HasAppliedRecoveryConflict(latest, runId, runType, status))
-        {
-            LogRecoveryConflict(runId, sessionId, runType, status, "already_applied");
-            return;
-        }
-
         var update = new VisionAgentWorkspaceSnapshotUpdate
         {
             ExpectedRevision = latest.WorkspaceSnapshot.Revision,
-            ClientMutationId = $"recovery-conflict:{runId}",
             LifecycleState = "recovery_conflict",
             PlanRunId = string.Equals(runType, "plan", StringComparison.OrdinalIgnoreCase) ? runId : null,
             PlanRunStatus = string.Equals(runType, "plan", StringComparison.OrdinalIgnoreCase) ? status : null,
             BuildRunId = string.Equals(runType, "build", StringComparison.OrdinalIgnoreCase) ? runId : null,
             BuildRunStatus = string.Equals(runType, "build", StringComparison.OrdinalIgnoreCase) ? status : null
         };
+        var mutationId = VisionAgentRecoveryConflictMutationIdentity.Build(runId, update);
+        update.ClientMutationId = mutationId;
+        if (HasAppliedRecoveryConflict(latest, runId, runType, status, mutationId))
+        {
+            LogRecoveryConflict(runId, sessionId, runType, status, "already_applied");
+            return;
+        }
+
         var result = _conversationService.TryUpdateWorkspaceSnapshot(sessionId, update);
         if (result.Success)
         {
@@ -396,7 +397,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
 
         ThrowIfPrimaryStoreFailed(result, "recovery conflict", runId, sessionId);
         var reread = _conversationService.GetSession(sessionId);
-        if (HasAppliedRecoveryConflict(reread, runId, runType, status))
+        if (HasAppliedRecoveryConflict(reread, runId, runType, status, mutationId))
         {
             LogRecoveryConflict(runId, sessionId, runType, status, "already_applied");
             return;
@@ -583,7 +584,8 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
         ConversationSession? session,
         string runId,
         string runType,
-        string status)
+        string status,
+        string mutationId)
     {
         if (session?.WorkspaceSnapshot == null)
         {
@@ -592,7 +594,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
 
         var workspace = session.WorkspaceSnapshot;
         var receiptApplied = session.MutationReceipts.Any(receipt =>
-            string.Equals(receipt.MutationId, $"recovery-conflict:{runId}", StringComparison.OrdinalIgnoreCase));
+            VisionAgentRecoveryConflictMutationIdentity.Matches(receipt.MutationId, runId, mutationId));
         if (!receiptApplied ||
             !string.Equals(workspace.LifecycleState, "recovery_conflict", StringComparison.OrdinalIgnoreCase))
         {

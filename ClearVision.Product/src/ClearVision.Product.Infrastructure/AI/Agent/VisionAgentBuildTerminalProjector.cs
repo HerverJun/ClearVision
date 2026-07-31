@@ -438,19 +438,20 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             return;
         }
 
-        if (HasAppliedRecoveryConflict(latest, runId, terminalStatus))
-        {
-            return;
-        }
-
         var update = new VisionAgentWorkspaceSnapshotUpdate
         {
             ExpectedRevision = latest.WorkspaceSnapshot.Revision,
-            ClientMutationId = $"recovery-conflict:{runId}",
             LifecycleState = "recovery_conflict",
             BuildRunId = runId,
             BuildRunStatus = terminalStatus
         };
+        var mutationId = VisionAgentRecoveryConflictMutationIdentity.Build(runId, update);
+        update.ClientMutationId = mutationId;
+        if (HasAppliedRecoveryConflict(latest, runId, terminalStatus, mutationId))
+        {
+            return;
+        }
+
         var result = _conversationalFlowService.TryUpdateWorkspaceSnapshot(sessionId, update);
         if (result.Success && result.PersistenceStatus.PrimaryStoreSaved)
         {
@@ -466,7 +467,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
         }
 
         var reread = _conversationalFlowService.GetSession(sessionId);
-        if (HasAppliedRecoveryConflict(reread, runId, terminalStatus))
+        if (HasAppliedRecoveryConflict(reread, runId, terminalStatus, mutationId))
         {
             LogRecoveryConflict(runId, sessionId, terminalStatus, conflictCode);
             return;
@@ -495,7 +496,8 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
     private static bool HasAppliedRecoveryConflict(
         ConversationSession? session,
         string runId,
-        string terminalStatus)
+        string terminalStatus,
+        string mutationId)
     {
         if (session?.WorkspaceSnapshot == null)
         {
@@ -507,7 +509,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
                string.Equals(workspace.BuildRunId, runId, StringComparison.OrdinalIgnoreCase) &&
                string.Equals(workspace.BuildRunStatus, terminalStatus, StringComparison.OrdinalIgnoreCase) &&
                session.MutationReceipts.Any(receipt =>
-                   string.Equals(receipt.MutationId, $"recovery-conflict:{runId}", StringComparison.OrdinalIgnoreCase));
+                   VisionAgentRecoveryConflictMutationIdentity.Matches(receipt.MutationId, runId, mutationId));
     }
 
     private static string BuildBuildIdentity(
