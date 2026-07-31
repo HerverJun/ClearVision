@@ -1,8 +1,10 @@
-# ClearVision Studio UI Next F07 完整开发计划（PROPOSED / AUDITED）
+# ClearVision Studio UI Next F07 完整开发计划（PROPOSED / AUDITED / G0 DECISIONS FROZEN）
 
-> 文档状态：`PROPOSED_AUDITED`。本轮只完成代码级只读审计与计划制定；没有实现 F07 产品代码，没有修改产品配置默认值、路由、CI 或 Legacy 工作树。
+> 文档状态：`PROPOSED_AUDITED`；F07 G0 产品决策已冻结。本轮只维护审计计划与决策边界；没有实现 F07 产品代码，没有修改产品配置默认值、路由、CI 或 Legacy 工作树。
 >
 > 审计日期：2026-07-31。审计基线是执行时当前 HEAD，不绑定历史 SHA。
+>
+> G0 决策记录：[F07 G0 进入治理与产品决策冻结](./F07_G0_进入治理与产品决策冻结.md)
 
 ## 0. 审计基线与证据声明
 
@@ -10,9 +12,9 @@
 | --- | --- |
 | 工作树 | `C:\Users\HerverJun\Desktop\ClearVision-UI-Next` |
 | 分支 | `studio-ui-next` |
-| Initial SHA | `e60408cb4b7825e09ca13c0a8f83479cdd554034` |
-| 审计开始时工作树 | clean；没有发现已有 dirty 文件 |
-| `origin/studio-ui-next` | 审计开始时与 Initial SHA 相同 |
+| G0 执行基线 SHA | `b7f54ffbe4e1efaed0ee599158cb1748cded0cd2` |
+| G0 执行时工作树 | clean；没有发现已有 dirty 文件 |
+| `origin/studio-ui-next` | G0 执行时与 G0 执行基线 SHA 相同 |
 | Remote | `https://github.com/HerverJun/ClearVision.git` |
 | 代码基线 | 当前仓库代码与当前配置优先；历史 README、旧 Goal 和历史 PASS 仅作线索 |
 | 本轮测试/build | `NOT RUN`；本轮不以未执行的 build、test、Browser、WebView2、DPI、publish 或 CI 结论填充计划 |
@@ -32,7 +34,7 @@ F07 不应被定义为“把旧 Settings 页逐项复制到 Vue”。当前产�
 
 因此建议 F07 采用一个 Next `/settings` 管理工作台、一个 Settings capability owner、按 authority 分区的 typed projection/draft，以及严格串行 Goal。建议总数为 **10 个串行 Goal：G0-G9**。
 
-F07 的完成不自动改变默认入口，不自动退役 Legacy，也不把 Settings 迁移误判为 Runtime、Station、连续检测、AgentRun 或正式结果迁移完成。
+F07 的完成不自动改变默认入口，不自动退役 Legacy，也不把 Settings 迁移误判为 Runtime、Station、连续检测、AgentRun 或正式结果迁移完成。G0 已冻结的权限、authority、section 范围和延期项以 [G0 决策记录](./F07_G0_进入治理与产品决策冻结.md) 为准；后续偏离必须另行形成产品决策或 ADR。
 
 ## 2. 当前事实
 
@@ -177,7 +179,7 @@ Generic `/api/settings` 仍然可以接受 `communication`、`tcpCommunication`�
 | Station runtime parameter import/export | Station WinForms runtime parameter panel | 不由 Studio Settings 替代 |
 | Settings bundle import/export | 当前没有 `/api/settings/import` 或 `/api/settings/export` 合同 | **缺失事实**；除非另行批准 schema、脱敏、校验、preview、原子 apply 与 rollback，不在 F07 虚构实现 |
 
-因此，F07 不能把 `GET /api/settings` 的完整响应直接下载成“配置备份”，也不能把 JSON editor 变成通用导入器。若产品确实需要 Settings bundle，应作为 G9 的明确决策项，必要时拆为后续独立 feature。
+因此，F07 不能把 `GET /api/settings` 的完整响应直接下载成“配置备份”，也不能把 JSON editor 变成通用导入器。Settings Import/Export 已排除出 F07；若未来需要，必须作为独立 feature 重新批准 schema、脱敏、校验、原子 apply 与 rollback 合同。
 
 ## 3. 问题、缺失、重复与不应保留项
 
@@ -215,10 +217,11 @@ F07 的实现目标是建立一个可逐步启用的 Next Settings 管理工作�
 1. 新增 `/settings` product route 与受控 Settings 导航入口；
 2. 建立唯一 `SettingsOwner`，其 projection/draft 只存在于该 owner 生命周期；
 3. 复用 `ProductRuntime.api` 的单一 `ApiTransport`，用 capability-local typed adapter/decoder 消费现有 endpoint；
-4. 按 authority 分区显示 General/Storage/Runtime/Security、PLC、TCP、Camera/Trigger、Station communication、AI model、Maintenance；
+4. 按 authority 分区显示 General/Storage/Runtime/Security、PLC、TCP、Camera/Trigger、Station communication、AI model、Database status/backup；Database restore、cleanup、global reset 不在首轮交付；
 5. 展示保存后状态、权限、校验错误、运行态与 restart required，而不是只显示“保存成功”；
 6. 为每一个 mutation 定义 scope、权限、敏感字段、apply/restart/reload 语义；
-7. 保持 Legacy 是可回退的独立 owner，并为每个 Goal 提供真实 unmount/dispose、Browser、WebView2、DPI、publish 和 CI 证据。
+7. `/settings` route 仅允许 Admin / Engineer；Operator 不进入该 route，且不扩大现有后端权限；
+8. 保持 Legacy 是可回退的独立 owner，并为每个 Goal 提供真实 unmount/dispose、Browser、WebView2、DPI、publish 和 CI 证据。
 
 ### 4.2 F07 外
 
@@ -234,6 +237,9 @@ F07 的实现目标是建立一个可逐步启用的 Next Settings 管理工作�
 - 用 Pinia、localStorage、DOM、IndexedDB 或前端 cache 长期保存产品配置或 secret；
 - 新建第二 HTTP client、ServiceRegistry、EventBus、HostBridge、Canvas kernel 或 project save chain；
 - 未有后端合同的 Settings import/export；
+- Database restore、cleanup、global reset；首轮只允许 database status 与 backup；
+- Station token 后端安全升级；现有 token endpoint 语义只能按当前后端消费，并登记为延期债务；
+- 将 RuntimePreview Pilot 从 developer-only surface 扩大为普通产品 Settings；
 - 真实相机、PLC、Station、LLM provider 的生产/现场验收。它们需要独立硬件或站点证据，不能由 Browser mock 代替。
 
 ## 5. 建议的信息架构
@@ -247,10 +253,10 @@ F07 Settings 不照搬 Legacy 的单一长页。建议使用一个受控 route �
 5. **Cameras & triggers**：系统 Camera binding/discovery/trigger diagnostics/preview；与 Workspace camera binding editor 通过同一后端 API 协调，不能共享未受控的 mutable camera object。
 6. **Station communication**：Studio ingress、Local Station sync、token masked/reveal/regenerate、restart diagnostics；不显示为“已实时应用”。
 7. **AI models**：model list、role/default、reasoning support、secret operation、connection test、last backend test status；不显示 fake throughput metrics，也不把 AgentRun 入口塞进 model config。
-8. **Maintenance**：database status/backup/restore/cleanup、scoped reset。高风险按钮需要 operation scope、影响范围、确认和恢复说明。
-9. **Import/Export**：默认不挂载；只有 G9 获得完整合同后才能出现。现有 Project/runtime/evidence/Station import/export 继续留在各自 authority 的入口。
+8. **Maintenance**：首轮只显示 database status 与 backup；restore、cleanup、global reset 延期，不进入 F07 Settings owner。高风险按钮需要 operation scope、影响范围、确认和恢复说明。
+9. **Import/Export**：Settings Import/Export 排除出 F07，不挂载入口，也不在 G9 内形成合同；现有 Project/runtime/evidence/Station import/export 继续留在各自 authority 的入口。
 
-导航和 section visibility 服从 session/role/feature flag，但安全性始终由 API policy 决定。组件只读 owner projection，写操作进入 owner 的窄命令接口；表单 draft 不直接写 Pinia 或 localStorage。
+导航和 section visibility 服从 session/role/feature flag，但安全性始终由 API policy 决定。组件只读 owner projection，写操作进入 owner 的窄命令接口；表单 draft 不直接写 Pinia 或 localStorage。`/settings` 的产品 route 角色固定为 Admin / Engineer，Operator 直接禁止。Next UI preferences 与 AppConfig 产品主题保持独立，不能互相隐式写入。
 
 ## 6. 配置 authority、保存与生效模型
 
@@ -258,15 +264,20 @@ F07 Settings 不照搬 Legacy 的单一长页。建议使用一个受控 route �
 
 | UI section | authority | F07 允许的写入口 | 前端不得做的事 |
 | --- | --- | --- | --- |
-| General/Storage/Runtime/Security policy | `IConfigurationService` / AppConfig | 现有 `PUT /api/settings` 的明确 `saveScope` | 不把完整 AppConfig 当成前端 store；不修改默认值；不使用 AppConfig revision 充当 Project revision |
+| General/Storage/Runtime/Security policy | `IConfigurationService` / AppConfig | 现有 `PUT /api/settings` 的明确 `saveScope`，且 generic scope 仅限这四类 | 不把完整 AppConfig 当成前端 store；不修改默认值；不使用 AppConfig revision 充当 Project revision |
+| Next UI preferences | `UiPreferencesOwner` 的 UI projection | 现有 UI preference owner 的本地投影；不进入产品 Settings save chain | 不把 Next theme/density/reduced-motion preference 写入 AppConfig General theme，也不把产品主题反向覆盖 UI preference |
 | PLC | `IConfigurationService` + PLC endpoint | `/api/plc/settings`、`/api/plc/mappings` | 不通过 generic settings PUT 绕过专用校验；不把 test 当持久化 |
 | TCP | `ITcpDeviceManager` + AppConfig | `/api/tcp/profiles`；运行时操作使用专用 `/api/tcp/profiles/{id}/...` | 不在浏览器保存 socket/frame state；不把 save 误报为 connected/listening |
-| Camera | `CameraManager` + frame/trigger coordinators | `/api/cameras/bindings` 与专用 discovery/trigger/preview APIs | 不在 Vue 直接持有 camera/stream/AbortController；不与 Workspace owner 形成第二长期 preview owner |
-| Station communication | `StationCommunicationSettingsStore` + `StationIngressOptions` | `/api/station-communication/settings`、`/token` | 不写 Station local settings 文件；不假定 save 后 Studio/Station live reload |
+| Camera | `CameraManager` + frame/trigger coordinators | `/api/cameras/bindings` 与专用 discovery/trigger/preview APIs | Settings 负责系统管理；Workspace 继续负责工程绑定与预览；不在 Vue 直接持有 camera/stream/AbortController；active stream 冲突必须 fail closed |
+| Station communication | `StationCommunicationSettingsStore` + `StationIngressOptions` | `/api/station-communication/settings`、`/token` | 不写 Station local settings 文件；不假定 save 后 Studio/Station live reload；token 后端安全升级登记为延期债务 |
 | AI model | `AiConfigStore` + DPAPI secret store | `/api/ai/models/**` | 不读写 `ai_model_secrets`；不在 localStorage/cache 备份 key；不由 AgentRun owner 写 model config |
 | User/password | UserManagement service/database + auth endpoint | `/api/users/**`、`/api/auth/change-password` | 不把 user record 或 password 放入 AppConfig draft |
-| Database maintenance | `VisionDatabaseMaintenanceService` | 现有 maintenance endpoints | 不在前端实现 backup/restore/cleanup；不把 backup 文件路径当普通 text field 无条件提交 |
+| Database maintenance | `VisionDatabaseMaintenanceService` | 首轮仅使用 status 与 backup endpoints | 不在前端实现 restore/cleanup/global reset；不把 backup 文件路径当普通 text field 无条件提交 |
 | Project/Flow/Runtime/Station package | 现有 Project/Application/Runtime/Station authorities | 现有各自 endpoint | 不由 Settings owner代理或缓存这些 authority |
+
+G0 已冻结 generic `/api/settings` 的产品使用面：F07 只允许 General、Storage、Runtime、Security；PLC、TCP、Camera、Station、AI 只走专用 endpoint，即使后端当前仍接受潜在重叠字段，也不得在 Next 形成 fallback 或双写入口。
+
+Camera Settings 负责系统管理，Workspace 继续负责工程绑定与预览；Settings owner 不得抢占 Workspace 的 active stream。后端 `409`、stream stop 和 owner dispose 都按 fail-closed 处理。
 
 ### 6.2 Draft、revision、保存结果
 
@@ -282,7 +293,8 @@ authoritative projection -> section draft -> local validation
 - `authoritative projection` 是最后一次服务端响应或重新 GET 的投影；不是 localStorage；
 - section draft 只在 mounted Settings owner 内存在，route leave/unmount 后默认丢弃或由 leave guard 明确阻止离开；
 - UI `draftRevision`/generation 只用于 stale response、abort 和 draft identity；
-- 后端 `AppConfig.Revision` 只作为观测和展示，直到后端提供条件保存合同；
+- 后端 `AppConfig.Revision` 只作为观测和展示；G0 决定 F07 不新增 conditional revision、ETag 或 409 保存合同；
+- 沿用单 Settings owner、section 串行写和现有后端无条件 revision / last-write-wins 语义；
 - Project `PersistenceRevision` 与 F07 config revision 完全分离；
 - 同一 section 的写请求由 owner 串行化；旧请求返回后不能覆盖新 draft；
 - 409、validation failure、403、network failure、unknown outcome 必须分别显示，并保留或丢弃 draft 的语义要由 owner 明确规定；不能把所有失败 catch 成“保存成功”。
@@ -313,15 +325,15 @@ UI 文案必须让用户知道“已持久化”与“已生效”不是同一�
 
 以下 Goal 必须串行推进。每个 Goal 只有在自己的门禁通过后才能进入下一个；任一停止条件出现时保持上一个已通过 Goal 的可回滚状态，不自动扩大范围。
 
-### G0：F07 入口、基线与权限冻结
+### G0：F07 入口、基线、权限与产品决策冻结
 
-**目标**：确认实现 worktree、源代码基线、共享文件 owner、产品负责人和本计划中的范围/决策项。
+**目标**：确认实现 worktree、执行时源代码基线、共享文件 owner，并冻结本计划中的权限、authority、section 范围、延期项和独立 release 决策。
 
 **允许范围**：
 
 - 只读审计、authority/endpoint/permission/secret/restart matrix、ADR 草案、测试矩阵；
 - 维护 F07 文档入口、Goal 状态和 evidence ledger；
-- 记录 `Initial SHA`、远端分支状态和当前未执行证据。
+- 记录 G0 执行基线 SHA、远端分支状态和当前未执行证据；决策详情见 [F07 G0 决策记录](./F07_G0_进入治理与产品决策冻结.md)。
 
 **禁止范围**：
 
@@ -329,7 +341,7 @@ UI 文案必须让用户知道“已持久化”与“已生效”不是同一�
 - 开始 Settings route、owner 或 API client 实现；
 - 擅自同步 `origin/codex初稿`、切换分支、stash、reset 或处理其他 worktree。
 
-**门禁**：产品负责人确认 F07 不是默认 cutover；所有 section 有 authority、permission、write endpoint、effective/restart 说明；未决项被显式列出。
+**门禁**：产品负责人已冻结 F07 不是默认 cutover；所有纳入 section 有 authority、permission、write endpoint、effective/restart 说明；本计划第 10 节不再保留未决产品问题；G1 尚未授权启动。
 
 **停止条件**：发现 source/contract 与本计划无法对应、远端分支发生不兼容前进/分叉、或需要未批准的后端 authority 扩权。
 
@@ -351,13 +363,13 @@ UI 文案必须让用户知道“已持久化”与“已生效”不是同一�
 - 先建 Settings JSON editor 再补合同；
 - 新增 Settings import/export endpoint 或把 secret 放进 contract。
 
-**门禁**：每个字段都有 source/decoder/write owner/permission/sensitive/apply classification；所有 403/404/409/validation response 有测试 fixture；明确 AppConfig concurrency 采用“当前串行写、后端无条件 revision”还是另行增加条件合同。
+**门禁**：每个字段都有 source/decoder/write owner/permission/sensitive/apply classification；所有 403/404/409/validation response 有测试 fixture；AppConfig concurrency 固定采用单 Settings owner、section 串行写和后端现有无条件 revision，不新增 conditional revision 合同；Operator 对 `/settings` 直接禁止。
 
 **停止条件**：发现关键字段没有权威 endpoint、敏感字段响应无法安全脱敏、需要新 authority、或 revision/concurrency 决策未获批准。
 
 ### G2：Next Settings Shell、Route 与生命周期地基
 
-**目标**：加入受控 `/settings` route、导航入口、role/feature guard、Settings owner skeleton 与 read-only projection，建立可验证的 mount/unmount 边界。
+**目标**：加入受控 `/settings` route、导航入口、Admin/Engineer role guard、Operator forbidden、Settings owner skeleton 与 read-only projection，建立可验证的 mount/unmount 边界。
 
 **允许范围**：
 
@@ -374,7 +386,7 @@ UI 文案必须让用户知道“已持久化”与“已生效”不是同一�
 - Vue 组件直接持有 EventSource、camera stream、AbortController、WebView2 channel 或 imperative canvas；
 - 使用 localStorage/Pinia 作为产品 Settings authority。
 
-**门禁**：router/role/feature tests；owner 单实例、离开 route 后无请求/定时器/subscription/write；Browser 中可验证 loading/error/403；Legacy regression 仍确认默认路径。
+**门禁**：router/role/feature tests；Admin/Engineer 可达、Operator forbidden；owner 单实例、离开 route 后无请求/定时器/subscription/write；Browser 中可验证 loading/error/403；Legacy regression 仍确认默认路径。
 
 **停止条件**：出现两个 mounted owner、dispose 后仍有请求/写入、Settings 访问依赖前端隐藏而非 API policy，或 route 引入第二 platform/client。
 
@@ -392,7 +404,7 @@ UI 文案必须让用户知道“已持久化”与“已生效”不是同一�
 **禁止范围**：
 
 - 修改默认保存路径、retention、runtime timeout、theme default 或配置 normalize；
-- 把 Next UI theme preference 自动写成产品 General theme，除非 G1/G3 明确决定 authority；
+- 把 Next UI theme preference 自动写成产品 General theme；两者保持独立；
 - 通过 `/api/settings` 写 Camera、PLC、TCP、Station、AI；
 - 把 auto-start 等已禁用历史字段变成可用功能。
 
@@ -402,26 +414,26 @@ UI 文案必须让用户知道“已持久化”与“已生效”不是同一�
 
 ### G4：Security、User 与 Database maintenance
 
-**目标**：迁移账户和维护操作，同时把 password、database restore、reset 等高风险能力从普通表单保存中分离。
+**目标**：迁移账户和有限维护投影，同时把 password、database restore、cleanup、global reset 等高风险能力从本轮普通 Settings 范围中排除。
 
 **允许范围**：
 
 - 密码修改、Admin user CRUD/reset、password policy projection；
-- database status/repair/backup/restore/cleanup 的 operation-specific dialog/result；
-- scoped reset 的 impact summary，明确它只重置 AppConfig + AI models，不重置 Station token 或 user database；
+- database status 与 backup 的 operation-specific dialog/result；
+- 记录 database repair/restore/cleanup、global reset 为延期项，不在 F07 首轮提供入口或前端合同；
 - Admin-only gating、confirm/cancel、timeout/unknown outcome、成功后 reload。
 
 **禁止范围**：
 
 - 前端保存/哈希/缓存密码；
-- 把 reset 展示为“全部设置恢复默认”；
+- 把延期的 database/reset 能力展示为“全部设置恢复默认”；
 - 前端直接操作 SQLite/数据库文件或自造 restore chain；
 - 允许非 Admin 通过前端参数绕过服务端权限；
 - 在截图、日志、telemetry 或 test artifact 中保留密码、token、backup path 等敏感值。
 
-**门禁**：现有 `UserEndpointsTests`、`SettingsDatabaseEndpointTests`、`SettingsResetEndpointTests` 与 auth/permission tests 定向通过；Browser 验证 Admin/非 Admin；真实 WebView2 只使用隔离测试数据库；reset 前后检查 scope，不接触用户生产数据。
+**门禁**：现有 `UserEndpointsTests`、database status/backup 对应测试与 auth/permission tests 定向通过；Browser 验证 Admin/Engineer/Operator matrix；真实 WebView2 只使用隔离测试数据库；restore、cleanup、global reset 不形成 F07 证据。
 
-**停止条件**：reset scope 与后端实现不一致、restore/cleanup 没有可追踪结果、敏感字段泄漏、或数据库测试无法可靠隔离。
+**停止条件**：status/backup scope 与后端实现不一致、敏感字段泄漏、数据库测试无法可靠隔离，或有人试图把 restore/cleanup/global reset 带回 F07 首轮。
 
 ### G5：PLC 与 TCP 连接工作台
 
@@ -448,14 +460,14 @@ UI 文案必须让用户知道“已持久化”与“已生效”不是同一�
 
 ### G6：Camera、Trigger 与 Preview
 
-**目标**：迁移系统级 camera discovery/binding/trigger diagnostics/preview，同时保护既有 Workspace CameraBindingEditor 和 camera stream lifecycle。
+**目标**：迁移系统级 Camera administration、discovery、trigger diagnostics/preview，同时明确 Workspace 继续负责工程绑定与预览，并保护既有 CameraBindingEditor 和 camera stream lifecycle。
 
 **允许范围**：
 
 - all/Huaray/Hikvision discovery、binding edit、active camera、exposure/gain/pixel/trigger、enter/serial photoelectric、soft capture、continuous preview；
 - 使用 `/api/cameras/**` 与 `/api/trigger-input/**`；preview/soft capture 仅展示 debug input，不写正式 inspection result；
 - Settings owner 通过专门 adapter 持有 AbortController、preview session、blob URL，并在 dispose/route leave 时停止；
-- 遇 active stream settings mutation 的 `409` 时显示冲突资源，要求先停止 preview/inspection。
+- 遇 active stream settings mutation 的 `409` 时 fail closed，显示冲突资源并要求先停止 preview/inspection；不得静默覆盖或抢占流。
 
 **禁止范围**：
 
@@ -471,7 +483,7 @@ UI 文案必须让用户知道“已持久化”与“已生效”不是同一�
 
 ### G7：Station communication 与 restart workflow
 
-**目标**：迁移 Studio 对 Station communication 的管理与诊断，不越过 Station 自身的 settings/site/package authority。
+**目标**：迁移 Studio 对 Station communication 的管理与诊断，不越过 Station 自身的 settings/site/package authority；现有 token endpoint 可按当前语义消费，但后端安全升级延期并登记为 `F07-D01`。
 
 **允许范围**：
 
@@ -484,15 +496,16 @@ UI 文案必须让用户知道“已持久化”与“已生效”不是同一�
 - 前端直接改 `%LocalAppData%` 文件、`StationLocalSettingsStore`、`StationSiteProfileStore` 或 Station hardware dialog；
 - 把保存报告成 Studio/Station 已实时重载；
 - 把 token 放入 localStorage、项目 JSON、普通日志、截图或通用 export；
+- 在 F07 内修改 token generation、storage、reveal 或 backend security contract；该升级进入延期债务，不由前端掩盖；
 - 通过 Settings 代替 Station runtime package deployment、commands、results 或 sync journal。
 
-**门禁**：`StationCommunicationSettingsStoreTests`、`StationCommunicationEndpointsTests`、Station sync tests；Admin-only Browser/WebView2 matrix；token reveal/regenerate artifact 必须脱敏且证明不落盘到前端 storage；restart result 必须可回读。
+**门禁**：`StationCommunicationSettingsStoreTests`、`StationCommunicationEndpointsTests`、Station sync tests；Admin/Engineer/Operator route matrix（Station mutation 仍 Admin-only）；token reveal/regenerate artifact 必须脱敏且证明不落盘到前端 storage；restart result 必须可回读。
 
 **停止条件**：两份文档写入不一致、restart marker 语义无法呈现、token 泄漏、或需要在 Studio 进程内新增 live reconfiguration authority。
 
 ### G8：AI model management 与 secret lifecycle
 
-**目标**：迁移 AI model profile/role/default/test/reasoning 维护能力，严格区别 model config、secret store 和 F06 AI workbench。
+**目标**：将 AI model profile/role/default/test/reasoning 管理纳入 F07，严格区别 model config、secret store 和 F06 AI workbench；RuntimePreview Pilot 继续保持 developer-only。
 
 **允许范围**：
 
@@ -512,20 +525,21 @@ UI 文案必须让用户知道“已持久化”与“已生效”不是同一�
 
 **停止条件**：key 在响应/日志/DOM persistence 中泄漏、AI model save 与 activate 语义被误合成一个不可回滚事务、真实 provider test 结果无法区分 mock/real，或 F06 owner 与 Settings owner 形成第二 model authority。
 
-### G9：Import/Export 决策、集成验收与 F07 准入
+### G9：集成验收与 F07 准入（不含 Settings Import/Export）
 
-**目标**：完成所有已批准 Settings sections 的组合验证，决定 Settings bundle import/export 是否另立合同，并形成完整证据包；不执行默认 cutover。
+**目标**：完成所有已批准 Settings sections 的组合验证并形成完整证据包；Settings Import/Export 已排除出 F07，不在 G9 内决定或实现；不执行默认 cutover。
 
 **允许范围**：
 
 - 端到端验证跨 section route leave、auth expiration、403、draft discard、restart pending、unknown outcome、reload/recovery；
 - 复核现有 Project import/export、Runtime Package export、evidence export、Station profile import/export 的边界；
-- 若产品负责人明确需要 Settings bundle，先形成版本化 schema、secret redaction、dry-run/validation、atomic apply、backup/rollback、permission 与 audit ADR，再决定是否拆出后续 Goal；
+- 记录 Settings Import/Export 为独立后续合同候选，不在 F07 创建 endpoint、schema、入口或 bundle；
 - 生成 F07 evidence ledger、风险签字、回滚演练与 legacy regression 结果。
 
 **禁止范围**：
 
 - 没有合同就新增 Settings import/export；
+- 将 Settings Import/Export 的后续合同决策伪装成 F07 准入项；
 - 把 `GET /api/settings` dump、AI key、Station token、user/password、database backup path 放入通用 bundle；
 - 修改默认入口、删除 Legacy、默认关闭回退；
 - 用一次 Browser mock 或一次 WebView2 smoke 代替硬件、DPI、publish、CI 和生产验收各自证据。
@@ -626,47 +640,67 @@ F07 完整准入必须通过真实 workflow_dispatch 或指向受支持 base bra
 | 风险 | 保护 | 回滚 |
 | --- | --- | --- |
 | Next/Legacy 双 owner、旧请求继续写 | route/flag 级单一 owner、generation/Abort、dispose tests、request ledger | 关闭 Next capability/回到 Legacy；不删除 Legacy 文件 |
-| AppConfig last-write-wins 或 generic overlap | section-specific write coordinator、保存前 reload、明确显示观察 revision；必要时另立条件合同 ADR | 禁止继续扩大写面；保留 dedicated endpoint，回退新增 UI |
+| AppConfig last-write-wins 或 generic overlap | 单 Settings owner、section-specific write coordinator、保存前 reload、明确显示观察 revision；F07 不新增 conditional revision | 禁止继续扩大写面；保留 dedicated endpoint，回退新增 UI |
 | Camera active stream 被改写 | 后端 `409`、Settings/Workspace owner 协调、dispose stop preview | 保持原 binding/stream；要求用户先停止 preview/inspection |
-| Station token/restart 误导 | masked/reveal operation、双文档回读、restart flags、脱敏 evidence | 停止 Station section release；继续使用 Legacy Station page |
+| Station token/restart 误导 | masked/reveal operation、双文档回读、restart flags、脱敏 evidence；后端安全升级登记为 `F07-D01` | 停止 Station section release；继续使用 Legacy Station page |
 | AI key 丢失或泄漏 | DPAPI authority、keep/replace/clear、内存清理、redaction tests | 关闭 AI Settings capability；不回滚/复制 secret 文件 |
-| Database/reset 破坏数据 | backend backup/restore、scope confirmation、隔离测试库、unknown outcome | 通过 backend/数据库 recovery；前端不伪造恢复 |
-| Settings bundle schema/secret policy 不成熟 | G9 只做决策与 ADR，默认不出现 import/export | 拆为独立后续 feature，F07 不交付该入口 |
+| Database/reset 破坏数据 | F07 首轮只做 status/backup；restore、cleanup、global reset 延期；隔离测试库、unknown outcome | 通过 backend/数据库 recovery；前端不伪造恢复 |
+| Settings bundle schema/secret policy 不成熟 | Import/Export 排除出 F07，不出现入口或伪造合同 | 拆为独立后续 feature，F07 不交付该入口 |
 | WebView2/DPI/publish 证据不足 | 分层 evidence matrix，独立 ports/user-data/runtime dirs | F07 只能保持 `PARTIAL`，不准入默认切换 |
 | 共享文件 owner 越界 | `AGENTS.md` 白名单、主协调代理串行改 shared files | 停止该 Goal，先完成语义合并和审计 |
 
 回滚的第一选择是关闭 F07 Next capability 或保持 route 不可达，而不是删除数据、覆盖 AppConfig、回滚 Station token 或重置数据库。任何产品数据恢复都必须由既有 backend authority 完成。
 
-## 10. 产品负责人需要裁决的问题
+## 10. G0 已冻结的产品决策
 
-F07 实现开始前必须对以下问题给出明确记录；不能由 capability 实现者自行假设：
+以下决策已由 F07 G0 冻结，不再作为 G1 capability 实现者可自行假设的开放问题。完整 authority、权限和债务登记见 [F07 G0 决策记录](./F07_G0_进入治理与产品决策冻结.md)。任何偏离都必须重新取得产品批准并建立独立 ADR。
 
-1. Settings route 的可见角色：Operator 是否可见只读概览；Engineer 是否可见 PLC/TCP/Camera test；哪些 mutation 只允许 Admin？
-2. General product theme 与 Next UI preferences 是否同一产品概念；若不是，两个页面如何命名和解释？
-3. AppConfig `Revision` 无条件保存是否可以在 F07 接受为“单 owner/串行写 + last-write-wins”，还是必须先增加后端 conditional revision/409 合同？
-4. 是否允许继续保留 generic settings PUT 对 `communication`/`tcpCommunication` 的潜在写入口；F07 是否只承诺 dedicated endpoints？
-5. 是否需要 Settings bundle import/export？若需要，schema version、包含/排除域、AI/Station secret redaction、dry-run、backup、atomic apply、rollback、审计和权限谁负责？
-6. Database restore/cleanup、AppConfig+AI reset 是否进入 F07 首次生产 pilot，还是只先做 read/status？
-7. Camera system administration 与 Workspace CameraBindingEditor 的最终 ownership/route 划分；Settings camera write 是否必须阻止 workspace active stream？
-8. Station communication token 当前六位数字、文件存储与 reveal/regenerate 语义是否满足产品安全要求；是否需要后端升级而非前端掩盖？
-9. AI model management 是否包含 planner/shadow-eval defaults、reasoning settings 和 real provider test；RuntimePreview Pilot 是否永久留在 developer surface？
-10. F07 完成后的产品视觉确认、默认入口切换和 Legacy 退役是否由独立 release decision 管理；本计划默认答案是“不自动授权”。
+| 编号 | 决策 | F07 约束 |
+| --- | --- | --- |
+| D01 | Settings route 仅 Admin / Engineer；Operator 禁止 | 前端 route guard 只能表达现有权限，不能扩大后端权限；Operator 不提供只读概览绕过 |
+| D02 | Next UI preferences 与 AppConfig 产品主题独立 | 不互相隐式写入；UI preference 仍是 UI projection，产品主题继续由 AppConfig authority 管理 |
+| D03 | F07 不新增 conditional revision | 沿用单 Settings owner、section 串行写和现有后端无条件 revision / last-write-wins 语义；UI revision 只做 draft/stale 防护 |
+| D04 | generic `/api/settings` 只负责 General、Storage、Runtime、Security | PLC、TCP、Camera、Station、AI 只走专用 endpoint；不得 generic fallback 或双写 |
+| D05 | Settings Import/Export 排除出 F07 | 不新增 endpoint、schema、入口、bundle 或伪造备份；未来另立 feature/ADR |
+| D06 | Database 首轮只迁移 status 与 backup | restore、cleanup、repair、global reset 不进入 F07 首轮 Settings owner 或准入证据 |
+| D07 | Camera Settings 负责系统管理；Workspace 继续负责工程绑定与预览 | active stream 冲突保留后端 `409` 并 fail closed；不得静默覆盖、抢占或复制 preview owner |
+| D08 | Station token 后端安全升级延期 | 现有 endpoint 只能按当前语义消费；`F07-D01` 登记 token generation/storage/reveal 安全升级债务，前端不得掩盖或擅自改后端 |
+| D09 | AI model management 纳入 F07；RuntimePreview Pilot 保持 developer-only | 可迁移 model profile/role/default/reasoning/test/secret lifecycle；不把 RuntimePreview 或 AgentRun 变成普通 Settings authority |
+| D10 | 默认入口切换与 Legacy 退役独立决策 | F07 完成、G0/G1/G9 通过均不自动修改默认 flags、入口或 Legacy 文件 |
+
+本节取代原“产品负责人需要裁决的问题”。G1 只能将这些决策翻译为 typed contract、permission matrix、owner lifecycle 和证据门禁，不得重新打开已冻结范围。
 
 ## 11. F07 最终完成定义
 
 只有在以下条件全部满足时，才能把 F07 标记为 `COMPLETE`：
 
 - 所有获批 section 都有明确 authority、唯一 write entry、permission、sensitive-field、save/apply/restart contract；
+- `/settings` route 只对 Admin / Engineer 可达，Operator forbidden；不新增或扩大后端权限；
 - Next `/settings` 由唯一 owner 挂载，route/feature 切换和 logout 后旧 owner 无 listener、timer、SSE、preview、AbortController、blob URL、请求或写入残留；
 - 不存在第二 HTTP/Host/EventBus/Canvas/Project save authority；
-- General/Storage/Runtime、Security/User/Maintenance、PLC/TCP、Camera/Trigger、Station communication、AI model 的实际 endpoint 语义与 UI 文案一致；
+- General/Storage/Runtime/Security、User、Database status/backup、PLC/TCP、Camera/Trigger、Station communication、AI model 的实际 endpoint 语义与 UI 文案一致；
+- generic `/api/settings` 只服务 General/Storage/Runtime/Security，其他设备和 AI section 只使用专用 endpoint；
+- Camera system administration 与 Workspace 工程绑定/预览保持唯一 owner 边界，active stream conflict fail closed；
 - AppConfig `Revision`、Project `PersistenceRevision`、AI model storage、Station restart state 没有被前端混用；
 - Legacy regression、Next unit/Browser、backend endpoint/service tests 均有当前 source SHA 证据；
 - 真实 WebView2 Debug、Release publish、DPI/125%、cleanup、publish/no-Node 分层证据齐全；未运行项明确为 `NOT RUN`/`NOT PERFORMED`；
 - CI 由真实 workflow/PR/dispatch 产生并上传可追溯 artifact；普通 feature branch push 不被当作 CI；
-- Settings import/export 若没有批准的完整合同则明确排除，不产生伪造入口；
+- Settings Import/Export 已明确排除出 F07，不产生 endpoint、schema、入口或伪造备份；
+- Station token 后端安全升级以 `F07-D01` 登记为延期债务，不被前端工作伪装为已完成；
 - 产品负责人签字确认破坏性操作、权限、secret、Station restart 和回滚；
 - `DEFAULT_ENTRY_CHANGE=NOT_AUTOMATIC`，`LEGACY_RETIREMENT=NOT_APPROVED`，除非另有独立批准和证据；
 - F07 完成只表示 Settings capability 达到批准的迁移门禁，不表示 Runtime、Station、真实硬件、真实模型质量、正式检测结果或生产现场验收完成。
 
-本审计轮结束状态：计划已形成；F07 实现、默认入口切换和 Legacy 退役均未开始。
+本 G0 结束状态：
+
+```text
+G0_STATUS=DONE
+F07_PRODUCT_DECISIONS=FROZEN
+F07_IMPLEMENTATION=FORBIDDEN
+G1_IMPLEMENTATION=FORBIDDEN
+DEFAULT_ENTRY_CHANGE=INDEPENDENT_DECISION
+LEGACY_RETIREMENT=INDEPENDENT_DECISION
+SETTINGS_IMPORT_EXPORT=EXCLUDED_FROM_F07
+DATABASE_FIRST_ROUND=STATUS_AND_BACKUP_ONLY
+STATION_TOKEN_BACKEND_HARDENING=DEFERRED_DEBT_F07-D01
+```
