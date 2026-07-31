@@ -1,5 +1,6 @@
-import type { GenericSettingsSection, SettingsSection } from './contracts';
+import type { GenericSettingsSection, SettingsSection, SettingsWriteResult } from './contracts';
 import type { SettingsProjectionV1 } from './decoder';
+import { projectSettingsOperationFailure, type SettingsOwner } from './settingsOwner';
 
 export type SettingsNavigationTarget = 'overview' | SettingsSection;
 
@@ -72,4 +73,102 @@ export function settingsSectionStateLabel(state: SettingsSectionReadState): stri
     case 'restricted': return '安全子集未返回';
     case 'shell-only': return '后续接入';
   }
+}
+
+export type SettingsFeedbackKind = 'saved' | 'error' | 'unknown' | 'cancelled' | 'forbidden';
+
+export interface SettingsFeedback {
+  readonly kind: SettingsFeedbackKind;
+  readonly message: string;
+  readonly savedLabel: string;
+  readonly effectiveLabel: string;
+  readonly restartLabel: string;
+}
+
+export function settingsFeedbackForResult<T>(result: SettingsWriteResult<T>): SettingsFeedback {
+  if (result.status === 'completed') {
+    return Object.freeze({
+      kind: 'saved',
+      message: '操作已完成；服务端返回值已作为新的权威投影。',
+      savedLabel: '已保存',
+      effectiveLabel: '投影已更新',
+      restartLabel: '重载要求：后端未声明'
+    });
+  }
+
+  if (result.status === 'forbidden') {
+    return Object.freeze({
+      kind: 'forbidden',
+      message: '当前角色没有执行该 Settings endpoint 的权限。',
+      savedLabel: '未保存',
+      effectiveLabel: '未生效',
+      restartLabel: '不适用'
+    });
+  }
+
+  if (result.status === 'cancelled' || result.status === 'disposed') {
+    return Object.freeze({
+      kind: 'cancelled',
+      message: '操作已取消；未根据本地结果推断服务端状态。',
+      savedLabel: '未确认',
+      effectiveLabel: '未确认',
+      restartLabel: '未确认'
+    });
+  }
+
+  if (result.status === 'stale') {
+    return Object.freeze({
+      kind: 'unknown',
+      message: '操作结果已过期；请重新读取服务端状态后再决定是否重试。',
+      savedLabel: '结果未知',
+      effectiveLabel: '结果未知',
+      restartLabel: '重新读取后判断'
+    });
+  }
+
+  if (result.status !== 'failed') {
+    return Object.freeze({
+      kind: 'cancelled',
+      message: '操作已取消；未根据本地结果推断服务端状态。',
+      savedLabel: '未确认',
+      effectiveLabel: '未确认',
+      restartLabel: '未确认'
+    });
+  }
+
+  const error = projectSettingsOperationFailure(result.error);
+  return Object.freeze({
+    kind: error.code === 'unknown-outcome' ? 'unknown' : 'error',
+    message: error.publicMessage,
+    savedLabel: error.code === 'unknown-outcome' ? '结果未知' : '未保存',
+    effectiveLabel: error.code === 'unknown-outcome' ? '结果未知' : '未生效',
+    restartLabel: error.code === 'unknown-outcome' ? '重新读取后判断' : '不适用'
+  });
+}
+
+export function settingsRoleCanWrite(role: string | null | undefined): boolean {
+  return role === 'Admin';
+}
+
+export function settingsRoleCanUseOwnerEndpoint(role: string | null | undefined): boolean {
+  return role === 'Admin' || role === 'Engineer';
+}
+
+export function settingsOwnerForPanel(owner: SettingsOwner | null): SettingsOwner {
+  if (!owner) throw new Error('Settings panel requires the mounted Settings owner.');
+  return owner;
+}
+
+export function formatSettingsBytes(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return '未提供';
+  if (value < 1024) return `${value} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let amount = value;
+  let unit = 'B';
+  for (const nextUnit of units) {
+    amount /= 1024;
+    unit = nextUnit;
+    if (amount < 1024) break;
+  }
+  return `${amount.toFixed(2)} ${unit}`;
 }

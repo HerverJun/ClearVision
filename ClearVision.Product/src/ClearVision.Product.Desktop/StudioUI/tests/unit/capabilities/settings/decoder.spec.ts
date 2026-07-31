@@ -202,5 +202,60 @@ describe('F07 G1 Settings public decoders', () => {
     }, '$.error', 'forbidden');
     expect(error).toMatchObject({ code: 'forbidden', policy: 'RequireAdmin' });
     expect(() => decodeSettingsErrorPayloadV1({ error: 'forbidden', token: 'raw' })).toThrow(SettingsContractDecodeError);
+    expect(() => decodeSettingsErrorPayloadV1({ error: 'failed', backupPath: 'C:/private/backup.cvdbbak' }))
+      .toThrow(SettingsContractDecodeError);
+  });
+
+  it('drops database paths while keeping status and backup result metadata', async () => {
+    const { decodeSettingsDatabaseBackupProjectionV1, decodeSettingsDatabaseStatusProjectionV1 } = await import('@/capabilities/settings');
+    const status = decodeSettingsDatabaseStatusProjectionV1({
+      databasePath: 'C:/private/vision.db',
+      exists: true,
+      state: 'Healthy',
+      schemaVersion: 6,
+      currentSchemaVersion: 6,
+      appliedMigrations: ['001'],
+      pendingMigrations: [],
+      missingSchemaItems: [],
+      integrityCheck: 'ok',
+      foreignKeyViolationCount: 0,
+      rowCounts: { projects: 2 },
+      issues: [],
+      databaseSizeBytes: 1024,
+      walSizeBytes: 0,
+      backupRootDirectory: 'C:/private/backups',
+      packageRootDirectory: 'C:/private/packages',
+      packageFileCount: 2
+    });
+    expect(status).not.toHaveProperty('databasePath');
+    expect(status).toMatchObject({ state: 'Healthy', schemaVersion: 6, rowCounts: { projects: 2 } });
+
+    const backup = decodeSettingsDatabaseBackupProjectionV1({
+      backupPath: 'C:/private/backups/manual.cvdbbak',
+      createdAtUtc: '2026-08-01T00:00:00Z',
+      sizeBytes: 2048,
+      databaseSizeBytes: 1024,
+      packageFileCount: 2,
+      packageBytes: 256
+    });
+    expect(backup).not.toHaveProperty('backupPath');
+    expect(backup).toMatchObject({ sizeBytes: 2048, packageFileCount: 2 });
+  });
+
+  it('decodes user projections without accepting password fields', async () => {
+    const { decodeSettingsUsersProjectionV1 } = await import('@/capabilities/settings');
+    const decoded = decodeSettingsUsersProjectionV1([{
+      id: 'user-1',
+      username: 'engineer',
+      displayName: 'Engineer',
+      role: 1,
+      isActive: true,
+      lastLoginAt: null
+    }]);
+    expect(decoded.items[0]).toMatchObject({ id: 'user-1', role: 'Engineer' });
+    expect(() => decodeSettingsUsersProjectionV1([{
+      id: 'user-1', username: 'engineer', displayName: 'Engineer', role: 1, isActive: true,
+      lastLoginAt: null, passwordHash: 'raw'
+    }])).toThrow(SettingsContractDecodeError);
   });
 });

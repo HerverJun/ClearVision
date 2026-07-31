@@ -69,6 +69,14 @@ describe('F07 G1 Settings contract matrix', () => {
       .toMatchObject({ allowed: false, reason: 'excluded-endpoint' });
     expect(evaluateSettingsEndpointAccess('plc.test-connection', 'plc', 'Operator'))
       .toMatchObject({ allowed: false, reason: 'engineer-or-admin-required' });
+    expect(evaluateSettingsEndpointAccess('auth.change-password', 'security', 'Engineer'))
+      .toMatchObject({ allowed: true, endpoint: { serverPermission: 'authenticated' } });
+    expect(evaluateSettingsEndpointAccess('auth.change-password', 'security', 'Operator'))
+      .toMatchObject({ allowed: false, reason: 'engineer-or-admin-required' });
+    expect(evaluateSettingsEndpointAccess('users.read', 'security', 'Engineer'))
+      .toMatchObject({ allowed: false, reason: 'admin-required' });
+    expect(evaluateSettingsEndpointAccess('users.read', 'security', 'Admin'))
+      .toMatchObject({ allowed: true });
   });
 
   it('builds a scoped generic payload without copying unrelated authority sections', () => {

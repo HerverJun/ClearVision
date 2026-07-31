@@ -20,13 +20,27 @@ import {
   type SettingsEndpointTask,
   type SettingsWriteResult,
 } from './contracts';
-import { createSettingsApiAdapter, type SettingsApiAdapter } from './apiAdapter';
+import {
+  createSettingsApiAdapter,
+  type SettingsApiAdapter,
+  type SettingsChangePasswordRequest,
+  type SettingsCreateUserRequest,
+  type SettingsUpdateUserRequest
+} from './apiAdapter';
 import {
   decodeSettingsErrorPayloadV1,
   settingsErrorCodeFromHttpStatus,
+  type SettingsAccountOperationResponseV1,
+  type SettingsDatabaseBackupProjectionV1,
+  type SettingsDatabaseStatusProjectionV1,
+  type SettingsDiskUsageProjectionV1,
   type SettingsErrorProjectionV1,
-  type SettingsProjectionV1
+  type SettingsProjectionV1,
+  type SettingsUserProjectionV1,
+  type SettingsUsersProjectionV1,
+  type SettingsWriteResponseV1
 } from './decoder';
+import type { GenericSettingsSection } from './contracts';
 import { createSettingsWriteCoordinator, type SettingsWriteCoordinator } from './settingsWriteCoordinator';
 
 export type SettingsOwnerPhase = 'idle' | 'loading' | 'ready' | 'forbidden' | 'stale' | 'error' | 'disposed';
@@ -60,6 +74,27 @@ export interface SettingsOwner {
     endpointId: string,
     task: SettingsEndpointTask<T>
   ): Promise<SettingsWriteResult<T>>;
+  saveGenericSection(
+    section: GenericSettingsSection,
+    value: Readonly<Record<string, unknown>>
+  ): Promise<SettingsWriteResult<SettingsWriteResponseV1>>;
+  readDiskUsage(path?: string): Promise<SettingsWriteResult<SettingsDiskUsageProjectionV1>>;
+  readDatabaseStatus(): Promise<SettingsWriteResult<SettingsDatabaseStatusProjectionV1>>;
+  backupDatabase(): Promise<SettingsWriteResult<SettingsDatabaseBackupProjectionV1>>;
+  changePassword(
+    request: SettingsChangePasswordRequest
+  ): Promise<SettingsWriteResult<SettingsAccountOperationResponseV1>>;
+  readUsers(): Promise<SettingsWriteResult<SettingsUsersProjectionV1>>;
+  createUser(request: SettingsCreateUserRequest): Promise<SettingsWriteResult<SettingsUserProjectionV1>>;
+  updateUser(
+    id: string,
+    request: SettingsUpdateUserRequest
+  ): Promise<SettingsWriteResult<SettingsUserProjectionV1>>;
+  deleteUser(id: string): Promise<SettingsWriteResult<void>>;
+  resetUserPassword(
+    id: string,
+    newPassword: string
+  ): Promise<SettingsWriteResult<SettingsAccountOperationResponseV1>>;
   diagnostics(): SettingsOwnerDiagnostics;
   dispose(reason?: string): void;
 }
@@ -147,6 +182,21 @@ function errorProjection(error: unknown): SettingsErrorProjectionV1 {
   });
 }
 
+export function projectSettingsError(error: unknown): SettingsErrorProjectionV1 {
+  return errorProjection(error);
+}
+
+export function projectSettingsOperationFailure(error: unknown): SettingsErrorProjectionV1 {
+  const projection = errorProjection(error);
+  if (projection.code !== 'network' && projection.code !== 'abort') return projection;
+  return Object.freeze({
+    code: 'unknown-outcome',
+    publicMessage: '操作结果未知；请先重新读取服务端状态，再决定是否重试。',
+    policy: null,
+    issues: Object.freeze([])
+  });
+}
+
 function isAbort(error: unknown): boolean {
   return error instanceof ApiAbortError ||
     (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError');
@@ -227,6 +277,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       }
 
       const operationGeneration = ++generation;
+      writes.invalidate('settings-refresh');
       const controller = new AbortController();
       readController?.abort('settings-read-superseded');
       readController = controller;
@@ -287,6 +338,96 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         ...context,
         endpoint: access.endpoint!
       })));
+    },
+    async saveGenericSection(
+      section: GenericSettingsSection,
+      value: Readonly<Record<string, unknown>>
+    ): Promise<SettingsWriteResult<SettingsWriteResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        section,
+        'settings.write',
+        context => adapter.writeGenericSection(section, value, context.signal)
+      );
+      if (result.status === 'completed' && !disposed) {
+        state.settings = result.value.config;
+        state.phase = 'ready';
+        state.error = null;
+        state.message = 'Settings section 已保存；服务端投影已更新，运行时重载要求由后端决定。';
+      }
+      return result;
+    },
+    readDiskUsage(path?: string): Promise<SettingsWriteResult<SettingsDiskUsageProjectionV1>> {
+      return owner.enqueueEndpointOperation(
+        'storage',
+        'settings.disk-usage.read',
+        context => adapter.readDiskUsage(path, context.signal)
+      );
+    },
+    readDatabaseStatus(): Promise<SettingsWriteResult<SettingsDatabaseStatusProjectionV1>> {
+      return owner.enqueueEndpointOperation(
+        'database',
+        'settings.database.status.read',
+        context => adapter.readDatabaseStatus(context.signal)
+      );
+    },
+    backupDatabase(): Promise<SettingsWriteResult<SettingsDatabaseBackupProjectionV1>> {
+      return owner.enqueueEndpointOperation(
+        'database',
+        'settings.database.backup',
+        context => adapter.backupDatabase(context.signal)
+      );
+    },
+    changePassword(
+      request: SettingsChangePasswordRequest
+    ): Promise<SettingsWriteResult<SettingsAccountOperationResponseV1>> {
+      return owner.enqueueEndpointOperation(
+        'security',
+        'auth.change-password',
+        context => adapter.changePassword(request, context.signal)
+      );
+    },
+    readUsers(): Promise<SettingsWriteResult<SettingsUsersProjectionV1>> {
+      return owner.enqueueEndpointOperation(
+        'security',
+        'users.read',
+        context => adapter.readUsers(context.signal)
+      );
+    },
+    createUser(
+      request: SettingsCreateUserRequest
+    ): Promise<SettingsWriteResult<SettingsUserProjectionV1>> {
+      return owner.enqueueEndpointOperation(
+        'security',
+        'users.create',
+        context => adapter.createUser(request, context.signal)
+      );
+    },
+    updateUser(
+      id: string,
+      request: SettingsUpdateUserRequest
+    ): Promise<SettingsWriteResult<SettingsUserProjectionV1>> {
+      return owner.enqueueEndpointOperation(
+        'security',
+        'users.update',
+        context => adapter.updateUser(id, request, context.signal)
+      );
+    },
+    deleteUser(id: string): Promise<SettingsWriteResult<void>> {
+      return owner.enqueueEndpointOperation(
+        'security',
+        'users.delete',
+        context => adapter.deleteUser(id, context.signal)
+      );
+    },
+    resetUserPassword(
+      id: string,
+      newPassword: string
+    ): Promise<SettingsWriteResult<SettingsAccountOperationResponseV1>> {
+      return owner.enqueueEndpointOperation(
+        'security',
+        'users.reset-password',
+        context => adapter.resetUserPassword(id, newPassword, context.signal)
+      );
     },
     diagnostics(): SettingsOwnerDiagnostics {
       const write = writes.diagnostics();

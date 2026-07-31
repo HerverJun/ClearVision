@@ -58,6 +58,63 @@ export interface SettingsThemeWriteResponseV1 {
   readonly semantics: SettingsOperationSemantics;
 }
 
+export interface SettingsDiskUsageProjectionV1 {
+  readonly driveName: string;
+  readonly sourcePath: string;
+  readonly isAccessible: boolean;
+  readonly canWrite: boolean;
+  readonly totalBytes: number;
+  readonly usedBytes: number;
+  readonly freeBytes: number;
+  readonly totalGb: number;
+  readonly usedGb: number;
+  readonly freeGb: number;
+  readonly usedPercent: number;
+}
+
+export interface SettingsDatabaseStatusProjectionV1 {
+  readonly exists: boolean;
+  readonly state: string;
+  readonly schemaVersion: number;
+  readonly currentSchemaVersion: number;
+  readonly appliedMigrations: readonly string[];
+  readonly pendingMigrations: readonly string[];
+  readonly missingSchemaItems: readonly string[];
+  readonly integrityCheck: string;
+  readonly foreignKeyViolationCount: number;
+  readonly rowCounts: Readonly<Record<string, number>>;
+  readonly issues: readonly string[];
+  readonly databaseSizeBytes: number;
+  readonly walSizeBytes: number;
+  readonly packageFileCount: number;
+}
+
+export interface SettingsDatabaseBackupProjectionV1 {
+  readonly createdAtUtc: string;
+  readonly sizeBytes: number;
+  readonly databaseSizeBytes: number;
+  readonly packageFileCount: number;
+  readonly packageBytes: number;
+}
+
+export interface SettingsUserProjectionV1 {
+  readonly id: string;
+  readonly username: string;
+  readonly displayName: string;
+  readonly role: 'Admin' | 'Engineer' | 'Operator';
+  readonly isActive: boolean;
+  readonly lastLoginAt: string | null;
+}
+
+export interface SettingsUsersProjectionV1 {
+  readonly items: readonly SettingsUserProjectionV1[];
+}
+
+export interface SettingsAccountOperationResponseV1 {
+  readonly message: string;
+  readonly semantics: SettingsOperationSemantics;
+}
+
 export interface SettingsValidationIssueV1 {
   readonly field: string;
   readonly message: string;
@@ -148,7 +205,7 @@ const genericTopLevelKeys = [
   'communication', 'tcpCommunication', 'features', 'cameras', 'activeCameraId'
 ] as const;
 const genericAuthorityKeys = new Set(['communication', 'tcpcommunication', 'features', 'cameras', 'activecameraid']);
-const sensitiveKeyPattern = /^(?:api[-_]?key|authorization|password|private[-_]?key|secret|token)$/i;
+const sensitiveKeyPattern = /^(?:api[-_]?key|authorization|(?:old|new|reset)?password(?:hash)?|private[-_]?key|secret|token|backup[-_]?path)$/i;
 const redactedValue = '<redacted>';
 
 function record(value: unknown, path: string): JsonRecord {
@@ -344,6 +401,141 @@ export function decodeSettingsThemeWriteResponseV1(value: unknown, path = '$'): 
     semantics: Object.freeze({
       persistence: 'persisted', effective: 'immediate-projection', restart: 'unknown',
       conflict: 'backend-contract-gap', unknownOutcome: 'reload-before-retry'
+    } satisfies SettingsOperationSemantics)
+  });
+}
+
+export function decodeSettingsDiskUsageProjectionV1(
+  value: unknown,
+  path = '$'
+): SettingsDiskUsageProjectionV1 {
+  const source = record(value, path);
+  exact(source, [
+    'driveName', 'sourcePath', 'isAccessible', 'canWrite', 'totalBytes', 'usedBytes', 'freeBytes',
+    'totalGb', 'usedGb', 'freeGb', 'usedPercent'
+  ], path);
+  return Object.freeze({
+    driveName: stringValue(valueOf(source, 'driveName', path), `${path}.driveName`),
+    sourcePath: stringValue(valueOf(source, 'sourcePath', path), `${path}.sourcePath`),
+    isAccessible: booleanValue(valueOf(source, 'isAccessible', path), `${path}.isAccessible`),
+    canWrite: booleanValue(valueOf(source, 'canWrite', path), `${path}.canWrite`),
+    totalBytes: integerValue(valueOf(source, 'totalBytes', path), `${path}.totalBytes`),
+    usedBytes: integerValue(valueOf(source, 'usedBytes', path), `${path}.usedBytes`),
+    freeBytes: integerValue(valueOf(source, 'freeBytes', path), `${path}.freeBytes`),
+    totalGb: finiteNumber(valueOf(source, 'totalGb', path), `${path}.totalGb`),
+    usedGb: finiteNumber(valueOf(source, 'usedGb', path), `${path}.usedGb`),
+    freeGb: finiteNumber(valueOf(source, 'freeGb', path), `${path}.freeGb`),
+    usedPercent: finiteNumber(valueOf(source, 'usedPercent', path), `${path}.usedPercent`)
+  });
+}
+
+function decodeStringNumberRecord(value: unknown, path: string): Readonly<Record<string, number>> {
+  const source = record(value, path);
+  const result: Record<string, number> = {};
+  for (const [key, item] of Object.entries(source)) {
+    result[key] = integerValue(item, `${path}.${key}`);
+  }
+  return Object.freeze(result);
+}
+
+export function decodeSettingsDatabaseStatusProjectionV1(
+  value: unknown,
+  path = '$'
+): SettingsDatabaseStatusProjectionV1 {
+  const source = record(value, path);
+  // Paths are validated for contract shape but intentionally omitted from the public projection.
+  exact(source, [
+    'databasePath', 'exists', 'state', 'schemaVersion', 'currentSchemaVersion', 'appliedMigrations',
+    'pendingMigrations', 'missingSchemaItems', 'integrityCheck', 'foreignKeyViolationCount', 'rowCounts',
+    'issues', 'databaseSizeBytes', 'walSizeBytes', 'backupRootDirectory', 'packageRootDirectory', 'packageFileCount'
+  ], path);
+  stringValue(valueOf(source, 'databasePath', path), `${path}.databasePath`, true);
+  stringValue(valueOf(source, 'backupRootDirectory', path), `${path}.backupRootDirectory`, true);
+  stringValue(valueOf(source, 'packageRootDirectory', path), `${path}.packageRootDirectory`, true);
+  return Object.freeze({
+    exists: booleanValue(valueOf(source, 'exists', path), `${path}.exists`),
+    state: stringValue(valueOf(source, 'state', path), `${path}.state`),
+    schemaVersion: integerValue(valueOf(source, 'schemaVersion', path), `${path}.schemaVersion`),
+    currentSchemaVersion: integerValue(valueOf(source, 'currentSchemaVersion', path), `${path}.currentSchemaVersion`),
+    appliedMigrations: stringArray(valueOf(source, 'appliedMigrations', path), `${path}.appliedMigrations`),
+    pendingMigrations: stringArray(valueOf(source, 'pendingMigrations', path), `${path}.pendingMigrations`),
+    missingSchemaItems: stringArray(valueOf(source, 'missingSchemaItems', path), `${path}.missingSchemaItems`),
+    integrityCheck: stringValue(valueOf(source, 'integrityCheck', path), `${path}.integrityCheck`, true),
+    foreignKeyViolationCount: integerValue(
+      valueOf(source, 'foreignKeyViolationCount', path), `${path}.foreignKeyViolationCount`
+    ),
+    rowCounts: decodeStringNumberRecord(valueOf(source, 'rowCounts', path), `${path}.rowCounts`),
+    issues: stringArray(valueOf(source, 'issues', path), `${path}.issues`,),
+    databaseSizeBytes: integerValue(valueOf(source, 'databaseSizeBytes', path), `${path}.databaseSizeBytes`),
+    walSizeBytes: integerValue(valueOf(source, 'walSizeBytes', path), `${path}.walSizeBytes`),
+    packageFileCount: integerValue(valueOf(source, 'packageFileCount', path), `${path}.packageFileCount`)
+  });
+}
+
+export function decodeSettingsDatabaseBackupProjectionV1(
+  value: unknown,
+  path = '$'
+): SettingsDatabaseBackupProjectionV1 {
+  const source = record(value, path);
+  exact(source, ['backupPath', 'createdAtUtc', 'sizeBytes', 'databaseSizeBytes', 'packageFileCount', 'packageBytes'], path);
+  stringValue(valueOf(source, 'backupPath', path), `${path}.backupPath`, true);
+  return Object.freeze({
+    createdAtUtc: stringValue(valueOf(source, 'createdAtUtc', path), `${path}.createdAtUtc`),
+    sizeBytes: integerValue(valueOf(source, 'sizeBytes', path), `${path}.sizeBytes`),
+    databaseSizeBytes: integerValue(valueOf(source, 'databaseSizeBytes', path), `${path}.databaseSizeBytes`),
+    packageFileCount: integerValue(valueOf(source, 'packageFileCount', path), `${path}.packageFileCount`),
+    packageBytes: integerValue(valueOf(source, 'packageBytes', path), `${path}.packageBytes`)
+  });
+}
+
+function decodeUserRole(value: unknown, path: string): SettingsUserProjectionV1['role'] {
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    if (value === 0) return 'Admin';
+    if (value === 1) return 'Engineer';
+    if (value === 2) return 'Operator';
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'admin') return 'Admin';
+    if (normalized === 'engineer') return 'Engineer';
+    if (normalized === 'operator') return 'Operator';
+  }
+  throw new SettingsContractDecodeError(path, 'Admin, Engineer or Operator');
+}
+
+export function decodeSettingsUserProjectionV1(value: unknown, path = '$'): SettingsUserProjectionV1 {
+  const source = record(value, path);
+  exact(source, ['id', 'username', 'displayName', 'role', 'isActive', 'lastLoginAt'], path);
+  return Object.freeze({
+    id: stringValue(valueOf(source, 'id', path), `${path}.id`),
+    username: stringValue(valueOf(source, 'username', path), `${path}.username`),
+    displayName: stringValue(valueOf(source, 'displayName', path), `${path}.displayName`),
+    role: decodeUserRole(valueOf(source, 'role', path), `${path}.role`),
+    isActive: booleanValue(valueOf(source, 'isActive', path), `${path}.isActive`),
+    lastLoginAt: optionalValueOf(source, 'lastLoginAt') === undefined
+      ? null
+      : nullableString(optionalValueOf(source, 'lastLoginAt'), `${path}.lastLoginAt`)
+  });
+}
+
+export function decodeSettingsUsersProjectionV1(value: unknown, path = '$'): SettingsUsersProjectionV1 {
+  if (!Array.isArray(value)) throw new SettingsContractDecodeError(path, 'an array of user projections');
+  return Object.freeze({
+    items: Object.freeze(value.map((item, index) => decodeSettingsUserProjectionV1(item, `${path}[${index}]`)))
+  });
+}
+
+export function decodeSettingsAccountOperationResponseV1(
+  value: unknown,
+  path = '$'
+): SettingsAccountOperationResponseV1 {
+  const source = record(value, path);
+  exact(source, ['message'], path);
+  return Object.freeze({
+    message: stringValue(valueOf(source, 'message', path), `${path}.message`, true),
+    semantics: Object.freeze({
+      persistence: 'persisted', effective: 'reload-dependent', restart: 'none', conflict: 'none',
+      unknownOutcome: 'stop-and-report'
     } satisfies SettingsOperationSemantics)
   });
 }

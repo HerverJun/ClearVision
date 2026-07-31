@@ -28,7 +28,12 @@ export type SettingsEndpointMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 export type SettingsEndpointKind = 'read' | 'write' | 'test' | 'runtime-operation';
 export type SettingsEndpointSection = SettingsSection | 'generic';
 export type SettingsServerPermission = 'authenticated' | 'engineer-or-admin' | 'admin';
-export type SettingsUiPermission = 'settings-route' | 'engineer-or-admin' | 'admin' | 'excluded';
+export type SettingsUiPermission =
+  | 'settings-route'
+  | 'settings-authenticated'
+  | 'engineer-or-admin'
+  | 'admin'
+  | 'excluded';
 
 export type SettingsPersistenceSemantics =
   | 'projection-only'
@@ -209,6 +214,13 @@ export const SETTINGS_SEMANTICS = Object.freeze({
     restart: 'none',
     conflict: 'none',
     unknownOutcome: 'stop-and-report'
+  } satisfies SettingsOperationSemantics),
+  accountOperation: Object.freeze({
+    persistence: 'persisted',
+    effective: 'reload-dependent',
+    restart: 'none',
+    conflict: 'none',
+    unknownOutcome: 'stop-and-report'
   } satisfies SettingsOperationSemantics)
 } as const);
 
@@ -272,6 +284,34 @@ export const SETTINGS_ENDPOINT_MATRIX: readonly SettingsEndpointContract[] = Obj
   endpoint({
     id: 'settings.database.backup', section: 'database', method: 'POST', path: 'settings/database/backup',
     kind: 'runtime-operation', serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.databaseMaintenance
+  }),
+  endpoint({
+    id: 'auth.change-password', section: 'security', method: 'POST', path: 'auth/change-password', kind: 'write',
+    serverPermission: 'authenticated', uiPermission: 'settings-authenticated', semantics: SETTINGS_SEMANTICS.accountOperation,
+    sensitiveFields: ['oldPassword', 'newPassword']
+  }),
+  endpoint({
+    id: 'users.read', section: 'security', method: 'GET', path: 'users', kind: 'read',
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.accountOperation,
+    sensitiveFields: ['password', 'passwordHash']
+  }),
+  endpoint({
+    id: 'users.create', section: 'security', method: 'POST', path: 'users', kind: 'write',
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.accountOperation,
+    sensitiveFields: ['password']
+  }),
+  endpoint({
+    id: 'users.update', section: 'security', method: 'PUT', path: 'users/{id}', kind: 'write',
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.accountOperation
+  }),
+  endpoint({
+    id: 'users.delete', section: 'security', method: 'DELETE', path: 'users/{id}', kind: 'write',
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.accountOperation
+  }),
+  endpoint({
+    id: 'users.reset-password', section: 'security', method: 'POST', path: 'users/{id}/reset-password', kind: 'write',
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.accountOperation,
+    sensitiveFields: ['newPassword']
   }),
   endpoint({
     id: 'plc.settings.read', section: 'plc', method: 'GET', path: 'plc/settings', kind: 'read',
@@ -402,7 +442,10 @@ export const SETTINGS_SECTION_CONTRACTS: readonly SettingsSectionContract[] = Ob
   }),
   section({
     section: 'security', authority: 'app-config', genericScope: 'security', routePermission: 'settings-route',
-    readPermission: 'authenticated', writePermission: 'admin', endpointIds: ['settings.read', 'settings.write'],
+    readPermission: 'authenticated', writePermission: 'admin', endpointIds: [
+      'settings.read', 'settings.write', 'auth.change-password', 'users.read', 'users.create', 'users.update',
+      'users.delete', 'users.reset-password'
+    ],
     sensitiveFields: genericSensitiveFields, semantics: SETTINGS_SEMANTICS.genericWrite
   }),
   section({
@@ -485,6 +528,16 @@ export function evaluateSettingsEndpointAccess(
       });
     case 'settings-route':
       return Object.freeze({ allowed: false, endpointId, role, endpoint, reason: 'route-only' });
+    case 'settings-authenticated':
+      return Object.freeze({
+        allowed: normalizedRole === 'Admin' || normalizedRole === 'Engineer',
+        endpointId,
+        role,
+        endpoint,
+        reason: normalizedRole === 'Admin' || normalizedRole === 'Engineer'
+          ? 'allowed'
+          : 'engineer-or-admin-required'
+      });
     case 'excluded':
       return Object.freeze({ allowed: false, endpointId, role, endpoint, reason: 'excluded-endpoint' });
   }

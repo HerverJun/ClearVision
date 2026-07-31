@@ -10,6 +10,7 @@ import {
 } from '@/design-system';
 import type { GenericSettingsSection, SettingsSection } from './contracts';
 import type { SettingsProjectionV1 } from './decoder';
+import type { SettingsOwner } from './settingsOwner';
 import {
   isGenericSettingsSection,
   settingsAuthorityLabel,
@@ -21,10 +22,17 @@ import {
   type SettingsNavigationTarget,
   type SettingsSectionReadState
 } from './settingsViewModel';
+import SettingsDatabasePanel from './SettingsDatabasePanel.vue';
+import SettingsGeneralPanel from './SettingsGeneralPanel.vue';
+import SettingsRuntimePanel from './SettingsRuntimePanel.vue';
+import SettingsSecurityPanel from './SettingsSecurityPanel.vue';
+import SettingsStoragePanel from './SettingsStoragePanel.vue';
 
 const props = defineProps<{
   projection: SettingsProjectionV1;
   activeGroup: SettingsNavigationTarget;
+  owner: SettingsOwner;
+  role: string | null;
 }>();
 
 const activeItem = computed(() => settingsNavigationItem(props.activeGroup));
@@ -175,7 +183,41 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
       </CvPanel>
     </template>
 
-    <template v-else-if="isGenericSection(activeGroup)">
+    <SettingsGeneralPanel
+      v-else-if="activeGroup === 'general'"
+      :projection="projection.sections.general"
+      :owner="owner"
+      :can-write="role === 'Admin'"
+    />
+
+    <SettingsStoragePanel
+      v-else-if="activeGroup === 'storage' && projection.sections.storage"
+      :projection="projection.sections.storage"
+      :owner="owner"
+      :can-write="role === 'Admin'"
+    />
+
+    <SettingsRuntimePanel
+      v-else-if="activeGroup === 'runtime' && projection.sections.runtime"
+      :projection="projection.sections.runtime"
+      :owner="owner"
+      :can-write="role === 'Admin'"
+    />
+
+    <SettingsSecurityPanel
+      v-else-if="activeGroup === 'security'"
+      :projection="projection.sections.security"
+      :owner="owner"
+      :role="role"
+    />
+
+    <SettingsDatabasePanel
+      v-else-if="activeGroup === 'database'"
+      :owner="owner"
+      :role="role"
+    />
+
+    <template v-else-if="isGenericSection(activeGroup) && !activeGenericProjection">
       <CvPanel
         :title="activeItem.label"
         :description="activeItem.description"

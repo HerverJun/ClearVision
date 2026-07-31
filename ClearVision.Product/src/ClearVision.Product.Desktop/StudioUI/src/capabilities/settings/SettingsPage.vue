@@ -34,6 +34,10 @@ const sessionPhase = computed(() => sessionProjection.value.phase);
 const activeGroup = shallowRef<SettingsNavigationTarget>('overview');
 const owner = shallowRef<SettingsOwner | null>(null);
 const ownerProjection = computed<Readonly<SettingsOwnerProjection> | null>(() => owner.value?.projection ?? null);
+const mountedOwner = computed<SettingsOwner>(() => {
+  if (!owner.value) throw new Error('Settings content cannot render without a mounted owner.');
+  return owner.value;
+});
 const phase = computed<SettingsOwnerPhase>(() => ownerProjection.value?.phase ?? 'loading');
 const settings = computed(() => ownerProjection.value?.settings ?? null);
 const error = computed(() => ownerProjection.value?.error ?? null);
@@ -173,6 +177,8 @@ onBeforeUnmount(() => {
         <SettingsOverview
           :projection="readOnlyProjection()"
           :active-group="activeGroup"
+          :owner="mountedOwner"
+          :role="role"
         />
       </div>
     </div>

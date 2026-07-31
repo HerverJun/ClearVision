@@ -86,7 +86,29 @@ function unauthorizedError(): ApiUnauthorizedError {
   });
 }
 
-describe('F07 G2 Settings shell', () => {
+function databaseStatusPayload(): Record<string, unknown> {
+  return {
+    databasePath: 'C:/private/vision.db',
+    exists: true,
+    state: 'Healthy',
+    schemaVersion: 6,
+    currentSchemaVersion: 6,
+    appliedMigrations: ['001'],
+    pendingMigrations: [],
+    missingSchemaItems: [],
+    integrityCheck: 'ok',
+    foreignKeyViolationCount: 0,
+    rowCounts: { projects: 2 },
+    issues: [],
+    databaseSizeBytes: 1024,
+    walSizeBytes: 0,
+    backupRootDirectory: 'C:/private/backups',
+    packageRootDirectory: 'C:/private/packages',
+    packageFileCount: 2
+  };
+}
+
+describe('F07 G2/G3 Settings shell and scoped sections', () => {
   it('renders an Admin full projection through ProductRuntime.api and exposes group navigation', async () => {
     const requestedPaths: string[] = [];
     const { runtime } = createRuntime(async path => {
@@ -102,8 +124,9 @@ describe('F07 G2 Settings shell', () => {
     expect(wrapper.text()).toContain('ClearVision');
     expect(wrapper.find('[data-settings-navigation]').exists()).toBe(true);
     await wrapper.get('[data-settings-group="storage"]').trigger('click');
-    expect(wrapper.text()).toContain('D:/VisionData');
-    expect(wrapper.text()).not.toContain('保存设置');
+    expect((wrapper.get('input[name="imageSavePath"]').element as HTMLInputElement).value)
+      .toBe('D:/VisionData');
+    expect(wrapper.text()).toContain('保存存储设置');
 
     wrapper.unmount();
     expect(getSettingsOwnerActiveCount()).toBe(0);
@@ -212,5 +235,62 @@ describe('F07 G2 Settings shell', () => {
     wrapper.unmount();
     resolveRequest(settingsPayload(true));
     await flushPromises();
+  });
+
+  it('clears Admin-only database status when the role changes to Engineer', async () => {
+    const requestedPaths: string[] = [];
+    const { runtime, session } = createRuntime(async path => {
+      requestedPaths.push(path);
+      if (path === 'settings/database/status') return databaseStatusPayload();
+      return path === 'settings' ? settingsPayload() : settingsPayload(true);
+    }, 'Admin');
+    const wrapper = mountSettingsPage(runtime);
+    await flushPromises();
+
+    await wrapper.get('[data-settings-group="database"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('Healthy');
+    expect(requestedPaths.filter(path => path === 'settings/database/status')).toHaveLength(1);
+
+    session.user.role = 'Engineer';
+    await nextTick();
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('Healthy');
+    expect(requestedPaths.filter(path => path === 'settings/database/status')).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it('clears Admin-only user data when the role changes to Engineer', async () => {
+    const requestedPaths: string[] = [];
+    const { runtime, session } = createRuntime(async path => {
+      requestedPaths.push(path);
+      if (path === 'users') {
+        return [{
+          id: 'user-1',
+          username: 'admin-user',
+          displayName: 'Admin User',
+          role: 0,
+          isActive: true,
+          lastLoginAt: null
+        }];
+      }
+      return path === 'settings' ? settingsPayload() : settingsPayload(true);
+    }, 'Admin');
+    const wrapper = mountSettingsPage(runtime);
+    await flushPromises();
+
+    await wrapper.get('[data-settings-group="security"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('admin-user');
+    expect(requestedPaths.filter(path => path === 'users')).toHaveLength(1);
+
+    session.user.role = 'Engineer';
+    await nextTick();
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('admin-user');
+    expect(requestedPaths.filter(path => path === 'users')).toHaveLength(1);
+    wrapper.unmount();
   });
 });
