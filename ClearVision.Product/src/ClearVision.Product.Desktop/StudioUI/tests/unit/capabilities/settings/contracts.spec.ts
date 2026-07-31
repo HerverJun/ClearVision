@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildGenericSectionWritePayload,
+  evaluateSettingsEndpointAccess,
   evaluateSettingsRouteAccess,
   findSettingsEndpoint,
   findSettingsSection,
@@ -45,6 +46,29 @@ describe('F07 G1 Settings contract matrix', () => {
     expect(SETTINGS_EXCLUDED_ENDPOINTS).toEqual(expect.arrayContaining([
       'settings/import', 'settings/export', 'settings/database/restore', 'settings/runtime-preview-pilot/**'
     ]));
+  });
+
+  it('requires a concrete endpoint contract and applies its UI permission', () => {
+    expect(evaluateSettingsEndpointAccess('plc.test-connection', 'plc', 'Engineer'))
+      .toMatchObject({ allowed: true, reason: 'allowed', endpoint: { id: 'plc.test-connection' } });
+    expect(evaluateSettingsEndpointAccess('tcp.runtime', 'tcp', 'Engineer'))
+      .toMatchObject({ allowed: true, reason: 'allowed' });
+    expect(evaluateSettingsEndpointAccess('camera.trigger-and-preview', 'camera', 'Engineer'))
+      .toMatchObject({ allowed: true, reason: 'allowed' });
+    expect(evaluateSettingsEndpointAccess('plc.settings.write', 'plc', 'Engineer'))
+      .toMatchObject({ allowed: false, reason: 'admin-required' });
+    expect(evaluateSettingsEndpointAccess('ai.reasoning-support', 'ai-model', 'Engineer'))
+      .toMatchObject({ allowed: false, reason: 'route-only' });
+    expect(evaluateSettingsEndpointAccess('settings.write', 'storage', 'Admin'))
+      .toMatchObject({ allowed: true, reason: 'allowed' });
+    expect(evaluateSettingsEndpointAccess('plc.settings.write', 'tcp', 'Admin'))
+      .toMatchObject({ allowed: false, reason: 'section-mismatch' });
+    expect(evaluateSettingsEndpointAccess('unknown.endpoint', 'plc', 'Admin'))
+      .toMatchObject({ allowed: false, reason: 'unknown-endpoint' });
+    expect(evaluateSettingsEndpointAccess('settings/import', 'general', 'Admin'))
+      .toMatchObject({ allowed: false, reason: 'excluded-endpoint' });
+    expect(evaluateSettingsEndpointAccess('plc.test-connection', 'plc', 'Operator'))
+      .toMatchObject({ allowed: false, reason: 'engineer-or-admin-required' });
   });
 
   it('builds a scoped generic payload without copying unrelated authority sections', () => {

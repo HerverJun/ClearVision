@@ -51,7 +51,8 @@ public static class SettingsEndpoints
             }
 
             return Results.Ok(ToSafeSettingsResponse(config));
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAuthenticated);
 
         // 更新配置
         app.MapPut("/api/settings", async (JsonElement request, IConfigurationService configService, HttpContext context) =>
@@ -281,7 +282,8 @@ public static class SettingsEndpoints
                 ? models.Select(ToAiModelResponse)
                 : models.Select(ToSafeAiModelResponse);
             return Results.Ok(result);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAuthenticated);
 
         app.MapPost("/api/ai/reasoning-support", (AiReasoningSupportRequest request) =>
         {
@@ -291,7 +293,8 @@ public static class SettingsEndpoints
                 request.BaseUrl,
                 request.Protocol);
             return Results.Ok(support);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAuthenticated);
 
         // 创建新模型
         app.MapPost("/api/ai/models", (AiModelCreateRequest request, AiConfigStore configStore, HttpContext context) =>

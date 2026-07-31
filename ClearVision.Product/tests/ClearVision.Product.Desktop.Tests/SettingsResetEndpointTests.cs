@@ -61,6 +61,36 @@ public class SettingsResetEndpointTests
     }
 
     [Fact]
+    public async Task GetSettings_ForEngineer_ShouldReturnOnlySafeUiSubset()
+    {
+        await using var host = await SettingsResetTestHost.CreateAsync(role: "Engineer", initialConfig: CreateSensitiveConfig());
+
+        using var response = await host.Client.GetAsync("/api/settings");
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, responseJson);
+        responseJson.Should().Contain("safeSubset");
+        responseJson.Should().Contain("general");
+        responseJson.Should().NotContain("communication");
+        responseJson.Should().NotContain("storage");
+        responseJson.Should().NotContain("192.168.10.8");
+        responseJson.Should().NotContain("CAM-SECRET-001");
+    }
+
+    [Fact]
+    public async Task GetSettings_WithoutAuthenticatedSession_ShouldRejectBeforeProjection()
+    {
+        await using var host = await SettingsResetTestHost.CreateAsync(role: null, initialConfig: CreateSensitiveConfig());
+
+        using var response = await host.Client.GetAsync("/api/settings");
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden, responseJson);
+        responseJson.Should().Contain("AuthenticatedSessionRequired");
+        responseJson.Should().Contain("RequireAuthenticated");
+    }
+
+    [Fact]
     public async Task ResetSettings_ShouldResetAppConfigAndAiModels()
     {
         await using var host = await SettingsResetTestHost.CreateAsync();
@@ -124,7 +154,7 @@ public class SettingsResetEndpointTests
 
         public IConfigurationService ConfigurationService { get; }
 
-        public static async Task<SettingsResetTestHost> CreateAsync(string role = "Admin", AppConfig? initialConfig = null)
+        public static async Task<SettingsResetTestHost> CreateAsync(string? role = "Admin", AppConfig? initialConfig = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -158,12 +188,15 @@ public class SettingsResetEndpointTests
             var app = builder.Build();
             app.Use(async (context, next) =>
             {
-                context.Items["CurrentUser"] = new UserSession
+                if (role != null)
                 {
-                    UserId = "admin",
-                    Username = role.ToLowerInvariant(),
-                    Role = role
-                };
+                    context.Items["CurrentUser"] = new UserSession
+                    {
+                        UserId = "admin",
+                        Username = role.ToLowerInvariant(),
+                        Role = role
+                    };
+                }
                 await next();
             });
             app.MapSettingsEndpoints();

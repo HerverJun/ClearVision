@@ -5,6 +5,7 @@ import {
   createSettingsOwner,
   createSettingsWriteCoordinator,
   getSettingsOwnerActiveCount,
+  type SettingsEndpointTask,
   type SettingsWriteResult
 } from '@/capabilities/settings';
 
@@ -73,9 +74,48 @@ describe('F07 G1 Settings owner lifecycle', () => {
     await operator.start();
     expect(operator.projection.phase).toBe('forbidden');
     expect(operatorGet).not.toHaveBeenCalled();
-    const write = await operator.enqueueSectionWrite('general', async () => 'must-not-run');
+    const write = await operator.enqueueEndpointOperation('general', 'settings.write', async () => 'must-not-run');
     expect(write.status).toBe('forbidden');
+    const diagnostic = await operator.enqueueEndpointOperation('plc', 'plc.test-connection', async () => 'must-not-run');
+    expect(diagnostic.status).toBe('forbidden');
     operator.dispose();
+  });
+
+  it('allows Engineer diagnostics but denies Admin writes, route-only, unknown and excluded endpoints', async () => {
+    const executed: string[] = [];
+    const engineer = createSettingsOwner({ runtime: runtime(vi.fn()), role: 'Engineer' });
+    const diagnosticTask: SettingsEndpointTask<string> = async context => {
+      executed.push(context.endpoint.id);
+      return context.endpoint.id;
+    };
+
+    expect(await engineer.enqueueEndpointOperation('plc', 'plc.test-connection', diagnosticTask))
+      .toMatchObject({ status: 'completed', section: 'plc', value: 'plc.test-connection' });
+    expect(await engineer.enqueueEndpointOperation('tcp', 'tcp.runtime', diagnosticTask))
+      .toMatchObject({ status: 'completed', section: 'tcp', value: 'tcp.runtime' });
+    expect(await engineer.enqueueEndpointOperation('camera', 'camera.trigger-and-preview', diagnosticTask))
+      .toMatchObject({ status: 'completed', section: 'camera', value: 'camera.trigger-and-preview' });
+
+    const adminWrite = await engineer.enqueueEndpointOperation('plc', 'plc.settings.write', diagnosticTask);
+    expect(adminWrite).toMatchObject({ status: 'forbidden', section: 'plc' });
+    const genericWrite = await engineer.enqueueEndpointOperation('general', 'settings.write', diagnosticTask);
+    expect(genericWrite).toMatchObject({ status: 'forbidden', section: 'general' });
+    const routeOnly = await engineer.enqueueEndpointOperation('ai-model', 'ai.reasoning-support', diagnosticTask);
+    expect(routeOnly).toMatchObject({ status: 'forbidden', section: 'ai-model' });
+    const unknown = await engineer.enqueueEndpointOperation('plc', 'settings.unknown', diagnosticTask);
+    expect(unknown).toMatchObject({ status: 'forbidden', section: 'plc' });
+    const excluded = await engineer.enqueueEndpointOperation('general', 'settings/import', diagnosticTask);
+    expect(excluded).toMatchObject({ status: 'forbidden', section: 'general' });
+    expect(executed).toEqual(['plc.test-connection', 'tcp.runtime', 'camera.trigger-and-preview']);
+    engineer.dispose();
+
+    const admin = createSettingsOwner({ runtime: runtime(vi.fn()), role: 'Admin' });
+    const saved = await admin.enqueueEndpointOperation('general', 'settings.write', async context => {
+      expect(context.endpoint.id).toBe('settings.write');
+      return 'admin-write';
+    });
+    expect(saved).toMatchObject({ status: 'completed', section: 'general', value: 'admin-write' });
+    admin.dispose();
   });
 
   it('projects backend 403 and 409 without exposing raw error payload fields', async () => {

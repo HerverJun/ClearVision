@@ -9,14 +9,16 @@ import {
   ApiRequestPathError
 } from '@/platform/api';
 import {
+  evaluateSettingsEndpointAccess,
   evaluateSettingsRouteAccess,
   SettingsContractDecodeError,
   type SettingsErrorCode,
+  type SettingsEndpointAccessReason,
   type SettingsRole,
   type SettingsSection,
   type SettingsWriteCoordinatorDiagnostics,
+  type SettingsEndpointTask,
   type SettingsWriteResult,
-  type SettingsWriteTask
 } from './contracts';
 import { createSettingsApiAdapter, type SettingsApiAdapter } from './apiAdapter';
 import {
@@ -53,7 +55,11 @@ export interface SettingsOwner {
   start(): Promise<void>;
   refresh(): Promise<boolean>;
   invalidate(reason?: string): void;
-  enqueueSectionWrite<T>(section: SettingsSection, task: SettingsWriteTask<T>): Promise<SettingsWriteResult<T>>;
+  enqueueEndpointOperation<T>(
+    section: SettingsSection,
+    endpointId: string,
+    task: SettingsEndpointTask<T>
+  ): Promise<SettingsWriteResult<T>>;
   diagnostics(): SettingsOwnerDiagnostics;
   dispose(reason?: string): void;
 }
@@ -144,6 +150,18 @@ function errorProjection(error: unknown): SettingsErrorProjectionV1 {
 function isAbort(error: unknown): boolean {
   return error instanceof ApiAbortError ||
     (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError');
+}
+
+function endpointAccessMessage(endpointId: string, reason: SettingsEndpointAccessReason): string {
+  switch (reason) {
+    case 'unknown-endpoint': return `Unknown Settings endpoint is forbidden: ${endpointId}.`;
+    case 'excluded-endpoint': return `Excluded Settings endpoint is forbidden: ${endpointId}.`;
+    case 'section-mismatch': return `Settings endpoint ${endpointId} does not belong to the requested section.`;
+    case 'route-only': return `Settings endpoint ${endpointId} is route-only and cannot be executed.`;
+    case 'engineer-or-admin-required': return `Settings endpoint ${endpointId} requires Engineer or Admin permission.`;
+    case 'admin-required': return `Settings endpoint ${endpointId} requires Admin permission.`;
+    case 'allowed': return '';
+  }
 }
 
 export function createSettingsOwner(options: CreateSettingsOwnerOptions): SettingsOwner {
@@ -247,20 +265,28 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         code: 'unknown-outcome', publicMessage: `${reason}；请重新读取服务端状态。`, policy: null, issues: Object.freeze([])
       });
     },
-    enqueueSectionWrite<T>(section: SettingsSection, task: SettingsWriteTask<T>): Promise<SettingsWriteResult<T>> {
+    enqueueEndpointOperation<T>(
+      section: SettingsSection,
+      endpointId: string,
+      task: SettingsEndpointTask<T>
+    ): Promise<SettingsWriteResult<T>> {
       if (disposed) {
         return Promise.resolve(Object.freeze({
           status: 'disposed', section, generation: writes.diagnostics().generation,
           message: 'Settings owner has been disposed.'
         }));
       }
-      if (!evaluateSettingsRouteAccess(role).allowed) {
+      const access = evaluateSettingsEndpointAccess(endpointId, section, role);
+      if (!access.allowed || !access.endpoint) {
         return Promise.resolve(Object.freeze({
           status: 'forbidden', section, generation: writes.diagnostics().generation,
-          message: '当前账户禁止执行 Settings 写操作。'
+          message: endpointAccessMessage(endpointId, access.reason)
         }));
       }
-      return writes.enqueue(section, task);
+      return writes.enqueue(section, context => task(Object.freeze({
+        ...context,
+        endpoint: access.endpoint!
+      })));
     },
     diagnostics(): SettingsOwnerDiagnostics {
       const write = writes.diagnostics();

@@ -100,6 +100,50 @@ public class AiModelEndpointsTests
     }
 
     [Fact]
+    public async Task GetAiModels_ForEngineer_ShouldReturnSafeModelDtoWithoutAuthMaterial()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync(userRole: "Engineer");
+
+        using var response = await host.Client.GetAsync("/api/ai/models");
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, responseJson);
+        using var document = JsonDocument.Parse(responseJson);
+        var model = document.RootElement.EnumerateArray().First(x => x.GetProperty("id").GetString() == "model_default");
+        model.TryGetProperty("hasApiKey", out _).Should().BeFalse();
+        model.TryGetProperty("baseUrl", out _).Should().BeFalse();
+        model.TryGetProperty("extraHeaders", out _).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("Admin", true)]
+    [InlineData("Engineer", true)]
+    [InlineData("Operator", true)]
+    public async Task GetAiModels_ShouldRequireAuthenticatedSessionWithoutChangingRoleProjection(
+        string? userRole,
+        bool shouldReturnProjection)
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync(userRole: userRole);
+
+        using var response = await host.Client.GetAsync("/api/ai/models");
+        var responseJson = await response.Content.ReadAsStringAsync();
+
+        if (!shouldReturnProjection)
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.Forbidden, responseJson);
+            responseJson.Should().Contain("AuthenticatedSessionRequired");
+            responseJson.Should().Contain("RequireAuthenticated");
+            return;
+        }
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, responseJson);
+        using var document = JsonDocument.Parse(responseJson);
+        var model = document.RootElement.EnumerateArray().First(x => x.GetProperty("id").GetString() == "model_default");
+        model.TryGetProperty("hasApiKey", out _).Should().Be(userRole == "Admin");
+    }
+
+    [Fact]
     public async Task GetAiModels_ForAdmin_ShouldMaskSensitiveExtraFields()
     {
         await using var host = await AiModelEndpointTestHost.CreateAsync();
@@ -504,6 +548,40 @@ public class AiModelEndpointsTests
             .Should().BeEquivalentTo(["auto", "off", "on"]);
         document.RootElement.GetProperty("allowedEfforts").EnumerateArray().Select(x => x.GetString())
             .Should().BeEquivalentTo(["low", "medium", "high"]);
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("Admin", true)]
+    [InlineData("Engineer", true)]
+    [InlineData("Operator", true)]
+    public async Task PreviewReasoningSupport_ShouldRequireAuthenticatedSession(string? userRole, bool shouldReturnProjection)
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync(userRole: userRole);
+        var payload = JsonSerializer.Serialize(new
+        {
+            provider = "OpenAI Compatible",
+            model = "gpt-5.1-mini",
+            baseUrl = "https://api.openai.com/v1",
+            protocol = (string?)null
+        });
+
+        using var response = await host.Client.PostAsync(
+            "/api/ai/reasoning-support",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+        var responseJson = await response.Content.ReadAsStringAsync();
+
+        if (!shouldReturnProjection)
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.Forbidden, responseJson);
+            responseJson.Should().Contain("AuthenticatedSessionRequired");
+            responseJson.Should().Contain("RequireAuthenticated");
+            return;
+        }
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, responseJson);
+        using var document = JsonDocument.Parse(responseJson);
+        document.RootElement.GetProperty("familyId").GetString().Should().Be("openai_gpt5");
     }
 
     [Fact]
@@ -1531,7 +1609,7 @@ public class AiModelEndpointsTests
         public static async Task<AiModelEndpointTestHost> CreateAsync(
             Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? aiSendAsync = null,
             AppConfig? appConfig = null,
-            string userRole = "Admin")
+            string? userRole = "Admin")
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -1591,12 +1669,15 @@ public class AiModelEndpointsTests
             var app = builder.Build();
             app.Use(async (context, next) =>
             {
-                context.Items["CurrentUser"] = new UserSession
+                if (userRole != null)
                 {
-                    UserId = "admin",
-                    Username = "admin",
-                    Role = userRole
-                };
+                    context.Items["CurrentUser"] = new UserSession
+                    {
+                        UserId = "admin",
+                        Username = "admin",
+                        Role = userRole
+                    };
+                }
                 await next();
             });
             app.MapSettingsEndpoints();

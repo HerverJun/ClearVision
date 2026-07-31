@@ -107,6 +107,12 @@ export interface SettingsEndpointContract {
   readonly sensitiveFields: readonly string[];
 }
 
+export interface SettingsEndpointTaskContext extends SettingsWriteTaskContext {
+  readonly endpoint: SettingsEndpointContract;
+}
+
+export type SettingsEndpointTask<T> = (context: SettingsEndpointTaskContext) => Promise<T>;
+
 export interface SettingsSectionContract {
   readonly section: SettingsSection;
   readonly authority:
@@ -130,6 +136,23 @@ export interface SettingsRouteAccess {
   readonly allowed: boolean;
   readonly role: SettingsRole;
   readonly reason: 'allowed' | 'operator-forbidden' | 'authenticated-role-required';
+}
+
+export type SettingsEndpointAccessReason =
+  | 'allowed'
+  | 'unknown-endpoint'
+  | 'excluded-endpoint'
+  | 'section-mismatch'
+  | 'route-only'
+  | 'engineer-or-admin-required'
+  | 'admin-required';
+
+export interface SettingsEndpointAccess {
+  readonly allowed: boolean;
+  readonly endpointId: string;
+  readonly role: SettingsRole;
+  readonly endpoint: SettingsEndpointContract | null;
+  readonly reason: SettingsEndpointAccessReason;
 }
 
 export function evaluateSettingsRouteAccess(role: SettingsRole): SettingsRouteAccess {
@@ -337,6 +360,21 @@ export const SETTINGS_EXCLUDED_ENDPOINTS = Object.freeze([
   'settings/runtime-preview-pilot/**'
 ] as const);
 
+function normalizeEndpointReference(value: string): string {
+  const normalized = value.trim().replace(/^\/+/, '');
+  return normalized.startsWith('api/') ? normalized.slice('api/'.length) : normalized;
+}
+
+export function isSettingsEndpointExcluded(endpointReference: string): boolean {
+  const normalized = normalizeEndpointReference(endpointReference);
+  return SETTINGS_EXCLUDED_ENDPOINTS.some(pattern => {
+    const normalizedPattern = normalizeEndpointReference(pattern);
+    return normalizedPattern.endsWith('/**')
+      ? normalized.startsWith(normalizedPattern.slice(0, -2))
+      : normalized === normalizedPattern;
+  });
+}
+
 const section = (
   value: Omit<SettingsSectionContract, 'genericScope'> & { readonly genericScope?: GenericSettingsSection | null }
 ): SettingsSectionContract => Object.freeze({
@@ -401,6 +439,55 @@ export const SETTINGS_SECTION_CONTRACTS: readonly SettingsSectionContract[] = Ob
 
 export function findSettingsEndpoint(id: string): SettingsEndpointContract | null {
   return SETTINGS_ENDPOINT_MATRIX.find(item => item.id === id) ?? null;
+}
+
+export function evaluateSettingsEndpointAccess(
+  endpointId: string,
+  sectionName: SettingsSection,
+  role: SettingsRole
+): SettingsEndpointAccess {
+  const endpoint = findSettingsEndpoint(endpointId);
+  if (!endpoint) {
+    return Object.freeze({
+      allowed: false,
+      endpointId,
+      role,
+      endpoint: null,
+      reason: isSettingsEndpointExcluded(endpointId) ? 'excluded-endpoint' : 'unknown-endpoint'
+    });
+  }
+
+  const sectionMatches = endpoint.section === sectionName ||
+    (endpoint.section === 'generic' && endpoint.genericScopes.some(scope => scope === sectionName));
+  if (!sectionMatches) {
+    return Object.freeze({ allowed: false, endpointId, role, endpoint, reason: 'section-mismatch' });
+  }
+
+  const normalizedRole = typeof role === 'string' ? role.trim() : '';
+  switch (endpoint.uiPermission) {
+    case 'engineer-or-admin':
+      return Object.freeze({
+        allowed: normalizedRole === 'Admin' || normalizedRole === 'Engineer',
+        endpointId,
+        role,
+        endpoint,
+        reason: normalizedRole === 'Admin' || normalizedRole === 'Engineer'
+          ? 'allowed'
+          : 'engineer-or-admin-required'
+      });
+    case 'admin':
+      return Object.freeze({
+        allowed: normalizedRole === 'Admin',
+        endpointId,
+        role,
+        endpoint,
+        reason: normalizedRole === 'Admin' ? 'allowed' : 'admin-required'
+      });
+    case 'settings-route':
+      return Object.freeze({ allowed: false, endpointId, role, endpoint, reason: 'route-only' });
+    case 'excluded':
+      return Object.freeze({ allowed: false, endpointId, role, endpoint, reason: 'excluded-endpoint' });
+  }
 }
 
 export function findSettingsSection(sectionName: SettingsSection): SettingsSectionContract {
