@@ -57,14 +57,18 @@ describe('F06 G4 handoff and save-authority architecture guards', () => {
 
   it('passes only artifact identity through the route after disposing the AI owner', () => {
     const page = read(join(aiRoot, 'AiWorkbenchPage.vue'));
-    const dispose = page.indexOf('current.dispose();');
-    const navigate = page.indexOf('await router.push({', dispose);
+    const handoffStart = page.indexOf('async function handoffAndOpenWorkspace');
+    const handoffEnd = page.indexOf('\nasync function ', handoffStart + 1);
+    const handoff = page.slice(handoffStart, handoffEnd);
+    const dispose = handoff.indexOf('releaseOwner(current);');
+    const navigate = handoff.indexOf('await router.push({', dispose);
+    expect(handoffStart).toBeGreaterThan(0);
     expect(dispose).toBeGreaterThan(0);
     expect(navigate).toBeGreaterThan(dispose);
-    expect(page.slice(navigate, page.indexOf('});', navigate) + 3)).toContain(
+    expect(handoff.slice(navigate, handoff.indexOf('});', navigate) + 3)).toContain(
       'query: { handoff: artifact.artifactId }'
     );
-    expect(page.slice(navigate, page.indexOf('});', navigate) + 3)).not.toMatch(/candidateFlow|fingerprint/);
+    expect(handoff.slice(navigate, handoff.indexOf('});', navigate) + 3)).not.toMatch(/candidateFlow|fingerprint/);
   });
 
   it('keeps new and existing formal saves on the existing Workspace persistence chain', () => {

@@ -3,6 +3,13 @@
   "initialEntryKey": "index.html",
   "hardInitialMaxBytes": 963630,
   "targets": {
+    "ai": {
+      "label": "AI Workbench",
+      "roots": [
+        "src/capabilities/ai-workbench/AiWorkbenchPage.vue"
+      ],
+      "maxBytes": 970000
+    },
     "inspection": {
       "label": "Inspection",
       "roots": [

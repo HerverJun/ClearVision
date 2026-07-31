@@ -2292,6 +2292,215 @@ public sealed class AgentRunEndpointsTests
         ownerOperation.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    [Fact(DisplayName = "AI Run history is owner scoped, paged, session filterable and redacted")]
+    public async Task AiRunHistory_ShouldBeOwnerScopedPagedAndRedacted()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(useAuth: true);
+        host.AuthorizeAs("owner-a-token");
+        using var create = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        using var createDocument = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
+        var sessionId = createDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString()!;
+        var planRunId = await host.CreatePlanRunAsync("plan owner scoped history", sessionId);
+        var buildRunId = await host.CreateRunAsync("build owner scoped history");
+        await host.WaitForTerminalAsync(planRunId);
+        await host.WaitForTerminalAsync(buildRunId);
+
+        using var firstPage = await host.Client.GetAsync("/api/ai/agent-runs?offset=0&limit=1");
+        firstPage.StatusCode.Should().Be(HttpStatusCode.OK);
+        var firstJson = await firstPage.Content.ReadAsStringAsync();
+        using var firstDocument = JsonDocument.Parse(firstJson);
+        firstDocument.RootElement.GetProperty("total").GetInt32().Should().Be(2);
+        firstDocument.RootElement.GetProperty("items").GetArrayLength().Should().Be(1);
+        var item = firstDocument.RootElement.GetProperty("items")[0];
+        item.EnumerateObject().Select(property => property.Name).Should().BeEquivalentTo(
+        [
+            "runId", "sessionId", "kind", "status", "title", "summary", "firstFixRecommendation",
+            "recoveryState", "createdAtUtc", "updatedAtUtc", "lastSequence", "eventCount"
+        ]);
+        firstJson.ToLowerInvariant().Should().NotContain("ownerhash");
+        firstJson.ToLowerInvariant().Should().NotContain("terminalintent");
+        firstJson.ToLowerInvariant().Should().NotContain("payload");
+        firstJson.ToLowerInvariant().Should().NotContain("reasoning");
+
+        using var secondPage = await host.Client.GetAsync("/api/ai/agent-runs?offset=1&limit=1");
+        using var secondDocument = JsonDocument.Parse(await secondPage.Content.ReadAsStringAsync());
+        secondDocument.RootElement.GetProperty("offset").GetInt32().Should().Be(1);
+        secondDocument.RootElement.GetProperty("items").GetArrayLength().Should().Be(1);
+
+        using var sessionPage = await host.Client.GetAsync(
+            $"/api/ai/agent-runs?offset=0&limit=10&sessionId={Uri.EscapeDataString(sessionId)}");
+        using var sessionDocument = JsonDocument.Parse(await sessionPage.Content.ReadAsStringAsync());
+        sessionDocument.RootElement.GetProperty("total").GetInt32().Should().Be(1);
+        sessionDocument.RootElement.GetProperty("items")[0].GetProperty("runId").GetString().Should().Be(planRunId);
+        sessionDocument.RootElement.GetProperty("items")[0].GetProperty("kind").GetString().Should().Be("plan");
+
+        host.AuthorizeAs("owner-b-token");
+        using var otherOwner = await host.Client.GetAsync("/api/ai/agent-runs?offset=0&limit=10");
+        using var otherOwnerDocument = JsonDocument.Parse(await otherOwner.Content.ReadAsStringAsync());
+        otherOwnerDocument.RootElement.GetProperty("total").GetInt32().Should().Be(0);
+    }
+
+    [Fact(DisplayName = "AI Session delete blocks pending operations, active artifacts and staged drafts")]
+    public async Task AiSessionDelete_ShouldFailClosedForUnsafeAssociations()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(useAuth: true);
+        host.AuthorizeAs("owner-a-token");
+
+        async Task<(string SessionId, string OwnerHash)> CreateSessionAsync()
+        {
+            using var response = await host.Client.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+            response.EnsureSuccessStatusCode();
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var id = document.RootElement.GetProperty("session").GetProperty("sessionId").GetString()!;
+            return (id, host.ConversationService.GetSession(id)!.OwnerHash!);
+        }
+
+        async Task<JsonElement> DeleteAsync(string sessionId, Guid mutationId)
+        {
+            using var response = await host.Client.DeleteAsync(
+                $"/api/ai/sessions/{sessionId}?expectedRevision=0&clientMutationId={mutationId:D}");
+            response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            return document.RootElement.Clone();
+        }
+
+        var pending = await CreateSessionAsync();
+        var pendingOperationId = Guid.NewGuid();
+        host.OperationStore.Reserve(
+            pending.OwnerHash,
+            AiOperationKinds.PlanRun,
+            pendingOperationId,
+            "sha256:" + new string('a', 64),
+            pending.SessionId);
+        var pendingDeleteId = Guid.NewGuid();
+        var pendingConflict = await DeleteAsync(pending.SessionId, pendingDeleteId);
+        pendingConflict.GetProperty("errorCode").GetString().Should().Be("session_active_operation_conflict");
+        using var pendingReceipt = await host.Client.GetAsync(
+            $"/api/ai/operations/{pendingDeleteId:D}?kind={AiOperationKinds.SessionDelete}");
+        using var pendingReceiptDocument = JsonDocument.Parse(await pendingReceipt.Content.ReadAsStringAsync());
+        pendingReceiptDocument.RootElement.GetProperty("status").GetString().Should().Be(AiOperationStatuses.Rejected);
+
+        var available = await CreateSessionAsync();
+        var availableArtifact = host.HandoffStore.Create(HandoffCommand(available.OwnerHash, available.SessionId));
+        availableArtifact.Outcome.Should().Be(AiWorkspaceHandoffStoreOutcome.Created);
+        var availableConflict = await DeleteAsync(available.SessionId, Guid.NewGuid());
+        availableConflict.GetProperty("errorCode").GetString().Should().Be("session_active_artifact_conflict");
+
+        var staged = await CreateSessionAsync();
+        var stagedArtifact = host.HandoffStore.Create(HandoffCommand(staged.OwnerHash, staged.SessionId)).Artifact!;
+        var consumeOperationId = Guid.NewGuid();
+        host.HandoffStore.ReserveConsume(staged.OwnerHash, stagedArtifact.ArtifactId, consumeOperationId, null)
+            .Outcome.Should().Be(AiWorkspaceHandoffStoreOutcome.Updated);
+        host.HandoffStore.Acknowledge(staged.OwnerHash, stagedArtifact.ArtifactId, consumeOperationId, null)
+            .Outcome.Should().Be(AiWorkspaceHandoffStoreOutcome.Updated);
+        var stagedConflict = await DeleteAsync(staged.SessionId, Guid.NewGuid());
+        stagedConflict.GetProperty("errorCode").GetString().Should().Be("session_staged_draft_conflict");
+
+        static AiWorkspaceHandoffCreateCommand HandoffCommand(string ownerHash, string sessionId) => new()
+        {
+            OwnerHash = ownerHash,
+            ClientOperationId = Guid.NewGuid(),
+            SessionId = sessionId,
+            SessionRevision = 0,
+            PlanRunId = "run_plan_history",
+            PlanId = "plan_history",
+            PlanHash = new string('b', 64),
+            BuildRunId = "run_build_history",
+            BuildClientOperationId = Guid.NewGuid(),
+            BuildIdentity = "build:history",
+            SubmittedBuildFingerprint = new string('c', 64),
+            TargetKind = "new",
+            CandidateFlowJson = "{}",
+            CandidateFlowFingerprint = new string('d', 64),
+            PublicBuild = new VisionAgentPublicBuildResultV1()
+        };
+    }
+
+    [Fact(DisplayName = "AI Session delete independently blocks active Plan and Build runs")]
+    public async Task AiSessionDelete_ShouldFailClosedForActivePlanAndBuildRuns()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(useAuth: true);
+        host.AuthorizeAs("owner-a-token");
+
+        foreach (var runKind in new[] { "plan", "build" })
+        {
+            using var create = await host.Client.PostAsJsonAsync(
+                "/api/ai/sessions",
+                new { clientOperationId = Guid.NewGuid() });
+            create.EnsureSuccessStatusCode();
+            using var createDocument = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
+            var createdSession = createDocument.RootElement.GetProperty("session");
+            var sessionId = createdSession.GetProperty("sessionId").GetString()!;
+            var ownerHash = host.ConversationService.GetSession(sessionId)!.OwnerHash!;
+            var activeRun = host.StreamService.CreateRun(
+                $"active {runKind} delete guard",
+                ownerHash: ownerHash);
+            var update = new VisionAgentWorkspaceSnapshotUpdate
+            {
+                ExpectedRevision = 0,
+                ClientMutationId = Guid.NewGuid().ToString("D"),
+                LifecycleState = runKind == "plan" ? "planning" : "building",
+                PlanRunId = runKind == "plan" ? activeRun.RunId : null,
+                PlanRunStatus = runKind == "plan" ? AgentRunEventStatuses.Running : null,
+                BuildRunId = runKind == "build" ? activeRun.RunId : null,
+                BuildRunStatus = runKind == "build" ? AgentRunEventStatuses.Running : null
+            };
+            var seeded = host.ConversationService.TryUpdateOwnedWorkspaceSnapshot(ownerHash, sessionId, update);
+            seeded.Success.Should().BeTrue(runKind);
+
+            var deleteMutationId = Guid.NewGuid();
+            using var delete = await host.Client.DeleteAsync(
+                $"/api/ai/sessions/{sessionId}?expectedRevision={seeded.Revision}&clientMutationId={deleteMutationId:D}");
+            delete.StatusCode.Should().Be(HttpStatusCode.Conflict, runKind);
+            using var deleteDocument = JsonDocument.Parse(await delete.Content.ReadAsStringAsync());
+            deleteDocument.RootElement.GetProperty("errorCode").GetString()
+                .Should().Be("session_active_run_conflict", runKind);
+            deleteDocument.RootElement.GetProperty("operation").GetProperty("status").GetString()
+                .Should().Be(AiOperationStatuses.Rejected, runKind);
+            host.ConversationService.GetSession(sessionId).Should().NotBeNull(runKind);
+
+            host.StreamService.Cancel(activeRun.RunId);
+        }
+    }
+
+    [Fact(DisplayName = "AI Session delete is idempotently reconciled and never deletes a Project")]
+    public async Task AiSessionDelete_ShouldReconcileByMutationReceiptWithoutProjectCascade()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        var projectId = Guid.NewGuid();
+        host.Projects.Project = new ProjectDto
+        {
+            Id = projectId,
+            Name = "delete-isolation-project",
+            PersistenceRevision = 1,
+            Flow = new OperatorFlowDto { Id = Guid.NewGuid(), Name = "delete-isolation-flow" }
+        };
+        using var create = await host.Client.PostAsJsonAsync("/api/ai/sessions", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            projectId
+        });
+        create.EnsureSuccessStatusCode();
+        using var createDocument = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
+        var createdSession = createDocument.RootElement.GetProperty("session");
+        var sessionId = createdSession.GetProperty("sessionId").GetString()!;
+        var expectedRevision = createdSession.GetProperty("snapshot").GetProperty("revision").GetInt64();
+        var mutationId = Guid.NewGuid();
+        var uri = $"/api/ai/sessions/{sessionId}?expectedRevision={expectedRevision}&clientMutationId={mutationId:D}";
+
+        using var first = await host.Client.DeleteAsync(uri);
+        using var replay = await host.Client.DeleteAsync(uri);
+        using var missing = await host.Client.GetAsync($"/api/ai/sessions/{sessionId}");
+
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        replay.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await replay.Content.ReadAsStringAsync()).Should().Contain("\"deleted\":true");
+        missing.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        host.Projects.Project.Should().NotBeNull();
+        host.Projects.Project!.Id.Should().Be(projectId);
+    }
+
     [Fact(DisplayName = "AI endpoints allow Admin and Engineer but reject Operator and unauthenticated users")]
     public async Task AiEndpoints_ShouldEnforceRoleAndAuthenticationMatrix()
     {
@@ -2340,6 +2549,7 @@ public sealed class AgentRunEndpointsTests
             target = new { targetKind = "new" },
             description = "operator must not build"
         });
+        using var operatorRunHistory = await host.Client.GetAsync("/api/ai/agent-runs?offset=0&limit=10");
         using var operatorBaseline = await host.Client.GetAsync($"/api/ai/projects/{host.Projects.Project.Id:D}/baseline");
         using var operatorRevalidate = await host.Client.PostAsJsonAsync("/api/ai/agent-runs/ar_missing/revalidate", new
         {
@@ -2348,11 +2558,13 @@ public sealed class AgentRunEndpointsTests
         });
         operatorSession.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         operatorBuild.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        operatorRunHistory.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         operatorBaseline.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         operatorRevalidate.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         using var anonymous = host.CreateAnonymousClient();
         using var unauthenticated = await anonymous.PostAsJsonAsync("/api/ai/sessions", new { clientOperationId = Guid.NewGuid() });
+        using var anonymousRunHistory = await anonymous.GetAsync("/api/ai/agent-runs?offset=0&limit=10");
         using var anonymousBaseline = await anonymous.GetAsync($"/api/ai/projects/{host.Projects.Project.Id:D}/baseline");
         using var anonymousRevalidate = await anonymous.PostAsJsonAsync("/api/ai/agent-runs/ar_missing/revalidate", new
         {
@@ -2360,6 +2572,7 @@ public sealed class AgentRunEndpointsTests
             clientMutationId = Guid.NewGuid()
         });
         unauthenticated.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        anonymousRunHistory.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         anonymousBaseline.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         anonymousRevalidate.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -3950,6 +4163,8 @@ public sealed class AgentRunEndpointsTests
             FakeAiFlowGenerationService generation,
             IAgentRunEventStreamService streamService,
             IConversationalFlowService conversationService,
+            IAiOperationReceiptStore operationStore,
+            IAiWorkspaceHandoffArtifactStore handoffStore,
             FakeProjectApplicationService projects,
             IVisionAgentBuildTerminalProjector terminalProjector)
         {
@@ -3959,6 +4174,8 @@ public sealed class AgentRunEndpointsTests
             StreamService = streamService;
             ConversationService = conversationService;
             ConcreteConversationService = (ConversationalFlowService)conversationService;
+            OperationStore = operationStore;
+            HandoffStore = handoffStore;
             Projects = projects;
             TerminalProjector = terminalProjector;
             Client = app.GetTestClient();
@@ -3975,6 +4192,10 @@ public sealed class AgentRunEndpointsTests
         public IConversationalFlowService ConversationService { get; }
 
         public ConversationalFlowService ConcreteConversationService { get; }
+
+        public IAiOperationReceiptStore OperationStore { get; }
+
+        public IAiWorkspaceHandoffArtifactStore HandoffStore { get; }
 
         public FakeProjectApplicationService Projects { get; }
 
@@ -4076,6 +4297,8 @@ public sealed class AgentRunEndpointsTests
                 generation,
                 streamService,
                 conversationService,
+                operationStore,
+                handoffStore,
                 projects,
                 terminalProjector);
         }

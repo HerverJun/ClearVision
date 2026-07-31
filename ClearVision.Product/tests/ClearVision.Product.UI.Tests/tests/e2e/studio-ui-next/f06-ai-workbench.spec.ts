@@ -207,22 +207,26 @@ test('project-bound compact deep link shows canonical project revision and handl
 });
 
 test('AI route and owner fail closed when flag or role is denied', async ({ page }) => {
-  const flagAudit = await boot(page, { width: 1366, height: 768 }, 'compact', '/ai', { flag: false });
+  const viewport = { width: 1366, height: 768 } as const;
+  const flagAudit = await boot(page, viewport, 'compact', '/ai', { flag: false });
   await expect(page).toHaveURL(/#\/forbidden$/);
   expect(flagAudit.requests.some(item => item.path.startsWith('/api/ai/'))).toBe(false);
   await expect(page.locator('[data-ai-owner-phase]')).toHaveCount(0);
+  await captureF06Evidence(page, flagAudit, 'g5-ai-flag-off-forbidden', viewport, 'compact');
 
   await page.close();
 });
 
 test('Operator role fails closed before mounting the AI owner', async ({ page }) => {
-  const audit = await boot(page, { width: 1366, height: 768 }, 'compact', `/projects/${f06ProjectId}/ai`, {
+  const viewport = { width: 1366, height: 768 } as const;
+  const audit = await boot(page, viewport, 'compact', `/projects/${f06ProjectId}/ai`, {
     role: 'Operator',
     projectBound: true
   });
   await expect(page).toHaveURL(/#\/forbidden$/);
   expect(audit.requests.some(item => item.path.startsWith('/api/ai/'))).toBe(false);
   await expect(page.locator('[data-ai-owner-phase]')).toHaveCount(0);
+  await captureF06Evidence(page, audit, 'g5-ai-operator-forbidden', viewport, 'compact');
 });
 
 test('Admin role mounts the same single AI owner through the unbound route', async ({ page }) => {

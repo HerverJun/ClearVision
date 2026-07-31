@@ -69,6 +69,8 @@ public static class AgentRunEndpoints
             .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
         app.MapPost("/api/ai/agent-runs", HandleCreateRunAsync)
             .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
+        app.MapGet("/api/ai/agent-runs", HandleListRuns)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
         app.MapGet("/api/ai/agent-runs/latest", HandleReplayLatestRun)
             .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
         app.MapGet("/api/ai/agent-runs/{runId}", HandleReplayRun)
@@ -870,8 +872,52 @@ public static class AgentRunEndpoints
         }
 
         return streamService.IsRunOwner(runId, AiOwnerIdentity.Resolve(context))
-            ? Results.Ok(replay)
-            : Results.NotFound(new { errorCode = "run_not_found", publicMessage = "运行记录不存在或当前用户无权访问。" });
+             ? Results.Ok(replay)
+             : Results.NotFound(new { errorCode = "run_not_found", publicMessage = "运行记录不存在或当前用户无权访问。" });
+    }
+
+    private static IResult HandleListRuns(
+        HttpContext context,
+        IAgentRunEventStreamService streamService,
+        IAiOperationReceiptStore operations,
+        string? sessionId = null,
+        int offset = 0,
+        int limit = 25)
+    {
+        var ownerHash = AiOwnerIdentity.Resolve(context);
+        var normalizedSessionId = string.IsNullOrWhiteSpace(sessionId) ? null : sessionId.Trim();
+        offset = Math.Max(0, offset);
+        limit = Math.Clamp(limit, 1, 100);
+
+        var summaries = streamService.ListSummaries(ownerHash)
+            .Select(summary =>
+            {
+                var planReceipt = operations.FindByRun(ownerHash, AiOperationKinds.PlanRun, summary.RunId);
+                var buildReceipt = operations.FindByRun(ownerHash, AiOperationKinds.BuildRun, summary.RunId);
+                var receipt = buildReceipt ?? planReceipt;
+                var runKind = buildReceipt != null
+                    ? "build"
+                    : planReceipt != null
+                        ? "plan"
+                        : NormalizeRunHistoryKind(summary.TerminalIntent?.RunType, streamService.Replay(summary.RunId));
+                var runSessionId = string.IsNullOrWhiteSpace(receipt?.SessionId)
+                    ? summary.TerminalIntent?.SessionId
+                    : receipt.SessionId;
+                return AiPublicContractMapper.ToRunHistorySummary(summary, runSessionId, runKind);
+            })
+            .Where(summary => normalizedSessionId == null ||
+                string.Equals(summary.SessionId, normalizedSessionId, StringComparison.Ordinal))
+            .ToArray();
+        var items = summaries.Skip(offset).Take(limit).ToArray();
+        return Results.Ok(new AiAgentRunHistoryPageV1(items, offset, limit, summaries.Length));
+    }
+
+    private static string NormalizeRunHistoryKind(string? runType, AgentRunReplayResult? replay)
+    {
+        if (string.Equals(runType, "plan", StringComparison.OrdinalIgnoreCase)) return "plan";
+        if (string.Equals(runType, "build", StringComparison.OrdinalIgnoreCase)) return "build";
+        if (replay == null) return "unknown";
+        return VisionAgentRunKindResolver.ToWireValue(VisionAgentRunKindResolver.Resolve(replay));
     }
 
     private static IResult BuildExistingOperationResponse(

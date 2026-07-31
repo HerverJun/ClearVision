@@ -170,6 +170,46 @@ export interface AiSessionDetailV1 {
   readonly updatedAtUtc: string;
 }
 
+export interface AiSessionSummaryV1 {
+  readonly sessionId: string;
+  readonly lifecycleState: string;
+  readonly projectId: string | null;
+  readonly revision: number;
+  readonly updatedAtUtc: string;
+}
+
+export interface AiSessionPageV1 {
+  readonly items: readonly AiSessionSummaryV1[];
+  readonly offset: number;
+  readonly limit: number;
+  readonly total: number;
+}
+
+export type AiRunHistoryKind = 'plan' | 'build' | 'unknown';
+export type AiRunRecoveryState = 'active' | 'reconciling' | 'terminal' | 'unknown';
+
+export interface AiRunHistorySummaryV1 {
+  readonly runId: string;
+  readonly sessionId: string | null;
+  readonly kind: AiRunHistoryKind;
+  readonly status: AiRunStatus;
+  readonly title: string;
+  readonly summary: string;
+  readonly firstFixRecommendation: string;
+  readonly recoveryState: AiRunRecoveryState;
+  readonly createdAtUtc: string;
+  readonly updatedAtUtc: string;
+  readonly lastSequence: number;
+  readonly eventCount: number;
+}
+
+export interface AiRunHistoryPageV1 {
+  readonly items: readonly AiRunHistorySummaryV1[];
+  readonly offset: number;
+  readonly limit: number;
+  readonly total: number;
+}
+
 export interface AiOperationProjectionV1 {
   readonly clientOperationId: string;
   readonly kind: AiOperationKind;

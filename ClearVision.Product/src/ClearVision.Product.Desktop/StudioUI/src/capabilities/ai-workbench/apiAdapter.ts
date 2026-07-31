@@ -16,9 +16,11 @@ import type {
   AiReadinessPreviewCommandV1,
   AiReadinessPreviewV1,
   AiRequirementMode,
+  AiRunHistoryPageV1,
   AiSessionCreateCommandV1,
   AiSessionCreateResponseV1,
   AiSessionDetailV1,
+  AiSessionPageV1,
   AiSessionSnapshotV1,
   AiWorkspaceSnapshotMutationV1
 } from './contracts';
@@ -33,14 +35,24 @@ import {
   decodeAiProjectContextV1,
   decodeAiProjectBaselineV1,
   decodeAiReadinessPreviewV1,
+  decodeAiRunHistoryPageV1,
   decodeAiSessionCreateResponseV1,
   decodeAiSessionDetailV1,
+  decodeAiSessionPageV1,
   decodeAiSessionSnapshotV1
 } from './decoder';
 
 export interface AiWorkbenchApi {
   createSession(command: AiSessionCreateCommandV1, signal?: AbortSignal): Promise<AiSessionCreateResponseV1>;
   getSession(sessionId: string, signal?: AbortSignal): Promise<AiSessionDetailV1>;
+  listSessions(offset: number, limit: number, signal?: AbortSignal): Promise<AiSessionPageV1>;
+  listRuns(offset: number, limit: number, sessionId?: string | null, signal?: AbortSignal): Promise<AiRunHistoryPageV1>;
+  deleteSession(
+    sessionId: string,
+    expectedRevision: number,
+    clientMutationId: string,
+    signal?: AbortSignal
+  ): Promise<void>;
   getOperation(clientOperationId: string, kind: AiOperationKind, signal?: AbortSignal): Promise<AiOperationProjectionV1>;
   getProject(projectId: string, signal?: AbortSignal): Promise<AiProjectContextV1>;
   getProjectBaseline(projectId: string, signal?: AbortSignal): Promise<AiProjectBaselineV1>;
@@ -110,6 +122,40 @@ export function createAiWorkbenchApi(api: ApiTransport): AiWorkbenchApi {
     async getSession(sessionId: string, signal?: AbortSignal) {
       const safeSessionId = encodeURIComponent(identifier(sessionId, 'sessionId'));
       return decodeAiSessionDetailV1(await api.get(`ai/sessions/${safeSessionId}`, signalOptions(signal)));
+    },
+    async listSessions(offset: number, limit: number, signal?: AbortSignal) {
+      const safeOffset = Math.max(0, Math.trunc(offset));
+      const safeLimit = Math.min(100, Math.max(1, Math.trunc(limit)));
+      return decodeAiSessionPageV1(await api.get(
+        `ai/sessions?offset=${safeOffset}&limit=${safeLimit}`,
+        signalOptions(signal)
+      ));
+    },
+    async listRuns(offset: number, limit: number, sessionId?: string | null, signal?: AbortSignal) {
+      const safeOffset = Math.max(0, Math.trunc(offset));
+      const safeLimit = Math.min(100, Math.max(1, Math.trunc(limit)));
+      const sessionQuery = sessionId
+        ? `&sessionId=${encodeURIComponent(identifier(sessionId, 'sessionId'))}`
+        : '';
+      return decodeAiRunHistoryPageV1(await api.get(
+        `ai/agent-runs?offset=${safeOffset}&limit=${safeLimit}${sessionQuery}`,
+        signalOptions(signal)
+      ));
+    },
+    async deleteSession(
+      sessionId: string,
+      expectedRevision: number,
+      clientMutationId: string,
+      signal?: AbortSignal
+    ) {
+      if (!api.delete) throw new Error('Shared API transport does not support DELETE.');
+      const safeSessionId = encodeURIComponent(identifier(sessionId, 'sessionId'));
+      const safeRevision = Math.max(0, Math.trunc(expectedRevision));
+      const safeMutationId = encodeURIComponent(identifier(clientMutationId, 'clientMutationId', guidPattern));
+      await api.delete(
+        `ai/sessions/${safeSessionId}?expectedRevision=${safeRevision}&clientMutationId=${safeMutationId}`,
+        signalOptions(signal)
+      );
     },
     async getOperation(clientOperationId: string, kind: AiOperationKind, signal?: AbortSignal) {
       const safeOperationId = encodeURIComponent(identifier(clientOperationId, 'clientOperationId', guidPattern));

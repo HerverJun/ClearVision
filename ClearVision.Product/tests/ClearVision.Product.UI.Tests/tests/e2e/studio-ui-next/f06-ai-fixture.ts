@@ -6,6 +6,8 @@ import { fulfillF02Json, installF02BrowserStartup } from './f02-browser-fixture'
 
 export const f06ProjectId = '22222222-2222-4222-8222-222222222222';
 export const f06SessionId = 'session_f06_01';
+export const f06ProjectSessionId = 'session_f06_project_02';
+export const f06UnboundHistorySessionId = 'session_f06_03';
 export const f06RunId = 'run_plan_f06_01';
 export const f06BuildRunId = 'run_build_f06_01';
 export const f06PlanId = 'plan_f06_01';
@@ -25,6 +27,7 @@ export interface F06BrowserAudit {
   readonly pageErrors: string[];
   readonly releaseBuildStream: () => void;
   readonly releaseRevalidation: () => void;
+  readonly releaseHistory: () => void;
 }
 
 export type F06InitialBuildState = 'ready' | 'building' | 'validating' | 'failed' | 'cancelled' |
@@ -45,6 +48,10 @@ export interface F06BrowserFixtureOptions {
   readonly artifactBaselineRevision?: number;
   readonly handoffCreateUnknownOutcome?: boolean;
   readonly saveUnknownOutcome?: boolean;
+  readonly historyMode?: 'empty' | 'long';
+  readonly historyDelete?: 'success' | 'blocked' | 'unknown-reconcile-deleted';
+  readonly historyUnauthorized?: boolean;
+  readonly holdHistory?: boolean;
 }
 
 function candidateFlow() {
@@ -141,8 +148,8 @@ function sessionSnapshot(projectBound: boolean, overrides: Record<string, unknow
   };
 }
 
-function session(projectBound: boolean, snapshot: Record<string, unknown>) {
-  return { sessionId: f06SessionId, snapshot, updatedAtUtc: timestamp };
+function session(projectBound: boolean, snapshot: Record<string, unknown>, sessionId = f06SessionId) {
+  return { sessionId, snapshot, updatedAtUtc: timestamp };
 }
 
 function projectBaseline(projectBound: boolean) {
@@ -420,6 +427,57 @@ function buildReplay(
   };
 }
 
+function historySessionSummary(index: number, projectBound: boolean) {
+  const sessionId = index === 0
+    ? f06SessionId
+    : index === 1
+      ? f06ProjectSessionId
+      : index === 2
+        ? f06UnboundHistorySessionId
+        : `session_f06_${String(index + 1).padStart(2, '0')}`;
+  const projectId = index === 0
+    ? (projectBound ? f06ProjectId : null)
+    : index === 1 || index > 2 && index % 3 === 1
+      ? f06ProjectId
+      : null;
+  const lifecycleStates = ['idle', 'plan_ready', 'build_ready', 'build_failed', 'plan_cancelled'] as const;
+  return {
+    sessionId,
+    lifecycleState: lifecycleStates[index % lifecycleStates.length],
+    projectId,
+    revision: 30 - index,
+    updatedAtUtc: new Date(Date.parse(timestamp) - index * 60_000).toISOString()
+  };
+}
+
+function historyRunSummary(index: number, sessions: readonly ReturnType<typeof historySessionSummary>[]) {
+  const runNumber = String(index + 1).padStart(2, '0');
+  const status = (['completed', 'running', 'failed', 'cancelled', 'blocked'] as const)[index % 5];
+  const recoveryState = status === 'running'
+    ? 'active'
+    : status === 'blocked'
+      ? 'reconciling'
+      : 'terminal';
+  return {
+    runId: `run_history_f06_${runNumber}`,
+    sessionId: sessions[index % sessions.length]?.sessionId ?? null,
+    kind: index % 2 === 0 ? 'plan' : 'build',
+    status,
+    title: index % 2 === 0 ? '公开方案规划' : '公开候选构建',
+    summary: index === 0
+      ? '长历史摘要：复杂环境光变化下的高反光表面缺陷验证；PUBLIC_VALIDATION_RECOMMENDATION_WITHOUT_INTERNAL_IDENTIFIERS 可完整换行。'
+      : `公开运行摘要 ${runNumber}`,
+    firstFixRecommendation: index % 4 === 0
+      ? '先确认公开参数与资源阻断，再从当前服务端会话继续。'
+      : '',
+    recoveryState,
+    createdAtUtc: new Date(Date.parse(timestamp) - (index + 1) * 120_000).toISOString(),
+    updatedAtUtc: new Date(Date.parse(timestamp) - index * 120_000).toISOString(),
+    lastSequence: index + 3,
+    eventCount: index + 3
+  };
+}
+
 export async function installF06Fixture(page: Page, options: F06BrowserFixtureOptions = {}): Promise<F06BrowserAudit> {
   const role = options.role ?? 'Engineer';
   const flag = options.flag ?? true;
@@ -473,11 +531,21 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
   }
   let releaseBuildStream = () => {};
   let releaseRevalidation = () => {};
+  let releaseHistory = () => {};
   const buildStreamGate = new Promise<void>(resolve => { releaseBuildStream = resolve; });
   const revalidationGate = new Promise<void>(resolve => { releaseRevalidation = resolve; });
+  const historyGate = new Promise<void>(resolve => { releaseHistory = resolve; });
   const audit: F06BrowserAudit = {
-    requests: [], consoleErrors: [], pageErrors: [], releaseBuildStream, releaseRevalidation
+    requests: [], consoleErrors: [], pageErrors: [], releaseBuildStream, releaseRevalidation, releaseHistory
   };
+  const historySessions = options.historyMode === 'long'
+    ? Array.from({ length: 25 }, (_, index) => historySessionSummary(index, projectBound))
+    : [];
+  const historyRuns = options.historyMode === 'long'
+    ? Array.from({ length: 23 }, (_, index) => historyRunSummary(index, historySessions))
+    : [];
+  let deleteOperationLookups = 0;
+  let pendingDeletedSessionId: string | null = null;
   function handoffArtifact(
     id: string,
     status = options.artifactStatus ?? 'available',
@@ -534,6 +602,17 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
   page.on('console', message => {
     if (message.type() !== 'error') return;
     const location = message.location();
+    const expectedHistoryFailure = (
+      location.url.includes('/api/ai/sessions/') && (
+        options.historyDelete === 'blocked' && message.text().includes('409') ||
+        options.historyDelete === 'unknown-reconcile-deleted' && message.text().includes('ERR_CONNECTION_FAILED')
+      )
+    ) || (
+      options.historyUnauthorized &&
+      (location.url.includes('/api/ai/sessions?') || location.url.includes('/api/ai/agent-runs?')) &&
+      message.text().includes('401')
+    );
+    if (expectedHistoryFailure) return;
     const source = location.url ? ` [${location.url}:${location.lineNumber + 1}]` : '';
     audit.consoleErrors.push(`${message.text()}${source}`);
   });
@@ -552,6 +631,7 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
     const json = (status: number, value: unknown) => fulfillF02Json(route, status, value, 'f06-g2-ai.v1');
     if (url.pathname === '/api/auth/setup-status') return json(200, { requiresInitialAdminSetup: false, usernameMinLength: 3, passwordMinLength: 6, requiresUppercase: false, requiresLowercase: false, requiresDigit: false });
     if (url.pathname === '/api/auth/me') return json(200, { userId: 'f06-user', username: 'f06-engineer', role });
+    if (url.pathname === '/api/auth/logout' && request.method() === 'POST') return json(200, {});
     if (url.pathname === '/api/operators/library') return json(200, []);
     if (url.pathname === '/api/cameras/bindings') {
       return json(200, []);
@@ -667,12 +747,95 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
     if (url.pathname === `/api/ai/projects/${f06ProjectId}/baseline`) {
       return json(200, projectBaseline(true));
     }
+    if (url.pathname === '/api/ai/sessions' && request.method() === 'GET') {
+      if (options.historyUnauthorized) {
+        return json(401, { errorCode: 'session_expired', publicMessage: '当前会话已失效。' });
+      }
+      if (options.holdHistory) await historyGate;
+      const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0));
+      const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') ?? 10)));
+      return json(200, {
+        items: historySessions.slice(offset, offset + limit),
+        offset,
+        limit,
+        total: historySessions.length
+      });
+    }
     if (url.pathname === '/api/ai/sessions' && request.method() === 'POST') {
       if (options.failSession) return json(200, { malformedPublicContract: true });
       return json(201, { operation: operation('session_create', String((body as { clientOperationId: string }).clientOperationId)), session: session(projectBound, snapshot) });
     }
-    if (url.pathname === `/api/ai/sessions/${f06SessionId}` && request.method() === 'GET') {
-      return json(200, session(projectBound, snapshot));
+    const sessionRequest = url.pathname.match(/^\/api\/ai\/sessions\/([a-z0-9_.:-]+)$/i);
+    if (sessionRequest && request.method() === 'DELETE') {
+      const deletedSessionId = sessionRequest[1]!;
+      pendingDeletedSessionId = deletedSessionId;
+      if (options.historyDelete === 'blocked') {
+        return json(409, {
+          errorCode: 'session_active_run_conflict',
+          publicMessage: '会话仍有关联的活动构建；请等待终态并完成恢复后再删除。'
+        });
+      }
+      if (options.historyDelete === 'unknown-reconcile-deleted') {
+        return route.abort('connectionfailed');
+      }
+      const index = historySessions.findIndex(item => item.sessionId === deletedSessionId);
+      if (index >= 0) historySessions.splice(index, 1);
+      return json(200, {});
+    }
+    if (sessionRequest && request.method() === 'GET') {
+      const requestedId = sessionRequest[1]!;
+      const summary = historySessions.find(item => item.sessionId === requestedId);
+      if (requestedId !== f06SessionId && !summary) {
+        return json(404, { errorCode: 'ai_session_not_found', publicMessage: '会话不存在或不可访问。' });
+      }
+      const sessionProjectBound = summary?.projectId !== null && summary?.projectId !== undefined
+        ? true
+        : requestedId === f06SessionId
+          ? projectBound
+          : false;
+      const canonicalSnapshot = requestedId === f06SessionId
+        ? snapshot
+        : sessionSnapshot(sessionProjectBound, {
+            revision: summary?.revision ?? 1,
+            lifecycleState: summary?.lifecycleState ?? 'idle'
+          });
+      return json(200, session(sessionProjectBound, canonicalSnapshot, requestedId));
+    }
+    if (url.pathname === '/api/ai/agent-runs' && request.method() === 'GET') {
+      if (options.historyUnauthorized) {
+        return json(401, { errorCode: 'session_expired', publicMessage: '当前会话已失效。' });
+      }
+      if (options.holdHistory) await historyGate;
+      const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0));
+      const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') ?? 10)));
+      const requestedSessionId = url.searchParams.get('sessionId');
+      const scopedRuns = requestedSessionId
+        ? historyRuns.filter(item => item.sessionId === requestedSessionId)
+        : historyRuns;
+      return json(200, {
+        items: scopedRuns.slice(offset, offset + limit),
+        offset,
+        limit,
+        total: scopedRuns.length
+      });
+    }
+    if (url.pathname.startsWith('/api/ai/operations/') &&
+        url.searchParams.get('kind') === 'session_delete') {
+      deleteOperationLookups += 1;
+      const clientOperationId = url.pathname.split('/').at(-1)!;
+      const status = options.historyDelete === 'unknown-reconcile-deleted' && deleteOperationLookups === 1
+        ? 'pending'
+        : 'created';
+      if (status === 'created') {
+        const index = historySessions.findIndex(item => item.sessionId === pendingDeletedSessionId);
+        if (index >= 0) historySessions.splice(index, 1);
+      }
+      return json(200, {
+        ...operation('session_create', clientOperationId),
+        kind: 'session_delete',
+        status,
+        runId: null
+      });
     }
     if (options.failSession && url.pathname.startsWith('/api/ai/operations/')) {
       const clientOperationId = url.pathname.split('/').at(-1)!;
@@ -820,11 +983,11 @@ function evidenceRoot(): string | null {
   const configured = process.env.CV_F06_EVIDENCE_DIR?.trim();
   if (!configured) return null;
   const repositoryRoot = resolve(process.cwd(), '..', '..', '..');
-  const allowedRoot = resolve(repositoryRoot, '.tmp', 'studio-ui-next', 'f06-g3');
+  const allowedRoot = resolve(repositoryRoot, '.tmp', 'studio-ui-next', 'f06-g5');
   const output = isAbsolute(configured) ? resolve(configured) : resolve(repositoryRoot, configured);
   const relativeOutput = relative(allowedRoot, output);
   if (relativeOutput.startsWith('..') || isAbsolute(relativeOutput)) {
-    throw new Error('CV_F06_EVIDENCE_DIR must remain under .tmp/studio-ui-next/f06-g3.');
+    throw new Error('CV_F06_EVIDENCE_DIR must remain under .tmp/studio-ui-next/f06-g5.');
   }
   return output;
 }
@@ -840,20 +1003,39 @@ export async function captureF06Evidence(
   if (!root) return;
   const safeScenario = scenario.replace(/[^a-z0-9_.-]+/gi, '-').toLowerCase();
   await mkdir(root, { recursive: true });
-  const projection = await page.evaluate(() => ({
-    viewport: { width: window.innerWidth, height: window.innerHeight },
-    density: document.documentElement.dataset.density ?? null,
-    overflow: Math.max(document.documentElement.scrollWidth - document.documentElement.clientWidth, document.body.scrollWidth - document.body.clientWidth),
-    dpr: window.devicePixelRatio
-  }));
+  const projection = await page.evaluate(() => {
+    const visibleText = document.body.innerText;
+    const sensitiveSentinels = [
+      'SYSTEM_PROMPT_SENTINEL', 'RAW_TOOL_PAYLOAD_SENTINEL', 'sk-private-f06',
+      'C:\\factory\\secret', '10.23.45.67', '192.168.88.9'
+    ];
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      density: document.documentElement.dataset.density ?? null,
+      overflow: Math.max(document.documentElement.scrollWidth - document.documentElement.clientWidth, document.body.scrollWidth - document.body.clientWidth),
+      dpr: window.devicePixelRatio,
+      dialogHorizontalOverflow: [...document.querySelectorAll<HTMLElement>('[role="dialog"], [role="dialog"] *')]
+        .filter(element => element.getClientRects().length > 0 && element.scrollWidth - element.clientWidth > 1)
+        .map(element => ({
+          element: `${element.tagName.toLowerCase()}${element.className ? `.${String(element.className).trim().replace(/\s+/g, '.')}` : ''}`,
+          overflow: element.scrollWidth - element.clientWidth
+        })),
+      sensitiveLeaks: sensitiveSentinels.filter(value => visibleText.includes(value))
+    };
+  });
   if (projection.overflow > 1) throw new Error(`F06 visual evidence has ${projection.overflow}px horizontal overflow.`);
+  if (projection.dialogHorizontalOverflow.length) {
+    throw new Error(`F06 drawer evidence has horizontal overflow: ${JSON.stringify(projection.dialogHorizontalOverflow)}.`);
+  }
   if (projection.density !== density) throw new Error(`F06 density mismatch: ${JSON.stringify(projection)}.`);
+  if (projection.sensitiveLeaks.length) throw new Error(`F06 sensitive field leak: ${JSON.stringify(projection.sensitiveLeaks)}.`);
   if (audit.consoleErrors.length || audit.pageErrors.length) throw new Error(`F06 runtime errors: ${JSON.stringify(audit)}.`);
   const screenshot = await page.screenshot({ animations: 'disabled', fullPage: false, type: 'png' });
-  const stem = `${safeScenario}-${viewport.width}x${viewport.height}-${density}`;
+  const safeDpr = String(projection.dpr).replace('.', '_');
+  const stem = `${safeScenario}-${viewport.width}x${viewport.height}-${density}-dpr-${safeDpr}`;
   await writeFile(resolve(root, `${stem}.png`), screenshot);
   await writeFile(resolve(root, `${stem}.json`), `${JSON.stringify({
-    schemaVersion: 'f06-g3-browser-evidence.v1', sourceSha: process.env.CV_F06_SOURCE_SHA ?? 'WORKTREE',
+    schemaVersion: 'f06-g5-browser-evidence.v1', sourceSha: process.env.CV_F06_SOURCE_SHA ?? 'WORKTREE',
     MODEL_MODE: 'RULE_FALLBACK', DATA_SOURCE: 'DETERMINISTIC_BROWSER_FIXTURE', scenario,
     url: page.url(), viewport, observed: projection, density, requestCount: audit.requests.length,
     forbiddenRequests: audit.requests.filter(item =>

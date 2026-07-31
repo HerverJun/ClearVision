@@ -105,6 +105,7 @@ public interface IAiWorkspaceHandoffArtifactStore
     AiWorkspaceHandoffArtifactV1? Get(string ownerHash, string artifactId);
     AiWorkspaceHandoffArtifactV1? FindByCreateOperation(string ownerHash, Guid clientOperationId);
     AiWorkspaceHandoffArtifactV1? FindByBuildRun(string ownerHash, string buildRunId);
+    IReadOnlyList<AiWorkspaceHandoffArtifactV1> ListBySession(string ownerHash, string sessionId);
     AiWorkspaceHandoffStoreResult ReserveConsume(
         string ownerHash,
         string artifactId,
@@ -301,6 +302,21 @@ public sealed class AiWorkspaceHandoffArtifactStore : IAiWorkspaceHandoffArtifac
                     string.Equals(item.BuildRunId, runId, StringComparison.Ordinal))
                 .OrderByDescending(item => item.UpdatedAtUtc)
                 .FirstOrDefault();
+        }
+    }
+
+    public IReadOnlyList<AiWorkspaceHandoffArtifactV1> ListBySession(string ownerHash, string sessionId)
+    {
+        var owner = Required(ownerHash, nameof(ownerHash));
+        var normalizedSessionId = Required(sessionId, nameof(sessionId));
+        lock (_gate)
+        {
+            MaintainAndPersistIfChanged(_utcNow());
+            return _artifacts.Values
+                .Where(item => item.OwnerHash == owner &&
+                    string.Equals(item.SessionId, normalizedSessionId, StringComparison.Ordinal))
+                .OrderByDescending(item => item.UpdatedAtUtc)
+                .ToArray();
         }
     }
 

@@ -23,6 +23,7 @@ public interface IAgentRunEventStreamService
     AgentRunReplayResult? ReplayRaw(string runId);
     AgentRunReplayResult? Replay(string runId);
     AgentRunReplayResult? ReplayLatest(string? ownerHash = null);
+    IReadOnlyList<AgentRunSummary> ListSummaries(string? ownerHash = null);
     CancellationToken GetCancellationToken(string? runId);
     bool TryCancelToken(string runId);
     bool IsRunOwner(string runId, string? ownerHash);
@@ -482,6 +483,20 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 
     public AgentRunReplayResult? ReplayLatest(string? ownerHash = null)
     {
+        foreach (var summary in ListSummaries(ownerHash))
+        {
+            var replay = Replay(summary.RunId);
+            if (replay != null)
+            {
+                return replay;
+            }
+        }
+
+        return null;
+    }
+
+    public IReadOnlyList<AgentRunSummary> ListSummaries(string? ownerHash = null)
+    {
         var normalizedOwner = NormalizeOwnerHash(ownerHash);
         var summaries = _store.LoadSummaries().ToList();
         foreach (var state in _runs.Values)
@@ -492,20 +507,13 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             }
         }
 
-        foreach (var summary in summaries
+        return summaries
             .GroupBy(item => item.RunId, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.OrderByDescending(item => item.UpdatedAt).First())
             .Where(summary => IsSummaryOwner(summary, normalizedOwner))
-            .OrderByDescending(summary => summary.UpdatedAt))
-        {
-            var replay = Replay(summary.RunId);
-            if (replay != null)
-            {
-                return replay;
-            }
-        }
-
-        return null;
+            .OrderByDescending(summary => summary.UpdatedAt)
+            .ThenByDescending(summary => summary.CreatedAt)
+            .ToArray();
     }
 
     public CancellationToken GetCancellationToken(string? runId)

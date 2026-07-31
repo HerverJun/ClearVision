@@ -70,6 +70,7 @@ public interface IAiOperationReceiptStore
     AiOperationReceipt? Get(string ownerHash, string kind, Guid clientOperationId);
     IReadOnlyList<AiOperationReceipt> Find(string ownerHash, Guid clientOperationId);
     AiOperationReceipt? FindByRun(string ownerHash, string kind, string runId);
+    IReadOnlyList<AiOperationReceipt> ListBySession(string ownerHash, string sessionId);
 
     AiOperationReceipt? MarkCreated(
         string ownerHash,
@@ -227,6 +228,21 @@ public sealed class AiOperationReceiptStore : IAiOperationReceiptStore
                     string.Equals(receipt.RunId, normalizedRunId, StringComparison.Ordinal))
                 .OrderByDescending(receipt => receipt.UpdatedAtUtc)
                 .FirstOrDefault();
+        }
+    }
+
+    public IReadOnlyList<AiOperationReceipt> ListBySession(string ownerHash, string sessionId)
+    {
+        var normalizedOwner = NormalizeRequired(ownerHash, nameof(ownerHash));
+        var normalizedSessionId = NormalizeRequired(sessionId, nameof(sessionId));
+        lock (_gate)
+        {
+            PruneExpiredUnderLock(DateTimeOffset.UtcNow);
+            return _receipts.Values
+                .Where(receipt => receipt.OwnerHash == normalizedOwner &&
+                    string.Equals(receipt.SessionId, normalizedSessionId, StringComparison.Ordinal))
+                .OrderByDescending(receipt => receipt.UpdatedAtUtc)
+                .ToArray();
         }
     }
 

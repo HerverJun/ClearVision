@@ -19,7 +19,8 @@ import type {
   AiProjectBaselineV1,
   AiRequirementMode,
   AiSessionDetailV1,
-  AiSessionSnapshotV1
+  AiSessionSnapshotV1,
+  AiSessionSummaryV1
 } from './contracts';
 import { decodeAiSessionSnapshotV1 } from './decoder';
 import { createAiWorkbenchApi, type AiWorkbenchApi } from './apiAdapter';
@@ -28,6 +29,10 @@ import { projectAiWorkbench, type AiWorkbenchProjection } from './projection';
 import { aiWorkbenchActionModel, type AiWorkbenchActionModel } from './actionModel';
 import { createAiResourceLedger, type AiResourceLedgerDiagnostics } from './resourceLedger';
 import { validateBuildParameterValues } from './parameterValidation';
+import {
+  createAiHistoryController,
+  type AiHistoryState
+} from './aiHistoryController';
 import {
   eventRequiresReplay,
   initialAiWorkbenchState,
@@ -48,6 +53,7 @@ export interface AiSessionOwner {
   readonly state: DeepReadonly<ShallowRef<AiWorkbenchState>>;
   readonly projection: ComputedRef<AiWorkbenchProjection>;
   readonly actionModel: ComputedRef<AiWorkbenchActionModel>;
+  readonly history: DeepReadonly<ShallowRef<AiHistoryState>>;
   start(): Promise<void>;
   submitTask(description: string, requirementMode: AiRequirementMode): Promise<void>;
   retryIntent(): Promise<void>;
@@ -68,6 +74,10 @@ export interface AiSessionOwner {
   startNewTask(): void;
   retry(): Promise<void>;
   refresh(): Promise<void>;
+  loadSessionHistory(offset?: number): Promise<void>;
+  loadRunHistory(offset?: number, sessionId?: string | null): Promise<void>;
+  deleteSession(session: AiSessionSummaryV1): Promise<boolean>;
+  reconcileSessionDelete(): Promise<boolean>;
   diagnostics(): AiResourceLedgerDiagnostics;
   dispose(): void;
 }
@@ -179,6 +189,12 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
       release();
     }
   }
+
+  const historyController = createAiHistoryController({
+    api,
+    execute: request,
+    operationIdFactory
+  });
 
   function fail(error: unknown, fallbackPhase: PublicFailure['phase'] = 'offline-or-service-unavailable'): void {
     if (disposed || error instanceof ApiAbortError) return;
@@ -1083,6 +1099,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     state: readonly(state),
     projection: computed(() => projectAiWorkbench(state.value)),
     actionModel: computed(() => aiWorkbenchActionModel(state.value)),
+    history: historyController.state,
     start,
     submitTask,
     retryIntent,
@@ -1103,12 +1120,17 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     startNewTask,
     retry,
     refresh: reconcile,
+    loadSessionHistory: historyController.loadSessions,
+    loadRunHistory: historyController.loadRuns,
+    deleteSession: historyController.deleteSession,
+    reconcileSessionDelete: historyController.reconcileDelete,
     diagnostics: ledger.diagnostics,
     dispose() {
       if (disposed) return;
       disposed = true;
       ownerGeneration += 1;
       planGeneration += 1;
+      historyController.dispose();
       streamAdapter.dispose();
       ledger.dispose();
       dispatch({ type: 'dispose', at: now() });

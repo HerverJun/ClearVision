@@ -6,6 +6,7 @@ using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
+using ClearVision.Product.Infrastructure.AI.Handoff;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -157,7 +158,9 @@ public static class AiSessionEndpoints
         Guid clientMutationId,
         HttpContext context,
         IConversationalFlowService conversationService,
-        IAiOperationReceiptStore operations)
+        IAiOperationReceiptStore operations,
+        IAgentRunEventStreamService runs,
+        IAiWorkspaceHandoffArtifactStore artifacts)
     {
         if (clientMutationId == Guid.Empty)
         {
@@ -180,6 +183,37 @@ public static class AiSessionEndpoints
                 deleted = reservation.Receipt!.Status == AiOperationStatuses.Created,
                 operation = AiPublicContractMapper.ToOperation(reservation.Receipt)
             });
+        }
+
+        var current = conversationService.GetOwnedSession(ownerHash, sessionId);
+        if (current != null && (current.WorkspaceSnapshot?.Revision ?? 0) == expectedRevision)
+        {
+            var unsafeDelete = BuildUnsafeDeleteConflict(
+                ownerHash,
+                sessionId,
+                clientMutationId,
+                current.WorkspaceSnapshot,
+                operations,
+                runs,
+                artifacts);
+            if (unsafeDelete != null)
+            {
+                var rejected = operations.MarkFailed(
+                    ownerHash,
+                    AiOperationKinds.SessionDelete,
+                    clientMutationId,
+                    unsafeDelete.Value.ErrorCode,
+                    unsafeDelete.Value.PublicMessage,
+                    rejected: true,
+                    sessionId: sessionId);
+                return Results.Json(new
+                {
+                    errorCode = unsafeDelete.Value.ErrorCode,
+                    publicMessage = unsafeDelete.Value.PublicMessage,
+                    latestSnapshot = AiPublicContractMapper.ToSnapshot(current.WorkspaceSnapshot),
+                    operation = rejected == null ? null : AiPublicContractMapper.ToOperation(rejected)
+                }, statusCode: StatusCodes.Status409Conflict);
+            }
         }
 
         var result = conversationService.DeleteOwnedSession(
@@ -380,6 +414,59 @@ public static class AiSessionEndpoints
             }, statusCode: StatusCodes.Status503ServiceUnavailable),
             _ => null
         };
+    }
+
+    private static (string ErrorCode, string PublicMessage)? BuildUnsafeDeleteConflict(
+        string ownerHash,
+        string sessionId,
+        Guid deleteMutationId,
+        VisionAgentWorkspaceSnapshot? snapshot,
+        IAiOperationReceiptStore operations,
+        IAgentRunEventStreamService runs,
+        IAiWorkspaceHandoffArtifactStore artifacts)
+    {
+        var sessionOperations = operations.ListBySession(ownerHash, sessionId);
+        if (sessionOperations.Any(operation =>
+                operation.ClientOperationId != deleteMutationId &&
+                operation.Status == AiOperationStatuses.Pending))
+        {
+            return (
+                "session_active_operation_conflict",
+                "会话仍有结果待确认的操作，当前不能删除。请先协调该操作的服务端状态。");
+        }
+
+        var activeRunIds = runs.ListSummaries(ownerHash)
+            .Where(summary => summary.Status is AgentRunEventStatuses.Pending or AgentRunEventStatuses.Running)
+            .Select(summary => summary.RunId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (sessionOperations.Any(operation =>
+                operation.Kind is AiOperationKinds.PlanRun or AiOperationKinds.BuildRun &&
+                !string.IsNullOrWhiteSpace(operation.RunId) &&
+                activeRunIds.Contains(operation.RunId)) ||
+            !string.IsNullOrWhiteSpace(snapshot?.PlanRunId) && activeRunIds.Contains(snapshot.PlanRunId) ||
+            !string.IsNullOrWhiteSpace(snapshot?.BuildRunId) && activeRunIds.Contains(snapshot.BuildRunId))
+        {
+            return (
+                "session_active_run_conflict",
+                "会话仍有运行中的规划或构建，当前不能删除。请先取消并等待服务端确认终态。");
+        }
+
+        var handoffs = artifacts.ListBySession(ownerHash, sessionId);
+        if (handoffs.Any(artifact => artifact.Status is
+                AiWorkspaceHandoffStatuses.Available or AiWorkspaceHandoffStatuses.Consuming))
+        {
+            return (
+                "session_active_artifact_conflict",
+                "会话仍有待接收的交接工件，当前不能删除。请先完成或放弃工作区交接。");
+        }
+        if (handoffs.Any(artifact => artifact.Status == AiWorkspaceHandoffStatuses.Consumed))
+        {
+            return (
+                "session_staged_draft_conflict",
+                "此会话的候选已进入工作区暂存草稿，当前不能删除。请先保存或放弃该草稿。");
+        }
+
+        return null;
     }
 
     internal static string ComputeFingerprint(object value)

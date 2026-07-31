@@ -8,10 +8,13 @@ import {
   decodeAiIntentResultV1,
   decodeAiOperationProjectionV1,
   decodeAiPlanV1,
+  decodeAiRunHistoryPageV1,
+  decodeAiSessionPageV1,
   decodeAiSessionDetailV1
 } from '@/capabilities/ai-workbench/decoder';
 import {
   aiProjectId,
+  aiTimestamp,
   buildParameterFixture,
   buildResultFixture,
   intentFixture,
@@ -37,6 +40,30 @@ describe('AI workbench public decoders', () => {
       ...sessionFixture(),
       snapshot: { ...sessionFixture().snapshot, authorization: 'Bearer secret' }
     })).toThrow(AiContractDecodeError);
+  });
+
+  it('strictly decodes owner-bound Session and Run history pages', () => {
+    const sessions = {
+      items: [{ sessionId: 'session_01', lifecycleState: 'plan_ready', projectId: null,
+        revision: 7, updatedAtUtc: aiTimestamp }],
+      offset: 0, limit: 10, total: 1
+    };
+    const runs = {
+      items: [{
+        runId: 'run_plan_01', sessionId: 'session_01', kind: 'plan', status: 'completed',
+        title: '方案规划', summary: '规划已完成。', firstFixRecommendation: '', recoveryState: 'terminal',
+        createdAtUtc: aiTimestamp, updatedAtUtc: aiTimestamp, lastSequence: 3, eventCount: 3
+      }],
+      offset: 0, limit: 10, total: 1
+    };
+    expect(decodeAiSessionPageV1(sessions).items[0]?.revision).toBe(7);
+    expect(decodeAiRunHistoryPageV1(runs).items[0]?.kind).toBe('plan');
+    expect(() => decodeAiSessionPageV1({ ...sessions, ownerHash: 'private' })).toThrow(AiContractDecodeError);
+    expect(() => decodeAiRunHistoryPageV1({
+      ...runs,
+      items: [{ ...runs.items[0], rawReasoning: 'private' }]
+    })).toThrow(AiContractDecodeError);
+    expect(() => decodeAiRunHistoryPageV1({ ...runs, limit: 0 })).toThrow(AiContractDecodeError);
   });
 
   it('strictly decodes Intent and replay-safe Plan public projections', () => {

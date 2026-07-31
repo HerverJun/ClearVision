@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ApiConflictError, ApiUnauthorizedError, type ApiTransport } from '@/platform/api';
+import { ApiAbortError, ApiConflictError, ApiUnauthorizedError, type ApiTransport } from '@/platform/api';
 import { createAiSessionOwner } from '@/capabilities/ai-workbench/aiSessionOwner';
 import {
   aiBuildOperationId,
@@ -774,6 +774,33 @@ describe('route-scoped AiSessionOwner', () => {
       await vi.waitFor(() => expect(owner.diagnostics().streamCount).toBeGreaterThan(0));
       owner.dispose();
       await starting;
+      expect(owner.diagnostics()).toEqual({
+        requestCount: 0, streamCount: 0, timerCount: 0, subscriptionCount: 0, disposed: true
+      });
+    }
+  });
+
+  it('aborts paged history requests and rejects their late projection across 20 owner switches', async () => {
+    for (let cycle = 0; cycle < 20; cycle += 1) {
+      const api = {
+        apiBaseUrl: 'http://localhost:5000/api',
+        get: vi.fn(async (path: string, options?: { signal?: AbortSignal }) => {
+          if (!path.startsWith('ai/sessions?')) throw new Error(`Unexpected GET ${path}`);
+          return await new Promise((_, reject) => {
+            options?.signal?.addEventListener('abort', () => {
+              reject(new ApiAbortError(path, options.signal?.reason));
+            }, { once: true });
+          });
+        })
+      } as unknown as ApiTransport;
+      const owner = createAiSessionOwner({ api });
+      const loading = owner.loadSessionHistory();
+      await vi.waitFor(() => expect(owner.diagnostics().requestCount).toBe(1));
+
+      owner.dispose();
+      await loading;
+
+      expect(owner.history.value.sessions.items).toHaveLength(0);
       expect(owner.diagnostics()).toEqual({
         requestCount: 0, streamCount: 0, timerCount: 0, subscriptionCount: 0, disposed: true
       });

@@ -3,7 +3,10 @@ import { computed, onMounted, onUnmounted, shallowRef, watch, type WatchStopHand
 import { useRoute, useRouter } from 'vue-router';
 import { useProductRuntime } from '@/app/productRuntime';
 import { CvPageHeader, CvPageState } from '@/design-system/patterns';
-import { CvInlineAlert, CvStatusBadge } from '@/design-system/primitives';
+import { CvIcon } from '@/design-system/icons';
+import { CvIconButton, CvInlineAlert, CvStatusBadge } from '@/design-system/primitives';
+import AiDiagnosticsDrawer from './AiDiagnosticsDrawer.vue';
+import AiHistoryDrawer from './AiHistoryDrawer.vue';
 import AiClarificationPanel from './AiClarificationPanel.vue';
 import AiBuildProgress from './AiBuildProgress.vue';
 import AiBuildWorkspace from './AiBuildWorkspace.vue';
@@ -17,7 +20,7 @@ import AiTaskComposer from './AiTaskComposer.vue';
 import AiWorkbenchStage from './AiWorkbenchStage.vue';
 import { aiWorkbenchActionModel, type AiWorkbenchActionId } from './actionModel';
 import { createAiSessionOwner, type AiSessionOwner } from './aiSessionOwner';
-import type { AiRequirementMode } from './contracts';
+import type { AiRequirementMode, AiSessionSummaryV1 } from './contracts';
 import { projectAiWorkbench } from './projection';
 import { initialAiWorkbenchState } from './reducer';
 
@@ -25,6 +28,8 @@ const route = useRoute();
 const router = useRouter();
 const runtime = useProductRuntime();
 const owner = shallowRef<AiSessionOwner | null>(null);
+const historyOpen = shallowRef(false);
+const diagnosticsOpen = shallowRef(false);
 let stopRouteWatch: WatchStopHandle | null = null;
 
 const state = computed(() => owner.value?.state.value ?? initialAiWorkbenchState);
@@ -33,6 +38,8 @@ const actionModel = computed(() => owner.value?.actionModel.value ?? aiWorkbench
 const diagnostics = computed(() => owner.value?.diagnostics() ?? {
   requestCount: 0, streamCount: 0, timerCount: 0, subscriptionCount: 0, disposed: true
 });
+const history = computed(() => owner.value?.history.value ?? null);
+const currentSessionId = computed(() => state.value.session?.sessionId ?? null);
 const requestedSessionId = computed(() => typeof route.query.sessionId === 'string' ? route.query.sessionId : null);
 const projectId = computed(() => typeof route.params.id === 'string' ? route.params.id : null);
 const routeIdentity = computed(() => `${String(route.name)}|${projectId.value ?? ''}|${requestedSessionId.value ?? ''}`);
@@ -48,6 +55,8 @@ const showApplyPreview = computed(() => state.value.build !== null && [
 
 function replaceOwner(): void {
   owner.value?.dispose();
+  historyOpen.value = false;
+  diagnosticsOpen.value = false;
   const next = createAiSessionOwner({
     api: runtime.api,
     requestedSessionId: requestedSessionId.value,
@@ -55,6 +64,58 @@ function replaceOwner(): void {
   });
   owner.value = next;
   void next.start();
+}
+
+function releaseOwner(current: AiSessionOwner): void {
+  current.dispose();
+  if (owner.value === current) owner.value = null;
+  const released = current.diagnostics();
+  if (released.requestCount || released.streamCount || released.timerCount || released.subscriptionCount) {
+    throw new Error('AI owner resources were not released before Session navigation.');
+  }
+}
+
+async function restoreSession(session: AiSessionSummaryV1): Promise<void> {
+  const current = owner.value;
+  if (!current || session.sessionId === currentSessionId.value) return;
+  historyOpen.value = false;
+  diagnosticsOpen.value = false;
+  releaseOwner(current);
+  await router.push({
+    name: session.projectId ? 'project-ai-workbench' : 'ai-workbench',
+    ...(session.projectId ? { params: { id: session.projectId } } : {}),
+    query: { sessionId: session.sessionId }
+  });
+}
+
+async function deleteSession(session: AiSessionSummaryV1): Promise<void> {
+  const current = owner.value;
+  if (!current) return;
+  const wasCurrent = session.sessionId === currentSessionId.value;
+  const deleted = await current.deleteSession(session);
+  if (!deleted || owner.value !== current || !wasCurrent) return;
+  historyOpen.value = false;
+  diagnosticsOpen.value = false;
+  releaseOwner(current);
+  const query = { ...route.query };
+  delete query.sessionId;
+  await router.replace({ name: route.name ?? undefined, params: route.params, query });
+  if (!owner.value) replaceOwner();
+}
+
+async function reconcileSessionDelete(): Promise<void> {
+  const current = owner.value;
+  const deletedSessionId = current?.history.value.deletingSessionId ?? null;
+  if (!current || !deletedSessionId) return;
+  const wasCurrent = deletedSessionId === currentSessionId.value;
+  const deleted = await current.reconcileSessionDelete();
+  if (!deleted || owner.value !== current || !wasCurrent) return;
+  historyOpen.value = false;
+  releaseOwner(current);
+  const query = { ...route.query };
+  delete query.sessionId;
+  await router.replace({ name: route.name ?? undefined, params: route.params, query });
+  if (!owner.value) replaceOwner();
 }
 
 async function handoffAndOpenWorkspace(reconcile: boolean): Promise<void> {
@@ -66,12 +127,7 @@ async function handoffAndOpenWorkspace(reconcile: boolean): Promise<void> {
   if (!artifact || owner.value !== current) return;
   const targetId = artifact.targetKind === 'new' ? 'new' : artifact.projectBaseline.projectId;
   if (!targetId) return;
-  current.dispose();
-  owner.value = null;
-  const released = current.diagnostics();
-  if (released.requestCount || released.streamCount || released.timerCount || released.subscriptionCount) {
-    throw new Error('AI owner resources were not released before Workspace navigation.');
-  }
+  releaseOwner(current);
   await router.push({
     name: 'project-workspace',
     params: { id: targetId },
@@ -128,6 +184,32 @@ onUnmounted(() => {
           :label="projection.statusLabel"
         />
         <span class="ai-workbench-page__scope">{{ projectId ? '工程方案' : '独立方案' }}</span>
+      </template>
+      <template #actions>
+        <CvIconButton
+          label="打开历史与恢复"
+          size="sm"
+          :disabled="!owner"
+          :aria-expanded="historyOpen"
+          @click="historyOpen = true; diagnosticsOpen = false"
+        >
+          <CvIcon
+            name="clock"
+            size="sm"
+          />
+        </CvIconButton>
+        <CvIconButton
+          label="打开公开诊断"
+          size="sm"
+          :disabled="!owner"
+          :aria-expanded="diagnosticsOpen"
+          @click="diagnosticsOpen = true; historyOpen = false"
+        >
+          <CvIcon
+            name="diagnostics"
+            size="sm"
+          />
+        </CvIconButton>
       </template>
     </CvPageHeader>
 
@@ -233,11 +315,32 @@ onUnmounted(() => {
         </div>
       </main>
     </template>
+
+    <AiHistoryDrawer
+      v-if="owner && history"
+      :open="historyOpen"
+      :history="history"
+      :current-session-id="currentSessionId"
+      :route-project-id="projectId"
+      @close="historyOpen = false"
+      @load-sessions="offset => owner?.loadSessionHistory(offset)"
+      @load-runs="(offset, sessionId) => owner?.loadRunHistory(offset, sessionId)"
+      @restore="restoreSession"
+      @delete="deleteSession"
+      @reconcile-delete="reconcileSessionDelete"
+    />
+    <AiDiagnosticsDrawer
+      v-if="owner"
+      :open="diagnosticsOpen"
+      :state="state"
+      :projection="projection"
+      @close="diagnosticsOpen = false"
+    />
   </section>
 </template>
 
 <style scoped>
-.ai-workbench-page { display: grid; min-width: 0; align-content: start; }
+.ai-workbench-page { display: grid; min-width: 0; align-content: start; overflow-x: clip; }
 .ai-workbench-page__scope { display: inline-flex; min-height: 22px; align-items: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .ai-workbench-page__context { padding: 0 var(--cv-density-page-padding) var(--cv-space-3); }
 .ai-workbench-page__main { display: grid; min-width: 0; gap: var(--cv-density-page-gap); padding: var(--cv-density-page-gap) var(--cv-density-page-padding) var(--cv-density-page-padding); }

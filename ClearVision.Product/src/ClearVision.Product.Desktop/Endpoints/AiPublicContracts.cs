@@ -141,6 +141,26 @@ public sealed record AiSessionPageV1(
     int Limit,
     int Total);
 
+public sealed record AiAgentRunHistorySummaryV1(
+    string RunId,
+    string? SessionId,
+    string Kind,
+    string Status,
+    string Title,
+    string Summary,
+    string FirstFixRecommendation,
+    string RecoveryState,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc,
+    long LastSequence,
+    int EventCount);
+
+public sealed record AiAgentRunHistoryPageV1(
+    IReadOnlyList<AiAgentRunHistorySummaryV1> Items,
+    int Offset,
+    int Limit,
+    int Total);
+
 public sealed record AiOperationProjectionV1(
     Guid ClientOperationId,
     string Kind,
@@ -173,6 +193,36 @@ internal static class AiPublicContractMapper
 
     public static AiSessionDetailV1 ToDetail(ConversationSession session) =>
         new(session.SessionId, ToSnapshot(session.WorkspaceSnapshot), session.UpdatedAtUtc);
+
+    public static AiAgentRunHistorySummaryV1 ToRunHistorySummary(
+        AgentRunSummary summary,
+        string? sessionId,
+        string kind)
+    {
+        var publicTextAllowed = summary.MetadataOnly && summary.RedactionPass;
+        var terminal = summary.Status is AgentRunEventStatuses.Completed or
+            AgentRunEventStatuses.Failed or AgentRunEventStatuses.Cancelled;
+        var recoveryState = terminal
+            ? "terminal"
+            : summary.TerminalIntent is not null
+                ? "reconciling"
+                : summary.Status is AgentRunEventStatuses.Pending or AgentRunEventStatuses.Running
+                    ? "active"
+                    : "unknown";
+        return new AiAgentRunHistorySummaryV1(
+            summary.RunId,
+            NormalizeOptional(sessionId),
+            kind is "plan" or "build" ? kind : "unknown",
+            summary.Status,
+            publicTextAllowed ? PublicRedactor.RedactText(summary.Title) : "运行摘要不可公开",
+            publicTextAllowed ? PublicRedactor.RedactText(summary.Summary) : "该运行未通过公开诊断校验。",
+            publicTextAllowed ? PublicRedactor.RedactText(summary.FirstFixRecommendation) : string.Empty,
+            recoveryState,
+            summary.CreatedAt,
+            summary.UpdatedAt,
+            Math.Max(0, summary.LastSequence),
+            Math.Max(0, summary.EventCount));
+    }
 
     public static AiSessionSnapshotV1 ToSnapshot(VisionAgentWorkspaceSnapshot? snapshot) =>
         new(

@@ -43,10 +43,16 @@ import {
   type AiWorkflowDiffV1,
   type AiApplyGateV1,
   type AiRunStatus,
+  type AiRunHistoryKind,
+  type AiRunHistoryPageV1,
+  type AiRunHistorySummaryV1,
+  type AiRunRecoveryState,
   type AiSemanticExtractionV1,
   type AiSessionCreateResponseV1,
   type AiSessionDetailV1,
+  type AiSessionPageV1,
   type AiSessionSnapshotV1,
+  type AiSessionSummaryV1,
   type AiTemplateSelectionV1
 } from './contracts';
 
@@ -69,6 +75,8 @@ const handoffStatuses = new Set<AiHandoffStatus>(['available', 'consuming', 'con
 const runStatuses = new Set<AiRunStatus>([
   'pending', 'running', 'completed', 'failed', 'cancelled', 'blocked', 'warning'
 ]);
+const runHistoryKinds = new Set<AiRunHistoryKind>(['plan', 'build', 'unknown']);
+const runRecoveryStates = new Set<AiRunRecoveryState>(['active', 'reconciling', 'terminal', 'unknown']);
 const parameterComparisons = new Set<AiParameterConditionV1['comparison']>([
   'equals', 'not-equals', 'empty', 'not-empty'
 ]);
@@ -719,6 +727,88 @@ export function decodeAiSessionDetailV1(value: unknown, path = '$'): AiSessionDe
     sessionId: string(required(source, 'sessionId', path), `${path}.sessionId`, sessionPattern),
     snapshot: decodeAiSessionSnapshotV1(required(source, 'snapshot', path), `${path}.snapshot`),
     updatedAtUtc: timestamp(required(source, 'updatedAtUtc', path), `${path}.updatedAtUtc`)
+  });
+}
+
+function decodeAiSessionSummaryV1(value: unknown, path: string): AiSessionSummaryV1 {
+  const source = record(value, path);
+  exact(source, ['sessionId', 'lifecycleState', 'projectId', 'revision', 'updatedAtUtc'], path);
+  return Object.freeze({
+    sessionId: string(required(source, 'sessionId', path), `${path}.sessionId`, sessionPattern),
+    lifecycleState: string(required(source, 'lifecycleState', path), `${path}.lifecycleState`, tokenPattern),
+    projectId: nullableString(required(source, 'projectId', path), `${path}.projectId`, guidPattern),
+    revision: integer(required(source, 'revision', path), `${path}.revision`),
+    updatedAtUtc: timestamp(required(source, 'updatedAtUtc', path), `${path}.updatedAtUtc`)
+  });
+}
+
+export function decodeAiSessionPageV1(value: unknown, path = '$'): AiSessionPageV1 {
+  const source = record(value, path);
+  exact(source, ['items', 'offset', 'limit', 'total'], path);
+  const items = required(source, 'items', path);
+  if (!Array.isArray(items)) throw new AiContractDecodeError(`${path}.items`, 'an array');
+  const offset = integer(required(source, 'offset', path), `${path}.offset`);
+  const limit = integer(required(source, 'limit', path), `${path}.limit`);
+  const total = integer(required(source, 'total', path), `${path}.total`);
+  if (limit < 1 || limit > 100 || items.length > limit || offset > total && items.length > 0) {
+    throw new AiContractDecodeError(path, 'a consistent Session history page');
+  }
+  return Object.freeze({
+    items: Object.freeze(items.map((item, index) => decodeAiSessionSummaryV1(item, `${path}.items[${index}]`))),
+    offset,
+    limit,
+    total
+  });
+}
+
+function decodeAiRunHistorySummaryV1(value: unknown, path: string): AiRunHistorySummaryV1 {
+  const source = record(value, path);
+  exact(source, [
+    'runId', 'sessionId', 'kind', 'status', 'title', 'summary', 'firstFixRecommendation',
+    'recoveryState', 'createdAtUtc', 'updatedAtUtc', 'lastSequence', 'eventCount'
+  ], path);
+  const kind = string(required(source, 'kind', path), `${path}.kind`) as AiRunHistoryKind;
+  const recoveryState = string(
+    required(source, 'recoveryState', path), `${path}.recoveryState`
+  ) as AiRunRecoveryState;
+  if (!runHistoryKinds.has(kind)) throw new AiContractDecodeError(`${path}.kind`, 'a public Run kind');
+  if (!runRecoveryStates.has(recoveryState)) {
+    throw new AiContractDecodeError(`${path}.recoveryState`, 'a public recovery state');
+  }
+  return Object.freeze({
+    runId: string(required(source, 'runId', path), `${path}.runId`, tokenPattern),
+    sessionId: nullableString(required(source, 'sessionId', path), `${path}.sessionId`, sessionPattern),
+    kind,
+    status: eventStatus(required(source, 'status', path), `${path}.status`),
+    title: string(required(source, 'title', path), `${path}.title`),
+    summary: string(required(source, 'summary', path), `${path}.summary`),
+    firstFixRecommendation: string(
+      required(source, 'firstFixRecommendation', path), `${path}.firstFixRecommendation`
+    ),
+    recoveryState,
+    createdAtUtc: timestamp(required(source, 'createdAtUtc', path), `${path}.createdAtUtc`),
+    updatedAtUtc: timestamp(required(source, 'updatedAtUtc', path), `${path}.updatedAtUtc`),
+    lastSequence: integer(required(source, 'lastSequence', path), `${path}.lastSequence`),
+    eventCount: integer(required(source, 'eventCount', path), `${path}.eventCount`)
+  });
+}
+
+export function decodeAiRunHistoryPageV1(value: unknown, path = '$'): AiRunHistoryPageV1 {
+  const source = record(value, path);
+  exact(source, ['items', 'offset', 'limit', 'total'], path);
+  const items = required(source, 'items', path);
+  if (!Array.isArray(items)) throw new AiContractDecodeError(`${path}.items`, 'an array');
+  const offset = integer(required(source, 'offset', path), `${path}.offset`);
+  const limit = integer(required(source, 'limit', path), `${path}.limit`);
+  const total = integer(required(source, 'total', path), `${path}.total`);
+  if (limit < 1 || limit > 100 || items.length > limit || offset > total && items.length > 0) {
+    throw new AiContractDecodeError(path, 'a consistent Run history page');
+  }
+  return Object.freeze({
+    items: Object.freeze(items.map((item, index) => decodeAiRunHistorySummaryV1(item, `${path}.items[${index}]`))),
+    offset,
+    limit,
+    total
   });
 }
 
