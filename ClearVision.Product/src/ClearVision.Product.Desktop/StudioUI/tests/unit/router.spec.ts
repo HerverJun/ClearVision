@@ -24,6 +24,7 @@ describe('StudioUI router', () => {
       '/stations',
       '/stations/:stationId',
       '/results',
+      '/settings',
       '/diagnostics',
       '/about',
       '/labs/design',
@@ -63,7 +64,7 @@ describe('StudioUI router', () => {
     const router = createTestRouter();
     const lazyRouteNames = [
       'overview', 'projects', 'project-detail', 'project-workspace', 'operators', 'operator-detail',
-      'stations', 'station-detail', 'inspection-projects', 'project-inspection', 'results', 'diagnostics',
+      'stations', 'station-detail', 'inspection-projects', 'project-inspection', 'results', 'settings', 'diagnostics',
       'about', 'design-lab-placeholder', 'canvas-lab-placeholder'
     ];
 

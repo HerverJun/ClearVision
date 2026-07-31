@@ -41,6 +41,7 @@ describe('G2 route guard', () => {
     expect(resolveSafeReturnRoute('/stations/station-1?tab=health')).toBe('/stations/station-1?tab=health');
     expect(resolveSafeReturnRoute('/inspection')).toBe('/inspection');
     expect(resolveSafeReturnRoute('/ai?sessionId=session_01')).toBe('/ai?sessionId=session_01');
+    expect(resolveSafeReturnRoute('/settings')).toBe('/settings');
     for (const attack of [
       'https://evil.example', '//evil.example', '/labs/design', '/login', '/unknown',
       '/projects/%2f%2fevil', '/projects\\evil', '/projects/../login',
@@ -83,12 +84,16 @@ describe('G2 route guard', () => {
     expect(router.currentRoute.value.path).toBe('/forbidden');
     await router.push('/ai');
     expect(router.currentRoute.value.path).toBe('/forbidden');
+    await router.push('/settings');
+    expect(router.currentRoute.value.path).toBe('/forbidden');
 
     const engineer = auth('authenticated', 'Engineer');
     const browserRouter = createStudioRouter(createMemoryHistory());
     installAuthRouteGuard(browserRouter, engineer.owner, startup({ 'Studio2.StationsRead': true }, 'browser-test'));
     await browserRouter.push('/stations');
     expect(browserRouter.currentRoute.value.path).toBe('/stations');
+    await browserRouter.push('/settings');
+    expect(browserRouter.currentRoute.value.path).toBe('/settings');
     await browserRouter.push('/labs/design');
     expect(browserRouter.currentRoute.value.path).toBe('/labs/design');
 

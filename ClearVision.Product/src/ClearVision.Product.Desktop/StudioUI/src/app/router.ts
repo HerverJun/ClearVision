@@ -36,6 +36,7 @@ const CanvasLabPlaceholder = () => import('@/labs/canvas/CanvasLabPlaceholder.vu
 const DesignLabPlaceholder = () => import('@/labs/design/DesignLabPlaceholder.vue');
 const DiagnosticsPage = () => import('@/platform/diagnostics/DiagnosticsPage.vue');
 const AiWorkbenchPage = () => import('@/capabilities/ai-workbench/AiWorkbenchPage.vue');
+const SettingsPage = () => import('@/capabilities/settings/SettingsPage.vue');
 
 const editorRoles = Object.freeze(['Admin', 'Engineer']);
 const stationFlagKey = 'Studio2.StationsRead';
@@ -191,6 +192,17 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
             meta: { title: '检测结果', breadcrumb: '检测结果', requiresSession: true }
           },
           {
+            path: 'settings',
+            name: 'settings',
+            component: SettingsPage,
+            meta: {
+              title: '设置',
+              breadcrumb: '设置',
+              requiresSession: true,
+              allowedRoles: editorRoles
+            }
+          },
+          {
             path: 'diagnostics',
             name: 'diagnostics',
             component: DiagnosticsPage,
@@ -264,7 +276,7 @@ export function resolveSafeReturnRoute(value: unknown): string | null {
   if (path === '/overview' || path === '/projects' || path.startsWith('/projects/') ||
       path === '/ai' ||
       path === '/operators' || path.startsWith('/operators/') || path === '/inspection' || path === '/results' ||
-      path === '/stations' || path.startsWith('/stations/') || path === '/diagnostics' ||
+      path === '/stations' || path.startsWith('/stations/') || path === '/settings' || path === '/diagnostics' ||
       path === '/about') {
     return value;
   }

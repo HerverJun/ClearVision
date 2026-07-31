@@ -3,3 +3,8 @@ export * from './contracts';
 export * from './decoder';
 export * from './settingsOwner';
 export * from './settingsWriteCoordinator';
+export * from './settingsViewModel';
+export { default as SettingsGroupNavigation } from './SettingsGroupNavigation.vue';
+export { default as SettingsOverview } from './SettingsOverview.vue';
+export { default as SettingsPage } from './SettingsPage.vue';
+export type { SettingsPageRuntime } from './SettingsPage.vue';

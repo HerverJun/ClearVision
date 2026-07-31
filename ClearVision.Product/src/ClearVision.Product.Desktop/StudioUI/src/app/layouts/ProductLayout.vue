@@ -28,6 +28,7 @@ const navigationIcons: Readonly<Record<string, CvIconName>> = Object.freeze({
   '/operators': 'operators',
   '/stations': 'stations',
   '/results': 'results',
+  '/settings': 'sliders',
   '/diagnostics': 'diagnostics',
   '/about': 'about'
 });
@@ -75,6 +76,14 @@ const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() =>
       to: aiPath,
       description: 'AI 工程工作台',
       current: route.path === '/ai' || route.path.endsWith('/ai')
+    });
+  }
+  if (session.user && ['Admin', 'Engineer'].includes(session.user.role)) {
+    items.push({
+      label: '设置',
+      to: '/settings',
+      description: '服务端配置投影与设置分组',
+      current: route.path === '/settings'
     });
   }
   return Object.freeze(items);

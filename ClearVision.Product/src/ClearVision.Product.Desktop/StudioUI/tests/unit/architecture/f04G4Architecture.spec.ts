@@ -70,15 +70,15 @@ describe('F04 G4 product shell and leave protection architecture guards', () => 
     expect(visibleProductNavigation('Operator', {}).map(item => item.to)).toEqual([
       '/projects', '/results'
     ]);
-    expect(visibleProductNavigation('Engineer', {}).map(item => item.to)).toEqual(['/projects', '/results']);
+    expect(visibleProductNavigation('Engineer', {}).map(item => item.to)).toEqual(['/projects', '/results', '/settings']);
     expect(visibleProductNavigation('Engineer', { 'Studio2.InspectionRun': true }).map(item => item.to))
-      .toEqual(['/inspection', '/projects', '/results']);
+      .toEqual(['/inspection', '/projects', '/results', '/settings']);
     expect(visibleProductNavigation('Engineer', { 'Studio2.StationsRead': true }).map(item => item.to))
-      .toEqual(['/projects', '/results', '/stations']);
+      .toEqual(['/projects', '/results', '/settings', '/stations']);
     expect(visibleProductNavigation('Admin', { 'Studio2.StationsRead': true }).map(item => item.to))
-      .toEqual(['/projects', '/results', '/stations']);
+      .toEqual(['/projects', '/results', '/settings', '/stations']);
     expect(visibleProductNavigation('Engineer', { 'Studio2.AiWorkbench': true }).map(item => item.to))
-      .toEqual(['/ai', '/projects', '/results']);
+      .toEqual(['/ai', '/projects', '/results', '/settings']);
     expect(visibleProductNavigation('Operator', { 'Studio2.AiWorkbench': true }).map(item => item.to))
       .toEqual(['/projects', '/results']);
     expect(productNavigation.some(item => item.to.startsWith('/labs'))).toBe(false);

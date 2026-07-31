@@ -78,6 +78,7 @@ describe('mountStudioApp', () => {
     expect(document.querySelector('[aria-label="产品主导航"]')).not.toBeNull();
     expect(document.querySelector('[data-product-nav="/projects"]')).not.toBeNull();
     expect(document.querySelector('[data-product-nav="/results"]')).not.toBeNull();
+    expect(document.querySelector('[data-product-nav="/settings"]')).not.toBeNull();
 
     mountedApp.unmount();
     mountedApp.unmount();

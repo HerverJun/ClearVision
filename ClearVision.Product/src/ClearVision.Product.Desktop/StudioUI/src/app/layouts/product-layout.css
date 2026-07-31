@@ -354,8 +354,8 @@
 }
 
 @media (max-width: 1120px) {
-  .product-layout__workspace-nav-item:nth-child(3),
-  .product-layout__workspace-nav-item:nth-child(6) { display: none; }
+  .product-layout__workspace-nav-item:nth-child(3):not([data-product-nav="/settings"]),
+  .product-layout__workspace-nav-item:nth-child(6):not([data-product-nav="/settings"]) { display: none; }
   .product-layout__user-copy { display: none; }
   .product-layout__appearance-trigger small { display: none; }
 }
