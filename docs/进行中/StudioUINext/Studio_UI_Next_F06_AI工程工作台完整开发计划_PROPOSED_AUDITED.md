@@ -1,12 +1,12 @@
 # Studio UI Next F06 AI 工程工作台完整开发计划（基于双工作树代码审计）
 
-> 状态：`G1_DONE_G2_AWAITING_REVIEW`
-> 阶段：F06 G1，合同、安全身份与唯一 Owner 地基
+> 状态：`G4_DONE_G5_AWAITING_REVIEW`
+> 阶段：F06 G4，Apply Preview 与 Workspace Handoff 已完成
 > 审计日期：2026-07-29
 > 产品定义：**工业视觉任务工作台，工作台主导，会话辅助；不迁移旧 AI 页面结构。**
-> 当前授权：G1 本地门禁、Remote CI 与 Final Gate 已通过；G2 仅进入复审等待，未获实现授权。默认入口变更和 Legacy AI 退役均未授权。
+> 当前授权：G4 产品工程、正式 WebView2 与 Remote CI Final Gate 已通过；G5 仅进入复审等待，未获实现授权。默认入口变更和 Legacy AI 退役均未授权。
 
-G1 当前实施证据见 [F06 G1 阶段报告](./F06_G1_AI合同安全身份与唯一Owner地基.md)、[G1 安全合同 ADR](./ADR-F06-G1-AI合同安全身份与唯一Owner.md) 与 [Handoff Artifact ADR](./ADR-F06-G1-Workspace-Handoff-Artifact.md)。B1-B5 已由本地合同/测试关闭；B6 仅批准 ADR，产品实现延期到 G4。
+G4 当前实施证据见 [G4 完成报告](./F06_G4_ApplyPreview与WorkspaceHandoff完成报告.md) 与 [Handoff Artifact ADR](./ADR-F06-G1-Workspace-Handoff-Artifact.md)。B1-B5 已由既有合同/测试关闭；B6 已在 G4 实现并验证，Project 保存 authority 保持不变。
 
 ## 0. 审计基线、工作树保护与证据限制
 
@@ -790,9 +790,15 @@ F06_B2_SESSION_HTTP=CLOSED
 F06_B3_MUTATION_POLICY=CLOSED
 F06_B4_OPERATION_IDENTITY=CLOSED
 F06_B5_PROJECT_BASELINE=CLOSED
-F06_B6_HANDOFF_ADR=APPROVED_IMPLEMENTATION_DEFERRED
-F06_G2_ENTRY=AWAITING_REVIEW
-F06_G2_IMPLEMENTATION=FORBIDDEN
+F06_B6_HANDOFF_ADR=IMPLEMENTED_AND_VERIFIED_IN_G4
+F06_G4_STATE=DONE
+F06_HANDOFF_ARTIFACT=COMPLETE
+F06_WORKSPACE_STAGED_DRAFT=COMPLETE
+F06_PROJECT_SAVE_AUTHORITY=PRESERVED
+F06_AUTOMATIC_SAVE_RUN_DEPLOY=FORBIDDEN
+F06_REAL_LLM_PRODUCT_QUALITY=NOT_EVALUATED
+F06_G5_ENTRY=AWAITING_REVIEW
+F06_G5_IMPLEMENTATION=FORBIDDEN
 DEFAULT_ENTRY_CHANGE=BLOCKED
 LEGACY_AI_RETIREMENT=NOT_APPROVED
 PRODUCTION_ACCEPTANCE=BLOCKED
