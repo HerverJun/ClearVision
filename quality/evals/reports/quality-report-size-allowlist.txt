@@ -1,2 +1,3 @@
 # JSON reports over the default 1 MB limit that are intentionally kept in git.
 # Keep this list empty unless a reviewer explicitly accepts a new exception.
+quality/evals/reports/VisionAgent_business_benchmark_baseline.json
