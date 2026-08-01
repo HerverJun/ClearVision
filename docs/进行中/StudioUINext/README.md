@@ -120,5 +120,6 @@ F04-R 纠偏期间以本目录链接的 F04-R 主计划与 G0/G1 受控文档为
 - [ADR F06-G1：AI Workspace Handoff Artifact](./ADR-F06-G1-Workspace-Handoff-Artifact.md)
 - [F06 G1 阶段报告（唯一当前状态入口）](./F06_G1_AI合同安全身份与唯一Owner地基.md)
 - [F07 Settings 完整开发计划（PROPOSED / AUDITED）](./Studio_UI_Next_F07_完整开发计划_PROPOSED_AUDITED.md)
+- [F07 G1-R 权限合同与操作门禁修补报告（当前权威入口）](./F07_G1-R_权限合同与操作门禁修补报告.md)
 - [仓库级协作规则](../../../AGENTS.md)
 - [旧 Studio2 历史入口](../Studio2/README.md)（历史取证，不是新计划）
