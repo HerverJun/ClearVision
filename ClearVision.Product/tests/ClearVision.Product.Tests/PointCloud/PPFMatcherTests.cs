@@ -11,7 +11,7 @@ using PointCloudModel = ClearVision.Product.Infrastructure.PointCloud.PointCloud
 
 namespace ClearVision.Product.Tests.PointCloud;
 
-[TestClassification(TestDomain.PointCloud, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
+[TestClassification(TestDomain.PointCloud, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "operator-quality", Suites = "PPFRegression")]
 [Collection(PointCloudMatchingTestCollections.PointCloudMatching)]
 public sealed class PPFMatcherTests
 {

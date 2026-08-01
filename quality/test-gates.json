@@ -15,6 +15,13 @@
       "minimumTotalTests": 1
     },
     {
+      "name": "product-coverage",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Lane=Pr&Suite!=ServicesCoverageSensitive&Suite!=PPFRegression",
+      "minimumTotalTests": 1
+    },
+    {
       "name": "desktop-pr",
       "project": "Desktop",
       "lane": "Pr",
@@ -41,6 +48,13 @@
       "lane": "Pr",
       "filter": "Suite=ServicesRegression&Lane=Pr",
       "minimumTotalTests": 1
+    },
+    {
+      "name": "tcp-device-regression",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Suite=ServicesCoverageSensitive&Lane=Pr",
+      "minimumTotalTests": 9
     },
     {
       "name": "desktop-endpoints",
@@ -155,6 +169,13 @@
       "minimumTotalTests": 1
     },
     {
+      "name": "ppf-regression",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Suite=PPFRegression&Lane=Nightly",
+      "minimumTotalTests": 9
+    },
+    {
       "name": "preprocessing-robustness",
       "project": "Product",
       "lane": "Nightly",
@@ -186,7 +207,7 @@
       "name": "product-nightly",
       "project": "Product",
       "lane": "Nightly",
-      "filter": "Lane=Nightly&Purpose!=Performance",
+      "filter": "Lane=Nightly&Purpose!=Performance&Suite!=PPFRegression",
       "minimumTotalTests": 1
     },
     {
@@ -228,12 +249,15 @@
   "lanes": {
     "Pr": [
       "product-pr",
+      "product-coverage",
+      "tcp-device-regression",
       "desktop-pr",
       "operator-library-smoke"
     ],
     "Nightly": [
       "product-nightly",
-      "product-nightly-performance"
+      "product-nightly-performance",
+      "ppf-regression"
     ],
     "ReleaseManual": [
       "product-release-manual"

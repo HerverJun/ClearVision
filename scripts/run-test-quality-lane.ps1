@@ -85,7 +85,10 @@ function Invoke-LaneStep {
 }
 
 function Invoke-ClassifiedGate {
-    param([Parameter(Mandatory = $true)][string]$GateName)
+    param(
+        [Parameter(Mandatory = $true)][string]$GateName,
+        [switch]$SkipCoverage
+    )
     $parameters = @{
         Gate = $GateName
         Verbosity = $Verbosity
@@ -96,7 +99,7 @@ function Invoke-ClassifiedGate {
     if (-not [string]::IsNullOrWhiteSpace($Configuration)) { $parameters.Configuration = $Configuration }
     if ($NoBuild) { $parameters.NoBuild = $true }
     if ($NoRestore) { $parameters.NoRestore = $true }
-    if ($CollectCoverage) { $parameters.Collect = @("XPlat Code Coverage") }
+    if ($CollectCoverage -and -not $SkipCoverage) { $parameters.Collect = @("XPlat Code Coverage") }
     & (Join-Path $scriptRoot "run-classified-test-gate.ps1") @parameters
 }
 
@@ -161,7 +164,13 @@ if (-not (Stop-AfterFailure $governance)) {
     }
 
     if ($Lane -eq "Nightly" -and -not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
-        [void](Invoke-LaneStep -Name "product-nightly" -Action { Invoke-ClassifiedGate -GateName "product-nightly" })
+        [void](Invoke-LaneStep -Name "ppf-regression" -Action {
+            Invoke-ClassifiedGate -GateName "ppf-regression" -SkipCoverage
+        })
+
+        if (-not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
+            [void](Invoke-LaneStep -Name "product-nightly" -Action { Invoke-ClassifiedGate -GateName "product-nightly" })
+        }
 
         if (-not ($FailFast -and @($results | Where-Object exitCode -ne 0).Count -gt 0)) {
             [void](Invoke-LaneStep -Name "measurement-performance" -Action {

@@ -199,14 +199,13 @@ jobs:
       - name: Run Product PR Lane with Coverage
         shell: pwsh
         run: |
-          & "./scripts/run-classified-test-gate.ps1" `
-            -Gate product-pr `
+          & "./scripts/run-product-coverage.ps1" `
             -Configuration Debug `
+            -NoBuild `
             -NoRestore `
             -Verbosity normal `
             -ResultsDirectory TestResults/product `
-            -LogFileName product.trx `
-            -Collect "XPlat Code Coverage"
+            -LogFileName product.trx
 
       - name: Run Product Performance Budget Tests
         if: github.event_name == 'workflow_dispatch'
@@ -271,6 +270,23 @@ jobs:
             }
           }
 
+          $productCoverageJsonPath = "TestResults/product/product-coverage.json"
+          $productCoverageMarkdownPath = "TestResults/product/product-coverage.md"
+          foreach ($path in @($productCoverageJsonPath, $productCoverageMarkdownPath)) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Product coverage evidence is missing: $path"
+            }
+          }
+          $productCoverage = Get-Content -LiteralPath $productCoverageJsonPath -Raw | ConvertFrom-Json
+          $currentSha = (& git rev-parse HEAD).Trim()
+          if ($productCoverage.source.sha -ne $currentSha -or
+              $productCoverage.population.gate -ne "product-coverage" -or
+              $productCoverage.population.filter -ne "Lane=Pr&Suite!=ServicesCoverageSensitive&Suite!=PPFRegression" -or
+              [int]$productCoverage.trx.total -lt 1 -or
+              [int]$productCoverage.trx.passed -ne [int]$productCoverage.trx.total) {
+            throw "Product coverage manifest is not a complete current-HEAD Product PR result."
+          }
+
           $files = Get-ChildItem -Path TestResults -Filter coverage.cobertura.xml -Recurse -File -ErrorAction SilentlyContinue
           $lines = @("# Coverage Summary", "")
           $lines += "| File | Line rate | Branch rate |"
@@ -289,6 +305,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path TestResults | Out-Null
           $lines | Set-Content -Path TestResults/coverage-summary.md -Encoding UTF8
           $lines | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding UTF8
+          Get-Content -LiteralPath $productCoverageMarkdownPath | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding UTF8
 
       - name: Run Detection Regression Gate
         if: github.event_name == 'workflow_dispatch'
@@ -371,6 +388,8 @@ jobs:
           path: |
             TestResults/**/*.trx
             TestResults/**/coverage.cobertura.xml
+            TestResults/product/product-coverage.json
+            TestResults/product/product-coverage.md
             TestResults/coverage-summary.md
 
       - name: Restore OperatorLibrary Package Project
