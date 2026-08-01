@@ -17,6 +17,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $scriptRoot "trx-validation.ps1")
 $repoRoot = Split-Path -Parent $scriptRoot
 $gateScript = Join-Path $scriptRoot "run-classified-test-gate.ps1"
 $projectPath = Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj"
@@ -54,47 +55,6 @@ function Get-GitValue {
     }
 
     return (($value | Out-String).Trim())
-}
-
-function Get-TrxCounters {
-    param([Parameter(Mandatory = $true)][string]$Path)
-
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
-        throw "Expected TRX file was not produced: $Path"
-    }
-
-    [xml]$trx = Get-Content -LiteralPath $Path -Raw
-    $counterNode = $trx.SelectSingleNode("//*[local-name()='Counters']")
-    if ($null -eq $counterNode) {
-        throw "TRX file does not contain a Counters node: $Path"
-    }
-
-    $resultNodes = @($trx.SelectNodes("//*[local-name()='UnitTestResult']"))
-    $observedPassed = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Passed" }).Count
-    $observedNotExecuted = @($resultNodes | Where-Object {
-        $outcome = ([string]$_.outcome).Trim()
-        $outcome -ieq "NotExecuted" -or $outcome -ieq "Skipped"
-    }).Count
-    $observedFailed = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Failed" }).Count
-    $observedError = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Error" }).Count
-    $observedTimeout = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Timeout" }).Count
-    $observedAborted = @($resultNodes | Where-Object {
-        $outcome = ([string]$_.outcome).Trim()
-        $outcome -ieq "Aborted" -or $outcome -ieq "PassedButRunAborted"
-    }).Count
-
-    return [ordered]@{
-        total = [int]$counterNode.total
-        executed = [int]$counterNode.executed
-        passed = [Math]::Max([int]$counterNode.passed, $observedPassed)
-        notExecuted = [Math]::Max([int]$counterNode.notExecuted, $observedNotExecuted)
-        failed = [Math]::Max([int]$counterNode.failed, $observedFailed)
-        error = [Math]::Max([int]$counterNode.error, $observedError)
-        timeout = [Math]::Max([int]$counterNode.timeout, $observedTimeout)
-        aborted = [Math]::Max([int]$counterNode.aborted, $observedAborted)
-        reportedNotExecuted = [int]$counterNode.notExecuted
-        observedNotExecuted = $observedNotExecuted
-    }
 }
 
 function Get-CoverageModule {
@@ -250,14 +210,9 @@ if ($trxItem.LastWriteTimeUtc -lt $startedAtUtc.AddSeconds(-2)) {
     throw "TRX is stale and was not produced by this coverage run: $trxPath"
 }
 $trxCounters = Get-TrxCounters -Path $trxPath
-if ($trxCounters.total -lt $minimumPopulationTests -or
-    $trxCounters.executed + $trxCounters.notExecuted -ne $trxCounters.total -or
-    $trxCounters.passed -ne $trxCounters.executed -or
-    $trxCounters.failed -gt 0 -or
-    $trxCounters.error -gt 0 -or
-    $trxCounters.timeout -gt 0 -or
-    $trxCounters.aborted -gt 0) {
-    throw "Product coverage TRX is not a complete green result: total=$($trxCounters.total), executed=$($trxCounters.executed), passed=$($trxCounters.passed), notExecuted=$($trxCounters.notExecuted), failed=$($trxCounters.failed), error=$($trxCounters.error), timeout=$($trxCounters.timeout), aborted=$($trxCounters.aborted), minimumPopulation=$minimumPopulationTests."
+$trxValidation = Test-TrxGreen -Counters $trxCounters -RequiredTotal $minimumPopulationTests
+if (-not $trxValidation.completeGreen) {
+    throw "Product coverage TRX is not a complete green result: $($trxValidation.issues -join '; ')."
 }
 
 $coverageCandidates = @(
@@ -302,7 +257,7 @@ $globalBranchValid = [int]$coverageNode.GetAttribute("branches-valid")
 $globalBranchCovered = [int]$coverageNode.GetAttribute("branches-covered")
 
 $report = [ordered]@{
-    schemaVersion = "2026-08-01.product-coverage.v1"
+    schemaVersion = "2026-08-02.product-coverage.v2"
     generatedAtUtc = [DateTime]::UtcNow.ToString("o")
     source = [ordered]@{
         sha = $sourceSha
@@ -326,7 +281,8 @@ $report = [ordered]@{
         includedLane = "Pr"
         excludedSuitesFromPopulation = @("ServicesCoverageSensitive", "PPFRegression")
         minimumTotalTests = $minimumPopulationTests
-        populationGuard = "A lower bound only; additions and deletions remain valid while the Product coverage population stays above the configured floor."
+        testCaseCount = $trxCounters.total
+        populationGuard = "TRX test-case count must stay above the configured floor; CI also checks the governance relation product-pr source population minus tcp-device-regression equals product-coverage source population, so normal additions and deletions remain valid while silent collapse is rejected."
         coverageSensitiveProtectionGate = "tcp-device-regression"
         servicesProtectionGate = "services-regression"
         ppfProtectionGate = "ppf-regression"
@@ -344,6 +300,7 @@ $report = [ordered]@{
         )
     }
     run = [ordered]@{
+        status = "passed"
         command = $gateCommand
         dotnetTestCommand = $dotnetTestCommand
         startedAtUtc = $startedAtUtc.ToString("o")
@@ -355,6 +312,7 @@ $report = [ordered]@{
         coberturaArtifacts = @($coverageCandidates | ForEach-Object { $_.FullName })
     }
     trx = $trxCounters
+    validation = $trxValidation
     coverage = [ordered]@{
         sourceRoots = $sourceRoots
         population = "All tests selected by Product product-coverage filter $testFilter"
@@ -385,8 +343,14 @@ $markdown = New-Object System.Collections.Generic.List[string]
 [void]$markdown.Add("- Coverage grouping: ServicesCoverageSensitive is protected by tcp-device-regression; PPFRegression is protected by ppf-regression; no coverage segments were added.")
 [void]$markdown.Add("- Command: $dotnetTestCommand")
 [void]$markdown.Add("- Elapsed seconds: $($report.run.elapsedSeconds)")
-[void]$markdown.Add("- TRX: $trxPath (total=$($trxCounters.total), executed=$($trxCounters.executed), passed=$($trxCounters.passed), notExecuted=$($trxCounters.notExecuted), failed=$($trxCounters.failed))")
+[void]$markdown.Add("- TRX: $trxPath (total=$($trxCounters.total), executed=$($trxCounters.executed), passed=$($trxCounters.passed), notExecuted=$($trxCounters.notExecuted), failed=$($trxCounters.failed), error=$($trxCounters.error), timeout=$($trxCounters.timeout), aborted=$($trxCounters.aborted))")
+[void]$markdown.Add("- TRX non-success counters: inconclusive=$($trxCounters.inconclusive), notRunnable=$($trxCounters.notRunnable), disconnected=$($trxCounters.disconnected), warning=$($trxCounters.warning), inProgress=$($trxCounters.inProgress), pending=$($trxCounters.pending), passedButRunAborted=$($trxCounters.passedButRunAborted)")
 [void]$markdown.Add("- Population guard: minimum total tests $minimumPopulationTests; no exact population count is required.")
+[void]$markdown.Add("- Skipped/notExecuted tests: $($trxCounters.skippedTests.Count)")
+foreach ($skippedTest in $trxCounters.skippedTests) {
+    $skipReason = ([string]$skippedTest.reason).Replace("|", "/").Replace("`r", " ").Replace("`n", " ")
+    [void]$markdown.Add("  - $($skippedTest.testName): $skipReason")
+}
 [void]$markdown.Add("- Cobertura: $($coverageItem.FullName)")
 [void]$markdown.Add("")
 [void]$markdown.Add("## Overall")

@@ -10,7 +10,7 @@ namespace ClearVision.Product.Tests.PointCloud;
 
 [TestClassification(TestDomain.PointCloud, TestPurpose.Smoke, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality", Suites = "PPFPrSmoke")]
 [Collection(PointCloudMatchingTestCollections.PointCloudMatching)]
-public sealed class PPFMatcherPrSmokeTests
+public sealed class PPFMatcherContractTests
 {
     [Fact]
     public void Match_EmptyModelOrScene_ShouldFailClosed()

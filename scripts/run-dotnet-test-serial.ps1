@@ -36,6 +36,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $dotnetShimPath = Join-Path $PSScriptRoot "dotnet.ps1"
+. (Join-Path $PSScriptRoot "trx-validation.ps1")
 $dotnetPathOutput = & $dotnetShimPath -InstallIfMissing -PrintPath -ReturnExitCode
 if ($LASTEXITCODE -ne 0) {
     throw "Unable to resolve repository .NET SDK with $dotnetShimPath."
@@ -59,50 +60,6 @@ function Quote-Argument {
     return $Value
 }
 
-function Get-TrxCounters {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path
-    )
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        throw "Expected TRX file was not produced: $Path"
-    }
-
-    [xml]$trx = Get-Content -LiteralPath $Path -Raw
-    $counters = $trx.SelectSingleNode("//*[local-name()='Counters']")
-    if ($null -eq $counters) {
-        throw "TRX file does not contain a Counters node: $Path"
-    }
-
-    $resultNodes = @($trx.SelectNodes("//*[local-name()='UnitTestResult']"))
-    $observedPassed = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Passed" }).Count
-    $observedNotExecuted = @($resultNodes | Where-Object {
-        $outcome = ([string]$_.outcome).Trim()
-        $outcome -ieq "NotExecuted" -or $outcome -ieq "Skipped"
-    }).Count
-    $observedFailed = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Failed" }).Count
-    $observedError = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Error" }).Count
-    $observedTimeout = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Timeout" }).Count
-    $observedAborted = @($resultNodes | Where-Object {
-        $outcome = ([string]$_.outcome).Trim()
-        $outcome -ieq "Aborted" -or $outcome -ieq "PassedButRunAborted"
-    }).Count
-
-    return [PSCustomObject]@{
-        Total = [int]$counters.total
-        Executed = [int]$counters.executed
-        Passed = [Math]::Max([int]$counters.passed, $observedPassed)
-        NotExecuted = [Math]::Max([int]$counters.notExecuted, $observedNotExecuted)
-        Failed = [Math]::Max([int]$counters.failed, $observedFailed)
-        Error = [Math]::Max([int]$counters.error, $observedError)
-        Timeout = [Math]::Max([int]$counters.timeout, $observedTimeout)
-        Aborted = [Math]::Max([int]$counters.aborted, $observedAborted)
-        ReportedNotExecuted = [int]$counters.notExecuted
-        ObservedNotExecuted = $observedNotExecuted
-    }
-}
-
 function Test-TrxCounters {
     param(
         [Parameter(Mandatory = $true)]
@@ -113,33 +70,19 @@ function Test-TrxCounters {
         [int]$RequiredPassed
     )
 
-    $passed = $true
-    if ($RequiredTotal -gt 0 -and $Counters.Total -lt $RequiredTotal) {
-        Write-Host "[dotnet-test] TRX validation failed: total tests $($Counters.Total) is below required minimum $RequiredTotal."
-        $passed = $false
-    }
-
+    $validation = Test-TrxGreen -Counters $Counters -RequiredTotal $RequiredTotal
     if ($RequiredPassed -gt 0 -and $Counters.Passed -lt $RequiredPassed) {
-        Write-Host "[dotnet-test] TRX validation failed: passed tests $($Counters.Passed) is below required minimum $RequiredPassed."
-        $passed = $false
+        $validation.completeGreen = $false
+        $validation.issues += "passed=$($Counters.Passed) is below minimum=$RequiredPassed"
     }
 
-    if (($Counters.Executed + $Counters.NotExecuted) -ne $Counters.Total) {
-        Write-Host "[dotnet-test] TRX validation failed: total=$($Counters.Total) does not equal executed=$($Counters.Executed) + notExecuted=$($Counters.NotExecuted)."
-        $passed = $false
+    if (-not $validation.completeGreen) {
+        foreach ($issue in $validation.issues) {
+            Write-Host "[dotnet-test] TRX validation failed: $issue"
+        }
     }
 
-    if ($Counters.Passed -ne $Counters.Executed) {
-        Write-Host "[dotnet-test] TRX validation failed: passed=$($Counters.Passed) does not equal executed=$($Counters.Executed)."
-        $passed = $false
-    }
-
-    if (($Counters.Failed + $Counters.Error + $Counters.Timeout + $Counters.Aborted) -gt 0) {
-        Write-Host "[dotnet-test] TRX validation failed: failed=$($Counters.Failed), error=$($Counters.Error), timeout=$($Counters.Timeout), aborted=$($Counters.Aborted)."
-        $passed = $false
-    }
-
-    return $passed
+    return [bool]$validation.completeGreen
 }
 
 if ($FullyQualifiedName.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($Filter)) {

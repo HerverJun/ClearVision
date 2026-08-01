@@ -233,16 +233,19 @@ public class TcpDeviceManagerTests
     }
 
     [Fact]
-    public async Task RawResponseReader_WithDeterministicChunks_ShouldReturnFullResponse()
+    public async Task RawResponseReader_WithDeterministicChunks_ShouldReturnFullResponseAcrossTwentyRuns()
     {
-        await using var stream = await ChunkedNetworkStream.CreateAsync(
-            Encoding.UTF8.GetBytes("ACK:"),
-            Encoding.UTF8.GetBytes("OK;score=98.5"));
+        for (var iteration = 1; iteration <= 20; iteration++)
+        {
+            await using var stream = await ChunkedNetworkStream.CreateAsync(
+                Encoding.UTF8.GetBytes("ACK:"),
+                Encoding.UTF8.GetBytes("OK;score=98.5"));
 
-        var response = await InvokeRawFrameReaderAsync(stream);
+            var response = await InvokeRawFrameReaderAsync(stream);
 
-        Encoding.UTF8.GetString(response).Should().Be("ACK:OK;score=98.5");
-        stream.ReadCount.Should().Be(2, "the test stream exposes exactly two deterministic chunks");
+            Encoding.UTF8.GetString(response).Should().Be("ACK:OK;score=98.5");
+            stream.ReadCount.Should().Be(2, $"run {iteration} exposes exactly two deterministic chunks");
+        }
     }
 
     [Fact]

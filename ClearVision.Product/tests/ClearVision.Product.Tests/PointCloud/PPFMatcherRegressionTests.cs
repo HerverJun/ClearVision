@@ -12,7 +12,7 @@ namespace ClearVision.Product.Tests.PointCloud;
 
 [TestClassification(TestDomain.PointCloud, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "operator-quality", Suites = "PPFRegression")]
 [Collection(PointCloudMatchingTestCollections.PointCloudMatching)]
-public sealed class PPFMatcherTests
+public sealed class PPFMatcherRegressionTests
 {
     [Fact]
     public void Match_ModelToScene_WithOcclusionAndOutliers_ShouldRecoverPose()
