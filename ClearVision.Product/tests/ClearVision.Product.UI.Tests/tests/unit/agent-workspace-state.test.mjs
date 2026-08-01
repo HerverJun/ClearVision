@@ -72,7 +72,7 @@ test('workspace projection keeps answerable questions separate from pending reso
       ...plan().buildReadiness,
       blockers: [
         ...plan().buildReadiness.blockers,
-        { id: 'resource_pending:model:detector', category: 'resource_pending', field: 'model', blocksBuild: true, resolutionMode: 'provide_resource', publicLabel: '妯″瀷寰呯粦瀹?' }
+        { id: 'resource_pending:model:detector', category: 'resource_pending', field: 'model', blocksBuild: true, resolutionMode: 'provide_resource', publicLabel: '模型资源待提供' }
       ]
     }
   }) }, { sessionId: 's1' });

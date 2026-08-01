@@ -377,11 +377,23 @@ public class TcpDeviceManagerTests
         using var client = await listener.AcceptTcpClientAsync(cancellationToken);
         await using var stream = client.GetStream();
         var buffer = new byte[expectedRequest.Length];
-        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
-        Encoding.UTF8.GetString(buffer, 0, read).Should().Be(expectedRequest);
+        var offset = 0;
+        while (offset < buffer.Length)
+        {
+            var read = await stream.ReadAsync(buffer.AsMemory(offset, buffer.Length - offset), cancellationToken);
+            if (read == 0)
+            {
+                break;
+            }
+
+            offset += read;
+        }
+
+        Encoding.UTF8.GetString(buffer, 0, offset).Should().Be(expectedRequest);
         var response = Encoding.UTF8.GetBytes(responseText);
         await stream.WriteAsync(response, cancellationToken);
         await stream.FlushAsync(cancellationToken);
+        client.Client.Shutdown(SocketShutdown.Send);
     }
 
     // 每个连接读取一次请求并原样回显，用于验证连续 transient 发送都能重新建立连接。

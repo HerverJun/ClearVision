@@ -106,7 +106,7 @@ async function runPreviewCoordinatorChecks() {
   const cameraNode = {
     id: 'camera-acq-1',
     type: 'ImageAcquisition',
-    title: '鍥惧儚閲囬泦',
+    title: '图像采集',
     parameters: [
       { name: 'SourceType', value: 'Camera' },
       { name: 'FilePath', value: 'stale-file.png' },

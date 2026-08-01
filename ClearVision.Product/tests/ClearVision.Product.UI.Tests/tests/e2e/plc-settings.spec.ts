@@ -289,7 +289,7 @@ async function expectLayoutHealthy(
       bodyOverflow: Math.ceil(document.body.scrollWidth - window.innerWidth),
       rootOverflow: root ? Math.ceil(root.scrollWidth - root.clientWidth) : 0,
       panelOverflow: panel ? Math.ceil(panel.scrollWidth - panel.clientWidth) : 0,
-      hasMojibake: /�|鍔|閰|绔|鏄犲|涓夎|淇濆|娴嬭瘯|濡\?/.test(text),
+      hasMojibake: /\uFFFD|\u9354|\u95B0|\u7ED4|\u93C4\u72B2|\u6D93\u590E|\u6DC7\u6FC6|\u5A34\u5B2D\u762F|\u6FE1\?/.test(text),
       actionOverlapsLastRow,
       saveButtonInViewport: Boolean(saveRect && saveRect.top >= 0 && saveRect.bottom <= window.innerHeight && saveRect.left >= 0 && saveRect.right <= window.innerWidth),
       resetButtonInViewport: Boolean(resetRect && resetRect.top >= 0 && resetRect.bottom <= window.innerHeight && resetRect.left >= 0 && resetRect.right <= window.innerWidth),
