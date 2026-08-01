@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
@@ -162,6 +163,47 @@ public class SettingsThemeEndpointTests
             config.TcpCommunication.Profiles.Count == 1 &&
             config.Cameras.Count == 1 &&
             config.Security.PasswordMinLength == initialConfig.Security.PasswordMinLength));
+    }
+
+    [Theory]
+    [InlineData("{\"saveScope\":\"unknown\",\"general\":{\"softwareTitle\":\"Updated\"}}")]
+    [InlineData("{\"saveScope\":\"general\"}")]
+    [InlineData("{\"saveScope\":\"general\",\"storage\":{\"retentionDays\":1}}")]
+    [InlineData("{\"saveScope\":\"general\",\"general\":{\"unknownField\":true}}")]
+    [InlineData("{\"saveScope\":\"general\",\"general\":{\"softwareTitle\":\"\"}}")]
+    [InlineData("{\"saveScope\":\"storage\",\"storage\":{\"retentionDays\":-1}}")]
+    [InlineData("{\"saveScope\":\"runtime\",\"runtime\":{\"missingMaterialTimeoutSeconds\":-1}}")]
+    [InlineData("{\"saveScope\":\"runtime\",\"runtime\":{\"runtimePreviewPilot\":{\"mode\":\"metadata_only\"}}}")]
+    [InlineData("{\"saveScope\":\"security\",\"security\":{\"passwordMinLength\":5}}")]
+    [InlineData("{\"saveScope\":\"security\",\"security\":{\"sessionTimeoutMinutes\":30}}")]
+    [InlineData("{\"saveScope\":\"general\",\"general\":{\"softwareTitle\":\"A\",\"softwareTitle\":\"B\"}}")]
+    [InlineData("{\"saveScope\":\"general\",\"general\":{\"softwareTitle\":\"A\"},\"GENERAL\":{\"theme\":\"light\"}}")]
+    public async Task UpdateSettings_WithMalformedScopedPayload_ShouldRejectBeforePersistence(string json)
+    {
+        await using var host = await SettingsThemeTestHost.CreateAsync(CreateRichSettingsConfig());
+
+        using var response = await host.Client.PutAsync(
+            "/api/settings",
+            new StringContent(json, Encoding.UTF8, "application/json"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+    }
+
+    [Fact]
+    public async Task UpdateSettings_WithLegacyUsersScope_ShouldMergeSecurityPolicy()
+    {
+        await using var host = await SettingsThemeTestHost.CreateAsync(CreateRichSettingsConfig());
+
+        using var response = await host.Client.PutAsJsonAsync("/api/settings", new
+        {
+            saveScope = "users",
+            security = new { passwordMinLength = 12 }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        await host.ConfigurationService.Received(1).SaveAsync(Arg.Is<AppConfig>(config =>
+            config.Security.PasswordMinLength == 12));
     }
 
     private sealed class SettingsThemeTestHost : IAsyncDisposable

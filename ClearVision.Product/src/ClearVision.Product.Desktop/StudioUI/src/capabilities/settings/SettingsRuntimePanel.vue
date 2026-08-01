@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, reactive, shallowRef, watch } from 'vue';
 import { CvButton, CvField, CvInlineAlert, CvPanel } from '@/design-system';
 import type { SettingsOwner } from './settingsOwner';
 import type { SettingsRuntimeProjectionV1 } from './decoder';
@@ -33,6 +33,11 @@ const baseline = shallowRef<RuntimeDraft>(copy(props.projection));
 const busy = shallowRef(false);
 const feedback = shallowRef<SettingsFeedback | null>(null);
 const dirty = computed(() => JSON.stringify(draft) !== JSON.stringify(baseline.value));
+const detachPanelState = props.owner.registerPanelState('runtime', () => ({
+  dirty: dirty.value,
+  pending: busy.value
+}));
+watch([dirty, busy], () => props.owner.refreshPanelState());
 const validationMessage = computed(() => {
   const stopOnNg = Number(draft.stopOnConsecutiveNg);
   const missingMaterial = Number(draft.missingMaterialTimeoutSeconds);
@@ -74,6 +79,8 @@ async function save(): Promise<void> {
     busy.value = false;
   }
 }
+
+onBeforeUnmount(() => detachPanelState());
 </script>
 
 <template>

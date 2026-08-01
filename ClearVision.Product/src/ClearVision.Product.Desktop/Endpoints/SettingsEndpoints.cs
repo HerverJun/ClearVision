@@ -1861,6 +1861,17 @@ public static class SettingsEndpoints
 
     private static AppConfig MergeSettingsUpdate(AppConfig currentConfig, JsonElement request)
     {
+        if (request.ValueKind == JsonValueKind.Object && TryGetJsonProperty(request, "saveScope", out _))
+        {
+            ValidateScopedSettingsUpdate(request);
+        }
+        else if (request.ValueKind == JsonValueKind.Object)
+        {
+            // Legacy/full settings payloads keep their permissive shape, but known
+            // AppConfig values must still be rejected before the save authority runs.
+            ValidateLegacySettingsValues(request);
+        }
+
         currentConfig ??= new AppConfig();
         currentConfig.Normalize();
         if (request.ValueKind != JsonValueKind.Object)
@@ -1871,7 +1882,7 @@ public static class SettingsEndpoints
         var incoming = JsonSerializer.Deserialize<AppConfig>(request.GetRawText(), SettingsJsonOptions) ?? new AppConfig();
         incoming.Normalize();
         var scope = TryGetJsonProperty(request, "saveScope", out var scopeElement)
-            ? scopeElement.GetString()
+            ? scopeElement.GetString()?.Trim()
             : null;
 
         if (ShouldMergeSection(request, scope, "general") &&
@@ -1925,6 +1936,273 @@ public static class SettingsEndpoints
         currentConfig.ActiveCameraId = currentConfig.ActiveCameraId ?? string.Empty;
         currentConfig.Normalize();
         return currentConfig;
+    }
+
+    private static void ValidateScopedSettingsUpdate(JsonElement request)
+    {
+        if (!TryGetJsonProperty(request, "saveScope", out var scopeElement) ||
+            scopeElement.ValueKind != JsonValueKind.String)
+        {
+            throw new ArgumentException("A scoped settings request must include a string saveScope.");
+        }
+
+        var scope = scopeElement.GetString()?.Trim().ToLowerInvariant();
+        // Legacy Settings uses "users" for the security policy tab. Keep this
+        // narrow alias while rejecting every other non-Next scope.
+        var sectionName = scope switch
+        {
+            "general" => "general",
+            "storage" => "storage",
+            "runtime" => "runtime",
+            "security" => "security",
+            "users" => "security",
+            _ => throw new ArgumentException("saveScope must be one of: general, storage, runtime, security.")
+        };
+
+        var duplicateTopLevel = request.EnumerateObject()
+            .GroupBy(property => property.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateTopLevel != null)
+        {
+            throw new ArgumentException($"Scoped settings request contains duplicate top-level field '{duplicateTopLevel.Key}'.");
+        }
+
+        var sectionProperty = request.EnumerateObject()
+            .FirstOrDefault(property => property.Name.Equals(sectionName, StringComparison.OrdinalIgnoreCase));
+        if (sectionProperty.Value.ValueKind != JsonValueKind.Object)
+        {
+            throw new ArgumentException($"Scoped settings request must include an object section named '{sectionName}'.");
+        }
+
+        var topLevelNames = request.EnumerateObject()
+            .Select(property => property.Name)
+            .ToArray();
+        if (topLevelNames.Any(name =>
+                !name.Equals("saveScope", StringComparison.OrdinalIgnoreCase) &&
+                !name.Equals(sectionName, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new ArgumentException($"Scoped settings request for '{sectionName}' contains fields from another section.");
+        }
+
+        var section = sectionProperty.Value;
+        var duplicateField = section.EnumerateObject()
+            .GroupBy(property => property.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateField != null)
+        {
+            throw new ArgumentException($"Scoped settings section '{sectionName}' contains duplicate field '{duplicateField.Key}'.");
+        }
+        if (!section.EnumerateObject().Any())
+        {
+            throw new ArgumentException($"Scoped settings section '{sectionName}' must contain at least one field.");
+        }
+
+        foreach (var property in section.EnumerateObject())
+        {
+            var field = property.Name.ToLowerInvariant();
+            switch (sectionName)
+            {
+                case "general":
+                    ValidateGeneralScopedField(field, property.Value);
+                    break;
+                case "storage":
+                    ValidateStorageScopedField(field, property.Value);
+                    break;
+                case "runtime":
+                    ValidateRuntimeScopedField(field, property.Value);
+                    break;
+                case "security":
+                    ValidateSecurityScopedField(field, property.Value);
+                    break;
+            }
+        }
+    }
+
+    private static void ValidateLegacySettingsValues(JsonElement request)
+    {
+        if (TryGetJsonProperty(request, "general", out var general) && general.ValueKind == JsonValueKind.Object)
+        {
+            if (TryGetJsonProperty(general, "softwareTitle", out var title)) RequireNonEmptyString(title, "general.softwareTitle");
+            if (TryGetJsonProperty(general, "theme", out var theme))
+            {
+                var normalized = RequireString(theme, "general.theme").Trim().ToLowerInvariant();
+                if (normalized is not (GeneralConfig.ThemeDark or GeneralConfig.ThemeLight))
+                    throw new ArgumentException("general.theme must be 'dark' or 'light'.");
+            }
+        }
+
+        if (TryGetJsonProperty(request, "storage", out var storage) && storage.ValueKind == JsonValueKind.Object)
+        {
+            if (TryGetJsonProperty(storage, "imageSavePath", out var path)) RequireNonEmptyString(path, "storage.imageSavePath");
+            if (TryGetJsonProperty(storage, "savePolicy", out var policy))
+            {
+                var normalized = RequireString(policy, "storage.savePolicy").Trim();
+                if (!normalized.Equals("None", StringComparison.OrdinalIgnoreCase) &&
+                    !normalized.Equals("NgOnly", StringComparison.OrdinalIgnoreCase) &&
+                    !normalized.Equals("All", StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException("storage.savePolicy must be None, NgOnly or All.");
+            }
+            if (TryGetJsonProperty(storage, "retentionDays", out var retention)) RequireNonNegativeInteger(retention, "storage.retentionDays");
+            if (TryGetJsonProperty(storage, "minFreeSpaceGb", out var freeSpace)) RequireNonNegativeInteger(freeSpace, "storage.minFreeSpaceGb");
+        }
+
+        if (TryGetJsonProperty(request, "runtime", out var runtime) && runtime.ValueKind == JsonValueKind.Object)
+        {
+            if (TryGetJsonProperty(runtime, "stopOnConsecutiveNg", out var stopOnNg)) RequireNonNegativeInteger(stopOnNg, "runtime.stopOnConsecutiveNg");
+            if (TryGetJsonProperty(runtime, "missingMaterialTimeoutSeconds", out var timeout)) RequireNonNegativeInteger(timeout, "runtime.missingMaterialTimeoutSeconds");
+        }
+
+        if (TryGetJsonProperty(request, "security", out var security) && security.ValueKind == JsonValueKind.Object)
+        {
+            if (TryGetJsonProperty(security, "passwordMinLength", out var passwordMinLength) &&
+                RequireInteger(passwordMinLength, "security.passwordMinLength") < 6)
+                throw new ArgumentException("security.passwordMinLength cannot be less than 6.");
+            if (TryGetJsonProperty(security, "loginFailureLockoutCount", out var lockoutCount) &&
+                RequireInteger(lockoutCount, "security.loginFailureLockoutCount") < 1)
+                throw new ArgumentException("security.loginFailureLockoutCount must be at least 1.");
+        }
+    }
+
+    private static void ValidateGeneralScopedField(string field, JsonElement value)
+    {
+        switch (field)
+        {
+            case "softwaretitle":
+                RequireNonEmptyString(value, "general.softwareTitle");
+                return;
+            case "theme":
+                var theme = RequireString(value, "general.theme").Trim().ToLowerInvariant();
+                if (theme is not (GeneralConfig.ThemeDark or GeneralConfig.ThemeLight))
+                {
+                    throw new ArgumentException("general.theme must be 'dark' or 'light'.");
+                }
+                return;
+            case "autostart":
+                RequireBoolean(value, "general.autoStart");
+                return;
+            default:
+                throw new ArgumentException($"Unknown field '{field}' in scoped general settings.");
+        }
+    }
+
+    private static void ValidateStorageScopedField(string field, JsonElement value)
+    {
+        switch (field)
+        {
+            case "imagesavepath":
+                RequireNonEmptyString(value, "storage.imageSavePath");
+                return;
+            case "savepolicy":
+                var policy = RequireString(value, "storage.savePolicy").Trim();
+                if (policy is not ("None" or "NgOnly" or "All") &&
+                    !policy.Equals("None", StringComparison.OrdinalIgnoreCase) &&
+                    !policy.Equals("NgOnly", StringComparison.OrdinalIgnoreCase) &&
+                    !policy.Equals("All", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new ArgumentException("storage.savePolicy must be None, NgOnly or All.");
+                }
+                return;
+            case "retentiondays":
+                RequireNonNegativeInteger(value, "storage.retentionDays");
+                return;
+            case "minfreespacegb":
+                RequireNonNegativeInteger(value, "storage.minFreeSpaceGb");
+                return;
+            default:
+                throw new ArgumentException($"Unknown field '{field}' in scoped storage settings.");
+        }
+    }
+
+    private static void ValidateRuntimeScopedField(string field, JsonElement value)
+    {
+        switch (field)
+        {
+            case "autorun":
+                RequireBoolean(value, "runtime.autoRun");
+                return;
+            case "stoponconsecutiveng":
+                RequireNonNegativeInteger(value, "runtime.stopOnConsecutiveNg");
+                return;
+            case "missingmaterialtimeoutseconds":
+                RequireNonNegativeInteger(value, "runtime.missingMaterialTimeoutSeconds");
+                return;
+            case "applyprotectionrules":
+                RequireBoolean(value, "runtime.applyProtectionRules");
+                return;
+            case "runtimepreviewpilot":
+                throw new ArgumentException("runtime.runtimePreviewPilot is developer-only and cannot be changed through generic settings.");
+            default:
+                throw new ArgumentException($"Unknown field '{field}' in scoped runtime settings.");
+        }
+    }
+
+    private static void ValidateSecurityScopedField(string field, JsonElement value)
+    {
+        switch (field)
+        {
+            case "passwordminlength":
+                var passwordMinLength = RequireInteger(value, "security.passwordMinLength");
+                if (passwordMinLength < 6)
+                {
+                    throw new ArgumentException("security.passwordMinLength cannot be less than 6.");
+                }
+                return;
+            case "sessiontimeoutminutes":
+                throw new ArgumentException("security.sessionTimeoutMinutes is a historical read-only field and cannot be changed.");
+            case "loginfailurelockoutcount":
+                var lockoutCount = RequireInteger(value, "security.loginFailureLockoutCount");
+                if (lockoutCount < 1)
+                {
+                    throw new ArgumentException("security.loginFailureLockoutCount must be at least 1.");
+                }
+                return;
+            default:
+                throw new ArgumentException($"Unknown field '{field}' in scoped security settings.");
+        }
+    }
+
+    private static string RequireString(JsonElement value, string path)
+    {
+        if (value.ValueKind != JsonValueKind.String)
+        {
+            throw new ArgumentException($"{path} must be a string.");
+        }
+
+        return value.GetString() ?? string.Empty;
+    }
+
+    private static void RequireNonEmptyString(JsonElement value, string path)
+    {
+        if (string.IsNullOrWhiteSpace(RequireString(value, path)))
+        {
+            throw new ArgumentException($"{path} cannot be empty.");
+        }
+    }
+
+    private static void RequireBoolean(JsonElement value, string path)
+    {
+        if (value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        {
+            throw new ArgumentException($"{path} must be a boolean.");
+        }
+    }
+
+    private static int RequireInteger(JsonElement value, string path)
+    {
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out var result))
+        {
+            throw new ArgumentException($"{path} must be an integer.");
+        }
+
+        return result;
+    }
+
+    private static void RequireNonNegativeInteger(JsonElement value, string path)
+    {
+        if (RequireInteger(value, path) < 0)
+        {
+            throw new ArgumentException($"{path} cannot be negative.");
+        }
     }
 
     private static bool ShouldMergeSection(JsonElement request, string? scope, string propertyName, params string[] scopeAliases)
@@ -2012,11 +2290,6 @@ public static class SettingsEndpoints
         if (TryGetJsonProperty(section, "passwordMinLength", out _))
         {
             target.PasswordMinLength = source.PasswordMinLength;
-        }
-
-        if (TryGetJsonProperty(section, "sessionTimeoutMinutes", out _))
-        {
-            target.SessionTimeoutMinutes = source.SessionTimeoutMinutes;
         }
 
         if (TryGetJsonProperty(section, "loginFailureLockoutCount", out _))

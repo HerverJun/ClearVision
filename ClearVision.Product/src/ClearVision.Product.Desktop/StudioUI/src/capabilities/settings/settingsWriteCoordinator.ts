@@ -1,13 +1,25 @@
 import {
+  ApiAbortError,
+  ApiDecodeError,
+  ApiNetworkError
+} from '@/platform/api';
+import {
   type SettingsSection,
+  type SettingsOperationKind,
   type SettingsWriteCoordinatorDiagnostics,
   type SettingsWriteResult,
   type SettingsWriteTask,
-  type SettingsWriteTaskContext
+  type SettingsWriteTaskContext,
+  SettingsContractDecodeError,
+  SettingsUnknownOutcomeError
 } from './contracts';
 
 export interface SettingsWriteCoordinator {
-  enqueue<T>(section: SettingsSection, task: SettingsWriteTask<T>): Promise<SettingsWriteResult<T>>;
+  enqueue<T>(
+    section: SettingsSection,
+    task: SettingsWriteTask<T>,
+    operationKind?: SettingsOperationKind
+  ): Promise<SettingsWriteResult<T>>;
   invalidate(reason?: string): void;
   cancel(section?: SettingsSection, reason?: string): void;
   diagnostics(): SettingsWriteCoordinatorDiagnostics;
@@ -19,6 +31,8 @@ interface QueueEntry<T> {
   readonly section: SettingsSection;
   readonly task: SettingsWriteTask<T>;
   readonly generation: number;
+  readonly globalGeneration: number;
+  readonly operationKind: SettingsOperationKind;
   readonly resolve: (result: SettingsWriteResult<T>) => void;
   settled: boolean;
 }
@@ -26,6 +40,7 @@ interface QueueEntry<T> {
 interface ActiveEntry {
   readonly entry: QueueEntry<unknown>;
   readonly controller: AbortController;
+  cancellationStatus?: 'cancelled' | 'stale' | 'disposed';
 }
 
 function cancellationResult<T>(
@@ -33,7 +48,13 @@ function cancellationResult<T>(
   status: 'cancelled' | 'stale' | 'disposed',
   message: string
 ): SettingsWriteResult<T> {
-  return Object.freeze({ status, section: entry.section, generation: entry.generation, message });
+  return Object.freeze({
+    status,
+    section: entry.section,
+    generation: entry.generation,
+    operationKind: entry.operationKind,
+    message
+  });
 }
 
 function failureMessage(error: unknown): string {
@@ -45,9 +66,36 @@ function failureMessage(error: unknown): string {
 export function createSettingsWriteCoordinator(): SettingsWriteCoordinator {
   const queues = new Map<SettingsSection, QueueEntry<unknown>[]>();
   const active = new Map<SettingsSection, ActiveEntry>();
+  const sectionGenerations = new Map<SettingsSection, number>();
   let nextEntryId = 0;
-  let generation = 0;
+  let globalGeneration = 0;
   let disposed = false;
+
+  function currentSectionGeneration(section: SettingsSection): number {
+    return sectionGenerations.get(section) ?? 0;
+  }
+
+  function bumpSectionGeneration(section: SettingsSection): void {
+    sectionGenerations.set(section, currentSectionGeneration(section) + 1);
+  }
+
+  function isCurrent(entry: QueueEntry<unknown>): boolean {
+    return entry.globalGeneration === globalGeneration &&
+      entry.generation === currentSectionGeneration(entry.section);
+  }
+
+  function isAbort(error: unknown): boolean {
+    return error instanceof ApiAbortError ||
+      (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError');
+  }
+
+  function hasUnknownMutationOutcome(entry: QueueEntry<unknown>, error: unknown): boolean {
+    if (entry.operationKind === 'read') return false;
+    return error instanceof ApiNetworkError ||
+      error instanceof ApiDecodeError ||
+      error instanceof SettingsContractDecodeError ||
+      isAbort(error);
+  }
 
   function settle<T>(entry: QueueEntry<T>, result: SettingsWriteResult<T>): void {
     if (entry.settled) return;
@@ -76,30 +124,47 @@ export function createSettingsWriteCoordinator(): SettingsWriteCoordinator {
 
     const controller = new AbortController();
     active.set(section, { entry: entry as QueueEntry<unknown>, controller });
-    const context: SettingsWriteTaskContext = Object.freeze({ signal: controller.signal, generation: entry.generation });
-    void (async () => {
+      const context: SettingsWriteTaskContext = Object.freeze({
+      signal: controller.signal,
+      generation: entry.generation,
+      operationKind: entry.operationKind
+    });
+      void (async () => {
       try {
         const value = await entry.task(context);
+        const current = active.get(section);
         if (disposed) {
           settle(entry, cancellationResult(entry, 'disposed', 'Settings write coordinator has been disposed.'));
-        } else if (controller.signal.aborted || entry.generation !== generation) {
+        } else if (current?.entry.id === entry.id && current.cancellationStatus) {
+          settle(entry, cancellationResult(entry, current.cancellationStatus, 'Settings write was cancelled before completion.'));
+        } else if (controller.signal.aborted || !isCurrent(entry as QueueEntry<unknown>)) {
           settle(entry, cancellationResult(entry, 'stale', 'Settings write result was invalidated before completion.'));
         } else {
           settle(entry, Object.freeze({
-            status: 'completed', section: entry.section, generation: entry.generation, value
+            status: 'completed', section: entry.section, generation: entry.generation,
+            operationKind: entry.operationKind, value
           }));
         }
       } catch (error) {
+        const current = active.get(section);
         if (disposed) {
           settle(entry, cancellationResult(entry, 'disposed', 'Settings write coordinator has been disposed.'));
-        } else if (entry.generation !== generation) {
+        } else if (current?.entry.id === entry.id && current.cancellationStatus) {
+          settle(entry, cancellationResult(entry, current.cancellationStatus, 'Settings write was cancelled before completion.'));
+        } else if (!isCurrent(entry as QueueEntry<unknown>)) {
           settle(entry, cancellationResult(entry, 'stale', 'Settings write result was invalidated before completion.'));
         } else if (controller.signal.aborted) {
           settle(entry, cancellationResult(entry, 'cancelled', 'Settings write was cancelled before completion.'));
+        } else if (hasUnknownMutationOutcome(entry as QueueEntry<unknown>, error)) {
+          const unknown = new SettingsUnknownOutcomeError(error, entry.operationKind);
+          settle(entry, Object.freeze({
+            status: 'failed', section: entry.section, generation: entry.generation,
+            operationKind: entry.operationKind, error: unknown, message: unknown.message
+          }));
         } else {
           settle(entry, Object.freeze({
             status: 'failed', section: entry.section, generation: entry.generation,
-            error, message: failureMessage(error)
+            operationKind: entry.operationKind, error, message: failureMessage(error)
           }));
         }
       } finally {
@@ -112,26 +177,39 @@ export function createSettingsWriteCoordinator(): SettingsWriteCoordinator {
     })();
   }
 
-  function abortActive(section: SettingsSection, reason: string): void {
+  function abortActive(
+    section: SettingsSection,
+    reason: string,
+    cancellationStatus: 'cancelled' | 'stale' | 'disposed'
+  ): void {
     const current = active.get(section);
-    current?.controller.abort(reason);
+    if (!current) return;
+    current.cancellationStatus = cancellationStatus;
+    current.controller.abort(reason);
   }
 
   const coordinator: SettingsWriteCoordinator = Object.freeze({
-    enqueue<T>(section: SettingsSection, task: SettingsWriteTask<T>): Promise<SettingsWriteResult<T>> {
+    enqueue<T>(
+      section: SettingsSection,
+      task: SettingsWriteTask<T>,
+      operationKind: SettingsOperationKind = 'write'
+    ): Promise<SettingsWriteResult<T>> {
       if (disposed) {
         return Promise.resolve(Object.freeze({
-          status: 'disposed', section, generation, message: 'Settings write coordinator has been disposed.'
+          status: 'disposed', section, generation: currentSectionGeneration(section), operationKind,
+          message: 'Settings write coordinator has been disposed.'
         }));
       }
       if (typeof task !== 'function') throw new TypeError('Settings write task must be a function.');
-      const entryGeneration = generation;
+      const entryGeneration = currentSectionGeneration(section);
       return new Promise<SettingsWriteResult<T>>(resolve => {
         const entry: QueueEntry<T> = {
           id: ++nextEntryId,
           section,
           task,
           generation: entryGeneration,
+          globalGeneration,
+          operationKind,
           resolve,
           settled: false
         };
@@ -143,36 +221,45 @@ export function createSettingsWriteCoordinator(): SettingsWriteCoordinator {
     },
     invalidate(reason = 'settings-write-invalidated'): void {
       if (disposed) return;
-      generation += 1;
-      for (const section of active.keys()) abortActive(section, reason);
+      globalGeneration += 1;
+      for (const section of active.keys()) abortActive(section, reason, 'stale');
       for (const section of queues.keys()) cancelQueue(section, 'stale', `Settings writes invalidated: ${reason}.`);
     },
     cancel(section?: SettingsSection, reason = 'settings-write-cancelled'): void {
       if (disposed) return;
-      generation += 1;
       if (section) {
-        abortActive(section, reason);
+        bumpSectionGeneration(section);
+        abortActive(section, reason, 'cancelled');
         cancelQueue(section, 'cancelled', `Settings write cancelled: ${reason}.`);
         return;
       }
-      for (const currentSection of active.keys()) abortActive(currentSection, reason);
+      globalGeneration += 1;
+      for (const currentSection of active.keys()) abortActive(currentSection, reason, 'cancelled');
       for (const currentSection of queues.keys()) cancelQueue(currentSection, 'cancelled', `Settings writes cancelled: ${reason}.`);
     },
     diagnostics(): SettingsWriteCoordinatorDiagnostics {
       const queuedTaskCount = [...queues.values()].reduce((total, queue) => total + queue.length, 0);
+      const activeOperationKinds: Partial<Record<SettingsOperationKind, number>> = {};
+      for (const { entry } of active.values()) {
+        activeOperationKinds[entry.operationKind] = (activeOperationKinds[entry.operationKind] ?? 0) + 1;
+      }
       return Object.freeze({
-        generation,
+        generation: globalGeneration,
         activeSectionCount: active.size,
         activeAbortControllerCount: active.size,
         queuedTaskCount,
+        activeOperationKinds: Object.freeze(activeOperationKinds),
         disposed
       });
     },
     dispose(reason = 'settings-write-coordinator-disposed'): void {
       if (disposed) return;
       disposed = true;
-      generation += 1;
-      for (const current of active.values()) current.controller.abort(reason);
+      globalGeneration += 1;
+      for (const current of active.values()) {
+        current.cancellationStatus = 'disposed';
+        current.controller.abort(reason);
+      }
       for (const section of queues.keys()) cancelQueue(section, 'disposed', `Settings write coordinator has been disposed: ${reason}.`);
     }
   });

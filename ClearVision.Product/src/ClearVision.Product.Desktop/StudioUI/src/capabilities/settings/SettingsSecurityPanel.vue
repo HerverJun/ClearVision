@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, shallowRef, watch } from 'vue';
+import type { AuthLifecycleOwner } from '@/app/auth';
 import { CvButton, CvField, CvInlineAlert, CvPanel } from '@/design-system';
 import type { SettingsOwner } from './settingsOwner';
 import type { SettingsSecurityProjectionV1 } from './decoder';
@@ -11,6 +12,7 @@ const props = defineProps<{
   projection: SettingsSecurityProjectionV1 | null;
   owner: SettingsOwner;
   role: string | null;
+  auth: AuthLifecycleOwner | null;
 }>();
 
 const canWritePolicy = computed(() => props.role === 'Admin' && props.projection !== null);
@@ -35,10 +37,17 @@ const passwordBusy = shallowRef(false);
 const passwordFeedback = shallowRef<SettingsFeedback | null>(null);
 
 const policyDirty = computed(() => JSON.stringify(policyDraft) !== JSON.stringify(policyBaseline.value));
+const detachPanelState = props.owner.registerPanelState('security', () => ({
+  dirty: policyDirty.value,
+  pending: policyBusy.value || passwordBusy.value
+}));
+watch([policyDirty, policyBusy, passwordBusy, oldPassword, newPassword], () => {
+  props.owner.refreshPanelState();
+});
 const policyValidation = computed(() => {
+  const passwordMinLength = Number(policyDraft.passwordMinLength);
+  if (!Number.isInteger(passwordMinLength) || passwordMinLength < 6) return 'PasswordMinLength must be at least 6.';
   for (const [label, raw] of [
-    ['密码最小长度', policyDraft.passwordMinLength],
-    ['会话超时', policyDraft.sessionTimeoutMinutes],
     ['失败锁定次数', policyDraft.loginFailureLockoutCount]
   ] as const) {
     const value = Number(raw);
@@ -82,7 +91,6 @@ async function savePolicy(): Promise<void> {
   try {
     const result = await props.owner.saveGenericSection('security', {
       passwordMinLength: Number(policyDraft.passwordMinLength),
-      sessionTimeoutMinutes: Number(policyDraft.sessionTimeoutMinutes),
       loginFailureLockoutCount: Number(policyDraft.loginFailureLockoutCount)
     });
     policyFeedback.value = settingsFeedbackForResult(result);
@@ -103,14 +111,39 @@ function discardPolicy(): void {
 
 async function changePassword(): Promise<void> {
   if (!canChangePassword.value || passwordBusy.value || !oldPassword.value || !newPassword.value) return;
-  passwordBusy.value = true;
   passwordFeedback.value = null;
   try {
-    const result = await props.owner.changePassword({
+    if (!props.auth) {
+      passwordFeedback.value = {
+        kind: 'error',
+        message: 'Auth lifecycle is unavailable; the password change was rejected.',
+        savedLabel: '未完成',
+        effectiveLabel: '未生效',
+        restartLabel: '不适用'
+      };
+      return;
+    }
+    const transition = props.auth.changePassword({
       oldPassword: oldPassword.value,
       newPassword: newPassword.value
     });
-    passwordFeedback.value = settingsFeedbackForResult(result);
+    passwordBusy.value = true;
+    const accepted = await transition;
+    passwordFeedback.value = accepted
+      ? {
+          kind: 'saved',
+          message: '密码修改成功，当前会话已失效，请使用新密码重新登录。',
+          savedLabel: '账户操作已完成',
+          effectiveLabel: '会话已失效',
+          restartLabel: '需要重新登录'
+        }
+      : {
+          kind: 'error',
+          message: props.auth.projection.message,
+          savedLabel: '未完成',
+          effectiveLabel: '未生效',
+          restartLabel: '不适用'
+        };
   } finally {
     oldPassword.value = '';
     newPassword.value = '';
@@ -119,6 +152,7 @@ async function changePassword(): Promise<void> {
 }
 
 onBeforeUnmount(() => {
+  detachPanelState();
   oldPassword.value = '';
   newPassword.value = '';
 });
@@ -145,10 +179,9 @@ onBeforeUnmount(() => {
           />
           <CvField
             v-model="policyDraft.sessionTimeoutMinutes"
-            label="会话超时（分钟）"
+            label="会话超时（历史只读，分钟）"
             type="number"
-            :readonly="!canWritePolicy"
-            :error="canWritePolicy ? policyValidation ?? undefined : undefined"
+            readonly
           />
           <CvField
             v-model="policyDraft.loginFailureLockoutCount"

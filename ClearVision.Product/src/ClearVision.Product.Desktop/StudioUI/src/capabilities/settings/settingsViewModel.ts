@@ -1,4 +1,9 @@
-import type { GenericSettingsSection, SettingsSection, SettingsWriteResult } from './contracts';
+import type {
+  GenericSettingsSection,
+  SettingsOperationKind,
+  SettingsSection,
+  SettingsWriteResult
+} from './contracts';
 import type { SettingsProjectionV1 } from './decoder';
 import { projectSettingsOperationFailure, type SettingsOwner } from './settingsOwner';
 
@@ -75,7 +80,7 @@ export function settingsSectionStateLabel(state: SettingsSectionReadState): stri
   }
 }
 
-export type SettingsFeedbackKind = 'saved' | 'error' | 'unknown' | 'cancelled' | 'forbidden';
+export type SettingsFeedbackKind = 'saved' | 'completed' | 'error' | 'unknown' | 'cancelled' | 'forbidden';
 
 export interface SettingsFeedback {
   readonly kind: SettingsFeedbackKind;
@@ -87,6 +92,43 @@ export interface SettingsFeedback {
 
 export function settingsFeedbackForResult<T>(result: SettingsWriteResult<T>): SettingsFeedback {
   if (result.status === 'completed') {
+    const operationKind: SettingsOperationKind = result.operationKind ?? 'write';
+    if (operationKind === 'read') {
+      return Object.freeze({
+        kind: 'completed',
+        message: '已重新读取服务端投影。',
+        savedLabel: '不适用（读取）',
+        effectiveLabel: '服务端投影已读取',
+        restartLabel: '不适用'
+      });
+    }
+    if (operationKind === 'runtime-operation') {
+      return Object.freeze({
+        kind: 'completed',
+        message: '运行操作已完成；运行时响应是当前权威结果。',
+        savedLabel: '不适用（运行操作）',
+        effectiveLabel: '运行状态已返回',
+        restartLabel: '不适用'
+      });
+    }
+    if (operationKind === 'account-operation') {
+      return Object.freeze({
+        kind: 'completed',
+        message: '账户操作已完成；用户与会话状态仍以服务端为准。',
+        savedLabel: '不适用（账户操作）',
+        effectiveLabel: '服务端状态为准',
+        restartLabel: '不适用'
+      });
+    }
+    if (operationKind === 'database-operation') {
+      return Object.freeze({
+        kind: 'completed',
+        message: '数据库操作已完成；返回响应是当前权威结果。',
+        savedLabel: '不适用（数据库操作）',
+        effectiveLabel: '服务端状态为准',
+        restartLabel: '不适用'
+      });
+    }
     return Object.freeze({
       kind: 'saved',
       message: '操作已完成；服务端返回值已作为新的权威投影。',
@@ -107,6 +149,15 @@ export function settingsFeedbackForResult<T>(result: SettingsWriteResult<T>): Se
   }
 
   if (result.status === 'cancelled' || result.status === 'disposed') {
+    if (result.operationKind && result.operationKind !== 'read') {
+      return Object.freeze({
+        kind: 'unknown',
+        message: '修改操作被中断，结果未知；请先重新读取服务端状态再重试。',
+        savedLabel: '结果未知',
+        effectiveLabel: '结果未知',
+        restartLabel: '重新读取后判断'
+      });
+    }
     return Object.freeze({
       kind: 'cancelled',
       message: '操作已取消；未根据本地结果推断服务端状态。',
@@ -136,7 +187,7 @@ export function settingsFeedbackForResult<T>(result: SettingsWriteResult<T>): Se
     });
   }
 
-  const error = projectSettingsOperationFailure(result.error);
+  const error = projectSettingsOperationFailure(result.error, result.operationKind);
   return Object.freeze({
     kind: error.code === 'unknown-outcome' ? 'unknown' : 'error',
     message: error.publicMessage,

@@ -58,7 +58,7 @@ public sealed class UserEndpointsTests
         using var listResponse = await host.Client.GetAsync("/api/users");
         listResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var users = await ReadJsonAsync(listResponse);
-        users.GetArrayLength().Should().Be(1);
+        users.GetArrayLength().Should().Be(2);
 
         using var getResponse = await host.Client.GetAsync($"/api/users/{userId}");
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -86,12 +86,12 @@ public sealed class UserEndpointsTests
         resetResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var reset = await ReadJsonAsync(resetResponse);
         GetProperty(reset, "message").GetString().Should().Be("密码重置成功");
-        var user = host.Repository.Users.Single();
+        var user = host.Repository.Users.Single(candidate => candidate.Username == "operator01");
         user.PasswordHash.Should().Be("hashed:ResetPwd123");
 
         using var deleteResponse = await host.Client.DeleteAsync($"/api/users/{userId}");
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
-        host.Repository.Users.Should().BeEmpty();
+        host.Repository.Users.Should().ContainSingle(user => user.Role == UserRole.Admin);
 
         using var missingResponse = await host.Client.GetAsync($"/api/users/{userId}");
         missingResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -113,7 +113,46 @@ public sealed class UserEndpointsTests
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var payload = await ReadJsonAsync(response);
         GetProperty(payload, "error").GetString().Should().Be("初始密码长度不能少于 10 位");
-        host.Repository.Users.Should().BeEmpty();
+        host.Repository.Users.Should().ContainSingle(user => user.Role == UserRole.Admin);
+    }
+
+    [Fact]
+    public async Task AdminEndpoints_ShouldFailClosedForSelfDeleteAndSelfDemotion()
+    {
+        await using var host = await UserEndpointsTestHost.CreateAsync();
+        var adminId = host.AdminId;
+        adminId.Should().NotBeNull();
+
+        using var updateResponse = await host.Client.PutAsJsonAsync($"/api/users/{adminId}", new UpdateUserRequest
+        {
+            DisplayName = "Still Admin",
+            Role = UserRole.Engineer,
+            IsActive = false
+        });
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        using var deleteResponse = await host.Client.DeleteAsync($"/api/users/{adminId}");
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        host.Repository.Users.Should().ContainSingle(user => user.Id == adminId && user.Role == UserRole.Admin && user.IsActive);
+    }
+
+    [Fact]
+    public async Task AdminEndpoints_ShouldPreserveAnActiveAdminWhenRemovingAnotherAdmin()
+    {
+        await using var host = await UserEndpointsTestHost.CreateAsync();
+        var secondAdmin = User.Create("second-admin", "hashed:Password123", "Second Admin", UserRole.Admin);
+        await host.Repository.AddAsync(secondAdmin);
+
+        using var response = await host.Client.PutAsJsonAsync($"/api/users/{secondAdmin.Id}", new UpdateUserRequest
+        {
+            DisplayName = "Disabled Admin",
+            Role = UserRole.Operator,
+            IsActive = false
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.Repository.Users.Count(user => user.Role == UserRole.Admin && user.IsActive).Should().Be(1);
+        host.Repository.Users.Should().Contain(user => user.Id == host.AdminId && user.Role == UserRole.Admin && user.IsActive);
     }
 
     [Fact]
@@ -155,16 +194,19 @@ public sealed class UserEndpointsTests
     {
         private readonly WebApplication _app;
 
-        private UserEndpointsTestHost(WebApplication app, InMemoryUserRepository repository)
+        private UserEndpointsTestHost(WebApplication app, InMemoryUserRepository repository, Guid? adminId)
         {
             _app = app;
             Repository = repository;
+            AdminId = adminId;
             Client = app.GetTestClient();
         }
 
         public HttpClient Client { get; }
 
         public InMemoryUserRepository Repository { get; }
+
+        public Guid? AdminId { get; }
 
         public static async Task<UserEndpointsTestHost> CreateAsync(string? role = "Admin", int passwordMinLength = 8)
         {
@@ -176,6 +218,12 @@ public sealed class UserEndpointsTests
             builder.WebHost.UseTestServer();
 
             var repository = new InMemoryUserRepository();
+            User? admin = null;
+            if (string.Equals(role, UserRole.Admin.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                admin = User.Create("admin", "hashed:AdminPassword", "Administrator", UserRole.Admin);
+                await repository.AddAsync(admin);
+            }
             var configService = Substitute.For<IConfigurationService>();
             configService.GetCurrent().Returns(new AppConfig
             {
@@ -204,7 +252,7 @@ public sealed class UserEndpointsTests
                 {
                     context.Items["CurrentUser"] = new UserSession
                     {
-                        UserId = role.ToLowerInvariant(),
+                        UserId = admin?.Id.ToString() ?? role.ToLowerInvariant(),
                         Username = role.ToLowerInvariant(),
                         Role = role
                     };
@@ -215,7 +263,7 @@ public sealed class UserEndpointsTests
 
             app.MapUserEndpoints();
             await app.StartAsync();
-            return new UserEndpointsTestHost(app, repository);
+            return new UserEndpointsTestHost(app, repository, admin?.Id);
         }
 
         public async ValueTask DisposeAsync()

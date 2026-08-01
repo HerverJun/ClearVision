@@ -5,17 +5,24 @@ import {
   SETTINGS_NAVIGATION_ITEMS,
   type SettingsNavigationTarget
 } from './settingsViewModel';
+import type { SettingsProjectionV1 } from './decoder';
 
 defineProps<{
   active: SettingsNavigationTarget;
+  role: string | null;
+  projection: SettingsProjectionV1;
 }>();
 
 const emit = defineEmits<{
   select: [target: SettingsNavigationTarget];
 }>();
 
-function stateLabel(target: SettingsNavigationTarget): string {
-  if (target === 'overview' || isGenericSettingsSection(target)) return '只读';
+function stateLabel(target: SettingsNavigationTarget, role: string | null, projection: SettingsProjectionV1): string {
+  if (target === 'overview') return '服务端投影';
+  if (isGenericSettingsSection(target)) {
+    const accessLabel = role === 'Admin' ? 'Admin 可编辑' : role === 'Engineer' ? 'Engineer 只读' : '只读';
+    return projection.sections[target] ? accessLabel : `${accessLabel}（安全子集未返回）`;
+  }
   if (target === 'plc' || target === 'tcp' || target === 'camera') return '已接入';
   return '后续';
 }
@@ -50,7 +57,7 @@ function stateLabel(target: SettingsNavigationTarget): string {
           <strong>{{ item.label }}</strong>
           <small>{{ item.description }}</small>
         </span>
-        <span class="settings-group-navigation__item-state">{{ stateLabel(item.id) }}</span>
+        <span class="settings-group-navigation__item-state">{{ stateLabel(item.id, role, projection) }}</span>
       </button>
     </div>
   </nav>

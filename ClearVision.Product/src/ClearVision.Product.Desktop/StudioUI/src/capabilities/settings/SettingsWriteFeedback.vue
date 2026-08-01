@@ -9,7 +9,7 @@ const props = defineProps<{
 
 const tone = computed(() => {
   if (!props.feedback) return 'info' as const;
-  if (props.feedback.kind === 'saved') return 'success' as const;
+  if (props.feedback.kind === 'saved' || props.feedback.kind === 'completed') return 'success' as const;
   if (props.feedback.kind === 'unknown') return 'warning' as const;
   if (props.feedback.kind === 'forbidden') return 'warning' as const;
   return 'error' as const;
@@ -17,7 +17,7 @@ const tone = computed(() => {
 
 const statusLabel = computed(() => {
   if (!props.feedback) return '';
-  if (props.feedback.kind === 'saved') return '已完成';
+  if (props.feedback.kind === 'saved' || props.feedback.kind === 'completed') return '已完成';
   if (props.feedback.kind === 'unknown') return '结果未知';
   if (props.feedback.kind === 'forbidden') return '无权限';
   if (props.feedback.kind === 'cancelled') return '已取消';

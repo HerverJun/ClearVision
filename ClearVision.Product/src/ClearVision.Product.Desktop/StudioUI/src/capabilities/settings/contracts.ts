@@ -26,6 +26,12 @@ export const SETTINGS_ROUTE_ROLES = Object.freeze(['Admin', 'Engineer'] as const
 
 export type SettingsEndpointMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type SettingsEndpointKind = 'read' | 'write' | 'test' | 'runtime-operation';
+export type SettingsOperationKind =
+  | 'read'
+  | 'write'
+  | 'runtime-operation'
+  | 'account-operation'
+  | 'database-operation';
 export type SettingsEndpointSection = SettingsSection | 'generic';
 export type SettingsServerPermission = 'authenticated' | 'engineer-or-admin' | 'admin';
 export type SettingsUiPermission =
@@ -64,21 +70,54 @@ export interface SettingsOperationSemantics {
 export interface SettingsWriteTaskContext {
   readonly signal: AbortSignal;
   readonly generation: number;
+  readonly operationKind: SettingsOperationKind;
 }
 
 export type SettingsWriteTask<T> = (context: SettingsWriteTaskContext) => Promise<T>;
 
 export type SettingsWriteResult<T> =
-  | { readonly status: 'completed'; readonly section: SettingsSection; readonly generation: number; readonly value: T }
-  | { readonly status: 'cancelled' | 'stale' | 'disposed' | 'forbidden'; readonly section: SettingsSection; readonly generation: number; readonly message: string }
-  | { readonly status: 'failed'; readonly section: SettingsSection; readonly generation: number; readonly error: unknown; readonly message: string };
+  | {
+      readonly status: 'completed';
+      readonly section: SettingsSection;
+      readonly generation: number;
+      readonly operationKind?: SettingsOperationKind;
+      readonly value: T;
+    }
+  | {
+      readonly status: 'cancelled' | 'stale' | 'disposed' | 'forbidden';
+      readonly section: SettingsSection;
+      readonly generation: number;
+      readonly operationKind?: SettingsOperationKind;
+      readonly message: string;
+    }
+  | {
+      readonly status: 'failed';
+      readonly section: SettingsSection;
+      readonly generation: number;
+      readonly operationKind?: SettingsOperationKind;
+      readonly error: unknown;
+      readonly message: string;
+    };
 
 export interface SettingsWriteCoordinatorDiagnostics {
   readonly generation: number;
   readonly activeSectionCount: number;
   readonly activeAbortControllerCount: number;
   readonly queuedTaskCount: number;
+  readonly activeOperationKinds: Readonly<Partial<Record<SettingsOperationKind, number>>>;
   readonly disposed: boolean;
+}
+
+export class SettingsUnknownOutcomeError extends Error {
+  readonly originalError: unknown;
+  readonly operationKind: SettingsOperationKind;
+
+  constructor(originalError: unknown, operationKind: SettingsOperationKind) {
+    super('Settings operation outcome is unknown; reread the server projection before retrying.');
+    this.name = 'SettingsUnknownOutcomeError';
+    this.originalError = originalError;
+    this.operationKind = operationKind;
+  }
 }
 
 export type SettingsErrorCode =

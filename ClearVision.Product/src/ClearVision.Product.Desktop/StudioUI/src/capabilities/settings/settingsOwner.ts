@@ -11,9 +11,12 @@ import {
 import {
   evaluateSettingsEndpointAccess,
   evaluateSettingsRouteAccess,
+  findSettingsEndpoint,
   SettingsContractDecodeError,
+  SettingsUnknownOutcomeError,
   type SettingsErrorCode,
   type SettingsEndpointAccessReason,
+  type SettingsOperationKind,
   type SettingsRole,
   type SettingsSection,
   type SettingsWriteCoordinatorDiagnostics,
@@ -37,6 +40,7 @@ import type {
   CameraBindingV1,
   CameraBindingsResponseV1,
   CameraDiscoveryResponseV1,
+  CameraPreviewDiagnosticsV1,
   CameraPreviewProjectionV1,
   PlcMappingV1,
   PlcMappingsResponseV1,
@@ -80,14 +84,26 @@ export interface SettingsOwnerProjection {
   readonly generation: number;
   readonly started: boolean;
   readonly device: SettingsDeviceProjectionV1;
+  readonly dirtySectionCount: number;
+  readonly pendingSectionCount: number;
 }
 
 export interface SettingsOwnerDiagnostics {
   readonly activeSettingsOwnerCount: number;
   readonly activeAbortControllerCount: number;
   readonly inFlightReadCount: number;
+  readonly dirtySectionCount: number;
+  readonly pendingSectionCount: number;
   readonly write: SettingsWriteCoordinatorDiagnostics;
+  readonly preview: CameraPreviewDiagnosticsV1;
   readonly disposed: boolean;
+}
+
+export type SettingsLeaveProtectionKind = 'settings-draft' | 'settings-pending' | 'settings-unknown';
+
+export interface SettingsPanelState {
+  readonly dirty: boolean;
+  readonly pending: boolean;
 }
 
 export interface SettingsOwner {
@@ -99,8 +115,12 @@ export interface SettingsOwner {
   enqueueEndpointOperation<T>(
     section: SettingsSection,
     endpointId: string,
-    task: SettingsEndpointTask<T>
+    task: SettingsEndpointTask<T>,
+    operationKind?: SettingsOperationKind
   ): Promise<SettingsWriteResult<T>>;
+  registerPanelState(section: SettingsSection, readState: () => SettingsPanelState): () => void;
+  refreshPanelState(): void;
+  leaveProtection(): SettingsLeaveProtectionKind | null;
   saveGenericSection(
     section: GenericSettingsSection,
     value: Readonly<Record<string, unknown>>
@@ -208,6 +228,14 @@ function fallbackMessage(code: SettingsErrorCode): string {
 }
 
 function errorProjection(error: unknown): SettingsErrorProjectionV1 {
+  if (error instanceof SettingsUnknownOutcomeError) {
+    return Object.freeze({
+      code: 'unknown-outcome',
+      publicMessage: 'Operation outcome is unknown; re-read the server projection before deciding whether to retry.',
+      policy: null,
+      issues: Object.freeze([])
+    });
+  }
   if (error instanceof ApiHttpError) {
     const fallbackCode = settingsErrorCodeFromHttpStatus(error.status);
     if (typeof error.payload === 'object' && error.payload !== null) {
@@ -248,15 +276,39 @@ export function projectSettingsError(error: unknown): SettingsErrorProjectionV1 
   return errorProjection(error);
 }
 
-export function projectSettingsOperationFailure(error: unknown): SettingsErrorProjectionV1 {
+export function projectSettingsOperationFailure(
+  error: unknown,
+  operationKind?: SettingsOperationKind
+): SettingsErrorProjectionV1 {
   const projection = errorProjection(error);
-  if (projection.code !== 'network' && projection.code !== 'abort') return projection;
+  const unknownMutation = operationKind !== undefined && operationKind !== 'read' &&
+    (projection.code === 'network' || projection.code === 'abort' || projection.code === 'decode');
+  if (!unknownMutation) return projection;
   return Object.freeze({
     code: 'unknown-outcome',
     publicMessage: '操作结果未知；请先重新读取服务端状态，再决定是否重试。',
     policy: null,
     issues: Object.freeze([])
   });
+}
+
+export function settingsOperationResultMessage(result: {
+  readonly status: string;
+  readonly message?: string;
+  readonly error?: unknown;
+  readonly operationKind?: SettingsOperationKind;
+}): string {
+  if (result.status === 'failed') {
+    const projection = projectSettingsOperationFailure(result.error, result.operationKind);
+    return projection.code === 'unknown-outcome'
+      ? '操作结果未知；请先重新读取服务端状态，再决定是否重试。'
+      : projection.publicMessage;
+  }
+  if (result.operationKind && result.operationKind !== 'read' &&
+      (result.status === 'cancelled' || result.status === 'stale' || result.status === 'disposed')) {
+    return '操作结果未知；请先重新读取服务端状态，再决定是否重试。';
+  }
+  return result.message ?? '操作未完成。';
 }
 
 function isAbort(error: unknown): boolean {
@@ -276,6 +328,28 @@ function endpointAccessMessage(endpointId: string, reason: SettingsEndpointAcces
   }
 }
 
+function operationKindForEndpoint(endpointId: string): SettingsOperationKind {
+  const endpoint = findSettingsEndpoint(endpointId);
+  if (endpoint?.kind === 'read') return 'read';
+  if (endpointId.startsWith('auth.') || endpointId.startsWith('users.')) return 'account-operation';
+  if (endpointId.startsWith('settings.database.')) return 'database-operation';
+  if (endpoint?.kind === 'runtime-operation' || endpointId.endsWith('.runtime')) return 'runtime-operation';
+  return 'write';
+}
+
+function emptyCameraPreviewDiagnostics(): CameraPreviewDiagnosticsV1 {
+  return Object.freeze({
+    controller: 'idle',
+    session: 'none',
+    frameLoop: 'idle',
+    blobUrl: 'none',
+    controllerCount: 0,
+    sessionCount: 0,
+    frameLoopCount: 0,
+    blobUrlCount: 0
+  });
+}
+
 function emptyCameraPreview(): CameraPreviewProjectionV1 {
   return Object.freeze({
     phase: 'idle',
@@ -288,7 +362,8 @@ function emptyCameraPreview(): CameraPreviewProjectionV1 {
     triggerMode: null,
     triggerSource: null,
     contentType: null,
-    message: '尚未开始相机预览。'
+    message: '尚未开始相机预览。',
+    diagnostics: emptyCameraPreviewDiagnostics()
   });
 }
 
@@ -377,7 +452,9 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     message: 'Settings owner 尚未启动。',
     generation: 0,
     started: false,
-    device: emptyDeviceProjection()
+    device: emptyDeviceProjection(),
+    dirtySectionCount: 0,
+    pendingSectionCount: 0
   });
   let disposed = false;
   let generation = 0;
@@ -386,6 +463,26 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
   let previewSessionId: string | null = null;
   let previewGeneration = 0;
   let previewObjectUrl: string | null = null;
+  let previewFrameLoopCount = 0;
+  let previewFrameLoopPromise: Promise<void> | undefined;
+  const panelStates = new Map<SettingsSection, () => SettingsPanelState>();
+  const unknownOutcomeSections = new Set<SettingsSection>();
+
+  function syncPanelState(): void {
+    let dirtySectionCount = 0;
+    let pendingSectionCount = 0;
+    for (const readState of panelStates.values()) {
+      try {
+        const panelState = readState();
+        if (panelState.dirty) dirtySectionCount += 1;
+        if (panelState.pending) pendingSectionCount += 1;
+      } catch {
+        // A panel can be in the middle of unmounting; its disposer removes it next.
+      }
+    }
+    state.dirtySectionCount = dirtySectionCount;
+    state.pendingSectionCount = pendingSectionCount;
+  }
 
   function updateDevice(update: (current: SettingsDeviceProjectionV1) => SettingsDeviceProjectionV1): void {
     if (disposed) return;
@@ -393,7 +490,35 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
   }
 
   function updatePreview(preview: CameraPreviewProjectionV1): void {
-    updateDevice(current => Object.freeze({ ...current, preview }));
+    updateDevice(current => Object.freeze({
+      ...current,
+      preview: Object.freeze({ ...preview, diagnostics: previewDiagnostics() })
+    }));
+  }
+
+  function previewDiagnostics(): CameraPreviewDiagnosticsV1 {
+    const controllerCount = previewController ? 1 : 0;
+    const sessionCount = previewSessionId ? 1 : 0;
+    const blobUrlCount = previewObjectUrl ? 1 : 0;
+    const frameLoopCount = disposed ? 0 : previewFrameLoopCount;
+    return Object.freeze({
+      controller: controllerCount > 0 ? 'active' : 'idle',
+      session: sessionCount > 0 ? 'active' : 'none',
+      frameLoop: frameLoopCount > 0 ? 'active' : 'idle',
+      blobUrl: blobUrlCount > 0 ? 'active' : 'none',
+      controllerCount,
+      sessionCount,
+      frameLoopCount,
+      blobUrlCount
+    });
+  }
+
+  function refreshPreviewDiagnostics(): void {
+    if (disposed) return;
+    updateDevice(current => Object.freeze({
+      ...current,
+      preview: Object.freeze({ ...current.preview, diagnostics: previewDiagnostics() })
+    }));
   }
 
   function clearPreviewObjectUrl(): void {
@@ -401,13 +526,19 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     previewObjectUrl = null;
   }
 
-  async function stopPreviewInternal(message: string, stopRemote = true): Promise<string | null> {
+  async function stopPreviewInternal(
+    message: string,
+    stopRemote = true,
+    waitForFrameLoop = true
+  ): Promise<string | null> {
     previewGeneration += 1;
+    const frameLoopPromise = previewFrameLoopPromise;
     previewController?.abort('settings-preview-stopped');
     previewController = undefined;
     const sessionId = previewSessionId;
     previewSessionId = null;
     clearPreviewObjectUrl();
+    if (waitForFrameLoop && frameLoopPromise) await frameLoopPromise.catch(() => undefined);
     if (sessionId && stopRemote) await adapter.stopContinuousPreview(sessionId).catch(() => undefined);
     if (!disposed) updatePreview({ ...emptyCameraPreview(), message });
     return sessionId;
@@ -442,35 +573,42 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     controller: AbortController,
     triggerMode: string
   ): Promise<void> {
-    while (!disposed && operationGeneration === previewGeneration && !controller.signal.aborted) {
-      try {
-        const response = await adapter.getContinuousPreviewFrame(sessionId, controller.signal);
-        const accepted = await setPreviewBlob(response.blob, response.contentType, operationGeneration, {
-          phase: 'running',
-          sessionId,
-          cameraBindingId,
-          triggerMode,
-          triggerSource: null,
-          width: positiveHeader(response.headers, 'X-Image-Width'),
-          height: positiveHeader(response.headers, 'X-Image-Height'),
-          frameSequence: positiveHeader(response.headers, 'X-Frame-Sequence'),
-          message: '连续预览正在接收帧。'
-        });
-        if (!accepted) return;
-        await delayWithAbort(80, controller.signal);
-      } catch (error) {
-        if (disposed || controller.signal.aborted || isAbort(error)) return;
-        await stopPreviewInternal('连续预览已停止。');
-        if (!disposed) {
-          updatePreview({
-            ...emptyCameraPreview(),
-            phase: 'error',
+    previewFrameLoopCount += 1;
+    refreshPreviewDiagnostics();
+    try {
+      while (!disposed && operationGeneration === previewGeneration && !controller.signal.aborted) {
+        try {
+          const response = await adapter.getContinuousPreviewFrame(sessionId, controller.signal);
+          const accepted = await setPreviewBlob(response.blob, response.contentType, operationGeneration, {
+            phase: 'running',
+            sessionId,
             cameraBindingId,
-            message: `连续预览失败：${error instanceof Error ? error.message : '帧读取失败。'}`
+            triggerMode,
+            triggerSource: null,
+            width: positiveHeader(response.headers, 'X-Image-Width'),
+            height: positiveHeader(response.headers, 'X-Image-Height'),
+            frameSequence: positiveHeader(response.headers, 'X-Frame-Sequence'),
+            message: '连续预览正在接收帧。'
           });
+          if (!accepted) return;
+          await delayWithAbort(80, controller.signal);
+        } catch (error) {
+          if (disposed || controller.signal.aborted || isAbort(error)) return;
+          await stopPreviewInternal('连续预览已停止。', true, false);
+          if (!disposed) {
+            updatePreview({
+              ...emptyCameraPreview(),
+              phase: 'error',
+              cameraBindingId,
+              message: `连续预览失败：${error instanceof Error ? error.message : '帧读取失败。'}`
+            });
+          }
+          return;
         }
-        return;
       }
+    } finally {
+      previewFrameLoopCount = Math.max(0, previewFrameLoopCount - 1);
+      refreshPreviewDiagnostics();
     }
   }
 
@@ -559,11 +697,14 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     enqueueEndpointOperation<T>(
       section: SettingsSection,
       endpointId: string,
-      task: SettingsEndpointTask<T>
+      task: SettingsEndpointTask<T>,
+      operationKindOverride?: SettingsOperationKind
     ): Promise<SettingsWriteResult<T>> {
+      const operationKind = operationKindOverride ?? operationKindForEndpoint(endpointId);
       if (disposed) {
         return Promise.resolve(Object.freeze({
           status: 'disposed', section, generation: writes.diagnostics().generation,
+          operationKind,
           message: 'Settings owner has been disposed.'
         }));
       }
@@ -571,13 +712,48 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       if (!access.allowed || !access.endpoint) {
         return Promise.resolve(Object.freeze({
           status: 'forbidden', section, generation: writes.diagnostics().generation,
+          operationKind,
           message: endpointAccessMessage(endpointId, access.reason)
         }));
       }
-      return writes.enqueue(section, context => task(Object.freeze({
-        ...context,
-        endpoint: access.endpoint!
-      })));
+      return writes.enqueue(
+        section,
+        context => task(Object.freeze({ ...context, endpoint: access.endpoint! })),
+        operationKind
+      ).then(result => {
+        const mutation = result.operationKind !== undefined && result.operationKind !== 'read';
+        const unknown = mutation && (
+          (result.status === 'failed' && projectSettingsOperationFailure(result.error, result.operationKind).code === 'unknown-outcome') ||
+          result.status === 'cancelled' || result.status === 'stale' || result.status === 'disposed'
+        );
+        if (unknown) {
+          unknownOutcomeSections.add(section);
+        } else if (result.status === 'completed') {
+          unknownOutcomeSections.delete(section);
+        }
+        return result;
+      });
+    },
+    registerPanelState(section: SettingsSection, readState: () => SettingsPanelState): () => void {
+      if (disposed) return () => undefined;
+      panelStates.set(section, readState);
+      syncPanelState();
+      return () => {
+        if (panelStates.get(section) === readState) {
+          panelStates.delete(section);
+          syncPanelState();
+        }
+      };
+    },
+    refreshPanelState(): void {
+      if (!disposed) syncPanelState();
+    },
+    leaveProtection(): SettingsLeaveProtectionKind | null {
+      syncPanelState();
+      if (unknownOutcomeSections.size > 0) return 'settings-unknown';
+      if (state.pendingSectionCount > 0) return 'settings-pending';
+      if (state.dirtySectionCount > 0) return 'settings-draft';
+      return null;
     },
     async saveGenericSection(
       section: GenericSettingsSection,
@@ -826,7 +1002,8 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       const result = await owner.enqueueEndpointOperation(
         'tcp',
         'tcp.runtime',
-        context => adapter.readTcpStatus(profileId, context.signal)
+        context => adapter.readTcpStatus(profileId, context.signal),
+        'read'
       );
       if (result.status === 'completed') {
         updateDevice(current => Object.freeze({
@@ -840,7 +1017,8 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       const result = await owner.enqueueEndpointOperation(
         'tcp',
         'tcp.runtime',
-        context => adapter.readTcpFrames(profileId, context.signal)
+        context => adapter.readTcpFrames(profileId, context.signal),
+        'read'
       );
       if (result.status === 'completed') {
         updateDevice(current => Object.freeze({
@@ -904,12 +1082,29 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         context => adapter.writeCameraBindings(bindings, activeCameraId, context.signal)
       );
       if (result.status !== 'completed') return result;
-      if (result.value.success) {
-        updateDevice(current => Object.freeze({ ...current, cameraBindings: bindings, activeCameraId }));
+      if (!result.value.success) return Object.freeze({ ...result, value: operationResult(false, result.value.message) });
+      const reread = await owner.readCameraBindings();
+      if (reread.status !== 'completed') {
+        unknownOutcomeSections.add('camera');
+        const rereadError = reread.status === 'failed' ? reread.error : new Error(reread.message);
+        const unknown = new SettingsUnknownOutcomeError(rereadError, 'write');
+        return Object.freeze({
+          status: 'failed',
+          section: 'camera',
+          generation: result.generation,
+          operationKind: 'write',
+          error: unknown,
+          message: '相机绑定已提交，但服务端重新读取失败；请重新读取后确认结果。'
+        });
       }
+      updateDevice(current => Object.freeze({
+        ...current,
+        cameraBindings: reread.value.bindings,
+        activeCameraId: reread.value.activeCameraId
+      }));
       return Object.freeze({
         ...result,
-        value: operationResult(result.value.success, result.value.message)
+        value: operationResult(true, '相机绑定已保存，并已重新读取服务端 binding projection。')
       });
     },
     readTriggerDiagnostics(): Promise<SettingsWriteResult<TriggerDiagnosticsV1>> {
@@ -998,7 +1193,17 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
             triggerMode: session.triggerMode,
             message: '连续预览已启动，正在等待帧。'
           });
-          void runPreviewLoop(session.sessionId, session.cameraBindingId, operationGeneration, controller, session.triggerMode);
+          const loop = runPreviewLoop(
+            session.sessionId,
+            session.cameraBindingId,
+            operationGeneration,
+            controller,
+            session.triggerMode
+          );
+          const trackedLoop = loop.finally(() => {
+            if (previewFrameLoopPromise === trackedLoop) previewFrameLoopPromise = undefined;
+          });
+          previewFrameLoopPromise = trackedLoop;
           return operationResult(true, '连续预览已启动。');
         }
       );
@@ -1021,7 +1226,10 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         activeSettingsOwnerCount,
         activeAbortControllerCount: (readController ? 1 : 0) + write.activeAbortControllerCount,
         inFlightReadCount: readController ? 1 : 0,
+        dirtySectionCount: state.dirtySectionCount,
+        pendingSectionCount: state.pendingSectionCount,
         write,
+        preview: previewDiagnostics(),
         disposed
       });
     },
@@ -1034,7 +1242,11 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       readController = undefined;
       writes.dispose(reason);
       clearPreviewObjectUrl();
+      panelStates.clear();
+      unknownOutcomeSections.clear();
       state.device = emptyDeviceProjection();
+      state.dirtySectionCount = 0;
+      state.pendingSectionCount = 0;
       state.phase = 'disposed';
       state.generation = generation;
       state.message = 'Settings owner 已释放。';

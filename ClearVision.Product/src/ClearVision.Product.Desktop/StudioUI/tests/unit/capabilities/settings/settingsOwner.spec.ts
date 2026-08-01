@@ -1,10 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ProductRuntime } from '@/app/productRuntime';
-import { ApiConflictError, ApiForbiddenError, type ApiTransport } from '@/platform/api';
+import {
+  ApiConflictError,
+  ApiDecodeError,
+  ApiForbiddenError,
+  ApiNetworkError,
+  type ApiTransport
+} from '@/platform/api';
 import {
   createSettingsOwner,
   createSettingsWriteCoordinator,
   getSettingsOwnerActiveCount,
+  SettingsContractDecodeError,
+  SettingsUnknownOutcomeError,
+  settingsOperationResultMessage,
   type SettingsEndpointTask,
   type SettingsWriteResult
 } from '@/capabilities/settings';
@@ -35,6 +44,10 @@ function runtime(get: FakeGet): Pick<ProductRuntime, 'api'> {
   return {
     api: { apiBaseUrl: 'http://localhost:5000/api', get: get as ApiTransport['get'] } as ApiTransport
   };
+}
+
+function runtimeWithApi(api: ApiTransport): Pick<ProductRuntime, 'api'> {
+  return { api };
 }
 
 function deferred<T>() {
@@ -156,6 +169,52 @@ describe('F07 G1 Settings owner lifecycle', () => {
     conflict.dispose();
   });
 
+  it('classifies mutation network and contract decode failures as unknown outcomes', async () => {
+    const network = createSettingsOwner({
+      runtime: runtimeWithApi({
+        ...({} as ApiTransport),
+        get: vi.fn(async () => undefined),
+        put: vi.fn(async () => {
+          throw new ApiNetworkError('http://localhost:5000/api/settings', new Error('offline'));
+        })
+      }),
+      role: 'Admin'
+    });
+    const networkResult = await network.saveGenericSection('general', { softwareTitle: 'Updated' });
+    expect(networkResult.status).toBe('failed');
+    if (networkResult.status === 'failed') expect(networkResult.error).toBeInstanceOf(SettingsUnknownOutcomeError);
+    expect(settingsOperationResultMessage(networkResult)).toContain('结果未知');
+    expect(network.leaveProtection()).toBe('settings-unknown');
+    network.dispose();
+
+    const decode = createSettingsOwner({
+      runtime: runtimeWithApi({
+        ...({} as ApiTransport),
+        get: vi.fn(async () => undefined),
+        put: vi.fn(async () => {
+          throw new SettingsContractDecodeError('$.config', 'object');
+        })
+      }),
+      role: 'Admin'
+    });
+    const decodeResult = await decode.saveGenericSection('general', { softwareTitle: 'Updated' });
+    expect(decodeResult.status).toBe('failed');
+    if (decodeResult.status === 'failed') expect(decodeResult.error).toBeInstanceOf(SettingsUnknownOutcomeError);
+    decode.dispose();
+  });
+
+  it('keeps read decode failures classified as read/decode failures', async () => {
+    const owner = createSettingsOwner({
+      runtime: runtime(async () => {
+        throw new ApiDecodeError('http://localhost:5000/api/settings', 200, new Error('invalid response'));
+      }),
+      role: 'Admin'
+    });
+    expect(await owner.refresh()).toBe(false);
+    expect(owner.projection.error).toMatchObject({ code: 'decode' });
+    owner.dispose();
+  });
+
   it('enforces one mounted Settings owner at a time', () => {
     const first = createSettingsOwner({ runtime: runtime(vi.fn()), role: 'Admin' });
     expect(getSettingsOwnerActiveCount()).toBe(1);
@@ -249,6 +308,23 @@ describe('F07 G1 Settings section write coordinator skeleton', () => {
     pending.resolve('late');
     expect((await active).status).toBe('stale');
     expect((await queued).status).toBe('stale');
+    coordinator.dispose();
+  });
+
+  it('cancels only the selected section while another section completes', async () => {
+    const coordinator = createSettingsWriteCoordinator();
+    const generalPending = deferred<string>();
+    const storagePending = deferred<string>();
+    const general = coordinator.enqueue('general', async () => generalPending.promise, 'write');
+    const storage = coordinator.enqueue('storage', async () => storagePending.promise, 'write');
+    await Promise.resolve();
+
+    coordinator.cancel('general', 'leave-general');
+    generalPending.resolve('late');
+    storagePending.resolve('saved');
+
+    expect((await general).status).toBe('cancelled');
+    expect((await storage).status).toBe('completed');
     coordinator.dispose();
   });
 

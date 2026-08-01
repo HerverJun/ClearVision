@@ -94,8 +94,15 @@ public class UserManagementService
     /// <summary>
     /// 更新用户
     /// </summary>
-    public async Task<UserResult> UpdateUserAsync(string id, UpdateUserRequest request)
+    public async Task<UserResult> UpdateUserAsync(
+        string id,
+        UpdateUserRequest request,
+        string? actingUserId = null)
     {
+        var actingUser = await ResolveActingAdminAsync(actingUserId);
+        if (actingUser == null)
+            return UserResult.Fail("当前登录用户身份无效。");
+
         if (!Guid.TryParse(id, out var userId))
             return UserResult.Fail("无效的用户ID");
 
@@ -104,6 +111,20 @@ public class UserManagementService
             return UserResult.Fail("用户不存在");
 
         // 更新显示名称
+        var isActingUser = user.Id == actingUser.Id;
+        var removesActiveAdmin = user.Role == UserRole.Admin && user.IsActive &&
+            (request.Role != UserRole.Admin || !request.IsActive);
+        if (isActingUser && user.Role == UserRole.Admin &&
+            (request.Role != UserRole.Admin || !request.IsActive))
+        {
+            return UserResult.Fail("当前登录 Admin 不能自行降级或停用。");
+        }
+
+        if (removesActiveAdmin && await CountActiveAdminsAsync() <= 1)
+        {
+            return UserResult.Fail("不能移除系统最后一个有效 Admin。");
+        }
+
         if (!string.IsNullOrWhiteSpace(request.DisplayName))
         {
             user.UpdateDisplayName(request.DisplayName.Trim());
@@ -129,14 +150,28 @@ public class UserManagementService
     /// <summary>
     /// 删除用户
     /// </summary>
-    public async Task<UserResult> DeleteUserAsync(string id)
+    public async Task<UserResult> DeleteUserAsync(string id, string? actingUserId = null)
     {
+        var actingUser = await ResolveActingAdminAsync(actingUserId);
+        if (actingUser == null)
+            return UserResult.Fail("当前登录用户身份无效。");
+
         if (!Guid.TryParse(id, out var userId))
             return UserResult.Fail("无效的用户ID");
 
         var user = await _userRepository.GetByIdAsync(userId);
         if (user == null)
             return UserResult.Fail("用户不存在");
+
+        if (user.Id == actingUser.Id)
+        {
+            return UserResult.Fail("当前登录用户不能自行删除。");
+        }
+
+        if (user.Role == UserRole.Admin && user.IsActive && await CountActiveAdminsAsync() <= 1)
+        {
+            return UserResult.Fail("不能移除系统最后一个有效 Admin。");
+        }
 
         await _userRepository.DeleteAsync(user);
 
@@ -176,6 +211,21 @@ public class UserManagementService
     /// <summary>
     /// 映射到DTO
     /// </summary>
+    private async Task<int> CountActiveAdminsAsync()
+    {
+        var users = await _userRepository.GetAllActiveUsersAsync();
+        return users.Count(user => user.Role == UserRole.Admin);
+    }
+
+    private async Task<User?> ResolveActingAdminAsync(string? actingUserId)
+    {
+        if (!Guid.TryParse(actingUserId, out var userId))
+            return null;
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        return user is { IsActive: true, Role: UserRole.Admin } ? user : null;
+    }
+
     private static UserDto MapToDto(User user)
     {
         return new UserDto

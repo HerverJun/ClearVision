@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
+import { computed, inject, onBeforeUnmount, shallowRef, watch } from 'vue';
 import {
   CvButton,
   CvInlineAlert,
@@ -10,6 +10,7 @@ import {
   type CvStatusTone
 } from '@/design-system';
 import { useProductRuntime, type ProductRuntime } from '@/app/productRuntime';
+import { authLifecycleRootKey } from '@/app/auth';
 import {
   createSettingsOwner,
   type SettingsOwner,
@@ -21,17 +22,21 @@ import SettingsGroupNavigation from './SettingsGroupNavigation.vue';
 import SettingsOverview from './SettingsOverview.vue';
 import type { SettingsNavigationTarget } from './settingsViewModel';
 
-export type SettingsPageRuntime = Pick<ProductRuntime, 'api' | 'session'>;
+export type SettingsPageRuntime = Pick<ProductRuntime, 'api' | 'session'> & {
+  readonly leaveGuard?: ProductRuntime['leaveGuard'];
+};
 
 const props = defineProps<{
   runtime?: SettingsPageRuntime;
 }>();
 
 const runtime = props.runtime ?? useProductRuntime();
+const authRoot = inject(authLifecycleRootKey, null);
 const sessionProjection = computed(() => runtime.session.projection);
 const role = computed(() => sessionProjection.value.user?.role ?? null);
 const sessionPhase = computed(() => sessionProjection.value.phase);
 const activeGroup = shallowRef<SettingsNavigationTarget>('overview');
+const navigationMessage = shallowRef<string | null>(null);
 const owner = shallowRef<SettingsOwner | null>(null);
 const ownerProjection = computed<Readonly<SettingsOwnerProjection> | null>(() => owner.value?.projection ?? null);
 const mountedOwner = computed<SettingsOwner>(() => {
@@ -79,6 +84,7 @@ const showReadOnlyContent = computed(() =>
   (phase.value === 'ready' || phase.value === 'stale') && settings.value !== null
 );
 let disposed = false;
+let detachLeaveParticipant: (() => void) | undefined;
 
 function readOnlyProjection(): SettingsProjectionV1 {
   if (!settings.value) throw new Error('Settings read-only content requires a decoded projection.');
@@ -87,18 +93,27 @@ function readOnlyProjection(): SettingsProjectionV1 {
 
 function replaceOwner(nextRole: string | null): void {
   if (disposed) return;
+  detachLeaveParticipant?.();
+  detachLeaveParticipant = undefined;
   const previous = owner.value;
   owner.value = null;
   previous?.dispose('settings-role-changed');
   if (sessionPhase.value !== 'authenticated') return;
   const next = createSettingsOwner({ runtime, role: nextRole });
   owner.value = next;
+  if (runtime.leaveGuard) {
+    detachLeaveParticipant = runtime.leaveGuard.attachSettingsParticipant({
+      inspect: () => next.leaveProtection()
+    });
+  }
   void next.start();
 }
 
 function disposeOwner(reason: string): void {
   const current = owner.value;
   owner.value = null;
+  detachLeaveParticipant?.();
+  detachLeaveParticipant = undefined;
   current?.dispose(reason);
 }
 
@@ -107,6 +122,17 @@ async function refresh(): Promise<void> {
 }
 
 function selectGroup(target: SettingsNavigationTarget): void {
+  if (target === activeGroup.value) return;
+  const protection = owner.value?.leaveProtection();
+  if (protection === 'settings-pending') {
+    navigationMessage.value = '当前 Settings 操作仍在执行，请等待完成或失败后再切换分组。';
+    return;
+  }
+  if (protection === 'settings-unknown') {
+    navigationMessage.value = '当前 Settings 操作结果未知，请先重新读取服务端状态后再切换分组。';
+    return;
+  }
+  navigationMessage.value = null;
   activeGroup.value = target;
 }
 
@@ -163,6 +189,8 @@ onBeforeUnmount(() => {
     >
       <SettingsGroupNavigation
         :active="activeGroup"
+        :role="role"
+        :projection="readOnlyProjection()"
         @select="selectGroup"
       />
       <div class="settings-page__content">
@@ -174,11 +202,20 @@ onBeforeUnmount(() => {
         >
           当前内容仅供核对；请刷新服务端投影后再继续任何后续操作。
         </CvInlineAlert>
+        <CvInlineAlert
+          v-if="navigationMessage"
+          class="settings-page__navigation-alert"
+          tone="warning"
+          title="暂不能切换分组"
+        >
+          {{ navigationMessage }}
+        </CvInlineAlert>
         <SettingsOverview
           :projection="readOnlyProjection()"
           :active-group="activeGroup"
           :owner="mountedOwner"
           :role="role"
+          :auth="authRoot?.auth ?? null"
         />
       </div>
     </div>

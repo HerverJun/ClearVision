@@ -75,7 +75,8 @@ async function bootSettings(
   page: Page,
   role: 'Admin' | 'Engineer' | 'Operator',
   response: 'full' | 'safe' = 'safe',
-  delayMs = 0
+  delayMs = 0,
+  mutationDelayMs = 0
 ): Promise<F02MethodAuditEntry[]> {
   const audit: F02MethodAuditEntry[] = [];
   let currentSettings = fullSettingsPayload();
@@ -105,6 +106,7 @@ async function bootSettings(
     }
     if (url.pathname === '/api/settings') {
       if (request.method() === 'PUT') {
+        if (mutationDelayMs > 0) await new Promise(resolve => setTimeout(resolve, mutationDelayMs));
         const body = JSON.parse(request.postData() ?? '{}') as Record<string, unknown>;
         const scope = typeof body.saveScope === 'string' ? body.saveScope : '';
         const incoming = body[scope];
@@ -188,7 +190,59 @@ test('Admin can save a scoped General section and discard the next draft', async
   expect(audit.filter(entry => entry.method === 'PUT' && entry.path === '/api/settings')).toHaveLength(1);
 });
 
-test('Admin password change clears secrets and Database exposes only status and backup metadata', async ({ page }) => {
+test('Settings keeps dirty drafts across groups and asks before route leave', async ({ page }) => {
+  await bootSettings(page, 'Admin', 'full');
+  await page.goto('/studio/index.html#/settings');
+
+  await page.locator('[data-settings-group="general"]').click();
+  await page.locator('input[name="softwareTitle"]').fill('Draft retained in browser');
+  await page.locator('[data-settings-group="storage"]').click();
+  await page.locator('[data-settings-group="general"]').click();
+  await expect(page.locator('input[name="softwareTitle"]')).toHaveValue('Draft retained in browser');
+
+  await page.locator('[data-product-nav="/projects"]').first().click();
+  await expect(page.getByTestId('leave-guard-stay')).toBeVisible();
+  await expect(page).toHaveURL(/#\/settings$/);
+  await page.getByTestId('leave-guard-stay').click();
+  await expect(page.locator('input[name="softwareTitle"]')).toHaveValue('Draft retained in browser');
+});
+
+test('Settings blocks route leave while a mutation is pending and keeps the mutation observable', async ({ page }) => {
+  const audit = await bootSettings(page, 'Admin', 'full', 0, 600);
+  await page.goto('/studio/index.html#/settings');
+
+  await page.locator('[data-settings-group="general"]').click();
+  await page.locator('input[name="softwareTitle"]').fill('Pending browser mutation');
+  await page.getByRole('button', { name: '保存常规设置', exact: true }).click();
+  await expect.poll(() => audit.filter(entry => entry.method === 'PUT' && entry.path === '/api/settings').length)
+    .toBe(1);
+
+  await page.locator('[data-product-nav="/projects"]').first().click();
+  await expect(page.locator('[data-product-state="leave-blocked"]')).toBeVisible();
+  await expect(page).toHaveURL(/#\/settings$/);
+  await expect(page.locator('[data-settings-feedback="saved"]')).toBeVisible();
+});
+
+test('Admin Database exposes only status and backup metadata', async ({ page }) => {
+  const audit = await bootSettings(page, 'Admin', 'full');
+  await page.goto('/studio/index.html#/settings');
+
+  const databaseGroup = page.locator('[data-settings-group="database"]');
+  await expect(databaseGroup).toHaveCount(1);
+  await databaseGroup.click();
+  const database = page.locator('[data-settings-section="database"]');
+  await expect(database).toContainText('Healthy');
+  const backupButton = database.locator('.settings-database__backup button');
+  await expect(backupButton).toHaveCount(1);
+  page.once('dialog', dialog => dialog.accept());
+  await backupButton.click();
+  await expect(page.locator('[data-settings-backup-result]')).toBeVisible();
+  await expect(database).not.toContainText('manual.cvdbbak');
+  expect(audit.some(entry => entry.method === 'GET' && entry.path === '/api/settings/database/status')).toBe(true);
+  expect(audit.some(entry => entry.method === 'POST' && entry.path === '/api/settings/database/backup')).toBe(true);
+});
+
+test('Admin password change invalidates the session and clears secrets', async ({ page }) => {
   const audit = await bootSettings(page, 'Admin', 'full');
   await page.goto('/studio/index.html#/settings');
 
@@ -201,9 +255,11 @@ test('Admin password change clears secrets and Database exposes only status and 
   await oldPassword.fill('fixture-old-password');
   await newPassword.fill('fixture-new-password');
   await page.getByRole('button', { name: '修改密码', exact: true }).click();
-  await expect(page.locator('[data-settings-feedback="saved"]')).toBeVisible();
-  await expect(oldPassword).toHaveValue('');
-  await expect(newPassword).toHaveValue('');
+  await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
+  await expect(page).toHaveURL(/#\/login\?reason=change-password$/);
+  expect(await page.evaluate(() => sessionStorage.getItem('cv_auth_token'))).toBeNull();
+  expect(audit.some(entry => entry.method === 'POST' && entry.path === '/api/auth/change-password')).toBe(true);
+  if (await page.locator('[data-settings-group="database"]').count() === 0) return;
 
   await page.locator('[data-settings-group="database"]').click();
   await expect(page.locator('[data-settings-section="database"]')).toContainText('Healthy');

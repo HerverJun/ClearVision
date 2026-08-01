@@ -84,7 +84,7 @@ public static class UserEndpoints
                 return Results.Forbid();
             }
 
-            var result = await userService.UpdateUserAsync(id, request);
+            var result = await userService.UpdateUserAsync(id, request, CurrentUserId(context));
 
             if (!result.Success)
             {
@@ -106,7 +106,7 @@ public static class UserEndpoints
                 return Results.Forbid();
             }
 
-            var result = await userService.DeleteUserAsync(id);
+            var result = await userService.DeleteUserAsync(id, CurrentUserId(context));
 
             if (!result.Success)
             {
@@ -168,6 +168,18 @@ public static class UserEndpoints
         }
 
         return Task.FromResult(false);
+    }
+
+    private static string? CurrentUserId(HttpContext context)
+    {
+        return context.Items.TryGetValue("CurrentUser", out var userObj)
+            ? userObj switch
+            {
+                ClearVision.Product.Application.Services.UserSession user => user.UserId,
+                ClearVision.Product.Desktop.Middleware.UserSession user => user.UserId,
+                _ => null
+            }
+            : null;
     }
 }
 

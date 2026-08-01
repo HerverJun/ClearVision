@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, reactive, shallowRef, watch } from 'vue';
 import { CvButton, CvField, CvInlineAlert, CvPanel } from '@/design-system';
 import type { SettingsOwner } from './settingsOwner';
 import type { SettingsDiskUsageProjectionV1, SettingsStorageProjectionV1 } from './decoder';
@@ -40,6 +40,11 @@ const feedback = shallowRef<SettingsFeedback | null>(null);
 const diskUsage = shallowRef<SettingsDiskUsageProjectionV1 | null>(null);
 const diskError = shallowRef<string | null>(null);
 const dirty = computed(() => JSON.stringify(draft) !== JSON.stringify(baseline.value));
+const detachPanelState = props.owner.registerPanelState('storage', () => ({
+  dirty: dirty.value,
+  pending: busy.value || diskBusy.value
+}));
+watch([dirty, busy, diskBusy], () => props.owner.refreshPanelState());
 const validationMessage = computed(() => {
   const retention = Number(draft.retentionDays);
   const minFree = Number(draft.minFreeSpaceGb);
@@ -100,6 +105,8 @@ async function inspectDiskUsage(): Promise<void> {
     diskBusy.value = false;
   }
 }
+
+onBeforeUnmount(() => detachPanelState());
 </script>
 
 <template>

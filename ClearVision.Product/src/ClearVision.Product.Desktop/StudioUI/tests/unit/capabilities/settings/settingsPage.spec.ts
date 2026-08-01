@@ -58,9 +58,39 @@ function apiWith(
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function settingsLeaveGuard() {
+  let participant: { inspect: () => string | null } | undefined;
+  const leaveGuard = {
+    attachSettingsParticipant: vi.fn((next: { inspect: () => string | null }) => {
+      participant = next;
+      return () => {
+        if (participant === next) participant = undefined;
+      };
+    })
+  } as unknown as NonNullable<SettingsPageRuntime['leaveGuard']>;
+  return {
+    leaveGuard,
+    inspect: () => participant?.inspect() ?? null
+  };
+}
+
 function createRuntime(
   implementation: (path: string, options?: ApiGetOptions) => Promise<unknown>,
-  role: string
+  role: string,
+  options: {
+    readonly api?: ApiTransport;
+    readonly leaveGuard?: NonNullable<SettingsPageRuntime['leaveGuard']>;
+  } = {}
 ): { readonly runtime: SettingsPageRuntime; readonly session: { phase: string; user: { role: string } } } {
   const session = reactive({
     phase: 'authenticated',
@@ -70,8 +100,9 @@ function createRuntime(
     updatedAt: Date.now()
   });
   const runtime = {
-    api: apiWith(implementation),
-    session: { projection: session }
+    api: options.api ?? apiWith(implementation),
+    session: { projection: session },
+    leaveGuard: options.leaveGuard
   } as unknown as SettingsPageRuntime;
   return { runtime, session };
 }
@@ -291,6 +322,56 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
 
     expect(wrapper.text()).not.toContain('admin-user');
     expect(requestedPaths.filter(path => path === 'users')).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it('keeps a dirty generic draft across group changes and reports it to the shared leave guard', async () => {
+    const leave = settingsLeaveGuard();
+    const { runtime } = createRuntime(async () => settingsPayload(), 'Admin', {
+      leaveGuard: leave.leaveGuard
+    });
+    const wrapper = mountSettingsPage(runtime);
+    await flushPromises();
+
+    await wrapper.get('[data-settings-group="general"]').trigger('click');
+    await wrapper.get('input[name="softwareTitle"]').setValue('Draft retained across groups');
+    expect(leave.inspect()).toBe('settings-draft');
+
+    await wrapper.get('[data-settings-group="storage"]').trigger('click');
+    await wrapper.get('[data-settings-group="general"]').trigger('click');
+    expect((wrapper.get('input[name="softwareTitle"]').element as HTMLInputElement).value)
+      .toBe('Draft retained across groups');
+    wrapper.unmount();
+  });
+
+  it('blocks group changes while a generic mutation is pending and exposes pending leave protection', async () => {
+    const pending = deferred<unknown>();
+    const api = apiWith(async () => settingsPayload());
+    api.put = vi.fn(async () => pending.promise) as NonNullable<ApiTransport['put']>;
+    const leave = settingsLeaveGuard();
+    const { runtime } = createRuntime(async () => settingsPayload(), 'Admin', {
+      api,
+      leaveGuard: leave.leaveGuard
+    });
+    const wrapper = mountSettingsPage(runtime);
+    await flushPromises();
+
+    await wrapper.get('[data-settings-group="general"]').trigger('click');
+    await wrapper.get('input[name="softwareTitle"]').setValue('Pending title');
+    const saveButton = wrapper.findAll('button').find(button => button.text().includes('保存常规设置'));
+    expect(saveButton).toBeDefined();
+    await saveButton!.trigger('click');
+    await vi.waitFor(() => expect(leave.inspect()).toBe('settings-pending'));
+
+    await wrapper.get('[data-settings-group="storage"]').trigger('click');
+    expect(wrapper.get('[data-settings-group="general"]').classes()).toContain('is-active');
+    expect(wrapper.find('[data-settings-section="general"]').exists()).toBe(true);
+
+    const saved = settingsPayload() as { general: { softwareTitle: string } } & Record<string, unknown>;
+    saved.general.softwareTitle = 'Pending title';
+    pending.resolve({ message: 'saved', config: saved });
+    await flushPromises();
+    expect(leave.inspect()).toBe(null);
     wrapper.unmount();
   });
 });
