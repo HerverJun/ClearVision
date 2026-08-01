@@ -254,4 +254,3 @@ test.describe('Flow Editor port contract (library → canvas → serialize)', ()
     expect(consoleErrors).toEqual([]);
   });
 });
-

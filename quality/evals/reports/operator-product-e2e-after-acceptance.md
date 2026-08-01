@@ -21,4 +21,4 @@
 
 ## Reproduction
 
-`& "./scripts/run-operator-product-e2e-benchmark.ps1" -Profile acceptance -Label after -IncludeCandidates -ResultsDirectory ".tmp/operator-product-e2e"` 
+`& "./scripts/run-operator-product-e2e-benchmark.ps1" -Profile acceptance -Label after -IncludeCandidates -ResultsDirectory ".tmp/operator-product-e2e"`
