@@ -768,6 +768,7 @@ jobs:
             -Configuration Debug `
             -NoBuild `
             -NoRestore `
+            -SkipUi `
             -ResultsRoot TestResults/nightly
 
       - name: Upload Nightly Lane Artifacts
