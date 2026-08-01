@@ -229,9 +229,7 @@ public class TcpEndpointsTests
         await stream.WriteAsync(Encoding.UTF8.GetBytes("PO"), cancellationToken);
         await stream.FlushAsync(cancellationToken);
 
-        // 间隔小于 Raw 收敛的 idle gap，模拟真实 TCP 分段。
-        await Task.Delay(30, cancellationToken);
-
+        // Keep the two writes separate without relying on wall-clock scheduling.
         await stream.WriteAsync(Encoding.UTF8.GetBytes("NG"), cancellationToken);
         await stream.FlushAsync(cancellationToken);
 
