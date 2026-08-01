@@ -207,6 +207,30 @@ jobs:
             -ResultsDirectory TestResults/product `
             -LogFileName product.trx
 
+      - name: Run TCP Device Regression Gate
+        shell: pwsh
+        run: |
+          & "./scripts/run-classified-test-gate.ps1" `
+            -Gate tcp-device-regression `
+            -Configuration Debug `
+            -NoBuild `
+            -NoRestore `
+            -Verbosity normal `
+            -ResultsDirectory TestResults/tcp-device-regression `
+            -LogFileName tcp-device-regression.trx
+
+      - name: Run PPF PR Smoke Gate
+        shell: pwsh
+        run: |
+          & "./scripts/run-classified-test-gate.ps1" `
+            -Gate ppf-pr-smoke `
+            -Configuration Debug `
+            -NoBuild `
+            -NoRestore `
+            -Verbosity normal `
+            -ResultsDirectory TestResults/ppf-pr-smoke `
+            -LogFileName ppf-pr-smoke.trx
+
       - name: Run Product Performance Budget Tests
         if: github.event_name == 'workflow_dispatch'
         shell: pwsh
@@ -279,12 +303,53 @@ jobs:
           }
           $productCoverage = Get-Content -LiteralPath $productCoverageJsonPath -Raw | ConvertFrom-Json
           $currentSha = (& git rev-parse HEAD).Trim()
+          $coverageCounters = $productCoverage.trx
           if ($productCoverage.source.sha -ne $currentSha -or
               $productCoverage.population.gate -ne "product-coverage" -or
               $productCoverage.population.filter -ne "Lane=Pr&Suite!=ServicesCoverageSensitive&Suite!=PPFRegression" -or
-              [int]$productCoverage.trx.total -lt 1 -or
-              [int]$productCoverage.trx.passed -ne [int]$productCoverage.trx.total) {
+              [int]$coverageCounters.total -lt [int]$productCoverage.population.minimumTotalTests -or
+              [int]$coverageCounters.executed + [int]$coverageCounters.notExecuted -ne [int]$coverageCounters.total -or
+              [int]$coverageCounters.passed -ne [int]$coverageCounters.executed -or
+              [int]$coverageCounters.failed -gt 0 -or
+              [int]$coverageCounters.error -gt 0 -or
+              [int]$coverageCounters.timeout -gt 0 -or
+              [int]$coverageCounters.aborted -gt 0) {
             throw "Product coverage manifest is not a complete current-HEAD Product PR result."
+          }
+
+          $governancePath = "TestResults/governance/test-governance.json"
+          if (-not (Test-Path -LiteralPath $governancePath -PathType Leaf)) {
+            throw "Test Governance evidence is missing: $governancePath"
+          }
+          $governance = Get-Content -LiteralPath $governancePath -Raw | ConvertFrom-Json
+          $coverageGate = @($governance.gates | Where-Object { $_.name -ceq "product-coverage" })
+          if ($coverageGate.Count -ne 1 -or [int]$coverageGate[0].sourceTestCount -lt [int]$productCoverage.population.minimumTotalTests) {
+            throw "Product coverage source population collapsed below the configured floor."
+          }
+
+          $namedGates = @(
+            @{ Path = "TestResults/tcp-device-regression/tcp-device-regression.gate.json"; Name = "tcp-device-regression" },
+            @{ Path = "TestResults/ppf-pr-smoke/ppf-pr-smoke.gate.json"; Name = "ppf-pr-smoke" }
+          )
+          foreach ($namedGate in $namedGates) {
+            if (-not (Test-Path -LiteralPath $namedGate.Path -PathType Leaf)) {
+              throw "Named Gate evidence is missing: $($namedGate.Path)"
+            }
+
+            $gateEvidence = Get-Content -LiteralPath $namedGate.Path -Raw | ConvertFrom-Json
+            $gateCounters = $gateEvidence.counters
+            if ($gateEvidence.gate -ne $namedGate.Name -or
+                $gateEvidence.sourceSha -ne $currentSha -or
+                [int]$gateEvidence.exitCode -ne 0 -or
+                $null -eq $gateCounters -or
+                [int]$gateCounters.executed + [int]$gateCounters.notExecuted -ne [int]$gateCounters.total -or
+                [int]$gateCounters.passed -ne [int]$gateCounters.executed -or
+                [int]$gateCounters.failed -gt 0 -or
+                [int]$gateCounters.error -gt 0 -or
+                [int]$gateCounters.timeout -gt 0 -or
+                [int]$gateCounters.aborted -gt 0) {
+              throw "Named Gate evidence is not a complete green current-HEAD result: $($namedGate.Name)"
+            }
           }
 
           $files = Get-ChildItem -Path TestResults -Filter coverage.cobertura.xml -Recurse -File -ErrorAction SilentlyContinue
@@ -387,7 +452,9 @@ jobs:
           if-no-files-found: error
           path: |
             TestResults/**/*.trx
+            TestResults/**/*.gate.json
             TestResults/**/coverage.cobertura.xml
+            TestResults/governance/**
             TestResults/product/product-coverage.json
             TestResults/product/product-coverage.md
             TestResults/coverage-summary.md
@@ -638,7 +705,7 @@ jobs:
   nightly-lane:
     name: Nightly Quality Lane
     runs-on: windows-latest
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout Code

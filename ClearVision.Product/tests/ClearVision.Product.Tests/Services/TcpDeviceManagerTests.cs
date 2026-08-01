@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
@@ -232,33 +233,16 @@ public class TcpDeviceManagerTests
     }
 
     [Fact]
-    public async Task SendTransientAsync_RawResponseArrivingInTwoSegments_ShouldReturnFullResponse()
+    public async Task RawResponseReader_WithDeterministicChunks_ShouldReturnFullResponse()
     {
-        using var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = RunSegmentedResponseServerAsync(listener, "PING", "ACK:", "OK;score=98.5", cts.Token);
-        await using var manager = CreateManager();
-        var profile = CreateTransientClientProfile(port);
+        await using var stream = await ChunkedNetworkStream.CreateAsync(
+            Encoding.UTF8.GetBytes("ACK:"),
+            Encoding.UTF8.GetBytes("OK;score=98.5"));
 
-        try
-        {
-            var result = await manager.SendTransientAsync(
-                profile,
-                new TcpDeviceSendRequest("PING", WaitResponse: true, ResponseTimeoutMs: 2500),
-                cts.Token);
+        var response = await InvokeRawFrameReaderAsync(stream);
 
-            result.Success.Should().BeTrue(result.Message);
-            // Raw 模式必须收敛两段数据为完整响应，而不是只读到第一段 "ACK:"。
-            result.Response.Should().Be("ACK:OK;score=98.5");
-        }
-        finally
-        {
-            cts.Cancel();
-            listener.Stop();
-            await IgnoreServerTerminationAsync(serverTask);
-        }
+        Encoding.UTF8.GetString(response).Should().Be("ACK:OK;score=98.5");
+        stream.ReadCount.Should().Be(2, "the test stream exposes exactly two deterministic chunks");
     }
 
     [Fact]
@@ -460,30 +444,89 @@ public class TcpDeviceManagerTests
         }
     }
 
-    // 分两段发送响应，两段之间留出足以跨越 idle gap 的间隔，
-    // 用于验证 Raw 模式能收敛跨 TCP 分段的完整响应。
-    private static async Task RunSegmentedResponseServerAsync(
-        TcpListener listener,
-        string expectedRequest,
-        string firstSegment,
-        string secondSegment,
-        CancellationToken cancellationToken)
+    private static async Task<byte[]> InvokeRawFrameReaderAsync(NetworkStream stream)
     {
-        using var client = await listener.AcceptTcpClientAsync(cancellationToken);
-        await using var stream = client.GetStream();
-        var buffer = new byte[expectedRequest.Length];
-        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
-        Encoding.UTF8.GetString(buffer, 0, read).Should().Be(expectedRequest);
+        var method = typeof(TcpDeviceManager).GetMethod(
+            "ReadRawFrameAsync",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        method.Should().NotBeNull();
 
-        await stream.WriteAsync(Encoding.UTF8.GetBytes(firstSegment), cancellationToken);
-        await stream.FlushAsync(cancellationToken);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var invocation = method!.Invoke(null, [stream, null, cts.Token]);
+        invocation.Should().BeAssignableTo<Task<byte[]>>();
+        return await (Task<byte[]>)invocation!;
+    }
 
-        // Separate writes exercise response accumulation without wall-clock scheduling.
-        await stream.WriteAsync(Encoding.UTF8.GetBytes(secondSegment), cancellationToken);
-        await stream.FlushAsync(cancellationToken);
+    private sealed class ChunkedNetworkStream : NetworkStream
+    {
+        private readonly TcpClient _owner;
+        private readonly byte[][] _chunks;
+        private int _nextChunk;
+        private int _readCount;
 
-        // 保持连接短暂开启，让读取端在 idle gap 后自然收敛。
-        await Task.Delay(300, cancellationToken);
+        private ChunkedNetworkStream(TcpClient owner, byte[][] chunks)
+            : base(owner.Client, ownsSocket: true)
+        {
+            _owner = owner;
+            _chunks = chunks;
+        }
+
+        public int ReadCount => Volatile.Read(ref _readCount);
+
+        public override bool DataAvailable => Volatile.Read(ref _nextChunk) < _chunks.Length;
+
+        public override ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var index = Interlocked.Increment(ref _nextChunk) - 1;
+            if (index >= _chunks.Length)
+            {
+                return ValueTask.FromResult(0);
+            }
+
+            var chunk = _chunks[index];
+            if (chunk.Length > buffer.Length)
+            {
+                throw new InvalidOperationException("The deterministic test buffer is smaller than the next chunk.");
+            }
+
+            chunk.AsMemory().CopyTo(buffer);
+            Interlocked.Increment(ref _readCount);
+            return ValueTask.FromResult(chunk.Length);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (disposing)
+            {
+                _owner.Dispose();
+            }
+        }
+
+        public static async Task<ChunkedNetworkStream> CreateAsync(params byte[][] chunks)
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            var client = new TcpClient { NoDelay = true };
+            try
+            {
+                var endpoint = (IPEndPoint)listener.LocalEndpoint;
+                var connectTask = client.ConnectAsync(endpoint.Address, endpoint.Port);
+                using var peer = await listener.AcceptTcpClientAsync();
+                await connectTask;
+                listener.Stop();
+                return new ChunkedNetworkStream(client, chunks);
+            }
+            catch
+            {
+                client.Dispose();
+                listener.Stop();
+                throw;
+            }
+        }
     }
 
     private static async Task<IReadOnlyList<TcpFrameLogEntry>> WaitForFramesAsync(

@@ -123,21 +123,41 @@ if (Test-Path -LiteralPath $trxPath -PathType Leaf) {
     [xml]$trx = Get-Content -LiteralPath $trxPath -Raw
     $counterNode = $trx.SelectSingleNode("//*[local-name()='Counters']")
     if ($null -ne $counterNode) {
+        $resultNodes = @($trx.SelectNodes("//*[local-name()='UnitTestResult']"))
+        $observedPassed = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Passed" }).Count
+        $observedNotExecuted = @($resultNodes | Where-Object {
+            $outcome = ([string]$_.outcome).Trim()
+            $outcome -ieq "NotExecuted" -or $outcome -ieq "Skipped"
+        }).Count
+        $observedFailed = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Failed" }).Count
+        $observedError = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Error" }).Count
+        $observedTimeout = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Timeout" }).Count
+        $observedAborted = @($resultNodes | Where-Object {
+            $outcome = ([string]$_.outcome).Trim()
+            $outcome -ieq "Aborted" -or $outcome -ieq "PassedButRunAborted"
+        }).Count
+
         $counters = [ordered]@{
             total = [int]$counterNode.total
             executed = [int]$counterNode.executed
-            passed = [int]$counterNode.passed
-            failed = [int]$counterNode.failed
-            error = [int]$counterNode.error
-            timeout = [int]$counterNode.timeout
-            aborted = [int]$counterNode.aborted
+            passed = [Math]::Max([int]$counterNode.passed, $observedPassed)
+            notExecuted = [Math]::Max([int]$counterNode.notExecuted, $observedNotExecuted)
+            failed = [Math]::Max([int]$counterNode.failed, $observedFailed)
+            error = [Math]::Max([int]$counterNode.error, $observedError)
+            timeout = [Math]::Max([int]$counterNode.timeout, $observedTimeout)
+            aborted = [Math]::Max([int]$counterNode.aborted, $observedAborted)
+            reportedNotExecuted = [int]$counterNode.notExecuted
+            observedNotExecuted = $observedNotExecuted
         }
     }
 }
 
+$sourceSha = (& git -C $repoRoot rev-parse HEAD 2>$null | Out-String).Trim()
+
 $summary = [ordered]@{
     schemaVersion = "2026-07-15.classified-gate.v1"
     gate = $Gate
+    sourceSha = $sourceSha
     project = [string]$gateDefinition.project
     lane = [string]$gateDefinition.lane
     filter = [string]$gateDefinition.filter

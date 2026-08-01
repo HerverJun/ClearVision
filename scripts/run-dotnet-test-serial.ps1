@@ -75,14 +75,31 @@ function Get-TrxCounters {
         throw "TRX file does not contain a Counters node: $Path"
     }
 
+    $resultNodes = @($trx.SelectNodes("//*[local-name()='UnitTestResult']"))
+    $observedPassed = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Passed" }).Count
+    $observedNotExecuted = @($resultNodes | Where-Object {
+        $outcome = ([string]$_.outcome).Trim()
+        $outcome -ieq "NotExecuted" -or $outcome -ieq "Skipped"
+    }).Count
+    $observedFailed = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Failed" }).Count
+    $observedError = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Error" }).Count
+    $observedTimeout = @($resultNodes | Where-Object { ([string]$_.outcome).Trim() -ieq "Timeout" }).Count
+    $observedAborted = @($resultNodes | Where-Object {
+        $outcome = ([string]$_.outcome).Trim()
+        $outcome -ieq "Aborted" -or $outcome -ieq "PassedButRunAborted"
+    }).Count
+
     return [PSCustomObject]@{
         Total = [int]$counters.total
         Executed = [int]$counters.executed
-        Passed = [int]$counters.passed
-        Failed = [int]$counters.failed
-        Error = [int]$counters.error
-        Timeout = [int]$counters.timeout
-        Aborted = [int]$counters.aborted
+        Passed = [Math]::Max([int]$counters.passed, $observedPassed)
+        NotExecuted = [Math]::Max([int]$counters.notExecuted, $observedNotExecuted)
+        Failed = [Math]::Max([int]$counters.failed, $observedFailed)
+        Error = [Math]::Max([int]$counters.error, $observedError)
+        Timeout = [Math]::Max([int]$counters.timeout, $observedTimeout)
+        Aborted = [Math]::Max([int]$counters.aborted, $observedAborted)
+        ReportedNotExecuted = [int]$counters.notExecuted
+        ObservedNotExecuted = $observedNotExecuted
     }
 }
 
@@ -102,13 +119,18 @@ function Test-TrxCounters {
         $passed = $false
     }
 
-    if ($RequiredTotal -gt 0 -and $Counters.Executed -lt $RequiredTotal) {
-        Write-Host "[dotnet-test] TRX validation failed: executed tests $($Counters.Executed) is below required minimum $RequiredTotal."
+    if ($RequiredPassed -gt 0 -and $Counters.Passed -lt $RequiredPassed) {
+        Write-Host "[dotnet-test] TRX validation failed: passed tests $($Counters.Passed) is below required minimum $RequiredPassed."
         $passed = $false
     }
 
-    if ($RequiredPassed -gt 0 -and $Counters.Passed -lt $RequiredPassed) {
-        Write-Host "[dotnet-test] TRX validation failed: passed tests $($Counters.Passed) is below required minimum $RequiredPassed."
+    if (($Counters.Executed + $Counters.NotExecuted) -ne $Counters.Total) {
+        Write-Host "[dotnet-test] TRX validation failed: total=$($Counters.Total) does not equal executed=$($Counters.Executed) + notExecuted=$($Counters.NotExecuted)."
+        $passed = $false
+    }
+
+    if ($Counters.Passed -ne $Counters.Executed) {
+        Write-Host "[dotnet-test] TRX validation failed: passed=$($Counters.Passed) does not equal executed=$($Counters.Executed)."
         $passed = $false
     }
 
@@ -281,12 +303,12 @@ try {
     $exitCode = $processExitCode
 
     if ($exitCode -eq 0 -and ($MinimumTotalTests -gt 0 -or $MinimumPassedTests -gt 0)) {
-        $requiredPassed = if ($MinimumPassedTests -gt 0) { $MinimumPassedTests } else { $MinimumTotalTests }
+        $requiredPassed = $MinimumPassedTests
         $trxPath = Join-Path $resolvedResultsDirectory $LogFileName
 
         try {
             $counters = Get-TrxCounters -Path $trxPath
-            Write-Host "[dotnet-test] TRX counters: total=$($counters.Total), executed=$($counters.Executed), passed=$($counters.Passed), failed=$($counters.Failed), error=$($counters.Error), timeout=$($counters.Timeout), aborted=$($counters.Aborted)."
+            Write-Host "[dotnet-test] TRX counters: total=$($counters.Total), executed=$($counters.Executed), passed=$($counters.Passed), notExecuted=$($counters.NotExecuted), failed=$($counters.Failed), error=$($counters.Error), timeout=$($counters.Timeout), aborted=$($counters.Aborted)."
 
             if (-not (Test-TrxCounters -Counters $counters -RequiredTotal $MinimumTotalTests -RequiredPassed $requiredPassed)) {
                 $exitCode = 1

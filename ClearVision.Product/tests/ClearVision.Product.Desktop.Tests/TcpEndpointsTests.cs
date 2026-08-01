@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
@@ -164,13 +165,13 @@ public class TcpEndpointsTests
     }
 
     [Fact]
-    public async Task PostTcpSend_WithSegmentedResponse_ShouldReturnFullResponse()
+    public async Task PostTcpSend_WithCompleteResponse_ShouldReturnFullResponse()
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = RunSegmentedResponseServerAsync(listener, cts.Token);
+        var serverTask = RunSingleEchoServerAsync(listener, cts.Token);
 
         var config = new AppConfig
         {
@@ -202,7 +203,6 @@ public class TcpEndpointsTests
             response.StatusCode.Should().Be(HttpStatusCode.OK);
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
-            // 响应分两段 ("PO" + "NG") 到达，收敛后应得到完整 "PONG"。
             document.RootElement.GetProperty("response").GetString().Should().Be("PONG");
         }
         finally
@@ -213,27 +213,107 @@ public class TcpEndpointsTests
         }
     }
 
+    [Fact]
+    public async Task RawResponseReader_WithDeterministicChunks_ShouldReturnFullResponse()
+    {
+        await using var stream = await ChunkedNetworkStream.CreateAsync(
+            Encoding.UTF8.GetBytes("PO"),
+            Encoding.UTF8.GetBytes("NG"));
+
+        var response = await InvokeRawFrameReaderAsync(stream);
+
+        Encoding.UTF8.GetString(response).Should().Be("PONG");
+        stream.ReadCount.Should().Be(2, "the test stream exposes exactly two deterministic chunks");
+    }
+
+    private static async Task<byte[]> InvokeRawFrameReaderAsync(NetworkStream stream)
+    {
+        var method = typeof(TcpDeviceManager).GetMethod(
+            "ReadRawFrameAsync",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        method.Should().NotBeNull();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var invocation = method!.Invoke(null, [stream, null, cts.Token]);
+        invocation.Should().BeAssignableTo<Task<byte[]>>();
+        return await (Task<byte[]>)invocation!;
+    }
+
+    private sealed class ChunkedNetworkStream : NetworkStream
+    {
+        private readonly TcpClient _owner;
+        private readonly byte[][] _chunks;
+        private int _nextChunk;
+        private int _readCount;
+
+        private ChunkedNetworkStream(TcpClient owner, byte[][] chunks)
+            : base(owner.Client, ownsSocket: true)
+        {
+            _owner = owner;
+            _chunks = chunks;
+        }
+
+        public int ReadCount => Volatile.Read(ref _readCount);
+
+        public override bool DataAvailable => Volatile.Read(ref _nextChunk) < _chunks.Length;
+
+        public override ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var index = Interlocked.Increment(ref _nextChunk) - 1;
+            if (index >= _chunks.Length)
+            {
+                return ValueTask.FromResult(0);
+            }
+
+            var chunk = _chunks[index];
+            if (chunk.Length > buffer.Length)
+            {
+                throw new InvalidOperationException("The deterministic test buffer is smaller than the next chunk.");
+            }
+
+            chunk.AsMemory().CopyTo(buffer);
+            Interlocked.Increment(ref _readCount);
+            return ValueTask.FromResult(chunk.Length);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (disposing)
+            {
+                _owner.Dispose();
+            }
+        }
+
+        public static async Task<ChunkedNetworkStream> CreateAsync(params byte[][] chunks)
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            var client = new TcpClient { NoDelay = true };
+            try
+            {
+                var endpoint = (IPEndPoint)listener.LocalEndpoint;
+                var connectTask = client.ConnectAsync(endpoint.Address, endpoint.Port);
+                using var peer = await listener.AcceptTcpClientAsync();
+                await connectTask;
+                listener.Stop();
+                return new ChunkedNetworkStream(client, chunks);
+            }
+            catch
+            {
+                client.Dispose();
+                listener.Stop();
+                throw;
+            }
+        }
+    }
+
     private static StringContent JsonContent(object payload)
     {
         return new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-    }
-
-    private static async Task RunSegmentedResponseServerAsync(TcpListener listener, CancellationToken cancellationToken)
-    {
-        using var client = await listener.AcceptTcpClientAsync(cancellationToken);
-        await using var stream = client.GetStream();
-        var buffer = new byte[4];
-        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
-        Encoding.UTF8.GetString(buffer, 0, read).Should().Be("PING");
-
-        await stream.WriteAsync(Encoding.UTF8.GetBytes("PO"), cancellationToken);
-        await stream.FlushAsync(cancellationToken);
-
-        // Keep the two writes separate without relying on wall-clock scheduling.
-        await stream.WriteAsync(Encoding.UTF8.GetBytes("NG"), cancellationToken);
-        await stream.FlushAsync(cancellationToken);
-
-        await Task.Delay(300, cancellationToken);
     }
 
     private static async Task RunSingleEchoServerAsync(TcpListener listener, CancellationToken cancellationToken)

@@ -132,8 +132,11 @@ $governance = Invoke-LaneStep -Name "governance" -Action {
 if (-not (Stop-AfterFailure $governance)) {
     $runPrPrerequisites = $Lane -in @("Pr", "Nightly")
     if ($runPrPrerequisites) {
-        foreach ($gateName in @("product-pr", "desktop-pr")) {
-            $step = Invoke-LaneStep -Name $gateName -Action { Invoke-ClassifiedGate -GateName $gateName }
+        foreach ($gateName in @("product-pr", "product-coverage", "tcp-device-regression", "ppf-pr-smoke", "desktop-pr")) {
+            $skipCoverage = $gateName -in @("tcp-device-regression", "ppf-pr-smoke")
+            $step = Invoke-LaneStep -Name $gateName -Action {
+                Invoke-ClassifiedGate -GateName $gateName -SkipCoverage:$skipCoverage
+            }
             if (Stop-AfterFailure $step) { break }
         }
 

@@ -19,7 +19,7 @@
       "project": "Product",
       "lane": "Pr",
       "filter": "Lane=Pr&Suite!=ServicesCoverageSensitive&Suite!=PPFRegression",
-      "minimumTotalTests": 1
+      "minimumTotalTests": 2000
     },
     {
       "name": "desktop-pr",
@@ -169,11 +169,18 @@
       "minimumTotalTests": 1
     },
     {
+      "name": "ppf-pr-smoke",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Suite=PPFPrSmoke&Lane=Pr",
+      "minimumTotalTests": 5
+    },
+    {
       "name": "ppf-regression",
       "project": "Product",
       "lane": "Nightly",
       "filter": "Suite=PPFRegression&Lane=Nightly",
-      "minimumTotalTests": 9
+      "minimumTotalTests": 10
     },
     {
       "name": "preprocessing-robustness",
@@ -251,6 +258,7 @@
       "product-pr",
       "product-coverage",
       "tcp-device-regression",
+      "ppf-pr-smoke",
       "desktop-pr",
       "operator-library-smoke"
     ],

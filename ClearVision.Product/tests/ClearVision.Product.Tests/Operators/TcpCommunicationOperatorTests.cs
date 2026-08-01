@@ -1338,46 +1338,41 @@ public class TcpCommunicationOperatorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithSegmentedRawResponse_ShouldReceiveFullResponseAndParse()
+    public async Task ExecuteAsync_WithCompleteRawResponse_ShouldReceiveFullResponseAndParse()
     {
-        using var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = RunSegmentedResponseServerAsync(listener, "READ", "ACK:", "OK;score=98.5", cts.Token);
+        var manager = Substitute.For<ITcpDeviceManager>();
+        manager.SendTransientAsync(
+                Arg.Any<TcpCommunicationProfile>(),
+                Arg.Any<TcpDeviceSendRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(TcpDeviceSendResult.Ok("ok", "ACK:OK;score=98.5")));
+        var sut = new TcpCommunicationOperator(Substitute.For<ILogger<TcpCommunicationOperator>>(), manager);
+        var op = new Operator("tcp-complete", OperatorType.TcpCommunication, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Mode", "Client", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("IpAddress", "127.0.0.1", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("Port", 9100, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("Timeout", 2500, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("ResponseTimeoutMs", 2500, "int"));
+        op.AddParameter(TestHelpers.CreateParameter("ExpectedResponse", "ACK:OK", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ResponseMatchMode", "Contains", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("FailOnUnexpectedResponse", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("ResponseParseMode", "KeyValue", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ResponseFieldName", "score", "string"));
 
-        try
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
         {
-            var op = new Operator("tcp-segmented", OperatorType.TcpCommunication, 0, 0);
-            op.AddParameter(TestHelpers.CreateParameter("Mode", "Client", "string"));
-            op.AddParameter(TestHelpers.CreateParameter("IpAddress", "127.0.0.1", "string"));
-            op.AddParameter(TestHelpers.CreateParameter("Port", port, "int"));
-            op.AddParameter(TestHelpers.CreateParameter("Timeout", 2500, "int"));
-            op.AddParameter(TestHelpers.CreateParameter("ResponseTimeoutMs", 2500, "int"));
-            op.AddParameter(TestHelpers.CreateParameter("ExpectedResponse", "ACK:OK", "string"));
-            op.AddParameter(TestHelpers.CreateParameter("ResponseMatchMode", "Contains", "string"));
-            op.AddParameter(TestHelpers.CreateParameter("FailOnUnexpectedResponse", true, "bool"));
-            op.AddParameter(TestHelpers.CreateParameter("ResponseParseMode", "KeyValue", "string"));
-            op.AddParameter(TestHelpers.CreateParameter("ResponseFieldName", "score", "string"));
+            ["Data"] = "READ"
+        });
 
-            var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
-            {
-                ["Data"] = "READ"
-            }, cts.Token);
-
-            result.IsSuccess.Should().BeTrue(result.ErrorMessage);
-            // 两段响应必须被收敛成完整报文，而不是只拿到第一段 "ACK:"。
-            GetResponse(result).Should().Be("ACK:OK;score=98.5");
-            result.OutputData!["ResponseAccepted"].Should().Be(true);
-            result.OutputData["ParseSuccess"].Should().Be(true);
-            result.OutputData["ParsedValue"].Should().Be(98.5);
-        }
-        finally
-        {
-            cts.Cancel();
-            listener.Stop();
-            await IgnoreServerTerminationAsync(serverTask);
-        }
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        GetResponse(result).Should().Be("ACK:OK;score=98.5");
+        result.OutputData!["ResponseAccepted"].Should().Be(true);
+        result.OutputData["ParseSuccess"].Should().Be(true);
+        result.OutputData["ParsedValue"].Should().Be(98.5);
+        await manager.Received(1).SendTransientAsync(
+            Arg.Is<TcpCommunicationProfile>(profile => profile.RemoteHost == "127.0.0.1" && profile.RemotePort == 9100),
+            Arg.Is<TcpDeviceSendRequest>(request => request.Payload == "READ" && request.WaitResponse),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -1430,32 +1425,6 @@ public class TcpCommunicationOperatorTests
         var response = Encoding.UTF8.GetBytes("PONG");
         await stream.WriteAsync(response, cancellationToken);
         await stream.FlushAsync(cancellationToken);
-    }
-
-    // 分两段发送响应，两段之间的间隔跨越 Raw 收敛的 idle gap，
-    // 用于验证算子最终拿到完整响应并能通过 ExpectedResponse/解析。
-    private static async Task RunSegmentedResponseServerAsync(
-        TcpListener listener,
-        string expectedRequest,
-        string firstSegment,
-        string secondSegment,
-        CancellationToken cancellationToken)
-    {
-        using var client = await listener.AcceptTcpClientAsync(cancellationToken);
-        await using var stream = client.GetStream();
-        var buffer = new byte[expectedRequest.Length];
-        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
-        Encoding.UTF8.GetString(buffer, 0, read).Should().Be(expectedRequest);
-
-        await stream.WriteAsync(Encoding.UTF8.GetBytes(firstSegment), cancellationToken);
-        await stream.FlushAsync(cancellationToken);
-
-        await Task.Delay(30, cancellationToken);
-
-        await stream.WriteAsync(Encoding.UTF8.GetBytes(secondSegment), cancellationToken);
-        await stream.FlushAsync(cancellationToken);
-
-        await Task.Delay(300, cancellationToken);
     }
 
     private static async Task IgnoreServerTerminationAsync(Task serverTask)
