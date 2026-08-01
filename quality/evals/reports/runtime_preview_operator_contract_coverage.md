@@ -1,6 +1,6 @@
 # RuntimePreview Operator Contract Coverage
 
-- Generated UTC: `2026-06-07T05:24:30.303399+00:00`
+- Generated UTC: `2026-08-01T07:46:37.041668+00:00`
 - Commit: `local`
 - Branch: `local`
 - Run: `local` attempt `local`

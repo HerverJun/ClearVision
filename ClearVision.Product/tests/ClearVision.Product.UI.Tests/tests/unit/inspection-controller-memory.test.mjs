@@ -337,12 +337,12 @@ test('handleResultEvent fetches cached image with authorization and publishes a 
 
   httpClient.defaultHeaders = {
     ...originalHeaders,
-    Authorization: 'Bearer inspection-image-token'
+    Authorization: 'Bearer image-token'
   };
   globalThis.fetch = async (url, options) => {
     assert.equal(url, expectedUrl);
     assert.equal(options.method, 'GET');
-    assert.equal(options.headers.Authorization, 'Bearer inspection-image-token');
+    assert.equal(options.headers.Authorization, 'Bearer image-token');
     return {
       ok: true,
       status: 200,

@@ -1,10 +1,10 @@
 ﻿# Vision Agent Executable Business Benchmark
 
 - Benchmark: `vision_agent_executable_business_benchmark`
-- Generated UTC: `2026-07-30T16:52:25.9744873+00:00`
-- Commit SHA: `5887387c0f9bc03489df994adbda5b0f2f6b039d`
-- Branch: `t01-g01a-r1`
-- Workflow run: `local-r2-quality` attempt `1`
+- Generated UTC: `2026-08-01T07:46:36.7643226+00:00`
+- Commit SHA: `local`
+- Branch: `local`
+- Workflow run: `local` attempt `local`
 - Mode: `offline_metadata_only`
 - Cases: 120
 - Accepted: True
