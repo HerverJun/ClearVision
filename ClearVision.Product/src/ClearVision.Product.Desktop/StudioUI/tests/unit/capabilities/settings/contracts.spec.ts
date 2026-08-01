@@ -58,6 +58,12 @@ describe('F07 G1 Settings contract matrix', () => {
     expect(evaluateSettingsEndpointAccess('plc.settings.write', 'plc', 'Engineer'))
       .toMatchObject({ allowed: false, reason: 'admin-required' });
     expect(evaluateSettingsEndpointAccess('ai.reasoning-support', 'ai-model', 'Engineer'))
+      .toMatchObject({ allowed: true, reason: 'allowed' });
+    expect(evaluateSettingsEndpointAccess('ai.models.read', 'ai-model', 'Engineer'))
+      .toMatchObject({ allowed: true, reason: 'allowed' });
+    expect(evaluateSettingsEndpointAccess('ai.models.test', 'ai-model', 'Engineer'))
+      .toMatchObject({ allowed: false, reason: 'admin-required', endpoint: { id: 'ai.models.test' } });
+    expect(evaluateSettingsEndpointAccess('settings.read', 'general', 'Engineer'))
       .toMatchObject({ allowed: false, reason: 'route-only' });
     expect(evaluateSettingsEndpointAccess('settings.write', 'storage', 'Admin'))
       .toMatchObject({ allowed: true, reason: 'allowed' });

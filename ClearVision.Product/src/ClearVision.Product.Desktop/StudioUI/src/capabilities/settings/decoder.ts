@@ -6,7 +6,7 @@ import {
   type SettingsSection
 } from './contracts';
 
-type JsonRecord = Readonly<Record<string, unknown>>;
+export type JsonRecord = Readonly<Record<string, unknown>>;
 
 export interface SettingsGeneralProjectionV1 {
   readonly softwareTitle: string;
@@ -138,9 +138,22 @@ export interface StationCommunicationProjectionV1 {
   readonly mode: string;
   readonly port: number;
   readonly lanHost: string;
+  readonly lanAddresses: readonly string[];
   readonly localStationSyncEnabled: boolean;
   readonly token: StationTokenViewV1;
+  readonly paths: Readonly<{ readonly studio: string; readonly localStation: string }>;
+  readonly currentRunning: Readonly<{
+    readonly studioEnabled: boolean;
+    readonly studioListenMode: string;
+    readonly studioPort: number;
+    readonly studioToken: StationTokenViewV1;
+  }>;
   readonly requiresRestart: Readonly<{ readonly studio: boolean; readonly localStation: boolean }>;
+  readonly localStationBaseUrl: string;
+  readonly remoteStationBaseUrl: string;
+  readonly localStationHubUrl: string;
+  readonly remoteStationHubUrl: string;
+  readonly diagnostics: readonly string[];
 }
 
 export interface StationTokenOperationV1 {
@@ -177,6 +190,9 @@ export interface AiModelProjectionV1 {
   readonly lastTestStatus: string | null;
   readonly lastTestAt: string | null;
   readonly lastTestLatencyMs: number | null;
+  readonly extraHeaders: JsonRecord | null;
+  readonly extraQuery: JsonRecord | null;
+  readonly extraBody: JsonRecord | null;
   readonly capabilities: JsonRecord | null;
   readonly reasoning: JsonRecord | null;
   readonly reasoningSupport: JsonRecord | null;
@@ -198,6 +214,38 @@ export type AiModelPublicProjectionV1 = AiModelProjectionV1 | AiModelSafeProject
 export interface AiModelsProjectionV1 {
   readonly safeSubset: boolean;
   readonly items: readonly AiModelPublicProjectionV1[];
+}
+
+export interface AiModelMutationResponseV1 {
+  readonly message: string;
+  readonly id: string | null;
+  readonly role: string | null;
+}
+
+export interface AiModelConnectionTestProjectionV1 {
+  readonly connectionOk: boolean;
+  readonly success: boolean;
+  readonly statusCode: number | null;
+  readonly errorCode: string;
+  readonly latencyMs: number;
+  readonly sanitizedMessage: string;
+  readonly message: string;
+  readonly provider: string;
+  readonly modelName: string;
+  readonly protocol: string;
+  readonly wireApi: string;
+}
+
+export interface AiReasoningSupportProjectionV1 {
+  readonly familyId: string;
+  readonly familyName: string;
+  readonly allowedModes: readonly string[];
+  readonly allowedEfforts: readonly string[];
+  readonly helpText: string;
+  readonly supportsExplicitMode: boolean;
+  readonly supportsEffort: boolean;
+  readonly isModelLockedOn: boolean;
+  readonly defaultMode: string;
 }
 
 const genericTopLevelKeys = [
@@ -262,6 +310,10 @@ function integerValue(value: unknown, path: string, minimum = 0): number {
     throw new SettingsContractDecodeError(path, `a safe integer >= ${minimum}`);
   }
   return value;
+}
+
+function nullableInteger(value: unknown, path: string, minimum = 0): number | null {
+  return value === null || value === undefined ? null : integerValue(value, path, minimum);
 }
 
 function finiteNumber(value: unknown, path: string, minimum = 0): number {
@@ -605,22 +657,69 @@ export function decodeStationCommunicationProjectionV1(
     'remoteStationHubUrl', 'diagnostics'
   ], path);
   const token = decodeStationTokenView(valueOf(source, 'token', path), `${path}.token`);
+  const paths = record(valueOf(source, 'paths', path), `${path}.paths`);
+  exact(paths, ['studio', 'localStation'], `${path}.paths`);
+  const currentRunning = record(valueOf(source, 'currentRunning', path), `${path}.currentRunning`);
+  exact(currentRunning, ['studioEnabled', 'studioListenMode', 'studioPort', 'studioToken'], `${path}.currentRunning`);
+  const runningToken = decodeStationTokenView(
+    valueOf(currentRunning, 'studioToken', `${path}.currentRunning`),
+    `${path}.currentRunning.studioToken`
+  );
   const restart = record(valueOf(source, 'requiresRestart', path), `${path}.requiresRestart`);
   exact(restart, ['studio', 'localStation'], `${path}.requiresRestart`);
   return Object.freeze({
     mode: stringValue(valueOf(source, 'mode', path), `${path}.mode`),
     port: integerValue(valueOf(source, 'port', path), `${path}.port`, 0),
     lanHost: stringValue(valueOf(source, 'lanHost', path), `${path}.lanHost`, true),
+    lanAddresses: stringArray(valueOf(source, 'lanAddresses', path), `${path}.lanAddresses`),
     localStationSyncEnabled: booleanValue(
       valueOf(source, 'localStationSyncEnabled', path), `${path}.localStationSyncEnabled`
     ),
     token,
+    paths: Object.freeze({
+      studio: stringValue(valueOf(paths, 'studio', `${path}.paths`), `${path}.paths.studio`, true),
+      localStation: stringValue(
+        valueOf(paths, 'localStation', `${path}.paths`),
+        `${path}.paths.localStation`,
+        true
+      )
+    }),
+    currentRunning: Object.freeze({
+      studioEnabled: booleanValue(
+        valueOf(currentRunning, 'studioEnabled', `${path}.currentRunning`),
+        `${path}.currentRunning.studioEnabled`
+      ),
+      studioListenMode: stringValue(
+        valueOf(currentRunning, 'studioListenMode', `${path}.currentRunning`),
+        `${path}.currentRunning.studioListenMode`,
+        true
+      ),
+      studioPort: integerValue(
+        valueOf(currentRunning, 'studioPort', `${path}.currentRunning`),
+        `${path}.currentRunning.studioPort`,
+        0
+      ),
+      studioToken: runningToken
+    }),
     requiresRestart: Object.freeze({
       studio: booleanValue(valueOf(restart, 'studio', `${path}.requiresRestart`), `${path}.requiresRestart.studio`),
       localStation: booleanValue(
         valueOf(restart, 'localStation', `${path}.requiresRestart`), `${path}.requiresRestart.localStation`
       )
-    })
+    }),
+    localStationBaseUrl: stringValue(
+      valueOf(source, 'localStationBaseUrl', path), `${path}.localStationBaseUrl`, true
+    ),
+    remoteStationBaseUrl: stringValue(
+      valueOf(source, 'remoteStationBaseUrl', path), `${path}.remoteStationBaseUrl`, true
+    ),
+    localStationHubUrl: stringValue(
+      valueOf(source, 'localStationHubUrl', path), `${path}.localStationHubUrl`, true
+    ),
+    remoteStationHubUrl: stringValue(
+      valueOf(source, 'remoteStationHubUrl', path), `${path}.remoteStationHubUrl`, true
+    ),
+    diagnostics: stringArray(valueOf(source, 'diagnostics', path), `${path}.diagnostics`)
   });
 }
 
@@ -680,9 +779,9 @@ function decodeFullAiModel(value: unknown, path: string): AiModelProjectionV1 {
     'roleBindings', 'modelRole', 'priority', 'remark', 'createdAt', 'updatedAt', 'lastTestStatus', 'lastTestAt',
     'lastTestLatencyMs', 'capabilities', 'reasoning', 'reasoningSupport'
   ], path);
-  redactedJson(optionalValueOf(source, 'extraHeaders'), `${path}.extraHeaders`);
-  redactedJson(optionalValueOf(source, 'extraQuery'), `${path}.extraQuery`);
-  redactedJson(optionalValueOf(source, 'extraBody'), `${path}.extraBody`);
+  const extraHeaders = redactedJson(optionalValueOf(source, 'extraHeaders'), `${path}.extraHeaders`);
+  const extraQuery = redactedJson(optionalValueOf(source, 'extraQuery'), `${path}.extraQuery`);
+  const extraBody = redactedJson(optionalValueOf(source, 'extraBody'), `${path}.extraBody`);
   const capability = redactedJson(optionalValueOf(source, 'capabilities'), `${path}.capabilities`);
   const reasoning = redactedJson(optionalValueOf(source, 'reasoning'), `${path}.reasoning`);
   const reasoningSupport = redactedJson(optionalValueOf(source, 'reasoningSupport'), `${path}.reasoningSupport`);
@@ -696,8 +795,7 @@ function decodeFullAiModel(value: unknown, path: string): AiModelProjectionV1 {
       ? null : booleanValue(optionalValueOf(source, 'hasApiKey'), `${path}.hasApiKey`),
     apiKeyMasked: nullableString(optionalValueOf(source, 'apiKeyMasked'), `${path}.apiKeyMasked`),
     baseUrl: nullableString(optionalValueOf(source, 'baseUrl'), `${path}.baseUrl`),
-    timeoutMs: optionalValueOf(source, 'timeoutMs') === undefined
-      ? null : integerValue(optionalValueOf(source, 'timeoutMs'), `${path}.timeoutMs`),
+    timeoutMs: nullableInteger(optionalValueOf(source, 'timeoutMs'), `${path}.timeoutMs`),
     isActive: booleanValue(valueOf(source, 'isActive', path), `${path}.isActive`),
     isEnabled: booleanValue(valueOf(source, 'isEnabled', path), `${path}.isEnabled`),
     protocol: nullableString(optionalValueOf(source, 'protocol'), `${path}.protocol`),
@@ -707,13 +805,14 @@ function decodeFullAiModel(value: unknown, path: string): AiModelProjectionV1 {
     roleBindings: optionalValueOf(source, 'roleBindings') === undefined
       ? Object.freeze([]) : stringArray(optionalValueOf(source, 'roleBindings'), `${path}.roleBindings`),
     modelRole: nullableString(optionalValueOf(source, 'modelRole'), `${path}.modelRole`),
-    priority: optionalValueOf(source, 'priority') === undefined
-      ? null : integerValue(optionalValueOf(source, 'priority'), `${path}.priority`),
+    priority: nullableInteger(optionalValueOf(source, 'priority'), `${path}.priority`),
     remark: nullableString(optionalValueOf(source, 'remark'), `${path}.remark`),
     lastTestStatus: nullableString(optionalValueOf(source, 'lastTestStatus'), `${path}.lastTestStatus`),
     lastTestAt: nullableString(optionalValueOf(source, 'lastTestAt'), `${path}.lastTestAt`),
-    lastTestLatencyMs: optionalValueOf(source, 'lastTestLatencyMs') === undefined
-      ? null : integerValue(optionalValueOf(source, 'lastTestLatencyMs'), `${path}.lastTestLatencyMs`),
+    lastTestLatencyMs: nullableInteger(optionalValueOf(source, 'lastTestLatencyMs'), `${path}.lastTestLatencyMs`),
+    extraHeaders,
+    extraQuery,
+    extraBody,
     capabilities: capability,
     reasoning,
     reasoningSupport
@@ -754,6 +853,70 @@ export function decodeAiModelsProjectionV1(value: unknown, path = '$'): AiModels
   return Object.freeze({
     safeSubset,
     items: Object.freeze(items)
+  });
+}
+
+export function decodeAiModelMutationResponseV1(value: unknown, path = '$'): AiModelMutationResponseV1 {
+  const source = record(value, path);
+  exact(source, ['message', 'id', 'role'], path);
+  const id = optionalValueOf(source, 'id');
+  const role = optionalValueOf(source, 'role');
+  return Object.freeze({
+    message: stringValue(valueOf(source, 'message', path), `${path}.message`, true),
+    id: nullableString(id, `${path}.id`),
+    role: nullableString(role, `${path}.role`)
+  });
+}
+
+export function decodeAiModelConnectionTestProjectionV1(
+  value: unknown,
+  path = '$'
+): AiModelConnectionTestProjectionV1 {
+  const source = record(value, path);
+  exact(source, [
+    'connectionOk', 'success', 'statusCode', 'errorCode', 'latencyMs', 'sanitizedMessage', 'message',
+    'provider', 'modelName', 'protocol', 'wireApi'
+  ], path);
+  const statusCode = optionalValueOf(source, 'statusCode');
+  return Object.freeze({
+    connectionOk: booleanValue(valueOf(source, 'connectionOk', path), `${path}.connectionOk`),
+    success: booleanValue(valueOf(source, 'success', path), `${path}.success`),
+    statusCode: statusCode === null || statusCode === undefined
+      ? null : integerValue(statusCode, `${path}.statusCode`),
+    errorCode: stringValue(valueOf(source, 'errorCode', path), `${path}.errorCode`, true),
+    latencyMs: integerValue(valueOf(source, 'latencyMs', path), `${path}.latencyMs`),
+    sanitizedMessage: stringValue(
+      valueOf(source, 'sanitizedMessage', path), `${path}.sanitizedMessage`, true
+    ),
+    message: stringValue(valueOf(source, 'message', path), `${path}.message`, true),
+    provider: stringValue(valueOf(source, 'provider', path), `${path}.provider`, true),
+    modelName: stringValue(valueOf(source, 'modelName', path), `${path}.modelName`, true),
+    protocol: stringValue(valueOf(source, 'protocol', path), `${path}.protocol`, true),
+    wireApi: stringValue(valueOf(source, 'wireApi', path), `${path}.wireApi`, true)
+  });
+}
+
+export function decodeAiReasoningSupportProjectionV1(
+  value: unknown,
+  path = '$'
+): AiReasoningSupportProjectionV1 {
+  const source = record(value, path);
+  exact(source, [
+    'familyId', 'familyName', 'allowedModes', 'allowedEfforts', 'helpText', 'supportsExplicitMode',
+    'supportsEffort', 'isModelLockedOn', 'defaultMode'
+  ], path);
+  return Object.freeze({
+    familyId: stringValue(valueOf(source, 'familyId', path), `${path}.familyId`, true),
+    familyName: stringValue(valueOf(source, 'familyName', path), `${path}.familyName`, true),
+    allowedModes: stringArray(valueOf(source, 'allowedModes', path), `${path}.allowedModes`),
+    allowedEfforts: stringArray(valueOf(source, 'allowedEfforts', path), `${path}.allowedEfforts`),
+    helpText: stringValue(valueOf(source, 'helpText', path), `${path}.helpText`, true),
+    supportsExplicitMode: booleanValue(
+      valueOf(source, 'supportsExplicitMode', path), `${path}.supportsExplicitMode`
+    ),
+    supportsEffort: booleanValue(valueOf(source, 'supportsEffort', path), `${path}.supportsEffort`),
+    isModelLockedOn: booleanValue(valueOf(source, 'isModelLockedOn', path), `${path}.isModelLockedOn`),
+    defaultMode: stringValue(valueOf(source, 'defaultMode', path), `${path}.defaultMode`, true)
   });
 }
 

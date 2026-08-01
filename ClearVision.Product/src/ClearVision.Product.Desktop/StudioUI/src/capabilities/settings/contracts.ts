@@ -459,7 +459,7 @@ export const SETTINGS_ENDPOINT_MATRIX: readonly SettingsEndpointContract[] = Obj
   }),
   endpoint({
     id: 'ai.models.read', section: 'ai-model', method: 'GET', path: 'ai/models', kind: 'read',
-    serverPermission: 'authenticated', uiPermission: 'settings-route', semantics: SETTINGS_SEMANTICS.genericRead,
+    serverPermission: 'authenticated', uiPermission: 'settings-authenticated', semantics: SETTINGS_SEMANTICS.genericRead,
     sensitiveFields: ['apiKey', 'apiKeyMasked', 'extraHeaders', 'extraQuery', 'extraBody']
   }),
   endpoint({
@@ -468,8 +468,13 @@ export const SETTINGS_ENDPOINT_MATRIX: readonly SettingsEndpointContract[] = Obj
     sensitiveFields: ['apiKey', 'extraHeaders', 'extraQuery', 'extraBody']
   }),
   endpoint({
+    id: 'ai.models.test', section: 'ai-model', method: 'POST', path: 'ai/models/{id}/test', kind: 'test',
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.runtimeOperation,
+    sensitiveFields: ['apiKey', 'extraHeaders', 'extraQuery', 'extraBody']
+  }),
+  endpoint({
     id: 'ai.reasoning-support', section: 'ai-model', method: 'POST', path: 'ai/reasoning-support', kind: 'test',
-    serverPermission: 'authenticated', uiPermission: 'settings-route', semantics: SETTINGS_SEMANTICS.runtimeOperation
+    serverPermission: 'authenticated', uiPermission: 'settings-authenticated', semantics: SETTINGS_SEMANTICS.runtimeOperation
   })
 ]);
 
@@ -558,7 +563,7 @@ export const SETTINGS_SECTION_CONTRACTS: readonly SettingsSectionContract[] = Ob
   }),
   section({
     section: 'ai-model', authority: 'ai-model-store', routePermission: 'settings-route', readPermission: 'authenticated', writePermission: 'admin',
-    endpointIds: ['ai.models.read', 'ai.models.write', 'ai.reasoning-support'],
+    endpointIds: ['ai.models.read', 'ai.models.write', 'ai.models.test', 'ai.reasoning-support'],
     sensitiveFields: ['apiKey', 'apiKeyMasked', 'extraHeaders', 'extraQuery', 'extraBody'], semantics: SETTINGS_SEMANTICS.genericWrite
   }),
   section({

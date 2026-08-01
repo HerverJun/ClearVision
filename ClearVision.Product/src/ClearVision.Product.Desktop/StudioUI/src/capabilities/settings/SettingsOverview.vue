@@ -31,6 +31,7 @@ import SettingsStoragePanel from './SettingsStoragePanel.vue';
 import SettingsPlcPanel from './SettingsPlcPanel.vue';
 import SettingsTcpPanel from './SettingsTcpPanel.vue';
 import SettingsCameraPanel from './SettingsCameraPanel.vue';
+import SettingsStationPanel from './SettingsStationPanel.vue';
 
 const props = defineProps<{
   projection: SettingsProjectionV1;
@@ -134,7 +135,8 @@ function stateTone(state: SettingsSectionReadState): CvStatusTone {
 }
 
 function mountedSection(target: SettingsNavigationTarget): boolean {
-  return target === 'overview' || target === 'database' || target === 'plc' || target === 'tcp' || target === 'camera';
+  return target === 'overview' || target === 'database' || target === 'plc' || target === 'tcp' ||
+    target === 'camera' || target === 'station';
 }
 
 function sectionStateLabel(
@@ -146,6 +148,10 @@ function sectionStateLabel(
     return state === 'restricted' ? `${accessLabel}（安全子集未返回）` : accessLabel;
   }
   if (target === 'database') return '已接入';
+  if (target === 'station') {
+    if (props.role !== 'Admin') return 'Admin only';
+    return props.owner.projection.station ? '已接入' : '读取中';
+  }
   const device = props.owner.projection.device;
   if (target === 'plc') return device.plcSettings ? `已接入（${device.plcSettings.activeProtocol}）` : '未读取';
   if (target === 'tcp') {
@@ -165,6 +171,7 @@ function sectionStateLabel(
 function sectionTone(target: SettingsNavigationTarget, state: SettingsSectionReadState): CvStatusTone {
   const device = props.owner.projection.device;
   if (target === 'database') return 'ok';
+  if (target === 'station') return props.owner.projection.station ? 'ok' : 'idle';
   if (target === 'plc') return device.plcSettings ? 'ok' : 'idle';
   if (target === 'tcp') {
     return Object.values(device.tcpStatuses).some(status => status?.isConnected || status?.isListening)
@@ -294,6 +301,13 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
         v-else-if="activeGroup === 'camera'"
         :owner="owner"
       />
+
+      <SettingsStationPanel
+        v-else-if="activeGroup === 'station'"
+        :owner="owner"
+        :role="role"
+      />
+
     </KeepAlive>
 
     <template v-if="isGenericSection(activeGroup) && !activeGenericProjection">

@@ -164,6 +164,8 @@ describe('F07 G1 Settings public decoders', () => {
   it('accepts redacted AI model projections and rejects a raw API key', () => {
     const decoded = decodeAiModelsProjectionV1([aiModel()]);
     expect(decoded.safeSubset).toBe(false);
+    const nullableMetadata = decodeAiModelsProjectionV1([aiModel({ timeoutMs: null, priority: null, lastTestLatencyMs: null })]);
+    expect(nullableMetadata.items[0]).toMatchObject({ timeoutMs: null, priority: null, lastTestLatencyMs: null });
     expect(decoded.items[0]).toMatchObject({ id: 'model_01', hasApiKey: true, apiKeyMasked: '••••••••' });
     expect(() => decodeAiModelsProjectionV1([aiModel({ apiKey: 'sk-raw' })]))
       .toThrow(SettingsContractDecodeError);

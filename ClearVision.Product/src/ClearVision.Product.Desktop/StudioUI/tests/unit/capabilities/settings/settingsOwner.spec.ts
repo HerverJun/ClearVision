@@ -46,6 +46,61 @@ function diskUsagePayload() {
   };
 }
 
+function stationCommunicationPayload() {
+  return {
+    success: true,
+    message: 'ok',
+    mode: 'LocalLoopback',
+    port: 5010,
+    lanHost: '127.0.0.1',
+    lanAddresses: ['127.0.0.1'],
+    localStationSyncEnabled: true,
+    token: { hasToken: true, mask: '******', last4: '9876' },
+    paths: { studio: 'C:/settings/studio.json', localStation: 'C:/settings/station.json' },
+    currentRunning: {
+      studioEnabled: true,
+      studioListenMode: 'Loopback',
+      studioPort: 5000,
+      studioToken: { hasToken: true, mask: '******', last4: '0000' }
+    },
+    requiresRestart: { studio: true, localStation: true },
+    localStationBaseUrl: 'http://127.0.0.1:5010',
+    remoteStationBaseUrl: '',
+    localStationHubUrl: 'http://127.0.0.1:5010/hubs/station-sync',
+    remoteStationHubUrl: '',
+    diagnostics: ['restart required']
+  };
+}
+
+function aiModelsPayload() {
+  return [{
+    id: 'model-1',
+    displayName: 'Test model',
+    provider: 'Test provider',
+    model: 'test-model',
+    modelRole: 'generation',
+    isEnabled: true,
+    isActive: true,
+    capabilities: null
+  }];
+}
+
+function aiConnectionTestPayload() {
+  return {
+    connectionOk: true,
+    success: true,
+    statusCode: 200,
+    errorCode: '',
+    latencyMs: 12,
+    sanitizedMessage: 'Connection verified.',
+    message: 'Connection verified.',
+    provider: 'Test provider',
+    modelName: 'test-model',
+    protocol: 'openai_compatible',
+    wireApi: 'responses'
+  };
+}
+
 type FakeGet = (path: string, options?: { readonly signal?: AbortSignal }) => Promise<unknown>;
 
 function runtime(get: FakeGet): Pick<ProductRuntime, 'api'> {
@@ -102,7 +157,7 @@ describe('F07 G1 Settings owner lifecycle', () => {
     operator.dispose();
   });
 
-  it('allows Engineer diagnostics but denies Admin writes, route-only, unknown and excluded endpoints', async () => {
+  it('allows Engineer diagnostics and AI safe reads but denies Admin writes, route-only, unknown and excluded endpoints', async () => {
     const executed: string[] = [];
     const engineer = createSettingsOwner({ runtime: runtime(vi.fn()), role: 'Engineer' });
     const diagnosticTask: SettingsEndpointTask<string> = async context => {
@@ -121,13 +176,19 @@ describe('F07 G1 Settings owner lifecycle', () => {
     expect(adminWrite).toMatchObject({ status: 'forbidden', section: 'plc' });
     const genericWrite = await engineer.enqueueEndpointOperation('general', 'settings.write', diagnosticTask);
     expect(genericWrite).toMatchObject({ status: 'forbidden', section: 'general' });
-    const routeOnly = await engineer.enqueueEndpointOperation('ai-model', 'ai.reasoning-support', diagnosticTask);
-    expect(routeOnly).toMatchObject({ status: 'forbidden', section: 'ai-model' });
+    const reasoningSupport = await engineer.enqueueEndpointOperation('ai-model', 'ai.reasoning-support', diagnosticTask);
+    expect(reasoningSupport).toMatchObject({ status: 'completed', section: 'ai-model', value: 'ai.reasoning-support' });
+    const safeRead = await engineer.enqueueEndpointOperation('ai-model', 'ai.models.read', diagnosticTask);
+    expect(safeRead).toMatchObject({ status: 'completed', section: 'ai-model', value: 'ai.models.read' });
+    const routeOnly = await engineer.enqueueEndpointOperation('general', 'settings.read', diagnosticTask);
+    expect(routeOnly).toMatchObject({ status: 'forbidden', section: 'general' });
     const unknown = await engineer.enqueueEndpointOperation('plc', 'settings.unknown', diagnosticTask);
     expect(unknown).toMatchObject({ status: 'forbidden', section: 'plc' });
     const excluded = await engineer.enqueueEndpointOperation('general', 'settings/import', diagnosticTask);
     expect(excluded).toMatchObject({ status: 'forbidden', section: 'general' });
-    expect(executed).toEqual(['plc.test-connection', 'tcp.runtime', 'camera.trigger-and-preview']);
+    expect(executed).toEqual([
+      'plc.test-connection', 'tcp.runtime', 'camera.trigger-and-preview', 'ai.reasoning-support', 'ai.models.read'
+    ]);
     engineer.dispose();
 
     const admin = createSettingsOwner({ runtime: runtime(vi.fn()), role: 'Admin' });
@@ -262,6 +323,82 @@ describe('F07 G1 Settings owner lifecycle', () => {
 
     const reread = await owner.readCameraBindings();
     expect(reread.status).toBe('completed');
+    expect(owner.projection.unknownOutcomeKeys).toEqual([]);
+    owner.dispose();
+  });
+
+  it('clears Station unknown only after the Station authority reread', async () => {
+    const get = vi.fn(async (path: string) => path === 'station-communication/settings'
+      ? stationCommunicationPayload()
+      : settingsPayload()) as unknown as ApiTransport['get'];
+    const owner = createSettingsOwner({
+      runtime: runtimeWithApi({ ...({} as ApiTransport), get }),
+      role: 'Admin'
+    });
+
+    const failed = await owner.enqueueEndpointOperation(
+      'station',
+      'station.settings.write',
+      async () => { throw new ApiNetworkError('http://localhost:5000/api/station-communication/settings', new Error('offline')); }
+    );
+    expect(failed.status).toBe('failed');
+    expect(owner.projection.unknownOutcomeKeys).toEqual(['station-communication']);
+
+    const unrelated = await owner.enqueueEndpointOperation(
+      'ai-model',
+      'ai.reasoning-support',
+      async () => 'diagnostic',
+      'read'
+    );
+    expect(unrelated).toMatchObject({ status: 'completed', value: 'diagnostic' });
+    expect(owner.projection.unknownOutcomeKeys).toEqual(['station-communication']);
+
+    const reread = await owner.readStationCommunication();
+    expect(reread).toMatchObject({ status: 'completed', value: { port: 5010 } });
+    expect(owner.projection.unknownOutcomeKeys).toEqual([]);
+    owner.dispose();
+  });
+
+  it('re-reads AI model authority after a mutation and keeps model unknown isolated from diagnostics', async () => {
+    const get = vi.fn(async (path: string) => path === 'ai/models'
+      ? aiModelsPayload()
+      : settingsPayload()) as unknown as ApiTransport['get'];
+    const put = vi.fn(async () => ({ message: 'updated' })) as NonNullable<ApiTransport['put']>;
+    const post = vi.fn(async (path: string) => path.endsWith('/test')
+      ? aiConnectionTestPayload()
+      : { familyId: 'test', familyName: 'Test', allowedModes: ['auto'], allowedEfforts: ['medium'], helpText: '', supportsExplicitMode: false, supportsEffort: false, isModelLockedOn: false, defaultMode: 'auto' }) as NonNullable<ApiTransport['post']>;
+    const owner = createSettingsOwner({
+      runtime: runtimeWithApi({ ...({} as ApiTransport), get, put, post }),
+      role: 'Admin'
+    });
+
+    const saved = await owner.updateAiModel('model-1', {
+      displayName: 'Updated', provider: 'Test provider', model: 'test-model', timeoutMs: 1000, isEnabled: true
+    });
+    expect(saved).toMatchObject({
+      status: 'completed',
+      value: { projection: { safeSubset: true, items: [{ id: 'model-1' }] } }
+    });
+    expect(get).toHaveBeenCalledWith('ai/models', expect.objectContaining({ signal: expect.any(AbortSignal) }));
+
+    const failed = await owner.enqueueEndpointOperation(
+      'ai-model',
+      'ai.models.write',
+      async () => { throw new ApiNetworkError('http://localhost:5000/api/ai/models/model-1', new Error('offline')); }
+    );
+    expect(failed.status).toBe('failed');
+    expect(owner.projection.unknownOutcomeKeys).toEqual(['ai-models']);
+
+    const connection = await owner.testAiModel('model-1');
+    expect(connection).toMatchObject({ status: 'completed', value: { connectionOk: true } });
+    expect(owner.projection.unknownOutcomeKeys).toEqual(['ai-models']);
+
+    const support = await owner.readAiReasoningSupport({ provider: 'Test provider', model: 'test-model' });
+    expect(support).toMatchObject({ status: 'completed', value: { familyId: 'test' } });
+    expect(owner.projection.unknownOutcomeKeys).toEqual(['ai-models']);
+
+    const reread = await owner.readAiModels();
+    expect(reread).toMatchObject({ status: 'completed', value: { safeSubset: true } });
     expect(owner.projection.unknownOutcomeKeys).toEqual([]);
     owner.dispose();
   });

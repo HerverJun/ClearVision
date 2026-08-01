@@ -98,6 +98,8 @@ function reconcileLabel(key: SettingsAuthorityReconcileKey): string {
   if (key === 'tcp-profiles') return 'TCP profiles';
   if (key.startsWith('tcp-runtime:')) return `TCP runtime (${key.slice('tcp-runtime:'.length)})`;
   if (key === 'camera-bindings') return 'Camera bindings';
+  if (key === 'station-communication') return 'Station communication';
+  if (key === 'ai-models') return 'AI model authority';
   if (key === 'camera-preview') return 'Camera preview session';
   if (key === 'users') return 'User authority';
   if (key === 'change-password') return 'Auth session';

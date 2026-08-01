@@ -26,6 +26,10 @@ import {
 import {
   createSettingsApiAdapter,
   type SettingsApiAdapter,
+  type AiModelMutationRequestV1,
+  type AiReasoningSupportRequestV1,
+  type StationCommunicationSettingsUpdateRequestV1,
+  type StationTokenOperationNameV1,
   type SettingsChangePasswordRequest,
   type SettingsCreateUserRequest,
   type SettingsUpdateUserRequest
@@ -61,14 +65,20 @@ import {
   decodeSettingsErrorPayloadV1,
   settingsErrorCodeFromHttpStatus,
   type SettingsAccountOperationResponseV1,
+  type AiModelMutationResponseV1,
   type SettingsDatabaseBackupProjectionV1,
   type SettingsDatabaseStatusProjectionV1,
   type SettingsDiskUsageProjectionV1,
   type SettingsErrorProjectionV1,
+  type AiModelConnectionTestProjectionV1,
+  type AiModelsProjectionV1,
+  type AiReasoningSupportProjectionV1,
   type SettingsProjectionV1,
   type SettingsUserProjectionV1,
   type SettingsUsersProjectionV1,
-  type SettingsWriteResponseV1
+  type SettingsWriteResponseV1,
+  type StationCommunicationProjectionV1,
+  type StationTokenOperationV1
 } from './decoder';
 import type { GenericSettingsSection } from './contracts';
 import { createSettingsWriteCoordinator, type SettingsWriteCoordinator } from './settingsWriteCoordinator';
@@ -84,6 +94,8 @@ export interface SettingsOwnerProjection {
   readonly generation: number;
   readonly started: boolean;
   readonly device: SettingsDeviceProjectionV1;
+  readonly station: StationCommunicationProjectionV1 | null;
+  readonly aiModels: AiModelsProjectionV1 | null;
   readonly dirtySectionCount: number;
   readonly pendingSectionCount: number;
   readonly unknownOutcomeKeys: readonly SettingsAuthorityReconcileKey[];
@@ -115,6 +127,8 @@ export type SettingsAuthorityReconcileKey =
   | `tcp-runtime:${string}`
   | 'camera-bindings'
   | 'camera-preview'
+  | 'station-communication'
+  | 'ai-models'
   | 'users'
   | 'change-password'
   | 'database-backup';
@@ -141,6 +155,31 @@ export interface SettingsOwner {
     section: GenericSettingsSection,
     value: Readonly<Record<string, unknown>>
   ): Promise<SettingsWriteResult<SettingsWriteResponseV1>>;
+  readStationCommunication(): Promise<SettingsWriteResult<StationCommunicationProjectionV1>>;
+  saveStationCommunication(
+    request: StationCommunicationSettingsUpdateRequestV1
+  ): Promise<SettingsWriteResult<StationCommunicationProjectionV1>>;
+  runStationTokenOperation(
+    operation: StationTokenOperationNameV1
+  ): Promise<SettingsWriteResult<StationTokenOperationV1>>;
+  readAiModels(): Promise<SettingsWriteResult<AiModelsProjectionV1>>;
+  createAiModel(
+    request: AiModelMutationRequestV1
+  ): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>>;
+  updateAiModel(
+    id: string,
+    request: AiModelMutationRequestV1
+  ): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>>;
+  deleteAiModel(id: string): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>>;
+  activateAiModel(id: string): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>>;
+  setAiModelDefault(
+    id: string,
+    role: 'planner' | 'shadow-eval'
+  ): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>>;
+  testAiModel(id: string): Promise<SettingsWriteResult<AiModelConnectionTestProjectionV1>>;
+  readAiReasoningSupport(
+    request: AiReasoningSupportRequestV1
+  ): Promise<SettingsWriteResult<AiReasoningSupportProjectionV1>>;
   readDiskUsage(path?: string): Promise<SettingsWriteResult<SettingsDiskUsageProjectionV1>>;
   readDatabaseStatus(): Promise<SettingsWriteResult<SettingsDatabaseStatusProjectionV1>>;
   backupDatabase(): Promise<SettingsWriteResult<SettingsDatabaseBackupProjectionV1>>;
@@ -195,6 +234,12 @@ export interface SettingsDeviceOperationResult {
   readonly message: string;
   readonly response?: string;
   readonly errors?: readonly unknown[];
+}
+
+export interface SettingsAiModelsMutationResultV1 {
+  readonly message: string;
+  readonly modelId: string | null;
+  readonly projection: AiModelsProjectionV1;
 }
 
 export interface CreateSettingsOwnerOptions {
@@ -369,6 +414,8 @@ function reconcileKeyForEndpoint(
   if (endpointId === 'auth.change-password') return 'change-password';
   if (endpointId.startsWith('users.')) return 'users';
   if (endpointId === 'settings.database.backup') return 'database-backup';
+  if (endpointId === 'station.settings.write' || endpointId === 'station.token') return 'station-communication';
+  if (endpointId === 'ai.models.write') return 'ai-models';
   if (endpointId === 'camera.bindings.write') return 'camera-bindings';
   if (endpointId.startsWith('camera.preview.') || endpointId === 'camera.soft-trigger-capture') {
     return 'camera-preview';
@@ -493,6 +540,8 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     generation: 0,
     started: false,
     device: emptyDeviceProjection(),
+    station: null,
+    aiModels: null,
     dirtySectionCount: 0,
     pendingSectionCount: 0,
     unknownOutcomeKeys: Object.freeze([])
@@ -706,6 +755,53 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     return result as SettingsWriteResult<unknown>;
   }
 
+  function unknownAfterAuthorityRead<T>(
+    section: SettingsSection,
+    operationKind: SettingsOperationKind,
+    generation: number,
+    result: SettingsWriteResult<unknown>,
+    message: string
+  ): SettingsWriteResult<T> {
+    markUnknownOutcome(section === 'station' ? 'station-communication' : 'ai-models');
+    const originalError = result.status === 'failed'
+      ? result.error
+      : new Error('Authority reread did not complete.');
+    const error = new SettingsUnknownOutcomeError(originalError, operationKind);
+    return Object.freeze({
+      status: 'failed',
+      section,
+      generation,
+      operationKind,
+      error,
+      message
+    });
+  }
+
+  async function finishAiMutation(
+    result: SettingsWriteResult<AiModelMutationResponseV1>,
+    fallbackModelId: string | null
+  ): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>> {
+    if (result.status !== 'completed') return result as unknown as SettingsWriteResult<SettingsAiModelsMutationResultV1>;
+    const reread = await owner.readAiModels();
+    if (reread.status !== 'completed') {
+      return unknownAfterAuthorityRead<SettingsAiModelsMutationResultV1>(
+        'ai-model',
+        result.operationKind ?? 'write',
+        result.generation,
+        reread as SettingsWriteResult<unknown>,
+        'AI 模型 mutation 已提交，但服务端模型 projection 重新读取失败；结果未知。'
+      );
+    }
+    return Object.freeze({
+      ...result,
+      value: Object.freeze({
+        message: result.value.message,
+        modelId: result.value.id ?? fallbackModelId,
+        projection: reread.value
+      })
+    });
+  }
+
   function previewResourcesAreIdle(): boolean {
     return previewController === undefined &&
       previewSessionId === null &&
@@ -756,6 +852,8 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       if (key === 'plc-mappings') return reconcileResult(await owner.readPlcMappings());
       if (key === 'tcp-profiles') return reconcileResult(await owner.readTcpProfiles());
       if (key === 'camera-bindings') return reconcileResult(await owner.readCameraBindings());
+      if (key === 'station-communication') return reconcileResult(await owner.readStationCommunication());
+      if (key === 'ai-models') return reconcileResult(await owner.readAiModels());
       if (key === 'users') return reconcileResult(await owner.readUsers());
       if (key === 'camera-preview') {
         return reconcileResult(await owner.stopCameraPreview('重新核对相机预览会话'));
@@ -938,6 +1036,158 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         state.message = 'Settings section 已保存；服务端投影已更新，运行时重载要求由后端决定。';
       }
       return result;
+    },
+    async readStationCommunication(): Promise<SettingsWriteResult<StationCommunicationProjectionV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'station',
+        'station.settings.read',
+        context => adapter.readStationCommunication(context.signal),
+        'read'
+      );
+      if (result.status === 'completed') {
+        state.station = result.value;
+        reconcileUnknownOutcome('station-communication');
+      }
+      return result;
+    },
+    async saveStationCommunication(
+      request: StationCommunicationSettingsUpdateRequestV1
+    ): Promise<SettingsWriteResult<StationCommunicationProjectionV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'station',
+        'station.settings.write',
+        context => adapter.writeStationCommunication(request, context.signal),
+        'write',
+        'station-communication'
+      );
+      if (result.status !== 'completed') return result;
+      const reread = await owner.readStationCommunication();
+      if (reread.status !== 'completed') {
+        return unknownAfterAuthorityRead<StationCommunicationProjectionV1>(
+          'station',
+          result.operationKind ?? 'write',
+          result.generation,
+          reread as SettingsWriteResult<unknown>,
+          'Station 配置已提交，但服务端 Station projection 重新读取失败；结果未知。'
+        );
+      }
+      return Object.freeze({ ...result, value: reread.value });
+    },
+    async runStationTokenOperation(
+      operation: StationTokenOperationNameV1
+    ): Promise<SettingsWriteResult<StationTokenOperationV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'station',
+        'station.token',
+        context => adapter.stationToken(operation, context.signal),
+        'runtime-operation',
+        'station-communication'
+      );
+      if (result.status !== 'completed') return result;
+      const reread = await owner.readStationCommunication();
+      if (reread.status !== 'completed') {
+        return unknownAfterAuthorityRead<StationTokenOperationV1>(
+          'station',
+          result.operationKind ?? 'runtime-operation',
+          result.generation,
+          reread as SettingsWriteResult<unknown>,
+          'Station token 操作已提交，但服务端 Station projection 重新读取失败；结果未知。'
+        );
+      }
+      // The endpoint returns a one-time token value. Keep it out of the owner,
+      // component state, logs and snapshots; only the masked projection survives.
+      return Object.freeze({
+        ...result,
+        value: Object.freeze({
+          ...result.value,
+          token: '',
+          settings: reread.value
+        })
+      });
+    },
+    async readAiModels(): Promise<SettingsWriteResult<AiModelsProjectionV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'ai-model',
+        'ai.models.read',
+        context => adapter.readAiModels(context.signal),
+        'read'
+      );
+      if (result.status === 'completed') {
+        state.aiModels = result.value;
+        reconcileUnknownOutcome('ai-models');
+      }
+      return result;
+    },
+    createAiModel(
+      request: AiModelMutationRequestV1
+    ): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>> {
+      return owner.enqueueEndpointOperation(
+        'ai-model',
+        'ai.models.write',
+        context => adapter.createAiModel(request, context.signal),
+        'write',
+        'ai-models'
+      ).then(result => finishAiMutation(result, null));
+    },
+    updateAiModel(
+      id: string,
+      request: AiModelMutationRequestV1
+    ): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>> {
+      return owner.enqueueEndpointOperation(
+        'ai-model',
+        'ai.models.write',
+        context => adapter.updateAiModel(id, request, context.signal),
+        'write',
+        'ai-models'
+      ).then(result => finishAiMutation(result, id));
+    },
+    deleteAiModel(id: string): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>> {
+      return owner.enqueueEndpointOperation(
+        'ai-model',
+        'ai.models.write',
+        context => adapter.deleteAiModel(id, context.signal),
+        'write',
+        'ai-models'
+      ).then(result => finishAiMutation(result, id));
+    },
+    activateAiModel(id: string): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>> {
+      return owner.enqueueEndpointOperation(
+        'ai-model',
+        'ai.models.write',
+        context => adapter.activateAiModel(id, context.signal),
+        'runtime-operation',
+        'ai-models'
+      ).then(result => finishAiMutation(result, id));
+    },
+    setAiModelDefault(
+      id: string,
+      role: 'planner' | 'shadow-eval'
+    ): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>> {
+      return owner.enqueueEndpointOperation(
+        'ai-model',
+        'ai.models.write',
+        context => adapter.setAiModelDefault(id, role, context.signal),
+        'runtime-operation',
+        'ai-models'
+      ).then(result => finishAiMutation(result, id));
+    },
+    testAiModel(id: string): Promise<SettingsWriteResult<AiModelConnectionTestProjectionV1>> {
+      return owner.enqueueEndpointOperation(
+        'ai-model',
+        'ai.models.test',
+        context => adapter.testAiModel(id, context.signal),
+        'runtime-operation'
+      );
+    },
+    readAiReasoningSupport(
+      request: AiReasoningSupportRequestV1
+    ): Promise<SettingsWriteResult<AiReasoningSupportProjectionV1>> {
+      return owner.enqueueEndpointOperation(
+        'ai-model',
+        'ai.reasoning-support',
+        context => adapter.readAiReasoningSupport(request, context.signal),
+        'read'
+      );
     },
     readDiskUsage(path?: string): Promise<SettingsWriteResult<SettingsDiskUsageProjectionV1>> {
       return owner.enqueueEndpointOperation(

@@ -24,6 +24,8 @@ function stateLabel(target: SettingsNavigationTarget, role: string | null, proje
     return projection.sections[target] ? accessLabel : `${accessLabel}（安全子集未返回）`;
   }
   if (target === 'plc' || target === 'tcp' || target === 'camera' || target === 'database') return '已接入';
+  if (target === 'station') return role === 'Admin' ? 'Admin 可管理' : 'Admin only';
+  if (target === 'ai-model') return role === 'Admin' ? 'Admin 可管理' : role === 'Engineer' ? 'safe read' : 'Admin only';
   return '后续';
 }
 </script>
