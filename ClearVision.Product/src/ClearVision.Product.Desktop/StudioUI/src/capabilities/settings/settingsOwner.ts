@@ -86,6 +86,7 @@ export interface SettingsOwnerProjection {
   readonly device: SettingsDeviceProjectionV1;
   readonly dirtySectionCount: number;
   readonly pendingSectionCount: number;
+  readonly unknownOutcomeKeys: readonly SettingsAuthorityReconcileKey[];
 }
 
 export interface SettingsOwnerDiagnostics {
@@ -106,17 +107,32 @@ export interface SettingsPanelState {
   readonly pending: boolean;
 }
 
+export type SettingsAuthorityReconcileKey =
+  | 'generic-settings'
+  | 'plc-settings'
+  | 'plc-mappings'
+  | 'tcp-profiles'
+  | `tcp-runtime:${string}`
+  | 'camera-bindings'
+  | 'camera-preview'
+  | 'users'
+  | 'change-password'
+  | 'database-backup';
+
 export interface SettingsOwner {
   readonly projection: DeepReadonly<SettingsOwnerProjection>;
   readonly writes: SettingsWriteCoordinator;
   start(): Promise<void>;
   refresh(): Promise<boolean>;
+  reconcileAuthority(key: SettingsAuthorityReconcileKey): Promise<SettingsWriteResult<unknown>>;
+  recordChangePasswordSessionResult(sessionInvalidated: boolean, outcomeUnknown?: boolean): void;
   invalidate(reason?: string): void;
   enqueueEndpointOperation<T>(
     section: SettingsSection,
     endpointId: string,
     task: SettingsEndpointTask<T>,
-    operationKind?: SettingsOperationKind
+    operationKind?: SettingsOperationKind,
+    reconcileKey?: SettingsAuthorityReconcileKey
   ): Promise<SettingsWriteResult<T>>;
   registerPanelState(section: SettingsSection, readState: () => SettingsPanelState): () => void;
   refreshPanelState(): void;
@@ -337,6 +353,30 @@ function operationKindForEndpoint(endpointId: string): SettingsOperationKind {
   return 'write';
 }
 
+function reconcileKeyForEndpoint(
+  endpointId: string,
+  operationKind: SettingsOperationKind,
+  override?: SettingsAuthorityReconcileKey
+): SettingsAuthorityReconcileKey | null {
+  if (override || operationKind === 'read') return override ?? null;
+
+  const endpoint = findSettingsEndpoint(endpointId);
+  if (endpoint?.kind === 'test') return null;
+  if (endpointId === 'settings.write' || endpointId === 'settings.theme.write') return 'generic-settings';
+  if (endpointId === 'plc.settings.write') return 'plc-settings';
+  if (endpointId === 'plc.mappings.write') return 'plc-mappings';
+  if (endpointId === 'tcp.profiles.write') return 'tcp-profiles';
+  if (endpointId === 'auth.change-password') return 'change-password';
+  if (endpointId.startsWith('users.')) return 'users';
+  if (endpointId === 'settings.database.backup') return 'database-backup';
+  if (endpointId === 'camera.bindings.write') return 'camera-bindings';
+  if (endpointId.startsWith('camera.preview.') || endpointId === 'camera.soft-trigger-capture') {
+    return 'camera-preview';
+  }
+  if (endpointId === 'camera.trigger-and-preview') return 'camera-preview';
+  return null;
+}
+
 function emptyCameraPreviewDiagnostics(): CameraPreviewDiagnosticsV1 {
   return Object.freeze({
     controller: 'idle',
@@ -454,7 +494,8 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     started: false,
     device: emptyDeviceProjection(),
     dirtySectionCount: 0,
-    pendingSectionCount: 0
+    pendingSectionCount: 0,
+    unknownOutcomeKeys: Object.freeze([])
   });
   let disposed = false;
   let generation = 0;
@@ -465,20 +506,26 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
   let previewObjectUrl: string | null = null;
   let previewFrameLoopCount = 0;
   let previewFrameLoopPromise: Promise<void> | undefined;
-  const panelStates = new Map<SettingsSection, () => SettingsPanelState>();
-  const unknownOutcomeSections = new Set<SettingsSection>();
+  const panelStates = new Map<SettingsSection, Set<() => SettingsPanelState>>();
+  const unknownOutcomeKeys = new Set<SettingsAuthorityReconcileKey>();
 
   function syncPanelState(): void {
     let dirtySectionCount = 0;
     let pendingSectionCount = 0;
-    for (const readState of panelStates.values()) {
-      try {
-        const panelState = readState();
-        if (panelState.dirty) dirtySectionCount += 1;
-        if (panelState.pending) pendingSectionCount += 1;
-      } catch {
-        // A panel can be in the middle of unmounting; its disposer removes it next.
+    for (const readers of panelStates.values()) {
+      let sectionDirty = false;
+      let sectionPending = false;
+      for (const readState of readers) {
+        try {
+          const panelState = readState();
+          sectionDirty ||= panelState.dirty;
+          sectionPending ||= panelState.pending;
+        } catch {
+          // A panel can be in the middle of unmounting; its disposer removes it next.
+        }
       }
+      if (sectionDirty) dirtySectionCount += 1;
+      if (sectionPending) pendingSectionCount += 1;
     }
     state.dirtySectionCount = dirtySectionCount;
     state.pendingSectionCount = pendingSectionCount;
@@ -626,6 +673,46 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     state.started = true;
   }
 
+  function syncUnknownOutcomeProjection(): void {
+    state.unknownOutcomeKeys = Object.freeze([...unknownOutcomeKeys]);
+  }
+
+  function markUnknownOutcome(key: SettingsAuthorityReconcileKey): void {
+    if (unknownOutcomeKeys.has(key)) return;
+    unknownOutcomeKeys.add(key);
+    syncUnknownOutcomeProjection();
+  }
+
+  function reconcileUnknownOutcome(key: SettingsAuthorityReconcileKey): void {
+    if (!unknownOutcomeKeys.delete(key)) return;
+    syncUnknownOutcomeProjection();
+  }
+
+  function unsupportedReconcile(
+    section: SettingsSection,
+    message: string
+  ): SettingsWriteResult<unknown> {
+    return Object.freeze({
+      status: 'failed',
+      section,
+      generation: writes.diagnostics().generation,
+      operationKind: 'read',
+      error: new SettingsUnknownOutcomeError(new Error(message), 'read'),
+      message
+    });
+  }
+
+  function reconcileResult<T>(result: SettingsWriteResult<T>): SettingsWriteResult<unknown> {
+    return result as SettingsWriteResult<unknown>;
+  }
+
+  function previewResourcesAreIdle(): boolean {
+    return previewController === undefined &&
+      previewSessionId === null &&
+      previewObjectUrl === null &&
+      previewFrameLoopCount === 0;
+  }
+
   const owner: SettingsOwner = Object.freeze({
     projection: readonly(state),
     writes,
@@ -634,8 +721,86 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       state.started = true;
       await owner.refresh();
     },
+    async reconcileAuthority(key: SettingsAuthorityReconcileKey): Promise<SettingsWriteResult<unknown>> {
+      if (disposed) {
+        return Object.freeze({
+          status: 'disposed',
+          section: 'general',
+          generation: writes.diagnostics().generation,
+          operationKind: 'read',
+          message: 'Settings owner has been disposed.'
+        });
+      }
+
+      if (key === 'generic-settings') {
+        // `/api/settings` is the page-level authority read. It is deliberately
+        // not exposed as a normal section operation because the endpoint is
+        // route-scoped in the access matrix. Reconcile it through the shared
+        // coordinator so an unknown write can only clear after a decoded read.
+        const result = await writes.enqueue(
+          'general',
+          context => adapter.readGenericProjection(context.signal),
+          'read'
+        );
+        if (result.status === 'completed' && !disposed) {
+          state.settings = result.value;
+          state.phase = 'ready';
+          state.error = null;
+          state.message = '已重新读取服务端 Settings 投影；Generic unknown 已完成核对。';
+          reconcileUnknownOutcome(key);
+        }
+        return reconcileResult(result);
+      }
+
+      if (key === 'plc-settings') return reconcileResult(await owner.readPlcSettings());
+      if (key === 'plc-mappings') return reconcileResult(await owner.readPlcMappings());
+      if (key === 'tcp-profiles') return reconcileResult(await owner.readTcpProfiles());
+      if (key === 'camera-bindings') return reconcileResult(await owner.readCameraBindings());
+      if (key === 'users') return reconcileResult(await owner.readUsers());
+      if (key === 'camera-preview') {
+        return reconcileResult(await owner.stopCameraPreview('重新核对相机预览会话'));
+      }
+      if (key === 'change-password') {
+        return unsupportedReconcile(
+          'security',
+          'Change password 只能由现有 auth lifecycle 的 session 失效结果确认。'
+        );
+      }
+      if (key === 'database-backup') {
+        return unsupportedReconcile(
+          'database',
+          'Database backup 没有可确认备份结果的读取合同；普通数据库状态读取不会清除 unknown。'
+        );
+      }
+      if (key.startsWith('tcp-runtime:')) {
+        const profileId = key.slice('tcp-runtime:'.length).trim();
+        if (!profileId) return unsupportedReconcile('tcp', 'TCP runtime profile identity is missing.');
+        const statusResult = await owner.readTcpStatus(profileId);
+        if (statusResult.status === 'completed') return reconcileResult(statusResult);
+        const framesResult = await owner.readTcpFrames(profileId);
+        return reconcileResult(framesResult);
+      }
+
+      return unsupportedReconcile('general', `Unsupported Settings authority reconcile key: ${key}.`);
+    },
+    recordChangePasswordSessionResult(sessionInvalidated: boolean, outcomeUnknown = false): void {
+      if (sessionInvalidated) {
+        reconcileUnknownOutcome('change-password');
+      } else if (outcomeUnknown) {
+        markUnknownOutcome('change-password');
+      }
+    },
     async refresh(): Promise<boolean> {
       if (disposed) return false;
+      syncPanelState();
+      if (unknownOutcomeKeys.size > 0 || state.pendingSectionCount > 0 || state.dirtySectionCount > 0) {
+        state.message = unknownOutcomeKeys.size > 0
+          ? 'Settings 操作结果未知；请先完成对应 authority reconcile。'
+          : state.pendingSectionCount > 0
+            ? 'Settings 操作仍在执行；完成前不能覆盖当前投影。'
+            : 'Settings 存在未保存草稿；请先保存或放弃草稿。';
+        return false;
+      }
       const access = evaluateSettingsRouteAccess(role);
       if (!access.allowed) {
         generation += 1;
@@ -672,6 +837,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
           ? '已读取服务端 safe subset；受限 section 由后端权限决定。'
           : '已读取服务端 Settings 投影；未授权的 authority section 已隔离。';
         state.error = null;
+        reconcileUnknownOutcome('generic-settings');
         return true;
       } catch (error) {
         setError(error, operationGeneration, controller);
@@ -698,7 +864,8 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       section: SettingsSection,
       endpointId: string,
       task: SettingsEndpointTask<T>,
-      operationKindOverride?: SettingsOperationKind
+      operationKindOverride?: SettingsOperationKind,
+      reconcileKeyOverride?: SettingsAuthorityReconcileKey
     ): Promise<SettingsWriteResult<T>> {
       const operationKind = operationKindOverride ?? operationKindForEndpoint(endpointId);
       if (disposed) {
@@ -722,25 +889,25 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         operationKind
       ).then(result => {
         const mutation = result.operationKind !== undefined && result.operationKind !== 'read';
+        const reconcileKey = reconcileKeyForEndpoint(endpointId, operationKind, reconcileKeyOverride);
         const unknown = mutation && (
           (result.status === 'failed' && projectSettingsOperationFailure(result.error, result.operationKind).code === 'unknown-outcome') ||
           result.status === 'cancelled' || result.status === 'stale' || result.status === 'disposed'
         );
-        if (unknown) {
-          unknownOutcomeSections.add(section);
-        } else if (result.status === 'completed') {
-          unknownOutcomeSections.delete(section);
-        }
+        if (unknown && reconcileKey) markUnknownOutcome(reconcileKey);
         return result;
       });
     },
     registerPanelState(section: SettingsSection, readState: () => SettingsPanelState): () => void {
       if (disposed) return () => undefined;
-      panelStates.set(section, readState);
+      const readers = panelStates.get(section) ?? new Set<() => SettingsPanelState>();
+      readers.add(readState);
+      panelStates.set(section, readers);
       syncPanelState();
       return () => {
-        if (panelStates.get(section) === readState) {
-          panelStates.delete(section);
+        const current = panelStates.get(section);
+        if (current?.delete(readState)) {
+          if (current.size === 0) panelStates.delete(section);
           syncPanelState();
         }
       };
@@ -750,7 +917,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     },
     leaveProtection(): SettingsLeaveProtectionKind | null {
       syncPanelState();
-      if (unknownOutcomeSections.size > 0) return 'settings-unknown';
+      if (unknownOutcomeKeys.size > 0) return 'settings-unknown';
       if (state.pendingSectionCount > 0) return 'settings-pending';
       if (state.dirtySectionCount > 0) return 'settings-draft';
       return null;
@@ -807,7 +974,10 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         'security',
         'users.read',
         context => adapter.readUsers(context.signal)
-      );
+      ).then(result => {
+        if (result.status === 'completed') reconcileUnknownOutcome('users');
+        return result;
+      });
     },
     createUser(
       request: SettingsCreateUserRequest
@@ -858,6 +1028,8 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
           plcSettings: settings,
           plcMappings: settings[settings.activeProtocol.toLowerCase() as 's7' | 'mc' | 'fins'].mappings
         }));
+        reconcileUnknownOutcome('plc-settings');
+        reconcileUnknownOutcome('plc-mappings');
       }
       return result;
     },
@@ -869,6 +1041,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       );
       if (result.status === 'completed') {
         updateDevice(current => Object.freeze({ ...current, plcMappings: result.value.mappings }));
+        reconcileUnknownOutcome('plc-mappings');
       }
       return result;
     },
@@ -914,6 +1087,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       );
       if (result.status === 'completed') {
         updateDevice(current => Object.freeze({ ...current, tcpProfiles: result.value.profiles }));
+        reconcileUnknownOutcome('tcp-profiles');
       }
       return result;
     },
@@ -932,7 +1106,9 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       const result = await owner.enqueueEndpointOperation(
         'tcp',
         'tcp.runtime',
-        context => adapter.connectTcp(profileId, context.signal)
+        context => adapter.connectTcp(profileId, context.signal),
+        undefined,
+        `tcp-runtime:${profileId}`
       );
       if (result.status === 'completed' && result.value.status) {
         updateDevice(current => Object.freeze({
@@ -946,7 +1122,9 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       const result = await owner.enqueueEndpointOperation(
         'tcp',
         'tcp.runtime',
-        context => adapter.disconnectTcp(profileId, context.signal)
+        context => adapter.disconnectTcp(profileId, context.signal),
+        undefined,
+        `tcp-runtime:${profileId}`
       );
       if (result.status === 'completed' && result.value.status) {
         updateDevice(current => Object.freeze({
@@ -960,7 +1138,9 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       const result = await owner.enqueueEndpointOperation(
         'tcp',
         'tcp.runtime',
-        context => adapter.startTcpServer(profileId, context.signal)
+        context => adapter.startTcpServer(profileId, context.signal),
+        undefined,
+        `tcp-runtime:${profileId}`
       );
       if (result.status === 'completed' && result.value.status) {
         updateDevice(current => Object.freeze({
@@ -974,7 +1154,9 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       const result = await owner.enqueueEndpointOperation(
         'tcp',
         'tcp.runtime',
-        context => adapter.stopTcpServer(profileId, context.signal)
+        context => adapter.stopTcpServer(profileId, context.signal),
+        undefined,
+        `tcp-runtime:${profileId}`
       );
       if (result.status === 'completed' && result.value.status) {
         updateDevice(current => Object.freeze({
@@ -988,7 +1170,9 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       const result = await owner.enqueueEndpointOperation(
         'tcp',
         'tcp.runtime',
-        context => adapter.sendTcp(profileId, request, context.signal)
+        context => adapter.sendTcp(profileId, request, context.signal),
+        undefined,
+        `tcp-runtime:${profileId}`
       );
       if (result.status === 'completed' && result.value.status) {
         updateDevice(current => Object.freeze({
@@ -1010,6 +1194,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
           ...current,
           tcpStatuses: Object.freeze({ ...current.tcpStatuses, [profileId]: result.value.status })
         }));
+        reconcileUnknownOutcome(`tcp-runtime:${profileId}`);
       }
       return result;
     },
@@ -1025,6 +1210,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
           ...current,
           tcpFrames: Object.freeze({ ...current.tcpFrames, [profileId]: result.value.frames })
         }));
+        reconcileUnknownOutcome(`tcp-runtime:${profileId}`);
       }
       return result;
     },
@@ -1032,7 +1218,9 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       const result = await owner.enqueueEndpointOperation(
         'tcp',
         'tcp.runtime',
-        context => adapter.clearTcpFrames(profileId, context.signal)
+        context => adapter.clearTcpFrames(profileId, context.signal),
+        undefined,
+        `tcp-runtime:${profileId}`
       );
       if (result.status === 'completed' && result.value.success) {
         updateDevice(current => Object.freeze({
@@ -1069,6 +1257,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
           cameraBindings: result.value.bindings,
           activeCameraId: result.value.activeCameraId
         }));
+        reconcileUnknownOutcome('camera-bindings');
       }
       return result;
     },
@@ -1085,7 +1274,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       if (!result.value.success) return Object.freeze({ ...result, value: operationResult(false, result.value.message) });
       const reread = await owner.readCameraBindings();
       if (reread.status !== 'completed') {
-        unknownOutcomeSections.add('camera');
+        markUnknownOutcome('camera-bindings');
         const rereadError = reread.status === 'failed' ? reread.error : new Error(reread.message);
         const unknown = new SettingsUnknownOutcomeError(rereadError, 'write');
         return Object.freeze({
@@ -1212,13 +1401,19 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     async stopCameraPreview(reason = '相机预览已停止。'): Promise<SettingsWriteResult<void>> {
       writes.cancel('camera', reason);
       const sessionId = await stopPreviewInternal(reason, false);
-      return owner.enqueueEndpointOperation(
+      const result = await owner.enqueueEndpointOperation(
         'camera',
         'camera.preview.stop',
         async context => {
           if (sessionId) await adapter.stopContinuousPreview(sessionId, context.signal);
         }
       );
+      if (result.status === 'completed' && previewResourcesAreIdle()) {
+        if (sessionId || !unknownOutcomeKeys.has('camera-preview')) {
+          reconcileUnknownOutcome('camera-preview');
+        }
+      }
+      return result;
     },
     diagnostics(): SettingsOwnerDiagnostics {
       const write = writes.diagnostics();
@@ -1243,7 +1438,8 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       writes.dispose(reason);
       clearPreviewObjectUrl();
       panelStates.clear();
-      unknownOutcomeSections.clear();
+      unknownOutcomeKeys.clear();
+      state.unknownOutcomeKeys = Object.freeze([]);
       state.device = emptyDeviceProjection();
       state.dirtySectionCount = 0;
       state.pendingSectionCount = 0;

@@ -23,7 +23,7 @@ function stateLabel(target: SettingsNavigationTarget, role: string | null, proje
     const accessLabel = role === 'Admin' ? 'Admin 可编辑' : role === 'Engineer' ? 'Engineer 只读' : '只读';
     return projection.sections[target] ? accessLabel : `${accessLabel}（安全子集未返回）`;
   }
-  if (target === 'plc' || target === 'tcp' || target === 'camera') return '已接入';
+  if (target === 'plc' || target === 'tcp' || target === 'camera' || target === 'database') return '已接入';
   return '后续';
 }
 </script>

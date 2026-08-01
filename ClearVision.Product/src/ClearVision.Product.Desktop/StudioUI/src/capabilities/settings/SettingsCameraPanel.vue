@@ -19,6 +19,7 @@ const pendingAction = shallowRef<string | null>(null);
 const feedback = shallowRef<{ tone: 'success' | 'warning' | 'error' | 'info'; title: string; message: string } | null>(null);
 const discoveryProvider = shallowRef<CameraDiscoveryProviderV1>('all');
 const bindingDirty = shallowRef(false);
+const bindingAuthorityRevision = shallowRef(0);
 const triggerPending = shallowRef(false);
 const previewPending = shallowRef(false);
 let leaveStopPromise: Promise<unknown> | undefined;
@@ -96,6 +97,7 @@ async function saveBindings(nextBindings: readonly CameraBindingV1[], activeCame
       showFeedback('error', '相机绑定未保存', resultMessage(result));
       return;
     }
+    if (result.value.success) bindingAuthorityRevision.value += 1;
     showFeedback(result.value.success ? 'success' : 'warning', '相机绑定', result.value.message);
   } finally {
     pendingAction.value = null;
@@ -262,6 +264,7 @@ onBeforeUnmount(() => {
       <SettingsCameraBindingSection
         :bindings="bindings"
         :active-camera-id="device.activeCameraId"
+        :authority-revision="bindingAuthorityRevision"
         :serial-ports="device.serialPorts"
         :can-write="canWriteBindings"
         :disabled="isBusy"

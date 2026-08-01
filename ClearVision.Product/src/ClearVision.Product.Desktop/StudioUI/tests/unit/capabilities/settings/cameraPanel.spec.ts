@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { reactive } from 'vue';
+import { nextTick, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import SettingsCameraPanel from '@/capabilities/settings/SettingsCameraPanel.vue';
 import type {
@@ -130,6 +130,32 @@ describe('F07 G6 Camera/Trigger/Preview panel', () => {
       [expect.objectContaining({ id: 'cam-1', exposureTimeUs: 7000 })],
       'cam-1'
     );
+    wrapper.unmount();
+  });
+
+  it('rebuilds the binding draft from the server-normalized authority projection after save', async () => {
+    const fixture = cameraOwner('Admin');
+    const normalized = {
+      ...binding(),
+      displayName: 'Server normalized camera',
+      exposureTimeUs: 1250
+    };
+    fixture.saveCameraBindings.mockImplementation(async () => {
+      fixture.projection.device.cameraBindings = [normalized];
+      fixture.projection.device.activeCameraId = normalized.id;
+      return completed({ success: true, message: 'saved and normalized' });
+    });
+    const wrapper = mount(SettingsCameraPanel, { props: { owner: fixture.owner } });
+    await flushPromises();
+
+    await wrapper.get('input[name="cameraExposure"]').setValue('7000');
+    await wrapper.find('[data-camera-action="save-bindings"]').trigger('click');
+    await flushPromises();
+    await nextTick();
+
+    expect((wrapper.get('input[name="cameraExposure"]').element as HTMLInputElement).value).toBe('1250');
+    expect((wrapper.get('input[name="cameraDisplayName"]').element as HTMLInputElement).value)
+      .toBe('Server normalized camera');
     wrapper.unmount();
   });
 

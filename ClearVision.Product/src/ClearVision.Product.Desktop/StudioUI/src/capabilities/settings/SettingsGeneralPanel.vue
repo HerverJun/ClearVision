@@ -45,9 +45,10 @@ const themeOptions = Object.freeze([
 ]);
 
 watch(() => props.projection, value => {
+  const wasDirty = dirty.value;
   const next = copy(value);
   baseline.value = next;
-  Object.assign(draft, next);
+  if (!wasDirty) Object.assign(draft, next);
   feedback.value = null;
 });
 

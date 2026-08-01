@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, reactive, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, onDeactivated, reactive, shallowRef, watch } from 'vue';
 import {
   CvButton,
   CvDataTable,
@@ -26,6 +26,7 @@ const message = shallowRef<string | null>(null);
 const operationFeedback = shallowRef<SettingsFeedback | null>(null);
 const createBusy = shallowRef(false);
 const editBusy = shallowRef(false);
+const deleteBusy = shallowRef(false);
 const resetBusy = shallowRef(false);
 const editingId = shallowRef<string | null>(null);
 const resetUser = shallowRef<SettingsUserProjectionV1 | null>(null);
@@ -43,6 +44,18 @@ const editDraft = reactive({
   role: '2',
   isActive: true
 });
+
+const userDraftDirty = computed(() =>
+  Boolean(createDraft.username.trim() || createDraft.displayName.trim() || createDraft.role !== '2' || editingId.value)
+);
+const userMutationPending = computed(() =>
+  createBusy.value || editBusy.value || deleteBusy.value || resetBusy.value
+);
+const detachPanelState = props.owner.registerPanelState('security', () => ({
+  dirty: userDraftDirty.value,
+  pending: userMutationPending.value
+}));
+watch([userDraftDirty, userMutationPending, editingId], () => props.owner.refreshPanelState());
 
 const roleOptions: readonly CvSelectOption[] = Object.freeze([
   { value: '0', label: 'Admin' },
@@ -78,6 +91,7 @@ function clearReadState(): void {
   operationFeedback.value = null;
   editingId.value = null;
   resetUser.value = null;
+  clearCreateSecret();
   clearResetSecret();
 }
 
@@ -102,7 +116,7 @@ async function loadUsers(): Promise<void> {
 }
 
 async function createUser(): Promise<void> {
-  if (createBusy.value || !createDraft.username.trim() || !createDraft.password) return;
+  if (userMutationPending.value || !createDraft.username.trim() || !createDraft.password) return;
   const owner = props.owner;
   const version = requestVersion;
   createBusy.value = true;
@@ -130,6 +144,7 @@ async function createUser(): Promise<void> {
 }
 
 function beginEdit(user: SettingsUserProjectionV1): void {
+  if (userMutationPending.value) return;
   editingId.value = user.id;
   editDraft.displayName = user.displayName;
   editDraft.role = user.role === 'Admin' ? '0' : user.role === 'Engineer' ? '1' : '2';
@@ -138,11 +153,12 @@ function beginEdit(user: SettingsUserProjectionV1): void {
 }
 
 function cancelEdit(): void {
+  if (editBusy.value) return;
   editingId.value = null;
 }
 
 async function saveEdit(): Promise<void> {
-  if (!editingId.value || editBusy.value) return;
+  if (!editingId.value || userMutationPending.value) return;
   const owner = props.owner;
   const version = requestVersion;
   editBusy.value = true;
@@ -165,17 +181,24 @@ async function saveEdit(): Promise<void> {
 }
 
 async function deleteUser(user: SettingsUserProjectionV1): Promise<void> {
+  if (userMutationPending.value) return;
   if (!window.confirm(`确定删除用户 ${user.username}？`)) return;
   const owner = props.owner;
   const version = requestVersion;
+  deleteBusy.value = true;
   operationFeedback.value = null;
-  const result = await owner.deleteUser(user.id);
-  if (version !== requestVersion || owner !== props.owner || !props.canManage) return;
-  operationFeedback.value = settingsFeedbackForResult(result);
-  if (result.status === 'completed') await loadUsers();
+  try {
+    const result = await owner.deleteUser(user.id);
+    if (version !== requestVersion || owner !== props.owner || !props.canManage) return;
+    operationFeedback.value = settingsFeedbackForResult(result);
+    if (result.status === 'completed') await loadUsers();
+  } finally {
+    deleteBusy.value = false;
+  }
 }
 
 function openReset(user: SettingsUserProjectionV1): void {
+  if (userMutationPending.value) return;
   resetUser.value = user;
   clearResetSecret();
   operationFeedback.value = null;
@@ -187,7 +210,7 @@ function closeReset(): void {
 }
 
 async function submitReset(): Promise<void> {
-  if (!resetUser.value || resetBusy.value || !resetPassword.value) return;
+  if (!resetUser.value || userMutationPending.value || !resetPassword.value) return;
   const owner = props.owner;
   const version = requestVersion;
   resetBusy.value = true;
@@ -211,9 +234,16 @@ watch([() => props.owner, () => props.canManage], () => {
 }, { immediate: true });
 
 onBeforeUnmount(() => {
+  detachPanelState();
   clearCreateSecret();
   clearResetSecret();
   requestVersion += 1;
+});
+
+onDeactivated(() => {
+  clearCreateSecret();
+  closeReset();
+  props.owner.refreshPanelState();
 });
 </script>
 
@@ -267,6 +297,7 @@ onBeforeUnmount(() => {
           size="sm"
           variant="primary"
           :loading="createBusy"
+          :disabled="editBusy || deleteBusy || resetBusy"
           loading-label="正在创建用户"
         >
           创建用户
@@ -309,6 +340,7 @@ onBeforeUnmount(() => {
             <CvButton
               size="sm"
               variant="quiet"
+              :disabled="userMutationPending"
               @click="beginEdit(row)"
             >
               编辑
@@ -316,6 +348,7 @@ onBeforeUnmount(() => {
             <CvButton
               size="sm"
               variant="quiet"
+              :disabled="userMutationPending"
               @click="openReset(row)"
             >
               重置密码
@@ -323,6 +356,8 @@ onBeforeUnmount(() => {
             <CvButton
               size="sm"
               variant="danger"
+              :loading="deleteBusy"
+              :disabled="userMutationPending"
               @click="deleteUser(row)"
             >
               删除
@@ -367,6 +402,7 @@ onBeforeUnmount(() => {
             size="sm"
             variant="primary"
             :loading="editBusy"
+            :disabled="createBusy || deleteBusy || resetBusy"
           >
             保存用户
           </CvButton>
@@ -414,7 +450,7 @@ onBeforeUnmount(() => {
         size="sm"
         variant="danger"
         :loading="resetBusy"
-        :disabled="!resetPassword"
+        :disabled="!resetPassword || createBusy || editBusy || deleteBusy"
         @click="submitReset"
       >
         确认重置

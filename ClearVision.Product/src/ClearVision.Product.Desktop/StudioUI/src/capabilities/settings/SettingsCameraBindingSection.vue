@@ -10,11 +10,13 @@ import type {
 const props = withDefaults(defineProps<{
   bindings: readonly CameraBindingV1[];
   activeCameraId: string;
+  authorityRevision?: number;
   serialPorts: readonly SerialPhotoelectricPortV1[];
   canWrite: boolean;
   disabled?: boolean;
 }>(), {
-  disabled: false
+  disabled: false,
+  authorityRevision: 0
 });
 
 const emit = defineEmits<{
@@ -202,8 +204,10 @@ function isCameraConnected(value: string): boolean {
   return value.trim().toLowerCase() === 'connected';
 }
 
-watch(() => props.bindings, value => {
-  if (drafts.length === 0 || !dirty.value) copyBindings(value);
+watch([() => props.bindings, () => props.authorityRevision], ([value, revision], oldValue) => {
+  const previousRevision = oldValue?.[1];
+  const authorityChanged = revision !== previousRevision;
+  if (drafts.length === 0 || !dirty.value || authorityChanged) copyBindings(value);
 }, { immediate: true });
 watch(() => props.activeCameraId, value => {
   if (!dirty.value && value && drafts.some(item => item.id === value)) {

@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick, reactive } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiUnauthorizedError, type ApiGetOptions, type ApiTransport } from '@/platform/api';
+import { ApiNetworkError, ApiUnauthorizedError, type ApiGetOptions, type ApiTransport } from '@/platform/api';
 import {
   getSettingsOwnerActiveCount,
   SettingsPage,
@@ -344,9 +344,84 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
     wrapper.unmount();
   });
 
+  it('does not overwrite a dirty draft when the page header refresh is clicked', async () => {
+    const get = vi.fn(async () => settingsPayload());
+    const { runtime } = createRuntime(get, 'Admin');
+    const wrapper = mountSettingsPage(runtime);
+    await flushPromises();
+
+    await wrapper.get('[data-settings-group="general"]').trigger('click');
+    await wrapper.get('input[name="softwareTitle"]').setValue('Draft must survive refresh');
+    const beforeRefresh = get.mock.calls.length;
+    const refreshButton = wrapper.findAll('button').find(button => button.text().trim() === '刷新');
+    expect(refreshButton).toBeDefined();
+
+    await refreshButton!.trigger('click');
+    await flushPromises();
+
+    expect(get).toHaveBeenCalledTimes(beforeRefresh);
+    expect((wrapper.get('input[name="softwareTitle"]').element as HTMLInputElement).value)
+      .toBe('Draft must survive refresh');
+    wrapper.unmount();
+  });
+
+  it('labels Database as connected and marks the historical session timeout as read-only', async () => {
+    const { runtime } = createRuntime(async path => {
+      if (path === 'users') return [];
+      return settingsPayload();
+    }, 'Admin');
+    const wrapper = mountSettingsPage(runtime);
+    await flushPromises();
+
+    expect(wrapper.get('[data-settings-group="database"]').text()).toContain('已接入');
+    await wrapper.get('[data-settings-group="security"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('历史只读');
+    expect(wrapper.text()).toContain('不控制当前 session expiry');
+    wrapper.unmount();
+  });
+
+  it('shows an authority reconcile action and clears only after the matching GET succeeds', async () => {
+    const requestedPaths: string[] = [];
+    const api = {
+      ...apiWith(async path => {
+        requestedPaths.push(path);
+        return settingsPayload();
+      }),
+      put: vi.fn(async () => {
+        throw new ApiNetworkError('http://localhost:5000/api/settings', new Error('offline'));
+      })
+    } as ApiTransport;
+    const { runtime } = createRuntime(async () => settingsPayload(), 'Admin', { api });
+    const wrapper = mountSettingsPage(runtime);
+    await flushPromises();
+    await wrapper.get('[data-settings-group="general"]').trigger('click');
+    await wrapper.get('input[name="softwareTitle"]').setValue('Unknown save');
+
+    const saveButton = wrapper.findAll('button').find(button => button.text().includes('保存常规设置'));
+    expect(saveButton).toBeDefined();
+    await saveButton!.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[data-settings-unknown-outcomes]').exists()).toBe(true);
+    expect(wrapper.find('[data-settings-unknown-key="generic-settings"]').exists()).toBe(true);
+    const beforeRefresh = requestedPaths.length;
+    await wrapper.findAll('button').find(button => button.text().trim() === '刷新')?.trigger('click');
+    await flushPromises();
+    expect(requestedPaths.length).toBe(beforeRefresh);
+    await wrapper.get('[data-settings-unknown-key="generic-settings"] button').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-settings-unknown-outcomes]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('blocks group changes while a generic mutation is pending and exposes pending leave protection', async () => {
     const pending = deferred<unknown>();
-    const api = apiWith(async () => settingsPayload());
+    const requestedPaths: string[] = [];
+    const api = apiWith(async path => {
+      requestedPaths.push(path);
+      return settingsPayload();
+    });
     api.put = vi.fn(async () => pending.promise) as NonNullable<ApiTransport['put']>;
     const leave = settingsLeaveGuard();
     const { runtime } = createRuntime(async () => settingsPayload(), 'Admin', {
@@ -362,6 +437,11 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
     expect(saveButton).toBeDefined();
     await saveButton!.trigger('click');
     await vi.waitFor(() => expect(leave.inspect()).toBe('settings-pending'));
+
+    const beforeRefresh = requestedPaths.length;
+    await wrapper.findAll('button').find(button => button.text().trim() === '刷新')?.trigger('click');
+    await flushPromises();
+    expect(requestedPaths.length).toBe(beforeRefresh);
 
     await wrapper.get('[data-settings-group="storage"]').trigger('click');
     expect(wrapper.get('[data-settings-group="general"]').classes()).toContain('is-active');

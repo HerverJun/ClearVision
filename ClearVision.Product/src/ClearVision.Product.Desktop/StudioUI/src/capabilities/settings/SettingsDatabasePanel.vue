@@ -15,6 +15,12 @@ const feedback = shallowRef<SettingsFeedback | null>(null);
 const message = shallowRef<string | null>(null);
 let requestVersion = 0;
 
+const detachPanelState = props.owner.registerPanelState('database', () => ({
+  dirty: false,
+  pending: backupBusy.value
+}));
+watch(backupBusy, () => props.owner.refreshPanelState());
+
 function clearReadState(): void {
   status.value = null;
   backup.value = null;
@@ -73,6 +79,7 @@ watch([() => props.owner, () => props.role], () => {
 
 onBeforeUnmount(() => {
   requestVersion += 1;
+  detachPanelState();
   clearReadState();
 });
 </script>

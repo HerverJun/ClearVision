@@ -137,6 +137,39 @@ public class SettingsThemeEndpointTests
     }
 
     [Fact]
+    public async Task UpdateSettings_ShouldReturnPersistedRevision_AndSubsequentGetShouldMatch()
+    {
+        var initialConfig = CreateRichSettingsConfig();
+        initialConfig.Revision = 12;
+        initialConfig.Normalize();
+        await using var host = await SettingsThemeTestHost.CreateAsync(initialConfig);
+
+        using var response = await host.Client.PutAsJsonAsync("/api/settings", new
+        {
+            saveScope = "general",
+            general = new
+            {
+                softwareTitle = "Revisioned Station"
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        using var saveDocument = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var persistedRevision = saveDocument.RootElement
+            .GetProperty("config")
+            .GetProperty("revision")
+            .GetInt64();
+        persistedRevision.Should().BeGreaterThan(initialConfig.Revision);
+
+        using var getResponse = await host.Client.GetAsync("/api/settings");
+        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var getDocument = JsonDocument.Parse(await getResponse.Content.ReadAsStringAsync());
+        getDocument.RootElement.GetProperty("revision").GetInt64().Should().Be(persistedRevision);
+        getDocument.RootElement.GetProperty("general").GetProperty("softwareTitle")
+            .GetString().Should().Be("Revisioned Station");
+    }
+
+    [Fact]
     public async Task UpdateSettings_WithMissingSections_ShouldNotClearExistingSections()
     {
         var initialConfig = CreateRichSettingsConfig();
@@ -206,6 +239,22 @@ public class SettingsThemeEndpointTests
             config.Security.PasswordMinLength == 12));
     }
 
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("null")]
+    [InlineData("42")]
+    public async Task UpdateSettings_WithNonObjectPayload_ShouldRejectBeforePersistence(string json)
+    {
+        await using var host = await SettingsThemeTestHost.CreateAsync(CreateRichSettingsConfig());
+
+        using var response = await host.Client.PutAsync(
+            "/api/settings",
+            new StringContent(json, Encoding.UTF8, "application/json"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await host.ConfigurationService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+    }
+
     private sealed class SettingsThemeTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
@@ -231,9 +280,16 @@ public class SettingsThemeEndpointTests
             builder.WebHost.UseTestServer();
 
             var configService = Substitute.For<IConfigurationService>();
-            configService.LoadAsync().Returns(_ => Task.FromResult(CloneConfig(initialConfig)));
-            configService.GetCurrent().Returns(CloneConfig(initialConfig));
-            configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
+            var persistedConfig = CloneConfig(initialConfig);
+            configService.LoadAsync().Returns(_ => Task.FromResult(CloneConfig(persistedConfig)));
+            configService.GetCurrent().Returns(_ => CloneConfig(persistedConfig));
+            configService.SaveAsync(Arg.Any<AppConfig>()).Returns(callInfo =>
+            {
+                var savedConfig = CloneConfig(callInfo.Arg<AppConfig>());
+                savedConfig.Revision = Math.Max(savedConfig.Revision, persistedConfig.Revision) + 1;
+                persistedConfig = savedConfig;
+                return Task.CompletedTask;
+            });
             builder.Services.AddSingleton(configService);
             builder.Services.AddSingleton(Substitute.For<ClearVision.Product.Core.Cameras.ICameraManager>());
 

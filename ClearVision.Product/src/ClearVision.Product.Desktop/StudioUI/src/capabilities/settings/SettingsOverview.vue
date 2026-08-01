@@ -105,7 +105,7 @@ const activeProjectionItems = computed<readonly CvDescriptionItem[]>(() => {
       if (!props.projection.sections.security) return [];
       return [
         { key: 'passwordMinLength', label: '密码最小长度', value: `${props.projection.sections.security.passwordMinLength} 位` },
-        { key: 'sessionTimeoutMinutes', label: '会话超时', value: `${props.projection.sections.security.sessionTimeoutMinutes} 分钟` },
+         { key: 'sessionTimeoutMinutes', label: '会话超时（历史只读，不控制当前 session expiry）', value: `${props.projection.sections.security.sessionTimeoutMinutes} 分钟` },
         { key: 'loginFailureLockoutCount', label: '失败锁定次数', value: `${props.projection.sections.security.loginFailureLockoutCount} 次` }
       ];
   }
@@ -145,6 +145,7 @@ function sectionStateLabel(
     const accessLabel = props.role === 'Admin' ? 'Admin 可编辑' : props.role === 'Engineer' ? 'Engineer 只读' : '只读';
     return state === 'restricted' ? `${accessLabel}（安全子集未返回）` : accessLabel;
   }
+  if (target === 'database') return '已接入';
   const device = props.owner.projection.device;
   if (target === 'plc') return device.plcSettings ? `已接入（${device.plcSettings.activeProtocol}）` : '未读取';
   if (target === 'tcp') {
@@ -163,6 +164,7 @@ function sectionStateLabel(
 
 function sectionTone(target: SettingsNavigationTarget, state: SettingsSectionReadState): CvStatusTone {
   const device = props.owner.projection.device;
+  if (target === 'database') return 'ok';
   if (target === 'plc') return device.plcSettings ? 'ok' : 'idle';
   if (target === 'tcp') {
     return Object.values(device.tcpStatuses).some(status => status?.isConnected || status?.isListening)

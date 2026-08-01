@@ -38,6 +38,14 @@ function settingsPayload(safeSubset = false) {
       };
 }
 
+function diskUsagePayload() {
+  return {
+    driveName: 'D:', sourcePath: 'D:/VisionData', isAccessible: true, canWrite: true,
+    totalBytes: 1000, usedBytes: 400, freeBytes: 600,
+    totalGb: 1, usedGb: 0.4, freeGb: 0.6, usedPercent: 40
+  };
+}
+
 type FakeGet = (path: string, options?: { readonly signal?: AbortSignal }) => Promise<unknown>;
 
 function runtime(get: FakeGet): Pick<ProductRuntime, 'api'> {
@@ -201,6 +209,61 @@ describe('F07 G1 Settings owner lifecycle', () => {
     expect(decodeResult.status).toBe('failed');
     if (decodeResult.status === 'failed') expect(decodeResult.error).toBeInstanceOf(SettingsUnknownOutcomeError);
     decode.dispose();
+  });
+
+  it('clears Generic unknown only after a decoded Settings GET, not an unrelated read', async () => {
+    const get = vi.fn(async (path: string) => path === 'settings' ? settingsPayload() : diskUsagePayload()) as unknown as ApiTransport['get'];
+    const put = vi.fn(async () => {
+      throw new ApiNetworkError('http://localhost:5000/api/settings', new Error('offline'));
+    }) as NonNullable<ApiTransport['put']>;
+    const owner = createSettingsOwner({
+      runtime: runtimeWithApi({ ...({} as ApiTransport), get, put }),
+      role: 'Admin'
+    });
+
+    const failed = await owner.saveGenericSection('general', { softwareTitle: 'Updated' });
+    expect(failed.status).toBe('failed');
+    expect(owner.projection.unknownOutcomeKeys).toEqual(['generic-settings']);
+
+    const unrelatedRead = await owner.readDiskUsage();
+    expect(unrelatedRead.status).toBe('completed');
+    expect(owner.projection.unknownOutcomeKeys).toEqual(['generic-settings']);
+
+    const reconciled = await owner.reconcileAuthority('generic-settings');
+    expect(reconciled.status).toBe('completed');
+    expect(owner.projection.unknownOutcomeKeys).toEqual([]);
+    expect(get).toHaveBeenCalledWith('settings', expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    owner.dispose();
+  });
+
+  it('does not clear Camera bindings unknown after discovery; bindings reread clears it', async () => {
+    const get = vi.fn(async (path: string) => path === 'cameras/bindings' ? [] : settingsPayload()) as unknown as ApiTransport['get'];
+    const owner = createSettingsOwner({
+      runtime: runtimeWithApi({ ...({} as ApiTransport), get }),
+      role: 'Admin'
+    });
+
+    const failed = await owner.enqueueEndpointOperation(
+      'camera',
+      'camera.bindings.write',
+      async () => { throw new ApiNetworkError('http://localhost:5000/api/cameras/bindings', new Error('offline')); }
+    );
+    expect(failed.status).toBe('failed');
+    expect(owner.projection.unknownOutcomeKeys).toEqual(['camera-bindings']);
+
+    const discovery = await owner.enqueueEndpointOperation(
+      'camera',
+      'camera.discovery.all',
+      async () => 'discovered',
+      'read'
+    );
+    expect(discovery).toMatchObject({ status: 'completed', value: 'discovered' });
+    expect(owner.projection.unknownOutcomeKeys).toEqual(['camera-bindings']);
+
+    const reread = await owner.readCameraBindings();
+    expect(reread.status).toBe('completed');
+    expect(owner.projection.unknownOutcomeKeys).toEqual([]);
+    owner.dispose();
   });
 
   it('keeps read decode failures classified as read/decode failures', async () => {

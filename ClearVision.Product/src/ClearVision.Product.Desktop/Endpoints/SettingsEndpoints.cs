@@ -62,13 +62,18 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
+            if (request.ValueKind != JsonValueKind.Object)
+            {
+                return Results.BadRequest(new { Error = "PUT /api/settings requires a JSON object body." });
+            }
+
             try
             {
                 var currentConfig = await configService.LoadAsync();
                 var config = MergeSettingsUpdate(currentConfig, request);
 
                 await configService.SaveAsync(config);
-                return Results.Ok(new { Message = "设置已保存", Config = config });
+                return Results.Ok(new { Message = "设置已保存", Config = configService.GetCurrent() });
             }
             catch (Exception ex)
             {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, shallowRef, watch } from 'vue';
+import { computed, inject, onBeforeUnmount, reactive, shallowRef, watch } from 'vue';
 import {
   CvButton,
   CvInlineAlert,
@@ -15,7 +15,8 @@ import {
   createSettingsOwner,
   type SettingsOwner,
   type SettingsOwnerPhase,
-  type SettingsOwnerProjection
+  type SettingsOwnerProjection,
+  type SettingsAuthorityReconcileKey
 } from './settingsOwner';
 import type { SettingsProjectionV1 } from './decoder';
 import SettingsGroupNavigation from './SettingsGroupNavigation.vue';
@@ -39,6 +40,10 @@ const activeGroup = shallowRef<SettingsNavigationTarget>('overview');
 const navigationMessage = shallowRef<string | null>(null);
 const owner = shallowRef<SettingsOwner | null>(null);
 const ownerProjection = computed<Readonly<SettingsOwnerProjection> | null>(() => owner.value?.projection ?? null);
+const unknownOutcomeKeys = computed<readonly SettingsAuthorityReconcileKey[]>(() =>
+  ownerProjection.value?.unknownOutcomeKeys ?? []
+);
+const reconcileBusyKeys = reactive(new Set<SettingsAuthorityReconcileKey>());
 const mountedOwner = computed<SettingsOwner>(() => {
   if (!owner.value) throw new Error('Settings content cannot render without a mounted owner.');
   return owner.value;
@@ -86,6 +91,42 @@ const showReadOnlyContent = computed(() =>
 let disposed = false;
 let detachLeaveParticipant: (() => void) | undefined;
 
+function reconcileLabel(key: SettingsAuthorityReconcileKey): string {
+  if (key === 'generic-settings') return 'Generic Settings';
+  if (key === 'plc-settings') return 'PLC settings';
+  if (key === 'plc-mappings') return 'PLC mappings';
+  if (key === 'tcp-profiles') return 'TCP profiles';
+  if (key.startsWith('tcp-runtime:')) return `TCP runtime (${key.slice('tcp-runtime:'.length)})`;
+  if (key === 'camera-bindings') return 'Camera bindings';
+  if (key === 'camera-preview') return 'Camera preview session';
+  if (key === 'users') return 'User authority';
+  if (key === 'change-password') return 'Auth session';
+  return 'Database backup';
+}
+
+function reconcileDescription(key: SettingsAuthorityReconcileKey): string {
+  if (key === 'change-password') return '等待现有 auth lifecycle 确认 session 失效结果。';
+  if (key === 'database-backup') return '当前没有能够确认备份结果的读取合同，普通 database status 不会替代核对。';
+  return '在对应 authority reread 成功前，不会重试或覆盖当前投影。';
+}
+
+async function reconcile(key: SettingsAuthorityReconcileKey): Promise<void> {
+  const currentOwner = owner.value;
+  if (!currentOwner || reconcileBusyKeys.has(key)) return;
+  reconcileBusyKeys.add(key);
+  navigationMessage.value = null;
+  try {
+    const result = await currentOwner.reconcileAuthority(key);
+    if (result.status === 'completed') {
+      navigationMessage.value = `${reconcileLabel(key)} 已完成 authority reconcile。`;
+    } else {
+      navigationMessage.value = result.message ?? `${reconcileLabel(key)} reconcile 未完成，unknown 保持可见。`;
+    }
+  } finally {
+    reconcileBusyKeys.delete(key);
+  }
+}
+
 function readOnlyProjection(): SettingsProjectionV1 {
   if (!settings.value) throw new Error('Settings read-only content requires a decoded projection.');
   return settings.value;
@@ -118,6 +159,20 @@ function disposeOwner(reason: string): void {
 }
 
 async function refresh(): Promise<void> {
+  const protection = owner.value?.leaveProtection();
+  if (protection === 'settings-draft') {
+    navigationMessage.value = '当前 Settings 存在未保存草稿；请先保存或放弃草稿后再刷新。';
+    return;
+  }
+  if (protection === 'settings-pending') {
+    navigationMessage.value = '当前 Settings 操作仍在执行；完成后再刷新，避免覆盖当前投影。';
+    return;
+  }
+  if (protection === 'settings-unknown') {
+    navigationMessage.value = '当前 Settings 操作结果未知；请先完成对应 authority reconcile 后再刷新。';
+    return;
+  }
+  navigationMessage.value = null;
   await owner.value?.refresh();
 }
 
@@ -182,6 +237,37 @@ onBeforeUnmount(() => {
         </CvButton>
       </template>
     </CvPageHeader>
+
+    <CvInlineAlert
+      v-if="unknownOutcomeKeys.length"
+      class="settings-page__unknown-alert"
+      tone="warning"
+      title="存在待核对的 Settings 操作结果"
+      data-settings-unknown-outcomes
+    >
+      <ul class="settings-page__unknown-list">
+        <li
+          v-for="key in unknownOutcomeKeys"
+          :key="key"
+          :data-settings-unknown-key="key"
+        >
+          <span>
+            <strong>{{ reconcileLabel(key) }}</strong>
+            <small>{{ reconcileDescription(key) }}</small>
+          </span>
+          <CvButton
+            size="sm"
+            variant="quiet"
+            :loading="reconcileBusyKeys.has(key)"
+            :disabled="reconcileBusyKeys.has(key)"
+            loading-label="正在核对"
+            @click="reconcile(key)"
+          >
+            重新核对
+          </CvButton>
+        </li>
+      </ul>
+    </CvInlineAlert>
 
     <div
       v-if="showReadOnlyContent"
@@ -269,8 +355,18 @@ onBeforeUnmount(() => {
 }
 
 .settings-page__stale-alert { margin-bottom: 0; }
+.settings-page__unknown-alert { align-items: start; }
+.settings-page__unknown-list { display: grid; gap: var(--cv-space-2); margin: 0; padding: 0; list-style: none; }
+.settings-page__unknown-list li { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
+.settings-page__unknown-list li > span { display: grid; min-width: 0; gap: 2px; }
+.settings-page__unknown-list strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); }
+.settings-page__unknown-list small { color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }
 
 @media (max-width: 900px) {
   .settings-page__workspace { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .settings-page__unknown-list li { align-items: stretch; flex-direction: column; }
 }
 </style>

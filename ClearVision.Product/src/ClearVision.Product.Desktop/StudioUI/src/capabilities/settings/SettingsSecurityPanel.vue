@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, onDeactivated, reactive, shallowRef, watch } from 'vue';
 import type { AuthLifecycleOwner } from '@/app/auth';
 import { CvButton, CvField, CvInlineAlert, CvPanel } from '@/design-system';
 import type { SettingsOwner } from './settingsOwner';
@@ -80,7 +80,14 @@ function resetPolicy(value: SettingsSecurityProjectionV1 | null): void {
 resetPolicy(props.projection);
 
 watch(() => props.projection, value => {
-  resetPolicy(value);
+  const wasDirty = policyDirty.value;
+  const next = value ? copyPolicy(value) : {
+    passwordMinLength: '',
+    sessionTimeoutMinutes: '',
+    loginFailureLockoutCount: ''
+  };
+  policyBaseline.value = next;
+  if (!wasDirty) Object.assign(policyDraft, next);
   policyFeedback.value = null;
 });
 
@@ -109,9 +116,40 @@ function discardPolicy(): void {
   policyFeedback.value = null;
 }
 
+function recordPasswordOutcome(accepted: boolean): boolean {
+  const auth = props.auth;
+  if (!auth) return false;
+  const sessionInvalidated = accepted &&
+    auth.projection.phase === 'unauthenticated' &&
+    auth.session.projection.phase === 'unauthorized';
+  if (sessionInvalidated) {
+    props.owner.recordChangePasswordSessionResult(true);
+    return false;
+  }
+
+  const errorCode = auth.projection.errorCode;
+  const outcomeUnknown = !accepted && (
+    auth.projection.phase !== 'authenticated' ||
+    errorCode === 'NETWORK_FAILURE' ||
+    errorCode === 'REQUEST_ABORTED' ||
+    errorCode === 'AUTH_FAILURE'
+  );
+  props.owner.recordChangePasswordSessionResult(false, outcomeUnknown);
+  return outcomeUnknown;
+}
+
 async function changePassword(): Promise<void> {
   if (!canChangePassword.value || passwordBusy.value || !oldPassword.value || !newPassword.value) return;
   passwordFeedback.value = null;
+  // Let the shared auth lifecycle pass its protected-transition check before
+  // this panel reports the mutation as pending to the shared leave guard.
+  const transition = props.auth
+    ? props.auth.changePassword({
+        oldPassword: oldPassword.value,
+        newPassword: newPassword.value
+      })
+    : Promise.resolve(false);
+  passwordBusy.value = true;
   try {
     if (!props.auth) {
       passwordFeedback.value = {
@@ -123,12 +161,8 @@ async function changePassword(): Promise<void> {
       };
       return;
     }
-    const transition = props.auth.changePassword({
-      oldPassword: oldPassword.value,
-      newPassword: newPassword.value
-    });
-    passwordBusy.value = true;
     const accepted = await transition;
+    const outcomeUnknown = recordPasswordOutcome(accepted);
     passwordFeedback.value = accepted
       ? {
           kind: 'saved',
@@ -138,11 +172,13 @@ async function changePassword(): Promise<void> {
           restartLabel: '需要重新登录'
         }
       : {
-          kind: 'error',
-          message: props.auth.projection.message,
-          savedLabel: '未完成',
-          effectiveLabel: '未生效',
-          restartLabel: '不适用'
+          kind: outcomeUnknown ? 'unknown' : 'error',
+          message: outcomeUnknown
+            ? '密码请求结果未知；请等待 auth lifecycle 确认 session 状态后再决定是否重试。'
+            : props.auth.projection.message,
+          savedLabel: outcomeUnknown ? '结果未知' : '未完成',
+          effectiveLabel: outcomeUnknown ? '结果未知' : '未生效',
+          restartLabel: outcomeUnknown ? '等待 session 核对' : '不适用'
         };
   } finally {
     oldPassword.value = '';
@@ -155,6 +191,12 @@ onBeforeUnmount(() => {
   detachPanelState();
   oldPassword.value = '';
   newPassword.value = '';
+});
+
+onDeactivated(() => {
+  oldPassword.value = '';
+  newPassword.value = '';
+  props.owner.refreshPanelState();
 });
 </script>
 
@@ -179,7 +221,7 @@ onBeforeUnmount(() => {
           />
           <CvField
             v-model="policyDraft.sessionTimeoutMinutes"
-            label="会话超时（历史只读，分钟）"
+            label="会话超时（历史只读，不控制当前 session expiry，分钟）"
             type="number"
             readonly
           />
