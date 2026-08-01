@@ -27,6 +27,10 @@ import {
   type SettingsWriteResponseV1,
   type StationCommunicationProjectionV1
 } from './decoder';
+import {
+  createSettingsDeviceApiAdapter,
+  type SettingsDeviceApiAdapter
+} from './deviceApiAdapter';
 
 export interface SettingsChangePasswordRequest {
   readonly oldPassword: string;
@@ -46,7 +50,7 @@ export interface SettingsUpdateUserRequest {
   readonly isActive: boolean;
 }
 
-export interface SettingsApiAdapter {
+export interface SettingsApiAdapter extends SettingsDeviceApiAdapter {
   readGenericProjection(signal?: AbortSignal): Promise<SettingsProjectionV1>;
   readStationCommunication(signal?: AbortSignal): Promise<StationCommunicationProjectionV1>;
   readAiModels(signal?: AbortSignal): Promise<AiModelsProjectionV1>;
@@ -91,7 +95,9 @@ function userPath(id: string, suffix = ''): string {
 }
 
 export function createSettingsApiAdapter(api: ApiTransport): SettingsApiAdapter {
+  const deviceAdapter = createSettingsDeviceApiAdapter(api);
   return Object.freeze({
+    ...deviceAdapter,
     async readGenericProjection(signal?: AbortSignal): Promise<SettingsProjectionV1> {
       return decodeSettingsProjectionV1(await api.get('settings', signalOptions(signal)));
     },

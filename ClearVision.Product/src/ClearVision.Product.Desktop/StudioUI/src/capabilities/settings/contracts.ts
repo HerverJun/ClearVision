@@ -350,6 +350,18 @@ export const SETTINGS_ENDPOINT_MATRIX: readonly SettingsEndpointContract[] = Obj
     serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.genericRead
   }),
   endpoint({
+    id: 'camera.discovery.all', section: 'camera', method: 'GET', path: 'cameras/discover', kind: 'read',
+    serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.genericRead
+  }),
+  endpoint({
+    id: 'camera.discovery.huaray', section: 'camera', method: 'GET', path: 'cameras/discover/huaray', kind: 'read',
+    serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.genericRead
+  }),
+  endpoint({
+    id: 'camera.discovery.hikvision', section: 'camera', method: 'GET', path: 'cameras/discover/hikvision', kind: 'read',
+    serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.genericRead
+  }),
+  endpoint({
     id: 'camera.bindings.read', section: 'camera', method: 'GET', path: 'cameras/bindings', kind: 'read',
     serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.genericRead
   }),
@@ -359,6 +371,38 @@ export const SETTINGS_ENDPOINT_MATRIX: readonly SettingsEndpointContract[] = Obj
   }),
   endpoint({
     id: 'camera.trigger-and-preview', section: 'camera', method: 'POST', path: '<camera-or-trigger-operation>', kind: 'runtime-operation',
+    serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.runtimeOperation
+  }),
+  endpoint({
+    id: 'camera.soft-trigger-capture', section: 'camera', method: 'POST', path: 'cameras/soft-trigger-capture', kind: 'runtime-operation',
+    serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.runtimeOperation
+  }),
+  endpoint({
+    id: 'trigger-input.diagnostics.read', section: 'camera', method: 'GET', path: 'trigger-input/diagnostics', kind: 'read',
+    serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.runtimeOperation
+  }),
+  endpoint({
+    id: 'trigger-input.serial-ports.read', section: 'camera', method: 'GET', path: 'trigger-input/serial-photoelectric-ports', kind: 'read',
+    serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.genericRead
+  }),
+  endpoint({
+    id: 'trigger-input.serial-test', section: 'camera', method: 'POST', path: 'trigger-input/test-serial-photoelectric', kind: 'runtime-operation',
+    serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.runtimeOperation
+  }),
+  endpoint({
+    id: 'trigger-input.enter-learn', section: 'camera', method: 'POST', path: 'trigger-input/learn-enter-device', kind: 'runtime-operation',
+    serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.runtimeOperation
+  }),
+  endpoint({
+    id: 'camera.preview.start', section: 'camera', method: 'POST', path: 'cameras/continuous-preview/start', kind: 'runtime-operation',
+    serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.runtimeOperation
+  }),
+  endpoint({
+    id: 'camera.preview.frame', section: 'camera', method: 'GET', path: 'cameras/continuous-preview/frame/{sessionId}', kind: 'read',
+    serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.runtimeOperation
+  }),
+  endpoint({
+    id: 'camera.preview.stop', section: 'camera', method: 'POST', path: 'cameras/continuous-preview/stop', kind: 'runtime-operation',
     serverPermission: 'engineer-or-admin', uiPermission: 'engineer-or-admin', semantics: SETTINGS_SEMANTICS.runtimeOperation
   }),
   endpoint({
@@ -460,7 +504,12 @@ export const SETTINGS_SECTION_CONTRACTS: readonly SettingsSectionContract[] = Ob
   }),
   section({
     section: 'camera', authority: 'camera-system', routePermission: 'settings-route', readPermission: 'engineer-or-admin', writePermission: 'engineer-or-admin',
-    endpointIds: ['camera.discovery', 'camera.bindings.read', 'camera.bindings.write', 'camera.trigger-and-preview'],
+    endpointIds: [
+      'camera.discovery', 'camera.discovery.all', 'camera.discovery.huaray', 'camera.discovery.hikvision',
+      'camera.bindings.read', 'camera.bindings.write', 'camera.trigger-and-preview', 'camera.soft-trigger-capture',
+      'trigger-input.diagnostics.read', 'trigger-input.serial-ports.read', 'trigger-input.serial-test',
+      'trigger-input.enter-learn', 'camera.preview.start', 'camera.preview.frame', 'camera.preview.stop'
+    ],
     sensitiveFields: ['ipAddress', 'serialNumber', 'sessionId'], semantics: SETTINGS_SEMANTICS.cameraMutation
   }),
   section({

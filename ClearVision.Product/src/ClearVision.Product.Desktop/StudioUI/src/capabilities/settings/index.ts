@@ -1,6 +1,9 @@
 export * from './apiAdapter';
 export * from './contracts';
 export * from './decoder';
+export * from './deviceContracts';
+export * from './deviceApiAdapter';
+export * from './deviceDecoder';
 export * from './settingsOwner';
 export * from './settingsWriteCoordinator';
 export * from './settingsViewModel';
@@ -14,4 +17,6 @@ export { default as SettingsSecurityPanel } from './SettingsSecurityPanel.vue';
 export { default as SettingsStoragePanel } from './SettingsStoragePanel.vue';
 export { default as SettingsUsersPanel } from './SettingsUsersPanel.vue';
 export { default as SettingsWriteFeedback } from './SettingsWriteFeedback.vue';
+export { default as SettingsPlcPanel } from './SettingsPlcPanel.vue';
+export { default as SettingsTcpPanel } from './SettingsTcpPanel.vue';
 export type { SettingsPageRuntime } from './SettingsPage.vue';

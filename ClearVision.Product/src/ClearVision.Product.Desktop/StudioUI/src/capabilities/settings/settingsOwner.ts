@@ -27,6 +27,32 @@ import {
   type SettingsCreateUserRequest,
   type SettingsUpdateUserRequest
 } from './apiAdapter';
+import type {
+  CameraDiscoveryProviderV1,
+  PlcTestConnectionRequestV1,
+  SerialPhotoelectricTestRequestV1,
+  TcpSendRequestV1
+} from './deviceApiAdapter';
+import type {
+  CameraBindingV1,
+  CameraBindingsResponseV1,
+  CameraDiscoveryResponseV1,
+  CameraPreviewProjectionV1,
+  PlcMappingV1,
+  PlcMappingsResponseV1,
+  PlcSettingsResponseV1,
+  PlcSettingsV1,
+  PlcTestConnectionResponseV1,
+  SettingsDeviceProjectionV1,
+  TcpClearFramesResponseV1,
+  TcpFramesResponseV1,
+  TcpProfilesResponseV1,
+  TcpProfileV1,
+  TcpRuntimeResponseV1,
+  TcpStatusResponseV1,
+  TriggerDiagnosticsV1,
+  SerialPhotoelectricPortV1
+} from './deviceContracts';
 import {
   decodeSettingsErrorPayloadV1,
   settingsErrorCodeFromHttpStatus,
@@ -53,6 +79,7 @@ export interface SettingsOwnerProjection {
   readonly message: string;
   readonly generation: number;
   readonly started: boolean;
+  readonly device: SettingsDeviceProjectionV1;
 }
 
 export interface SettingsOwnerDiagnostics {
@@ -95,8 +122,43 @@ export interface SettingsOwner {
     id: string,
     newPassword: string
   ): Promise<SettingsWriteResult<SettingsAccountOperationResponseV1>>;
+  readPlcSettings(): Promise<SettingsWriteResult<PlcSettingsResponseV1>>;
+  readPlcMappings(): Promise<SettingsWriteResult<PlcMappingsResponseV1>>;
+  savePlcSettings(settings: PlcSettingsV1): Promise<SettingsWriteResult<PlcSettingsResponseV1>>;
+  savePlcMappings(mappings: readonly PlcMappingV1[]): Promise<SettingsWriteResult<PlcMappingsResponseV1>>;
+  testPlcConnection(request: PlcTestConnectionRequestV1): Promise<SettingsWriteResult<PlcTestConnectionResponseV1>>;
+  readTcpProfiles(): Promise<SettingsWriteResult<TcpProfilesResponseV1>>;
+  saveTcpProfiles(profiles: readonly TcpProfileV1[]): Promise<SettingsWriteResult<TcpProfilesResponseV1>>;
+  connectTcp(profileId: string): Promise<SettingsWriteResult<TcpRuntimeResponseV1>>;
+  disconnectTcp(profileId: string): Promise<SettingsWriteResult<TcpRuntimeResponseV1>>;
+  startTcpServer(profileId: string): Promise<SettingsWriteResult<TcpRuntimeResponseV1>>;
+  stopTcpServer(profileId: string): Promise<SettingsWriteResult<TcpRuntimeResponseV1>>;
+  sendTcp(profileId: string, request: TcpSendRequestV1): Promise<SettingsWriteResult<TcpRuntimeResponseV1>>;
+  readTcpStatus(profileId: string): Promise<SettingsWriteResult<TcpStatusResponseV1>>;
+  readTcpFrames(profileId: string): Promise<SettingsWriteResult<TcpFramesResponseV1>>;
+  clearTcpFrames(profileId: string): Promise<SettingsWriteResult<TcpClearFramesResponseV1>>;
+  discoverCameras(provider: CameraDiscoveryProviderV1): Promise<SettingsWriteResult<CameraDiscoveryResponseV1>>;
+  readCameraBindings(): Promise<SettingsWriteResult<CameraBindingsResponseV1>>;
+  saveCameraBindings(
+    bindings: readonly CameraBindingV1[],
+    activeCameraId: string
+  ): Promise<SettingsWriteResult<SettingsDeviceOperationResult>>;
+  readTriggerDiagnostics(): Promise<SettingsWriteResult<TriggerDiagnosticsV1>>;
+  readSerialPhotoelectricPorts(): Promise<SettingsWriteResult<readonly SerialPhotoelectricPortV1[]>>;
+  testSerialPhotoelectric(request: SerialPhotoelectricTestRequestV1): Promise<SettingsWriteResult<SettingsDeviceOperationResult>>;
+  learnEnterPhotoelectricDevice(timeoutMs: number): Promise<SettingsWriteResult<SettingsDeviceOperationResult>>;
+  captureSoftTrigger(cameraBindingId: string): Promise<SettingsWriteResult<SettingsDeviceOperationResult>>;
+  startCameraPreview(cameraBindingId: string): Promise<SettingsWriteResult<SettingsDeviceOperationResult>>;
+  stopCameraPreview(reason?: string): Promise<SettingsWriteResult<void>>;
   diagnostics(): SettingsOwnerDiagnostics;
   dispose(reason?: string): void;
+}
+
+export interface SettingsDeviceOperationResult {
+  readonly success: boolean;
+  readonly message: string;
+  readonly response?: string;
+  readonly errors?: readonly unknown[];
 }
 
 export interface CreateSettingsOwnerOptions {
@@ -214,6 +276,90 @@ function endpointAccessMessage(endpointId: string, reason: SettingsEndpointAcces
   }
 }
 
+function emptyCameraPreview(): CameraPreviewProjectionV1 {
+  return Object.freeze({
+    phase: 'idle',
+    sessionId: null,
+    cameraBindingId: null,
+    imageUrl: null,
+    width: null,
+    height: null,
+    frameSequence: null,
+    triggerMode: null,
+    triggerSource: null,
+    contentType: null,
+    message: '尚未开始相机预览。'
+  });
+}
+
+function emptyDeviceProjection(): SettingsDeviceProjectionV1 {
+  return Object.freeze({
+    plcSettings: null,
+    plcMappings: Object.freeze([]),
+    tcpProfiles: Object.freeze([]),
+    tcpStatuses: Object.freeze({}),
+    tcpFrames: Object.freeze({}),
+    cameraBindings: Object.freeze([]),
+    activeCameraId: '',
+    cameraDiscovery: null,
+    triggerDiagnostics: null,
+    serialPorts: Object.freeze([]),
+    preview: emptyCameraPreview()
+  });
+}
+
+function operationResult(
+  success: boolean,
+  message: string,
+  response?: string,
+  errors?: readonly unknown[]
+): SettingsDeviceOperationResult {
+  const result: { success: boolean; message: string; response?: string; errors?: readonly unknown[] } = {
+    success,
+    message
+  };
+  if (response !== undefined) result.response = response;
+  if (errors !== undefined) result.errors = errors;
+  return Object.freeze(result);
+}
+
+async function blobObjectUrl(blob: Blob, contentType: string): Promise<string> {
+  if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+    return URL.createObjectURL(blob);
+  }
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return `data:${contentType || blob.type || 'image/png'};base64,${globalThis.btoa?.(binary) ?? ''}`;
+}
+
+function revokeBlobObjectUrl(value: string | null): void {
+  if (!value?.startsWith('blob:')) return;
+  if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(value);
+}
+
+function delayWithAbort(milliseconds: number, signal: AbortSignal): Promise<void> {
+  return new Promise(resolve => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, milliseconds);
+    function onAbort(): void {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function positiveHeader(headers: Headers, name: string): number | null {
+  const value = Number(headers.get(name));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 export function createSettingsOwner(options: CreateSettingsOwnerOptions): SettingsOwner {
   if (activeSettingsOwnerToken) throw new SettingsOwnerConflictError();
   const ownerToken = {};
@@ -230,11 +376,103 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     error: null,
     message: 'Settings owner 尚未启动。',
     generation: 0,
-    started: false
+    started: false,
+    device: emptyDeviceProjection()
   });
   let disposed = false;
   let generation = 0;
   let readController: AbortController | undefined;
+  let previewController: AbortController | undefined;
+  let previewSessionId: string | null = null;
+  let previewGeneration = 0;
+  let previewObjectUrl: string | null = null;
+
+  function updateDevice(update: (current: SettingsDeviceProjectionV1) => SettingsDeviceProjectionV1): void {
+    if (disposed) return;
+    state.device = Object.freeze(update(state.device));
+  }
+
+  function updatePreview(preview: CameraPreviewProjectionV1): void {
+    updateDevice(current => Object.freeze({ ...current, preview }));
+  }
+
+  function clearPreviewObjectUrl(): void {
+    revokeBlobObjectUrl(previewObjectUrl);
+    previewObjectUrl = null;
+  }
+
+  async function stopPreviewInternal(message: string, stopRemote = true): Promise<string | null> {
+    previewGeneration += 1;
+    previewController?.abort('settings-preview-stopped');
+    previewController = undefined;
+    const sessionId = previewSessionId;
+    previewSessionId = null;
+    clearPreviewObjectUrl();
+    if (sessionId && stopRemote) await adapter.stopContinuousPreview(sessionId).catch(() => undefined);
+    if (!disposed) updatePreview({ ...emptyCameraPreview(), message });
+    return sessionId;
+  }
+
+  async function setPreviewBlob(
+    blob: Blob,
+    contentType: string,
+    operationGeneration: number,
+    metadata: Readonly<Partial<CameraPreviewProjectionV1>>
+  ): Promise<boolean> {
+    const imageUrl = await blobObjectUrl(blob, contentType);
+    if (disposed || operationGeneration !== previewGeneration) {
+      revokeBlobObjectUrl(imageUrl);
+      return false;
+    }
+    clearPreviewObjectUrl();
+    previewObjectUrl = imageUrl;
+    updatePreview({
+      ...emptyCameraPreview(),
+      ...metadata,
+      imageUrl,
+      contentType: contentType || blob.type || 'image/png'
+    });
+    return true;
+  }
+
+  async function runPreviewLoop(
+    sessionId: string,
+    cameraBindingId: string,
+    operationGeneration: number,
+    controller: AbortController,
+    triggerMode: string
+  ): Promise<void> {
+    while (!disposed && operationGeneration === previewGeneration && !controller.signal.aborted) {
+      try {
+        const response = await adapter.getContinuousPreviewFrame(sessionId, controller.signal);
+        const accepted = await setPreviewBlob(response.blob, response.contentType, operationGeneration, {
+          phase: 'running',
+          sessionId,
+          cameraBindingId,
+          triggerMode,
+          triggerSource: null,
+          width: positiveHeader(response.headers, 'X-Image-Width'),
+          height: positiveHeader(response.headers, 'X-Image-Height'),
+          frameSequence: positiveHeader(response.headers, 'X-Frame-Sequence'),
+          message: '连续预览正在接收帧。'
+        });
+        if (!accepted) return;
+        await delayWithAbort(80, controller.signal);
+      } catch (error) {
+        if (disposed || controller.signal.aborted || isAbort(error)) return;
+        await stopPreviewInternal('连续预览已停止。');
+        if (!disposed) {
+          updatePreview({
+            ...emptyCameraPreview(),
+            phase: 'error',
+            cameraBindingId,
+            message: `连续预览失败：${error instanceof Error ? error.message : '帧读取失败。'}`
+          });
+        }
+        return;
+      }
+    }
+  }
 
   function isCurrent(operationGeneration: number, controller: AbortController): boolean {
     return !disposed && generation === operationGeneration && readController === controller;
@@ -263,6 +501,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       const access = evaluateSettingsRouteAccess(role);
       if (!access.allowed) {
         generation += 1;
+        void stopPreviewInternal('Settings 权限已变化，预览已停止。');
         readController?.abort('settings-route-forbidden');
         readController = undefined;
         writes.cancel(undefined, 'settings-route-forbidden');
@@ -306,6 +545,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     invalidate(reason = 'settings-owner-invalidated'): void {
       if (disposed) return;
       generation += 1;
+      void stopPreviewInternal('Settings 投影已失效，预览已停止。');
       readController?.abort(reason);
       readController = undefined;
       writes.invalidate(reason);
@@ -429,6 +669,352 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         context => adapter.resetUserPassword(id, newPassword, context.signal)
       );
     },
+    async readPlcSettings(): Promise<SettingsWriteResult<PlcSettingsResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'plc',
+        'plc.settings.read',
+        context => adapter.readPlcSettings(context.signal)
+      );
+      const settings = result.status === 'completed' ? result.value.settings : null;
+      if (settings) {
+        updateDevice(current => Object.freeze({
+          ...current,
+          plcSettings: settings,
+          plcMappings: settings[settings.activeProtocol.toLowerCase() as 's7' | 'mc' | 'fins'].mappings
+        }));
+      }
+      return result;
+    },
+    async readPlcMappings(): Promise<SettingsWriteResult<PlcMappingsResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'plc',
+        'plc.mappings.read',
+        context => adapter.readPlcMappings(context.signal)
+      );
+      if (result.status === 'completed') {
+        updateDevice(current => Object.freeze({ ...current, plcMappings: result.value.mappings }));
+      }
+      return result;
+    },
+    async savePlcSettings(settings: PlcSettingsV1): Promise<SettingsWriteResult<PlcSettingsResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'plc',
+        'plc.settings.write',
+        context => adapter.writePlcSettings(settings, context.signal)
+      );
+      const savedSettings = result.status === 'completed' ? result.value.settings : null;
+      if (savedSettings) {
+        updateDevice(current => Object.freeze({
+          ...current,
+          plcSettings: savedSettings,
+          plcMappings: savedSettings[savedSettings.activeProtocol.toLowerCase() as 's7' | 'mc' | 'fins'].mappings
+        }));
+      }
+      return result;
+    },
+    async savePlcMappings(mappings: readonly PlcMappingV1[]): Promise<SettingsWriteResult<PlcMappingsResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'plc',
+        'plc.mappings.write',
+        context => adapter.writePlcMappings(mappings, context.signal)
+      );
+      if (result.status === 'completed') {
+        updateDevice(current => Object.freeze({ ...current, plcMappings: result.value.mappings }));
+      }
+      return result;
+    },
+    testPlcConnection(request: PlcTestConnectionRequestV1): Promise<SettingsWriteResult<PlcTestConnectionResponseV1>> {
+      return owner.enqueueEndpointOperation(
+        'plc',
+        'plc.test-connection',
+        context => adapter.testPlcConnection(request, context.signal)
+      );
+    },
+    async readTcpProfiles(): Promise<SettingsWriteResult<TcpProfilesResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'tcp',
+        'tcp.profiles.read',
+        context => adapter.readTcpProfiles(context.signal)
+      );
+      if (result.status === 'completed') {
+        updateDevice(current => Object.freeze({ ...current, tcpProfiles: result.value.profiles }));
+      }
+      return result;
+    },
+    async saveTcpProfiles(profiles: readonly TcpProfileV1[]): Promise<SettingsWriteResult<TcpProfilesResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'tcp',
+        'tcp.profiles.write',
+        context => adapter.writeTcpProfiles(profiles, context.signal)
+      );
+      if (result.status === 'completed') {
+        updateDevice(current => Object.freeze({ ...current, tcpProfiles: result.value.profiles }));
+      }
+      return result;
+    },
+    async connectTcp(profileId: string): Promise<SettingsWriteResult<TcpRuntimeResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'tcp',
+        'tcp.runtime',
+        context => adapter.connectTcp(profileId, context.signal)
+      );
+      if (result.status === 'completed' && result.value.status) {
+        updateDevice(current => Object.freeze({
+          ...current,
+          tcpStatuses: Object.freeze({ ...current.tcpStatuses, [profileId]: result.value.status })
+        }));
+      }
+      return result;
+    },
+    async disconnectTcp(profileId: string): Promise<SettingsWriteResult<TcpRuntimeResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'tcp',
+        'tcp.runtime',
+        context => adapter.disconnectTcp(profileId, context.signal)
+      );
+      if (result.status === 'completed' && result.value.status) {
+        updateDevice(current => Object.freeze({
+          ...current,
+          tcpStatuses: Object.freeze({ ...current.tcpStatuses, [profileId]: result.value.status })
+        }));
+      }
+      return result;
+    },
+    async startTcpServer(profileId: string): Promise<SettingsWriteResult<TcpRuntimeResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'tcp',
+        'tcp.runtime',
+        context => adapter.startTcpServer(profileId, context.signal)
+      );
+      if (result.status === 'completed' && result.value.status) {
+        updateDevice(current => Object.freeze({
+          ...current,
+          tcpStatuses: Object.freeze({ ...current.tcpStatuses, [profileId]: result.value.status })
+        }));
+      }
+      return result;
+    },
+    async stopTcpServer(profileId: string): Promise<SettingsWriteResult<TcpRuntimeResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'tcp',
+        'tcp.runtime',
+        context => adapter.stopTcpServer(profileId, context.signal)
+      );
+      if (result.status === 'completed' && result.value.status) {
+        updateDevice(current => Object.freeze({
+          ...current,
+          tcpStatuses: Object.freeze({ ...current.tcpStatuses, [profileId]: result.value.status })
+        }));
+      }
+      return result;
+    },
+    async sendTcp(profileId: string, request: TcpSendRequestV1): Promise<SettingsWriteResult<TcpRuntimeResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'tcp',
+        'tcp.runtime',
+        context => adapter.sendTcp(profileId, request, context.signal)
+      );
+      if (result.status === 'completed' && result.value.status) {
+        updateDevice(current => Object.freeze({
+          ...current,
+          tcpStatuses: Object.freeze({ ...current.tcpStatuses, [profileId]: result.value.status })
+        }));
+      }
+      return result;
+    },
+    async readTcpStatus(profileId: string): Promise<SettingsWriteResult<TcpStatusResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'tcp',
+        'tcp.runtime',
+        context => adapter.readTcpStatus(profileId, context.signal)
+      );
+      if (result.status === 'completed') {
+        updateDevice(current => Object.freeze({
+          ...current,
+          tcpStatuses: Object.freeze({ ...current.tcpStatuses, [profileId]: result.value.status })
+        }));
+      }
+      return result;
+    },
+    async readTcpFrames(profileId: string): Promise<SettingsWriteResult<TcpFramesResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'tcp',
+        'tcp.runtime',
+        context => adapter.readTcpFrames(profileId, context.signal)
+      );
+      if (result.status === 'completed') {
+        updateDevice(current => Object.freeze({
+          ...current,
+          tcpFrames: Object.freeze({ ...current.tcpFrames, [profileId]: result.value.frames })
+        }));
+      }
+      return result;
+    },
+    async clearTcpFrames(profileId: string): Promise<SettingsWriteResult<TcpClearFramesResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'tcp',
+        'tcp.runtime',
+        context => adapter.clearTcpFrames(profileId, context.signal)
+      );
+      if (result.status === 'completed' && result.value.success) {
+        updateDevice(current => Object.freeze({
+          ...current,
+          tcpFrames: Object.freeze({ ...current.tcpFrames, [profileId]: Object.freeze([]) })
+        }));
+      }
+      return result;
+    },
+    discoverCameras(provider: CameraDiscoveryProviderV1): Promise<SettingsWriteResult<CameraDiscoveryResponseV1>> {
+      const endpointId = provider === 'all'
+        ? 'camera.discovery.all'
+        : provider === 'huaray' ? 'camera.discovery.huaray' : 'camera.discovery.hikvision';
+      return owner.enqueueEndpointOperation(
+        'camera',
+        endpointId,
+        async context => {
+          const result = await adapter.discoverCameras(provider, context.signal);
+          if (result.devices.length > 0) updateDevice(current => Object.freeze({ ...current, cameraDiscovery: result }));
+          else updateDevice(current => Object.freeze({ ...current, cameraDiscovery: result }));
+          return result;
+        }
+      );
+    },
+    async readCameraBindings(): Promise<SettingsWriteResult<CameraBindingsResponseV1>> {
+      const result = await owner.enqueueEndpointOperation(
+        'camera',
+        'camera.bindings.read',
+        context => adapter.readCameraBindings(context.signal)
+      );
+      if (result.status === 'completed') {
+        updateDevice(current => Object.freeze({
+          ...current,
+          cameraBindings: result.value.bindings,
+          activeCameraId: result.value.activeCameraId
+        }));
+      }
+      return result;
+    },
+    async saveCameraBindings(
+      bindings: readonly CameraBindingV1[],
+      activeCameraId: string
+    ): Promise<SettingsWriteResult<SettingsDeviceOperationResult>> {
+      const result = await owner.enqueueEndpointOperation(
+        'camera',
+        'camera.bindings.write',
+        context => adapter.writeCameraBindings(bindings, activeCameraId, context.signal)
+      );
+      if (result.status !== 'completed') return result;
+      if (result.value.success) {
+        updateDevice(current => Object.freeze({ ...current, cameraBindings: bindings, activeCameraId }));
+      }
+      return Object.freeze({
+        ...result,
+        value: operationResult(result.value.success, result.value.message)
+      });
+    },
+    readTriggerDiagnostics(): Promise<SettingsWriteResult<TriggerDiagnosticsV1>> {
+      return owner.enqueueEndpointOperation(
+        'camera',
+        'trigger-input.diagnostics.read',
+        context => adapter.readTriggerDiagnostics(context.signal)
+      ).then(result => {
+        if (result.status === 'completed') updateDevice(current => Object.freeze({ ...current, triggerDiagnostics: result.value }));
+        return result;
+      });
+    },
+    readSerialPhotoelectricPorts(): Promise<SettingsWriteResult<readonly SerialPhotoelectricPortV1[]>> {
+      return owner.enqueueEndpointOperation(
+        'camera',
+        'trigger-input.serial-ports.read',
+        context => adapter.readSerialPhotoelectricPorts(context.signal)
+      ).then(result => {
+        if (result.status === 'completed') updateDevice(current => Object.freeze({ ...current, serialPorts: result.value }));
+        return result;
+      });
+    },
+    async testSerialPhotoelectric(request: SerialPhotoelectricTestRequestV1): Promise<SettingsWriteResult<SettingsDeviceOperationResult>> {
+      const result = await owner.enqueueEndpointOperation(
+        'camera',
+        'trigger-input.serial-test',
+        context => adapter.testSerialPhotoelectric(request, context.signal)
+      );
+      if (result.status !== 'completed') return result;
+      return Object.freeze({ ...result, value: operationResult(true, result.value.message) });
+    },
+    async learnEnterPhotoelectricDevice(timeoutMs: number): Promise<SettingsWriteResult<SettingsDeviceOperationResult>> {
+      const result = await owner.enqueueEndpointOperation(
+        'camera',
+        'trigger-input.enter-learn',
+        context => adapter.learnEnterPhotoelectricDevice(timeoutMs, context.signal)
+      );
+      if (result.status !== 'completed') return result;
+      return Object.freeze({
+        ...result,
+        value: operationResult(true, `已识别 Enter 光电设备：${result.value.deviceId}。`)
+      });
+    },
+    async captureSoftTrigger(cameraBindingId: string): Promise<SettingsWriteResult<SettingsDeviceOperationResult>> {
+      const result = await owner.enqueueEndpointOperation(
+        'camera',
+        'camera.soft-trigger-capture',
+        async context => {
+          await stopPreviewInternal('已切换到单帧抓图。');
+          const captured = await adapter.softTriggerCapture(cameraBindingId, context.signal);
+          const accepted = await setPreviewBlob(captured.blob.blob, captured.blob.contentType, previewGeneration, {
+            phase: 'captured',
+            cameraBindingId: captured.cameraBindingId,
+            triggerMode: captured.triggerMode,
+            triggerSource: captured.triggerSource,
+            width: captured.width,
+            height: captured.height,
+            message: '单帧已捕获，仅用于调试预览。'
+          });
+          return operationResult(accepted, accepted ? '单帧已捕获，仅用于调试预览。' : '单帧已过期，未更新预览。');
+        }
+      );
+      return result;
+    },
+    async startCameraPreview(cameraBindingId: string): Promise<SettingsWriteResult<SettingsDeviceOperationResult>> {
+      const result = await owner.enqueueEndpointOperation(
+        'camera',
+        'camera.preview.start',
+        async context => {
+          await stopPreviewInternal('已停止上一相机预览。');
+          const session = await adapter.startContinuousPreview(cameraBindingId, context.signal);
+          if (context.signal.aborted || disposed) {
+            await adapter.stopContinuousPreview(session.sessionId).catch(() => undefined);
+            throw new DOMException('连续预览启动结果已过期。', 'AbortError');
+          }
+          previewGeneration += 1;
+          const operationGeneration = previewGeneration;
+          const controller = new AbortController();
+          previewController = controller;
+          previewSessionId = session.sessionId;
+          updatePreview({
+            ...emptyCameraPreview(),
+            phase: 'running',
+            sessionId: session.sessionId,
+            cameraBindingId: session.cameraBindingId,
+            triggerMode: session.triggerMode,
+            message: '连续预览已启动，正在等待帧。'
+          });
+          void runPreviewLoop(session.sessionId, session.cameraBindingId, operationGeneration, controller, session.triggerMode);
+          return operationResult(true, '连续预览已启动。');
+        }
+      );
+      return result;
+    },
+    async stopCameraPreview(reason = '相机预览已停止。'): Promise<SettingsWriteResult<void>> {
+      writes.cancel('camera', reason);
+      const sessionId = await stopPreviewInternal(reason, false);
+      return owner.enqueueEndpointOperation(
+        'camera',
+        'camera.preview.stop',
+        async context => {
+          if (sessionId) await adapter.stopContinuousPreview(sessionId, context.signal);
+        }
+      );
+    },
     diagnostics(): SettingsOwnerDiagnostics {
       const write = writes.diagnostics();
       return Object.freeze({
@@ -443,9 +1029,12 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       if (disposed) return;
       disposed = true;
       generation += 1;
+      void stopPreviewInternal('Settings owner 已释放，预览已停止。');
       readController?.abort(reason);
       readController = undefined;
       writes.dispose(reason);
+      clearPreviewObjectUrl();
+      state.device = emptyDeviceProjection();
       state.phase = 'disposed';
       state.generation = generation;
       state.message = 'Settings owner 已释放。';

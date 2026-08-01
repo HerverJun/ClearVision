@@ -16,6 +16,7 @@ const emit = defineEmits<{
 
 function stateLabel(target: SettingsNavigationTarget): string {
   if (target === 'overview' || isGenericSettingsSection(target)) return '只读';
+  if (target === 'plc' || target === 'tcp') return '已接入';
   return '后续';
 }
 </script>
@@ -28,7 +29,7 @@ function stateLabel(target: SettingsNavigationTarget): string {
   >
     <div class="settings-group-navigation__heading">
       <span class="settings-group-navigation__eyebrow">配置分组</span>
-      <strong>只读壳层</strong>
+      <strong>系统配置工作台</strong>
     </div>
     <div class="settings-group-navigation__items">
       <button

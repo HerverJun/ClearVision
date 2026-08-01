@@ -174,6 +174,47 @@ withDefaults(defineProps<{
       <path d="M20 11a8 8 0 1 0-2.3 5.7" />
       <path d="M20 4v7h-7" />
     </template>
+    <path
+      v-else-if="name === 'plus'"
+      d="M12 5v14M5 12h14"
+    />
+    <template v-else-if="name === 'server'">
+      <rect
+        x="4"
+        y="4"
+        width="16"
+        height="6"
+        rx="1"
+      />
+      <rect
+        x="4"
+        y="14"
+        width="16"
+        height="6"
+        rx="1"
+      />
+      <path d="M8 7h.01M8 17h.01M12 7h5M12 17h5" />
+    </template>
+    <template v-else-if="name === 'link'">
+      <path d="m10 13 4-4" />
+      <path d="M7.5 16.5 6 18a3.5 3.5 0 0 1-5-5l3-3a3.5 3.5 0 0 1 5 0" />
+      <path d="m16.5 7.5 1.5-1.5a3.5 3.5 0 0 1 5 5l-3 3a3.5 3.5 0 0 1-5 0" />
+    </template>
+    <template v-else-if="name === 'unlink'">
+      <path d="m10 13 4-4M8 16l-1.5 1.5a3.5 3.5 0 0 1-5-5l2-2M16 8l1.5-1.5a3.5 3.5 0 0 1 5 5l-2 2M9 3l12 18" />
+    </template>
+    <rect
+      v-else-if="name === 'square'"
+      x="5"
+      y="5"
+      width="14"
+      height="14"
+      rx="2"
+    />
+    <template v-else-if="name === 'send'">
+      <path d="m3 4 18 8-18 8 3-8z" />
+      <path d="M6 12h15" />
+    </template>
     <template v-else-if="name === 'undo'">
       <path d="M9 7 4 12l5 5" />
       <path d="M5 12h8a6 6 0 0 1 6 6" />
