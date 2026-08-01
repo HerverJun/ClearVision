@@ -11,6 +11,10 @@ export { default as SettingsGroupNavigation } from './SettingsGroupNavigation.vu
 export { default as SettingsOverview } from './SettingsOverview.vue';
 export { default as SettingsPage } from './SettingsPage.vue';
 export { default as SettingsDatabasePanel } from './SettingsDatabasePanel.vue';
+export { default as SettingsCameraPanel } from './SettingsCameraPanel.vue';
+export { default as SettingsCameraBindingSection } from './SettingsCameraBindingSection.vue';
+export { default as SettingsCameraPreviewSection } from './SettingsCameraPreviewSection.vue';
+export { default as SettingsCameraTriggerSection } from './SettingsCameraTriggerSection.vue';
 export { default as SettingsGeneralPanel } from './SettingsGeneralPanel.vue';
 export { default as SettingsRuntimePanel } from './SettingsRuntimePanel.vue';
 export { default as SettingsSecurityPanel } from './SettingsSecurityPanel.vue';

@@ -58,7 +58,12 @@ public class CameraBindingsEndpointTests
             new CameraInfo { CameraId = "SN-ONLINE", Name = "Discovered Online", IsConnected = false }
         }));
 
-        await using var host = await CameraBindingsTestHost.CreateAsync(cameraManager);
+        var configService = Substitute.For<IConfigurationService>();
+        configService.LoadAsync().Returns(Task.FromResult(new AppConfig { ActiveCameraId = "cam-connected" }));
+        configService.GetCurrent().Returns(new AppConfig { ActiveCameraId = "cam-connected" });
+        configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
+
+        await using var host = await CameraBindingsTestHost.CreateAsync(cameraManager, configService: configService);
         using var response = await host.Client.GetAsync("/api/cameras/bindings");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -74,6 +79,8 @@ public class CameraBindingsEndpointTests
         GetProperty(FindById(items, "cam-connected"), "HardwareTriggerSource", "hardwareTriggerSource").GetString().Should().Be("Line2");
         GetProperty(FindById(items, "cam-connected"), "PixelFormat", "pixelFormat").GetString().Should().Be("RGB8");
         GetProperty(FindById(items, "cam-connected"), "TargetFrameRateFps", "targetFrameRateFps").GetInt32().Should().Be(30);
+        GetProperty(FindById(items, "cam-connected"), "IsActive", "isActive").GetBoolean().Should().BeTrue();
+        GetProperty(FindById(items, "cam-online"), "IsActive", "isActive").GetBoolean().Should().BeFalse();
         GetProperty(FindById(items, "cam-online"), "SoftwareTriggerSource", "softwareTriggerSource").GetString().Should().Be("EnterPhotoelectric");
         GetProperty(FindById(items, "cam-online"), "EnterPhotoelectricDebounceMs", "enterPhotoelectricDebounceMs").GetInt32().Should().Be(75);
         GetProperty(FindById(items, "cam-online"), "EnterPhotoelectricTimeoutMs", "enterPhotoelectricTimeoutMs").GetInt32().Should().Be(12000);

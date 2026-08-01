@@ -29,6 +29,7 @@ import SettingsSecurityPanel from './SettingsSecurityPanel.vue';
 import SettingsStoragePanel from './SettingsStoragePanel.vue';
 import SettingsPlcPanel from './SettingsPlcPanel.vue';
 import SettingsTcpPanel from './SettingsTcpPanel.vue';
+import SettingsCameraPanel from './SettingsCameraPanel.vue';
 
 const props = defineProps<{
   projection: SettingsProjectionV1;
@@ -229,6 +230,11 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
       v-else-if="activeGroup === 'tcp'"
       :owner="owner"
       :can-write="role === 'Admin'"
+    />
+
+    <SettingsCameraPanel
+      v-else-if="activeGroup === 'camera'"
+      :owner="owner"
     />
 
     <template v-else-if="isGenericSection(activeGroup) && !activeGenericProjection">

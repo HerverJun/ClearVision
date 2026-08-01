@@ -16,7 +16,7 @@ const emit = defineEmits<{
 
 function stateLabel(target: SettingsNavigationTarget): string {
   if (target === 'overview' || isGenericSettingsSection(target)) return '只读';
-  if (target === 'plc' || target === 'tcp') return '已接入';
+  if (target === 'plc' || target === 'tcp' || target === 'camera') return '已接入';
   return '后续';
 }
 </script>

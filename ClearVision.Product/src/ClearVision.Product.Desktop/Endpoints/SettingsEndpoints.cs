@@ -1453,9 +1453,13 @@ public static class SettingsEndpoints
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanOperateHardware);
 
         // 获取已配置的相机绑定列表
-        app.MapGet("/api/cameras/bindings", async (ClearVision.Product.Core.Cameras.ICameraManager cameraManager) =>
+        app.MapGet("/api/cameras/bindings", async (
+            ClearVision.Product.Core.Cameras.ICameraManager cameraManager,
+            IConfigurationService configService) =>
         {
             var bindings = cameraManager.GetBindings();
+            var config = await configService.LoadAsync();
+            config.Normalize();
             var discoveredDevices = await cameraManager.EnumerateCamerasAsync();
             var discoveredLookup = discoveredDevices.ToDictionary(
                 device => device.CameraId,
@@ -1485,6 +1489,7 @@ public static class SettingsEndpoints
                     binding.ModelName,
                     binding.InterfaceType,
                     binding.IsEnabled,
+                    IsActive = string.Equals(binding.Id, config.ActiveCameraId, StringComparison.OrdinalIgnoreCase),
                     binding.ExposureTimeUs,
                     binding.GainDb,
                     binding.PixelFormat,
