@@ -478,9 +478,7 @@ public class TcpDeviceManagerTests
         await stream.WriteAsync(Encoding.UTF8.GetBytes(firstSegment), cancellationToken);
         await stream.FlushAsync(cancellationToken);
 
-        // 间隔明显小于 idle gap，模拟真实 TCP 分段（同一响应被拆成两个报文）。
-        await Task.Delay(30, cancellationToken);
-
+        // Separate writes exercise response accumulation without wall-clock scheduling.
         await stream.WriteAsync(Encoding.UTF8.GetBytes(secondSegment), cancellationToken);
         await stream.FlushAsync(cancellationToken);
 
