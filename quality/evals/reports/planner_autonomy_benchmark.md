@@ -1,7 +1,7 @@
 # Vision Agent Planner Autonomy Benchmark
 
 - Benchmark: `vision_agent_planner_autonomy_benchmark`
-- Generated UTC: `2026-06-14T09:24:01.9882328+00:00`
+- Generated UTC: `2026-08-01T07:46:49.8501374+00:00`
 - Commit SHA: `local`
 - Branch: `local`
 - Workflow run: `local` attempt `local`

@@ -1123,19 +1123,20 @@ internal static class VisionAgentPlannerAutonomyBenchmark
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var op in flow.Operators)
         {
-            if (IsOperatorType(op, "ImageAcquisition"))
+            if (IsOperatorType(op, "ImageAcquisition") &&
+                string.Equals(ReadParameter(op, "SourceType"), "Camera", StringComparison.OrdinalIgnoreCase))
             {
-                AddManualConfirmation(confirmations, seen, op, "camera_binding", "CameraBindingId", "CameraId");
+                AddManualConfirmation(confirmations, seen, flow, op, "camera_binding", "CameraId", "CameraBindingId");
             }
 
             if (IsDeepLearningOperator(op.OperatorType))
             {
-                AddManualConfirmation(confirmations, seen, op, "model_resource", "ModelPath", "ModelId", "ModelCatalogPath");
+                AddManualConfirmation(confirmations, seen, flow, op, "model_resource", "ModelId", "ModelPath", "ModelCatalogPath");
             }
 
             if (IsOperatorType(op, "TemplateMatching"))
             {
-                AddManualConfirmation(confirmations, seen, op, "template_artifact", "TemplatePath", "TemplateId", "Template");
+                AddManualConfirmation(confirmations, seen, flow, op, "template_artifact", "TemplateId", "Template");
             }
 
         }
@@ -1146,6 +1147,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
     private static void AddManualConfirmation(
         List<object> confirmations,
         HashSet<string> seen,
+        PlannerFlow flow,
         PlannerOperator op,
         string resourceType,
         params string[] parameterNames)
@@ -1159,8 +1161,8 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 continue;
             }
 
-            var resourceKey = $"{op.TempId}.{parameterName}";
-            if (!seen.Add($"{resourceType}|{resourceKey}"))
+            var identity = ResourceIdentityFor(flow, resourceType, op.TempId, parameterName);
+            if (!seen.Add(identity.CanonicalId))
             {
                 return;
             }
@@ -1171,11 +1173,52 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 resourceType,
                 operatorId = op.TempId,
                 parameterName,
-                resourceKey,
+                resourceKey = identity.ResourceKey,
+                canonicalId = identity.CanonicalId,
+                status = VisionAgentResourceStatuses.Bound,
+                valueSummary = value,
                 metadataOnly = true
             });
             return;
         }
+    }
+
+    private static PlannerResourceIdentity ResourceIdentityFor(
+        PlannerFlow flow,
+        string resourceType,
+        string operatorId,
+        string parameterName)
+    {
+        var op = flow.Operators.FirstOrDefault(item =>
+            string.Equals(item.TempId, operatorId, StringComparison.OrdinalIgnoreCase));
+        var operatorType = op?.OperatorType ?? string.Empty;
+        var operatorIndex = op == null
+            ? 0
+            : flow.Operators
+                .TakeWhile(item => !ReferenceEquals(item, op))
+                .Count(item => string.Equals(item.OperatorType, operatorType, StringComparison.OrdinalIgnoreCase));
+        var operatorKey = VisionAgentResourceIdentity.OperatorKey(operatorType, operatorIndex);
+        var canonicalParameter = CanonicalResourceParameter(resourceType, parameterName);
+        return new PlannerResourceIdentity(
+            VisionAgentResourceIdentity.CreateCanonicalId(
+                resourceType,
+                operatorKey,
+                canonicalParameter,
+                operatorId),
+            $"{operatorId}.{parameterName}");
+    }
+
+    private static string CanonicalResourceParameter(string resourceType, string parameterName)
+    {
+        var canonicalResourceType = VisionAgentResourceIdentity.NormalizeResourceType(resourceType);
+        if (canonicalResourceType == "camera_binding") return "CameraId";
+        if (canonicalResourceType == "template_artifact") return "Template";
+        return parameterName;
+    }
+
+    private static string? ReadParameter(PlannerOperator op, string parameterName)
+    {
+        return op.Parameters.TryGetValue(parameterName, out var value) ? value : null;
     }
 
     private static JsonElement CaptureArgs(PlannerCaseRuntimeState state)
@@ -1508,7 +1551,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
     {
         return Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-wire")),
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "mock-cam-wire")),
                 Op("op_roi", "RoiManager", ("Shape", "Rectangle"), ("Operation", "Crop"), ("X", "0"), ("Y", "0"), ("Width", "320"), ("Height", "160")),
                 Op("op_detect", "DeepLearning", ("ModelId", "mock-wire-sequence-model")),
                 Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "NotEqual"), ("ExpectValue", "")),
@@ -1556,13 +1599,15 @@ internal static class VisionAgentPlannerAutonomyBenchmark
 
         return Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-template")),
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "mock-cam-template")),
+                Op("op_template_source", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "mock-cam-template-source")),
                 Op("op_match", "TemplateMatching", templateParams.ToArray()),
                 Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "GreaterOrEqual"), ("ExpectValue", minScore ?? "0.82")),
                 Op("op_out", "ResultOutput")
             ],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
+                Link("op_template_source", "Image", "op_match", "Template"),
                 Link("op_match", "Score", "op_judge", "Value"),
                 Link("op_judge", "JudgmentResult", "op_out", "Result")
             ],
@@ -1573,7 +1618,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
     {
         return Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-template")),
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "mock-cam-template")),
                 Op("op_match", "TemplateMatching"),
                 Op("op_out", "ResultOutput")
             ],
@@ -1588,7 +1633,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
     {
         return Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-model")),
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "mock-cam-model")),
                 Op("op_detect", "DeepLearning"),
                 Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "NotEqual"), ("ExpectValue", "")),
                 Op("op_out", "ResultOutput")
@@ -1605,7 +1650,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
     {
         return Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-model")),
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "mock-cam-model")),
                 Op("op_detect", "DeepLearning", ("ModelId", "mock-model-catalog-item")),
                 Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "NotEqual"), ("ExpectValue", "")),
                 Op("op_out", "ResultOutput")
@@ -1622,7 +1667,8 @@ internal static class VisionAgentPlannerAutonomyBenchmark
     {
         return Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-combo")),
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "mock-cam-combo")),
+                Op("op_template_source", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "mock-cam-combo-template-source")),
                 Op("op_match", "TemplateMatching", ("TemplateId", "mock-template-combo")),
                 Op("op_detect", "DeepLearning", ("ModelId", "mock-combo-model")),
                 Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "GreaterOrEqual"), ("ExpectValue", "0.8")),
@@ -1630,6 +1676,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
             ],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
+                Link("op_template_source", "Image", "op_match", "Template"),
                 Link("op_cam", "Image", "op_detect", "Image"),
                 Link("op_match", "Score", "op_judge", "Value"),
                 Link("op_judge", "JudgmentResult", "op_out", "Result")
@@ -1641,7 +1688,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
     {
         return Flow(
             [
-                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-hole")),
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraId", "mock-cam-hole")),
                 Op("op_circle_a", "CircleMeasurement", ("Method", "HoughCircle"), ("MinRadius", "10"), ("MaxRadius", "200")),
                 Op("op_circle_b", "CircleMeasurement", ("Method", "HoughCircle"), ("MinRadius", "10"), ("MaxRadius", "200")),
                 Op("op_distance", "Measurement", ("MeasureType", "PointToPoint")),
@@ -1972,6 +2019,10 @@ internal sealed record PlannerOperator(
     string TempId,
     string OperatorType,
     IReadOnlyDictionary<string, string> Parameters);
+
+internal sealed record PlannerResourceIdentity(
+    string CanonicalId,
+    string ResourceKey);
 
 internal sealed record PlannerConnection(
     string SourceTempId,
