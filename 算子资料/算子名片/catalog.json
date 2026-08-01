@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-16T11:22:20.7402589+08:00",
-  "generationFingerprint": "76148AD9A83D0089AF8B5AAF58850CB3087E2457E3443834F3B2F6D94AB70456",
+  "generatedAt": "2026-08-01T23:43:18.9236021+08:00",
+  "generationFingerprint": "3C7C69D1A08C481E227D2A3BCF11A839324B429BD01E3568E5EC8BB8C2DB4C53",
   "totalCount": 158,
   "categories": {
     "采集": {
@@ -861,7 +861,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "A71333E3777265EDC5D7B98D0A62BCC14C84A9A92E8D0C9622D9595EE48EAA8C",
+      "generationFingerprint": "EC476E1B09690CFEE7531B96898D659A910CEF553C16BE367035194B1D198781",
       "docPath": "算子资料/算子名片/ImageAcquisition.md"
     },
     {
@@ -43674,7 +43674,7 @@
           "description": "",
           "defaultValue": "1",
           "min": "1",
-          "max": "247",
+          "max": "255",
           "isRequired": true,
           "options": null
         },
@@ -43940,7 +43940,7 @@
         }
       ],
       "generationDependencies": [],
-      "generationFingerprint": "F44B9E02DAF4601B2B2D01922F1F62E7C6141FA1B4CF3DB7239783EC0BF9A468",
+      "generationFingerprint": "178A9106719B1EF3C8B9A04EF5C976D1487C24CB97A6B0DE70A746B3D9B53E5D",
       "docPath": "算子资料/算子名片/ModbusCommunication.md"
     },
     {

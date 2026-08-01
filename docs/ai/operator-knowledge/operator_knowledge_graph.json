@@ -1,8 +1,8 @@
 {
   "SchemaVersion": "2026-07.operator-knowledge-graph.v4",
-  "GeneratedAtUtc": "2026-07-16T03:22:52.7942253Z",
+  "GeneratedAtUtc": "2026-08-01T15:45:49.2413649Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
-  "GenerationFingerprint": "76148AD9A83D0089AF8B5AAF58850CB3087E2457E3443834F3B2F6D94AB70456",
+  "GenerationFingerprint": "3C7C69D1A08C481E227D2A3BCF11A839324B429BD01E3568E5EC8BB8C2DB4C53",
   "Cards": [
     {
       "SchemaVersion": "2026-07.operator-knowledge-card.v2",
@@ -19460,7 +19460,7 @@
         }
       ],
       "GenerationDependencies": [],
-      "GenerationFingerprint": "A71333E3777265EDC5D7B98D0A62BCC14C84A9A92E8D0C9622D9595EE48EAA8C",
+      "GenerationFingerprint": "EC476E1B09690CFEE7531B96898D659A910CEF553C16BE367035194B1D198781",
       "RequiredResources": [
         "ImageAcquisition.FilePath",
         "ImageAcquisition.CameraId"
@@ -27624,7 +27624,7 @@
           "Description": "",
           "DefaultValue": "1",
           "MinValue": "1",
-          "MaxValue": "247",
+          "MaxValue": "255",
           "IsRequired": true,
           "AllowedValues": []
         },
@@ -27876,7 +27876,7 @@
         }
       ],
       "GenerationDependencies": [],
-      "GenerationFingerprint": "F44B9E02DAF4601B2B2D01922F1F62E7C6141FA1B4CF3DB7239783EC0BF9A468",
+      "GenerationFingerprint": "178A9106719B1EF3C8B9A04EF5C976D1487C24CB97A6B0DE70A746B3D9B53E5D",
       "RequiredResources": [
         "ModbusCommunication.IpAddress",
         "ModbusCommunication.RegisterAddress"

@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-07-16 11:22:20 +08:00`
+> 生成时间 / Generated At: `2026-08-01 23:43:18 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 当前版本快照 / Current Snapshot
@@ -1267,6 +1267,7 @@
 ### OperatorType.ImageAcquisition / 图像采集
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.0` | `2026-08-01T23:43:18.9236021+08:00` | `EC476E1B0969` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-15T11:26:25.6098568+08:00` | `A71333E37772` | `operator-runtime-metadata-v2:image-contract-v2.1` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `95FAF1A2F92B` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-13T15:25:22.2877465+08:00` | `331645B2B66D` | `legacy-source-only` |
@@ -1699,6 +1700,7 @@
 ### OperatorType.ModbusCommunication / Modbus TCP通信
 | 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |
 |------|------|------|------|
+| `1.0.0` | `2026-08-01T23:43:18.9236021+08:00` | `178A9106719B` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-14T15:07:23.3198726+08:00` | `F44B9E02DAF4` | `operator-runtime-metadata-v2` |
 | `1.0.0` | `2026-07-13T19:08:24.4997898+08:00` | `0E80FF1315C9` | `legacy-source-only` |
 | `1.0.0` | `2026-07-13T15:30:35.6120213+08:00` | `861C9C537804` | `legacy-source-only` |
