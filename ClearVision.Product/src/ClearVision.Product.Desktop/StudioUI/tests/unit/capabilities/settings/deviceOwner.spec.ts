@@ -34,6 +34,16 @@ function apiBase(overrides: Partial<ApiTransport> = {}): ApiTransport {
   } as ApiTransport;
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 describe('F07 G6 Settings owner preview lifecycle', () => {
   it('aborts the frame waiter and sends the authorized stop endpoint on explicit stop', async () => {
     let frameSignal: AbortSignal | undefined;
@@ -61,6 +71,12 @@ describe('F07 G6 Settings owner preview lifecycle', () => {
     expect(stopped).toMatchObject({ status: 'completed' });
     expect(post).toHaveBeenCalledWith('cameras/continuous-preview/stop', { sessionId: 'session-1' }, expect.anything());
     expect(owner.projection.device.preview.phase).toBe('idle');
+    expect(owner.diagnostics().preview).toMatchObject({
+      controllerCount: 0,
+      sessionCount: 0,
+      frameLoopCount: 0,
+      blobUrlCount: 0
+    });
     expect(owner.diagnostics().activeAbortControllerCount).toBe(0);
     owner.dispose();
   });
@@ -75,7 +91,7 @@ describe('F07 G6 Settings owner preview lifecycle', () => {
         responseBody: '{"code":"camera_stream_active"}'
       });
     }) as NonNullable<ApiTransport['put']>;
-    const owner: SettingsOwner = createSettingsOwner({ runtime: runtime(apiBase({ put })), role: 'Engineer' });
+    const owner: SettingsOwner = createSettingsOwner({ runtime: runtime(apiBase({ put })), role: 'Admin' });
     const next = { ...binding(), exposureTimeUs: 7000 };
 
     const result = await owner.saveCameraBindings([next], 'cam-1');
@@ -83,6 +99,63 @@ describe('F07 G6 Settings owner preview lifecycle', () => {
     expect(result.status).toBe('failed');
     expect(owner.projection.device.cameraBindings).toEqual([]);
     expect(put).toHaveBeenCalledWith('cameras/bindings', expect.objectContaining({ activeCameraId: 'cam-1' }), expect.anything());
+    owner.dispose();
+  });
+
+  it('cancels Camera work without staling parallel PLC and TCP operations', async () => {
+    const cameraStart = deferred<unknown>();
+    const plcOperation = deferred<unknown>();
+    const tcpOperation = deferred<unknown>();
+    let cameraSignal: AbortSignal | undefined;
+    const post = vi.fn(async (
+      path: string,
+      _body?: unknown,
+      options?: { readonly signal?: AbortSignal }
+    ) => {
+      if (path === 'cameras/continuous-preview/start') {
+        cameraSignal = options?.signal;
+        return cameraStart.promise;
+      }
+      if (path === 'plc/test-connection') return plcOperation.promise;
+      if (path === 'tcp/profiles/tcp-1/connect') return tcpOperation.promise;
+      if (path === 'cameras/continuous-preview/stop') return { Message: 'stopped' };
+      throw new Error(`unexpected path: ${path}`);
+    }) as NonNullable<ApiTransport['post']>;
+    const owner = createSettingsOwner({ runtime: runtime(apiBase({ post })), role: 'Admin' });
+
+    const camera = owner.startCameraPreview('cam-1');
+    const plc = owner.testPlcConnection({ protocol: 'S7', ipAddress: '127.0.0.1', port: 102 });
+    const tcp = owner.connectTcp('tcp-1');
+    await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(3));
+
+    const stop = owner.stopCameraPreview('camera-cancel-test');
+    expect(cameraSignal?.aborted).toBe(true);
+
+    plcOperation.resolve({ success: true, message: 'PLC ready', protocol: 'S7' });
+    tcpOperation.resolve({
+      success: true,
+      message: 'TCP connected',
+      response: '',
+      status: {
+        profileId: 'tcp-1', mode: 'Client', isConnected: true, isListening: false,
+        localEndpoint: '127.0.0.1:9001', remoteEndpoint: '127.0.0.1:9000', connectedClients: 0,
+        lastError: '', lastConnectedAtUtc: null, lastReceivedAtUtc: null, lastSentAtUtc: null
+      },
+      errors: []
+    });
+    cameraStart.resolve({
+      sessionId: 'session-cancelled', cameraBindingId: 'cam-1', triggerMode: 'Software', targetFrameRateFps: 30
+    });
+
+    expect((await plc).status).toBe('completed');
+    expect((await tcp).status).toBe('completed');
+    expect((await camera).status).toBe('cancelled');
+    expect((await stop).status).toBe('completed');
+    expect(owner.diagnostics().write).toMatchObject({
+      activeSectionCount: 0,
+      activeAbortControllerCount: 0,
+      queuedTaskCount: 0
+    });
     owner.dispose();
   });
 });

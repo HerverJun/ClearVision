@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   save: [bindings: readonly CameraBindingV1[], activeCameraId: string];
+  state: [state: { readonly dirty: boolean }];
 }>();
 
 interface CameraBindingDraft {
@@ -66,6 +67,7 @@ const serialPortOptions = computed(() => props.serialPorts.length > 0
   }))
   : [{ value: '', label: '未发现串口' }]);
 const dirty = computed(() => JSON.stringify(payload()) !== JSON.stringify(props.bindings));
+watch(dirty, value => emit('state', { dirty: value }), { immediate: true });
 const selectedErrors = computed(() => {
   const draft = selectedDraft.value;
   if (!draft) return [];
@@ -196,6 +198,10 @@ function selectBinding(id: string): void {
   selectedId.value = id;
 }
 
+function isCameraConnected(value: string): boolean {
+  return value.trim().toLowerCase() === 'connected';
+}
+
 watch(() => props.bindings, value => {
   if (drafts.length === 0 || !dirty.value) copyBindings(value);
 }, { immediate: true });
@@ -279,7 +285,7 @@ watch(() => props.activeCameraId, value => {
             <span>{{ selectedDraft.manufacturer || '未知厂商' }} / {{ selectedDraft.modelName || '未知型号' }}</span>
           </div>
           <CvStatusBadge
-            :tone="selectedDraft.connectionStatus.toLowerCase().includes('connected') ? 'ok' : 'warning'"
+            :tone="isCameraConnected(selectedDraft.connectionStatus) ? 'ok' : 'warning'"
             :label="selectedDraft.connectionStatus || 'Unknown'"
           />
         </div>

@@ -11,6 +11,7 @@ import {
 import type { GenericSettingsSection, SettingsSection } from './contracts';
 import type { SettingsProjectionV1 } from './decoder';
 import type { SettingsOwner } from './settingsOwner';
+import type { AuthLifecycleOwner } from '@/app/auth';
 import {
   isGenericSettingsSection,
   settingsAuthorityLabel,
@@ -36,6 +37,7 @@ const props = defineProps<{
   activeGroup: SettingsNavigationTarget;
   owner: SettingsOwner;
   role: string | null;
+  auth: AuthLifecycleOwner | null;
 }>();
 
 const activeItem = computed(() => settingsNavigationItem(props.activeGroup));
@@ -54,7 +56,7 @@ const projectionSummary = computed<readonly CvDescriptionItem[]>(() => [
   { key: 'productTheme', label: '产品主题', value: props.projection.sections.general.theme === 'dark' ? '深色' : '浅色' },
   { key: 'revision', label: '服务端观察版本', value: props.projection.revision },
   { key: 'scope', label: '读取范围', value: props.projection.safeSubset ? 'safe subset' : '完整管理员投影' },
-  { key: 'authority', label: '保存 authority', value: '后端配置服务；本轮不保存' },
+  { key: 'authority', label: '保存 authority', value: '后端配置服务' },
   { key: 'revision-policy', label: '并发语义', value: '现有无条件 revision；不新增 conditional revision' }
 ]);
 
@@ -115,12 +117,64 @@ function booleanLabel(value: boolean | null): string {
   return value ? '已启用' : '未启用';
 }
 
+function isCameraConnected(status: string): boolean {
+  return status.trim().toLowerCase() === 'connected';
+}
+
+function isCameraOnline(status: string): boolean {
+  return status.trim().toLowerCase() === 'online';
+}
+
 function stateTone(state: SettingsSectionReadState): CvStatusTone {
   switch (state) {
     case 'available': return 'ok';
     case 'restricted': return 'warning';
     case 'shell-only': return 'idle';
   }
+}
+
+function mountedSection(target: SettingsNavigationTarget): boolean {
+  return target === 'overview' || target === 'database' || target === 'plc' || target === 'tcp' || target === 'camera';
+}
+
+function sectionStateLabel(
+  target: SettingsNavigationTarget,
+  state: SettingsSectionReadState
+): string {
+  if (isGenericSettingsSection(target)) {
+    const accessLabel = props.role === 'Admin' ? 'Admin 可编辑' : props.role === 'Engineer' ? 'Engineer 只读' : '只读';
+    return state === 'restricted' ? `${accessLabel}（安全子集未返回）` : accessLabel;
+  }
+  const device = props.owner.projection.device;
+  if (target === 'plc') return device.plcSettings ? `已接入（${device.plcSettings.activeProtocol}）` : '未读取';
+  if (target === 'tcp') {
+    const statuses = Object.values(device.tcpStatuses);
+    if (statuses.some(status => status?.isConnected || status?.isListening)) return '运行中';
+    return device.tcpProfiles.length > 0 ? '已配置，未运行' : '未读取';
+  }
+  if (target === 'camera') {
+    const bindings = device.cameraBindings;
+    if (bindings.some(binding => isCameraConnected(binding.connectionStatus))) return '已连接';
+    if (bindings.some(binding => isCameraOnline(binding.connectionStatus))) return '在线（已发现）';
+    return bindings.length > 0 ? '已读取，未连接' : '未读取';
+  }
+  return settingsSectionStateLabel(state);
+}
+
+function sectionTone(target: SettingsNavigationTarget, state: SettingsSectionReadState): CvStatusTone {
+  const device = props.owner.projection.device;
+  if (target === 'plc') return device.plcSettings ? 'ok' : 'idle';
+  if (target === 'tcp') {
+    return Object.values(device.tcpStatuses).some(status => status?.isConnected || status?.isListening)
+      ? 'ok'
+      : device.tcpProfiles.length > 0 ? 'warning' : 'idle';
+  }
+  if (target === 'camera') {
+    if (device.cameraBindings.some(binding => isCameraConnected(binding.connectionStatus))) return 'ok';
+    if (device.cameraBindings.some(binding => isCameraOnline(binding.connectionStatus))) return 'info';
+    return device.cameraBindings.length > 0 ? 'warning' : 'idle';
+  }
+  return stateTone(state);
 }
 
 function isGenericSection(target: SettingsNavigationTarget): target is GenericSettingsSection {
@@ -148,7 +202,7 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
 
       <CvPanel
         title="分组读取状态"
-        description="设备、工作站、AI 与数据库分组保留各自 authority；本轮不通过 generic endpoint 猜测或双写。"
+        description="设备、工作站、AI 与数据库分组使用各自服务端状态；此处只显示已读取的权威投影。"
       >
         <ul class="settings-overview__section-list">
           <li
@@ -160,8 +214,8 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
               <strong>{{ item.label }}</strong>
               <span>{{ item.description }}</span>
             </div>
-            <CvStatusBadge :tone="stateTone(item.state)">
-              {{ settingsSectionStateLabel(item.state) }}
+            <CvStatusBadge :tone="sectionTone(item.id, item.state)">
+              {{ sectionStateLabel(item.id, item.state) }}
             </CvStatusBadge>
           </li>
         </ul>
@@ -186,58 +240,61 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
       </CvPanel>
     </template>
 
-    <SettingsGeneralPanel
-      v-else-if="activeGroup === 'general'"
-      :projection="projection.sections.general"
-      :owner="owner"
-      :can-write="role === 'Admin'"
-    />
+    <KeepAlive>
+      <SettingsGeneralPanel
+        v-if="activeGroup === 'general' && projection.sections.general"
+        :projection="projection.sections.general"
+        :owner="owner"
+        :can-write="role === 'Admin'"
+      />
 
-    <SettingsStoragePanel
-      v-else-if="activeGroup === 'storage' && projection.sections.storage"
-      :projection="projection.sections.storage"
-      :owner="owner"
-      :can-write="role === 'Admin'"
-    />
+      <SettingsStoragePanel
+        v-else-if="activeGroup === 'storage' && projection.sections.storage"
+        :projection="projection.sections.storage"
+        :owner="owner"
+        :can-write="role === 'Admin'"
+      />
 
-    <SettingsRuntimePanel
-      v-else-if="activeGroup === 'runtime' && projection.sections.runtime"
-      :projection="projection.sections.runtime"
-      :owner="owner"
-      :can-write="role === 'Admin'"
-    />
+      <SettingsRuntimePanel
+        v-else-if="activeGroup === 'runtime' && projection.sections.runtime"
+        :projection="projection.sections.runtime"
+        :owner="owner"
+        :can-write="role === 'Admin'"
+      />
 
-    <SettingsSecurityPanel
-      v-else-if="activeGroup === 'security'"
-      :projection="projection.sections.security"
-      :owner="owner"
-      :role="role"
-    />
+      <SettingsSecurityPanel
+        v-else-if="activeGroup === 'security' && projection.sections.security"
+        :projection="projection.sections.security"
+        :owner="owner"
+        :role="role"
+        :auth="auth"
+      />
 
-    <SettingsDatabasePanel
-      v-else-if="activeGroup === 'database'"
-      :owner="owner"
-      :role="role"
-    />
+      <SettingsDatabasePanel
+        v-else-if="activeGroup === 'database'"
+        :owner="owner"
+        :role="role"
+      />
 
-    <SettingsPlcPanel
-      v-else-if="activeGroup === 'plc'"
-      :owner="owner"
-      :can-write="role === 'Admin'"
-    />
+      <SettingsPlcPanel
+        v-else-if="activeGroup === 'plc'"
+        :owner="owner"
+        :can-write="role === 'Admin'"
+      />
 
-    <SettingsTcpPanel
-      v-else-if="activeGroup === 'tcp'"
-      :owner="owner"
-      :can-write="role === 'Admin'"
-    />
+      <SettingsTcpPanel
+        v-else-if="activeGroup === 'tcp'"
+        :owner="owner"
+        :can-write="role === 'Admin'"
+      />
 
-    <SettingsCameraPanel
-      v-else-if="activeGroup === 'camera'"
-      :owner="owner"
-    />
+      <SettingsCameraPanel
+        v-else-if="activeGroup === 'camera'"
+        :owner="owner"
+      />
+    </KeepAlive>
 
-    <template v-else-if="isGenericSection(activeGroup) && !activeGenericProjection">
+    <template v-if="isGenericSection(activeGroup) && !activeGenericProjection">
       <CvPanel
         :title="activeItem.label"
         :description="activeItem.description"
@@ -271,22 +328,22 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
     </template>
 
     <CvPanel
-      v-else
+      v-if="!isGenericSection(activeGroup) && !mountedSection(activeGroup)"
       :title="activeItem.label"
       :description="activeItem.description"
     >
       <template #actions>
         <CvStatusBadge
           tone="idle"
-          label="后续接入"
+          label="待接入"
         />
       </template>
       <div class="settings-overview__deferred">
         <strong>{{ activeItem.label }}保持独立 authority</strong>
         <p>
-          本轮只建立 Settings route、唯一 owner 和 generic safe/full 只读投影；该分组将在后续 Goal 按已冻结 endpoint contract 接入。
+          该分组仍保持独立 authority，待对应 endpoint contract 接入后再挂载工作台。
         </p>
-        <p>当前没有本地草稿、保存按钮或伪造的运行状态。</p>
+        <p>该分组当前没有可用的编辑或运行操作。</p>
       </div>
     </CvPanel>
   </div>

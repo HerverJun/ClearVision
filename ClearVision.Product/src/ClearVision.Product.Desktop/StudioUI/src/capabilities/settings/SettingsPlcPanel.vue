@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, shallowRef, watch } from 'vue';
 import { CvButton, CvField, CvInlineAlert, CvPanel, CvSelect, CvStatusBadge } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 import type {
@@ -12,9 +12,10 @@ import type {
 import { PLC_PROTOCOLS } from './deviceContracts';
 import type { PlcTestConnectionRequestV1 } from './deviceApiAdapter';
 import {
-  projectSettingsOperationFailure,
+  settingsOperationResultMessage,
   type SettingsOwner
 } from './settingsOwner';
+import type { SettingsOperationKind } from './contracts';
 
 const props = defineProps<{
   owner: SettingsOwner;
@@ -75,6 +76,7 @@ const dataTypeOptions = Object.freeze([
 const activeDraft = computed(() => drafts[protocol.value]);
 const activeMappings = computed(() => mappingDrafts[protocol.value]);
 const activeBaselineProfile = computed(() => profileFor(baseline.value, protocol.value));
+const protocolMismatch = computed(() => baseline.value !== null && baseline.value.activeProtocol !== protocol.value);
 const settingsDirty = computed(() => {
   const source = baseline.value;
   if (!source) return false;
@@ -107,6 +109,11 @@ const localErrors = computed(() => {
 });
 const canTest = computed(() => props.owner.projection.role === 'Admin' || props.owner.projection.role === 'Engineer');
 const isBusy = computed(() => pendingAction.value !== null);
+const detachPanelState = props.owner.registerPanelState('plc', () => ({
+  dirty: settingsDirty.value || mappingDirty.value,
+  pending: isBusy.value
+}));
+watch([settingsDirty, mappingDirty, isBusy], () => props.owner.refreshPanelState());
 
 function emptyDraft(protocolName: PlcProtocolV1): PlcDraft {
   return {
@@ -185,9 +192,8 @@ function showFeedback(tone: 'success' | 'warning' | 'error' | 'info', title: str
   feedback.value = { tone, title, message };
 }
 
-function resultMessage(result: { status: string; message?: string; error?: unknown }): string {
-  if (result.status === 'failed') return projectSettingsOperationFailure(result.error).publicMessage;
-  return result.message ?? '操作未完成。';
+function resultMessage(result: { status: string; message?: string; error?: unknown; operationKind?: SettingsOperationKind }): string {
+  return settingsOperationResultMessage(result);
 }
 
 async function load(): Promise<void> {
@@ -233,7 +239,12 @@ async function saveSettings(): Promise<void> {
       showFeedback('error', 'PLC 配置校验失败', result.value.message || '请修正高亮字段后重试。');
       return;
     }
-    if (result.value.settings) copySettings(result.value.settings);
+    const reread = await props.owner.readPlcSettings();
+    if (reread.status !== 'completed' || !reread.value.settings) {
+      showFeedback('warning', 'PLC 设置已提交', '协议保存响应已返回，但重新读取服务端投影失败；请刷新后确认。');
+      return;
+    }
+    copySettings(reread.value.settings);
     showFeedback('success', 'PLC 设置已保存', '配置已持久化；不会自动建立 PLC 长期连接。');
   } finally {
     pendingAction.value = null;
@@ -241,7 +252,12 @@ async function saveSettings(): Promise<void> {
 }
 
 async function saveMappings(): Promise<void> {
-  if (!props.canWrite || isBusy.value) return;
+  if (!props.canWrite || isBusy.value || protocolMismatch.value) {
+    if (protocolMismatch.value) {
+      showFeedback('warning', 'PLC 映射暂未保存', '当前本地协议与服务端 ActiveProtocol 不一致，请先保存协议设置。');
+    }
+    return;
+  }
   pendingAction.value = 'save-mappings';
   feedback.value = null;
   validationIssues.value = Object.freeze([]);
@@ -263,7 +279,7 @@ async function saveMappings(): Promise<void> {
         ...source,
         [protocol.value === 'S7' ? 's7' : protocol.value === 'MC' ? 'mc' : 'fins']: {
           ...profileFor(source, protocol.value),
-          mappings: mappingPayload()
+          mappings: result.value.mappings
         }
       } as PlcSettingsV1;
       baseline.value = Object.freeze(updated);
@@ -317,6 +333,7 @@ watch(() => props.owner.projection.device.plcSettings, value => {
 });
 
 onMounted(() => { void load(); });
+onBeforeUnmount(() => detachPanelState());
 </script>
 
 <template>
@@ -432,6 +449,15 @@ onMounted(() => { void load(); });
         title="先修正连接参数"
       >
         {{ localErrors.join(' ') }}
+      </CvInlineAlert>
+
+      <CvInlineAlert
+        v-if="protocolMismatch"
+        class="settings-panel__notice"
+        tone="warning"
+        title="当前协议尚未保存"
+      >
+        当前本地协议为 {{ activeProtocolLabel }}，服务端 ActiveProtocol 仍为 {{ baseline?.activeProtocol }}；请先保存协议设置，再保存映射。
       </CvInlineAlert>
 
       <template #footer>
@@ -598,7 +624,7 @@ onMounted(() => { void load(); });
           size="sm"
           data-plc-action="save-mappings"
           :loading="pendingAction === 'save-mappings'"
-          :disabled="!mappingDirty"
+          :disabled="!mappingDirty || protocolMismatch"
           @click="saveMappings"
         >
           <template #leading>

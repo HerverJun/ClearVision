@@ -3,7 +3,8 @@ import { computed, shallowRef, watch } from 'vue';
 import { CvButton, CvInlineAlert, CvSelect, CvStatusBadge } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 import type { CameraBindingV1 } from './deviceContracts';
-import { projectSettingsOperationFailure, type SettingsOwner } from './settingsOwner';
+import { settingsOperationResultMessage, type SettingsOwner } from './settingsOwner';
+import type { SettingsOperationKind } from './contracts';
 
 const props = withDefaults(defineProps<{
   owner: SettingsOwner;
@@ -14,6 +15,10 @@ const props = withDefaults(defineProps<{
 }>(), {
   disabled: false
 });
+
+const emit = defineEmits<{
+  state: [state: { readonly pending: boolean }];
+}>();
 
 const selectedId = shallowRef('');
 const pendingAction = shallowRef<string | null>(null);
@@ -26,6 +31,7 @@ const cameraOptions = computed(() => props.bindings.map(item => ({
 const preview = computed(() => props.owner.projection.device.preview);
 const isRunning = computed(() => preview.value.phase === 'running' && Boolean(preview.value.sessionId));
 const isBusy = computed(() => pendingAction.value !== null);
+watch(isBusy, value => emit('state', { pending: value }), { immediate: true });
 const selectedBinding = computed(() => props.bindings.find(item => item.id === selectedId.value) ?? null);
 const previewTone = computed(() => {
   if (preview.value.phase === 'error') return 'error' as const;
@@ -41,10 +47,8 @@ const previewLabel = computed(() => {
   return '未运行';
 });
 
-function operationMessage(result: { status: string; message?: string; error?: unknown }): string {
-  return result.status === 'failed'
-    ? projectSettingsOperationFailure(result.error).publicMessage
-    : result.message ?? '操作未完成。';
+function operationMessage(result: { status: string; message?: string; error?: unknown; operationKind?: SettingsOperationKind }): string {
+  return settingsOperationResultMessage(result);
 }
 
 function showFeedback(tone: 'success' | 'warning' | 'error' | 'info', title: string, message: string): void {
@@ -197,6 +201,17 @@ async function togglePreview(): Promise<void> {
       </div>
     </div>
 
+    <dl
+      class="preview-diagnostics"
+      data-camera-preview-diagnostics
+    >
+      <div><dt>Controller</dt><dd>{{ preview.diagnostics?.controller ?? 'idle' }}</dd></div>
+      <div><dt>Session</dt><dd>{{ preview.diagnostics?.session ?? 'none' }}</dd></div>
+      <div><dt>Frame loop</dt><dd>{{ preview.diagnostics?.frameLoop ?? 'idle' }}</dd></div>
+      <div><dt>Blob URL</dt><dd>{{ preview.diagnostics?.blobUrl ?? 'none' }}</dd></div>
+      <div><dt>资源计数</dt><dd>{{ preview.diagnostics?.controllerCount ?? 0 }}/{{ preview.diagnostics?.sessionCount ?? 0 }}/{{ preview.diagnostics?.frameLoopCount ?? 0 }}/{{ preview.diagnostics?.blobUrlCount ?? 0 }}</dd></div>
+    </dl>
+
     <CvInlineAlert
       v-if="feedback"
       class="camera-preview__alert"
@@ -223,7 +238,12 @@ async function togglePreview(): Promise<void> {
 .preview-frame__empty strong { color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }
 .preview-frame__empty span { font-size: var(--cv-font-size-xs); }
 .preview-frame__meta { position: absolute; right: var(--cv-space-3); bottom: var(--cv-space-3); display: flex; flex-wrap: wrap; gap: var(--cv-space-2); padding: var(--cv-space-1) var(--cv-space-2); background: color-mix(in srgb, var(--cv-surface-overlay) 90%, transparent); color: var(--cv-text-primary); font-size: var(--cv-font-size-2xs); }
+.preview-diagnostics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--cv-space-2); margin: var(--cv-space-3) 0 0; }
+.preview-diagnostics > div { min-width: 0; padding: var(--cv-space-2); border: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
+.preview-diagnostics dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.preview-diagnostics dd { margin: var(--cv-space-1) 0 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
 .camera-empty { margin-top: var(--cv-space-4); color: var(--cv-text-muted); font-size: var(--cv-font-size-sm); }
 .camera-preview__alert { margin-top: var(--cv-space-4); }
-@media (max-width: 700px) { .preview-toolbar { grid-template-columns: 1fr; } .preview-actions { justify-content: flex-start; } .preview-frame { min-height: 220px; } }
+@media (max-width: 900px) { .preview-diagnostics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .preview-toolbar { grid-template-columns: 1fr; } .preview-actions { justify-content: flex-start; } .preview-frame { min-height: 220px; } .preview-diagnostics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>

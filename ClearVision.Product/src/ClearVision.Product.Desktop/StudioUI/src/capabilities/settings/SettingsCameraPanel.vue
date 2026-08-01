@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue';
+import { computed, onBeforeUnmount, onDeactivated, onMounted, shallowRef, watch } from 'vue';
 import { CvButton, CvInlineAlert, CvPanel, CvStatusBadge } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 import type { CameraDiscoveryProviderV1 } from './deviceApiAdapter';
 import type { CameraBindingV1 } from './deviceContracts';
-import { projectSettingsOperationFailure, type SettingsOwner } from './settingsOwner';
+import { settingsOperationResultMessage, type SettingsOwner } from './settingsOwner';
+import type { SettingsOperationKind } from './contracts';
 import SettingsCameraBindingSection from './SettingsCameraBindingSection.vue';
 import SettingsCameraPreviewSection from './SettingsCameraPreviewSection.vue';
 import SettingsCameraTriggerSection from './SettingsCameraTriggerSection.vue';
@@ -17,19 +18,27 @@ const phase = shallowRef<'idle' | 'loading' | 'ready' | 'error'>('idle');
 const pendingAction = shallowRef<string | null>(null);
 const feedback = shallowRef<{ tone: 'success' | 'warning' | 'error' | 'info'; title: string; message: string } | null>(null);
 const discoveryProvider = shallowRef<CameraDiscoveryProviderV1>('all');
+const bindingDirty = shallowRef(false);
+const triggerPending = shallowRef(false);
+const previewPending = shallowRef(false);
+let leaveStopPromise: Promise<unknown> | undefined;
 
 const device = computed(() => props.owner.projection.device);
 const bindings = computed(() => device.value.cameraBindings);
 const discovery = computed(() => device.value.cameraDiscovery);
 const canOperate = computed(() => props.owner.projection.role === 'Admin' || props.owner.projection.role === 'Engineer');
+const canWriteBindings = computed(() => canOperate.value);
 const isBusy = computed(() => pendingAction.value !== null);
+const detachPanelState = props.owner.registerPanelState('camera', () => ({
+  dirty: bindingDirty.value,
+  pending: isBusy.value || triggerPending.value || previewPending.value
+}));
+watch([bindingDirty, triggerPending, previewPending, isBusy], () => props.owner.refreshPanelState());
 const cameraStatusTone = computed(() => phase.value === 'ready' ? 'ok' : phase.value === 'error' ? 'error' : 'info');
 const cameraStatusLabel = computed(() => phase.value === 'ready' ? '已读取' : phase.value === 'loading' ? '读取中' : phase.value === 'error' ? '读取失败' : '未读取');
 
-function resultMessage(result: { status: string; message?: string; error?: unknown }): string {
-  return result.status === 'failed'
-    ? projectSettingsOperationFailure(result.error).publicMessage
-    : result.message ?? '操作未完成。';
+function resultMessage(result: { status: string; message?: string; error?: unknown; operationKind?: SettingsOperationKind }): string {
+  return settingsOperationResultMessage(result);
 }
 
 function showFeedback(tone: 'success' | 'warning' | 'error' | 'info', title: string, message: string): void {
@@ -78,7 +87,7 @@ async function discover(provider: CameraDiscoveryProviderV1): Promise<void> {
 }
 
 async function saveBindings(nextBindings: readonly CameraBindingV1[], activeCameraId: string): Promise<void> {
-  if (!canOperate.value || isBusy.value) return;
+  if (!canWriteBindings.value || isBusy.value) return;
   pendingAction.value = 'save-bindings';
   feedback.value = null;
   try {
@@ -94,8 +103,21 @@ async function saveBindings(nextBindings: readonly CameraBindingV1[], activeCame
 }
 
 onMounted(() => { void load(); });
+function stopPreviewOnLeave(): void {
+  if (leaveStopPromise) return;
+  previewPending.value = true;
+  props.owner.refreshPanelState();
+  leaveStopPromise = props.owner.stopCameraPreview('离开相机 Settings 面板。')
+    .finally(() => {
+      leaveStopPromise = undefined;
+      previewPending.value = false;
+      props.owner.refreshPanelState();
+    });
+}
+onDeactivated(stopPreviewOnLeave);
 onBeforeUnmount(() => {
-  void props.owner.stopCameraPreview('离开相机 Settings 面板。');
+  stopPreviewOnLeave();
+  detachPanelState();
 });
 </script>
 
@@ -241,8 +263,9 @@ onBeforeUnmount(() => {
         :bindings="bindings"
         :active-camera-id="device.activeCameraId"
         :serial-ports="device.serialPorts"
-        :can-write="canOperate"
+        :can-write="canWriteBindings"
         :disabled="isBusy"
+        @state="bindingDirty = $event.dirty"
         @save="saveBindings"
       />
       <SettingsCameraTriggerSection
@@ -251,6 +274,7 @@ onBeforeUnmount(() => {
         :serial-ports="device.serialPorts"
         :can-operate="canOperate"
         :disabled="isBusy"
+        @state="triggerPending = $event.pending"
       />
       <SettingsCameraPreviewSection
         :owner="owner"
@@ -258,6 +282,7 @@ onBeforeUnmount(() => {
         :active-camera-id="device.activeCameraId"
         :can-operate="canOperate"
         :disabled="isBusy"
+        @state="previewPending = $event.pending"
       />
 
       <CvInlineAlert

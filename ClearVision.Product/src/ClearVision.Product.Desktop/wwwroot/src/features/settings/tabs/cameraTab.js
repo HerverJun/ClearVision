@@ -1829,17 +1829,11 @@ export function installCameraTab(SettingsView) {
         ,
         async saveCameraSettingsFromTop() {
             if (this.selectedCameraBindingId) {
-                const saved = await this.saveSelectedCameraParameters();
-                if (saved) {
-                    await this.saveAppSettingsForTab('cameras');
-                }
+                await this.saveSelectedCameraParameters();
                 return;
             }
 
             const saved = await this.saveCameraBindings();
-            if (saved) {
-                await this.saveAppSettingsForTab('cameras');
-            }
             if (saved) {
                 showToast('相机绑定配置已保存。', 'success');
             }

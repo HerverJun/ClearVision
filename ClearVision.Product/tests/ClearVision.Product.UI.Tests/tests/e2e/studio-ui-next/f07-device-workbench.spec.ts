@@ -83,7 +83,7 @@ test('G5 TCP Admin saves profiles without auto-connect, then operates the runtim
 });
 
 test('G6 Camera discovery, trigger inputs, soft capture, preview, 409 fail-closed, and leave cleanup', async ({ page }) => {
-  const fixture = await installF07DeviceFixture(page, 'Engineer');
+  const fixture = await installF07DeviceFixture(page, 'Admin');
   await openSettings(page, fixture);
 
   await page.locator('[data-settings-group="camera"]').click();

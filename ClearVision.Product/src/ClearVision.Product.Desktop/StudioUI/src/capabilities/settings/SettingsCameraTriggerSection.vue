@@ -8,10 +8,11 @@ import type {
 } from './deviceContracts';
 import type { SerialPhotoelectricTestRequestV1 } from './deviceApiAdapter';
 import {
-  projectSettingsOperationFailure,
+  settingsOperationResultMessage,
   type SettingsDeviceOperationResult,
   type SettingsOwner
 } from './settingsOwner';
+import type { SettingsOperationKind } from './contracts';
 
 const props = withDefaults(defineProps<{
   owner: SettingsOwner;
@@ -22,6 +23,10 @@ const props = withDefaults(defineProps<{
 }>(), {
   disabled: false
 });
+
+const emit = defineEmits<{
+  state: [state: { readonly pending: boolean }];
+}>();
 
 const pendingAction = shallowRef<string | null>(null);
 const feedback = shallowRef<{ tone: 'success' | 'warning' | 'error' | 'info'; title: string; message: string } | null>(null);
@@ -37,6 +42,7 @@ const serialPortOptions = computed(() => props.serialPorts.length > 0
   }))
   : [{ value: '', label: '未发现串口' }]);
 const isBusy = computed(() => pendingAction.value !== null);
+watch(isBusy, value => emit('state', { pending: value }), { immediate: true });
 const diagnosticsTone = computed(() => {
   if (!props.diagnostics) return 'idle' as const;
   if (props.diagnostics.lastError) return 'error' as const;
@@ -48,10 +54,8 @@ const diagnosticsLabel = computed(() => {
   return props.diagnostics.isAvailable ? '可用' : '不可用';
 });
 
-function operationMessage(result: { status: string; message?: string; error?: unknown }): string {
-  return result.status === 'failed'
-    ? projectSettingsOperationFailure(result.error).publicMessage
-    : result.message ?? '操作未完成。';
+function operationMessage(result: { status: string; message?: string; error?: unknown; operationKind?: SettingsOperationKind }): string {
+  return settingsOperationResultMessage(result);
 }
 
 function showFeedback(tone: 'success' | 'warning' | 'error' | 'info', title: string, message: string): void {

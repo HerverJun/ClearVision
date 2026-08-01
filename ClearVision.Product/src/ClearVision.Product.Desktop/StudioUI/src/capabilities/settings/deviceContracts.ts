@@ -248,6 +248,19 @@ export interface CameraPreviewProjectionV1 {
   readonly triggerSource: string | null;
   readonly contentType: string | null;
   readonly message: string;
+  /** Runtime resource diagnostics are a projection, never a second preview owner. */
+  readonly diagnostics?: CameraPreviewDiagnosticsV1;
+}
+
+export interface CameraPreviewDiagnosticsV1 {
+  readonly controller: 'idle' | 'active';
+  readonly session: 'none' | 'active';
+  readonly frameLoop: 'idle' | 'active';
+  readonly blobUrl: 'none' | 'active';
+  readonly controllerCount: number;
+  readonly sessionCount: number;
+  readonly frameLoopCount: number;
+  readonly blobUrlCount: number;
 }
 
 export interface CameraSettingsProjectionV1 {

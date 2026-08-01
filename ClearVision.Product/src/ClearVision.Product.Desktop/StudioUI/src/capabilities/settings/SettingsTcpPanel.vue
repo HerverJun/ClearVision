@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, shallowRef, watch } from 'vue';
 import { CvButton, CvField, CvInlineAlert, CvPanel, CvSelect, CvStatusBadge } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 import {
@@ -14,7 +14,8 @@ import {
   type TcpProfileV1
 } from './deviceContracts';
 import type { TcpSendRequestV1 } from './deviceApiAdapter';
-import { projectSettingsOperationFailure, type SettingsOwner } from './settingsOwner';
+import { settingsOperationResultMessage, type SettingsOwner } from './settingsOwner';
+import type { SettingsOperationKind } from './contracts';
 
 const props = defineProps<{
   owner: SettingsOwner;
@@ -73,7 +74,15 @@ const selectedStatus = computed<TcpProfileStatusV1 | null>(() => {
 });
 const selectedFrames = computed<readonly TcpFrameV1[]>(() => props.owner.projection.device.tcpFrames[selectedId.value] ?? []);
 const isBusy = computed(() => pendingAction.value !== null);
-const dirty = computed(() => JSON.stringify(drafts) !== JSON.stringify(baseline.value));
+const normalizedDrafts = computed(() => drafts.map(profilePayload));
+const dirty = computed(() => JSON.stringify(normalizedDrafts.value) !== JSON.stringify(baseline.value));
+const selectedProfileDirty = computed(() => {
+  const draft = selectedDraft.value;
+  if (!draft) return false;
+  const saved = baseline.value.find(profile => profile.id === draft.id);
+  return !saved || JSON.stringify(profilePayload(draft)) !== JSON.stringify(saved);
+});
+const selectedProfileSaved = computed(() => Boolean(selectedDraft.value) && !selectedProfileDirty.value);
 const localErrors = computed(() => validateProfile(selectedDraft.value));
 const canOperate = computed(() => props.owner.projection.role === 'Admin' || props.owner.projection.role === 'Engineer');
 const runtimeLabel = computed(() => {
@@ -84,6 +93,12 @@ const runtimeLabel = computed(() => {
   return '未连接';
 });
 const runtimeTone = computed(() => runtimeLabel.value === '已连接' || runtimeLabel.value === '监听中' ? 'ok' : runtimeLabel.value === '错误' ? 'error' : 'idle');
+const detachPanelState = props.owner.registerPanelState('tcp', () => ({
+  dirty: dirty.value,
+  pending: isBusy.value
+}));
+
+watch([dirty, isBusy], () => props.owner.refreshPanelState());
 
 function profileId(): string {
   if (globalThis.crypto?.randomUUID) return `tcp_${globalThis.crypto.randomUUID().slice(0, 8)}`;
@@ -179,6 +194,17 @@ function validateProfile(value: TcpDraft | null): string[] {
 function isValidHost(value: string): boolean {
   const normalized = value.trim();
   if (normalized.toLowerCase() === 'localhost') return true;
+  const ipv6 = normalized.startsWith('[') && normalized.endsWith(']')
+    ? normalized.slice(1, -1)
+    : normalized;
+  if (ipv6.includes(':')) {
+    try {
+      new URL(`http://[${ipv6}]`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
   const parts = normalized.split('.');
   return parts.length === 4 && parts.every(part => /^\d{1,3}$/.test(part) && Number(part) <= 255);
 }
@@ -187,9 +213,8 @@ function showFeedback(tone: 'success' | 'warning' | 'error' | 'info', title: str
   feedback.value = { tone, title, message };
 }
 
-function resultMessage(result: { status: string; message?: string; error?: unknown }): string {
-  if (result.status === 'failed') return projectSettingsOperationFailure(result.error).publicMessage;
-  return result.message ?? '操作未完成。';
+function resultMessage(result: { status: string; message?: string; error?: unknown; operationKind?: SettingsOperationKind }): string {
+  return settingsOperationResultMessage(result);
 }
 
 function applyRuntimeResponse(
@@ -223,7 +248,7 @@ async function load(): Promise<void> {
     }
     copyProfiles(result.value.profiles);
     phase.value = 'ready';
-    if (selectedId.value) await refreshRuntime();
+    if (selectedId.value) await readRuntime(selectedId.value);
   } finally {
     pendingAction.value = null;
   }
@@ -256,17 +281,25 @@ async function refreshRuntime(): Promise<void> {
   if (!selectedId.value || isBusy.value) return;
   pendingAction.value = 'refresh-runtime';
   try {
-    await Promise.all([
-      props.owner.readTcpStatus(selectedId.value),
-      props.owner.readTcpFrames(selectedId.value)
-    ]);
+    await readRuntime(selectedId.value);
   } finally {
     pendingAction.value = null;
   }
 }
 
+async function readRuntime(profileId: string): Promise<void> {
+  if (!baseline.value.some(profile => profile.id === profileId)) return;
+  await Promise.all([
+    props.owner.readTcpStatus(profileId),
+    props.owner.readTcpFrames(profileId)
+  ]);
+}
+
 async function runtimeAction(action: 'connect' | 'disconnect' | 'start-server' | 'stop-server'): Promise<void> {
-  if (!selectedDraft.value || !canOperate.value || isBusy.value || localErrors.value.length > 0) return;
+  const requiresSavedProfile = action === 'connect' || action === 'start-server';
+  if (!selectedDraft.value || !canOperate.value || isBusy.value) return;
+  if (requiresSavedProfile && (localErrors.value.length > 0 || !selectedProfileSaved.value)) return;
+  if (requiresSavedProfile && !selectedProfileSaved.value) return;
   pendingAction.value = action;
   feedback.value = null;
   try {
@@ -285,7 +318,7 @@ async function runtimeAction(action: 'connect' | 'disconnect' | 'start-server' |
 }
 
 async function send(): Promise<void> {
-  if (!selectedDraft.value || !canOperate.value || isBusy.value || !sendPayload.value) return;
+  if (!selectedDraft.value || !canOperate.value || isBusy.value || !sendPayload.value || !selectedProfileSaved.value) return;
   pendingAction.value = 'send';
   feedback.value = null;
   lastResponse.value = null;
@@ -309,7 +342,7 @@ async function send(): Promise<void> {
 }
 
 async function clearFrames(): Promise<void> {
-  if (!selectedDraft.value || !canOperate.value || isBusy.value) return;
+  if (!selectedDraft.value || !canOperate.value || isBusy.value || !selectedProfileSaved.value) return;
   pendingAction.value = 'clear-frames';
   feedback.value = null;
   try {
@@ -348,6 +381,7 @@ watch(selectedId, value => {
 });
 
 onMounted(() => { void load(); });
+onBeforeUnmount(() => detachPanelState());
 </script>
 
 <template>
@@ -464,7 +498,7 @@ onMounted(() => { void load(); });
               v-model="selectedDraft.id"
               label="Profile Id"
               name="tcpProfileId"
-              :readonly="!canWrite"
+              :readonly="true"
               required
             />
             <CvSelect
@@ -634,7 +668,7 @@ onMounted(() => { void load(); });
           variant="quiet"
           size="sm"
           :loading="pendingAction === 'refresh-runtime'"
-          :disabled="isBusy"
+          :disabled="isBusy || !selectedProfileSaved"
           @click="refreshRuntime"
         >
           <template #leading>
@@ -665,7 +699,7 @@ onMounted(() => { void load(); });
           variant="secondary"
           size="sm"
           data-tcp-action="connect"
-          :disabled="!canOperate || isBusy || localErrors.length > 0 || selectedStatus?.isConnected === true"
+          :disabled="!canOperate || isBusy || localErrors.length > 0 || !selectedProfileSaved || selectedStatus?.isConnected === true"
           :loading="pendingAction === 'connect'"
           @click="runtimeAction('connect')"
         >
@@ -697,7 +731,7 @@ onMounted(() => { void load(); });
           variant="secondary"
           size="sm"
           data-tcp-action="start-server"
-          :disabled="!canOperate || isBusy || localErrors.length > 0 || selectedStatus?.isListening === true"
+          :disabled="!canOperate || isBusy || localErrors.length > 0 || !selectedProfileSaved || selectedStatus?.isListening === true"
           :loading="pendingAction === 'start-server'"
           @click="runtimeAction('start-server')"
         >
@@ -735,6 +769,7 @@ onMounted(() => { void load(); });
         />
         <label class="tcp-send-form__payload"><span>发送内容</span><textarea
           v-model="sendPayload"
+          name="tcpPayload"
           rows="3"
           :disabled="!canOperate || isBusy"
           :placeholder="sendMode === 'hex' ? '例如：02 01 FF 03' : '输入要发送的文本'"
@@ -755,7 +790,7 @@ onMounted(() => { void load(); });
           variant="primary"
           size="sm"
           data-tcp-action="send"
-          :disabled="!canOperate || isBusy || !sendPayload"
+          :disabled="!canOperate || isBusy || !selectedProfileSaved || !sendPayload"
           :loading="pendingAction === 'send'"
           @click="send"
         >
@@ -779,7 +814,7 @@ onMounted(() => { void load(); });
         <div><strong>有界收发日志</strong><small>仅显示后端运行时返回的最近 {{ selectedFrames.length }} 条记录</small></div><CvButton
           variant="quiet"
           size="sm"
-          :disabled="!canOperate || isBusy"
+          :disabled="!canOperate || isBusy || !selectedProfileSaved"
           @click="clearFrames"
         >
           <template #leading>
