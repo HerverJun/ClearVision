@@ -319,7 +319,6 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
         :owner="owner"
         :role="role"
       />
-
     </KeepAlive>
 
     <template v-if="isGenericSection(activeGroup) && !activeGenericProjection">
