@@ -24,4 +24,5 @@ export { default as SettingsWriteFeedback } from './SettingsWriteFeedback.vue';
 export { default as SettingsPlcPanel } from './SettingsPlcPanel.vue';
 export { default as SettingsTcpPanel } from './SettingsTcpPanel.vue';
 export { default as SettingsStationPanel } from './SettingsStationPanel.vue';
+export { default as SettingsAiModelPanel } from './SettingsAiModelPanel.vue';
 export type { SettingsPageRuntime } from './SettingsPage.vue';

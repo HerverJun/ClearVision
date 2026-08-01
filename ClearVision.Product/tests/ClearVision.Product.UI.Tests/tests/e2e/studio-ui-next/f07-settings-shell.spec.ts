@@ -71,6 +71,95 @@ function databaseBackupPayload(): Record<string, unknown> {
   };
 }
 
+function stationSettingsPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    success: true,
+    message: 'Station settings loaded.',
+    mode: 'LocalLoopback',
+    port: 5010,
+    lanHost: '127.0.0.1',
+    lanAddresses: ['127.0.0.1'],
+    localStationSyncEnabled: true,
+    token: { hasToken: true, mask: '******', last4: '9876' },
+    paths: { studio: 'C:/fixture/studio-settings.json', localStation: 'C:/fixture/station-settings.json' },
+    currentRunning: {
+      studioEnabled: true,
+      studioListenMode: 'Loopback',
+      studioPort: 5000,
+      studioToken: { hasToken: true, mask: '******', last4: '0000' }
+    },
+    requiresRestart: { studio: false, localStation: false },
+    localStationBaseUrl: 'http://127.0.0.1:5010',
+    remoteStationBaseUrl: '',
+    localStationHubUrl: 'http://127.0.0.1:5010/hubs/station-sync',
+    remoteStationHubUrl: '',
+    diagnostics: ['Station communication fixture is available.'],
+    ...overrides
+  };
+}
+
+function aiReasoningSupportPayload(): Record<string, unknown> {
+  return {
+    familyId: 'openai_gpt5',
+    familyName: 'OpenAI GPT-5',
+    allowedModes: ['auto', 'off', 'on'],
+    allowedEfforts: ['low', 'medium', 'high'],
+    helpText: 'Fixture reasoning support only describes the endpoint contract.',
+    supportsExplicitMode: true,
+    supportsEffort: true,
+    isModelLockedOn: false,
+    defaultMode: 'auto'
+  };
+}
+
+function aiFullModelPayload(hasApiKey = true): Record<string, unknown> {
+  return {
+    id: 'model-1',
+    name: 'fixture-primary',
+    displayName: 'Fixture AI model',
+    provider: 'OpenAI Compatible',
+    model: 'gpt-5.1-mini',
+    hasApiKey,
+    apiKeyMasked: hasApiKey ? '******' : '',
+    baseUrl: 'https://fixture.example/v1',
+    timeoutMs: 120000,
+    isActive: true,
+    isEnabled: true,
+    protocol: 'openai_compatible',
+    wireApi: 'responses',
+    authMode: 'bearer',
+    authHeaderName: 'Authorization',
+    extraHeaders: { authorization: '<redacted>' },
+    extraQuery: null,
+    extraBody: null,
+    roleBindings: ['generation', 'planner'],
+    modelRole: 'generation',
+    priority: 10,
+    remark: 'Browser fixture',
+    createdAt: '2026-08-01T00:00:00Z',
+    updatedAt: '2026-08-01T00:00:00Z',
+    lastTestStatus: null,
+    lastTestAt: null,
+    lastTestLatencyMs: null,
+    capabilities: { supportsVisionInput: true, supportsToolCall: true },
+    reasoning: { mode: 'auto', effort: 'medium' },
+    reasoningSupport: aiReasoningSupportPayload()
+  };
+}
+
+function aiSafeModelPayload(): Record<string, unknown> {
+  return {
+    id: 'model-1',
+    displayName: 'Fixture AI model',
+    provider: 'OpenAI Compatible',
+    model: 'gpt-5.1-mini',
+    modelRole: 'generation',
+    isEnabled: true,
+    isActive: true,
+    capabilities: { supportsVisionInput: true, supportsToolCall: true }
+  };
+}
+
 async function bootSettings(
   page: Page,
   role: 'Admin' | 'Engineer' | 'Operator',
@@ -80,6 +169,8 @@ async function bootSettings(
 ): Promise<F02MethodAuditEntry[]> {
   const audit: F02MethodAuditEntry[] = [];
   let currentSettings = fullSettingsPayload();
+  let currentStation = stationSettingsPayload();
+  let currentAiKey = 'fixture-ai-key';
   await installF02BrowserStartup(page);
   await page.route('**/health', async route => {
     audit.push(auditF02Request(route.request()));
@@ -102,6 +193,86 @@ async function bootSettings(
     }
     if (url.pathname === '/api/auth/me') {
       await fulfillF02Json(route, 200, { userId: 'fixture-user', username: 'fixture-settings', role }, fixtureSchema);
+      return;
+    }
+    if (url.pathname === '/api/station-communication/settings') {
+      if (role !== 'Admin') {
+        await fulfillF02Json(route, 403, { error: 'AdminRequired' }, fixtureSchema);
+        return;
+      }
+      if (request.method() === 'PUT') {
+        if (mutationDelayMs > 0) await new Promise(resolve => setTimeout(resolve, mutationDelayMs));
+        const body = JSON.parse(request.postData() ?? '{}') as Record<string, unknown>;
+        currentStation = stationSettingsPayload({
+          mode: typeof body.mode === 'string' ? body.mode : currentStation.mode,
+          port: typeof body.port === 'number' ? body.port : currentStation.port,
+          lanHost: typeof body.lanHost === 'string' ? body.lanHost : currentStation.lanHost,
+          localStationSyncEnabled: typeof body.localStationSyncEnabled === 'boolean'
+            ? body.localStationSyncEnabled
+            : currentStation.localStationSyncEnabled,
+          requiresRestart: { studio: true, localStation: true }
+        });
+        await fulfillF02Json(route, 200, currentStation, fixtureSchema);
+        return;
+      }
+      await fulfillF02Json(route, 200, currentStation, fixtureSchema);
+      return;
+    }
+    if (url.pathname === '/api/station-communication/token' && request.method() === 'POST') {
+      if (role !== 'Admin') {
+        await fulfillF02Json(route, 403, { error: 'AdminRequired' }, fixtureSchema);
+        return;
+      }
+      await fulfillF02Json(route, 200, {
+        success: true,
+        operation: 'regenerate',
+        token: 'fixture-token-value',
+        tokenInfo: { hasToken: true, mask: '******', last4: '9876' },
+        settings: currentStation,
+        message: 'Station token regenerated.',
+        errors: []
+      }, fixtureSchema);
+      return;
+    }
+    if (url.pathname === '/api/ai/models' || url.pathname === '/api/ai/models/model-1') {
+      if (request.method() === 'GET') {
+        await fulfillF02Json(route, 200, role === 'Admin'
+          ? [aiFullModelPayload(currentAiKey.length > 0)]
+          : [aiSafeModelPayload()], fixtureSchema);
+        return;
+      }
+      if (role !== 'Admin') {
+        await fulfillF02Json(route, 403, { error: 'AdminRequired' }, fixtureSchema);
+        return;
+      }
+      if (request.method() === 'PUT' || request.method() === 'POST') {
+        if (mutationDelayMs > 0) await new Promise(resolve => setTimeout(resolve, mutationDelayMs));
+        const body = JSON.parse(request.postData() ?? '{}') as Record<string, unknown>;
+        const operation = typeof body.apiKeyOperation === 'string' ? body.apiKeyOperation : 'keep';
+        if (operation === 'replace' && typeof body.apiKey === 'string') currentAiKey = body.apiKey;
+        if (operation === 'clear') currentAiKey = '';
+        await fulfillF02Json(route, 200, { message: 'AI model updated.' }, fixtureSchema);
+        return;
+      }
+    }
+    if (url.pathname === '/api/ai/reasoning-support' && request.method() === 'POST') {
+      await fulfillF02Json(route, 200, aiReasoningSupportPayload(), fixtureSchema);
+      return;
+    }
+    if (url.pathname === '/api/ai/models/model-1/test' && request.method() === 'POST') {
+      await fulfillF02Json(route, 200, {
+        connectionOk: true,
+        success: true,
+        statusCode: 200,
+        errorCode: '',
+        latencyMs: 17,
+        sanitizedMessage: 'Connection contract verified.',
+        message: 'Connection contract verified.',
+        provider: 'OpenAI Compatible',
+        modelName: 'gpt-5.1-mini',
+        protocol: 'openai_compatible',
+        wireApi: 'responses'
+      }, fixtureSchema);
       return;
     }
     if (url.pathname === '/api/settings') {
@@ -205,6 +376,110 @@ test('Settings keeps dirty drafts across groups and asks before route leave', as
   await expect(page).toHaveURL(/#\/settings$/);
   await page.getByTestId('leave-guard-stay').click();
   await expect(page.locator('input[name="softwareTitle"]')).toHaveValue('Draft retained in browser');
+});
+
+test('Admin Station communication preserves masked token and shows restart-required after save', async ({ page }) => {
+  const stationBodies: string[] = [];
+  page.on('request', request => {
+    const url = new URL(request.url());
+    if (url.pathname === '/api/station-communication/settings' && request.method() === 'PUT') {
+      stationBodies.push(request.postData() ?? '');
+    }
+  });
+  await bootSettings(page, 'Admin', 'full');
+  await page.goto('/studio/index.html#/settings');
+
+  await page.locator('[data-settings-group="station"]').click();
+  const station = page.locator('[data-settings-station]');
+  await expect(station).toBeVisible();
+  await station.locator('input[name="stationPort"]').fill('5033');
+  await station.locator('[data-settings-station-save]').click();
+  await expect(station.locator('[data-settings-station-restart-required]')).toBeVisible();
+  await expect(station.locator('[data-settings-station-feedback]')).toBeVisible();
+
+  expect(stationBodies).toHaveLength(1);
+  expect(JSON.parse(stationBodies[0]!)).not.toHaveProperty('sharedToken');
+  expect(await station.textContent()).not.toContain('fixture-token-value');
+
+  await station.locator('select[name="stationTokenOperation"]').selectOption('replace');
+  await station.locator('input[name="stationToken"]').fill('station-browser-secret');
+  await station.locator('[data-settings-station-save]').click();
+  await expect(station.locator('input[name="stationToken"]')).toHaveCount(0);
+  expect(JSON.parse(stationBodies[1]!)).toMatchObject({ sharedToken: 'station-browser-secret' });
+  expect(await station.textContent()).not.toContain('station-browser-secret');
+  expect(await page.evaluate(() => Object.values(sessionStorage).join('|'))).not.toContain('station-browser-secret');
+});
+
+test('Admin AI model administration keeps API key out of projection and supports keep replace clear', async ({ page }) => {
+  const aiBodies: string[] = [];
+  page.on('request', request => {
+    const url = new URL(request.url());
+    if (url.pathname === '/api/ai/models/model-1' && request.method() === 'PUT') {
+      aiBodies.push(request.postData() ?? '');
+    }
+  });
+  await bootSettings(page, 'Admin', 'full');
+  await page.goto('/studio/index.html#/settings');
+
+  await page.locator('[data-settings-group="ai-model"]').click();
+  const ai = page.locator('[data-settings-ai-model]');
+  await expect(ai.locator('[data-settings-ai-model-editor]')).toBeVisible();
+
+  await ai.locator('input[name="aiModel"]').fill('gpt-5.1-mini-updated');
+  await ai.locator('[data-settings-ai-model-save]').click();
+  await expect(ai.locator('[data-settings-ai-model-feedback]')).toBeVisible();
+  expect(JSON.parse(aiBodies[0]!)).toMatchObject({ apiKeyOperation: 'keep' });
+  expect(JSON.parse(aiBodies[0]!)).not.toHaveProperty('apiKey');
+
+  await ai.locator('[data-settings-ai-key-operation] select').selectOption('replace');
+  await ai.locator('input[name="aiApiKey"]').fill('ai-browser-secret');
+  await ai.locator('[data-settings-ai-model-save]').click();
+  await expect(ai.locator('input[name="aiApiKey"]')).toHaveCount(0);
+  expect(JSON.parse(aiBodies[1]!)).toMatchObject({ apiKeyOperation: 'replace', apiKey: 'ai-browser-secret' });
+  expect(await ai.textContent()).not.toContain('ai-browser-secret');
+
+  await ai.locator('[data-settings-ai-key-operation] select').selectOption('clear');
+  await ai.locator('[data-settings-ai-model-save]').click();
+  expect(JSON.parse(aiBodies[2]!)).toMatchObject({ apiKeyOperation: 'clear' });
+  expect(JSON.parse(aiBodies[2]!)).not.toHaveProperty('apiKey');
+  expect(await page.evaluate(() => Object.values(sessionStorage).join('|'))).not.toContain('ai-browser-secret');
+
+  await ai.locator('[data-settings-ai-model-test]').click();
+  await expect(ai.locator('[data-settings-ai-model-test-result]')).toBeVisible();
+  await ai.locator('[data-settings-ai-reasoning-support]').click();
+  await expect(ai).toContainText('OpenAI GPT-5');
+});
+
+test('Engineer receives AI safe projection and reasoning support without management or secrets', async ({ page }) => {
+  const audit = await bootSettings(page, 'Engineer', 'safe');
+  await page.goto('/studio/index.html#/settings');
+
+  await page.locator('[data-settings-group="ai-model"]').click();
+  const ai = page.locator('[data-settings-ai-model]');
+  await expect(ai.locator('[data-settings-ai-model-safe]')).toBeVisible();
+  await expect(ai.locator('[data-settings-ai-model-editor]')).toHaveCount(0);
+  await expect(ai.locator('input[type="password"]')).toHaveCount(0);
+  await ai.locator('[data-settings-ai-reasoning-support]').click();
+  await expect(ai).toContainText('OpenAI GPT-5');
+  expect(audit.some(entry => entry.method === 'GET' && entry.path === '/api/ai/models')).toBe(true);
+  expect(audit.some(entry => entry.method === 'POST' && entry.path === '/api/ai/reasoning-support')).toBe(true);
+  expect(await ai.textContent()).not.toContain('fixture-ai-key');
+});
+
+test('Settings blocks route leave while an AI model mutation is pending', async ({ page }) => {
+  const audit = await bootSettings(page, 'Admin', 'full', 0, 600);
+  await page.goto('/studio/index.html#/settings');
+
+  await page.locator('[data-settings-group="ai-model"]').click();
+  await page.locator('[data-settings-ai-model] input[name="aiModel"]').fill('pending-ai-model');
+  await page.locator('[data-settings-ai-model-save]').click();
+  await expect.poll(() => audit.filter(entry => entry.method === 'PUT' && entry.path === '/api/ai/models/model-1').length)
+    .toBe(1);
+
+  await page.locator('[data-product-nav="/projects"]').first().click();
+  await expect(page.locator('[data-product-state="leave-blocked"]')).toBeVisible();
+  await expect(page).toHaveURL(/#\/settings$/);
+  await expect(page.locator('[data-settings-ai-model-feedback]')).toBeVisible();
 });
 
 test('Settings blocks route leave while a mutation is pending and keeps the mutation observable', async ({ page }) => {

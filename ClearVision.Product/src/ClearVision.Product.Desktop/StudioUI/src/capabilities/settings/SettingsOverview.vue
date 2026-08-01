@@ -32,6 +32,7 @@ import SettingsPlcPanel from './SettingsPlcPanel.vue';
 import SettingsTcpPanel from './SettingsTcpPanel.vue';
 import SettingsCameraPanel from './SettingsCameraPanel.vue';
 import SettingsStationPanel from './SettingsStationPanel.vue';
+import SettingsAiModelPanel from './SettingsAiModelPanel.vue';
 
 const props = defineProps<{
   projection: SettingsProjectionV1;
@@ -136,7 +137,7 @@ function stateTone(state: SettingsSectionReadState): CvStatusTone {
 
 function mountedSection(target: SettingsNavigationTarget): boolean {
   return target === 'overview' || target === 'database' || target === 'plc' || target === 'tcp' ||
-    target === 'camera' || target === 'station';
+    target === 'camera' || target === 'station' || target === 'ai-model';
 }
 
 function sectionStateLabel(
@@ -151,6 +152,10 @@ function sectionStateLabel(
   if (target === 'station') {
     if (props.role !== 'Admin') return 'Admin only';
     return props.owner.projection.station ? '已接入' : '读取中';
+  }
+  if (target === 'ai-model') {
+    if (!props.owner.projection.aiModels) return props.role === 'Engineer' ? 'safe read' : '读取中';
+    return props.owner.projection.aiModels.safeSubset ? 'Engineer safe read' : 'Admin 可管理';
   }
   const device = props.owner.projection.device;
   if (target === 'plc') return device.plcSettings ? `已接入（${device.plcSettings.activeProtocol}）` : '未读取';
@@ -172,6 +177,7 @@ function sectionTone(target: SettingsNavigationTarget, state: SettingsSectionRea
   const device = props.owner.projection.device;
   if (target === 'database') return 'ok';
   if (target === 'station') return props.owner.projection.station ? 'ok' : 'idle';
+  if (target === 'ai-model') return props.owner.projection.aiModels ? 'ok' : 'idle';
   if (target === 'plc') return device.plcSettings ? 'ok' : 'idle';
   if (target === 'tcp') {
     return Object.values(device.tcpStatuses).some(status => status?.isConnected || status?.isListening)
@@ -304,6 +310,12 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
 
       <SettingsStationPanel
         v-else-if="activeGroup === 'station'"
+        :owner="owner"
+        :role="role"
+      />
+
+      <SettingsAiModelPanel
+        v-else-if="activeGroup === 'ai-model'"
         :owner="owner"
         :role="role"
       />
