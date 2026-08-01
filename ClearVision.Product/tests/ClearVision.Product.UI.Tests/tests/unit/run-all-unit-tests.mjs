@@ -22,7 +22,7 @@ if (testFiles.length < minimumTestFiles) {
 }
 
 const outputChunks = [];
-const child = spawn(process.execPath, ['--test', '--test-reporter=tap', ...testFiles], {
+const child = spawn(process.execPath, ['--test', '--test-reporter=tap', '--test-concurrency=1', ...testFiles], {
   cwd: process.cwd(),
   env: process.env,
   stdio: ['inherit', 'pipe', 'pipe']
