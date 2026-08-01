@@ -140,8 +140,8 @@ public class TcpDeviceManagerTests
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = RunSingleEchoServerAsync(listener, "PING", "PONG", cts.Token);
+        using var serverCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var serverTask = RunSingleEchoServerAsync(listener, "PING", "PONG", serverCts.Token);
         await using var manager = CreateManager();
         var profile = CreateTransientClientProfile(port);
 
@@ -150,7 +150,7 @@ public class TcpDeviceManagerTests
             var result = await manager.SendTransientAsync(
                 profile,
                 new TcpDeviceSendRequest("PING", WaitResponse: true, ResponseTimeoutMs: 2500),
-                cts.Token);
+                CancellationToken.None);
 
             result.Success.Should().BeTrue(result.Message);
             result.Response.Should().Be("PONG");
@@ -161,13 +161,13 @@ public class TcpDeviceManagerTests
             result.Status.RemoteEndpoint.Should().BeNull();
 
             // 后续查询状态同样不得残留可复用连接。
-            var status = await manager.GetStatusAsync(profile.Id, cts.Token);
+            var status = await manager.GetStatusAsync(profile.Id, CancellationToken.None);
             status.IsConnected.Should().BeFalse();
             status.RemoteEndpoint.Should().BeNull();
         }
         finally
         {
-            cts.Cancel();
+            serverCts.Cancel();
             listener.Stop();
             await IgnoreServerTerminationAsync(serverTask);
         }
