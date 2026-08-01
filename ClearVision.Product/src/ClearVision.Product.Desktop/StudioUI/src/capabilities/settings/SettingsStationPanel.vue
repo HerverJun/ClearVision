@@ -125,17 +125,22 @@ async function loadStation(): Promise<void> {
 
   phase.value = 'loading';
   loadBusy.value = true;
-  const result = await owner.readStationCommunication();
-  if (version !== requestVersion.value || owner !== props.owner) return;
-  if (result.status === 'completed') {
-    phase.value = 'ready';
-    readMessage.value = null;
-  } else {
-    phase.value = 'error';
-    readMessage.value = resultMessage(result);
+  try {
+    const result = await owner.readStationCommunication();
+    if (version !== requestVersion.value || owner !== props.owner) return;
+    if (result.status === 'completed') {
+      phase.value = 'ready';
+      readMessage.value = null;
+    } else {
+      phase.value = 'error';
+      readMessage.value = resultMessage(result);
+    }
+  } finally {
+    if (version === requestVersion.value && owner === props.owner) {
+      loadBusy.value = false;
+      owner.refreshPanelState();
+    }
   }
-  loadBusy.value = false;
-  owner.refreshPanelState();
 }
 
 function discard(): void {

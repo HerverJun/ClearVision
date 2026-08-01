@@ -63,7 +63,9 @@ const reasoningSupport = shallowRef<AiReasoningSupportProjectionV1 | null>(null)
 const selectedId = shallowRef<string | null>(null);
 const mutationBusy = shallowRef(false);
 const readBusy = shallowRef(false);
+const reasoningBusy = shallowRef(false);
 const requestVersion = shallowRef(0);
+const reasoningRequestVersion = shallowRef(0);
 const apiKeyMode = shallowRef<AiApiKeyOperationV1>('keep');
 const apiKeyDraft = shallowRef('');
 const draftBaseline = shallowRef<Readonly<Record<string, unknown>>>({});
@@ -171,6 +173,11 @@ function isFullModel(value: AiModelPublicProjectionV1 | null | undefined): value
   return value !== null && value !== undefined && 'name' in value;
 }
 
+function invalidateReasoningRequest(): void {
+  reasoningRequestVersion.value += 1;
+  reasoningBusy.value = false;
+}
+
 function stringFromRecord(value: JsonRecord | null | undefined, key: string, fallback: string): string {
   const item = value?.[key];
   return typeof item === 'string' && item.trim() ? item : fallback;
@@ -224,6 +231,7 @@ function snapshotDraft(): Readonly<Record<string, unknown>> {
 }
 
 function resetDraft(value: AiModelPublicProjectionV1 | null): void {
+  invalidateReasoningRequest();
   const next = emptyDraft();
   if (isFullModel(value)) {
     next.name = value.name ?? value.displayName;
@@ -357,10 +365,12 @@ async function loadModels(): Promise<void> {
   const owner = props.owner;
   const version = requestVersion.value + 1;
   requestVersion.value = version;
+  invalidateReasoningRequest();
   clearSecret();
   feedback.value = null;
   connectionResult.value = null;
   if (!canRead.value) {
+    readBusy.value = false;
     phase.value = 'forbidden';
     readMessage.value = '当前角色没有读取 AI 模型 safe projection 的权限。';
     selectedId.value = null;
@@ -369,22 +379,27 @@ async function loadModels(): Promise<void> {
   }
   phase.value = 'loading';
   readBusy.value = true;
-  const result = await owner.readAiModels();
-  if (version !== requestVersion.value || owner !== props.owner) return;
-  if (result.status === 'completed') {
-    phase.value = 'ready';
-    readMessage.value = null;
-    const current = selectedId.value && result.value.items.some(item => item.id === selectedId.value)
-      ? selectedId.value
-      : result.value.items[0]?.id ?? null;
-    selectedId.value = current;
-    resetDraft(result.value.items.find(item => item.id === current) ?? null);
-  } else {
-    phase.value = 'error';
-    readMessage.value = resultFeedback(result).message;
+  try {
+    const result = await owner.readAiModels();
+    if (version !== requestVersion.value || owner !== props.owner) return;
+    if (result.status === 'completed') {
+      phase.value = 'ready';
+      readMessage.value = null;
+      const current = selectedId.value && result.value.items.some(item => item.id === selectedId.value)
+        ? selectedId.value
+        : result.value.items[0]?.id ?? null;
+      selectedId.value = current;
+      resetDraft(result.value.items.find(item => item.id === current) ?? null);
+    } else {
+      phase.value = 'error';
+      readMessage.value = resultFeedback(result).message;
+    }
+  } finally {
+    if (version === requestVersion.value && owner === props.owner) {
+      readBusy.value = false;
+      owner.refreshPanelState();
+    }
   }
-  readBusy.value = false;
-  owner.refreshPanelState();
 }
 
 async function save(): Promise<void> {
@@ -502,7 +517,7 @@ async function setDefault(id: string, role: 'planner' | 'shadow-eval'): Promise<
 }
 
 async function queryReasoningSupport(): Promise<void> {
-  if (!canRead.value || mutationBusy.value || !draft.model.trim()) return;
+  if (!canRead.value || readBusy.value || reasoningBusy.value || mutationBusy.value || !draft.model.trim()) return;
   const owner = props.owner;
   const request: AiReasoningSupportRequestV1 = {
     provider: draft.provider.trim(),
@@ -510,16 +525,25 @@ async function queryReasoningSupport(): Promise<void> {
     baseUrl: draft.baseUrl.trim() || null,
     protocol: draft.protocol
   };
-  const result = await owner.readAiReasoningSupport(request);
-  if (owner !== props.owner) return;
-  if (result.status === 'completed') {
-    reasoningSupport.value = result.value;
-    const allowedModes = result.value.allowedModes;
-    const allowedEfforts = result.value.allowedEfforts;
-    if (!allowedModes.includes(draft.reasoningMode)) draft.reasoningMode = allowedModes[0] ?? 'auto';
-    if (!allowedEfforts.includes(draft.reasoningEffort)) draft.reasoningEffort = allowedEfforts[0] ?? 'medium';
-  } else {
-    feedback.value = resultFeedback(result);
+  const version = reasoningRequestVersion.value + 1;
+  reasoningRequestVersion.value = version;
+  reasoningBusy.value = true;
+  try {
+    const result = await owner.readAiReasoningSupport(request);
+    if (version !== reasoningRequestVersion.value || owner !== props.owner) return;
+    if (result.status === 'completed') {
+      reasoningSupport.value = result.value;
+      const allowedModes = result.value.allowedModes;
+      const allowedEfforts = result.value.allowedEfforts;
+      if (!allowedModes.includes(draft.reasoningMode)) draft.reasoningMode = allowedModes[0] ?? 'auto';
+      if (!allowedEfforts.includes(draft.reasoningEffort)) draft.reasoningEffort = allowedEfforts[0] ?? 'medium';
+    } else {
+      feedback.value = resultFeedback(result);
+    }
+  } finally {
+    if (version === reasoningRequestVersion.value && owner === props.owner) {
+      reasoningBusy.value = false;
+    }
   }
 }
 
@@ -571,10 +595,12 @@ onBeforeUnmount(() => {
   detachPanelState();
   clearSecret();
   requestVersion.value += 1;
+  invalidateReasoningRequest();
 });
 
 onDeactivated(() => {
   clearSecret();
+  invalidateReasoningRequest();
   props.owner.refreshPanelState();
 });
 </script>
@@ -851,8 +877,8 @@ onDeactivated(() => {
             <CvButton
               size="sm"
               variant="quiet"
-              :loading="readBusy"
-              :disabled="readBusy || mutationBusy || !draft.model.trim()"
+              :loading="reasoningBusy"
+              :disabled="readBusy || reasoningBusy || mutationBusy || !draft.model.trim()"
               loading-label="正在查询"
               data-settings-ai-reasoning-support
               @click="queryReasoningSupport"
@@ -938,8 +964,8 @@ onDeactivated(() => {
             <CvButton
               size="sm"
               variant="quiet"
-              :loading="readBusy"
-              :disabled="readBusy || !draft.model.trim()"
+              :loading="reasoningBusy"
+              :disabled="readBusy || reasoningBusy || !draft.model.trim()"
               loading-label="正在查询"
               data-settings-ai-reasoning-support
               @click="queryReasoningSupport"

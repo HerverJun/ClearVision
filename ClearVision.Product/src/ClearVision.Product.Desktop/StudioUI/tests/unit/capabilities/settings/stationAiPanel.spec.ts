@@ -298,6 +298,46 @@ describe('F07 G8 AI model administration panel', () => {
     expect(wrapper.text()).toContain('OpenAI GPT-5');
   });
 
+  it('does not submit duplicate reasoning support reads while the first read is pending', async () => {
+    const pending = new Promise<SettingsWriteResult<AiReasoningSupportProjectionV1>>(() => undefined);
+    const fixture = ownerFixture({ role: 'Engineer', aiModels: safeAiProjection() });
+    fixture.aiReasoning.mockReturnValue(pending);
+    const wrapper = mount(SettingsAiModelPanel, { props: { owner: fixture.owner, role: 'Engineer' } });
+    mountedWrappers.push(wrapper);
+    await flushPromises();
+
+    const button = wrapper.get('[data-settings-ai-reasoning-support]');
+    await button.trigger('click');
+    await button.trigger('click');
+
+    expect(fixture.aiReasoning).toHaveBeenCalledTimes(1);
+    expect(button.attributes('disabled')).toBeDefined();
+  });
+
+  it('does not apply reasoning support from a model that was replaced while the read was pending', async () => {
+    let resolveReasoning!: (result: SettingsWriteResult<AiReasoningSupportProjectionV1>) => void;
+    const pending = new Promise<SettingsWriteResult<AiReasoningSupportProjectionV1>>(resolve => {
+      resolveReasoning = resolve;
+    });
+    const projection = safeAiProjection();
+    const second = { ...projection.items[0]!, id: 'safe-2', displayName: 'Second safe model', model: 'gpt-5.1-large' };
+    const fixture = ownerFixture({
+      role: 'Engineer',
+      aiModels: { ...projection, items: [projection.items[0]!, second] }
+    });
+    fixture.aiReasoning.mockReturnValue(pending);
+    const wrapper = mount(SettingsAiModelPanel, { props: { owner: fixture.owner, role: 'Engineer' } });
+    mountedWrappers.push(wrapper);
+    await flushPromises();
+
+    await wrapper.get('[data-settings-ai-reasoning-support]').trigger('click');
+    await wrapper.findAll('button.settings-ai-model__select')[1]!.trigger('click');
+    resolveReasoning(completed({ ...reasoningSupport(), familyName: 'Stale model support' }));
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('Stale model support');
+  });
+
   it('reports model mutation pending and clears the API key on KeepAlive deactivation', async () => {
     const pending = new Promise<SettingsWriteResult<{
       message: string; modelId: string | null; projection: AiModelsProjectionV1;
