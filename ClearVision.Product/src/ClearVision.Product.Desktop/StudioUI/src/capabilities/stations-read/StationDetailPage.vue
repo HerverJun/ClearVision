@@ -17,6 +17,10 @@ import {
 } from '@/design-system';
 import { formatInspectionOutcome } from '@/shared/inspectionOutcome';
 import {
+  createStationResultsDeepLink,
+  resolveProductionReturnTo
+} from '@/shared/productionTraceLinks';
+import {
   createStationAdminDetailsQuery,
   createStationAuditsQuery,
   createStationCommandsQuery,
@@ -34,6 +38,8 @@ import {
 import { createStationSseAdapter } from './stationSseAdapter';
 import { createStationAdminCommandOwner } from './stationAdminCommandOwner';
 import StationAdminPanel from './StationAdminPanel.vue';
+import StationProductionTrace from './StationProductionTrace.vue';
+import type { StationAdminEvidenceState } from './stationProductionTrace';
 import type {
   StationHealthSnapshot,
   StationResult
@@ -64,6 +70,14 @@ const router = useRouter();
 const runtime = useStationsReadRuntime(props.runtime);
 const activeStationId = computed(() => props.stationId ?? String(route.params.stationId ?? ''));
 const isStationAdmin = runtime.session?.projection.user?.role === 'Admin';
+const canOpenWorkspace = ['Admin', 'Engineer'].includes(runtime.session?.projection.user?.role ?? '');
+const returnTarget = computed(() => {
+  const value = route.query.returnTo;
+  return resolveProductionReturnTo(typeof value === 'string' ? value : null);
+});
+const returnLabel = computed(() => returnTarget.value?.startsWith('/results')
+  ? '返回检测结果'
+  : '返回工作站列表');
 
 function initialTake(): number {
   const candidate = Number(route.query.take);
@@ -114,6 +128,15 @@ const station = computed(() => listState.value.data?.find(
 const lastOutcome = computed(() => station.value?.lastOutcome
   ? formatInspectionOutcome(station.value.lastOutcome)
   : null);
+const adminEvidence = computed<StationAdminEvidenceState>(() => {
+  if (!isStationAdmin) return 'restricted';
+  const states = [commandsState?.value, auditsState?.value, packagesState?.value];
+  if (states.some(state => state?.phase === 'loading' || state?.phase === 'idle')) return 'loading';
+  if (states.every(state => state && ['success', 'empty', 'stale', 'partial-failure'].includes(state.phase))) {
+    return 'available';
+  }
+  return 'unavailable';
+});
 
 async function refreshAll(): Promise<void> {
   const refreshes: Promise<unknown>[] = [
@@ -209,12 +232,13 @@ const takeModel = computed({
 });
 
 const resultColumns: readonly CvDataTableColumn<StationResult>[] = Object.freeze([
-  { key: 'completedAtUtc', label: '完成时间', width: '20%' },
+  { key: 'completedAtUtc', label: '完成时间', width: '18%' },
   { key: 'outcome', label: '结果', width: '13%' },
-  { key: 'axes', label: '执行状态 / 判定结果', width: '20%' },
-  { key: 'packageName', label: '运行包', width: '17%' },
-  { key: 'diagnosticCode', label: '诊断码', width: '15%' },
-  { key: 'executionTimeMs', label: '耗时', align: 'end', width: '15%' }
+  { key: 'axes', label: '执行状态 / 判定结果', width: '18%' },
+  { key: 'packageName', label: '运行包', width: '15%' },
+  { key: 'diagnosticCode', label: '诊断码', width: '14%' },
+  { key: 'executionTimeMs', label: '耗时', align: 'end', width: '10%' },
+  { key: 'actions', label: '操作', align: 'end', width: '12%' }
 ]);
 
 const healthColumns: readonly CvDataTableColumn<StationHealthSnapshot>[] = Object.freeze([
@@ -255,6 +279,23 @@ const ordinaryItems = computed<readonly CvDescriptionItem[]>(() => {
 function resultPresentation(result: StationResult) {
   return formatInspectionOutcome(result.outcome);
 }
+
+function stationReturnPath(): string {
+  return `/stations/${encodeURIComponent(activeStationId.value)}`;
+}
+
+function stationResultLink(result: StationResult): string {
+  return createStationResultsDeepLink({
+    stationId: result.stationId,
+    resultId: result.messageId,
+    returnTo: stationReturnPath()
+  });
+}
+
+const stationResultsLink = computed(() => createStationResultsDeepLink({
+  stationId: activeStationId.value,
+  returnTo: stationReturnPath()
+}));
 
 async function changeTake(): Promise<void> {
   const nextQuery = { ...route.query };
@@ -299,12 +340,19 @@ onBeforeUnmount(() => {
       <template #breadcrumbs>
         <RouterLink
           class="station-detail__back"
-          to="/stations"
+          :to="returnTarget ?? '/stations'"
         >
-          ← 返回工作站列表
+          ← {{ returnLabel }}
         </RouterLink>
       </template>
       <template #actions>
+        <RouterLink
+          class="station-detail__nav-link"
+          :to="stationResultsLink"
+          data-testid="station-open-results"
+        >
+          查看结果
+        </RouterLink>
         <CvSelect
           v-model="takeModel"
           class="station-detail__take"
@@ -484,8 +532,29 @@ onBeforeUnmount(() => {
         <template #cell-executionTimeMs="{ row }">
           {{ row.executionTimeMs }} ms
         </template>
+        <template #cell-actions="{ row }">
+          <RouterLink
+            class="station-detail__nav-link"
+            :to="stationResultLink(row)"
+            data-testid="station-result-link"
+          >
+            追溯
+          </RouterLink>
+        </template>
       </CvDataTable>
     </CvPanel>
+
+    <StationProductionTrace
+      v-if="station"
+      class="station-detail__production-trace"
+      :station="station"
+      :results="resultsState.data ?? []"
+      :commands="commandsState?.data ?? []"
+      :audits="auditsState?.data ?? []"
+      :packages="packagesState?.data ?? []"
+      :admin-evidence="adminEvidence"
+      :can-open-project="canOpenWorkspace"
+    />
 
     <CvPanel
       class="station-detail__health-panel"
@@ -593,11 +662,15 @@ onBeforeUnmount(() => {
 .station-detail > :deep(.cv-page-state) { grid-column: 1 / -1; }
 .station-detail__back { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); text-decoration: none; }
 .station-detail__back:hover { color: var(--cv-color-link); text-decoration: underline; }
+.station-detail__nav-link { min-height: var(--cv-density-control-height-sm); padding: 0 var(--cv-space-2); display: inline-flex; align-items: center; justify-content: center; border-radius: var(--cv-radius-sm); color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; touch-action: manipulation; }
+.station-detail__nav-link:hover { background: var(--cv-interactive-hover); color: var(--cv-color-link-hover); }
+.station-detail__nav-link:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
 .station-detail__take { min-width: 150px; }
 .station-detail__grid { display: contents; }
 .station-detail__overview-panel { grid-column: 1; }
 .station-detail__results-panel { grid-column: 2; grid-row: span 2; }
 .station-detail__health-panel { grid-column: 1 / -1; }
+.station-detail__production-trace { grid-column: 1 / -1; }
 .station-detail__admin-control { grid-column: 1 / -1; }
 .station-detail__outcome { display: grid; justify-items: start; gap: var(--cv-space-1); }
 .station-detail__outcome span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }

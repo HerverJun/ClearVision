@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
+import { RouterLink } from 'vue-router';
 import { CvButton, CvModal, CvStatusBadge, type CvStatusTone } from '@/design-system';
+import { createStationFleetDeepLink } from '@/shared/productionTraceLinks';
 import type { WorkspaceProjectV1 } from '../workspaceContracts';
 import type { RuntimePackageExportOwner } from './runtimePackageExportOwner';
 
@@ -20,6 +22,11 @@ const statusLabel = computed(() => ({
   idle: '等待导出', saving: '正在保存工程', exporting: '正在生成运行包', success: '运行包已生成',
   forbidden: '需要管理员权限', error: '导出未完成', 'unknown-outcome': '导出结果未知', disposed: '导出已关闭'
 }[props.owner.projection.phase] ?? '状态未知'));
+const stationFleetLink = computed(() => createStationFleetDeepLink({
+  packageId: props.owner.projection.result?.stationPackageId ?? props.owner.projection.result?.packageId ?? null,
+  projectId: props.project.id,
+  revision: props.owner.projection.requestedRevision ?? props.project.persistenceRevision
+}));
 
 async function copyField(key: string, value: string): Promise<void> {
   try {
@@ -98,6 +105,14 @@ async function copyField(key: string, value: string): Promise<void> {
           <div><dt>判定配置身份</dt><dd>{{ owner.projection.result.decisionConfigurationHash ? '已写入并校验' : '未提供' }}</dd></div>
           <div><dt>工作站注册</dt><dd>{{ owner.projection.result.registeredForStationDeployment ? '已注册，可供部署' : '未注册' }}</dd></div>
         </dl>
+        <RouterLink
+          v-if="owner.projection.result.registeredForStationDeployment"
+          class="package-dialog__stations-link"
+          :to="stationFleetLink"
+          data-testid="runtime-package-open-stations"
+        >
+          按运行包身份定位工作站
+        </RouterLink>
       </section>
       <details class="package-dialog__technical cv-technical-detail">
         <summary>技术详情</summary>
@@ -191,6 +206,9 @@ async function copyField(key: string, value: string): Promise<void> {
 .package-dialog__status p { margin: 0; min-width: 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
 .package-dialog__result { background: color-mix(in srgb, var(--cv-color-status-ok-soft) 62%, var(--cv-surface-raised)); }
 .package-dialog__result strong { color: var(--cv-color-status-ok-strong); }
+.package-dialog__stations-link { width: fit-content; min-height: var(--cv-density-control-height-sm); margin-top: var(--cv-space-2); padding: 0 var(--cv-space-3); display: inline-flex; align-items: center; border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-sm); background: var(--cv-surface-raised); color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; }
+.package-dialog__stations-link:hover { border-color: var(--cv-control-border-hover); background: var(--cv-interactive-hover); }
+.package-dialog__stations-link:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
 .package-dialog__technical dl { grid-template-columns: 1fr; }
 .package-dialog__warning { margin: 0; padding: var(--cv-space-2); border: 1px solid var(--cv-color-status-warning-border); background: var(--cv-color-status-warning-soft); color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-xs); line-height: 1.45; }
 </style>

@@ -25,6 +25,7 @@ import {
 export type ResultsSource = 'local' | 'station';
 
 export interface ResultsListFilters {
+  readonly stationId: string;
   readonly outcome: CanonicalInspectionOutcomeKind | '';
   readonly diagnosticCode: string;
   readonly from: string;
@@ -105,6 +106,8 @@ export function createComparisonPath(
 
 export function createStationResultsPath(filters: ResultsListFilters): string {
   const query = new URLSearchParams();
+  const stationId = filters.stationId.trim();
+  if (stationId) query.set('stationId', stationId);
   appendDate(query, 'from', filters.from);
   appendDate(query, 'to', filters.to);
   if (filters.outcome) query.set('status', filters.outcome);
@@ -117,6 +120,8 @@ export function createStationResultsPath(filters: ResultsListFilters): string {
 
 export function createStationStatisticsPath(filters: ResultsListFilters): string {
   const query = new URLSearchParams();
+  const stationId = filters.stationId.trim();
+  if (stationId) query.set('stationId', stationId);
   appendDate(query, 'from', filters.from);
   appendDate(query, 'to', filters.to);
   if (filters.outcome) query.set('status', filters.outcome);
@@ -267,7 +272,7 @@ export function createStationResultsDefinition(
   return Object.freeze({
     key: () => `results:station:${createStationResultsPath(filters())}`,
     path: () => createStationResultsPath(filters()),
-    decode: decodeStationInspectionResultPage,
+    decode: (payload: unknown) => decodeStationInspectionResultPage(payload, filters().stationId),
     isEmpty: (page: StationInspectionResultPage) => page.totalCount === 0,
     protected: true,
     cacheTimeMs: 5_000

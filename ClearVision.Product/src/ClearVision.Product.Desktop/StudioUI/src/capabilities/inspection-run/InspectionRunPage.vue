@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { useProductRuntime } from '@/app/productRuntime';
 import { isProjectId } from '@/capabilities/projects-read/projectContracts';
+import { createLocalResultsDeepLink } from '@/shared/productionTraceLinks';
 import { createInspectionRunOwner } from './inspectionRunOwner';
 import { createInspectionRunApiAdapter } from './realtimeApiAdapter';
 import { createInspectionSseAdapter } from './sseAdapter';
@@ -169,6 +170,13 @@ const results = computed<readonly RunConsoleResultItem[]>(() => runState.recentR
     ...flattenRunDiagnostics(result.outputData, 'output')
   ])
 })));
+function inspectionResultsLink(resultId?: string): string {
+  return createLocalResultsDeepLink({
+    projectId,
+    ...(resultId ? { resultId } : {}),
+    returnTo: `/projects/${encodeURIComponent(projectId)}/inspection`
+  });
+}
 
 onMounted(() => owner.load());
 onBeforeUnmount(() => {
@@ -187,7 +195,7 @@ onBeforeUnmount(() => {
       :description="projection.project ? projection.project.name + ' · 保存修订 ' + projection.project.persistenceRevision : '正在读取工程'"
     >
       <template #actions>
-        <RouterLink :to="{ path: '/results', query: { source: 'local', projectId } }">
+        <RouterLink :to="inspectionResultsLink()">
           查看检测结果
         </RouterLink>
       </template>
@@ -247,6 +255,14 @@ onBeforeUnmount(() => {
             :disabled="Boolean(runState.runtime?.isBusy) || pending"
             @update:model-value="owner.selectCamera($event || null)"
           />
+        </template>
+        <template #result-action="{ result }">
+          <RouterLink
+            :to="inspectionResultsLink(result.id)"
+            data-testid="inspection-run-result-link"
+          >
+            查看结果
+          </RouterLink>
         </template>
       </RunConsole>
     </template>

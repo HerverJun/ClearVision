@@ -142,13 +142,25 @@ function result(): Record<string, unknown> {
     packageId: 'pkg-a',
     packageName: '瓶盖检测包',
     packageVersion: '1.0.0',
+    packageFlowHash: 'sha256:package',
+    executionFlowHash: 'sha256:execution',
+    flowHash: 'sha256:execution',
+    executionSnapshotId: '11111111-1111-4111-8111-111111111111',
+    projectRevision: 12,
+    decisionConfigurationHash: 'sha256:decision',
+    executionRunMode: 'Production',
     outcome: 1,
     inspectionStatus: 'NG',
     executionOutcome: 'Succeeded',
     decisionOutcome: 'Ng',
+    hasJudgmentSignal: true,
+    decisionSource: 'FinalDecision',
+    reasonCode: 'WIRE_SWAP',
     executionTimeMs: 25,
     diagnosticCode: 'WIRE_SWAP',
     diagnosticMessage: '线序错误',
+    primaryOutputsPreview: { score: '0.91' },
+    startedAtUtc: '2026-07-15T01:59:59Z',
     completedAtUtc: '2026-07-15T02:00:00Z'
   };
 }
@@ -285,6 +297,16 @@ async function bootStations(
       });
       return;
     }
+    if (url.pathname === '/api/stations/results') {
+      const pageIndex = Number(url.searchParams.get('pageIndex') ?? 0);
+      const pageSize = Number(url.searchParams.get('pageSize') ?? 20);
+      const item = result();
+      const items = !url.searchParams.get('stationId') || url.searchParams.get('stationId') === item.stationId
+        ? [item]
+        : [];
+      await fulfill(route, 200, { items, totalCount: items.length, pageIndex, pageSize });
+      return;
+    }
     if (url.pathname === '/api/stations/station-a/results') {
       await fulfill(route, 200, [result()]);
       return;
@@ -324,9 +346,11 @@ async function bootStations(
       return;
     }
     if (url.pathname === '/api/stations/audit') {
+      const deployCommand = commands.find(item => item.commandType === 'DeployPackage');
       await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? [{
         auditId: 'audit-a', userName: 'fixture-admin', action: 'StationCommandCreated', targetStationId: 'station-a',
-        commandId: 'command-a', payloadSummary: 'Ping', createdAtUtc: '2026-07-15T02:00:00Z', result: 'Created', clientIp: '127.0.0.1'
+        commandId: deployCommand?.commandId ?? 'command-a', payloadSummary: deployCommand ? 'DeployPackage pkg-a' : 'Ping',
+        createdAtUtc: '2026-07-15T02:00:00Z', result: deployCommand?.status ?? 'Created', clientIp: '127.0.0.1'
       }] : { error: 'StationAdminRequired' });
       return;
     }
@@ -393,6 +417,7 @@ test('Engineer Station journey remains read-only and never mounts the Admin cont
   await expect(page.getByText('工作站详情读取失败')).toHaveCount(0);
   await expect(page.getByText('TCP', { exact: true })).toBeVisible();
   await expect(page.getByText('未上报/不可确认', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('station-production-trace')).toContainText('当前角色仅能查看监控摘要');
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'station-detail-abnormal', viewport, runtimeErrors, requestAudit: audit
@@ -401,6 +426,19 @@ test('Engineer Station journey remains read-only and never mounts the Admin cont
   expect(expectGetOnly(audit)).toBe(true);
   expect(audit.some(entry => entry.path === '/api/stations/events')).toBe(true);
   expect(audit.some(entry => /commands|logs|audit|packages|download/.test(entry.path))).toBe(false);
+
+  await page.getByTestId('station-result-link').click();
+  await expect(page).toHaveURL(/#\/results\?source=station&stationId=station-a&resultId=message-9/);
+  await expect(page.getByText('远程结果仅保留摘要')).toBeVisible();
+  await expect(page.locator('[data-remote-image-status="not-uploaded"]')).toBeVisible();
+  await expect.poll(() => audit.some(entry =>
+    entry.path.includes('/api/stations/results?stationId=station-a')
+  )).toBe(true);
+  expect(audit.some(entry => entry.path.startsWith('/api/images/'))).toBe(false);
+
+  await page.getByTestId('results-open-station').click();
+  await expect(page).toHaveURL(/#\/stations\/station-a\?returnTo=/);
+  await expect(page.getByText('返回检测结果')).toBeVisible();
 });
 
 test('Admin Station journey mounts controls and creates command, identity and package operations', async ({ page, context }) => {
@@ -566,6 +604,7 @@ for (const visual of [
     await expect(admin).toBeVisible();
     const deploymentStatus = admin.getByTestId('station-deployment-status');
     await expect(deploymentStatus.getByText('部署完成')).toBeVisible();
+    await expect(page.getByTestId('station-production-trace')).toContainText('身份闭合');
     await deploymentStatus.evaluate(element => element.scrollIntoView({ block: 'center' }));
     await captureF02VisualEvidence(page, {
       scenario: visual.id,
@@ -575,6 +614,50 @@ for (const visual of [
       requests: audit,
       runtimeErrors
     });
+    expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  });
+}
+
+for (const visual of [
+  { id: 'g6-production-trace-wide', width: 1920, height: 1080 },
+  { id: 'g6-production-trace-standard', width: 1366, height: 768 },
+  { id: 'g6-production-trace-short', width: 1366, height: 600 }
+] as const) {
+  test(`captures ${visual.id} identity-chain evidence`, async ({ page }) => {
+    test.skip(!hasF02VisualEvidenceTarget(), 'Visual evidence output was not requested.');
+    await page.setViewportSize({ width: visual.width, height: visual.height });
+    await installF02VisualPreferences(page, 'light', 'compact');
+    const runtimeErrors = createF02RuntimeErrorAudit(page);
+    const deploymentCommand = command({
+      commandId: 'deploy-succeeded',
+      commandType: 'DeployPackage',
+      clientRequestId: 'deploy-request-g6',
+      payloadJson: JSON.stringify(deploymentPayload()),
+      status: 'Succeeded',
+      progressPercent: 100,
+      completedAtUtc: '2026-07-15T02:02:00Z',
+      resultMessage: 'Package pkg-a deployed.'
+    });
+    const audit = await bootStations(page, [station()], summary(), 'Admin', [deploymentCommand]);
+    await page.goto('/studio/index.html#/stations/station-a');
+    const trace = page.getByTestId('station-production-trace');
+    await expect(trace).toContainText('身份闭合');
+    await expect(trace).toContainText('deploy-succeeded · Succeeded');
+    await expect(trace).toContainText('run-9 · message-9');
+    await expect(trace.locator('[data-remote-image-status="not-uploaded"]')).toBeVisible();
+    await trace.evaluate(element => {
+      element.style.scrollMarginTop = '60px';
+      element.scrollIntoView({ block: 'start' });
+    });
+    await captureF02VisualEvidence(page, {
+      scenario: visual.id,
+      viewport: { width: visual.width, height: visual.height },
+      theme: 'light',
+      density: 'compact',
+      requests: audit,
+      runtimeErrors
+    });
+    expect(audit.some(entry => entry.path.startsWith('/api/images/'))).toBe(false);
     expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
   });
 }

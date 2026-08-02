@@ -25,6 +25,7 @@ const projectId = '11111111-1111-4111-8111-111111111111';
 const resultId = '22222222-2222-4222-8222-222222222222';
 
 const baseFilters: ResultsListFilters = Object.freeze({
+  stationId: '',
   outcome: '',
   diagnosticCode: '',
   from: '',
@@ -132,11 +133,12 @@ describe('Results queries', () => {
     );
     expect(createStationResultsPath({
       ...baseFilters,
+      stationId: 'station-a',
       outcome: 'TimedOut',
       diagnosticCode: 'CAMERA_TIMEOUT',
       page: 2,
       pageSize: 100
-    })).toBe('stations/results?status=TimedOut&diagnosticCode=CAMERA_TIMEOUT&pageIndex=1&pageSize=100');
+    })).toBe('stations/results?stationId=station-a&status=TimedOut&diagnosticCode=CAMERA_TIMEOUT&pageIndex=1&pageSize=100');
     expect(createLocalStatisticsPath(projectId, {
       ...baseFilters,
       outcome: 'Ng',
@@ -144,9 +146,10 @@ describe('Results queries', () => {
     })).toBe(`inspection/statistics/${projectId}?startTime=2026-07-15T00%3A00%3A00Z&status=Ng`);
     expect(createStationStatisticsPath({
       ...baseFilters,
+      stationId: 'station-a',
       outcome: 'Failed',
       diagnosticCode: 'CAMERA_TIMEOUT'
-    })).toBe('stations/statistics?status=Failed&diagnosticCode=CAMERA_TIMEOUT');
+    })).toBe('stations/statistics?stationId=station-a&status=Failed&diagnosticCode=CAMERA_TIMEOUT');
     expect(createPreviousSuccessPath(projectId, resultId)).toBe(
       `inspection/history/${projectId}/${resultId}/previous-success?limit=50`
     );

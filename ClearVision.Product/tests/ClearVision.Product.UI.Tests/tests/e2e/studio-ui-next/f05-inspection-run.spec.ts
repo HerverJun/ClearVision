@@ -148,8 +148,10 @@ test('continuous inspection persists across route leave and restores from author
   expect(startRequest?.body).toMatchObject({ projectId, runMode: 'canonical-project', cameraId: 'camera-a' });
   expect(JSON.stringify(startRequest?.body)).not.toContain('FlowData');
 
-  await page.getByRole('link', { name: '查看检测结果' }).click();
-  await expect(page).toHaveURL(/#\/results(?:\?|$)/);
+  await page.getByTestId('inspection-run-result-link').click();
+  await expect(page).toHaveURL(new RegExp(
+    `#/results\\?source=local&projectId=${projectId}&resultId=${resultId}&returnTo=`
+  ));
   expect(audit.stops()).toBe(0);
 
   await page.goto(`/studio/index.html#/projects/${projectId}/inspection`);

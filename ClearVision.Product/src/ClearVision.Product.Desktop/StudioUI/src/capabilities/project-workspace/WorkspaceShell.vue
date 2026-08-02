@@ -9,6 +9,7 @@ import {
   type CvStatusTone
 } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
+import { createLocalResultsDeepLink } from '@/shared/productionTraceLinks';
 import type { WorkspaceProjectV1 } from './workspaceContracts';
 import type { WorkspaceOwner } from './workspaceOwner';
 import type { WorkspaceNewDraftOwner } from './workspaceNewDraftOwner';
@@ -330,6 +331,14 @@ const runResults = computed<readonly RunConsoleResultItem[]>(() => {
   })];
 });
 const runStatistics = computed(() => calculateRunConsoleStatistics(runResults.value));
+function workspaceResultsLink(resultId?: string): string {
+  const projectId = effectiveProjectId.value;
+  return createLocalResultsDeepLink({
+    projectId,
+    ...(resultId ? { resultId } : {}),
+    returnTo: `/projects/${encodeURIComponent(projectId)}/workspace`
+  });
+}
 </script>
 
 <template>
@@ -478,7 +487,7 @@ const runStatistics = computed(() => calculateRunConsoleStatistics(runResults.va
           <RouterLink
             v-if="!newDraftOwner"
             class="workspace-shell__results-link"
-            :to="{ path: '/results', query: { source: 'local', projectId: effectiveProjectId } }"
+            :to="workspaceResultsLink()"
             data-testid="workspace-results"
           >
             本次结果
@@ -545,7 +554,16 @@ const runStatistics = computed(() => calculateRunConsoleStatistics(runResults.va
       @stop="workspaceOwner?.stopFormal()"
       @reconcile="workspaceOwner?.reconcileFormalRun()"
       @refresh-admission="workspaceOwner?.refreshFormalAdmission()"
-    />
+    >
+      <template #result-action="{ result }">
+        <RouterLink
+          :to="workspaceResultsLink(result.id)"
+          data-testid="workspace-current-result"
+        >
+          查看本次结果
+        </RouterLink>
+      </template>
+    </RunConsole>
 
     <div
       class="workspace-shell__top-state-stack"

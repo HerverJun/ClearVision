@@ -229,6 +229,13 @@ export interface StationResult {
   readonly packageId: string;
   readonly packageName: string;
   readonly packageVersion: string;
+  readonly packageFlowHash: string | null;
+  readonly executionFlowHash: string | null;
+  readonly flowHash: string | null;
+  readonly executionSnapshotId: string | null;
+  readonly projectRevision: number | null;
+  readonly decisionConfigurationHash: string | null;
+  readonly executionRunMode: string | null;
   readonly executionTimeMs: number;
   readonly diagnosticCode: string;
   readonly diagnosticMessage: string | null;
@@ -517,6 +524,27 @@ export function decodeStationResult(value: unknown, path = '$'): StationResult {
     packageId: decodeString(record.packageId, `${path}.packageId`, true),
     packageName: decodeString(record.packageName, `${path}.packageName`, true),
     packageVersion: decodeString(record.packageVersion, `${path}.packageVersion`, true),
+    packageFlowHash: record.packageFlowHash === undefined || record.packageFlowHash === null
+      ? null
+      : decodeString(record.packageFlowHash, `${path}.packageFlowHash`, true),
+    executionFlowHash: record.executionFlowHash === undefined || record.executionFlowHash === null
+      ? null
+      : decodeString(record.executionFlowHash, `${path}.executionFlowHash`, true),
+    flowHash: record.flowHash === undefined || record.flowHash === null
+      ? null
+      : decodeString(record.flowHash, `${path}.flowHash`, true),
+    executionSnapshotId: record.executionSnapshotId === undefined || record.executionSnapshotId === null
+      ? null
+      : decodeString(record.executionSnapshotId, `${path}.executionSnapshotId`, true),
+    projectRevision: record.projectRevision === undefined || record.projectRevision === null
+      ? null
+      : decodeNumber(record.projectRevision, `${path}.projectRevision`, true),
+    decisionConfigurationHash: record.decisionConfigurationHash === undefined || record.decisionConfigurationHash === null
+      ? null
+      : decodeString(record.decisionConfigurationHash, `${path}.decisionConfigurationHash`, true),
+    executionRunMode: record.executionRunMode === undefined || record.executionRunMode === null
+      ? null
+      : decodeString(record.executionRunMode, `${path}.executionRunMode`, true),
     executionTimeMs: decodeNumber(record.executionTimeMs, `${path}.executionTimeMs`, true),
     diagnosticCode: decodeString(record.diagnosticCode, `${path}.diagnosticCode`, true),
     diagnosticMessage: decodeNullableString(record.diagnosticMessage, `${path}.diagnosticMessage`),

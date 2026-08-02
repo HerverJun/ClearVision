@@ -113,6 +113,7 @@ export function isF03G6RequestAllowlist(
         entry.path === '/api/inspection/reconcile';
     }
     if (entry.method === 'GET' && (entry.path === '/api/projects' ||
+      /^\/api\/inspection\/realtime\/[0-9a-f-]{36}\/state$/i.test(entry.path) ||
       /^\/api\/inspection\/history\/[0-9a-f-]{36}(?:\/[0-9a-f-]{36})?(?:\?.*)?$/i.test(entry.path))) {
       return true;
     }

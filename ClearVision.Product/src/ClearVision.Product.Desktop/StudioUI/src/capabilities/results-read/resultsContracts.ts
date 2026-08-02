@@ -707,12 +707,20 @@ export function decodeLocalInspectionResultDetail(
   });
 }
 
-export function decodeStationInspectionResultPage(payload: unknown): StationInspectionResultPage {
+export function decodeStationInspectionResultPage(
+  payload: unknown,
+  expectedStationId = ''
+): StationInspectionResultPage {
   const page = record(payload, '$');
+  const items = Object.freeze(
+    array(page.items, '$.items').map((item, index) => decodeStationSummary(item, `$.items[${index}]`))
+  );
+  const normalizedStationId = expectedStationId.trim();
+  if (normalizedStationId && items.some(item => !sameIdentity(item.stationId, normalizedStationId))) {
+    throw new ResultsContractDecodeError('$.items[].stationId', 'the requested Station identity');
+  }
   return Object.freeze({
-    items: Object.freeze(
-      array(page.items, '$.items').map((item, index) => decodeStationSummary(item, `$.items[${index}]`))
-    ),
+    items,
     totalCount: nonNegativeInteger(page.totalCount, '$.totalCount'),
     pageIndex: nonNegativeInteger(page.pageIndex, '$.pageIndex'),
     pageSize: positiveInteger(page.pageSize, '$.pageSize')

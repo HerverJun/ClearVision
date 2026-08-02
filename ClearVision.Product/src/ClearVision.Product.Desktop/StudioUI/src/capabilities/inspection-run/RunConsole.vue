@@ -283,6 +283,15 @@ const formattedTime = (value: string | null): string => {
             <span>{{ formattedTime(result.timestamp) }}</span>
             <span>{{ duration(result.processingTimeMs) }}</span>
             <span>{{ result.defectCount == null ? '--' : result.defectCount + ' 缺陷' }}</span>
+            <div
+              v-if="$slots['result-action']"
+              class="run-console__result-action"
+            >
+              <slot
+                name="result-action"
+                :result="result"
+              />
+            </div>
             <details v-if="result.diagnostics.length || result.errorMessage">
               <summary>诊断</summary>
               <p v-if="result.errorMessage">
@@ -342,7 +351,11 @@ const formattedTime = (value: string | null): string => {
 .run-console__violations span,.run-console__violations small { overflow-wrap: anywhere; }
 .run-console__violations small { grid-column: 2; color: var(--cv-text-muted); }
 .run-console__results ol { max-height: 214px; overflow: auto; }
-.run-console__results li { min-width: 0; padding: var(--cv-space-1) 0; display: grid; grid-template-columns: auto 64px 58px minmax(62px, 1fr); align-items: center; gap: var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: 10px; }
+.run-console__results li { min-width: 0; padding: var(--cv-space-1) 0; display: grid; grid-template-columns: auto 64px 58px minmax(62px, 1fr) auto; align-items: center; gap: var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: 10px; }
+.run-console__result-action { justify-self: end; }
+.run-console__result-action :deep(a) { color: var(--cv-color-link); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; white-space: nowrap; }
+.run-console__result-action :deep(a:hover) { text-decoration: underline; }
+.run-console__result-action :deep(a:focus-visible) { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 2px; }
 .run-console__results details { grid-column: 1 / -1; }
 .run-console__results summary { cursor: pointer; color: var(--cv-text-muted); }
 .run-console__results summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 2px; }

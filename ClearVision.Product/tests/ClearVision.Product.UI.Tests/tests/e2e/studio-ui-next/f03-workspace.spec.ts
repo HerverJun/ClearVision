@@ -1848,7 +1848,7 @@ test('G6 runs only the saved Project identity, stays in Workspace, and hands off
     '/api/inspection/admission',
     '/api/inspection/execute'
   ]);
-  expect(isF03G6RequestAllowlist(audit)).toBe(true);
+  expect(isF03G6RequestAllowlist(audit), JSON.stringify(audit)).toBe(true);
   await page.locator('[data-testid="workspace-current-result"]').click();
   await expect(page.locator('[data-capability="results-read"]')).toBeVisible();
 });
@@ -2011,6 +2011,10 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 76
     await page.getByRole('button', { name: '导出运行包', exact: true }).click();
     await expect(packageDialog).toHaveAttribute('data-phase', 'success');
     await expect(packageDialog).toContainText('cvpkg-g3-golden');
+    await expect(packageDialog.getByTestId('runtime-package-open-stations')).toHaveAttribute(
+      'href',
+      /#\/stations\?packageId=station-pkg-g3&projectId=.*&revision=8/
+    );
     if (hasF04VisualEvidenceTarget()) {
       await captureF04VisualEvidence(page, {
         scenario: `g4a-admin-runtime-package-${viewport.width}`, viewport, runtimeErrors, requestAudit: audit

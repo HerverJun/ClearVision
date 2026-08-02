@@ -219,7 +219,12 @@ function apiWith(implementation: GetImplementation): ApiTransport {
 async function mountResults(path: string, api: ApiTransport) {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/results', component: { template: '<div />' } }]
+    routes: [
+      { path: '/results', component: { template: '<div />' } },
+      { path: '/stations/:stationId', component: { template: '<div />' } },
+      { path: '/projects/:id/workspace', component: { template: '<div />' } },
+      { path: '/projects/:id/inspection', component: { template: '<div />' } }
+    ]
   });
   await router.push(path);
   await router.isReady();
@@ -365,6 +370,48 @@ describe('Results page', () => {
     expect(mounted.wrapper.text()).toContain('远程结果仅保留摘要');
     expect(mounted.wrapper.find('[data-remote-image-status="not-uploaded"]').exists()).toBe(true);
 
+    mounted.wrapper.unmount();
+    mounted.queries.dispose();
+  });
+
+  it('re-reads a Station deep link by canonical station id and preserves a safe return route', async () => {
+    const requested: string[] = [];
+    const mounted = await mountResults(
+      '/results?source=station&stationId=station-a&resultId=message-9&returnTo=/stations/station-a',
+      apiWith(async path => {
+        requested.push(path);
+        if (path.startsWith('stations/results?')) return legacyStationPage();
+        if (path.startsWith('stations/statistics?')) return statistics();
+        throw new Error(`Unexpected request: ${path}`);
+      })
+    );
+
+    expect(requested).toContain('stations/results?stationId=station-a&pageIndex=0&pageSize=20');
+    expect(requested).toContain('stations/statistics?stationId=station-a');
+    expect(mounted.wrapper.text()).toContain('已按工作站身份读取');
+    expect(mounted.wrapper.get('[data-testid="results-return-workspace"]').text()).toBe('返回工作站');
+
+    await mounted.wrapper.get('[data-testid="results-detail-open-station"]').trigger('click');
+    await flushPromises();
+    expect(mounted.router.currentRoute.value.path).toBe('/stations/station-a');
+    expect(mounted.router.currentRoute.value.query.returnTo).toBe(
+      '/results?source=station&stationId=station-a&resultId=message-9'
+    );
+
+    mounted.wrapper.unmount();
+    mounted.queries.dispose();
+  });
+
+  it('rejects Station rows whose identity differs from the deep-link filter', async () => {
+    const mounted = await mountResults(
+      '/results?source=station&stationId=station-a',
+      apiWith(async path => path.startsWith('stations/results?')
+        ? { ...legacyStationPage(), items: [{ ...legacyStationPage().items[0], stationId: 'station-b' }] }
+        : statistics())
+    );
+
+    expect(mounted.wrapper.text()).toContain('工作站结果读取失败');
+    expect(mounted.wrapper.text()).not.toContain('station-b');
     mounted.wrapper.unmount();
     mounted.queries.dispose();
   });

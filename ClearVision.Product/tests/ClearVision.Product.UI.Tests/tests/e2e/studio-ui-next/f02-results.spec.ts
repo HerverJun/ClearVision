@@ -349,13 +349,15 @@ async function bootResults(page: Page, initialHash = '/results'): Promise<F02Met
       return;
     }
     if (url.pathname === '/api/stations/results') {
+      const requestedStationId = url.searchParams.get('stationId');
       const requestedStatus = url.searchParams.get('status');
       const requestedDiagnostic = url.searchParams.get('diagnosticCode');
       const filtered = stationFixtures.filter(item => {
         const kind = item.messageId === 'fixture-result-0001'
           ? 'Failed'
           : canonicalCases[(item.sequenceId - 1) % canonicalCases.length]![0];
-        return (!requestedStatus || kind === requestedStatus) &&
+        return (!requestedStationId || item.stationId === requestedStationId) &&
+          (!requestedStatus || kind === requestedStatus) &&
           (!requestedDiagnostic || item.diagnosticCode === requestedDiagnostic);
       });
       const pageIndex = Number(url.searchParams.get('pageIndex') ?? 0);
@@ -385,7 +387,7 @@ test('Results local view keeps query filters, dual axes, detail 404 and GET-only
   expect(audit.some(entry => entry.path.includes('/inspection/history/'))).toBe(false);
 
   await page.getByLabel('本机工程').selectOption(projectId);
-  await expect(page.getByRole('button', { name: '返回工作区' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '返回工作区' })).toBeVisible();
   await expect(page.getByRole('cell', { name: '不适用', exact: true }).first()).toBeVisible();
   await expect(page.getByRole('cell', { name: '执行成功', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: '不适用', exact: true }).nth(1)).toBeVisible();

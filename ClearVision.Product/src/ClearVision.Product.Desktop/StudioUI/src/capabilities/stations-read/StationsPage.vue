@@ -18,6 +18,10 @@ import {
 } from '@/design-system';
 import { formatInspectionOutcome } from '@/shared/inspectionOutcome';
 import {
+  createStationDetailDeepLink,
+  createStationFleetDeepLink
+} from '@/shared/productionTraceLinks';
+import {
   createStationStatisticsQuery,
   createStationSummaryQuery,
   createStationsQuery,
@@ -66,6 +70,18 @@ const runtimeState = shallowRef(queryText('runtime') || 'all');
 const range = shallowRef(queryText('range') || 'today');
 const outcome = shallowRef(queryText('outcome') || 'all');
 const diagnosticCode = shallowRef(queryText('diagnosticCode'));
+const packageIdFilter = computed(() => queryText('packageId').trim());
+const projectIdFilter = computed(() => queryText('projectId').trim());
+const revisionText = computed(() => queryText('revision').trim());
+const revisionFilter = computed<number | null>(() => {
+  if (!revisionText.value) return null;
+  const value = Number(revisionText.value);
+  return Number.isInteger(value) && value >= 0 ? value : null;
+});
+const hasProductionTraceFilter = computed(() => Boolean(
+  packageIdFilter.value || projectIdFilter.value || revisionText.value
+));
+const hasInvalidRevisionFilter = computed(() => Boolean(revisionText.value) && revisionFilter.value === null);
 
 const statisticsFilters = computed<StationStatisticsFilters>(() => ({
   range: range.value,
@@ -83,12 +99,30 @@ const statisticsSlot = createStationQuerySlot(() => createStationStatisticsQuery
 const listState = listSlot.state;
 const summaryState = summarySlot.state;
 const statisticsState = statisticsSlot.state;
-const visibleStations = computed(() => filterStations(
-  listState.value.data ?? [],
-  activeSearch.value,
-  onlineState.value,
-  runtimeState.value
-));
+const visibleStations = computed(() => {
+  if (hasInvalidRevisionFilter.value) return [];
+  return filterStations(
+    listState.value.data ?? [],
+    activeSearch.value,
+    onlineState.value,
+    runtimeState.value
+  ).filter(station =>
+    (!packageIdFilter.value || station.packageId?.toLocaleLowerCase() === packageIdFilter.value.toLocaleLowerCase()) &&
+    (!projectIdFilter.value || station.sourceProjectId?.toLocaleLowerCase() === projectIdFilter.value.toLocaleLowerCase()) &&
+    (revisionFilter.value === null || station.sourceProjectRevision === revisionFilter.value)
+  );
+});
+const fleetReturnTo = computed(() => createStationFleetDeepLink({
+  packageId: packageIdFilter.value,
+  projectId: projectIdFilter.value,
+  revision: revisionFilter.value,
+  q: activeSearch.value,
+  online: onlineState.value === 'all' ? '' : onlineState.value,
+  runtime: runtimeState.value === 'all' ? '' : runtimeState.value,
+  range: range.value === 'today' ? '' : range.value,
+  outcome: outcome.value === 'all' ? '' : outcome.value,
+  diagnosticCode: diagnosticCode.value
+}));
 
 async function refreshAuthority(request: StationAuthorityRefreshRequest): Promise<void> {
   const full = request.reason !== 'event' && request.reason !== 'heartbeat';
@@ -274,6 +308,14 @@ async function applyStatisticsFilters(): Promise<void> {
   await writeQueryAndRefresh(true);
 }
 
+async function clearProductionTraceFilter(): Promise<void> {
+  const nextQuery = { ...route.query };
+  delete nextQuery.packageId;
+  delete nextQuery.projectId;
+  delete nextQuery.revision;
+  await router.replace({ query: nextQuery });
+}
+
 onMounted(() => monitoring.start());
 
 onBeforeUnmount(() => {
@@ -440,6 +482,27 @@ onBeforeUnmount(() => {
         正在刷新，暂时显示上次读取的工作站列表。
       </CvInlineAlert>
       <CvInlineAlert
+        v-if="hasProductionTraceFilter"
+        :tone="hasInvalidRevisionFilter ? 'warning' : 'info'"
+        :title="hasInvalidRevisionFilter ? '生产身份筛选无效' : '正在定位生产身份'"
+        data-testid="stations-production-filter"
+      >
+        <span v-if="hasInvalidRevisionFilter">工程修订必须是非负整数，当前未猜测关联。</span>
+        <span v-else>
+          运行包 {{ packageIdFilter || '未指定' }} · 工程 {{ projectIdFilter || '未指定' }} ·
+          修订 {{ revisionFilter === null ? '未指定' : `r${revisionFilter}` }}。列表已重新读取后端权威并按完整身份筛选。
+        </span>
+        <template #actions>
+          <CvButton
+            size="sm"
+            variant="quiet"
+            @click="clearProductionTraceFilter"
+          >
+            清除定位
+          </CvButton>
+        </template>
+      </CvInlineAlert>
+      <CvInlineAlert
         v-if="(listState.phase === 'stale' || listState.phase === 'partial-failure') && listState.data"
         tone="warning"
         title="列表刷新未完成"
@@ -476,8 +539,10 @@ onBeforeUnmount(() => {
       <CvPageState
         v-else-if="listState.data && visibleStations.length === 0"
         kind="empty"
-        title="没有匹配的工作站"
-        description="请调整搜索词或状态筛选。"
+        :title="hasProductionTraceFilter ? '没有匹配该生产身份的工作站' : '没有匹配的工作站'"
+        :description="hasProductionTraceFilter
+          ? '该运行包可能尚未激活、已归档，或旧工作站没有上报完整工程身份；当前不会猜测关联。'
+          : '请调整搜索词或状态筛选。'"
       />
 
       <CvDataTable
@@ -490,7 +555,7 @@ onBeforeUnmount(() => {
       >
         <template #cell-station="{ row }">
           <div class="stations-page__station-name">
-            <RouterLink :to="`/stations/${encodeURIComponent(row.stationId)}`">
+            <RouterLink :to="createStationDetailDeepLink(row.stationId, fleetReturnTo)">
               <strong>{{ stationDisplayName(row) }}</strong>
             </RouterLink>
             <span>{{ row.lineName || row.stationId }}</span>

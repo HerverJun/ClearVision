@@ -6,7 +6,7 @@ import {
   shallowRef,
   watch
 } from 'vue';
-import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router';
+import { RouterLink, useRoute, useRouter, type LocationQueryRaw } from 'vue-router';
 import {
   CvButton,
   CvDataTable,
@@ -29,6 +29,11 @@ import {
   formatInspectionOutcome,
   type CanonicalInspectionOutcomeKind
 } from '@/shared/inspectionOutcome';
+import {
+  createStationDetailDeepLink,
+  createStationResultsDeepLink,
+  resolveProductionReturnTo
+} from '@/shared/productionTraceLinks';
 import type {
   LocalInspectionResultDetail,
   LocalInspectionResultPage,
@@ -102,11 +107,6 @@ async function copyTechnicalField(key: string, value: string): Promise<void> {
   }
 }
 
-function returnToWorkspace(): void {
-  if (!projectId.value) return;
-  void router.push(`/projects/${projectId.value}/workspace`);
-}
-
 function idleState<T>(): ReadQueryState<T> {
   return Object.freeze({
     phase: 'idle',
@@ -137,6 +137,7 @@ const source = computed<ResultsSource>(() =>
   firstQueryValue(route.query.source) === 'station' ? 'station' : 'local'
 );
 const projectId = computed(() => firstQueryValue(route.query.projectId));
+const stationId = computed(() => firstQueryValue(route.query.stationId));
 const resultId = computed(() => firstQueryValue(route.query.resultId));
 const outcome = computed(() => normalizedOutcome(firstQueryValue(route.query.outcome)));
 const diagnosticCode = computed(() => firstQueryValue(route.query.diagnosticCode));
@@ -151,6 +152,7 @@ const invalidFrom = computed(() => from.value.length > 0 && Number.isNaN(Date.pa
 const invalidTo = computed(() => to.value.length > 0 && Number.isNaN(Date.parse(to.value)));
 const hasInvalidDate = computed(() => invalidFrom.value || invalidTo.value);
 const filters = computed<ResultsListFilters>(() => Object.freeze({
+  stationId: stationId.value,
   outcome: outcome.value,
   diagnosticCode: diagnosticCode.value,
   from: from.value,
@@ -183,6 +185,34 @@ const selectedStationResult = computed(() => {
   return stationListState.value.data?.items.find(item =>
     item.messageId === resultId.value || item.runId === resultId.value
   ) ?? null;
+});
+const returnTarget = computed(() => resolveProductionReturnTo(firstQueryValue(route.query.returnTo)));
+const returnHref = computed(() => returnTarget.value ?? (
+  source.value === 'local' && projectId.value
+    ? `/projects/${encodeURIComponent(projectId.value)}/workspace`
+    : null
+));
+const stationDetailHref = computed(() => {
+  const targetStationId = selectedStationResult.value?.stationId ?? stationId.value;
+  if (!targetStationId) return null;
+  const returnTo = createStationResultsDeepLink({
+    stationId: stationId.value,
+    resultId: resultId.value,
+    outcome: outcome.value,
+    diagnosticCode: diagnosticCode.value,
+    from: from.value,
+    to: to.value,
+    page: page.value,
+    pageSize: pageSize.value
+  });
+  return createStationDetailDeepLink(targetStationId, returnTo);
+});
+const returnLabel = computed(() => {
+  if (returnTarget.value?.endsWith('/inspection')) return '返回连续检测';
+  if (returnTarget.value?.endsWith('/workspace')) return '返回工作区';
+  if (returnTarget.value?.startsWith('/stations/')) return '返回工作站';
+  if (returnTarget.value?.startsWith('/stations')) return '返回工作站列表';
+  return '返回工作区';
 });
 
 const sourceOptions: readonly CvSelectOption[] = Object.freeze([
@@ -243,11 +273,26 @@ const stationColumns: readonly CvDataTableColumn<StationInspectionResultSummary>
 
 const sourceModel = computed({
   get: () => source.value,
-  set: value => { void updateQuery({ source: value, resultId: undefined, page: '1' }); }
+  set: value => { void updateQuery({
+    source: value,
+    stationId: undefined,
+    resultId: undefined,
+    returnTo: undefined,
+    page: '1'
+  }); }
 });
 const projectModel = computed({
   get: () => projectId.value,
-  set: value => { void updateQuery({ projectId: value || undefined, resultId: undefined, page: '1' }); }
+  set: value => { void updateQuery({
+    projectId: value || undefined,
+    resultId: undefined,
+    returnTo: undefined,
+    page: '1'
+  }); }
+});
+const stationModel = computed({
+  get: () => stationId.value,
+  set: value => { void updateQuery({ stationId: value || undefined, resultId: undefined, page: '1' }); }
 });
 const outcomeModel = computed({
   get: () => outcome.value,
@@ -656,15 +701,14 @@ watch(
   }
 );
 
-watch(diagnosticCode, () => {
-  if (!mounted.value || source.value !== 'station') return;
-  void Promise.all([refreshStationList(true), refreshStationStatistics(true)]);
-});
-
 watch(
-  () => [outcome.value, from.value, to.value, page.value, pageSize.value],
-  () => {
+  () => [stationId.value, diagnosticCode.value, outcome.value, from.value, to.value, page.value, pageSize.value],
+  (next, previous) => {
     if (!mounted.value || source.value !== 'station') return;
+    if (next[0] !== previous[0]) {
+      disposeStationList();
+      disposeStationStatistics();
+    }
     void Promise.all([refreshStationList(true), refreshStationStatistics(true)]);
   }
 );
@@ -718,15 +762,22 @@ onBeforeUnmount(() => {
         </span>
       </div>
       <div class="results-page__commands">
-        <CvButton
-          v-if="source === 'local' && projectId"
-          size="sm"
-          variant="quiet"
+        <RouterLink
+          v-if="returnHref"
+          class="results-page__nav-link"
+          :to="returnHref"
           data-testid="results-return-workspace"
-          @click="returnToWorkspace"
         >
-          返回工作区
-        </CvButton>
+          {{ returnLabel }}
+        </RouterLink>
+        <RouterLink
+          v-if="source === 'station' && stationDetailHref"
+          class="results-page__nav-link"
+          :to="stationDetailHref"
+          data-testid="results-open-station"
+        >
+          查看工作站
+        </RouterLink>
         <CvButton
           size="sm"
           :loading="localListState.isRefreshing || stationListState.isRefreshing"
@@ -762,6 +813,15 @@ onBeforeUnmount(() => {
           label="本机工程"
           :options="projectOptions"
           :disabled="projectsState.phase === 'loading'"
+        />
+        <CvField
+          v-if="source === 'station'"
+          v-model="stationModel"
+          class="results-page__station"
+          name="resultsStationId"
+          label="工作站标识"
+          placeholder="全部工作站"
+          autocomplete="off"
         />
         <CvSelect
           v-model="outcomeModel"
@@ -832,6 +892,14 @@ onBeforeUnmount(() => {
       title="本机诊断码为当前页过滤"
     >
       当前本机历史接口没有诊断码参数；此条件只过滤当前页已读取结果，不代表后端全量结果计数。
+    </CvInlineAlert>
+
+    <CvInlineAlert
+      v-if="source === 'station' && stationId"
+      tone="info"
+      title="已按工作站身份读取"
+    >
+      当前列表与统计由后端按工作站 {{ stationId }} 重新查询；URL 未携带结果或工作站 payload。
     </CvInlineAlert>
 
     <CvInlineAlert
@@ -1430,7 +1498,16 @@ onBeforeUnmount(() => {
             此旧格式数据缺少标准双轴；当前结果仅按后端固定映射展示，不从诊断文案推断。
           </CvInlineAlert>
           <section class="results-page__detail-section results-page__detail-section--summary">
-            <h3>判定摘要</h3>
+            <div class="results-page__detail-heading">
+              <h3>判定摘要</h3>
+              <RouterLink
+                class="results-page__nav-link"
+                :to="stationDetailHref!"
+                data-testid="results-detail-open-station"
+              >
+                工作站详情
+              </RouterLink>
+            </div>
             <CvDescriptionList
               :items="stationOverviewItems(selectedStationResult)"
               label="工作站结果判定摘要"
@@ -1485,6 +1562,9 @@ onBeforeUnmount(() => {
 .results-page { height: 100%; min-height: 0; display: flex; flex-direction: column; max-width: 1720px; min-width: 0; gap: var(--cv-space-2); overflow: hidden; }
 .results-page__commandbar { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); border-bottom: 1px solid var(--cv-border-subtle); }
 .results-page__title,.results-page__commands { min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); }
+.results-page__nav-link { min-height: var(--cv-density-control-height-sm); padding: 0 var(--cv-space-2); display: inline-flex; align-items: center; border-radius: var(--cv-radius-sm); color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; touch-action: manipulation; }
+.results-page__nav-link:hover { background: var(--cv-interactive-hover); color: var(--cv-color-link-hover); }
+.results-page__nav-link:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
 .results-page__title h1 { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-md); font-weight: var(--cv-font-weight-semibold); letter-spacing: 0; }
 .results-page__meta { align-self: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .results-page__filters { overflow: hidden; border-block: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
@@ -1492,6 +1572,7 @@ onBeforeUnmount(() => {
 .results-page__filter-toolbar :deep(.cv-toolbar__primary) { flex: 1 1 100%; align-items: end; }
 .results-page__source { min-width: 124px; flex: 0 1 124px; }
 .results-page__project { min-width: 220px; flex: 1 1 260px; }
+.results-page__station { min-width: 180px; flex: 1 1 220px; }
 .results-page__outcome { min-width: 132px; flex: 0 1 132px; }
 .results-page__diagnostic { min-width: 180px; flex: 1 1 220px; }
 .results-page__date { min-width: 206px; flex: 1 1 240px; }
@@ -1516,6 +1597,8 @@ onBeforeUnmount(() => {
 .results-page__detail-section { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
 .results-page__detail-section--summary { background: var(--cv-surface-page); }
 .results-page__detail-section h3 { margin: 0 0 var(--cv-space-2); color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); }
+.results-page__detail-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); margin-bottom: var(--cv-space-2); }
+.results-page__detail-heading h3 { margin: 0; }
 .results-page__defects { display: grid; gap: var(--cv-space-2); margin: 0; padding: 0; list-style: none; }
 .results-page__defects li { display: grid; grid-template-columns: minmax(96px, 0.62fr) minmax(116px, 0.72fr) minmax(0, 1fr); gap: var(--cv-space-3); padding: var(--cv-space-2) 0; border-bottom: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .results-page__defects li:last-child { border-bottom: 0; }
