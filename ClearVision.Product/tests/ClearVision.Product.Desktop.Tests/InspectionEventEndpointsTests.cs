@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Endpoints;
@@ -144,6 +145,40 @@ public class InspectionEventEndpointsTests
         eventChunk.Should().Contain("id: 1");
         eventChunk.Should().Contain("event: progressChanged");
         eventChunk.Should().Contain("\"processedCount\":1");
+    }
+
+    [Fact]
+    public async Task StateEndpoint_ReturnsCompleteFormalIdentity_ForRefreshRecovery()
+    {
+        await using var host = await InspectionEventTestHost.CreateAsync();
+        var projectId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var snapshot = new ExecutionSnapshot(
+            projectId,
+            new OperatorFlow("formal-refresh"),
+            persistenceRevision: 17,
+            ExecutionSnapshotSource.PersistedProject,
+            ExecutionRunMode.FormalPrimary);
+        (await host.Coordinator.TryStartAsync(
+            snapshot,
+            sessionId,
+            RuntimeSessionType.WorkspaceFormalRun,
+            CancellationToken.None)).Should().Be(StartResult.Success);
+
+        using var response = await host.Client.GetAsync($"/api/inspection/realtime/{projectId}/state");
+        var state = await ReadJsonObjectAsync(response);
+
+        response.EnsureSuccessStatusCode();
+        state.GetProperty("isBusy").GetBoolean().Should().BeTrue();
+        state.GetProperty("sessionId").GetGuid().Should().Be(sessionId);
+        state.GetProperty("sessionType").GetString().Should().Be("WorkspaceFormalRun");
+        state.GetProperty("clientSnapshotId").GetGuid().Should().Be(snapshot.SnapshotId);
+        state.GetProperty("persistenceRevision").GetInt64().Should().Be(17);
+        state.GetProperty("canonicalFlowHash").GetString().Should().Be(snapshot.FlowHash);
+        state.GetProperty("decisionConfigurationHash").GetString()
+            .Should().Be(snapshot.DecisionConfigurationHash);
+        state.GetProperty("executionSource").GetString()
+            .Should().Be(ExecutionSnapshotSource.PersistedProject.ToString());
     }
 
     [Fact]

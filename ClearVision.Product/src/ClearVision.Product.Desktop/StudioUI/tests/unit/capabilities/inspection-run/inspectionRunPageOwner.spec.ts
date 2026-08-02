@@ -70,4 +70,23 @@ describe('inspectionRunPageOwner', () => {
     }), 'camera-a');
     h.owner.dispose();
   });
+
+  it('deduplicates rapid start clicks and refreshes admission before the only start command', async () => {
+    const h = harness();
+    let resolveStart: ((value: boolean) => void) | undefined;
+    vi.mocked(h.run.start).mockImplementationOnce(() => new Promise<boolean>(resolve => {
+      resolveStart = resolve;
+    }));
+    await h.owner.load();
+
+    const first = h.owner.start();
+    const duplicate = h.owner.start();
+    expect(duplicate).toBe(first);
+    await vi.waitFor(() => expect(h.run.start).toHaveBeenCalledOnce());
+    expect(h.post).toHaveBeenCalledTimes(2);
+
+    resolveStart?.(true);
+    await expect(first).resolves.toBe(true);
+    h.owner.dispose();
+  });
 });

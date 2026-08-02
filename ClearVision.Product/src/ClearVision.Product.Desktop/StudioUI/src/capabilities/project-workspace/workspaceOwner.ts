@@ -27,6 +27,7 @@ import {
   createWorkspaceRunCommandOwner,
   createWorkspaceRunPort,
   type WorkspaceRunCommandOwner,
+  type WorkspaceRunAdmissionV1,
   type WorkspaceRunReconciliationV1,
   type WorkspaceRunResultV1
 } from './run';
@@ -47,6 +48,10 @@ import type {
   WorkspaceLifecycleDiagnosticsOwner,
   WorkspaceOwnerDiagnosticsLease
 } from './workspaceLifecycleDiagnostics';
+import {
+  createInspectionRunApiAdapter,
+  createInspectionSseAdapter
+} from '@/capabilities/inspection-run';
 
 export type WorkspaceOwnerPhase = 'ready' | 'empty' | 'readonly' | 'disposed';
 
@@ -90,6 +95,8 @@ export interface WorkspaceOwner {
   reconcileSave(): Promise<WorkspaceSaveAttemptResult>;
   reapplyConflict(): void;
   discardConflict(): void;
+  hydrateFormalRun(): Promise<void>;
+  refreshFormalAdmission(): Promise<WorkspaceRunAdmissionV1 | null>;
   runFormal(): Promise<WorkspaceRunResultV1 | null>;
   stopFormal(): Promise<boolean>;
   reconcileFormalRun(): Promise<WorkspaceRunReconciliationV1 | null>;
@@ -213,6 +220,8 @@ export function createWorkspaceOwner(
         projectId: project.id,
         persistenceOwner,
         port: createWorkspaceRunPort(api, project.id),
+        runtimeApi: createInspectionRunApiAdapter(api),
+        sse: createInspectionSseAdapter(api),
         diagnostics
       });
       state.run = runOwner.projection;
@@ -253,6 +262,17 @@ export function createWorkspaceOwner(
     },
     discardConflict(): void {
       persistenceOwner?.discardConflict();
+    },
+    hydrateFormalRun(): Promise<void> {
+      return runOwner?.hydrate() ?? Promise.resolve();
+    },
+    refreshFormalAdmission(): Promise<WorkspaceRunAdmissionV1 | null> {
+      if (!runOwner) return Promise.resolve(null);
+      if (runOwner.projection.runtime?.isBusy || runOwner.projection.phase === 'occupied' ||
+        runOwner.projection.phase === 'disconnected') {
+        return runOwner.hydrate().then(() => runOwner?.projection.admission ?? null);
+      }
+      return runOwner.refreshAdmission();
     },
     runFormal(): Promise<WorkspaceRunResultV1 | null> {
       return runOwner?.run() ?? Promise.resolve(null);

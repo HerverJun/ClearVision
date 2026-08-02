@@ -18,9 +18,15 @@ import { GlobalVariablesWorkbench, type WorkspaceGlobalVariablesOwner } from './
 import { FinalDecisionWorkbench, type FinalDecisionOwner } from './final-decision';
 import type { FlowCanvasOwner } from './flow';
 import { RuntimePackageExportDialog, type RuntimePackageExportOwner } from './runtime-package';
-import { formatInspectionOutcome } from '@/shared/inspectionOutcome';
 import WorkspaceHandoffBanner from './handoff/WorkspaceHandoffBanner.vue';
 import type { WorkspaceHandoffReceiveProjection } from './handoff/handoffContracts';
+import RunConsole from '@/capabilities/inspection-run/RunConsole.vue';
+import {
+  calculateRunConsoleStatistics,
+  type RunConsoleAdmissionCheck,
+  type RunConsoleResultItem,
+  type RunConsoleViolation
+} from '@/capabilities/inspection-run';
 
 export type WorkspaceShellState =
   | 'flag-off'
@@ -197,7 +203,8 @@ const runTone = computed(() => {
   const phase = run.value?.phase;
   if (phase === 'succeeded') return 'ok';
   if (phase === 'failed' || phase === 'unknown-outcome') return 'ng';
-  if (phase === 'admitting' || phase === 'executing' || phase === 'cancel-requested') return 'warning';
+  if (phase === 'admitting' || phase === 'executing' || phase === 'cancel-requested' ||
+    phase === 'occupied' || phase === 'reconnecting' || phase === 'disconnected') return 'warning';
   return 'idle';
 });
 const runLabel = computed(() => {
@@ -205,9 +212,13 @@ const runLabel = computed(() => {
   if (!projection) return '正式运行尚未就绪';
   return {
     idle: '正式运行就绪',
+    hydrating: '正在读取运行状态',
     blocked: '当前状态不可正式运行',
     admitting: '正在检查运行条件',
     executing: '正式运行中',
+    occupied: '其他运行占用',
+    reconnecting: '实时恢复中',
+    disconnected: '实时已断开',
     succeeded: '正式运行完成',
     failed: '正式运行失败',
     cancelled: '正式运行已取消',
@@ -216,12 +227,109 @@ const runLabel = computed(() => {
     disposed: '正式运行已结束'
   }[projection.phase];
 });
-const runResultPresentation = computed(() => run.value?.result
-  ? formatInspectionOutcome(run.value.result.outcome)
-  : null);
-const showRunSummary = computed(() => Boolean(run.value && [
-  'succeeded', 'failed', 'cancelled', 'unknown-outcome'
+const runPending = computed(() => Boolean(run.value && [
+  'hydrating', 'admitting', 'executing', 'cancel-requested', 'reconnecting'
 ].includes(run.value.phase)));
+const runIdentity = computed(() => {
+  const projection = run.value;
+  const admission = projection?.admission;
+  const runtime = projection?.runtime;
+  return [
+    { key: 'revision', label: '保存修订', value: String(admission?.persistenceRevision ??
+      runtime?.persistenceRevision ?? persistence.value?.persistenceRevision ?? '--') },
+    { key: 'snapshot', label: '执行快照', value: admission?.clientSnapshotId ??
+      runtime?.clientSnapshotId ?? '--' },
+    { key: 'flow', label: '流程身份', value: admission?.canonicalFlowHash ??
+      runtime?.canonicalFlowHash ?? '--' },
+    { key: 'decision', label: '判定身份', value: admission?.decisionConfigurationHash ??
+      runtime?.decisionConfigurationHash ?? '--' },
+    { key: 'session', label: '会话', value: runtime?.sessionId ?? '--' }
+  ];
+});
+const runAdmissionCodes = computed(() => run.value?.admission?.violations
+  .map(item => item.code ?? '')
+  .filter(Boolean) ?? []);
+const runHasCode = (...segments: readonly string[]): boolean => runAdmissionCodes.value.some(
+  code => segments.some(segment => code.includes(segment)));
+const runCheckState = (blocked: boolean): RunConsoleAdmissionCheck['state'] =>
+  blocked ? 'blocked' : run.value?.admission?.allowed ? 'pass' :
+    run.value?.phase === 'admitting' ? 'pending' : 'unknown';
+const runAdmissionChecks = computed<readonly RunConsoleAdmissionCheck[]>(() => [
+  {
+    key: 'revision',
+    label: '保存修订',
+    state: run.value?.admission?.persistenceRevision === persistence.value?.persistenceRevision
+      ? 'pass' : persistence.value?.dirty ? 'blocked' : run.value?.phase === 'admitting' ? 'pending' : 'unknown',
+    detail: persistence.value?.dirty
+      ? '本地参数尚未保存'
+      : 'revision ' + (run.value?.admission?.persistenceRevision ?? persistence.value?.persistenceRevision ?? '--')
+  },
+  {
+    key: 'flow',
+    label: '流程与判定身份',
+    state: run.value?.admission?.canonicalFlowHash && run.value.admission.decisionConfigurationHash
+      ? 'pass' : runCheckState(runHasCode('FLOW', 'DECISION')),
+    detail: run.value?.admission?.canonicalFlowHash ? '已取得 canonical identity' : '等待权威身份'
+  },
+  {
+    key: 'parameters',
+    label: '必要参数',
+    state: persistence.value?.dirty ? 'blocked' : runCheckState(runHasCode('PARAMETER', 'REQUIRED')),
+    detail: persistence.value?.dirty ? '保存当前参数后重新准入' : '由 admission 校验'
+  },
+  {
+    key: 'resources',
+    label: '工程资源',
+    state: runCheckState(runHasCode('RESOURCE', 'ASSET', 'MISSING')),
+    detail: runHasCode('RESOURCE', 'ASSET', 'MISSING') ? '存在缺失资源' : '由 admission 校验'
+  },
+  {
+    key: 'decision',
+    label: '最终判定',
+    state: runCheckState(runHasCode('DECISION')),
+    detail: runHasCode('DECISION') ? '最终判定配置阻断运行' : '由 admission 校验'
+  },
+  {
+    key: 'device',
+    label: '设备准入',
+    state: runCheckState(runHasCode('DEVICE', 'CAMERA', 'SITE_PROFILE')),
+    detail: runHasCode('DEVICE', 'CAMERA', 'SITE_PROFILE') ? '设备或现场配置阻断运行' : '由后端有效快照校验'
+  },
+  {
+    key: 'package',
+    label: '运行包',
+    state: 'not-applicable',
+    detail: 'Workspace 正式运行直接使用已保存工程快照'
+  }
+]);
+const runViolations = computed<readonly RunConsoleViolation[]>(() => (run.value?.admission?.violations ?? []).map(
+  (item, index) => ({
+    key: (item.code ?? 'ADMISSION') + '-' + index,
+    code: item.code ?? run.value?.admission?.code ?? 'ADMISSION_REJECTED',
+    message: item.reason,
+    target: item.operatorName || item.parameterName
+      ? [item.operatorName, item.parameterName].filter(Boolean).join(' · ')
+      : null
+  })));
+const runResults = computed<readonly RunConsoleResultItem[]>(() => {
+  const result = run.value?.result;
+  if (!result) return [];
+  return [Object.freeze({
+    id: result.id,
+    timestamp: null,
+    outcome: result.outcome,
+    defectCount: null,
+    processingTimeMs: null,
+    errorMessage: result.errorMessage,
+    diagnostics: Object.freeze([
+      { key: 'snapshot', label: 'executionSnapshotId', value: result.executionSnapshotId },
+      { key: 'revision', label: 'persistenceRevision', value: String(result.persistenceRevision) },
+      { key: 'flow', label: 'flowHash', value: result.flowHash ?? '--' },
+      { key: 'decision', label: 'decisionConfigurationHash', value: result.decisionConfigurationHash ?? '--' }
+    ])
+  })];
+});
+const runStatistics = computed(() => calculateRunConsoleStatistics(runResults.value));
 </script>
 
 <template>
@@ -333,31 +441,6 @@ const showRunSummary = computed(() => Boolean(run.value && [
             </template>
             {{ persistence?.phase === 'saving' || newDraft?.savePhase === 'workspace-project-creating' ? '保存中…' : newDraft?.savePhase === 'workspace-save-unknown-outcome' ? '核对创建结果' : '保存' }}
           </CvButton>
-          <CvButton
-            v-if="run"
-            data-testid="workspace-run"
-            size="sm"
-            variant="primary"
-            :disabled="!run.canRun"
-            @click="workspaceOwner?.runFormal()"
-          >
-            <template #leading>
-              <CvIcon
-                name="play"
-                size="sm"
-              />
-            </template>
-            正式运行
-          </CvButton>
-          <CvButton
-            v-if="run?.canStop"
-            data-testid="workspace-run-stop"
-            size="sm"
-            variant="danger"
-            @click="workspaceOwner?.stopFormal()"
-          >
-            停止
-          </CvButton>
         </div>
         <span
           class="workspace-shell__command-divider"
@@ -402,15 +485,6 @@ const showRunSummary = computed(() => Boolean(run.value && [
           </RouterLink>
         </div>
         <CvButton
-          v-if="run?.canReconcile"
-          data-testid="workspace-run-reconcile"
-          size="sm"
-          variant="quiet"
-          @click="workspaceOwner?.reconcileFormalRun()"
-        >
-          查询运行结果
-        </CvButton>
-        <CvButton
           v-if="persistence?.canRetry"
           data-testid="workspace-save-retry"
           size="sm"
@@ -443,37 +517,35 @@ const showRunSummary = computed(() => Boolean(run.value && [
           放弃本地草稿
         </CvButton>
       </div>
-      <section
-        v-if="showRunSummary && run"
-        class="workspace-shell__run-summary"
-        :data-run-phase="run.phase"
-        role="status"
-      >
-        <CvStatusBadge
-          :tone="runResultPresentation?.tone ?? (run.phase === 'unknown-outcome' ? 'warning' : 'error')"
-          :label="runResultPresentation?.label ?? runLabel"
-        />
-        <span>{{ runResultPresentation?.executionLabel ?? run.message }}</span>
-        <span v-if="runResultPresentation">{{ runResultPresentation.decisionLabel }}</span>
-        <span v-if="run.result?.errorMessage">{{ run.result.errorMessage }}</span>
-        <span v-else-if="run.phase === 'failed' || run.phase === 'cancelled'">{{ run.message }}</span>
-        <RouterLink
-          v-if="run.result && run.result.outcome.execution === 'Succeeded'"
-          class="workspace-shell__run-result-link"
-          :to="{ path: '/results', query: { source: 'local', projectId: run.result.projectId, resultId: run.result.id } }"
-          data-testid="workspace-current-result"
-        >
-          查看本次结果
-        </RouterLink>
-        <button
-          v-if="run.phase === 'unknown-outcome' && run.canReconcile"
-          type="button"
-          @click="workspaceOwner?.reconcileFormalRun()"
-        >
-          核对运行结果
-        </button>
-      </section>
     </header>
+
+    <RunConsole
+      v-if="run && currentProject"
+      mode="formal"
+      :project-name="currentProject.name"
+      :phase-label="runLabel"
+      :tone="runTone"
+      :message="run.message"
+      :error-code="run.errorCode"
+      :connected="run.connected === true"
+      :reconnect-attempt="run.reconnectAttempt ?? 0"
+      :pending="runPending"
+      :can-start="run.canRun"
+      :can-stop="run.canStop"
+      :can-reconcile="run.canReconcile"
+      :identity="runIdentity"
+      :admission="runAdmissionChecks"
+      :violations="runViolations"
+      :statistics="runStatistics"
+      :results="runResults"
+      start-test-id="workspace-run"
+      stop-test-id="workspace-run-stop"
+      reconcile-test-id="workspace-run-reconcile"
+      @start="workspaceOwner?.runFormal()"
+      @stop="workspaceOwner?.stopFormal()"
+      @reconcile="workspaceOwner?.reconcileFormalRun()"
+      @refresh-admission="workspaceOwner?.refreshFormalAdmission()"
+    />
 
     <div
       class="workspace-shell__top-state-stack"
@@ -728,10 +800,6 @@ const showRunSummary = computed(() => Boolean(run.value && [
   padding: 4px 10px;
   border-bottom: 1px solid var(--cv-border-subtle);
 }
-.workspace-shell__run-summary { grid-column: 1 / -1; min-width: 0; min-height: 32px; margin: 0 -10px -4px; padding: 0 var(--cv-space-3); display: flex; align-items: center; gap: var(--cv-space-2); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-.workspace-shell__run-summary > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workspace-shell__run-result-link,.workspace-shell__run-summary > button { margin-left: auto; white-space: nowrap; color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: 600; }
-.workspace-shell__run-summary > button { min-height: 26px; border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); cursor: pointer; }
 
 .workspace-shell__identity,
 .workspace-shell__commands {

@@ -177,6 +177,9 @@ async function mountCreatedProjectDraft(
     });
     const saved = await workspaceOwner.save();
     if (saved.status === 'saved' || saved.status === 'no-op') {
+      if (typeof workspaceOwner.hydrateFormalRun === 'function') {
+        await workspaceOwner.hydrateFormalRun();
+      }
       pendingNewSaveIntent = null;
       pendingCreatedProjectId = null;
       promotedProjectId = projectId;
@@ -356,6 +359,11 @@ async function startLifecycle(reason: string): Promise<void> {
       project.value = result.data;
       shellState.value = workspaceOwner.projection.phase === 'empty' ? 'empty' : 'ready';
       message.value = null;
+      await nextTick();
+      if (typeof workspaceOwner.hydrateFormalRun === 'function') {
+        await workspaceOwner.hydrateFormalRun();
+      }
+      if (generation !== lifecycleGeneration) return;
       await receiveHandoff(generation);
     } catch (error) {
       nextRead.dispose('workspace-owner-conflict');

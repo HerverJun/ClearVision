@@ -7,7 +7,21 @@ import { createInspectionRunOwner } from './inspectionRunOwner';
 import { createInspectionRunApiAdapter } from './realtimeApiAdapter';
 import { createInspectionSseAdapter } from './sseAdapter';
 import { createInspectionRunPageOwner } from './inspectionRunPageOwner';
-import { CvButton, CvDescriptionList, CvInlineAlert, CvPageHeader, CvPageState, CvPanel, CvSelect, CvStatusBadge, type CvSelectOption } from '@/design-system';
+import RunConsole from './RunConsole.vue';
+import {
+  flattenRunDiagnostics,
+  type RunConsoleAdmissionCheck,
+  type RunConsoleResultItem,
+  type RunConsoleViolation
+} from './runConsoleProjection';
+import {
+  CvInlineAlert,
+  CvPageHeader,
+  CvPageState,
+  CvSelect,
+  type CvSelectOption,
+  type CvStatusTone
+} from '@/design-system';
 
 const route = useRoute();
 const runtime = useProductRuntime();
@@ -24,38 +38,137 @@ const projection = owner.projection;
 const runState = run.projection;
 const isContinuous = computed(() => runState.runtime?.sessionType === 'ContinuousInspection');
 const occupiedByOther = computed(() => runState.runtime?.isBusy === true && !isContinuous.value);
-const canStart = computed(() => projection.phase === 'ready' && !runState.runtime?.isBusy && Boolean(projection.project));
-const canStop = computed(() => isContinuous.value && runState.runtime?.isBusy === true && projection.phase !== 'stopping');
+const pending = computed(() => ['loading', 'admitting', 'starting', 'stopping'].includes(projection.phase) ||
+  ['hydrating', 'starting', 'stopping', 'reconnecting'].includes(runState.phase));
+const canStart = computed(() => projection.phase === 'ready' && projection.admission?.allowed === true &&
+  !runState.runtime?.isBusy && Boolean(projection.project));
+const canStop = computed(() => isContinuous.value && runState.runtime?.isBusy === true &&
+  projection.phase !== 'stopping');
+const canReconcile = computed(() => runState.phase === 'disconnected' ||
+  runState.runtime?.isBusy === true || projection.phase === 'error');
 const cameraOptions = computed<readonly CvSelectOption[]>(() => projection.cameras.map(camera => ({
   value: camera.id,
   label: camera.connectionStatus
-    ? `${camera.label} · ${camera.connectionStatus === 'Connected' ? '已连接' : camera.connectionStatus}`
+    ? camera.label + ' · ' + (camera.connectionStatus === 'Connected' ? '已连接' : camera.connectionStatus)
     : camera.label,
   disabled: !camera.enabled
 })));
-const stateTone = computed(() => occupiedByOther.value ? 'warning' : runState.runtime?.status === 'Faulted' ? 'error' :
-  runState.runtime?.isBusy ? 'info' : 'idle');
-const stateLabels = Object.freeze({
-  Idle: '未运行', Starting: '启动中', Running: '运行中', Stopping: '停止中', Stopped: '已停止', Faulted: '运行故障'
+const tone = computed<CvStatusTone>(() => {
+  if (occupiedByOther.value || runState.phase === 'reconnecting' || runState.phase === 'disconnected') return 'warning';
+  if (runState.phase === 'faulted' || projection.phase === 'error') return 'error';
+  if (runState.runtime?.isBusy) return 'info';
+  if (projection.admission?.allowed) return 'ok';
+  return 'idle';
 });
-const stateLabel = computed(() => occupiedByOther.value ? '正式运行占用' :
-  stateLabels[runState.runtime?.status ?? 'Idle']);
-const sessionTypeLabel = computed(() => {
-  if (runState.runtime?.sessionType === 'ContinuousInspection') return '连续检测';
-  if (runState.runtime?.sessionType === 'WorkspaceFormalRun') return '正式运行';
-  if (runState.runtime?.sessionType === 'LegacyRealtime') return '兼容实时运行';
-  return '未运行';
+const phaseLabel = computed(() => {
+  if (occupiedByOther.value) return '其他运行占用';
+  const labels = {
+    idle: '未运行',
+    hydrating: '读取状态',
+    starting: '启动中',
+    running: '连续检测中',
+    stopping: '停止中',
+    reconnecting: '实时恢复中',
+    disconnected: '实时已断开',
+    occupied: '其他运行占用',
+    faulted: '运行故障',
+    disposed: '已释放'
+  };
+  return labels[runState.phase];
 });
-const dateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
-  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
-});
-const identityItems = computed(() => [
-  { key: 'project', label: '工程', value: projection.project?.name ?? projectId },
-  { key: 'revision', label: '保存修订', value: String(projection.project?.persistenceRevision ?? '—') },
-  { key: 'snapshot', label: '快照', value: runState.runtime?.clientSnapshotId ?? '启动时由后端 admission 确认' },
-  { key: 'flow-hash', label: '流程哈希', value: runState.runtime?.canonicalFlowHash ?? '—' },
-  { key: 'session-type', label: '会话类型', value: sessionTypeLabel.value }
+const selectedCamera = computed(() => projection.cameras.find(
+  camera => camera.id === projection.selectedCameraId) ?? null);
+const identity = computed(() => [
+  { key: 'revision', label: '保存修订', value: String(projection.admission?.persistenceRevision ??
+    runState.runtime?.persistenceRevision ?? projection.project?.persistenceRevision ?? '--') },
+  { key: 'snapshot', label: '执行快照', value: projection.admission?.clientSnapshotId ??
+    runState.runtime?.clientSnapshotId ?? '--' },
+  { key: 'flow', label: '流程身份', value: projection.admission?.canonicalFlowHash ??
+    runState.runtime?.canonicalFlowHash ?? '--' },
+  { key: 'decision', label: '判定身份', value: projection.admission?.decisionConfigurationHash ??
+    runState.runtime?.decisionConfigurationHash ?? '--' },
+  { key: 'session', label: '会话', value: runState.runtime?.sessionId ?? '--' }
 ]);
+const admissionCodes = computed(() => projection.admission?.violations
+  .map(item => item.code ?? '')
+  .filter(Boolean) ?? []);
+const hasCode = (...segments: readonly string[]): boolean => admissionCodes.value.some(
+  code => segments.some(segment => code.includes(segment)));
+const checkState = (blocked: boolean): RunConsoleAdmissionCheck['state'] =>
+  blocked ? 'blocked' : projection.admission?.allowed ? 'pass' :
+    projection.phase === 'admitting' ? 'pending' : 'unknown';
+const admissionChecks = computed<readonly RunConsoleAdmissionCheck[]>(() => [
+  {
+    key: 'revision',
+    label: '保存修订',
+    state: projection.admission?.persistenceRevision === projection.project?.persistenceRevision ? 'pass' :
+      projection.phase === 'admitting' ? 'pending' : 'unknown',
+    detail: projection.admission?.persistenceRevision == null
+      ? '等待后端确认'
+      : 'revision ' + projection.admission.persistenceRevision
+  },
+  {
+    key: 'flow',
+    label: '流程与判定身份',
+    state: projection.admission?.canonicalFlowHash && projection.admission.decisionConfigurationHash
+      ? 'pass' : checkState(hasCode('FLOW', 'DECISION')),
+    detail: projection.admission?.canonicalFlowHash ? '已取得 canonical identity' : '等待权威身份'
+  },
+  {
+    key: 'parameters',
+    label: '必要参数',
+    state: checkState(hasCode('PARAMETER', 'REQUIRED')),
+    detail: hasCode('PARAMETER', 'REQUIRED') ? '存在未满足的必要参数' : '由 admission 校验'
+  },
+  {
+    key: 'resources',
+    label: '工程资源',
+    state: checkState(hasCode('RESOURCE', 'ASSET', 'MISSING')),
+    detail: hasCode('RESOURCE', 'ASSET', 'MISSING') ? '存在缺失资源' : '由 admission 校验'
+  },
+  {
+    key: 'decision',
+    label: '最终判定',
+    state: checkState(hasCode('DECISION')),
+    detail: hasCode('DECISION') ? '最终判定配置阻断运行' : '由 admission 校验'
+  },
+  {
+    key: 'device',
+    label: '采集设备',
+    state: selectedCamera.value?.enabled && selectedCamera.value.connectionStatus === 'Connected'
+      ? 'pass' : selectedCamera.value?.enabled ? 'unknown' : 'blocked',
+    detail: selectedCamera.value
+      ? selectedCamera.value.label + ' · ' + (selectedCamera.value.connectionStatus ?? '状态未知')
+      : '未选择可用相机'
+  },
+  {
+    key: 'package',
+    label: '运行包',
+    state: 'not-applicable',
+    detail: 'Studio 连续检测使用已保存工程快照'
+  }
+]);
+const violations = computed<readonly RunConsoleViolation[]>(() => (projection.admission?.violations ?? []).map(
+  (item, index) => ({
+    key: (item.code ?? 'ADMISSION') + '-' + index,
+    code: item.code ?? projection.admission?.code ?? 'ADMISSION_REJECTED',
+    message: item.reason,
+    target: item.operatorName || item.parameterName
+      ? [item.operatorName, item.parameterName].filter(Boolean).join(' · ')
+      : null
+  })));
+const results = computed<readonly RunConsoleResultItem[]>(() => runState.recentResults.map(result => ({
+  id: result.resultId,
+  timestamp: result.timestamp,
+  outcome: result.outcome,
+  defectCount: result.defectCount,
+  processingTimeMs: result.processingTimeMs,
+  errorMessage: result.errorMessage,
+  diagnostics: Object.freeze([
+    ...flattenRunDiagnostics(result.analysisData, 'analysis'),
+    ...flattenRunDiagnostics(result.outputData, 'output')
+  ])
+})));
 
 onMounted(() => owner.load());
 onBeforeUnmount(() => {
@@ -71,10 +184,10 @@ onBeforeUnmount(() => {
   >
     <CvPageHeader
       title="连续检测"
-      :description="projection.project ? `${projection.project.name} · 保存修订 ${projection.project.persistenceRevision}` : '读取工程中'"
+      :description="projection.project ? projection.project.name + ' · 保存修订 ' + projection.project.persistenceRevision : '正在读取工程'"
     >
       <template #actions>
-        <RouterLink to="/results">
+        <RouterLink :to="{ path: '/results', query: { source: 'local', projectId } }">
           查看检测结果
         </RouterLink>
       </template>
@@ -84,7 +197,7 @@ onBeforeUnmount(() => {
       v-if="projection.phase === 'loading'"
       kind="loading"
       title="正在准备连续检测"
-      description="读取工程、相机与运行权威状态。"
+      description="正在读取工程、相机与运行权威状态。"
     />
     <CvPageState
       v-else-if="projection.phase === 'error' && !projection.project"
@@ -96,106 +209,50 @@ onBeforeUnmount(() => {
       <CvInlineAlert
         v-if="occupiedByOther"
         tone="warning"
-        title="工程正在正式运行"
+        title="工程已被其他运行会话占用"
       >
-        当前会话不属于连续检测。本页不会挂载停止权限，可直接离开或等待正式运行结束。
+        {{ runState.message }}
       </CvInlineAlert>
-      <CvInlineAlert
-        v-else-if="projection.errorCode || runState.errorCode"
-        tone="error"
-        title="连续检测操作未完成"
+      <RunConsole
+        mode="continuous"
+        :project-name="projection.project?.name ?? projectId"
+        :phase-label="phaseLabel"
+        :tone="tone"
+        :message="projection.message || runState.message"
+        :error-code="projection.errorCode || runState.errorCode"
+        :connected="runState.connected"
+        :reconnect-attempt="runState.reconnectAttempt"
+        :pending="pending"
+        :can-start="canStart"
+        :can-stop="canStop"
+        :can-reconcile="canReconcile"
+        :identity="identity"
+        :admission="admissionChecks"
+        :violations="violations"
+        :statistics="runState.statistics"
+        :results="results"
+        start-test-id="inspection-start"
+        stop-test-id="inspection-stop"
+        latest-result-test-id="inspection-latest-result"
+        @start="owner.start"
+        @stop="owner.stop"
+        @reconcile="run.reconcile"
+        @refresh-admission="owner.refreshAdmission"
       >
-        {{ projection.message || runState.message }}
-        <span v-if="projection.errorCode || runState.errorCode">（{{ projection.errorCode || runState.errorCode }}）</span>
-      </CvInlineAlert>
-
-      <div class="inspection-run-page__layout">
-        <CvPanel
-          title="运行控制"
-          description="只运行后端确认的保存快照。"
-        >
-          <div class="inspection-run-page__status">
-            <CvStatusBadge
-              :tone="stateTone"
-              :label="stateLabel"
-            />
-            <span>{{ runState.connected ? '实时连接已建立' : isContinuous ? '实时连接恢复中' : '未连接' }}</span>
-          </div>
+        <template #configuration>
           <CvSelect
             label="相机"
             :model-value="projection.selectedCameraId ?? ''"
             :options="cameraOptions"
-            :disabled="Boolean(runState.runtime?.isBusy) || projection.phase === 'starting'"
+            :disabled="Boolean(runState.runtime?.isBusy) || pending"
             @update:model-value="owner.selectCamera($event || null)"
           />
-          <div class="inspection-run-page__actions">
-            <CvButton
-              variant="primary"
-              :disabled="!canStart"
-              :loading="projection.phase === 'starting'"
-              data-testid="inspection-start"
-              @click="owner.start"
-            >
-              启动连续检测
-            </CvButton>
-            <CvButton
-              variant="danger"
-              :disabled="!canStop"
-              :loading="projection.phase === 'stopping'"
-              data-testid="inspection-stop"
-              @click="owner.stop"
-            >
-              停止连续检测
-            </CvButton>
-          </div>
-          <p
-            class="inspection-run-page__message"
-            role="status"
-            aria-live="polite"
-          >
-            {{ runState.message }}
-          </p>
-        </CvPanel>
-
-        <CvPanel title="工程与保存快照身份">
-          <CvDescriptionList :items="identityItems" />
-        </CvPanel>
-      </div>
-
-      <CvPanel
-        title="最近检测结果"
-        description="实时流仅接受当前权威会话的事件。"
-      >
-        <CvPageState
-          v-if="!runState.latestResult"
-          kind="empty"
-          title="暂无本会话结果"
-          description="启动连续检测后，最新结果会显示在这里。"
-        />
-        <div
-          v-else
-          class="inspection-run-page__result"
-          data-testid="inspection-latest-result"
-        >
-          <strong>{{ runState.latestResult.status }}</strong>
-          <span>判定 {{ runState.latestResult.decisionOutcome ?? '未判定' }}</span>
-          <span>缺陷 {{ runState.latestResult.defectCount }}</span>
-          <span>{{ runState.latestResult.processingTimeMs }} ms</span>
-          <span>{{ dateTimeFormatter.format(new Date(runState.latestResult.timestamp)) }}</span>
-          <span v-if="runState.latestResult.errorMessage">{{ runState.latestResult.errorMessage }}</span>
-        </div>
-      </CvPanel>
+        </template>
+      </RunConsole>
     </template>
   </section>
 </template>
 
 <style scoped>
-.inspection-run-page { display: grid; max-width: 1380px; gap: var(--cv-density-page-gap); }
-.inspection-run-page__layout { display: grid; grid-template-columns: minmax(360px, 0.85fr) minmax(420px, 1.15fr); gap: var(--cv-space-4); align-items: start; }
-.inspection-run-page__status { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); margin-bottom: var(--cv-space-4); color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }
-.inspection-run-page__actions { display: flex; gap: var(--cv-space-2); margin-top: var(--cv-space-4); }
-.inspection-run-page__message { margin: var(--cv-space-3) 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }
-.inspection-run-page__result { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--cv-space-3); padding: 0 var(--cv-density-panel-padding) var(--cv-density-panel-padding); color: var(--cv-text-secondary); }
-.inspection-run-page__result strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-lg); }
-@media (max-width: 960px) { .inspection-run-page__layout { grid-template-columns: 1fr; } }
+.inspection-run-page { width: 100%; max-width: 1540px; min-width: 0; display: grid; gap: var(--cv-density-page-gap); }
 </style>

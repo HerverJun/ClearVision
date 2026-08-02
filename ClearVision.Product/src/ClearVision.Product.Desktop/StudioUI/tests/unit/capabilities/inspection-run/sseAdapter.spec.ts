@@ -6,7 +6,7 @@ describe('inspection SSE adapter', () => {
   it('decodes normal state and result events through the shared stream transport', async () => {
     const frames = [
       'id: 4\nevent: stateChanged\ndata: {"projectId":"p","sessionId":"s","oldState":"Starting","newState":"Running","errorMessage":null,"timestamp":"2026-07-26T00:00:00Z","isSnapshot":false,"startedAt":null,"stoppedAt":null}\n\n',
-      'id: 5\nevent: resultProduced\ndata: {"projectId":"p","sessionId":"s","resultId":"r","status":"OK","executionOutcome":"Succeeded","decisionOutcome":"OK","defectCount":0,"processingTimeMs":3,"errorMessage":null,"timestamp":"2026-07-26T00:00:01Z"}\n\n'
+      'id: 5\nevent: resultProduced\ndata: {"projectId":"p","sessionId":"s","resultId":"r","status":"OK","executionOutcome":"Succeeded","decisionOutcome":"Ok","defectCount":0,"processingTimeMs":3,"errorMessage":null,"timestamp":"2026-07-26T00:00:01Z"}\n\n'
     ];
     const stream = new ReadableStream<Uint8Array>({
       start(controller) { for (const frame of frames) controller.enqueue(new TextEncoder().encode(frame)); controller.close(); }

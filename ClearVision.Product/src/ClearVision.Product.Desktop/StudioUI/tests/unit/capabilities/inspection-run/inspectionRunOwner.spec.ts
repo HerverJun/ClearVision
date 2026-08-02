@@ -37,8 +37,12 @@ describe('inspectionRunOwner', () => {
     const h = harness(); const owner = createInspectionRunOwner({ projectId, api: h.api, sse: h.sse });
     expect(await owner.start(identity)).toBe(true);
     expect(h.api.start).toHaveBeenCalledWith(identity, null, expect.anything());
-    const event: InspectionSseEvent = { type: 'resultProduced', id: '9', result: { projectId, sessionId: running.sessionId!, resultId: 'r', status: 'OK',
-      executionOutcome: 'Succeeded', decisionOutcome: 'OK', defectCount: 0, processingTimeMs: 4, errorMessage: null, timestamp: new Date().toISOString() } };
+    const event: InspectionSseEvent = { type: 'resultProduced', id: '9', result: {
+      projectId, sessionId: running.sessionId!, resultId: 'r', imageId: null, status: 'OK',
+      outcome: { execution: 'Succeeded', decision: 'Ok' }, decisionSource: null, reasonCode: null,
+      hasJudgmentSignal: true, defectCount: 0, processingTimeMs: 4, errorMessage: null,
+      outputData: null, analysisData: null, timestamp: new Date().toISOString()
+    } };
     h.connection()?.onEvent(event); expect(owner.projection.latestResult?.resultId).toBe('r');
     h.setState(idle); expect(await owner.stop()).toBe(true); expect(h.api.stop).toHaveBeenCalledWith(identity, expect.anything());
     expect(owner.projection.phase).toBe('idle'); owner.dispose(); await owner.settle();
@@ -65,7 +69,7 @@ describe('inspectionRunOwner', () => {
     owner.dispose(); await owner.settle(); vi.useRealTimers();
   });
 
-  it('preserves stable backend rejection codes without guessing a runtime state', async () => {
+  it('preserves stable 409 codes and rereads authority without starting again', async () => {
     const h = harness();
     vi.mocked(h.api.start).mockRejectedValueOnce(new ApiConflictError({
       url: 'http://localhost/api/inspection/realtime/start', status: 409, statusText: 'Conflict',
@@ -76,7 +80,8 @@ describe('inspectionRunOwner', () => {
     expect(await owner.start(identity)).toBe(false);
     expect(owner.projection.phase).toBe('faulted');
     expect(owner.projection.errorCode).toBe('ADMISSION_SNAPSHOT_MISMATCH');
-    expect(h.api.hydrate).not.toHaveBeenCalled();
+    expect(h.api.hydrate).toHaveBeenCalledOnce();
+    expect(h.api.start).toHaveBeenCalledOnce();
     owner.dispose();
   });
 
@@ -107,8 +112,10 @@ describe('inspectionRunOwner', () => {
 
     await owner.start(identity);
     connections[0]?.onEvent({ type: 'resultProduced', id: '40', result: {
-      projectId, sessionId: 'old-session', resultId: 'old-result', status: 'NG', executionOutcome: 'Succeeded',
-      decisionOutcome: 'NG', defectCount: 1, processingTimeMs: 5, errorMessage: null, timestamp: new Date().toISOString()
+      projectId, sessionId: 'old-session', resultId: 'old-result', imageId: null, status: 'NG',
+      outcome: { execution: 'Succeeded', decision: 'Ng' }, decisionSource: null, reasonCode: null,
+      hasJudgmentSignal: true, defectCount: 1, processingTimeMs: 5, errorMessage: null,
+      outputData: null, analysisData: null, timestamp: new Date().toISOString()
     } });
     expect(owner.projection.latestResult).toBeNull();
 
@@ -144,6 +151,28 @@ describe('inspectionRunOwner', () => {
     owner.dispose(); await owner.settle();
   });
 
+  it('drops a late authoritative start recovery after disposal', async () => {
+    let resolveHydrate: ((value: InspectionRunState) => void) | undefined;
+    const h = harness();
+    vi.mocked(h.api.start).mockRejectedValueOnce(
+      new ApiNetworkError('http://localhost/api/inspection/realtime/start', new Error('offline'))
+    );
+    vi.mocked(h.api.hydrate).mockImplementationOnce(() => new Promise<InspectionRunState>(resolve => {
+      resolveHydrate = resolve;
+    }));
+    const owner = createInspectionRunOwner({ projectId, api: h.api, sse: h.sse });
+
+    const start = owner.start(identity);
+    await vi.waitFor(() => expect(h.api.hydrate).toHaveBeenCalledOnce());
+    owner.dispose();
+    resolveHydrate?.(running);
+
+    await expect(start).resolves.toBe(false);
+    expect(owner.projection).toMatchObject({ phase: 'disposed', errorCode: null });
+    expect(owner.resources()).toEqual({ streams: 0, timers: 0, abortControllers: 0, subscriptions: 0 });
+    await owner.settle();
+  });
+
   it('backs off across repeated disconnects until a valid event resets the attempt', async () => {
     vi.useFakeTimers(); const h = harness(); let calls = 0;
     const sse: InspectionSsePort = { connect: vi.fn(async options => {
@@ -161,6 +190,82 @@ describe('inspectionRunOwner', () => {
     await vi.advanceTimersByTimeAsync(20);
     expect(sse.connect).toHaveBeenCalledTimes(3);
     owner.dispose(); await owner.settle(); vi.useRealTimers();
+  });
+
+  it('drops duplicate and out-of-order SSE sequences before they can replace current statistics', async () => {
+    const h = harness();
+    const owner = createInspectionRunOwner({ projectId, api: h.api, sse: h.sse });
+    await owner.start(identity);
+    const resultEvent = (id: string, resultId: string): InspectionSseEvent => ({
+      type: 'resultProduced',
+      id,
+      result: {
+        projectId,
+        sessionId: running.sessionId!,
+        resultId,
+        imageId: null,
+        status: 'OK',
+        outcome: { execution: 'Succeeded', decision: 'Ok' },
+        decisionSource: 'FinalDecision',
+        reasonCode: null,
+        hasJudgmentSignal: true,
+        defectCount: 0,
+        processingTimeMs: 8,
+        errorMessage: null,
+        outputData: { score: 0.98 },
+        analysisData: { threshold: 0.9 },
+        timestamp: '2026-08-02T00:00:00Z'
+      }
+    });
+
+    h.connection()?.onEvent(resultEvent('10', 'current'));
+    h.connection()?.onEvent(resultEvent('9', 'stale'));
+    h.connection()?.onEvent(resultEvent('10', 'duplicate'));
+
+    expect(owner.projection.latestResult?.resultId).toBe('current');
+    expect(owner.projection.recentResults).toHaveLength(1);
+    expect(owner.projection.statistics).toMatchObject({
+      total: 1,
+      ok: 1,
+      ng: 0,
+      yieldRate: 1,
+      decisionCoverageRate: 1,
+      averageProcessingTimeMs: 8
+    });
+    owner.dispose();
+    await owner.settle();
+  });
+
+  it('bounds SSE retries, rereads authority once, and never restarts the session', async () => {
+    vi.useFakeTimers();
+    const h = harness(running);
+    const sse: InspectionSsePort = {
+      connect: vi.fn(async options => {
+        options.onOpen();
+        throw new Error('disconnected');
+      })
+    };
+    const owner = createInspectionRunOwner({
+      projectId,
+      api: h.api,
+      sse,
+      retryDelaysMs: [10, 20]
+    });
+
+    await owner.start(identity);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(10);
+    await vi.advanceTimersByTimeAsync(20);
+    await vi.waitFor(() => expect(owner.projection.phase).toBe('disconnected'));
+
+    expect(sse.connect).toHaveBeenCalledTimes(3);
+    expect(h.api.hydrate).toHaveBeenCalledOnce();
+    expect(h.api.start).toHaveBeenCalledOnce();
+    expect(owner.projection.errorCode).toBe('INSPECTION_SSE_RETRY_EXHAUSTED');
+    expect(owner.resources()).toEqual({ streams: 0, timers: 0, abortControllers: 0, subscriptions: 0 });
+    owner.dispose();
+    await owner.settle();
+    vi.useRealTimers();
   });
 
   it('disposes every resource and survives 20 mount/unmount cycles without leaks', async () => {

@@ -227,13 +227,6 @@ export function createProductLeaveGuardOwner(
     return workspaceProtection(options.workspace.getLeaveProtectionSnapshot(projectId));
   }
 
-  function currentInspectionProtection(): ProductLeaveProtectionKind {
-    const runtime = inspectionRunOwner?.projection.runtime;
-    return runtime?.isBusy && runtime.sessionType === 'ContinuousInspection'
-      ? 'continuous-inspection-active'
-      : null;
-  }
-
   function currentSettingsProtection(): ProductLeaveProtectionKind {
     return settingsParticipant?.inspect() ?? null;
   }
@@ -299,15 +292,6 @@ export function createProductLeaveGuardOwner(
     if (projectAfter === 'project-update-conflict') return await prompt(projectAfter, reason, generation);
     if (projectAfter) return block(projectAfter, generation);
 
-    if (currentInspectionProtection()) {
-      const stopped = await inspectionRunOwner!.stop();
-      if (!isCurrent(generation)) return false;
-      await inspectionRunOwner!.reconcile();
-      if (!stopped || currentInspectionProtection()) {
-        return block('continuous-inspection-active', generation);
-      }
-    }
-
     const settingsProtection = currentSettingsProtection();
     if (settingsProtection) {
       return isPromptable(settingsProtection)
@@ -358,7 +342,7 @@ export function createProductLeaveGuardOwner(
     },
     hasProtection(targetProjectId?: string): boolean {
       if (disposed) return false;
-      return currentProjectProtection() !== null || currentInspectionProtection() !== null ||
+      return currentProjectProtection() !== null ||
         currentWorkspaceProtection(targetProjectId) !== null || currentSettingsProtection() !== null;
     },
     confirmPrompt(): void {

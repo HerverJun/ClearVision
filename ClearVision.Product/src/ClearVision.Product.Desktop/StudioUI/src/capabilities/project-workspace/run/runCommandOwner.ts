@@ -1,5 +1,11 @@
 import { reactive, readonly, type DeepReadonly } from 'vue';
 import { ApiAbortError, ApiHttpError, ApiNetworkError } from '@/platform/api';
+import type {
+  InspectionRunApiPort,
+  InspectionRunState,
+  InspectionSseEvent,
+  InspectionSsePort
+} from '@/capabilities/inspection-run';
 import type { WorkspacePersistenceOwner } from '../persistence';
 import type {
   WorkspaceCapabilityDiagnosticsLease,
@@ -16,9 +22,13 @@ import {
 
 export type WorkspaceRunPhase =
   | 'idle'
+  | 'hydrating'
   | 'blocked'
   | 'admitting'
   | 'executing'
+  | 'occupied'
+  | 'reconnecting'
+  | 'disconnected'
   | 'succeeded'
   | 'failed'
   | 'cancelled'
@@ -31,12 +41,15 @@ export interface WorkspaceRunProjection {
   readonly projectId: string;
   readonly clientSnapshotId: string | null;
   readonly admission: WorkspaceRunAdmissionV1 | null;
+  readonly runtime: InspectionRunState | null;
   readonly result: WorkspaceRunResultV1 | null;
   readonly message: string;
   readonly errorCode: string | null;
   readonly canRun: boolean;
   readonly canStop: boolean;
   readonly canReconcile: boolean;
+  readonly connected: boolean;
+  readonly reconnectAttempt: number;
 }
 
 type MutableWorkspaceRunProjection = {
@@ -46,6 +59,8 @@ type MutableWorkspaceRunProjection = {
 export interface WorkspaceRunCommandOwner {
   readonly projectId: string;
   readonly projection: DeepReadonly<WorkspaceRunProjection>;
+  hydrate(): Promise<void>;
+  refreshAdmission(): Promise<WorkspaceRunAdmissionV1 | null>;
   run(): Promise<WorkspaceRunResultV1 | null>;
   stop(): Promise<boolean>;
   reconcile(): Promise<WorkspaceRunReconciliationV1 | null>;
@@ -101,33 +116,63 @@ export function createWorkspaceRunCommandOwner(options: {
   readonly projectId: string;
   readonly persistenceOwner: WorkspacePersistenceOwner;
   readonly port: WorkspaceRunPort;
+  readonly runtimeApi?: Pick<InspectionRunApiPort, 'hydrate'>;
+  readonly sse?: InspectionSsePort;
   readonly diagnostics: WorkspaceLifecycleDiagnosticsOwner;
+  readonly retryDelaysMs?: readonly number[];
+  readonly setTimer?: typeof globalThis.setTimeout;
+  readonly clearTimer?: typeof globalThis.clearTimeout;
 }): WorkspaceRunCommandOwner {
   if (options.port.projectId !== options.projectId || options.persistenceOwner.projectId !== options.projectId) {
     throw new TypeError('Workspace Run owner requires one Project identity.');
   }
+  const runtimeApi: Pick<InspectionRunApiPort, 'hydrate'> = options.runtimeApi ?? Object.freeze({
+    async hydrate(): Promise<InspectionRunState> {
+      throw new Error('Formal Run realtime state adapter is not configured.');
+    }
+  });
+  const sse: InspectionSsePort = options.sse ?? Object.freeze({
+    async connect(_options: Parameters<InspectionSsePort['connect']>[0]): Promise<void> {
+      void _options;
+      throw new Error('Formal Run SSE adapter is not configured.');
+    }
+  });
   const lease: WorkspaceCapabilityDiagnosticsLease = options.diagnostics.reserveRun(options.projectId);
   const state = reactive<MutableWorkspaceRunProjection>({
     phase: 'idle',
     projectId: options.projectId,
     clientSnapshotId: null,
     admission: null,
+    runtime: null,
     result: null,
     message: 'Formal Run is ready when the persisted Project is clean.',
     errorCode: null,
     canRun: false,
     canStop: false,
-    canReconcile: false
+    canReconcile: false,
+    connected: false,
+    reconnectAttempt: 0
   });
+  const retryDelays = options.retryDelaysMs ?? [250, 500, 1000, 2000, 5000];
+  const setTimer = options.setTimer ?? globalThis.setTimeout.bind(globalThis);
+  const clearTimer = options.clearTimer ?? globalThis.clearTimeout.bind(globalThis);
   let disposed = false;
   let operationGeneration = 0;
   let activeController: AbortController | undefined;
   let authoritySettledLocalAbort: AbortController | undefined;
   let stopController: AbortController | undefined;
   let reconcileController: AbortController | undefined;
+  let hydrateController: AbortController | undefined;
+  let admissionController: AbortController | undefined;
+  let streamController: AbortController | undefined;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastEventSequence: number | null = null;
+  let runtimeLockedPersistence = false;
   let runPromise: Promise<WorkspaceRunResultV1 | null> | undefined;
   let stopPromise: Promise<boolean> | undefined;
   let reconcilePromise: Promise<WorkspaceRunReconciliationV1 | null> | undefined;
+  let hydratePromise: Promise<void> | undefined;
+  let admissionPromise: Promise<WorkspaceRunAdmissionV1 | null> | undefined;
   const pending = new Set<Promise<unknown>>();
 
   function isCurrent(generation: number, clientSnapshotId: string): boolean {
@@ -137,11 +182,19 @@ export function createWorkspaceRunCommandOwner(options: {
 
   function syncDiagnostics(inFlight = false): void {
     if (disposed) return;
-    const activeAbortControllers = [activeController, stopController, reconcileController]
+    const activeAbortControllers = [
+      activeController,
+      stopController,
+      reconcileController,
+      hydrateController,
+      admissionController,
+      streamController
+    ]
       .filter(controller => controller !== undefined).length;
     lease.update(Object.freeze({
       ...zeroResources(),
-      activeSubscriptions: 1,
+      activeSubscriptions: 1 + (streamController ? 1 : 0),
+      activeTimers: reconnectTimer ? 1 : 0,
       activeAbortControllers,
       inFlightExecute: inFlight ? 1 : 0
     }));
@@ -149,18 +202,362 @@ export function createWorkspaceRunCommandOwner(options: {
 
   function syncAvailability(): void {
     if (disposed) return;
-    state.canRun = !runPromise && options.persistenceOwner.projection.canRun &&
+    state.canRun = !runPromise && !hydratePromise && !admissionPromise &&
+      state.admission?.allowed !== false && options.persistenceOwner.projection.canRun &&
       (state.phase === 'idle' || state.phase === 'blocked' || state.phase === 'succeeded' ||
         state.phase === 'failed' || state.phase === 'cancelled');
-    state.canStop = Boolean(runPromise && activeController && state.phase === 'executing');
+    state.canStop = Boolean(!stopPromise && state.clientSnapshotId && state.admission &&
+      ((runPromise && activeController && state.phase === 'executing') ||
+      (state.runtime?.sessionType === 'WorkspaceFormalRun' && state.runtime.isBusy)) &&
+      (state.phase === 'executing' || state.phase === 'cancel-requested' || state.phase === 'disconnected'));
     state.canReconcile = Boolean(!stopPromise && !reconcilePromise && state.clientSnapshotId && state.admission &&
-      (state.phase === 'executing' || state.phase === 'cancel-requested' || state.phase === 'unknown-outcome'));
+      (state.phase === 'executing' || state.phase === 'cancel-requested' ||
+        state.phase === 'unknown-outcome' || state.phase === 'disconnected'));
   }
 
   function track<T>(promise: Promise<T>): Promise<T> {
     pending.add(promise);
     promise.finally(() => pending.delete(promise)).catch(() => {});
     return promise;
+  }
+
+  function clearReconnect(): void {
+    if (reconnectTimer) clearTimer(reconnectTimer);
+    reconnectTimer = undefined;
+  }
+
+  function closeStream(): void {
+    streamController?.abort();
+    streamController = undefined;
+    state.connected = false;
+    clearReconnect();
+  }
+
+  function identityFromRuntime(runtime: InspectionRunState): WorkspaceRunIdentityV1 | null {
+    if (runtime.sessionType !== 'WorkspaceFormalRun' || !runtime.clientSnapshotId ||
+      runtime.persistenceRevision == null || !runtime.canonicalFlowHash ||
+      !runtime.decisionConfigurationHash) {
+      return null;
+    }
+    return Object.freeze({
+      projectId: options.projectId,
+      clientSnapshotId: runtime.clientSnapshotId,
+      expectedPersistenceRevision: runtime.persistenceRevision,
+      expectedCanonicalFlowHash: runtime.canonicalFlowHash,
+      expectedDecisionConfigurationHash: runtime.decisionConfigurationHash
+    });
+  }
+
+  function admissionFromIdentity(identity: WorkspaceRunIdentityV1): WorkspaceRunAdmissionV1 {
+    return Object.freeze({
+      allowed: true,
+      code: null,
+      message: '已从后端运行状态恢复正式运行身份。',
+      projectId: identity.projectId,
+      clientSnapshotId: identity.clientSnapshotId,
+      persistenceRevision: identity.expectedPersistenceRevision,
+      canonicalFlowHash: identity.expectedCanonicalFlowHash,
+      decisionConfigurationHash: identity.expectedDecisionConfigurationHash,
+      violations: Object.freeze([])
+    });
+  }
+
+  function identitiesMatch(left: WorkspaceRunIdentityV1, right: WorkspaceRunIdentityV1): boolean {
+    return left.projectId === right.projectId &&
+      left.clientSnapshotId === right.clientSnapshotId &&
+      left.expectedPersistenceRevision === right.expectedPersistenceRevision &&
+      left.expectedCanonicalFlowHash === right.expectedCanonicalFlowHash &&
+      left.expectedDecisionConfigurationHash === right.expectedDecisionConfigurationHash;
+  }
+
+  function acceptsSequence(id: string | null): boolean {
+    if (id == null || id === '') return true;
+    const sequence = Number(id);
+    if (!Number.isSafeInteger(sequence) || sequence < 0) return false;
+    if (lastEventSequence != null && sequence <= lastEventSequence) return false;
+    lastEventSequence = sequence;
+    return true;
+  }
+
+  function applyRuntimeEvent(event: InspectionSseEvent, ownerGeneration: number): void {
+    if (disposed || ownerGeneration !== operationGeneration || !acceptsSequence(event.id)) return;
+    if (event.type === 'heartbeat') {
+      state.reconnectAttempt = 0;
+      return;
+    }
+    const sessionId = event.type === 'stateChanged' ? event.state.sessionId
+      : event.type === 'resultProduced' ? event.result.sessionId
+        : event.type === 'progressChanged' ? event.progress.sessionId
+          : event.sessionId;
+    if (event.type === 'stateChanged' && event.state.projectId !== options.projectId) return;
+    if (event.type === 'resultProduced' && event.result.projectId !== options.projectId) return;
+    if (event.type === 'progressChanged' && event.progress.projectId !== options.projectId) return;
+    if (event.type === 'faulted' && event.projectId !== options.projectId) return;
+    if (state.runtime?.sessionId && state.runtime.sessionId !== sessionId) return;
+    state.reconnectAttempt = 0;
+    if (event.type === 'stateChanged' && state.runtime) {
+      const busy = event.state.newState === 'Starting' || event.state.newState === 'Running' ||
+        event.state.newState === 'Stopping';
+      state.runtime = Object.freeze({
+        ...state.runtime,
+        status: event.state.newState,
+        isBusy: busy,
+        startedAt: event.state.startedAt ?? state.runtime.startedAt,
+        stoppedAt: event.state.stoppedAt
+      });
+      state.phase = event.state.newState === 'Stopping' ? 'cancel-requested'
+        : busy ? 'executing' : event.state.newState === 'Faulted' ? 'unknown-outcome' : state.phase;
+      state.message = '正式运行状态：' + event.state.newState;
+      if (!busy) {
+        closeStream();
+        void reconcileCurrent();
+      }
+    }
+    if (event.type === 'resultProduced' || event.type === 'faulted') {
+      closeStream();
+      void reconcileCurrent();
+    }
+    syncAvailability();
+  }
+
+  async function rereadAfterRetryExhausted(ownerGeneration: number): Promise<void> {
+    if (disposed || ownerGeneration !== operationGeneration || hydrateController) return;
+    const controller = new AbortController();
+    hydrateController = controller;
+    try {
+      const runtime = await runtimeApi.hydrate(options.projectId, { signal: controller.signal });
+      if (disposed || ownerGeneration !== operationGeneration) return;
+      state.runtime = runtime;
+      const identity = identityFromRuntime(runtime);
+      const expectedIdentity = currentIdentity();
+      if (runtime.isBusy && identity && expectedIdentity && identitiesMatch(identity, expectedIdentity)) {
+        state.phase = 'disconnected';
+        state.errorCode = 'RUN_SSE_RETRY_EXHAUSTED';
+        state.message = '实时重连已达上限；后端仍确认正式运行中，请手动核对状态。';
+      } else if (!runtime.isBusy && currentIdentity()) {
+        await reconcileCurrent();
+      } else if (runtime.isBusy) {
+        state.phase = 'unknown-outcome';
+        state.errorCode = 'RUN_RUNTIME_IDENTITY_MISMATCH';
+        state.message = '权威运行状态与当前正式运行身份不一致，工作区保持锁定。';
+      }
+    } catch (error) {
+      if (!disposed && ownerGeneration === operationGeneration && !(error instanceof ApiAbortError)) {
+        state.phase = 'disconnected';
+        state.errorCode = errorCode(error) ?? 'RUN_AUTHORITY_REREAD_FAILED';
+        state.message = '实时重连已达上限，且权威状态重读失败。';
+      }
+    } finally {
+      if (hydrateController === controller) hydrateController = undefined;
+      syncDiagnostics(Boolean(activeController));
+      syncAvailability();
+    }
+  }
+
+  function scheduleReconnect(ownerGeneration: number): void {
+    if (disposed || ownerGeneration !== operationGeneration || reconnectTimer ||
+      state.phase === 'succeeded' || state.phase === 'failed' || state.phase === 'cancelled') return;
+    if (state.reconnectAttempt >= retryDelays.length) {
+      void track(rereadAfterRetryExhausted(ownerGeneration));
+      return;
+    }
+    const delay = retryDelays[state.reconnectAttempt] ?? 5000;
+    state.phase = 'reconnecting';
+    state.reconnectAttempt += 1;
+    state.message = '正式运行实时连接中断，正在恢复。';
+    reconnectTimer = setTimer(() => {
+      reconnectTimer = undefined;
+      connect(ownerGeneration);
+    }, delay);
+    syncDiagnostics(Boolean(activeController));
+  }
+
+  function connect(ownerGeneration: number): void {
+    if (disposed || ownerGeneration !== operationGeneration || streamController) return;
+    const controller = new AbortController();
+    streamController = controller;
+    syncDiagnostics(Boolean(activeController));
+    const flight = sse.connect({
+      projectId: options.projectId,
+      lastEventId: lastEventSequence == null ? null : String(lastEventSequence),
+      signal: controller.signal,
+      onOpen: () => {
+        if (!disposed && ownerGeneration === operationGeneration && streamController === controller) {
+          state.connected = true;
+          if (state.phase === 'reconnecting') state.phase = 'executing';
+        }
+      },
+      onEvent: event => applyRuntimeEvent(event, ownerGeneration)
+    });
+    track(flight).catch(() => {
+      if (!controller.signal.aborted && !disposed && ownerGeneration === operationGeneration) {
+        state.errorCode = 'RUN_SSE_DISCONNECTED';
+      }
+    }).finally(() => {
+      if (streamController === controller) streamController = undefined;
+      state.connected = false;
+      syncDiagnostics(Boolean(activeController));
+      if (!controller.signal.aborted) scheduleReconnect(ownerGeneration);
+    });
+  }
+
+  async function performAdmissionRefresh(): Promise<WorkspaceRunAdmissionV1 | null> {
+    if (disposed || state.runtime?.isBusy) return null;
+    if (!options.persistenceOwner.projection.canRun) {
+      state.phase = 'blocked';
+      state.admission = null;
+      state.errorCode = 'RUN_PERSISTENCE_GATE';
+      state.message = '存在未保存参数或待协调保存状态，正式运行准入未发起。';
+      syncAvailability();
+      return null;
+    }
+    admissionController?.abort();
+    const controller = new AbortController();
+    admissionController = controller;
+    const clientSnapshotId = globalThis.crypto.randomUUID();
+    state.phase = 'admitting';
+    state.clientSnapshotId = clientSnapshotId;
+    state.admission = null;
+    state.errorCode = null;
+    state.message = '正在读取已保存工程的正式运行准入。';
+    syncDiagnostics();
+    syncAvailability();
+    try {
+      const admission = await options.port.admit({
+        projectId: options.projectId,
+        clientSnapshotId,
+        expectedPersistenceRevision: options.persistenceOwner.projection.persistenceRevision
+      }, { signal: controller.signal });
+      if (disposed || admissionController !== controller) return null;
+      state.admission = admission;
+      state.phase = admission.allowed ? 'idle' : 'blocked';
+      state.errorCode = admission.allowed ? null : admission.code;
+      state.message = admission.message;
+      return admission;
+    } catch (error) {
+      if (disposed || controller.signal.aborted || error instanceof ApiAbortError) return null;
+      state.phase = 'blocked';
+      state.errorCode = errorCode(error) ?? 'RUN_ADMISSION_FAILED';
+      state.message = error instanceof ApiHttpError && (error.status === 401 || error.status === 403)
+        ? '当前会话无权读取正式运行准入。'
+        : '正式运行准入读取失败。';
+      if (error instanceof ApiHttpError && error.status === 409) await performHydrate();
+      return null;
+    } finally {
+      if (admissionController === controller) admissionController = undefined;
+      syncDiagnostics();
+      syncAvailability();
+    }
+  }
+
+  function refreshAdmission(): Promise<WorkspaceRunAdmissionV1 | null> {
+    if (admissionPromise) return admissionPromise;
+    const operation = track(performAdmissionRefresh());
+    const flight = operation.finally(() => {
+      if (admissionPromise === flight) admissionPromise = undefined;
+      syncAvailability();
+    });
+    admissionPromise = flight;
+    syncAvailability();
+    return flight;
+  }
+
+  async function performHydrate(): Promise<void> {
+    if (disposed) return;
+    const generation = ++operationGeneration;
+    closeStream();
+    hydrateController?.abort();
+    const controller = new AbortController();
+    hydrateController = controller;
+    state.phase = 'hydrating';
+    state.errorCode = null;
+    state.message = '正在读取后端运行权威状态。';
+    syncDiagnostics();
+    syncAvailability();
+    try {
+      const runtime = await runtimeApi.hydrate(options.projectId, { signal: controller.signal });
+      if (disposed || generation !== operationGeneration) return;
+      const expectedIdentity = currentIdentity();
+      state.runtime = runtime;
+      const identity = identityFromRuntime(runtime);
+      if (identity && expectedIdentity && !identitiesMatch(identity, expectedIdentity)) {
+        if (options.persistenceOwner.projection.canRun) {
+          runtimeLockedPersistence = options.persistenceOwner.setRunning(
+            '权威运行身份与当前正式运行身份不一致。'
+          );
+        }
+        state.phase = 'unknown-outcome';
+        state.errorCode = 'RUN_RUNTIME_IDENTITY_MISMATCH';
+        state.message = '权威运行状态与当前正式运行身份不一致，工作区保持锁定。';
+        return;
+      }
+      if (runtime.isBusy && identity) {
+        state.clientSnapshotId = identity.clientSnapshotId;
+        state.admission = admissionFromIdentity(identity);
+        state.result = null;
+        if (options.persistenceOwner.projection.canRun) {
+          runtimeLockedPersistence = options.persistenceOwner.setRunning('后端正式运行会话已恢复。');
+        }
+        state.phase = runtime.status === 'Stopping' ? 'cancel-requested' : 'executing';
+        state.message = '已恢复后端正式运行会话。';
+        lastEventSequence = null;
+        connect(generation);
+        return;
+      }
+      if (runtime.isBusy) {
+        state.clientSnapshotId = null;
+        state.admission = null;
+        state.result = null;
+        if (options.persistenceOwner.projection.canRun) {
+          runtimeLockedPersistence = options.persistenceOwner.setRunning('工程由其他运行会话占用。');
+        }
+        state.phase = 'occupied';
+        state.errorCode = 'ADMISSION_RUNTIME_ALREADY_ACTIVE';
+        state.message = '工程由' + (runtime.sessionType ?? '其他运行会话') + '占用；未挂载第二个运行 owner。';
+        return;
+      }
+      if (identity) {
+        state.clientSnapshotId = identity.clientSnapshotId;
+        state.admission = admissionFromIdentity(identity);
+        if (options.persistenceOwner.projection.canRun) {
+          runtimeLockedPersistence = options.persistenceOwner.setRunning('正在核对已结束的正式运行。');
+        }
+        state.phase = 'unknown-outcome';
+        await reconcileCurrent();
+        return;
+      }
+      if (runtimeLockedPersistence) {
+        options.persistenceOwner.clearRunning('后端确认工程未运行。');
+        runtimeLockedPersistence = false;
+      }
+      state.phase = 'idle';
+      state.message = '后端确认工程未运行。';
+      await refreshAdmission();
+    } catch (error) {
+      if (!disposed && generation === operationGeneration && !(error instanceof ApiAbortError)) {
+        state.phase = 'blocked';
+        state.errorCode = errorCode(error) ?? 'RUN_HYDRATE_FAILED';
+        state.message = error instanceof ApiHttpError && (error.status === 401 || error.status === 403)
+          ? '当前会话无权读取工程运行状态。'
+          : '无法读取工程运行权威状态。';
+      }
+    } finally {
+      if (hydrateController === controller) hydrateController = undefined;
+      syncDiagnostics(Boolean(activeController));
+      syncAvailability();
+    }
+  }
+
+  function hydrate(): Promise<void> {
+    if (hydratePromise) return hydratePromise;
+    const operation = track(performHydrate());
+    const flight = operation.finally(() => {
+      if (hydratePromise === flight) hydratePromise = undefined;
+      syncAvailability();
+    });
+    hydratePromise = flight;
+    syncAvailability();
+    return flight;
   }
 
   function currentIdentity(): WorkspaceRunIdentityV1 | null {
@@ -179,11 +576,13 @@ export function createWorkspaceRunCommandOwner(options: {
   }
 
   function reconciliationMatchesIdentity(reconciliation: WorkspaceRunReconciliationV1, identity: WorkspaceRunIdentityV1): boolean {
-    return reconciliation.projectId === identity.projectId &&
-      reconciliation.clientSnapshotId === identity.clientSnapshotId &&
-      reconciliation.persistenceRevision === identity.expectedPersistenceRevision &&
-      reconciliation.canonicalFlowHash === identity.expectedCanonicalFlowHash &&
-      reconciliation.decisionConfigurationHash === identity.expectedDecisionConfigurationHash;
+    return identitiesMatch({
+      projectId: reconciliation.projectId,
+      clientSnapshotId: reconciliation.clientSnapshotId,
+      expectedPersistenceRevision: reconciliation.persistenceRevision,
+      expectedCanonicalFlowHash: reconciliation.canonicalFlowHash,
+      expectedDecisionConfigurationHash: reconciliation.decisionConfigurationHash
+    }, identity);
   }
 
   function resultMatchesIdentity(result: WorkspaceRunResultV1, identity: WorkspaceRunIdentityV1): boolean {
@@ -212,6 +611,19 @@ export function createWorkspaceRunCommandOwner(options: {
     syncDiagnostics(false);
     syncAvailability();
     return true;
+  }
+
+  function markRuntimeTerminal(status: InspectionRunState['status']): void {
+    if (state.runtime) {
+      state.runtime = Object.freeze({
+        ...state.runtime,
+        status,
+        isBusy: false,
+        stoppedAt: state.runtime.stoppedAt ?? new Date().toISOString()
+      });
+    }
+    runtimeLockedPersistence = false;
+    closeStream();
   }
 
   function applyReconciliation(
@@ -252,6 +664,7 @@ export function createWorkspaceRunCommandOwner(options: {
         state.errorCode = reconciliation.code;
         state.message = reconciliation.message;
         options.persistenceOwner.clearRunning(state.message);
+        markRuntimeTerminal('Stopped');
         break;
       case 'succeeded':
         if (!reconciliation.result) {
@@ -265,6 +678,7 @@ export function createWorkspaceRunCommandOwner(options: {
         state.errorCode = reconciliation.code;
         state.message = terminalMessage(reconciliation.result);
         options.persistenceOwner.clearRunning(state.message);
+        markRuntimeTerminal('Stopped');
         break;
       case 'failed':
         state.result = reconciliation.result;
@@ -272,6 +686,7 @@ export function createWorkspaceRunCommandOwner(options: {
         state.errorCode = reconciliation.code;
         state.message = reconciliation.message;
         options.persistenceOwner.clearRunning(state.message);
+        markRuntimeTerminal('Faulted');
         break;
       case 'result-not-found':
       case 'identity-mismatch':
@@ -281,6 +696,43 @@ export function createWorkspaceRunCommandOwner(options: {
         break;
     }
     syncAvailability();
+  }
+
+  async function recoverExecuteAuthority(
+    identity: WorkspaceRunIdentityV1,
+    generation: number
+  ): Promise<void> {
+    if (!isCurrent(generation, identity.clientSnapshotId)) return;
+    hydrateController?.abort();
+    const controller = new AbortController();
+    hydrateController = controller;
+    syncDiagnostics(Boolean(activeController));
+    try {
+      const runtime = await runtimeApi.hydrate(options.projectId, { signal: controller.signal });
+      if (!isCurrent(generation, identity.clientSnapshotId)) return;
+      state.runtime = runtime;
+      const runtimeIdentity = identityFromRuntime(runtime);
+      if (runtime.isBusy) {
+        if (!runtimeIdentity || !identitiesMatch(runtimeIdentity, identity)) {
+          state.phase = 'unknown-outcome';
+          state.errorCode = 'RUN_RUNTIME_IDENTITY_MISMATCH';
+          state.message = '启动响应未知，且后端运行身份与本次准入不一致；工作区保持锁定。';
+          return;
+        }
+        state.phase = runtime.status === 'Stopping' ? 'cancel-requested' : 'executing';
+        state.message = '执行响应未确认，已恢复后端正式运行会话。';
+        lastEventSequence = null;
+        connect(generation);
+        return;
+      }
+      await reconcileCurrent();
+    } catch {
+      // The prior unknown outcome remains locked until an explicit reconcile succeeds.
+    } finally {
+      if (hydrateController === controller) hydrateController = undefined;
+      syncDiagnostics(Boolean(activeController));
+      syncAvailability();
+    }
   }
 
   async function performRun(): Promise<WorkspaceRunResultV1 | null> {
@@ -363,6 +815,11 @@ export function createWorkspaceRunCommandOwner(options: {
         : result.outcome.execution === 'Succeeded' ? 'succeeded' : 'failed';
       state.message = terminalMessage(result);
       options.persistenceOwner.clearRunning(state.message);
+      markRuntimeTerminal(
+        result.outcome.execution === 'Succeeded' || result.outcome.execution === 'Cancelled'
+          ? 'Stopped'
+          : 'Faulted'
+      );
       return result;
     } catch (error) {
       if (!isCurrent(generation, clientSnapshotId)) return null;
@@ -381,12 +838,22 @@ export function createWorkspaceRunCommandOwner(options: {
         state.phase = 'unknown-outcome';
         state.message = 'Formal Run network outcome is unknown, so Workspace remains locked.';
       } else if (error instanceof ApiHttpError) {
-        state.phase = 'unknown-outcome';
-        state.message = 'Formal Run returned an indeterminate server response. Reconcile the authoritative outcome before leaving.';
+        if (error.status === 401 || error.status === 403) {
+          state.phase = 'blocked';
+          state.message = '当前会话无权执行正式运行；后端未创建本次会话。';
+          options.persistenceOwner.clearRunning(state.message);
+        } else {
+          state.phase = 'unknown-outcome';
+          state.message = '正式运行响应不确定，正在读取后端权威状态。';
+        }
       } else {
         state.phase = 'failed';
         state.message = messageFor(error);
         options.persistenceOwner.clearRunning(state.message);
+      }
+      const identity = currentIdentity();
+      if (identity && state.phase === 'unknown-outcome') {
+        await recoverExecuteAuthority(identity, generation);
       }
       return null;
     } finally {
@@ -401,7 +868,7 @@ export function createWorkspaceRunCommandOwner(options: {
 
   async function stopCurrent(): Promise<boolean> {
     if (stopPromise) return stopPromise;
-    if (disposed || !activeController || !state.canStop) return false;
+    if (disposed || !state.canStop) return false;
 
     const generation = operationGeneration;
     const clientSnapshotId = state.clientSnapshotId;
@@ -411,7 +878,7 @@ export function createWorkspaceRunCommandOwner(options: {
       state.phase = 'unknown-outcome';
       state.errorCode = 'RUN_IDENTITY_UNAVAILABLE';
       state.message = 'Formal Run identity is incomplete. Workspace remains locked.';
-      activeController.abort();
+      activeController?.abort();
       syncAvailability();
       return true;
     }
@@ -443,6 +910,7 @@ export function createWorkspaceRunCommandOwner(options: {
           activeController?.abort();
           syncDiagnostics(false);
           syncAvailability();
+          await reconcileCurrent();
         }
         return true;
       }
@@ -503,7 +971,9 @@ export function createWorkspaceRunCommandOwner(options: {
       return true;
     }
     if (state.phase === 'executing') {
-      await stopCurrent();
+      state.message = '正式运行仍由后端执行；离开页面不会隐式停止会话。';
+      syncAvailability();
+      return false;
     }
     if (state.phase === 'cancel-requested' || state.phase === 'unknown-outcome') {
       const reconciliation = await reconcileCurrent();
@@ -519,6 +989,12 @@ export function createWorkspaceRunCommandOwner(options: {
   const owner: WorkspaceRunCommandOwner = Object.freeze({
     projectId: options.projectId,
     projection: readonly(state),
+    hydrate(): Promise<void> {
+      return hydrate();
+    },
+    refreshAdmission(): Promise<WorkspaceRunAdmissionV1 | null> {
+      return refreshAdmission();
+    },
     run(): Promise<WorkspaceRunResultV1 | null> {
       if (runPromise) return runPromise;
       const operation = track(performRun());
@@ -552,17 +1028,25 @@ export function createWorkspaceRunCommandOwner(options: {
       if (state.phase === 'admitting') cancelAdmission(reason);
       disposed = true;
       operationGeneration += 1;
+      clearReconnect();
+      streamController?.abort();
+      hydrateController?.abort();
+      admissionController?.abort();
       activeController?.abort();
       stopController?.abort();
       reconcileController?.abort();
       activeController = undefined;
       stopController = undefined;
       reconcileController = undefined;
+      streamController = undefined;
+      hydrateController = undefined;
+      admissionController = undefined;
       authoritySettledLocalAbort = undefined;
       state.phase = 'disposed';
       state.canRun = false;
       state.canStop = false;
       state.canReconcile = false;
+      state.connected = false;
       lease.update(zeroResources());
       lease.dispose(reason);
     }

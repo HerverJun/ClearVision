@@ -26,7 +26,16 @@ export interface WorkspaceRunAdmissionV1 {
   readonly persistenceRevision: number | null;
   readonly canonicalFlowHash: string | null;
   readonly decisionConfigurationHash: string | null;
-  readonly violations: readonly unknown[];
+  readonly violations: readonly WorkspaceRunAdmissionViolationV1[];
+}
+
+export interface WorkspaceRunAdmissionViolationV1 {
+  readonly operatorId: string | null;
+  readonly operatorName: string | null;
+  readonly operatorType: string | null;
+  readonly reason: string;
+  readonly parameterName: string | null;
+  readonly code: string | null;
 }
 
 export interface WorkspaceRunExecuteRequestV1 {
@@ -115,6 +124,25 @@ function nullableString(value: unknown, path: string): string | null {
   return string(value, path);
 }
 
+function optionalText(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') return value.trim() || null;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return null;
+}
+
+function decodeAdmissionViolation(value: unknown, path: string): WorkspaceRunAdmissionViolationV1 {
+  const source = record(value, path);
+  return Object.freeze({
+    operatorId: optionalText(source.operatorId),
+    operatorName: optionalText(source.operatorName),
+    operatorType: optionalText(source.operatorType),
+    reason: string(source.reason, path + '.reason'),
+    parameterName: optionalText(source.parameterName),
+    code: optionalText(source.code)
+  });
+}
+
 function nonNegativeInteger(value: unknown, path: string): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
     throw new WorkspaceRunContractDecodeError(path, 'a non-negative safe integer');
@@ -142,7 +170,8 @@ export function decodeWorkspaceRunAdmissionV1(payload: unknown): WorkspaceRunAdm
       : nonNegativeInteger(persistenceRevision, '$.projectPersistenceRevision'),
     canonicalFlowHash: nullableString(source.canonicalFlowHash, '$.canonicalFlowHash'),
     decisionConfigurationHash: nullableString(source.decisionConfigurationHash, '$.decisionConfigurationHash'),
-    violations: Object.freeze([...violations])
+    violations: Object.freeze(violations.map((item, index) =>
+      decodeAdmissionViolation(item, '$.violations[' + index + ']')))
   });
 }
 

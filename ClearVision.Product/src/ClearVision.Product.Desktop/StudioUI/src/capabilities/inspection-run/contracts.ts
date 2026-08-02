@@ -1,3 +1,5 @@
+import { decodeInspectionOutcome, type InspectionOutcome } from '@/shared/inspectionOutcome';
+
 export type InspectionRuntimeStatus = 'Idle' | 'Starting' | 'Running' | 'Stopping' | 'Stopped' | 'Faulted';
 export type InspectionRuntimeSessionType = 'WorkspaceFormalRun' | 'ContinuousInspection' | 'LegacyRealtime';
 
@@ -38,20 +40,36 @@ export interface InspectionRunResult {
   readonly projectId: string;
   readonly sessionId: string;
   readonly resultId: string;
+  readonly imageId: string | null;
   readonly status: string;
-  readonly executionOutcome: string | null;
-  readonly decisionOutcome: string | null;
+  readonly outcome: InspectionOutcome;
+  readonly decisionSource: string | null;
+  readonly reasonCode: string | null;
+  readonly hasJudgmentSignal: boolean | null;
   readonly defectCount: number;
   readonly processingTimeMs: number;
   readonly errorMessage: string | null;
+  readonly outputData: unknown;
+  readonly analysisData: unknown;
   readonly timestamp: string;
 }
 
 export type InspectionSseEvent =
   | Readonly<{ type: 'stateChanged'; id: string | null; state: InspectionRunStateEvent }>
   | Readonly<{ type: 'resultProduced'; id: string | null; result: InspectionRunResult }>
+  | Readonly<{ type: 'progressChanged'; id: string | null; progress: InspectionRunProgress }>
   | Readonly<{ type: 'faulted'; id: string | null; projectId: string; sessionId: string; errorMessage: string | null }>
   | Readonly<{ type: 'heartbeat'; id: string | null }>;
+
+export interface InspectionRunProgress {
+  readonly projectId: string;
+  readonly sessionId: string;
+  readonly processedCount: number;
+  readonly totalCount: number;
+  readonly progressPercentage: number;
+  readonly currentOperator: string | null;
+  readonly timestamp: string;
+}
 
 export interface InspectionRunStateEvent {
   readonly projectId: string;
@@ -101,6 +119,11 @@ function nonNegativeInteger(value: unknown, label: string): number {
 function boolean(value: unknown, label: string): boolean {
   if (typeof value !== 'boolean') throw new InspectionRunDecodeError(`${label} must be a boolean.`);
   return value;
+}
+
+function nullableBoolean(value: unknown, label: string): boolean | null {
+  if (value == null) return null;
+  return boolean(value, label);
 }
 
 const runtimeStatuses = new Set<InspectionRuntimeStatus>(['Idle', 'Starting', 'Running', 'Stopping', 'Stopped', 'Faulted']);
@@ -175,13 +198,28 @@ export function decodeInspectionSseEvent(type: string, id: string | null, value:
   }
   if (type === 'faulted') return Object.freeze({ type, id, projectId: string(data.projectId, 'projectId'),
     sessionId: string(data.sessionId, 'sessionId'), errorMessage: nullableString(data.errorMessage, 'errorMessage') });
+  if (type === 'progressChanged') return Object.freeze({ type, id, progress: Object.freeze({
+    projectId: string(data.projectId, 'projectId'), sessionId: string(data.sessionId, 'sessionId'),
+    processedCount: nonNegativeInteger(data.processedCount, 'processedCount'),
+    totalCount: nonNegativeInteger(data.totalCount, 'totalCount'),
+    progressPercentage: number(data.progressPercentage, 'progressPercentage'),
+    currentOperator: nullableString(data.currentOperator, 'currentOperator'),
+    timestamp: string(data.timestamp, 'timestamp')
+  }) });
   if (type === 'resultProduced') return Object.freeze({ type, id, result: Object.freeze({
     projectId: string(data.projectId, 'projectId'), sessionId: string(data.sessionId, 'sessionId'),
-    resultId: string(data.resultId, 'resultId'), status: string(data.status, 'status'),
-    executionOutcome: nullableString(data.executionOutcome, 'executionOutcome'),
-    decisionOutcome: nullableString(data.decisionOutcome, 'decisionOutcome'), defectCount: nonNegativeInteger(data.defectCount, 'defectCount'),
+    resultId: string(data.resultId, 'resultId'), imageId: nullableString(data.imageId, 'imageId'),
+    status: string(data.status, 'status'),
+    outcome: decodeInspectionOutcome(data.executionOutcome, data.decisionOutcome),
+    decisionSource: nullableString(data.decisionSource, 'decisionSource'),
+    reasonCode: nullableString(data.reasonCode, 'reasonCode'),
+    hasJudgmentSignal: nullableBoolean(data.hasJudgmentSignal, 'hasJudgmentSignal'),
+    defectCount: nonNegativeInteger(data.defectCount, 'defectCount'),
     processingTimeMs: nonNegativeInteger(data.processingTimeMs, 'processingTimeMs'),
-    errorMessage: nullableString(data.errorMessage, 'errorMessage'), timestamp: string(data.timestamp, 'timestamp')
+    errorMessage: nullableString(data.errorMessage, 'errorMessage'),
+    outputData: data.outputData ?? null,
+    analysisData: data.analysisData ?? null,
+    timestamp: string(data.timestamp, 'timestamp')
   }) });
   return null;
 }

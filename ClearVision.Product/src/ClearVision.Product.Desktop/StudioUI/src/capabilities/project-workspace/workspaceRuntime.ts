@@ -143,6 +143,8 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
         reconcileSave: inner.reconcileSave,
         reapplyConflict: inner.reapplyConflict,
         discardConflict: inner.discardConflict,
+        hydrateFormalRun: inner.hydrateFormalRun,
+        refreshFormalAdmission: inner.refreshFormalAdmission,
         runFormal: inner.runFormal,
         stopFormal: inner.stopFormal,
         reconcileFormalRun: inner.reconcileFormalRun,

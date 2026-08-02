@@ -152,7 +152,7 @@ describe('productLeaveGuardOwner', () => {
     });
   });
 
-  it('stops its mounted continuous inspection and authoritatively rereads before leaving', async () => {
+  it('allows route leave without treating owner disposal as a continuous stop command', async () => {
     const h = harness();
     const runtime = reactive({ isBusy: true, sessionType: 'ContinuousInspection' as const });
     const inspection = {
@@ -164,12 +164,12 @@ describe('productLeaveGuardOwner', () => {
 
     await expect(h.owner.request('route-leave')).resolves.toBe(true);
 
-    expect(inspection.stop).toHaveBeenCalledOnce();
-    expect(inspection.reconcile).toHaveBeenCalledOnce();
+    expect(inspection.stop).not.toHaveBeenCalled();
+    expect(inspection.reconcile).not.toHaveBeenCalled();
     expect(h.owner.projection.phase).toBe('allowed');
   });
 
-  it('blocks leave when continuous inspection remains busy after stop and reread', async () => {
+  it('does not block route leave solely because the backend continuous session remains busy', async () => {
     const h = harness();
     const inspection = {
       projection: reactive({ runtime: { isBusy: true, sessionType: 'ContinuousInspection' as const } }),
@@ -178,8 +178,10 @@ describe('productLeaveGuardOwner', () => {
     } as unknown as InspectionRunOwner;
     h.owner.attachInspectionRun(inspection);
 
-    await expect(h.owner.request('route-leave')).resolves.toBe(false);
-    expect(h.owner.projection).toMatchObject({ phase: 'blocked', protectionKind: 'continuous-inspection-active' });
+    await expect(h.owner.request('route-leave')).resolves.toBe(true);
+    expect(inspection.stop).not.toHaveBeenCalled();
+    expect(inspection.reconcile).not.toHaveBeenCalled();
+    expect(h.owner.projection).toMatchObject({ phase: 'allowed', protectionKind: null });
   });
 
   it('allows leave only after active Project and Workspace authority settle', async () => {

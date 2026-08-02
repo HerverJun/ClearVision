@@ -12,6 +12,11 @@ import {
   type WorkspaceRunReconciliationV1,
   type WorkspaceRunResultV1
 } from '@/capabilities/project-workspace/run';
+import type {
+  InspectionRunApiPort,
+  InspectionRunState,
+  InspectionSsePort
+} from '@/capabilities/inspection-run';
 
 const projectId = '11111111-1111-4111-8111-111111111111';
 const resultId = '22222222-2222-4222-8222-222222222222';
@@ -123,7 +128,241 @@ function createPort(overrides: Partial<WorkspaceRunPort> = {}): WorkspaceRunPort
   };
 }
 
+function runtimeState(
+  sessionType: InspectionRunState['sessionType'],
+  status: InspectionRunState['status'] = 'Running'
+): InspectionRunState {
+  const busy = status === 'Starting' || status === 'Running' || status === 'Stopping';
+  return Object.freeze({
+    projectId,
+    status,
+    isBusy: busy,
+    sessionId: '44444444-4444-4444-8444-444444444444',
+    startedAt: '2026-08-02T00:00:00Z',
+    stoppedAt: busy ? null : '2026-08-02T00:00:01Z',
+    clientSnapshotId: '33333333-3333-4333-8333-333333333333',
+    persistenceRevision: 7,
+    canonicalFlowHash: flowHash,
+    decisionConfigurationHash: decisionHash,
+    executionSource: 'PersistedProject',
+    sessionType
+  });
+}
+
+function realtimeHarness(initial: InspectionRunState) {
+  let current = initial;
+  let connection: Parameters<InspectionSsePort['connect']>[0] | null = null;
+  const runtimeApi = {
+    hydrate: vi.fn(async () => current)
+  } as Pick<InspectionRunApiPort, 'hydrate'>;
+  const sse: InspectionSsePort = {
+    connect: vi.fn(options => {
+      connection = options;
+      options.onOpen();
+      return new Promise<void>(resolve => {
+        options.signal.addEventListener('abort', () => resolve(), { once: true });
+      });
+    })
+  };
+  return {
+    runtimeApi,
+    sse,
+    connection: () => connection,
+    setState(next: InspectionRunState) {
+      current = next;
+    }
+  };
+}
+
 describe('F03 G6 Workspace Run command owner', () => {
+  it('restores a formal session from realtime authority and stops with the exact identity', async () => {
+    const persistence = createPersistence();
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const realtime = realtimeHarness(runtimeState('WorkspaceFormalRun'));
+    const port = createPort({
+      stop: vi.fn(async payload => reconciliation(
+        payload.clientSnapshotId,
+        'cancelled',
+        cancelledResult(payload.clientSnapshotId)
+      ))
+    });
+    const owner = createWorkspaceRunCommandOwner({
+      projectId,
+      persistenceOwner: persistence.owner,
+      port,
+      runtimeApi: realtime.runtimeApi,
+      sse: realtime.sse,
+      diagnostics
+    });
+
+    await owner.hydrate();
+
+    expect(owner.projection).toMatchObject({
+      phase: 'executing',
+      canStop: true,
+      connected: true,
+      clientSnapshotId: '33333333-3333-4333-8333-333333333333'
+    });
+    expect(owner.reconciliationIdentity()).toEqual({
+      projectId,
+      clientSnapshotId: '33333333-3333-4333-8333-333333333333',
+      expectedPersistenceRevision: 7,
+      expectedCanonicalFlowHash: flowHash,
+      expectedDecisionConfigurationHash: decisionHash
+    });
+    await expect(owner.stop()).resolves.toBe(true);
+    expect(port.stop).toHaveBeenCalledWith(owner.reconciliationIdentity(), expect.anything());
+    expect(owner.projection.phase).toBe('cancelled');
+    owner.dispose();
+    await owner.settle();
+    expect(diagnostics.diagnostics).toMatchObject({
+      runOwnerCount: 0,
+      activeTimers: 0,
+      activeAbortControllers: 0
+    });
+    diagnostics.dispose();
+  });
+
+  it('projects continuous occupancy without mounting formal SSE or stop authority', async () => {
+    const persistence = createPersistence();
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const realtime = realtimeHarness(runtimeState('ContinuousInspection'));
+    const port = createPort();
+    const owner = createWorkspaceRunCommandOwner({
+      projectId,
+      persistenceOwner: persistence.owner,
+      port,
+      runtimeApi: realtime.runtimeApi,
+      sse: realtime.sse,
+      diagnostics
+    });
+
+    await owner.hydrate();
+
+    expect(owner.projection).toMatchObject({
+      phase: 'occupied',
+      errorCode: 'ADMISSION_RUNTIME_ALREADY_ACTIVE',
+      canRun: false,
+      canStop: false,
+      connected: false
+    });
+    expect(realtime.sse.connect).not.toHaveBeenCalled();
+    await expect(owner.stop()).resolves.toBe(false);
+    expect(port.stop).not.toHaveBeenCalled();
+    owner.dispose();
+    diagnostics.dispose();
+  });
+
+  it('locks an existing formal identity when an authoritative hydrate changes any exact identity field', async () => {
+    const persistence = createPersistence();
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const realtime = realtimeHarness(runtimeState('WorkspaceFormalRun'));
+    const owner = createWorkspaceRunCommandOwner({
+      projectId,
+      persistenceOwner: persistence.owner,
+      port: createPort(),
+      runtimeApi: realtime.runtimeApi,
+      sse: realtime.sse,
+      diagnostics
+    });
+
+    await owner.hydrate();
+    realtime.setState(Object.freeze({
+      ...runtimeState('WorkspaceFormalRun'),
+      canonicalFlowHash: 'different-flow-hash'
+    }));
+    await owner.hydrate();
+
+    expect(owner.projection).toMatchObject({
+      phase: 'unknown-outcome',
+      errorCode: 'RUN_RUNTIME_IDENTITY_MISMATCH',
+      canRun: false,
+      canStop: false
+    });
+    expect(owner.reconciliationIdentity()).toMatchObject({
+      expectedCanonicalFlowHash: flowHash,
+      expectedDecisionConfigurationHash: decisionHash
+    });
+    owner.dispose();
+    await owner.settle();
+    diagnostics.dispose();
+  });
+
+  it('uses the full formal identity after SSE retry exhaustion and never restarts', async () => {
+    const persistence = createPersistence();
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const first = runtimeState('WorkspaceFormalRun');
+    const runtimeApi = {
+      hydrate: vi.fn()
+        .mockResolvedValueOnce(first)
+        .mockResolvedValueOnce(Object.freeze({ ...first, decisionConfigurationHash: 'different-decision-hash' }))
+    } as Pick<InspectionRunApiPort, 'hydrate'>;
+    const sse: InspectionSsePort = {
+      connect: vi.fn(async options => {
+        options.onOpen();
+        throw new Error('disconnected');
+      })
+    };
+    const port = createPort();
+    const owner = createWorkspaceRunCommandOwner({
+      projectId,
+      persistenceOwner: persistence.owner,
+      port,
+      runtimeApi,
+      sse,
+      retryDelaysMs: [],
+      diagnostics
+    });
+
+    await owner.hydrate();
+    await vi.waitFor(() => expect(runtimeApi.hydrate).toHaveBeenCalledTimes(2));
+
+    expect(owner.projection).toMatchObject({
+      phase: 'unknown-outcome',
+      errorCode: 'RUN_RUNTIME_IDENTITY_MISMATCH',
+      canRun: false,
+      canStop: false
+    });
+    expect(port.execute).not.toHaveBeenCalled();
+    expect(sse.connect).toHaveBeenCalledTimes(1);
+    owner.dispose();
+    await owner.settle();
+    diagnostics.dispose();
+  });
+
+  it('uses exact result reconciliation after terminal coordinator cleanup on refresh', async () => {
+    const persistence = createPersistence();
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const realtime = realtimeHarness(runtimeState('WorkspaceFormalRun', 'Stopped'));
+    const port = createPort({
+      reconcile: vi.fn(async payload => reconciliation(
+        payload.clientSnapshotId,
+        'succeeded',
+        result(payload.clientSnapshotId, 'Ok')
+      ))
+    });
+    const owner = createWorkspaceRunCommandOwner({
+      projectId,
+      persistenceOwner: persistence.owner,
+      port,
+      runtimeApi: realtime.runtimeApi,
+      sse: realtime.sse,
+      diagnostics
+    });
+
+    await owner.hydrate();
+
+    expect(port.reconcile).toHaveBeenCalledOnce();
+    expect(owner.projection).toMatchObject({
+      phase: 'succeeded',
+      result: { id: resultId },
+      canRun: true
+    });
+    expect(realtime.sse.connect).not.toHaveBeenCalled();
+    owner.dispose();
+    diagnostics.dispose();
+  });
+
   it.each(['Ok', 'Ng', 'Undetermined', 'Invalid'] as const)(
     'keeps canonical final decision %s separate from execution success',
     async decision => {
@@ -187,6 +426,85 @@ describe('F03 G6 Workspace Run command owner', () => {
     diagnostics.dispose();
   });
 
+  it('recovers a response-less Formal start from realtime authority without starting twice', async () => {
+    const persistence = createPersistence();
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const runningState = runtimeState('WorkspaceFormalRun');
+    const port = createPort({
+      admit: vi.fn(async () => admission(runningState.clientSnapshotId!)),
+      execute: vi.fn(async () => {
+        throw new ApiNetworkError('http://localhost/api/inspection/execute', new Error('lost'));
+      })
+    });
+    const realtime = realtimeHarness(runningState);
+    const owner = createWorkspaceRunCommandOwner({
+      projectId,
+      persistenceOwner: persistence.owner,
+      port,
+      runtimeApi: realtime.runtimeApi,
+      sse: realtime.sse,
+      diagnostics
+    });
+    vi.stubGlobal('crypto', {
+      randomUUID: () => runningState.clientSnapshotId
+    });
+
+    await expect(owner.run()).resolves.toBeNull();
+
+    expect(owner.projection).toMatchObject({
+      phase: 'executing',
+      connected: true,
+      runtime: { sessionType: 'WorkspaceFormalRun', isBusy: true }
+    });
+    expect(port.execute).toHaveBeenCalledOnce();
+    expect(realtime.runtimeApi.hydrate).toHaveBeenCalledOnce();
+    expect(persistence.owner.clearRunning).not.toHaveBeenCalled();
+    owner.dispose();
+    await owner.settle();
+    vi.unstubAllGlobals();
+    diagnostics.dispose();
+  });
+
+  it('exactly reconciles a response-less Formal stop before unlocking', async () => {
+    const persistence = createPersistence();
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const runningState = runtimeState('WorkspaceFormalRun');
+    const realtime = realtimeHarness(runningState);
+    const port = createPort({
+      stop: vi.fn(async () => {
+        throw new ApiNetworkError('http://localhost/api/inspection/stop', new Error('lost'));
+      }),
+      reconcile: vi.fn(async payload => reconciliation(
+        payload.clientSnapshotId,
+        'cancelled',
+        cancelledResult(payload.clientSnapshotId)
+      ))
+    });
+    const owner = createWorkspaceRunCommandOwner({
+      projectId,
+      persistenceOwner: persistence.owner,
+      port,
+      runtimeApi: realtime.runtimeApi,
+      sse: realtime.sse,
+      diagnostics
+    });
+    await owner.hydrate();
+
+    await expect(owner.stop()).resolves.toBe(true);
+
+    expect(port.stop).toHaveBeenCalledOnce();
+    expect(port.reconcile).toHaveBeenCalledOnce();
+    expect(owner.projection).toMatchObject({
+      phase: 'cancelled',
+      canStop: false,
+      canReconcile: false
+    });
+    expect(persistence.owner.clearRunning).toHaveBeenCalledOnce();
+    owner.dispose();
+    await owner.settle();
+    diagnostics.dispose();
+  });
+
   it('uses authoritative stop cancellation before unlocking the Workspace', async () => {
     let resolveExecute: ((value: WorkspaceRunResultV1) => void) | undefined;
     const persistence = createPersistence();
@@ -214,6 +532,39 @@ describe('F03 G6 Workspace Run command owner', () => {
     resolveExecute?.(cancelledResult(owner.projection.clientSnapshotId!));
     await expect(running).resolves.toMatchObject({ outcome: { execution: 'Cancelled' } });
 
+    owner.dispose();
+    diagnostics.dispose();
+  });
+
+  it('deduplicates Formal Run clicks and route leave never becomes an implicit stop', async () => {
+    let resolveExecute: ((value: WorkspaceRunResultV1) => void) | undefined;
+    const persistence = createPersistence();
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const port = createPort({
+      execute: vi.fn(() => new Promise<WorkspaceRunResultV1>(resolve => {
+        resolveExecute = resolve;
+      }))
+    });
+    const owner = createWorkspaceRunCommandOwner({
+      projectId,
+      persistenceOwner: persistence.owner,
+      port,
+      diagnostics
+    });
+
+    const first = owner.run();
+    const duplicate = owner.run();
+    expect(duplicate).toBe(first);
+    await vi.waitFor(() => expect(port.execute).toHaveBeenCalledOnce());
+    expect(port.admit).toHaveBeenCalledOnce();
+
+    await expect(owner.prepareForLeave('route-leave')).resolves.toBe(false);
+    expect(port.stop).not.toHaveBeenCalled();
+    expect(owner.projection.message).toContain('不会隐式停止');
+
+    await owner.stop();
+    resolveExecute?.(cancelledResult(owner.projection.clientSnapshotId!));
+    await first;
     owner.dispose();
     diagnostics.dispose();
   });
