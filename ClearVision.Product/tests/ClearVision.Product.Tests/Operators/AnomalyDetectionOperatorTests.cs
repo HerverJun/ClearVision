@@ -419,17 +419,17 @@ public sealed class AnomalyDetectionOperatorTests
     private static string ResolveRepoPath(string relativePath)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !dir.Name.Equals("ClearVision", StringComparison.OrdinalIgnoreCase))
+        while (dir != null)
         {
+            if (File.Exists(Path.Combine(dir.FullName, "ClearVision.Product", "ClearVision.Product.sln")))
+            {
+                return Path.Combine(dir.FullName, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            }
+
             dir = dir.Parent;
         }
 
-        if (dir == null)
-        {
-            throw new DirectoryNotFoundException("Failed to resolve repository root.");
-        }
-
-        return Path.Combine(dir.FullName, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        throw new DirectoryNotFoundException("Failed to resolve repository root.");
     }
 
     private static void DisposeOutputs(Dictionary<string, object>? outputData)

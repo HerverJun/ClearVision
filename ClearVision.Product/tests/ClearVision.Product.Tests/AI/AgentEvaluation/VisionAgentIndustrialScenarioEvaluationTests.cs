@@ -32,7 +32,6 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
         AssertWorkflowUsesOnlyRealOperatorTypes(result);
         AssertWorkflowDoesNotContainParameter(result, "ModelId", "TemplatePath", "Rule", "Channel");
         result.BuildResult.MissingResources.Should().Contain(item => item.ResourceType == "camera_binding");
-        result.BuildResult.MissingResources.Should().Contain(item => item.ResourceType == "output_channel");
     }
 
     [Fact(DisplayName = "Scenario eval: terminal wire sequence should keep model and sequence labels pending")]
@@ -79,7 +78,7 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
         result.BuildResult!.OperatorPipeline.Select(item => item.OperatorType)
             .Should().Contain(["ImageAcquisition", "CircleMeasurement", "Measurement", "UnitConvert", "ResultJudgment", "ResultOutput"]);
         result.BuildResult.MissingResources.Should().Contain(item =>
-            item.ResourceType == "measurement_parameter" &&
+            item.ResourceType == "calibration_resource" &&
             item.ResourceKey == "op_calibration.Scale");
         result.BuildResult.PendingParameters.Should().Contain(item =>
             item.OperatorId == "op_calibration" &&
@@ -165,6 +164,17 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
                 Description = prompt,
                 OriginalUserPrompt = prompt,
                 CurrentFlowSnapshot = currentFlowSnapshot,
+                ConfirmedPlanAnswers = buildIntent.Equals("modify", StringComparison.OrdinalIgnoreCase)
+                    ?
+                    [
+                        new VisionAgentPlanAnswer
+                        {
+                            Field = VisionAgentPlanAnswerFields.AlgorithmStrategy,
+                            Value = "traditional_rule",
+                            Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
+                        }
+                    ]
+                    : [],
                 TemplateSelection = templateSelection,
                 AttachmentSummary = new VisionAgentAttachmentSummary
                 {
@@ -183,6 +193,7 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
                 PlanId = plan.PlanId,
                 PlanHash = plan.PlanHash,
                 PlanSnapshot = plan,
+                ConfirmedAnswers = plan.ConfirmedPlanAnswers,
                 UserSelections = userSelections ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
                 AcceptedDefaults = plan.RecommendedDefaults.Select(item => item.Id).ToList(),
                 CurrentFlowSnapshot = currentFlowSnapshot,

@@ -165,8 +165,7 @@ public sealed class DeepLearningMultiTaskOperatorTests
             result.OutputData["ClassificationTopK"]
                 .Should().BeAssignableTo<IReadOnlyCollection<Dictionary<string, object>>>()
                 .Which.Should().HaveCount(3);
-            result.OutputData["DetectionList"].Should().BeOfType<DetectionList>()
-                .Which.Count.Should().Be(0);
+            result.OutputData.Should().NotContainKey("DetectionList");
         }
         finally
         {

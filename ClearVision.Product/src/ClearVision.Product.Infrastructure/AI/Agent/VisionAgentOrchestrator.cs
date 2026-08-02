@@ -1045,7 +1045,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             MetadataOnly = true
         };
 
-        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(result);
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            result,
+            requirementMode: request.RequirementMode);
         var finalCanBuild = canBuild && readiness.CanBuild;
         result = result with
         {

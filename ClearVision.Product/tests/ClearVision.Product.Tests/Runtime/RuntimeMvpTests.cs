@@ -1364,6 +1364,21 @@ public class RuntimeMvpTests
                         Id = acquisitionId,
                         Name = "PackageConfiguredImage",
                         Type = OperatorType.ImageAcquisition,
+                        Parameters =
+                        [
+                            CreateParameterDto("SourceType", "enum", "File"),
+                            CreateParameterDto(
+                                "FilePath",
+                                "string",
+                                Path.Combine(
+                                    FindRepositoryRoot(),
+                                    "ClearVision.Product",
+                                    "tests",
+                                    "TestData",
+                                    "model_test_suite",
+                                    "identity_2x2",
+                                    "input.png"))
+                        ],
                         OutputPorts =
                         [
                             new PortDto

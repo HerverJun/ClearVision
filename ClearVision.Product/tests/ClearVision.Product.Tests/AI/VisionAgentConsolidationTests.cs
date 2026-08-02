@@ -493,7 +493,27 @@ public sealed class VisionAgentConsolidationTests
         remaining.Should().NotContain(new[] { "image_source", "task_type", "acceptance_criteria" });
 
         // Readiness 仍根据真实剩余阻断决定 CanBuild
-        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(plan, validatedAnswers: validation);
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            validatedAnswers: validation,
+            resourceDecisions:
+            [
+                new VisionAgentResourceDecision
+                {
+                    CanonicalId = VisionAgentResourceIdentity.CreateCanonicalId(
+                        "camera_binding",
+                        "imageacquisition#1",
+                        "CameraBindingId"),
+                    Status = VisionAgentResourceStatuses.Bound,
+                    ResourceType = "camera_binding",
+                    ResourceKey = "imageacquisition#1.CameraBindingId",
+                    OperatorKey = "imageacquisition#1",
+                    OperatorType = "ImageAcquisition",
+                    OperatorIndex = 0,
+                    ParameterName = "CameraBindingId",
+                    Source = "test_fixture"
+                }
+            ]);
         readiness.CanBuild.Should().BeTrue();
     }
 }

@@ -223,7 +223,9 @@ public sealed class VisionAgentBuildOrchestratorTests
         strict.AcceptedAnswers.Should().BeEmpty();
         draft.BuildReadiness.CanBuild.Should().BeTrue();
         draft.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
-            blocker.Id == "resource_pending:image_source_missing" &&
+            blocker.Resource != null &&
+            blocker.Resource.ResourceType == "camera_binding" &&
+            blocker.Resource.ResourceKey == "imageacquisition#1.CameraBindingId" &&
             blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
             blocker.BlocksBuild == false);
         draft.AnswerRevision.Should().Be(8);
@@ -285,11 +287,15 @@ public sealed class VisionAgentBuildOrchestratorTests
 
         strict.BuildReadiness.CanBuild.Should().BeFalse();
         strict.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
-            blocker.Id == "resource_pending:camera_binding" &&
+            blocker.Resource != null &&
+            blocker.Resource.ResourceType == "camera_binding" &&
+            blocker.Resource.ResourceKey == "imageacquisition#1.CameraBindingId" &&
             blocker.BlocksBuild);
         draft.BuildReadiness.CanBuild.Should().BeTrue();
         draft.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
-            blocker.Id == "resource_pending:camera_binding" &&
+            blocker.Resource != null &&
+            blocker.Resource.ResourceType == "camera_binding" &&
+            blocker.Resource.ResourceKey == "imageacquisition#1.CameraBindingId" &&
             blocker.BlocksBuild == false);
         draft.AcceptedAnswers.Should().ContainSingle(accepted =>
             accepted.Field == VisionAgentPlanAnswerFields.ImageSource &&
@@ -1020,7 +1026,8 @@ public sealed class VisionAgentBuildOrchestratorTests
             new VisionAgentPlanModeRequest
             {
                 Description = prompt,
-                OriginalUserPrompt = prompt
+                OriginalUserPrompt = prompt,
+                RequirementMode = AiRequirementModes.Draft
             },
             CancellationToken.None);
 
@@ -1045,7 +1052,8 @@ public sealed class VisionAgentBuildOrchestratorTests
                     ["attribute_target"] = "semantic_attribute",
                     ["ok_ng_rule"] = "use_extracted_conditions",
                     ["classification_ok_label"] = "熟透"
-                }),
+                },
+                requirementMode: AiRequirementModes.Draft),
             CancellationToken.None);
 
         result.Success.Should().BeTrue();
@@ -1478,7 +1486,7 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.OperatorId == "op_calibration" &&
             item.ParameterNames.Contains("Scale"));
         result.BuildResult.MissingResources.Should().Contain(item =>
-            item.ResourceType == "measurement_parameter" &&
+            item.ResourceType == "calibration_resource" &&
             item.ResourceKey == "op_calibration.Scale");
         AssertBuildQuality(result, sink, expectPreserved: true);
     }
@@ -2488,7 +2496,7 @@ public sealed class VisionAgentBuildOrchestratorTests
             OkCondition = "熟透为 OK",
             NgCondition = "否则 NG",
             CanPlanCandidate = true,
-            CanBuildCandidate = false,
+            CanBuildCandidate = true,
             ObjectSignals = ["草莓"],
             TaskSignals = ["成熟度", "熟透"],
             Source = VisionAgentSemanticSources.Model,

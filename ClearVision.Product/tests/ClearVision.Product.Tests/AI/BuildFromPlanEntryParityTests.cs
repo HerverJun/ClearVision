@@ -1303,6 +1303,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             PlanSnapshot = plan,
             ConfirmedAnswers = plan.ConfirmedPlanAnswers,
             AcceptedRecommendedDefaults = true,
+            ResourceDecisions = [BoundCameraBindingDecision()],
             OperatorCatalogVersion = plan.OperatorCatalogVersion,
             StationBoundarySummary = plan.StationBoundarySummary,
             PlcOutputPolicy = plan.PlcOutputPolicy,
@@ -1387,6 +1388,26 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             Value = value,
             Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection,
             Resolved = true
+        };
+    }
+
+    private static VisionAgentResourceDecision BoundCameraBindingDecision()
+    {
+        var operatorKey = VisionAgentResourceIdentity.OperatorKey("ImageAcquisition", 0);
+        return new VisionAgentResourceDecision
+        {
+            CanonicalId = VisionAgentResourceIdentity.CreateCanonicalId(
+                "camera_binding",
+                operatorKey,
+                "CameraBindingId"),
+            Status = VisionAgentResourceStatuses.Bound,
+            ResourceKey = $"{operatorKey}.CameraBindingId",
+            ResourceType = "camera_binding",
+            OperatorKey = operatorKey,
+            OperatorType = "ImageAcquisition",
+            OperatorIndex = 0,
+            ParameterName = "CameraBindingId",
+            Source = "resource_binding"
         };
     }
 

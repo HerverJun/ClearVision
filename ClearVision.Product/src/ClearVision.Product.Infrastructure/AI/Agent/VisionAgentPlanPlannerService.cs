@@ -499,7 +499,8 @@ PlannerCandidateParsed:
             AdditionalContext = request.AdditionalContext,
             Mode = request.Mode,
             HasCurrentFlow = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),
-            TemplateSelection = baseline.TemplateSelection
+            TemplateSelection = baseline.TemplateSelection,
+            RequirementMode = request.RequirementMode
         };
         var updatedMaturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, semantic) with
         {
@@ -514,7 +515,7 @@ PlannerCandidateParsed:
                 BlockingReasons = maturity.BlockingReasons.Count > 0
                     ? maturity.BlockingReasons.ToList()
                     : baseline.BlockingReasons.ToList()
-            });
+            }, requirementMode: request.RequirementMode);
             result = result with
             {
                 Intent = maturity.Maturity,
@@ -540,7 +541,9 @@ PlannerCandidateParsed:
         }
         else
         {
-            var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(result with { RequirementMaturity = maturity });
+            var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+                result with { RequirementMaturity = maturity },
+                requirementMode: request.RequirementMode);
             var buildBlockingReasons = readiness.Blockers
                 .Where(blocker => blocker.BlocksBuild)
                 .Select(blocker => blocker.Id)
