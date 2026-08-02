@@ -4386,6 +4386,11 @@ async function main() {
     evidence.status = 'pass';
     evidence.completedAtUtc = new Date().toISOString();
     const output = writeJsonEvidence(evidenceDirectory, outputName, evidence);
+    fs.writeFileSync(
+      requiredEnvironment('CV_NODE_COMPLETION_SIGNAL'),
+      `${JSON.stringify({ status: 'PASS', completedAtUtc: evidence.completedAtUtc })}\n`,
+      'utf8'
+    );
     process.stdout.write(`${JSON.stringify({ ok: true, output, expectation, runName })}\n`);
   } catch (error) {
     evidence.status = 'fail';
