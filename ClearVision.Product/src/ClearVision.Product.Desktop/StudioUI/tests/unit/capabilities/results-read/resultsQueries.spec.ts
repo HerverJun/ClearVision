@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  createComparisonPath,
   createLocalResultsPath,
   createLocalResultsQuery,
+  createLocalStatisticsPath,
+  createPreviousSuccessPath,
   createStationResultsPath,
+  createStationStatisticsPath,
   createStationResultsQuery,
   type ResultsListFilters
 } from '@/capabilities/results-read';
@@ -133,6 +137,22 @@ describe('Results queries', () => {
       page: 2,
       pageSize: 100
     })).toBe('stations/results?status=TimedOut&diagnosticCode=CAMERA_TIMEOUT&pageIndex=1&pageSize=100');
+    expect(createLocalStatisticsPath(projectId, {
+      ...baseFilters,
+      outcome: 'Ng',
+      from: '2026-07-15T00:00:00Z'
+    })).toBe(`inspection/statistics/${projectId}?startTime=2026-07-15T00%3A00%3A00Z&status=Ng`);
+    expect(createStationStatisticsPath({
+      ...baseFilters,
+      outcome: 'Failed',
+      diagnosticCode: 'CAMERA_TIMEOUT'
+    })).toBe('stations/statistics?status=Failed&diagnosticCode=CAMERA_TIMEOUT');
+    expect(createPreviousSuccessPath(projectId, resultId)).toBe(
+      `inspection/history/${projectId}/${resultId}/previous-success?limit=50`
+    );
+    expect(createComparisonPath(projectId, resultId, projectId)).toBe(
+      `inspection/history/${projectId}/compare?leftId=${resultId}&rightId=${projectId}`
+    );
     expect(() => createLocalResultsPath('not-a-guid', baseFilters)).toThrow(TypeError);
   });
 
@@ -213,6 +233,21 @@ describe('Results queries', () => {
       items: [{ ...stationPage().items[0], executionOutcome: 'Mystery' }]
     })));
     const owner = createStationResultsQuery(client, () => baseFilters);
+
+    await expect(owner.refresh({ force: true })).resolves.toMatchObject({
+      phase: 'error',
+      failure: { kind: 'decode' }
+    });
+    owner.dispose();
+    client.dispose();
+  });
+
+  it('rejects local list data whose project identity differs from the request', async () => {
+    const client = createReadQueryClient(apiWith(async () => ({
+      ...localPage(),
+      items: [{ ...localPage().items[0], projectId: crypto.randomUUID() }]
+    })));
+    const owner = createLocalResultsQuery(client, () => projectId, () => baseFilters);
 
     await expect(owner.refresh({ force: true })).resolves.toMatchObject({
       phase: 'error',

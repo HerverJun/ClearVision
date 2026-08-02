@@ -15,6 +15,8 @@ import { createReadQueryClient } from '@/platform/query';
 const projectId = '11111111-1111-4111-8111-111111111111';
 const resultId = '22222222-2222-4222-8222-222222222222';
 const defectId = '33333333-3333-4333-8333-333333333333';
+const referenceId = '44444444-4444-4444-8444-444444444444';
+const snapshotId = '55555555-5555-4555-8555-555555555555';
 
 function project() {
   return {
@@ -84,17 +86,72 @@ function localDetail() {
       calibrationBundleId: null,
       sessionId: null,
       runId: null,
+      executionSnapshotId: snapshotId,
       projectPersistenceRevision: 17,
       decisionConfigurationHash: 'decision-hash',
-      packageId: null,
+      packageId: 'package-17',
+      runtimePackageId: 'package-17',
+      executionSource: 'PersistedProject',
+      executionRunMode: 'FormalPrimary',
+      shadowRole: 'Primary',
       stationId: null
     },
+    hasImage: false,
+    imageReference: null,
+    imageMissing: false,
+    imageMissingMessage: null,
+    hasOutputData: true,
+    hasAnalysisData: true,
     hasEvidenceManifest: false,
     evidenceStatus: 'missing',
     evidenceManifestReference: `/api/inspection/history/${projectId}/${resultId}/evidence/manifest`,
     evidenceTotalBytes: null,
     retentionExpiresAtUtc: null,
     evidenceMessage: '证据清单缺失或已清理'
+  };
+}
+
+function statistics() {
+  return {
+    totalCount: 10,
+    executionSucceededCount: 8,
+    validDecisionCount: 6,
+    okCount: 5,
+    ngCount: 1,
+    undeterminedCount: 1,
+    notApplicableCount: 1,
+    invalidCount: 0,
+    failedCount: 1,
+    cancelledCount: 0,
+    timedOutCount: 1,
+    skippedCount: 0,
+    executionFailureCount: 2,
+    yieldRate: 5 / 6,
+    decisionCoverageRate: 0.75,
+    averageProcessingTimeMs: 18
+  };
+}
+
+function comparisonSummary(id: string, decision: 'Ok' | 'Ng') {
+  return {
+    resultId: id,
+    id,
+    projectId,
+    status: decision === 'Ok' ? 'OK' : 'NG',
+    executionOutcome: 'Succeeded',
+    decisionOutcome: decision,
+    inspectionTime: '2026-07-15T01:00:02Z',
+    defectCount: decision === 'Ok' ? 0 : 1,
+    processingTimeMs: 12,
+    confidenceScore: null,
+    flowVersionHash: 'flow-hash',
+    calibrationBundleId: null,
+    sessionId: null,
+    runId: null,
+    imageReference: null,
+    hasImage: false,
+    hasOutputData: true,
+    hasAnalysisData: true
   };
 }
 
@@ -110,12 +167,19 @@ function legacyStationPage() {
       packageId: 'package-a',
       packageName: '瓶盖检测',
       packageVersion: '1.0.0',
-      projectRevision: 9,
+      packageFlowHash: null,
+      executionFlowHash: null,
+      flowHash: null,
+      executionSnapshotId: null,
+      projectRevision: null,
+      decisionConfigurationHash: null,
+      executionRunMode: null,
       outcome: 2,
       inspectionStatus: 'Error',
       executionTimeMs: 88,
       diagnosticCode: 'TEXT_SAYS_NG',
       diagnosticMessage: '文案写 NG 也不得折叠',
+      primaryOutputsPreview: {},
       startedAtUtc: '2026-07-15T01:00:00Z',
       completedAtUtc: '2026-07-15T01:00:01Z'
     }],
@@ -191,6 +255,7 @@ describe('Results page', () => {
       apiWith(async path => {
         requested.push(path);
         if (path === 'projects') return [project()];
+        if (path === `inspection/statistics/${projectId}`) return statistics();
         if (path === `inspection/history/${projectId}/${resultId}`) return localDetail();
         if (path === `inspection/history/${projectId}/${resultId}/evidence/manifest`) return {
           status: 'available',
@@ -216,6 +281,44 @@ describe('Results page', () => {
           }
         };
         if (path.startsWith(`inspection/history/${projectId}?`)) return localPage();
+        if (path === `inspection/history/${projectId}/${resultId}/previous-success?limit=50`) return {
+          currentSummary: comparisonSummary(resultId, 'Ng'),
+          referenceSummary: comparisonSummary(referenceId, 'Ok'),
+          found: true,
+          isFlowVersionFallback: false,
+          queryLimit: 50,
+          warnings: [],
+          message: '已找到失败前成功参考'
+        };
+        if (path.startsWith(`inspection/history/${projectId}/compare?`)) return {
+          leftSummary: comparisonSummary(referenceId, 'Ok'),
+          rightSummary: comparisonSummary(resultId, 'Ng'),
+          compatibility: {
+            flowVersionCompatible: true,
+            calibrationBundleCompatible: true,
+            onlySafePreviewComparison: true,
+            hasUnknownFields: false
+          },
+          warnings: ['仅比较安全预览字段'],
+          fieldDiffs: [{
+            path: '$["outcome"]["decision"]', label: 'decisionOutcome',
+            leftValuePreview: 'Ok', rightValuePreview: 'Ng', diffType: 'Changed',
+            severity: 'info', message: null
+          }],
+          traceabilityDiff: [],
+          sceneReplayAvailability: {
+            kind: 'scene', mode: 'summary-only', isAvailable: false,
+            leftAvailable: false, rightAvailable: false, leftReference: null,
+            rightReference: null, leftSummary: null, rightSummary: null,
+            message: '暂无 Scene evidence，已降级为摘要回放'
+          },
+          imageReplayAvailability: {
+            kind: 'image', mode: 'summary-only', isAvailable: false,
+            leftAvailable: false, rightAvailable: false, leftReference: null,
+            rightReference: null, leftSummary: 'no image', rightSummary: 'no image',
+            message: '无图像引用，已降级为摘要回放'
+          }
+        };
         throw new Error(`Unexpected request: ${path}`);
       })
     );
@@ -225,9 +328,18 @@ describe('Results page', () => {
     expect(mounted.wrapper.text()).toContain('判定结果不适用');
     expect(mounted.wrapper.text()).toContain('轻微划痕');
     expect(mounted.wrapper.text()).toContain('流程版本哈希');
+    expect(mounted.wrapper.text()).toContain('执行快照');
+    expect(mounted.wrapper.text()).toContain('判定配置哈希');
+    expect(mounted.wrapper.text()).toContain('83.3%');
     expect(mounted.wrapper.text()).toContain('manifest-deep-link');
     expect(requested).toContain(`inspection/history/${projectId}/${resultId}/evidence/manifest`);
-    expect(mounted.wrapper.text()).not.toContain('图像预览');
+    expect(mounted.wrapper.text()).toContain('本次检测未产生可访问图像');
+
+    await mounted.wrapper.get('[data-testid="results-previous-success"]').trigger('click');
+    await flushPromises();
+    expect(mounted.wrapper.text()).toContain('已找到失败前成功参考');
+    expect(mounted.wrapper.text()).toContain('仅比较安全预览字段');
+    expect(mounted.wrapper.text()).toContain('decisionOutcome');
 
     mounted.wrapper.unmount();
     mounted.queries.dispose();
@@ -238,6 +350,7 @@ describe('Results page', () => {
       '/results?source=station&resultId=message-9',
       apiWith(async path => {
         if (path.startsWith('stations/results?')) return legacyStationPage();
+        if (path === 'stations/statistics') return statistics();
         throw new Error(`Unexpected request: ${path}`);
       })
     );
@@ -249,6 +362,8 @@ describe('Results page', () => {
     expect(mounted.wrapper.findAll('[data-status-tone="error"]')).toHaveLength(1);
     expect(mounted.wrapper.findAll('[data-status-tone="ng"]')).toHaveLength(0);
     expect(mounted.wrapper.text()).not.toContain('判定 NG');
+    expect(mounted.wrapper.text()).toContain('远程结果仅保留摘要');
+    expect(mounted.wrapper.find('[data-remote-image-status="not-uploaded"]').exists()).toBe(true);
 
     mounted.wrapper.unmount();
     mounted.queries.dispose();

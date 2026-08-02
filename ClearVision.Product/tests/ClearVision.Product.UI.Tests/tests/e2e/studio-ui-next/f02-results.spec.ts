@@ -22,6 +22,9 @@ const projectId = '11111111-1111-4111-8111-111111111111';
 const localResultId = '22222222-2222-4222-8222-222222222222';
 const missingResultId = '99999999-9999-4999-8999-999999999999';
 const defectId = '33333333-3333-4333-8333-333333333333';
+const referenceResultId = '44444444-4444-4444-8444-444444444444';
+const executionSnapshotId = '55555555-5555-4555-8555-555555555555';
+const imageId = '66666666-6666-4666-8666-666666666666';
 const canonicalCases = Object.freeze([
   ['Ok', 'Succeeded', 'Ok'],
   ['Ng', 'Succeeded', 'Ng'],
@@ -74,7 +77,7 @@ function localSummary(kind = 'NotApplicable') {
   };
 }
 
-function localDetail(kind = 'NotApplicable') {
+function localDetail(kind = 'NotApplicable', evidenceStatus = 'available') {
   return {
     ...localSummary(kind),
     defects: [{
@@ -93,17 +96,72 @@ function localDetail(kind = 'NotApplicable') {
       calibrationBundleId: null,
       sessionId: null,
       runId: null,
+      executionSnapshotId,
       projectPersistenceRevision: 8,
       decisionConfigurationHash: 'decision-hash',
-      packageId: null,
+      packageId: 'package-f02',
+      runtimePackageId: 'package-f02',
+      executionSource: 'PersistedProject',
+      executionRunMode: 'FormalPrimary',
+      shadowRole: 'Primary',
       stationId: null
     },
-    hasEvidenceManifest: true,
-    evidenceStatus: 'available',
+    hasImage: true,
+    imageReference: `/api/images/${imageId}`,
+    imageMissing: false,
+    imageMissingMessage: null,
+    hasOutputData: true,
+    hasAnalysisData: true,
+    hasEvidenceManifest: evidenceStatus !== 'missing',
+    evidenceStatus,
     evidenceManifestReference: `/api/inspection/history/${projectId}/${localResultId}/evidence/manifest`,
     evidenceTotalBytes: 4,
-    retentionExpiresAtUtc: null,
-    evidenceMessage: '证据可用'
+    retentionExpiresAtUtc: evidenceStatus === 'expired' ? '2026-07-16T00:00:00Z' : null,
+    evidenceMessage: evidenceStatus === 'expired' ? '证据已过保留期' : '证据可用'
+  };
+}
+
+function statistics() {
+  return {
+    totalAttemptCount: 10,
+    executionSucceededCount: 8,
+    validDecisionCount: 6,
+    okCount: 5,
+    ngCount: 1,
+    undeterminedCount: 1,
+    notApplicableCount: 1,
+    invalidCount: 0,
+    failedCount: 1,
+    cancelledCount: 0,
+    timedOutCount: 1,
+    skippedCount: 0,
+    executionFailureCount: 2,
+    yieldRate: 5 / 6,
+    decisionCoverageRate: 0.75,
+    averageExecutionTimeMs: 18
+  };
+}
+
+function comparisonSummary(id: string, decision: 'Ok' | 'Ng') {
+  return {
+    resultId: id,
+    id,
+    projectId,
+    status: decision === 'Ok' ? 'OK' : 'NG',
+    executionOutcome: 'Succeeded',
+    decisionOutcome: decision,
+    inspectionTime: '2026-07-15T01:00:02Z',
+    defectCount: decision === 'Ok' ? 0 : 1,
+    processingTimeMs: 16,
+    confidenceScore: 0.91,
+    flowVersionHash: 'flow-hash',
+    calibrationBundleId: null,
+    sessionId: null,
+    runId: null,
+    imageReference: null,
+    hasImage: false,
+    hasOutputData: true,
+    hasAnalysisData: true
   };
 }
 
@@ -120,7 +178,13 @@ function stationFixture(index: number) {
     packageId: 'package-results-fixture',
     packageName: 'Results 500 Fixture',
     packageVersion: '1.0.0',
+    packageFlowHash: 'package-flow-hash',
+    executionFlowHash: 'execution-flow-hash',
+    flowHash: 'execution-flow-hash',
+    executionSnapshotId,
     projectRevision: 8,
+    decisionConfigurationHash: 'decision-hash',
+    executionRunMode: 'StationRuntime',
     outcome: legacy ? 2 : canonical[0] === 'Ng' ? 1 : 0,
     inspectionStatus: legacy ? 'Error' : canonical[0],
     ...(legacy ? {} : {
@@ -133,6 +197,7 @@ function stationFixture(index: number) {
     executionTimeMs: 10 + index,
     diagnosticCode: legacy ? 'LEGACY_ERROR' : `FIXTURE_${canonical[0].toUpperCase()}`,
     diagnosticMessage: legacy ? 'legacy 文案中即使出现 NG 也不得推断' : null,
+    primaryOutputsPreview: { score: String(90 - (index % 10)) },
     startedAtUtc: new Date(Date.UTC(2026, 6, 15, 0, 0, index)).toISOString(),
     completedAtUtc: new Date(Date.UTC(2026, 6, 15, 0, 0, index + 1)).toISOString()
   };
@@ -148,6 +213,9 @@ async function fulfillJson(route: Route, status: number, body: unknown): Promise
 
 async function bootResults(page: Page, initialHash = '/results'): Promise<F02MethodAuditEntry[]> {
   const audit: F02MethodAuditEntry[] = [];
+  const initialQuery = new URL(initialHash, 'http://clearvision.local').searchParams;
+  let activeLocalKind = initialQuery.get('outcome') ?? 'NotApplicable';
+  const evidenceMode = initialQuery.get('evidenceMode') ?? 'available';
   await installF02BrowserStartup(page);
   await page.route('**/health', route => fulfillJson(route, 200, { status: 'Healthy', port: 5177 }));
   await page.route('**/api/**', async route => {
@@ -170,7 +238,20 @@ async function bootResults(page: Page, initialHash = '/results'): Promise<F02Met
       await fulfillJson(route, 200, [project()]);
       return;
     }
+    if (url.pathname === `/api/inspection/statistics/${projectId}` || url.pathname === '/api/stations/statistics') {
+      await fulfillJson(route, 200, statistics());
+      return;
+    }
     if (url.pathname === `/api/inspection/history/${projectId}/${localResultId}/evidence/manifest`) {
+      if (evidenceMode === 'expired') {
+        await fulfillJson(route, 200, {
+          status: 'expired',
+          errorCode: 'EvidenceExpired',
+          message: 'Evidence manifest retention has expired.',
+          manifest: null
+        });
+        return;
+      }
       await fulfillJson(route, 200, {
         status: 'available',
         message: '证据可用',
@@ -196,16 +277,69 @@ async function bootResults(page: Page, initialHash = '/results'): Promise<F02Met
       });
       return;
     }
+    if (url.pathname === `/api/images/${imageId}`) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+      });
+      return;
+    }
     if (url.pathname === `/api/inspection/history/${projectId}/${missingResultId}`) {
       await fulfillJson(route, 404, { error: 'Inspection history result was not found.' });
       return;
     }
     if (url.pathname === `/api/inspection/history/${projectId}/${localResultId}`) {
-      await fulfillJson(route, 200, localDetail(url.searchParams.get('status') ?? 'NotApplicable'));
+      await fulfillJson(route, 200, localDetail(activeLocalKind, evidenceMode));
+      return;
+    }
+    if (url.pathname === `/api/inspection/history/${projectId}/${localResultId}/previous-success`) {
+      await fulfillJson(route, 200, {
+        currentSummary: comparisonSummary(localResultId, 'Ng'),
+        referenceSummary: comparisonSummary(referenceResultId, 'Ok'),
+        found: true,
+        isFlowVersionFallback: false,
+        queryLimit: 50,
+        warnings: [],
+        message: '已找到失败前成功参考'
+      });
+      return;
+    }
+    if (url.pathname === `/api/inspection/history/${projectId}/compare`) {
+      await fulfillJson(route, 200, {
+        leftSummary: comparisonSummary(referenceResultId, 'Ok'),
+        rightSummary: comparisonSummary(localResultId, 'Ng'),
+        compatibility: {
+          flowVersionCompatible: true,
+          calibrationBundleCompatible: true,
+          onlySafePreviewComparison: true,
+          hasUnknownFields: false
+        },
+        warnings: ['仅比较安全预览字段'],
+        fieldDiffs: [{
+          path: '$["outcome"]["decision"]', label: 'decisionOutcome',
+          leftValuePreview: 'Ok', rightValuePreview: 'Ng', diffType: 'Changed',
+          severity: 'info', message: null
+        }],
+        traceabilityDiff: [],
+        sceneReplayAvailability: {
+          kind: 'scene', mode: 'summary-only', isAvailable: false,
+          leftAvailable: false, rightAvailable: false, leftReference: null,
+          rightReference: null, leftSummary: null, rightSummary: null,
+          message: '暂无 Scene evidence，已降级为摘要回放'
+        },
+        imageReplayAvailability: {
+          kind: 'image', mode: 'summary-only', isAvailable: false,
+          leftAvailable: false, rightAvailable: false, leftReference: null,
+          rightReference: null, leftSummary: 'no image', rightSummary: 'no image',
+          message: '无图像引用，已降级为摘要回放'
+        }
+      });
       return;
     }
     if (url.pathname === `/api/inspection/history/${projectId}`) {
-      const item = localSummary(url.searchParams.get('status') ?? 'NotApplicable');
+      activeLocalKind = url.searchParams.get('status') ?? 'NotApplicable';
+      const item = localSummary(activeLocalKind);
       await fulfillJson(route, 200, {
         items: [item],
         totalCount: 1,
@@ -266,8 +400,18 @@ test('Results local view keeps query filters, dual axes, detail 404 and GET-only
   }
   await page.getByRole('button', { name: '查看详情' }).first().click();
   await expect(page.getByText('轻微划痕')).toBeVisible();
+  await expect(page.getByText('判定依据', { exact: true })).toBeVisible();
+  await expect(page.getByText('FinalDecision', { exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: '本机检测结果图像' })).toBeVisible();
+  await expect(page.getByText('83.3%', { exact: true })).toBeVisible();
   await page.getByText('技术追溯', { exact: true }).click();
   await expect(page.getByText('流程版本哈希')).toBeVisible();
+  await expect(page.getByText(executionSnapshotId, { exact: true })).toBeVisible();
+  await expect(page.getByText('decision-hash', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '查找前次成功并对比' }).click();
+  await expect(page.getByText('已找到失败前成功参考')).toBeVisible();
+  await expect(page.getByText('仅比较安全预览字段')).toBeVisible();
+  await expect(page.getByText('decisionOutcome', { exact: true })).toBeVisible();
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'results-detail', viewport, runtimeErrors, requestAudit: audit
@@ -279,12 +423,41 @@ test('Results local view keeps query filters, dual axes, detail 404 and GET-only
   expect(expectGetOnly(audit)).toBe(true);
 });
 
+test('Results renders NG and non-NG exception axes without inference and distinguishes expired evidence', async ({ page }) => {
+  const audit = await bootResults(
+    page,
+    `/results?source=local&projectId=${projectId}&resultId=${localResultId}&outcome=Ng&evidenceMode=expired`
+  );
+  const detail = page.getByLabel('结果详情');
+  await expect(detail.getByText('判定 NG', { exact: true })).toBeVisible();
+  await expect(detail.getByText('FIXTURE_NG', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('[data-evidence-phase="expired"]')).toBeVisible();
+  await expect(page.getByText('证据已过保留期，结果摘要仍可调查。')).toBeVisible();
+  await expect(page.getByText('加载失败', { exact: true })).toHaveCount(0);
+
+  for (const [kind, executionLabel, decisionLabel] of [
+    ['Failed', '执行失败', '未判定'],
+    ['Invalid', '执行成功', '判定无效'],
+    ['Undetermined', '执行成功', '未判定'],
+    ['Cancelled', '已取消', '不适用']
+  ] as const) {
+    await page.getByLabel('标准结果').selectOption(kind);
+    await page.getByRole('button', { name: '查看详情' }).first().click();
+    await expect(detail.getByText(executionLabel, { exact: true }).first()).toBeVisible();
+    await expect(detail.getByText(decisionLabel, { exact: true }).first()).toBeVisible();
+  }
+  expect(expectGetOnly(audit)).toBe(true);
+});
+
 test('Results Station view paginates the frozen 500-result fixture and marks legacy projection', async ({ page }) => {
   const audit = await bootResults(page, '/results?source=station&pageSize=200&resultId=fixture-result-0001');
   await expect(page.getByText('旧版工作站结果映射')).toBeVisible();
   const detail = page.getByLabel('工作站结果详情');
   await expect(detail.getByText('执行失败', { exact: true }).first()).toBeVisible();
   await expect(detail.getByText('未判定', { exact: true })).toBeVisible();
+  await expect(detail.getByText('远程结果仅保留摘要')).toBeVisible();
+  await expect(detail.locator('[data-remote-image-status="not-uploaded"]')).toBeVisible();
+  expect(audit.some(entry => entry.path.startsWith('/api/images/'))).toBe(false);
   await expect(page.getByText('第 1–200 项，共 500 项')).toBeVisible();
   await page.getByRole('button', { name: '第 3 页' }).click();
   await expect(page.getByText('第 401–500 项，共 500 项')).toBeVisible();
