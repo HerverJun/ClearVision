@@ -83,8 +83,17 @@ public sealed class StationCommunicationSettingsStore
             target.StationSync,
             snapshot.StationSync ?? new LocalStationSyncOptions());
 
-        WriteStudioDocument(target.StudioDocument);
-        WriteStationSyncDocument(target.StationSyncDocument);
+        try
+        {
+            WriteStudioDocument(target.StudioDocument);
+            WriteStationSyncDocument(target.StationSyncDocument);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            throw new StationCommunicationPersistenceException(
+                "Station communication persistence outcome is unknown; reread Station authority before retrying.",
+                ex);
+        }
 
         var savedSnapshot = ReadSnapshot(runningIngress);
         var view = BuildView(
@@ -96,25 +105,54 @@ public sealed class StationCommunicationSettingsStore
         return StationCommunicationSaveResult.Succeeded(view);
     }
 
-    public StationCommunicationTokenResult RevealToken(StationIngressOptions runningIngress)
-    {
-        var snapshot = ReadSnapshot(runningIngress);
-        var token = ResolveToken(snapshot);
-        return new StationCommunicationTokenResult
-        {
-            Success = true,
-            Operation = "reveal",
-            Token = token,
-            TokenInfo = BuildTokenInfo(token),
-            Settings = BuildView(snapshot, runningIngress, null, null, "Station token revealed.")
-        };
-    }
-
     public StationCommunicationTokenResult RegenerateToken(StationIngressOptions runningIngress)
     {
         var snapshot = ReadSnapshot(runningIngress);
-        var generatedToken = GenerateToken(ResolveToken(snapshot));
         var mode = InferMode(snapshot.Ingress, snapshot.Metadata);
+        if (mode == StationCommunicationMode.Disabled)
+        {
+            var currentToken = ResolveToken(snapshot);
+            return new StationCommunicationTokenResult
+            {
+                Success = false,
+                Operation = "regenerate",
+                TokenInfo = BuildTokenInfo(currentToken),
+                Settings = BuildView(
+                    snapshot,
+                    runningIngress,
+                    null,
+                    null,
+                    "Station communication is disabled; enable LocalLoopback before regenerating a token."),
+                Message = "Disabled 模式禁止生成无用途 token；请先启用 LocalLoopback。",
+                Errors = new[]
+                {
+                    new StationCommunicationValidationError("mode", "Token regeneration is only supported for LocalLoopback.")
+                }
+            };
+        }
+        if (mode == StationCommunicationMode.LanController)
+        {
+            var currentToken = ResolveToken(snapshot);
+            return new StationCommunicationTokenResult
+            {
+                Success = false,
+                Operation = "regenerate",
+                TokenInfo = BuildTokenInfo(currentToken),
+                Settings = BuildView(
+                    snapshot,
+                    runningIngress,
+                    null,
+                    null,
+                    "LanController 当前没有获批的安全 token handoff；请使用手动 replace。"),
+                Message = "LanController 禁止自动 regenerate token；请使用手动 replace。",
+                Errors = new[]
+                {
+                    new StationCommunicationValidationError("token", "No approved secure token handoff is available for LanController.")
+                }
+            };
+        }
+
+        var generatedToken = GenerateToken(ResolveToken(snapshot));
         var request = new StationCommunicationSettingsUpdateRequest
         {
             Mode = mode.ToString(),
@@ -125,12 +163,12 @@ public sealed class StationCommunicationSettingsStore
         };
 
         var saveResult = SaveSettings(request, runningIngress);
+        var persistedTokenInfo = saveResult.Settings?.Token ?? BuildTokenInfo(ResolveToken(snapshot));
         return new StationCommunicationTokenResult
         {
             Success = saveResult.Success,
             Operation = "regenerate",
-            Token = generatedToken,
-            TokenInfo = BuildTokenInfo(generatedToken),
+            TokenInfo = persistedTokenInfo,
             Settings = saveResult.Settings,
             Message = saveResult.Message,
             Errors = saveResult.Errors
@@ -176,6 +214,17 @@ public sealed class StationCommunicationSettingsStore
             return false;
         }
 
+        if (!string.IsNullOrWhiteSpace(request.SharedToken) && IsMaskedOrRedactedToken(request.SharedToken))
+        {
+            errors = new[]
+            {
+                new StationCommunicationValidationError(
+                    "sharedToken",
+                    "Shared token replacement must be a real token, not a masked or redacted projection.")
+            };
+            return false;
+        }
+
         var port = requestedPort <= 0 ? 5000 : requestedPort;
         if (!TryNormalizeLanHost(request.LanHost, snapshot.Metadata.LanHost, out var lanHost, out var lanHostError))
         {
@@ -191,7 +240,18 @@ public sealed class StationCommunicationSettingsStore
             ? request.SharedToken.Trim()
             : ResolveToken(snapshot);
 
-        if (mode != StationCommunicationMode.Disabled && string.IsNullOrWhiteSpace(token))
+        if (mode == StationCommunicationMode.LanController && string.IsNullOrWhiteSpace(token))
+        {
+            errors = new[]
+            {
+                new StationCommunicationValidationError(
+                    "sharedToken",
+                    "LanController requires an explicit token replacement because no approved secure handoff is available.")
+            };
+            return false;
+        }
+
+        if (mode == StationCommunicationMode.LocalLoopback && string.IsNullOrWhiteSpace(token))
         {
             token = GenerateToken();
         }
@@ -453,6 +513,16 @@ public sealed class StationCommunicationSettingsStore
             Mask = "****" + last4,
             Last4 = last4
         };
+    }
+
+    private static bool IsMaskedOrRedactedToken(string value)
+    {
+        var normalized = value.Trim();
+        return normalized.Contains("<redacted", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("[redacted", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "redacted", StringComparison.OrdinalIgnoreCase) ||
+            normalized.StartsWith("****", StringComparison.Ordinal) ||
+            normalized.All(character => character == '*');
     }
 
     private static string GenerateToken(string? excludedToken = null)
@@ -882,8 +952,6 @@ public sealed class StationCommunicationTokenResult
 
     public string Operation { get; set; } = string.Empty;
 
-    public string Token { get; set; } = string.Empty;
-
     public StationCommunicationTokenView TokenInfo { get; set; } = new();
 
     public StationCommunicationSettingsView? Settings { get; set; }
@@ -892,4 +960,12 @@ public sealed class StationCommunicationTokenResult
 
     public IReadOnlyList<StationCommunicationValidationError> Errors { get; set; } =
         Array.Empty<StationCommunicationValidationError>();
+}
+
+public sealed class StationCommunicationPersistenceException : IOException
+{
+    public StationCommunicationPersistenceException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 }

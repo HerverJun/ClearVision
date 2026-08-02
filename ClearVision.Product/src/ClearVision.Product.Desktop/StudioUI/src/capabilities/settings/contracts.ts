@@ -247,6 +247,20 @@ export const SETTINGS_SEMANTICS = Object.freeze({
     conflict: 'none',
     unknownOutcome: 'stop-and-report'
   } satisfies SettingsOperationSemantics),
+  aiModelMutation: Object.freeze({
+    persistence: 'persisted',
+    effective: 'immediate-projection',
+    restart: 'none',
+    conflict: 'none',
+    unknownOutcome: 'reload-before-retry'
+  } satisfies SettingsOperationSemantics),
+  aiModelTest: Object.freeze({
+    persistence: 'persisted',
+    effective: 'immediate-projection',
+    restart: 'none',
+    conflict: 'none',
+    unknownOutcome: 'reload-before-retry'
+  } satisfies SettingsOperationSemantics),
   databaseMaintenance: Object.freeze({
     persistence: 'runtime-only',
     effective: 'runtime-operation',
@@ -453,7 +467,7 @@ export const SETTINGS_ENDPOINT_MATRIX: readonly SettingsEndpointContract[] = Obj
     serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.stationRestart
   }),
   endpoint({
-    id: 'station.token', section: 'station', method: 'POST', path: 'station-communication/token', kind: 'runtime-operation',
+    id: 'station.token', section: 'station', method: 'POST', path: 'station-communication/token', kind: 'write',
     serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.stationRestart,
     sensitiveFields: ['token', 'last4', 'mask']
   }),
@@ -463,13 +477,38 @@ export const SETTINGS_ENDPOINT_MATRIX: readonly SettingsEndpointContract[] = Obj
     sensitiveFields: ['apiKey', 'apiKeyMasked', 'extraHeaders', 'extraQuery', 'extraBody']
   }),
   endpoint({
-    id: 'ai.models.write', section: 'ai-model', method: 'POST', path: 'ai/models/<mutation>', kind: 'write',
-    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.genericWrite,
+    id: 'ai.models.create', section: 'ai-model', method: 'POST', path: 'ai/models', kind: 'write',
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.aiModelMutation,
+    sensitiveFields: ['apiKey', 'extraHeaders', 'extraQuery', 'extraBody']
+  }),
+  endpoint({
+    id: 'ai.models.update', section: 'ai-model', method: 'PUT', path: 'ai/models/{id}', kind: 'write',
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.aiModelMutation,
+    sensitiveFields: ['apiKey', 'extraHeaders', 'extraQuery', 'extraBody']
+  }),
+  endpoint({
+    id: 'ai.models.delete', section: 'ai-model', method: 'DELETE', path: 'ai/models/{id}', kind: 'write',
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.aiModelMutation,
+    sensitiveFields: ['apiKey', 'extraHeaders', 'extraQuery', 'extraBody']
+  }),
+  endpoint({
+    id: 'ai.models.activate', section: 'ai-model', method: 'POST', path: 'ai/models/{id}/activate', kind: 'write',
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.aiModelMutation,
+    sensitiveFields: ['apiKey', 'extraHeaders', 'extraQuery', 'extraBody']
+  }),
+  endpoint({
+    id: 'ai.models.default-planner', section: 'ai-model', method: 'POST', path: 'ai/models/{id}/default-planner', kind: 'write',
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.aiModelMutation,
+    sensitiveFields: ['apiKey', 'extraHeaders', 'extraQuery', 'extraBody']
+  }),
+  endpoint({
+    id: 'ai.models.default-shadow-eval', section: 'ai-model', method: 'POST', path: 'ai/models/{id}/default-shadow-eval', kind: 'write',
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.aiModelMutation,
     sensitiveFields: ['apiKey', 'extraHeaders', 'extraQuery', 'extraBody']
   }),
   endpoint({
     id: 'ai.models.test', section: 'ai-model', method: 'POST', path: 'ai/models/{id}/test', kind: 'test',
-    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.runtimeOperation,
+    serverPermission: 'admin', uiPermission: 'admin', semantics: SETTINGS_SEMANTICS.aiModelTest,
     sensitiveFields: ['apiKey', 'extraHeaders', 'extraQuery', 'extraBody']
   }),
   endpoint({
@@ -563,8 +602,11 @@ export const SETTINGS_SECTION_CONTRACTS: readonly SettingsSectionContract[] = Ob
   }),
   section({
     section: 'ai-model', authority: 'ai-model-store', routePermission: 'settings-route', readPermission: 'authenticated', writePermission: 'admin',
-    endpointIds: ['ai.models.read', 'ai.models.write', 'ai.models.test', 'ai.reasoning-support'],
-    sensitiveFields: ['apiKey', 'apiKeyMasked', 'extraHeaders', 'extraQuery', 'extraBody'], semantics: SETTINGS_SEMANTICS.genericWrite
+    endpointIds: [
+      'ai.models.read', 'ai.models.create', 'ai.models.update', 'ai.models.delete', 'ai.models.activate',
+      'ai.models.default-planner', 'ai.models.default-shadow-eval', 'ai.models.test', 'ai.reasoning-support'
+    ],
+    sensitiveFields: ['apiKey', 'apiKeyMasked', 'extraHeaders', 'extraQuery', 'extraBody'], semantics: SETTINGS_SEMANTICS.aiModelMutation
   }),
   section({
     section: 'database', authority: 'database-maintenance', routePermission: 'settings-route', readPermission: 'admin', writePermission: 'admin',

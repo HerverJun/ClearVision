@@ -158,9 +158,7 @@ export interface StationCommunicationProjectionV1 {
 
 export interface StationTokenOperationV1 {
   readonly success: boolean;
-  readonly operation: 'reveal' | 'regenerate';
-  /** Ephemeral response only. The Settings owner must never store this value. */
-  readonly token: string;
+  readonly operation: 'regenerate';
   readonly tokenInfo: StationTokenViewV1;
   readonly settings: StationCommunicationProjectionV1 | null;
   readonly message: string;
@@ -725,16 +723,15 @@ export function decodeStationCommunicationProjectionV1(
 
 export function decodeStationTokenOperationV1(value: unknown, path = '$'): StationTokenOperationV1 {
   const source = record(value, path);
-  exact(source, ['success', 'operation', 'token', 'tokenInfo', 'settings', 'message', 'errors'], path);
+  exact(source, ['success', 'operation', 'tokenInfo', 'settings', 'message', 'errors'], path);
   const operation = stringValue(valueOf(source, 'operation', path), `${path}.operation`).toLowerCase();
-  if (operation !== 'reveal' && operation !== 'regenerate') {
-    throw new SettingsContractDecodeError(`${path}.operation`, 'reveal or regenerate');
+  if (operation !== 'regenerate') {
+    throw new SettingsContractDecodeError(`${path}.operation`, 'regenerate');
   }
   const errors = optionalValueOf(source, 'errors');
   return Object.freeze({
     success: booleanValue(valueOf(source, 'success', path), `${path}.success`),
     operation,
-    token: stringValue(valueOf(source, 'token', path), `${path}.token`, true),
     tokenInfo: decodeStationTokenView(valueOf(source, 'tokenInfo', path), `${path}.tokenInfo`),
     settings: optionalValueOf(source, 'settings') === null || optionalValueOf(source, 'settings') === undefined
       ? null

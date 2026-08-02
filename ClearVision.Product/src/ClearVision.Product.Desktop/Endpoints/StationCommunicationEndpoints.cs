@@ -38,13 +38,20 @@ public static class StationCommunicationEndpoints
                 return Results.Json(new { error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var result = store.SaveSettings(request, runningIngressOptions.Value);
-            if (!result.Success)
+            try
             {
-                return Results.BadRequest(result);
-            }
+                var result = store.SaveSettings(request, runningIngressOptions.Value);
+                if (!result.Success)
+                {
+                    return Results.BadRequest(result);
+                }
 
-            return Results.Ok(result.Settings);
+                return Results.Ok(result.Settings);
+            }
+            catch (StationCommunicationPersistenceException)
+            {
+                return BuildPersistenceUnknownResult();
+            }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
@@ -60,26 +67,28 @@ public static class StationCommunicationEndpoints
             }
 
             var operation = (request.Operation ?? request.Action ?? string.Empty).Trim();
-            if (operation.Equals("reveal", StringComparison.OrdinalIgnoreCase))
-            {
-                return Results.Ok(store.RevealToken(runningIngressOptions.Value));
-            }
-
             if (operation.Equals("regenerate", StringComparison.OrdinalIgnoreCase))
             {
-                var result = store.RegenerateToken(runningIngressOptions.Value);
-                if (!result.Success)
+                try
                 {
-                    return Results.BadRequest(result);
-                }
+                    var result = store.RegenerateToken(runningIngressOptions.Value);
+                    if (!result.Success)
+                    {
+                        return Results.BadRequest(result);
+                    }
 
-                return Results.Ok(result);
+                    return Results.Ok(result);
+                }
+                catch (StationCommunicationPersistenceException)
+                {
+                    return BuildPersistenceUnknownResult();
+                }
             }
 
             return Results.BadRequest(new
             {
                 success = false,
-                message = "Token operation must be reveal or regenerate."
+                message = "Token reveal is excluded; the only supported token operation is regenerate."
             });
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
@@ -88,4 +97,15 @@ public static class StationCommunicationEndpoints
     }
 
     private static bool IsAdmin(HttpContext context) => ClearVisionPermissionPolicies.IsAdmin(context);
+
+    private static IResult BuildPersistenceUnknownResult()
+    {
+        return Results.Json(new
+        {
+            errorCode = "unknown-outcome",
+            code = "unknown-outcome",
+            policy = "reload-before-retry",
+            publicMessage = "Station communication persistence outcome is unknown; reread Station authority before retrying."
+        }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
 }

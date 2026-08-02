@@ -58,7 +58,7 @@ export interface SettingsUpdateUserRequest {
   readonly isActive: boolean;
 }
 
-export type StationTokenOperationNameV1 = 'reveal' | 'regenerate';
+export type StationTokenOperationNameV1 = 'regenerate';
 
 export interface StationCommunicationSettingsUpdateRequestV1 {
   readonly mode: string;
@@ -70,6 +70,7 @@ export interface StationCommunicationSettingsUpdateRequestV1 {
 }
 
 export type AiApiKeyOperationV1 = 'keep' | 'replace' | 'clear';
+export type AiBaseUrlOperationV1 = 'preserve' | 'replace' | 'clear';
 
 export interface AiModelMutationRequestV1 {
   readonly name?: string | null;
@@ -78,6 +79,7 @@ export interface AiModelMutationRequestV1 {
   readonly apiKey?: string;
   readonly apiKeyOperation?: AiApiKeyOperationV1;
   readonly model: string;
+  readonly baseUrlOperation?: AiBaseUrlOperationV1;
   readonly baseUrl?: string | null;
   readonly timeoutMs: number;
   readonly protocol?: string | null;

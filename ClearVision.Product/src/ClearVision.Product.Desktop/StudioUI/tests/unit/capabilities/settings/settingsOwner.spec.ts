@@ -359,6 +359,33 @@ describe('F07 G1 Settings owner lifecycle', () => {
     owner.dispose();
   });
 
+  it('treats Station token regeneration as a persisted restart-dependent write', async () => {
+    const get = vi.fn(async (path: string) => path === 'station-communication/settings'
+      ? stationCommunicationPayload()
+      : settingsPayload()) as unknown as ApiTransport['get'];
+    const post = vi.fn(async (path: string) => {
+      expect(path).toBe('station-communication/token');
+      return {
+        success: true,
+        operation: 'regenerate',
+        tokenInfo: { hasToken: true, mask: '******', last4: '3456' },
+        settings: stationCommunicationPayload(),
+        message: 'regenerated',
+        errors: []
+      };
+    }) as NonNullable<ApiTransport['post']>;
+    const owner = createSettingsOwner({
+      runtime: runtimeWithApi({ ...({} as ApiTransport), get, post }),
+      role: 'Admin'
+    });
+
+    const result = await owner.runStationTokenOperation('regenerate');
+
+    expect(result).toMatchObject({ status: 'completed', operationKind: 'write' });
+    if (result.status === 'completed') expect(result.value).not.toHaveProperty('token');
+    owner.dispose();
+  });
+
   it('re-reads AI model authority after a mutation and keeps model unknown isolated from diagnostics', async () => {
     const get = vi.fn(async (path: string) => path === 'ai/models'
       ? aiModelsPayload()
@@ -383,7 +410,7 @@ describe('F07 G1 Settings owner lifecycle', () => {
 
     const failed = await owner.enqueueEndpointOperation(
       'ai-model',
-      'ai.models.write',
+      'ai.models.update',
       async () => { throw new ApiNetworkError('http://localhost:5000/api/ai/models/model-1', new Error('offline')); }
     );
     expect(failed.status).toBe('failed');
@@ -391,11 +418,11 @@ describe('F07 G1 Settings owner lifecycle', () => {
 
     const connection = await owner.testAiModel('model-1');
     expect(connection).toMatchObject({ status: 'completed', value: { connectionOk: true } });
-    expect(owner.projection.unknownOutcomeKeys).toEqual(['ai-models']);
+    expect(owner.projection.unknownOutcomeKeys).toEqual([]);
 
     const support = await owner.readAiReasoningSupport({ provider: 'Test provider', model: 'test-model' });
     expect(support).toMatchObject({ status: 'completed', value: { familyId: 'test' } });
-    expect(owner.projection.unknownOutcomeKeys).toEqual(['ai-models']);
+    expect(owner.projection.unknownOutcomeKeys).toEqual([]);
 
     const reread = await owner.readAiModels();
     expect(reread).toMatchObject({ status: 'completed', value: { safeSubset: true } });
@@ -412,6 +439,65 @@ describe('F07 G1 Settings owner lifecycle', () => {
     });
     expect(await owner.refresh()).toBe(false);
     expect(owner.projection.error).toMatchObject({ code: 'decode' });
+    owner.dispose();
+  });
+
+  it('keeps AI connection-test unknown isolated until the model authority reread succeeds', async () => {
+    let failAiRead = true;
+    const get = vi.fn(async (path: string) => {
+      if (path === 'ai/models' && failAiRead) {
+        throw new ApiNetworkError('http://localhost:5000/api/ai/models', new Error('offline'));
+      }
+      if (path === 'ai/models') return aiModelsPayload();
+      return settingsPayload();
+    }) as unknown as ApiTransport['get'];
+    const post = vi.fn(async (path: string) => path.endsWith('/test')
+      ? aiConnectionTestPayload()
+      : { familyId: 'test', familyName: 'Test', allowedModes: ['auto'], allowedEfforts: ['medium'], helpText: '', supportsExplicitMode: false, supportsEffort: false, isModelLockedOn: false, defaultMode: 'auto' }) as NonNullable<ApiTransport['post']>;
+    const owner = createSettingsOwner({
+      runtime: runtimeWithApi({ ...({} as ApiTransport), get, post }),
+      role: 'Admin'
+    });
+
+    const test = await owner.testAiModel('model-1');
+    expect(test.status).toBe('failed');
+    if (test.status === 'failed') {
+      expect(test.error).toBeInstanceOf(SettingsUnknownOutcomeError);
+    }
+    expect(owner.projection.unknownOutcomeKeys).toEqual(['ai-model-test:model-1']);
+
+    const support = await owner.readAiReasoningSupport({ provider: 'Test provider', model: 'test-model' });
+    expect(support.status).toBe('completed');
+    expect(owner.projection.unknownOutcomeKeys).toEqual(['ai-model-test:model-1']);
+
+    failAiRead = false;
+    const reconciled = await owner.reconcileAuthority('ai-model-test:model-1');
+    expect(reconciled.status).toBe('completed');
+    expect(owner.projection.unknownOutcomeKeys).toEqual([]);
+    owner.dispose();
+  });
+
+  it('routes activate and default AI operations through persisted write contracts', async () => {
+    const get = vi.fn(async (path: string) => path === 'ai/models' ? aiModelsPayload() : settingsPayload());
+    const post = vi.fn(async (path: string) => path.endsWith('/test')
+      ? aiConnectionTestPayload()
+      : { message: 'updated', id: 'model-1', role: null });
+    const owner = createSettingsOwner({
+      runtime: runtimeWithApi({ ...({} as ApiTransport), get: get as ApiTransport['get'], post: post as NonNullable<ApiTransport['post']> }),
+      role: 'Admin'
+    });
+
+    const activated = await owner.activateAiModel('model-1');
+    const planner = await owner.setAiModelDefault('model-1', 'planner');
+    const shadow = await owner.setAiModelDefault('model-1', 'shadow-eval');
+    expect(activated.operationKind).toBe('write');
+    expect(planner.operationKind).toBe('write');
+    expect(shadow.operationKind).toBe('write');
+    expect(post.mock.calls.map(call => call[0])).toEqual([
+      'ai/models/model-1/activate',
+      'ai/models/model-1/default-planner',
+      'ai/models/model-1/default-shadow-eval'
+    ]);
     owner.dispose();
   });
 

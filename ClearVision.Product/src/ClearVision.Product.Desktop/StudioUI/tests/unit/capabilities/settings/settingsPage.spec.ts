@@ -353,7 +353,7 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
     await wrapper.get('[data-settings-group="general"]').trigger('click');
     await wrapper.get('input[name="softwareTitle"]').setValue('Draft must survive refresh');
     const beforeRefresh = get.mock.calls.length;
-    const refreshButton = wrapper.findAll('button').find(button => button.text().trim() === '刷新');
+    const refreshButton = wrapper.find('[data-settings-generic-refresh]');
     expect(refreshButton).toBeDefined();
 
     await refreshButton!.trigger('click');

@@ -125,6 +125,7 @@ function ownerFixture(options: {
   readonly role?: string;
   readonly station?: StationCommunicationProjectionV1 | null;
   readonly aiModels?: AiModelsProjectionV1 | null;
+  readonly unknownOutcomeKeys?: readonly string[];
   readonly stationSave?: (request: unknown) => Promise<SettingsWriteResult<StationCommunicationProjectionV1>>;
   readonly aiUpdate?: (id: string, request: unknown) => Promise<SettingsWriteResult<{
     message: string; modelId: string | null; projection: AiModelsProjectionV1;
@@ -136,6 +137,7 @@ function ownerFixture(options: {
   const readers = new Set<() => SettingsPanelState>();
   const projection = baseProjection({
     role: options.role ?? 'Admin',
+    unknownOutcomeKeys: options.unknownOutcomeKeys ?? [],
     station: options.station ?? null,
     aiModels: options.aiModels ?? null
   });
@@ -144,7 +146,6 @@ function ownerFixture(options: {
   const stationToken = vi.fn(async () => completed({
     success: true,
     operation: 'regenerate' as const,
-    token: '',
     tokenInfo: projection.station?.token ?? { hasToken: false, mask: '', last4: '' },
     settings: projection.station,
     message: 'regenerated',
@@ -257,6 +258,41 @@ describe('F07 G7 Station communication panel', () => {
   });
 });
 
+  it('blocks LanController regenerate without a secure handoff and protects dirty refresh', async () => {
+    const fixture = ownerFixture({ station: stationProjection() });
+    const wrapper = mount(SettingsStationPanel, { props: { owner: fixture.owner, role: 'Admin' } });
+    mountedWrappers.push(wrapper);
+    await flushPromises();
+
+    await wrapper.get('select[name="stationMode"]').setValue('LanController');
+    const regenerate = wrapper.get('[data-settings-station-regenerate]');
+    expect(regenerate.attributes('disabled')).toBeDefined();
+    expect(wrapper.get('[data-settings-station-token-hint]').text()).toContain('LanController');
+    await regenerate.trigger('click');
+    expect(fixture.stationToken).not.toHaveBeenCalled();
+
+    await wrapper.get('input[type="number"]').setValue('5033');
+    const readCount = fixture.stationRead.mock.calls.length;
+    await wrapper.get('[data-settings-station-authority-refresh]').trigger('click');
+    expect(fixture.stationRead).toHaveBeenCalledTimes(readCount);
+    expect((wrapper.get('input[name="stationPort"]').element as HTMLInputElement).value).toBe('5033');
+  });
+
+  it('does not regenerate a token while a LocalLoopback draft is dirty', async () => {
+    const fixture = ownerFixture({ station: stationProjection() });
+    const wrapper = mount(SettingsStationPanel, { props: { owner: fixture.owner, role: 'Admin' } });
+    mountedWrappers.push(wrapper);
+    await flushPromises();
+
+    await wrapper.get('input[name="stationPort"]').setValue('5033');
+    const regenerate = wrapper.get('[data-settings-station-regenerate]');
+    expect(regenerate.attributes('disabled')).toBeDefined();
+    expect(wrapper.get('[data-settings-station-token-hint]').text()).toContain('unsaved');
+    await regenerate.trigger('click');
+
+    expect(fixture.stationToken).not.toHaveBeenCalled();
+  });
+
 describe('F07 G8 AI model administration panel', () => {
   it('implements API key keep, replace and clear without rendering the key after submission', async () => {
     const fixture = ownerFixture({ aiModels: aiProjection() });
@@ -266,8 +302,9 @@ describe('F07 G8 AI model administration panel', () => {
 
     await wrapper.get('input[placeholder="例如 gpt-4o-mini"]').setValue('gpt-5.1-mini-updated');
     await wrapper.get('[data-settings-ai-model-save]').trigger('click');
-    expect(fixture.aiUpdate.mock.calls[0]?.[1]).toMatchObject({ apiKeyOperation: 'keep' });
+    expect(fixture.aiUpdate.mock.calls[0]?.[1]).toMatchObject({ apiKeyOperation: 'keep', baseUrlOperation: 'preserve' });
     expect(fixture.aiUpdate.mock.calls[0]?.[1]).not.toHaveProperty('apiKey');
+    expect(fixture.aiUpdate.mock.calls[0]?.[1]).not.toHaveProperty('baseUrl');
 
     await wrapper.get('[data-settings-ai-key-operation] select').setValue('replace');
     await wrapper.get('input[type="password"]').setValue('ai-secret-replacement');
@@ -281,6 +318,117 @@ describe('F07 G8 AI model administration panel', () => {
     await wrapper.get('[data-settings-ai-model-save]').trigger('click');
     expect(fixture.aiUpdate.mock.calls[2]?.[1]).toMatchObject({ apiKeyOperation: 'clear' });
     expect(fixture.aiUpdate.mock.calls[2]?.[1]).not.toHaveProperty('apiKey');
+  });
+
+  it('preserves a redacted BaseUrl and supports explicit preserve, replace and clear operations', async () => {
+    const source = aiProjection();
+    const redacted = {
+      ...source,
+      items: [{ ...source.items[0]!, baseUrl: 'https://<redacted-host>/<redacted-path>' }]
+    };
+    const fixture = ownerFixture({ aiModels: redacted });
+    const wrapper = mount(SettingsAiModelPanel, { props: { owner: fixture.owner, role: 'Admin' } });
+    mountedWrappers.push(wrapper);
+    await flushPromises();
+
+    expect(wrapper.find('[name="aiBaseUrl"]').exists()).toBe(false);
+    await wrapper.get('[name="aiModel"]').setValue('gpt-5.1-mini-updated');
+    await wrapper.get('[data-settings-ai-model-save]').trigger('click');
+    expect(fixture.aiUpdate.mock.calls[0]?.[1]).toMatchObject({ baseUrlOperation: 'preserve' });
+    expect(fixture.aiUpdate.mock.calls[0]?.[1]).not.toHaveProperty('baseUrl');
+
+    await wrapper.get('[data-settings-ai-base-url-operation] select').setValue('replace');
+    await wrapper.get('[name="aiBaseUrl"]').setValue('https://replacement.example/v2');
+    await wrapper.get('[data-settings-ai-model-save]').trigger('click');
+    expect(fixture.aiUpdate.mock.calls[1]?.[1]).toMatchObject({
+      baseUrlOperation: 'replace', baseUrl: 'https://replacement.example/v2'
+    });
+
+    await wrapper.get('[data-settings-ai-base-url-operation] select').setValue('clear');
+    await wrapper.get('[data-settings-ai-model-save]').trigger('click');
+    expect(fixture.aiUpdate.mock.calls[2]?.[1]).toMatchObject({ baseUrlOperation: 'clear' });
+    expect(fixture.aiUpdate.mock.calls[2]?.[1]).not.toHaveProperty('baseUrl');
+  });
+
+  it('applies provider presets without removing the custom Provider path and displays LastTest metadata', async () => {
+    const fixture = ownerFixture({ aiModels: aiProjection() });
+    const wrapper = mount(SettingsAiModelPanel, { props: { owner: fixture.owner, role: 'Admin' } });
+    mountedWrappers.push(wrapper);
+    await flushPromises();
+
+    expect(wrapper.get('[data-settings-ai-last-test]').text()).toContain('LastTestStatus: ok');
+    await wrapper.get('[data-settings-ai-provider-preset] select').setValue('anthropic');
+    expect((wrapper.get('[name="aiProvider"]').element as HTMLInputElement).value).toBe('Anthropic');
+    await wrapper.get('[data-settings-ai-model-save]').trigger('click');
+    expect(fixture.aiUpdate.mock.calls[0]?.[1]).toMatchObject({
+      provider: 'Anthropic', protocol: 'anthropic', wireApi: 'chat_completions',
+      authMode: 'header_key', authHeaderName: 'x-api-key'
+    });
+  });
+
+  it('links a manually entered known Provider to defaults unless fields were overridden', async () => {
+    const fixture = ownerFixture({ aiModels: aiProjection() });
+    const wrapper = mount(SettingsAiModelPanel, { props: { owner: fixture.owner, role: 'Admin' } });
+    mountedWrappers.push(wrapper);
+    await flushPromises();
+
+    await wrapper.get('[name="aiProvider"]').setValue('Anthropic');
+    await wrapper.get('[data-settings-ai-model-save]').trigger('click');
+
+    expect(fixture.aiUpdate.mock.calls[0]?.[1]).toMatchObject({
+      provider: 'Anthropic', protocol: 'anthropic', wireApi: 'chat_completions',
+      authMode: 'header_key', authHeaderName: 'x-api-key'
+    });
+  });
+
+  it('invalidates old reasoning support immediately when the reasoning identity changes and protects refresh drafts', async () => {
+    const fixture = ownerFixture({ aiModels: aiProjection() });
+    const wrapper = mount(SettingsAiModelPanel, { props: { owner: fixture.owner, role: 'Admin' } });
+    mountedWrappers.push(wrapper);
+    await flushPromises();
+
+    await wrapper.get('[data-settings-ai-reasoning-support]').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('OpenAI GPT-5');
+
+    await wrapper.get('[name="aiProvider"]').setValue('Custom Proxy');
+    await nextTick();
+    expect(wrapper.text()).not.toContain('OpenAI GPT-5');
+
+    const readCount = fixture.aiRead.mock.calls.length;
+    await wrapper.get('[name="aiModel"]').setValue('dirty-model');
+    await wrapper.get('[data-settings-ai-authority-refresh]').trigger('click');
+    expect(fixture.aiRead).toHaveBeenCalledTimes(readCount);
+    expect((wrapper.get('[name="aiModel"]').element as HTMLInputElement).value).toBe('dirty-model');
+  });
+
+  it('rebuilds the selected draft from a new authoritative model projection when clean', async () => {
+    const fixture = ownerFixture({ aiModels: aiProjection() });
+    const wrapper = mount(SettingsAiModelPanel, { props: { owner: fixture.owner, role: 'Admin' } });
+    mountedWrappers.push(wrapper);
+    await flushPromises();
+
+    const next = {
+      ...aiProjection(),
+      items: [{ ...aiProjection().items[0]!, model: 'server-normalized-model' }]
+    };
+    (fixture.projection as unknown as { aiModels: AiModelsProjectionV1 }).aiModels = next;
+    await nextTick();
+
+    expect((wrapper.get('[name="aiModel"]').element as HTMLInputElement).value).toBe('server-normalized-model');
+  });
+
+  it('does not retry an AI mutation before its unknown outcome is reconciled', async () => {
+    const fixture = ownerFixture({ aiModels: aiProjection(), unknownOutcomeKeys: ['ai-models'] });
+    const wrapper = mount(SettingsAiModelPanel, { props: { owner: fixture.owner, role: 'Admin' } });
+    mountedWrappers.push(wrapper);
+    await flushPromises();
+
+    await wrapper.get('[name="aiModel"]').setValue('dirty-model');
+    await wrapper.get('[data-settings-ai-model-save]').trigger('click');
+
+    expect(fixture.aiUpdate).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-settings-ai-model-feedback]').text()).toContain('refresh AI authority');
   });
 
   it('shows safe projection to Engineer and allows reasoning support diagnosis only', async () => {

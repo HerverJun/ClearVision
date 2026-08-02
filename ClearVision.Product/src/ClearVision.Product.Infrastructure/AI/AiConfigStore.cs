@@ -95,8 +95,10 @@ public class AiConfigStore
 
     public AiModelConfig Add(AiModelConfig model)
     {
+        List<AiModelConfig> previousModels;
         lock (_lock)
         {
+            previousModels = CloneModels(_models);
             if (string.IsNullOrWhiteSpace(model.Id))
             {
                 model.Id = $"model_{Guid.NewGuid():N}";
@@ -117,7 +119,7 @@ public class AiConfigStore
             _models.Add(model);
         }
 
-        Save();
+        SaveAndRollback(previousModels);
         _logger.LogInformation("[AiConfigStore] 新增模型: {Name} ({Id})", SanitizeLogValue(model.Name), SanitizeLogValue(model.Id));
         return model;
     }
@@ -132,8 +134,10 @@ public class AiConfigStore
 
     public AiModelConfig? Update(string id, AiModelConfig updated, AiApiKeyUpdateMode apiKeyUpdateMode)
     {
+        List<AiModelConfig> previousModels;
         lock (_lock)
         {
+            previousModels = CloneModels(_models);
             var index = _models.FindIndex(x => x.Id == id);
             if (index < 0)
                 return null;
@@ -146,17 +150,20 @@ public class AiConfigStore
             _models[index] = candidate;
         }
 
-        Save();
+        SaveAndRollback(previousModels);
         _logger.LogInformation("[AiConfigStore] 更新模型: {Name} ({Id})", SanitizeLogValue(updated.Name), SanitizeLogValue(id));
         return GetById(id);
     }
 
     public bool Delete(string id)
     {
+        List<AiModelConfig> previousModels;
         lock (_lock)
         {
             if (_models.Count <= 1)
                 throw new InvalidOperationException("至少需保留一个模型配置");
+
+            previousModels = CloneModels(_models);
 
             var removed = _models.RemoveAll(x => x.Id == id);
             if (removed == 0)
@@ -168,15 +175,17 @@ public class AiConfigStore
             }
         }
 
-        Save();
+        SaveAndRollback(previousModels);
         _logger.LogInformation("[AiConfigStore] 删除模型: {Id}", SanitizeLogValue(id));
         return true;
     }
 
     public bool SetActive(string id)
     {
+        List<AiModelConfig> previousModels;
         lock (_lock)
         {
+            previousModels = CloneModels(_models);
             var target = _models.FirstOrDefault(x => x.Id == id);
             if (target == null)
                 return false;
@@ -187,7 +196,7 @@ public class AiConfigStore
             target.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
-        Save();
+        SaveAndRollback(previousModels);
         _logger.LogInformation("[AiConfigStore] 激活模型切换为: {Id}", SanitizeLogValue(id));
         return true;
     }
@@ -195,8 +204,10 @@ public class AiConfigStore
     public bool SetDefaultForRole(string id, string role)
     {
         var normalizedRole = AiModelConfig.NormalizeRoleName(role);
+        List<AiModelConfig> previousModels;
         lock (_lock)
         {
+            previousModels = CloneModels(_models);
             var target = _models.FirstOrDefault(x => x.Id == id);
             if (target == null)
                 return false;
@@ -229,7 +240,7 @@ public class AiConfigStore
             target.NormalizeAdvancedFields();
         }
 
-        Save();
+        SaveAndRollback(previousModels);
         _logger.LogInformation("[AiConfigStore] Set default model role {Role}: {Id}", SanitizeLogValue(normalizedRole), SanitizeLogValue(id));
         return true;
     }
@@ -240,8 +251,10 @@ public class AiConfigStore
         DateTimeOffset testedAt,
         int? latencyMs)
     {
+        List<AiModelConfig> previousModels;
         lock (_lock)
         {
+            previousModels = CloneModels(_models);
             var model = _models.FirstOrDefault(x => x.Id == id);
             if (model == null)
                 return null;
@@ -253,20 +266,22 @@ public class AiConfigStore
             model.NormalizeAdvancedFields();
         }
 
-        Save();
+        SaveAndRollback(previousModels);
         return GetById(id);
     }
 
     public List<AiModelConfig> ResetToDefaults()
     {
         List<AiModelConfig> resetModels;
+        List<AiModelConfig> previousModels;
         lock (_lock)
         {
+            previousModels = CloneModels(_models);
             _models = CreateDefaultModels(_initialOptions);
             resetModels = _models.Select(CloneModel).ToList();
         }
 
-        Save();
+        SaveAndRollback(previousModels);
 
         try
         {
@@ -429,11 +444,31 @@ public class AiConfigStore
         model.NormalizeAdvancedFields();
     }
 
-    private void Save()
+    private void SaveAndRollback(IReadOnlyList<AiModelConfig> previousModels)
     {
         try
         {
-            List<AiModelConfig> snapshot;
+            Save(previousModels);
+        }
+        catch
+        {
+            lock (_lock)
+            {
+                _models = CloneModels(previousModels);
+            }
+
+            throw;
+        }
+    }
+
+    private void Save(IReadOnlyList<AiModelConfig>? previousModels = null)
+    {
+        List<AiModelConfig> snapshot = new();
+        var previousFileExists = File.Exists(_modelsFilePath);
+        byte[]? previousFile = null;
+        try
+        {
+            previousFile = previousFileExists ? File.ReadAllBytes(_modelsFilePath) : null;
             lock (_lock)
             {
                 snapshot = _models.Select(CloneModel).ToList();
@@ -448,8 +483,59 @@ public class AiConfigStore
         }
         catch (Exception ex)
         {
+            if (previousModels != null)
+            {
+                RestorePersistentState(previousModels, snapshot, previousFileExists, previousFile);
+            }
+
             _logger.LogError(ex, "[AiConfigStore] 持久化失败: {Message}", ex.Message);
+            throw new AiConfigPersistenceException(
+                "AI model configuration persistence failed; the authority must be reread before retrying.",
+                ex);
         }
+    }
+
+    private void RestorePersistentState(
+        IReadOnlyList<AiModelConfig> previousModels,
+        IReadOnlyList<AiModelConfig> attemptedModels,
+        bool previousFileExists,
+        byte[]? previousFile)
+    {
+        try
+        {
+            var previousIds = previousModels
+                .Select(model => model.Id)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var model in attemptedModels)
+            {
+                if (!previousIds.Contains(model.Id))
+                {
+                    _apiKeySecretStore.Delete(model.Id);
+                }
+            }
+
+            PersistApiKeys(previousModels);
+
+            if (previousFileExists && previousFile != null)
+            {
+                File.WriteAllBytes(_modelsFilePath, previousFile);
+            }
+            else if (File.Exists(_modelsFilePath))
+            {
+                File.Delete(_modelsFilePath);
+            }
+        }
+        catch (Exception restoreException)
+        {
+            _logger.LogError(restoreException, "[AiConfigStore] rollback of failed persistence did not complete.");
+        }
+    }
+
+    private static List<AiModelConfig> CloneModels(IEnumerable<AiModelConfig> models)
+    {
+        return models.Select(CloneModel).ToList();
     }
 
     private bool ImportOrHydrateApiKeys(List<AiModelConfig> models)
@@ -616,13 +702,12 @@ public class AiConfigStore
                 candidate.ApiKey = string.Empty;
                 break;
             case AiApiKeyUpdateMode.Keep:
-            default:
-                if (!string.IsNullOrEmpty(updated.ApiKey))
-                {
-                    candidate.ApiKey = updated.ApiKey;
-                }
-
+                // Keep is intentionally strict: the endpoint rejects any
+                // accompanying key, so this branch must never overwrite the
+                // secret authority with a masked or empty projection value.
                 break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(apiKeyUpdateMode), apiKeyUpdateMode, "Unknown API key update mode.");
         }
     }
 

@@ -57,6 +57,25 @@ const dirty = computed(() =>
   tokenDraft.value.length > 0
 );
 const pending = computed(() => mutationBusy.value);
+const hasStationUnknown = computed(() => props.owner.projection.unknownOutcomeKeys.includes('station-communication'));
+const canRegenerateToken = computed(() =>
+  canManage.value &&
+  !mutationBusy.value &&
+  !loadBusy.value &&
+  !dirty.value &&
+  !hasStationUnknown.value &&
+  draft.mode === 'LocalLoopback' &&
+  draft.localStationSyncEnabled
+);
+const regenerateDisabledReason = computed(() => {
+  if (draft.mode === 'LanController') return 'LanController 没有获批的安全 token handoff，请使用手动 replace。';
+  if (hasStationUnknown.value) return 'Station token outcome is unknown; refresh Station authority before retrying.';
+  if (dirty.value) return 'Station communication has unsaved changes; save or discard the draft before regenerating.';
+  if (draft.mode !== 'LocalLoopback' || !draft.localStationSyncEnabled) {
+    return 'Regenerate is available only for enabled LocalLoopback synchronization.';
+  }
+  return '';
+});
 
 let detachPanelState = props.owner.registerPanelState('station', () => ({
   dirty: dirty.value,
@@ -143,6 +162,21 @@ async function loadStation(): Promise<void> {
   }
 }
 
+async function refreshAuthority(): Promise<void> {
+  if (loadBusy.value || mutationBusy.value) return;
+  if (dirty.value) {
+    feedback.value = {
+      kind: 'error',
+      message: 'Station communication has unsaved changes. Save or discard the draft before refreshing its authority.',
+      savedLabel: 'not saved',
+      effectiveLabel: 'not effective',
+      restartLabel: 'not applicable'
+    };
+    return;
+  }
+  await loadStation();
+}
+
 function discard(): void {
   Object.assign(draft, baseline.value);
   clearTokenInput();
@@ -156,6 +190,16 @@ function setTokenMode(value: string): void {
 
 async function save(): Promise<void> {
   if (!canManage.value || mutationBusy.value || !dirty.value) return;
+  if (hasStationUnknown.value) {
+    feedback.value = {
+      kind: 'unknown',
+      message: 'Station communication outcome is unknown; refresh Station authority before retrying the mutation.',
+      savedLabel: 'unknown',
+      effectiveLabel: 'unknown',
+      restartLabel: 'unknown'
+    };
+    return;
+  }
   if (tokenMode.value === 'replace' && !tokenDraft.value.trim()) {
     feedback.value = {
       kind: 'error',
@@ -193,7 +237,16 @@ async function save(): Promise<void> {
 }
 
 async function regenerateToken(): Promise<void> {
-  if (!canManage.value || mutationBusy.value) return;
+  if (!canRegenerateToken.value) {
+    feedback.value = {
+      kind: 'error',
+      message: regenerateDisabledReason.value,
+      savedLabel: 'not saved',
+      effectiveLabel: 'not effective',
+      restartLabel: 'not applicable'
+    };
+    return;
+  }
   if (!window.confirm('确认重新生成 Station token？现有 Station 将需要使用新配置。')) return;
   const owner = props.owner;
   mutationBusy.value = true;
@@ -267,6 +320,19 @@ onDeactivated(() => {
         description="配置 Studio 与本机/局域网 Station 的通信参数；保存只写入专用 Station endpoint，不会自动重启进程。"
         data-settings-station-communication
       >
+        <template #actions>
+          <CvButton
+            size="sm"
+            variant="quiet"
+            :loading="loadBusy"
+            :disabled="loadBusy || mutationBusy || dirty"
+            loading-label="Refreshing Station authority"
+            data-settings-station-authority-refresh
+            @click="refreshAuthority"
+          >
+            Refresh Station authority
+          </CvButton>
+        </template>
         <form
           class="settings-station__form"
           @submit.prevent="save"
@@ -336,13 +402,20 @@ onDeactivated(() => {
             size="sm"
             variant="quiet"
             :loading="mutationBusy"
-            :disabled="mutationBusy || phase === 'loading'"
+            :disabled="!canRegenerateToken"
             loading-label="正在生成"
             data-settings-station-regenerate
             @click="regenerateToken"
           >
             重新生成 token
           </CvButton>
+          <small
+            v-if="regenerateDisabledReason"
+            class="settings-station__token-hint"
+            data-settings-station-token-hint
+          >
+            {{ regenerateDisabledReason }}
+          </small>
         </div>
 
         <template #footer>
@@ -467,6 +540,7 @@ onDeactivated(() => {
 .settings-station__token-copy { display: grid; min-width: 0; gap: 2px; }
 .settings-station__token-copy strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .settings-station__token-copy small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.settings-station__token-hint { grid-column: 1 / -1; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .settings-station__eyebrow { color: var(--cv-color-brand-text); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-semibold); }
 .settings-station__footer { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
 .settings-station__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--cv-space-2); }

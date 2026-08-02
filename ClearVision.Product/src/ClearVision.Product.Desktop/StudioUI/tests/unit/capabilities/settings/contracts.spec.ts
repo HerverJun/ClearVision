@@ -42,6 +42,10 @@ describe('F07 G1 Settings contract matrix', () => {
     expect(SETTINGS_SEMANTICS.stationRestart).toMatchObject({
       persistence: 'persisted', effective: 'restart-dependent', restart: 'studio-and-local-station'
     });
+    expect(findSettingsSection('ai-model').semantics).toEqual(SETTINGS_SEMANTICS.aiModelMutation);
+    expect(SETTINGS_SEMANTICS.aiModelMutation).toMatchObject({
+      persistence: 'persisted', effective: 'immediate-projection', unknownOutcome: 'reload-before-retry'
+    });
     expect(SETTINGS_SEMANTICS.databaseMaintenance.persistence).toBe('runtime-only');
     expect(SETTINGS_EXCLUDED_ENDPOINTS).toEqual(expect.arrayContaining([
       'settings/import', 'settings/export', 'settings/database/restore', 'settings/runtime-preview-pilot/**'

@@ -63,7 +63,7 @@ public sealed class StationCommunicationSettingsStoreTests : IDisposable
     }
 
     [Fact]
-    public void SaveSettings_ShouldMapLanControllerButKeepLocalStationOnLoopback()
+    public void SaveSettings_ShouldMapLanControllerWithExplicitTokenAndKeepLocalStationOnLoopback()
     {
         var store = new StationCommunicationSettingsStore(_root);
         var running = new StationIngressOptions { Enabled = false, Port = 5000 };
@@ -73,7 +73,8 @@ public sealed class StationCommunicationSettingsStoreTests : IDisposable
             {
                 Mode = "LanController",
                 Port = 5020,
-                LanHost = "10.10.0.8"
+                LanHost = "10.10.0.8",
+                SharedToken = "654321"
             },
             running);
 
@@ -88,6 +89,96 @@ public sealed class StationCommunicationSettingsStoreTests : IDisposable
         using var stationDocument = JsonDocument.Parse(File.ReadAllText(store.StationSyncSettingsPath));
         stationDocument.RootElement.GetProperty("StationSync").GetProperty("StudioBaseUrl").GetString()
             .Should().Be("http://127.0.0.1:5020");
+    }
+
+    [Fact]
+    public void SaveSettings_ShouldRejectLanControllerWithoutExplicitTokenHandoff()
+    {
+        var store = new StationCommunicationSettingsStore(_root);
+
+        var result = store.SaveSettings(
+            new StationCommunicationSettingsUpdateRequest
+            {
+                Mode = "LanController",
+                Port = 5020,
+                LanHost = "10.10.0.8"
+            },
+            new StationIngressOptions { Enabled = false, Port = 5000 });
+
+        result.Success.Should().BeFalse();
+        result.Errors.Should().Contain(error => error.Field == "sharedToken");
+        File.Exists(store.StudioSettingsPath).Should().BeFalse();
+        File.Exists(store.StationSyncSettingsPath).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("****1234")]
+    [InlineData("<redacted-token>")]
+    [InlineData("********")]
+    public void SaveSettings_ShouldRejectMaskedOrRedactedTokenReplacement(string maskedToken)
+    {
+        var store = new StationCommunicationSettingsStore(_root);
+
+        var result = store.SaveSettings(
+            new StationCommunicationSettingsUpdateRequest
+            {
+                Mode = "LocalLoopback",
+                Port = 5020,
+                SharedToken = maskedToken
+            },
+            new StationIngressOptions { Enabled = false, Port = 5000 });
+
+        result.Success.Should().BeFalse();
+        result.Errors.Should().Contain(error => error.Field == "sharedToken");
+        File.Exists(store.StudioSettingsPath).Should().BeFalse();
+        File.Exists(store.StationSyncSettingsPath).Should().BeFalse();
+    }
+
+    [Fact]
+    public void RegenerateToken_ShouldRejectDisabledModeWithoutWritingAUsableToken()
+    {
+        var store = new StationCommunicationSettingsStore(_root);
+        var result = store.RegenerateToken(new StationIngressOptions
+        {
+            Enabled = false,
+            ListenMode = StationIngressListenMode.Loopback,
+            Port = 5000,
+            SharedToken = string.Empty
+        });
+
+        result.Success.Should().BeFalse();
+        result.TokenInfo.HasToken.Should().BeFalse();
+        result.Errors.Should().Contain(error => error.Field == "mode");
+        File.Exists(store.StudioSettingsPath).Should().BeFalse();
+        File.Exists(store.StationSyncSettingsPath).Should().BeFalse();
+    }
+
+    [Fact]
+    public void RegenerateToken_ShouldReturnThePersistedAuthorityMask()
+    {
+        var store = new StationCommunicationSettingsStore(_root);
+        var running = new StationIngressOptions
+        {
+            Enabled = true,
+            ListenMode = StationIngressListenMode.Loopback,
+            Port = 5010,
+            SharedToken = "123456"
+        };
+
+        store.SaveSettings(
+            new StationCommunicationSettingsUpdateRequest
+            {
+                Mode = "LocalLoopback",
+                Port = 5010,
+                SharedToken = "123456"
+            },
+            running).Success.Should().BeTrue();
+
+        var regenerated = store.RegenerateToken(running);
+        var reread = store.GetSettings(running);
+
+        regenerated.Success.Should().BeTrue();
+        regenerated.TokenInfo.Should().BeEquivalentTo(reread.Token);
     }
 
     [Fact]

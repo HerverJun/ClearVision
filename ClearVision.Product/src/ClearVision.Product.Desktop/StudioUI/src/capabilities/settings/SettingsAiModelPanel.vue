@@ -14,6 +14,7 @@ import {
 import type {
   AiModelMutationRequestV1,
   AiApiKeyOperationV1,
+  AiBaseUrlOperationV1,
   AiReasoningSupportRequestV1
 } from './apiAdapter';
 import type {
@@ -67,15 +68,33 @@ const reasoningBusy = shallowRef(false);
 const requestVersion = shallowRef(0);
 const reasoningRequestVersion = shallowRef(0);
 const apiKeyMode = shallowRef<AiApiKeyOperationV1>('keep');
+const baseUrlMode = shallowRef<AiBaseUrlOperationV1>('preserve');
 const apiKeyDraft = shallowRef('');
+const reasoningSupportIdentity = shallowRef<string | null>(null);
+const providerPreset = shallowRef('custom');
 const draftBaseline = shallowRef<Readonly<Record<string, unknown>>>({});
+
+const presetOverrides = reactive({
+  protocol: false,
+  wireApi: false,
+  authMode: false,
+  authHeaderName: false
+});
 
 const draft = reactive<DraftState>(emptyDraft());
 
-const providerOptions: readonly CvSelectOption[] = Object.freeze([
-  { value: 'OpenAI Compatible', label: 'OpenAI Compatible' },
-  { value: 'OpenAI API', label: 'OpenAI API' },
-  { value: 'Anthropic Claude', label: 'Anthropic Claude' }
+const providerPresetOptions: readonly CvSelectOption[] = Object.freeze([
+  { value: 'custom', label: 'Custom provider' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'openai-compatible', label: 'OpenAI-compatible' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'azure-openai', label: 'Azure OpenAI' },
+  { value: 'ollama', label: 'Ollama' }
+]);
+const baseUrlOptions: readonly CvSelectOption[] = Object.freeze([
+  { value: 'preserve', label: 'Preserve current URL (default)' },
+  { value: 'replace', label: 'Replace URL' },
+  { value: 'clear', label: 'Clear URL' }
 ]);
 const protocolOptions: readonly CvSelectOption[] = Object.freeze([
   { value: 'openai_compatible', label: 'OpenAI Compatible' },
@@ -107,11 +126,11 @@ const roleOptions: readonly CvSelectOption[] = Object.freeze([
   { value: 'validation', label: 'validation' }
 ]);
 const reasoningModeOptions = computed<readonly CvSelectOption[]>(() => {
-  const allowed = reasoningSupport.value?.allowedModes ?? ['auto', 'off', 'on'];
+  const allowed = displayReasoningSupport.value?.allowedModes ?? ['auto', 'off', 'on'];
   return allowed.map(value => ({ value, label: value === 'auto' ? 'Auto' : value === 'off' ? 'Off' : 'On' }));
 });
 const reasoningEffortOptions = computed<readonly CvSelectOption[]>(() => {
-  const allowed = reasoningSupport.value?.allowedEfforts ?? ['low', 'medium', 'high', 'xhigh'];
+  const allowed = displayReasoningSupport.value?.allowedEfforts ?? ['low', 'medium', 'high', 'xhigh'];
   return allowed.map(value => ({ value, label: value === 'xhigh' ? 'XHigh' : value[0]!.toUpperCase() + value.slice(1) }));
 });
 
@@ -126,9 +145,12 @@ const dirty = computed(() => {
   const current = snapshotDraft();
   return JSON.stringify(current) !== JSON.stringify(draftBaseline.value) ||
     apiKeyMode.value !== 'keep' ||
-    apiKeyDraft.value.length > 0;
+    apiKeyDraft.value.length > 0 ||
+    baseUrlMode.value !== 'preserve';
 });
 const pending = computed(() => mutationBusy.value);
+const hasAiMutationUnknown = computed(() => props.owner.projection.unknownOutcomeKeys.includes('ai-models'));
+const hasSelectedTestUnknown = computed(() => selectedId.value !== null && props.owner.projection.unknownOutcomeKeys.includes(`ai-model-test:${selectedId.value}`));
 const selectedSafeDetails = computed<readonly CvDescriptionItem[]>(() => {
   const model = selectedModel.value;
   if (!model) return [];
@@ -141,7 +163,11 @@ const selectedSafeDetails = computed<readonly CvDescriptionItem[]>(() => {
     { key: 'capabilities', label: '能力元数据', value: capabilitySummary(model.capabilities) }
   ];
 });
-const displayReasoningSupport = computed(() => reasoningSupport.value ?? supportFromRecord(selectedFullModel.value?.reasoningSupport));
+const displayReasoningSupport = computed(() => {
+  const identity = currentReasoningIdentity();
+  if (reasoningSupportIdentity.value !== identity) return null;
+  return reasoningSupport.value ?? supportFromRecord(selectedFullModel.value?.reasoningSupport);
+});
 
 let detachPanelState = props.owner.registerPanelState('ai-model', () => ({
   dirty: dirty.value,
@@ -167,6 +193,90 @@ function emptyDraft(): DraftState {
     reasoningMode: 'auto',
     reasoningEffort: 'medium'
   };
+}
+
+type ProviderPreset = {
+  readonly provider: string;
+  readonly protocol: string;
+  readonly wireApi: string;
+  readonly authMode: string;
+  readonly authHeaderName: string;
+};
+
+const providerPresets: Readonly<Record<string, ProviderPreset>> = Object.freeze({
+  openai: { provider: 'OpenAI', protocol: 'openai_compatible', wireApi: 'chat_completions', authMode: 'bearer', authHeaderName: 'Authorization' },
+  'openai-compatible': { provider: 'OpenAI Compatible', protocol: 'openai_compatible', wireApi: 'chat_completions', authMode: 'bearer', authHeaderName: 'Authorization' },
+  anthropic: { provider: 'Anthropic', protocol: 'anthropic', wireApi: 'chat_completions', authMode: 'header_key', authHeaderName: 'x-api-key' },
+  'azure-openai': { provider: 'Azure OpenAI', protocol: 'azure_openai', wireApi: 'chat_completions', authMode: 'header_key', authHeaderName: 'api-key' },
+  ollama: { provider: 'Ollama', protocol: 'ollama_native', wireApi: 'chat_completions', authMode: 'none', authHeaderName: '' }
+});
+
+function currentReasoningIdentity(): string {
+  return JSON.stringify([
+    draft.provider.trim(),
+    draft.model.trim(),
+    baseUrlMode.value,
+    baseUrlMode.value === 'replace' ? draft.baseUrl.trim() : '',
+    draft.protocol
+  ]);
+}
+
+function isRedactedPlaceholder(value: string | null | undefined): boolean {
+  const normalized = value?.trim() ?? '';
+  if (!normalized) return false;
+  const lower = normalized.toLowerCase();
+  return lower.includes('<redacted') ||
+    lower.includes('[redacted') ||
+    lower.includes('<masked') ||
+    lower.includes('[masked') ||
+    lower === 'redacted' ||
+    lower === 'masked' ||
+    /[*#\u2022\u00b7\u25cf\u25cb]{4}/u.test(normalized);
+}
+
+function resetPresetOverrides(): void {
+  presetOverrides.protocol = false;
+  presetOverrides.wireApi = false;
+  presetOverrides.authMode = false;
+  presetOverrides.authHeaderName = false;
+}
+
+function inferProviderPreset(provider: string, protocol: string): string {
+  const normalized = provider.trim().toLowerCase();
+  if (normalized.includes('anthropic') || protocol === 'anthropic') return 'anthropic';
+  if (normalized.includes('azure') || protocol === 'azure_openai') return 'azure-openai';
+  if (normalized.includes('ollama') || protocol === 'ollama_native') return 'ollama';
+  if (normalized === 'openai' || normalized === 'openai api') return 'openai';
+  if (normalized.includes('openai')) return 'openai-compatible';
+  return 'custom';
+}
+
+function setProviderPreset(value: string): void {
+  const preset = providerPresets[value];
+  providerPreset.value = value in providerPresets ? value : 'custom';
+  if (!preset) return;
+  draft.provider = preset.provider;
+  applyProviderPresetDefaults(value);
+}
+
+function applyProviderPresetDefaults(value: string): void {
+  const preset = providerPresets[value];
+  if (!preset) return;
+  if (!presetOverrides.protocol) draft.protocol = preset.protocol;
+  if (!presetOverrides.wireApi) draft.wireApi = preset.wireApi;
+  if (!presetOverrides.authMode) draft.authMode = preset.authMode;
+  if (!presetOverrides.authHeaderName) draft.authHeaderName = preset.authHeaderName;
+}
+
+function onProviderInput(value: string): void {
+  draft.provider = value;
+  const inferred = inferProviderPreset(value, '');
+  providerPreset.value = inferred;
+  if (inferred !== 'custom') applyProviderPresetDefaults(inferred);
+}
+
+function markPresetOverride(field: keyof typeof presetOverrides): void {
+  presetOverrides[field] = true;
 }
 
 function isFullModel(value: AiModelPublicProjectionV1 | null | undefined): value is AiModelProjectionV1 {
@@ -233,6 +343,8 @@ function snapshotDraft(): Readonly<Record<string, unknown>> {
 function resetDraft(value: AiModelPublicProjectionV1 | null): void {
   invalidateReasoningRequest();
   const next = emptyDraft();
+  baseUrlMode.value = 'preserve';
+  resetPresetOverrides();
   if (isFullModel(value)) {
     next.name = value.name ?? value.displayName;
     next.displayName = value.displayName;
@@ -242,7 +354,7 @@ function resetDraft(value: AiModelPublicProjectionV1 | null): void {
     next.authMode = value.authMode ?? next.authMode;
     next.authHeaderName = value.authHeaderName ?? next.authHeaderName;
     next.model = value.model;
-    next.baseUrl = value.baseUrl ?? '';
+    next.baseUrl = isRedactedPlaceholder(value.baseUrl) ? '' : value.baseUrl ?? '';
     next.timeoutMs = String(value.timeoutMs ?? 120000);
     next.priority = String(value.priority ?? 100);
     next.isEnabled = value.isEnabled;
@@ -262,10 +374,12 @@ function resetDraft(value: AiModelPublicProjectionV1 | null): void {
     reasoningSupport.value = null;
   }
   Object.assign(draft, next);
+  providerPreset.value = inferProviderPreset(draft.provider, draft.protocol);
   draftBaseline.value = snapshotDraft();
   apiKeyDraft.value = '';
   apiKeyMode.value = 'keep';
   connectionResult.value = null;
+  reasoningSupportIdentity.value = currentReasoningIdentity();
   feedback.value = null;
 }
 
@@ -284,6 +398,16 @@ function clearSecret(): void {
 
 function resultFeedback<T>(result: SettingsWriteResult<T>): SettingsFeedback {
   return settingsFeedbackForResult(result);
+}
+
+function reportUnknownMutation(message = 'AI model mutation outcome is unknown; refresh AI authority before retrying the mutation.'): void {
+  feedback.value = {
+    kind: 'unknown',
+    message,
+    savedLabel: 'unknown',
+    effectiveLabel: 'unknown',
+    restartLabel: 'unknown'
+  };
 }
 
 function chooseModel(id: string): void {
@@ -314,6 +438,12 @@ function setApiKeyMode(value: string): void {
   if (next !== 'replace') apiKeyDraft.value = '';
 }
 
+function setBaseUrlMode(value: string): void {
+  const next: AiBaseUrlOperationV1 = value === 'replace' || value === 'clear' ? value : 'preserve';
+  baseUrlMode.value = next;
+  if (next !== 'replace') draft.baseUrl = '';
+}
+
 function validateDraft(): string | null {
   if (!draft.displayName.trim() && !draft.name.trim()) return '请填写模型名称。';
   if (!draft.provider.trim()) return '请填写 Provider。';
@@ -324,20 +454,34 @@ function validateDraft(): string | null {
   if (!Number.isInteger(priority) || priority < 0) return 'Priority 必须是非负整数。';
   if (apiKeyMode.value === 'replace') {
     if (!apiKeyDraft.value.trim()) return '选择替换 API key 后必须输入新 key。';
-    if (apiKeyDraft.value === selectedFullModel.value?.apiKeyMasked) {
+    if (isRedactedPlaceholder(apiKeyDraft.value) || apiKeyDraft.value === selectedFullModel.value?.apiKeyMasked) {
       return '不能把 masked API key 当作真实 key 回写。请重新输入真实 key，或选择保留。';
+    }
+  }
+  if (baseUrlMode.value === 'replace') {
+    const value = draft.baseUrl.trim();
+    if (!value || isRedactedPlaceholder(value)) return 'Base URL replacement must be a real URL.';
+    try {
+      new URL(value);
+    } catch {
+      return 'Base URL must be an absolute URL.';
     }
   }
   return null;
 }
 
 function buildRequest(): AiModelMutationRequestV1 {
+  const baseUrl = baseUrlMode.value === 'replace'
+    ? { baseUrlOperation: 'replace' as const, baseUrl: draft.baseUrl.trim() }
+    : baseUrlMode.value === 'clear'
+      ? { baseUrlOperation: 'clear' as const }
+      : { baseUrlOperation: 'preserve' as const };
   return {
     name: draft.name.trim() || draft.displayName.trim(),
     displayName: draft.displayName.trim() || draft.name.trim(),
     provider: draft.provider.trim(),
     model: draft.model.trim(),
-    baseUrl: draft.baseUrl.trim() || null,
+    ...baseUrl,
     timeoutMs: Number(draft.timeoutMs),
     protocol: draft.protocol,
     wireApi: draft.wireApi,
@@ -402,8 +546,27 @@ async function loadModels(): Promise<void> {
   }
 }
 
+async function refreshAuthority(): Promise<void> {
+  if (readBusy.value || mutationBusy.value) return;
+  if (dirty.value) {
+    feedback.value = {
+      kind: 'error',
+      message: 'AI model has unsaved changes. Save or discard the draft before refreshing its authority.',
+      savedLabel: 'not saved',
+      effectiveLabel: 'not effective',
+      restartLabel: 'not applicable'
+    };
+    return;
+  }
+  await loadModels();
+}
+
 async function save(): Promise<void> {
   if (!canEditSelected.value || mutationBusy.value || !dirty.value) return;
+  if (hasAiMutationUnknown.value) {
+    reportUnknownMutation();
+    return;
+  }
   const validation = validateDraft();
   if (validation) {
     clearSecret();
@@ -442,6 +605,10 @@ async function save(): Promise<void> {
 async function deleteModel(id: string): Promise<void> {
   const model = models.value.find(item => item.id === id) ?? null;
   if (!canManage.value || !model || mutationBusy.value || dirty.value) return;
+  if (hasAiMutationUnknown.value) {
+    reportUnknownMutation();
+    return;
+  }
   if (models.value.length <= 1) {
     feedback.value = { kind: 'error', message: '后端要求至少保留一个 AI 模型配置。', savedLabel: '未删除', effectiveLabel: '未生效', restartLabel: '不适用' };
     return;
@@ -474,6 +641,10 @@ async function deleteModel(id: string): Promise<void> {
 
 async function activateModel(id: string): Promise<void> {
   if (!canManage.value || mutationBusy.value || dirty.value) return;
+  if (hasAiMutationUnknown.value) {
+    reportUnknownMutation();
+    return;
+  }
   const owner = props.owner;
   mutationBusy.value = true;
   feedback.value = null;
@@ -496,6 +667,10 @@ async function activateModel(id: string): Promise<void> {
 
 async function setDefault(id: string, role: 'planner' | 'shadow-eval'): Promise<void> {
   if (!canManage.value || mutationBusy.value || dirty.value) return;
+  if (hasAiMutationUnknown.value) {
+    reportUnknownMutation();
+    return;
+  }
   const owner = props.owner;
   mutationBusy.value = true;
   feedback.value = null;
@@ -522,7 +697,7 @@ async function queryReasoningSupport(): Promise<void> {
   const request: AiReasoningSupportRequestV1 = {
     provider: draft.provider.trim(),
     model: draft.model.trim(),
-    baseUrl: draft.baseUrl.trim() || null,
+    baseUrl: baseUrlMode.value === 'replace' ? draft.baseUrl.trim() : null,
     protocol: draft.protocol
   };
   const version = reasoningRequestVersion.value + 1;
@@ -533,6 +708,7 @@ async function queryReasoningSupport(): Promise<void> {
     if (version !== reasoningRequestVersion.value || owner !== props.owner) return;
     if (result.status === 'completed') {
       reasoningSupport.value = result.value;
+      reasoningSupportIdentity.value = currentReasoningIdentity();
       const allowedModes = result.value.allowedModes;
       const allowedEfforts = result.value.allowedEfforts;
       if (!allowedModes.includes(draft.reasoningMode)) draft.reasoningMode = allowedModes[0] ?? 'auto';
@@ -549,6 +725,10 @@ async function queryReasoningSupport(): Promise<void> {
 
 async function testSelectedModel(): Promise<void> {
   if (!canManage.value || !selectedId.value || mutationBusy.value) return;
+  if (hasSelectedTestUnknown.value) {
+    reportUnknownMutation('AI connection-test outcome is unknown; refresh AI authority before testing this model again.');
+    return;
+  }
   if (dirty.value) {
     feedback.value = { kind: 'error', message: '请先保存模型配置，再执行连接测试。连接测试只验证通信合同，不代表真实 LLM 产品质量。', savedLabel: '未保存', effectiveLabel: '未测试', restartLabel: '不适用' };
     return;
@@ -569,16 +749,32 @@ async function testSelectedModel(): Promise<void> {
   }
 }
 
+watch(
+  [() => draft.provider, () => draft.model, () => draft.baseUrl, () => draft.protocol, baseUrlMode],
+  () => {
+    const identity = currentReasoningIdentity();
+    if (reasoningSupportIdentity.value === identity) return;
+    reasoningSupport.value = null;
+    reasoningSupportIdentity.value = null;
+    invalidateReasoningRequest();
+  }
+);
+
 watch(projection, value => {
-  if (!canRead.value) return;
-  if (selectedId.value && !value?.items.some(item => item.id === selectedId.value)) {
-    if (!dirty.value) {
-      selectedId.value = value?.items[0]?.id ?? null;
-      resetDraft(value?.items[0] ?? null);
-    }
+  if (!canRead.value || dirty.value || mutationBusy.value) return;
+  const selected = selectedId.value
+    ? value?.items.find(item => item.id === selectedId.value) ?? null
+    : null;
+  if (selectedId.value && !selected) {
+    selectedId.value = value?.items[0]?.id ?? null;
+    resetDraft(value?.items[0] ?? null);
     return;
   }
-  if (selectedId.value === null && value?.items.length && !dirty.value) {
+  if (selected) {
+    resetDraft(selected);
+    return;
+  }
+  if (value?.items.length) {
     selectedId.value = value.items[0]!.id;
     resetDraft(value.items[0]!);
   }
@@ -647,6 +843,17 @@ onDeactivated(() => {
         </CvInlineAlert>
 
         <div class="settings-ai-model__toolbar">
+          <CvButton
+            size="sm"
+            variant="quiet"
+            :loading="readBusy"
+            :disabled="readBusy || mutationBusy || dirty"
+            loading-label="Refreshing AI authority"
+            data-settings-ai-authority-refresh
+            @click="refreshAuthority"
+          >
+            Refresh AI authority
+          </CvButton>
           <span class="settings-ai-model__count">{{ models.length }} 个模型配置</span>
           <CvButton
             v-if="canManage"
@@ -761,33 +968,46 @@ onDeactivated(() => {
             :readonly="mutationBusy"
           />
           <CvSelect
-            v-model="draft.provider"
-            label="Provider"
-            :options="providerOptions"
+            :model-value="providerPreset"
+            label="Provider preset"
+            :options="providerPresetOptions"
             :disabled="mutationBusy"
+            data-settings-ai-provider-preset
+            @update:model-value="setProviderPreset"
+          />
+          <CvField
+            :model-value="draft.provider"
+            label="Provider"
+            name="aiProvider"
+            :readonly="mutationBusy"
+            @update:model-value="onProviderInput"
           />
           <CvSelect
             v-model="draft.protocol"
             label="Protocol"
             :options="protocolOptions"
             :disabled="mutationBusy"
+            @update:model-value="markPresetOverride('protocol')"
           />
           <CvSelect
             v-model="draft.wireApi"
             label="Wire API"
             :options="wireApiOptions"
             :disabled="mutationBusy"
+            @update:model-value="markPresetOverride('wireApi')"
           />
           <CvSelect
             v-model="draft.authMode"
             label="Auth mode"
             :options="authModeOptions"
             :disabled="mutationBusy"
+            @update:model-value="markPresetOverride('authMode')"
           />
           <CvField
             v-model="draft.authHeaderName"
             label="Auth header"
             :readonly="mutationBusy || draft.authMode === 'none'"
+            @update:model-value="markPresetOverride('authHeaderName')"
           />
           <CvField
             v-model="draft.model"
@@ -797,9 +1017,19 @@ onDeactivated(() => {
             placeholder="例如 gpt-4o-mini"
             :readonly="mutationBusy"
           />
+          <CvSelect
+            :model-value="baseUrlMode"
+            label="Base URL operation"
+            :options="baseUrlOptions"
+            :disabled="mutationBusy"
+            data-settings-ai-base-url-operation
+            @update:model-value="setBaseUrlMode"
+          />
           <CvField
+            v-if="baseUrlMode === 'replace'"
             v-model="draft.baseUrl"
-            label="Base URL"
+            label="Base URL replacement"
+            name="aiBaseUrl"
             placeholder="可选；服务端返回值可能已脱敏"
             :readonly="mutationBusy"
           />
@@ -849,6 +1079,23 @@ onDeactivated(() => {
             :readonly="mutationBusy"
           />
         </form>
+
+        <div
+          v-if="selectedFullModel"
+          class="settings-ai-model__last-test"
+          data-settings-ai-last-test
+        >
+          <span>LastTestStatus: {{ selectedFullModel.lastTestStatus || 'untested' }}</span>
+          <span>LastTestAt: {{ selectedFullModel.lastTestAt || 'not available' }}</span>
+          <span>LastTestLatencyMs: {{ selectedFullModel.lastTestLatencyMs ?? 'not available' }}</span>
+        </div>
+        <div
+          v-if="selectedFullModel"
+          class="settings-ai-model__readonly-secrets"
+          data-settings-ai-readonly-extra
+        >
+          Extra headers, query and body are read-only redacted projections in Settings; editing is not supported.
+        </div>
 
         <div class="settings-ai-model__roles">
           <span class="settings-ai-model__eyebrow">Role bindings</span>
@@ -1025,6 +1272,8 @@ onDeactivated(() => {
 .settings-ai-model__toggle span { display: grid; gap: 2px; }
 .settings-ai-model__toggle strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .settings-ai-model__toggle small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.settings-ai-model__last-test, .settings-ai-model__readonly-secrets { display: flex; flex-wrap: wrap; gap: var(--cv-space-3); margin-top: var(--cv-space-4); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }
+.settings-ai-model__readonly-secrets { color: var(--cv-text-muted); }
 .settings-ai-model__roles { display: flex; flex-wrap: wrap; align-items: center; gap: var(--cv-space-2) var(--cv-space-3); margin-top: var(--cv-space-4); padding-top: var(--cv-space-4); border-top: 1px solid var(--cv-border-subtle); }
 .settings-ai-model__eyebrow { color: var(--cv-color-brand-text); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-semibold); }
 .settings-ai-model__role { display: inline-flex; align-items: center; gap: var(--cv-space-1); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }

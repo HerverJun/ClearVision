@@ -164,6 +164,8 @@ public sealed class StudioUiArchitectureGuardTests
             "src/capabilities/project-workspace/run/runCommandOwner.ts",
             "src/capabilities/project-workspace/runtime-package/runtimePackageExportOwner.ts",
             "src/capabilities/results-read/resultEvidenceOwner.ts",
+            "src/capabilities/settings/settingsOwner.ts",
+            "src/capabilities/settings/settingsWriteCoordinator.ts",
             "src/capabilities/stations-read/stationAdminCommandOwner.ts",
             "src/platform/diagnostics/runtimeDiagnostics.ts",
             "src/platform/query/readQuery.ts"
@@ -437,6 +439,7 @@ public sealed class StudioUiArchitectureGuardTests
         var productSource = sourceFiles
             .Where(file => !StudioUiRelativePath(file).StartsWith("src/labs/", StringComparison.Ordinal))
             .Where(file => StudioUiRelativePath(file) != "src/platform/api/apiTransport.ts")
+            .Where(file => StudioUiRelativePath(file) != "src/capabilities/settings/contracts.ts")
             .Select(File.ReadAllText)
             .ToList();
         productSource.Should().OnlyContain(text =>
@@ -484,6 +487,7 @@ public sealed class StudioUiArchitectureGuardTests
         router.Should().Contain("path: 'inspection'");
         router.Should().Contain("path: 'projects/:id/inspection'");
         router.Should().Contain("path: 'results'");
+        router.Should().Contain("path: 'settings'");
         router.Should().Contain("path: 'diagnostics'");
         router.Should().Contain("path: 'about'");
         router.Should().Contain("path: ':pathMatch(.*)*'");
@@ -495,12 +499,13 @@ public sealed class StudioUiArchitectureGuardTests
         router.Should().Contain("path: '/login'");
         router.Should().Contain("path: '/setup'");
         router.Should().Contain("path: '/forbidden'");
-        router.Should().NotContain("/settings");
+        router.Should().Contain("path === '/settings'");
 
         navigation.Should().Contain("to: '/ai'");
         navigation.Should().Contain("to: '/projects'");
         navigation.Should().Contain("to: '/inspection'");
         navigation.Should().Contain("to: '/results'");
+        navigation.Should().Contain("to: '/settings'");
         navigation.Should().Contain("to: '/stations'");
         navigation.Should().NotContain("to: '/overview'");
         navigation.Should().NotContain("to: '/operators'");

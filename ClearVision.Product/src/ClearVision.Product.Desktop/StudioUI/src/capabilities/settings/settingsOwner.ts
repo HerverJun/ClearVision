@@ -129,6 +129,7 @@ export type SettingsAuthorityReconcileKey =
   | 'camera-preview'
   | 'station-communication'
   | 'ai-models'
+  | `ai-model-test:${string}`
   | 'users'
   | 'change-password'
   | 'database-backup';
@@ -406,6 +407,7 @@ function reconcileKeyForEndpoint(
   if (override || operationKind === 'read') return override ?? null;
 
   const endpoint = findSettingsEndpoint(endpointId);
+  if (endpointId === 'ai.models.test') return null;
   if (endpoint?.kind === 'test') return null;
   if (endpointId === 'settings.write' || endpointId === 'settings.theme.write') return 'generic-settings';
   if (endpointId === 'plc.settings.write') return 'plc-settings';
@@ -415,7 +417,7 @@ function reconcileKeyForEndpoint(
   if (endpointId.startsWith('users.')) return 'users';
   if (endpointId === 'settings.database.backup') return 'database-backup';
   if (endpointId === 'station.settings.write' || endpointId === 'station.token') return 'station-communication';
-  if (endpointId === 'ai.models.write') return 'ai-models';
+  if (endpointId.startsWith('ai.models.')) return 'ai-models';
   if (endpointId === 'camera.bindings.write') return 'camera-bindings';
   if (endpointId.startsWith('camera.preview.') || endpointId === 'camera.soft-trigger-capture') {
     return 'camera-preview';
@@ -737,6 +739,32 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     syncUnknownOutcomeProjection();
   }
 
+  function reconcileAiModelAuthority(): void {
+    reconcileUnknownOutcome('ai-models');
+    for (const key of [...unknownOutcomeKeys]) {
+      if (key.startsWith('ai-model-test:')) reconcileUnknownOutcome(key);
+    }
+  }
+
+  async function finishAiModelTest(
+    result: SettingsWriteResult<AiModelConnectionTestProjectionV1>,
+    modelId: string
+  ): Promise<SettingsWriteResult<AiModelConnectionTestProjectionV1>> {
+    if (result.status !== 'completed') return result;
+    const reread = await owner.readAiModels();
+    if (reread.status !== 'completed') {
+      return unknownAfterAuthorityRead<AiModelConnectionTestProjectionV1>(
+        'ai-model',
+        result.operationKind ?? 'write',
+        result.generation,
+        reread as SettingsWriteResult<unknown>,
+        'AI model connection test completed, but the model authority reread failed; the outcome is unknown.',
+        `ai-model-test:${modelId}`
+      );
+    }
+    return result;
+  }
+
   function unsupportedReconcile(
     section: SettingsSection,
     message: string
@@ -760,9 +788,12 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     operationKind: SettingsOperationKind,
     generation: number,
     result: SettingsWriteResult<unknown>,
-    message: string
+    message: string,
+    reconcileKey: SettingsAuthorityReconcileKey = section === 'station'
+      ? 'station-communication'
+      : 'ai-models'
   ): SettingsWriteResult<T> {
-    markUnknownOutcome(section === 'station' ? 'station-communication' : 'ai-models');
+    markUnknownOutcome(reconcileKey);
     const originalError = result.status === 'failed'
       ? result.error
       : new Error('Authority reread did not complete.');
@@ -854,6 +885,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       if (key === 'camera-bindings') return reconcileResult(await owner.readCameraBindings());
       if (key === 'station-communication') return reconcileResult(await owner.readStationCommunication());
       if (key === 'ai-models') return reconcileResult(await owner.readAiModels());
+      if (key.startsWith('ai-model-test:')) return reconcileResult(await owner.readAiModels());
       if (key === 'users') return reconcileResult(await owner.readUsers());
       if (key === 'camera-preview') {
         return reconcileResult(await owner.stopCameraPreview('重新核对相机预览会话'));
@@ -1080,7 +1112,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         'station',
         'station.token',
         context => adapter.stationToken(operation, context.signal),
-        'runtime-operation',
+        'write',
         'station-communication'
       );
       if (result.status !== 'completed') return result;
@@ -1088,19 +1120,16 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       if (reread.status !== 'completed') {
         return unknownAfterAuthorityRead<StationTokenOperationV1>(
           'station',
-          result.operationKind ?? 'runtime-operation',
+          result.operationKind ?? 'write',
           result.generation,
           reread as SettingsWriteResult<unknown>,
           'Station token 操作已提交，但服务端 Station projection 重新读取失败；结果未知。'
         );
       }
-      // The endpoint returns a one-time token value. Keep it out of the owner,
-      // component state, logs and snapshots; only the masked projection survives.
       return Object.freeze({
         ...result,
         value: Object.freeze({
           ...result.value,
-          token: '',
           settings: reread.value
         })
       });
@@ -1114,7 +1143,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       );
       if (result.status === 'completed') {
         state.aiModels = result.value;
-        reconcileUnknownOutcome('ai-models');
+        reconcileAiModelAuthority();
       }
       return result;
     },
@@ -1123,7 +1152,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     ): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>> {
       return owner.enqueueEndpointOperation(
         'ai-model',
-        'ai.models.write',
+        'ai.models.create',
         context => adapter.createAiModel(request, context.signal),
         'write',
         'ai-models'
@@ -1135,7 +1164,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     ): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>> {
       return owner.enqueueEndpointOperation(
         'ai-model',
-        'ai.models.write',
+        'ai.models.update',
         context => adapter.updateAiModel(id, request, context.signal),
         'write',
         'ai-models'
@@ -1144,7 +1173,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     deleteAiModel(id: string): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>> {
       return owner.enqueueEndpointOperation(
         'ai-model',
-        'ai.models.write',
+        'ai.models.delete',
         context => adapter.deleteAiModel(id, context.signal),
         'write',
         'ai-models'
@@ -1153,9 +1182,9 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     activateAiModel(id: string): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>> {
       return owner.enqueueEndpointOperation(
         'ai-model',
-        'ai.models.write',
+        'ai.models.activate',
         context => adapter.activateAiModel(id, context.signal),
-        'runtime-operation',
+        'write',
         'ai-models'
       ).then(result => finishAiMutation(result, id));
     },
@@ -1165,9 +1194,9 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     ): Promise<SettingsWriteResult<SettingsAiModelsMutationResultV1>> {
       return owner.enqueueEndpointOperation(
         'ai-model',
-        'ai.models.write',
+        role === 'planner' ? 'ai.models.default-planner' : 'ai.models.default-shadow-eval',
         context => adapter.setAiModelDefault(id, role, context.signal),
-        'runtime-operation',
+        'write',
         'ai-models'
       ).then(result => finishAiMutation(result, id));
     },
@@ -1176,8 +1205,9 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         'ai-model',
         'ai.models.test',
         context => adapter.testAiModel(id, context.signal),
-        'runtime-operation'
-      );
+        'write',
+        `ai-model-test:${id}`
+      ).then(result => finishAiModelTest(result, id));
     },
     readAiReasoningSupport(
       request: AiReasoningSupportRequestV1

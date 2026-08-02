@@ -143,7 +143,7 @@ describe('F07 G1 Settings public decoders', () => {
       .toThrow(SettingsContractDecodeError);
   });
 
-  it('requires station read projections to be masked and keeps raw token separate', () => {
+  it('requires station read projections to be masked and excludes the raw token from the typed contract', () => {
     const decoded = decodeStationCommunicationProjectionV1(stationSettings());
     expect(decoded.token).toEqual({ hasToken: true, mask: '******', last4: '1234' });
     expect(() => decodeStationCommunicationProjectionV1(stationSettings({
@@ -151,14 +151,22 @@ describe('F07 G1 Settings public decoders', () => {
     }))).toThrow(SettingsContractDecodeError);
     const operation = decodeStationTokenOperationV1({
       success: true,
-      operation: 'reveal',
+      operation: 'regenerate',
+      tokenInfo: { hasToken: true, mask: '******', last4: '1234' },
+      settings: null,
+      message: 'regenerated',
+      errors: []
+    });
+    expect(operation).not.toHaveProperty('token');
+    expect(() => decodeStationTokenOperationV1({
+      success: true,
+      operation: 'regenerate',
       token: '123456',
       tokenInfo: { hasToken: true, mask: '******', last4: '1234' },
       settings: null,
-      message: 'revealed',
+      message: 'regenerated',
       errors: []
-    });
-    expect(operation.token).toBe('123456');
+    })).toThrow(SettingsContractDecodeError);
   });
 
   it('accepts redacted AI model projections and rejects a raw API key', () => {

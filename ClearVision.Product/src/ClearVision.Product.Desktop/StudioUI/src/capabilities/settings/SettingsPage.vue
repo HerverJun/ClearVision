@@ -100,6 +100,7 @@ function reconcileLabel(key: SettingsAuthorityReconcileKey): string {
   if (key === 'camera-bindings') return 'Camera bindings';
   if (key === 'station-communication') return 'Station communication';
   if (key === 'ai-models') return 'AI model authority';
+  if (key.startsWith('ai-model-test:')) return 'AI model connection test';
   if (key === 'camera-preview') return 'Camera preview session';
   if (key === 'users') return 'User authority';
   if (key === 'change-password') return 'Auth session';
@@ -232,10 +233,11 @@ onBeforeUnmount(() => {
           v-if="phase !== 'forbidden'"
           size="sm"
           :loading="phase === 'loading'"
-          loading-label="正在读取设置"
+          loading-label="Refreshing generic Settings projection"
+          data-settings-generic-refresh
           @click="refresh"
         >
-          刷新
+          Refresh generic projection
         </CvButton>
       </template>
     </CvPageHeader>

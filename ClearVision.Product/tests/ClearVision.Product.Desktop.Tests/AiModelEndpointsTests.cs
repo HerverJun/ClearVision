@@ -172,11 +172,358 @@ public class AiModelEndpointsTests
         responseJson.Should().NotContain("body-secret");
         using var document = JsonDocument.Parse(responseJson);
         var model = document.RootElement.EnumerateArray().First(x => x.GetProperty("id").GetString() == "admin-secret-model");
-        model.GetProperty("baseUrl").GetString().Should().Contain("<redacted>");
+        model.GetProperty("baseUrl").GetString().Should().Be("https://<redacted-host>/<redacted-path>");
         model.GetProperty("extraHeaders").GetProperty("authorization").GetString().Should().Be("<redacted>");
         model.GetProperty("extraHeaders").GetProperty("x-api-key").GetString().Should().Be("<redacted>");
         model.GetProperty("extraQuery").GetProperty("token").GetString().Should().Be("<redacted>");
         model.GetProperty("extraBody").GetProperty("token").GetString().Should().Be("<redacted>");
+    }
+
+    [Fact]
+    public async Task UpdateAiModel_ShouldPreserveRedactedBaseUrlUntilAnExplicitOperation()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync();
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "base-url-model",
+            Name = "Base URL Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            BaseUrl = "https://private-gateway.example/v1",
+            ApiKey = "base-url-key"
+        });
+
+        using var preserveResponse = await host.Client.PutAsync(
+            "/api/ai/models/base-url-model",
+            JsonContent(new
+            {
+                name = "Base URL Model Renamed",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrlOperation = "preserve",
+                apiKeyOperation = "keep",
+                isEnabled = true
+            }));
+        preserveResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.AiConfigStore.GetById("base-url-model")!.BaseUrl.Should().Be("https://private-gateway.example/v1");
+
+        using var replaceResponse = await host.Client.PutAsync(
+            "/api/ai/models/base-url-model",
+            JsonContent(new
+            {
+                name = "Base URL Model",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrlOperation = "replace",
+                baseUrl = "https://replacement.example/v2",
+                apiKeyOperation = "keep",
+                isEnabled = true
+            }));
+        replaceResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.AiConfigStore.GetById("base-url-model")!.BaseUrl.Should().Be("https://replacement.example/v2");
+
+        using var clearResponse = await host.Client.PutAsync(
+            "/api/ai/models/base-url-model",
+            JsonContent(new
+            {
+                name = "Base URL Model",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrlOperation = "clear",
+                apiKeyOperation = "keep",
+                isEnabled = true
+            }));
+        clearResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.AiConfigStore.GetById("base-url-model")!.BaseUrl.Should().BeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task UpdateAiModel_ShouldRejectMaskedAndAmbiguousApiKeyOperations()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync();
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "key-contract-model",
+            Name = "Key Contract Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            BaseUrl = "https://api.example/v1",
+            ApiKey = "original-key"
+        });
+
+        using var keepWithKey = await host.Client.PutAsync(
+            "/api/ai/models/key-contract-model",
+            JsonContent(new
+            {
+                name = "Key Contract Model",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrlOperation = "preserve",
+                apiKeyOperation = "keep",
+                apiKey = "********",
+                isEnabled = true
+            }));
+        keepWithKey.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        using var maskedReplace = await host.Client.PutAsync(
+            "/api/ai/models/key-contract-model",
+            JsonContent(new
+            {
+                name = "Key Contract Model",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrlOperation = "preserve",
+                apiKeyOperation = "replace",
+                apiKey = "****abcd",
+                isEnabled = true
+            }));
+        maskedReplace.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        using var clearWithKey = await host.Client.PutAsync(
+            "/api/ai/models/key-contract-model",
+            JsonContent(new
+            {
+                name = "Key Contract Model",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrlOperation = "preserve",
+                apiKeyOperation = "clear",
+                apiKey = "replacement-key",
+                isEnabled = true
+            }));
+        clearWithKey.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        using var unknownOperation = await host.Client.PutAsync(
+            "/api/ai/models/key-contract-model",
+            JsonContent(new
+            {
+                name = "Key Contract Model",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrlOperation = "preserve",
+                apiKeyOperation = "rotate",
+                isEnabled = true
+            }));
+        unknownOperation.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        host.AiConfigStore.GetById("key-contract-model")!.ApiKey.Should().Be("original-key");
+    }
+
+    [Fact]
+    public async Task CreateAiModel_ShouldRequireExplicitApiKeyOperation()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync();
+
+        using var missingOperation = await host.Client.PostAsync(
+            "/api/ai/models",
+            JsonContent(new
+            {
+                name = "Ambiguous Create",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrlOperation = "clear"
+            }));
+
+        missingOperation.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await missingOperation.Content.ReadAsStringAsync()).Should().Contain("explicitly choose API key operation");
+    }
+
+    [Fact]
+    public async Task CreateAiModel_ShouldRejectKeepBecauseNewModelHasNoExistingKey()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync();
+
+        using var response = await host.Client.PostAsync(
+            "/api/ai/models",
+            JsonContent(new
+            {
+                name = "Ambiguous Create",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrlOperation = "clear",
+                apiKeyOperation = "keep"
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("keep");
+    }
+
+    [Theory]
+    [InlineData("OpenAI Compatible", "openai_compatible", "chat_completions", "bearer", "Authorization")]
+    [InlineData("Anthropic", "anthropic", "chat_completions", "header_key", "x-api-key")]
+    [InlineData("Azure OpenAI", "azure_openai", "chat_completions", "header_key", "api-key")]
+    [InlineData("Ollama", "ollama_native", "chat_completions", "none", "")]
+    [InlineData("Custom Proxy", "openai_compatible", "chat_completions", "header_key", "x-api-key")]
+    public async Task CreateAiModel_ShouldAcceptKnownAndCustomProviderContracts(
+        string provider,
+        string protocol,
+        string wireApi,
+        string authMode,
+        string authHeaderName)
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync();
+        var payload = new Dictionary<string, object?>
+        {
+            ["name"] = $"{provider} Model",
+            ["provider"] = provider,
+            ["model"] = "provider-model",
+            ["baseUrlOperation"] = "replace",
+            ["baseUrl"] = "https://provider.example/v1",
+            ["protocol"] = protocol,
+            ["wireApi"] = wireApi,
+            ["authMode"] = authMode,
+            ["authHeaderName"] = authHeaderName,
+            ["timeoutMs"] = 120000,
+            ["isEnabled"] = true,
+            ["apiKeyOperation"] = authMode == "none" ? "clear" : "replace"
+        };
+        if (authMode != "none")
+        {
+            payload["apiKey"] = "provider-secret";
+        }
+
+        using var response = await host.Client.PostAsync("/api/ai/models", JsonContent(payload));
+        var responseBody = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, responseBody);
+        using var document = JsonDocument.Parse(responseBody);
+        var id = document.RootElement.GetProperty("id").GetString();
+        id.Should().NotBeNullOrWhiteSpace();
+        var model = host.AiConfigStore.GetById(id!);
+        model!.Provider.Should().Be(provider);
+        model.Protocol.Should().Be(protocol);
+        model.WireApi.Should().Be(wireApi);
+        model.AuthMode.Should().Be(authMode);
+        model.AuthHeaderName.Should().Be(authHeaderName);
+    }
+
+    [Fact]
+    public async Task CreateAiModel_ShouldRejectKnownProviderProtocolMismatch()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync();
+
+        using var response = await host.Client.PostAsync(
+            "/api/ai/models",
+            JsonContent(new
+            {
+                name = "Anthropic Through OpenAI",
+                provider = "Anthropic",
+                model = "claude-3-5-sonnet",
+                baseUrlOperation = "clear",
+                protocol = "openai_compatible",
+                wireApi = "chat_completions",
+                authMode = "bearer",
+                apiKeyOperation = "clear"
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("requires protocol");
+        host.AiConfigStore.GetAll().Should().NotContain(model => model.Name == "Anthropic Through OpenAI");
+    }
+
+    [Fact]
+    public async Task UpdateAiModel_ShouldPreserveIsEnabledWhenFieldIsOmitted()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync();
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "disabled-model",
+            Name = "Disabled Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            IsEnabled = false
+        });
+
+        using var response = await host.Client.PutAsync(
+            "/api/ai/models/disabled-model",
+            JsonContent(new
+            {
+                name = "Disabled Model Renamed",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrlOperation = "preserve",
+                apiKeyOperation = "keep"
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.AiConfigStore.GetById("disabled-model")!.IsEnabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task TestAiModel_ShouldPersistLastTestMetadataAndExposeItAfterProjectionReread()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""
+                {
+                  "choices": [{ "message": { "content": "{\"ok\":true}" } }]
+                }
+                """, Encoding.UTF8, "application/json")
+            }));
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "test-metadata-model",
+            Name = "Test Metadata Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            BaseUrl = "https://api.example/v1",
+            ApiKey = "test-key"
+        });
+
+        using var testResponse = await host.Client.PostAsync(
+            "/api/ai/models/test-metadata-model/test",
+            JsonContent(new { }));
+        testResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var testDocument = JsonDocument.Parse(await testResponse.Content.ReadAsStringAsync());
+        testDocument.RootElement.GetProperty("connectionOk").GetBoolean().Should().BeTrue();
+
+        var persisted = host.AiConfigStore.GetById("test-metadata-model")!;
+        persisted.LastTestStatus.Should().Be("ok");
+        persisted.LastTestAt.Should().NotBeNull();
+        persisted.LastTestLatencyMs.Should().NotBeNull();
+
+        using var modelsResponse = await host.Client.GetAsync("/api/ai/models");
+        using var modelsDocument = JsonDocument.Parse(await modelsResponse.Content.ReadAsStringAsync());
+        var model = modelsDocument.RootElement.EnumerateArray()
+            .First(item => item.GetProperty("id").GetString() == "test-metadata-model");
+        model.GetProperty("lastTestStatus").GetString().Should().Be("ok");
+        model.GetProperty("lastTestAt").GetString().Should().NotBeNullOrWhiteSpace();
+        model.GetProperty("lastTestLatencyMs").ValueKind.Should().Be(JsonValueKind.Number);
+    }
+
+    [Fact]
+    public async Task TestAiModel_WhenCallerAborts_ShouldNotConvertAbortIntoPersistedTimeoutResult()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync(async (_, cancellationToken) =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "aborted-test-model",
+            Name = "Aborted Test Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            BaseUrl = "https://api.example/v1",
+            ApiKey = "test-key",
+            TimeoutMs = 300000
+        });
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/ai/models/aborted-test-model/test")
+        {
+            Content = JsonContent(new { })
+        };
+        using var abort = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        var send = () => host.Client.SendAsync(request, abort.Token);
+        await FluentActions.Awaiting(send).Should().ThrowAsync<OperationCanceledException>();
+
+        var persisted = host.AiConfigStore.GetById("aborted-test-model")!;
+        persisted.LastTestStatus.Should().Be("untested");
+        persisted.LastTestAt.Should().BeNull();
+        persisted.LastTestLatencyMs.Should().BeNull();
     }
 
     [Fact]
@@ -198,6 +545,8 @@ public class AiModelEndpointsTests
             model = "deepseek-reasoner",
             baseUrl = "https://api.deepseek.com",
             apiKey = "test-key",
+            apiKeyOperation = "replace",
+            baseUrlOperation = "replace",
             timeoutMs = 120000,
             reasoning = new
             {
@@ -322,8 +671,10 @@ public class AiModelEndpointsTests
             provider = "OpenAI Compatible",
             model = "gpt-4o-mini",
             baseUrl = "https://api.openai.com/v1",
+            baseUrlOperation = "replace",
             wireApi = "responses",
             apiKey = "created-secret-key",
+            apiKeyOperation = "replace",
             timeoutMs = 90000
         });
 
@@ -382,7 +733,7 @@ public class AiModelEndpointsTests
                 provider = "OpenAI Compatible",
                 model = "gpt-4o-mini",
                 baseUrl = "https://api.openai.com/v1",
-                apiKey = "",
+                baseUrlOperation = "replace",
                 apiKeyOperation = "keep",
                 roleBindings = new[] { "planner" },
                 isEnabled = true,
@@ -399,6 +750,7 @@ public class AiModelEndpointsTests
                 provider = "OpenAI Compatible",
                 model = "gpt-4o-mini",
                 baseUrl = "https://api.openai.com/v1",
+                baseUrlOperation = "replace",
                 apiKey = replacementKey,
                 apiKeyOperation = "replace",
                 roleBindings = new[] { "planner", "vision-agent-shadow-eval" },
@@ -424,7 +776,7 @@ public class AiModelEndpointsTests
                 provider = "OpenAI Compatible",
                 model = "gpt-4o-mini",
                 baseUrl = "https://api.openai.com/v1",
-                apiKey = "",
+                baseUrlOperation = "replace",
                 apiKeyOperation = "clear",
                 roleBindings = new[] { "planner", "vision-agent-shadow-eval" },
                 isEnabled = true,

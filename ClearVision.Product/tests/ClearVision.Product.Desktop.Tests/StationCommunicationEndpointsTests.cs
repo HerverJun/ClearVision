@@ -50,7 +50,8 @@ public sealed class StationCommunicationEndpointsTests
                 mode = "LanController",
                 port = 5033,
                 lanHost = "192.168.50.10",
-                localStationSyncEnabled = true
+                localStationSyncEnabled = true,
+                sharedToken = "lan-controller-token"
             }));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -67,7 +68,27 @@ public sealed class StationCommunicationEndpointsTests
     }
 
     [Fact]
-    public async Task TokenEndpoints_ShouldRevealAndRegenerateForAdminOnly()
+    public async Task PutSettings_ShouldRejectLanControllerWithoutAnExplicitToken()
+    {
+        await using var host = await StationCommunicationTestHost.CreateAsync();
+
+        using var response = await host.Client.PutAsync(
+            "/api/station-communication/settings",
+            JsonContent(new
+            {
+                mode = "LanController",
+                port = 5033,
+                lanHost = "192.168.50.10",
+                localStationSyncEnabled = true
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("explicit token replacement");
+        File.Exists(host.Store.StudioSettingsPath).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task TokenEndpoints_ShouldNeverReturnRawTokenAndRegenerateForAdminOnly()
     {
         await using var adminHost = await StationCommunicationTestHost.CreateAsync();
         using var saveResponse = await adminHost.Client.PutAsync(
@@ -78,24 +99,25 @@ public sealed class StationCommunicationEndpointsTests
         using var revealResponse = await adminHost.Client.PostAsync(
             "/api/station-communication/token",
             JsonContent(new { operation = "reveal" }));
-        revealResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        using var revealDocument = JsonDocument.Parse(await revealResponse.Content.ReadAsStringAsync());
-        var revealedToken = revealDocument.RootElement.GetProperty("token").GetString();
-        revealedToken.Should().MatchRegex(@"^\d{6}$");
+        revealResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var revealBody = await revealResponse.Content.ReadAsStringAsync();
+        revealBody.ToLowerInvariant().Should().NotContain("token\":\"");
+        revealBody.ToLowerInvariant().Should().Contain("excluded");
 
         using var regenerateResponse = await adminHost.Client.PostAsync(
             "/api/station-communication/token",
             JsonContent(new { operation = "regenerate" }));
         regenerateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         using var regenerateDocument = JsonDocument.Parse(await regenerateResponse.Content.ReadAsStringAsync());
-        var regeneratedToken = regenerateDocument.RootElement.GetProperty("token").GetString();
-        regeneratedToken.Should().MatchRegex(@"^\d{6}$");
-        regeneratedToken.Should().NotBe(revealedToken);
+        regenerateDocument.RootElement.TryGetProperty("token", out _).Should().BeFalse();
+        regenerateDocument.RootElement.GetProperty("tokenInfo").GetProperty("hasToken").GetBoolean().Should().BeTrue();
+        regenerateDocument.RootElement.GetProperty("tokenInfo").GetProperty("mask").GetString()
+            .Should().MatchRegex(@"^\*{4}\d{4}$");
 
         await using var operatorHost = await StationCommunicationTestHost.CreateAsync(role: "Operator");
         using var forbiddenResponse = await operatorHost.Client.PostAsync(
             "/api/station-communication/token",
-            JsonContent(new { operation = "reveal" }));
+            JsonContent(new { operation = "regenerate" }));
         forbiddenResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 

@@ -311,20 +311,37 @@ public static class SettingsEndpoints
 
             try
             {
+                var provider = RequireAiText(request.Provider, "Provider");
+                var modelName = RequireAiText(request.Model, "Model");
+                var apiKeyMode = ResolveApiKeyUpdateMode(request.ApiKeyOperation, request.ApiKey, requireExplicitOperation: true);
+                var baseUrl = ResolveBaseUrl(request.BaseUrlOperation, request.BaseUrl, null);
+                var protocol = NormalizeAiProtocol(request.Protocol, provider);
+                var wireApi = NormalizeAiWireApi(request.WireApi);
+                var authMode = NormalizeAiAuthMode(request.AuthMode, protocol);
+                var authHeaderName = AiModelConfig.NormalizeAuthHeaderName(request.AuthHeaderName, authMode, protocol);
+                ValidateAiModelRequest(
+                    provider,
+                    modelName,
+                    protocol,
+                    wireApi,
+                    authMode,
+                    authHeaderName,
+                    baseUrl);
+                RejectUnsupportedAiExtraFields(request.ExtraHeaders, request.ExtraQuery, request.ExtraBody);
                 var model = new AiModelConfig
                 {
                     Id = $"model_{Guid.NewGuid():N}",
                     Name = request.Name ?? "新建模型",
                     DisplayName = request.DisplayName,
-                    Provider = request.Provider ?? AiModelConfig.GetLegacyProviderByProtocol(request.Protocol),
-                    ApiKey = request.ApiKey ?? "",
-                    Model = request.Model ?? string.Empty,
-                    BaseUrl = string.IsNullOrWhiteSpace(request.BaseUrl) ? null : request.BaseUrl,
+                    Provider = provider,
+                    ApiKey = apiKeyMode == AiApiKeyUpdateMode.Replace ? ReadReplacementApiKey(request.ApiKey) : string.Empty,
+                    Model = modelName,
+                    BaseUrl = baseUrl,
                     TimeoutMs = request.TimeoutMs > 0 ? request.TimeoutMs : 120000,
-                    Protocol = request.Protocol,
-                    WireApi = request.WireApi,
-                    AuthMode = request.AuthMode,
-                    AuthHeaderName = request.AuthHeaderName,
+                    Protocol = protocol,
+                    WireApi = wireApi,
+                    AuthMode = authMode,
+                    AuthHeaderName = authHeaderName,
                     ExtraHeaders = CloneStringMap(request.ExtraHeaders),
                     ExtraQuery = CloneStringMap(request.ExtraQuery),
                     ExtraBody = CloneJsonMap(request.ExtraBody),
@@ -338,7 +355,11 @@ public static class SettingsEndpoints
                     Reasoning = request.Reasoning?.Clone()
                 };
                 configStore.Add(model);
-                return Results.Ok(new { Message = "模型已创建", model.Id });
+                return Results.Ok(new { Message = "模型已创建", id = model.Id, role = model.ModelRole });
+            }
+            catch (AiConfigPersistenceException)
+            {
+                return BuildAiPersistenceUnknownResult();
             }
             catch (Exception ex)
             {
@@ -357,19 +378,51 @@ public static class SettingsEndpoints
 
             try
             {
+                var current = configStore.GetById(id);
+                if (current == null)
+                    return Results.NotFound(new { Error = $"模型 {id} 不存在" });
+
+                var provider = string.IsNullOrWhiteSpace(request.Provider) ? current.Provider : request.Provider.Trim();
+                var modelName = string.IsNullOrWhiteSpace(request.Model) ? current.Model : request.Model.Trim();
+                var apiKeyMode = ResolveApiKeyUpdateMode(request.ApiKeyOperation, request.ApiKey);
+                var baseUrl = ResolveBaseUrl(request.BaseUrlOperation, request.BaseUrl, current.BaseUrl);
+                var providerChanged = !string.Equals(provider, current.Provider, StringComparison.Ordinal);
+                var protocol = NormalizeAiProtocol(
+                    request.Protocol ?? (providerChanged ? null : current.Protocol),
+                    provider);
+                var wireApi = NormalizeAiWireApi(request.WireApi ?? current.WireApi);
+                var authMode = NormalizeAiAuthMode(
+                    request.AuthMode ?? (providerChanged || request.Protocol != null ? null : current.AuthMode),
+                    protocol);
+                var authHeaderName = AiModelConfig.NormalizeAuthHeaderName(
+                    request.AuthHeaderName ?? (providerChanged || request.Protocol != null || request.AuthMode != null
+                        ? null
+                        : current.AuthHeaderName),
+                    authMode,
+                    protocol);
+                ValidateAiModelRequest(
+                    provider,
+                    modelName,
+                    protocol,
+                    wireApi,
+                    authMode,
+                    authHeaderName,
+                    baseUrl);
+                RejectUnsupportedAiExtraFields(request.ExtraHeaders, request.ExtraQuery, request.ExtraBody);
+
                 var updated = new AiModelConfig
                 {
                     Name = request.Name!,
                     DisplayName = request.DisplayName,
-                    Provider = request.Provider!,
-                    ApiKey = request.ApiKey ?? "", // 空字符串 → 保留原值（由 AiConfigStore.Update 处理）
-                    Model = request.Model ?? string.Empty,
-                    BaseUrl = request.BaseUrl,
+                    Provider = provider,
+                    ApiKey = apiKeyMode == AiApiKeyUpdateMode.Replace ? ReadReplacementApiKey(request.ApiKey) : string.Empty,
+                    Model = modelName,
+                    BaseUrl = baseUrl,
                     TimeoutMs = request.TimeoutMs,
-                    Protocol = request.Protocol,
-                    WireApi = request.WireApi,
-                    AuthMode = request.AuthMode,
-                    AuthHeaderName = request.AuthHeaderName,
+                    Protocol = protocol,
+                    WireApi = wireApi,
+                    AuthMode = authMode,
+                    AuthHeaderName = authHeaderName,
                     ExtraHeaders = CloneStringMap(request.ExtraHeaders),
                     ExtraQuery = CloneStringMap(request.ExtraQuery),
                     ExtraBody = CloneJsonMap(request.ExtraBody),
@@ -377,15 +430,19 @@ public static class SettingsEndpoints
                     ModelRole = request.ModelRole,
                     Priority = request.Priority,
                     Remark = request.Remark,
-                    IsEnabled = request.IsEnabled ?? true,
+                    IsEnabled = request.IsEnabled ?? current.IsEnabled,
                     Capabilities = request.Capabilities?.Clone(),
                     Reasoning = request.Reasoning?.Clone()
                 };
-                var result = configStore.Update(id, updated, ResolveApiKeyUpdateMode(request.ApiKeyOperation, request.ApiKey));
+                var result = configStore.Update(id, updated, apiKeyMode);
                 if (result == null)
                     return Results.NotFound(new { Error = $"模型 {id} 不存在" });
 
-                return Results.Ok(new { Message = "模型已更新" });
+                return Results.Ok(new { Message = "模型已更新", id, role = result.ModelRole });
+            }
+            catch (AiConfigPersistenceException)
+            {
+                return BuildAiPersistenceUnknownResult();
             }
             catch (Exception ex)
             {
@@ -406,8 +463,12 @@ public static class SettingsEndpoints
             {
                 var ok = configStore.Delete(id);
                 return ok
-                    ? Results.Ok(new { Message = "模型已删除" })
+                    ? Results.Ok(new { Message = "模型已删除", id, role = (string?)null })
                     : Results.NotFound(new { Error = $"模型 {id} 不存在" });
+            }
+            catch (AiConfigPersistenceException)
+            {
+                return BuildAiPersistenceUnknownResult();
             }
             catch (Exception ex)
             {
@@ -424,10 +485,17 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
-            var ok = configStore.SetActive(id);
-            return ok
-                ? Results.Ok(new { Message = "已切换激活模型" })
-                : Results.NotFound(new { Error = $"模型 {id} 不存在" });
+            try
+            {
+                var ok = configStore.SetActive(id);
+                return ok
+                    ? Results.Ok(new { Message = "已切换激活模型", id, role = (string?)null })
+                    : Results.NotFound(new { Error = $"模型 {id} 不存在" });
+            }
+            catch (AiConfigPersistenceException)
+            {
+                return BuildAiPersistenceUnknownResult();
+            }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
@@ -439,10 +507,17 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
-            var ok = configStore.SetDefaultForRole(id, AiModelConfig.RolePlanner);
-            return ok
-                ? Results.Ok(new { Message = "Default planner model updated.", role = AiModelConfig.RolePlanner })
-                : Results.NotFound(new { Error = $"Model {id} not found." });
+            try
+            {
+                var ok = configStore.SetDefaultForRole(id, AiModelConfig.RolePlanner);
+                return ok
+                    ? Results.Ok(new { Message = "Default planner model updated.", id, role = AiModelConfig.RolePlanner })
+                    : Results.NotFound(new { Error = $"Model {id} not found." });
+            }
+            catch (AiConfigPersistenceException)
+            {
+                return BuildAiPersistenceUnknownResult();
+            }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
@@ -453,10 +528,17 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
-            var ok = configStore.SetDefaultForRole(id, AiModelConfig.RoleShadowEval);
-            return ok
-                ? Results.Ok(new { Message = "Default shadow eval model updated.", role = AiModelConfig.RoleShadowEval })
-                : Results.NotFound(new { Error = $"Model {id} not found." });
+            try
+            {
+                var ok = configStore.SetDefaultForRole(id, AiModelConfig.RoleShadowEval);
+                return ok
+                    ? Results.Ok(new { Message = "Default shadow eval model updated.", id, role = AiModelConfig.RoleShadowEval })
+                    : Results.NotFound(new { Error = $"Model {id} not found." });
+            }
+            catch (AiConfigPersistenceException)
+            {
+                return BuildAiPersistenceUnknownResult();
+            }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
 
@@ -483,11 +565,18 @@ public static class SettingsEndpoints
             }
 
             var testResult = await TestAiModelConnectionAsync(model, apiClient, context.RequestAborted);
-            configStore.UpdateTestStatus(
-                id,
-                testResult.ConnectionOk ? "ok" : "failed",
-                DateTimeOffset.UtcNow,
-                testResult.LatencyMs);
+            try
+            {
+                configStore.UpdateTestStatus(
+                    id,
+                    testResult.ConnectionOk ? "ok" : "failed",
+                    DateTimeOffset.UtcNow,
+                    testResult.LatencyMs);
+            }
+            catch (AiConfigPersistenceException)
+            {
+                return BuildAiPersistenceUnknownResult();
+            }
             return Results.Ok(testResult);
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
@@ -2376,6 +2465,17 @@ public static class SettingsEndpoints
                value.Any(item => string.Equals(item, "true", StringComparison.OrdinalIgnoreCase));
     }
 
+    private static IResult BuildAiPersistenceUnknownResult()
+    {
+        return Results.Json(new
+        {
+            errorCode = "unknown-outcome",
+            code = "unknown-outcome",
+            policy = "reload-before-retry",
+            publicMessage = "AI model persistence outcome is unknown; reread AI model authority before retrying."
+        }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
     private static bool IsSuccessfulAiHealthCheck(string? content)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -2492,7 +2592,13 @@ public static class SettingsEndpoints
                 protocol,
                 wireApi);
         }
-        catch (Exception ex) when (ex is TaskCanceledException or OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // A caller abort leaves the downstream request outcome unknown. Let the
+            // aborted request propagate so the owner can register its matching unknown.
+            throw;
+        }
+        catch (OperationCanceledException)
         {
             stopwatch.Stop();
             return BuildAiModelConnectionResult(
@@ -2580,20 +2686,233 @@ public static class SettingsEndpoints
         return (int)Math.Clamp(stopwatch.ElapsedMilliseconds, 0, int.MaxValue);
     }
 
-    private static AiApiKeyUpdateMode ResolveApiKeyUpdateMode(string? apiKeyOperation, string? apiKey)
+    private static AiApiKeyUpdateMode ResolveApiKeyUpdateMode(
+        string? apiKeyOperation,
+        JsonElement apiKey,
+        bool requireExplicitOperation = false)
     {
-        var normalized = string.IsNullOrWhiteSpace(apiKeyOperation)
-            ? (string.IsNullOrWhiteSpace(apiKey) ? "keep" : "replace")
-            : apiKeyOperation.Trim().ToLowerInvariant().Replace("_", "-");
+        if (requireExplicitOperation && apiKeyOperation is null)
+            throw new InvalidOperationException("Create model requests must explicitly choose API key operation keep, replace, or clear.");
 
+        var normalized = apiKeyOperation is null
+            ? "keep"
+            : apiKeyOperation.Trim().ToLowerInvariant();
+
+        var keyProvided = apiKey.ValueKind != JsonValueKind.Undefined;
+        switch (normalized)
+        {
+            case "keep":
+                if (requireExplicitOperation)
+                    throw new InvalidOperationException("Create model requests cannot use API key operation keep because a new model has no existing key.");
+                if (keyProvided)
+                    throw new InvalidOperationException("API key operation keep must not carry apiKey.");
+                return AiApiKeyUpdateMode.Keep;
+            case "replace":
+                ReadReplacementApiKey(apiKey);
+                return AiApiKeyUpdateMode.Replace;
+            case "clear":
+                if (apiKey.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null))
+                    throw new InvalidOperationException("API key operation clear must not carry a replacement key.");
+                return AiApiKeyUpdateMode.Clear;
+            default:
+                throw new InvalidOperationException("API key operation must be keep, replace, or clear.");
+        }
+    }
+
+    private static string ReadReplacementApiKey(JsonElement apiKey)
+    {
+        if (apiKey.ValueKind != JsonValueKind.String)
+            throw new InvalidOperationException("API key operation replace requires a non-empty string key.");
+
+        var value = apiKey.GetString()?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(value) || IsRedactedPlaceholder(value))
+            throw new InvalidOperationException("API key replacement must be a non-empty real key.");
+
+        return value;
+    }
+
+    private static string? ResolveBaseUrl(string? baseUrlOperation, JsonElement baseUrl, string? current)
+    {
+        var normalized = baseUrlOperation is null
+            ? "preserve"
+            : baseUrlOperation.Trim().ToLowerInvariant();
+        var valueProvided = baseUrl.ValueKind != JsonValueKind.Undefined;
+
+        switch (normalized)
+        {
+            case "preserve":
+                if (valueProvided)
+                    throw new InvalidOperationException("BaseUrl operation preserve must not carry baseUrl.");
+                return current;
+            case "clear":
+                if (baseUrl.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null) &&
+                    (baseUrl.ValueKind != JsonValueKind.String || !string.IsNullOrWhiteSpace(baseUrl.GetString())))
+                    throw new InvalidOperationException("BaseUrl operation clear must not carry a replacement URL.");
+                return null;
+            case "replace":
+                if (baseUrl.ValueKind != JsonValueKind.String)
+                    throw new InvalidOperationException("BaseUrl operation replace requires a non-empty URL.");
+                var replacement = baseUrl.GetString()?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(replacement) || IsRedactedPlaceholder(replacement))
+                    throw new InvalidOperationException("BaseUrl replacement must be a real URL, not a redacted placeholder.");
+                if (!Uri.TryCreate(replacement, UriKind.Absolute, out _))
+                    throw new InvalidOperationException("BaseUrl replacement must be an absolute URL.");
+                return replacement;
+            default:
+                throw new InvalidOperationException("BaseUrl operation must be preserve, replace, or clear.");
+        }
+    }
+
+    private static void ValidateAiModelRequest(
+        string provider,
+        string model,
+        string? protocol,
+        string? wireApi,
+        string? authMode,
+        string? authHeaderName,
+        string? baseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(provider))
+            throw new InvalidOperationException("Provider is required.");
+        if (string.IsNullOrWhiteSpace(model))
+            throw new InvalidOperationException("Model is required.");
+
+        var normalizedProtocol = NormalizeAiProtocol(protocol, provider);
+        var normalizedWireApi = NormalizeAiWireApi(wireApi);
+        var normalizedAuthMode = NormalizeAiAuthMode(authMode, normalizedProtocol);
+
+        var expectedProtocol = KnownProviderProtocol(provider);
+        if (expectedProtocol != null && !string.Equals(expectedProtocol, normalizedProtocol, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Provider '{provider}' requires protocol '{expectedProtocol}'. Select Custom for an explicitly compatible proxy combination.");
+        }
+
+        if (normalizedProtocol == AiModelConfig.ProtocolAzureOpenAi && string.IsNullOrWhiteSpace(baseUrl))
+            throw new InvalidOperationException("Azure OpenAI protocol requires BaseUrl.");
+        if (normalizedProtocol == AiModelConfig.ProtocolAnthropic && normalizedAuthMode == AiModelConfig.AuthModeBearer)
+            throw new InvalidOperationException("Anthropic protocol requires header_key or none auth mode.");
+        if (normalizedProtocol == AiModelConfig.ProtocolAzureOpenAi && normalizedAuthMode != AiModelConfig.AuthModeHeaderKey)
+            throw new InvalidOperationException("Azure OpenAI protocol requires header_key auth mode.");
+        if (normalizedProtocol is (AiModelConfig.ProtocolAnthropic or AiModelConfig.ProtocolAzureOpenAi or AiModelConfig.ProtocolOllamaNative) &&
+            normalizedWireApi == AiModelConfig.WireApiResponses)
+            throw new InvalidOperationException("The selected protocol requires chat_completions wire API.");
+        if (normalizedAuthMode == AiModelConfig.AuthModeHeaderKey && string.IsNullOrWhiteSpace(authHeaderName))
+            throw new InvalidOperationException("Header_key auth mode requires an auth header name.");
+        if (!string.IsNullOrWhiteSpace(authHeaderName) && IsRedactedPlaceholder(authHeaderName))
+            throw new InvalidOperationException("Auth header name must not be a redacted placeholder.");
+
+        _ = normalizedWireApi;
+    }
+
+    private static string? KnownProviderProtocol(string provider)
+    {
+        var normalized = provider.Trim().ToLowerInvariant();
+        if (normalized.Contains("anthropic", StringComparison.Ordinal))
+            return AiModelConfig.ProtocolAnthropic;
+        if (normalized.Contains("azure", StringComparison.Ordinal))
+            return AiModelConfig.ProtocolAzureOpenAi;
+        if (normalized.Contains("ollama", StringComparison.Ordinal))
+            return AiModelConfig.ProtocolOllamaNative;
+        if (normalized is "openai" or "openai api" or "openai compatible")
+            return AiModelConfig.ProtocolOpenAiCompatible;
+        return null;
+    }
+
+    private static string NormalizeAiProtocol(string? protocol, string provider)
+    {
+        if (string.IsNullOrWhiteSpace(protocol))
+            return AiModelConfig.NormalizeProtocol(null, provider);
+
+        var normalized = protocol.Trim().ToLowerInvariant();
         return normalized switch
         {
-            "clear" => AiApiKeyUpdateMode.Clear,
-            "replace" => AiApiKeyUpdateMode.Replace,
-            "new" => AiApiKeyUpdateMode.Replace,
-            "keep" => AiApiKeyUpdateMode.Keep,
-            _ => string.IsNullOrWhiteSpace(apiKey) ? AiApiKeyUpdateMode.Keep : AiApiKeyUpdateMode.Replace
+            AiModelConfig.ProtocolOpenAiCompatible => normalized,
+            AiModelConfig.ProtocolAnthropic => normalized,
+            AiModelConfig.ProtocolAzureOpenAi => normalized,
+            AiModelConfig.ProtocolOllamaNative => normalized,
+            _ => throw new InvalidOperationException("Protocol must be openai_compatible, anthropic, azure_openai, or ollama_native.")
         };
+    }
+
+    private static string NormalizeAiWireApi(string? wireApi)
+    {
+        if (string.IsNullOrWhiteSpace(wireApi))
+            return AiModelConfig.WireApiChatCompletions;
+
+        var normalized = wireApi.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            AiModelConfig.WireApiChatCompletions => normalized,
+            AiModelConfig.WireApiResponses => normalized,
+            _ => throw new InvalidOperationException("WireApi must be chat_completions or responses.")
+        };
+    }
+
+    private static string NormalizeAiAuthMode(string? authMode, string protocol)
+    {
+        if (string.IsNullOrWhiteSpace(authMode))
+            return AiModelConfig.NormalizeAuthMode(null, protocol);
+
+        var normalized = authMode.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            AiModelConfig.AuthModeBearer => normalized,
+            AiModelConfig.AuthModeHeaderKey => normalized,
+            AiModelConfig.AuthModeNone => normalized,
+            _ => throw new InvalidOperationException("AuthMode must be bearer, header_key, or none.")
+        };
+    }
+
+    private static string RequireAiText(string? value, string field)
+    {
+        var normalized = value?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalized))
+            throw new InvalidOperationException($"{field} is required.");
+        return normalized;
+    }
+
+    private static void RejectUnsupportedAiExtraFields(
+        Dictionary<string, string>? extraHeaders,
+        Dictionary<string, string>? extraQuery,
+        Dictionary<string, JsonElement>? extraBody)
+    {
+        if (extraHeaders is not null || extraQuery is not null || extraBody is not null)
+            throw new InvalidOperationException("extraHeaders, extraQuery, and extraBody are read-only in Settings and must be omitted.");
+    }
+
+    private static bool IsRedactedPlaceholder(string value)
+    {
+        var normalized = value.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+            return false;
+
+        if (normalized.Contains("<redacted", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("[redacted", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("<masked", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("[masked", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "redacted", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "masked", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var maskRun = 0;
+        foreach (var character in normalized)
+        {
+            if (character is '*' or '#' or '\u2022' or '\u00B7' or '\u25CF' or '\u25CB')
+            {
+                maskRun += 1;
+                if (maskRun >= 4)
+                    return true;
+            }
+            else
+            {
+                maskRun = 0;
+            }
+        }
+
+        return false;
     }
 
     private static object ToSafeAiModelResponse(AiModelConfig m) => new
@@ -2617,7 +2936,7 @@ public static class SettingsEndpoints
         hasApiKey = !string.IsNullOrWhiteSpace(m.ApiKey),
         apiKeyMasked = AiSecretSanitizer.MaskApiKey(!string.IsNullOrWhiteSpace(m.ApiKey)),
         m.Model,
-        baseUrl = AiSecretSanitizer.Redact(m.BaseUrl ?? ""),
+        baseUrl = AiSecretSanitizer.RedactBaseUrlForReport(m.BaseUrl),
         m.TimeoutMs,
         m.IsActive,
         m.IsEnabled,
@@ -3429,10 +3748,11 @@ public class AiModelCreateRequest
     public string? Name { get; set; }
     public string? DisplayName { get; set; }
     public string? Provider { get; set; }
-    public string? ApiKey { get; set; }
+    public JsonElement ApiKey { get; set; }
     public string? ApiKeyOperation { get; set; }
     public string? Model { get; set; }
-    public string? BaseUrl { get; set; }
+    public JsonElement BaseUrl { get; set; }
+    public string? BaseUrlOperation { get; set; }
     public int TimeoutMs { get; set; }
     public string? Protocol { get; set; }
     public string? WireApi { get; set; }
@@ -3456,10 +3776,11 @@ public class AiModelUpdateRequest
     public string? Name { get; set; }
     public string? DisplayName { get; set; }
     public string? Provider { get; set; }
-    public string? ApiKey { get; set; }
+    public JsonElement ApiKey { get; set; }
     public string? ApiKeyOperation { get; set; }
     public string? Model { get; set; }
-    public string? BaseUrl { get; set; }
+    public JsonElement BaseUrl { get; set; }
+    public string? BaseUrlOperation { get; set; }
     public int TimeoutMs { get; set; }
     public string? Protocol { get; set; }
     public string? WireApi { get; set; }
