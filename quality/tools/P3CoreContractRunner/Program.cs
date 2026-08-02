@@ -319,12 +319,12 @@ internal static class ContractRunner
         Add(cases, "ArrayIndexer", "out_of_range_fails", "Error contract", async () =>
         {
             var result = await op.ExecuteAsync(CreateOperator(OperatorType.ArrayIndexer, ("Index", 99)), Inputs(("List", values)));
-            RequireFailure(result, "绱㈠紩瓒婄晫");
+            RequireFailure(result, "索引越界");
         });
         Add(cases, "ArrayIndexer", "non_enumerable_fails", "Error contract", async () =>
         {
             var result = await op.ExecuteAsync(CreateOperator(OperatorType.ArrayIndexer), Inputs(("List", 123)));
-            RequireFailure(result, "鍙灇涓?);
+            RequireFailure(result, "可枚举");
         });
     }
 
@@ -364,7 +364,7 @@ internal static class ContractRunner
         Add(cases, "JsonExtractor", "required_missing_fails", "Error contract", async () =>
         {
             var result = await op.ExecuteAsync(CreateOperator(OperatorType.JsonExtractor, ("JsonPath", "$.missing"), ("Required", true)), Inputs(("Json", """{"ok":true}""")));
-            RequireFailure(result, "鏈壘鍒拌矾寰?);
+            RequireFailure(result, "未找到路径");
         });
         Add(cases, "JsonExtractor", "invalid_json_fails", "Error contract", async () =>
         {
