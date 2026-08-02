@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
@@ -131,149 +132,155 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
         AddParam(widthOp, "RobustMode", true, "bool");
         AddParam(widthOp, "OutlierSigmaK", 3.0, "double");
 
-        var cases = new List<MeasurementBudgetCase>
+        var fixedInputs = new List<Dictionary<string, object>>();
+        var angleInputs = new Dictionary<string, object> { ["Image"] = CreateMeasurementImage(512, 512) };
+        fixedInputs.Add(angleInputs);
+        var caliperInputs = new Dictionary<string, object> { ["Image"] = CreateCaliperImage(512, 512) };
+        fixedInputs.Add(caliperInputs);
+        var circleInputs = new Dictionary<string, object> { ["Image"] = CreateCircleImage(512, 512) };
+        fixedInputs.Add(circleInputs);
+        var contourInputs = new Dictionary<string, object> { ["Image"] = CreateMeasurementImage(512, 512) };
+        fixedInputs.Add(contourInputs);
+        var colorInputs = new Dictionary<string, object>
         {
-            new("AngleMeasurement", 10.0, async () =>
-            {
-                await ExecuteCaseAsync("AngleMeasurement", angle, angleOp, new Dictionary<string, object> { ["Image"] = CreateMeasurementImage(512, 512) });
-            }),
-            new("CaliperTool", 50.0, async () =>
-            {
-                await ExecuteCaseAsync("CaliperTool", caliper, caliperOp, new Dictionary<string, object> { ["Image"] = CreateCaliperImage(512, 512) });
-            }),
-            new("CircleMeasurement", 30.0, async () =>
-            {
-                await ExecuteCaseAsync("CircleMeasurement", circle, circleOp, new Dictionary<string, object> { ["Image"] = CreateCircleImage(512, 512) });
-            }),
-            new("ContourMeasurement", 40.0, async () =>
-            {
-                await ExecuteCaseAsync("ContourMeasurement", contour, contourOp, new Dictionary<string, object> { ["Image"] = CreateMeasurementImage(512, 512) });
-            }),
-            new("ColorMeasurement", 22.5, async () =>
-            {
-                var inputs = new Dictionary<string, object>
-                {
-                    ["Image"] = CreateMeasurementImage(512, 512),
-                    ["ReferenceColor"] = new Dictionary<string, object> { ["L"] = 0.0, ["A"] = 0.0, ["B"] = 0.0 }
-                };
-                await ExecuteCaseAsync("ColorMeasurement", color, colorOp, inputs);
-            }),
-            new("GapMeasurement", 30.0, async () =>
-            {
-                await ExecuteCaseAsync("GapMeasurement", gap, gapOp, new Dictionary<string, object> { ["Image"] = CreateGapImage(512, 512) });
-            }),
-            new("GeoMeasurement", 20.0, async () =>
-            {
-                await ExecuteCaseAsync("GeoMeasurement", geo, geoOp, new Dictionary<string, object>
-                {
-                    ["Element1"] = new LineData(60, 200, 460, 200),
-                    ["Element2"] = new LineData(260, 40, 260, 460)
-                });
-            }),
-            new("GeometricFitting", 35.0, async () =>
-            {
-                await ExecuteCaseAsync("GeometricFitting", fitting, fittingOp, new Dictionary<string, object> { ["Image"] = CreateCircleImage(512, 512) });
-            }),
-            new("GeometricTolerance", 20.0, async () =>
-            {
-                await ExecuteCaseAsync("GeometricTolerance", tolerance, toleranceOp, new Dictionary<string, object>
-                {
-                    ["FeaturePrimary"] = new LineData(60, 120, 460, 120),
-                    ["DatumA"] = new LineData(60, 220, 460, 220)
-                });
-            }),
-            new("HistogramAnalysis", 10.0, async () =>
-            {
-                await ExecuteCaseAsync("HistogramAnalysis", histogram, histogramOp, new Dictionary<string, object> { ["Image"] = CreateMeasurementImage(512, 512) });
-            }),
-            new("LineLineDistance", 10.0, async () =>
-            {
-                await ExecuteCaseAsync("LineLineDistance", lineLineDistance, lineLineOp, new Dictionary<string, object>
-                {
-                    ["Line1"] = new LineData(20, 20, 420, 20),
-                    ["Line2"] = new LineData(20, 160, 420, 160)
-                });
-            }),
-            new("LineMeasurement", 20.0, async () =>
-            {
-                await ExecuteCaseAsync("LineMeasurement", line, lineOp, new Dictionary<string, object> { ["Image"] = CreateLineImage(512, 512) });
-            }),
-            new("MeasureDistance", 10.0, async () =>
-            {
-                await ExecuteCaseAsync("MeasureDistance", measureDistance, measureDistanceOp, new Dictionary<string, object> { ["Image"] = CreateMeasurementImage(512, 512) });
-            }),
-            new("PixelStatistics", 10.0, async () =>
-            {
-                await ExecuteCaseAsync("PixelStatistics", pixelStats, pixelStatsOp, new Dictionary<string, object> { ["Image"] = CreateMeasurementImage(512, 512) });
-            }),
-            new("PointLineDistance", 10.0, async () =>
-            {
-                await ExecuteCaseAsync("PointLineDistance", pointLineDistance, pointLineOp, new Dictionary<string, object>
-                {
-                    ["Point"] = new Position(240, 210),
-                    ["Line"] = new LineData(60, 200, 460, 200)
-                });
-            }),
-            new("SharpnessEvaluation", 15.0, async () =>
-            {
-                await ExecuteCaseAsync("SharpnessEvaluation", sharpness, sharpnessOp, new Dictionary<string, object> { ["Image"] = CreateMeasurementImage(512, 512) });
-            }),
-            new("WidthMeasurement", 30.0, async () =>
-            {
-                await ExecuteCaseAsync("WidthMeasurement", width, widthOp, new Dictionary<string, object>
-                {
-                    ["Image"] = CreateWidthImage(512, 512),
-                    ["Line1"] = new LineData(180, 120, 180, 390),
-                    ["Line2"] = new LineData(300, 120, 300, 390)
-                });
-            })
+            ["Image"] = CreateMeasurementImage(512, 512),
+            ["ReferenceColor"] = new Dictionary<string, object> { ["L"] = 0.0, ["A"] = 0.0, ["B"] = 0.0 }
         };
-
-        var entries = new List<PerformanceEntry>(cases.Count);
-        foreach (var testCase in cases)
+        fixedInputs.Add(colorInputs);
+        var gapInputs = new Dictionary<string, object> { ["Image"] = CreateGapImage(512, 512) };
+        fixedInputs.Add(gapInputs);
+        var geoInputs = new Dictionary<string, object>
         {
-            var allowed = testCase.BudgetMs * budgetScale;
-            try
-            {
-                StabilizeMeasurementEnvironment();
-                var stats = await MeasureAsync(testCase.ExecuteAsync, warmupIterations, measuredIterations);
-                var status = stats.P95Ms <= allowed ? "PASS" : "FAIL";
-                var notes = status == "PASS" ? "Within budget." : $"p95 {stats.P95Ms:F2}ms exceeded allowed {allowed:F2}ms.";
-                entries.Add(new PerformanceEntry(testCase.Name, testCase.BudgetMs, budgetScale, allowed, stats.MeanMs, stats.P95Ms, stats.P99Ms, status, notes));
-            }
-            catch (Exception ex)
-            {
-                entries.Add(new PerformanceEntry(testCase.Name, testCase.BudgetMs, budgetScale, allowed, 0.0, 0.0, 0.0, "ERROR", $"Execution failed: {ex.Message}"));
-            }
-        }
+            ["Element1"] = new LineData(60, 200, 460, 200),
+            ["Element2"] = new LineData(260, 40, 260, 460)
+        };
+        fixedInputs.Add(geoInputs);
+        var fittingInputs = new Dictionary<string, object> { ["Image"] = CreateCircleImage(512, 512) };
+        fixedInputs.Add(fittingInputs);
+        var toleranceInputs = new Dictionary<string, object>
+        {
+            ["FeaturePrimary"] = new LineData(60, 120, 460, 120),
+            ["DatumA"] = new LineData(60, 220, 460, 220)
+        };
+        fixedInputs.Add(toleranceInputs);
+        var histogramInputs = new Dictionary<string, object> { ["Image"] = CreateMeasurementImage(512, 512) };
+        fixedInputs.Add(histogramInputs);
+        var lineLineInputs = new Dictionary<string, object>
+        {
+            ["Line1"] = new LineData(20, 20, 420, 20),
+            ["Line2"] = new LineData(20, 160, 420, 160)
+        };
+        fixedInputs.Add(lineLineInputs);
+        var lineInputs = new Dictionary<string, object> { ["Image"] = CreateLineImage(512, 512) };
+        fixedInputs.Add(lineInputs);
+        var measureDistanceInputs = new Dictionary<string, object> { ["Image"] = CreateMeasurementImage(512, 512) };
+        fixedInputs.Add(measureDistanceInputs);
+        var pixelStatsInputs = new Dictionary<string, object> { ["Image"] = CreateMeasurementImage(512, 512) };
+        fixedInputs.Add(pixelStatsInputs);
+        var pointLineInputs = new Dictionary<string, object>
+        {
+            ["Point"] = new Position(240, 210),
+            ["Line"] = new LineData(60, 200, 460, 200)
+        };
+        fixedInputs.Add(pointLineInputs);
+        var sharpnessInputs = new Dictionary<string, object> { ["Image"] = CreateMeasurementImage(512, 512) };
+        fixedInputs.Add(sharpnessInputs);
+        var widthInputs = new Dictionary<string, object>
+        {
+            ["Image"] = CreateWidthImage(512, 512),
+            ["Line1"] = new LineData(180, 120, 180, 390),
+            ["Line2"] = new LineData(300, 120, 300, 390)
+        };
+        fixedInputs.Add(widthInputs);
 
-        var artifacts = WriteReport(entries, warmupIterations, measuredIterations, budgetScale, gateProfile);
-        Console.WriteLine($"Measurement performance budget report written: {artifacts.MarkdownPath}");
-
-        var failed = entries.Where(entry => !entry.Status.Equals("PASS", StringComparison.OrdinalIgnoreCase)).ToList();
-        Assert.True(
-            failed.Count == 0,
-            "Measurement performance budget gate failed: " +
-            string.Join("; ", failed.Select(item => $"{item.Name}({item.Status}): {item.Notes}")));
-    }
-
-    private static async Task ExecuteCaseAsync(string name, OperatorBase executor, Operator op, Dictionary<string, object> inputs)
-    {
-        OperatorExecutionOutput? result = null;
-        RetainInputImageWrappers(inputs);
         try
         {
-            result = await executor.ExecuteAsync(op, inputs);
-            if (!result.IsSuccess)
+            var cases = new List<MeasurementBudgetCase>
             {
-                throw new InvalidOperationException($"{name} failed: {result.ErrorMessage}");
+                new("AngleMeasurement", 10.0, () => ExecuteCaseAsync("AngleMeasurement", angle, angleOp, angleInputs)),
+                new("CaliperTool", 50.0, () => ExecuteCaseAsync("CaliperTool", caliper, caliperOp, caliperInputs)),
+                new("CircleMeasurement", 30.0, () => ExecuteCaseAsync("CircleMeasurement", circle, circleOp, circleInputs)),
+                new("ContourMeasurement", 40.0, () => ExecuteCaseAsync("ContourMeasurement", contour, contourOp, contourInputs)),
+                new("ColorMeasurement", 22.5, () => ExecuteCaseAsync("ColorMeasurement", color, colorOp, colorInputs)),
+                new("GapMeasurement", 30.0, () => ExecuteCaseAsync("GapMeasurement", gap, gapOp, gapInputs)),
+                new("GeoMeasurement", 20.0, () => ExecuteCaseAsync("GeoMeasurement", geo, geoOp, geoInputs)),
+                new("GeometricFitting", 35.0, () => ExecuteCaseAsync("GeometricFitting", fitting, fittingOp, fittingInputs)),
+                new("GeometricTolerance", 20.0, () => ExecuteCaseAsync("GeometricTolerance", tolerance, toleranceOp, toleranceInputs)),
+                new("HistogramAnalysis", 10.0, () => ExecuteCaseAsync("HistogramAnalysis", histogram, histogramOp, histogramInputs)),
+                new("LineLineDistance", 10.0, () => ExecuteCaseAsync("LineLineDistance", lineLineDistance, lineLineOp, lineLineInputs)),
+                new("LineMeasurement", 20.0, () => ExecuteCaseAsync("LineMeasurement", line, lineOp, lineInputs)),
+                new("MeasureDistance", 10.0, () => ExecuteCaseAsync("MeasureDistance", measureDistance, measureDistanceOp, measureDistanceInputs)),
+                new("PixelStatistics", 10.0, () => ExecuteCaseAsync("PixelStatistics", pixelStats, pixelStatsOp, pixelStatsInputs)),
+                new("PointLineDistance", 10.0, () => ExecuteCaseAsync("PointLineDistance", pointLineDistance, pointLineOp, pointLineInputs)),
+                new("SharpnessEvaluation", 15.0, () => ExecuteCaseAsync("SharpnessEvaluation", sharpness, sharpnessOp, sharpnessInputs)),
+                new("WidthMeasurement", 30.0, () => ExecuteCaseAsync("WidthMeasurement", width, widthOp, widthInputs))
+            };
+
+            var entries = new List<PerformanceEntry>(cases.Count);
+            foreach (var testCase in cases)
+            {
+                var allowed = testCase.BudgetMs * budgetScale;
+                try
+                {
+                    StabilizeMeasurementEnvironment();
+                    var stats = await MeasureAsync(testCase.ExecuteAsync, warmupIterations, measuredIterations);
+                    var status = stats.P95Ms <= allowed ? "PASS" : "FAIL";
+                    var notes = status == "PASS" ? "Within budget." : $"p95 {stats.P95Ms:F2}ms exceeded allowed {allowed:F2}ms.";
+                    entries.Add(new PerformanceEntry(testCase.Name, testCase.BudgetMs, budgetScale, allowed, stats.MeanMs, stats.P95Ms, stats.P99Ms, status, notes, stats.SamplesMs));
+                }
+                catch (Exception ex)
+                {
+                    entries.Add(new PerformanceEntry(testCase.Name, testCase.BudgetMs, budgetScale, allowed, 0.0, 0.0, 0.0, "ERROR", $"Execution failed: {ex.Message}", []));
+                }
             }
+
+            var artifacts = WriteReport(entries, warmupIterations, measuredIterations, budgetScale, gateProfile);
+            Console.WriteLine($"Measurement performance budget report written: {artifacts.MarkdownPath}");
+
+            var failed = entries.Where(entry => !entry.Status.Equals("PASS", StringComparison.OrdinalIgnoreCase)).ToList();
+            Assert.True(
+                failed.Count == 0,
+                "Measurement performance budget gate failed: " +
+                string.Join("; ", failed.Select(item => $"{item.Name}({item.Status}): {item.Notes}")));
         }
         finally
         {
-            DisposeObjectGraph(result?.OutputData, new HashSet<object>(ReferenceEqualityComparer.Instance));
-            DisposeObjectGraph(inputs, new HashSet<object>(ReferenceEqualityComparer.Instance));
+            foreach (var inputs in fixedInputs)
+            {
+                DisposeObjectGraph(inputs, new HashSet<object>(ReferenceEqualityComparer.Instance));
+            }
         }
+    }
+
+    private static async Task<double> ExecuteCaseAsync(
+        string name,
+        OperatorBase executor,
+        Operator op,
+        IReadOnlyDictionary<string, object> fixedInputs)
+    {
+        var inputs = CreateInvocationInputs(fixedInputs);
+        OperatorExecutionOutput? result = null;
+        var elapsedMs = 0.0;
+        try
+        {
+            var start = Stopwatch.GetTimestamp();
+            result = await executor.ExecuteAsync(op, inputs);
+            elapsedMs = (Stopwatch.GetTimestamp() - start) * 1000.0 / Stopwatch.Frequency;
+        }
+        finally
+        {
+            // OperatorBase owns and releases the per-call image leases. Only dispose output resources and non-image input resources here.
+            var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            DisposeObjectGraph(result?.OutputData, visited);
+            DisposeObjectGraph(inputs, visited, releaseImageWrappers: false);
+        }
+
+        if (result == null || !result.IsSuccess)
+        {
+            throw new InvalidOperationException($"{name} failed: {result?.ErrorMessage ?? "No execution result."}");
+        }
+
+        return elapsedMs;
     }
 
     private static void StabilizeMeasurementEnvironment()
@@ -283,24 +290,21 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
         GC.Collect();
     }
 
-    private static void RetainInputImageWrappers(Dictionary<string, object>? inputs)
+    private static Dictionary<string, object> CreateInvocationInputs(IReadOnlyDictionary<string, object> fixedInputs)
     {
-        if (inputs == null)
+        var inputs = new Dictionary<string, object>(fixedInputs.Count, StringComparer.Ordinal);
+        var retained = new HashSet<ImageWrapper>(ReferenceEqualityComparer.Instance);
+        foreach (var (name, value) in fixedInputs)
         {
-            return;
+            inputs[name] = value is ImageWrapper image && retained.Add(image)
+                ? image.AddRef()
+                : value;
         }
 
-        var retained = new HashSet<ImageWrapper>(ReferenceEqualityComparer.Instance);
-        foreach (var value in inputs.Values)
-        {
-            if (value is ImageWrapper image && retained.Add(image))
-            {
-                image.AddRef();
-            }
-        }
+        return inputs;
     }
 
-    private static async Task<PerfStats> MeasureAsync(Func<Task> action, int warmupIterations, int measuredIterations)
+    private static async Task<PerfStats> MeasureAsync(Func<Task<double>> action, int warmupIterations, int measuredIterations)
     {
         for (var i = 0; i < warmupIterations; i++)
         {
@@ -311,14 +315,10 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
         var samples = new List<double>(measuredIterations);
         for (var i = 0; i < measuredIterations; i++)
         {
-            var start = Stopwatch.GetTimestamp();
-            await action();
-            var end = Stopwatch.GetTimestamp();
-            samples.Add((end - start) * 1000.0 / Stopwatch.Frequency);
+            samples.Add(await action());
         }
 
-        samples.Sort();
-        return new PerfStats(samples);
+        return new PerfStats(samples, samples.OrderBy(value => value).ToArray());
     }
 
     private static PerformanceReportArtifacts WriteReport(
@@ -334,6 +334,15 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
         var reportPath = Path.Combine(reportDir, $"{ReportFileStem}.md");
         var jsonPath = Path.Combine(reportDir, $"{ReportFileStem}.json");
         var generatedAtUtc = DateTime.UtcNow;
+        var environment = new PerformanceEnvironmentMetadata(
+            Environment.MachineName,
+            RuntimeInformation.OSDescription,
+            RuntimeInformation.OSArchitecture.ToString(),
+            RuntimeInformation.FrameworkDescription,
+            Environment.Version.ToString(),
+            RuntimeInformation.ProcessArchitecture.ToString(),
+            Environment.ProcessorCount,
+            Stopwatch.Frequency);
         var builder = new StringBuilder();
         builder.AppendLine("# Measurement Performance Budget Report");
         builder.AppendLine();
@@ -342,6 +351,13 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
         builder.AppendLine($"Warmup Iterations: {warmupIterations}");
         builder.AppendLine($"Measured Iterations: {measuredIterations}");
         builder.AppendLine($"Budget Scale: {budgetScale.ToString("0.00", CultureInfo.InvariantCulture)}");
+        builder.AppendLine($"Machine: {environment.MachineName}");
+        builder.AppendLine($"OS: {environment.OSDescription} ({environment.OSArchitecture})");
+        builder.AppendLine($"Runtime: {environment.FrameworkDescription}; .NET {environment.RuntimeVersion}");
+        builder.AppendLine($"Process Architecture: {environment.ProcessArchitecture}");
+        builder.AppendLine($"Processors: {environment.ProcessorCount}");
+        builder.AppendLine($"Stopwatch Frequency: {environment.StopwatchFrequency}");
+        builder.AppendLine($"Measured Sample Metadata: {entries.Sum(entry => entry.SamplesMs.Count)} total samples; {measuredIterations} requested samples per case");
         builder.AppendLine();
         builder.AppendLine("| Operator | Budget (ms) | Scale | Allowed P95 (ms) | Mean (ms) | P95 (ms) | P99 (ms) | Status | Notes |");
         builder.AppendLine("|---|---:|---:|---:|---:|---:|---:|---|---|");
@@ -350,6 +366,17 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
         {
             builder.AppendLine(
                 $"| {entry.Name} | {entry.BudgetMs.ToString("0.##", CultureInfo.InvariantCulture)} | {entry.Scale.ToString("0.00", CultureInfo.InvariantCulture)} | {entry.AllowedMs.ToString("0.##", CultureInfo.InvariantCulture)} | {entry.MeanMs.ToString("0.00", CultureInfo.InvariantCulture)} | {entry.P95Ms.ToString("0.00", CultureInfo.InvariantCulture)} | {entry.P99Ms.ToString("0.00", CultureInfo.InvariantCulture)} | {entry.Status} | {entry.Notes} |");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("## Raw Measured Samples (ms)");
+        builder.AppendLine();
+        builder.AppendLine("| Operator | Sample Count | Samples (measurement order) |");
+        builder.AppendLine("|---|---:|---|");
+        foreach (var entry in entries.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            var samples = string.Join(", ", entry.SamplesMs.Select(sample => sample.ToString("0.0000", CultureInfo.InvariantCulture)));
+            builder.AppendLine($"| {entry.Name} | {entry.SamplesMs.Count} | {samples} |");
         }
 
         File.WriteAllText(reportPath, builder.ToString());
@@ -363,6 +390,14 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
                     WarmupIterations = warmupIterations,
                     MeasuredIterations = measuredIterations,
                     BudgetScale = budgetScale,
+                    Environment = environment,
+                    SampleMetadata = new
+                    {
+                        WarmupIterations = warmupIterations,
+                        MeasuredIterations = measuredIterations,
+                        TotalMeasuredSamples = entries.Sum(entry => entry.SamplesMs.Count),
+                        SamplesPerEntry = entries.ToDictionary(entry => entry.Name, entry => entry.SamplesMs.Count, StringComparer.OrdinalIgnoreCase)
+                    },
                     Entries = entries
                 },
                 new JsonSerializerOptions { WriteIndented = true }));
@@ -490,7 +525,10 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
         return new ImageWrapper(mat);
     }
 
-    private static void DisposeObjectGraph(object? value, HashSet<object> visited)
+    private static void DisposeObjectGraph(
+        object? value,
+        HashSet<object> visited,
+        bool releaseImageWrappers = true)
     {
         if (value == null)
         {
@@ -504,7 +542,11 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
 
         if (value is ImageWrapper imageWrapper)
         {
-            imageWrapper.Release();
+            if (releaseImageWrappers)
+            {
+                imageWrapper.Release();
+            }
+
             return;
         }
 
@@ -518,7 +560,7 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
         {
             foreach (DictionaryEntry entry in dictionary)
             {
-                DisposeObjectGraph(entry.Value, visited);
+                DisposeObjectGraph(entry.Value, visited, releaseImageWrappers);
             }
 
             return;
@@ -528,7 +570,7 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
         {
             foreach (var item in enumerable)
             {
-                DisposeObjectGraph(item, visited);
+                DisposeObjectGraph(item, visited, releaseImageWrappers);
             }
         }
     }
@@ -545,13 +587,13 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
         return orderedValues[index];
     }
 
-    private sealed record MeasurementBudgetCase(string Name, double BudgetMs, Func<Task> ExecuteAsync);
+    private sealed record MeasurementBudgetCase(string Name, double BudgetMs, Func<Task<double>> ExecuteAsync);
 
-    private sealed record PerfStats(IReadOnlyList<double> Samples)
+    private sealed record PerfStats(IReadOnlyList<double> SamplesMs, IReadOnlyList<double> OrderedSamplesMs)
     {
-        public double MeanMs => Samples.Count == 0 ? 0 : Samples.Average();
-        public double P95Ms => Percentile(Samples, 0.95);
-        public double P99Ms => Percentile(Samples, 0.99);
+        public double MeanMs => SamplesMs.Count == 0 ? 0 : SamplesMs.Average();
+        public double P95Ms => Percentile(OrderedSamplesMs, 0.95);
+        public double P99Ms => Percentile(OrderedSamplesMs, 0.99);
     }
 
     private sealed record PerformanceEntry(
@@ -563,7 +605,18 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
         double P95Ms,
         double P99Ms,
         string Status,
-        string Notes);
+        string Notes,
+        IReadOnlyList<double> SamplesMs);
+
+    private sealed record PerformanceEnvironmentMetadata(
+        string MachineName,
+        string OSDescription,
+        string OSArchitecture,
+        string FrameworkDescription,
+        string RuntimeVersion,
+        string ProcessArchitecture,
+        int ProcessorCount,
+        long StopwatchFrequency);
 
     private sealed record PerformanceReportArtifacts(
         string ReportDirectory,
