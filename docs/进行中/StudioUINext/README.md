@@ -59,6 +59,7 @@ F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision
 - F05：`DONE`，唯一当前状态入口是 [F05 完成报告](./F05_完成报告.md)。G1-G6 的本地、Browser、真实 WebView2 Debug/Release、Windows 125% DPI、Release publish、Remote CI 与 Final Gate 已通过。`PRODUCTION_ACCEPTANCE=BLOCKED`、`DEFAULT_ENTRY_CHANGE=BLOCKED`、`F06_IMPLEMENTATION=FORBIDDEN`。
 - F06：G1 合同、安全身份与唯一 Owner 地基已完成，当前唯一状态入口是 [F06 G1 阶段报告](./F06_G1_AI合同安全身份与唯一Owner地基.md)。B1-B5 已关闭；[Handoff Artifact ADR](./ADR-F06-G1-Workspace-Handoff-Artifact.md) 状态为 `ADR_APPROVED_IMPLEMENTATION_DEFERRED_TO_G4`；Remote CI run `30423131238` 与 Final Gate 已通过。当前保持 `F06_G1_STATE=DONE`、`F06_G2_ENTRY=AWAITING_REVIEW`、`F06_G2_IMPLEMENTATION=FORBIDDEN`、`DEFAULT_ENTRY_CHANGE=BLOCKED`、`LEGACY_AI_RETIREMENT=NOT_APPROVED`。
 - F07：G1-G6、G7、G8 及 G7/G8-R 已完成；G9 集成验收已在 source evidence SHA `a5f017d0d0ae6bf3ba20ec85488bb5afa96e21ce` 上闭环。当前状态由 [F07 G9 集成验收与 Final Evidence](./F07_G9_集成验收与FinalEvidence闭环.md) 维护：`F07_G9_STATE=DONE`、`F07_ENGINEERING_STATE=DONE`、`F07_SETTINGS_IMPORT_EXPORT=EXCLUDED`、`F07_REAL_HARDWARE_VALIDATION=NOT_PERFORMED`、`F07_REAL_LLM_PRODUCT_QUALITY=NOT_EVALUATED`、`PRODUCTION_ACCEPTANCE=BLOCKED`、`DEFAULT_ENTRY_CHANGE=BLOCKED`、`LEGACY_SETTINGS_RETIREMENT=NOT_APPROVED`。G10 未进入。
+- F08：G0 post-G9 delta reconcile 与合同冻结已完成，实施基线固定在 `123665268cfc579e74561cc4bc2c41d582134e2b`。当前只允许进入 G1；G2-G7 继续串行门禁。状态与冻结合同见 [F08 G0 Post-G9 Delta Reconcile 与合同冻结](./F08_POST_G9_DELTA与G0合同冻结.md)。
 - `Studio:StudioUiEnabled=false` 保持不变；legacy 仍是默认入口。
 
 ## 阶段门禁
@@ -124,5 +125,6 @@ F04-R 纠偏期间以本目录链接的 F04-R 主计划与 G0/G1 受控文档为
 - [F07 G1-R 权限合同与操作门禁修补报告（当前权威入口）](./F07_G1-R_权限合同与操作门禁修补报告.md)
 - [F07 G7/G8-R Station token 与 AI 模型 authority 修补报告](./F07_G7_G8_R_StationToken与AI模型Authority修补报告.md)
 - [F07 G9 集成验收与 Final Evidence 闭环](./F07_G9_集成验收与FinalEvidence闭环.md)
+- [F08 G0 Post-G9 Delta Reconcile 与合同冻结](./F08_POST_G9_DELTA与G0合同冻结.md)
 - [仓库级协作规则](../../../AGENTS.md)
 - [旧 Studio2 历史入口](../Studio2/README.md)（历史取证，不是新计划）
