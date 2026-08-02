@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reflection;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Cameras;
@@ -69,14 +68,15 @@ public sealed class StationSyncHostedServiceTests
         {
             InvokeResultAvailable(fixture.Service, BuildResult("run-1"));
 
-            var stopwatch = Stopwatch.StartNew();
-            var secondInvoke = Task.Run(() => InvokeResultAvailable(fixture.Service, BuildResult("run-2")));
+            var secondInvoke = Task.Factory.StartNew(
+                () => InvokeResultAvailable(fixture.Service, BuildResult("run-2")),
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
             var completed = await Task.WhenAny(secondInvoke, Task.Delay(TimeSpan.FromMilliseconds(250)));
-            stopwatch.Stop();
 
             completed.Should().Be(secondInvoke, "Station telemetry must not block the runtime result callback when the sync queue is saturated.");
             await secondInvoke;
-            stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(250));
             ReadPrivateLong(fixture.Service, "_droppedResultSummaries").Should().Be(1);
             ReadPrivateLong(fixture.Service, "_queuedResultSummaries").Should().Be(1);
         }
