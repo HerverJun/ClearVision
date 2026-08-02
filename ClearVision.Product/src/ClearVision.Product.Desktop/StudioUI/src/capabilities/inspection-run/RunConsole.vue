@@ -382,7 +382,7 @@ const formattedTime = (value: string | null): string => {
 @media (max-height: 760px) {
   .run-console[data-run-mode="formal"] {
     max-height: max(
-      160px,
+      152px,
       calc(
         100vh -
         var(--cv-workspace-topbar-height, 52px) -

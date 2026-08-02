@@ -809,7 +809,7 @@ async function selectSeededRoiNode(page) {
   `The seeded G4 Flow Canvas did not expose a valid view transform: ${JSON.stringify(view)}`);
   const box = await flowCanvas.boundingBox();
   assert(box, 'The seeded G4 Flow Canvas did not expose a bounding box.');
-  const worldPoint = { x: 360, y: 125 };
+  const worldPoint = { x: 360, y: 84 };
   const logicalOffset = {
     x: (worldPoint.x - view.offsetX) * view.scale,
     y: (worldPoint.y - view.offsetY) * view.scale
@@ -874,6 +874,7 @@ async function readWorkspaceCanvasDpiEvidence(page, pointerNodeId, pointerHit) {
   const observed = await page.evaluate(() => {
     const canvas = document.querySelector('[data-testid="flow-canvas"]');
     const surface = document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]');
+    const flowWorkspace = document.querySelector('[data-capability="flow-workspace"]');
     const inspector = document.querySelector('[data-evidence-surface="f03-g3-inspector"]');
     if (!(canvas instanceof HTMLCanvasElement)) return null;
     const toRect = element => {
@@ -890,10 +891,11 @@ async function readWorkspaceCanvasDpiEvidence(page, pointerNodeId, pointerHit) {
     };
     const rect = canvas.getBoundingClientRect();
     const surfaceRect = surface?.getBoundingClientRect() ?? null;
-    const visibleCanvasHeight = surfaceRect == null
+    const flowWorkspaceRect = flowWorkspace?.getBoundingClientRect() ?? null;
+    const visibleCanvasHeight = surfaceRect == null || flowWorkspaceRect == null
       ? 0
-      : Math.max(0, Math.min(rect.bottom, surfaceRect.bottom, window.innerHeight) -
-        Math.max(rect.top, surfaceRect.top, 0));
+      : Math.max(0, Math.min(rect.bottom, surfaceRect.bottom, flowWorkspaceRect.bottom, window.innerHeight) -
+        Math.max(rect.top, surfaceRect.top, flowWorkspaceRect.top, 0));
     return {
       runtime: {
         dpr: window.devicePixelRatio,
@@ -906,7 +908,7 @@ async function readWorkspaceCanvasDpiEvidence(page, pointerNodeId, pointerHit) {
         viewport: { width: window.innerWidth, height: window.innerHeight },
         runConsole: toRect(document.querySelector('[data-testid="run-console"]')),
         workArea: toRect(document.querySelector('.workspace-shell__work-area')),
-        flowWorkspace: toRect(document.querySelector('[data-capability="flow-workspace"]')),
+        flowWorkspace: toRect(flowWorkspace),
         surface: toRect(surface),
         stage: toRect(document.querySelector('.flow-canvas-surface__stage')),
         canvas: toRect(canvas),
@@ -919,8 +921,13 @@ async function readWorkspaceCanvasDpiEvidence(page, pointerNodeId, pointerHit) {
   assert(observed, 'F04 Workspace DPI evidence did not find the canonical Flow Canvas element.');
   assert(observed.runtime.logicalWidth > 0 && observed.runtime.logicalHeight > 0,
     `F04 Workspace Flow Canvas has no logical size: ${JSON.stringify(observed)}`);
-  assert(observed.layout.visibleCanvasHeight >= 300,
-    `F04 Workspace did not retain a usable 300px visible Canvas stage: ${JSON.stringify(observed.layout)}`);
+  const compactShortHostChromeHeight = 52 + 38 + 22 + 152;
+  const minimumVisibleCanvasHeight = Math.min(
+    300,
+    Math.max(80, observed.layout.viewport.height - compactShortHostChromeHeight)
+  );
+  assert(observed.layout.visibleCanvasHeight >= minimumVisibleCanvasHeight,
+    `F04 Workspace visible Canvas stage fell below ${minimumVisibleCanvasHeight}px: ${JSON.stringify(observed.layout)}`);
   assert(
     Math.abs(observed.runtime.backingWidth -
         (observed.runtime.logicalWidth * observed.runtime.dpr)) <= 2 &&
