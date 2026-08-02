@@ -281,10 +281,11 @@ onBeforeUnmount(() => layoutOwner.dispose());
   grid-template-columns:
     var(--cv-workspace-operator-rail-width)
     var(--workspace-inspector-width)
-    6px
+    8px
     minmax(680px, 1fr)
-    6px
+    8px
     var(--workspace-preview-width);
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   background: var(--cv-surface-page);
 }
@@ -335,7 +336,7 @@ onBeforeUnmount(() => layoutOwner.dispose());
     grid-template-columns:
       var(--cv-workspace-operator-rail-width)
       minmax(560px, 1fr)
-      6px
+      8px
       var(--workspace-preview-width);
   }
   .flow-workspace__inspector-splitter,

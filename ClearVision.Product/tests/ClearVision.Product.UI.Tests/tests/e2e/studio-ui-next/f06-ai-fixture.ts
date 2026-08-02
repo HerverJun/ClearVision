@@ -649,6 +649,41 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
         eligibleOutputs: []
       });
     }
+    const realtimeState = url.pathname.match(/^\/api\/inspection\/realtime\/([0-9a-f-]{36})\/state$/i);
+    if (realtimeState && request.method() === 'GET') {
+      return json(200, {
+        projectId: realtimeState[1],
+        status: 'Idle',
+        isBusy: false,
+        sessionId: null,
+        startedAt: null,
+        stoppedAt: null,
+        clientSnapshotId: null,
+        persistenceRevision: null,
+        canonicalFlowHash: null,
+        decisionConfigurationHash: null,
+        executionSource: null,
+        sessionType: null
+      });
+    }
+    if (url.pathname === '/api/inspection/admission' && request.method() === 'POST') {
+      const requestIdentity = body as {
+        projectId: string;
+        clientSnapshotId: string;
+        expectedPersistenceRevision: number;
+      };
+      return json(200, {
+        allowed: true,
+        code: null,
+        message: 'fixture admission allowed',
+        projectId: requestIdentity.projectId,
+        clientSnapshotId: requestIdentity.clientSnapshotId,
+        projectPersistenceRevision: requestIdentity.expectedPersistenceRevision,
+        canonicalFlowHash: 'fixture-f06-flow-hash',
+        decisionConfigurationHash: 'fixture-f06-decision-hash',
+        violations: []
+      });
+    }
     if (url.pathname === '/api/projects' && request.method() === 'POST') {
       const create = body as { clientOperationId: string; name: string; description: string | null };
       const created = workspaceProject(f06CreatedProjectId, 0, null, create.name, create.description);

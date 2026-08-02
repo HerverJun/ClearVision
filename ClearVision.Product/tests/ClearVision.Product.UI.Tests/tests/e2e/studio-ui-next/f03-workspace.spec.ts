@@ -417,6 +417,26 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
       );
       return;
     }
+    const realtimeStateMatch = url.pathname.match(
+      /^\/api\/inspection\/realtime\/([0-9a-f-]{36})\/state$/i
+    );
+    if (realtimeStateMatch && request.method() === 'GET') {
+      await fulfillF03Json(route, 200, {
+        projectId: realtimeStateMatch[1],
+        status: 'Idle',
+        isBusy: false,
+        sessionId: null,
+        startedAt: null,
+        stoppedAt: null,
+        clientSnapshotId: null,
+        persistenceRevision: null,
+        canonicalFlowHash: null,
+        decisionConfigurationHash: null,
+        executionSource: null,
+        sessionType: null
+      }, fixtureSchema);
+      return;
+    }
     if (url.pathname === '/api/inspection/admission' && request.method() === 'POST') {
       runCall += 1;
       const requestBody = request.postDataJSON() as Readonly<Record<string, unknown>>;

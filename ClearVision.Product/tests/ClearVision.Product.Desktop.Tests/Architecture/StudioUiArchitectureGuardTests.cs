@@ -167,6 +167,7 @@ public sealed class StudioUiArchitectureGuardTests
             "src/capabilities/settings/settingsOwner.ts",
             "src/capabilities/settings/settingsWriteCoordinator.ts",
             "src/capabilities/stations-read/stationAdminCommandOwner.ts",
+            "src/capabilities/stations-read/stationLifecycleOwner.ts",
             "src/platform/diagnostics/runtimeDiagnostics.ts",
             "src/platform/query/readQuery.ts"
         });

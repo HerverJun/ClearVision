@@ -73,14 +73,17 @@ export function isF03G4RequestAllowlist(
     if (entry.method === 'POST') {
       return entry.path === '/api/flows/preview-node' ||
         entry.path === '/api/inspection/decision-configuration/validate' ||
+        entry.path === '/api/inspection/admission' ||
         /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/open$/i
           .test(entry.path);
     }
     if (entry.method === 'DELETE') return /^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(entry.path);
     if (entry.method !== 'GET') return false;
     return entry.path === '/api/auth/setup-status' || entry.path === '/api/auth/me' ||
+      entry.path === '/api/projects' ||
       entry.path === '/api/operators/library?includeCompatibility=true' ||
       entry.path === '/api/cameras/bindings' ||
+      /^\/api\/inspection\/realtime\/[0-9a-f-]{36}\/state$/i.test(entry.path) ||
       /^\/api\/operators\/(?:\d+|[A-Za-z][A-Za-z0-9_]*)\/metadata$/.test(entry.path) ||
       /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
         .test(entry.path) ||

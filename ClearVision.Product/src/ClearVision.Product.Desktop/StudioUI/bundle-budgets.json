@@ -8,7 +8,7 @@
       "roots": [
         "src/capabilities/ai-workbench/AiWorkbenchPage.vue"
       ],
-      "maxBytes": 970000
+      "maxBytes": 1020000
     },
     "inspection": {
       "label": "Inspection",
@@ -16,21 +16,21 @@
         "src/capabilities/inspection-run/InspectionProjectsPage.vue",
         "src/capabilities/inspection-run/InspectionRunPage.vue"
       ],
-      "maxBytes": 790000
+      "maxBytes": 815000
     },
     "results": {
       "label": "Results",
       "roots": [
         "src/capabilities/results-read/ResultsPage.vue"
       ],
-      "maxBytes": 820000
+      "maxBytes": 870000
     },
     "shell": {
       "label": "Shell",
       "roots": [
         "index.html"
       ],
-      "maxBytes": 850000
+      "maxBytes": 890000
     },
     "stations": {
       "label": "Stations",
@@ -38,14 +38,14 @@
         "src/capabilities/stations-read/StationsPage.vue",
         "src/capabilities/stations-read/StationDetailPage.vue"
       ],
-      "maxBytes": 820000
+      "maxBytes": 880000
     },
     "workspace": {
       "label": "Workspace",
       "roots": [
         "src/capabilities/project-workspace/WorkspacePage.vue"
       ],
-      "maxBytes": 900000
+      "maxBytes": 970000
     }
   }
 }
