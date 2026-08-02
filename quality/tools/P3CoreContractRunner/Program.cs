@@ -4,6 +4,7 @@ using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
@@ -318,12 +319,12 @@ internal static class ContractRunner
         Add(cases, "ArrayIndexer", "out_of_range_fails", "Error contract", async () =>
         {
             var result = await op.ExecuteAsync(CreateOperator(OperatorType.ArrayIndexer, ("Index", 99)), Inputs(("List", values)));
-            RequireFailure(result, "索引越界");
+            RequireFailure(result, "绱㈠紩瓒婄晫");
         });
         Add(cases, "ArrayIndexer", "non_enumerable_fails", "Error contract", async () =>
         {
             var result = await op.ExecuteAsync(CreateOperator(OperatorType.ArrayIndexer), Inputs(("List", 123)));
-            RequireFailure(result, "可枚举");
+            RequireFailure(result, "鍙灇涓?);
         });
     }
 
@@ -363,7 +364,7 @@ internal static class ContractRunner
         Add(cases, "JsonExtractor", "required_missing_fails", "Error contract", async () =>
         {
             var result = await op.ExecuteAsync(CreateOperator(OperatorType.JsonExtractor, ("JsonPath", "$.missing"), ("Required", true)), Inputs(("Json", """{"ok":true}""")));
-            RequireFailure(result, "未找到路径");
+            RequireFailure(result, "鏈壘鍒拌矾寰?);
         });
         Add(cases, "JsonExtractor", "invalid_json_fails", "Error contract", async () =>
         {
@@ -1160,11 +1161,14 @@ internal static class ContractRunner
             RequireFailure(result);
         });
 
-        Add(cases, "ImageAcquisition", "image_input_without_file_path_fails", "SourceType contract", async () =>
+        Add(cases, "ImageAcquisition", "image_input_without_file_path_succeeds", "SourceType contract", async () =>
         {
             var bytes = CreatePngBytes(8, 6);
             var result = await op.ExecuteAsync(CreateOperator(OperatorType.ImageAcquisition), Inputs(("Image", bytes)));
-            RequireFailure(result);
+            RequireSuccess(result);
+            RequireValue(result, "Width", 8);
+            RequireValue(result, "Height", 6);
+            RequireValue(result, "Source", "provided-image");
         });
 
         for (var i = 0; i < 4; i++)
@@ -1763,6 +1767,11 @@ internal sealed class SingleServiceProvider(IFlowExecutionService flowExecutionS
             return flowExecutionService;
         }
 
+        if (serviceType == typeof(IFlowExecutionEngine) && flowExecutionService is IFlowExecutionEngine flowExecutionEngine)
+        {
+            return flowExecutionEngine;
+        }
+
         if (serviceType == typeof(IServiceScopeFactory))
         {
             return this;
@@ -1777,7 +1786,7 @@ internal sealed class SingleServiceProvider(IFlowExecutionService flowExecutionS
 }
 
 internal sealed class StubFlowExecutionService(
-    Func<Dictionary<string, object>?, FlowExecutionResult>? execute = null) : IFlowExecutionService
+    Func<Dictionary<string, object>?, FlowExecutionResult>? execute = null) : IFlowExecutionService, IFlowExecutionEngine
 {
     private readonly Func<Dictionary<string, object>?, FlowExecutionResult> _execute =
         execute ?? (_ => new FlowExecutionResult
@@ -1796,8 +1805,57 @@ internal sealed class StubFlowExecutionService(
         return Task.FromResult(_execute(inputData));
     }
 
-    public Task<OperatorExecutionResult> ExecuteOperatorAsync(Operator @operator, Dictionary<string, object>? inputs = null)
+    public Task<FlowExecutionResult> ExecuteWithSnapshotAsync(
+        ExecutionSnapshot snapshot,
+        Dictionary<string, object>? inputData = null,
+        bool enableParallel = false,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_execute(inputData));
+    }
+
+    public Task<FlowExecutionResult> ExecuteWithSnapshotAsync(
+        ExecutionSnapshot snapshot,
+        Dictionary<string, object>? inputData,
+        ProjectVariableExecutionContext projectVariables,
+        bool enableParallel = false,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_execute(inputData));
+    }
+
+    public Task<FlowDebugExecutionResult> ExecuteDebugWithSnapshotAsync(
+        ExecutionSnapshot snapshot,
+        DebugOptions options,
+        Dictionary<string, object>? inputData = null,
+        ProjectVariableExecutionContext? projectVariables = null,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("Debug execution is outside the P3 contract baseline.");
+    }
+
+    public Task<OperatorExecutionResult> ExecuteOperatorAsync(
+        GovernedOperatorExecutionContext context,
+        Operator @operator,
+        Dictionary<string, object>? inputs = null,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("Governed operator execution is outside the P3 contract baseline.");
+    }
+
+    public FlowValidationResult ValidateSnapshot(ExecutionSnapshot snapshot)
+    {
+        return new FlowValidationResult { IsValid = true };
+    }
+
+    public Task<OperatorExecutionResult> ExecuteOperatorAsync(
+        Operator @operator,
+        Dictionary<string, object>? inputs = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         throw new NotSupportedException("P3 contract runner only exercises ForEach subgraph execution.");
     }
 
