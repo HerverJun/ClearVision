@@ -27,9 +27,11 @@ import {
   createStationsQuery
 } from './stationQueries';
 import {
+  createStationMonitoringOwner,
   createStationQuerySlot,
-  createVisibleStationPollingOwner
+  type StationAuthorityRefreshRequest
 } from './stationLifecycleOwner';
+import { createStationSseAdapter } from './stationSseAdapter';
 import { createStationAdminCommandOwner } from './stationAdminCommandOwner';
 import StationAdminPanel from './StationAdminPanel.vue';
 import type {
@@ -41,6 +43,7 @@ import {
   formatStationDateTime,
   formatStationDuration,
   stationDisplayName,
+  stationOfflineReasonLabel,
   stationOnlineLabel,
   stationOnlineTone,
   stationRuntimeLabel,
@@ -131,9 +134,42 @@ async function refreshAdmin(): Promise<void> {
   await Promise.allSettled(refreshes);
 }
 
-const polling = createVisibleStationPollingOwner({
-  refresh: refreshAll,
-  pause: () => {
+async function refreshAuthority(request: StationAuthorityRefreshRequest): Promise<void> {
+  const full = request.reason !== 'event' && request.reason !== 'heartbeat';
+  const events = request.events.filter(event => !event.stationId ||
+    event.stationId.toLocaleLowerCase() === activeStationId.value.toLocaleLowerCase());
+  const eventTypes = new Set(events.map(event => event.type));
+  const refreshes: Promise<unknown>[] = [];
+  if (full || request.reason === 'heartbeat' || eventTypes.has('stationUpserted') ||
+      eventTypes.has('stationHealthUpdated') || eventTypes.has('stationResultAdded')) {
+    refreshes.push(listSlot.refresh({ force: true }));
+  }
+  if (full || eventTypes.has('stationResultAdded')) {
+    refreshes.push(resultsSlot.refresh({ force: true }));
+  }
+  if (full || eventTypes.has('stationHealthUpdated')) {
+    refreshes.push(healthSlot.refresh({ force: true }));
+  }
+  if (full) {
+    for (const slot of [adminSlot, logsSlot, commandsSlot, auditsSlot, packagesSlot]) {
+      if (slot) refreshes.push(slot.refresh({ force: true }));
+    }
+  } else {
+    if (eventTypes.has('stationLogAdded') && logsSlot) {
+      refreshes.push(logsSlot.refresh({ force: true }));
+    }
+    if (eventTypes.has('stationCommandUpdated')) {
+      if (commandsSlot) refreshes.push(commandsSlot.refresh({ force: true }));
+      if (auditsSlot) refreshes.push(auditsSlot.refresh({ force: true }));
+    }
+  }
+  await Promise.allSettled(refreshes);
+}
+
+const monitoring = createStationMonitoringOwner({
+  stream: runtime.api?.getTextStream ? createStationSseAdapter(runtime.api) : undefined,
+  refreshAuthority,
+  pauseAuthority: () => {
     listSlot.pause();
     resultsSlot.pause();
     healthSlot.pause();
@@ -144,6 +180,23 @@ const polling = createVisibleStationPollingOwner({
     packagesSlot?.pause();
   }
 });
+const monitoringState = monitoring.state;
+const monitoringLabel = computed(() => {
+  switch (monitoringState.value.phase) {
+    case 'live': return '实时连接';
+    case 'recovering': return '连接恢复中';
+    case 'recovery-polling': return '恢复轮询';
+    case 'paused': return '监控已暂停';
+    case 'unauthorized': return '会话已失效';
+    case 'disposed': return '监控已停止';
+    default: return '正在连接';
+  }
+});
+const monitoringTone = computed(() => monitoringState.value.phase === 'live'
+  ? 'ok'
+  : monitoringState.value.phase === 'unauthorized'
+    ? 'ng'
+    : 'warning');
 
 const takeOptions: readonly CvSelectOption[] = Object.freeze([
   { value: '25', label: '最近 25 条' },
@@ -179,17 +232,23 @@ const ordinaryItems = computed<readonly CvDescriptionItem[]>(() => {
   if (!value) return [];
   return [
     { key: 'station-id', label: '工作站标识', value: value.stationId, span: 2 },
+    { key: 'connection', label: '服务端连接判定', value: value.isOnline ? '在线' : (stationOfflineReasonLabel(value.offlineReason) ?? '离线') },
     { key: 'machine', label: '机器名', value: value.machineName || '—' },
     { key: 'line', label: '产线', value: value.lineName || '—' },
     { key: 'last-seen', label: '最后心跳', value: formatStationDateTime(value.lastSeenAtUtc), span: 2 },
-    { key: 'package', label: '当前运行包', value: value.packageName || '—' },
-    { key: 'run', label: '当前运行标识', value: value.currentRunId || '—' },
+    { key: 'package', label: 'Active 运行包', value: value.packageName ? `${value.packageName}${value.packageVersion ? ` · ${value.packageVersion}` : ''}` : '未激活运行包' },
+    { key: 'package-id', label: '运行包标识', value: value.packageId || '未上报' },
+    { key: 'source-revision', label: '来源工程修订', value: value.sourceProjectRevision === null ? '未上报' : `r${value.sourceProjectRevision}` },
+    { key: 'flow', label: '执行 Flow Hash', value: value.executionFlowHash || value.packageFlowHash || '未上报' },
+    { key: 'decision', label: '判定配置 Hash', value: value.decisionConfigurationHash || '未上报' },
+    { key: 'run', label: '当前运行标识', value: value.currentRunId || '无活动 Run' },
     { key: 'average', label: '平均执行耗时', value: `${value.averageExecutionTimeMs.toFixed(1)} ms` },
-    { key: 'spool', label: '待上报结果', value: value.spoolPendingCount },
-    { key: 'camera', label: '相机摘要', value: value.cameraStatusSummary || '—' },
-    { key: 'plc', label: 'PLC 摘要', value: value.plcStatusSummary || '—' },
-    { key: 'package-health', label: '运行包健康', value: value.currentPackageHealth || '—' },
-    { key: 'diagnostic', label: '最近诊断', value: value.lastDiagnosticCode || '—' }
+    { key: 'spool', label: 'Spool', value: value.spoolPendingCount > 0 ? `待回放 ${value.spoolPendingCount} · ${formatStationBytes(value.spoolBytes)}` : '无待回放' },
+    { key: 'camera', label: 'Camera', value: value.cameraStatusSummary || '未上报/不可确认' },
+    { key: 'plc', label: 'PLC', value: value.plcStatusSummary || '未上报/不可确认' },
+    { key: 'tcp', label: 'TCP', value: '未上报/不可确认' },
+    { key: 'package-health', label: '运行包一致性', value: value.currentPackageHealth || '未上报/不可确认' },
+    { key: 'diagnostic', label: '最近诊断', value: value.lastDiagnosticCode || '无已上报诊断' }
   ];
 });
 
@@ -212,10 +271,10 @@ watch(activeStationId, (next, previous) => {
   if (next !== previous) void refreshAll();
 });
 
-onMounted(() => polling.start());
+onMounted(() => monitoring.start());
 
 onBeforeUnmount(() => {
-  polling.dispose();
+  monitoring.dispose();
   listSlot.dispose();
   resultsSlot.dispose();
   healthSlot.dispose();
@@ -258,7 +317,7 @@ onBeforeUnmount(() => {
           size="sm"
           :loading="Boolean(listState.isRefreshing || resultsState.isRefreshing || healthState.isRefreshing || adminState?.isRefreshing || logsState?.isRefreshing || commandsState?.isRefreshing)"
           loading-label="正在刷新工作站详情"
-          @click="polling.refreshNow()"
+          @click="monitoring.refreshNow()"
         >
           刷新
         </CvButton>
@@ -269,6 +328,9 @@ onBeforeUnmount(() => {
       >
         <CvStatusBadge :tone="stationOnlineTone(station.onlineState)">
           {{ stationOnlineLabel(station.onlineState) }}
+        </CvStatusBadge>
+        <CvStatusBadge :tone="monitoringTone">
+          {{ monitoringLabel }}
         </CvStatusBadge>
         <CvStatusBadge :tone="stationRuntimeTone(station.runtimeState)">
           {{ stationRuntimeLabel(station.runtimeState) }}
@@ -281,6 +343,14 @@ onBeforeUnmount(() => {
         </CvStatusBadge>
       </template>
     </CvPageHeader>
+
+    <CvInlineAlert
+      v-if="monitoringState.phase === 'recovering'"
+      tone="warning"
+      title="实时连接正在恢复"
+    >
+      当前保留上次权威读取；恢复期间按服务端状态重新同步。
+    </CvInlineAlert>
 
     <CvInlineAlert
       v-if="(listState.phase === 'stale' || listState.phase === 'partial-failure') && listState.data"

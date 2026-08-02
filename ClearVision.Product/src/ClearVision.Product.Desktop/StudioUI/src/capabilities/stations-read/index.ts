@@ -2,6 +2,7 @@ export { default as StationsPage } from './StationsPage.vue';
 export { default as StationDetailPage } from './StationDetailPage.vue';
 export * from './stationContracts';
 export * from './stationLifecycleOwner';
+export * from './stationSseAdapter';
 export * from './stationAdminCommandOwner';
 export * from './stationDeploymentProjection';
 export * from './stationQueries';

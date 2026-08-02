@@ -32,8 +32,16 @@ export const stationRuntimeStates = Object.freeze([
   'Stopping'
 ] as const);
 
+export const stationOfflineReasons = Object.freeze([
+  'NeverRegistered',
+  'HeartbeatExpired',
+  'Disabled',
+  'Disconnected'
+] as const);
+
 export type StationOnlineState = (typeof stationOnlineStates)[number];
 export type StationRuntimeState = (typeof stationRuntimeStates)[number];
+export type StationOfflineReason = (typeof stationOfflineReasons)[number];
 
 export interface InspectionOutcomeStatistics {
   readonly totalAttemptCount: number;
@@ -58,6 +66,8 @@ export interface StationStatus {
   readonly onlineState: StationOnlineState;
   readonly runtimeState: StationRuntimeState;
   readonly isOnline: boolean;
+  readonly isEnabled: boolean;
+  readonly offlineReason: StationOfflineReason | null;
   readonly lastSeenAtUtc: string;
   readonly startedAtUtc: string;
   readonly packageId: string | null;
@@ -67,7 +77,11 @@ export interface StationStatus {
   readonly sourceProjectId: string | null;
   readonly sourceProjectRevision: number | null;
   readonly packageFlowHash: string | null;
+  readonly executionFlowHash: string | null;
+  readonly executionSnapshotId: string | null;
+  readonly projectRevision: number | null;
   readonly decisionConfigurationHash: string | null;
+  readonly executionRunMode: string | null;
   readonly currentRunId: string | null;
   readonly averageExecutionTimeMs: number;
   readonly spoolPendingCount: number;
@@ -388,7 +402,7 @@ function decodeOptionalOutcomePair(
   return decodeInspectionOutcome(execution, decision, path);
 }
 
-function decodeStationStatus(value: unknown, path: string): StationStatus {
+export function decodeStationStatus(value: unknown, path = '$'): StationStatus {
   const record = decodeRecord(value, path);
   return Object.freeze({
     stationId: decodeString(record.stationId, `${path}.stationId`),
@@ -398,6 +412,10 @@ function decodeStationStatus(value: unknown, path: string): StationStatus {
     onlineState: decodeNumericOrStringEnum(record.onlineState, `${path}.onlineState`, stationOnlineStates),
     runtimeState: decodeNumericOrStringEnum(record.runtimeState, `${path}.runtimeState`, stationRuntimeStates),
     isOnline: decodeBoolean(record.isOnline, `${path}.isOnline`),
+    isEnabled: decodeBoolean(record.isEnabled, `${path}.isEnabled`),
+    offlineReason: record.offlineReason === undefined || record.offlineReason === null
+      ? null
+      : decodeNumericOrStringEnum(record.offlineReason, `${path}.offlineReason`, stationOfflineReasons),
     lastSeenAtUtc: decodeDateTime(record.lastSeenAtUtc, `${path}.lastSeenAtUtc`),
     startedAtUtc: decodeDateTime(record.startedAtUtc, `${path}.startedAtUtc`),
     packageId: decodeNullableString(record.packageId, `${path}.packageId`),
@@ -407,10 +425,14 @@ function decodeStationStatus(value: unknown, path: string): StationStatus {
     sourceProjectId: decodeNullableString(record.sourceProjectId, `${path}.sourceProjectId`),
     sourceProjectRevision: decodeNullableNumber(record.sourceProjectRevision, `${path}.sourceProjectRevision`, true),
     packageFlowHash: decodeNullableString(record.packageFlowHash, `${path}.packageFlowHash`),
+    executionFlowHash: decodeNullableString(record.executionFlowHash, `${path}.executionFlowHash`),
+    executionSnapshotId: decodeNullableString(record.executionSnapshotId, `${path}.executionSnapshotId`),
+    projectRevision: decodeNullableNumber(record.projectRevision, `${path}.projectRevision`, true),
     decisionConfigurationHash: decodeNullableString(
       record.decisionConfigurationHash,
       `${path}.decisionConfigurationHash`
     ),
+    executionRunMode: decodeNullableString(record.executionRunMode, `${path}.executionRunMode`),
     currentRunId: decodeNullableString(record.currentRunId, `${path}.currentRunId`),
     averageExecutionTimeMs: decodeNumber(record.averageExecutionTimeMs, `${path}.averageExecutionTimeMs`),
     spoolPendingCount: decodeNumber(record.spoolPendingCount, `${path}.spoolPendingCount`, true),
@@ -482,7 +504,7 @@ function decodeResultOutcome(
   });
 }
 
-function decodeStationResult(value: unknown, path: string): StationResult {
+export function decodeStationResult(value: unknown, path = '$'): StationResult {
   const record = decodeRecord(value, path);
   const outcome = decodeResultOutcome(record, path);
   return Object.freeze({
@@ -503,7 +525,7 @@ function decodeStationResult(value: unknown, path: string): StationResult {
   });
 }
 
-function decodeHealthSnapshot(value: unknown, path: string): StationHealthSnapshot {
+export function decodeHealthSnapshot(value: unknown, path = '$'): StationHealthSnapshot {
   const record = decodeRecord(value, path);
   return Object.freeze({
     schemaVersion: decodeNumber(record.schemaVersion, `${path}.schemaVersion`, true),

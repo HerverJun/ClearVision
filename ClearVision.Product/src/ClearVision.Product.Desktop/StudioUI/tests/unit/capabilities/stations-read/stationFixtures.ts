@@ -30,6 +30,7 @@ export function stationStatus(overrides: Record<string, unknown> = {}): Record<s
     stationRole: 'Inspection',
     owner: '生产一组',
     isEnabled: true,
+    offlineReason: null,
     remark: '只读 fixture',
     onlineState: 'Online',
     state: 'Running',

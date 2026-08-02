@@ -61,10 +61,20 @@ public sealed class StationSimulatorEndToEndTests
         healthAck.StationId.Should().Be("sim-1");
 
         await connection.StopAsync();
+        var disconnected = host.Registry.GetStation("sim-1");
+        disconnected.Should().NotBeNull();
+        disconnected!.IsOnline.Should().BeFalse();
+        disconnected.OnlineState.Should().Be(StationOnlineState.Offline);
+        disconnected.OfflineReason.Should().Be(StationOfflineReason.Disconnected);
+
         await connection.StartAsync();
         await connection.InvokeAsync<StationReplayCursorDto>(
             StationHubMethods.RegisterStationAsync,
             BuildRegistration("sim-1"));
+        var reconnected = host.Registry.GetStation("sim-1");
+        reconnected.Should().NotBeNull();
+        reconnected!.IsOnline.Should().BeTrue();
+        reconnected.OfflineReason.Should().BeNull();
 
         for (var sequence = 1; sequence <= 20; sequence++)
         {
@@ -80,6 +90,17 @@ public sealed class StationSimulatorEndToEndTests
             duplicateAck.LastPersistedSequenceId.Should().Be(20);
         }
 
+        var gapAck = await connection.InvokeAsync<StationAckDto>(
+            StationHubMethods.ReportResultGap,
+            new StationResultGapDto
+            {
+                StationId = "sim-1",
+                DroppedFromSequenceId = 21,
+                DroppedThroughSequenceId = 22,
+                Reason = "capacity"
+            });
+        gapAck.LastPersistedSequenceId.Should().Be(22);
+
         using var response = await host.Client.SendAsync(
             new HttpRequestMessage(HttpMethod.Get, "/api/stations/events"),
             HttpCompletionOption.ResponseHeadersRead);
@@ -89,7 +110,7 @@ public sealed class StationSimulatorEndToEndTests
         initialState.Should().Contain("event: initialState");
 
         var station = host.Registry.GetStation("sim-1")!;
-        station.LastSequenceId.Should().Be(20);
+        station.LastSequenceId.Should().Be(22);
         station.SpoolPendingCount.Should().Be(20);
         station.RecentResults.Should().HaveCount(20);
         station.RecentResults.Count(result => result.SequenceId == 20).Should().Be(1);

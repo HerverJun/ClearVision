@@ -20,6 +20,7 @@ const stationFixture = Object.freeze({
   schemaVersion: 'f02-stations-read.v1',
   endpoint: Object.freeze([
     'GET /api/stations',
+    'GET /api/stations/events',
     'GET /api/stations/summary',
     'GET /api/stations/statistics',
     'GET /api/stations/{stationId}',
@@ -69,6 +70,7 @@ function station(overrides: Record<string, unknown> = {}): Record<string, unknow
     stationRole: 'Inspection',
     owner: '生产一组',
     isEnabled: true,
+    offlineReason: null,
     remark: '只读 fixture',
     onlineState: 1,
     state: 'Running',
@@ -249,6 +251,24 @@ async function bootStations(
       await fulfill(route, 200, listPayload);
       return;
     }
+    if (url.pathname === '/api/stations/events') {
+      const stations = Array.isArray(listPayload) ? listPayload : [];
+      const body = [
+        'event: initialState',
+        `data: ${JSON.stringify({ eventSequenceId: 12, summary: summaryPayload, stations, recentResults: [] })}`,
+        '',
+        ':keepalive',
+        '',
+        ''
+      ].join('\n');
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        headers: { 'Cache-Control': 'no-cache', 'X-F02-Fixture': stationFixture.schemaVersion },
+        body
+      });
+      return;
+    }
     if (url.pathname === '/api/stations/summary') {
       await fulfill(route, 200, summaryPayload);
       return;
@@ -371,13 +391,15 @@ test('Engineer Station journey remains read-only and never mounts the Admin cont
   await expect(page.getByText('判定 NG')).toBeVisible();
   await expect(page.getByText('进程运行时长')).toBeVisible();
   await expect(page.getByText('工作站详情读取失败')).toHaveCount(0);
+  await expect(page.getByText('TCP', { exact: true })).toBeVisible();
+  await expect(page.getByText('未上报/不可确认', { exact: true })).toBeVisible();
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'station-detail-abnormal', viewport, runtimeErrors, requestAudit: audit
     });
   }
   expect(expectGetOnly(audit)).toBe(true);
-  expect(audit.some(entry => entry.path.includes('/events'))).toBe(false);
+  expect(audit.some(entry => entry.path === '/api/stations/events')).toBe(true);
   expect(audit.some(entry => /commands|logs|audit|packages|download/.test(entry.path))).toBe(false);
 });
 
@@ -464,6 +486,7 @@ for (const visual of [
         onlineState: 'Offline',
         runtimeState: 'Faulted',
         isOnline: false,
+        offlineReason: 'HeartbeatExpired',
         packageName: '端子检测包',
         lastExecutionOutcome: 'Failed',
         lastDecisionOutcome: 'Undetermined',

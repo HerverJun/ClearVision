@@ -399,7 +399,10 @@ public static class StationEndpoints
             {
                 replayWatermark = Math.Max(replayWatermark, storedEvent.SequenceId);
                 await context.Response.WriteSseMessageAsync(
-                    new SseMessage(storedEvent.SequenceId, storedEvent.EventType, storedEvent.Data),
+                    new SseMessage(
+                        storedEvent.SequenceId,
+                        storedEvent.EventType,
+                        ProjectSsePayload(context, storedEvent)),
                     cancellationToken);
             }
         }
@@ -416,7 +419,7 @@ public static class StationEndpoints
                 }
 
                 await context.Response.WriteSseMessageAsync(
-                    new SseMessage(evt.SequenceId, evt.EventType, evt.Data),
+                    new SseMessage(evt.SequenceId, evt.EventType, ProjectSsePayload(context, evt)),
                     cancellationToken);
             }
         }
@@ -519,6 +522,17 @@ public static class StationEndpoints
             error = "PayloadJsonInvalid";
             return false;
         }
+    }
+
+    private static object ProjectSsePayload(HttpContext context, StoredStationRegistryEvent evt)
+    {
+        if (IsStationAdmin(context) || evt.EventType is not ("stationLogAdded" or "stationCommandUpdated"))
+        {
+            return evt.Data;
+        }
+
+        var stationId = evt.Data.GetType().GetProperty("StationId")?.GetValue(evt.Data) as string;
+        return new { StationId = stationId ?? string.Empty };
     }
 
     private static bool TryNormalizeClientRequestId(

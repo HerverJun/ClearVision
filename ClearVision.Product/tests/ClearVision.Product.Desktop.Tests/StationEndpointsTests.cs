@@ -46,6 +46,7 @@ public sealed class StationEndpointsTests
         var initialChunk = await ReadUntilContainsAsync(stream, "event: initialState", TimeSpan.FromSeconds(2));
         initialChunk.Should().Contain("event: initialState");
         initialChunk.Should().Contain("\"stationId\":\"station-a\"");
+        initialChunk.Should().Contain("\"eventSequenceId\":2");
 
         host.Registry.UpsertHeartbeat("conn-1", new StationHeartbeatDto
         {
@@ -207,6 +208,35 @@ public sealed class StationEndpointsTests
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await response.Content.ReadAsStringAsync()).Should().Contain("ClientRequestIdRequired");
+    }
+
+    [Fact]
+    public async Task EventsEndpoint_ShouldRedactAdminOnlyLogPayloadForMonitorReaders()
+    {
+        await using var host = await StationEndpointTestHost.CreateAsync();
+        host.Registry.UpsertRegistration("conn-monitor", BuildRegistration("station-monitor"));
+        var checkpoint = host.Registry.GetEventsAfter(0).Max(evt => evt.SequenceId);
+        host.Registry.UpsertLogSummary("conn-monitor", new StationLogSummaryDto
+        {
+            SchemaVersion = 2,
+            StationId = "station-monitor",
+            SequenceId = 1,
+            MessageId = "log-secret",
+            TimestampUtc = DateTimeOffset.UtcNow,
+            Level = "Error",
+            Source = "RuntimeHost",
+            RenderedMessage = "sensitive-admin-log-payload",
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        });
+
+        using var response = await host.Client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"/api/stations/events?afterSequence={checkpoint}"),
+            HttpCompletionOption.ResponseHeadersRead);
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        var chunk = await ReadUntilContainsAsync(stream, "event: stationLogAdded", TimeSpan.FromSeconds(2));
+
+        chunk.Should().Contain("\"stationId\":\"station-monitor\"");
+        chunk.Should().NotContain("sensitive-admin-log-payload");
     }
 
     [Fact]

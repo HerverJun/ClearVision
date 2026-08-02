@@ -1,9 +1,17 @@
 import type { CvStatusTone } from '@/design-system';
 import type {
+  StationOfflineReason,
   StationOnlineState,
   StationRuntimeState,
   StationStatus
 } from './stationContracts';
+
+const offlineReasonLabels: Readonly<Record<StationOfflineReason, string>> = Object.freeze({
+  NeverRegistered: '从未注册',
+  HeartbeatExpired: '心跳过期',
+  Disabled: '已停用',
+  Disconnected: '连接已断开'
+});
 
 const onlineLabels: Readonly<Record<StationOnlineState, string>> = Object.freeze({
   Unknown: '未知',
@@ -30,6 +38,10 @@ export function stationOnlineLabel(state: StationOnlineState): string {
 
 export function stationRuntimeLabel(state: StationRuntimeState): string {
   return runtimeLabels[state];
+}
+
+export function stationOfflineReasonLabel(reason: StationOfflineReason | null): string | null {
+  return reason ? offlineReasonLabels[reason] : null;
 }
 
 export function stationOnlineTone(state: StationOnlineState): CvStatusTone {

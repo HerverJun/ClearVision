@@ -666,6 +666,8 @@ public sealed class StationRegistryServiceTests
         summary.OfflineStations.Should().Be(1);
         station.Should().NotBeNull();
         station!.IsOnline.Should().BeFalse();
+        station.OnlineState.Should().Be(StationOnlineState.Offline);
+        station.OfflineReason.Should().Be(StationOfflineReason.Disconnected);
     }
 
     [Fact]
@@ -764,6 +766,8 @@ public sealed class StationRegistryServiceTests
         updated.LineName.Should().Be("line-7");
         updated.IsEnabled.Should().BeFalse();
         updated.IsOnline.Should().BeFalse();
+        updated.OnlineState.Should().Be(StationOnlineState.Offline);
+        updated.OfflineReason.Should().Be(StationOfflineReason.Disabled);
     }
 
     private static StationRegistryService CreateRegistry()

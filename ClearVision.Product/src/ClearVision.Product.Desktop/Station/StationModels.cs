@@ -99,6 +99,14 @@ public sealed class StationSummaryViewModel
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }
 
+public enum StationOfflineReason
+{
+    NeverRegistered = 0,
+    HeartbeatExpired = 1,
+    Disabled = 2,
+    Disconnected = 3
+}
+
 public class StationStatusViewModel
 {
     public string StationId { get; set; } = string.Empty;
@@ -134,6 +142,8 @@ public class StationStatusViewModel
     public StationRuntimeState RuntimeState { get; set; }
 
     public bool IsOnline { get; set; }
+
+    public StationOfflineReason? OfflineReason { get; set; }
 
     public DateTimeOffset StartedAtUtc { get; set; }
 
@@ -246,6 +256,8 @@ public sealed class StationResultEventViewModel
 
 public sealed class StationSseSnapshotViewModel
 {
+    public long EventSequenceId { get; set; }
+
     public StationSummaryViewModel Summary { get; set; } = new();
 
     public IReadOnlyList<StationStatusViewModel> Stations { get; set; } = Array.Empty<StationStatusViewModel>();

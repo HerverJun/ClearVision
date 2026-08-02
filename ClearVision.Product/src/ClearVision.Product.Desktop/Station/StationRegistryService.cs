@@ -543,6 +543,7 @@ public sealed class StationRegistryService
                 State = status.State,
                 RuntimeState = status.RuntimeState,
                 IsOnline = status.IsOnline,
+                OfflineReason = status.OfflineReason,
                 StartedAtUtc = status.StartedAtUtc,
                 LastSeenAtUtc = status.LastSeenAtUtc,
                 PackageId = status.PackageId,
@@ -772,6 +773,7 @@ public sealed class StationRegistryService
 
             return new StationSseSnapshotViewModel
             {
+                EventSequenceId = _nextEventSequenceId,
                 Summary = BuildSummaryLocked(now),
                 Stations = stationViewModels,
                 RecentResults = recentResults
@@ -950,6 +952,7 @@ public sealed class StationRegistryService
 
     private StationStatusViewModel ToStatusViewModelLocked(StationRegistryEntry entry, DateTimeOffset now)
     {
+        var offlineReason = ResolveOfflineReasonLocked(entry, now);
         return new StationStatusViewModel
         {
             StationId = entry.StationId,
@@ -965,10 +968,11 @@ public sealed class StationRegistryService
             Owner = entry.Owner,
             IsEnabled = entry.IsEnabled,
             Remark = entry.Remark,
-            OnlineState = entry.OnlineState,
+            OnlineState = offlineReason.HasValue ? StationOnlineState.Offline : entry.OnlineState,
             State = entry.State,
             RuntimeState = entry.RuntimeState,
-            IsOnline = IsOnlineLocked(entry, now),
+            IsOnline = !offlineReason.HasValue,
+            OfflineReason = offlineReason,
             StartedAtUtc = entry.StartedAtUtc,
             LastSeenAtUtc = entry.LastSeenAtUtc,
             PackageId = entry.PackageId,
@@ -1024,8 +1028,11 @@ public sealed class StationRegistryService
         var faultedStations = stations.Count(entry => entry.State == RuntimeHostState.Faulted);
         var runningStations = stations.Count(entry => entry.State == RuntimeHostState.Running && IsOnlineLocked(entry, now));
         var recentResults = stations.SelectMany(entry => entry.RecentResults).ToList();
-        var warningStations = stations.Count(entry => entry.OnlineState == StationOnlineState.Warning || entry.OnlineState == StationOnlineState.Degraded);
-        var criticalStations = stations.Count(entry => entry.OnlineState == StationOnlineState.Critical);
+        var warningStations = stations.Count(entry =>
+            IsOnlineLocked(entry, now) &&
+            entry.OnlineState is StationOnlineState.Warning or StationOnlineState.Degraded);
+        var criticalStations = stations.Count(entry =>
+            IsOnlineLocked(entry, now) && entry.OnlineState == StationOnlineState.Critical);
 
         var outcomeStatistics = StationOutcomeStatisticsBuilder.Combine(stations.Select(ResolveSessionOutcomeStatistics));
         return new StationSummaryViewModel
@@ -1050,9 +1057,26 @@ public sealed class StationRegistryService
 
     private bool IsOnlineLocked(StationRegistryEntry entry, DateTimeOffset now)
     {
-        return entry.IsEnabled &&
-               !string.IsNullOrWhiteSpace(entry.ConnectionId) &&
-               now - entry.LastSeenAtUtc <= TimeSpan.FromSeconds(Math.Max(1, _options.OfflineThresholdSeconds));
+        return !ResolveOfflineReasonLocked(entry, now).HasValue;
+    }
+
+    private StationOfflineReason? ResolveOfflineReasonLocked(StationRegistryEntry entry, DateTimeOffset now)
+    {
+        if (!entry.IsEnabled)
+        {
+            return StationOfflineReason.Disabled;
+        }
+
+        if (string.IsNullOrWhiteSpace(entry.ConnectionId))
+        {
+            return entry.LastSeenAtUtc == default
+                ? StationOfflineReason.NeverRegistered
+                : StationOfflineReason.Disconnected;
+        }
+
+        return now - entry.LastSeenAtUtc > TimeSpan.FromSeconds(Math.Max(1, _options.OfflineThresholdSeconds))
+            ? StationOfflineReason.HeartbeatExpired
+            : null;
     }
 
     private static bool MatchesStatus(StationResultSummaryDto result, string? requestedStatus) =>

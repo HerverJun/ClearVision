@@ -24,14 +24,18 @@ import {
   type StationStatisticsFilters
 } from './stationQueries';
 import {
+  createStationMonitoringOwner,
   createStationQuerySlot,
-  createVisibleStationPollingOwner
+  type StationAuthorityRefreshRequest
 } from './stationLifecycleOwner';
+import { createStationSseAdapter } from './stationSseAdapter';
 import type { StationStatus } from './stationContracts';
 import {
   filterStations,
   formatStationDateTime,
+  formatStationBytes,
   stationDisplayName,
+  stationOfflineReasonLabel,
   stationOnlineLabel,
   stationOnlineTone,
   stationRuntimeLabel,
@@ -86,20 +90,35 @@ const visibleStations = computed(() => filterStations(
   runtimeState.value
 ));
 
-const polling = createVisibleStationPollingOwner({
-  refresh: async () => {
-    await Promise.allSettled([
-      listSlot.refresh({ force: true }),
-      summarySlot.refresh({ force: true }),
-      statisticsSlot.refresh({ force: true })
-    ]);
-  },
-  pause: () => {
+async function refreshAuthority(request: StationAuthorityRefreshRequest): Promise<void> {
+  const full = request.reason !== 'event' && request.reason !== 'heartbeat';
+  const eventTypes = new Set(request.events.map(event => event.type));
+  const refreshes: Promise<unknown>[] = [];
+  if (full || request.reason === 'heartbeat' || eventTypes.has('stationUpserted') ||
+      eventTypes.has('stationHealthUpdated') || eventTypes.has('stationResultAdded')) {
+    refreshes.push(listSlot.refresh({ force: true }));
+  }
+  if (full || request.reason === 'heartbeat' || eventTypes.has('summaryUpdated') ||
+      eventTypes.has('stationUpserted') || eventTypes.has('stationHealthUpdated') ||
+      eventTypes.has('stationResultAdded')) {
+    refreshes.push(summarySlot.refresh({ force: true }));
+  }
+  if (full || eventTypes.has('stationResultAdded')) {
+    refreshes.push(statisticsSlot.refresh({ force: true }));
+  }
+  await Promise.allSettled(refreshes);
+}
+
+const monitoring = createStationMonitoringOwner({
+  stream: runtime.api?.getTextStream ? createStationSseAdapter(runtime.api) : undefined,
+  refreshAuthority,
+  pauseAuthority: () => {
     listSlot.pause();
     summarySlot.pause();
     statisticsSlot.pause();
   }
 });
+const monitoringState = monitoring.state;
 
 const onlineOptions: readonly CvSelectOption[] = Object.freeze([
   { value: 'all', label: '全部在线状态' },
@@ -143,13 +162,13 @@ const outcomeOptions: readonly CvSelectOption[] = Object.freeze([
 ]);
 
 const columns: readonly CvDataTableColumn<StationStatus>[] = Object.freeze([
-  { key: 'station', label: '工作站', width: '21%' },
-  { key: 'onlineState', label: '连接', width: '11%' },
-  { key: 'runtimeState', label: '运行状态', width: '12%' },
-  { key: 'packageName', label: '运行包', width: '17%' },
-  { key: 'lastOutcome', label: '最近结果', width: '12%' },
-  { key: 'lastSeenAtUtc', label: '最后心跳', width: '17%' },
-  { key: 'actions', label: '操作', align: 'end', width: '10%' }
+  { key: 'station', label: '工作站', width: '17%' },
+  { key: 'onlineState', label: '连接', width: '10%' },
+  { key: 'runtimeState', label: '运行 / Run', width: '12%' },
+  { key: 'packageName', label: 'Active 运行包', width: '18%' },
+  { key: 'fieldHealth', label: '现场健康', width: '23%' },
+  { key: 'lastOutcome', label: '最近结果', width: '10%' },
+  { key: 'lastSeenAtUtc', label: '最后心跳', width: '10%' }
 ]);
 
 const summaryCounters = computed(() => {
@@ -183,6 +202,39 @@ const outcomeCounters = computed(() => {
 
 function lastOutcome(station: StationStatus) {
   return station.lastOutcome ? formatInspectionOutcome(station.lastOutcome) : null;
+}
+
+const monitoringLabel = computed(() => {
+  switch (monitoring.state.value.phase) {
+    case 'live': return '实时连接';
+    case 'recovering': return '连接恢复中';
+    case 'recovery-polling': return '恢复轮询';
+    case 'paused': return '监控已暂停';
+    case 'unauthorized': return '会话已失效';
+    case 'disposed': return '监控已停止';
+    default: return '正在连接';
+  }
+});
+const monitoringTone = computed(() => monitoring.state.value.phase === 'live'
+  ? 'ok'
+  : monitoring.state.value.phase === 'unauthorized'
+    ? 'ng'
+    : 'warning');
+
+function packageIdentity(station: StationStatus): string {
+  if (!station.packageId) return '未激活运行包';
+  const revision = station.sourceProjectRevision === null ? '来源修订未上报' : `来源 r${station.sourceProjectRevision}`;
+  return `${station.packageId} · ${revision}`;
+}
+
+function deviceReport(label: string, value: string | null): string {
+  return value ? `${label} ${value}` : `${label} 未上报/不可确认`;
+}
+
+function spoolReport(station: StationStatus): string {
+  return station.spoolPendingCount > 0
+    ? `Spool 待回放 ${station.spoolPendingCount} · ${formatStationBytes(station.spoolBytes)}`
+    : 'Spool 无待回放';
 }
 
 async function writeQueryAndRefresh(refreshStatistics: boolean): Promise<void> {
@@ -222,10 +274,10 @@ async function applyStatisticsFilters(): Promise<void> {
   await writeQueryAndRefresh(true);
 }
 
-onMounted(() => polling.start());
+onMounted(() => monitoring.start());
 
 onBeforeUnmount(() => {
-  polling.dispose();
+  monitoring.dispose();
   listSlot.dispose();
   summarySlot.dispose();
   statisticsSlot.dispose();
@@ -242,6 +294,9 @@ onBeforeUnmount(() => {
       description="查看连接与运行状态，定位异常，并进入工作站详情核对最近结果。"
     >
       <template #meta>
+        <CvStatusBadge :tone="monitoringTone">
+          {{ monitoringLabel }}
+        </CvStatusBadge>
         <CvStatusBadge
           tone="info"
           :dot="false"
@@ -260,12 +315,20 @@ onBeforeUnmount(() => {
           size="sm"
           :loading="listState.isRefreshing || summaryState.isRefreshing || statisticsState.isRefreshing"
           loading-label="正在刷新工作站"
-          @click="polling.refreshNow()"
+          @click="monitoring.refreshNow()"
         >
           刷新
         </CvButton>
       </template>
     </CvPageHeader>
+
+    <CvInlineAlert
+      v-if="monitoringState.phase === 'recovering'"
+      tone="warning"
+      title="实时连接正在恢复"
+    >
+      当前保留上次权威读取；恢复期间按服务端状态重新同步。
+    </CvInlineAlert>
 
     <CvPanel
       class="stations-page__summary-panel"
@@ -427,7 +490,9 @@ onBeforeUnmount(() => {
       >
         <template #cell-station="{ row }">
           <div class="stations-page__station-name">
-            <strong>{{ stationDisplayName(row) }}</strong>
+            <RouterLink :to="`/stations/${encodeURIComponent(row.stationId)}`">
+              <strong>{{ stationDisplayName(row) }}</strong>
+            </RouterLink>
             <span>{{ row.lineName || row.stationId }}</span>
             <small v-if="row.lastDiagnosticCode">
               {{ row.lastDiagnosticCode }}<template v-if="row.lastDiagnosticMessage"> · {{ row.lastDiagnosticMessage }}</template>
@@ -435,17 +500,37 @@ onBeforeUnmount(() => {
           </div>
         </template>
         <template #cell-onlineState="{ row }">
-          <CvStatusBadge :tone="stationOnlineTone(row.onlineState)">
-            {{ stationOnlineLabel(row.onlineState) }}
-          </CvStatusBadge>
+          <div class="stations-page__stack">
+            <CvStatusBadge :tone="stationOnlineTone(row.onlineState)">
+              {{ stationOnlineLabel(row.onlineState) }}
+            </CvStatusBadge>
+            <small v-if="stationOfflineReasonLabel(row.offlineReason)">
+              {{ stationOfflineReasonLabel(row.offlineReason) }}
+            </small>
+          </div>
         </template>
         <template #cell-runtimeState="{ row }">
-          <CvStatusBadge :tone="stationRuntimeTone(row.runtimeState)">
-            {{ stationRuntimeLabel(row.runtimeState) }}
-          </CvStatusBadge>
+          <div class="stations-page__stack">
+            <CvStatusBadge :tone="stationRuntimeTone(row.runtimeState)">
+              {{ stationRuntimeLabel(row.runtimeState) }}
+            </CvStatusBadge>
+            <small>{{ row.currentRunId || '无活动 Run' }}</small>
+          </div>
         </template>
         <template #cell-packageName="{ row }">
-          {{ row.packageName || '—' }}
+          <div class="stations-page__stack">
+            <strong>{{ row.packageName || '未激活运行包' }}<template v-if="row.packageVersion"> · {{ row.packageVersion }}</template></strong>
+            <small>{{ packageIdentity(row) }}</small>
+            <small>{{ row.currentPackageHealth ? `包健康 ${row.currentPackageHealth}` : '包一致性未上报/不可确认' }}</small>
+          </div>
+        </template>
+        <template #cell-fieldHealth="{ row }">
+          <div class="stations-page__stack stations-page__field-health">
+            <span>{{ spoolReport(row) }}</span>
+            <small>{{ deviceReport('Camera', row.cameraStatusSummary) }}</small>
+            <small>{{ deviceReport('PLC', row.plcStatusSummary) }}</small>
+            <small>TCP 未上报/不可确认</small>
+          </div>
         </template>
         <template #cell-lastOutcome="{ row }">
           <CvStatusBadge
@@ -458,11 +543,6 @@ onBeforeUnmount(() => {
         </template>
         <template #cell-lastSeenAtUtc="{ row }">
           {{ formatStationDateTime(row.lastSeenAtUtc) }}
-        </template>
-        <template #cell-actions="{ row }">
-          <RouterLink :to="`/stations/${encodeURIComponent(row.stationId)}`">
-            查看详情
-          </RouterLink>
         </template>
       </CvDataTable>
     </CvPanel>
@@ -570,12 +650,13 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.stations-page { display: grid; max-width: 1660px; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(268px, 304px); gap: var(--cv-density-page-gap); align-items: start; }
-.stations-page :deep(.cv-page-header) { grid-column: 1 / -1; }
+.stations-page { display: grid; max-width: 1660px; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(268px, 304px); grid-auto-flow: row dense; gap: var(--cv-density-page-gap); align-items: start; }
+.stations-page :deep(.cv-page-header),
+.stations-page > :deep(.cv-inline-alert) { grid-column: 1 / -1; }
 .stations-page__updated-at { align-self: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-variant-numeric: tabular-nums lining-nums; }
-.stations-page__summary-panel { grid-column: 2; grid-row: 2; }
-.stations-page__list-panel { grid-column: 1; grid-row: 2 / span 2; }
-.stations-page__statistics-panel { grid-column: 2; grid-row: 3; }
+.stations-page__summary-panel { grid-column: 2; }
+.stations-page__list-panel { grid-column: 1; grid-row: span 2; }
+.stations-page__statistics-panel { grid-column: 2; }
 .stations-page__list-toolbar,
 .stations-page__statistics-toolbar { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
 .stations-page__statistics-toolbar :deep(.cv-toolbar__primary) { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
@@ -592,8 +673,16 @@ onBeforeUnmount(() => {
 .stations-page__metrics dt { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .stations-page__metrics dd { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-lg); font-weight: var(--cv-font-weight-semibold); font-variant-numeric: tabular-nums lining-nums; }
 .stations-page__station-name { display: grid; gap: var(--cv-space-1); }
+.stations-page__station-name a { color: var(--cv-color-link); text-decoration: none; }
+.stations-page__station-name a:hover { text-decoration: underline; }
 .stations-page__station-name span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .stations-page__station-name small { max-width: 34ch; overflow: hidden; color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
+.stations-page__stack { display: grid; gap: 2px; min-width: 0; }
+.stations-page__stack strong,
+.stations-page__stack span,
+.stations-page__stack small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stations-page__stack small { color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }
+.stations-page__field-health span { color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); }
 .stations-page__outcomes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--cv-border-subtle); }
 .stations-page__outcomes article { display: grid; place-items: center; align-content: center; gap: 2px; min-height: 52px; padding: var(--cv-space-1); border-right: 1px solid var(--cv-border-subtle); border-bottom: 1px solid var(--cv-border-subtle); }
 .stations-page__outcomes article:nth-child(3n) { border-right: 0; }
