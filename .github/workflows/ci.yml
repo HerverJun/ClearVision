@@ -70,11 +70,23 @@ jobs:
         shell: pwsh
         run: dotnet restore $env:SOLUTION_PATH --locked-mode
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/package-lock.json
+
+      - name: Install FrontendV2 Dependencies
+        working-directory: ${{ env.FRONTEND_V2_DIR }}
+        run: npm ci
+
       - name: Build Measurement Test Dependencies
         shell: pwsh
         run: dotnet build $env:SOLUTION_PATH --configuration Debug --no-restore -p:SkipFrontendV2Install=true
 
       - name: Run Measurement Performance Gate
+        id: measurement_gate
         shell: pwsh
         run: |
           & "./scripts/run-tests-measurement-performance.ps1" `
@@ -85,20 +97,20 @@ jobs:
             -Verbosity minimal `
             -ResultsDirectory TestResults/measurement-performance `
             -LogFileName measurement-performance.trx `
-            -ReportDirectory ClearVision.Product/test_results
+            -ReportDirectory TestResults/measurement-performance/report
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
 
       - name: Upload Measurement Performance Report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.measurement_gate.outcome != 'skipped'
         with:
           name: measurement-performance-report
           if-no-files-found: error
           path: |
-            ClearVision.Product/test_results/measurement_performance_budget_report.md
-            ClearVision.Product/test_results/measurement_performance_budget_report.json
+            TestResults/measurement-performance/report/measurement_performance_budget_report.md
+            TestResults/measurement-performance/report/measurement_performance_budget_report.json
             TestResults/measurement-performance/measurement-performance.trx
 
   build-and-test:
