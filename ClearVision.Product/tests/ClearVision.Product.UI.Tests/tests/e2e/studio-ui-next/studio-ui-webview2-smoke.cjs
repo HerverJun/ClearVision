@@ -799,24 +799,101 @@ async function verifyWorkspaceInspectorG3(page, expectedName) {
 
 async function selectSeededRoiNode(page) {
   const flowCanvas = page.locator('[data-testid="flow-canvas"]');
+  const view = await page.locator('[data-evidence-surface="f03-g2-flow-canvas"]').evaluate(surface => ({
+    scale: Number(surface.getAttribute('data-scale')),
+    offsetX: Number(surface.getAttribute('data-offset-x')),
+    offsetY: Number(surface.getAttribute('data-offset-y'))
+  }));
+  assert(Number.isFinite(view.scale) && view.scale > 0 &&
+    Number.isFinite(view.offsetX) && Number.isFinite(view.offsetY),
+  `The seeded G4 Flow Canvas did not expose a valid view transform: ${JSON.stringify(view)}`);
   const box = await flowCanvas.boundingBox();
   assert(box, 'The seeded G4 Flow Canvas did not expose a bounding box.');
-  await page.mouse.click(box.x + 360, box.y + 125);
-  await page.waitForFunction(() =>
-    document.querySelector('[data-evidence-surface="f03-g3-inspector"]')
-      ?.getAttribute('data-inspector-mode') === 'node');
-  return { flowCanvas, box };
+  const worldPoint = { x: 360, y: 125 };
+  const logicalOffset = {
+    x: (worldPoint.x - view.offsetX) * view.scale,
+    y: (worldPoint.y - view.offsetY) * view.scale
+  };
+  assert(logicalOffset.x >= 0 && logicalOffset.x <= box.width &&
+    logicalOffset.y >= 0 && logicalOffset.y <= box.height,
+  `The seeded ROI center is outside the current Canvas viewport: ${JSON.stringify({ box, view, worldPoint, logicalOffset })}`);
+  await page.mouse.click(box.x + logicalOffset.x, box.y + logicalOffset.y);
+  try {
+    await page.waitForFunction(() =>
+      document.querySelector('[data-evidence-surface="f03-g3-inspector"]')
+        ?.getAttribute('data-inspector-mode') === 'node', null, { timeout: 10_000 });
+  } catch (error) {
+    const selection = await page.evaluate(() => {
+      const flow = document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]');
+      const inspector = document.querySelector('[data-evidence-surface="f03-g3-inspector"]');
+      const rect = selector => {
+        const element = document.querySelector(selector);
+        if (!element) return null;
+        const bounds = element.getBoundingClientRect();
+        return {
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.width,
+          height: bounds.height,
+          bottom: bounds.bottom
+        };
+      };
+      return {
+        selectedCount: Number(flow?.getAttribute('data-selected-count') ?? -1),
+        inspectorMode: inspector?.getAttribute('data-inspector-mode') || null,
+        inspectorName: inspector?.querySelector('.inspector-panel__field input')?.value || null,
+        viewport: {
+          innerWidth: window.innerWidth,
+          innerHeight: window.innerHeight,
+          scrollWidth: document.documentElement.scrollWidth,
+          scrollHeight: document.documentElement.scrollHeight
+        },
+        rects: {
+          productMain: rect('.product-layout__main'),
+          workspaceShell: rect('[data-evidence-surface="f03-workspace-shell"]'),
+          topStateStack: rect('[data-testid="workspace-top-state-stack"]'),
+          flowWorkspace: rect('[data-capability="flow-workspace"]'),
+          flowSurface: rect('[data-evidence-surface="f03-g2-flow-canvas"]'),
+          flowStage: rect('.flow-canvas-surface__stage'),
+          flowCanvas: rect('[data-testid="flow-canvas"]')
+        }
+      };
+    });
+    throw new Error(`Seeded ROI pointer hit failed: ${JSON.stringify({ box, view, worldPoint, logicalOffset, selection })}`, {
+      cause: error
+    });
+  }
+  return { flowCanvas, box, view, worldPoint, logicalOffset };
 }
 
-async function readWorkspaceCanvasDpiEvidence(page, pointerNodeId) {
+async function readWorkspaceCanvasDpiEvidence(page, pointerNodeId, pointerHit) {
   assert(/^[0-9a-f-]{36}$/i.test(pointerNodeId || ''),
     'F04 Workspace DPI evidence did not retain the seeded pointer-hit node identity.');
+  assert(pointerHit?.worldPoint && pointerHit?.logicalOffset && pointerHit?.view,
+    'F04 Workspace DPI evidence did not retain the transformed pointer hit.');
   const observed = await page.evaluate(() => {
     const canvas = document.querySelector('[data-testid="flow-canvas"]');
     const surface = document.querySelector('[data-evidence-surface="f03-g2-flow-canvas"]');
     const inspector = document.querySelector('[data-evidence-surface="f03-g3-inspector"]');
     if (!(canvas instanceof HTMLCanvasElement)) return null;
+    const toRect = element => {
+      if (!(element instanceof Element)) return null;
+      const bounds = element.getBoundingClientRect();
+      return {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        right: bounds.right,
+        bottom: bounds.bottom
+      };
+    };
     const rect = canvas.getBoundingClientRect();
+    const surfaceRect = surface?.getBoundingClientRect() ?? null;
+    const visibleCanvasHeight = surfaceRect == null
+      ? 0
+      : Math.max(0, Math.min(rect.bottom, surfaceRect.bottom, window.innerHeight) -
+        Math.max(rect.top, surfaceRect.top, 0));
     return {
       runtime: {
         dpr: window.devicePixelRatio,
@@ -825,6 +902,16 @@ async function readWorkspaceCanvasDpiEvidence(page, pointerNodeId) {
         backingWidth: canvas.width,
         backingHeight: canvas.height
       },
+      layout: {
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        runConsole: toRect(document.querySelector('[data-testid="run-console"]')),
+        workArea: toRect(document.querySelector('.workspace-shell__work-area')),
+        flowWorkspace: toRect(document.querySelector('[data-capability="flow-workspace"]')),
+        surface: toRect(surface),
+        stage: toRect(document.querySelector('.flow-canvas-surface__stage')),
+        canvas: toRect(canvas),
+        visibleCanvasHeight
+      },
       selectedCount: Number(surface?.getAttribute('data-selected-count') || -1),
       inspectorMode: inspector?.getAttribute('data-inspector-mode') || null
     };
@@ -832,6 +919,8 @@ async function readWorkspaceCanvasDpiEvidence(page, pointerNodeId) {
   assert(observed, 'F04 Workspace DPI evidence did not find the canonical Flow Canvas element.');
   assert(observed.runtime.logicalWidth > 0 && observed.runtime.logicalHeight > 0,
     `F04 Workspace Flow Canvas has no logical size: ${JSON.stringify(observed)}`);
+  assert(observed.layout.visibleCanvasHeight >= 300,
+    `F04 Workspace did not retain a usable 300px visible Canvas stage: ${JSON.stringify(observed.layout)}`);
   assert(
     Math.abs(observed.runtime.backingWidth -
         (observed.runtime.logicalWidth * observed.runtime.dpr)) <= 2 &&
@@ -843,10 +932,12 @@ async function readWorkspaceCanvasDpiEvidence(page, pointerNodeId) {
     `F04 Workspace pointer hit did not preserve the seeded ROI selection: ${JSON.stringify(observed)}`);
   return {
     source: 'FORMAL_PRODUCT_WORKSPACE_CANONICAL_FLOW_CANVAS',
-    mounted: { canvas: { runtime: observed.runtime } },
+    mounted: { canvas: { runtime: observed.runtime, layout: observed.layout } },
     pointerHit: {
       id: pointerNodeId,
-      logicalOffset: { x: 360, y: 125 },
+      worldPoint: pointerHit.worldPoint,
+      view: pointerHit.view,
+      logicalOffset: pointerHit.logicalOffset,
       selectedCount: observed.selectedCount,
       inspectorMode: observed.inspectorMode
     }
@@ -2039,6 +2130,7 @@ async function verifyProductPage(
         state: shell?.getAttribute('data-workspace-state') || null,
         projectId: shell?.getAttribute('data-workspace-project-id') || null,
         persistencePhase: shell?.getAttribute('data-workspace-persistence-phase') || null,
+        persistenceRevision: Number(shell?.getAttribute('data-workspace-persistence-revision') ?? -1),
         dirty: shell?.getAttribute('data-workspace-dirty') || null,
         dirtyGeneration: Number(shell?.getAttribute('data-workspace-dirty-generation') ?? -1),
         activeElement: activeElement ? {
@@ -2072,7 +2164,31 @@ async function verifyProductPage(
       };
     });
     if (dpiOnly) {
-      const mounted = await readWorkspace();
+      let mounted = await readWorkspace();
+      let normalizationSave = null;
+      if (mounted.dirty === 'true' && mounted.persistencePhase === 'dirty') {
+        const saveButton = page.locator('[data-testid="workspace-save"]');
+        assert(await saveButton.isEnabled(),
+          `Harness-seeded Workspace was dirty but could not use the formal save command: ${JSON.stringify(mounted)}`);
+        const saveRequestStart = runtimeErrors.requests.length;
+        await saveButton.click();
+        await waitForFunctionWithoutHandle(page, () => {
+          const shell = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+          return shell?.getAttribute('data-workspace-dirty') === 'false' &&
+            ['clean', 'saved'].includes(shell?.getAttribute('data-workspace-persistence-phase') || '');
+        }, null, { timeout: 45_000 });
+        const saved = await readWorkspace();
+        const writeRequests = runtimeErrors.requests.slice(saveRequestStart)
+          .map(item => ({ method: item.method, path: new URL(item.url).pathname }))
+          .filter(item => item.method === 'PUT' && /^\/api\/projects\/[0-9a-f-]{36}$/i.test(item.path));
+        assert(writeRequests.length === 1 &&
+          writeRequests[0].path.toLowerCase() === `/api/projects/${mounted.projectId}`.toLowerCase(),
+        `Seed normalization did not use exactly one canonical Project save: ${JSON.stringify(writeRequests)}`);
+        assert(saved.persistenceRevision > mounted.persistenceRevision,
+          `Seed normalization save did not advance PersistenceRevision: ${JSON.stringify({ mounted, saved })}`);
+        normalizationSave = { before: mounted, after: saved, writeRequests };
+        mounted = saved;
+      }
       assert(mounted.dirty === 'false' && ['clean', 'saved'].includes(mounted.persistencePhase),
         `Workspace was not clean before DPI capture: ${JSON.stringify(mounted)}`);
       assert(mounted.mainCount === 1 && mounted.shellCount === 1 &&
@@ -2080,7 +2196,14 @@ async function verifyProductPage(
         mounted.previewOwnerCount === 1 && mounted.imageCanvasOwnerCount === 1 && mounted.roiOwnerCount === 1 &&
         mounted.persistenceOwnerCount === 1,
       `F04 DPI-only Workspace did not retain exactly one owner chain: ${JSON.stringify(mounted)}`);
-      workspaceLifecycle = { mode: 'dpi-only', mounted, disposed: null, remounted: null, cycles: [] };
+      workspaceLifecycle = {
+        mode: 'dpi-only',
+        normalizationSave,
+        mounted,
+        disposed: null,
+        remounted: null,
+        cycles: []
+      };
     } else {
       const mounted = await readWorkspace();
       assert(mounted.dirty === 'false' && ['clean', 'saved'].includes(mounted.persistencePhase),
@@ -2241,11 +2364,11 @@ async function verifyProductPage(
       }
     }
   }
-  if (dpiOnly && workspaceReady && seededWorkspace) {
-    await selectSeededRoiNode(page);
-  }
+  const workspacePointerHit = isF04Evidence && workspaceReady && seededWorkspace
+    ? await selectSeededRoiNode(page)
+    : null;
   const workspaceCanvasDpi = isF04Evidence && workspaceReady && seededWorkspace
-    ? await readWorkspaceCanvasDpiEvidence(page, workspaceSeedRoiNodeId)
+    ? await readWorkspaceCanvasDpiEvidence(page, workspaceSeedRoiNodeId, workspacePointerHit)
     : null;
   const formalRunInstallation = formalRun ? await installFormalRunDecision(page, formalRunSeed) : null;
   const workspaceG6 = formalRun
@@ -2359,6 +2482,8 @@ async function verifyProductPage(
         !/^\/api\/operators\/[^/]+\/metadata$/i.test(url.pathname) &&
         !(isF04Evidence && isProjectOpenRequest(item)) &&
         !(item.method === 'POST' && url.pathname === '/api/inspection/decision-configuration/validate') &&
+        !(item.method === 'GET' &&
+          /^\/api\/inspection\/realtime\/[0-9a-f-]{36}\/state$/i.test(url.pathname)) &&
         !(goldenJourney && item.method === 'POST' && url.pathname === '/api/cameras/soft-trigger-capture') &&
         !(goldenJourney && item.method === 'POST' &&
           /^\/api\/projects\/[0-9a-f-]{36}\/runtime-package\/export$/i.test(url.pathname)) &&

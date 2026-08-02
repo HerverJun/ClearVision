@@ -796,7 +796,7 @@ function workspaceResultsLink(resultId?: string): string {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) var(--cv-workspace-status-height, 24px);
+  grid-template-rows: auto auto auto minmax(0, 1fr) var(--cv-workspace-status-height, 24px);
   overflow: hidden;
   background: var(--cv-surface-page);
 }

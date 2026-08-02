@@ -379,4 +379,25 @@ const formattedTime = (value: string | null): string => {
   .run-console__body > section { border-right: 0; border-bottom: 1px solid var(--cv-border-subtle); }
   .run-console__results { grid-column: auto; }
 }
+@media (max-height: 760px) {
+  .run-console[data-run-mode="formal"] {
+    max-height: max(
+      160px,
+      calc(
+        100vh -
+        var(--cv-workspace-topbar-height, 52px) -
+        var(--cv-workspace-toolbar-height, 38px) -
+        var(--cv-workspace-status-height, 22px) -
+        330px
+      )
+    );
+    grid-template-rows: auto auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+  .run-console[data-run-mode="formal"] .run-console__body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
 </style>

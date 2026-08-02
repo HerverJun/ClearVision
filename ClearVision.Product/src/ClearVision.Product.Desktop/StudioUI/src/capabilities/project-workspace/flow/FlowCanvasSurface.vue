@@ -48,6 +48,8 @@ const toggleDisabledLabel = computed(() => {
     :data-selected-count="selectedCount"
     :data-selected-disabled-count="selectedDisabledCount"
     :data-scale="runtime?.scale ?? 1"
+    :data-offset-x="runtime?.offsetX ?? 0"
+    :data-offset-y="runtime?.offsetY ?? 0"
     :data-mutation-gate="projection.mutationGate"
   >
     <div
