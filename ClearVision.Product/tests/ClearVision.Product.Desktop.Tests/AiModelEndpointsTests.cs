@@ -396,6 +396,75 @@ public class AiModelEndpointsTests
     }
 
     [Fact]
+    public async Task CreateAiModel_OllamaWithoutKey_ShouldRequireAndPersistExplicitClear()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync();
+
+        using var invalid = await host.Client.PostAsync(
+            "/api/ai/models",
+            JsonContent(new
+            {
+                name = "Ollama Invalid Key Contract",
+                provider = "Ollama",
+                model = "llama3.2",
+                baseUrlOperation = "clear",
+                protocol = "ollama_native",
+                wireApi = "chat_completions",
+                authMode = "none",
+                authHeaderName = "",
+                apiKeyOperation = "replace",
+                apiKey = "must-not-be-stored"
+            }));
+        invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await invalid.Content.ReadAsStringAsync()).Should().Contain("requires API key operation clear");
+
+        using var valid = await host.Client.PostAsync(
+            "/api/ai/models",
+            JsonContent(new
+            {
+                name = "Ollama Explicit Clear",
+                provider = "Ollama",
+                model = "llama3.2",
+                baseUrlOperation = "clear",
+                protocol = "ollama_native",
+                wireApi = "chat_completions",
+                authMode = "none",
+                authHeaderName = "",
+                apiKeyOperation = "clear"
+            }));
+        valid.StatusCode.Should().Be(HttpStatusCode.OK, await valid.Content.ReadAsStringAsync());
+        var stored = host.AiConfigStore.GetAll().Single(model => model.Name == "Ollama Explicit Clear");
+        stored.AuthMode.Should().Be("none");
+        stored.ApiKey.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CreateAiModel_AuthenticatedProvider_ShouldAllowExplicitKeylessState()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync();
+
+        using var response = await host.Client.PostAsync(
+            "/api/ai/models",
+            JsonContent(new
+            {
+                name = "OpenAI Keyless Draft",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrlOperation = "clear",
+                protocol = "openai_compatible",
+                wireApi = "chat_completions",
+                authMode = "bearer",
+                authHeaderName = "Authorization",
+                apiKeyOperation = "clear"
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var stored = host.AiConfigStore.GetAll().Single(model => model.Name == "OpenAI Keyless Draft");
+        stored.AuthMode.Should().Be("bearer");
+        stored.ApiKey.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task CreateAiModel_ShouldRejectKnownProviderProtocolMismatch()
     {
         await using var host = await AiModelEndpointTestHost.CreateAsync();

@@ -287,6 +287,145 @@ public sealed class StationCommunicationSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void SaveSettings_WhenStationSyncWriteFails_ShouldRestoreOriginalStudioDocument()
+    {
+        var store = new StationCommunicationSettingsStore(_root);
+        var running = new StationIngressOptions { Enabled = false, Port = 5000 };
+        store.SaveSettings(
+            new StationCommunicationSettingsUpdateRequest
+            {
+                Mode = "LocalLoopback",
+                Port = 5010,
+                SharedToken = "original-token"
+            },
+            running).Success.Should().BeTrue();
+        var originalStudio = File.ReadAllBytes(store.StudioSettingsPath);
+        var originalStation = File.ReadAllBytes(store.StationSyncSettingsPath);
+        var firstWriteCompleted = false;
+        store.PersistenceHook = stage =>
+        {
+            if (stage == StationCommunicationPersistenceStage.AfterStudioWrite)
+            {
+                firstWriteCompleted = true;
+            }
+            else if (stage == StationCommunicationPersistenceStage.BeforeStationSyncWrite)
+            {
+                throw new IOException("Injected Local Station sync write failure.");
+            }
+        };
+
+        var action = () => store.SaveSettings(
+            new StationCommunicationSettingsUpdateRequest
+            {
+                Mode = "LocalLoopback",
+                Port = 5011,
+                SharedToken = "replacement-token"
+            },
+            running);
+
+        var exception = action.Should().Throw<StationCommunicationPersistenceException>().Which;
+        firstWriteCompleted.Should().BeTrue();
+        exception.OutcomeUnknown.Should().BeFalse();
+        exception.DiagnosticCode.Should().Be("station-communication-save-rolled-back");
+        File.ReadAllBytes(store.StudioSettingsPath).Should().Equal(originalStudio);
+        File.ReadAllBytes(store.StationSyncSettingsPath).Should().Equal(originalStation);
+    }
+
+    [Fact]
+    public void SaveSettings_WhenStationSyncWriteAndRollbackFail_ShouldReportPairInconsistency()
+    {
+        var store = new StationCommunicationSettingsStore(_root);
+        var running = new StationIngressOptions { Enabled = false, Port = 5000 };
+        store.SaveSettings(
+            new StationCommunicationSettingsUpdateRequest
+            {
+                Mode = "LocalLoopback",
+                Port = 5010,
+                SharedToken = "original-token"
+            },
+            running).Success.Should().BeTrue();
+        store.PersistenceHook = stage =>
+        {
+            if (stage == StationCommunicationPersistenceStage.BeforeStationSyncWrite)
+            {
+                throw new IOException("Injected Local Station sync write failure.");
+            }
+
+            if (stage == StationCommunicationPersistenceStage.BeforeStudioRollback)
+            {
+                throw new IOException("Injected Studio rollback failure.");
+            }
+        };
+
+        var action = () => store.SaveSettings(
+            new StationCommunicationSettingsUpdateRequest
+            {
+                Mode = "LocalLoopback",
+                Port = 5012,
+                SharedToken = "replacement-token"
+            },
+            running);
+
+        var exception = action.Should().Throw<StationCommunicationPersistenceException>().Which;
+        exception.OutcomeUnknown.Should().BeTrue();
+        exception.DiagnosticCode.Should().Be("station-communication-pair-inconsistent");
+        ReadStudioPort(store.StudioSettingsPath).Should().Be(5012);
+        ReadStationPort(store.StationSyncSettingsPath).Should().Be(5010);
+    }
+
+    [Fact]
+    public async Task SaveSettings_ConcurrentRequests_ShouldSerializeTheDocumentPairMutation()
+    {
+        var store = new StationCommunicationSettingsStore(_root);
+        var running = new StationIngressOptions { Enabled = false, Port = 5000 };
+        using var firstStudioWrite = new ManualResetEventSlim();
+        using var allowFirstMutationToFinish = new ManualResetEventSlim();
+        var completedStudioWrites = 0;
+        store.PersistenceHook = stage =>
+        {
+            if (stage != StationCommunicationPersistenceStage.AfterStudioWrite)
+            {
+                return;
+            }
+
+            if (Interlocked.Increment(ref completedStudioWrites) == 1)
+            {
+                firstStudioWrite.Set();
+                allowFirstMutationToFinish.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+            }
+        };
+
+        var first = Task.Run(() => store.SaveSettings(
+            new StationCommunicationSettingsUpdateRequest
+            {
+                Mode = "LocalLoopback",
+                Port = 5021,
+                SharedToken = "first-token"
+            },
+            running));
+        firstStudioWrite.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        var second = Task.Run(() => store.SaveSettings(
+            new StationCommunicationSettingsUpdateRequest
+            {
+                Mode = "LocalLoopback",
+                Port = 5022,
+                SharedToken = "second-token"
+            },
+            running));
+
+        await Task.Delay(100);
+        Volatile.Read(ref completedStudioWrites).Should().Be(1);
+        allowFirstMutationToFinish.Set();
+        var results = await Task.WhenAll(first, second);
+
+        results.Should().OnlyContain(result => result.Success);
+        completedStudioWrites.Should().Be(2);
+        ReadStudioPort(store.StudioSettingsPath).Should().Be(5022);
+        ReadStationPort(store.StationSyncSettingsPath).Should().Be(5022);
+        Directory.EnumerateFiles(_root, "*.tmp", SearchOption.AllDirectories).Should().BeEmpty();
+    }
+
+    [Fact]
     public void StationSyncJsonOverride_ShouldOverrideDefaultAppsettingsValues()
     {
         var appsettingsPath = Path.Combine(_root, "appsettings.json");
@@ -337,5 +476,18 @@ public sealed class StationCommunicationSettingsStoreTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
+    }
+
+    private static int ReadStudioPort(string path)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        return document.RootElement.GetProperty("StationIngress").GetProperty("Port").GetInt32();
+    }
+
+    private static int ReadStationPort(string path)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        var baseUrl = document.RootElement.GetProperty("StationSync").GetProperty("StudioBaseUrl").GetString();
+        return new Uri(baseUrl!).Port;
     }
 }

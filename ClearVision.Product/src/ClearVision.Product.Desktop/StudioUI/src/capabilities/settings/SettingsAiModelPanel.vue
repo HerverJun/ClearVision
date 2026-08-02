@@ -70,6 +70,8 @@ const reasoningRequestVersion = shallowRef(0);
 const apiKeyMode = shallowRef<AiApiKeyOperationV1>('keep');
 const baseUrlMode = shallowRef<AiBaseUrlOperationV1>('preserve');
 const apiKeyDraft = shallowRef('');
+const apiKeyBaseline = shallowRef<AiApiKeyOperationV1>('keep');
+const apiKeyOperationOverridden = shallowRef(false);
 const reasoningSupportIdentity = shallowRef<string | null>(null);
 const providerPreset = shallowRef('custom');
 const draftBaseline = shallowRef<Readonly<Record<string, unknown>>>({});
@@ -111,11 +113,22 @@ const authModeOptions: readonly CvSelectOption[] = Object.freeze([
   { value: 'header_key', label: 'Header key' },
   { value: 'none', label: 'None' }
 ]);
-const apiKeyOptions: readonly CvSelectOption[] = Object.freeze([
-  { value: 'keep', label: '保留当前 key（默认）' },
-  { value: 'replace', label: '替换 key' },
-  { value: 'clear', label: '清除 key' }
-]);
+const apiKeyOptions = computed<readonly CvSelectOption[]>(() => {
+  if (draft.authMode === 'none') {
+    return Object.freeze([{ value: 'clear', label: '不使用 API key' }]);
+  }
+  if (isNewModel.value) {
+    return Object.freeze([
+      { value: 'replace', label: '创建并写入 key' },
+      { value: 'clear', label: '暂不配置 key（稍后补充）' }
+    ]);
+  }
+  return Object.freeze([
+    { value: 'keep', label: '保留当前 key（默认）' },
+    { value: 'replace', label: '替换 key' },
+    { value: 'clear', label: '清除 key' }
+  ]);
+});
 const roleOptions: readonly CvSelectOption[] = Object.freeze([
   { value: 'generation', label: 'generation' },
   { value: 'planner', label: 'planner' },
@@ -144,7 +157,7 @@ const canEditSelected = computed(() => canManage.value && (isNewModel.value || s
 const dirty = computed(() => {
   const current = snapshotDraft();
   return JSON.stringify(current) !== JSON.stringify(draftBaseline.value) ||
-    apiKeyMode.value !== 'keep' ||
+    apiKeyMode.value !== apiKeyBaseline.value ||
     apiKeyDraft.value.length > 0 ||
     baseUrlMode.value !== 'preserve';
 });
@@ -257,6 +270,8 @@ function setProviderPreset(value: string): void {
   if (!preset) return;
   draft.provider = preset.provider;
   applyProviderPresetDefaults(value);
+  apiKeyOperationOverridden.value = false;
+  synchronizeApiKeyOperation();
 }
 
 function applyProviderPresetDefaults(value: string): void {
@@ -268,15 +283,35 @@ function applyProviderPresetDefaults(value: string): void {
   if (!presetOverrides.authHeaderName) draft.authHeaderName = preset.authHeaderName;
 }
 
+function defaultApiKeyOperation(newModel: boolean, authMode: string): AiApiKeyOperationV1 {
+  if (authMode === 'none') return 'clear';
+  return newModel ? 'replace' : 'keep';
+}
+
+function synchronizeApiKeyOperation(): void {
+  if (draft.authMode === 'none' || !apiKeyOperationOverridden.value) {
+    apiKeyMode.value = defaultApiKeyOperation(isNewModel.value, draft.authMode);
+    apiKeyDraft.value = '';
+  }
+}
+
 function onProviderInput(value: string): void {
   draft.provider = value;
   const inferred = inferProviderPreset(value, '');
   providerPreset.value = inferred;
   if (inferred !== 'custom') applyProviderPresetDefaults(inferred);
+  apiKeyOperationOverridden.value = false;
+  synchronizeApiKeyOperation();
 }
 
 function markPresetOverride(field: keyof typeof presetOverrides): void {
   presetOverrides[field] = true;
+}
+
+function onAuthModeChanged(): void {
+  markPresetOverride('authMode');
+  apiKeyOperationOverridden.value = false;
+  synchronizeApiKeyOperation();
 }
 
 function isFullModel(value: AiModelPublicProjectionV1 | null | undefined): value is AiModelProjectionV1 {
@@ -377,7 +412,9 @@ function resetDraft(value: AiModelPublicProjectionV1 | null): void {
   providerPreset.value = inferProviderPreset(draft.provider, draft.protocol);
   draftBaseline.value = snapshotDraft();
   apiKeyDraft.value = '';
-  apiKeyMode.value = 'keep';
+  apiKeyMode.value = defaultApiKeyOperation(value === null, next.authMode);
+  apiKeyBaseline.value = apiKeyMode.value;
+  apiKeyOperationOverridden.value = false;
   connectionResult.value = null;
   reasoningSupportIdentity.value = currentReasoningIdentity();
   feedback.value = null;
@@ -393,7 +430,8 @@ function bindPanelState(owner: SettingsOwner): void {
 
 function clearSecret(): void {
   apiKeyDraft.value = '';
-  apiKeyMode.value = 'keep';
+  apiKeyOperationOverridden.value = false;
+  apiKeyMode.value = defaultApiKeyOperation(isNewModel.value, draft.authMode);
 }
 
 function resultFeedback<T>(result: SettingsWriteResult<T>): SettingsFeedback {
@@ -433,8 +471,13 @@ function toggleRole(role: string, event: Event): void {
 }
 
 function setApiKeyMode(value: string): void {
-  const next = value === 'replace' || value === 'clear' ? value : 'keep';
+  const next = draft.authMode === 'none'
+    ? 'clear'
+    : value === 'replace' || value === 'clear'
+      ? value
+      : isNewModel.value ? 'replace' : 'keep';
   apiKeyMode.value = next;
+  apiKeyOperationOverridden.value = true;
   if (next !== 'replace') apiKeyDraft.value = '';
 }
 
@@ -452,6 +495,8 @@ function validateDraft(): string | null {
   if (!Number.isInteger(timeout) || timeout <= 0) return 'Timeout 必须是正整数毫秒。';
   const priority = Number(draft.priority);
   if (!Number.isInteger(priority) || priority < 0) return 'Priority 必须是非负整数。';
+  if (draft.authMode === 'none' && apiKeyMode.value !== 'clear') return '不使用认证的模型必须明确清除 API key。';
+  if (isNewModel.value && apiKeyMode.value === 'keep') return '新模型没有可保留的 API key，请选择写入 key 或暂不配置。';
   if (apiKeyMode.value === 'replace') {
     if (!apiKeyDraft.value.trim()) return '选择替换 API key 后必须输入新 key。';
     if (isRedactedPlaceholder(apiKeyDraft.value) || apiKeyDraft.value === selectedFullModel.value?.apiKeyMasked) {
@@ -1001,7 +1046,7 @@ onDeactivated(() => {
             label="Auth mode"
             :options="authModeOptions"
             :disabled="mutationBusy"
-            @update:model-value="markPresetOverride('authMode')"
+            @update:model-value="onAuthModeChanged"
           />
           <CvField
             v-model="draft.authHeaderName"
@@ -1059,7 +1104,7 @@ onDeactivated(() => {
             :model-value="apiKeyMode"
             label="API key 操作"
             :options="apiKeyOptions"
-            :disabled="mutationBusy"
+            :disabled="mutationBusy || draft.authMode === 'none'"
             data-settings-ai-key-operation
             @update:model-value="setApiKeyMode"
           />

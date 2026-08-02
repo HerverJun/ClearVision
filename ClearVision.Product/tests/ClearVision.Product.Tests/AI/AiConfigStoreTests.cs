@@ -615,4 +615,112 @@ public class AiConfigStoreTests : IDisposable
         Assert.NotNull(reloaded.CreatedAt);
         Assert.NotNull(reloaded.UpdatedAt);
     }
+
+    [Fact]
+    public void Update_WhenModelDocumentWriteFails_ShouldRollbackMemorySecretAndJson()
+    {
+        var store = CreateStore();
+        store.Add(new AiModelConfig
+        {
+            Id = "rollback-model",
+            Name = "Rollback Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            ApiKey = "original-secret"
+        });
+        var originalJson = File.ReadAllBytes(_testModelsFile);
+        store.PersistenceHook = stage =>
+        {
+            if (stage == AiConfigPersistenceStage.BeforeModelDocumentWrite)
+            {
+                throw new IOException("Injected model JSON write failure.");
+            }
+        };
+
+        var exception = Assert.Throws<AiConfigPersistenceException>(() => store.Update(
+            "rollback-model",
+            new AiModelConfig
+            {
+                Name = "Mutated Name",
+                Provider = "OpenAI Compatible",
+                Model = "gpt-4o-mini",
+                ApiKey = "replacement-secret"
+            },
+            AiApiKeyUpdateMode.Replace));
+
+        Assert.True(exception.RollbackSucceeded);
+        Assert.Equal("Rollback Model", store.GetById("rollback-model")!.Name);
+        Assert.Equal("original-secret", store.GetById("rollback-model")!.ApiKey);
+        Assert.Equal(originalJson, File.ReadAllBytes(_testModelsFile));
+        store.PersistenceHook = null;
+
+        var reloaded = CreateStore().GetById("rollback-model")!;
+        Assert.Equal("Rollback Model", reloaded.Name);
+        Assert.Equal("original-secret", reloaded.ApiKey);
+        Assert.Empty(Directory.EnumerateFiles(_testDir, "*.tmp", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task ConcurrentMutations_ShouldKeepMemorySecretsAndModelJsonConsistent()
+    {
+        var store = CreateStore();
+        for (var index = 0; index < 8; index++)
+        {
+            store.Add(new AiModelConfig
+            {
+                Id = $"concurrent-{index}",
+                Name = $"Concurrent {index}",
+                Provider = "OpenAI Compatible",
+                Model = "gpt-4o-mini",
+                ApiKey = $"initial-secret-{index}"
+            });
+        }
+
+        var mutations = new List<Task>();
+        for (var index = 0; index < 6; index++)
+        {
+            var captured = index;
+            mutations.Add(Task.Run(() => store.Update(
+                $"concurrent-{captured}",
+                new AiModelConfig
+                {
+                    Name = $"Updated {captured}",
+                    Provider = "OpenAI Compatible",
+                    Model = "gpt-4o-mini",
+                    ApiKey = $"updated-secret-{captured}"
+                },
+                AiApiKeyUpdateMode.Replace)));
+            mutations.Add(Task.Run(() => store.UpdateTestStatus(
+                $"concurrent-{captured}",
+                "ok",
+                DateTimeOffset.UtcNow,
+                captured + 10)));
+        }
+
+        mutations.Add(Task.Run(() => store.SetActive("concurrent-5")));
+        mutations.Add(Task.Run(() => store.SetDefaultForRole("concurrent-4", AiModelConfig.RolePlanner)));
+        mutations.Add(Task.Run(() => store.Delete("concurrent-6")));
+        mutations.Add(Task.Run(() => store.Delete("concurrent-7")));
+        await Task.WhenAll(mutations);
+
+        var memory = store.GetAll();
+        var reloaded = CreateStore().GetAll();
+        Assert.Equal(memory.Select(model => model.Id).OrderBy(id => id), reloaded.Select(model => model.Id).OrderBy(id => id));
+        Assert.DoesNotContain(reloaded, model => model.Id is "concurrent-6" or "concurrent-7");
+        Assert.Single(reloaded.Where(model => model.IsActive));
+        Assert.Equal("concurrent-5", reloaded.Single(model => model.IsActive).Id);
+        Assert.Contains(AiModelConfig.RolePlanner, reloaded.Single(model => model.Id == "concurrent-4").RoleBindings!);
+        for (var index = 0; index < 6; index++)
+        {
+            var model = reloaded.Single(item => item.Id == $"concurrent-{index}");
+            Assert.Equal($"Updated {index}", model.Name);
+            Assert.Equal($"updated-secret-{index}", model.ApiKey);
+            Assert.Equal("ok", model.LastTestStatus);
+        }
+
+        using var persisted = JsonDocument.Parse(File.ReadAllText(_testModelsFile));
+        Assert.Equal(reloaded.Count, persisted.RootElement.GetArrayLength());
+        Assert.DoesNotContain("updated-secret", File.ReadAllText(_testModelsFile));
+        Assert.Empty(Directory.EnumerateFiles(_testDir, "*.tmp", SearchOption.AllDirectories));
+    }
 }

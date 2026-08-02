@@ -48,9 +48,9 @@ public static class StationCommunicationEndpoints
 
                 return Results.Ok(result.Settings);
             }
-            catch (StationCommunicationPersistenceException)
+            catch (StationCommunicationPersistenceException ex)
             {
-                return BuildPersistenceUnknownResult();
+                return BuildPersistenceFailureResult(ex);
             }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAdmin);
@@ -79,9 +79,9 @@ public static class StationCommunicationEndpoints
 
                     return Results.Ok(result);
                 }
-                catch (StationCommunicationPersistenceException)
+                catch (StationCommunicationPersistenceException ex)
                 {
-                    return BuildPersistenceUnknownResult();
+                    return BuildPersistenceFailureResult(ex);
                 }
             }
 
@@ -98,14 +98,17 @@ public static class StationCommunicationEndpoints
 
     private static bool IsAdmin(HttpContext context) => ClearVisionPermissionPolicies.IsAdmin(context);
 
-    private static IResult BuildPersistenceUnknownResult()
+    private static IResult BuildPersistenceFailureResult(StationCommunicationPersistenceException exception)
     {
         return Results.Json(new
         {
-            errorCode = "unknown-outcome",
-            code = "unknown-outcome",
-            policy = "reload-before-retry",
-            publicMessage = "Station communication persistence outcome is unknown; reread Station authority before retrying."
-        }, statusCode: StatusCodes.Status503ServiceUnavailable);
+            errorCode = exception.DiagnosticCode,
+            code = exception.DiagnosticCode,
+            outcome = exception.OutcomeUnknown ? "unknown" : "unchanged",
+            policy = exception.OutcomeUnknown ? "reload-before-retry" : "retry-allowed",
+            publicMessage = exception.Message
+        }, statusCode: exception.OutcomeUnknown
+            ? StatusCodes.Status503ServiceUnavailable
+            : StatusCodes.Status500InternalServerError);
     }
 }

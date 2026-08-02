@@ -23,6 +23,7 @@ public enum StationCommunicationMode
 public sealed class StationCommunicationSettingsStore
 {
     private const int GeneratedTokenUpperBound = 1_000_000;
+    private readonly object _mutationLock = new();
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -62,13 +63,28 @@ public sealed class StationCommunicationSettingsStore
 
     public string StationSyncAppliedMarkerPath { get; }
 
+    internal Action<StationCommunicationPersistenceStage>? PersistenceHook { get; set; }
+
     public StationCommunicationSettingsView GetSettings(StationIngressOptions runningIngress)
     {
-        var snapshot = ReadSnapshot(runningIngress);
-        return BuildView(snapshot, runningIngress, null, null, "Station communication settings loaded.");
+        lock (_mutationLock)
+        {
+            var snapshot = ReadSnapshot(runningIngress);
+            return BuildView(snapshot, runningIngress, null, null, "Station communication settings loaded.");
+        }
     }
 
     public StationCommunicationSaveResult SaveSettings(
+        StationCommunicationSettingsUpdateRequest request,
+        StationIngressOptions runningIngress)
+    {
+        lock (_mutationLock)
+        {
+            return SaveSettingsCore(request, runningIngress);
+        }
+    }
+
+    private StationCommunicationSaveResult SaveSettingsCore(
         StationCommunicationSettingsUpdateRequest request,
         StationIngressOptions runningIngress)
     {
@@ -83,16 +99,45 @@ public sealed class StationCommunicationSettingsStore
             target.StationSync,
             snapshot.StationSync ?? new LocalStationSyncOptions());
 
+        PersistedFileState originalStudioState;
         try
         {
+            originalStudioState = CaptureFileState(StudioSettingsPath);
             WriteStudioDocument(target.StudioDocument);
-            WriteStationSyncDocument(target.StationSyncDocument);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
             throw new StationCommunicationPersistenceException(
-                "Station communication persistence outcome is unknown; reread Station authority before retrying.",
-                ex);
+                "Station communication settings were not saved; the persisted authority is unchanged.",
+                ex,
+                outcomeUnknown: false,
+                diagnosticCode: "station-communication-save-failed");
+        }
+
+        try
+        {
+            WriteStationSyncDocument(target.StationSyncDocument);
+        }
+        catch (Exception writeException) when (writeException is IOException or UnauthorizedAccessException or JsonException)
+        {
+            try
+            {
+                RestoreFileState(StudioSettingsPath, originalStudioState);
+            }
+            catch (Exception rollbackException) when (rollbackException is IOException or UnauthorizedAccessException)
+            {
+                throw new StationCommunicationPersistenceException(
+                    "Station communication documents may be inconsistent because the Local Station sync write and Studio rollback both failed; reread both authority documents before retrying.",
+                    new AggregateException(writeException, rollbackException),
+                    outcomeUnknown: true,
+                    diagnosticCode: "station-communication-pair-inconsistent");
+            }
+
+            throw new StationCommunicationPersistenceException(
+                "Local Station sync settings were not saved; the Studio communication document was restored to its original state.",
+                writeException,
+                outcomeUnknown: false,
+                diagnosticCode: "station-communication-save-rolled-back");
         }
 
         var savedSnapshot = ReadSnapshot(runningIngress);
@@ -106,6 +151,14 @@ public sealed class StationCommunicationSettingsStore
     }
 
     public StationCommunicationTokenResult RegenerateToken(StationIngressOptions runningIngress)
+    {
+        lock (_mutationLock)
+        {
+            return RegenerateTokenCore(runningIngress);
+        }
+    }
+
+    private StationCommunicationTokenResult RegenerateTokenCore(StationIngressOptions runningIngress)
     {
         var snapshot = ReadSnapshot(runningIngress);
         var mode = InferMode(snapshot.Ingress, snapshot.Metadata);
@@ -162,7 +215,7 @@ public sealed class StationCommunicationSettingsStore
             SharedToken = generatedToken
         };
 
-        var saveResult = SaveSettings(request, runningIngress);
+        var saveResult = SaveSettingsCore(request, runningIngress);
         var persistedTokenInfo = saveResult.Settings?.Token ?? BuildTokenInfo(ResolveToken(snapshot));
         return new StationCommunicationTokenResult
         {
@@ -390,15 +443,57 @@ public sealed class StationCommunicationSettingsStore
 
     private void WriteStudioDocument(StudioStationCommunicationSettingsDocument document)
     {
-        WriteJsonFile(StudioSettingsPath, document);
+        WriteJsonFile(
+            StudioSettingsPath,
+            document,
+            StationCommunicationPersistenceStage.BeforeStudioWrite,
+            StationCommunicationPersistenceStage.AfterStudioWrite);
     }
 
     private void WriteStationSyncDocument(StationSyncSettingsDocument document)
     {
-        WriteJsonFile(StationSyncSettingsPath, document);
+        WriteJsonFile(
+            StationSyncSettingsPath,
+            document,
+            StationCommunicationPersistenceStage.BeforeStationSyncWrite,
+            StationCommunicationPersistenceStage.AfterStationSyncWrite);
     }
 
-    private static void WriteJsonFile<T>(string path, T value)
+    private void WriteJsonFile<T>(
+        string path,
+        T value,
+        StationCommunicationPersistenceStage beforeStage,
+        StationCommunicationPersistenceStage afterStage)
+    {
+        PersistenceHook?.Invoke(beforeStage);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(value, JsonOptions);
+        WriteFileAtomically(path, bytes);
+        PersistenceHook?.Invoke(afterStage);
+    }
+
+    private static PersistedFileState CaptureFileState(string path)
+    {
+        return File.Exists(path)
+            ? new PersistedFileState(true, File.ReadAllBytes(path))
+            : new PersistedFileState(false, null);
+    }
+
+    private void RestoreFileState(string path, PersistedFileState state)
+    {
+        PersistenceHook?.Invoke(StationCommunicationPersistenceStage.BeforeStudioRollback);
+        if (state.Exists)
+        {
+            WriteFileAtomically(path, state.Content ?? Array.Empty<byte>());
+        }
+        else if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+
+        PersistenceHook?.Invoke(StationCommunicationPersistenceStage.AfterStudioRollback);
+    }
+
+    private static void WriteFileAtomically(string path, byte[] content)
     {
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory))
@@ -406,10 +501,19 @@ public sealed class StationCommunicationSettingsStore
             Directory.CreateDirectory(directory);
         }
 
-        var json = JsonSerializer.Serialize(value, JsonOptions);
-        var tempPath = path + ".tmp";
-        File.WriteAllText(tempPath, json, new UTF8Encoding(false));
-        File.Move(tempPath, path, true);
+        var tempPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllBytes(tempPath, content);
+            File.Move(tempPath, path, true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
     }
 
     private bool IsStationSyncRestartRequired()
@@ -771,6 +875,18 @@ public sealed class StationCommunicationSettingsStore
         StationSyncSettingsDocument StationSyncDocument,
         StationIngressOptions Ingress,
         LocalStationSyncOptions StationSync);
+
+    private sealed record PersistedFileState(bool Exists, byte[]? Content);
+}
+
+internal enum StationCommunicationPersistenceStage
+{
+    BeforeStudioWrite,
+    AfterStudioWrite,
+    BeforeStationSyncWrite,
+    AfterStationSyncWrite,
+    BeforeStudioRollback,
+    AfterStudioRollback
 }
 
 public sealed class StudioStationCommunicationSettingsDocument
@@ -964,8 +1080,18 @@ public sealed class StationCommunicationTokenResult
 
 public sealed class StationCommunicationPersistenceException : IOException
 {
-    public StationCommunicationPersistenceException(string message, Exception innerException)
+    public StationCommunicationPersistenceException(
+        string message,
+        Exception innerException,
+        bool outcomeUnknown = true,
+        string diagnosticCode = "unknown-outcome")
         : base(message, innerException)
     {
+        OutcomeUnknown = outcomeUnknown;
+        DiagnosticCode = diagnosticCode;
     }
+
+    public bool OutcomeUnknown { get; }
+
+    public string DiagnosticCode { get; }
 }

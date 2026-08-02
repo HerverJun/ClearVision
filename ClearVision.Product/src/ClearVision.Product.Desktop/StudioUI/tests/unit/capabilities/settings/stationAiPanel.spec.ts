@@ -1,15 +1,18 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { reactive, ref, nextTick, defineComponent } from 'vue';
+import type { ProductRuntime } from '@/app/productRuntime';
+import type { ApiTransport } from '@/platform/api';
 import SettingsAiModelPanel from '@/capabilities/settings/SettingsAiModelPanel.vue';
 import SettingsStationPanel from '@/capabilities/settings/SettingsStationPanel.vue';
-import type {
-  AiModelsProjectionV1,
-  AiReasoningSupportProjectionV1,
-  SettingsOwner,
-  SettingsPanelState,
-  SettingsWriteResult,
-  StationCommunicationProjectionV1
+import {
+  createSettingsOwner,
+  type AiModelsProjectionV1,
+  type AiReasoningSupportProjectionV1,
+  type SettingsOwner,
+  type SettingsPanelState,
+  type SettingsWriteResult,
+  type StationCommunicationProjectionV1
 } from '@/capabilities/settings';
 
 const mountedWrappers: Array<{ unmount: () => void }> = [];
@@ -201,6 +204,7 @@ function ownerFixture(options: {
     stationToken,
     aiRead,
     aiUpdate,
+    aiCreate,
     aiDelete,
     aiReasoning,
     aiTest
@@ -294,6 +298,89 @@ describe('F07 G7 Station communication panel', () => {
   });
 
 describe('F07 G8 AI model administration panel', () => {
+  it.each([
+    {
+      name: 'Ollama without a key',
+      preset: 'ollama',
+      expectedAuthMode: 'none',
+      expectedOperation: 'clear',
+      apiKey: null
+    },
+    {
+      name: 'OpenAI-compatible with a key',
+      preset: 'openai-compatible',
+      expectedAuthMode: 'bearer',
+      expectedOperation: 'replace',
+      apiKey: 'create-contract-secret'
+    }
+  ])('submits $name through the real owner and API adapter create contract', async scenario => {
+    let created = false;
+    let createBody: Record<string, unknown> | null = null;
+    const get = vi.fn(async (path: string) => {
+      if (path !== 'ai/models') throw new Error(`Unexpected GET ${path}`);
+      if (!created) return [];
+      const source = aiProjection().items[0]!;
+      return [{
+        ...source,
+        id: 'created-model',
+        name: 'Created contract model',
+        displayName: 'Created contract model',
+        provider: scenario.preset === 'ollama' ? 'Ollama' : 'OpenAI Compatible',
+        model: scenario.preset === 'ollama' ? 'llama3.2' : 'gpt-4o-mini',
+        hasApiKey: scenario.apiKey !== null,
+        apiKeyMasked: scenario.apiKey === null ? '' : '******',
+        protocol: scenario.preset === 'ollama' ? 'ollama_native' : 'openai_compatible',
+        authMode: scenario.expectedAuthMode,
+        authHeaderName: scenario.preset === 'ollama' ? '' : 'Authorization'
+      }];
+    });
+    const post = vi.fn(async (path: string, body: unknown) => {
+      if (path !== 'ai/models') throw new Error(`Unexpected POST ${path}`);
+      createBody = body as Record<string, unknown>;
+      created = true;
+      return { message: 'created', id: 'created-model', role: 'generation' };
+    });
+    const runtime = {
+      api: {
+        apiBaseUrl: 'http://localhost:5000/api',
+        get,
+        post
+      } as unknown as ApiTransport
+    } as Pick<ProductRuntime, 'api'>;
+    const owner = createSettingsOwner({ runtime, role: 'Admin' });
+    const wrapper = mount(SettingsAiModelPanel, { props: { owner, role: 'Admin' } });
+
+    try {
+      await flushPromises();
+      await wrapper.get('[data-settings-ai-model-editor] input').setValue('Created contract model');
+      await wrapper.get('[data-settings-ai-provider-preset] select').setValue(scenario.preset);
+      await wrapper.get('input[placeholder="例如 gpt-4o-mini"]').setValue(
+        scenario.preset === 'ollama' ? 'llama3.2' : 'gpt-4o-mini'
+      );
+      if (scenario.apiKey !== null) {
+        await wrapper.get('input[name="aiApiKey"]').setValue(scenario.apiKey);
+      }
+
+      await wrapper.get('[data-settings-ai-model-save]').trigger('click');
+      await flushPromises();
+
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(createBody).toMatchObject({
+        authMode: scenario.expectedAuthMode,
+        apiKeyOperation: scenario.expectedOperation
+      });
+      if (scenario.apiKey === null) {
+        expect(createBody).not.toHaveProperty('apiKey');
+      } else {
+        expect(createBody).toHaveProperty('apiKey', scenario.apiKey);
+      }
+      expect(get).toHaveBeenCalledTimes(2);
+    } finally {
+      wrapper.unmount();
+      owner.dispose();
+    }
+  });
+
   it('implements API key keep, replace and clear without rendering the key after submission', async () => {
     const fixture = ownerFixture({ aiModels: aiProjection() });
     const wrapper = mount(SettingsAiModelPanel, { props: { owner: fixture.owner, role: 'Admin' } });

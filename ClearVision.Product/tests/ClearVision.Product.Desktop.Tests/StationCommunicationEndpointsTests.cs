@@ -121,6 +121,31 @@ public sealed class StationCommunicationEndpointsTests
         forbiddenResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task PutSettings_WhenDocumentPairRollbackFails_ShouldExposeInconsistencyDiagnostic()
+    {
+        await using var host = await StationCommunicationTestHost.CreateAsync(
+            persistenceHook: stage =>
+            {
+                if (stage is StationCommunicationPersistenceStage.BeforeStationSyncWrite or
+                    StationCommunicationPersistenceStage.BeforeStudioRollback)
+                {
+                    throw new IOException("Injected persistence failure.");
+                }
+            });
+
+        using var response = await host.Client.PutAsync(
+            "/api/station-communication/settings",
+            JsonContent(new { mode = "LocalLoopback", port = 5044 }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        document.RootElement.GetProperty("errorCode").GetString()
+            .Should().Be("station-communication-pair-inconsistent");
+        document.RootElement.GetProperty("outcome").GetString().Should().Be("unknown");
+        document.RootElement.GetProperty("policy").GetString().Should().Be("reload-before-retry");
+    }
+
     private static StringContent JsonContent(object payload)
     {
         return new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
@@ -143,7 +168,9 @@ public sealed class StationCommunicationEndpointsTests
 
         public StationCommunicationSettingsStore Store { get; }
 
-        public static async Task<StationCommunicationTestHost> CreateAsync(string? role = "Admin")
+        public static async Task<StationCommunicationTestHost> CreateAsync(
+            string? role = "Admin",
+            Action<StationCommunicationPersistenceStage>? persistenceHook = null)
         {
             var root = Path.Combine(
                 Path.GetTempPath(),
@@ -154,7 +181,11 @@ public sealed class StationCommunicationEndpointsTests
                 EnvironmentName = Environments.Development
             });
             builder.WebHost.UseTestServer();
-            builder.Services.AddSingleton(new StationCommunicationSettingsStore(root));
+            var store = new StationCommunicationSettingsStore(root)
+            {
+                PersistenceHook = persistenceHook
+            };
+            builder.Services.AddSingleton(store);
             builder.Services.AddSingleton(Options.Create(new StationIngressOptions
             {
                 Enabled = false,

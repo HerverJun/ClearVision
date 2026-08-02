@@ -22,6 +22,8 @@ public class AiConfigStore
     private readonly string _legacyConfigFilePath;
     private readonly IAiApiKeySecretStore _apiKeySecretStore;
 
+    internal Action<AiConfigPersistenceStage>? PersistenceHook { get; set; }
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -95,10 +97,10 @@ public class AiConfigStore
 
     public AiModelConfig Add(AiModelConfig model)
     {
-        List<AiModelConfig> previousModels;
+        AiModelConfig result;
         lock (_lock)
         {
-            previousModels = CloneModels(_models);
+            var previousModels = CloneModels(_models);
             if (string.IsNullOrWhiteSpace(model.Id))
             {
                 model.Id = $"model_{Guid.NewGuid():N}";
@@ -117,11 +119,12 @@ public class AiConfigStore
                 model.IsActive = true;
 
             _models.Add(model);
+            SaveAndRollback(previousModels);
+            result = CloneModel(model);
         }
 
-        SaveAndRollback(previousModels);
         _logger.LogInformation("[AiConfigStore] 新增模型: {Name} ({Id})", SanitizeLogValue(model.Name), SanitizeLogValue(model.Id));
-        return model;
+        return result;
     }
 
     /// <summary>
@@ -134,10 +137,10 @@ public class AiConfigStore
 
     public AiModelConfig? Update(string id, AiModelConfig updated, AiApiKeyUpdateMode apiKeyUpdateMode)
     {
-        List<AiModelConfig> previousModels;
+        AiModelConfig result;
         lock (_lock)
         {
-            previousModels = CloneModels(_models);
+            var previousModels = CloneModels(_models);
             var index = _models.FindIndex(x => x.Id == id);
             if (index < 0)
                 return null;
@@ -148,22 +151,22 @@ public class AiConfigStore
             candidate.ValidateReasoningConfiguration();
             candidate.NormalizeAdvancedFields();
             _models[index] = candidate;
+            SaveAndRollback(previousModels);
+            result = CloneModel(candidate);
         }
 
-        SaveAndRollback(previousModels);
         _logger.LogInformation("[AiConfigStore] 更新模型: {Name} ({Id})", SanitizeLogValue(updated.Name), SanitizeLogValue(id));
-        return GetById(id);
+        return result;
     }
 
     public bool Delete(string id)
     {
-        List<AiModelConfig> previousModels;
         lock (_lock)
         {
             if (_models.Count <= 1)
                 throw new InvalidOperationException("至少需保留一个模型配置");
 
-            previousModels = CloneModels(_models);
+            var previousModels = CloneModels(_models);
 
             var removed = _models.RemoveAll(x => x.Id == id);
             if (removed == 0)
@@ -173,19 +176,19 @@ public class AiConfigStore
             {
                 _models[0].IsActive = true;
             }
+
+            SaveAndRollback(previousModels);
         }
 
-        SaveAndRollback(previousModels);
         _logger.LogInformation("[AiConfigStore] 删除模型: {Id}", SanitizeLogValue(id));
         return true;
     }
 
     public bool SetActive(string id)
     {
-        List<AiModelConfig> previousModels;
         lock (_lock)
         {
-            previousModels = CloneModels(_models);
+            var previousModels = CloneModels(_models);
             var target = _models.FirstOrDefault(x => x.Id == id);
             if (target == null)
                 return false;
@@ -194,9 +197,9 @@ public class AiConfigStore
                 model.IsActive = model.Id == id;
             target.IsEnabled = true;
             target.UpdatedAt = DateTimeOffset.UtcNow;
+            SaveAndRollback(previousModels);
         }
 
-        SaveAndRollback(previousModels);
         _logger.LogInformation("[AiConfigStore] 激活模型切换为: {Id}", SanitizeLogValue(id));
         return true;
     }
@@ -204,10 +207,9 @@ public class AiConfigStore
     public bool SetDefaultForRole(string id, string role)
     {
         var normalizedRole = AiModelConfig.NormalizeRoleName(role);
-        List<AiModelConfig> previousModels;
         lock (_lock)
         {
-            previousModels = CloneModels(_models);
+            var previousModels = CloneModels(_models);
             var target = _models.FirstOrDefault(x => x.Id == id);
             if (target == null)
                 return false;
@@ -238,9 +240,9 @@ public class AiConfigStore
             target.IsEnabled = true;
             target.UpdatedAt = DateTimeOffset.UtcNow;
             target.NormalizeAdvancedFields();
+            SaveAndRollback(previousModels);
         }
 
-        SaveAndRollback(previousModels);
         _logger.LogInformation("[AiConfigStore] Set default model role {Role}: {Id}", SanitizeLogValue(normalizedRole), SanitizeLogValue(id));
         return true;
     }
@@ -251,10 +253,10 @@ public class AiConfigStore
         DateTimeOffset testedAt,
         int? latencyMs)
     {
-        List<AiModelConfig> previousModels;
+        AiModelConfig result;
         lock (_lock)
         {
-            previousModels = CloneModels(_models);
+            var previousModels = CloneModels(_models);
             var model = _models.FirstOrDefault(x => x.Id == id);
             if (model == null)
                 return null;
@@ -264,24 +266,23 @@ public class AiConfigStore
             model.LastTestLatencyMs = latencyMs;
             model.UpdatedAt = DateTimeOffset.UtcNow;
             model.NormalizeAdvancedFields();
+            SaveAndRollback(previousModels);
+            result = CloneModel(model);
         }
 
-        SaveAndRollback(previousModels);
-        return GetById(id);
+        return result;
     }
 
     public List<AiModelConfig> ResetToDefaults()
     {
         List<AiModelConfig> resetModels;
-        List<AiModelConfig> previousModels;
         lock (_lock)
         {
-            previousModels = CloneModels(_models);
+            var previousModels = CloneModels(_models);
             _models = CreateDefaultModels(_initialOptions);
+            SaveAndRollback(previousModels);
             resetModels = _models.Select(CloneModel).ToList();
         }
-
-        SaveAndRollback(previousModels);
 
         try
         {
@@ -463,39 +464,64 @@ public class AiConfigStore
 
     private void Save(IReadOnlyList<AiModelConfig>? previousModels = null)
     {
+        lock (_lock)
+        {
+            SaveCore(previousModels);
+        }
+    }
+
+    private void SaveCore(IReadOnlyList<AiModelConfig>? previousModels)
+    {
         List<AiModelConfig> snapshot = new();
         var previousFileExists = File.Exists(_modelsFilePath);
         byte[]? previousFile = null;
         try
         {
             previousFile = previousFileExists ? File.ReadAllBytes(_modelsFilePath) : null;
-            lock (_lock)
-            {
-                snapshot = _models.Select(CloneModel).ToList();
-            }
+            snapshot = _models.Select(CloneModel).ToList();
 
+            PersistenceHook?.Invoke(AiConfigPersistenceStage.BeforeSecretPersistence);
             PersistApiKeys(snapshot);
             _apiKeySecretStore.PruneExcept(snapshot.Select(model => model.Id));
+            PersistenceHook?.Invoke(AiConfigPersistenceStage.AfterSecretPersistence);
 
             var persistedModels = snapshot.Select(CloneModelForPersistence).ToList();
             var json = JsonSerializer.Serialize(persistedModels, JsonOptions);
-            File.WriteAllText(_modelsFilePath, json);
+            PersistenceHook?.Invoke(AiConfigPersistenceStage.BeforeModelDocumentWrite);
+            WriteFileAtomically(_modelsFilePath, System.Text.Encoding.UTF8.GetBytes(json));
+            PersistenceHook?.Invoke(AiConfigPersistenceStage.AfterModelDocumentWrite);
         }
         catch (Exception ex)
         {
+            var rollbackSucceeded = false;
+            Exception? rollbackException = null;
             if (previousModels != null)
             {
-                RestorePersistentState(previousModels, snapshot, previousFileExists, previousFile);
+                try
+                {
+                    PersistenceHook?.Invoke(AiConfigPersistenceStage.BeforeRollback);
+                    rollbackSucceeded = RestorePersistentState(
+                        previousModels,
+                        snapshot,
+                        previousFileExists,
+                        previousFile);
+                    PersistenceHook?.Invoke(AiConfigPersistenceStage.AfterRollback);
+                }
+                catch (Exception restoreException)
+                {
+                    rollbackException = restoreException;
+                }
             }
 
             _logger.LogError(ex, "[AiConfigStore] 持久化失败: {Message}", ex.Message);
             throw new AiConfigPersistenceException(
                 "AI model configuration persistence failed; the authority must be reread before retrying.",
-                ex);
+                rollbackException == null ? ex : new AggregateException(ex, rollbackException),
+                rollbackSucceeded);
         }
     }
 
-    private void RestorePersistentState(
+    private bool RestorePersistentState(
         IReadOnlyList<AiModelConfig> previousModels,
         IReadOnlyList<AiModelConfig> attemptedModels,
         bool previousFileExists,
@@ -520,16 +546,42 @@ public class AiConfigStore
 
             if (previousFileExists && previousFile != null)
             {
-                File.WriteAllBytes(_modelsFilePath, previousFile);
+                WriteFileAtomically(_modelsFilePath, previousFile);
             }
             else if (File.Exists(_modelsFilePath))
             {
                 File.Delete(_modelsFilePath);
             }
+
+            return true;
         }
         catch (Exception restoreException)
         {
             _logger.LogError(restoreException, "[AiConfigStore] rollback of failed persistence did not complete.");
+            return false;
+        }
+    }
+
+    private static void WriteFileAtomically(string path, byte[] content)
+    {
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var tempPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllBytes(tempPath, content);
+            File.Move(tempPath, path, true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
         }
     }
 
@@ -754,4 +806,14 @@ public class AiConfigStore
         ReasoningMode = options.ReasoningMode,
         ReasoningEffort = options.ReasoningEffort
     };
+}
+
+internal enum AiConfigPersistenceStage
+{
+    BeforeSecretPersistence,
+    AfterSecretPersistence,
+    BeforeModelDocumentWrite,
+    AfterModelDocumentWrite,
+    BeforeRollback,
+    AfterRollback
 }

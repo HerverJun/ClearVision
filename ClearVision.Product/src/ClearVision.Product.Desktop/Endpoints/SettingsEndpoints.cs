@@ -318,6 +318,7 @@ public static class SettingsEndpoints
                 var protocol = NormalizeAiProtocol(request.Protocol, provider);
                 var wireApi = NormalizeAiWireApi(request.WireApi);
                 var authMode = NormalizeAiAuthMode(request.AuthMode, protocol);
+                ValidateApiKeyOperationForAuthMode(authMode, apiKeyMode);
                 var authHeaderName = AiModelConfig.NormalizeAuthHeaderName(request.AuthHeaderName, authMode, protocol);
                 ValidateAiModelRequest(
                     provider,
@@ -394,6 +395,7 @@ public static class SettingsEndpoints
                 var authMode = NormalizeAiAuthMode(
                     request.AuthMode ?? (providerChanged || request.Protocol != null ? null : current.AuthMode),
                     protocol);
+                ValidateApiKeyOperationForAuthMode(authMode, apiKeyMode);
                 var authHeaderName = AiModelConfig.NormalizeAuthHeaderName(
                     request.AuthHeaderName ?? (providerChanged || request.Protocol != null || request.AuthMode != null
                         ? null
@@ -2729,6 +2731,16 @@ public static class SettingsEndpoints
             throw new InvalidOperationException("API key replacement must be a non-empty real key.");
 
         return value;
+    }
+
+    private static void ValidateApiKeyOperationForAuthMode(
+        string authMode,
+        AiApiKeyUpdateMode apiKeyUpdateMode)
+    {
+        if (authMode == AiModelConfig.AuthModeNone && apiKeyUpdateMode != AiApiKeyUpdateMode.Clear)
+        {
+            throw new InvalidOperationException("AuthMode none requires API key operation clear.");
+        }
     }
 
     private static string? ResolveBaseUrl(string? baseUrlOperation, JsonElement baseUrl, string? current)
