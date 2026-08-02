@@ -42,6 +42,65 @@ env:
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
 jobs:
+  measurement-performance:
+    name: Measurement Performance Gate
+    runs-on: windows-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore Dependencies
+        shell: pwsh
+        run: dotnet restore $env:SOLUTION_PATH --locked-mode
+
+      - name: Build Measurement Test Dependencies
+        shell: pwsh
+        run: dotnet build $env:SOLUTION_PATH --configuration Debug --no-restore -p:SkipFrontendV2Install=true
+
+      - name: Run Measurement Performance Gate
+        shell: pwsh
+        run: |
+          & "./scripts/run-tests-measurement-performance.ps1" `
+            -GateProfile standard `
+            -Configuration Debug `
+            -NoBuild `
+            -NoRestore `
+            -Verbosity minimal `
+            -ResultsDirectory TestResults/measurement-performance `
+            -LogFileName measurement-performance.trx `
+            -ReportDirectory ClearVision.Product/test_results
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Upload Measurement Performance Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: measurement-performance-report
+          if-no-files-found: error
+          path: |
+            ClearVision.Product/test_results/measurement_performance_budget_report.md
+            ClearVision.Product/test_results/measurement_performance_budget_report.json
+            TestResults/measurement-performance/measurement-performance.trx
+
   build-and-test:
     name: Build & Test
     runs-on: windows-latest
@@ -244,18 +303,6 @@ jobs:
             -ResultsDirectory TestResults/product-performance `
             -LogFileName product-performance.trx
 
-      - name: Run Measurement Performance Gate
-        if: github.event_name == 'workflow_dispatch'
-        shell: pwsh
-        run: |
-          & "./scripts/run-tests-measurement-performance.ps1" `
-            -NoBuild `
-            -NoRestore `
-            -Verbosity minimal `
-            -ResultsDirectory TestResults/measurement-performance `
-            -LogFileName measurement-performance.trx `
-            -ReportDirectory ClearVision.Product/test_results
-
       - name: Run Data Processing Remediation Gate
         if: github.event_name == 'workflow_dispatch'
         shell: pwsh
@@ -449,16 +496,6 @@ jobs:
             ClearVision.Product/test_results/detection_performance_budget_report.md
             ClearVision.Product/test_results/detection_performance_budget_report.json
             ClearVision.Product/test_results/archive/detection_performance_failures/**
-
-      - name: Upload Measurement Performance Report
-        uses: actions/upload-artifact@v4
-        if: always() && github.event_name == 'workflow_dispatch'
-        with:
-          name: measurement-performance-report
-          if-no-files-found: error
-          path: |
-            ClearVision.Product/test_results/measurement_performance_budget_report.md
-            ClearVision.Product/test_results/measurement_performance_budget_report.json
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
