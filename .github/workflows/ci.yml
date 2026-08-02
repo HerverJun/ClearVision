@@ -88,6 +88,8 @@ jobs:
       - name: Run Measurement Performance Gate
         id: measurement_gate
         shell: pwsh
+        env:
+          CV_MEASUREMENT_PERF_WARMUP_ITERS: "12"
         run: |
           & "./scripts/run-tests-measurement-performance.ps1" `
             -GateProfile standard `
