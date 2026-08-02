@@ -124,6 +124,7 @@ public class InspectionEventEndpointsTests
             new HttpRequestMessage(HttpMethod.Get, $"/api/inspection/realtime/{projectId}/events"),
             HttpCompletionOption.ResponseHeadersRead);
         await using var stream = await response.Content.ReadAsStreamAsync();
+        await host.EventBus.WaitForInterfaceSubscriptionAsync();
 
         var initialChunk = await ReadUntilContainsAsync(stream, "event: stateChanged", TimeSpan.FromSeconds(2));
         initialChunk.Should().Contain("event: stateChanged");
@@ -338,7 +339,7 @@ public class InspectionEventEndpointsTests
 
         private InspectionEventTestHost(
             WebApplication app,
-            IInspectionEventBus eventBus,
+            TrackingInspectionEventBus eventBus,
             IEventStore eventStore,
             IInspectionRuntimeCoordinator coordinator)
         {
@@ -350,7 +351,7 @@ public class InspectionEventEndpointsTests
         }
 
         public HttpClient Client { get; }
-        public IInspectionEventBus EventBus { get; }
+        public TrackingInspectionEventBus EventBus { get; }
         public IEventStore EventStore { get; }
         public IInspectionRuntimeCoordinator Coordinator { get; }
 
@@ -366,9 +367,10 @@ public class InspectionEventEndpointsTests
             builder.WebHost.UseTestServer();
 
             eventStore ??= new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance);
-            var eventBus = new InMemoryInspectionEventBus(
+            var innerEventBus = new InMemoryInspectionEventBus(
                 NullLogger<InMemoryInspectionEventBus>.Instance,
                 eventStore);
+            var eventBus = new TrackingInspectionEventBus(innerEventBus);
             var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
 
             builder.Services.AddSingleton<IEventStore>(eventStore);
@@ -405,6 +407,39 @@ public class InspectionEventEndpointsTests
             Client.Dispose();
             await _app.StopAsync();
             await _app.DisposeAsync();
+        }
+    }
+
+    private sealed class TrackingInspectionEventBus : IInspectionEventBus
+    {
+        private readonly IInspectionEventBus _inner;
+        private readonly TaskCompletionSource<bool> _interfaceSubscriptionReady = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TrackingInspectionEventBus(IInspectionEventBus inner)
+        {
+            _inner = inner;
+        }
+
+        public Task WaitForInterfaceSubscriptionAsync(TimeSpan? timeout = null)
+        {
+            return timeout.HasValue
+                ? _interfaceSubscriptionReady.Task.WaitAsync(timeout.Value)
+                : _interfaceSubscriptionReady.Task;
+        }
+
+        public Task PublishAsync<T>(T eventData, CancellationToken ct = default)
+            where T : IInspectionEvent => _inner.PublishAsync(eventData, ct);
+
+        public IDisposable Subscribe<T>(Func<T, CancellationToken, Task> handler)
+            where T : IInspectionEvent => _inner.Subscribe(handler);
+
+        public IDisposable SubscribeInterface<TInterface>(Func<TInterface, CancellationToken, Task> handler)
+            where TInterface : class, IInspectionEvent
+        {
+            var subscription = _inner.SubscribeInterface(handler);
+            _interfaceSubscriptionReady.TrySetResult(true);
+            return subscription;
         }
     }
 
