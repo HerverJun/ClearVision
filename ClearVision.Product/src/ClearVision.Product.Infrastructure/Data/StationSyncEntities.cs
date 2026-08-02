@@ -44,6 +44,12 @@ public sealed class StationNodeEntity
 
     public string? CurrentPackageVersion { get; set; }
 
+    public string? CurrentPackageSha256 { get; set; }
+
+    public Guid? SourceProjectId { get; set; }
+
+    public long? SourceProjectRevision { get; set; }
+
     public string? PackageFlowHash { get; set; }
 
     public string? ExecutionFlowHash { get; set; }
@@ -242,6 +248,10 @@ public sealed class StationCommandRecordEntity
 
     public string CorrelationId { get; set; } = string.Empty;
 
+    public string? ClientRequestId { get; set; }
+
+    public string? RequestPayloadSha256 { get; set; }
+
     public string? ResultMessage { get; set; }
 
     public string? ErrorCode { get; set; }
@@ -335,6 +345,8 @@ public sealed class StationPackageRecordEntity
     public string PackageName { get; set; } = string.Empty;
 
     public string PackageVersion { get; set; } = string.Empty;
+
+    public string MinStationVersion { get; set; } = "0.1.0";
 
     public string PackageKind { get; set; } = "Production";
 

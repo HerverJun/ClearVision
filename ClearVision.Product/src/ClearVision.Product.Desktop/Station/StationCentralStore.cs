@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using System.Security.Cryptography;
+using System.Text;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -75,6 +77,9 @@ public sealed class StationCentralStore
             node.CurrentPackageId = ChooseNullable(dto.CurrentPackageId, node.CurrentPackageId);
             node.CurrentPackageName = ChooseNullable(dto.CurrentPackageName, node.CurrentPackageName);
             node.CurrentPackageVersion = ChooseNullable(dto.CurrentPackageVersion, node.CurrentPackageVersion);
+            node.CurrentPackageSha256 = ChooseNullable(dto.CurrentPackageSha256, node.CurrentPackageSha256);
+            node.SourceProjectId = dto.SourceProjectId ?? node.SourceProjectId;
+            node.SourceProjectRevision = dto.SourceProjectRevision ?? node.SourceProjectRevision;
             var cursor = GetOrCreateCursor(db, dto.StationId);
             cursor.UpdatedAtUtc = now;
             db.SaveChanges();
@@ -102,6 +107,9 @@ public sealed class StationCentralStore
             node.CurrentPackageId = dto.CurrentPackageId;
             node.CurrentPackageName = dto.CurrentPackageName;
             node.CurrentPackageVersion = dto.CurrentPackageVersion;
+            node.CurrentPackageSha256 = dto.CurrentPackageSha256;
+            node.SourceProjectId = dto.SourceProjectId;
+            node.SourceProjectRevision = dto.SourceProjectRevision;
             ApplyExecutionIdentity(node, dto.PackageFlowHash, dto.ExecutionFlowHash, dto.FlowHash,
                 dto.ExecutionSnapshotId, dto.ProjectRevision, dto.DecisionConfigurationHash,
                 dto.ExecutionRunMode, dto.CurrentRunId);
@@ -144,6 +152,10 @@ public sealed class StationCentralStore
                 LastSeenAtUtc = node.LastSeenAtUtc,
                 PackageId = node.CurrentPackageId,
                 PackageName = node.CurrentPackageName,
+                PackageVersion = node.CurrentPackageVersion,
+                PackageSha256 = node.CurrentPackageSha256,
+                SourceProjectId = node.SourceProjectId,
+                SourceProjectRevision = node.SourceProjectRevision,
                 PackageFlowHash = node.PackageFlowHash,
                 ExecutionFlowHash = node.ExecutionFlowHash,
                 FlowHash = node.ExecutionFlowHash ?? node.FlowHash,
@@ -177,6 +189,9 @@ public sealed class StationCentralStore
             node.CurrentPackageId = ChooseNullable(dto.CurrentPackageId, node.CurrentPackageId);
             node.CurrentPackageName = ChooseNullable(dto.CurrentPackageName, node.CurrentPackageName);
             node.CurrentPackageVersion = ChooseNullable(dto.CurrentPackageVersion, node.CurrentPackageVersion);
+            node.CurrentPackageSha256 = ChooseNullable(dto.CurrentPackageSha256, node.CurrentPackageSha256);
+            node.SourceProjectId = dto.SourceProjectId ?? node.SourceProjectId;
+            node.SourceProjectRevision = dto.SourceProjectRevision ?? node.SourceProjectRevision;
             ApplyExecutionIdentity(node, dto.PackageFlowHash, dto.ExecutionFlowHash, dto.FlowHash,
                 dto.ExecutionSnapshotId, dto.ProjectRevision, dto.DecisionConfigurationHash,
                 dto.ExecutionRunMode, dto.CurrentRunId);
@@ -522,37 +537,98 @@ public sealed class StationCentralStore
         StationCommandType commandType,
         string payloadJson,
         string issuedBy,
-        TimeSpan expiresIn)
+        TimeSpan expiresIn,
+        string? clientRequestId = null)
     {
+        var normalizedStationId = stationId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedStationId))
+        {
+            throw new ArgumentException("Station id is required.", nameof(stationId));
+        }
+
+        var normalizedRequestId = string.IsNullOrWhiteSpace(clientRequestId) ? null : clientRequestId.Trim();
+        if (normalizedRequestId?.Length > 128)
+        {
+            throw new ArgumentException("Client request id must not exceed 128 characters.", nameof(clientRequestId));
+        }
+
+        var normalizedPayload = string.IsNullOrWhiteSpace(payloadJson) ? "{}" : payloadJson;
+        var payloadSha256 = ComputeCanonicalPayloadSha256(normalizedPayload);
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        if (normalizedRequestId != null)
+        {
+            var existing = FindCommandByClientRequest(db, normalizedStationId, commandType, normalizedRequestId);
+            if (existing != null)
+            {
+                return ResolveIdempotentCommand(existing, payloadSha256);
+            }
+        }
+
         var now = DateTimeOffset.UtcNow;
         var command = new StationCommandRecordEntity
         {
             CommandId = $"cmd_{Guid.NewGuid():N}",
-            StationId = stationId,
+            StationId = normalizedStationId,
             CommandType = commandType.ToString(),
-            PayloadJson = string.IsNullOrWhiteSpace(payloadJson) ? "{}" : payloadJson,
+            PayloadJson = normalizedPayload,
             Status = StationCommandStatus.Created.ToString(),
             CreatedAtUtc = now,
             ExpiresAtUtc = now.Add(expiresIn <= TimeSpan.Zero ? TimeSpan.FromMinutes(5) : expiresIn),
             IssuedBy = string.IsNullOrWhiteSpace(issuedBy) ? "Studio" : issuedBy,
-            CorrelationId = Guid.NewGuid().ToString("N")
+            CorrelationId = Guid.NewGuid().ToString("N"),
+            ClientRequestId = normalizedRequestId,
+            RequestPayloadSha256 = payloadSha256
         };
         db.StationCommandRecords.Add(command);
         AddAudit(db, new StationAuditDto
         {
             AuditId = $"audit_{Guid.NewGuid():N}",
             Action = commandType.ToString(),
-            TargetStationId = stationId,
+            TargetStationId = normalizedStationId,
             CommandId = command.CommandId,
             PayloadSummary = Redact(payloadJson),
             Result = "Created",
             UserName = command.IssuedBy,
             CreatedAtUtc = now
         });
-        db.SaveChanges();
+        try
+        {
+            db.SaveChanges();
+        }
+        catch (DbUpdateException ex) when (normalizedRequestId != null && IsUniqueConstraintFailure(ex))
+        {
+            using var retryScope = _scopeFactory.CreateScope();
+            var retryDb = retryScope.ServiceProvider.GetRequiredService<VisionDbContext>();
+            var existing = FindCommandByClientRequest(retryDb, normalizedStationId, commandType, normalizedRequestId);
+            if (existing != null)
+            {
+                return ResolveIdempotentCommand(existing, payloadSha256);
+            }
+
+            throw;
+        }
         return ToDto(command);
+    }
+
+    public StationCommandDto? GetCommandByClientRequestId(
+        string stationId,
+        StationCommandType commandType,
+        string clientRequestId)
+    {
+        if (string.IsNullOrWhiteSpace(stationId) || string.IsNullOrWhiteSpace(clientRequestId))
+        {
+            return null;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        if (ExpirePendingCommands(db, stationId.Trim(), DateTimeOffset.UtcNow) > 0)
+        {
+            db.SaveChanges();
+        }
+        var entity = FindCommandByClientRequest(db, stationId.Trim(), commandType, clientRequestId.Trim());
+        return entity == null ? null : ToDto(entity);
     }
 
     public StationCommandDto? PollCommand(string stationId)
@@ -564,20 +640,7 @@ public sealed class StationCentralStore
         var createdStatus = StationCommandStatus.Created.ToString();
         var deliveredStatus = StationCommandStatus.Delivered.ToString();
 
-        var expired = db.StationCommandRecords
-            .Where(item =>
-                item.StationId == stationId &&
-                (item.Status == createdStatus ||
-                 item.Status == deliveredStatus))
-            .AsEnumerable()
-            .Where(item => item.ExpiresAtUtc <= now)
-            .ToList();
-        foreach (var item in expired)
-        {
-            item.Status = StationCommandStatus.TimedOut.ToString();
-            item.CompletedAtUtc = now;
-            item.ResultMessage = "Command expired before Station accepted it.";
-        }
+        ExpirePendingCommands(db, stationId, now);
 
         var command = db.StationCommandRecords
             .Where(item =>
@@ -671,6 +734,10 @@ public sealed class StationCentralStore
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        if (ExpirePendingCommands(db, stationId, DateTimeOffset.UtcNow) > 0)
+        {
+            db.SaveChanges();
+        }
         return db.StationCommandRecords
             .AsNoTracking()
             .Where(item => item.StationId == stationId)
@@ -992,6 +1059,7 @@ public sealed class StationCentralStore
             ExpiresAtUtc = entity.ExpiresAtUtc,
             IssuedBy = entity.IssuedBy,
             CorrelationId = entity.CorrelationId,
+            ClientRequestId = entity.ClientRequestId,
             Status = ParseCommandStatus(entity.Status),
             ProgressPercent = entity.ProgressPercent,
             DeliveredAtUtc = entity.DeliveredAtUtc,
@@ -1089,6 +1157,106 @@ public sealed class StationCentralStore
     private static bool IsUniqueConstraintFailure(DbUpdateException exception)
     {
         return exception.InnerException?.Message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static int ExpirePendingCommands(
+        VisionDbContext db,
+        string stationId,
+        DateTimeOffset now)
+    {
+        var createdStatus = StationCommandStatus.Created.ToString();
+        var deliveredStatus = StationCommandStatus.Delivered.ToString();
+        var expired = db.StationCommandRecords
+            .Where(item =>
+                item.StationId == stationId &&
+                (item.Status == createdStatus || item.Status == deliveredStatus))
+            .AsEnumerable()
+            .Where(item => item.ExpiresAtUtc <= now)
+            .ToList();
+        foreach (var item in expired)
+        {
+            item.Status = StationCommandStatus.TimedOut.ToString();
+            item.CompletedAtUtc = now;
+            item.ResultMessage = "Command expired before Station accepted it.";
+        }
+
+        return expired.Count;
+    }
+
+    private static StationCommandRecordEntity? FindCommandByClientRequest(
+        VisionDbContext db,
+        string stationId,
+        StationCommandType commandType,
+        string clientRequestId)
+    {
+        var operation = commandType.ToString();
+        return db.StationCommandRecords
+            .AsNoTracking()
+            .SingleOrDefault(item =>
+                item.StationId == stationId &&
+                item.CommandType == operation &&
+                item.ClientRequestId == clientRequestId);
+    }
+
+    private static StationCommandDto ResolveIdempotentCommand(
+        StationCommandRecordEntity existing,
+        string requestPayloadSha256)
+    {
+        var existingPayloadSha256 = string.IsNullOrWhiteSpace(existing.RequestPayloadSha256)
+            ? ComputeCanonicalPayloadSha256(existing.PayloadJson)
+            : existing.RequestPayloadSha256;
+        if (!string.Equals(existingPayloadSha256, requestPayloadSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new StationCommandIdempotencyConflictException(
+                existing.StationId,
+                existing.CommandType,
+                existing.ClientRequestId ?? string.Empty,
+                existing.CommandId);
+        }
+
+        return ToDto(existing);
+    }
+
+    private static string ComputeCanonicalPayloadSha256(string payloadJson)
+    {
+        var node = JsonNode.Parse(payloadJson) ?? JsonValue.Create((string?)null);
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            WriteCanonicalJson(writer, node);
+        }
+
+        return Convert.ToHexString(SHA256.HashData(stream.ToArray())).ToLowerInvariant();
+    }
+
+    private static void WriteCanonicalJson(Utf8JsonWriter writer, JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonObject jsonObject:
+                writer.WriteStartObject();
+                foreach (var property in jsonObject.OrderBy(item => item.Key, StringComparer.Ordinal))
+                {
+                    writer.WritePropertyName(property.Key);
+                    WriteCanonicalJson(writer, property.Value);
+                }
+                writer.WriteEndObject();
+                break;
+            case JsonArray jsonArray:
+                writer.WriteStartArray();
+                foreach (var item in jsonArray)
+                {
+                    WriteCanonicalJson(writer, item);
+                }
+                writer.WriteEndArray();
+                break;
+            case null:
+                writer.WriteNullValue();
+                break;
+            default:
+                node.WriteTo(writer);
+                break;
+        }
     }
 
     private static bool IsTerminal(StationCommandStatus status)
@@ -1244,4 +1412,28 @@ public sealed class StationCentralStore
 
         return text[..maxLength];
     }
+}
+
+public sealed class StationCommandIdempotencyConflictException : Exception
+{
+    public StationCommandIdempotencyConflictException(
+        string stationId,
+        string operation,
+        string clientRequestId,
+        string existingCommandId)
+        : base($"Client request '{clientRequestId}' is already bound to command '{existingCommandId}' with a different payload.")
+    {
+        StationId = stationId;
+        Operation = operation;
+        ClientRequestId = clientRequestId;
+        ExistingCommandId = existingCommandId;
+    }
+
+    public string StationId { get; }
+
+    public string Operation { get; }
+
+    public string ClientRequestId { get; }
+
+    public string ExistingCommandId { get; }
 }

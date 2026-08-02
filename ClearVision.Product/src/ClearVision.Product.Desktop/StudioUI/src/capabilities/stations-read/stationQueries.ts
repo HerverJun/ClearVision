@@ -139,6 +139,17 @@ export function createStationCommandsPath(stationId: string, take = defaultStati
   return `stations/${encodeURIComponent(requireStationId(stationId))}/commands?take=${requireTake(take)}`;
 }
 
+export function createStationCommandByClientRequestPath(
+  stationId: string,
+  commandType: StationCommand['commandType'],
+  clientRequestId: string
+): string {
+  const requestId = clientRequestId.trim();
+  if (!requestId) throw new TypeError('Station command client request id must be a non-empty string.');
+  return `stations/${encodeURIComponent(requireStationId(stationId))}/commands/by-client-request/${encodeURIComponent(requestId)}` +
+    `?commandType=${encodeURIComponent(commandType)}`;
+}
+
 export function createStationAuditPath(stationId: string, take = defaultStationDetailTake): string {
   return `stations/audit?stationId=${encodeURIComponent(requireStationId(stationId))}&take=${requireTake(take)}`;
 }

@@ -841,8 +841,15 @@ class StationMonitorView {
         return httpClient.post(`/stations/${encodeURIComponent(this.selectedStationId)}/commands`, {
             commandType,
             payloadJson: JSON.stringify(payload || {}),
-            issuedBy: this.getCommandIssuer()
+            issuedBy: this.getCommandIssuer(),
+            clientRequestId: this.createClientRequestId(commandType)
         });
+    }
+
+    createClientRequestId(operation) {
+        const id = globalThis.crypto?.randomUUID?.()
+            ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        return `legacy-station-${operation}-${id}`;
     }
 
     async deployLatestPackage() {
@@ -854,7 +861,8 @@ class StationMonitorView {
 
         return httpClient.post(`/stations/${encodeURIComponent(this.selectedStationId)}/deploy-package`, {
             packageId,
-            issuedBy: this.getCommandIssuer()
+            issuedBy: this.getCommandIssuer(),
+            clientRequestId: this.createClientRequestId('DeployPackage')
         });
     }
 
@@ -1016,7 +1024,8 @@ class StationMonitorView {
         this.packages = await httpClient.get('/station-packages').catch(() => this.packages);
         return httpClient.post(`/stations/${encodeURIComponent(this.selectedStationId)}/deploy-package`, {
             packageId,
-            issuedBy: this.getCommandIssuer()
+            issuedBy: this.getCommandIssuer(),
+            clientRequestId: this.createClientRequestId('DeployTestPackage')
         });
     }
 

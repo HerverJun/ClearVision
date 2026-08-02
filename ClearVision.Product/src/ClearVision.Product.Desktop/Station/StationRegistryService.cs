@@ -54,6 +54,9 @@ public sealed class StationRegistryService
             entry.PackageId = registration.CurrentPackageId;
             entry.PackageName = registration.CurrentPackageName;
             entry.PackageVersion = registration.CurrentPackageVersion;
+            entry.PackageSha256 = registration.CurrentPackageSha256;
+            entry.SourceProjectId = registration.SourceProjectId;
+            entry.SourceProjectRevision = registration.SourceProjectRevision;
             entry.LastAcceptedSequenceId = Math.Max(entry.LastAcceptedSequenceId, _centralStore?.UpsertRegistration(registration) ?? 0);
             TouchConnectionLocked(entry, connectionId, now);
 
@@ -88,6 +91,9 @@ public sealed class StationRegistryService
                 heartbeat.PackageId,
                 heartbeat.PackageName,
                 heartbeat.CurrentPackageVersion,
+                heartbeat.CurrentPackageSha256,
+                heartbeat.SourceProjectId,
+                heartbeat.SourceProjectRevision,
                 heartbeat.PackageFlowHash,
                 heartbeat.ExecutionFlowHash,
                 heartbeat.FlowHash,
@@ -135,6 +141,9 @@ public sealed class StationRegistryService
                 snapshot.PackageId,
                 snapshot.PackageName,
                 snapshot.CurrentPackageVersion,
+                snapshot.CurrentPackageSha256,
+                snapshot.SourceProjectId,
+                snapshot.SourceProjectRevision,
                 snapshot.PackageFlowHash,
                 snapshot.ExecutionFlowHash,
                 snapshot.FlowHash,
@@ -538,6 +547,10 @@ public sealed class StationRegistryService
                 LastSeenAtUtc = status.LastSeenAtUtc,
                 PackageId = status.PackageId,
                 PackageName = status.PackageName,
+                PackageVersion = status.PackageVersion,
+                PackageSha256 = status.PackageSha256,
+                SourceProjectId = status.SourceProjectId,
+                SourceProjectRevision = status.SourceProjectRevision,
                 PackageFlowHash = status.PackageFlowHash,
                 ExecutionFlowHash = status.ExecutionFlowHash,
                 FlowHash = status.FlowHash,
@@ -716,15 +729,20 @@ public sealed class StationRegistryService
     {
         lock (_syncRoot)
         {
-            if (!_entries.TryGetValue(stationId, out var entry))
+            var persisted = _centralStore?.GetCommands(stationId, take);
+            if (persisted is { Count: > 0 })
             {
-                return _centralStore?.GetCommands(stationId, take) ?? Array.Empty<StationCommandDto>();
+                return persisted;
             }
 
-            var memory = entry.RecentCommands
+            if (!_entries.TryGetValue(stationId, out var entry))
+            {
+                return Array.Empty<StationCommandDto>();
+            }
+
+            return entry.RecentCommands
                 .Take(Math.Max(1, take))
                 .ToList();
-            return memory.Count > 0 ? memory : (_centralStore?.GetCommands(stationId, take) ?? memory);
         }
     }
 
@@ -795,6 +813,9 @@ public sealed class StationRegistryService
         string? packageId,
         string? packageName,
         string? packageVersion,
+        string? packageSha256,
+        Guid? sourceProjectId,
+        long? sourceProjectRevision,
         string? packageFlowHash,
         string? executionFlowHash,
         string? flowHash,
@@ -821,6 +842,9 @@ public sealed class StationRegistryService
         entry.PackageId = packageId;
         entry.PackageName = packageName;
         entry.PackageVersion = packageVersion;
+        entry.PackageSha256 = NullIfWhiteSpace(packageSha256);
+        entry.SourceProjectId = sourceProjectId;
+        entry.SourceProjectRevision = sourceProjectRevision;
         entry.PackageFlowHash = NullIfWhiteSpace(packageFlowHash);
         entry.ExecutionFlowHash = NullIfWhiteSpace(executionFlowHash) ?? NullIfWhiteSpace(flowHash);
         entry.FlowHash = entry.ExecutionFlowHash;
@@ -903,6 +927,10 @@ public sealed class StationRegistryService
             entry.LastSeenAtUtc = status.LastSeenAtUtc;
             entry.PackageId = status.PackageId;
             entry.PackageName = status.PackageName;
+            entry.PackageVersion = status.PackageVersion;
+            entry.PackageSha256 = status.PackageSha256;
+            entry.SourceProjectId = status.SourceProjectId;
+            entry.SourceProjectRevision = status.SourceProjectRevision;
             entry.PackageFlowHash = status.PackageFlowHash;
             entry.ExecutionFlowHash = status.ExecutionFlowHash;
             entry.FlowHash = status.ExecutionFlowHash ?? status.FlowHash;
@@ -945,6 +973,10 @@ public sealed class StationRegistryService
             LastSeenAtUtc = entry.LastSeenAtUtc,
             PackageId = entry.PackageId,
             PackageName = entry.PackageName,
+            PackageVersion = entry.PackageVersion,
+            PackageSha256 = entry.PackageSha256,
+            SourceProjectId = entry.SourceProjectId,
+            SourceProjectRevision = entry.SourceProjectRevision,
             PackageFlowHash = entry.PackageFlowHash,
             ExecutionFlowHash = entry.ExecutionFlowHash,
             FlowHash = entry.FlowHash,
@@ -1317,6 +1349,12 @@ public sealed class StationRegistryService
         public string? PackageName { get; set; }
 
         public string? PackageVersion { get; set; }
+
+        public string? PackageSha256 { get; set; }
+
+        public Guid? SourceProjectId { get; set; }
+
+        public long? SourceProjectRevision { get; set; }
 
         public string? PackageFlowHash { get; set; }
 

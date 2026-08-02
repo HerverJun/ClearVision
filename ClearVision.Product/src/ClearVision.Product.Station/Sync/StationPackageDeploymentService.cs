@@ -16,7 +16,7 @@ public sealed class StationPackageDeploymentService
     private readonly StationLocalSettingsStore _settingsStore;
     private readonly StationSiteProfileStore _siteProfileStore;
     private readonly ILogger<StationPackageDeploymentService> _logger;
-    private readonly HttpClient _httpClient = new();
+    private readonly HttpClient _httpClient;
     private readonly SemaphoreSlim _deploymentGate = new(1, 1);
 
     public StationPackageDeploymentService(
@@ -24,13 +24,15 @@ public sealed class StationPackageDeploymentService
         RuntimeHost runtimeHost,
         StationLocalSettingsStore settingsStore,
         StationSiteProfileStore siteProfileStore,
-        ILogger<StationPackageDeploymentService> logger)
+        ILogger<StationPackageDeploymentService> logger,
+        HttpClient? httpClient = null)
     {
         _options = options.Value;
         _runtimeHost = runtimeHost;
         _settingsStore = settingsStore;
         _siteProfileStore = siteProfileStore;
         _logger = logger;
+        _httpClient = httpClient ?? new HttpClient();
     }
 
     public async Task<string> DeployAsync(string payloadJson, CancellationToken cancellationToken)
@@ -71,7 +73,7 @@ public sealed class StationPackageDeploymentService
                 ResetDirectory(stagingRoot);
                 ZipFile.ExtractToDirectory(downloadPath, stagingRoot);
                 var runtimeRoot = ResolveRuntimeRoot(stagingRoot);
-                ValidateExtractedPackage(stagingRoot, runtimeRoot, payload);
+                var stationManifest = ValidateExtractedPackage(stagingRoot, runtimeRoot, payload);
 
                 if (Directory.Exists(activeRoot))
                 {
@@ -99,13 +101,32 @@ public sealed class StationPackageDeploymentService
                         throw new InvalidOperationException("Package is missing runtime package.json.");
                     }
 
-                    await LoadPackageWithLocalProfileAsync(activeRoot, cancellationToken);
-                    _settingsStore.UpdateLastGoodPackage(activeRoot);
+                    var loadedPackage = await LoadPackageWithLocalProfileAsync(activeRoot, cancellationToken);
+                    ValidateLoadedPackageIdentity(loadedPackage, stationManifest, payload);
+                    _settingsStore.UpdateActivePackage(
+                        activeRoot,
+                        payload.PackageVersion ?? loadedPackage.Manifest.RuntimeApiVersion,
+                        payload.Sha256);
                     return $"Package {payload.PackageId} deployed.";
                 }
-                catch
+                catch (Exception activationError)
                 {
                     RollBack(activeRoot, lastKnownGoodRoot);
+                    if (Directory.Exists(activeRoot))
+                    {
+                        try
+                        {
+                            await LoadPackageWithLocalProfileAsync(activeRoot, cancellationToken);
+                        }
+                        catch (Exception rollbackError)
+                        {
+                            throw new AggregateException(
+                                "Package activation failed and the last-known-good package could not be restored.",
+                                activationError,
+                                rollbackError);
+                        }
+                    }
+
                     throw;
                 }
             }
@@ -158,11 +179,12 @@ public sealed class StationPackageDeploymentService
         return new Uri(baseUri, downloadUrl);
     }
 
-    private async Task LoadPackageWithLocalProfileAsync(string packageRoot, CancellationToken cancellationToken)
+    private async Task<RuntimePackage> LoadPackageWithLocalProfileAsync(string packageRoot, CancellationToken cancellationToken)
     {
         var package = await _runtimeHost.LoadPackageAsync(packageRoot, cancellationToken);
         var profile = _siteProfileStore.LoadOrCreate(package);
         _runtimeHost.SetActiveSiteProfile(profile);
+        return package;
     }
 
     private static bool IsSameOrigin(Uri expectedOrigin, Uri candidate)
@@ -225,7 +247,10 @@ public sealed class StationPackageDeploymentService
         return Directory.Exists(nestedPackage) ? nestedPackage : stagingRoot;
     }
 
-    private static void ValidateExtractedPackage(string stagingRoot, string runtimeRoot, DeployPackagePayload payload)
+    private static StationPackageManifestDto ValidateExtractedPackage(
+        string stagingRoot,
+        string runtimeRoot,
+        DeployPackagePayload payload)
     {
         var manifestPath = Path.Combine(stagingRoot, "manifest.json");
         if (!File.Exists(manifestPath))
@@ -258,6 +283,23 @@ public sealed class StationPackageDeploymentService
             throw new InvalidOperationException("Package manifest packageId does not match deploy payload.");
         }
 
+        if (payload.PackageKind != StationPackageKind.Production || manifest.PackageKind != StationPackageKind.Production)
+        {
+            throw new InvalidOperationException("DeployPackage requires a production package manifest.");
+        }
+
+        RequireIdentityMatch("packageVersion", payload.PackageVersion, manifest.PackageVersion);
+        RequireIdentityMatch("flowHash", payload.FlowHash, manifest.FlowHash);
+        RequireIdentityMatch("decisionConfigurationHash", payload.DecisionConfigurationHash, manifest.DecisionConfigurationHash);
+        if (payload.SourceProjectId != manifest.SourceProjectId)
+        {
+            throw new InvalidOperationException("Package manifest sourceProjectId does not match deploy payload.");
+        }
+        if (payload.SourceProjectRevision != manifest.SourceProjectRevision)
+        {
+            throw new InvalidOperationException("Package manifest sourceProjectRevision does not match deploy payload.");
+        }
+
         if (!string.IsNullOrWhiteSpace(payload.Sha256) &&
             !string.IsNullOrWhiteSpace(manifest.Sha256) &&
             !string.Equals(NormalizeSha256(payload.Sha256), NormalizeSha256(manifest.Sha256), StringComparison.OrdinalIgnoreCase))
@@ -268,6 +310,42 @@ public sealed class StationPackageDeploymentService
         if (!IsStationVersionSupported(manifest.MinStationVersion))
         {
             throw new InvalidOperationException($"Package requires Station version {manifest.MinStationVersion} or newer.");
+        }
+
+        return manifest;
+    }
+
+    private static void ValidateLoadedPackageIdentity(
+        RuntimePackage package,
+        StationPackageManifestDto stationManifest,
+        DeployPackagePayload payload)
+    {
+        RequireIdentityMatch("loaded packageId", payload.PackageId, package.Manifest.PackageId);
+        RequireIdentityMatch("loaded packageVersion", payload.PackageVersion, package.Manifest.RuntimeApiVersion);
+        RequireIdentityMatch("loaded flowHash", payload.FlowHash, package.Manifest.FlowHash);
+        RequireIdentityMatch(
+            "loaded decisionConfigurationHash",
+            payload.DecisionConfigurationHash,
+            package.Manifest.DecisionConfigurationHash);
+        if (payload.SourceProjectId != package.Manifest.SourceProjectId ||
+            stationManifest.SourceProjectId != package.Manifest.SourceProjectId)
+        {
+            throw new InvalidOperationException("Loaded package sourceProjectId does not match the deployment identity.");
+        }
+        if (payload.SourceProjectRevision != package.Manifest.SourceProjectRevision ||
+            stationManifest.SourceProjectRevision != package.Manifest.SourceProjectRevision)
+        {
+            throw new InvalidOperationException("Loaded package sourceProjectRevision does not match the deployment identity.");
+        }
+    }
+
+    private static void RequireIdentityMatch(string field, string? expected, string? actual)
+    {
+        if (string.IsNullOrWhiteSpace(expected) ||
+            string.IsNullOrWhiteSpace(actual) ||
+            !string.Equals(expected.Trim(), actual.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Package manifest {field} does not match deploy payload.");
         }
     }
 
@@ -354,8 +432,18 @@ public sealed class StationPackageDeploymentService
 
         public string? PackageVersion { get; set; }
 
+        public StationPackageKind PackageKind { get; set; }
+
         public string DownloadUrl { get; set; } = string.Empty;
 
         public string? Sha256 { get; set; }
+
+        public string? FlowHash { get; set; }
+
+        public Guid? SourceProjectId { get; set; }
+
+        public long? SourceProjectRevision { get; set; }
+
+        public string? DecisionConfigurationHash { get; set; }
     }
 }

@@ -12,6 +12,41 @@ namespace ClearVision.Product.Desktop.Tests;
 public sealed class StationRegistryServiceTests
 {
     [Fact]
+    public void Snapshot_ShouldProjectExactActivePackageIdentity()
+    {
+        var registry = CreateRegistry();
+        var sourceProjectId = Guid.NewGuid();
+        registry.UpsertRegistration("conn-identity", new StationRegistrationDto
+        {
+            StationId = "station-active-identity",
+            MachineName = "machine",
+            ClientVersion = "1.0"
+        });
+        registry.UpsertSnapshot("conn-identity", new StationSnapshotDto
+        {
+            StationId = "station-active-identity",
+            RuntimeState = StationRuntimeState.Idle,
+            CurrentPackageId = "pkg-active",
+            CurrentPackageName = "Active package",
+            CurrentPackageVersion = "1.2.3",
+            CurrentPackageSha256 = "sha256:artifact",
+            SourceProjectId = sourceProjectId,
+            SourceProjectRevision = 19,
+            PackageFlowHash = "sha256:flow",
+            DecisionConfigurationHash = "sha256:decision"
+        });
+
+        var station = registry.GetStation("station-active-identity")!;
+        station.PackageId.Should().Be("pkg-active");
+        station.PackageVersion.Should().Be("1.2.3");
+        station.PackageSha256.Should().Be("sha256:artifact");
+        station.SourceProjectId.Should().Be(sourceProjectId);
+        station.SourceProjectRevision.Should().Be(19);
+        station.PackageFlowHash.Should().Be("sha256:flow");
+        station.DecisionConfigurationHash.Should().Be("sha256:decision");
+    }
+
+    [Fact]
     public void UpsertResultSummary_ShouldIgnoreDuplicateSequenceIds()
     {
         var registry = CreateRegistry();
@@ -270,6 +305,78 @@ public sealed class StationRegistryServiceTests
             (await db.StationConnectionEvents.CountAsync(item =>
                 item.StationId == "station-central-gap" &&
                 item.EventType == "ResultGap")).Should().Be(1);
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public async Task CentralStore_ShouldCreateOneCommandForConcurrentIdempotentRequestsAndPersistAcrossRestart()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationCommandIdempotencyTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+        var provider = new ServiceCollection()
+            .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
+            .BuildServiceProvider();
+
+        try
+        {
+            await using (var scope = provider.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+            }
+
+            var store = CreateCentralStore(provider);
+            var commands = await Task.WhenAll(Enumerable.Range(0, 8).Select(index => Task.Run(() =>
+                store.CreateCommand(
+                    "station-idempotent",
+                    StationCommandType.StartRuntime,
+                    index % 2 == 0 ? """{"mode":"formal","count":1}""" : """{"count":1,"mode":"formal"}""",
+                    "unit-test",
+                    TimeSpan.FromMinutes(5),
+                    "request-start-1"))));
+
+            commands.Select(command => command.CommandId).Distinct().Should().ContainSingle();
+            commands.Should().OnlyContain(command => command.ClientRequestId == "request-start-1");
+
+            var restartedStore = CreateCentralStore(provider);
+            var recovered = restartedStore.CreateCommand(
+                "station-idempotent",
+                StationCommandType.StartRuntime,
+                """{"mode":"formal","count":1}""",
+                "after-restart",
+                TimeSpan.FromMinutes(30),
+                "request-start-1");
+            recovered.CommandId.Should().Be(commands[0].CommandId);
+            restartedStore.GetCommandByClientRequestId(
+                "station-idempotent",
+                StationCommandType.StartRuntime,
+                "request-start-1")!.CommandId.Should().Be(commands[0].CommandId);
+
+            Action conflictingPayload = () => restartedStore.CreateCommand(
+                "station-idempotent",
+                StationCommandType.StartRuntime,
+                """{"mode":"preview","count":1}""",
+                "unit-test",
+                TimeSpan.FromMinutes(5),
+                "request-start-1");
+            conflictingPayload.Should().Throw<StationCommandIdempotencyConflictException>();
+
+            await using var verifyScope = provider.CreateAsyncScope();
+            var db = verifyScope.ServiceProvider.GetRequiredService<VisionDbContext>();
+            (await db.StationCommandRecords.CountAsync()).Should().Be(1);
+            (await db.StationAuditRecords.CountAsync(item => item.Action == StationCommandType.StartRuntime.ToString()))
+                .Should().Be(1);
         }
         finally
         {

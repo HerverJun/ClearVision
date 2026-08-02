@@ -22,6 +22,7 @@ import type {
   StationPackage
 } from './stationContracts';
 import type { StationAdminCommandOwner, StationIdentityUpdate } from './stationAdminCommandOwner';
+import { mergeStationCommandProjection, projectStationDeployment } from './stationDeploymentProjection';
 import { formatStationBytes, formatStationDateTime } from './stationViewModel';
 
 const props = defineProps<{
@@ -70,8 +71,28 @@ const packageOptions = computed<readonly CvSelectOption[]>(() => [
     .filter(item => item.packageKind === 'Production')
     .map(item => ({ value: item.packageId, label: `${item.packageName} · ${item.packageVersion}` }))
 ]);
+const selectedPackage = computed(() => (props.packagesState.data ?? []).find(
+  item => item.packageId === selectedCommand.packageId
+) ?? null);
+const projectedCommands = computed<readonly StationCommand[]>(() => {
+  return mergeStationCommandProjection(
+    props.commandsState.data ?? [],
+    props.owner.projection.command
+  );
+});
+const deployment = computed(() => projectStationDeployment({
+  commands: projectedCommands.value,
+  packages: props.packagesState.data ?? [],
+  station: props.detailsState.data ?? null
+}));
+const identityPackage = computed(() => deployment.value.expectedIdentity ?? selectedPackage.value);
 const busy = computed(() => props.owner.projection.phase === 'pending');
-const submissionLocked = computed(() => busy.value || props.owner.projection.phase === 'unknown-outcome');
+const commandInFlight = computed(() => projectedCommands.value.some(command =>
+  !['Succeeded', 'Failed', 'TimedOut', 'Cancelled', 'Rejected'].includes(command.status)
+));
+const submissionLocked = computed(() =>
+  busy.value || props.owner.projection.phase === 'unknown-outcome' || commandInFlight.value
+);
 const operationTone = computed(() => {
   const phase = props.owner.projection.phase;
   if (phase === 'succeeded') return 'success';
@@ -112,6 +133,14 @@ function commandTone(status: StationCommand['status']) {
   if (status === 'Cancelled') return 'warning';
   if (status === 'Running' || status === 'Accepted' || status === 'Delivered') return 'info';
   return 'idle';
+}
+
+function commandStatusLabel(status: StationCommand['status']): string {
+  const labels: Record<StationCommand['status'], string> = {
+    Created: '已创建', Delivered: '已送达', Accepted: '已接受', Rejected: '已拒绝', Running: '执行中',
+    Succeeded: '成功', Failed: '失败', TimedOut: '已过期', Cancelled: '已取消'
+  };
+  return labels[status];
 }
 
 async function issueCommand(): Promise<void> {
@@ -176,7 +205,7 @@ async function recover(): Promise<void> {
     <div class="station-admin__control-grid">
       <CvPanel
         title="运行控制"
-        description="命令只通过现有 Station Admin HTTP 合同下发。"
+        description="命令只通过现有工作站管理 HTTP 合同创建；创建成功不代表执行成功。"
       >
         <div class="station-admin__command-row">
           <CvSelect
@@ -213,6 +242,40 @@ async function recover(): Promise<void> {
             下发运行包
           </CvButton>
         </div>
+        <section
+          class="station-admin__deployment"
+          aria-labelledby="station-deployment-title"
+          aria-live="polite"
+          data-testid="station-deployment-status"
+        >
+          <div class="station-admin__deployment-heading">
+            <h3 id="station-deployment-title">
+              部署核对
+            </h3>
+            <CvStatusBadge :tone="deployment.tone">
+              {{ deployment.label }}
+            </CvStatusBadge>
+          </div>
+          <p>{{ deployment.message }}</p>
+          <dl
+            v-if="identityPackage"
+            class="station-admin__identity-grid"
+          >
+            <div><dt>运行包 ID</dt><dd>{{ identityPackage.packageId }}</dd></div>
+            <div><dt>版本</dt><dd>{{ identityPackage.packageVersion }}</dd></div>
+            <div class="station-admin__identity-wide">
+              <dt>SHA-256</dt><dd>{{ identityPackage.sha256 || '身份不完整' }}</dd>
+            </div>
+            <div><dt>来源工程</dt><dd>{{ identityPackage.sourceProjectId || '身份不完整' }}</dd></div>
+            <div><dt>来源修订</dt><dd>{{ identityPackage.sourceProjectRevision ?? '身份不完整' }}</dd></div>
+            <div class="station-admin__identity-wide">
+              <dt>流程哈希</dt><dd>{{ identityPackage.flowHash || '身份不完整' }}</dd>
+            </div>
+            <div class="station-admin__identity-wide">
+              <dt>判定配置哈希</dt><dd>{{ identityPackage.decisionConfigurationHash || '身份不完整' }}</dd>
+            </div>
+          </dl>
+        </section>
       </CvPanel>
 
       <CvPanel
@@ -359,7 +422,7 @@ async function recover(): Promise<void> {
         </template>
         <template #cell-status="{ row }">
           <CvStatusBadge :tone="commandTone(row.status)">
-            {{ row.status }}
+            {{ commandStatusLabel(row.status) }}
           </CvStatusBadge>
         </template>
         <template #cell-progressPercent="{ row }">
@@ -462,6 +525,15 @@ async function recover(): Promise<void> {
 .station-admin__records-grid { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-density-page-gap); align-items: start; }
 .station-admin__command-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--cv-space-3); align-items: end; }
 .station-admin__command-row + .station-admin__command-row { margin-top: var(--cv-space-4); }
+.station-admin__deployment { margin-top: var(--cv-space-4); padding-top: var(--cv-space-4); border-top: 1px solid var(--cv-border-subtle); }
+.station-admin__deployment-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
+.station-admin__deployment-heading h3 { margin: 0; font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); letter-spacing: 0; }
+.station-admin__deployment p { margin: var(--cv-space-2) 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }
+.station-admin__identity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-2) var(--cv-space-4); margin: var(--cv-space-3) 0 0; }
+.station-admin__identity-grid div { min-width: 0; }
+.station-admin__identity-grid dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
+.station-admin__identity-grid dd { margin: var(--cv-space-1) 0 0; color: var(--cv-text-primary); font-family: var(--cv-font-mono); font-size: var(--cv-font-size-xs); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.station-admin__identity-wide { grid-column: 1 / -1; }
 .station-admin__identity-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-3); }
 .station-admin__wide,
 .station-admin__identity-actions { grid-column: 1 / -1; }

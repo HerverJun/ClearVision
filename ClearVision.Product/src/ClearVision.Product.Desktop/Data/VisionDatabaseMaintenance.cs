@@ -681,7 +681,7 @@ public sealed class VisionDatabaseRestoreRequest
 
 internal static class VisionDatabaseMaintenance
 {
-    public const int CurrentSqliteSchemaVersion = 7;
+    public const int CurrentSqliteSchemaVersion = 8;
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -699,6 +699,7 @@ internal static class VisionDatabaseMaintenance
 
         await RepairStationPackageKindColumnAsync(dbContext, cancellationToken);
         await EnsureStationPackageIdentitySchemaAsync(dbContext, cancellationToken);
+        await EnsureStationCommandIdempotencySchemaAsync(dbContext, cancellationToken);
         await EnsureProjectLifecycleOperationSchemaAsync(dbContext, cancellationToken);
         await EnsureStationCanonicalOutcomeSchemaAsync(dbContext, cancellationToken);
         await EnsureStationExecutionIdentitySchemaAsync(dbContext, cancellationToken);
@@ -786,6 +787,7 @@ internal static class VisionDatabaseMaintenance
         }
 
         await EnsureStationPackageIdentitySchemaAsync(dbContext, cancellationToken);
+        await EnsureStationCommandIdempotencySchemaAsync(dbContext, cancellationToken);
     }
 
     private static async Task EnsureStationCanonicalOutcomeSchemaAsync(
@@ -860,6 +862,9 @@ internal static class VisionDatabaseMaintenance
                          (Table: "StationNodes", Name: "DecisionConfigurationHash", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"DecisionConfigurationHash\" TEXT NULL;"),
                          (Table: "StationNodes", Name: "ExecutionRunMode", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"ExecutionRunMode\" TEXT NULL;"),
                          (Table: "StationNodes", Name: "CurrentRunId", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"CurrentRunId\" TEXT NULL;"),
+                         (Table: "StationNodes", Name: "CurrentPackageSha256", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"CurrentPackageSha256\" TEXT NULL;"),
+                         (Table: "StationNodes", Name: "SourceProjectId", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"SourceProjectId\" TEXT NULL;"),
+                         (Table: "StationNodes", Name: "SourceProjectRevision", Statement: "ALTER TABLE \"StationNodes\" ADD COLUMN \"SourceProjectRevision\" INTEGER NULL;"),
                          (Table: "StationResultSummaries", Name: "PackageFlowHash", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"PackageFlowHash\" TEXT NULL;"),
                          (Table: "StationResultSummaries", Name: "ExecutionFlowHash", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"ExecutionFlowHash\" TEXT NULL;"),
                          (Table: "StationResultSummaries", Name: "ExecutionSnapshotId", Statement: "ALTER TABLE \"StationResultSummaries\" ADD COLUMN \"ExecutionSnapshotId\" TEXT NULL;"),
@@ -1151,7 +1156,8 @@ internal static class VisionDatabaseMaintenance
                      {
                          (Name: "SourceProjectId", Statement: "ALTER TABLE \"StationPackageRecords\" ADD COLUMN \"SourceProjectId\" TEXT NULL;"),
                          (Name: "SourceProjectRevision", Statement: "ALTER TABLE \"StationPackageRecords\" ADD COLUMN \"SourceProjectRevision\" INTEGER NULL;"),
-                         (Name: "DecisionConfigurationHash", Statement: "ALTER TABLE \"StationPackageRecords\" ADD COLUMN \"DecisionConfigurationHash\" TEXT NULL;")
+                         (Name: "DecisionConfigurationHash", Statement: "ALTER TABLE \"StationPackageRecords\" ADD COLUMN \"DecisionConfigurationHash\" TEXT NULL;"),
+                         (Name: "MinStationVersion", Statement: "ALTER TABLE \"StationPackageRecords\" ADD COLUMN \"MinStationVersion\" TEXT NOT NULL DEFAULT '0.1.0';")
                      })
             {
                 if (!await ColumnExistsAsync(connection, "StationPackageRecords", column.Name, cancellationToken))
@@ -1159,6 +1165,52 @@ internal static class VisionDatabaseMaintenance
                     await dbContext.Database.ExecuteSqlRawAsync(column.Statement, cancellationToken);
                 }
             }
+        }
+        finally
+        {
+            if (shouldCloseConnection)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private static async Task EnsureStationCommandIdempotencySchemaAsync(
+        VisionDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldCloseConnection = connection.State != ConnectionState.Open;
+        if (shouldCloseConnection)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            if (!await TableExistsAsync(connection, "StationCommandRecords", cancellationToken))
+            {
+                return;
+            }
+
+            foreach (var column in new[]
+                     {
+                         (Name: "ClientRequestId", Statement: "ALTER TABLE \"StationCommandRecords\" ADD COLUMN \"ClientRequestId\" TEXT NULL;"),
+                         (Name: "RequestPayloadSha256", Statement: "ALTER TABLE \"StationCommandRecords\" ADD COLUMN \"RequestPayloadSha256\" TEXT NULL;")
+                     })
+            {
+                if (!await ColumnExistsAsync(connection, "StationCommandRecords", column.Name, cancellationToken))
+                {
+                    await dbContext.Database.ExecuteSqlRawAsync(column.Statement, cancellationToken);
+                }
+            }
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_StationCommandRecords_StationId_CommandType_ClientRequestId"
+                ON "StationCommandRecords" ("StationId", "CommandType", "ClientRequestId");
+                """,
+                cancellationToken);
         }
         finally
         {
@@ -1338,11 +1390,17 @@ internal static class VisionDatabaseMaintenance
         "column:StationNodes.DecisionConfigurationHash",
         "column:StationNodes.ExecutionRunMode",
         "column:StationNodes.CurrentRunId",
+        "column:StationNodes.CurrentPackageSha256",
+        "column:StationNodes.SourceProjectId",
+        "column:StationNodes.SourceProjectRevision",
         "table:StationPackageRecords",
         "column:StationPackageRecords.PackageKind",
         "column:StationPackageRecords.SourceProjectId",
         "column:StationPackageRecords.SourceProjectRevision",
         "column:StationPackageRecords.DecisionConfigurationHash",
+        "column:StationPackageRecords.MinStationVersion",
+        "column:StationCommandRecords.ClientRequestId",
+        "column:StationCommandRecords.RequestPayloadSha256",
         "table:StationResultSummaries",
         "table:StationSyncCursors",
         "column:StationResultSummaries.ExecutionOutcome",
@@ -1363,6 +1421,7 @@ internal static class VisionDatabaseMaintenance
         "index:IX_StationCommandRecords_CommandId",
         "index:IX_StationCommandRecords_StationId_CreatedAtUtc",
         "index:IX_StationCommandRecords_StationId_Status",
+        "index:IX_StationCommandRecords_StationId_CommandType_ClientRequestId",
         "index:IX_StationConnectionEvents_StationId_CreatedAtUtc",
         "index:IX_StationHealthSnapshots_StationId_CreatedAtUtc",
         "index:IX_StationHealthSnapshots_StationId_SequenceId",
@@ -1404,6 +1463,9 @@ internal static class VisionDatabaseMaintenance
             "CurrentPackageId" TEXT NULL,
             "CurrentPackageName" TEXT NULL,
             "CurrentPackageVersion" TEXT NULL,
+            "CurrentPackageSha256" TEXT NULL,
+            "SourceProjectId" TEXT NULL,
+            "SourceProjectRevision" INTEGER NULL,
             "IsEnabled" INTEGER NOT NULL DEFAULT 1,
             "Remark" TEXT NULL
         );
@@ -1496,6 +1558,8 @@ internal static class VisionDatabaseMaintenance
             "CompletedAtUtc" TEXT NULL,
             "IssuedBy" TEXT NOT NULL,
             "CorrelationId" TEXT NOT NULL,
+            "ClientRequestId" TEXT NULL,
+            "RequestPayloadSha256" TEXT NULL,
             "ResultMessage" TEXT NULL,
             "ErrorCode" TEXT NULL,
             "ErrorDetail" TEXT NULL
@@ -1554,6 +1618,7 @@ internal static class VisionDatabaseMaintenance
             "PackageName" TEXT NOT NULL,
             "PackageVersion" TEXT NOT NULL,
             "PackageKind" TEXT NOT NULL DEFAULT 'Production',
+            "MinStationVersion" TEXT NOT NULL DEFAULT '0.1.0',
             "FlowHash" TEXT NOT NULL,
             "SourceProjectId" TEXT NULL,
             "SourceProjectRevision" INTEGER NULL,
@@ -1578,6 +1643,7 @@ internal static class VisionDatabaseMaintenance
         """CREATE UNIQUE INDEX IF NOT EXISTS "IX_StationCommandRecords_CommandId" ON "StationCommandRecords" ("CommandId");""",
         """CREATE INDEX IF NOT EXISTS "IX_StationCommandRecords_StationId_CreatedAtUtc" ON "StationCommandRecords" ("StationId", "CreatedAtUtc");""",
         """CREATE INDEX IF NOT EXISTS "IX_StationCommandRecords_StationId_Status" ON "StationCommandRecords" ("StationId", "Status");""",
+        """CREATE UNIQUE INDEX IF NOT EXISTS "IX_StationCommandRecords_StationId_CommandType_ClientRequestId" ON "StationCommandRecords" ("StationId", "CommandType", "ClientRequestId");""",
         """CREATE INDEX IF NOT EXISTS "IX_StationConnectionEvents_StationId_CreatedAtUtc" ON "StationConnectionEvents" ("StationId", "CreatedAtUtc");""",
         """CREATE UNIQUE INDEX IF NOT EXISTS "IX_StationSyncCursors_StationId" ON "StationSyncCursors" ("StationId");""",
         """CREATE UNIQUE INDEX IF NOT EXISTS "IX_StationLogSummaries_StationId_SequenceId" ON "StationLogSummaries" ("StationId", "SequenceId");""",

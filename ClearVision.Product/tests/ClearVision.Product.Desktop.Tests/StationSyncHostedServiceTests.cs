@@ -28,7 +28,8 @@ public sealed class StationSyncHostedServiceTests
         {
             StationId = "station-identity",
             LineName = "line-a",
-            CurrentPackageVersion = "1.2.3"
+            CurrentPackageVersion = "1.2.3",
+            CurrentPackageSha256 = "sha256:artifact"
         };
         var snapshotId = Guid.NewGuid();
         var snapshot = new RuntimeHostSnapshot
@@ -36,6 +37,9 @@ public sealed class StationSyncHostedServiceTests
             State = RuntimeHostState.Running,
             PackageId = "pkg-1",
             PackageName = "package",
+            PackageVersion = "1.2.3",
+            SourceProjectId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            SourceProjectRevision = 42,
             PackageFlowHash = "package-hash",
             ExecutionFlowHash = "execution-hash",
             FlowHash = "execution-hash",
@@ -49,6 +53,10 @@ public sealed class StationSyncHostedServiceTests
         var heartbeat = InvokeBuildHeartbeat(identity, snapshot);
 
         heartbeat.PackageFlowHash.Should().Be(snapshot.PackageFlowHash);
+        heartbeat.CurrentPackageVersion.Should().Be("1.2.3");
+        heartbeat.CurrentPackageSha256.Should().Be("sha256:artifact");
+        heartbeat.SourceProjectId.Should().Be(snapshot.SourceProjectId);
+        heartbeat.SourceProjectRevision.Should().Be(42);
         heartbeat.ExecutionFlowHash.Should().Be(snapshot.ExecutionFlowHash);
         heartbeat.FlowHash.Should().Be(snapshot.ExecutionFlowHash);
         heartbeat.ExecutionSnapshotId.Should().Be(snapshotId);

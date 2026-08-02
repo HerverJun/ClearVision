@@ -143,6 +143,14 @@ public class StationStatusViewModel
 
     public string? PackageName { get; set; }
 
+    public string? PackageVersion { get; set; }
+
+    public string? PackageSha256 { get; set; }
+
+    public Guid? SourceProjectId { get; set; }
+
+    public long? SourceProjectRevision { get; set; }
+
     public string? PackageFlowHash { get; set; }
 
     public string? ExecutionFlowHash { get; set; }

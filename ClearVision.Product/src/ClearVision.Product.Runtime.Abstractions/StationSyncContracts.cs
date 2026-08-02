@@ -199,6 +199,13 @@ public sealed class StationRegistrationDto
     /// <summary>Currently loaded package version.</summary>
     public string? CurrentPackageVersion { get; set; }
 
+    /// <summary>SHA-256 of the artifact that produced the active package.</summary>
+    public string? CurrentPackageSha256 { get; set; }
+
+    public Guid? SourceProjectId { get; set; }
+
+    public long? SourceProjectRevision { get; set; }
+
     /// <summary>When the Station process started.</summary>
     public DateTimeOffset StartedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
@@ -298,6 +305,12 @@ public sealed class StationHeartbeatDto
 
     /// <summary>Currently loaded runtime package version.</summary>
     public string? CurrentPackageVersion { get; set; }
+
+    public string? CurrentPackageSha256 { get; set; }
+
+    public Guid? SourceProjectId { get; set; }
+
+    public long? SourceProjectRevision { get; set; }
 
     /// <summary>Package-semantic flow hash from the manifest.</summary>
     public string? PackageFlowHash { get; set; }
@@ -407,6 +420,12 @@ public sealed class StationSnapshotDto
 
     /// <summary>Currently loaded runtime package version.</summary>
     public string? CurrentPackageVersion { get; set; }
+
+    public string? CurrentPackageSha256 { get; set; }
+
+    public Guid? SourceProjectId { get; set; }
+
+    public long? SourceProjectRevision { get; set; }
 
     /// <summary>Package-semantic flow hash from the manifest.</summary>
     public string? PackageFlowHash { get; set; }
@@ -762,6 +781,9 @@ public sealed class StationCommandDto
 
     /// <summary>Correlation identifier for diagnostics.</summary>
     public string CorrelationId { get; set; } = string.Empty;
+
+    /// <summary>Client-generated identity used to make command creation idempotent.</summary>
+    public string? ClientRequestId { get; set; }
 
     /// <summary>Current command lifecycle status.</summary>
     public StationCommandStatus Status { get; set; } = StationCommandStatus.Created;

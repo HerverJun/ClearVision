@@ -446,6 +446,7 @@ public sealed class StationSyncHostedService : BackgroundService
         }
 
         var identity = _identityResolver.GetOrCreate();
+        var snapshot = _runtimeHost.GetSnapshot();
         var response = await _hubClient.RegisterStationAsync(
             new StationRegistrationDto
             {
@@ -464,6 +465,12 @@ public sealed class StationSyncHostedService : BackgroundService
                 StationVersion = identity.ClientVersion,
                 RuntimeVersion = typeof(RuntimeHost).Assembly.GetName().Version?.ToString() ?? identity.ClientVersion,
                 ClientVersion = identity.ClientVersion,
+                CurrentPackageId = snapshot.PackageId,
+                CurrentPackageName = snapshot.PackageName,
+                CurrentPackageVersion = snapshot.PackageVersion,
+                CurrentPackageSha256 = identity.CurrentPackageSha256,
+                SourceProjectId = snapshot.SourceProjectId,
+                SourceProjectRevision = snapshot.SourceProjectRevision,
                 StartedAtUtc = identity.StartedAtUtc,
                 RegisteredAtUtc = DateTimeOffset.UtcNow,
                 CreatedAtUtc = DateTimeOffset.UtcNow
@@ -1091,7 +1098,10 @@ public sealed class StationSyncHostedService : BackgroundService
             RuntimeState = StationSyncStateMapper.ToStationRuntimeState(snapshot.State),
             CurrentPackageId = snapshot.PackageId,
             CurrentPackageName = snapshot.PackageName,
-            CurrentPackageVersion = identity.CurrentPackageVersion,
+            CurrentPackageVersion = snapshot.PackageVersion,
+            CurrentPackageSha256 = identity.CurrentPackageSha256,
+            SourceProjectId = snapshot.SourceProjectId,
+            SourceProjectRevision = snapshot.SourceProjectRevision,
             PackageFlowHash = snapshot.PackageFlowHash,
             ExecutionFlowHash = snapshot.ExecutionFlowHash,
             FlowHash = snapshot.FlowHash,
@@ -1121,7 +1131,10 @@ public sealed class StationSyncHostedService : BackgroundService
             ConnectionState = "Connected",
             CurrentPackageId = snapshot.PackageId,
             CurrentPackageName = snapshot.PackageName,
-            CurrentPackageVersion = identity.CurrentPackageVersion,
+            CurrentPackageVersion = snapshot.PackageVersion,
+            CurrentPackageSha256 = identity.CurrentPackageSha256,
+            SourceProjectId = snapshot.SourceProjectId,
+            SourceProjectRevision = snapshot.SourceProjectRevision,
             PackageFlowHash = snapshot.PackageFlowHash,
             ExecutionFlowHash = snapshot.ExecutionFlowHash,
             FlowHash = snapshot.FlowHash,

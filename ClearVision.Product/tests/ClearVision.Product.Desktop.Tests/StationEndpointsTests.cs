@@ -193,6 +193,97 @@ public sealed class StationEndpointsTests
     }
 
     [Fact]
+    public async Task CreateCommand_ShouldRequireClientRequestId()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/commands",
+            new StationCommandCreateRequest
+            {
+                CommandType = StationCommandType.Ping,
+                PayloadJson = "{}"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("ClientRequestIdRequired");
+    }
+
+    [Fact]
+    public async Task CreateCommand_ShouldReuseSameKeyAndRejectDifferentPayload()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        var request = new StationCommandCreateRequest
+        {
+            CommandType = StationCommandType.StartRuntime,
+            PayloadJson = """{"mode":"formal"}""",
+            ClientRequestId = "request-http-retry"
+        };
+
+        using var firstResponse = await host.Client.PostAsJsonAsync("/api/stations/station-a/commands", request);
+        using var retryResponse = await host.Client.PostAsJsonAsync("/api/stations/station-a/commands", request);
+        var first = await firstResponse.Content.ReadFromJsonAsync<StationCommandDto>();
+        var retry = await retryResponse.Content.ReadFromJsonAsync<StationCommandDto>();
+
+        firstResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        retryResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        retry!.CommandId.Should().Be(first!.CommandId);
+        retry.ClientRequestId.Should().Be("request-http-retry");
+
+        request.PayloadJson = """{"mode":"preview"}""";
+        using var conflictResponse = await host.Client.PostAsJsonAsync("/api/stations/station-a/commands", request);
+        conflictResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        using var lookupResponse = await host.Client.GetAsync(
+            "/api/stations/station-a/commands/by-client-request/request-http-retry?commandType=StartRuntime");
+        var lookup = await lookupResponse.Content.ReadFromJsonAsync<StationCommandDto>();
+        lookupResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        lookup!.CommandId.Should().Be(first.CommandId);
+
+        using var listResponse = await host.Client.GetAsync("/api/stations/station-a/commands?take=50");
+        var listed = await listResponse.Content.ReadFromJsonAsync<List<StationCommandDto>>();
+        listed.Should().ContainSingle(command => command.CommandId == first.CommandId && command.Status == StationCommandStatus.Created);
+    }
+
+    [Fact]
+    public async Task CommandReads_ShouldSettleExpiredCommandWhileStationIsOffline()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        using var createResponse = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/commands",
+            new StationCommandCreateRequest
+            {
+                CommandType = StationCommandType.StartRuntime,
+                PayloadJson = "{}",
+                ClientRequestId = "request-offline-expiry"
+            });
+        var created = await createResponse.Content.ReadFromJsonAsync<StationCommandDto>();
+        createResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using (var scope = host.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+            var entity = await db.StationCommandRecords.SingleAsync();
+            entity.ExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(-1);
+            await db.SaveChangesAsync();
+        }
+
+        using var lookupResponse = await host.Client.GetAsync(
+            "/api/stations/station-a/commands/by-client-request/request-offline-expiry?commandType=StartRuntime");
+        var lookup = await lookupResponse.Content.ReadFromJsonAsync<StationCommandDto>();
+        lookupResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        lookup.Should().Match<StationCommandDto>(command =>
+            command.CommandId == created!.CommandId &&
+            command.Status == StationCommandStatus.TimedOut &&
+            command.CompletedAtUtc.HasValue);
+
+        using var listResponse = await host.Client.GetAsync("/api/stations/station-a/commands?take=50");
+        var listed = await listResponse.Content.ReadFromJsonAsync<List<StationCommandDto>>();
+        listed.Should().ContainSingle(command =>
+            command.CommandId == created!.CommandId && command.Status == StationCommandStatus.TimedOut);
+    }
+
+    [Fact]
     public async Task CreateCommand_ShouldRejectInvalidPayloadJson()
     {
         await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
@@ -301,6 +392,7 @@ public sealed class StationEndpointsTests
             await host.Client.GetAsync("/api/stations/station-a"),
             await host.Client.GetAsync("/api/stations/station-a/logs"),
             await host.Client.GetAsync("/api/stations/station-a/commands"),
+            await host.Client.GetAsync("/api/stations/station-a/commands/by-client-request/request-1?commandType=Ping"),
             await host.Client.GetAsync("/api/stations/audit")
         };
 
@@ -391,7 +483,8 @@ public sealed class StationEndpointsTests
             new StationDeployPackageRequest
             {
                 PackageId = "test-package",
-                IssuedBy = "unit-test"
+                IssuedBy = "unit-test",
+                ClientRequestId = "deploy-test-package"
             });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -406,13 +499,16 @@ public sealed class StationEndpointsTests
     {
         await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
         await SeedPackageAsync(host.Services, "production-package", StationPackageKind.Production);
+        await SeedPackageAsync(host.Services, "production-package-2", StationPackageKind.Production);
+        RegisterDeployableStation(host);
 
         using var response = await host.Client.PostAsJsonAsync(
             "/api/stations/station-a/deploy-package",
             new StationDeployPackageRequest
             {
                 PackageId = "production-package",
-                IssuedBy = "unit-test"
+                IssuedBy = "unit-test",
+                ClientRequestId = "deploy-production-package"
             });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -422,6 +518,177 @@ public sealed class StationEndpointsTests
         var command = await db.StationCommandRecords.SingleAsync();
         command.CommandType.Should().Be(StationCommandType.DeployPackage.ToString());
         command.PayloadJson.Should().Contain("production-package");
+        command.ClientRequestId.Should().Be("deploy-production-package");
+
+        host.Registry.MarkDisconnected("conn-station-a");
+        using var retryResponse = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "production-package",
+                ClientRequestId = "deploy-production-package"
+            });
+        var retry = await retryResponse.Content.ReadFromJsonAsync<StationCommandDto>();
+        retryResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        retry!.CommandId.Should().Be(command.CommandId);
+        (await db.StationCommandRecords.CountAsync()).Should().Be(1);
+
+        using var conflictResponse = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "production-package-2",
+                ClientRequestId = "deploy-production-package"
+            });
+        conflictResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await conflictResponse.Content.ReadAsStringAsync()).Should().Contain("StationCommandIdempotencyConflict");
+        (await db.StationCommandRecords.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task DeployPackage_ShouldRejectUnknownStation()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        await SeedPackageAsync(host.Services, "production-package", StationPackageKind.Production);
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "production-package",
+                ClientRequestId = "deploy-unknown-station"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("StationNotFound");
+    }
+
+    [Fact]
+    public async Task DeployPackage_ShouldRejectOfflineStation()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        await SeedPackageAsync(host.Services, "production-package", StationPackageKind.Production);
+        RegisterDeployableStation(host);
+        host.Registry.MarkDisconnected("conn-station-a");
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "production-package",
+                ClientRequestId = "deploy-offline-station"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("StationOffline");
+    }
+
+    [Fact]
+    public async Task DeployPackage_ShouldRejectDisabledStation()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        await SeedPackageAsync(host.Services, "production-package", StationPackageKind.Production);
+        RegisterDeployableStation(host);
+        host.Registry.UpdateIdentity(
+            "station-a",
+            new StationIdentityUpdateRequest { IsEnabled = false },
+            "admin",
+            clientIp: null);
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "production-package",
+                ClientRequestId = "deploy-disabled-station"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("StationDisabled");
+    }
+
+    [Fact]
+    public async Task DeployPackage_ShouldRejectNonInspectionStation()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        await SeedPackageAsync(host.Services, "production-package", StationPackageKind.Production);
+        RegisterDeployableStation(host, stationRole: "Configuration");
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "production-package",
+                ClientRequestId = "deploy-wrong-role"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("StationRoleNotDeployable");
+    }
+
+    [Fact]
+    public async Task DeployPackage_ShouldRejectRunningStation()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        await SeedPackageAsync(host.Services, "production-package", StationPackageKind.Production);
+        RegisterDeployableStation(host, runtimeState: StationRuntimeState.Running);
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "production-package",
+                ClientRequestId = "deploy-running-station"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("StationRuntimeNotIdle");
+    }
+
+    [Fact]
+    public async Task DeployPackage_ShouldRejectIncompatibleStationVersion()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        await SeedPackageAsync(
+            host.Services,
+            "production-package",
+            StationPackageKind.Production,
+            minStationVersion: "2.0.0");
+        RegisterDeployableStation(host, clientVersion: "1.9.9");
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "production-package",
+                ClientRequestId = "deploy-incompatible-version"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("StationVersionIncompatible");
+    }
+
+    [Fact]
+    public async Task DeployPackage_ShouldRejectIncompletePackageIdentity()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        await SeedPackageAsync(
+            host.Services,
+            "production-package",
+            StationPackageKind.Production,
+            includeIdentity: false);
+        RegisterDeployableStation(host);
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "production-package",
+                ClientRequestId = "deploy-incomplete-package"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("StationPackageIdentityIncomplete");
     }
 
     [Fact]
@@ -484,23 +751,48 @@ public sealed class StationEndpointsTests
         return builder.ToString();
     }
 
-    private static StationRegistrationDto BuildRegistration(string stationId)
+    private static StationRegistrationDto BuildRegistration(
+        string stationId,
+        string stationRole = "Inspection",
+        string clientVersion = "1.0.0")
     {
         return new StationRegistrationDto
         {
             StationId = stationId,
             StationName = $"{stationId} name",
             LineName = "line-1",
+            StationRole = stationRole,
             MachineName = $"{stationId}-machine",
-            ClientVersion = "test",
+            ClientVersion = clientVersion,
             StartedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private static void RegisterDeployableStation(
+        StationEndpointTestHost host,
+        string stationId = "station-a",
+        string stationRole = "Inspection",
+        string clientVersion = "1.0.0",
+        StationRuntimeState runtimeState = StationRuntimeState.Idle)
+    {
+        var connectionId = $"conn-{stationId}";
+        host.Registry.UpsertRegistration(
+            connectionId,
+            BuildRegistration(stationId, stationRole, clientVersion));
+        host.Registry.UpsertHeartbeat(connectionId, new StationHeartbeatDto
+        {
+            StationId = stationId,
+            RuntimeState = runtimeState,
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        });
     }
 
     private static async Task SeedPackageAsync(
         IServiceProvider services,
         string packageId,
-        StationPackageKind packageKind)
+        StationPackageKind packageKind,
+        string minStationVersion = "0.1.0",
+        bool includeIdentity = true)
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
@@ -509,12 +801,16 @@ public sealed class StationEndpointsTests
             PackageId = packageId,
             PackageName = packageKind == StationPackageKind.Test ? "Test Package" : "Production Package",
             PackageVersion = "1.0.0",
+            MinStationVersion = minStationVersion,
             PackageKind = packageKind.ToString(),
             FlowHash = "sha256:test",
+            SourceProjectId = includeIdentity ? Guid.Parse("11111111-1111-1111-1111-111111111111") : null,
+            SourceProjectRevision = includeIdentity ? 7 : null,
+            DecisionConfigurationHash = includeIdentity ? "sha256:decision" : null,
             FileName = $"{packageId}.cvpkg",
             FilePath = Path.Combine(Path.GetTempPath(), $"{packageId}.cvpkg"),
             SizeBytes = 1024,
-            Sha256 = "test",
+            Sha256 = includeIdentity ? new string('a', 64) : string.Empty,
             CreatedBy = "unit-test",
             CreatedAtUtc = DateTimeOffset.UtcNow
         });
@@ -632,7 +928,8 @@ public sealed class StationEndpointsTests
             builder.Services.AddSingleton<StationRegistryService>(sp =>
                 new StationRegistryService(
                     sp.GetRequiredService<IOptions<StationIngressOptions>>(),
-                    NullLogger<StationRegistryService>.Instance));
+                    NullLogger<StationRegistryService>.Instance,
+                    sp.GetRequiredService<StationCentralStore>()));
             builder.Services.AddSingleton<StationCentralStore>(sp =>
                 new StationCentralStore(
                     sp.GetRequiredService<IServiceScopeFactory>(),

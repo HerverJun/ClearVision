@@ -51,11 +51,19 @@ describe('Station response decoders', () => {
     expect(statistics.outcomeStatistics).toEqual(outcomeStatistics());
     expect(statistics.byDiagnosticCode).toEqual([{ diagnosticCode: 'WIRE_SWAP', count: 1 }]);
     expect(health[0]).toMatchObject({ stationId: 'station-a', runtimeState: 'Running' });
-    expect(admin).toMatchObject({ stationId: 'station-a', owner: '生产一组' });
-    expect(commands[0]).toMatchObject({ commandType: 'CollectLogs', status: 'Succeeded' });
+    expect(admin).toMatchObject({
+      stationId: 'station-a', owner: '生产一组', packageVersion: '1.0.0',
+      packageSha256: `sha256:${'a'.repeat(64)}`, sourceProjectId: 'project-a', sourceProjectRevision: 12
+    });
+    expect(commands[0]).toMatchObject({
+      commandType: 'CollectLogs', status: 'Succeeded', clientRequestId: 'request-a'
+    });
     expect(logs[0]).toMatchObject({ source: 'RuntimeHost' });
     expect(audits[0]).toMatchObject({ action: 'StationCommandCreated' });
-    expect(packages[0]).toMatchObject({ packageKind: 'Production' });
+    expect(packages[0]).toMatchObject({
+      packageKind: 'Production', sourceProjectId: 'project-a', sourceProjectRevision: 12,
+      decisionConfigurationHash: 'sha256:decision'
+    });
     expect(admin).not.toHaveProperty('recentCommands');
   });
 

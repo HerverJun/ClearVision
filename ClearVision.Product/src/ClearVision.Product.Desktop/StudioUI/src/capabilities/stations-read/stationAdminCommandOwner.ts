@@ -5,6 +5,7 @@ import {
   ApiDecodeError,
   ApiForbiddenError,
   ApiNetworkError,
+  ApiNotFoundError,
   ApiServerError,
   ApiUnauthorizedError,
   ApiUnexpectedHttpError,
@@ -12,7 +13,7 @@ import {
 } from '@/platform/api';
 import {
   decodeStationAdminDetails,
-  decodeStationCommands,
+  decodeStationCommand,
   StationContractDecodeError,
   type StationAdminDetails,
   type StationCommand,
@@ -20,13 +21,14 @@ import {
 } from './stationContracts';
 import {
   createStationAdminDetailsPath,
-  createStationCommandsPath
+  createStationCommandByClientRequestPath
 } from './stationQueries';
 
 export type StationAdminOperation = 'command' | 'identity' | 'deploy-package' | null;
 export type StationAdminCommandPhase =
   | 'idle'
   | 'pending'
+  | 'command-created'
   | 'succeeded'
   | 'failed'
   | 'conflict'
@@ -78,7 +80,6 @@ export interface StationAdminCommandOwner {
 
 interface PendingCommand {
   readonly operation: Exclude<StationAdminOperation, null>;
-  readonly startedAtMs: number;
   readonly requestId: string;
   readonly commandType?: StationCommandType;
   readonly packageId?: string;
@@ -121,17 +122,6 @@ function identityMatches(actual: StationAdminDetails, expected: StationIdentityU
     actual.inspectionNodeName === expected.inspectionNodeName && actual.cameraAlias === expected.cameraAlias &&
     actual.stationRole === expected.stationRole && actual.owner === expected.owner &&
     actual.isEnabled === expected.isEnabled && actual.remark === expected.remark;
-}
-
-function payloadRecord(command: StationCommand): Record<string, unknown> {
-  try {
-    const value = JSON.parse(command.payloadJson) as unknown;
-    return typeof value === 'object' && value !== null && !Array.isArray(value)
-      ? value as Record<string, unknown>
-      : {};
-  } catch {
-    return {};
-  }
 }
 
 function errorCode(error: unknown): string {
@@ -198,7 +188,7 @@ export function createStationAdminCommandOwner(options: {
     return value;
   }
 
-  function begin(operation: Exclude<StationAdminOperation, null>, details: Omit<PendingCommand, 'operation' | 'startedAtMs'>): AbortController {
+  function begin(operation: Exclude<StationAdminOperation, null>, details: Omit<PendingCommand, 'operation'>): AbortController {
     if (disposed) throw new Error('stationAdminCommandOwner has been disposed.');
     if (flight || state.phase === 'pending' || state.phase === 'unknown-outcome') {
       throw new Error('必须先等待或恢复当前工作站操作，禁止重复提交。');
@@ -210,7 +200,7 @@ export function createStationAdminCommandOwner(options: {
     state.canRecover = false;
     state.command = null;
     state.identity = null;
-    pending = Object.freeze({ operation, startedAtMs: Date.now(), ...details });
+    pending = Object.freeze({ operation, ...details });
     controller = new AbortController();
     return controller;
   }
@@ -262,32 +252,31 @@ export function createStationAdminCommandOwner(options: {
         }
         state.identity = identity;
       } else {
-        const payload = await options.api.get(createStationCommandsPath(stationId(), 100), { signal: controller.signal });
-        const commands = decodeStationCommands(payload);
-        const candidates = commands.filter(item => {
-          if (Date.parse(item.createdAtUtc) < target.startedAtMs - 2_000) return false;
-          const body = payloadRecord(item);
-          return target.operation === 'deploy-package'
-            ? item.commandType === 'DeployPackage' && body.packageId === target.packageId
-            : item.commandType === target.commandType && body.studioRequestId === target.requestId;
-        });
-        if (candidates.length !== 1) {
-          state.phase = 'unknown-outcome';
-          state.canRecover = true;
-          state.message = candidates.length === 0
-            ? '命令记录中尚未找到对应操作；不要重复提交，可稍后再次恢复。'
-            : '命令记录中存在多个可能对应的操作，无法唯一确认结果；不要重复提交，请核对后端记录。';
-          return false;
-        }
-        state.command = candidates[0] ?? null;
+        const commandType = target.operation === 'deploy-package' ? 'DeployPackage' : target.commandType;
+        if (!commandType) throw new TypeError('待恢复命令缺少命令类型。');
+        const payload = await options.api.get(
+          createStationCommandByClientRequestPath(stationId(), commandType, target.requestId),
+          { signal: controller.signal }
+        );
+        state.command = decodeStationCommand(payload);
       }
       pending = null;
-      state.phase = 'succeeded';
+      state.phase = target.operation === 'identity' ? 'succeeded' : 'command-created';
       state.canRecover = false;
       state.errorCode = null;
-      state.message = '已从后端权威记录确认操作结果。';
+      state.message = target.operation === 'identity'
+        ? '已从后端权威记录确认操作结果。'
+        : '已按请求标识确认命令记录；执行终态仍以后端命令状态为准。';
       return true;
     } catch (error) {
+      if (error instanceof ApiNotFoundError && target.operation !== 'identity') {
+        pending = null;
+        state.phase = 'failed';
+        state.canRecover = false;
+        state.errorCode = 'STATION_COMMAND_NOT_CREATED';
+        state.message = '后端已确认该请求未创建命令；现在可以重新提交。';
+        return false;
+      }
       fail(error);
       return false;
     } finally {
@@ -305,13 +294,14 @@ export function createStationAdminCommandOwner(options: {
         try {
           const payload = await options.api.post?.(`stations/${encodeURIComponent(stationId())}/commands`, {
             commandType,
-            payloadJson: JSON.stringify({ studioRequestId: id }),
-            expiresInSeconds: 300
+            payloadJson: '{}',
+            expiresInSeconds: 300,
+            clientRequestId: id
           }, { signal: active.signal });
-          const command = decodeStationCommands([payload])[0] ?? null;
+          const command = decodeStationCommand(payload);
           state.command = command;
-          state.phase = 'succeeded';
-          state.message = '工作站命令已由后端受理。';
+          state.phase = 'command-created';
+          state.message = '命令已创建；执行结果尚未确认。';
           pending = null;
           return command;
         } catch (error) { fail(error); return null; }
@@ -338,13 +328,18 @@ export function createStationAdminCommandOwner(options: {
       return track(async () => {
         const packageId = packageIdValue.trim();
         if (!packageId) throw new TypeError('请选择运行包。');
-        const active = begin('deploy-package', { requestId: requestId(), packageId });
+        const id = requestId();
+        const active = begin('deploy-package', { requestId: id, packageId });
         try {
-          const payload = await options.api.post?.(`stations/${encodeURIComponent(stationId())}/deploy-package`, { packageId }, { signal: active.signal });
-          const command = decodeStationCommands([payload])[0] ?? null;
+          const payload = await options.api.post?.(
+            `stations/${encodeURIComponent(stationId())}/deploy-package`,
+            { packageId, clientRequestId: id },
+            { signal: active.signal }
+          );
+          const command = decodeStationCommand(payload);
           state.command = command;
-          state.phase = 'succeeded';
-          state.message = '运行包下发命令已由后端受理。';
+          state.phase = 'command-created';
+          state.message = '部署命令已创建；仅在命令成功且工作站激活身份匹配后才算部署完成。';
           pending = null;
           return command;
         } catch (error) { fail(error); return null; }

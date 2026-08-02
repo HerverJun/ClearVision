@@ -58,6 +58,7 @@ public sealed class StationPackageStoreTests
                 var packagePath = store.GetPackagePath(manifest.PackageId);
 
                 manifest.PackageKind.Should().Be(StationPackageKind.Test);
+                manifest.MinStationVersion.Should().Be("0.1.0");
                 packagePath.Should().NotBeNullOrWhiteSpace();
                 File.Exists(packagePath).Should().BeTrue();
 
@@ -123,6 +124,7 @@ public sealed class StationPackageStoreTests
 
                 manifest.PackageId.Should().Be("cvpkg-import-1");
                 manifest.PackageKind.Should().Be(StationPackageKind.Production);
+                manifest.MinStationVersion.Should().Be("0.1.0");
                 manifest.CreatedBy.Should().Be("unit-test");
                 manifest.SourceProjectId.Should().Be(Guid.Parse("11111111-2222-3333-4444-555555555555"));
                 manifest.SourceProjectRevision.Should().Be(42);
@@ -145,6 +147,7 @@ public sealed class StationPackageStoreTests
                 reloadedManifest!.SourceProjectId.Should().Be(manifest.SourceProjectId);
                 reloadedManifest.SourceProjectRevision.Should().Be(manifest.SourceProjectRevision);
                 reloadedManifest.DecisionConfigurationHash.Should().Be(manifest.DecisionConfigurationHash);
+                reloadedManifest.MinStationVersion.Should().Be(manifest.MinStationVersion);
                 store.GetProductionPackages().Should().ContainSingle(item => item.PackageId == manifest.PackageId);
 
                 var legacyRuntimeRoot = Path.Combine(root, "runtime-package-legacy");
@@ -163,6 +166,7 @@ public sealed class StationPackageStoreTests
                 reloadedLegacyManifest!.SourceProjectId.Should().BeNull();
                 reloadedLegacyManifest.SourceProjectRevision.Should().BeNull();
                 reloadedLegacyManifest.DecisionConfigurationHash.Should().BeNull();
+                reloadedLegacyManifest.MinStationVersion.Should().Be("0.1.0");
             }
         }
         finally
@@ -208,6 +212,7 @@ public sealed class StationPackageStoreTests
                 legacy.SourceProjectId.Should().BeNull();
                 legacy.SourceProjectRevision.Should().BeNull();
                 legacy.DecisionConfigurationHash.Should().BeNull();
+                legacy.MinStationVersion.Should().Be("0.1.0");
             }
         }
         finally

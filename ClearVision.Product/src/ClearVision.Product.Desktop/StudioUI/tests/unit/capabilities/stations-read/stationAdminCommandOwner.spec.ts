@@ -8,6 +8,7 @@ import {
   ApiConflictError,
   ApiForbiddenError,
   ApiNetworkError,
+  ApiNotFoundError,
   type ApiTransport
 } from '@/platform/api';
 import { stationCommand, stationStatus } from './stationFixtures';
@@ -45,7 +46,13 @@ describe('stationAdminCommandOwner', () => {
     await expect(owner.reviseIdentity(identity())).resolves.toMatchObject({ stationName: '一号检测站（修订）' });
     owner.reset();
     await expect(owner.deployPackage('pkg-a')).resolves.toMatchObject({ commandType: 'DeployPackage' });
-    expect(owner.projection.phase).toBe('succeeded');
+    expect(owner.projection.phase).toBe('command-created');
+    expect(post).toHaveBeenNthCalledWith(1, 'stations/station-a/commands', {
+      commandType: 'Ping', payloadJson: '{}', expiresInSeconds: 300, clientRequestId: 'request-a'
+    }, expect.any(Object));
+    expect(post).toHaveBeenNthCalledWith(2, 'stations/station-a/deploy-package', {
+      packageId: 'pkg-a', clientRequestId: 'request-a'
+    }, expect.any(Object));
     owner.dispose();
   });
 
@@ -69,11 +76,12 @@ describe('stationAdminCommandOwner', () => {
     const patch = vi.fn(async () => { throw new ApiNetworkError('http://localhost/api/stations', new Error('lost')); });
     const get = vi.fn(async () => {
       if (recovery === 'identity') return stationStatus({ stationName: '一号检测站（修订）', remark: '已修订' });
-      return [stationCommand({
+      return stationCommand({
         commandType: recovery === 'deploy' ? 'DeployPackage' : 'Ping',
+        clientRequestId: 'request-a',
         createdAtUtc: new Date().toISOString(),
-        payloadJson: JSON.stringify(recovery === 'deploy' ? { packageId: 'pkg-a' } : { studioRequestId: 'request-a' })
-      })];
+        payloadJson: JSON.stringify(recovery === 'deploy' ? { packageId: 'pkg-a' } : {})
+      });
     });
     const api = { apiBaseUrl: 'http://localhost/api', get, post, patch } as ApiTransport;
     const owner = createStationAdminCommandOwner({ api, stationId: () => 'station-a', createRequestId: () => 'request-a' });
@@ -81,6 +89,7 @@ describe('stationAdminCommandOwner', () => {
     await owner.issueCommand('Ping');
     expect(owner.projection.phase).toBe('unknown-outcome');
     await expect(owner.recover()).resolves.toBe(true);
+    expect(owner.projection.phase).toBe('command-created');
 
     owner.reset(); recovery = 'identity';
     await owner.reviseIdentity(identity());
@@ -92,6 +101,15 @@ describe('stationAdminCommandOwner', () => {
     expect(owner.projection.phase).toBe('unknown-outcome');
     await expect(owner.recover()).resolves.toBe(true);
     expect(get).toHaveBeenCalledTimes(3);
+    expect(get).toHaveBeenNthCalledWith(
+      1,
+      'stations/station-a/commands/by-client-request/request-a?commandType=Ping',
+      expect.any(Object)
+    );
+    expect(get).toHaveBeenNthCalledWith(3,
+      'stations/station-a/commands/by-client-request/request-a?commandType=DeployPackage',
+      expect.any(Object)
+    );
     owner.dispose();
   });
 
@@ -114,36 +132,40 @@ describe('stationAdminCommandOwner', () => {
     owner.dispose();
   });
 
-  it('keeps package deployment unknown when command history has multiple matching candidates', async () => {
+  it('allows a retry only after the exact request lookup authoritatively returns 404', async () => {
+    const requestIds = ['request-a', 'request-b'];
+    let submitAttempt = 0;
     const post = vi.fn(async () => {
-      throw new ApiNetworkError('http://localhost/api/stations/station-a/deploy-package', new Error('lost'));
-    });
-    const matchingCommand = () => stationCommand({
-      commandType: 'DeployPackage',
-      createdAtUtc: new Date().toISOString(),
-      payloadJson: JSON.stringify({ packageId: 'pkg-a' })
+      submitAttempt += 1;
+      if (submitAttempt === 1) {
+        throw new ApiNetworkError('http://localhost/api/stations/station-a/deploy-package', new Error('lost'));
+      }
+      return stationCommand({ commandType: 'DeployPackage', clientRequestId: 'request-b' });
     });
     const api = {
       apiBaseUrl: 'http://localhost/api',
-      get: vi.fn(async () => [matchingCommand(), matchingCommand()]),
+      get: vi.fn(async () => { throw new ApiNotFoundError(details(404)); }),
       post,
       patch: vi.fn()
     } as ApiTransport;
     const owner = createStationAdminCommandOwner({
       api,
       stationId: () => 'station-a',
-      createRequestId: () => 'request-a'
+      createRequestId: () => requestIds.shift() ?? 'request-c'
     });
 
     await owner.deployPackage('pkg-a');
     await expect(owner.recover()).resolves.toBe(false);
 
     expect(owner.projection).toMatchObject({
-      phase: 'unknown-outcome',
-      canRecover: true,
+      phase: 'failed',
+      canRecover: false,
+      errorCode: 'STATION_COMMAND_NOT_CREATED',
       command: null
     });
-    expect(owner.projection.message).toContain('多个可能对应');
+    await expect(owner.deployPackage('pkg-a')).resolves.toMatchObject({ clientRequestId: 'request-b' });
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(owner.projection.phase).toBe('command-created');
     owner.dispose();
   });
 

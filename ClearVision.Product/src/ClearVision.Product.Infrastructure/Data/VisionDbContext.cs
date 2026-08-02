@@ -282,6 +282,7 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.MachineName).HasMaxLength(200);
             entity.Property(e => e.OnlineState).HasMaxLength(50);
             entity.Property(e => e.RuntimeState).HasMaxLength(50);
+            entity.Property(e => e.CurrentPackageSha256).HasMaxLength(80);
             entity.Property(e => e.PackageFlowHash).HasMaxLength(128);
             entity.Property(e => e.ExecutionFlowHash).HasMaxLength(128);
             entity.Property(e => e.FlowHash).HasMaxLength(128);
@@ -354,9 +355,12 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.StationId).IsRequired().HasMaxLength(128);
             entity.Property(e => e.CommandType).IsRequired().HasMaxLength(80);
             entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.ClientRequestId).HasMaxLength(128);
+            entity.Property(e => e.RequestPayloadSha256).HasMaxLength(64);
             entity.HasIndex(e => e.CommandId).IsUnique();
             entity.HasIndex(e => new { e.StationId, e.CreatedAtUtc });
             entity.HasIndex(e => new { e.StationId, e.Status });
+            entity.HasIndex(e => new { e.StationId, e.CommandType, e.ClientRequestId }).IsUnique();
         });
 
         modelBuilder.Entity<StationSyncCursorEntity>(entity =>
@@ -392,6 +396,7 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.PackageId).IsRequired().HasMaxLength(128);
             entity.Property(e => e.PackageName).HasMaxLength(200);
             entity.Property(e => e.PackageVersion).HasMaxLength(80);
+            entity.Property(e => e.MinStationVersion).HasMaxLength(80).HasDefaultValue("0.1.0");
             entity.Property(e => e.PackageKind).HasMaxLength(40).HasDefaultValue("Production");
             entity.Property(e => e.FlowHash).HasMaxLength(128);
             entity.Property(e => e.DecisionConfigurationHash).HasMaxLength(128);

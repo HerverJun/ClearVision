@@ -1107,7 +1107,10 @@ public sealed class MainForm : Form
             _runtimeHost.SetActiveSiteProfile(_activeSiteProfile);
             _runtimeParameterPanel.LoadPackage(_loadedPackage, _activeSiteProfile);
             RefreshProjectVariableMonitor();
-            _settingsStore.UpdateLastGoodPackage(resolvedPackagePath);
+            _settingsStore.UpdateActivePackage(
+                resolvedPackagePath,
+                _loadedPackage.Manifest.RuntimeApiVersion,
+                packageSha256: null);
             _selectedPathLabel.Text = $"当前选择：{resolvedPackagePath}";
             AppendLog($"运行包加载成功：{_loadedPackage.Manifest.PackageName}");
             AppendLog($"现场参数 Profile：Revision {_activeSiteProfile.Revision}，{_activeSiteProfile.Overrides.Count} 项覆盖。");

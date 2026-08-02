@@ -375,6 +375,12 @@ public sealed class RuntimeHostSnapshot
 
     public string? PackageName { get; set; }
 
+    public string? PackageVersion { get; set; }
+
+    public Guid? SourceProjectId { get; set; }
+
+    public long? SourceProjectRevision { get; set; }
+
     public string? PackageFlowHash { get; set; }
 
     public string? ExecutionFlowHash { get; set; }
@@ -447,6 +453,8 @@ public sealed class StationLocalSettings
     public string? LastRunId { get; set; }
 
     public string? CurrentPackageVersion { get; set; }
+
+    public string? CurrentPackageSha256 { get; set; }
 
     public long LastHealthSequenceId { get; set; }
 

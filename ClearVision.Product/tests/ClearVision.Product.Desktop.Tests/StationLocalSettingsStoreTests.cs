@@ -6,6 +6,28 @@ namespace ClearVision.Product.Desktop.Tests;
 public sealed class StationLocalSettingsStoreTests
 {
     [Fact]
+    public void ActivePackageIdentity_ShouldPersistAcrossRestart()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationLocalSettingsTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            var store = new StationLocalSettingsStore(root);
+            store.UpdateActivePackage("C:\\station\\active", "1.2.3", "sha256:artifact");
+
+            var restarted = new StationLocalSettingsStore(root);
+            restarted.Current.LastGoodPackagePath.Should().Be("C:\\station\\active");
+            restarted.Current.CurrentPackageVersion.Should().Be("1.2.3");
+            restarted.Current.CurrentPackageSha256.Should().Be("sha256:artifact");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Load_ShouldRecoverFromBackup_WhenPrimarySettingsJsonIsCorrupt()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationLocalSettingsTests", Guid.NewGuid().ToString("N"));

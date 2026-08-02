@@ -62,6 +62,12 @@ export interface StationStatus {
   readonly startedAtUtc: string;
   readonly packageId: string | null;
   readonly packageName: string | null;
+  readonly packageVersion: string | null;
+  readonly packageSha256: string | null;
+  readonly sourceProjectId: string | null;
+  readonly sourceProjectRevision: number | null;
+  readonly packageFlowHash: string | null;
+  readonly decisionConfigurationHash: string | null;
   readonly currentRunId: string | null;
   readonly averageExecutionTimeMs: number;
   readonly spoolPendingCount: number;
@@ -94,6 +100,14 @@ export interface StationAdminDetails {
   readonly owner: string | null;
   readonly isEnabled: boolean;
   readonly remark: string | null;
+  readonly onlineState: StationOnlineState;
+  readonly isOnline: boolean;
+  readonly packageId: string | null;
+  readonly packageName: string | null;
+  readonly packageVersion: string | null;
+  readonly packageSha256: string | null;
+  readonly sourceProjectId: string | null;
+  readonly sourceProjectRevision: number | null;
   readonly packageFlowHash: string | null;
   readonly executionFlowHash: string | null;
   readonly projectRevision: number | null;
@@ -120,6 +134,7 @@ export interface StationCommand {
   readonly expiresAtUtc: string;
   readonly issuedBy: string;
   readonly correlationId: string;
+  readonly clientRequestId: string | null;
   readonly status: StationCommandStatus;
   readonly progressPercent: number;
   readonly completedAtUtc: string | null;
@@ -164,6 +179,9 @@ export interface StationPackage {
   readonly packageVersion: string;
   readonly packageKind: StationPackageKind;
   readonly flowHash: string;
+  readonly sourceProjectId: string | null;
+  readonly sourceProjectRevision: number | null;
+  readonly decisionConfigurationHash: string | null;
   readonly createdBy: string;
   readonly minStationVersion: string;
   readonly requiredOperators: readonly string[];
@@ -384,6 +402,15 @@ function decodeStationStatus(value: unknown, path: string): StationStatus {
     startedAtUtc: decodeDateTime(record.startedAtUtc, `${path}.startedAtUtc`),
     packageId: decodeNullableString(record.packageId, `${path}.packageId`),
     packageName: decodeNullableString(record.packageName, `${path}.packageName`),
+    packageVersion: decodeNullableString(record.packageVersion, `${path}.packageVersion`),
+    packageSha256: decodeNullableString(record.packageSha256, `${path}.packageSha256`),
+    sourceProjectId: decodeNullableString(record.sourceProjectId, `${path}.sourceProjectId`),
+    sourceProjectRevision: decodeNullableNumber(record.sourceProjectRevision, `${path}.sourceProjectRevision`, true),
+    packageFlowHash: decodeNullableString(record.packageFlowHash, `${path}.packageFlowHash`),
+    decisionConfigurationHash: decodeNullableString(
+      record.decisionConfigurationHash,
+      `${path}.decisionConfigurationHash`
+    ),
     currentRunId: decodeNullableString(record.currentRunId, `${path}.currentRunId`),
     averageExecutionTimeMs: decodeNumber(record.averageExecutionTimeMs, `${path}.averageExecutionTimeMs`),
     spoolPendingCount: decodeNumber(record.spoolPendingCount, `${path}.spoolPendingCount`, true),
@@ -539,6 +566,14 @@ export function decodeStationAdminDetails(payload: unknown): StationAdminDetails
     owner: decodeNullableString(record.owner, '$.owner'),
     isEnabled: decodeBoolean(record.isEnabled, '$.isEnabled'),
     remark: decodeNullableString(record.remark, '$.remark'),
+    onlineState: decodeNumericOrStringEnum(record.onlineState, '$.onlineState', stationOnlineStates),
+    isOnline: decodeBoolean(record.isOnline, '$.isOnline'),
+    packageId: decodeNullableString(record.packageId, '$.packageId'),
+    packageName: decodeNullableString(record.packageName, '$.packageName'),
+    packageVersion: decodeNullableString(record.packageVersion, '$.packageVersion'),
+    packageSha256: decodeNullableString(record.packageSha256, '$.packageSha256'),
+    sourceProjectId: decodeNullableString(record.sourceProjectId, '$.sourceProjectId'),
+    sourceProjectRevision: decodeNullableNumber(record.sourceProjectRevision, '$.sourceProjectRevision', true),
     packageFlowHash: decodeNullableString(record.packageFlowHash, '$.packageFlowHash'),
     executionFlowHash: decodeNullableString(record.executionFlowHash, '$.executionFlowHash'),
     projectRevision: decodeNullableNumber(record.projectRevision, '$.projectRevision', true),
@@ -564,6 +599,7 @@ export function decodeStationCommands(payload: unknown): readonly StationCommand
       expiresAtUtc: decodeDateTime(record.expiresAtUtc, `${path}.expiresAtUtc`),
       issuedBy: decodeString(record.issuedBy, `${path}.issuedBy`, true),
       correlationId: decodeString(record.correlationId, `${path}.correlationId`, true),
+      clientRequestId: decodeNullableString(record.clientRequestId, `${path}.clientRequestId`),
       status: decodeNumericOrStringEnum(record.status, `${path}.status`, stationCommandStatuses),
       progressPercent: decodeNumber(record.progressPercent, `${path}.progressPercent`, true),
       completedAtUtc: decodeNullableDateTime(record.completedAtUtc, `${path}.completedAtUtc`),
@@ -571,6 +607,12 @@ export function decodeStationCommands(payload: unknown): readonly StationCommand
       errorCode: decodeNullableString(record.errorCode, `${path}.errorCode`)
     });
   }));
+}
+
+export function decodeStationCommand(payload: unknown): StationCommand {
+  const command = decodeStationCommands([payload])[0];
+  if (!command) throw new StationContractDecodeError('$', 'a Station command');
+  return command;
 }
 
 export function decodeStationLogs(payload: unknown): readonly StationLog[] {
@@ -626,6 +668,12 @@ export function decodeStationPackages(payload: unknown): readonly StationPackage
       packageVersion: decodeString(record.packageVersion, `${path}.packageVersion`, true),
       packageKind: decodeNumericOrStringEnum(record.packageKind, `${path}.packageKind`, kinds),
       flowHash: decodeString(record.flowHash, `${path}.flowHash`, true),
+      sourceProjectId: decodeNullableString(record.sourceProjectId, `${path}.sourceProjectId`),
+      sourceProjectRevision: decodeNullableNumber(record.sourceProjectRevision, `${path}.sourceProjectRevision`, true),
+      decisionConfigurationHash: decodeNullableString(
+        record.decisionConfigurationHash,
+        `${path}.decisionConfigurationHash`
+      ),
       createdBy: decodeString(record.createdBy, `${path}.createdBy`, true),
       minStationVersion: decodeString(record.minStationVersion, `${path}.minStationVersion`, true),
       requiredOperators: Object.freeze(decodeArray(record.requiredOperators, `${path}.requiredOperators`).map(

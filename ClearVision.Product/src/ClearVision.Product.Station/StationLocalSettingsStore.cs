@@ -51,6 +51,7 @@ public sealed class StationLocalSettingsStore
                     LastGoodPackagePath = _settings.LastGoodPackagePath,
                     LastRunId = _settings.LastRunId,
                     CurrentPackageVersion = _settings.CurrentPackageVersion,
+                    CurrentPackageSha256 = _settings.CurrentPackageSha256,
                     LastHealthSequenceId = _settings.LastHealthSequenceId,
                     LastLogSequenceId = _settings.LastLogSequenceId,
                     LastUnexpectedExitAtUtc = _settings.LastUnexpectedExitAtUtc
@@ -91,6 +92,17 @@ public sealed class StationLocalSettingsStore
         lock (_syncRoot)
         {
             _settings.LastGoodPackagePath = packagePath;
+            SaveLocked();
+        }
+    }
+
+    public void UpdateActivePackage(string packagePath, string? packageVersion, string? packageSha256)
+    {
+        lock (_syncRoot)
+        {
+            _settings.LastGoodPackagePath = packagePath;
+            _settings.CurrentPackageVersion = string.IsNullOrWhiteSpace(packageVersion) ? null : packageVersion.Trim();
+            _settings.CurrentPackageSha256 = string.IsNullOrWhiteSpace(packageSha256) ? null : packageSha256.Trim();
             SaveLocked();
         }
     }

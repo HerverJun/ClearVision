@@ -568,6 +568,10 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ClientRequestId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTimeOffset?>("CompletedAtUtc")
                         .HasColumnType("TEXT");
 
@@ -604,6 +608,10 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<string>("ResultMessage")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("RequestPayloadSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTimeOffset?>("StartedAtUtc")
                         .HasColumnType("TEXT");
 
@@ -623,6 +631,9 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.HasIndex("StationId", "CreatedAtUtc");
+
+                    b.HasIndex("StationId", "CommandType", "ClientRequestId")
+                        .IsUnique();
 
                     b.HasIndex("StationId", "Status");
 
@@ -836,6 +847,10 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                     b.Property<string>("CurrentPackageVersion")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CurrentPackageSha256")
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("CurrentRunId")
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
@@ -928,6 +943,12 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("SourceProjectId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("SourceProjectRevision")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("WorkcellName")
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
@@ -982,6 +1003,12 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("TEXT")
                         .HasDefaultValue("Production");
+
+                    b.Property<string>("MinStationVersion")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("0.1.0");
 
                     b.Property<string>("PackageName")
                         .IsRequired()

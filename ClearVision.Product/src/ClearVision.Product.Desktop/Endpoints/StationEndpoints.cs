@@ -75,6 +75,19 @@ public static class StationEndpoints
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
 
+        app.MapGet("/api/stations/{stationId}/commands/by-client-request/{clientRequestId}", (
+            string stationId,
+            string clientRequestId,
+            StationCommandType commandType,
+            [FromServices] StationCentralStore store) =>
+        {
+            var command = store.GetCommandByClientRequestId(stationId, commandType, clientRequestId);
+            return command == null
+                ? Results.NotFound(new { error = "StationCommandNotFound" })
+                : Results.Ok(command);
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
+
         app.MapPatch("/api/stations/{stationId}/identity", (
             string stationId,
             [FromBody] StationIdentityUpdateRequest request,
@@ -134,13 +147,30 @@ public static class StationEndpoints
                 return Results.BadRequest(new { error = payloadError });
             }
 
-            var command = store.CreateCommand(
-                stationId,
-                request.CommandType,
-                payloadJson,
-                issuedBy,
-                TimeSpan.FromSeconds(Math.Clamp(request.ExpiresInSeconds ?? 300, 30, 86_400)));
-            return Results.Ok(command);
+            if (!TryNormalizeClientRequestId(request.ClientRequestId, out var clientRequestId, out var requestIdError))
+            {
+                return Results.BadRequest(new { error = requestIdError });
+            }
+
+            try
+            {
+                var command = store.CreateCommand(
+                    stationId,
+                    request.CommandType,
+                    payloadJson,
+                    issuedBy,
+                    TimeSpan.FromSeconds(Math.Clamp(request.ExpiresInSeconds ?? 300, 30, 86_400)),
+                    clientRequestId);
+                return Results.Ok(command);
+            }
+            catch (StationCommandIdempotencyConflictException conflict)
+            {
+                return Results.Conflict(new
+                {
+                    error = "StationCommandIdempotencyConflict",
+                    conflict.ExistingCommandId
+                });
+            }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
 
@@ -149,6 +179,7 @@ public static class StationEndpoints
             [FromBody] StationDeployPackageRequest request,
             [FromServices] StationCentralStore commandStore,
             [FromServices] StationPackageStore packageStore,
+            [FromServices] StationRegistryService registry,
             HttpContext context) =>
         {
             if (!IsStationAdmin(context))
@@ -171,6 +202,25 @@ public static class StationEndpoints
             {
                 return Results.BadRequest(new { error = "PackageIdRequired" });
             }
+            if (!TryNormalizeClientRequestId(request.ClientRequestId, out var clientRequestId, out var requestIdError))
+            {
+                return Results.BadRequest(new { error = requestIdError });
+            }
+
+            var existing = commandStore.GetCommandByClientRequestId(
+                stationId,
+                StationCommandType.DeployPackage,
+                clientRequestId);
+            if (existing != null)
+            {
+                return DeployCommandTargetsPackage(existing, request.PackageId)
+                    ? Results.Ok(existing)
+                    : Results.Conflict(new
+                    {
+                        error = "StationCommandIdempotencyConflict",
+                        existingCommandId = existing.CommandId
+                    });
+            }
 
             var package = packageStore.GetPackage(request.PackageId);
             if (package == null)
@@ -187,21 +237,63 @@ public static class StationEndpoints
                 });
             }
 
+            if (!HasCompleteDeploymentIdentity(package))
+            {
+                return Results.Conflict(new
+                {
+                    error = "StationPackageIdentityIncomplete",
+                    message = "运行包缺少版本、SHA、来源修订、流程或判定配置身份，不能创建正式部署命令。"
+                });
+            }
+
+            var station = registry.GetStation(stationId);
+            if (station == null)
+            {
+                return Results.NotFound(new { error = "StationNotFound" });
+            }
+
+            var admissionFailure = ValidateDeploymentAdmission(station, package);
+            if (admissionFailure.HasValue)
+            {
+                return Results.Conflict(new
+                {
+                    error = admissionFailure.Value.Error,
+                    message = admissionFailure.Value.Message
+                });
+            }
+
             var payload = System.Text.Json.JsonSerializer.Serialize(new
             {
                 packageId = package.PackageId,
                 packageName = package.PackageName,
                 packageVersion = package.PackageVersion,
+                packageKind = package.PackageKind,
                 sha256 = package.Sha256,
+                flowHash = package.FlowHash,
+                sourceProjectId = package.SourceProjectId,
+                sourceProjectRevision = package.SourceProjectRevision,
+                decisionConfigurationHash = package.DecisionConfigurationHash,
                 downloadUrl = $"/api/station-packages/{Uri.EscapeDataString(package.PackageId)}/download"
             });
-            var command = commandStore.CreateCommand(
-                stationId,
-                ClearVision.Product.Runtime.Abstractions.StationCommandType.DeployPackage,
-                payload,
-                issuedBy,
-                TimeSpan.FromMinutes(30));
-            return Results.Ok(command);
+            try
+            {
+                var command = commandStore.CreateCommand(
+                    stationId,
+                    ClearVision.Product.Runtime.Abstractions.StationCommandType.DeployPackage,
+                    payload,
+                    issuedBy,
+                    TimeSpan.FromMinutes(30),
+                    clientRequestId);
+                return Results.Ok(command);
+            }
+            catch (StationCommandIdempotencyConflictException conflict)
+            {
+                return Results.Conflict(new
+                {
+                    error = "StationCommandIdempotencyConflict",
+                    conflict.ExistingCommandId
+                });
+            }
         })
         .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireStationAdmin);
 
@@ -429,6 +521,96 @@ public static class StationEndpoints
         }
     }
 
+    private static bool TryNormalizeClientRequestId(
+        string? clientRequestId,
+        out string normalizedClientRequestId,
+        out string? error)
+    {
+        normalizedClientRequestId = clientRequestId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedClientRequestId))
+        {
+            error = "ClientRequestIdRequired";
+            return false;
+        }
+
+        if (normalizedClientRequestId.Length > 128)
+        {
+            error = "ClientRequestIdTooLong";
+            return false;
+        }
+
+        error = null;
+        return true;
+    }
+
+    private static bool DeployCommandTargetsPackage(StationCommandDto command, string packageId)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(command.PayloadJson);
+            return document.RootElement.TryGetProperty("packageId", out var value) &&
+                string.Equals(value.GetString(), packageId.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool HasCompleteDeploymentIdentity(StationPackageManifestDto package)
+    {
+        var sha256 = package.Sha256.Trim().Replace("sha256:", string.Empty, StringComparison.OrdinalIgnoreCase);
+        return !string.IsNullOrWhiteSpace(package.PackageVersion) &&
+            !string.IsNullOrWhiteSpace(package.MinStationVersion) &&
+            sha256.Length == 64 && sha256.All(Uri.IsHexDigit) &&
+            !string.IsNullOrWhiteSpace(package.FlowHash) &&
+            package.SourceProjectId is { } projectId && projectId != Guid.Empty &&
+            package.SourceProjectRevision.HasValue &&
+            !string.IsNullOrWhiteSpace(package.DecisionConfigurationHash);
+    }
+
+    private static (string Error, string Message)? ValidateDeploymentAdmission(
+        StationStatusViewModel station,
+        StationPackageManifestDto package)
+    {
+        if (!station.IsEnabled)
+        {
+            return ("StationDisabled", "目标工作站已禁用；请先恢复工作站准入状态。");
+        }
+        if (!station.IsOnline || station.OnlineState == StationOnlineState.Offline)
+        {
+            return ("StationOffline", "目标工作站离线或心跳已过期；恢复在线后再创建部署命令。");
+        }
+        if (!string.Equals(station.StationRole, "Inspection", StringComparison.OrdinalIgnoreCase))
+        {
+            return ("StationRoleNotDeployable", "正式运行包只能部署到 Inspection 角色工作站。");
+        }
+        if (station.RuntimeState != StationRuntimeState.Idle)
+        {
+            return ("StationRuntimeNotIdle", "目标工作站必须处于空闲状态才能创建部署命令。");
+        }
+        if (!TryParseVersion(station.ClientVersion, out var stationVersion))
+        {
+            return ("StationVersionUnknown", "目标工作站未上报可比较的版本号。");
+        }
+        if (!TryParseVersion(package.MinStationVersion, out var minimumVersion))
+        {
+            return ("PackageMinimumVersionInvalid", "运行包最小工作站版本格式无效。");
+        }
+        if (stationVersion < minimumVersion)
+        {
+            return ("StationVersionIncompatible", $"目标工作站版本 {station.ClientVersion} 低于运行包要求 {package.MinStationVersion}。");
+        }
+
+        return null;
+    }
+
+    private static bool TryParseVersion(string? value, out Version version)
+    {
+        var normalized = value?.Trim().Split('-', 2)[0].Split('+', 2)[0] ?? string.Empty;
+        return Version.TryParse(normalized, out version!);
+    }
+
     private static bool IsStationAdmin(HttpContext context)
     {
         return ClearVisionPermissionPolicies.Authorize(
@@ -491,6 +673,8 @@ public sealed class StationCommandCreateRequest
     public string? IssuedBy { get; set; }
 
     public int? ExpiresInSeconds { get; set; }
+
+    public string? ClientRequestId { get; set; }
 }
 
 public sealed class StationDeployPackageRequest
@@ -498,4 +682,6 @@ public sealed class StationDeployPackageRequest
     public string PackageId { get; set; } = string.Empty;
 
     public string? IssuedBy { get; set; }
+
+    public string? ClientRequestId { get; set; }
 }

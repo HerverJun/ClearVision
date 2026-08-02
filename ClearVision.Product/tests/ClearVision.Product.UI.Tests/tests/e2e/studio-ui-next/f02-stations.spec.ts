@@ -27,6 +27,7 @@ const stationFixture = Object.freeze({
     'GET /api/stations/{stationId}/health',
     'GET /api/stations/{stationId}/logs',
     'GET /api/stations/{stationId}/commands',
+    'GET /api/stations/{stationId}/commands/by-client-request/{clientRequestId}',
     'GET /api/stations/audit',
     'GET /api/station-packages',
     'POST /api/stations/{stationId}/commands',
@@ -77,6 +78,10 @@ function station(overrides: Record<string, unknown> = {}): Record<string, unknow
     lastSeenAtUtc: '2026-07-15T02:00:00Z',
     packageId: 'pkg-a',
     packageName: '瓶盖检测包',
+    packageVersion: '1.0.0',
+    packageSha256: `sha256:${'a'.repeat(64)}`,
+    sourceProjectId: '11111111-2222-3333-4444-555555555555',
+    sourceProjectRevision: 12,
     packageFlowHash: 'sha256:package',
     executionFlowHash: 'sha256:execution',
     flowHash: 'sha256:execution',
@@ -175,7 +180,7 @@ function command(overrides: Record<string, unknown> = {}): Record<string, unknow
   return {
     schemaVersion: 2, commandId: 'command-a', stationId: 'station-a', commandType: 'Ping', payloadJson: '{}',
     createdAtUtc: new Date().toISOString(), expiresAtUtc: '2026-07-26T03:00:00Z', issuedBy: 'fixture-admin',
-    correlationId: 'correlation-a', status: 'Created', progressPercent: 0, deliveredAtUtc: null,
+    correlationId: 'correlation-a', clientRequestId: 'request-a', status: 'Created', progressPercent: 0, deliveredAtUtc: null,
     acceptedAtUtc: null, startedAtUtc: null, completedAtUtc: null, resultMessage: null, errorCode: null,
     ...overrides
   };
@@ -190,9 +195,25 @@ const stationLog = {
 
 const stationPackage = {
   schemaVersion: 2, packageId: 'pkg-a', packageName: '瓶盖检测包', packageVersion: '1.0.0', packageKind: 'Production',
-  flowHash: 'sha256:package', createdBy: 'fixture-admin', minStationVersion: '2.0.0', requiredOperators: ['Threshold'],
+  flowHash: 'sha256:package', sourceProjectId: '11111111-2222-3333-4444-555555555555', sourceProjectRevision: 12,
+  decisionConfigurationHash: 'sha256:decision', createdBy: 'fixture-admin', minStationVersion: '2.0.0', requiredOperators: ['Threshold'],
   sizeBytes: 4096, sha256: 'a'.repeat(64), createdAtUtc: '2026-07-15T01:00:00Z'
 };
+
+function deploymentPayload(packageRecord = stationPackage): Record<string, unknown> {
+  return {
+    packageId: packageRecord.packageId,
+    packageName: packageRecord.packageName,
+    packageVersion: packageRecord.packageVersion,
+    packageKind: packageRecord.packageKind,
+    sha256: packageRecord.sha256,
+    flowHash: packageRecord.flowHash,
+    sourceProjectId: packageRecord.sourceProjectId,
+    sourceProjectRevision: packageRecord.sourceProjectRevision,
+    decisionConfigurationHash: packageRecord.decisionConfigurationHash,
+    downloadUrl: `/api/station-packages/${encodeURIComponent(packageRecord.packageId)}/download`
+  };
+}
 
 async function fulfill(route: Route, status: number, body: unknown): Promise<void> {
   await fulfillF02Json(route, status, body, stationFixture.schemaVersion);
@@ -202,10 +223,13 @@ async function bootStations(
   page: Page,
   listPayload: unknown = [station()],
   summaryPayload: unknown = summary(),
-  role: 'Admin' | 'Engineer' = 'Engineer'
+  role: 'Admin' | 'Engineer' = 'Engineer',
+  initialCommands: Record<string, unknown>[] = [command({
+    status: 'Succeeded', progressPercent: 100, completedAtUtc: '2026-07-15T02:01:00Z'
+  })]
 ): Promise<F02MethodAuditEntry[]> {
   const audit: F02MethodAuditEntry[] = [];
-  const commands = [command()];
+  const commands = [...initialCommands];
   let identity = station();
   await installF02BrowserStartup(page, { 'Studio2.StationsRead': true });
   await page.route('**/health', route => fulfill(route, 200, { status: 'Healthy', port: 5177 }));
@@ -259,12 +283,24 @@ async function bootStations(
     }
     if (url.pathname === '/api/stations/station-a/commands') {
       if (request.method() === 'POST') {
-        const created = command({ commandId: `command-${commands.length + 1}`, commandType: request.postDataJSON().commandType, payloadJson: request.postDataJSON().payloadJson });
+        const body = request.postDataJSON();
+        const created = command({
+          commandId: `command-${commands.length + 1}`, commandType: body.commandType,
+          clientRequestId: body.clientRequestId, payloadJson: body.payloadJson
+        });
         commands.unshift(created);
         await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? created : { error: 'StationAdminRequired' });
       } else {
         await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? commands : { error: 'StationAdminRequired' });
       }
+      return;
+    }
+    if (url.pathname.startsWith('/api/stations/station-a/commands/by-client-request/')) {
+      const requestId = decodeURIComponent(url.pathname.split('/').at(-1) ?? '');
+      const found = commands.find(item =>
+        item.clientRequestId === requestId && item.commandType === url.searchParams.get('commandType')
+      );
+      await fulfill(route, found ? 200 : 404, found ?? { error: 'StationCommandNotFound' });
       return;
     }
     if (url.pathname === '/api/stations/audit') {
@@ -284,7 +320,11 @@ async function bootStations(
       return;
     }
     if (url.pathname === '/api/stations/station-a/deploy-package') {
-      const created = command({ commandId: `deploy-${commands.length + 1}`, commandType: 'DeployPackage', payloadJson: JSON.stringify({ packageId: 'pkg-a' }) });
+      const body = request.postDataJSON();
+      const created = command({
+        commandId: `deploy-${commands.length + 1}`, commandType: 'DeployPackage', clientRequestId: body.clientRequestId,
+        payloadJson: JSON.stringify(deploymentPayload())
+      });
       commands.unshift(created);
       await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? created : { error: 'StationAdminRequired' });
       return;
@@ -341,28 +381,47 @@ test('Engineer Station journey remains read-only and never mounts the Admin cont
   expect(audit.some(entry => /commands|logs|audit|packages|download/.test(entry.path))).toBe(false);
 });
 
-test('Admin Station journey mounts controls and completes command, identity and package submission', async ({ page }) => {
+test('Admin Station journey mounts controls and creates command, identity and package operations', async ({ page, context }) => {
   await page.setViewportSize({ width: 1600, height: 1000 });
   const runtimeErrors = createF02RuntimeErrorAudit(page);
-  const audit = await bootStations(page, [station()], summary(), 'Admin');
+  const commandAudit = await bootStations(page, [station()], summary(), 'Admin');
   await page.goto('/studio/index.html#/stations/station-a');
 
   const admin = page.locator('[data-capability="station-admin-control"]');
   await expect(admin).toBeVisible();
   await expect(admin.getByText('运行包健康状态降级')).toBeVisible();
   await admin.getByTestId('station-issue-command').click();
-  await expect(admin.getByText('工作站命令已由后端受理。')).toBeVisible();
-  await admin.getByLabel('工作站名称').fill('一号检测站（修订）');
-  await admin.getByTestId('station-save-identity').click();
-  await expect(admin.getByText('工作站身份已由后端修订。')).toBeVisible();
-  await admin.getByLabel('生产运行包').selectOption('pkg-a');
-  await admin.getByTestId('station-deploy-package').click();
-  await expect(admin.getByText('运行包下发命令已由后端受理。')).toBeVisible();
+  await expect(admin.getByText('命令已创建；执行结果尚未确认。')).toBeVisible();
 
-  expect(audit.some(entry => entry.method === 'POST' && entry.path === '/api/stations/station-a/commands')).toBe(true);
-  expect(audit.some(entry => entry.method === 'PATCH' && entry.path === '/api/stations/station-a/identity')).toBe(true);
-  expect(audit.some(entry => entry.method === 'POST' && entry.path === '/api/stations/station-a/deploy-package')).toBe(true);
+  const identityPage = await context.newPage();
+  const identityErrors = createF02RuntimeErrorAudit(identityPage);
+  const identityAudit = await bootStations(identityPage, [station()], summary(), 'Admin');
+  await identityPage.goto('/studio/index.html#/stations/station-a');
+  const identityAdmin = identityPage.locator('[data-capability="station-admin-control"]');
+  await identityAdmin.getByLabel('工作站名称').fill('一号检测站（修订）');
+  await identityAdmin.getByTestId('station-save-identity').click();
+  await expect(identityAdmin.getByText('工作站身份已由后端修订。')).toBeVisible();
+
+  await identityPage.close();
+
+  const deployPage = await context.newPage();
+  const deployErrors = createF02RuntimeErrorAudit(deployPage);
+  const deployAudit = await bootStations(deployPage, [station()], summary(), 'Admin');
+  await deployPage.goto('/studio/index.html#/stations/station-a');
+  const deployAdmin = deployPage.locator('[data-capability="station-admin-control"]');
+  await deployAdmin.getByLabel('生产运行包').selectOption('pkg-a');
+  await deployAdmin.getByTestId('station-deploy-package').click();
+  await expect(deployAdmin.getByText('部署命令已创建；仅在命令成功且工作站激活身份匹配后才算部署完成。')).toBeVisible();
+  await expect(deployAdmin.getByTestId('station-deployment-status').getByText('命令已创建')).toBeVisible();
+
+  const audits = [...commandAudit, ...identityAudit, ...deployAudit];
+  expect(audits.some(entry => entry.method === 'POST' && entry.path === '/api/stations/station-a/commands')).toBe(true);
+  expect(audits.some(entry => entry.method === 'PATCH' && entry.path === '/api/stations/station-a/identity')).toBe(true);
+  expect(audits.some(entry => entry.method === 'POST' && entry.path === '/api/stations/station-a/deploy-package')).toBe(true);
   expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  expect(identityErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  expect(deployErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  await deployPage.close();
 });
 
 test('Station list surfaces frozen-contract malformed and empty responses', async ({ page }) => {
@@ -457,6 +516,42 @@ for (const visual of [
       });
     }
     expect(expectGetOnly(audit)).toBe(true);
+    expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  });
+}
+
+for (const visual of [
+  { id: 'station-admin-wide-light-compact', width: 1920, height: 1080, density: 'compact' },
+  { id: 'station-admin-pressure-light-comfortable', width: 1536, height: 864, density: 'comfortable' }
+] as const) {
+  test(`captures ${visual.id} deployment identity evidence`, async ({ page }) => {
+    test.skip(
+      !hasF02VisualEvidenceTarget(),
+      'Visual evidence output was not requested.'
+    );
+    await page.setViewportSize({ width: visual.width, height: visual.height });
+    await installF02VisualPreferences(page, 'light', visual.density);
+    const runtimeErrors = createF02RuntimeErrorAudit(page);
+    const deploymentCommand = command({
+      commandId: 'deploy-succeeded', commandType: 'DeployPackage', clientRequestId: 'deploy-request-1',
+      payloadJson: JSON.stringify(deploymentPayload()), status: 'Succeeded', progressPercent: 100,
+      completedAtUtc: '2026-07-15T02:02:00Z', resultMessage: 'Package pkg-a deployed.'
+    });
+    const audit = await bootStations(page, [station()], summary(), 'Admin', [deploymentCommand]);
+    await page.goto('/studio/index.html#/stations/station-a');
+    const admin = page.locator('[data-capability="station-admin-control"]');
+    await expect(admin).toBeVisible();
+    const deploymentStatus = admin.getByTestId('station-deployment-status');
+    await expect(deploymentStatus.getByText('部署完成')).toBeVisible();
+    await deploymentStatus.evaluate(element => element.scrollIntoView({ block: 'center' }));
+    await captureF02VisualEvidence(page, {
+      scenario: visual.id,
+      viewport: { width: visual.width, height: visual.height },
+      theme: 'light',
+      density: visual.density,
+      requests: audit,
+      runtimeErrors
+    });
     expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
   });
 }

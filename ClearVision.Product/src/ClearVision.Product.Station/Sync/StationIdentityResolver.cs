@@ -50,7 +50,8 @@ public sealed class StationIdentityResolver
                 InspectionNodeName = current.InspectionNodeName,
                 CameraAlias = current.CameraAlias,
                 Owner = current.Owner,
-                CurrentPackageVersion = current.CurrentPackageVersion
+                CurrentPackageVersion = current.CurrentPackageVersion,
+                CurrentPackageSha256 = current.CurrentPackageSha256
             };
 
             return _cachedIdentity;
@@ -109,6 +110,8 @@ public sealed record StationIdentityContext
     public string ClientVersion { get; init; } = string.Empty;
 
     public string? CurrentPackageVersion { get; init; }
+
+    public string? CurrentPackageSha256 { get; init; }
 
     public DateTimeOffset StartedAtUtc { get; init; }
 }

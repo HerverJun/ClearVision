@@ -381,6 +381,9 @@ public sealed class StationPackageStore
 
         existing.PackageName = manifest.PackageName;
         existing.PackageVersion = manifest.PackageVersion;
+        existing.MinStationVersion = string.IsNullOrWhiteSpace(manifest.MinStationVersion)
+            ? "0.1.0"
+            : manifest.MinStationVersion.Trim();
         existing.PackageKind = manifest.PackageKind.ToString();
         existing.FlowHash = manifest.FlowHash;
         existing.SourceProjectId = manifest.SourceProjectId;
@@ -404,6 +407,7 @@ public sealed class StationPackageStore
             PackageId = entity.PackageId,
             PackageName = entity.PackageName,
             PackageVersion = entity.PackageVersion,
+            MinStationVersion = entity.MinStationVersion,
             PackageKind = ParsePackageKind(entity.PackageKind),
             FlowHash = entity.FlowHash,
             SourceProjectId = entity.SourceProjectId,
