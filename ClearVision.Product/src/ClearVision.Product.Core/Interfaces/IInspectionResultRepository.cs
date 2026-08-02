@@ -167,8 +167,13 @@ public class InspectionHistoryDetail
     public string? FlowVersionHash { get; set; }
     public string? CalibrationBundleId { get; set; }
     public Guid? SessionId { get; set; }
+    public Guid? ExecutionSnapshotId { get; set; }
     public long? ProjectPersistenceRevision { get; set; }
     public string? DecisionConfigurationHash { get; set; }
+    public string? RuntimePackageId { get; set; }
+    public string? ExecutionSource { get; set; }
+    public string? ExecutionRunMode { get; set; }
+    public string? ShadowRole { get; set; }
     public bool HasImage { get; set; }
     public bool HasOutputData { get; set; }
     public bool HasAnalysisData { get; set; }

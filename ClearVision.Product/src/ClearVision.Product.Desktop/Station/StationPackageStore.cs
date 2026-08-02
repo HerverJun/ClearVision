@@ -208,6 +208,7 @@ public sealed class StationPackageStore
             PackageVersion = packageVersion,
             PackageKind = StationPackageKind.Test,
             FlowHash = flowHash,
+            DecisionConfigurationHash = runtimeManifest.DecisionConfigurationHash,
             CreatedBy = "Studio",
             MinStationVersion = "0.1.0",
             CreatedAtUtc = DateTimeOffset.UtcNow
@@ -250,8 +251,12 @@ public sealed class StationPackageStore
         }
 
         var runtimeManifestJson = await File.ReadAllTextAsync(runtimeManifestPath, cancellationToken);
+        using var runtimeManifestDocument = JsonDocument.Parse(runtimeManifestJson);
         var runtimeManifest = JsonSerializer.Deserialize<RuntimePackageManifest>(runtimeManifestJson, PackageJsonOptions)
             ?? throw new InvalidOperationException("Runtime package manifest could not be read.");
+        var hasSourceProjectRevision = HasProperty(
+            runtimeManifestDocument.RootElement,
+            "sourceProjectRevision");
         var packageId = SanitizePackageId(runtimeManifest.PackageId);
         var packageDirectory = Path.Combine(FilesDirectory, packageId);
         Directory.CreateDirectory(packageDirectory);
@@ -276,6 +281,15 @@ public sealed class StationPackageStore
                 : runtimeManifest.RuntimeApiVersion.Trim(),
             PackageKind = StationPackageKind.Production,
             FlowHash = runtimeManifest.FlowHash,
+            SourceProjectId = runtimeManifest.SourceProjectId == Guid.Empty
+                ? null
+                : runtimeManifest.SourceProjectId,
+            SourceProjectRevision = hasSourceProjectRevision
+                ? runtimeManifest.SourceProjectRevision
+                : null,
+            DecisionConfigurationHash = string.IsNullOrWhiteSpace(runtimeManifest.DecisionConfigurationHash)
+                ? null
+                : runtimeManifest.DecisionConfigurationHash.Trim(),
             CreatedBy = string.IsNullOrWhiteSpace(createdBy)
                 ? (string.IsNullOrWhiteSpace(runtimeManifest.CreatedBy) ? "Studio" : runtimeManifest.CreatedBy.Trim())
                 : createdBy.Trim(),
@@ -369,6 +383,9 @@ public sealed class StationPackageStore
         existing.PackageVersion = manifest.PackageVersion;
         existing.PackageKind = manifest.PackageKind.ToString();
         existing.FlowHash = manifest.FlowHash;
+        existing.SourceProjectId = manifest.SourceProjectId;
+        existing.SourceProjectRevision = manifest.SourceProjectRevision;
+        existing.DecisionConfigurationHash = manifest.DecisionConfigurationHash;
         existing.FileName = Path.GetFileName(path);
         existing.FilePath = path;
         existing.SizeBytes = manifest.SizeBytes;
@@ -389,6 +406,9 @@ public sealed class StationPackageStore
             PackageVersion = entity.PackageVersion,
             PackageKind = ParsePackageKind(entity.PackageKind),
             FlowHash = entity.FlowHash,
+            SourceProjectId = entity.SourceProjectId,
+            SourceProjectRevision = entity.SourceProjectRevision,
+            DecisionConfigurationHash = entity.DecisionConfigurationHash,
             CreatedBy = entity.CreatedBy,
             SizeBytes = entity.SizeBytes,
             Sha256 = entity.Sha256,
@@ -446,6 +466,13 @@ public sealed class StationPackageStore
         return string.IsNullOrWhiteSpace(safe) || safe is "." or ".."
             ? $"pkg_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}"[..32]
             : safe;
+    }
+
+    private static bool HasProperty(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object &&
+               element.EnumerateObject().Any(property =>
+                   property.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
     }
 
     private static void CopyDirectory(string sourceDirectory, string targetDirectory)

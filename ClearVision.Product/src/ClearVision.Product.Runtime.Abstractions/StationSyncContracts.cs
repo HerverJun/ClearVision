@@ -937,6 +937,15 @@ public sealed class StationPackageManifestDto
     /// <summary>Flow hash for the package.</summary>
     public string FlowHash { get; set; } = string.Empty;
 
+    /// <summary>Source project identifier captured by the runtime manifest.</summary>
+    public Guid? SourceProjectId { get; set; }
+
+    /// <summary>Source project persistence revision captured by the runtime manifest.</summary>
+    public long? SourceProjectRevision { get; set; }
+
+    /// <summary>Canonical decision configuration hash captured by the runtime manifest.</summary>
+    public string? DecisionConfigurationHash { get; set; }
+
     /// <summary>User or system that created the package.</summary>
     public string CreatedBy { get; set; } = "Studio";
 

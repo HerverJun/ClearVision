@@ -955,6 +955,10 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("DecisionConfigurationHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -995,6 +999,12 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<long>("SizeBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("SourceProjectId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("SourceProjectRevision")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");

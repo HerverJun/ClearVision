@@ -141,6 +141,24 @@ public class InspectionResult : Entity
         SetOutcome(legacyOutcome, processingTimeMs, confidenceScore);
     }
 
+    public void RestoreLegacyResult(
+        InspectionStatus status,
+        long processingTimeMs,
+        double? confidenceScore = null,
+        string? errorMessage = null)
+    {
+        Status = status;
+        ExecutionOutcome = null;
+        DecisionOutcome = null;
+        HasJudgmentSignal = null;
+        DecisionSource = null;
+        ReasonCode = null;
+        ProcessingTimeMs = processingTimeMs;
+        ConfidenceScore = confidenceScore;
+        ErrorMessage = NormalizeOptional(errorMessage);
+        MarkAsModified();
+    }
+
     public void SetOutcome(
         InspectionOutcome outcome,
         long processingTimeMs,
@@ -263,6 +281,25 @@ public class InspectionResult : Entity
         ExecutionSource = snapshot.Source.ToString();
         ExecutionRunMode = snapshot.RunMode.ToString();
         ShadowRole = snapshot.ShadowRole.ToString();
+        MarkAsModified();
+    }
+
+    public void RestoreExecutionTraceability(
+        Guid? executionSnapshotId,
+        long? projectPersistenceRevision,
+        string? decisionConfigurationHash,
+        string? runtimePackageId,
+        string? executionSource,
+        string? executionRunMode,
+        string? shadowRole)
+    {
+        ExecutionSnapshotId = executionSnapshotId;
+        ProjectPersistenceRevision = projectPersistenceRevision;
+        DecisionConfigurationHash = NormalizeOptional(decisionConfigurationHash);
+        RuntimePackageId = NormalizeOptional(runtimePackageId);
+        ExecutionSource = NormalizeOptional(executionSource);
+        ExecutionRunMode = NormalizeOptional(executionRunMode);
+        ShadowRole = NormalizeOptional(shadowRole);
         MarkAsModified();
     }
 

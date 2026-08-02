@@ -681,7 +681,7 @@ public sealed class VisionDatabaseRestoreRequest
 
 internal static class VisionDatabaseMaintenance
 {
-    public const int CurrentSqliteSchemaVersion = 6;
+    public const int CurrentSqliteSchemaVersion = 7;
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -698,6 +698,7 @@ internal static class VisionDatabaseMaintenance
         }
 
         await RepairStationPackageKindColumnAsync(dbContext, cancellationToken);
+        await EnsureStationPackageIdentitySchemaAsync(dbContext, cancellationToken);
         await EnsureProjectLifecycleOperationSchemaAsync(dbContext, cancellationToken);
         await EnsureStationCanonicalOutcomeSchemaAsync(dbContext, cancellationToken);
         await EnsureStationExecutionIdentitySchemaAsync(dbContext, cancellationToken);
@@ -783,6 +784,8 @@ internal static class VisionDatabaseMaintenance
                 """ALTER TABLE "StationPackageRecords" ADD COLUMN "PackageKind" TEXT NOT NULL DEFAULT 'Production';""",
                 cancellationToken);
         }
+
+        await EnsureStationPackageIdentitySchemaAsync(dbContext, cancellationToken);
     }
 
     private static async Task EnsureStationCanonicalOutcomeSchemaAsync(
@@ -1126,6 +1129,46 @@ internal static class VisionDatabaseMaintenance
         }
     }
 
+    private static async Task EnsureStationPackageIdentitySchemaAsync(
+        VisionDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldCloseConnection = connection.State != ConnectionState.Open;
+        if (shouldCloseConnection)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            if (!await TableExistsAsync(connection, "StationPackageRecords", cancellationToken))
+            {
+                return;
+            }
+
+            foreach (var column in new[]
+                     {
+                         (Name: "SourceProjectId", Statement: "ALTER TABLE \"StationPackageRecords\" ADD COLUMN \"SourceProjectId\" TEXT NULL;"),
+                         (Name: "SourceProjectRevision", Statement: "ALTER TABLE \"StationPackageRecords\" ADD COLUMN \"SourceProjectRevision\" INTEGER NULL;"),
+                         (Name: "DecisionConfigurationHash", Statement: "ALTER TABLE \"StationPackageRecords\" ADD COLUMN \"DecisionConfigurationHash\" TEXT NULL;")
+                     })
+            {
+                if (!await ColumnExistsAsync(connection, "StationPackageRecords", column.Name, cancellationToken))
+                {
+                    await dbContext.Database.ExecuteSqlRawAsync(column.Statement, cancellationToken);
+                }
+            }
+        }
+        finally
+        {
+            if (shouldCloseConnection)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
     private static async Task EnsureProjectLifecycleOperationSchemaAsync(
         VisionDbContext dbContext,
         CancellationToken cancellationToken)
@@ -1297,6 +1340,9 @@ internal static class VisionDatabaseMaintenance
         "column:StationNodes.CurrentRunId",
         "table:StationPackageRecords",
         "column:StationPackageRecords.PackageKind",
+        "column:StationPackageRecords.SourceProjectId",
+        "column:StationPackageRecords.SourceProjectRevision",
+        "column:StationPackageRecords.DecisionConfigurationHash",
         "table:StationResultSummaries",
         "table:StationSyncCursors",
         "column:StationResultSummaries.ExecutionOutcome",
@@ -1509,6 +1555,9 @@ internal static class VisionDatabaseMaintenance
             "PackageVersion" TEXT NOT NULL,
             "PackageKind" TEXT NOT NULL DEFAULT 'Production',
             "FlowHash" TEXT NOT NULL,
+            "SourceProjectId" TEXT NULL,
+            "SourceProjectRevision" INTEGER NULL,
+            "DecisionConfigurationHash" TEXT NULL,
             "FileName" TEXT NOT NULL,
             "FilePath" TEXT NOT NULL,
             "SizeBytes" INTEGER NOT NULL,

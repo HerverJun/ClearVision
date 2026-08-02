@@ -314,7 +314,12 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
 
         var nextProfile = profile ?? package.DefaultSiteProfile;
-        RuntimeParameterValidator.ThrowIfInvalid(package.ParameterSchema, nextProfile);
+        var validation = RuntimeParameterValidator.Validate(package.ParameterSchema, nextProfile);
+        if (!validation.IsValid)
+        {
+            throw new RuntimePackageException(
+                $"ADMISSION_SITE_PROFILE_INVALID: {string.Join("; ", validation.Errors)}");
+        }
 
         lock (_profileGate)
         {
@@ -355,15 +360,16 @@ public sealed class RuntimeHost : IAsyncDisposable
         {
             EnsurePackageLoaded();
             EnsureNotRunning();
-            ValidateRuntimeAdmission(_loadedPackage!);
+            var effectiveSnapshot = ValidateRuntimeAdmission(_loadedPackage!);
             runCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             runGeneration = Interlocked.Increment(ref _runGenerationCounter);
             _activeRunGeneration = runGeneration;
             _stopTimeoutPending = false;
             _activeRunCts = runCts;
+            _currentExecutionSnapshot = effectiveSnapshot;
             _state = RuntimeHostState.Running;
             backgroundRunTask = Task.Run(
-                () => ExecuteSingleCoreAsync(imagePath, runCts.Token),
+                () => ExecuteSingleCoreAsync(imagePath, effectiveSnapshot, runCts.Token),
                 CancellationToken.None);
             _backgroundRunTask = backgroundRunTask;
         }
@@ -391,7 +397,7 @@ public sealed class RuntimeHost : IAsyncDisposable
         {
             EnsurePackageLoaded();
             EnsureNotRunning();
-            ValidateRuntimeAdmission(_loadedPackage!);
+            var effectiveSnapshot = ValidateRuntimeAdmission(_loadedPackage!);
 
             var files = EnumerateReplayFiles(folderPath, _loadedPackage!.RuntimeProfile).ToList();
             if (files.Count == 0)
@@ -405,9 +411,10 @@ public sealed class RuntimeHost : IAsyncDisposable
             _activeRunGeneration = runGeneration;
             _stopTimeoutPending = false;
             _activeRunCts = runCts;
+            _currentExecutionSnapshot = effectiveSnapshot;
             _state = RuntimeHostState.Running;
             _backgroundRunTask = Task.Run(
-                () => ExecuteFolderReplayAsync(files, runGeneration, runCts),
+                () => ExecuteFolderReplayAsync(files, effectiveSnapshot, runGeneration, runCts),
                 CancellationToken.None);
         }
         finally
@@ -572,6 +579,7 @@ public sealed class RuntimeHost : IAsyncDisposable
 
     private async Task ExecuteFolderReplayAsync(
         IReadOnlyList<string> files,
+        ExecutionSnapshot effectiveSnapshot,
         long runGeneration,
         CancellationTokenSource runCts)
     {
@@ -582,7 +590,7 @@ public sealed class RuntimeHost : IAsyncDisposable
             foreach (var file in files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                await ExecuteSingleCoreAsync(file, cancellationToken);
+                await ExecuteSingleCoreAsync(file, effectiveSnapshot, cancellationToken);
                 Interlocked.Decrement(ref _pendingCount);
                 EmitSnapshot();
             }
@@ -623,7 +631,10 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
     }
 
-    private async Task<RuntimeNormalizedResult> ExecuteSingleCoreAsync(string? imagePath, CancellationToken cancellationToken)
+    private async Task<RuntimeNormalizedResult> ExecuteSingleCoreAsync(
+        string? imagePath,
+        ExecutionSnapshot effectiveSnapshot,
+        CancellationToken cancellationToken)
     {
         var package = _loadedPackage ?? throw new RuntimePackageException("当前尚未加载运行包。");
         var imageId = string.IsNullOrWhiteSpace(imagePath)
@@ -632,16 +643,9 @@ public sealed class RuntimeHost : IAsyncDisposable
         var startedAt = DateTimeOffset.UtcNow;
         var runId = Guid.NewGuid().ToString("N");
         byte[]? sourceImageBytes = null;
-        var runtimeSnapshot = package.ExecutionSnapshot
-            ?? throw new RuntimePackageException("The loaded package does not contain a runtime execution snapshot.");
+        var runtimeSnapshot = effectiveSnapshot;
         try
         {
-            var profile = GetActiveSiteProfileSnapshot(package);
-            var applyResult = RuntimeParameterOverrideApplier.CloneAndApply(package, profile);
-            var appliedFlow = RuntimeFlowAdapter.ToEntity(applyResult.Flow);
-            var appliedIdentityFlow = RuntimeFlowAdapter.ToEntity(applyResult.IdentityFlow);
-            runtimeSnapshot = CreateRuntimeExecutionSnapshot(package, appliedFlow, appliedIdentityFlow, runtimeSnapshot);
-            _currentExecutionSnapshot = runtimeSnapshot;
             _currentRunId = runId;
             EmitSnapshot();
             sourceImageBytes = await PrepareRuntimeInputAsync(imagePath, cancellationToken);
@@ -1325,7 +1329,7 @@ public sealed class RuntimeHost : IAsyncDisposable
         };
     }
 
-    private void ValidateRuntimeAdmission(RuntimePackage package)
+    private ExecutionSnapshot ValidateRuntimeAdmission(RuntimePackage package)
     {
         var flow = RuntimeFlowAdapter.ToEntity(package.Flow);
         var admission = ExecutionAdmissionService.ValidateStandaloneFlow(
@@ -1343,6 +1347,42 @@ public sealed class RuntimeHost : IAsyncDisposable
         {
             throw new RuntimePackageException($"ADMISSION_FLOW_INVALID: {string.Join("; ", validation.Errors)}");
         }
+
+        RuntimeParameterOverrideApplyResult applyResult;
+        try
+        {
+            var profile = GetActiveSiteProfileSnapshot(package);
+            applyResult = RuntimeParameterOverrideApplier.CloneAndApply(package, profile);
+        }
+        catch (RuntimePackageException ex)
+        {
+            throw new RuntimePackageException($"ADMISSION_SITE_PROFILE_INVALID: {ex.Message}", ex);
+        }
+
+        var effectiveFlow = RuntimeFlowAdapter.ToEntity(applyResult.Flow);
+        var effectiveIdentityFlow = RuntimeFlowAdapter.ToEntity(applyResult.IdentityFlow);
+        var effectiveAdmission = ExecutionAdmissionService.ValidateStandaloneFlow(
+            effectiveFlow,
+            ExecutionAdmissionSurface.StationRuntimeExecution);
+        if (!effectiveAdmission.IsAllowed)
+        {
+            throw new RuntimePackageException(
+                $"ADMISSION_EFFECTIVE_FLOW_INVALID: {effectiveAdmission.Code}: {effectiveAdmission.Message}");
+        }
+
+        var effectiveSnapshot = CreateRuntimeExecutionSnapshot(
+            package,
+            effectiveFlow,
+            effectiveIdentityFlow,
+            snapshot);
+        var effectiveValidation = _flowExecutionService.ValidateSnapshot(effectiveSnapshot);
+        if (!effectiveValidation.IsValid)
+        {
+            throw new RuntimePackageException(
+                $"ADMISSION_EFFECTIVE_FLOW_INVALID: {string.Join("; ", effectiveValidation.Errors)}");
+        }
+
+        return effectiveSnapshot;
     }
 }
 

@@ -1207,6 +1207,163 @@ public class RuntimeMvpTests
         }
     }
 
+    [Fact]
+    public async Task RuntimeHost_EffectiveProfileInvalidForExecutor_ShouldRejectBeforeRunningOrPersisting()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var modelPath = Path.Combine(root, "model.onnx");
+            await File.WriteAllBytesAsync(modelPath, [1, 2, 3, 4]);
+            var operatorId = Guid.NewGuid();
+            var decisionPortId = Guid.NewGuid();
+            var judgmentId = Guid.NewGuid();
+            var deepLearning = RuntimeParameterTestData.CreateDeepLearningOperator(
+                operatorId,
+                "Detection",
+                modelPath,
+                confidence: 0.62d);
+            deepLearning.OutputPorts = [];
+            var project = new ProjectDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "runtime-effective-profile-admission",
+                PersistenceRevision = 23,
+                Flow = new OperatorFlowDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "main",
+                    DecisionConfiguration = CreateStringDecisionConfiguration(judgmentId, decisionPortId),
+                    Operators =
+                    [
+                        deepLearning,
+                        new OperatorDto
+                        {
+                            Id = judgmentId,
+                            Name = "Final judgment",
+                            Type = OperatorType.ResultJudgment,
+                            OutputPorts = [CreateDecisionPort(decisionPortId)]
+                        }
+                    ]
+                }
+            };
+            var export = await new RuntimePackageExporter(
+                new OperatorFactory(),
+                NullLogger<RuntimePackageExporter>.Instance).ExportAsync(new RuntimePackageExportRequest
+                {
+                    Project = project,
+                    TargetRootDirectory = root
+                });
+            var inputPath = Path.Combine(root, "input.bmp");
+            await File.WriteAllBytesAsync(inputPath, ValidImageBytes);
+
+            TrackingRuntimeResultWriter? writer = null;
+            var published = new List<RuntimeNormalizedResult>();
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new RejectingTunableDeepLearningExecutor(), new FixedOkJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance,
+                writerFactory: null,
+                resultWriterFactory: (_, _) => writer = new TrackingRuntimeResultWriter());
+            runtimeHost.ResultAvailable += published.Add;
+            var package = await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+            var parameter = package.ParameterSchema.Parameters.Should().ContainSingle().Subject;
+            var invalidProfileException = FluentActions
+                .Invoking(() => runtimeHost.SetActiveSiteProfile(RuntimeParameterTestData.CreateProfile(
+                    string.Empty,
+                    package.Manifest.FlowHash,
+                    RuntimeParameterTestData.CreateOverride(parameter.Id, 0.7d))))
+                .Should()
+                .Throw<RuntimePackageException>();
+            invalidProfileException.Which.Message.Should().StartWith("ADMISSION_SITE_PROFILE_INVALID:");
+            runtimeHost.GetSnapshot().State.Should().Be(RuntimeHostState.Loaded);
+            writer!.EnqueueCount.Should().Be(0);
+
+            runtimeHost.SetActiveSiteProfile(RuntimeParameterTestData.CreateProfile(
+                package.Manifest.PackageId,
+                package.Manifest.FlowHash,
+                RuntimeParameterTestData.CreateOverride(parameter.Id, 0.81d)));
+
+            var exception = await FluentActions
+                .Invoking(() => runtimeHost.RunSingleAsync(inputPath))
+                .Should()
+                .ThrowAsync<RuntimePackageException>();
+
+            exception.Which.Message.Should().StartWith("ADMISSION_EFFECTIVE_FLOW_INVALID:");
+            runtimeHost.GetSnapshot().State.Should().Be(RuntimeHostState.Loaded);
+            published.Should().BeEmpty();
+            writer.Should().NotBeNull();
+            writer!.EnqueueCount.Should().Be(0);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Theory]
+    [InlineData("decision", "DecisionConfigurationHashMismatch")]
+    [InlineData("resource", "MissingResources")]
+    public async Task RuntimeHost_InvalidPackageIdentityOrResources_ShouldRejectBeforePreparingWriters(
+        string failureKind,
+        string expectedCode)
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var export = await new RuntimePackageExporter(
+                new OperatorFactory(),
+                NullLogger<RuntimePackageExporter>.Instance).ExportAsync(new RuntimePackageExportRequest
+                {
+                    Project = CreateProjectDto($"runtime-admission-{failureKind}"),
+                    TargetRootDirectory = root
+                });
+            var manifestPath = Path.Combine(export.PackageRootPath, "package.json");
+            var manifest = JsonSerializer.Deserialize<RuntimePackageManifest>(
+                await File.ReadAllTextAsync(manifestPath),
+                CreateJsonOptions())!;
+            if (failureKind == "decision")
+            {
+                manifest.DecisionConfigurationHash = "sha256:stale";
+            }
+            else
+            {
+                manifest.MissingResources.Add("missing-model.onnx");
+            }
+
+            await File.WriteAllTextAsync(
+                manifestPath,
+                JsonSerializer.Serialize(manifest, CreateJsonOptions()));
+
+            var writerFactoryCalls = 0;
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance,
+                writerFactory: null,
+                resultWriterFactory: (_, _) =>
+                {
+                    writerFactoryCalls++;
+                    return new TrackingRuntimeResultWriter();
+                });
+
+            var exception = await FluentActions
+                .Invoking(() => runtimeHost.LoadPackageAsync(export.PackageRootPath))
+                .Should()
+                .ThrowAsync<RuntimePackageException>();
+
+            exception.Which.Message.Should().Contain(expectedCode);
+            runtimeHost.GetSnapshot().State.Should().Be(RuntimeHostState.Idle);
+            writerFactoryCalls.Should().Be(0);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
     private sealed class FailingRuntimeProjectVariableStateStore : IProjectVariableStateStore
     {
         public bool FailSaves { get; set; }
@@ -1786,6 +1943,26 @@ public class RuntimeMvpTests
             }));
 
         public ValidationResult ValidateParameters(Operator @operator) => ValidationResult.Valid();
+    }
+
+    private sealed class RejectingTunableDeepLearningExecutor : IOperatorExecutor
+    {
+        public OperatorType OperatorType => OperatorType.DeepLearning;
+
+        public Task<OperatorExecutionOutput> ExecuteAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs = null,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Admission must reject this profile before executor invocation.");
+
+        public ValidationResult ValidateParameters(Operator @operator)
+        {
+            var confidence = Convert.ToDouble(
+                @operator.Parameters.Single(parameter => parameter.Name == "Confidence").GetValue());
+            return confidence <= 0.8d
+                ? ValidationResult.Valid()
+                : ValidationResult.Invalid("Confidence must be less than or equal to 0.8.");
+        }
     }
 
     private sealed class PackageConfiguredImageAcquisitionExecutor : IOperatorExecutor

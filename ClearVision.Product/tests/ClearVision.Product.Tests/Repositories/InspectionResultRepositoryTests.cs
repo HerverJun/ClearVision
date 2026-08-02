@@ -221,17 +221,27 @@ public sealed class InspectionResultRepositoryTests
             var projectId = Guid.NewGuid();
             var otherProjectId = Guid.NewGuid();
             var sessionId = Guid.NewGuid();
+            var executionSnapshotId = Guid.NewGuid();
             var result = CreateResult(projectId, InspectionStatus.Error, 99);
             result.SetOutputImage([1, 2, 3, 4]);
             result.SetOutputDataJson("""{"score":99}""");
             result.SetAnalysisDataJson("""{"cards":[]}""");
             result.SetTraceability("FLOW-DETAIL", "bundle-detail", sessionId);
+            result.RestoreExecutionTraceability(
+                executionSnapshotId,
+                31,
+                "DECISION-DETAIL",
+                "PACKAGE-DETAIL",
+                "RuntimePackage",
+                "StationRuntime",
+                "Primary");
             var otherProject = CreateResult(otherProjectId, InspectionStatus.OK, 10);
 
             await repository.AddRangeAsync([result, otherProject]);
             db.ChangeTracker.Clear();
 
             var detail = await repository.GetHistoryDetailAsync(projectId, result.Id);
+            var exactResult = await repository.FindByExecutionSnapshotIdAsync(projectId, executionSnapshotId);
             var notFoundForOtherProject = await repository.GetHistoryDetailAsync(otherProjectId, result.Id);
             var notFoundMissing = await repository.GetHistoryDetailAsync(projectId, Guid.NewGuid());
 
@@ -243,6 +253,16 @@ public sealed class InspectionResultRepositoryTests
             detail.FlowVersionHash.Should().Be("FLOW-DETAIL");
             detail.CalibrationBundleId.Should().Be("bundle-detail");
             detail.SessionId.Should().Be(sessionId);
+            detail.ExecutionSnapshotId.Should().Be(executionSnapshotId);
+            detail.ProjectPersistenceRevision.Should().Be(31);
+            detail.DecisionConfigurationHash.Should().Be("DECISION-DETAIL");
+            detail.RuntimePackageId.Should().Be("PACKAGE-DETAIL");
+            detail.ExecutionSource.Should().Be("RuntimePackage");
+            detail.ExecutionRunMode.Should().Be("StationRuntime");
+            detail.ShadowRole.Should().Be("Primary");
+            exactResult.Should().NotBeNull();
+            exactResult!.Id.Should().Be(result.Id);
+            exactResult.ExecutionSnapshotId.Should().Be(executionSnapshotId);
             detail.HasImage.Should().BeTrue();
             detail.GetType().GetProperty("OutputImage").Should().BeNull();
             notFoundForOtherProject.Should().BeNull();

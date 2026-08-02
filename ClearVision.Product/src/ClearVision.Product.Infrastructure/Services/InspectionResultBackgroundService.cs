@@ -6,6 +6,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -551,10 +552,18 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
 
     private sealed class InspectionResultSpoolRecord
     {
+        public const int CurrentSchemaVersion = 2;
+
+        public int SchemaVersion { get; set; }
         public Guid Id { get; set; }
         public Guid ProjectId { get; set; }
         public Guid? ImageId { get; set; }
         public InspectionStatus Status { get; set; }
+        public ExecutionOutcome? ExecutionOutcome { get; set; }
+        public DecisionOutcome? DecisionOutcome { get; set; }
+        public bool? HasJudgmentSignal { get; set; }
+        public string? DecisionSource { get; set; }
+        public string? ReasonCode { get; set; }
         public long ProcessingTimeMs { get; set; }
         public double? ConfidenceScore { get; set; }
         public string? ErrorMessage { get; set; }
@@ -567,16 +576,29 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
         public string? FlowVersionHash { get; set; }
         public string? CalibrationBundleId { get; set; }
         public Guid? SessionId { get; set; }
+        public Guid? ExecutionSnapshotId { get; set; }
+        public long? ProjectPersistenceRevision { get; set; }
+        public string? DecisionConfigurationHash { get; set; }
+        public string? RuntimePackageId { get; set; }
+        public string? ExecutionSource { get; set; }
+        public string? ExecutionRunMode { get; set; }
+        public string? ShadowRole { get; set; }
         public List<InspectionDefectSpoolRecord> Defects { get; set; } = [];
 
         public static InspectionResultSpoolRecord FromEntity(InspectionResult result)
         {
             return new InspectionResultSpoolRecord
             {
+                SchemaVersion = CurrentSchemaVersion,
                 Id = result.Id,
                 ProjectId = result.ProjectId,
                 ImageId = result.ImageId,
                 Status = result.Status,
+                ExecutionOutcome = result.ExecutionOutcome,
+                DecisionOutcome = result.DecisionOutcome,
+                HasJudgmentSignal = result.HasJudgmentSignal,
+                DecisionSource = result.DecisionSource,
+                ReasonCode = result.ReasonCode,
                 ProcessingTimeMs = result.ProcessingTimeMs,
                 ConfidenceScore = result.ConfidenceScore,
                 ErrorMessage = result.ErrorMessage,
@@ -589,14 +611,45 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
                 FlowVersionHash = result.FlowVersionHash,
                 CalibrationBundleId = result.CalibrationBundleId,
                 SessionId = result.SessionId,
+                ExecutionSnapshotId = result.ExecutionSnapshotId,
+                ProjectPersistenceRevision = result.ProjectPersistenceRevision,
+                DecisionConfigurationHash = result.DecisionConfigurationHash,
+                RuntimePackageId = result.RuntimePackageId,
+                ExecutionSource = result.ExecutionSource,
+                ExecutionRunMode = result.ExecutionRunMode,
+                ShadowRole = result.ShadowRole,
                 Defects = result.Defects.Select(InspectionDefectSpoolRecord.FromEntity).ToList()
             };
         }
 
         public InspectionResult ToEntity()
         {
+            if (SchemaVersion is < 0 or > CurrentSchemaVersion)
+            {
+                throw new InvalidDataException(
+                    $"Unsupported inspection result spool schema version '{SchemaVersion}'.");
+            }
+
             var result = new InspectionResult(ProjectId, ImageId);
-            result.SetResult(Status, ProcessingTimeMs, ConfidenceScore, ErrorMessage);
+            if (ExecutionOutcome.HasValue && DecisionOutcome.HasValue)
+            {
+                result.SetOutcome(
+                    new InspectionOutcome(
+                        ExecutionOutcome.Value,
+                        DecisionOutcome.Value,
+                        DecisionSource,
+                        ReasonCode,
+                        ErrorMessage,
+                        HasJudgmentSignal ??
+                        (ExecutionOutcome.Value == ClearVision.Product.Core.Outcomes.ExecutionOutcome.Succeeded &&
+                         DecisionOutcome.Value is ClearVision.Product.Core.Outcomes.DecisionOutcome.Ok or ClearVision.Product.Core.Outcomes.DecisionOutcome.Ng)),
+                    ProcessingTimeMs,
+                    ConfidenceScore);
+            }
+            else
+            {
+                result.RestoreLegacyResult(Status, ProcessingTimeMs, ConfidenceScore, ErrorMessage);
+            }
             if (OutputImage is { Length: > 0 })
             {
                 result.SetOutputImage(OutputImage);
@@ -613,8 +666,16 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
             }
 
             result.SetTraceability(FlowVersionHash, CalibrationBundleId, SessionId);
+            result.RestoreExecutionTraceability(
+                ExecutionSnapshotId,
+                ProjectPersistenceRevision,
+                DecisionConfigurationHash,
+                RuntimePackageId,
+                ExecutionSource,
+                ExecutionRunMode,
+                ShadowRole);
             var inspectionResultId = Id == Guid.Empty ? result.Id : Id;
-            foreach (var defect in Defects)
+            foreach (var defect in Defects ?? [])
             {
                 result.AddDefect(defect.ToEntity(inspectionResultId));
             }

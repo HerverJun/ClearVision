@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Decisions;
@@ -123,6 +124,9 @@ public sealed class StationPackageStoreTests
                 manifest.PackageId.Should().Be("cvpkg-import-1");
                 manifest.PackageKind.Should().Be(StationPackageKind.Production);
                 manifest.CreatedBy.Should().Be("unit-test");
+                manifest.SourceProjectId.Should().Be(Guid.Parse("11111111-2222-3333-4444-555555555555"));
+                manifest.SourceProjectRevision.Should().Be(42);
+                manifest.DecisionConfigurationHash.Should().NotBeNullOrWhiteSpace();
                 packagePath.Should().NotBeNullOrWhiteSpace();
                 File.Exists(packagePath).Should().BeTrue();
 
@@ -134,11 +138,31 @@ public sealed class StationPackageStoreTests
                 var loaded = await provider.GetRequiredService<RuntimePackageLoader>().LoadAsync(runtimePackageRoot);
                 loaded.Manifest.PackageId.Should().Be("cvpkg-import-1");
                 loaded.ValidationReport.IsValid.Should().BeTrue();
+                manifest.DecisionConfigurationHash.Should().Be(loaded.Manifest.DecisionConfigurationHash);
 
-                store.GetPackages().Should().Contain(item =>
-                    item.PackageId == manifest.PackageId &&
-                    item.PackageKind == StationPackageKind.Production);
+                var reloadedManifest = store.GetPackage(manifest.PackageId);
+                reloadedManifest.Should().NotBeNull();
+                reloadedManifest!.SourceProjectId.Should().Be(manifest.SourceProjectId);
+                reloadedManifest.SourceProjectRevision.Should().Be(manifest.SourceProjectRevision);
+                reloadedManifest.DecisionConfigurationHash.Should().Be(manifest.DecisionConfigurationHash);
                 store.GetProductionPackages().Should().ContainSingle(item => item.PackageId == manifest.PackageId);
+
+                var legacyRuntimeRoot = Path.Combine(root, "runtime-package-legacy");
+                await CreateRuntimePackageRootAsync(
+                    legacyRuntimeRoot,
+                    "cvpkg-import-legacy",
+                    includeIdentity: false);
+                var legacyManifest = await store.ImportRuntimePackageAsync(
+                    legacyRuntimeRoot,
+                    "unit-test",
+                    CancellationToken.None);
+                legacyManifest.SourceProjectId.Should().BeNull();
+                legacyManifest.SourceProjectRevision.Should().BeNull();
+                legacyManifest.DecisionConfigurationHash.Should().BeNull();
+                var reloadedLegacyManifest = store.GetPackage(legacyManifest.PackageId);
+                reloadedLegacyManifest!.SourceProjectId.Should().BeNull();
+                reloadedLegacyManifest.SourceProjectRevision.Should().BeNull();
+                reloadedLegacyManifest.DecisionConfigurationHash.Should().BeNull();
             }
         }
         finally
@@ -180,6 +204,10 @@ public sealed class StationPackageStoreTests
                 packages.Should().ContainSingle(item =>
                     item.PackageId == "legacy-package" &&
                     item.PackageKind == StationPackageKind.Production);
+                var legacy = packages.Single();
+                legacy.SourceProjectId.Should().BeNull();
+                legacy.SourceProjectRevision.Should().BeNull();
+                legacy.DecisionConfigurationHash.Should().BeNull();
             }
         }
         finally
@@ -192,7 +220,10 @@ public sealed class StationPackageStoreTests
         }
     }
 
-    private static async Task CreateRuntimePackageRootAsync(string runtimeRoot, string packageId)
+    private static async Task CreateRuntimePackageRootAsync(
+        string runtimeRoot,
+        string packageId,
+        bool includeIdentity = true)
     {
         Directory.CreateDirectory(runtimeRoot);
         Directory.CreateDirectory(Path.Combine(runtimeRoot, "quality"));
@@ -252,6 +283,8 @@ public sealed class StationPackageStoreTests
             MinStationVersion = "0.1.0",
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedBy = "ClearVision Studio",
+            SourceProjectId = Guid.Parse("11111111-2222-3333-4444-555555555555"),
+            SourceProjectRevision = 42,
             EntryFlow = "flow.json",
             FlowHash = flowHash,
             DecisionConfigurationHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(
@@ -272,7 +305,17 @@ public sealed class StationPackageStoreTests
         };
 
         await File.WriteAllBytesAsync(Path.Combine(runtimeRoot, "flow.json"), flowBytes);
-        await File.WriteAllTextAsync(Path.Combine(runtimeRoot, "package.json"), JsonSerializer.Serialize(manifest, JsonOptions));
+        var manifestNode = JsonSerializer.SerializeToNode(manifest, JsonOptions)!.AsObject();
+        if (!includeIdentity)
+        {
+            manifestNode.Remove("sourceProjectId");
+            manifestNode.Remove("sourceProjectRevision");
+            manifestNode.Remove("decisionConfigurationHash");
+        }
+
+        await File.WriteAllTextAsync(
+            Path.Combine(runtimeRoot, "package.json"),
+            manifestNode.ToJsonString(JsonOptions));
         await File.WriteAllTextAsync(Path.Combine(runtimeRoot, "runtime-profile.json"), JsonSerializer.Serialize(new RuntimeProfile(), JsonOptions));
         await File.WriteAllTextAsync(
             Path.Combine(runtimeRoot, "quality", "validation-report.json"),

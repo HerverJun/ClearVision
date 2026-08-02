@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.Outcomes;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
@@ -77,6 +78,149 @@ public sealed class InspectionResultBackgroundServiceTests
             replayedResult.Defects.Should().ContainSingle();
             replayedResult.Defects.Single().InspectionResultId.Should().Be(originalResult.Id);
             File.ReadAllLines(Path.Combine(root, "inspection-results.jsonl")).Should().BeEmpty();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldRoundTripCanonicalOutcomeAndExecutionIdentityAcrossRestart()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var projectId = Guid.NewGuid();
+            var imageId = Guid.NewGuid();
+            var sessionId = Guid.NewGuid();
+            var executionSnapshotId = Guid.NewGuid();
+            var originalResult = new InspectionResult(projectId, imageId);
+            originalResult.SetOutcome(
+                new InspectionOutcome(
+                    ExecutionOutcome.Succeeded,
+                    DecisionOutcome.Invalid,
+                    "FinalDecision",
+                    "DecisionValueInvalid",
+                    "Decision value is invalid.",
+                    false),
+                27,
+                0.81);
+            originalResult.SetTraceability("FLOW-V2", "BUNDLE-V2", sessionId);
+            originalResult.RestoreExecutionTraceability(
+                executionSnapshotId,
+                42,
+                "DECISION-V2",
+                "PACKAGE-V2",
+                "RuntimePackage",
+                "StationRuntime",
+                "Primary");
+            originalResult.SetOutputDataJson("""{"score":0.81}""");
+            originalResult.SetAnalysisDataJson("""{"cards":[]}""");
+            originalResult.AddDefect(new Defect(
+                originalResult.Id,
+                DefectType.Scratch,
+                1,
+                2,
+                3,
+                4,
+                0.91,
+                "canonical defect",
+                """{"shape":"rect"}"""));
+
+            await using (var provider = CreateProvider(new CapturingInspectionResultRepository { FailAdds = true }))
+            {
+                var service = CreateService(provider, root);
+                await service.StartAsync(CancellationToken.None);
+                await service.WriteAsync(originalResult, CancellationToken.None);
+                await WaitUntilAsync(() => TryGetSpoolLineCount(root, out var lineCount) && lineCount == 1);
+                await service.StopAsync(CancellationToken.None);
+            }
+
+            var spoolLine = File.ReadLines(Path.Combine(root, "inspection-results.jsonl")).Single();
+            using (var spoolJson = System.Text.Json.JsonDocument.Parse(spoolLine))
+            {
+                spoolJson.RootElement.GetProperty("schemaVersion").GetInt32().Should().Be(2);
+                spoolJson.RootElement.GetProperty("executionSnapshotId").GetGuid().Should().Be(executionSnapshotId);
+            }
+
+            var replayRepository = new CapturingInspectionResultRepository();
+            await using (var provider = CreateProvider(replayRepository))
+            {
+                var service = CreateService(provider, root);
+                await service.StartAsync(CancellationToken.None);
+                await WaitUntilAsync(() => replayRepository.Added.Count == 1);
+                await service.StopAsync(CancellationToken.None);
+            }
+
+            var replayed = replayRepository.Added.Should().ContainSingle().Subject;
+            replayed.Id.Should().Be(originalResult.Id);
+            replayed.ProjectId.Should().Be(projectId);
+            replayed.ImageId.Should().Be(imageId);
+            replayed.ExecutionOutcome.Should().Be(ExecutionOutcome.Succeeded);
+            replayed.DecisionOutcome.Should().Be(DecisionOutcome.Invalid);
+            replayed.HasJudgmentSignal.Should().BeFalse();
+            replayed.DecisionSource.Should().Be("FinalDecision");
+            replayed.ReasonCode.Should().Be("DecisionValueInvalid");
+            replayed.ErrorMessage.Should().Be("Decision value is invalid.");
+            replayed.FlowVersionHash.Should().Be("FLOW-V2");
+            replayed.CalibrationBundleId.Should().Be("BUNDLE-V2");
+            replayed.SessionId.Should().Be(sessionId);
+            replayed.ExecutionSnapshotId.Should().Be(executionSnapshotId);
+            replayed.ProjectPersistenceRevision.Should().Be(42);
+            replayed.DecisionConfigurationHash.Should().Be("DECISION-V2");
+            replayed.RuntimePackageId.Should().Be("PACKAGE-V2");
+            replayed.ExecutionSource.Should().Be("RuntimePackage");
+            replayed.ExecutionRunMode.Should().Be("StationRuntime");
+            replayed.ShadowRole.Should().Be("Primary");
+            replayed.OutputDataJson.Should().Be(originalResult.OutputDataJson);
+            replayed.AnalysisDataJson.Should().Be(originalResult.AnalysisDataJson);
+            replayed.Defects.Should().ContainSingle().Which.AnnotationData.Should().Contain("rect");
+            (await replayRepository.FindByExecutionSnapshotIdAsync(projectId, executionSnapshotId))
+                .Should().BeSameAs(replayed);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldReadLegacySpoolWithoutInventingCanonicalIdentity()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var resultId = Guid.NewGuid();
+            var projectId = Guid.NewGuid();
+            var spoolFile = Path.Combine(root, "inspection-results.jsonl");
+            await File.WriteAllTextAsync(
+                spoolFile,
+                $$"""
+                {"id":"{{resultId:D}}","projectId":"{{projectId:D}}","status":"NG","processingTimeMs":19,"inspectionTime":"2026-01-02T03:04:05Z","createdAt":"2026-01-02T03:04:00Z","flowVersionHash":"LEGACY-FLOW","defects":[]}
+                """);
+
+            var repository = new CapturingInspectionResultRepository();
+            await using var provider = CreateProvider(repository);
+            var service = CreateService(provider, root);
+            await service.StartAsync(CancellationToken.None);
+            await WaitUntilAsync(() => repository.Added.Count == 1);
+            await service.StopAsync(CancellationToken.None);
+
+            var replayed = repository.Added.Should().ContainSingle().Subject;
+            replayed.Id.Should().Be(resultId);
+            replayed.Status.Should().Be(InspectionStatus.NG);
+            replayed.ExecutionOutcome.Should().BeNull();
+            replayed.DecisionOutcome.Should().BeNull();
+            replayed.HasJudgmentSignal.Should().BeNull();
+            replayed.ExecutionSnapshotId.Should().BeNull();
+            replayed.ProjectPersistenceRevision.Should().BeNull();
+            replayed.DecisionConfigurationHash.Should().BeNull();
+            replayed.RuntimePackageId.Should().BeNull();
+            replayed.ExecutionSource.Should().BeNull();
+            replayed.ExecutionRunMode.Should().BeNull();
+            replayed.ShadowRole.Should().BeNull();
+            replayed.GetOutcome().Decision.Should().Be(DecisionOutcome.Ng);
         }
         finally
         {

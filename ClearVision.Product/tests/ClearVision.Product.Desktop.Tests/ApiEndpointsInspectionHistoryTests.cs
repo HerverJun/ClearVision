@@ -510,8 +510,13 @@ public sealed class ApiEndpointsInspectionHistoryTests
             FlowVersionHash = "FLOW-HASH-2",
             CalibrationBundleId = "bundle-2",
             SessionId = Guid.NewGuid(),
+            ExecutionSnapshotId = Guid.NewGuid(),
             ProjectPersistenceRevision = 23,
             DecisionConfigurationHash = "DECISION-HASH-23",
+            RuntimePackageId = "PACKAGE-23",
+            ExecutionSource = "RuntimePackage",
+            ExecutionRunMode = "StationRuntime",
+            ShadowRole = "Primary",
             OutputDataJson = $$"""
             {
               "score": 42,
@@ -543,6 +548,12 @@ public sealed class ApiEndpointsInspectionHistoryTests
         var traceability = root.GetProperty("traceability");
         traceability.GetProperty("projectPersistenceRevision").GetInt64().Should().Be(23);
         traceability.GetProperty("decisionConfigurationHash").GetString().Should().Be("DECISION-HASH-23");
+        traceability.GetProperty("executionSnapshotId").GetGuid().Should().Be(detail.ExecutionSnapshotId!.Value);
+        traceability.GetProperty("packageId").GetString().Should().Be("PACKAGE-23");
+        traceability.GetProperty("runtimePackageId").GetString().Should().Be("PACKAGE-23");
+        traceability.GetProperty("executionSource").GetString().Should().Be("RuntimePackage");
+        traceability.GetProperty("executionRunMode").GetString().Should().Be("StationRuntime");
+        traceability.GetProperty("shadowRole").GetString().Should().Be("Primary");
         root.GetProperty("imageReference").GetString().Should().Be($"/api/images/{imageId:D}");
         root.GetProperty("outputDataPreview").GetProperty("wasTruncated").GetBoolean().Should().BeTrue();
         root.GetProperty("outputDataPreview").GetProperty("wasRedacted").GetBoolean().Should().BeTrue();

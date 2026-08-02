@@ -340,6 +340,12 @@ public sealed class StationPackageRecordEntity
 
     public string FlowHash { get; set; } = string.Empty;
 
+    public Guid? SourceProjectId { get; set; }
+
+    public long? SourceProjectRevision { get; set; }
+
+    public string? DecisionConfigurationHash { get; set; }
+
     public string FileName { get; set; } = string.Empty;
 
     public string FilePath { get; set; } = string.Empty;
