@@ -582,6 +582,7 @@ jobs:
             ClearVision.OperatorLibrary/THIRD-PARTY-NOTICES.md
 
       - name: Run Operator Performance Benchmark Smoke
+        id: operator_benchmark
         shell: pwsh
         run: |
           $startedAtUtc = [DateTime]::UtcNow
@@ -617,7 +618,7 @@ jobs:
 
       - name: Upload Operator Performance Benchmark
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.operator_benchmark.outcome != 'skipped'
         with:
           name: operator-performance-benchmark
           if-no-files-found: error
@@ -753,6 +754,7 @@ jobs:
         run: npm run test:unit
 
       - name: Run UI E2E Tests
+        id: ui_e2e
         if: github.event_name == 'workflow_dispatch'
         working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
         run: |
@@ -761,7 +763,7 @@ jobs:
 
       - name: Upload UI Test Results
         uses: actions/upload-artifact@v4
-        if: always() && github.event_name == 'workflow_dispatch'
+        if: always() && github.event_name == 'workflow_dispatch' && steps.ui_e2e.outcome != 'skipped'
         with:
           name: ui-test-results
           if-no-files-found: error
@@ -829,6 +831,8 @@ jobs:
 
       - name: Run Nightly Lane
         shell: pwsh
+        env:
+          CV_MEASUREMENT_PERF_WARMUP_ITERS: "12"
         run: |
           & "./scripts/run-test-quality-lane.ps1" `
             -Lane Nightly `

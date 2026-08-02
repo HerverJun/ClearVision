@@ -138,8 +138,15 @@ public sealed class StationSimulatorEndToEndTests
         var builder = new StringBuilder();
         using var cts = new CancellationTokenSource(timeout);
 
-        while (!builder.ToString().Contains(marker, StringComparison.Ordinal))
+        while (true)
         {
+            var current = builder.ToString();
+            var markerIndex = current.IndexOf(marker, StringComparison.Ordinal);
+            if (markerIndex >= 0 && current.IndexOf("\n\n", markerIndex, StringComparison.Ordinal) >= 0)
+            {
+                break;
+            }
+
             var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cts.Token);
             bytesRead.Should().BeGreaterThan(0);
             builder.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
