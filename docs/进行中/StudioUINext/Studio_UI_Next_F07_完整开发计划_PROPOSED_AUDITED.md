@@ -1,6 +1,6 @@
 # ClearVision Studio UI Next F07 完整开发计划（PROPOSED / AUDITED / G0 DECISIONS FROZEN）
 
-> 文档状态：`PROPOSED_AUDITED`；F07 G0 产品决策已冻结。本轮只维护审计计划与决策边界；没有实现 F07 产品代码，没有修改产品配置默认值、路由、CI 或 Legacy 工作树。
+> 文档状态：`PROPOSED_AUDITED`；本文前半部分记录 F07 G0 的历史审计计划、产品决策与边界冻结。G1-G9 的实际实现与当前证据见本文第 12 节和链接的阶段报告；本计划本身不改变产品配置默认值、默认入口、CI 或 Legacy 工作树。
 >
 > 审计日期：2026-07-31。审计基线是执行时当前 HEAD，不绑定历史 SHA。
 >
@@ -704,3 +704,21 @@ SETTINGS_IMPORT_EXPORT=EXCLUDED_FROM_F07
 DATABASE_FIRST_ROUND=STATUS_AND_BACKUP_ONLY
 STATION_TOKEN_BACKEND_HARDENING=DEFERRED_DEBT_F07-D01
 ```
+
+## 12. G1-G9 执行闭环附录
+
+本计划前文记录的是 G0 的审计计划和冻结决策，不能继续作为当前实现状态的唯一入口。G1-G8 实现、G7/G8-R 修补和 G9 集成证据已在当前分支完成，当前状态与测试事实以 [F07 G9 集成验收与 Final Evidence 闭环](./F07_G9_集成验收与FinalEvidence闭环.md) 为准。
+
+```text
+F07_SOURCE_EVIDENCE_SHA=a5f017d0d0ae6bf3ba20ec85488bb5afa96e21ce
+F07_G9_STATE=DONE
+F07_ENGINEERING_STATE=DONE
+F07_SETTINGS_IMPORT_EXPORT=EXCLUDED
+F07_REAL_HARDWARE_VALIDATION=NOT_PERFORMED
+F07_REAL_LLM_PRODUCT_QUALITY=NOT_EVALUATED
+DEFAULT_ENTRY_CHANGE=BLOCKED
+LEGACY_SETTINGS_RETIREMENT=NOT_APPROVED
+PRODUCTION_ACCEPTANCE=BLOCKED
+```
+
+已验证的本地证据包括 StudioUI `119 files / 721 tests`、typecheck、lint、production build、bundle gate/reproducibility、Desktop `744/744`、F07 Browser `18/18`、StudioUI Next Browser `159 total / 138 passed / 21 skipped / 0 failed` 和 Virtual PLC `83/83`。真实 Station、真实 LLM 产品质量、WebView2、Windows 125% DPI、Release publish、无 Node 目标机和完整 CI 仍为 `NOT PERFORMED`，不得将本地证据写成生产验收通过。
