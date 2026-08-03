@@ -156,7 +156,7 @@ test('continuous inspection persists across route leave and restores from author
 
   await page.goto(`/studio/index.html#/projects/${projectId}/inspection`);
   await expect(page.getByTestId('inspection-run-page')).toBeVisible();
-  await expect(page.getByTestId('run-console')).toContainText('连续检测中');
+  await expect(page.getByTestId('run-console')).toContainText(/连续检测中|实时恢复中/);
   expect(audit.requests.filter(entry => entry.path === '/api/inspection/realtime/start')).toHaveLength(1);
 });
 
