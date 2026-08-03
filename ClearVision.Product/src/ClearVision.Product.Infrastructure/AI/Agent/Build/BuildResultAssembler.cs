@@ -112,7 +112,7 @@ public sealed class BuildResultAssembler
             RemainingFields = input.LoadPlan.RemainingFields.ToList(),
             SelectionSource = input.Selection.SelectionSource,
             EffectiveRouteId = input.Selection.EffectiveRoute.RouteId,
-            EffectiveOperators = input.Selection.EffectiveRoute.Operators.ToList(),
+            EffectiveOperators = input.Pipeline.Steps.Select(step => step.OperatorType).ToList(),
             StrategyConfirmed = input.Selection.StrategyConfirmed,
             StrategyConfirmationSource = input.Selection.StrategyConfirmationSource,
             UnresolvedStrategyBlockers = input.Selection.UnresolvedStrategyBlockers.ToList(),

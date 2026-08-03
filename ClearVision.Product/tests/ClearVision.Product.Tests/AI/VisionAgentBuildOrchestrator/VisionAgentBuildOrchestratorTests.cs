@@ -161,14 +161,14 @@ public sealed class VisionAgentBuildOrchestratorTests
             .Contain(VisionAgentPlanAnswerFields.ImageSource);
     }
 
-    [Fact(DisplayName = "BuildReadiness preview should share strict/draft defer semantics with BuildFromPlan")]
+    [Fact(DisplayName = "BuildReadiness preview should allow draft defer with a repairable planner route")]
     public async Task PreviewBuildReadiness_StrictAndDraftDefer_ShouldUseCanonicalEvaluator()
     {
         var sink = new CapturingAgentRunEventSink();
         var applicationService = CreateBuildApplicationService(sink);
         var baseline = Plan(
             "surface_defect",
-            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment"],
             "logo appearance defect workflow");
         var plan = baseline with
         {
@@ -191,6 +191,22 @@ public sealed class VisionAgentBuildOrchestratorTests
                             AnswerEffect = VisionAgentClarificationAnswerEffects.Defer
                         }
                     ]
+                },
+                new VisionAgentClarificationQuestion
+                {
+                    Id = "ok_ng_rule",
+                    Field = VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                    Title = "OK/NG rule",
+                    Options =
+                    [
+                        new VisionAgentClarificationOption
+                        {
+                            Value = "threshold_pending",
+                            Label = "Keep pending",
+                            Recommended = true,
+                            AnswerEffect = VisionAgentClarificationAnswerEffects.Defer
+                        }
+                    ]
                 }
             ],
             SemanticExtraction = baseline.SemanticExtraction! with
@@ -208,7 +224,8 @@ public sealed class VisionAgentBuildOrchestratorTests
         plan = plan with { PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan) };
         var selections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["image_source"] = "camera_pending"
+            ["image_source"] = "camera_pending",
+            ["ok_ng_rule"] = "threshold_pending"
         };
 
         var strict = await applicationService.PreviewBuildReadinessAsync(
@@ -219,17 +236,131 @@ public sealed class VisionAgentBuildOrchestratorTests
             CancellationToken.None);
 
         strict.BuildReadiness.CanBuild.Should().BeFalse();
-        strict.DeferredQuestionIds.Should().ContainSingle("image_source");
+        strict.DeferredQuestionIds.Should().BeEquivalentTo(["image_source", "ok_ng_rule"]);
         strict.AcceptedAnswers.Should().BeEmpty();
         draft.BuildReadiness.CanBuild.Should().BeTrue();
+        draft.BuildReadiness.ResolvedFields.Should().NotContain(VisionAgentPlanAnswerFields.AcceptanceCriteria);
+        draft.BuildReadiness.RemainingFields.Should().Contain(VisionAgentPlanAnswerFields.AcceptanceCriteria);
         draft.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
             blocker.Resource != null &&
             blocker.Resource.ResourceType == "camera_binding" &&
             blocker.Resource.ResourceKey == "imageacquisition#1.CameraBindingId" &&
             blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
             blocker.BlocksBuild == false);
+        draft.BuildBlockingConfirmationCount.Should().Be(0);
+        draft.BuildRequiredResourceCount.Should().Be(0);
+        draft.DeferredFieldCount.Should().Be(1);
+        draft.DraftAllowedResourceCount.Should().Be(1);
+        draft.MustConfirmBeforeBuildCount.Should().Be(0);
+        draft.FillLaterCount.Should().Be(2);
+        draft.TotalIncompleteCount.Should().Be(2);
         draft.AnswerRevision.Should().Be(8);
         sink.Events.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "BuildFromPlan strawberry draft should append a safe terminal output and round-trip the canvas flow")]
+    public async Task BuildAsync_StrawberryDraftWithoutTerminalOutput_ShouldProduceEditableRoundTripFlow()
+    {
+        var applicationService = CreateBuildApplicationService(new CapturingAgentRunEventSink());
+        var plan = StrawberryDraftBuildPlan();
+        var selections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["classification_strategy"] = "strategy_pending",
+            ["ok_ng_rule"] = "threshold_pending",
+            ["q_fallback_image_source"] = "camera_pending"
+        };
+        var confirmed = plan.ConfirmedPlanAnswers.ToList();
+
+        var preview = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(
+                plan,
+                selections,
+                confirmed,
+                requirementMode: AiRequirementModes.Draft),
+            CancellationToken.None);
+        var outcome = await applicationService.BuildAsync(
+            BuildCommand.FromGenerationRequest(
+                Request(
+                    plan,
+                    userSelections: selections,
+                    confirmedAnswers: confirmed,
+                    acceptedRecommendedDefaults: false,
+                    requirementMode: AiRequirementModes.Draft),
+                transport: BuildCommandTransports.Internal,
+                persistResult: false),
+            CancellationToken.None);
+
+        preview.BuildReadiness.CanBuild.Should().BeTrue();
+        outcome.Result.Success.Should().BeTrue();
+        outcome.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusCompleted);
+        outcome.FailureCode.Should().BeEmpty();
+        outcome.FailureType.Should().BeEmpty();
+        outcome.Result.BuildResult.Should().NotBeNull();
+        var build = outcome.Result.BuildResult!;
+        var finalOperators = build.OperatorPipeline.Select(item => item.OperatorType).ToList();
+        finalOperators.Should().Equal([
+            "ImageAcquisition",
+            "ColorConversion",
+            "RoiManager",
+            "Thresholding",
+            "BlobAnalysis",
+            "ResultOutput"
+        ]);
+        build.EffectiveOperators.Should().Equal(finalOperators);
+        build.OperatorPipeline.Should().ContainSingle(step =>
+            step.OperatorType == "ResultOutput" &&
+            step.Source == "repair" &&
+            step.RepairNote == "draft_terminal_output_added");
+        build.PublicWarnings.Should().Contain("draft_terminal_output_added");
+
+        var normalized = VisionAgentFlowDraftNormalizer.Normalize(
+            JsonSerializer.SerializeToElement(new { flow = build.WorkflowDraft }),
+            new VisionAgentToolContext());
+        normalized.Success.Should().BeTrue();
+        var validation = VisionAgentFlowDraftValidator.Validate(normalized.Flow);
+        validation.BlockingIssues.Should().BeEmpty();
+        validation.BlockingIssues.Should().NotContain(issue =>
+            issue.Code.Equals("missing_required_input", StringComparison.OrdinalIgnoreCase));
+
+        var flow = Flow(outcome.Result);
+        var resultOutput = flow.Operators.Should()
+            .ContainSingle(op => op.Type == OperatorType.ResultOutput)
+            .Which;
+        resultOutput.Parameters.Should().ContainSingle(parameter =>
+            parameter.Name == "SaveToFile" &&
+            parameter.Value != null &&
+            string.Equals(parameter.Value.ToString(), "false", StringComparison.OrdinalIgnoreCase));
+        var flowJson = JsonSerializer.Serialize(flow);
+        var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var canvasFlow = JsonSerializer.Deserialize<OperatorFlowDto>(flowJson, jsonOptions);
+        canvasFlow.Should().NotBeNull();
+        canvasFlow!.ToEntity().Operators.Should().HaveCount(flow.Operators.Count);
+
+        var storagePath = Path.Combine(Path.GetTempPath(), $"ClearVision-strawberry-build-{Guid.NewGuid():N}");
+        try
+        {
+            var storage = new ClearVision.Product.Infrastructure.Services.JsonFileProjectFlowStorage(storagePath);
+            await storage.SaveFlowJsonAsync(flow.Id, flowJson, 1);
+            var restoredJson = await storage.LoadFlowJsonAsync(flow.Id);
+            restoredJson.Should().NotBeNullOrWhiteSpace();
+            var restoredFlow = JsonSerializer.Deserialize<OperatorFlowDto>(restoredJson!, jsonOptions);
+            restoredFlow.Should().NotBeNull();
+            restoredFlow!.ToEntity().Operators.Should().ContainSingle(op => op.Type == OperatorType.ResultOutput);
+        }
+        finally
+        {
+            if (Directory.Exists(storagePath)) Directory.Delete(storagePath, recursive: true);
+        }
+
+        build.ApplyGate.CanvasApplyReady.Should().BeTrue();
+        build.ApplyGate.DeploymentReady.Should().BeFalse();
+        build.MissingResources.Select(resource => resource.ResourceType).Should().BeEquivalentTo([
+            "camera_binding",
+            "threshold_parameter",
+            "area_range_parameter"
+        ]);
+        var runAllowed = build.ApplyGate.RuntimeDraftReady && build.MissingResources.Count == 0;
+        runAllowed.Should().BeFalse();
     }
 
     [Fact(DisplayName = "BuildReadiness preview should keep station camera resource pending in strict and draft")]
@@ -2499,6 +2630,110 @@ public sealed class VisionAgentBuildOrchestratorTests
         return result with
         {
             PlanHash = VisionAgentOrchestrator.ComputePlanHash(result)
+        };
+    }
+
+    private static VisionAgentPlanModeResult StrawberryDraftBuildPlan()
+    {
+        var baseline = Plan(
+            AiVisionTaskTypes.AttributeClassification,
+            ["ImageAcquisition", "ColorConversion", "RoiManager", "Thresholding", "BlobAnalysis"],
+            "构建一个检测果园中草莓成熟度的视觉检测应用。");
+        var plan = baseline with
+        {
+            PlanId = "plan_strawberry_draft_build_contract",
+            Goal = "构建一个检测果园中草莓成熟度的视觉检测应用。",
+            Intent = AiVisionTaskTypes.AttributeClassification,
+            Confidence = "medium",
+            CanBuild = false,
+            BlockingReasons = ["resource_pending:image_source_missing"],
+            RecommendedRoute = baseline.RecommendedRoute with
+            {
+                RouteId = "strawberry_maturity_attribute_classification",
+                Operators = ["imageacquisition", "colorconversion", "roimanager", "thresholding", "blobanalysis"],
+                TemplateDecision = "planner_route"
+            },
+            ClarificationQuestions =
+            [
+                DeferredQuestion("classification_strategy", VisionAgentPlanAnswerFields.AlgorithmStrategy, "model_strategy", "strategy_pending"),
+                DeferredQuestion("ok_ng_rule", VisionAgentPlanAnswerFields.AcceptanceCriteria, "use_extracted_conditions", "threshold_pending"),
+                DeferredQuestion("q_fallback_image_source", VisionAgentPlanAnswerFields.ImageSource, "station_camera", "camera_pending")
+            ],
+            ConfirmedPlanAnswers =
+            [
+                PlanAnswer(string.Empty, VisionAgentPlanAnswerFields.InspectionObject, "草莓", VisionAgentPlanAnswerOrigins.ExplicitUserText),
+                PlanAnswer("classification_strategy", VisionAgentPlanAnswerFields.AlgorithmStrategy, "model_strategy")
+            ],
+            ResolvedPlanFields = [VisionAgentPlanAnswerFields.InspectionObject],
+            RemainingPlanFields =
+            [
+                VisionAgentPlanAnswerFields.ImageSource,
+                VisionAgentPlanAnswerFields.TaskType,
+                VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                VisionAgentPlanAnswerFields.OutputTarget,
+                VisionAgentPlanAnswerFields.AlgorithmStrategy
+            ],
+            SemanticExtraction = new VisionAgentSemanticExtractionResult
+            {
+                IsVisionRequest = true,
+                TaskType = AiVisionTaskTypes.AttributeClassification,
+                InspectionObject = "草莓",
+                TargetAttribute = "成熟度",
+                OkCondition = "草莓已成熟",
+                NgCondition = "草莓未成熟",
+                ObjectSignals = ["果园环境", "草莓果实", "草莓"],
+                TaskSignals = ["成熟度判断", "视觉检测", "OK/NG分类", "成熟度", "草莓已成熟", "草莓未成熟"],
+                Source = VisionAgentSemanticSources.Model,
+                MetadataOnly = true
+            },
+            RequirementMaturity = new AiRequirementMaturityResult
+            {
+                Maturity = AiRequirementMaturity.Ambiguous,
+                TaskType = AiVisionTaskTypes.AttributeClassification,
+                CanPlan = true,
+                CanBuild = false,
+                ObjectSignals = ["果园环境", "草莓果实", "草莓"],
+                TaskSignals = ["成熟度判断", "视觉检测", "OK/NG分类", "成熟度", "草莓已成熟", "草莓未成熟"],
+                MissingFields =
+                [
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    VisionAgentPlanAnswerFields.TaskType,
+                    VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                    VisionAgentPlanAnswerFields.OutputTarget,
+                    VisionAgentPlanAnswerFields.AlgorithmStrategy
+                ],
+                MetadataOnly = true
+            }
+        };
+        return plan with { PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan) };
+    }
+
+    private static VisionAgentClarificationQuestion DeferredQuestion(
+        string id,
+        string field,
+        string resolvedValue,
+        string deferredValue)
+    {
+        return new VisionAgentClarificationQuestion
+        {
+            Id = id,
+            Field = field,
+            Title = field,
+            Options =
+            [
+                new VisionAgentClarificationOption
+                {
+                    Value = resolvedValue,
+                    Label = resolvedValue,
+                    AnswerEffect = VisionAgentClarificationAnswerEffects.ResolveField
+                },
+                new VisionAgentClarificationOption
+                {
+                    Value = deferredValue,
+                    Label = deferredValue,
+                    AnswerEffect = VisionAgentClarificationAnswerEffects.Defer
+                }
+            ]
         };
     }
 

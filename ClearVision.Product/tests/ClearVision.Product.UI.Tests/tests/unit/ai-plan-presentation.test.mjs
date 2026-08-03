@@ -236,6 +236,34 @@ test('newer optimistic choice wins over stale confirmed choice in presentation',
   assert.equal(presentation.activeQuestion.confirming, true);
 });
 
+test('deferred clarification never appears in the confirmed summary', () => {
+  const question = createQuestion({
+    options: [
+      { value: 'industrial_camera', label: '工业相机', answerEffect: 'resolve_field' },
+      { value: 'camera_pending', label: '稍后补充', answerEffect: 'defer' },
+    ],
+  });
+  const deferred = { ...question, deferred: true, selectedValue: 'camera_pending' };
+  const panel = createPanel({
+    queue: [deferred],
+    batch: [deferred],
+    confirmed: {
+      image_source: {
+        field: 'image_source',
+        questionId: question.id,
+        value: 'industrial_camera',
+        resolved: true,
+      },
+    },
+  });
+
+  const presentation = deriveAiClarificationPresentation(panel, createPlan({ questions: [question] }));
+
+  assert.equal(presentation.confirmedItems.length, 0);
+  assert.equal(presentation.deferredItems.length, 1);
+  assert.equal(presentation.deferredItems[0].confirmed, false);
+});
+
 test('accept-all recommendation is hidden for safety, resource, or non-resolving recommendations', () => {
   const safe = createQuestion();
   const safePanel = createPanel({ queue: [safe], batch: [safe] });

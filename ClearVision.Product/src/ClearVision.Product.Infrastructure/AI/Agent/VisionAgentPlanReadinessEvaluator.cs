@@ -74,7 +74,7 @@ public static class VisionAgentPlanReadinessEvaluator
         var answers = validatedAnswers?.AcceptedAnswers ?? [];
         var blockers = new List<VisionAgentBuildBlocker>();
         var questionIndex = BuildQuestionIndex(planSnapshot);
-        var hasSupportedRoute = HasSupportedRouteOrTemplate(planSnapshot, out var invalidOperators);
+        var hasSupportedRoute = HasSupportedRouteOrTemplate(planSnapshot, requirementMode, out var invalidOperators);
         var strictMode = !string.Equals(requirementMode, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase);
 
         AddValidationBlockers(validatedAnswers, blockers);
@@ -196,7 +196,7 @@ public static class VisionAgentPlanReadinessEvaluator
         VisionAgentEffectiveRequirement? effectiveRequirement)
     {
         var fields = new List<string>();
-        if (plan.ConfirmedPlanAnswers != null)
+        if (validatedAnswers == null && plan.ConfirmedPlanAnswers != null)
         {
             fields.AddRange(plan.ConfirmedPlanAnswers
                 .Where(a => VisionAgentPlanFieldPolicy.IsAuthoritativeConfirmationOrigin(a.Origin) &&
@@ -209,6 +209,10 @@ public static class VisionAgentPlanReadinessEvaluator
         if (validatedAnswers != null)
         {
             fields.AddRange(validatedAnswers.ResolvedFields);
+        }
+        if (effectiveRequirement != null)
+        {
+            fields.AddRange(effectiveRequirement.ResolvedFields);
         }
 
         return fields
@@ -1083,6 +1087,7 @@ public static class VisionAgentPlanReadinessEvaluator
 
     private static bool HasSupportedRouteOrTemplate(
         VisionAgentPlanModeResult plan,
+        string requirementMode,
         out List<string> invalidOperators)
     {
         invalidOperators = [];
@@ -1103,9 +1108,15 @@ public static class VisionAgentPlanReadinessEvaluator
             var supportedOperators = routeOperators
                 .Where(op => allowed.Contains(op))
                 .ToList();
+            var hasProcessingOperator = supportedOperators.Any(op =>
+                !string.Equals(op, "ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(op, "ResultOutput", StringComparison.OrdinalIgnoreCase));
+            var hasTerminalOutput = supportedOperators.Any(op =>
+                string.Equals(op, "ResultOutput", StringComparison.OrdinalIgnoreCase));
+            var allowsEditableDraft = requirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase);
             if (invalidOperators.Count == 0 &&
-                supportedOperators.Any(op => !string.Equals(op, "ImageAcquisition", StringComparison.OrdinalIgnoreCase)) &&
-                supportedOperators.Any(op => string.Equals(op, "ResultOutput", StringComparison.OrdinalIgnoreCase)))
+                hasProcessingOperator &&
+                (hasTerminalOutput || allowsEditableDraft))
             {
                 return true;
             }

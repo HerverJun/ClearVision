@@ -122,6 +122,40 @@ test('authoritative readiness acknowledgement confirms answers without inventing
   assert.equal(state.projection.optimisticAnswers.length, 0);
 });
 
+test('defer selection suppresses a stale confirmed answer for the same canonical field', () => {
+  const strategyQuestion = {
+    id: 'q-strategy',
+    field: 'algorithm_strategy',
+    title: 'algorithm_strategy',
+    options: [
+      { value: 'model_strategy', label: 'Model', answerEffect: 'resolve_field' },
+      { value: 'strategy_pending', label: 'Later', answerEffect: 'defer' },
+    ],
+  };
+  let state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.PLAN_RECEIVED, {
+    plan: plan({
+      confirmedPlanAnswers: [{
+        questionId: 'q-strategy',
+        field: 'algorithm_strategy',
+        value: 'model_strategy',
+        origin: 'explicit_user_selection',
+      }],
+      clarificationQuestions: [strategyQuestion],
+    }),
+  }, { sessionId: 's1' });
+
+  state = reduce(state, AgentWorkspaceEventTypes.SELECTION_SET, {
+    questionId: 'q-strategy',
+    value: 'strategy_pending',
+  }, { planId: 'plan-1', planHash: 'hash-1' });
+
+  const projected = state.projection.clarificationQueue.find(item => item.field === 'algorithm_strategy');
+  assert.equal(state.projection.answersByField.algorithm_strategy, undefined);
+  assert.equal(state.projection.confirmedAnswers.some(answer => answer.field === 'algorithm_strategy'), false);
+  assert.equal(projected.answered, false);
+  assert.equal(projected.deferred, true);
+});
+
 test('custom and other controls are never accepted as business answers', () => {
   assert.equal(isPlaceholderAnswer('other'), true);
   assert.equal(isPlaceholderAnswer('custom_input'), true);

@@ -90,6 +90,25 @@ public sealed class OperatorPipelineSelector
             ];
         }
 
+        var terminalOutputAdded = false;
+        if (load.RequirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) &&
+            repaired.Any(step =>
+                !step.OperatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+                !step.OperatorType.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase)) &&
+            repaired.All(step => !step.OperatorType.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase)))
+        {
+            publicWarnings.Add("draft_terminal_output_added");
+            repaired.Add(new VisionAgentOperatorPipelineStep
+            {
+                TempId = "op_out",
+                OperatorType = "ResultOutput",
+                Source = "repair",
+                Status = "selected",
+                RepairNote = "draft_terminal_output_added"
+            });
+            terminalOutputAdded = true;
+        }
+
         if (invalid.Count > 0)
         {
             publicWarnings.Add("invalid_operator_removed");
@@ -118,10 +137,16 @@ public sealed class OperatorPipelineSelector
                 selectionStrategy = selection.Strategy,
                 metadataOnly = true
             },
-            warningCode: invalid.Count > 0 ? "invalid_operator_removed" : string.Empty,
-            repairAction: invalid.Count > 0 ? "removed_invalid_operators" : string.Empty,
+            warningCode: invalid.Count > 0
+                ? "invalid_operator_removed"
+                : terminalOutputAdded ? "draft_terminal_output_added" : string.Empty,
+            repairAction: invalid.Count > 0
+                ? "removed_invalid_operators"
+                : terminalOutputAdded ? "appended_result_output" : string.Empty,
             applyImpact: "editable_draft_allowed",
-            deploymentImpact: invalid.Count > 0 ? "operator_contract_repaired" : "no_deployment_blocker");
+            deploymentImpact: invalid.Count > 0 || terminalOutputAdded
+                ? "operator_contract_repaired"
+                : "no_deployment_blocker");
     }
 
     private static IEnumerable<string> ReadOperatorTypes(object? templateSkeleton)

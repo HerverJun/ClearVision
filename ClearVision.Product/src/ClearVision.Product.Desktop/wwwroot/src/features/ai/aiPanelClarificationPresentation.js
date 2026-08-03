@@ -131,7 +131,8 @@ export function deriveAiClarificationPresentation(panel, plan) {
         const confirming = hasPendingChange && state?.readinessStatus === 'validating';
         const failed = hasPendingChange && state?.readinessStatus === 'failed';
         const unconfirmed = hasPendingChange && !confirming && !failed;
-        const confirmed = Boolean(confirmedAnswer?.resolved) && !hasPendingChange;
+        const deferred = rawItem?.deferred === true;
+        const confirmed = Boolean(confirmedAnswer?.resolved) && !hasPendingChange && !deferred;
         const selectedValue = clean(optimisticAnswer?.value || confirmedAnswer?.value || rawItem?.selectedValue);
         const editing = runtime.editingFields.has(field);
         return {
@@ -147,7 +148,7 @@ export function deriveAiClarificationPresentation(panel, plan) {
             unconfirmed,
             confirmed,
             editing,
-            deferred: rawItem?.deferred === true,
+            deferred,
             resource: isResourceItem(rawItem)
         };
     });
@@ -167,7 +168,7 @@ export function deriveAiClarificationPresentation(panel, plan) {
         !item.resource && !item.deferred && !item.confirmed
     ) || null;
     const unresolved = items.filter(item => !item.confirmed && !item.deferred && !item.resource);
-    const confirmedItems = items.filter(item => item.confirmed && item !== activeQuestion);
+    const confirmedItems = items.filter(item => item.confirmed && !item.deferred && item !== activeQuestion);
     const deferredItems = items.filter(item => item.deferred && !item.resource);
     const resourceItems = projectedResources
         .filter(item => item?.answered !== true)

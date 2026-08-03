@@ -20,8 +20,16 @@ public sealed class VisionAgentPlanRequirementOverlay
         {
             values[item.Key] = item.Value;
         }
+        foreach (var field in validation.DeferredFields)
+        {
+            values.Remove(VisionAgentPlanFieldPolicy.NormalizeField(field));
+        }
 
-        var semantic = BuildSemantic(plan?.SemanticExtraction, values, maturityRequest.RequirementMode);
+        var semantic = BuildSemantic(
+            plan?.SemanticExtraction,
+            values,
+            maturityRequest.RequirementMode,
+            validation.DeferredFields);
         var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, semantic);
         if (string.Equals(maturityRequest.RequirementMode, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) &&
             string.IsNullOrWhiteSpace(Read(values, VisionAgentPlanAnswerFields.InspectionObject)) &&
@@ -83,7 +91,8 @@ public sealed class VisionAgentPlanRequirementOverlay
     private static VisionAgentSemanticExtractionResult BuildSemantic(
         VisionAgentSemanticExtractionResult? semantic,
         IReadOnlyDictionary<string, string> values,
-        string requirementMode)
+        string requirementMode,
+        IReadOnlyCollection<string> deferredFields)
     {
         var taskType = Read(values, VisionAgentPlanAnswerFields.TaskType);
         var inspectionObject = Read(values, VisionAgentPlanAnswerFields.InspectionObject);
@@ -105,8 +114,15 @@ public sealed class VisionAgentPlanRequirementOverlay
         }
 
         var parsed = VisionAgentPlanFieldPolicy.ParseAcceptanceCriteria(acceptance);
-        var okCondition = !string.IsNullOrWhiteSpace(parsed.Ok) ? parsed.Ok : (semantic?.OkCondition ?? string.Empty);
-        var ngCondition = !string.IsNullOrWhiteSpace(parsed.Ng) ? parsed.Ng : (semantic?.NgCondition ?? string.Empty);
+        var acceptanceDeferred = deferredFields.Contains(
+            VisionAgentPlanAnswerFields.AcceptanceCriteria,
+            StringComparer.OrdinalIgnoreCase);
+        var okCondition = acceptanceDeferred
+            ? string.Empty
+            : (!string.IsNullOrWhiteSpace(parsed.Ok) ? parsed.Ok : (semantic?.OkCondition ?? string.Empty));
+        var ngCondition = acceptanceDeferred
+            ? string.Empty
+            : (!string.IsNullOrWhiteSpace(parsed.Ng) ? parsed.Ng : (semantic?.NgCondition ?? string.Empty));
 
         return new VisionAgentSemanticExtractionResult
         {
