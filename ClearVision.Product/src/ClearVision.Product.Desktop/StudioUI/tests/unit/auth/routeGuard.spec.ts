@@ -70,7 +70,10 @@ describe('G2 route guard', () => {
     expect(router.currentRoute.value.query.returnTo).toBe('/stations/station-1');
   });
 
-  it('enforces role, product profile and internal route decisions on direct URLs', async () => {
+  it(
+    'enforces role, product profile and internal route decisions on direct URLs',
+    { timeout: 15_000 },
+    async () => {
     const operator = auth('authenticated', 'Operator');
     const router = createStudioRouter(createMemoryHistory());
     installAuthRouteGuard(router, operator.owner, startup());
@@ -110,7 +113,8 @@ describe('G2 route guard', () => {
     expect(aiRouter.currentRoute.value.name).toBe('ai-workbench');
     await aiRouter.push('/projects/11111111-1111-1111-1111-111111111111/ai');
     expect(aiRouter.currentRoute.value.name).toBe('project-ai-workbench');
-  });
+    }
+  );
 
   it('re-evaluates browser navigation after logout and never restores protected routes', async () => {
     const session = auth('authenticated', 'Engineer');

@@ -25,8 +25,15 @@ using OpenCvSharp;
 namespace ClearVision.Product.Tests.Services;
 
 [Collection(ProjectSaveCoordinatorTestCollections.ProjectSaveCoordinatorState)]
-public class ProjectServiceTests
+public class ProjectServiceTests : IDisposable
 {
+    private readonly string _transactionRoot = Path.Combine(
+        Path.GetTempPath(),
+        "ClearVision.ProjectServiceTests.Transactions",
+        Guid.NewGuid().ToString("N"));
+
+    public void Dispose() => DeleteDirectoryIfExists(_transactionRoot);
+
     [Fact]
     public async Task ListSearchAndRecent_ShouldSkipRecoveryRequiredProjectAndReturnHealthyProjects()
     {
@@ -94,7 +101,7 @@ public class ProjectServiceTests
         repository.GetByIdAsync(Arg.Any<Guid>()).Returns(Task.FromResult<Project?>(project));
         storage.LoadFlowJsonAsync(Arg.Any<Guid>()).Returns(Task.FromResult<string?>("{ invalid json"));
 
-        var sut = new ProjectService(repository, storage, factory, logger);
+        var sut = CreateService(repository, storage, factory, logger);
 
         var dto = await sut.GetByIdAsync(project.Id);
 
@@ -114,7 +121,7 @@ public class ProjectServiceTests
         var project = new Project("demo");
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
-        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, projectAssetStorage: assets);
+        var sut = CreateService(repository, storage, new OperatorFactory(), projectAssetStorage: assets);
 
         var dto = await sut.GetByIdAsync(project.Id);
 
@@ -135,7 +142,7 @@ public class ProjectServiceTests
             .Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
         storage.SaveFlowJsonAsync(Arg.Any<Guid>(), Arg.Do<string>(json => persistedFlowJson = json))
             .Returns(Task.CompletedTask);
-        var service = new ProjectService(repository, storage, new OperatorFactory());
+        var service = CreateService(repository, storage, new OperatorFactory());
         var request = new CreateProjectRequest
         {
             Name = "camera-alias-round-trip",
@@ -216,7 +223,7 @@ public class ProjectServiceTests
             .Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
         storage.SaveFlowJsonAsync(Arg.Any<Guid>(), Arg.Do<string>(json => persistedFlowJson = json))
             .Returns(Task.CompletedTask);
-        var service = new ProjectService(repository, storage, new OperatorFactory());
+        var service = CreateService(repository, storage, new OperatorFactory());
         var request = new CreateProjectRequest
         {
             Name = "camera-canonical-default-round-trip",
@@ -312,7 +319,7 @@ public class ProjectServiceTests
             .Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
         storage.SaveFlowJsonAsync(Arg.Any<Guid>(), Arg.Do<string>(json => persistedFlowJson = json))
             .Returns(Task.CompletedTask);
-        var service = new ProjectService(repository, storage, new OperatorFactory());
+        var service = CreateService(repository, storage, new OperatorFactory());
         var request = new CreateProjectRequest
         {
             Name = "image-save-alias-round-trip",
@@ -402,7 +409,7 @@ public class ProjectServiceTests
             .Returns(callInfo => Task.FromResult(callInfo.Arg<Project>()));
         storage.SaveFlowJsonAsync(Arg.Any<Guid>(), Arg.Do<string>(json => persistedFlowJson = json))
             .Returns(Task.CompletedTask);
-        var service = new ProjectService(repository, storage, new OperatorFactory());
+        var service = CreateService(repository, storage, new OperatorFactory());
         var request = new CreateProjectRequest
         {
             Name = "default-fallback-round-trip",
@@ -469,7 +476,7 @@ public class ProjectServiceTests
         var assets = Substitute.For<IProjectAssetStorage>();
         var projectId = Guid.NewGuid();
         repository.GetByIdAsync(projectId).Returns(Task.FromResult<Project?>(null));
-        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, projectAssetStorage: assets);
+        var sut = CreateService(repository, storage, new OperatorFactory(), projectAssetStorage: assets);
 
         var dto = await sut.GetByIdAsync(projectId);
 
@@ -513,7 +520,7 @@ public class ProjectServiceTests
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
-        var coordinator = new ProjectSaveCoordinator(repository, storage, projectAssetStorage: assetStorage);
+        var coordinator = new ProjectSaveCoordinator(repository, storage, transactionRoot: _transactionRoot, projectAssetStorage: assetStorage);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, coordinator, assetStorage);
         var payload = CreateCalibrationPayload();
 
@@ -546,7 +553,7 @@ public class ProjectServiceTests
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
-        var coordinator = new ProjectSaveCoordinator(repository, storage, projectAssetStorage: assetStorage);
+        var coordinator = new ProjectSaveCoordinator(repository, storage, transactionRoot: _transactionRoot, projectAssetStorage: assetStorage);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, coordinator, assetStorage);
 
         var act = async () => await sut.SaveCalibrationAssetAsync(project.Id, new ProjectCalibrationAssetSaveRequest
@@ -582,7 +589,7 @@ public class ProjectServiceTests
         var existingSession = registry.GetOrCreate(project.Id, project.GlobalVariables);
         existingSession.SetValue(variableId, 7L, ProjectVariableUpdatedBy.StudioManual);
 
-        var sut = new ProjectService(repository, storage, factory, null, registry);
+        var sut = CreateService(repository, storage, factory, projectVariableSessions: registry);
 
         await sut.UpdateAsync(project.Id, new UpdateProjectRequest
         {
@@ -614,7 +621,7 @@ public class ProjectServiceTests
         storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
         var oldSession = registry.GetOrCreate(project.Id, project.GlobalVariables);
         oldSession.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
-        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+        var sut = CreateService(repository, storage, new OperatorFactory(), projectVariableSessions: registry);
 
         var act = async () => await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 5));
 
@@ -640,7 +647,7 @@ public class ProjectServiceTests
         storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
         var oldSession = registry.GetOrCreate(project.Id, project.GlobalVariables);
         oldSession.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
-        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+        var sut = CreateService(repository, storage, new OperatorFactory(), projectVariableSessions: registry);
 
         var act = async () => await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 5, "stats.renamed"));
 
@@ -667,7 +674,7 @@ public class ProjectServiceTests
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        var sut = new ProjectService(repository, storage, factory, null, registry);
+        var sut = CreateService(repository, storage, factory, projectVariableSessions: registry);
         var schema = CreateSchema(variableId, 3);
         var flow = CreateVariableReadFlow(variableId, "stats.count");
 
@@ -698,7 +705,7 @@ public class ProjectServiceTests
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        var sut = new ProjectService(repository, storage, factory);
+        var sut = CreateService(repository, storage, factory);
 
         var act = async () => await sut.UpdateAsync(project.Id, new UpdateProjectRequest
         {
@@ -726,7 +733,7 @@ public class ProjectServiceTests
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        var sut = new ProjectService(repository, storage, factory);
+        var sut = CreateService(repository, storage, factory);
 
         var saved = await sut.UpdateAsync(project.Id, new UpdateProjectRequest
         {
@@ -755,7 +762,7 @@ public class ProjectServiceTests
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         var session = registry.GetOrCreate(project.Id, project.GlobalVariables);
         session.SetValue(variableId, 128L, ProjectVariableUpdatedBy.StudioManual);
-        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+        var sut = CreateService(repository, storage, new OperatorFactory(), projectVariableSessions: registry);
 
         await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
         {
@@ -789,7 +796,7 @@ public class ProjectServiceTests
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        var sut = new ProjectService(repository, storage, new OperatorFactory());
+        var sut = CreateService(repository, storage, new OperatorFactory());
 
         var saved = await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
         {
@@ -839,7 +846,7 @@ public class ProjectServiceTests
             },
             MissingDecisionPolicy = MissingDecisionPolicy.Invalid
         };
-        var sut = new ProjectService(repository, storage, new OperatorFactory());
+        var sut = CreateService(repository, storage, new OperatorFactory());
 
         var saved = await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
         {
@@ -880,7 +887,7 @@ public class ProjectServiceTests
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        var sut = new ProjectService(repository, storage, new OperatorFactory());
+        var sut = CreateService(repository, storage, new OperatorFactory());
 
         var act = async () => await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
         {
@@ -907,7 +914,7 @@ public class ProjectServiceTests
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        var sut = new ProjectService(repository, storage, new OperatorFactory());
+        var sut = CreateService(repository, storage, new OperatorFactory());
 
         await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
         {
@@ -938,7 +945,7 @@ public class ProjectServiceTests
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        var sut = new ProjectService(repository, storage, new OperatorFactory());
+        var sut = CreateService(repository, storage, new OperatorFactory());
 
         await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
         {
@@ -969,7 +976,7 @@ public class ProjectServiceTests
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        var sut = new ProjectService(repository, storage, new OperatorFactory());
+        var sut = CreateService(repository, storage, new OperatorFactory());
 
         await sut.UpdateFlowAsync(project.Id, new UpdateFlowRequest
         {
@@ -999,7 +1006,7 @@ public class ProjectServiceTests
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        var sut = new ProjectService(repository, storage, new OperatorFactory());
+        var sut = CreateService(repository, storage, new OperatorFactory());
         var sourceOperatorId = Guid.NewGuid();
         var targetOperatorId = Guid.NewGuid();
         var sourcePortId = Guid.NewGuid();
@@ -1110,7 +1117,7 @@ public class ProjectServiceTests
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         storage.Seed(project.Id, storedFlowJson, 0);
-        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+        var sut = CreateService(repository, storage, new OperatorFactory(), projectVariableSessions: registry);
 
         await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 1, "stats.current"));
 
@@ -1134,7 +1141,7 @@ public class ProjectServiceTests
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
         storage.Seed(project.Id, storedFlowJson, 0);
-        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+        var sut = CreateService(repository, storage, new OperatorFactory(), projectVariableSessions: registry);
 
         await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 1, "stats.count"));
 
@@ -1155,7 +1162,7 @@ public class ProjectServiceTests
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+        var sut = CreateService(repository, storage, new OperatorFactory(), projectVariableSessions: registry);
         await sut.UpdateAsync(project.Id, new UpdateProjectRequest
         {
             Name = "demo",
@@ -1185,7 +1192,7 @@ public class ProjectServiceTests
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.GetByIdForUpdateAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
-        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+        var sut = CreateService(repository, storage, new OperatorFactory(), projectVariableSessions: registry);
 
         var act = async () => await sut.UpdateAsync(project.Id, new UpdateProjectRequest
         {
@@ -1217,7 +1224,7 @@ public class ProjectServiceTests
         storage.Seed(project.Id, oldFlowJson, 0);
         var oldSession = registry.GetOrCreate(project.Id, project.GlobalVariables);
         oldSession.SetValue(variableId, 8L, ProjectVariableUpdatedBy.StudioManual);
-        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+        var sut = CreateService(repository, storage, new OperatorFactory(), projectVariableSessions: registry);
 
         var act = async () => await sut.UpdateAsync(project.Id, new UpdateProjectRequest
         {
@@ -1241,7 +1248,7 @@ public class ProjectServiceTests
         var storage = Substitute.For<IProjectFlowStorage>();
         var projectId = Guid.NewGuid();
         repository.GetByIdAsync(projectId).Returns(Task.FromResult<Project?>(null));
-        var sut = new ProjectService(repository, storage, new OperatorFactory());
+        var sut = CreateService(repository, storage, new OperatorFactory());
 
         var update = async () => await sut.UpdateAsync(projectId, new UpdateProjectRequest { Name = "deleted" });
         var updateFlow = async () => await sut.UpdateFlowAsync(projectId, new UpdateFlowRequest());
@@ -1308,7 +1315,7 @@ public class ProjectServiceTests
                 .BeTrue(seedError);
             Directory.EnumerateFileSystemEntries(root).Should().NotBeEmpty();
 
-            var coordinator = new ProjectSaveCoordinator(repository, storage, registry, projectAssetStorage: assetStorage);
+            var coordinator = new ProjectSaveCoordinator(repository, storage, registry, _transactionRoot, projectAssetStorage: assetStorage);
             await coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
                 project,
                 project.PersistenceRevision,
@@ -1371,7 +1378,7 @@ public class ProjectServiceTests
         project.MarkAsDeleted();
         repository.GetByIdIncludingDeletedAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         storage.DeleteFlowJsonAsync(project.Id).Returns(_ => Task.FromException(new IOException("flow cleanup failed")));
-        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, projectAssetStorage: assets);
+        var sut = CreateService(repository, storage, new OperatorFactory(), projectAssetStorage: assets);
 
         var act = async () => await sut.CleanupDeletedProjectAsync(project.Id);
 
@@ -1388,7 +1395,7 @@ public class ProjectServiceTests
         var assets = Substitute.For<IProjectAssetStorage>();
         var projectId = Guid.NewGuid();
         repository.GetByIdIncludingDeletedAsync(projectId).Returns(Task.FromResult<Project?>(null));
-        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, null, projectAssetStorage: assets);
+        var sut = CreateService(repository, storage, new OperatorFactory(), projectAssetStorage: assets);
 
         var act = async () => await sut.CleanupDeletedProjectAsync(projectId);
 
@@ -1582,6 +1589,30 @@ public class ProjectServiceTests
 
     private static string CreateTempPath() =>
         Path.Combine(Path.GetTempPath(), "ClearVision.ProjectServiceTests", Guid.NewGuid().ToString("N"));
+
+    private ProjectService CreateService(
+        IProjectRepository repository,
+        IProjectFlowStorage storage,
+        IOperatorFactory operatorFactory,
+        ILogger<ProjectService>? logger = null,
+        ProjectVariableSessionRegistry? projectVariableSessions = null,
+        IProjectAssetStorage? projectAssetStorage = null)
+    {
+        var coordinator = new ProjectSaveCoordinator(
+            repository,
+            storage,
+            projectVariableSessions,
+            _transactionRoot,
+            projectAssetStorage: projectAssetStorage);
+        return new ProjectService(
+            repository,
+            storage,
+            operatorFactory,
+            logger,
+            projectVariableSessions,
+            coordinator,
+            projectAssetStorage);
+    }
 
     private static void DeleteDirectoryIfExists(string path)
     {

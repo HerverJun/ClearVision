@@ -4,6 +4,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Tests.Integration;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -12,6 +13,7 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[Collection(PerformanceAcceptanceCollection.Name)]
 public class Phase42MeasurementAndSignalOperatorTests
 {
     [Fact]
