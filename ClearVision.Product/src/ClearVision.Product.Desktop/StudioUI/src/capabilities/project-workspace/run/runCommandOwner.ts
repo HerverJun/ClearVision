@@ -967,8 +967,15 @@ export function createWorkspaceRunCommandOwner(options: {
     void reason;
     if (disposed) return true;
     if (state.phase === 'admitting') {
-      cancelAdmission(reason);
-      return true;
+      if (activeController) {
+        cancelAdmission(reason);
+        return true;
+      }
+      if (admissionPromise) {
+        await admissionPromise;
+        return disposed || state.phase !== 'admitting';
+      }
+      return false;
     }
     if (state.phase === 'executing') {
       state.message = '正式运行仍由后端执行；离开页面不会隐式停止会话。';

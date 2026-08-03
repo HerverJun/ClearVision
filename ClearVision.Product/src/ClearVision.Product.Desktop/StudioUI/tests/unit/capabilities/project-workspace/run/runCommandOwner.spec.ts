@@ -627,6 +627,41 @@ describe('F03 G6 Workspace Run command owner', () => {
     diagnostics.dispose();
   });
 
+  it('waits for the read-only admission refresh before allowing route leave', async () => {
+    let resolveAdmission: ((value: WorkspaceRunAdmissionV1) => void) | undefined;
+    let admissionSignal: AbortSignal | undefined;
+    const persistence = createPersistence();
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const port = createPort({ admit: vi.fn((payload, options) => {
+      admissionSignal = options?.signal;
+      return new Promise<WorkspaceRunAdmissionV1>(resolve => {
+        resolveAdmission = resolve;
+        void payload;
+      });
+    }) });
+    const owner = createWorkspaceRunCommandOwner({ projectId, persistenceOwner: persistence.owner, port, diagnostics });
+
+    const refresh = owner.refreshAdmission();
+    expect(owner.projection.phase).toBe('admitting');
+    let leaveSettled = false;
+    const leave = owner.prepareForLeave('route-leave').then(result => {
+      leaveSettled = true;
+      return result;
+    });
+    await Promise.resolve();
+    expect(leaveSettled).toBe(false);
+
+    resolveAdmission?.(admission(owner.projection.clientSnapshotId ?? projectId));
+    await expect(refresh).resolves.toMatchObject({ allowed: true });
+    await expect(leave).resolves.toBe(true);
+    expect(admissionSignal?.aborted).toBe(false);
+    expect(owner.projection).toMatchObject({ phase: 'idle', canRun: true });
+    expect(diagnostics.diagnostics).toMatchObject({ activeAbortControllers: 0, inFlightExecute: 0 });
+
+    owner.dispose();
+    diagnostics.dispose();
+  });
+
   it('reconciles a successful backend run after the execute response is lost', async () => {
     const persistence = createPersistence();
     const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });

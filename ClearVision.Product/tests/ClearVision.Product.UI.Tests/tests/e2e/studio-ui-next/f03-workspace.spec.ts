@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { expect, Page, Route, test } from '@playwright/test';
+import { expect, Page, Request, Route, test } from '@playwright/test';
 import {
   auditF03Request,
   captureF03WorkspaceEvidence,
@@ -744,6 +744,121 @@ async function workspaceDiagnostics(page: Page) {
     }).__STUDIO_UI_WORKSPACE_DIAGNOSTICS__;
     return diagnostics ? { ...diagnostics } : null;
   });
+}
+
+interface WorkspaceLifecycleObservation {
+  readonly cycleIndex: number;
+  readonly phase: 'active' | 'left';
+  readonly routeName: 'project-workspace' | 'about' | 'unknown';
+  readonly routePath: string;
+  readonly ownerGeneration: number;
+  readonly workspaceOwnerCount: number;
+  readonly flowCanvasOwnerCount: number;
+  readonly inspectorOwnerCount: number;
+  readonly imageCanvasOwnerCount: number;
+  readonly previewOwnerCount: number;
+  readonly roiOwnerCount: number;
+  readonly persistenceOwnerCount: number;
+  readonly runOwnerCount: number;
+  readonly activeSubscriptions: number;
+  readonly activeTimers: number;
+  readonly activeAnimationFrames: number;
+  readonly activeObservers: number;
+  readonly activeAbortControllers: number;
+  readonly activeBlobUrls: number;
+  readonly activePreviewArtifactIds: number;
+  readonly inFlightReads: number;
+  readonly inFlightWrites: number;
+  readonly inFlightPreview: number;
+  readonly inFlightExecute: number;
+  readonly totalWorkspaceDisposals: number;
+  readonly ownerConflictCount: number;
+  readonly leaveGuardPhase: string | null;
+  readonly leaveGuardProtection: string | null;
+}
+
+async function workspaceLifecycleObservation(
+  page: Page,
+  cycleIndex: number,
+  phase: WorkspaceLifecycleObservation['phase']
+): Promise<WorkspaceLifecycleObservation> {
+  return await page.evaluate(({ cycleIndex, phase }) => {
+    const runtimeWindow = window as typeof window & {
+      __STUDIO_UI_WORKSPACE_DIAGNOSTICS__?: Record<string, unknown>;
+      __STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__?: Record<string, unknown>;
+    };
+    const diagnostics = runtimeWindow.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__ ?? {};
+    const leaveGuard = runtimeWindow.__STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__ ?? {};
+    const routePath = window.location.hash.slice(1).split('?')[0] || '/';
+    const routeName = routePath === '/about'
+      ? 'about'
+      : /^\/projects\/[0-9a-f-]{36}\/workspace$/i.test(routePath)
+        ? 'project-workspace'
+        : 'unknown';
+    const numberValue = (key: string): number => Number(diagnostics[key] ?? -1);
+    return {
+      cycleIndex,
+      phase,
+      routeName,
+      routePath,
+      ownerGeneration: numberValue('totalWorkspaceMounts'),
+      workspaceOwnerCount: numberValue('workspaceOwnerCount'),
+      flowCanvasOwnerCount: numberValue('flowCanvasOwnerCount'),
+      inspectorOwnerCount: numberValue('inspectorOwnerCount'),
+      imageCanvasOwnerCount: numberValue('imageCanvasOwnerCount'),
+      previewOwnerCount: numberValue('previewOwnerCount'),
+      roiOwnerCount: numberValue('roiOwnerCount'),
+      persistenceOwnerCount: numberValue('persistenceOwnerCount'),
+      runOwnerCount: numberValue('runOwnerCount'),
+      activeSubscriptions: numberValue('activeSubscriptions'),
+      activeTimers: numberValue('activeTimers'),
+      activeAnimationFrames: numberValue('activeAnimationFrames'),
+      activeObservers: numberValue('activeObservers'),
+      activeAbortControllers: numberValue('activeAbortControllers'),
+      activeBlobUrls: numberValue('activeBlobUrls'),
+      activePreviewArtifactIds: numberValue('activePreviewArtifactIds'),
+      inFlightReads: numberValue('inFlightReads'),
+      inFlightWrites: numberValue('inFlightWrites'),
+      inFlightPreview: numberValue('inFlightPreview'),
+      inFlightExecute: numberValue('inFlightExecute'),
+      totalWorkspaceDisposals: numberValue('totalWorkspaceDisposals'),
+      ownerConflictCount: numberValue('ownerConflictCount'),
+      leaveGuardPhase: typeof leaveGuard.phase === 'string' ? leaveGuard.phase : null,
+      leaveGuardProtection: typeof leaveGuard.protectionKind === 'string'
+        ? leaveGuard.protectionKind
+        : null
+    } as WorkspaceLifecycleObservation;
+  }, { cycleIndex, phase });
+}
+
+function zeroWorkspaceGeneration(ownerGeneration: number) {
+  return {
+    routeName: 'about',
+    routePath: '/about',
+    ownerGeneration,
+    workspaceOwnerCount: 0,
+    flowCanvasOwnerCount: 0,
+    inspectorOwnerCount: 0,
+    previewOwnerCount: 0,
+    imageCanvasOwnerCount: 0,
+    roiOwnerCount: 0,
+    persistenceOwnerCount: 0,
+    runOwnerCount: 0,
+    activeSubscriptions: 0,
+    activeTimers: 0,
+    activeAnimationFrames: 0,
+    activeObservers: 0,
+    activeAbortControllers: 0,
+    activeBlobUrls: 0,
+    activePreviewArtifactIds: 0,
+    inFlightReads: 0,
+    inFlightWrites: 0,
+    inFlightPreview: 0,
+    inFlightExecute: 0,
+    totalWorkspaceDisposals: ownerGeneration,
+    ownerConflictCount: 0,
+    leaveGuardProtection: null
+  };
 }
 
 async function searchOperator(page: Page, value: string) {
@@ -3259,53 +3374,92 @@ test('rejects a 401 before mounting ProductRuntime or Workspace owners', async (
   expect(isF03G4RequestAllowlist(audit)).toBe(true);
 });
 
-test('passes 20 real Browser route mount/unmount cycles with a zero ledger', async ({ page }) => {
+test('passes 20 real Browser route mount/unmount cycles with a zero ledger', async ({ page }, testInfo) => {
   test.setTimeout(90_000);
+  const runtimeErrors = createF03RuntimeErrorAudit(page);
+  const requestFailures: string[] = [];
+  const pendingApiRequests = new Set<Request>();
+  const observations: WorkspaceLifecycleObservation[] = [];
+  page.on('request', request => {
+    if (new URL(request.url()).pathname.startsWith('/api/')) pendingApiRequests.add(request);
+  });
+  page.on('requestfinished', request => pendingApiRequests.delete(request));
+  page.on('requestfailed', request => {
+    pendingApiRequests.delete(request);
+    requestFailures.push(`${request.method()} ${new URL(request.url()).pathname}: ${request.failure()?.errorText ?? 'unknown'}`);
+  });
   const audit = await bootWorkspace(page);
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
 
-  for (let cycle = 0; cycle < 20; cycle += 1) {
-    await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
-    await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
-      previewOwnerCount: 1,
-      imageCanvasOwnerCount: 1,
-      roiOwnerCount: 1,
-      ownerConflictCount: 0
-    });
-    await page.goto('/studio/index.html#/about');
-    await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
-      workspaceOwnerCount: 0,
-      flowCanvasOwnerCount: 0,
-      previewOwnerCount: 0,
-      imageCanvasOwnerCount: 0,
-      roiOwnerCount: 0,
-      activeSubscriptions: 0,
-      activeAbortControllers: 0,
-      activeBlobUrls: 0,
-      activePreviewArtifactIds: 0,
-      inFlightReads: 0
-    });
-    await page.goto(`/studio/index.html#/projects/${projectA}/workspace`);
-    await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
-  }
+  try {
+    for (let cycle = 0; cycle < 20; cycle += 1) {
+      await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
+      await expect(page.locator('[data-testid="workspace-run"]'), `cycle ${cycle} admission stable`)
+        .toBeEnabled();
+      await expect.poll(
+        () => pendingApiRequests.size,
+        { message: `cycle ${cycle} API requests settled before leave` }
+      ).toBe(0);
+      await expect.poll(
+        async () => await workspaceLifecycleObservation(page, cycle, 'active'),
+        { message: `cycle ${cycle} active route/generation ledger` }
+      ).toMatchObject({
+        routeName: 'project-workspace',
+        workspaceOwnerCount: 1,
+        previewOwnerCount: 1,
+        imageCanvasOwnerCount: 1,
+        roiOwnerCount: 1,
+        activeAbortControllers: 0,
+        inFlightReads: 0,
+        inFlightWrites: 0,
+        inFlightPreview: 0,
+        inFlightExecute: 0,
+        ownerConflictCount: 0
+      });
+      const active = await workspaceLifecycleObservation(page, cycle, 'active');
+      observations.push(active);
 
-  await expect(page.locator('[data-testid="workspace-run"]')).toBeEnabled();
-  await page.goto('/studio/index.html#/about');
-  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
-    workspaceOwnerCount: 0,
-    previewOwnerCount: 0,
-    imageCanvasOwnerCount: 0,
-    roiOwnerCount: 0,
-    activeSubscriptions: 0,
-    activeAbortControllers: 0,
-    activeBlobUrls: 0,
-    activePreviewArtifactIds: 0,
-    inFlightReads: 0,
-    totalWorkspaceMounts: 21,
-    totalWorkspaceDisposals: 21,
-    ownerConflictCount: 0
-  });
-  expect(isF03G4RequestAllowlist(audit)).toBe(true);
+      await requestStudioHashNavigation(page, '#/about');
+      await expect(page, `cycle ${cycle} route leave completed`).toHaveURL(/#\/about$/);
+      await expect.poll(
+        async () => await workspaceLifecycleObservation(page, cycle, 'left'),
+        { message: `cycle ${cycle} current generation zero ledger` }
+      ).toMatchObject(zeroWorkspaceGeneration(active.ownerGeneration));
+      observations.push(await workspaceLifecycleObservation(page, cycle, 'left'));
+
+      await requestStudioHashNavigation(page, `#/projects/${projectA}/workspace`);
+      await expect(page, `cycle ${cycle} Workspace re-entry completed`)
+        .toHaveURL(new RegExp(`#/projects/${projectA}/workspace$`));
+      await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
+    }
+
+    await expect(page.locator('[data-testid="workspace-run"]')).toBeEnabled();
+    await expect.poll(
+      () => pendingApiRequests.size,
+      { message: 'final API requests settled before leave' }
+    ).toBe(0);
+    const finalActive = await workspaceLifecycleObservation(page, 20, 'active');
+    observations.push(finalActive);
+    await requestStudioHashNavigation(page, '#/about');
+    await expect(page, 'final route leave completed').toHaveURL(/#\/about$/);
+    await expect.poll(
+      async () => await workspaceLifecycleObservation(page, 20, 'left'),
+      { message: 'final current generation zero ledger' }
+    ).toMatchObject({
+      ...zeroWorkspaceGeneration(finalActive.ownerGeneration),
+      ownerGeneration: 21,
+      totalWorkspaceDisposals: 21
+    });
+    observations.push(await workspaceLifecycleObservation(page, 20, 'left'));
+    expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+    expect(requestFailures).toEqual([]);
+    expect(isF03G4RequestAllowlist(audit)).toBe(true);
+  } finally {
+    await testInfo.attach('workspace-lifecycle-observations', {
+      body: JSON.stringify(observations, null, 2),
+      contentType: 'application/json'
+    });
+  }
 });
 
 test('Workspace splitters preserve bounds, Preview recovery and layout preferences across re-entry', async ({ page }) => {
