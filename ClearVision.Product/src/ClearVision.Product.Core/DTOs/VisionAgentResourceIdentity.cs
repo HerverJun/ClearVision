@@ -38,11 +38,49 @@ public static partial class VisionAgentResourceIdentity
         string? parameterName,
         string? fallbackScope = null)
     {
+        if (TryParseCanonicalId(resourceType, out var canonicalType, out var canonicalOperator, out var canonicalParameter))
+        {
+            return FormatCanonicalId(canonicalType, canonicalOperator, canonicalParameter);
+        }
+
         var type = NormalizeResourceType(resourceType);
         var op = NormalizeOperatorKey(operatorKey);
         var parameter = NormalizeParameter(parameterName);
         var scope = NormalizeToken(fallbackScope);
-        return $"resource:v1|{type}|{FirstNonBlank(op, scope, "global")}|{FirstNonBlank(parameter, "resource")}";
+        return FormatCanonicalId(type, FirstNonBlank(op, scope, "global"), FirstNonBlank(parameter, "resource"));
+    }
+
+    public static string Canonicalize(string? value)
+    {
+        if (TryParseCanonicalId(value, out var type, out var operatorKey, out var parameterName))
+        {
+            return FormatCanonicalId(type, operatorKey, parameterName);
+        }
+
+        return CreateCanonicalId(value, string.Empty, string.Empty);
+    }
+
+    public static bool TryParseCanonicalId(
+        string? value,
+        out string resourceType,
+        out string operatorKey,
+        out string parameterName)
+    {
+        resourceType = string.Empty;
+        operatorKey = string.Empty;
+        parameterName = string.Empty;
+        var text = (value ?? string.Empty).Trim();
+        var parts = text.Split('|', StringSplitOptions.TrimEntries);
+        if (parts.Length != 4 ||
+            !parts[0].Equals("resource:v1", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        resourceType = NormalizeResourceType(parts[1]);
+        operatorKey = FirstNonBlank(NormalizeOperatorKey(parts[2]), "global");
+        parameterName = FirstNonBlank(NormalizeParameter(parts[3]), "resource");
+        return true;
     }
 
     public static IReadOnlyList<string> BuildAliases(params string?[] values)
@@ -74,6 +112,9 @@ public static partial class VisionAgentResourceIdentity
 
     private static string FirstNonBlank(params string[] values) =>
         values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+
+    private static string FormatCanonicalId(string resourceType, string operatorKey, string parameterName) =>
+        $"resource:v1|{NormalizeResourceType(resourceType)}|{FirstNonBlank(NormalizeOperatorKey(operatorKey), "global")}|{FirstNonBlank(NormalizeParameter(parameterName), "resource")}";
 
     [GeneratedRegex("[^a-z0-9_]+", RegexOptions.CultureInvariant)]
     private static partial Regex UnsafeTokenRegex();

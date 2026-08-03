@@ -121,6 +121,94 @@ test('supported workspace snapshot preserves safe Plan and run metadata', () => 
   assert.equal(result.snapshot.planRunId, 'plan-run-a');
 });
 
+for (const [name, previewOverride] of [
+  ['plan id', { planId: 'plan-other' }],
+  ['plan hash', { planHash: 'sha256:other' }],
+  ['requirement mode', { requirementMode: 'strict' }],
+  ['answer revision', { answerRevision: 8 }],
+  ['resource revision', { resourceRevision: 6 }],
+]) {
+  test(`workspace restore marks readiness stale when ${name} differs`, () => {
+    const result = normalizeWorkspaceSnapshotForRestore({
+      schemaVersion: 2,
+      revision: 7,
+      lifecycleState: 'plan_ready',
+      requirementMode: 'draft',
+      answerRevision: 7,
+      resourceRevision: 5,
+      pendingPlanSnapshot: { planId: 'plan-a', planHash: 'sha256:a' },
+      readinessPreview: {
+        planId: 'plan-a',
+        planHash: 'sha256:a',
+        requirementMode: 'draft',
+        answerRevision: 7,
+        resourceRevision: 5,
+        buildReadiness: { canBuild: true },
+        ...previewOverride,
+      },
+    });
+    assert.equal(result.trusted, true);
+    assert.equal(result.snapshot.readinessPreview, null);
+    assert.equal(result.snapshot.readinessStale, true);
+  });
+}
+
+test('workspace restore marks missing readiness stale while a current plan is pending', () => {
+  const result = normalizeWorkspaceSnapshotForRestore({
+    schemaVersion: 2,
+    revision: 8,
+    lifecycleState: 'plan_blocked',
+    requirementMode: 'draft',
+    answerRevision: 7,
+    resourceRevision: 5,
+    pendingPlanSnapshot: {
+      planId: 'plan-mode-transition',
+      planHash: 'sha256:mode-transition',
+      buildReadiness: {
+        canBuild: false,
+        requirementMode: 'strict',
+      },
+    },
+    readinessPreview: null,
+  });
+
+  assert.equal(result.trusted, true);
+  assert.equal(result.snapshot.readinessPreview, null);
+  assert.equal(result.snapshot.readinessStale, true);
+});
+
+test('workspace restore discards a matching but double-encoded derived readiness resource', () => {
+  const polluted = {
+    canonicalId: 'resource:v1|resource|resourcev1resourceglobalresource|resource',
+    resourceType: 'resource',
+    operatorKey: 'resourcev1resourceglobalresource',
+    parameterName: 'resource',
+  };
+  const result = normalizeWorkspaceSnapshotForRestore({
+    schemaVersion: 2,
+    revision: 9,
+    lifecycleState: 'plan_blocked',
+    requirementMode: 'draft',
+    answerRevision: 7,
+    resourceRevision: 5,
+    pendingPlanSnapshot: { planId: 'plan-polluted', planHash: 'sha256:polluted' },
+    readinessPreview: {
+      planId: 'plan-polluted',
+      planHash: 'sha256:polluted',
+      requirementMode: 'draft',
+      answerRevision: 7,
+      resourceRevision: 5,
+      buildReadiness: { canBuild: false, missingResources: [polluted] },
+    },
+    missingResources: [polluted],
+  });
+
+  assert.equal(result.trusted, true);
+  assert.equal(result.snapshot.readinessPreview, null);
+  assert.equal(result.snapshot.readinessStale, true);
+  assert.deepEqual(result.snapshot.missingResources, []);
+});
+
 for (const [name, snapshot] of [
   ['missing version', { lifecycleState: 'applied', readinessPreview: { canBuild: true }, buildRunId: 'build-a' }],
   ['future version', { schemaVersion: 99, lifecycleState: 'building', buildRunId: 'build-a' }],

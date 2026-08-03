@@ -1635,6 +1635,9 @@ public class ConversationalFlowService : IConversationalFlowService
             snapshot.BuildTerminalSequence = update.BuildTerminalSequence;
         if (update.SubmittedBuildFingerprint != null)
             snapshot.SubmittedBuildFingerprint = NormalizeOptionalSnapshotString(update.SubmittedBuildFingerprint);
+
+        if (!IsCurrentReadinessPreview(snapshot, snapshot.ReadinessPreview))
+            snapshot.ReadinessPreview = null;
     }
 
     private static string? NormalizeOptionalSnapshotString(string value)
@@ -1686,7 +1689,7 @@ public class ConversationalFlowService : IConversationalFlowService
         if (snapshot == null)
             return null;
 
-        return new VisionAgentWorkspaceSnapshot
+        var clone = new VisionAgentWorkspaceSnapshot
         {
             SchemaVersion = snapshot.SchemaVersion,
             Revision = snapshot.Revision,
@@ -1715,7 +1718,56 @@ public class ConversationalFlowService : IConversationalFlowService
             SubmittedBuildFingerprint = snapshot.SubmittedBuildFingerprint,
             UpdatedAtUtc = snapshot.UpdatedAtUtc
         };
+
+        if (!IsCurrentReadinessPreview(clone, clone.ReadinessPreview))
+            clone.ReadinessPreview = null;
+
+        return clone;
     }
+
+    private static bool IsCurrentReadinessPreview(
+        VisionAgentWorkspaceSnapshot snapshot,
+        VisionAgentBuildReadinessPreviewResult? preview)
+    {
+        var plan = snapshot.PendingPlanSnapshot;
+        if (preview == null || plan == null)
+            return false;
+
+        return IdentityEquals(preview.PlanId, plan.PlanId) &&
+               IdentityEquals(preview.PlanHash, plan.PlanHash) &&
+               IdentityEquals(preview.RequirementMode, snapshot.RequirementMode) &&
+               preview.AnswerRevision == snapshot.AnswerRevision &&
+               preview.ResourceRevision == snapshot.ResourceRevision &&
+               !HasDoubleEncodedDerivedResource(preview);
+    }
+
+    private static bool HasDoubleEncodedDerivedResource(VisionAgentBuildReadinessPreviewResult preview)
+    {
+        return preview.BuildReadiness.MissingResources
+            .Concat(preview.BuildReadiness.Blockers
+                .Where(blocker => blocker.Resource != null)
+                .Select(blocker => blocker.Resource!))
+            .Any(resource =>
+            {
+                if (!VisionAgentResourceIdentity.TryParseCanonicalId(
+                        resource.CanonicalId,
+                        out var resourceType,
+                        out var operatorKey,
+                        out var parameterName) ||
+                    !resourceType.Equals("resource", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                var encodedIdentity = VisionAgentResourceIdentity.NormalizeToken($"{operatorKey}{parameterName}");
+                return encodedIdentity.Contains("resourcev1resource", StringComparison.Ordinal);
+            });
+    }
+
+    private static bool IdentityEquals(string? left, string? right) =>
+        !string.IsNullOrWhiteSpace(left) &&
+        !string.IsNullOrWhiteSpace(right) &&
+        string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
 
     private static VisionAgentPlanModeResult? ClonePlanSnapshot(VisionAgentPlanModeResult? plan)
     {

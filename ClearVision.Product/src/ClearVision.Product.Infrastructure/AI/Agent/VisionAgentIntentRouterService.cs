@@ -100,24 +100,40 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
     private readonly VisionAgentIntentRouterOptions _options;
     private readonly Microsoft.Extensions.Logging.ILogger<VisionAgentIntentRouterService> _logger;
     private readonly IVisionAgentSemanticExtractorService? _semanticExtractor;
+    private readonly VisionAgentPlanningDeadlineOptions _deadlineOptions;
 
     public VisionAgentIntentRouterService(
         IVisionAgentIntentRouterCompletionSource completionSource,
         IOptions<VisionAgentIntentRouterOptions>? options,
         Microsoft.Extensions.Logging.ILogger<VisionAgentIntentRouterService> logger,
-        IVisionAgentSemanticExtractorService? semanticExtractor = null)
+        IVisionAgentSemanticExtractorService? semanticExtractor = null,
+        IOptions<VisionAgentPlanningDeadlineOptions>? deadlineOptions = null)
     {
         _completionSource = completionSource;
         _options = (options?.Value ?? new VisionAgentIntentRouterOptions()).Normalize();
         _logger = logger;
         _semanticExtractor = semanticExtractor;
+        _deadlineOptions = (deadlineOptions?.Value ?? new VisionAgentPlanningDeadlineOptions()).Normalize();
     }
 
     public async Task<VisionAgentIntentRouterResult> RouteAsync(
         VisionAgentIntentRouterRequest request,
         CancellationToken cancellationToken)
     {
-        var routedRequest = await AttachSemanticExtractionAsync(request, cancellationToken);
+        using var deadline = VisionAgentPlanningDeadline.Begin(
+            _deadlineOptions,
+            cancellationToken,
+            request.PlanningBudgetMs);
+        VisionAgentIntentRouterRequest routedRequest;
+        try
+        {
+            routedRequest = await AttachSemanticExtractionAsync(request, deadline.Token);
+        }
+        catch (OperationCanceledException) when (deadline.TotalBudgetExceeded)
+        {
+            throw new VisionAgentPlanningDeadlineExceededException("semantic_extraction");
+        }
+
         if (!_options.Enabled)
         {
             return RuleFallback(routedRequest, "router_disabled");
@@ -125,27 +141,46 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
 
         try
         {
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
+            using var timeout = deadline.CreateStageCancellation(_options.TimeoutSeconds * 1_000);
             var prompt = BuildPrompt(routedRequest, _options);
             var completion = await _completionSource.CompleteAsync(
                 new VisionAgentIntentRouterCompletionRequest(prompt.SystemPrompt, prompt.Messages, _options.ModelRole),
                 timeout.Token);
             return RepairResult(ParseResult(completion), routedRequest, "model_router", string.Empty);
         }
+        catch (OperationCanceledException) when (deadline.TotalBudgetExceeded)
+        {
+            throw new VisionAgentPlanningDeadlineExceededException("intent_router");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return RuleFallback(routedRequest, "router_timeout");
+        }
         catch (Exception firstError) when (!cancellationToken.IsCancellationRequested &&
                                          !IsUnauthorized(firstError) &&
                                          IsRepairable(firstError))
         {
+            if (deadline.RemainingMs < deadline.Options.MinimumRepairBudgetMs)
+            {
+                return RuleFallback(routedRequest, "router_repair_skipped_budget");
+            }
+
             try
             {
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
+                using var timeout = deadline.CreateStageCancellation(_options.TimeoutSeconds * 1_000);
                 var repairPrompt = BuildRepairPrompt(routedRequest, firstError.Message, _options);
                 var repaired = await _completionSource.CompleteAsync(
                     new VisionAgentIntentRouterCompletionRequest(repairPrompt.SystemPrompt, repairPrompt.Messages, _options.ModelRole),
                     timeout.Token);
                 return RepairResult(ParseResult(repaired), routedRequest, "model_router_repaired", "router_json_repaired");
+            }
+            catch (OperationCanceledException) when (deadline.TotalBudgetExceeded)
+            {
+                throw new VisionAgentPlanningDeadlineExceededException("intent_router_repair");
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return RuleFallback(routedRequest, "router_repair_timeout");
             }
             catch (Exception repairError) when (!cancellationToken.IsCancellationRequested)
             {

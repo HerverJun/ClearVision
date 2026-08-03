@@ -473,7 +473,9 @@ export function agentWorkspaceReducer(state, event) {
             restored.answers.optimisticByField = normalizeAnswerMap(payload.optimisticAnswers);
             restored.answers.answerRevision = Number(payload.answerRevision) || 0;
             restored.answers.selectionByQuestion = cloneMap(payload.selections);
-            restored.readiness = normalizeReadiness(payload.readiness || read(payload.plan, 'buildReadiness'));
+            restored.readiness = normalizeReadiness(Object.prototype.hasOwnProperty.call(payload, 'readiness')
+                ? payload.readiness
+                : read(payload.plan, 'buildReadiness'));
             restored.readinessPreview = payload.readinessPreview || null;
             restored.readinessStatus = payload.readinessStatus || (restored.plan
                 ? (restored.readiness.canBuild ? 'ready' : 'blocked')
@@ -547,7 +549,15 @@ export function agentWorkspaceReducer(state, event) {
                 result: Object.prototype.hasOwnProperty.call(payload, 'result') ? payload.result : payload
             }, event);
         case AgentWorkspaceEventTypes.REQUIREMENT_MODE_CHANGED:
-            return withProjection({ ...state, requirementMode: lower(payload.mode) === 'draft' ? 'draft' : 'strict' }, event);
+            return withProjection({
+                ...state,
+                requirementMode: lower(payload.mode) === 'draft' ? 'draft' : 'strict',
+                readiness: createAgentWorkspaceState().readiness,
+                readinessPreview: null,
+                readinessStatus: 'idle',
+                readinessError: '',
+                readinessRequest: null
+            }, event);
         case AgentWorkspaceEventTypes.ANSWERS_REPLACED:
             return withProjection({
                 ...state,
@@ -621,13 +631,25 @@ export function agentWorkspaceReducer(state, event) {
         case AgentWorkspaceEventTypes.READINESS_RECEIVED:
             {
             const readiness = normalizeReadiness(payload.buildReadiness || payload.readiness || payload);
+            const readinessPreview = payload.buildReadiness ? payload : { ...payload, buildReadiness: payload.readiness || payload };
+            const missingByKey = Object.fromEntries(readiness.missingResources.map((item, index) => {
+                const resource = normalizeMissingResource(item, index);
+                return [resource.canonicalId, serializeCanonicalResource(resource, { source: resource.source || 'readiness' })];
+            }));
             return withProjection({
                 ...state,
+                plan: state.plan ? {
+                    ...state.plan,
+                    buildReadiness: readiness,
+                    effectiveReadiness: readinessPreview,
+                    missingResources: readiness.missingResources
+                } : state.plan,
                 readiness,
-                readinessPreview: payload.buildReadiness ? payload : { ...payload, buildReadiness: payload.readiness || payload },
+                readinessPreview,
                 readinessStatus: readiness.canBuild ? 'ready' : 'blocked',
                 readinessError: '',
-                readinessRequest: null
+                readinessRequest: null,
+                resources: { ...state.resources, missingByKey }
             }, event);
             }
         case AgentWorkspaceEventTypes.READINESS_FAILED:

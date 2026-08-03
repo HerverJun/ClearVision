@@ -10,6 +10,13 @@ export const AgentWorkspaceModes = Object.freeze({
     APPLIED: 'applied'
 });
 
+export const PLANNING_DEADLINE_FALLBACK = Object.freeze({
+    contractVersion: 'v1',
+    totalBudgetMs: 120000,
+    clientNetworkMarginMs: 15000,
+    minimumRepairBudgetMs: 5000
+});
+
 const BUILD_STAGE_ORDER = [
     'understand_requirement',
     'context_collection',
@@ -82,8 +89,6 @@ const PLAN_PHASES = [
 
 const PLAN_PENDING_STATUS = 'waiting';
 const PLANNING_SLOW_FEEDBACK_MS = 6000;
-const PLANNING_ROUTER_TIMEOUT_MS = 45000;
-const PLANNING_RUN_TIMEOUT_MS = 180000;
 const LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE = 'legacy_build_artifact_missing_canonical_flow';
 const LEGACY_BUILD_MISSING_CANONICAL_FLOW_MESSAGE = '该构建结果不包含可验证的画布流程产物，无法直接应用。\n请基于原计划重新构建。';
 
@@ -448,6 +453,96 @@ const AI_PARAMETER_LABELS = {
 };
 
 export const aiPanelAgentWorkspaceMixin = {
+    _getPlanningClientDeadlineMs() {
+        const contract = this.planningDeadlineContract || PLANNING_DEADLINE_FALLBACK;
+        const totalBudgetMs = Number(contract.totalBudgetMs);
+        const clientNetworkMarginMs = Number(contract.clientNetworkMarginMs);
+        if (!Number.isFinite(totalBudgetMs) || totalBudgetMs < 1000 ||
+            !Number.isFinite(clientNetworkMarginMs) || clientNetworkMarginMs < 1000) {
+            return PLANNING_DEADLINE_FALLBACK.totalBudgetMs + PLANNING_DEADLINE_FALLBACK.clientNetworkMarginMs;
+        }
+        return totalBudgetMs + clientNetworkMarginMs;
+    },
+
+    _getPlanningBackendBudgetMs() {
+        const contract = this.planningDeadlineContract || PLANNING_DEADLINE_FALLBACK;
+        const configuredBudgetMs = Number(contract.totalBudgetMs);
+        return Number.isFinite(configuredBudgetMs) && configuredBudgetMs >= 1000
+            ? configuredBudgetMs
+            : PLANNING_DEADLINE_FALLBACK.totalBudgetMs;
+    },
+
+    _getPlanningBackendRemainingMs() {
+        const totalBudgetMs = this._getPlanningBackendBudgetMs?.() || PLANNING_DEADLINE_FALLBACK.totalBudgetMs;
+        const deadlineAt = Number(this.planningLifecycle?.backendDeadlineAt);
+        if (!Number.isFinite(deadlineAt) || deadlineAt <= 0) return totalBudgetMs;
+        return Math.max(1, Math.floor(deadlineAt - Date.now()));
+    },
+
+    async _refreshPlanningDeadlineContract() {
+        try {
+            const result = await httpClient.get('/ai/vision-agent/planning-deadline');
+            const data = this._asObject?.(result) || result || {};
+            const contractVersion = String(data.contractVersion || data.ContractVersion || '').trim();
+            const totalBudgetMs = Number(data.totalBudgetMs ?? data.TotalBudgetMs);
+            const clientNetworkMarginMs = Number(data.clientNetworkMarginMs ?? data.ClientNetworkMarginMs);
+            const minimumRepairBudgetMs = Number(data.minimumRepairBudgetMs ?? data.MinimumRepairBudgetMs);
+            if (contractVersion === PLANNING_DEADLINE_FALLBACK.contractVersion &&
+                Number.isFinite(totalBudgetMs) && totalBudgetMs >= 1000 &&
+                Number.isFinite(clientNetworkMarginMs) && clientNetworkMarginMs >= 1000) {
+                this.planningDeadlineContract = {
+                    contractVersion,
+                    totalBudgetMs,
+                    clientNetworkMarginMs,
+                    minimumRepairBudgetMs: Number.isFinite(minimumRepairBudgetMs) && minimumRepairBudgetMs >= 500
+                        ? minimumRepairBudgetMs
+                        : PLANNING_DEADLINE_FALLBACK.minimumRepairBudgetMs
+                };
+            }
+        } catch {
+            this.planningDeadlineContract = this.planningDeadlineContract || { ...PLANNING_DEADLINE_FALLBACK };
+        }
+        return this.planningDeadlineContract;
+    },
+
+    _getPlanningDeadlineError(error) {
+        const payload = this._asObject?.(error?.payload) || error?.payload || {};
+        const errorCode = String(
+            payload.errorCode || payload.ErrorCode || error?.errorCode || ''
+        ).trim().toLowerCase();
+        if (errorCode !== 'planning_deadline_exceeded') return null;
+        return {
+            errorCode,
+            timeoutKind: String(
+                payload.timeoutKind || payload.TimeoutKind || error?.timeoutKind || 'total_budget_exceeded'
+            ).trim().toLowerCase(),
+            stage: String(payload.stage || payload.Stage || error?.stage || '').trim()
+        };
+    },
+
+    _handlePlanningDeadlineExceeded(error, turn = this.activeAssistantTurn) {
+        const deadlineError = this._getPlanningDeadlineError?.(error);
+        if (!deadlineError) return false;
+        if (this.planningLifecycle) {
+            this.planningLifecycle.timeoutKind = deadlineError.timeoutKind || 'total_budget_exceeded';
+            this.planningLifecycle.timeoutStage = deadlineError.stage;
+        }
+        this._setGeneratingState?.(false);
+        this.isCancellingGenerate = false;
+        this._setWorkbenchState?.(AiWorkbenchStates.FAILED);
+        this._setAssistantTurnStatus?.(turn, '规划超时', 'failed');
+        this._setAssistantSectionText?.(turn, 'reply', '规划超过后端公布的总时间预算，请重试本次需求。');
+        this._setResultStatusNote?.('规划超过后端公布的总时间预算，请重试。', 'warning');
+        this._markPlanningLifecycleTerminal?.(
+            'timeout',
+            '规划超过后端公布的总时间预算，请重试本次需求。',
+            { preserveReply: true });
+        this._renderAgentWorkspaceOverview?.();
+        this._renderPlanWorkspace?.(this.pendingVisionPlan);
+        this._updatePlanBuildActionState?.();
+        return true;
+    },
+
     _clearPlanningLifecycleTimers() {
         const lifecycle = this.planningLifecycle;
         if (!lifecycle) return;
@@ -460,6 +555,10 @@ export const aiPanelAgentWorkspaceMixin = {
     _beginPlanningLifecycle({ requestId, requestContext, turn, phase = 'understand' } = {}) {
         this._clearPlanningLifecycleTimers?.();
         this.lastPlanningRequestContext = requestContext || this.lastPlanningRequestContext || null;
+        const startedAt = Date.now();
+        const clientDeadlineMs = this._getPlanningClientDeadlineMs?.() ||
+            (PLANNING_DEADLINE_FALLBACK.totalBudgetMs + PLANNING_DEADLINE_FALLBACK.clientNetworkMarginMs);
+        const backendBudgetMs = this._getPlanningBackendBudgetMs?.() || PLANNING_DEADLINE_FALLBACK.totalBudgetMs;
         this.planningLifecycle = {
             requestId: String(requestId || '').trim(),
             timelineId: String(requestId || '').trim() || `planning-${Date.now()}`,
@@ -471,14 +570,16 @@ export const aiPanelAgentWorkspaceMixin = {
                 ? '正在理解需求，等待 Intent Router 返回。'
                 : '正在整理工程上下文。',
             slow: false,
-            startedAt: Date.now(),
+            startedAt,
+            backendDeadlineAt: startedAt + backendBudgetMs,
+            clientDeadlineAt: startedAt + clientDeadlineMs,
             turn: turn || this.activeAssistantTurn || null,
             slowTimer: null,
             timeoutTimer: null
         };
         this._armPlanningLifecycleTimers?.(
             this.planningLifecycle.requestId,
-            phase === 'understand' ? PLANNING_ROUTER_TIMEOUT_MS : PLANNING_RUN_TIMEOUT_MS);
+            clientDeadlineMs);
         this._renderPlanningProgress?.(turn);
         return this.planningLifecycle;
     },
@@ -499,6 +600,7 @@ export const aiPanelAgentWorkspaceMixin = {
         lifecycle.timeoutTimer = window.setTimeout?.(() => {
             const current = this.planningLifecycle;
             if (!current || current.status !== 'running' || current.requestId !== requestId) return;
+            current.timeoutKind = 'client_deadline_exceeded';
             this._markPlanningLifecycleTerminal?.('timeout', '规划等待超时，未将未完成阶段标记为完成。可重试本次需求。');
             this.activeIntentRouterRequestId = null;
             this._clearActivePlanRequest?.();
@@ -521,9 +623,14 @@ export const aiPanelAgentWorkspaceMixin = {
         if (routerStatus) lifecycle.routerStatus = routerStatus;
         if (routerSummary) lifecycle.routerSummary = routerSummary;
         if (requestId) lifecycle.requestId = String(requestId).trim();
+        const clientDeadlineAt = Number(lifecycle.clientDeadlineAt);
+        const remainingClientMs = Number.isFinite(clientDeadlineAt) && clientDeadlineAt > 0
+            ? Math.max(1, Math.floor(clientDeadlineAt - Date.now()))
+            : this._getPlanningClientDeadlineMs?.() ||
+                (PLANNING_DEADLINE_FALLBACK.totalBudgetMs + PLANNING_DEADLINE_FALLBACK.clientNetworkMarginMs);
         this._armPlanningLifecycleTimers?.(
             lifecycle.requestId,
-            lifecycle.phase === 'understand' ? PLANNING_ROUTER_TIMEOUT_MS : PLANNING_RUN_TIMEOUT_MS);
+            remainingClientMs);
         this._renderPlanningProgress?.(lifecycle.turn);
     },
 
@@ -950,6 +1057,12 @@ export const aiPanelAgentWorkspaceMixin = {
     _normalizePlanReadinessPreviewResult(result) {
         const data = this._asObject?.(result) || result || {};
         const readiness = this._normalizePlanBuildReadiness(data.buildReadiness || data.BuildReadiness);
+        const hasAuthoritativeCountPartition = [
+            ['mustConfirmBeforeBuildCount', 'MustConfirmBeforeBuildCount'],
+            ['fillLaterCount', 'FillLaterCount'],
+            ['totalIncompleteCount', 'TotalIncompleteCount']
+        ].every(([camel, pascal]) => Object.prototype.hasOwnProperty.call(data, camel) ||
+            Object.prototype.hasOwnProperty.call(data, pascal));
         return {
             planId: String(data.planId || data.PlanId || '').trim(),
             planHash: String(data.planHash || data.PlanHash || '').trim(),
@@ -967,6 +1080,14 @@ export const aiPanelAgentWorkspaceMixin = {
             pendingConfirmationCount: Number(data.pendingConfirmationCount ?? data.PendingConfirmationCount ?? 0) || 0,
             resourcePendingCount: Number(data.resourcePendingCount ?? data.ResourcePendingCount ?? 0) || 0,
             hardBlockerCount: Number(data.hardBlockerCount ?? data.HardBlockerCount ?? 0) || 0,
+            buildBlockingConfirmationCount: Number(data.buildBlockingConfirmationCount ?? data.BuildBlockingConfirmationCount ?? 0) || 0,
+            buildRequiredResourceCount: Number(data.buildRequiredResourceCount ?? data.BuildRequiredResourceCount ?? 0) || 0,
+            deferredFieldCount: Number(data.deferredFieldCount ?? data.DeferredFieldCount ?? 0) || 0,
+            draftAllowedResourceCount: Number(data.draftAllowedResourceCount ?? data.DraftAllowedResourceCount ?? 0) || 0,
+            mustConfirmBeforeBuildCount: Number(data.mustConfirmBeforeBuildCount ?? data.MustConfirmBeforeBuildCount ?? 0) || 0,
+            fillLaterCount: Number(data.fillLaterCount ?? data.FillLaterCount ?? 0) || 0,
+            totalIncompleteCount: Number(data.totalIncompleteCount ?? data.TotalIncompleteCount ?? 0) || 0,
+            hasAuthoritativeCountPartition,
             metadataOnly: (data.metadataOnly ?? data.MetadataOnly) === true,
             contractValid: (data.contractValid ?? data.ContractValid) !== false,
             failureCode: String(data.failureCode || data.FailureCode || '').trim(),
@@ -1072,6 +1193,10 @@ export const aiPanelAgentWorkspaceMixin = {
             planHash: preview.planHash
         });
         this.lastPlanReadinessPreviewError = '';
+        if (this.pendingRequirementModeReadinessPersistence === preview.requirementMode) {
+            this.pendingRequirementModeReadinessPersistence = '';
+            this._queueWorkspaceSnapshotFlush?.('readiness_preview');
+        }
         return true;
     },
 
@@ -1517,6 +1642,10 @@ export const aiPanelAgentWorkspaceMixin = {
             .catch(error => {
                 if (!this._isActiveIntentRouterRequest(routerRequestId)) return;
                 this._clearActiveIntentRouterRequest(routerRequestId);
+                if (this._handlePlanningDeadlineExceeded?.(error, turn)) {
+                    this.activeAssistantTurn = null;
+                    return;
+                }
                 this._advancePlanningLifecycle?.(
                     'context',
                     '路由服务未完成，已交由 Planner 继续整理工程上下文。',
@@ -2080,6 +2209,10 @@ export const aiPanelAgentWorkspaceMixin = {
                     input.value = userMessage || normalizedDescription;
                     input.style.height = 'auto';
                 }
+                if (this._handlePlanningDeadlineExceeded?.(error, turn)) {
+                    this.activeAssistantTurn = null;
+                    return;
+                }
                 const cancelled = this.planningLifecycle?.status === 'cancelled';
                 this._setAssistantTurnStatus(turn, cancelled ? '已取消' : '规划失败', cancelled ? 'cancelled' : 'failed');
                 const message = this._sanitizePlanDiagnosticText(error?.message || String(error || '未知错误'), 260) || '未知错误';
@@ -2143,7 +2276,8 @@ export const aiPanelAgentWorkspaceMixin = {
             semanticExtraction: semanticExtraction || null,
             confirmedPlanAnswers: this._buildConfirmedPlanAnswers(this.pendingVisionPlan),
             resolvedPlanFields: this._getResolvedPlanFields(this.pendingVisionPlan),
-            remainingPlanFields: this._getRemainingPlanFields(this.pendingVisionPlan)
+            remainingPlanFields: this._getRemainingPlanFields(this.pendingVisionPlan),
+            planningBudgetMs: this._getPlanningBackendRemainingMs?.() || PLANNING_DEADLINE_FALLBACK.totalBudgetMs
         };
     },
 
@@ -2430,7 +2564,9 @@ export const aiPanelAgentWorkspaceMixin = {
 
         if (evt.eventType === 'run.failed') {
             const terminal = this._applyPlanRunTerminalPayload(evt);
-            this._rejectActivePlanRun(new Error(this._buildPlanRunTerminalMessage(evt, terminal, '规划失败。')));
+            const error = new Error(this._buildPlanRunTerminalMessage(evt, terminal, '规划失败。'));
+            error.payload = terminal.payload;
+            this._rejectActivePlanRun(error);
         }
     },
 
@@ -3247,7 +3383,14 @@ export const aiPanelAgentWorkspaceMixin = {
             ...readinessStats,
             pendingConfirmationCount: Number(preview?.pendingConfirmationCount) || readinessStats.pendingConfirmationCount,
             resourcePendingCount: Number(preview?.resourcePendingCount) || readinessStats.resourcePendingCount,
-            hardBlockerCount: Number(preview?.hardBlockerCount) || 0
+            hardBlockerCount: Number(preview?.hardBlockerCount) || 0,
+            buildBlockingConfirmationCount: Number(preview?.buildBlockingConfirmationCount) || 0,
+            buildRequiredResourceCount: Number(preview?.buildRequiredResourceCount) || 0,
+            deferredFieldCount: Number(preview?.deferredFieldCount) || 0,
+            draftAllowedResourceCount: Number(preview?.draftAllowedResourceCount) || 0,
+            mustConfirmBeforeBuildCount: Number(preview?.mustConfirmBeforeBuildCount) || 0,
+            fillLaterCount: Number(preview?.fillLaterCount) || 0,
+            totalIncompleteCount: Number(preview?.totalIncompleteCount) || 0
         };
         const fields = Array.isArray(missingFields)
             ? missingFields
@@ -3255,54 +3398,40 @@ export const aiPanelAgentWorkspaceMixin = {
         const normalizedFields = [...new Set(this._toArray(fields)
             .map(field => this._inferPlanQuestionField?.(field) || String(field || '').trim().toLowerCase())
             .filter(Boolean))];
-        const blockers = this._toArray(readiness.blockers);
-        const resourceFields = new Set(blockers
-            .filter(blocker => blocker?.category === PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING)
-            .map(blocker => this._inferPlanQuestionField?.(blocker?.field || blocker?.questionId || blocker?.id) || String(blocker?.field || blocker?.questionId || blocker?.id || '').trim().toLowerCase())
-            .filter(Boolean));
-        const hardFields = new Set(blockers
-            .filter(blocker => blocker?.blocksBuild === true && blocker?.category !== PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING)
-            .map(blocker => this._inferPlanQuestionField?.(blocker?.field || blocker?.questionId || blocker?.id) || String(blocker?.field || blocker?.questionId || blocker?.id || '').trim().toLowerCase())
-            .filter(Boolean));
-        const mode = this._normalizeRequirementMode?.(this.requirementMode || plan.requirementMode || 'strict') || 'strict';
-        const maturity = plan.requirementMaturity || {};
-        const semantic = plan.semanticExtraction || {};
-        this._toArray(readiness.remainingFields)
-            .map(field => this._inferPlanQuestionField?.(field) || String(field || '').trim().toLowerCase())
-            .filter(Boolean)
-            .forEach(field => {
-                if (this._isPlanBuildBlockingField?.(field, mode, maturity, {
-                    plan,
-                    semanticExtraction: semantic,
-                    route: plan?.route
-                })) {
-                    hardFields.add(field);
+        const previewCarriesPartition = preview?.hasAuthoritativeCountPartition !== false &&
+            ['mustConfirmBeforeBuildCount', 'fillLaterCount', 'totalIncompleteCount']
+                .every(key => Object.prototype.hasOwnProperty.call(preview || {}, key));
+        let mustConfirmCount;
+        let fillLaterCount;
+        let totalCount;
+        if (previewCarriesPartition) {
+            mustConfirmCount = Math.max(Number(preview?.mustConfirmBeforeBuildCount) || 0, 0);
+            fillLaterCount = Math.max(Number(preview?.fillLaterCount) || 0, 0);
+            totalCount = Math.max(Number(preview?.totalIncompleteCount) || 0, 0);
+        } else {
+            const blockingKeys = new Set();
+            const deferredKeys = new Set();
+            this._toArray(readiness.blockers).forEach(blocker => {
+                if (blocker?.category === PLAN_BUILD_BLOCKER_CATEGORIES.CONTRACT_WARNING) return;
+                const resource = blocker?.resource;
+                const resourceId = String(resource?.canonicalId || resource?.CanonicalId || '').trim().toLowerCase();
+                const field = this._inferPlanQuestionField?.(blocker?.field || blocker?.questionId || blocker?.id) ||
+                    String(blocker?.field || blocker?.questionId || blocker?.id || '').trim().toLowerCase();
+                const key = resourceId ? `resource:${resourceId}` : (field ? `field:${field}` : '');
+                if (!key) return;
+                (blocker?.blocksBuild === true ? blockingKeys : deferredKeys).add(key);
+            });
+            normalizedFields.forEach(field => {
+                const key = `field:${field}`;
+                if (!blockingKeys.has(key) && !deferredKeys.has(key)) {
+                    (readiness.canBuild === true ? deferredKeys : blockingKeys).add(key);
                 }
             });
-
-        const canBuildNow = readiness.canBuild === true;
-        let mustConfirmCount = Math.max(
-            hardFields.size,
-            Number(stats.hardBlockerCount) || 0,
-            canBuildNow
-                ? 0
-                : Math.max((Number(stats.pendingConfirmationCount) || 0) - (Number(stats.resourcePendingCount) || 0), 0)
-        );
-        let fillLaterCount = Math.max(resourceFields.size, Number(stats.resourcePendingCount) || 0);
-        let totalCount = Math.max(
-            normalizedFields.length,
-            mustConfirmCount + fillLaterCount,
-            Number(stats.pendingConfirmationCount) || 0,
-            Number(stats.blockingCount) || 0
-        );
-        if (totalCount > mustConfirmCount + fillLaterCount) {
-            fillLaterCount = totalCount - mustConfirmCount;
-        } else {
+            blockingKeys.forEach(key => deferredKeys.delete(key));
+            mustConfirmCount = blockingKeys.size;
+            fillLaterCount = deferredKeys.size;
             totalCount = mustConfirmCount + fillLaterCount;
         }
-        mustConfirmCount = Math.max(mustConfirmCount, 0);
-        fillLaterCount = Math.max(fillLaterCount, 0);
-        totalCount = Math.max(totalCount, 0);
 
         return {
             totalCount,

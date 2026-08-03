@@ -430,7 +430,9 @@ public class ConversationalFlowServiceTests : IDisposable
             {
                 PlanId = "plan-1",
                 PlanHash = "sha256:plan",
+                RequirementMode = AiRequirementModes.Draft,
                 AnswerRevision = 7,
+                ResourceRevision = 3,
                 BuildReadiness = new VisionAgentBuildReadinessSnapshot
                 {
                     CanBuild = false,
@@ -493,6 +495,167 @@ public class ConversationalFlowServiceTests : IDisposable
         reloaded.WorkspaceSnapshot.ResourceRevision.Should().Be(3);
         reloaded.WorkspaceSnapshot.WorkspaceViewMode.Should().Be("build");
         reloaded.WorkspaceSnapshot.PendingPlanSnapshot!.PlanId.Should().Be("plan-1");
+    }
+
+    [Fact]
+    public void UpdateWorkspaceSnapshot_ModeChangeShouldInvalidatePreviewUntilMatchingPreviewIsPersisted()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+        var plan = new VisionAgentPlanModeResult
+        {
+            PlanId = "plan-mode-transition",
+            PlanHash = "sha256:mode-transition",
+            Goal = "Detect scratches"
+        };
+        var initial = service.UpdateWorkspaceSnapshot("mode-transition-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            PendingPlanSnapshot = plan,
+            RequirementMode = AiRequirementModes.Strict,
+            AnswerRevision = 4,
+            ResourceRevision = 2,
+            ReadinessPreview = Preview(AiRequirementModes.Strict)
+        });
+
+        var modeSaved = service.UpdateWorkspaceSnapshot("mode-transition-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = initial.WorkspaceSnapshot!.Revision,
+            RequirementMode = AiRequirementModes.Draft
+        });
+
+        modeSaved.WorkspaceSnapshot!.RequirementMode.Should().Be(AiRequirementModes.Draft);
+        modeSaved.WorkspaceSnapshot.ReadinessPreview.Should().BeNull();
+
+        var readinessSaved = service.UpdateWorkspaceSnapshot("mode-transition-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = modeSaved.WorkspaceSnapshot.Revision,
+            ReadinessPreview = Preview(AiRequirementModes.Draft)
+        });
+        readinessSaved.WorkspaceSnapshot!.ReadinessPreview.Should().NotBeNull();
+        readinessSaved.WorkspaceSnapshot.ReadinessPreview!.RequirementMode.Should().Be(AiRequirementModes.Draft);
+
+        var restored = new ConversationalFlowService(_tempRoot)
+            .GetSession("mode-transition-session")!
+            .WorkspaceSnapshot!;
+        restored.RequirementMode.Should().Be(AiRequirementModes.Draft);
+        restored.ReadinessPreview!.RequirementMode.Should().Be(AiRequirementModes.Draft);
+
+        VisionAgentBuildReadinessPreviewResult Preview(string mode) => new()
+        {
+            PlanId = plan.PlanId,
+            PlanHash = plan.PlanHash,
+            RequirementMode = mode,
+            AnswerRevision = 4,
+            ResourceRevision = 2,
+            BuildReadiness = new VisionAgentBuildReadinessSnapshot
+            {
+                CanBuild = mode == AiRequirementModes.Draft,
+                ContractVersion = VisionAgentPlanContractVersions.V2
+            }
+        };
+    }
+
+    [Theory]
+    [InlineData("planId")]
+    [InlineData("planHash")]
+    [InlineData("requirementMode")]
+    [InlineData("answerRevision")]
+    [InlineData("resourceRevision")]
+    public void ReloadWorkspaceSnapshot_MismatchedReadinessIdentityShouldBeDiscarded(string mismatch)
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+        var preview = new VisionAgentBuildReadinessPreviewResult
+        {
+            PlanId = mismatch == "planId" ? "other-plan" : "plan-current",
+            PlanHash = mismatch == "planHash" ? "sha256:other" : "sha256:current",
+            RequirementMode = mismatch == "requirementMode" ? AiRequirementModes.Strict : AiRequirementModes.Draft,
+            AnswerRevision = mismatch == "answerRevision" ? 6 : 5,
+            ResourceRevision = mismatch == "resourceRevision" ? 4 : 3,
+            BuildReadiness = new VisionAgentBuildReadinessSnapshot { CanBuild = true }
+        };
+        service.UpdateWorkspaceSnapshot("stale-preview-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            PendingPlanSnapshot = new VisionAgentPlanModeResult
+            {
+                PlanId = "plan-current",
+                PlanHash = "sha256:current"
+            },
+            RequirementMode = AiRequirementModes.Draft,
+            AnswerRevision = 5,
+            ResourceRevision = 3,
+            ReadinessPreview = preview
+        });
+
+        var restored = new ConversationalFlowService(_tempRoot)
+            .GetSession("stale-preview-session")!
+            .WorkspaceSnapshot!;
+
+        restored.ReadinessPreview.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReloadWorkspaceSnapshot_PollutedDerivedReadinessShouldBeDiscardedWithoutLosingAnswersOrBindings()
+    {
+        const string pollutedId = "resource:v1|resource|resourcev1resourceglobalresource|resource";
+        const string cameraId = "resource:v1|camera_binding|imageacquisition#1|camera_binding_id";
+        var service = new ConversationalFlowService(_tempRoot);
+        service.UpdateWorkspaceSnapshot("polluted-readiness-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            PendingPlanSnapshot = new VisionAgentPlanModeResult
+            {
+                PlanId = "plan-polluted",
+                PlanHash = "sha256:polluted"
+            },
+            RequirementMode = AiRequirementModes.Draft,
+            AnswerRevision = 2,
+            ResourceRevision = 3,
+            ConfirmedPlanAnswers =
+            [
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                    Value = "detect scratches",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                }
+            ],
+            ResourceDecisions = new Dictionary<string, JsonElement>
+            {
+                [cameraId] = JsonSerializer.SerializeToElement(new
+                {
+                    canonicalId = cameraId,
+                    status = VisionAgentResourceStatuses.Bound
+                })
+            },
+            ReadinessPreview = new VisionAgentBuildReadinessPreviewResult
+            {
+                PlanId = "plan-polluted",
+                PlanHash = "sha256:polluted",
+                RequirementMode = AiRequirementModes.Draft,
+                AnswerRevision = 2,
+                ResourceRevision = 3,
+                BuildReadiness = new VisionAgentBuildReadinessSnapshot
+                {
+                    CanBuild = false,
+                    MissingResources =
+                    [
+                        new VisionAgentResourceRequirement
+                        {
+                            CanonicalId = pollutedId,
+                            ResourceType = "resource",
+                            OperatorKey = "resourcev1resourceglobalresource",
+                            ParameterName = "resource"
+                        }
+                    ]
+                }
+            }
+        });
+
+        var restored = new ConversationalFlowService(_tempRoot)
+            .GetSession("polluted-readiness-session")!
+            .WorkspaceSnapshot!;
+
+        restored.ReadinessPreview.Should().BeNull();
+        restored.ConfirmedPlanAnswers.Should().ContainSingle(answer => answer.Value == "detect scratches");
+        restored.ResourceDecisions.Should().ContainKey(cameraId);
     }
 
     [Fact]

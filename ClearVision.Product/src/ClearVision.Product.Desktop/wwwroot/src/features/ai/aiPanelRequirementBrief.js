@@ -29,6 +29,7 @@ export const aiPanelRequirementBriefMixin = {
             planHash: this.agentWorkspaceState?.identity?.planHash
         });
         this._rememberRequirementModeForPlan?.(this.pendingVisionPlan, normalized);
+        this.pendingRequirementModeReadinessPersistence = normalized;
         this._queueWorkspaceSnapshotFlush?.('requirement_mode');
         this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'requirement_mode' });
         this._updateRequirementModeUI();

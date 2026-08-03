@@ -302,6 +302,7 @@ public sealed record VisionAgentPlanModeRequest
     public List<VisionAgentPlanAnswer> ConfirmedPlanAnswers { get; init; } = [];
     public List<string> ResolvedPlanFields { get; init; } = [];
     public List<string> RemainingPlanFields { get; init; } = [];
+    public int PlanningBudgetMs { get; init; }
 }
 
 public sealed record VisionAgentIntentRouterRequest
@@ -326,6 +327,7 @@ public sealed record VisionAgentIntentRouterRequest
     public bool DeveloperDirectBuildDebug { get; init; }
     public VisionAgentSemanticExtractionResult? SemanticExtraction { get; init; }
     public bool MetadataOnly { get; init; } = true;
+    public int PlanningBudgetMs { get; init; }
 }
 
 public sealed record VisionAgentIntentRouterResult

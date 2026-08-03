@@ -264,6 +264,104 @@ test('readiness status distinguishes blocked failed timeout and active validatio
   assert.equal(state.readinessStatus, 'failed');
 });
 
+test('requirement mode transition invalidates the previous authoritative readiness immediately', () => {
+  let state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.PLAN_RECEIVED, {
+    plan: plan({
+      effectiveReadiness: {
+        planId: 'plan-1',
+        planHash: 'hash-1',
+        requirementMode: 'strict',
+        answerRevision: 0,
+        resourceRevision: 0,
+        buildReadiness: { canBuild: false, blockers: [], resolvedFields: [], remainingFields: [], contractVersion: 'v2' }
+      }
+    })
+  }, { sessionId: 's1' });
+  assert.notEqual(state.readinessPreview, null);
+
+  state = reduce(state, AgentWorkspaceEventTypes.REQUIREMENT_MODE_CHANGED, { mode: 'draft' }, {
+    sessionId: 's1', planId: 'plan-1', planHash: 'hash-1'
+  });
+
+  assert.equal(state.requirementMode, 'draft');
+  assert.equal(state.readinessPreview, null);
+  assert.equal(state.readinessStatus, 'idle');
+  assert.equal(state.projection.readiness.canBuild, false);
+});
+
+test('session restore honors an explicit stale readiness clear instead of falling back to plan readiness', () => {
+  const state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.SESSION_RESTORED, {
+    sessionId: 's1',
+    planId: 'plan-restore',
+    planHash: 'hash-restore',
+    requirementMode: 'draft',
+    plan: plan({
+      planId: 'plan-restore',
+      planHash: 'hash-restore',
+      buildReadiness: {
+        canBuild: true,
+        blockers: [],
+        resolvedFields: [],
+        remainingFields: [],
+        contractVersion: 'v2',
+      },
+    }),
+    readiness: null,
+    readinessPreview: null,
+    readinessStatus: 'idle',
+  }, { sessionId: 's1' });
+
+  assert.equal(state.readiness.canBuild, false);
+  assert.equal(state.readinessPreview, null);
+  assert.equal(state.readinessStatus, 'idle');
+  assert.equal(state.projection.readiness.canBuild, false);
+});
+
+test('authoritative readiness replaces polluted derived resources instead of accumulating generations', () => {
+  let state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.SESSION_RESTORED, {
+    sessionId: 's1',
+    planId: 'plan-resource-restore',
+    planHash: 'hash-resource-restore',
+    plan: plan({ planId: 'plan-resource-restore', planHash: 'hash-resource-restore' }),
+    missingResources: [{
+      canonicalId: 'resource:v1|resource|resourcev1resourceglobalresource|resource',
+      resourceType: 'resource',
+      operatorKey: 'resourcev1resourceglobalresource',
+      parameterName: 'resource',
+      draftPolicy: 'build_required',
+    }],
+    readiness: null,
+    readinessPreview: null,
+    readinessStatus: 'idle',
+  }, { sessionId: 's1' });
+
+  state = reduce(state, AgentWorkspaceEventTypes.READINESS_RECEIVED, {
+    planId: 'plan-resource-restore',
+    planHash: 'hash-resource-restore',
+    requirementMode: 'draft',
+    answerRevision: 0,
+    resourceRevision: 0,
+    buildReadiness: {
+      canBuild: true,
+      blockers: [],
+      resolvedFields: [],
+      remainingFields: ['image_source'],
+      contractVersion: 'v2',
+      missingResources: [{
+        canonicalId: 'resource:v1|camera_binding|imageacquisition#1|camera_binding_id',
+        resourceType: 'camera_binding',
+        operatorKey: 'imageacquisition#1',
+        parameterName: 'camera_binding_id',
+        draftPolicy: 'draft_allowed',
+      }],
+    },
+  }, { sessionId: 's1', planId: 'plan-resource-restore', planHash: 'hash-resource-restore' });
+
+  assert.equal(Object.keys(state.resources.missingByKey).length, 1);
+  assert.equal(state.projection.missingResources.length, 1);
+  assert.equal(state.projection.missingResources[0].resourceType, 'camera_binding');
+});
+
 test('run reducer drops duplicate events and ignores nonterminal events after a terminal event', () => {
   let state = reduce(createAgentWorkspaceState({ sessionId: 's1' }), AgentWorkspaceEventTypes.RUN_STARTED, { kind: 'build', runId: 'run-1' }, { sessionId: 's1' });
   const started = { runId: 'run-1', sequence: 1, eventType: 'run.started' };

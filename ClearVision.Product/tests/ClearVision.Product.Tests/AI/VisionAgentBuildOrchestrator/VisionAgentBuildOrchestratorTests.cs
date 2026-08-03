@@ -291,6 +291,10 @@ public sealed class VisionAgentBuildOrchestratorTests
             blocker.Resource.ResourceType == "camera_binding" &&
             blocker.Resource.ResourceKey == "imageacquisition#1.CameraBindingId" &&
             blocker.BlocksBuild);
+        strict.DraftAllowedResourceCount.Should().Be(1);
+        strict.MustConfirmBeforeBuildCount.Should().Be(1);
+        strict.FillLaterCount.Should().Be(0);
+        strict.TotalIncompleteCount.Should().Be(1);
         draft.BuildReadiness.CanBuild.Should().BeTrue();
         draft.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
             blocker.Resource != null &&
@@ -300,6 +304,121 @@ public sealed class VisionAgentBuildOrchestratorTests
         draft.AcceptedAnswers.Should().ContainSingle(accepted =>
             accepted.Field == VisionAgentPlanAnswerFields.ImageSource &&
             accepted.Value == "station_camera");
+
+        var partition = JsonSerializer.SerializeToElement(draft);
+        partition.GetProperty("buildBlockingConfirmationCount").GetInt32().Should().Be(0);
+        partition.GetProperty("buildRequiredResourceCount").GetInt32().Should().Be(0);
+        partition.GetProperty("deferredFieldCount").GetInt32().Should().Be(0);
+        partition.GetProperty("draftAllowedResourceCount").GetInt32().Should().Be(1);
+        partition.GetProperty("mustConfirmBeforeBuildCount").GetInt32().Should().Be(0);
+        partition.GetProperty("fillLaterCount").GetInt32().Should().Be(1);
+        partition.GetProperty("totalIncompleteCount").GetInt32().Should().Be(1);
+
+        var bound = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(
+                plan,
+                confirmedAnswers: [answer],
+                requirementMode: AiRequirementModes.Strict,
+                resourceDecisions:
+                [
+                    new VisionAgentResourceDecision
+                    {
+                        CanonicalId = draft.BuildReadiness.MissingResources.Single().CanonicalId,
+                        ResourceType = "camera_binding",
+                        OperatorKey = "imageacquisition#1",
+                        ParameterName = "CameraBindingId",
+                        Status = VisionAgentResourceStatuses.Bound
+                    }
+                ]),
+            CancellationToken.None);
+        bound.BuildReadiness.CanBuild.Should().BeTrue();
+        bound.ResourcePendingCount.Should().Be(0);
+        bound.MustConfirmBeforeBuildCount.Should().Be(0);
+        bound.FillLaterCount.Should().Be(0);
+        bound.TotalIncompleteCount.Should().Be(0);
+    }
+
+    [Fact(DisplayName = "BuildReadiness count partition should be disjoint for fields and build-required resources")]
+    public async Task PreviewBuildReadiness_CountPartition_ShouldCoverStrictDraftAndBoundResources()
+    {
+        var applicationService = CreateBuildApplicationService(new CapturingAgentRunEventSink());
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"]);
+        var fieldPlan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons = ["hard_requirement:acceptance_criteria_missing"],
+            RemainingPlanFields = [VisionAgentPlanAnswerFields.AcceptanceCriteria],
+            SemanticExtraction = baseline.SemanticExtraction! with { OkCondition = string.Empty, NgCondition = string.Empty },
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanPlan = true,
+                CanBuild = false,
+                MissingFields = [VisionAgentPlanAnswerFields.AcceptanceCriteria],
+                BlockingReasons = ["acceptance_criteria_missing"]
+            }
+        };
+        fieldPlan = fieldPlan with { PlanHash = VisionAgentOrchestrator.ComputePlanHash(fieldPlan) };
+
+        var strictField = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(fieldPlan, requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+        var draftField = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(fieldPlan, requirementMode: AiRequirementModes.Draft),
+            CancellationToken.None);
+
+        strictField.BuildBlockingConfirmationCount.Should().Be(1);
+        strictField.DeferredFieldCount.Should().Be(0);
+        strictField.MustConfirmBeforeBuildCount.Should().Be(1);
+        strictField.FillLaterCount.Should().Be(0);
+        strictField.TotalIncompleteCount.Should().Be(1);
+        draftField.BuildBlockingConfirmationCount.Should().Be(0);
+        draftField.DeferredFieldCount.Should().Be(1);
+        draftField.MustConfirmBeforeBuildCount.Should().Be(0);
+        draftField.FillLaterCount.Should().Be(1);
+        draftField.TotalIncompleteCount.Should().Be(1);
+
+        var resourcePlan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons =
+            [
+                "resource_pending:plc_output_missing",
+                "resource_pending:resource:v1|plc_output|resultoutput#1|outputchannel"
+            ]
+        };
+        resourcePlan = resourcePlan with { PlanHash = VisionAgentOrchestrator.ComputePlanHash(resourcePlan) };
+        var pendingResource = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(resourcePlan, requirementMode: AiRequirementModes.Draft),
+            CancellationToken.None);
+
+        pendingResource.BuildRequiredResourceCount.Should().Be(1);
+        pendingResource.DraftAllowedResourceCount.Should().Be(0);
+        pendingResource.MustConfirmBeforeBuildCount.Should().Be(1);
+        pendingResource.TotalIncompleteCount.Should().Be(1);
+        pendingResource.BuildReadiness.MissingResources.Should().ContainSingle();
+
+        var boundResource = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(
+                resourcePlan,
+                requirementMode: AiRequirementModes.Draft,
+                resourceDecisions:
+                [
+                    new VisionAgentResourceDecision
+                    {
+                        CanonicalId = pendingResource.BuildReadiness.MissingResources.Single().CanonicalId,
+                        ResourceType = "plc_output",
+                        OperatorKey = "resultoutput#1",
+                        ParameterName = "OutputChannel",
+                        Status = VisionAgentResourceStatuses.Bound
+                    }
+                ]),
+            CancellationToken.None);
+        boundResource.ResourcePendingCount.Should().Be(0);
+        boundResource.MustConfirmBeforeBuildCount.Should().Be(0);
+        boundResource.FillLaterCount.Should().Be(0);
+        boundResource.TotalIncompleteCount.Should().Be(0);
     }
 
     [Fact(DisplayName = "BuildReadiness preview should block external output in strict and draft")]
@@ -993,6 +1112,38 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.ResourceKey == "op_detect.ModelPath");
         result.BuildResult.ApplyGate.DeploymentBlockers.Should().Contain("op_detect.ModelPath");
         AssertBuildQuality(result, sink, expectPreserved: true);
+    }
+
+    [Fact(DisplayName = "Plan should keep source blocking reasons separate from derived readiness blockers")]
+    public async Task CreatePlanAsync_MissingCamera_ShouldNotWriteReadinessIdsBackToBlockingReasons()
+    {
+        const string prompt = "检测金属表面划痕，划痕为 NG，输入源使用现场相机，结果使用本地结构化输出。";
+        var semantic = SemanticForPlan("surface_defect", prompt) with { ImageSource = "station_camera" };
+        var orchestrator = new VisionAgentOrchestrator(
+            CreateToolRegistry(),
+            semanticExtractor: new FakeSemanticExtractor(semantic));
+
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = prompt,
+                OriginalUserPrompt = prompt,
+                RequirementMode = AiRequirementModes.Strict,
+                ConfirmedPlanAnswers =
+                [
+                    new VisionAgentPlanAnswer
+                    {
+                        Field = VisionAgentPlanAnswerFields.ImageSource,
+                        Value = "station_camera",
+                        Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
+                    }
+                ]
+            },
+            CancellationToken.None);
+
+        plan.BuildReadiness.MissingResources.Should().ContainSingle(resource =>
+            resource.ResourceType == "camera_binding");
+        plan.BlockingReasons.Should().Equal("inspection_goal_missing");
     }
 
     [Fact(DisplayName = "End-to-end mature strawberry Plan repair and Build should create editable classification draft")]
@@ -2160,7 +2311,8 @@ public sealed class VisionAgentBuildOrchestratorTests
         bool acceptedRecommendedDefaults = false,
         string requirementMode = AiRequirementModes.Strict,
         int answerRevision = 1,
-        string? planHashOverride = null)
+        string? planHashOverride = null,
+        List<VisionAgentResourceDecision>? resourceDecisions = null)
     {
         var request = Request(
             plan,
@@ -2181,6 +2333,7 @@ public sealed class VisionAgentBuildOrchestratorTests
             AcceptedDefaults = build.AcceptedDefaults,
             AcceptedRecommendedDefaults = build.AcceptedRecommendedDefaults,
             AnswerRevision = answerRevision,
+            ResourceDecisions = resourceDecisions ?? [],
             AdditionalContext = request.AdditionalContext,
             CurrentFlowSnapshot = build.CurrentFlowSnapshot,
             TemplateSelection = build.TemplateSelection,

@@ -976,6 +976,122 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
     }
 
     [Fact]
+    public void Evaluate_ChineseMissingCameraOrSample_ShouldUseOneStableCameraBinding()
+    {
+        var baseline = Plan(["resource_pending:未提供现场相机或代表性图像样本"]);
+        var plan = baseline with
+        {
+            SemanticExtraction = baseline.SemanticExtraction! with { ImageSource = string.Empty },
+            RemainingPlanFields = [VisionAgentPlanAnswerFields.ImageSource],
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanPlan = true,
+                CanBuild = false,
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                BlockingReasons = ["image_source_missing"]
+            }
+        };
+
+        var strict = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            requirementMode: AiRequirementModes.Strict);
+        var draft = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            requirementMode: AiRequirementModes.Draft);
+
+        strict.CanBuild.Should().BeFalse();
+        draft.CanBuild.Should().BeTrue();
+        strict.MissingResources.Should().ContainSingle();
+        draft.MissingResources.Should().ContainSingle();
+        strict.MissingResources.Single().Should().Match<VisionAgentResourceRequirement>(resource =>
+            resource.ResourceType == "camera_binding" &&
+            resource.DraftPolicy == VisionAgentResourceDraftPolicies.DraftAllowed &&
+            resource.ResolutionTarget == VisionAgentResourceResolutionTargets.CameraSettings);
+        draft.MissingResources.Single().CanonicalId.Should().Be(strict.MissingResources.Single().CanonicalId);
+        strict.MissingResources.Should().NotContain(resource => resource.ResourceType == "resource");
+        draft.MissingResources.Should().NotContain(resource => resource.ResourceType == "resource");
+    }
+
+    [Fact]
+    public void CanonicalIdentity_ShouldBeIdempotentAcrossRoundTripAndRepeatedEvaluation()
+    {
+        const string canonical = "resource:v1|camera_binding|imageacquisition#1|camera_binding_id";
+        VisionAgentResourceIdentity.CreateCanonicalId(canonical, string.Empty, string.Empty)
+            .Should().Be(canonical);
+
+        var baseline = Plan(["resource_pending:未提供现场相机或代表性图像样本"]);
+        var plan = baseline with
+        {
+            SemanticExtraction = baseline.SemanticExtraction! with { ImageSource = string.Empty },
+            RemainingPlanFields = [VisionAgentPlanAnswerFields.ImageSource],
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanPlan = true,
+                CanBuild = false,
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                BlockingReasons = ["image_source_missing"]
+            }
+        };
+
+        var identities = new List<string>();
+        for (var iteration = 0; iteration < 3; iteration++)
+        {
+            var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(plan, requirementMode: AiRequirementModes.Draft);
+            readiness.MissingResources.Should().ContainSingle();
+            identities.Add(readiness.MissingResources.Single().CanonicalId);
+            plan = plan with { BlockingReasons = readiness.Blockers.Select(blocker => blocker.Id).ToList() };
+        }
+
+        identities.Distinct(StringComparer.OrdinalIgnoreCase).Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Evaluate_PollutedLegacyCanonicalId_ShouldMergeAndCameraBindingShouldReleaseAllGenerations()
+    {
+        const string canonical = "resource:v1|camera_binding|imageacquisition#1|camera_binding_id";
+        var baseline = Plan([
+            "resource_pending:resource:v1|resource|resourcev1resourceglobalresource|resource",
+            $"resource_pending:{canonical}"
+        ]);
+        var plan = baseline with
+        {
+            SemanticExtraction = baseline.SemanticExtraction! with { ImageSource = string.Empty },
+            RemainingPlanFields = [VisionAgentPlanAnswerFields.ImageSource],
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanPlan = true,
+                CanBuild = false,
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                BlockingReasons = ["image_source_missing"]
+            }
+        };
+
+        var pending = VisionAgentPlanReadinessEvaluator.Evaluate(plan, requirementMode: AiRequirementModes.Strict);
+        var bound = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            requirementMode: AiRequirementModes.Strict,
+            resourceDecisions:
+            [
+                new VisionAgentResourceDecision
+                {
+                    CanonicalId = canonical,
+                    ResourceType = "camera_binding",
+                    OperatorKey = "imageacquisition#1",
+                    ParameterName = "CameraBindingId",
+                    Status = VisionAgentResourceStatuses.Bound,
+                    Source = "test"
+                }
+            ]);
+
+        pending.MissingResources.Should().ContainSingle(resource =>
+            resource.CanonicalId == canonical && resource.ResourceType == "camera_binding");
+        bound.MissingResources.Should().BeEmpty();
+        bound.Blockers.Should().NotContain(blocker =>
+            blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending);
+        bound.CanBuild.Should().BeTrue();
+    }
+
+    [Fact]
     public void Evaluate_CanBuild_ShouldEqualAbsenceOfBlockingBlockers()
     {
         var snapshots = new[]
