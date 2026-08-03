@@ -59,7 +59,7 @@ F01 Prompt 1 的最终决定是完整退役 `ClearVision.Product/src/ClearVision
 - F05：`DONE`，唯一当前状态入口是 [F05 完成报告](./F05_完成报告.md)。G1-G6 的本地、Browser、真实 WebView2 Debug/Release、Windows 125% DPI、Release publish、Remote CI 与 Final Gate 已通过。`PRODUCTION_ACCEPTANCE=BLOCKED`、`DEFAULT_ENTRY_CHANGE=BLOCKED`、`F06_IMPLEMENTATION=FORBIDDEN`。
 - F06：G1 合同、安全身份与唯一 Owner 地基已完成，当前唯一状态入口是 [F06 G1 阶段报告](./F06_G1_AI合同安全身份与唯一Owner地基.md)。B1-B5 已关闭；[Handoff Artifact ADR](./ADR-F06-G1-Workspace-Handoff-Artifact.md) 状态为 `ADR_APPROVED_IMPLEMENTATION_DEFERRED_TO_G4`；Remote CI run `30423131238` 与 Final Gate 已通过。当前保持 `F06_G1_STATE=DONE`、`F06_G2_ENTRY=AWAITING_REVIEW`、`F06_G2_IMPLEMENTATION=FORBIDDEN`、`DEFAULT_ENTRY_CHANGE=BLOCKED`、`LEGACY_AI_RETIREMENT=NOT_APPROVED`。
 - F07：G1-G6、G7、G8 及 G7/G8-R 已完成；G9 集成验收已在 source evidence SHA `a5f017d0d0ae6bf3ba20ec85488bb5afa96e21ce` 上闭环。当前状态由 [F07 G9 集成验收与 Final Evidence](./F07_G9_集成验收与FinalEvidence闭环.md) 维护：`F07_G9_STATE=DONE`、`F07_ENGINEERING_STATE=DONE`、`F07_SETTINGS_IMPORT_EXPORT=EXCLUDED`、`F07_REAL_HARDWARE_VALIDATION=NOT_PERFORMED`、`F07_REAL_LLM_PRODUCT_QUALITY=NOT_EVALUATED`、`PRODUCTION_ACCEPTANCE=BLOCKED`、`DEFAULT_ENTRY_CHANGE=BLOCKED`、`LEGACY_SETTINGS_RETIREMENT=NOT_APPROVED`。G10 未进入。
-- F08：`REOPENED_FOR_R1 / BLOCKED`。RunId/SessionId 混淆已按 `ABSENT_RETURN_NULL` 修复，Workspace 路由卸载产品缺陷已修复，完整 F03 为 54/54；但其余 Browser suite 仍有 1 个既有 F05 测试缺陷，Product full 两轮均有非零失败，因此没有创建远程审计分支或触发 CI。当前唯一状态入口是 [F08-R1 RunId 语义与 Final Evidence 修复审计](./F08_R1_RunId语义与FinalEvidence修复审计.md)。旧完成报告和 G7 报告仅保留历史事实，其 DONE 结论已由 `F08_ORIGINAL_DONE_CLAIM=SUPERSEDED_BY_R1_AUDIT` 取代。当前保持 `F08_R1_1_STATE=BLOCKED`、`F08_ENGINEERING_STATE=PARTIAL`、`F08_G7_STATE=BLOCKED`、`REMOTE_CI=NOT_RUN`、`F08_PRODUCTION_ACCEPTANCE=NOT_GRANTED`。
+- F08：本地最终工程门禁已在 source evidence SHA `a7782d85e27adfa82d1cfac6f907d10d53cf16bc` 闭合，当前唯一状态入口是 [F08 Final 工程收口与远程准入报告](./F08_Final_工程收口与远程准入报告.md)。当前为 `F08_FINAL_CLOSURE=AWAITING_REMOTE_CI`、`F08_ENGINEERING_STATE=READY_FOR_REMOTE_AUDIT`、`F08_PLAN_STATE=READY_FOR_REMOTE_AUDIT`、`REMOTE_AUDIT_BRANCH=audit/f08-final-a7782d85`、`REMOTE_CI_STATE=AWAITING`；`PRODUCTION_ACCEPTANCE=NOT_GRANTED`、`DEFAULT_ENTRY_CHANGE=BLOCKED`、`LEGACY_RETIREMENT=NOT_APPROVED` 保持不变。R1、G7 和旧完成报告仅保留历史 DONE/BLOCKED 事实，`F08_ORIGINAL_DONE_CLAIM=SUPERSEDED_BY_FINAL_AUDIT`。
 - `Studio:StudioUiEnabled=false` 保持不变；legacy 仍是默认入口。
 
 ## 阶段门禁
@@ -127,6 +127,6 @@ F04-R 纠偏期间以本目录链接的 F04-R 主计划与 G0/G1 受控文档为
 - [F07 G9 集成验收与 Final Evidence 闭环](./F07_G9_集成验收与FinalEvidence闭环.md)
 - [F08 G0 Post-G9 Delta Reconcile 与合同冻结](./F08_POST_G9_DELTA与G0合同冻结.md)
 - [F08 G1 Canonical Identity、结果持久化与有效准入加固](./F08_G1_CanonicalIdentity结果持久化与有效准入加固.md)
-- [F08-R1 RunId 语义与 Final Evidence 修复审计（当前唯一状态入口）](./F08_R1_RunId语义与FinalEvidence修复审计.md)
+- [F08 Final 工程收口与远程准入报告（当前唯一状态入口）](./F08_Final_工程收口与远程准入报告.md)
 - [仓库级协作规则](../../../AGENTS.md)
 - [旧 Studio2 历史入口](../Studio2/README.md)（历史取证，不是新计划）

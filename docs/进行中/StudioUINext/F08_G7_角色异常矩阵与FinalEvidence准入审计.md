@@ -1,6 +1,6 @@
 # ClearVision Studio UI Next F08 G7：角色、异常矩阵与 Final Evidence 准入审计
 
-> 历史审计说明（2026-08-03）：本报告记录 F08-R1 重开前的 G7 结论。由于本机 RunId/SessionId 语义混淆和完整 F03 Workspace suite 尚未闭环，当前 `F08_G7_STATE=BLOCKED`；当前状态与后续证据统一见 [F08-R1 RunId 语义与 Final Evidence 修复审计](./F08_R1_RunId语义与FinalEvidence修复审计.md)。以下原始结论不作静默改写。
+> 历史审计说明（2026-08-03）：本报告保留原 G7 的 DONE/PASS 结论及其审计范围；R1 重开期间的 `F08_G7_STATE=BLOCKED` 结论也保留在 R1 审计中。当前唯一状态与最终证据统一见 [F08 Final 工程收口与远程准入报告](./F08_Final_工程收口与远程准入报告.md)。以下原始结论不作静默改写，`F08_ORIGINAL_DONE_CLAIM=SUPERSEDED_BY_FINAL_AUDIT`。
 
 ## 1. 状态与结论
 

@@ -1,6 +1,8 @@
 # ClearVision Studio UI Next F08-R1：RunId 语义与 Final Evidence 修复审计
 
-## 1. 当前唯一状态
+> 历史审计说明（2026-08-03）：本文件保留 F08-R1 重开期间的阻断结论，不再是当前状态入口。当前唯一状态入口是 [F08 Final 工程收口与远程准入报告](./F08_Final_工程收口与远程准入报告.md)。本文件原先记录的 `F08_ORIGINAL_DONE_CLAIM=SUPERSEDED_BY_R1_AUDIT` 已被最终审计推进为 `F08_ORIGINAL_DONE_CLAIM=SUPERSEDED_BY_FINAL_AUDIT`；以下 `F08_R1_STATE=BLOCKED`、`F08_R1_1_STATE=BLOCKED` 等历史结论保留用于追踪。
+
+## 1. 历史状态（R1 重开期间）
 
 ```text
 F08_PLAN_STATE=REOPENED_FOR_R1
@@ -14,14 +16,14 @@ F08_G4_STATE=PASS
 F08_G5_IDENTITY_REPAIR=PASS
 F08_G6_IDENTITY_REPAIR=PASS
 F08_G7_STATE=BLOCKED
-F08_ORIGINAL_DONE_CLAIM=SUPERSEDED_BY_R1_AUDIT
+F08_ORIGINAL_DONE_CLAIM=SUPERSEDED_BY_FINAL_AUDIT
 F08_NEXT_GOAL=F08_R1_BLOCKER_RECONCILE
 F08_PRODUCTION_ACCEPTANCE=NOT_GRANTED
 ```
 
-本文件是 F08 当前唯一状态入口。`F08_完成报告.md` 与
-`F08_G7_角色异常矩阵与FinalEvidence准入审计.md` 保留 2026-08-03 R1 重开前的历史审计记录，
-其中的 F08 DONE 结论已被本审计取代，不代表当前状态。
+本文件曾是 F08-R1 阶段的唯一状态入口。`F08_完成报告.md` 与
+`F08_G7_角色异常矩阵与FinalEvidence准入审计.md` 保留更早的历史审计记录；当前唯一状态和最终证据
+由上方 Final 报告维护，本文的 R1 阻断结论不代表当前状态。
 
 F08-R1.1 的 Workspace 路由卸载产品缺陷已修复，F03 已达到 54/54；但其余 Browser suite
 仍有 1 个既有 F05 测试缺陷，Product full 两轮均出现非零失败。当前任务禁止扩大修复范围，
