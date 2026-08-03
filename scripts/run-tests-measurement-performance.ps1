@@ -232,7 +232,7 @@ if ([string]::IsNullOrWhiteSpace($env:CV_MEASUREMENT_PERF_BUDGET_SCALE)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($env:CV_MEASUREMENT_PERF_WARMUP_ITERS)) {
-    $env:CV_MEASUREMENT_PERF_WARMUP_ITERS = "5"
+    $env:CV_MEASUREMENT_PERF_WARMUP_ITERS = "24"
 }
 
 if ([string]::IsNullOrWhiteSpace($env:CV_MEASUREMENT_PERF_MEASURE_ITERS)) {

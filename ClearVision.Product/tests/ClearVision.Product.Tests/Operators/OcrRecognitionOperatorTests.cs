@@ -97,7 +97,14 @@ public class OcrRecognitionOperatorTests : IDisposable
         var op = new Operator("OCR预热", OperatorType.OcrRecognition, 0, 0);
         await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(warmupImg));
 
-        // 2. 1920x1080 性能测试
+        // 2. Warm the actual measured image size as well. The smaller engine
+        // warmup does not exercise the large-image preprocessing/inference path.
+        using var fullSizeWarmupImg = CreateOcrTestImage("FULL_SIZE_WARMUP", 1920, 1080);
+        var fullSizeWarmup = await _operator.ExecuteAsync(op, TestHelpers.CreateImageInputs(fullSizeWarmupImg));
+        fullSizeWarmup.ErrorMessage.Should().BeNull();
+        fullSizeWarmup.IsSuccess.Should().BeTrue();
+
+        // 3. 1920x1080 performance measurement
         using var img = CreateOcrTestImage("PERFORMANCE_2026", 1920, 1080);
 
         var sw = Stopwatch.StartNew();

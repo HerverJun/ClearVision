@@ -24,7 +24,7 @@ public sealed class MeasurementPerformanceBudgetAcceptanceTests
     [Fact(Timeout = 300000)]
     public async Task W5_MeasurementOperatorPerformanceBudget_512_ShouldMeetUnifiedGate()
     {
-        var warmupIterations = GetEnvInt("CV_MEASUREMENT_PERF_WARMUP_ITERS", 5, 0, 100);
+        var warmupIterations = GetEnvInt("CV_MEASUREMENT_PERF_WARMUP_ITERS", 24, 0, 100);
         var measuredIterations = GetEnvInt("CV_MEASUREMENT_PERF_MEASURE_ITERS", 24, 10, 400);
         var budgetScale = GetEnvDouble("CV_MEASUREMENT_PERF_BUDGET_SCALE", DefaultBudgetScale, 0.5, 10.0);
         var gateProfile = GetEnvString("CV_MEASUREMENT_PERF_GATE_PROFILE", "standard");

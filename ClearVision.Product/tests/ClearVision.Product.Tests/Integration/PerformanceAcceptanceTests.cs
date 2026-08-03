@@ -20,15 +20,15 @@ namespace ClearVision.Product.Tests.Integration
 {
     [Collection(PerformanceAcceptanceCollection.Name)]
     [Trait("Category", "PerformanceBudget")]
-    public class PerformanceAcceptanceTests
+    public class PerformanceAcceptanceTests : IDisposable
     {
         private readonly IFlowExecutionEngine _flowExecutionService;
         private readonly OperatorFlow _testFlow;
 
         public PerformanceAcceptanceTests()
         {
-            // Keep performance tests isolated from prior pool state.
-            MatPool.Shared.Configure(maxPerBucket: 128, maxTotalGb: 8.0);
+            // Keep performance tests isolated from prior pool state without changing the
+            // shared pool configuration seen by the rest of the test assembly.
             MatPool.Shared.Trim();
 
             var logger = Substitute.For<ILogger<FlowExecutionService>>();
@@ -142,7 +142,6 @@ namespace ClearVision.Product.Tests.Integration
             double minHitRate = GetEnvDouble("CV_PERF_MIN_HIT_RATE", 0.55, 0.0, 1.0);
             double maxMemoryIncreaseMb = GetEnvDouble("CV_PERF_MAX_MEMORY_MB", 150.0, 32.0, 1024.0);
 
-            MatPool.Shared.Configure(maxPerBucket: 128, maxTotalGb: 8.0);
             MatPool.Shared.Trim();
             GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
 
@@ -240,6 +239,13 @@ namespace ClearVision.Product.Tests.Integration
             Assert.True(
                 hitRate >= minHitRate,
                 $"MatPool hit rate too low: {hitRate:P2}. Hits={hits}, Misses={misses}, Required>={minHitRate:P2}, Warmup={warmupIterations}, Measured={measuredIterations}");
+        }
+
+        public void Dispose()
+        {
+            // Deep stability rents 6000x4000 Mats. Do not retain those buffers for
+            // unrelated tests running later in the same process.
+            MatPool.Shared.Trim();
         }
 
         [Fact]
