@@ -125,6 +125,8 @@ public sealed class ApiEndpointsInspectionHistoryTests
         var projectId = Guid.NewGuid();
         var resultId = Guid.NewGuid();
         var referenceId = Guid.NewGuid();
+        var currentSessionId = Guid.NewGuid();
+        var referenceSessionId = Guid.NewGuid();
         authService.GetSessionAsync("desktop-token").Returns(Task.FromResult<ClearVision.Product.Application.Services.UserSession?>(new ClearVision.Product.Application.Services.UserSession
         {
             UserId = "history-user",
@@ -144,7 +146,8 @@ public sealed class ApiEndpointsInspectionHistoryTests
                     ProjectId = projectId,
                     Status = InspectionStatus.NG,
                     InspectionTime = DateTime.UtcNow,
-                    FlowVersionHash = "FLOW-A"
+                    FlowVersionHash = "FLOW-A",
+                    SessionId = currentSessionId
                 },
                 ReferenceSummary = new InspectionHistoryComparisonSummary
                 {
@@ -152,7 +155,8 @@ public sealed class ApiEndpointsInspectionHistoryTests
                     ProjectId = projectId,
                     Status = InspectionStatus.OK,
                     InspectionTime = DateTime.UtcNow.AddMinutes(-1),
-                    FlowVersionHash = "FLOW-A"
+                    FlowVersionHash = "FLOW-A",
+                    SessionId = referenceSessionId
                 }
             });
         await using var host = await HistoryEndpointTestHost.CreateAsync(service, authService);
@@ -167,7 +171,13 @@ public sealed class ApiEndpointsInspectionHistoryTests
 
         using var document = JsonDocument.Parse(body);
         document.RootElement.GetProperty("found").GetBoolean().Should().BeTrue();
-        document.RootElement.GetProperty("referenceSummary").GetProperty("resultId").GetGuid().Should().Be(referenceId);
+        var currentSummary = document.RootElement.GetProperty("currentSummary");
+        var referenceSummary = document.RootElement.GetProperty("referenceSummary");
+        currentSummary.GetProperty("sessionId").GetGuid().Should().Be(currentSessionId);
+        currentSummary.GetProperty("runId").ValueKind.Should().Be(JsonValueKind.Null);
+        referenceSummary.GetProperty("resultId").GetGuid().Should().Be(referenceId);
+        referenceSummary.GetProperty("sessionId").GetGuid().Should().Be(referenceSessionId);
+        referenceSummary.GetProperty("runId").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact]
@@ -449,6 +459,7 @@ public sealed class ApiEndpointsInspectionHistoryTests
         item.GetProperty("flowVersionHash").GetString().Should().Be("FLOW-HASH-1");
         item.GetProperty("calibrationBundleId").GetString().Should().Be("bundle-authority-1");
         item.GetProperty("sessionId").GetGuid().Should().Be(sessionId);
+        item.GetProperty("runId").ValueKind.Should().Be(JsonValueKind.Null);
         item.GetProperty("defectCount").GetInt32().Should().Be(1);
         item.GetProperty("processingTimeMs").GetInt64().Should().Be(123);
         item.GetProperty("status").GetString().Should().Be("NG");
@@ -495,6 +506,7 @@ public sealed class ApiEndpointsInspectionHistoryTests
     public void ToInspectionHistoryDetailResponse_ShouldRedactPathsSecretsAndLargePayloads()
     {
         var imageId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
         var longText = new string('A', 900);
         var detail = new InspectionHistoryDetail
         {
@@ -509,7 +521,7 @@ public sealed class ApiEndpointsInspectionHistoryTests
             HasAnalysisData = true,
             FlowVersionHash = "FLOW-HASH-2",
             CalibrationBundleId = "bundle-2",
-            SessionId = Guid.NewGuid(),
+            SessionId = sessionId,
             ExecutionSnapshotId = Guid.NewGuid(),
             ProjectPersistenceRevision = 23,
             DecisionConfigurationHash = "DECISION-HASH-23",
@@ -546,6 +558,10 @@ public sealed class ApiEndpointsInspectionHistoryTests
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
         var traceability = root.GetProperty("traceability");
+        root.GetProperty("sessionId").GetGuid().Should().Be(sessionId);
+        root.GetProperty("runId").ValueKind.Should().Be(JsonValueKind.Null);
+        traceability.GetProperty("sessionId").GetGuid().Should().Be(sessionId);
+        traceability.GetProperty("runId").ValueKind.Should().Be(JsonValueKind.Null);
         traceability.GetProperty("projectPersistenceRevision").GetInt64().Should().Be(23);
         traceability.GetProperty("decisionConfigurationHash").GetString().Should().Be("DECISION-HASH-23");
         traceability.GetProperty("executionSnapshotId").GetGuid().Should().Be(detail.ExecutionSnapshotId!.Value);
@@ -566,6 +582,8 @@ public sealed class ApiEndpointsInspectionHistoryTests
         var projectId = Guid.NewGuid();
         var leftId = Guid.NewGuid();
         var rightId = Guid.NewGuid();
+        var leftSessionId = Guid.NewGuid();
+        var rightSessionId = Guid.NewGuid();
         var comparison = new InspectionHistoryComparison
         {
             LeftSummary = new InspectionHistoryComparisonSummary
@@ -576,6 +594,7 @@ public sealed class ApiEndpointsInspectionHistoryTests
                 InspectionTime = DateTime.UtcNow,
                 FlowVersionHash = "FLOW-A",
                 CalibrationBundleId = "BUNDLE-A",
+                SessionId = leftSessionId,
                 HasImage = true,
                 ImageId = Guid.NewGuid(),
                 ImageReference = "/api/images/left"
@@ -588,6 +607,7 @@ public sealed class ApiEndpointsInspectionHistoryTests
                 InspectionTime = DateTime.UtcNow,
                 FlowVersionHash = "FLOW-B",
                 CalibrationBundleId = "BUNDLE-B",
+                SessionId = rightSessionId,
                 HasImage = true
             },
             Compatibility = new InspectionHistoryCompatibility
@@ -638,7 +658,13 @@ public sealed class ApiEndpointsInspectionHistoryTests
 
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
-        root.GetProperty("leftSummary").GetProperty("resultId").GetGuid().Should().Be(leftId);
+        var leftSummary = root.GetProperty("leftSummary");
+        var rightSummary = root.GetProperty("rightSummary");
+        leftSummary.GetProperty("resultId").GetGuid().Should().Be(leftId);
+        leftSummary.GetProperty("sessionId").GetGuid().Should().Be(leftSessionId);
+        leftSummary.GetProperty("runId").ValueKind.Should().Be(JsonValueKind.Null);
+        rightSummary.GetProperty("sessionId").GetGuid().Should().Be(rightSessionId);
+        rightSummary.GetProperty("runId").ValueKind.Should().Be(JsonValueKind.Null);
         root.GetProperty("compatibility").GetProperty("onlySafePreviewComparison").GetBoolean().Should().BeTrue();
         root.GetProperty("warnings")[0].GetString().Should().Contain("流程版本不一致");
         root.GetProperty("sceneReplayAvailability").GetProperty("message").GetString().Should().Be("暂无 Scene evidence，已降级为摘要回放");

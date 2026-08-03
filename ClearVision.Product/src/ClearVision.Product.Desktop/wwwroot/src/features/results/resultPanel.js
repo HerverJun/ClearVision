@@ -2046,7 +2046,8 @@ class ResultPanel {
         const rows = [
             ['FlowVersionHash', result.flowVersionHash || legacy],
             ['CalibrationBundleId', result.calibrationBundleId || legacy],
-            ['SessionId / RunId', result.sessionId || result.runId || legacy]
+            ['SessionId', result.sessionId || legacy],
+            ['RunId', result.runId || 'Run ID 未记录，旧结果身份不完整']
         ];
 
         return `

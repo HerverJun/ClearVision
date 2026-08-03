@@ -1140,12 +1140,14 @@ function normalizeInspectionResultRecord(result, fallbackProjectId = null) {
         ?? null;
     normalized.sessionId = normalized.sessionId
         ?? normalized.SessionId
-        ?? normalized.runId
-        ?? normalized.RunId
         ?? normalized.traceability?.sessionId
         ?? normalized.Traceability?.SessionId
         ?? null;
-    normalized.runId = normalized.runId ?? normalized.RunId ?? normalized.sessionId;
+    normalized.runId = normalized.runId
+        ?? normalized.RunId
+        ?? normalized.traceability?.runId
+        ?? normalized.Traceability?.RunId
+        ?? null;
     normalized.errorMessage = normalized.errorMessage ?? normalized.ErrorMessage ?? '';
 
     return normalized;

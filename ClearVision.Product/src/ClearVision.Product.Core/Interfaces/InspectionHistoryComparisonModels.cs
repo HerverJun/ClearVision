@@ -48,7 +48,7 @@ public sealed class InspectionHistoryComparisonSummary
 
     public Guid? SessionId { get; init; }
 
-    public Guid? RunId => SessionId;
+    public Guid? RunId { get; init; }
 
     public Guid? ImageId { get; init; }
 

@@ -46,6 +46,8 @@ public sealed class InspectionEvidenceManifestServiceTests
             manifest.SchemaVersion.Should().Be(1);
             manifest.ProjectId.Should().Be(projectId);
             manifest.InspectionResultId.Should().Be(result.Id);
+            manifest.SessionId.Should().Be(result.SessionId);
+            manifest.RunId.Should().BeNull();
             manifest.Checksum.Should().Be(InspectionEvidenceManifestService.ComputeManifestChecksum(manifest));
             manifest.RetentionClass.Should().Be("long");
             manifest.Items.Should().Contain(item => item.Role == "output-image");
@@ -63,6 +65,7 @@ public sealed class InspectionEvidenceManifestServiceTests
             var export = await CreateService(root, CreateRepository(projectId, result.Id)).ExportAsync(projectId, result.Id);
             var json = Encoding.UTF8.GetString(export.Content);
             export.Success.Should().BeTrue();
+            json.Should().NotContain("\"runId\"");
             json.Should().NotContain("do-not-leak");
             json.Should().NotContain("secret-token");
             json.Should().NotContain("C:\\\\Users\\\\A\\\\secret\\\\raw.png");
@@ -71,6 +74,39 @@ public sealed class InspectionEvidenceManifestServiceTests
             json.Should().Contain("[REDACTED_PATH]");
             json.Should().Contain("[OMITTED_LARGE_PAYLOAD]");
             json.Should().Contain("binary-item-omitted-from-json-export");
+        }
+        finally
+        {
+            DeleteTempDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task GetManifestAsync_ShouldDiscardLegacyConflatedRunIdAfterChecksumValidation()
+    {
+        var root = CreateTempDirectory();
+        var projectId = Guid.NewGuid();
+        var result = CreateResult(projectId, InspectionStatus.NG);
+
+        try
+        {
+            var service = CreateService(root, CreateRepository(projectId, result.Id));
+            await service.CaptureAsync(result);
+
+            var manifest = await ReadManifestAsync(root, projectId, result.Id);
+            manifest.RunId = manifest.SessionId;
+            manifest.Checksum = InspectionEvidenceManifestService.ComputeManifestChecksum(manifest);
+            var manifestPath = Path.Combine(root, projectId.ToString("N"), result.Id.ToString("N"), "manifest.json");
+            await File.WriteAllTextAsync(
+                manifestPath,
+                JsonSerializer.Serialize(manifest, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+
+            var read = await service.GetManifestAsync(projectId, result.Id);
+
+            read.Found.Should().BeTrue();
+            read.Manifest!.SessionId.Should().Be(result.SessionId);
+            read.Manifest.RunId.Should().BeNull();
+            read.Warnings.Should().ContainSingle(warning => warning.Contains("RunId was discarded"));
         }
         finally
         {

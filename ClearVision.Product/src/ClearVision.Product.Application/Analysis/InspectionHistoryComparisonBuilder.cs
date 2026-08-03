@@ -80,9 +80,14 @@ public static class InspectionHistoryComparisonBuilder
 
         traceabilityDiffs.Add(CompareField(
             Path("traceability", "sessionId"),
-            "SessionId / RunId",
+            "SessionId",
             left.SessionId,
             right.SessionId));
+        traceabilityDiffs.Add(CompareField(
+            Path("traceability", "runId"),
+            "RunId",
+            leftValue: null,
+            rightValue: null));
 
         AddDefectSummaryDiffs(left, right, fieldDiffs);
         AddPreviewDiffs("outputDataPreview", "输出数据", leftOutputPreview, rightOutputPreview, fieldDiffs, warnings);
@@ -159,6 +164,7 @@ public static class InspectionHistoryComparisonBuilder
             FlowVersionHash = result.FlowVersionHash,
             CalibrationBundleId = result.CalibrationBundleId,
             SessionId = result.SessionId,
+            RunId = null,
             ImageId = result.ImageId,
             ImageReference = BuildImageReference(result.ImageId),
             HasImage = result.HasImage,

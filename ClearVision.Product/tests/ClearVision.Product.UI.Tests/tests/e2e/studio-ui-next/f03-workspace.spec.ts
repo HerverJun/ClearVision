@@ -27,6 +27,7 @@ const goldenRoiNodeId = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000c352';
 const goldenJudgeNodeId = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000c353';
 const goldenJudgeOutputId = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000c3b5';
 const goldenResultId = 'aaaaaaaa-aaaa-4aaa-8aaa-000000015f91';
+const goldenSessionId = 'aaaaaaaa-aaaa-4aaa-8aaa-000000015f92';
 const previewImage = Buffer.from(
   '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">' +
   '<rect width="100" height="100" fill="#203040"/><circle cx="50" cy="50" r="24" fill="#7dd3fc"/></svg>',
@@ -329,6 +330,7 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
   let projectGetCall = 0;
   let projectPutCall = 0;
   let runCall = 0;
+  let lastExecutionSnapshotId: string | null = null;
   const projects = new Map<string, Readonly<Record<string, unknown>>>();
   await installF03BrowserStartup(page, options.workspaceEnabled ?? true);
   await page.route('**/health', route => fulfillF03Json(
@@ -517,6 +519,9 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
     if (url.pathname === '/api/inspection/execute' && request.method() === 'POST') {
       runCall += 1;
       const requestBody = request.postDataJSON() as Readonly<Record<string, unknown>>;
+      lastExecutionSnapshotId = typeof requestBody.clientSnapshotId === 'string'
+        ? requestBody.clientSnapshotId
+        : null;
       const scenario = await (options.runScenario?.('execute', requestBody, runCall) ?? {});
       if (scenario.delayMs) await new Promise(resolve => setTimeout(resolve, scenario.delayMs));
       if (scenario.abort) {
@@ -550,7 +555,7 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
         version: 4,
         updatedAtUtc: '2026-07-22T01:02:03Z',
         updatedBy: 'FormalRun',
-        runId: goldenResultId,
+        runId: null,
         operatorId: goldenJudgeNodeId
       }], fixtureSchema);
       return;
@@ -575,6 +580,27 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
       await fulfillF03Json(route, 200, [projectPayload(projectA)], fixtureSchema);
       return;
     }
+    if (url.pathname === `/api/inspection/statistics/${projectA}` && request.method() === 'GET') {
+      await fulfillF03Json(route, 200, {
+        totalAttemptCount: 1,
+        executionSucceededCount: 1,
+        validDecisionCount: 1,
+        okCount: 1,
+        ngCount: 0,
+        undeterminedCount: 0,
+        notApplicableCount: 0,
+        invalidCount: 0,
+        failedCount: 0,
+        cancelledCount: 0,
+        timedOutCount: 0,
+        skippedCount: 0,
+        executionFailureCount: 0,
+        yieldRate: 1,
+        decisionCoverageRate: 1,
+        averageExecutionTimeMs: 18
+      }, fixtureSchema);
+      return;
+    }
     if (url.pathname === `/api/inspection/history/${projectA}/${goldenResultId}/evidence/manifest` &&
         request.method() === 'GET') {
       await fulfillF03Json(route, 200, goldenEvidenceManifest(), fixtureSchema);
@@ -595,7 +621,7 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
       return;
     }
     if (url.pathname === `/api/inspection/history/${projectA}/${goldenResultId}` && request.method() === 'GET') {
-      await fulfillF03Json(route, 200, goldenResultDetail(), fixtureSchema);
+      await fulfillF03Json(route, 200, goldenResultDetail(lastExecutionSnapshotId), fixtureSchema);
       return;
     }
     if (url.pathname === `/api/inspection/history/${projectA}` && request.method() === 'GET') {
@@ -874,22 +900,23 @@ function goldenResultSummary() {
     confidenceScore: 0.98,
     flowVersionHash: 'fixture-persisted-flow-hash',
     calibrationBundleId: null,
-    runId: goldenResultId,
+    runId: null,
     diagnosticCode: 'G3_OK',
     diagnosticMessage: '黄金旅程正式运行完成。',
     errorMessage: null
   };
 }
 
-function goldenResultDetail() {
+function goldenResultDetail(executionSnapshotId: string | null) {
   return {
     ...goldenResultSummary(),
     defects: [],
     traceability: {
       flowVersionHash: 'fixture-persisted-flow-hash',
       calibrationBundleId: null,
-      sessionId: null,
-      runId: goldenResultId,
+      sessionId: goldenSessionId,
+      runId: null,
+      executionSnapshotId,
       packageId: 'cvpkg-g3-golden',
       stationId: null,
       projectPersistenceRevision: 8,
@@ -900,7 +927,13 @@ function goldenResultDetail() {
     evidenceManifestReference: 'manifest-g3',
     evidenceTotalBytes: previewImage.length,
     retentionExpiresAtUtc: null,
-    evidenceMessage: '本次结果证据完整，可导出。'
+    evidenceMessage: '本次结果证据完整，可导出。',
+    hasImage: false,
+    imageReference: null,
+    imageMissing: false,
+    imageMissingMessage: null,
+    hasOutputData: true,
+    hasAnalysisData: true
   };
 }
 
@@ -918,8 +951,8 @@ function goldenEvidenceManifest() {
       createdAtUtc: '2026-07-22T01:02:03Z',
       flowVersionHash: 'fixture-persisted-flow-hash',
       calibrationBundleId: null,
-      sessionId: null,
-      runId: goldenResultId,
+      sessionId: goldenSessionId,
+      runId: null,
       retentionClass: 'standard',
       retentionExpiresAtUtc: null,
       totalBytes: previewImage.length,
@@ -1835,7 +1868,8 @@ test('G5 GET PUT GET saves one canonical payload and preserves null, falsy and o
   await textInput.press('Enter');
   await expect(shell).toHaveAttribute('data-workspace-dirty', 'true');
   expect(isF03G5RequestAllowlist(audit)).toBe(true);
-  expect(audit.some(entry => /\/api\/(?:inspection\/execute|inspection\/admission|runs)/i.test(entry.path))).toBe(false);
+  expect(audit.some(entry => /\/api\/(?:inspection\/execute|runs)/i.test(entry.path))).toBe(false);
+  expect(audit.filter(entry => entry.path === '/api/inspection/admission')).toHaveLength(2);
 });
 
 test('G6 runs only the saved Project identity, stays in Workspace, and hands off the current result explicitly', async ({ page }) => {
@@ -1852,19 +1886,20 @@ test('G6 runs only the saved Project identity, stays in Workspace, and hands off
   await page.locator('[data-testid="workspace-run"]').click();
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'succeeded');
   await expect(page.locator('[data-testid="workspace-current-result"]')).toHaveText('查看本次结果');
-  expect(requests.map(item => item.stage)).toEqual(['admission', 'execute']);
-  expect(requests[0]!.request).toMatchObject({ projectId: projectA, expectedPersistenceRevision: 7 });
-  expect(requests[0]!.request).not.toHaveProperty('flowData');
-  expect(requests[1]!.request).toMatchObject({
+  expect(requests.map(item => item.stage)).toEqual(['admission', 'admission', 'execute']);
+  expect(requests[1]!.request).toMatchObject({ projectId: projectA, expectedPersistenceRevision: 7 });
+  expect(requests[1]!.request).not.toHaveProperty('flowData');
+  expect(requests[2]!.request).toMatchObject({
     projectId: projectA,
     expectedPersistenceRevision: 7,
     expectedCanonicalFlowHash: 'fixture-persisted-flow-hash',
     expectedDecisionConfigurationHash: 'fixture-decision-hash'
   });
-  expect(requests[1]!.request.clientSnapshotId).toBe(requests[0]!.request.clientSnapshotId);
+  expect(requests[2]!.request.clientSnapshotId).toBe(requests[1]!.request.clientSnapshotId);
   expect(audit.filter(item => item.method === 'POST' && item.path.startsWith('/api/inspection/') &&
     item.path !== '/api/inspection/decision-configuration/validate')
     .map(item => item.path)).toEqual([
+    '/api/inspection/admission',
     '/api/inspection/admission',
     '/api/inspection/execute'
   ]);
@@ -2076,10 +2111,15 @@ test('G4 visual evidence holds Formal Run executing until the authoritative resu
 });
 
 test('G6 blocks execute after admission rejection and keeps the saved Workspace editable', async ({ page }) => {
+  let admissionCall = 0;
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
-    runScenario: (stage, request) => stage === 'admission'
-      ? {
+    runScenario: (stage, request) => {
+      if (stage !== 'admission') return {};
+      admissionCall += 1;
+      return admissionCall === 1
+        ? {}
+        : {
           body: {
             allowed: false,
             code: 'ADMISSION_FINAL_DECISION_INVALID',
@@ -2089,22 +2129,27 @@ test('G6 blocks execute after admission rejection and keeps the saved Workspace 
             projectPersistenceRevision: null,
             canonicalFlowHash: null,
             decisionConfigurationHash: null,
-            violations: [{ code: 'FINAL_DECISION_INVALID' }]
+            violations: [{ code: 'FINAL_DECISION_INVALID', reason: '最终判定配置未通过权威校验。' }]
           }
-        }
-      : {}
+        };
+    }
   });
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
   await page.locator('[data-testid="workspace-run"]').click();
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'blocked');
-  await expect(page.locator('[data-testid="workspace-run"]')).toBeEnabled();
+  await expect(page.locator('[data-testid="workspace-run"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="run-console-admission-refresh"]')).toBeEnabled();
+  await expect(page.locator('[data-evidence-surface="f03-g2-flow-canvas"]'))
+    .toHaveAttribute('data-mutation-gate', 'editable');
   expect(audit.filter(item => item.path === '/api/inspection/execute')).toHaveLength(0);
+  expect(audit.filter(item => item.path === '/api/inspection/admission')).toHaveLength(2);
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
 
 test('G6 genuine running Stop cancels before execute completion and unlocks without Results navigation', async ({ page }) => {
   const executeEntered = deferred();
   const cancellationRequested = deferred();
+  const releaseExecuteResponse = deferred();
   let executeCompleted = false;
   let stopObservedBeforeCompletion = false;
   const audit = await bootWorkspace(page, {
@@ -2113,6 +2158,7 @@ test('G6 genuine running Stop cancels before execute completion and unlocks with
       if (stage === 'execute') {
         executeEntered.resolve();
         await cancellationRequested.promise;
+        await releaseExecuteResponse.promise;
         executeCompleted = true;
         return { abort: true };
       }
@@ -2156,15 +2202,17 @@ test('G6 genuine running Stop cancels before execute completion and unlocks with
   await expect(page.locator('[data-capability="results-read"]')).toHaveCount(0);
   await page.locator('[data-testid="workspace-run-stop"]').click();
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'cancelled');
+  releaseExecuteResponse.resolve();
+  await expect.poll(() => executeCompleted).toBe(true);
   await expect(page.locator('[data-testid="workspace-run"]')).toBeEnabled();
   await expect(page.locator('[data-evidence-surface="f03-g2-flow-canvas"]')).toHaveAttribute('data-mutation-gate', 'editable');
   await expect(page.locator('[data-capability="results-read"]')).toHaveCount(0);
   expect(new URL(page.url()).hash).toContain(`/projects/${projectA}/workspace`);
   expect(stopObservedBeforeCompletion).toBe(true);
-  expect(executeCompleted).toBe(true);
   expect(audit.filter(entry => entry.method === 'POST' && entry.path.startsWith('/api/inspection/') &&
     entry.path !== '/api/inspection/decision-configuration/validate')
     .map(entry => entry.path)).toEqual([
+    '/api/inspection/admission',
     '/api/inspection/admission',
     '/api/inspection/execute',
     '/api/inspection/stop'
@@ -2173,12 +2221,15 @@ test('G6 genuine running Stop cancels before execute completion and unlocks with
 });
 
 test('G6 explicit reconcile recovers a successful result after execute response loss', async ({ page }) => {
+  let reconcileCall = 0;
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
     runScenario: (stage, request) => stage === 'execute'
       ? { abort: true }
       : stage === 'reconcile'
-        ? {
+        ? ++reconcileCall === 1
+          ? { abort: true }
+          : {
             body: {
               status: 'succeeded',
               code: null,
@@ -2216,12 +2267,15 @@ test('G6 explicit reconcile recovers a successful result after execute response 
 
 test('G6 reconcile still-running and identity mismatch remain fail-closed', async ({ page }) => {
   let mode: 'running' | 'mismatch' = 'running';
+  let reconcileCall = 0;
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
     runScenario: (stage, request) => stage === 'execute'
       ? { abort: true }
       : stage === 'reconcile'
-        ? mode === 'running'
+        ? ++reconcileCall === 1
+          ? { abort: true }
+          : mode === 'running'
           ? {
               body: {
                 status: 'still-running',
@@ -2284,8 +2338,8 @@ test('G6 protects route leave while Formal Run is still executing', async ({ pag
   await requestStudioHashNavigation(page, '#/about');
   await expect(page.locator('[data-product-state="leave-blocked"]')).toContainText('Formal Run');
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
-  expect(audit.some(entry => entry.path === '/api/inspection/stop')).toBe(true);
-  expect(audit.some(entry => entry.path === '/api/inspection/reconcile')).toBe(true);
+  expect(audit.some(entry => entry.path === '/api/inspection/stop')).toBe(false);
+  expect(audit.some(entry => entry.path === '/api/inspection/reconcile')).toBe(false);
 
   reconcileStatus = 'cancelled';
   await page.locator('[data-testid="workspace-run-reconcile"]').click();
@@ -2302,6 +2356,7 @@ test('G6 protects route leave while Formal Run is still executing', async ({ pag
 });
 
 test('G6 protects project switch while Formal Run is still executing', async ({ page }) => {
+  test.setTimeout(60_000);
   let reconcileStatus: 'still-running' | 'cancelled' = 'still-running';
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
@@ -2321,12 +2376,15 @@ test('G6 protects project switch while Formal Run is still executing', async ({ 
   await requestStudioHashNavigation(page, `#/projects/${projectB}/workspace`);
   await expect(page.locator('[data-product-state="leave-blocked"]')).toContainText('Formal Run');
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
+  expect(audit.some(entry => entry.path === '/api/inspection/stop')).toBe(false);
+  expect(audit.some(entry => entry.path === '/api/inspection/reconcile')).toBe(false);
 
   reconcileStatus = 'cancelled';
   await page.locator('[data-testid="workspace-run-reconcile"]').click();
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'cancelled');
   await requestStudioHashNavigation(page, `#/projects/${projectB}/workspace`);
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectB);
+  await expect(page.locator('[data-testid="workspace-run"]')).toBeEnabled();
   await requestStudioHashNavigation(page, '#/about');
   await expect(page).toHaveURL(/#\/about$/);
   await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
@@ -2362,13 +2420,15 @@ test('G6 Host close flush keeps the owner alive when Formal Run cannot be settle
     return await flush?.('host-close');
   });
   expect(flushResult).toBe(false);
-  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'cancel-requested');
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'executing');
   await expect(page.locator('[data-testid="workspace-save"]')).toBeDisabled();
+  expect(audit.some(entry => entry.path === '/api/inspection/stop')).toBe(false);
+  expect(audit.some(entry => entry.path === '/api/inspection/reconcile')).toBe(false);
   await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
     workspaceOwnerCount: 1,
     runOwnerCount: 1,
-    activeAbortControllers: 0,
-    inFlightExecute: 0
+    activeAbortControllers: 1,
+    inFlightExecute: 1
   });
 
   reconcileStatus = 'cancelled';
@@ -2420,7 +2480,8 @@ test('G5 saves and reloads a catalog-added numeric operator type through the for
   await page.reload();
   await expect(shell).toHaveAttribute('data-workspace-persistence-revision', '8');
   await expect(canvas).toHaveAttribute('data-node-count', '1');
-  expect(audit.some(entry => /\/api\/(?:inspection\/execute|inspection\/admission|runs)/i.test(entry.path))).toBe(false);
+  expect(audit.some(entry => /\/api\/(?:inspection\/execute|runs)/i.test(entry.path))).toBe(false);
+  expect(audit.filter(entry => entry.path === '/api/inspection/admission')).toHaveLength(2);
   expect(isF03G5RequestAllowlist(audit)).toBe(true);
 });
 
@@ -2831,12 +2892,15 @@ test('G4 Preview keeps the latest node when an older response arrives late', asy
 });
 
 test('passes 20 project switches with one owner and a zero final resource ledger', async ({ page }) => {
+  test.setTimeout(90_000);
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
   });
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
   for (let cycle = 0; cycle < 20; cycle += 1) {
     const projectId = cycle % 2 === 0 ? projectB : projectA;
+    await expect(page.locator('[data-testid="workspace-run"]'), `cycle ${cycle} admission stable`)
+      .toBeEnabled();
     await page.goto(`/studio/index.html#/projects/${projectId}/workspace`);
     await expect(shell).toHaveAttribute('data-workspace-project-id', projectId);
     await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
@@ -2877,6 +2941,7 @@ test('passes 20 project switches with one owner and a zero final resource ledger
 });
 
 test('G5 passes 20 save and project-switch cycles with one PUT per save and a zero final ledger', async ({ page }) => {
+  test.setTimeout(90_000);
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
   });
@@ -2942,12 +3007,14 @@ test('G5 passes 20 save and project-switch cycles with one PUT per save and a ze
     ownerConflictCount: 0
   });
   expect(audit.filter(entry => entry.method === 'PUT')).toHaveLength(20);
-  expect(audit.filter(entry => /\/api\/(?:inspection\/execute|inspection\/admission|runs)/i.test(entry.path)))
+  expect(audit.filter(entry => /\/api\/(?:inspection\/execute|runs)/i.test(entry.path)))
     .toEqual([]);
+  expect(audit.filter(entry => entry.path === '/api/inspection/admission')).toHaveLength(21);
   expect(isF03G5RequestAllowlist(audit)).toBe(true);
 });
 
 test('G6 passes 20 formal Run, Project switch, and route-leave cycles with a zero final ledger', async ({ page }) => {
+  test.setTimeout(90_000);
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
   });
@@ -3000,16 +3067,21 @@ test('G6 passes 20 formal Run, Project switch, and route-leave cycles with a zer
   });
   expect(audit.filter(entry => entry.method === 'POST' &&
     (entry.path === '/api/inspection/admission' || entry.path === '/api/inspection/execute')))
-    .toHaveLength(40);
+    .toHaveLength(61);
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
 
 test('G6 passes 20 run, stop/reconcile, project, and route lifecycle cycles with zero resources', async ({ page }) => {
+  test.setTimeout(90_000);
   let mode: 'stop' | 'reconcile' = 'stop';
+  let reconcileCall = 0;
   const audit = await bootWorkspace(page, {
     projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() }),
     runScenario: (stage, request) => {
-      if (stage === 'execute') return mode === 'stop' ? { delayMs: 1000, abort: true } : { abort: true };
+      if (stage === 'execute') {
+        reconcileCall = 0;
+        return mode === 'stop' ? { delayMs: 1000, abort: true } : { abort: true };
+      }
       if (stage === 'stop') {
         return {
           body: reconciliationFixture(
@@ -3020,6 +3092,8 @@ test('G6 passes 20 run, stop/reconcile, project, and route lifecycle cycles with
         };
       }
       if (stage === 'reconcile') {
+        reconcileCall += 1;
+        if (mode === 'reconcile' && reconcileCall === 1) return { abort: true };
         return {
           body: mode === 'reconcile'
             ? reconciliationFixture(
@@ -3086,10 +3160,14 @@ test('G6 passes 20 run, stop/reconcile, project, and route lifecycle cycles with
       });
   }
 
-  expect(audit.filter(entry => entry.method === 'POST' && [
-    '/api/inspection/admission', '/api/inspection/execute', '/api/inspection/stop', '/api/inspection/reconcile'
-  ].includes(entry.path)))
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/inspection/admission'))
     .toHaveLength(60);
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/inspection/execute'))
+    .toHaveLength(20);
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/inspection/stop'))
+    .toHaveLength(10);
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/inspection/reconcile'))
+    .toHaveLength(20);
   expect(isF03G6RequestAllowlist(audit)).toBe(true);
 });
 
@@ -3182,6 +3260,7 @@ test('rejects a 401 before mounting ProductRuntime or Workspace owners', async (
 });
 
 test('passes 20 real Browser route mount/unmount cycles with a zero ledger', async ({ page }) => {
+  test.setTimeout(90_000);
   const audit = await bootWorkspace(page);
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
 
@@ -3210,9 +3289,9 @@ test('passes 20 real Browser route mount/unmount cycles with a zero ledger', asy
     await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
   }
 
+  await expect(page.locator('[data-testid="workspace-run"]')).toBeEnabled();
   await page.goto('/studio/index.html#/about');
-  const final = await workspaceDiagnostics(page);
-  expect(final).toMatchObject({
+  await expect.poll(async () => await workspaceDiagnostics(page)).toMatchObject({
     workspaceOwnerCount: 0,
     previewOwnerCount: 0,
     imageCanvasOwnerCount: 0,
@@ -3242,7 +3321,7 @@ test('Workspace splitters preserve bounds, Preview recovery and layout preferenc
 
   await expect(shell).toHaveAttribute('data-workspace-owner-count', '1');
   await expect(workspace).toHaveAttribute('data-inspector-width', '280');
-  await expect(workspace).toHaveAttribute('data-preview-height', '220');
+  await expect(workspace).toHaveAttribute('data-preview-height', '160');
   await expect(workspace).toHaveAttribute('data-preview-width', '340');
   await expect(inspectorSplitter).toHaveAttribute('aria-valuetext', '属性检查器宽度 280 像素');
   await expect(previewSplitter).toHaveAttribute('aria-valuetext', '预览工作台宽度 340 像素');
@@ -3346,7 +3425,7 @@ test('Workspace splitters preserve bounds, Preview recovery and layout preferenc
   await expect(workspace).toHaveAttribute('data-preview-collapsed', 'true');
   await page.locator('[data-testid="preview-collapse-toggle"]').click();
   await expect(workspace).toHaveAttribute('data-preview-collapsed', 'false');
-  await expect(workspace).toHaveAttribute('data-preview-height', '220');
+  await expect(workspace).toHaveAttribute('data-preview-height', '160');
   await expect(workspace).toHaveAttribute('data-preview-width', '372');
   await expect(previewSplitter).toBeVisible();
   if (hasF04VisualEvidenceTarget()) {

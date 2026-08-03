@@ -611,15 +611,19 @@ function localTraceabilityItems(detail: LocalInspectionResultDetail): readonly C
     { key: 'flowVersionHash', label: '流程版本哈希', value: detail.traceability.flowVersionHash },
     { key: 'calibrationBundleId', label: '标定包', value: detail.traceability.calibrationBundleId },
     { key: 'executionSnapshotId', label: '执行快照', value: detail.traceability.executionSnapshotId },
-    { key: 'runId', label: '运行标识', value: detail.traceability.runId },
+    { key: 'sessionId', label: 'Session ID', value: detail.traceability.sessionId },
+    {
+      key: 'runId',
+      label: 'Run ID',
+      value: detail.traceability.runId ?? 'Run ID 未记录，旧结果身份不完整'
+    },
     { key: 'projectPersistenceRevision', label: '工程保存修订', value: detail.traceability.projectPersistenceRevision },
     { key: 'decisionConfigurationHash', label: '判定配置哈希', value: detail.traceability.decisionConfigurationHash },
     { key: 'packageId', label: '运行包标识', value: detail.traceability.runtimePackageId ?? detail.traceability.packageId },
     { key: 'executionSource', label: '执行来源', value: detail.traceability.executionSource },
     { key: 'executionRunMode', label: '运行模式', value: detail.traceability.executionRunMode },
     { key: 'shadowRole', label: '执行角色', value: detail.traceability.shadowRole },
-    { key: 'stationId', label: '工作站标识', value: detail.traceability.stationId },
-    { key: 'sessionId', label: '会话标识', value: detail.traceability.sessionId }
+    { key: 'stationId', label: '工作站标识', value: detail.traceability.stationId }
   ]);
 }
 

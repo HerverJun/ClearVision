@@ -141,6 +141,8 @@ public sealed class InspectionResultBackgroundServiceTests
             using (var spoolJson = System.Text.Json.JsonDocument.Parse(spoolLine))
             {
                 spoolJson.RootElement.GetProperty("schemaVersion").GetInt32().Should().Be(2);
+                spoolJson.RootElement.GetProperty("sessionId").GetGuid().Should().Be(sessionId);
+                spoolJson.RootElement.TryGetProperty("runId", out _).Should().BeFalse();
                 spoolJson.RootElement.GetProperty("executionSnapshotId").GetGuid().Should().Be(executionSnapshotId);
             }
 

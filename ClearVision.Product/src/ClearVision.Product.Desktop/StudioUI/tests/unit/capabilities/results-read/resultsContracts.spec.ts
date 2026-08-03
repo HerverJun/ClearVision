@@ -18,7 +18,7 @@ import {
 const projectId = '11111111-1111-4111-8111-111111111111';
 const resultId = '22222222-2222-4222-8222-222222222222';
 const defectId = '33333333-3333-4333-8333-333333333333';
-const runId = '44444444-4444-4444-8444-444444444444';
+const sessionId = '44444444-4444-4444-8444-444444444444';
 
 function localSummary(outcome: InspectionOutcome = { execution: 'Succeeded', decision: 'Ok' }) {
   return {
@@ -41,8 +41,8 @@ function localSummary(outcome: InspectionOutcome = { execution: 'Succeeded', dec
     confidenceScore: null,
     flowVersionHash: 'flow-hash',
     calibrationBundleId: null,
-    sessionId: runId,
-    runId,
+    sessionId,
+    runId: null,
     diagnosticCode: 'FINAL_DECISION_OK',
     diagnosticMessage: '完成',
     errorMessage: null
@@ -187,8 +187,8 @@ describe('Results contracts', () => {
       traceability: {
         flowVersionHash: 'flow-hash',
         calibrationBundleId: null,
-        sessionId: runId,
-        runId,
+        sessionId,
+        runId: null,
         executionSnapshotId: '55555555-5555-4555-8555-555555555555',
         projectPersistenceRevision: 17,
         decisionConfigurationHash: 'decision-hash',
@@ -224,6 +224,8 @@ describe('Results contracts', () => {
       evidenceStatus: 'available',
       evidenceTotalBytes: 1024,
       traceability: {
+        sessionId,
+        runId: null,
         executionSnapshotId: '55555555-5555-4555-8555-555555555555',
         projectPersistenceRevision: 17,
         decisionConfigurationHash: 'decision-hash',
@@ -339,8 +341,8 @@ describe('Results contracts', () => {
       confidenceScore: null,
       flowVersionHash: 'flow-hash',
       calibrationBundleId: null,
-      sessionId: runId,
-      runId,
+      sessionId,
+      runId: null,
       imageReference: null,
       hasImage: false,
       hasOutputData: true,
@@ -356,6 +358,10 @@ describe('Results contracts', () => {
       message: '已找到失败前成功参考'
     });
     expect(previous.referenceSummary?.resultId).toBe(referenceId);
+    expect(previous.currentSummary.sessionId).toBe(sessionId);
+    expect(previous.currentSummary.runId).toBeNull();
+    expect(previous.referenceSummary?.sessionId).toBe(sessionId);
+    expect(previous.referenceSummary?.runId).toBeNull();
 
     const comparison = decodeInspectionHistoryComparison({
       leftSummary: comparisonSummary(referenceId, 'Ok'),
@@ -386,6 +392,10 @@ describe('Results contracts', () => {
         message: '无图像引用，已降级为摘要回放'
       }
     });
+    expect(comparison.leftSummary.sessionId).toBe(sessionId);
+    expect(comparison.leftSummary.runId).toBeNull();
+    expect(comparison.rightSummary.sessionId).toBe(sessionId);
+    expect(comparison.rightSummary.runId).toBeNull();
     expect(comparison.fieldDiffs[0]).toMatchObject({ leftValuePreview: 'Ok', rightValuePreview: 'Ng' });
     expect(() => decodeInspectionHistoryComparison({
       leftSummary: comparisonSummary(referenceId, 'Ok'),

@@ -117,7 +117,7 @@ export interface WorkspaceOwner {
 
 export interface WorkspaceSessionReconcileIdentity extends WorkspaceRunIdentityV1 {
   readonly operationId: string;
-  readonly runId: string | null;
+  readonly resultId: string | null;
   readonly executionSnapshotId: string;
 }
 
@@ -306,7 +306,7 @@ export function createWorkspaceOwner(
       return Object.freeze({
         ...identity,
         operationId: identity.clientSnapshotId,
-        runId: runOwner?.projection.result?.id ?? null,
+        resultId: runOwner?.projection.result?.id ?? null,
         executionSnapshotId: runOwner?.projection.result?.executionSnapshotId ?? identity.clientSnapshotId
       });
     },

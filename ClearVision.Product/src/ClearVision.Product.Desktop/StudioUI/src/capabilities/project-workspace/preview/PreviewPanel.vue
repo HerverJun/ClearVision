@@ -444,7 +444,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 .preview-panel__manual-reason { max-width: 180px; }
 .preview-panel__collapse-icon { transform: rotate(180deg); transition: transform var(--cv-motion-duration-fast) var(--cv-motion-ease-standard); }
 .preview-panel__collapse-icon.is-collapsed { transform: rotate(0); }
-.preview-panel__body { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(250px, 43%) minmax(0, 1fr); overflow: hidden; }
+.preview-panel__body { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 43%) minmax(0, 1fr); overflow: hidden; }
 .preview-panel__body > :deep(.image-viewport) { min-height: 0; }
 .preview-panel__details { min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; border-top: 1px solid var(--cv-border-subtle); scrollbar-gutter: stable; }
 .preview-panel__alerts { padding: var(--cv-space-2) var(--cv-space-3) 0; display: grid; gap: var(--cv-space-2); }
@@ -508,7 +508,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 }
 
 @media (max-height: 760px) {
-  .preview-panel__body { grid-template-rows: minmax(210px, 48%) minmax(0, 1fr); }
+  .preview-panel__body { grid-template-rows: minmax(0, 48%) minmax(0, 1fr); }
   .preview-panel__summary,
   .preview-panel__roi,
   .preview-panel__key-outputs,

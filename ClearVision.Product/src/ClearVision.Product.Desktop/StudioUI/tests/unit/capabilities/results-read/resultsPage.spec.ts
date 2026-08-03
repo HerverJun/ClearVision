@@ -17,6 +17,7 @@ const resultId = '22222222-2222-4222-8222-222222222222';
 const defectId = '33333333-3333-4333-8333-333333333333';
 const referenceId = '44444444-4444-4444-8444-444444444444';
 const snapshotId = '55555555-5555-4555-8555-555555555555';
+const sessionId = '66666666-6666-4666-8666-666666666666';
 
 function project() {
   return {
@@ -84,7 +85,7 @@ function localDetail() {
     traceability: {
       flowVersionHash: 'flow-hash',
       calibrationBundleId: null,
-      sessionId: null,
+      sessionId,
       runId: null,
       executionSnapshotId: snapshotId,
       projectPersistenceRevision: 17,
@@ -334,6 +335,9 @@ describe('Results page', () => {
     expect(mounted.wrapper.text()).toContain('轻微划痕');
     expect(mounted.wrapper.text()).toContain('流程版本哈希');
     expect(mounted.wrapper.text()).toContain('执行快照');
+    expect(mounted.wrapper.text()).toContain('Session ID');
+    expect(mounted.wrapper.text()).toContain(sessionId);
+    expect(mounted.wrapper.text()).toContain('Run ID 未记录，旧结果身份不完整');
     expect(mounted.wrapper.text()).toContain('判定配置哈希');
     expect(mounted.wrapper.text()).toContain('83.3%');
     expect(mounted.wrapper.text()).toContain('manifest-deep-link');
@@ -368,6 +372,7 @@ describe('Results page', () => {
     expect(mounted.wrapper.findAll('[data-status-tone="ng"]')).toHaveLength(0);
     expect(mounted.wrapper.text()).not.toContain('判定 NG');
     expect(mounted.wrapper.text()).toContain('远程结果仅保留摘要');
+    expect(mounted.wrapper.text()).toContain('run-9');
     expect(mounted.wrapper.find('[data-remote-image-status="not-uploaded"]').exists()).toBe(true);
 
     mounted.wrapper.unmount();

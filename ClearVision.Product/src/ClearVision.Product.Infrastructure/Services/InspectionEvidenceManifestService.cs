@@ -172,7 +172,7 @@ public sealed class InspectionEvidenceManifestService : IInspectionEvidenceManif
                 FlowVersionHash = result.FlowVersionHash,
                 CalibrationBundleId = result.CalibrationBundleId,
                 SessionId = result.SessionId,
-                RunId = result.SessionId,
+                RunId = null,
                 RetentionClass = policy.RetentionClass,
                 RetentionExpiresAtUtc = policy.RetentionDays > 0 ? now.AddDays(policy.RetentionDays) : null,
                 TotalBytes = items.Where(item => item.Available).Sum(item => item.SizeBytes),
@@ -495,6 +495,12 @@ public sealed class InspectionEvidenceManifestService : IInspectionEvidenceManif
         }
 
         var warnings = new List<string>();
+        if (manifest.RunId.HasValue)
+        {
+            manifest.RunId = null;
+            warnings.Add("Legacy local evidence RunId was discarded because no independent RunId authority exists.");
+        }
+
         var itemRoot = GetResultRoot(result.ProjectId, result.Id);
         foreach (var item in manifest.Items)
         {
@@ -837,7 +843,7 @@ public sealed class InspectionEvidenceManifestService : IInspectionEvidenceManif
             flowVersionHash = result.FlowVersionHash,
             calibrationBundleId = result.CalibrationBundleId,
             sessionId = result.SessionId,
-            runId = result.SessionId,
+            runId = (Guid?)null,
             defectCount = result.Defects.Count,
             defects = result.Defects.Take(64).Select(defect => new
             {

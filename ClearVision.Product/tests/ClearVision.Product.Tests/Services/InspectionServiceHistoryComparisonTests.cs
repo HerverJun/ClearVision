@@ -58,7 +58,16 @@ public sealed class InspectionServiceHistoryComparisonTests
         var comparison = await service.CompareInspectionHistoryAsync(projectId, leftId, rightId);
 
         comparison.Should().NotBeNull();
-        comparison!.Compatibility.FlowVersionCompatible.Should().BeFalse();
+        comparison!.LeftSummary.SessionId.Should().Be(left.SessionId);
+        comparison.LeftSummary.RunId.Should().BeNull();
+        comparison.RightSummary.SessionId.Should().Be(right.SessionId);
+        comparison.RightSummary.RunId.Should().BeNull();
+        comparison.TraceabilityDiff.Should().ContainSingle(diff =>
+            diff.Path == """$["traceability"]["sessionId"]""" && diff.Label == "SessionId");
+        comparison.TraceabilityDiff.Should().ContainSingle(diff =>
+            diff.Path == """$["traceability"]["runId"]""" && diff.Label == "RunId");
+        comparison.TraceabilityDiff.Should().NotContain(diff => diff.Label.Contains("SessionId / RunId"));
+        comparison.Compatibility.FlowVersionCompatible.Should().BeFalse();
         comparison.Compatibility.CalibrationBundleCompatible.Should().BeFalse();
         comparison.Warnings.Should().Contain("流程版本不一致，对比仅供参考");
         comparison.Warnings.Should().Contain("标定资产不一致，空间坐标对比可能无效");
@@ -170,6 +179,10 @@ public sealed class InspectionServiceHistoryComparisonTests
         reference!.Found.Should().BeTrue();
         reference.IsFlowVersionFallback.Should().BeFalse();
         reference.QueryLimit.Should().Be(200);
+        reference.CurrentSummary.SessionId.Should().Be(current.SessionId);
+        reference.CurrentSummary.RunId.Should().BeNull();
+        reference.ReferenceSummary!.SessionId.Should().Be(previous.SessionId);
+        reference.ReferenceSummary.RunId.Should().BeNull();
         reference.ReferenceSummary!.ResultId.Should().Be(previous.Id);
         _ = repository.Received(1).FindPreviousSuccessfulInspectionAsync(projectId, currentTime, "FLOW-A", 200);
         _ = repository.DidNotReceive().FindPreviousSuccessfulInspectionAsync(projectId, currentTime, flowVersionHash: null, limit: 200);

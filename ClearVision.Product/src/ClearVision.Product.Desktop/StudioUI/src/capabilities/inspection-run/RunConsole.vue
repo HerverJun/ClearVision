@@ -123,7 +123,6 @@ const formattedTime = (value: string | null): string => {
           v-if="canStop"
           size="sm"
           variant="danger"
-          :disabled="pending"
           :data-testid="stopTestId ?? 'run-console-stop'"
           @click="emit('stop')"
         >
@@ -139,7 +138,6 @@ const formattedTime = (value: string | null): string => {
           v-if="canReconcile"
           size="sm"
           variant="secondary"
-          :disabled="pending"
           :data-testid="reconcileTestId ?? 'run-console-reconcile'"
           @click="emit('reconcile')"
         >
