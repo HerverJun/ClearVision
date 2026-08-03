@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Memory;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
@@ -92,6 +93,12 @@ public class OcrRecognitionOperatorTests : IDisposable
     [Trait("Category", "PerformanceBudget")]
     public async Task Performance_1920x1080_InferenceTime_ShouldBe_Under_500ms()
     {
+        var pooledBytesBefore = MatPool.Shared.CurrentTotalBytes;
+        MatPool.Shared.Trim();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        _output.WriteLine($"[Isolation] MatPool bytes before={pooledBytesBefore}, after={MatPool.Shared.CurrentTotalBytes}");
+
         // 1. 预热引擎，消除首次加载模型耗时
         using var warmupImg = CreateOcrTestImage("WARMUP_TEXT", 800, 200);
         var op = new Operator("OCR预热", OperatorType.OcrRecognition, 0, 0);
