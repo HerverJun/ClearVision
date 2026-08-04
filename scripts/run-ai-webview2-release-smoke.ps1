@@ -232,20 +232,18 @@ foreach ($name in $environmentNames) {
 
 function Set-ProcessEnvironment {
     param([string]$Name, [string]$Value)
-    [Environment]::SetEnvironmentVariable($Name, $Value, "Process")
+    $normalizedName = if ([string]::Equals($Name, "PATH", [System.StringComparison]::OrdinalIgnoreCase)) {
+        "Path"
+    } else {
+        $Name
+    }
+    [Environment]::SetEnvironmentVariable($normalizedName, $Value, "Process")
 }
 
 function Restore-ProcessEnvironment {
     foreach ($name in $environmentNames) {
         $value = $previousEnvironment[$name]
-        if ($null -eq $value) {
-            [Environment]::SetEnvironmentVariable($name, $null, "Process")
-            continue
-        }
-        [Environment]::SetEnvironmentVariable(
-            $name,
-            [string]$value,
-            "Process")
+        Set-ProcessEnvironment -Name $name -Value $value
     }
 }
 
