@@ -2614,7 +2614,7 @@ async function verifyProductPage(
     if (item.method !== 'POST' || new URL(item.url).pathname !== '/api/inspection/admission') {
       return false;
     }
-    return rollbackPhase === 'NEXT_REOPEN' || (dpiOnly && seedWorkspace && !formalRun);
+    return rollbackPhase === 'NEXT_REOPEN' || (dpiOnly && seededWorkspace && !formalRun);
   };
   const forbiddenRunRequests = formalRun
     ? (workspaceG6?.formalRunRequests ?? [])
