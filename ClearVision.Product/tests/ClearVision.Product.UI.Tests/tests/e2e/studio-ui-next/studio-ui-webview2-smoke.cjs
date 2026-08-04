@@ -2607,18 +2607,21 @@ async function verifyProductPage(
     return item.method === 'POST' && /^\/api\/projects\/[0-9a-f-]{36}\/open$/i.test(url.pathname);
   };
   const projectOpenRequests = productRequests.filter(isProjectOpenRequest);
-  // NEXT_REOPEN exercises 20 owner remounts; each clean mount refreshes the
-  // persisted admission projection without executing a run.
-  const isExpectedRollbackAdmissionRefresh = item => {
-    if (rollbackPhase !== 'NEXT_REOPEN' || item.method !== 'POST') return false;
-    return new URL(item.url).pathname === '/api/inspection/admission';
+  // NEXT_REOPEN and seeded DPI-only workspaces refresh the persisted admission
+  // projection without executing a run. The HTTP contract is POST even though
+  // this validation refresh is not a formal execution command.
+  const isExpectedAdmissionProjectionRefresh = item => {
+    if (item.method !== 'POST' || new URL(item.url).pathname !== '/api/inspection/admission') {
+      return false;
+    }
+    return rollbackPhase === 'NEXT_REOPEN' || (dpiOnly && seedWorkspace && !formalRun);
   };
   const forbiddenRunRequests = formalRun
     ? (workspaceG6?.formalRunRequests ?? [])
     : productRequests.filter(item => {
       const url = new URL(item.url);
       return /\/api\/(?:inspection\/(?:admission|execute|stop|reconcile)|runs)(?:\/|$)/i.test(url.pathname) &&
-        !isExpectedRollbackAdmissionRefresh(item);
+        !isExpectedAdmissionProjectionRefresh(item);
     });
   const expectedRunPaths = formalRun
     ? [
@@ -2632,7 +2635,7 @@ async function verifyProductPage(
     if (!isWorkspaceRoute) return true;
     const url = new URL(item.url);
     return !isProjectOpenRequest(item) &&
-      !isExpectedRollbackAdmissionRefresh(item) &&
+      !isExpectedAdmissionProjectionRefresh(item) &&
       !(item.method === 'POST' && url.pathname === '/api/inspection/decision-configuration/validate') &&
       !(item.method === 'POST' && url.pathname === '/api/flows/preview-node') &&
       !(goldenJourney && item.method === 'POST' && url.pathname === '/api/cameras/soft-trigger-capture') &&
