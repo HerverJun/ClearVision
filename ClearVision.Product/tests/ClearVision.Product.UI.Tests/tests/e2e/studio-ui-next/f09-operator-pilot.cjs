@@ -196,6 +196,15 @@ async function readRoutePageState(page, selector) {
   }, selector);
 }
 
+async function waitForReadOnlyPageSettle(page, selector) {
+  await page.waitForFunction(targetSelector => {
+    const root = document.querySelector(targetSelector);
+    if (!root || !root.getClientRects().length) return false;
+    return ![...root.querySelectorAll('[data-page-state="loading"]')]
+      .some(element => element.getClientRects().length > 0);
+  }, selector, { timeout: 45_000 });
+}
+
 async function navigateToRoute(page, webPort, route, selector, expectedApiPath = null) {
   const routeResponse = expectedApiPath
     ? page.waitForResponse(response => isRouteApiResponse(response, webPort, expectedApiPath), {
@@ -215,6 +224,7 @@ async function navigateToRoute(page, webPort, route, selector, expectedApiPath =
     assert(response.status() >= 200 && response.status() < 300,
       `${route} did not receive a successful expected read response: ${response.status()}.`);
   }
+  await waitForReadOnlyPageSettle(page, selector);
   await waitForDoubleAnimationFrame(page);
   const pageState = await readRoutePageState(page, selector);
   assert(pageState.rootVisible && !pageState.forbiddenVisible &&
