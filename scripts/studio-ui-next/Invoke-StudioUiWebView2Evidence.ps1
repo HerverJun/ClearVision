@@ -171,7 +171,7 @@ $isolationRoot = if (-not [string]::IsNullOrWhiteSpace($IsolationRoot)) {
 } else {
     Join-Path $runRoot "isolation"
 }
-if (-not [System.IO.Path]::IsPathFullyQualified($isolationRoot) -or
+if (-not [System.IO.Path]::IsPathRooted($isolationRoot) -or
     $isolationRoot -match '(^|[\\/])\.\.([\\/]|$)') {
     throw "IsolationRoot must be an absolute path without parent traversal."
 }
@@ -201,7 +201,7 @@ function Assert-RepositoryTemporaryPath {
         [string]$Label
     )
 
-    if (-not [System.IO.Path]::IsPathFullyQualified($Path) -or
+    if (-not [System.IO.Path]::IsPathRooted($Path) -or
         $Path -match '(^|[\\/])\.\.([\\/]|$)') {
         throw "$Label must be an absolute path without parent traversal."
     }

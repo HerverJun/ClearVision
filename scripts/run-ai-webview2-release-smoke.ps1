@@ -88,7 +88,7 @@ $requestedIsolationRoot = if (-not [string]::IsNullOrWhiteSpace($IsolationRoot))
     Join-Path $repositoryTemporaryRoot (
         "desktop-unattended-" + [Guid]::NewGuid().ToString("N"))
 }
-if (-not [System.IO.Path]::IsPathFullyQualified($requestedIsolationRoot) -or
+if (-not [System.IO.Path]::IsPathRooted($requestedIsolationRoot) -or
     $requestedIsolationRoot -match '(^|[\\/])\.\.([\\/]|$)') {
     throw "IsolationRoot must be an absolute path without parent traversal."
 }
@@ -161,7 +161,7 @@ function Assert-RepositoryTemporaryPath {
     if ([string]::IsNullOrWhiteSpace($Path)) {
         throw "$Label must be non-empty."
     }
-    if (-not [System.IO.Path]::IsPathFullyQualified($Path) -or
+    if (-not [System.IO.Path]::IsPathRooted($Path) -or
         $Path -match '(^|[\\/])\.\.([\\/]|$)') {
         throw "$Label must be an absolute path without parent traversal."
     }
