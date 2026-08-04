@@ -2607,11 +2607,18 @@ async function verifyProductPage(
     return item.method === 'POST' && /^\/api\/projects\/[0-9a-f-]{36}\/open$/i.test(url.pathname);
   };
   const projectOpenRequests = productRequests.filter(isProjectOpenRequest);
+  // NEXT_REOPEN exercises 20 owner remounts; each clean mount refreshes the
+  // persisted admission projection without executing a run.
+  const isExpectedRollbackAdmissionRefresh = item => {
+    if (rollbackPhase !== 'NEXT_REOPEN' || item.method !== 'POST') return false;
+    return new URL(item.url).pathname === '/api/inspection/admission';
+  };
   const forbiddenRunRequests = formalRun
     ? (workspaceG6?.formalRunRequests ?? [])
     : productRequests.filter(item => {
       const url = new URL(item.url);
-      return /\/api\/(?:inspection\/(?:admission|execute|stop|reconcile)|runs)(?:\/|$)/i.test(url.pathname);
+      return /\/api\/(?:inspection\/(?:admission|execute|stop|reconcile)|runs)(?:\/|$)/i.test(url.pathname) &&
+        !isExpectedRollbackAdmissionRefresh(item);
     });
   const expectedRunPaths = formalRun
     ? [
@@ -2625,6 +2632,7 @@ async function verifyProductPage(
     if (!isWorkspaceRoute) return true;
     const url = new URL(item.url);
     return !isProjectOpenRequest(item) &&
+      !isExpectedRollbackAdmissionRefresh(item) &&
       !(item.method === 'POST' && url.pathname === '/api/inspection/decision-configuration/validate') &&
       !(item.method === 'POST' && url.pathname === '/api/flows/preview-node') &&
       !(goldenJourney && item.method === 'POST' && url.pathname === '/api/cameras/soft-trigger-capture') &&
@@ -2705,6 +2713,7 @@ async function verifyProductPage(
         !(item.method === 'POST' && url.pathname === '/api/inspection/decision-configuration/validate') &&
         !(item.method === 'GET' &&
           /^\/api\/inspection\/realtime\/[0-9a-f-]{36}\/state$/i.test(url.pathname)) &&
+        !isExpectedRollbackAdmissionRefresh(item) &&
         !(goldenJourney && item.method === 'POST' && url.pathname === '/api/cameras/soft-trigger-capture') &&
         !(goldenJourney && item.method === 'POST' &&
           /^\/api\/projects\/[0-9a-f-]{36}\/runtime-package\/export$/i.test(url.pathname)) &&
