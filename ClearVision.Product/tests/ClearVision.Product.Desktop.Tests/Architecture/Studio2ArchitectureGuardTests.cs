@@ -212,7 +212,7 @@ public sealed class Studio2ArchitectureGuardTests
         webViewHostText.Should().Contain("Object.defineProperty(startup, 'featureFlags'");
         webViewHostText.Should().Contain("Object.freeze(startup)");
         webViewHostText.Should().Contain("configurable: false");
-        appSettingsText.Should().Contain("\"NodePreviewInspectorEnabled\": false");
+        appSettingsText.Should().Contain("\"NodePreviewInspectorEnabled\": true");
         appSettingsText.Should().Contain("\"CircleSearchV2ToolEnabled\": true");
         appSettingsText.Should().Contain("\"NPointCalibrationWorkbenchEnabled\": true");
         adrText.Should().Contain("Studio:NodePreviewInspectorEnabled");
@@ -865,9 +865,7 @@ public sealed class Studio2ArchitectureGuardTests
             studioOptionsText.Should().Contain(capability.Option);
             webViewHostText.Should().Contain(capability.Option);
             webViewHostText.Should().Contain($"[\"{capability.Flag}\"]");
-            var expectedDefault = capability.Option is "SettingsCapabilityEnabled" or "AiPanelCapabilityEnabled"
-                ? "false"
-                : "true";
+            var expectedDefault = "true";
             appSettingsText.Should().Contain($"\"{capability.Option}\": {expectedDefault}");
             appText.Should().Contain(capability.Flag);
             appText.Should().Contain(capability.Owner);
@@ -995,14 +993,14 @@ public sealed class Studio2ArchitectureGuardTests
                      "AiPanelCapabilityEnabled"
                  })
         {
-            appSettingsText.Should().Contain($"\"{option}\": false");
+            appSettingsText.Should().Contain($"\"{option}\": true");
         }
 
         appText.Should().Contain("window.__CLEARVISION_ENABLE_EXPERIMENTAL_SETTINGS_CAPABILITY === true");
         appText.Should().Contain("window.__CLEARVISION_ENABLE_EXPERIMENTAL_AI_PANEL_CAPABILITY === true");
 
         appSettingsText.Should().NotContain("WorkspaceV2Enabled");
-        appSettingsText.Should().Contain("\"NodePreviewInspectorEnabled\": false");
+        appSettingsText.Should().Contain("\"NodePreviewInspectorEnabled\": true");
 
         foreach (var legacyModule in new[]
                  {
