@@ -344,9 +344,9 @@ public sealed class StudioUiArchitectureGuardTests
         rollbackEvidence.Should().Contain("NEXT_CREATE");
         rollbackEvidence.Should().Contain("LEGACY_VERIFY");
         rollbackEvidence.Should().Contain("NEXT_REOPEN");
-        rollbackEvidence.Should().Contain("NEXT_DEFAULT_CANDIDATE");
+        rollbackEvidence.Should().Contain("NEXT_DEFAULT");
         rollbackEvidence.Should().Contain("LEGACY_FALLBACK");
-        rollbackEvidence.Should().Contain("f09-candidate-fallback-candidate-rollback.v1");
+        rollbackEvidence.Should().Contain("f09-next-default-fallback-next-default-rollback.v1");
         rollbackEvidence.Should().Contain("missing-studio-assets");
         rollbackEvidence.Should().Contain("KeepDatabase");
         rollbackEvidence.Should().Contain("ReuseDatabase");

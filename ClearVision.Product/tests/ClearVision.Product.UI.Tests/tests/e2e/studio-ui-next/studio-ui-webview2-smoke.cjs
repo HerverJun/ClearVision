@@ -4361,7 +4361,7 @@ async function applyRollbackEvidence(evidence, webPort, token, user, rollbackPha
       handoff.runIdentity
     );
     const state = {
-      schemaVersion: 'f09-candidate-fallback-candidate-rollback.v1',
+      schemaVersion: 'f09-next-default-fallback-next-default-rollback.v1',
       sourceSha: evidence.sourceSha,
       createdAtUtc: new Date().toISOString(),
       user: {
@@ -4379,7 +4379,7 @@ async function applyRollbackEvidence(evidence, webPort, token, user, rollbackPha
 
   assert(fs.existsSync(statePath), `Rollback state was not found: ${statePath}`);
   const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-  assert(state.schemaVersion === 'f09-candidate-fallback-candidate-rollback.v1',
+  assert(state.schemaVersion === 'f09-next-default-fallback-next-default-rollback.v1',
     'Rollback state schema is unsupported.');
   assert(state.sourceSha === evidence.sourceSha, 'Rollback state source SHA changed between restarts.');
   assert(state.runIdentity?.projectId === state.authority.projectId &&

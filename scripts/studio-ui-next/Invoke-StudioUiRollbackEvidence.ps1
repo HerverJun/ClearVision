@@ -395,7 +395,7 @@ try {
     $nextCreate = Invoke-RollbackRun `
         -Name "next-create" `
         -Expectation "studio-product" `
-        -StartupProfile "NEXT_DEFAULT_CANDIDATE" `
+        -StartupProfile "NEXT_DEFAULT" `
         -RollbackPhase "NEXT_CREATE" `
         -PortOffset 0 `
         -SeedWorkspace $true `
@@ -410,7 +410,7 @@ try {
         throw "NEXT_CREATE did not retain the shared database and rollback state."
     }
     $state = Get-Content -LiteralPath $rollbackStatePath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([string]$state.schemaVersion -ne "f09-candidate-fallback-candidate-rollback.v1" -or
+    if ([string]$state.schemaVersion -ne "f09-next-default-fallback-next-default-rollback.v1" -or
         [string]$state.sourceSha -ne $sourceSha) {
         throw "Rollback state schema/source identity is invalid."
     }
@@ -432,9 +432,9 @@ try {
         throw "Failure injection sample lost its Legacy asset root."
     }
     $failureInjection = Invoke-RollbackRun `
-        -Name "candidate-missing-assets" `
+        -Name "next-default-missing-assets" `
         -Expectation "missing-assets" `
-        -StartupProfile "NEXT_DEFAULT_CANDIDATE" `
+        -StartupProfile "NEXT_DEFAULT" `
         -RollbackPhase "" `
         -PortOffset 1 `
         -SeedWorkspace $false `
@@ -472,7 +472,7 @@ try {
     $nextReopen = Invoke-RollbackRun `
         -Name "next-reopen" `
         -Expectation "studio-product" `
-        -StartupProfile "NEXT_DEFAULT_CANDIDATE" `
+        -StartupProfile "NEXT_DEFAULT" `
         -RollbackPhase "NEXT_REOPEN" `
         -PortOffset 3 `
         -SeedWorkspace $false `
@@ -517,7 +517,7 @@ $manifestPassed = -not $rollbackError -and $phaseCountPassed -and
     $authorityPassed -and $failureInjectionPassed -and $databaseCleanupPassed
 $manifest = [pscustomobject]@{
     schemaVersion = 1
-    evidenceKind = "F09_G6_CANDIDATE_FALLBACK_CANDIDATE_ROLLBACK"
+    evidenceKind = "F09_G6_NEXT_DEFAULT_FALLBACK_NEXT_DEFAULT_ROLLBACK"
     sourceSha = $sourceSha
     runName = $RunName
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
@@ -529,13 +529,13 @@ $manifest = [pscustomobject]@{
         sharedDatabaseRemoved = $databaseCleanupPassed
     }
     sequence = @(
-        "NEXT_DEFAULT_CANDIDATE",
+        "NEXT_DEFAULT",
         "MISSING_ASSETS_FAILURE_INJECTION",
         "LEGACY_FALLBACK",
-        "NEXT_DEFAULT_CANDIDATE")
+        "NEXT_DEFAULT")
     failureInjection = [pscustomobject]@{
         kind = "missing-studio-assets"
-        profile = "NEXT_DEFAULT_CANDIDATE"
+        profile = "NEXT_DEFAULT"
         passed = $failureInjectionPassed
         rootKind = if ($failureInjection) { $failureInjection.rootKind } else { $null }
     }
