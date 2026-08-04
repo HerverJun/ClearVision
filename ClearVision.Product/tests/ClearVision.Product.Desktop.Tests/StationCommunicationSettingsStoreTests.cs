@@ -395,25 +395,34 @@ public sealed class StationCommunicationSettingsStoreTests : IDisposable
             }
         };
 
-        var first = Task.Run(() => store.SaveSettings(
-            new StationCommunicationSettingsUpdateRequest
-            {
-                Mode = "LocalLoopback",
-                Port = 5021,
-                SharedToken = "first-token"
-            },
-            running));
+        var first = StartLongRunningSave(store, new StationCommunicationSettingsUpdateRequest
+        {
+            Mode = "LocalLoopback",
+            Port = 5021,
+            SharedToken = "first-token"
+        }, running);
         firstStudioWrite.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
-        var second = Task.Run(() => store.SaveSettings(
-            new StationCommunicationSettingsUpdateRequest
+        using var secondStarted = new ManualResetEventSlim();
+        var second = Task.Factory.StartNew(
+            () =>
             {
-                Mode = "LocalLoopback",
-                Port = 5022,
-                SharedToken = "second-token"
+                secondStarted.Set();
+                return store.SaveSettings(
+                    new StationCommunicationSettingsUpdateRequest
+                    {
+                        Mode = "LocalLoopback",
+                        Port = 5022,
+                        SharedToken = "second-token"
+                    },
+                    running);
             },
-            running));
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
+        secondStarted.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
 
         await Task.Delay(100);
+        second.IsCompleted.Should().BeFalse("the second request must remain behind the mutation lock");
         Volatile.Read(ref completedStudioWrites).Should().Be(1);
         allowFirstMutationToFinish.Set();
         var results = await Task.WhenAll(first, second);
@@ -423,6 +432,18 @@ public sealed class StationCommunicationSettingsStoreTests : IDisposable
         ReadStudioPort(store.StudioSettingsPath).Should().Be(5022);
         ReadStationPort(store.StationSyncSettingsPath).Should().Be(5022);
         Directory.EnumerateFiles(_root, "*.tmp", SearchOption.AllDirectories).Should().BeEmpty();
+    }
+
+    private static Task<StationCommunicationSaveResult> StartLongRunningSave(
+        StationCommunicationSettingsStore store,
+        StationCommunicationSettingsUpdateRequest request,
+        StationIngressOptions running)
+    {
+        return Task.Factory.StartNew(
+            () => store.SaveSettings(request, running),
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
     }
 
     [Fact]
