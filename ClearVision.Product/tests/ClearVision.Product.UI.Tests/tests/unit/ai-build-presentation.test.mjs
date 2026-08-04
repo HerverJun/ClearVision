@@ -148,6 +148,51 @@ test('Build presentation reports validation failure from structured diagnostics'
   assert.match(presentation.actionItems[0].summary, /输出端口类型不兼容/);
 });
 
+test('failed Build presentation keeps the quarantined artifact summary and blocker visible', () => {
+  const events = [
+    {
+      sequence: 35,
+      eventType: 'workflow.draft.updated',
+      stage: 'workflow_draft',
+      payload: { details: { operatorCount: 6, connectionCount: 7 } }
+    },
+    {
+      sequence: 79,
+      eventType: 'artifact.created',
+      stage: 'artifact',
+      payload: {
+        effectiveOperators: ['ImageAcquisition', 'RoiManager', 'Thresholding', 'BlobAnalysis', 'ResultJudgment', 'ResultOutput'],
+        workflowDiff: { addedNodes: ['op_cam', 'op_roi', 'op_threshold', 'op_blob', 'op_judge', 'op_out'] },
+        applyGate: {
+          canvasApplyReady: false,
+          blocked: true,
+          status: 'blocked',
+          applyBlockers: ['route_missing_task_processor']
+        }
+      }
+    },
+    {
+      sequence: 80,
+      eventType: 'run.failed',
+      stage: 'run',
+      payload: { failureCode: 'route_semantics_not_satisfied' }
+    }
+  ];
+  const panel = createPanel({}, {
+    activeAgentRunEvents: events,
+    workbenchState: 'failed',
+    _getAgentRunResultPayload: () => events.at(-1).payload
+  });
+
+  const presentation = deriveAiBuildPresentation(panel);
+
+  assert.equal(presentation.nodeCount, 6);
+  assert.equal(presentation.connectionCount, 7);
+  assert.equal(presentation.gate.blocked, true);
+  assert.ok(presentation.gate.blockers.includes('route_missing_task_processor'));
+  assert.ok(presentation.actionItems.some(item => item.priority === 'blocking'));
+});
+
 test('Build presentation keeps resolved resource drafts out of the unresolved count', () => {
   const result = readyResult();
   result.missingResources = [{ resourceType: 'model_resource', resourceKey: 'op_2.ModelPath' }];
