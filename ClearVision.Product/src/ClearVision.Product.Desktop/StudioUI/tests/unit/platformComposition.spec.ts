@@ -37,6 +37,8 @@ describe('StudioPlatform composition', () => {
         hostKind: 'browser-test',
         apiBaseUrl: 'http://127.0.0.1:5177/api',
         studioUiBasePath: '/studio/',
+        startupProfile: 'NEXT_DEFAULT',
+        profileAllowedRoles: ['Admin', 'Engineer', 'Operator'],
         featureFlags: {}
       }
     });
@@ -56,6 +58,8 @@ describe('StudioPlatform composition', () => {
       hostKind: 'browser-test',
       apiBaseUrl: 'http://localhost:5000/api',
       studioUiBasePath: '/studio/',
+      startupProfile: 'NEXT_DEFAULT',
+      profileAllowedRoles: ['Admin', 'Engineer', 'Operator'],
       featureFlags: {}
     }, { pageOrigin: 'http://localhost:5000' });
     const host = createBrowserHostFake();
@@ -83,6 +87,8 @@ describe('StudioPlatform composition', () => {
         hostKind: 'desktop-webview2',
         apiBaseUrl: 'http://localhost:5000/api',
         studioUiBasePath: '/studio/',
+        startupProfile: 'NEXT_DEFAULT',
+        profileAllowedRoles: ['Admin', 'Engineer', 'Operator'],
         featureFlags: {}
       }
     });
@@ -103,6 +109,8 @@ describe('StudioPlatform composition', () => {
       hostKind: 'browser-test',
       apiBaseUrl: 'http://localhost:5000/api',
       studioUiBasePath: '/studio/',
+      startupProfile: 'NEXT_DEFAULT',
+      profileAllowedRoles: ['Admin', 'Engineer', 'Operator'],
       featureFlags: {}
     }, { pageOrigin: 'http://localhost:5000' });
     const host = createBrowserHostFake();

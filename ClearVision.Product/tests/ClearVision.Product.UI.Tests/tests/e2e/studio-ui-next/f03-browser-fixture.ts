@@ -153,6 +153,8 @@ export async function installF03BrowserStartup(
         hostKind: 'browser-test',
         apiBaseUrl: `${window.location.origin}/api`,
         studioUiBasePath: '/studio/',
+        startupProfile: 'NEXT_DEFAULT',
+        profileAllowedRoles: Object.freeze(['Admin', 'Engineer', 'Operator']),
         featureFlags: Object.freeze({ 'Studio2.Workspace': enabled })
       }),
       writable: false,

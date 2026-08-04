@@ -6,7 +6,7 @@ param(
     [string]$EvidenceDirectory,
     [string]$RuntimeDirectory,
     [string]$PublishDirectory,
-    [ValidateSet("f01", "f02", "f03", "f04")]
+    [ValidateSet("f01", "f02", "f03", "f04", "f09")]
     [string]$EvidencePhase = "f01",
     [ValidateSet("full", "publish-only")]
     [string]$RunScope = "full",
@@ -136,7 +136,7 @@ if ([string]::Equals(
 $missingAssetsRoot = Join-Path (Split-Path -Parent $publishRoot) "missing-assets-publish"
 $publishArtifactsRoot = Join-Path (Split-Path -Parent $publishRoot) "artifacts"
 $publishLockFilePath = Join-Path $publishArtifactsRoot 'locks\restore-disabled.packages.lock.json'
-$publishProductRoutes = if ($EvidencePhase -eq "f02") {
+$publishProductRoutes = if ($EvidencePhase -in @("f02", "f09")) {
     @("/overview", "/projects", "/operators", "/stations", "/results")
 } else {
     @("/overview")
@@ -200,7 +200,7 @@ function Invoke-MatrixRun {
         [string]$Route,
         [bool]$DeepCanvas,
         [bool]$NoBuild,
-        [bool]$WorkspaceCapabilityEnabled = $false,
+        [string]$StartupProfile,
         [bool]$SeedWorkspace = $false,
         [bool]$DpiOnly = $false
     )
@@ -235,8 +235,8 @@ function Invoke-MatrixRun {
     if ($NoBuild) {
         $parameters["NoBuild"] = $true
     }
-    if ($WorkspaceCapabilityEnabled) {
-        $parameters["WorkspaceCapabilityEnabled"] = $true
+    if (-not [string]::IsNullOrWhiteSpace($StartupProfile)) {
+        $parameters["StartupProfile"] = $StartupProfile
     }
     if ($SeedWorkspace) {
         $parameters["SeedWorkspace"] = $true
@@ -300,19 +300,23 @@ try {
             -Scale 1.0 `
             -Route "" `
             -DeepCanvas $false `
-            -NoBuild $debugBuilt
+            -NoBuild $debugBuilt `
+            -StartupProfile $(if ($EvidencePhase -eq "f09") { "LEGACY_FALLBACK" } else { "" })
         $debugBuilt = $true
 
         Invoke-MatrixRun -Name "debug-diagnostics" -Expectation "studio-diagnostics" `
             -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
-            -Scale 1.0 -Route "/diagnostics" -DeepCanvas $false -NoBuild $true
+            -Scale 1.0 -Route "/diagnostics" -DeepCanvas $false -NoBuild $true `
+            -StartupProfile $(if ($EvidencePhase -eq "f09") { "NEXT_DEFAULT_CANDIDATE" } else { "" })
         Invoke-MatrixRun -Name "debug-overview" -Expectation "studio-product" `
             -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
-            -Scale 1.0 -Route "/overview" -DeepCanvas $false -NoBuild $true
+            -Scale 1.0 -Route "/overview" -DeepCanvas $false -NoBuild $true `
+            -StartupProfile $(if ($EvidencePhase -eq "f09") { "NEXT_DEFAULT_CANDIDATE" } else { "" })
         Invoke-MatrixRun -Name "debug-projects" -Expectation "studio-product" `
             -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
-            -Scale 1.0 -Route "/projects" -DeepCanvas $false -NoBuild $true
-        if ($EvidencePhase -ne "f04") {
+            -Scale 1.0 -Route "/projects" -DeepCanvas $false -NoBuild $true `
+            -StartupProfile $(if ($EvidencePhase -eq "f09") { "NEXT_DEFAULT_CANDIDATE" } else { "" })
+        if ($EvidencePhase -notin @("f04", "f09")) {
             Invoke-MatrixRun -Name "debug-design" -Expectation "studio-design" `
                 -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
                 -Scale 1.0 -Route "/labs/design" -DeepCanvas $false -NoBuild $true
@@ -320,11 +324,12 @@ try {
 
         foreach ($scale in @(1.0, 1.25, 1.5, 2.0)) {
             $scaleName = ([string]$scale).Replace('.', '-')
-            if ($EvidencePhase -eq "f04") {
+            if ($EvidencePhase -in @("f04", "f09")) {
                 Invoke-MatrixRun -Name "debug-workspace-dpi-$scaleName" -Expectation "studio-product" `
                     -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
                     -Scale $scale -Route "" -DeepCanvas $false -NoBuild $true `
-                    -WorkspaceCapabilityEnabled $true -SeedWorkspace $true -DpiOnly $true
+                    -StartupProfile $(if ($EvidencePhase -eq "f09") { "NEXT_DEFAULT_CANDIDATE" } else { "" }) `
+                    -SeedWorkspace $true -DpiOnly $true
             } else {
                 Invoke-MatrixRun -Name "debug-canvas-dpi-$scaleName" -Expectation "studio-canvas" `
                     -Configuration "Debug" -RuntimeKind "debug" -ExecutablePath $debugExe `
@@ -332,7 +337,7 @@ try {
             }
         }
 
-        if ($EvidencePhase -eq "f04") {
+        if ($EvidencePhase -in @("f04", "f09")) {
             $performanceStatus = "NOT_APPLICABLE_INTERNAL_LABS_HIDDEN"
         } elseif (-not $SkipPerformance) {
             & $performanceRun `
@@ -400,23 +405,32 @@ try {
         }
         $publishStatus = "PASS"
         $releaseExe = Join-Path $publishRoot "ClearVision.Product.Desktop.exe"
+        if ($EvidencePhase -eq "f09") {
+            Invoke-MatrixRun -Name "publish-legacy-fallback" -Expectation "legacy" `
+                -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
+                -Scale 1.0 -Route "" -DeepCanvas $false -NoBuild $true `
+                -StartupProfile "LEGACY_FALLBACK"
+        }
         if ($RunScope -eq "full") {
             Invoke-MatrixRun -Name "publish-diagnostics" -Expectation "studio-diagnostics" `
                 -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
-                -Scale 1.0 -Route "/diagnostics" -DeepCanvas $false -NoBuild $true
+                -Scale 1.0 -Route "/diagnostics" -DeepCanvas $false -NoBuild $true `
+                -StartupProfile $(if ($EvidencePhase -eq "f09") { "NEXT_DEFAULT_CANDIDATE" } else { "" })
         }
         foreach ($productRoute in $publishProductRoutes) {
             $routeName = $productRoute.Trim('/').Replace('/', '-')
             Invoke-MatrixRun -Name "publish-$routeName" -Expectation "studio-product" `
                 -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
-                -Scale 1.0 -Route $productRoute -DeepCanvas $false -NoBuild $true
+                -Scale 1.0 -Route $productRoute -DeepCanvas $false -NoBuild $true `
+                -StartupProfile $(if ($EvidencePhase -eq "f09") { "NEXT_DEFAULT_CANDIDATE" } else { "" })
         }
         if ($RunScope -eq "full") {
-            if ($EvidencePhase -eq "f04") {
+            if ($EvidencePhase -in @("f04", "f09")) {
                 Invoke-MatrixRun -Name "publish-workspace-dpi" -Expectation "studio-product" `
                     -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
                     -Scale 1.0 -Route "" -DeepCanvas $false -NoBuild $true `
-                    -WorkspaceCapabilityEnabled $true -SeedWorkspace $true -DpiOnly $true
+                    -StartupProfile $(if ($EvidencePhase -eq "f09") { "NEXT_DEFAULT_CANDIDATE" } else { "" }) `
+                    -SeedWorkspace $true -DpiOnly $true
             } else {
                 Invoke-MatrixRun -Name "publish-canvas" -Expectation "studio-canvas" `
                     -Configuration "Release" -RuntimeKind "publish" -ExecutablePath $releaseExe `
@@ -441,7 +455,8 @@ try {
         Invoke-MatrixRun -Name "publish-missing-assets" -Expectation "missing-assets" `
             -Configuration "Release" -RuntimeKind "missing-assets" `
             -ExecutablePath (Join-Path $verifiedMissingRoot "ClearVision.Product.Desktop.exe") `
-            -Scale 1.0 -Route "" -DeepCanvas $false -NoBuild $true
+            -Scale 1.0 -Route "" -DeepCanvas $false -NoBuild $true `
+            -StartupProfile $(if ($EvidencePhase -eq "f09") { "NEXT_DEFAULT_CANDIDATE" } else { "" })
     }
 
     if ($RunScope -eq "full") {
@@ -457,7 +472,7 @@ try {
             RuntimeEvidenceDirectory = $evidenceRoot
             OutputPath = Join-Path $evidenceRoot "studio-ui-no-node-evidence.json"
         }
-        if ($EvidencePhase -in @("f02", "f03", "f04")) {
+        if ($EvidencePhase -in @("f02", "f03", "f04", "f09")) {
             $noNodeParameters["RequiredProductRoutes"] = $publishProductRoutes
             $noNodeParameters["ExpectedEvidencePhase"] = $EvidencePhase
             $noNodeParameters["ExpectedSourceSha"] = $sourceSha

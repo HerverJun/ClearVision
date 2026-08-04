@@ -75,11 +75,15 @@ describe('F02 architecture guards', () => {
     expect(router).toContain('ProductLayout');
   });
 
-  it('keeps the legacy default entry disabled', () => {
-    const settings = read(join(
+  it('keeps the named F09 candidate entry explicit', () => {
+    const settings = JSON.parse(read(join(
       repositoryRoot,
       'ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json'
-    ));
-    expect(settings).toMatch(/"StudioUiEnabled"\s*:\s*false/);
+    ))) as { Studio: { StartupProfile: string; StudioUiEnabled: boolean; WorkspaceCapabilityEnabled: boolean } };
+    expect(settings.Studio).toMatchObject({
+      StartupProfile: 'NEXT_DEFAULT_CANDIDATE',
+      StudioUiEnabled: true,
+      WorkspaceCapabilityEnabled: true
+    });
   });
 });

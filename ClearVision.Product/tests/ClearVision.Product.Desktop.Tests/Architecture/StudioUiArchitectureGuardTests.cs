@@ -252,6 +252,10 @@ public sealed class StudioUiArchitectureGuardTests
     {
         var program = File.ReadAllText(RepoPath(
             "ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs"));
+        program.Should().Contain("IValidateOptions<StudioOptions>, StudioOptionsValidator");
+        program.Should().Contain("RequireValidStudioOptions(app.Services)");
+        program.IndexOf("RequireValidStudioOptions(app.Services)", StringComparison.Ordinal)
+            .Should().BeLessThan(program.IndexOf("RunStartupRecoveryAsync", StringComparison.Ordinal));
         program.Should().Contain("CV_DESKTOP_HTTP_PORT");
         program.Should().Contain("CV_DESKTOP_LOG_PATH");
         program.Should().Contain("Requested Desktop HTTP port");
@@ -301,10 +305,8 @@ public sealed class StudioUiArchitectureGuardTests
         var evidenceWrapper = File.ReadAllText(RepoPath(
             "scripts/studio-ui-next/Invoke-StudioUiWebView2Evidence.ps1"));
         evidenceWrapper.Should().Contain("scripts/run-ai-webview2-release-smoke.ps1");
-        evidenceWrapper.Should().Contain("\"f01\", \"f02\", \"f03\"");
-        evidenceWrapper.Should().Contain("WorkspaceCapabilityEnabled");
-        evidenceWrapper.Should().Contain("Studio__WorkspaceCapabilityEnabled");
-        evidenceWrapper.Should().Contain("CV_STUDIO_UI_PROFILE");
+        evidenceWrapper.Should().Contain("\"f09\"");
+        evidenceWrapper.Should().Contain("Studio__StartupProfile");
         evidenceWrapper.Should().Contain("[StudioStartup]");
         evidenceWrapper.Should().Contain("startupLog");
         evidenceWrapper.Should().Contain("KeepDatabase");
@@ -317,9 +319,14 @@ public sealed class StudioUiArchitectureGuardTests
             "scripts/studio-ui-next/Invoke-StudioUiProfileEvidence.ps1"));
         profileEvidence.Should().Contain("Invoke-StudioUiWebView2Evidence.ps1");
         profileEvidence.Should().Contain("LEGACY_DEFAULT");
-        profileEvidence.Should().Contain("NEXT_PILOT");
-        profileEvidence.Should().Contain("NEXT_FULL_CANDIDATE");
-        profileEvidence.Should().Contain("ISOLATED_TRUTH_TABLE");
+        profileEvidence.Should().Contain("LEGACY_FALLBACK");
+        profileEvidence.Should().Contain("NEXT_INTERNAL_PILOT");
+        profileEvidence.Should().Contain("NEXT_ENGINEER_PILOT");
+        profileEvidence.Should().Contain("NEXT_OPERATOR_PILOT");
+        profileEvidence.Should().Contain("NEXT_DEFAULT_CANDIDATE");
+        profileEvidence.Should().Contain("NEXT_DEFAULT");
+        profileEvidence.Should().Contain("F09_G3_STARTUP_PROFILES");
+        profileEvidence.Should().Contain("operatorPilot");
         profileEvidence.Should().Contain("missing-assets");
         profileEvidence.Should().NotContain("Start-Process");
 
@@ -329,6 +336,10 @@ public sealed class StudioUiArchitectureGuardTests
         rollbackEvidence.Should().Contain("NEXT_CREATE");
         rollbackEvidence.Should().Contain("LEGACY_VERIFY");
         rollbackEvidence.Should().Contain("NEXT_REOPEN");
+        rollbackEvidence.Should().Contain("NEXT_DEFAULT_CANDIDATE");
+        rollbackEvidence.Should().Contain("LEGACY_FALLBACK");
+        rollbackEvidence.Should().Contain("f09-candidate-fallback-candidate-rollback.v1");
+        rollbackEvidence.Should().Contain("missing-studio-assets");
         rollbackEvidence.Should().Contain("KeepDatabase");
         rollbackEvidence.Should().Contain("ReuseDatabase");
         rollbackEvidence.Should().NotContain("Start-Process");
@@ -353,12 +364,14 @@ public sealed class StudioUiArchitectureGuardTests
         matrix.Should().Contain("RestorePackagesWithLockFile=false");
         matrix.Should().Contain("NuGetLockFilePath");
         matrix.Should().Contain("restore-disabled.packages.lock.json");
-        matrix.Should().Contain("\"f01\", \"f02\", \"f03\"");
+        matrix.Should().Contain("\"f09\"");
+        matrix.Should().Contain("StartupProfile");
+        matrix.Should().NotContain("WorkspaceCapabilityEnabled");
         matrix.Should().NotContain("Start-Process");
 
         var browserFixtureServer = File.ReadAllText(RepoPath(
             "ClearVision.Product/tests/ClearVision.Product.UI.Tests/tests/support/studio-ui-next-server.cjs"));
-        browserFixtureServer.Should().Contain("'f01', 'f02', 'f03'");
+        browserFixtureServer.Should().Contain("'f09'");
 
         var webView2Scenario = File.ReadAllText(RepoPath(
             "ClearVision.Product/tests/ClearVision.Product.UI.Tests/tests/e2e/studio-ui-next/studio-ui-webview2-smoke.cjs"));
@@ -381,21 +394,34 @@ public sealed class StudioUiArchitectureGuardTests
         using var settings = JsonDocument.Parse(File.ReadAllText(settingsPath));
         settings.RootElement
             .GetProperty("Studio")
+            .GetProperty("StartupProfile")
+            .GetString()
+            .Should()
+            .Be("NEXT_DEFAULT_CANDIDATE");
+        settings.RootElement
+            .GetProperty("Studio")
             .GetProperty("StudioUiEnabled")
             .GetBoolean()
             .Should()
-            .BeFalse();
+            .BeTrue();
         settings.RootElement
             .GetProperty("Studio")
             .GetProperty("WorkspaceCapabilityEnabled")
             .GetBoolean()
             .Should()
-            .BeFalse();
+            .BeTrue();
+        settings.RootElement
+            .GetProperty("Studio")
+            .GetProperty("AiWorkbenchCapabilityEnabled")
+            .GetBoolean()
+            .Should()
+            .BeTrue();
 
         var options = File.ReadAllText(RepoPath(
             "ClearVision.Product/src/ClearVision.Product.Desktop/Configuration/StudioOptions.cs"));
         options.Should().Contain("StudioUiEnabled { get; set; } = false");
         options.Should().Contain("WorkspaceCapabilityEnabled { get; set; } = false");
+        options.Should().Contain("StartupProfile { get; set; }");
 
         var host = File.ReadAllText(RepoPath(
             "ClearVision.Product/src/ClearVision.Product.Desktop/WebView2Host.cs"));
@@ -405,6 +431,8 @@ public sealed class StudioUiArchitectureGuardTests
             "CreateStartupPlan");
         studioV1Builder.Should().Contain("schemaVersion = 1");
         studioV1Builder.Should().Contain("uiKind = \"studio-ui\"");
+        studioV1Builder.Should().Contain("startupProfile");
+        studioV1Builder.Should().Contain("profileAllowedRoles");
         studioV1Builder.Should().NotContain("window.__API_BASE_URL__");
         studioV1Builder.Should().NotContain("window.__CSS_VERSION__");
 
@@ -505,13 +533,13 @@ public sealed class StudioUiArchitectureGuardTests
         navigation.Should().Contain("to: '/ai'");
         navigation.Should().Contain("to: '/projects'");
         navigation.Should().Contain("to: '/inspection'");
+        navigation.Should().Contain("to: '/operators'");
         navigation.Should().Contain("to: '/results'");
         navigation.Should().Contain("to: '/settings'");
         navigation.Should().Contain("to: '/stations'");
-        navigation.Should().NotContain("to: '/overview'");
-        navigation.Should().NotContain("to: '/operators'");
-        navigation.Should().NotContain("to: '/diagnostics'");
-        navigation.Should().NotContain("to: '/about'");
+        navigation.Should().Contain("to: '/overview'");
+        navigation.Should().Contain("to: '/diagnostics'");
+        navigation.Should().Contain("to: '/about'");
         navigation.Should().NotContain("/labs");
     }
 

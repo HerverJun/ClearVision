@@ -452,6 +452,9 @@ async function readStartupEvidence(page) {
     const featureFlags = startup && typeof startup === 'object'
       ? startup.featureFlags
       : undefined;
+    const profileAllowedRoles = startup && typeof startup === 'object'
+      ? startup.profileAllowedRoles
+      : undefined;
     return {
       exists: startup !== undefined,
       value: startup && typeof startup === 'object'
@@ -463,6 +466,9 @@ async function readStartupEvidence(page) {
       frozen: startup && typeof startup === 'object' ? Object.isFrozen(startup) : false,
       featureFlagsFrozen: featureFlags && typeof featureFlags === 'object'
         ? Object.isFrozen(featureFlags)
+        : false,
+      profileAllowedRolesFrozen: Array.isArray(profileAllowedRoles)
+        ? Object.isFrozen(profileAllowedRoles)
         : false,
       featureFlagTypes: featureFlags && typeof featureFlags === 'object'
         ? Object.fromEntries(Object.entries(featureFlags).map(([key, value]) => [key, typeof value]))
@@ -492,6 +498,27 @@ function assertFrozenStartupProjection(startup) {
   assert(startup.descriptor?.enumerable === true, 'Desktop startup projection is not enumerable.');
   assert(startup.tokenPresent, 'Authenticated session token was not visible to the mounted page.');
   assert(startup.chromeWebView, 'The formal WebView2 host bridge is unavailable.');
+}
+
+const profileAllowedRolesByProfile = Object.freeze({
+  NEXT_INTERNAL_PILOT: Object.freeze(['Admin']),
+  NEXT_ENGINEER_PILOT: Object.freeze(['Admin', 'Engineer']),
+  NEXT_OPERATOR_PILOT: Object.freeze(['Operator']),
+  NEXT_DEFAULT_CANDIDATE: Object.freeze(['Admin', 'Engineer', 'Operator']),
+  NEXT_DEFAULT: Object.freeze(['Admin', 'Engineer', 'Operator']),
+  NEXT_PILOT: Object.freeze(['Admin']),
+  NEXT_FULL_CANDIDATE: Object.freeze(['Admin', 'Engineer', 'Operator'])
+});
+
+function assertRequestedStartupProfile(startup) {
+  const requestedProfile = String(process.env.Studio__StartupProfile || '').trim().toUpperCase();
+  assert(requestedProfile, 'Studio__StartupProfile was not supplied to the WebView2 evidence run.');
+  const expectedRoles = profileAllowedRolesByProfile[requestedProfile];
+  assert(expectedRoles, `Unsupported requested Studio startup profile: ${requestedProfile}`);
+  assert(startup.value.startupProfile === requestedProfile,
+    `Desktop injected profile ${startup.value.startupProfile} instead of requested ${requestedProfile}.`);
+  assert(JSON.stringify(startup.value.profileAllowedRoles) === JSON.stringify(expectedRoles),
+    `Desktop injected roles drifted for ${requestedProfile}: ${JSON.stringify(startup.value.profileAllowedRoles)}`);
 }
 
 async function navigateWithAuthenticatedSession(page, webPort, expectation, route) {
@@ -563,7 +590,9 @@ async function verifyStudioFoundation(page, webPort, route) {
       'apiBaseUrl',
       'featureFlags',
       'hostKind',
+      'profileAllowedRoles',
       'schemaVersion',
+      'startupProfile',
       'studioUiBasePath',
       'uiKind'
     ]),
@@ -574,6 +603,13 @@ async function verifyStudioFoundation(page, webPort, route) {
   assert(startup.value.hostKind === 'desktop-webview2', 'StudioUI is not running in Desktop WebView2.');
   assert(startup.value.apiBaseUrl === `http://localhost:${webPort}/api`, 'StudioUI API base URL is unexpected.');
   assert(startup.value.studioUiBasePath === '/studio/', 'StudioUI base path is unexpected.');
+  assert(typeof startup.value.startupProfile === 'string', 'StudioUI startup profile is missing.');
+  assert(
+    Array.isArray(startup.value.profileAllowedRoles) && startup.value.profileAllowedRoles.length > 0,
+    'StudioUI profile role scope is missing.'
+  );
+  assert(startup.profileAllowedRolesFrozen, 'Desktop startup profileAllowedRoles projection is not frozen.');
+  assertRequestedStartupProfile(startup);
   assert(diagnostics.ready === true, 'StudioUI lifecycle diagnostics did not reach ready.');
   assert(diagnostics.mountCount === 1, `StudioUI mounted ${diagnostics.mountCount} times.`);
   assert(diagnostics.activeRoot === 'studio-ui', 'StudioUI is not the active mounted root.');
@@ -2762,7 +2798,7 @@ async function captureFinalJourneyScene(page, evidenceDirectory, phase, scene, s
   const buffer = await page.screenshot({ type: 'png', animations: 'disabled' });
   const artifact = writePngEvidence(
     evidenceDirectory,
-    `f04-g6-${safeFileName(phase)}-${safeFileName(scene)}.png`,
+    `f09-g7-${safeFileName(phase)}-${safeFileName(scene)}.png`,
     buffer
   );
   return {
@@ -3096,7 +3132,7 @@ function setOperatorParameter(operator, name, value) {
 }
 
 async function installFinalJourneyAuthority(webPort, token, projectId, evidenceDirectory) {
-  const imageEvidence = createPreviewPpm(path.join(evidenceDirectory, `f04-g6-${projectId}-input.ppm`));
+  const imageEvidence = createPreviewPpm(path.join(evidenceDirectory, `f09-g7-${projectId}-input.ppm`));
   const [project, catalogPayload] = await Promise.all([
     readAuthorizedJson(webPort, token, `/api/projects/${projectId}`),
     readAuthorizedJson(webPort, token, '/api/operators/library?includeCompatibility=true')
@@ -3317,7 +3353,7 @@ async function verifyFinalJourneyCreateRunLogout(
   assert(authority.persistenceRevision === finalRevision && authority.flowId === prepared.flowId,
     `Final post-run save identity drifted: ${JSON.stringify(authority)}`);
   const state = {
-    schemaVersion: 'f04-g6-final-journey.v1',
+    schemaVersion: 'f09-final-journey.v1',
     sourceSha,
     createdAtUtc: new Date().toISOString(),
     user: auth.session.user,
@@ -3374,7 +3410,7 @@ async function verifyFinalJourneyReopenDelete(
 ) {
   assert(fs.existsSync(statePath), `Final journey state was not found after restart: ${statePath}`);
   const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-  assert(state.schemaVersion === 'f04-g6-final-journey.v1' && state.sourceSha === sourceSha,
+  assert(state.schemaVersion === 'f09-final-journey.v1' && state.sourceSha === sourceSha,
     'Final journey restart state schema/source SHA changed.');
   const screenshots = [];
   const captureScene = async scene => screenshots.push(await captureFinalJourneyScene(
@@ -3942,7 +3978,7 @@ async function verifyFinalJourneySoak(
     gcGate && weakReferenceGate && Object.values(trends).every(item => item.passed);
   const diagnosticArtifact = writeJsonEvidence(
     evidenceDirectory,
-    `f04-g6-soak-diagnostics-${safeFileName(runName)}.json`,
+    `f09-g7-soak-diagnostics-${safeFileName(runName)}.json`,
     {
       status: soakGatePassed ? 'pass' : 'fail',
       sourceSha,
@@ -4134,7 +4170,7 @@ async function applyRollbackEvidence(evidence, webPort, token, user, rollbackPha
       handoff.runIdentity
     );
     const state = {
-      schemaVersion: 'f04-next-legacy-next-rollback.v1',
+      schemaVersion: 'f09-candidate-fallback-candidate-rollback.v1',
       sourceSha: evidence.sourceSha,
       createdAtUtc: new Date().toISOString(),
       user: {
@@ -4152,7 +4188,7 @@ async function applyRollbackEvidence(evidence, webPort, token, user, rollbackPha
 
   assert(fs.existsSync(statePath), `Rollback state was not found: ${statePath}`);
   const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-  assert(state.schemaVersion === 'f04-next-legacy-next-rollback.v1',
+  assert(state.schemaVersion === 'f09-candidate-fallback-candidate-rollback.v1',
     'Rollback state schema is unsupported.');
   assert(state.sourceSha === evidence.sourceSha, 'Rollback state source SHA changed between restarts.');
   assert(state.runIdentity?.projectId === state.authority.projectId &&
@@ -4184,7 +4220,7 @@ async function applyRollbackEvidence(evidence, webPort, token, user, rollbackPha
     statePath,
     authority,
     matched: true,
-    root: evidence.expectation === 'legacy' ? 'LEGACY_DEFAULT' : 'NEXT_PILOT'
+    root: evidence.startupProfileRequested
   };
 }
 
@@ -4214,7 +4250,7 @@ async function main() {
   const formalRun = parseBooleanEnvironment('CV_STUDIO_UI_FORMAL_RUN');
   const goldenJourney = parseBooleanEnvironment('CV_STUDIO_UI_G4B_GOLDEN_JOURNEY');
   const dpiOnly = parseBooleanEnvironment('CV_STUDIO_UI_DPI_ONLY');
-  const startupProfileRequested = String(process.env.CV_STUDIO_UI_PROFILE || '').trim().toUpperCase();
+  const startupProfileRequested = String(process.env.Studio__StartupProfile || '').trim().toUpperCase();
   const authMode = String(process.env.CV_STUDIO_UI_AUTH_MODE || 'UNRECORDED').trim().toUpperCase();
   const rollbackPhase = String(process.env.CV_STUDIO_UI_ROLLBACK_PHASE || '').trim().toUpperCase();
   const rollbackStatePath = String(process.env.CV_STUDIO_UI_ROLLBACK_STATE || '').trim();
@@ -4480,7 +4516,7 @@ async function main() {
       evidence.viewportScreenshot = {
         ...artifact,
         sourceSha: evidence.sourceSha,
-        scenes: ['f04-g6-final-journey', finalJourneyPhase.toLowerCase()],
+        scenes: ['f09-g7-final-journey', finalJourneyPhase.toLowerCase()],
         route: new URL(page.url()).hash.replace(/^#/, ''),
         DATA_SOURCE: 'REAL_WEBVIEW2_PROJECT_AUTHORITY',
         AUTH_SOURCE: 'UI_SETUP_OR_LOGIN',

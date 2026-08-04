@@ -118,6 +118,8 @@ async function installStudioStartup(page: Page): Promise<string[]> {
       hostKind: 'browser-test',
       apiBaseUrl: `${window.location.origin}/api`,
       studioUiBasePath: '/studio/',
+      startupProfile: 'NEXT_DEFAULT',
+      profileAllowedRoles: Object.freeze(['Admin', 'Engineer', 'Operator']),
       featureFlags: Object.freeze({})
     });
     Object.defineProperty(window, '__CLEARVISION_STARTUP__', {

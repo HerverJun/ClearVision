@@ -4,6 +4,27 @@ using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Desktop.Configuration;
 
+public sealed class StudioOptionsValidator : IValidateOptions<StudioOptions>
+{
+    public ValidateOptionsResult Validate(string? name, StudioOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.StartupProfile))
+        {
+            // Keep the pre-F09 truth-table behavior for isolated tests and
+            // existing deployments that have not adopted a named profile yet.
+            return ValidateOptionsResult.Success;
+        }
+
+        if (StudioStartupProfileCatalog.IsKnownConfiguredProfile(options.StartupProfile))
+        {
+            return ValidateOptionsResult.Success;
+        }
+
+        return ValidateOptionsResult.Fail(
+            $"Studio:StartupProfile '{options.StartupProfile}' is not a supported startup profile.");
+    }
+}
+
 public sealed class StationIngressOptionsValidator : IValidateOptions<StationIngressOptions>
 {
     public ValidateOptionsResult Validate(string? name, StationIngressOptions options)

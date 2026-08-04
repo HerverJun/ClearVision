@@ -71,6 +71,8 @@ function platform(runtime: ProductRuntime) {
       hostKind: 'browser-test',
       apiBaseUrl: 'http://localhost:5000/api',
       studioUiBasePath: '/studio/',
+      startupProfile: 'NEXT_DEFAULT',
+      profileAllowedRoles: ['Admin', 'Engineer', 'Operator'],
       featureFlags: Object.freeze({})
     },
     host: { dispose: vi.fn() },

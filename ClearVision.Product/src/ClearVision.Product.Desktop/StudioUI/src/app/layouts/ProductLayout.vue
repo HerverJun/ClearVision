@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
 import { useAuthLifecycleRoot } from '@/app/auth';
+import { visibleProductNavigation } from '@/app/navigation';
 import { useProductRuntime } from '@/app/productRuntime';
 import { CvBrand } from '@/design-system/patterns';
 import { CvButton, CvInlineAlert, CvModal, CvStatusBadge } from '@/design-system/primitives';
@@ -41,25 +42,38 @@ interface ProductTopNavigationItem {
   readonly disabled?: boolean;
 }
 
+const visibleNavigation = computed(() => visibleProductNavigation(
+  session.user?.role,
+  runtime.featureFlags
+));
+
+function isVisibleNavigation(path: string): boolean {
+  return visibleNavigation.value.some(item => item.to === path);
+}
+
 const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() => {
-  const items: ProductTopNavigationItem[] = [{
-    label: '工程',
-    to: '/projects',
-    description: '工程管理',
-    current: !workspaceMode.value && route.path.startsWith('/projects') &&
-      !route.path.endsWith('/inspection') && !route.path.endsWith('/ai')
-  }];
+  const items: ProductTopNavigationItem[] = [];
+  if (isVisibleNavigation('/projects')) {
+    items.push({
+      label: '工程',
+      to: '/projects',
+      description: '工程管理',
+      current: !workspaceMode.value && route.path.startsWith('/projects') &&
+        !route.path.endsWith('/inspection') && !route.path.endsWith('/ai')
+    });
+  }
   if (workspaceMode.value) {
     items.push({ label: '流程', to: route.fullPath, description: '当前工程流程', current: true });
   }
-  items.push({
-    label: '检测结果',
-    to: '/results',
-    description: '正式检测结果与历史追溯',
-    current: route.path.startsWith('/results')
-  });
-  if (session.user && ['Admin', 'Engineer'].includes(session.user.role) &&
-      runtime.featureFlags['Studio2.InspectionRun'] === true) {
+  if (isVisibleNavigation('/results')) {
+    items.push({
+      label: '检测结果',
+      to: '/results',
+      description: '正式检测结果与历史追溯',
+      current: route.path.startsWith('/results')
+    });
+  }
+  if (isVisibleNavigation('/inspection')) {
     items.splice(1, 0, {
       label: '连续检测',
       to: '/inspection',
@@ -67,8 +81,7 @@ const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() =>
       current: route.path === '/inspection' || route.path.endsWith('/inspection')
     });
   }
-  if (session.user && ['Admin', 'Engineer'].includes(session.user.role) &&
-      runtime.featureFlags['Studio2.AiWorkbench'] === true) {
+  if (isVisibleNavigation('/ai')) {
     const boundProjectId = typeof route.params.id === 'string' ? route.params.id : null;
     const aiPath = boundProjectId ? `/projects/${encodeURIComponent(boundProjectId)}/ai` : '/ai';
     items.push({
@@ -78,7 +91,7 @@ const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() =>
       current: route.path === '/ai' || route.path.endsWith('/ai')
     });
   }
-  if (session.user && ['Admin', 'Engineer'].includes(session.user.role)) {
+  if (isVisibleNavigation('/settings')) {
     items.push({
       label: '设置',
       to: '/settings',
@@ -88,7 +101,11 @@ const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() =>
   }
   return Object.freeze(items);
 });
-const productMoreNavigation = computed<readonly Readonly<{ to: string; label: string }>[]>(() => Object.freeze([]));
+const productMoreNavigation = computed<readonly Readonly<{ to: string; label: string }>[]>(() => Object.freeze(
+  visibleNavigation.value
+    .filter(item => ['/overview', '/operators', '/stations', '/diagnostics', '/about'].includes(item.to))
+    .map(item => Object.freeze({ to: item.to, label: item.label }))
+));
 const statusTone = computed(() => {
   if (systemStatus.phase === 'online') return 'ok';
   if (systemStatus.phase === 'stale') return 'warning';

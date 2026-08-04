@@ -45,15 +45,15 @@ $RunName = ($RunName -replace '[^A-Za-z0-9_.-]+', '-').Trim('-')
 if ([string]::IsNullOrWhiteSpace($RunName)) {
     throw "RunName must contain at least one safe filename character."
 }
-if ($BaseWebPort -lt 1 -or $BaseWebPort + 2 -gt 65535) {
-    throw "BaseWebPort must leave room for three isolated restarts."
+if ($BaseWebPort -lt 1 -or $BaseWebPort + 3 -gt 65535) {
+    throw "BaseWebPort must leave room for four isolated restarts."
 }
-if ($BaseCdpPort -lt 1 -or $BaseCdpPort + 2 -gt 65535) {
-    throw "BaseCdpPort must leave room for three isolated restarts."
+if ($BaseCdpPort -lt 1 -or $BaseCdpPort + 3 -gt 65535) {
+    throw "BaseCdpPort must leave room for four isolated restarts."
 }
 
 $relativeEvidenceRoot = if ([string]::IsNullOrWhiteSpace($EvidenceDirectory)) {
-    ".tmp/studio-ui-next/f04/rollback/$RunName"
+    ".tmp/studio-ui-next/f09/rollback/$RunName"
 } else {
     $EvidenceDirectory.Replace('\', '/')
 }
@@ -79,6 +79,27 @@ $sharedRoot = Join-Path $evidenceRoot "shared"
 $databasePath = Join-Path $sharedRoot "vision.db"
 $rollbackStatePath = Join-Path $sharedRoot "rollback-state.json"
 New-Item -ItemType Directory -Force -Path $sharedRoot | Out-Null
+$publishCheckBoundary = [System.IO.Path]::GetFullPath((
+    Join-Path $repoRoot ".tmp/publish-check/studio-ui-next-f09"))
+$publishCheckRoot = Join-Path $publishCheckBoundary $RunName
+$missingAssetsRuntime = Join-Path $publishCheckRoot "missing-assets-runtime"
+
+function Remove-VerifiedTemporaryDirectory {
+    param([string]$Path, [string]$AllowedRoot)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+    $resolved = [System.IO.Path]::GetFullPath($Path)
+    $root = [System.IO.Path]::GetFullPath($AllowedRoot)
+    $prefix = $root.TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $resolved.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Unsafe temporary directory '$resolved'; expected a child of '$root'."
+    }
+    Remove-Item -LiteralPath $resolved -Recurse -Force
+}
 
 $randomBytes = New-Object byte[] 24
 $random = [Security.Cryptography.RandomNumberGenerator]::Create()
@@ -96,8 +117,9 @@ const fs = require('fs');
 const evidence = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
 const ledger = evidence.productPage?.ownerLedger || null;
 const legacy = evidence.legacy?.projection || null;
-const rootKind = legacy ? 'legacy' : 'studio-ui';
-const owners = legacy ? {
+const missing = evidence.missingAssets || null;
+const rootKind = legacy ? 'legacy' : missing ? 'diagnostic' : 'studio-ui';
+const owners = legacy || missing ? {
   studioRootCount: 0,
   projectLifecycleOwnerCount: 0,
   leaveGuardOwnerCount: 0,
@@ -115,6 +137,7 @@ process.stdout.write(JSON.stringify({
   rootKind,
   owners,
   legacyProjection: legacy,
+  missingAssets: missing,
   rollback: evidence.rollback ?? null,
   meaningfulConsoleErrorCount: Array.isArray(evidence.meaningfulConsoleErrors)
     ? evidence.meaningfulConsoleErrors.length : 0,
@@ -213,13 +236,14 @@ function Invoke-RollbackRun {
         [string]$StartupProfile,
         [string]$RollbackPhase,
         [int]$PortOffset,
-        [bool]$WorkspaceEnabled,
         [bool]$SeedWorkspace,
         [bool]$FormalRun,
         [bool]$KeepDatabase,
         [bool]$ReuseDatabase,
         [bool]$AllowInitialAdminSetup,
-        [string]$Route
+        [string]$Route,
+        [string]$ExecutablePath,
+        [string]$RuntimeKind
     )
 
     $webPort = $BaseWebPort + $PortOffset
@@ -227,10 +251,10 @@ function Invoke-RollbackRun {
     $relativeEvidence = "$relativeEvidenceRoot/runs/$Name/evidence"
     $parameters = @{
         Expectation = $Expectation
-        EvidencePhase = "f04"
+        EvidencePhase = "f09"
         Configuration = "Debug"
-        RuntimeKind = "debug"
-        DesktopExecutablePath = $desktopExe
+        RuntimeKind = $RuntimeKind
+        DesktopExecutablePath = $ExecutablePath
         NodeExecutablePath = $nodeExe
         RunName = $Name
         EvidenceDirectory = $relativeEvidence
@@ -247,7 +271,6 @@ function Invoke-RollbackRun {
         WindowWidth = 1600
         WindowHeight = 1000
     }
-    if ($WorkspaceEnabled) { $parameters["WorkspaceCapabilityEnabled"] = $true }
     if ($SeedWorkspace) { $parameters["SeedWorkspace"] = $true }
     if ($FormalRun) { $parameters["FormalRun"] = $true }
     if ($KeepDatabase) { $parameters["KeepDatabase"] = $true }
@@ -263,7 +286,12 @@ function Invoke-RollbackRun {
     $cleanupPath = Join-Path $repoRoot "$relativeEvidence/studio-ui-webview2-$Name-cleanup.json"
     $cleanup = Get-Content -LiteralPath $cleanupPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $summary = Read-EvidenceSummary -Path $evidencePath
-    $expectedPageKind = if ($Expectation -eq "legacy") { "Legacy" } else { "StudioUi" }
+    $expectedPageKind = switch ($Expectation) {
+        "legacy" { "Legacy" }
+        "missing-assets" { "Diagnostic" }
+        default { "StudioUi" }
+    }
+    $requiresRollbackAssertion = -not [string]::IsNullOrWhiteSpace($RollbackPhase)
     if (-not [bool]$cleanup.passed -or
         -not [bool]$cleanup.startupLog.passed -or
         [string]$cleanup.startupLog.record.profile -ne $StartupProfile -or
@@ -271,8 +299,9 @@ function Invoke-RollbackRun {
         [string]$cleanup.startupLog.record.sourceSha -ne $sourceSha -or
         [string]$cleanup.startupLog.record.authMode -ne $authMode -or
         [string]$summary.status -ne "pass" -or
-        [string]$summary.rollback.phase -ne $RollbackPhase -or
-        -not [bool]$summary.rollback.matched -or
+        ($requiresRollbackAssertion -and ($null -eq $summary.rollback -or
+            [string]$summary.rollback.phase -ne $RollbackPhase -or
+            -not [bool]$summary.rollback.matched)) -or
         [int]$summary.meaningfulConsoleErrorCount -ne 0 -or
         [int]$summary.pageErrorCount -ne 0 -or
         [int]$summary.meaningfulRequestFailureCount -ne 0) {
@@ -283,6 +312,12 @@ function Invoke-RollbackRun {
             [int]$summary.owners.studioRootCount -ne 0 -or
             [string]$summary.legacyProjection.studioDiagnosticsType -ne "undefined") {
             throw "Legacy rollback phase mounted a Next root."
+        }
+    } elseif ($Expectation -eq "missing-assets") {
+        if ([string]$summary.rootKind -ne "diagnostic" -or
+            [int]$summary.owners.studioRootCount -ne 0 -or
+            $null -eq $summary.missingAssets) {
+            throw "Failure injection did not fail closed to the missing-assets diagnostic root."
         }
     } elseif ([string]$summary.rootKind -ne "studio-ui" -or
         [int]$summary.owners.studioRootCount -ne 1 -or
@@ -299,7 +334,7 @@ function Invoke-RollbackRun {
         profile = $StartupProfile
         rootKind = $summary.rootKind
         ownerLedger = $summary.owners
-        authority = $summary.rollback.authority
+        authority = if ($summary.rollback) { $summary.rollback.authority } else { $null }
         databaseKept = [bool]$cleanup.runtimeCleanup.databaseKept
         databaseReused = [bool]$cleanup.runtimeCleanup.databaseReused
         databaseStatePassed = [bool]$cleanup.runtimeCleanup.databaseStatePassed
@@ -313,44 +348,79 @@ function Invoke-RollbackRun {
 
 $rollbackError = $null
 $state = $null
+$failureInjection = $null
 try {
     $nextCreate = Invoke-RollbackRun `
         -Name "next-create" `
         -Expectation "studio-product" `
-        -StartupProfile "NEXT_PILOT" `
+        -StartupProfile "NEXT_DEFAULT_CANDIDATE" `
         -RollbackPhase "NEXT_CREATE" `
         -PortOffset 0 `
-        -WorkspaceEnabled $true `
         -SeedWorkspace $true `
         -FormalRun $true `
         -KeepDatabase $true `
         -ReuseDatabase $false `
         -AllowInitialAdminSetup $true `
-        -Route ""
+        -Route "" `
+        -ExecutablePath $desktopExe `
+        -RuntimeKind "debug"
     if (-not (Test-DatabaseExists) -or -not (Test-Path -LiteralPath $rollbackStatePath -PathType Leaf)) {
         throw "NEXT_CREATE did not retain the shared database and rollback state."
     }
     $state = Get-Content -LiteralPath $rollbackStatePath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([string]$state.schemaVersion -ne "f04-next-legacy-next-rollback.v1" -or
+    if ([string]$state.schemaVersion -ne "f09-candidate-fallback-candidate-rollback.v1" -or
         [string]$state.sourceSha -ne $sourceSha) {
         throw "Rollback state schema/source identity is invalid."
     }
     Assert-AuthorityShape -Authority $state.authority
     Assert-AuthorityMatches -Expected $state.authority -Actual $nextCreate.authority -Phase "NEXT_CREATE"
 
-    $legacyVerify = Invoke-RollbackRun `
-        -Name "legacy-verify" `
-        -Expectation "legacy" `
-        -StartupProfile "LEGACY_DEFAULT" `
-        -RollbackPhase "LEGACY_VERIFY" `
+    if (-not (Test-Path -LiteralPath $desktopExe -PathType Leaf)) {
+        throw "The Desktop executable was not found after NEXT_CREATE: $desktopExe"
+    }
+    New-Item -ItemType Directory -Force -Path $publishCheckRoot | Out-Null
+    Copy-Item -LiteralPath (Split-Path -Parent $desktopExe) `
+        -Destination $missingAssetsRuntime -Recurse
+    $studioAssets = Join-Path $missingAssetsRuntime "wwwroot/studio"
+    if (-not (Test-Path -LiteralPath $studioAssets -PathType Container)) {
+        throw "Failure injection sample did not start with a StudioUI asset root."
+    }
+    Remove-Item -LiteralPath $studioAssets -Recurse -Force
+    if (-not (Test-Path -LiteralPath (Join-Path $missingAssetsRuntime "wwwroot/index.html") -PathType Leaf)) {
+        throw "Failure injection sample lost its Legacy asset root."
+    }
+    $failureInjection = Invoke-RollbackRun `
+        -Name "candidate-missing-assets" `
+        -Expectation "missing-assets" `
+        -StartupProfile "NEXT_DEFAULT_CANDIDATE" `
+        -RollbackPhase "" `
         -PortOffset 1 `
-        -WorkspaceEnabled $false `
         -SeedWorkspace $false `
         -FormalRun $false `
         -KeepDatabase $true `
         -ReuseDatabase $true `
         -AllowInitialAdminSetup $false `
-        -Route ""
+        -Route "" `
+        -ExecutablePath (Join-Path $missingAssetsRuntime "ClearVision.Product.Desktop.exe") `
+        -RuntimeKind "missing-assets"
+    if (-not (Test-DatabaseExists) -or -not (Test-Path -LiteralPath $rollbackStatePath -PathType Leaf)) {
+        throw "Failure injection changed the shared rollback authority state."
+    }
+
+    $legacyVerify = Invoke-RollbackRun `
+        -Name "legacy-verify" `
+        -Expectation "legacy" `
+        -StartupProfile "LEGACY_FALLBACK" `
+        -RollbackPhase "LEGACY_VERIFY" `
+        -PortOffset 2 `
+        -SeedWorkspace $false `
+        -FormalRun $false `
+        -KeepDatabase $true `
+        -ReuseDatabase $true `
+        -AllowInitialAdminSetup $false `
+        -Route "" `
+        -ExecutablePath $desktopExe `
+        -RuntimeKind "debug"
     if (-not (Test-DatabaseExists)) {
         throw "LEGACY_VERIFY removed the shared database before the final restart."
     }
@@ -360,38 +430,53 @@ try {
     $nextReopen = Invoke-RollbackRun `
         -Name "next-reopen" `
         -Expectation "studio-product" `
-        -StartupProfile "NEXT_PILOT" `
+        -StartupProfile "NEXT_DEFAULT_CANDIDATE" `
         -RollbackPhase "NEXT_REOPEN" `
-        -PortOffset 2 `
-        -WorkspaceEnabled $true `
+        -PortOffset 3 `
         -SeedWorkspace $false `
         -FormalRun $false `
         -KeepDatabase $false `
         -ReuseDatabase $true `
         -AllowInitialAdminSetup $false `
-        -Route $projectRoute
+        -Route $projectRoute `
+        -ExecutablePath $desktopExe `
+        -RuntimeKind "debug"
     Assert-AuthorityMatches -Expected $state.authority -Actual $nextReopen.authority -Phase "NEXT_REOPEN"
     if (-not (Test-DatabaseRemoved)) {
         throw "NEXT_REOPEN did not clean the isolated shared database artifacts."
     }
 } catch {
     $rollbackError = $_
+} finally {
+    Remove-VerifiedTemporaryDirectory -Path $missingAssetsRuntime -AllowedRoot $publishCheckRoot
+    Remove-VerifiedTemporaryDirectory -Path $publishCheckRoot -AllowedRoot $publishCheckBoundary
 }
 
-$phaseCountPassed = $runRecords.Count -eq 3
+$phaseCountPassed = $runRecords.Count -eq 4
+$failureInjectionPassed = $null -ne $failureInjection -and $failureInjection.rootKind -eq "diagnostic"
 $authorityPassed = -not $rollbackError -and $null -ne $state
 $databaseCleanupPassed = Test-DatabaseRemoved
 $manifestPassed = -not $rollbackError -and $phaseCountPassed -and
-    $authorityPassed -and $databaseCleanupPassed
+    $authorityPassed -and $failureInjectionPassed -and $databaseCleanupPassed
 $manifest = [pscustomobject]@{
     schemaVersion = 1
-    evidenceKind = "F04_G5_NEXT_LEGACY_NEXT_ROLLBACK"
+    evidenceKind = "F09_G6_CANDIDATE_FALLBACK_CANDIDATE_ROLLBACK"
     sourceSha = $sourceSha
     runName = $RunName
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
     status = if ($manifestPassed) { "PASS" } else { "FAIL" }
     error = if ($rollbackError) { $rollbackError.Exception.Message } else { $null }
-    sequence = @("NEXT_PILOT", "LEGACY_DEFAULT", "NEXT_PILOT")
+    sequence = @(
+        "NEXT_DEFAULT_CANDIDATE",
+        "MISSING_ASSETS_FAILURE_INJECTION",
+        "LEGACY_FALLBACK",
+        "NEXT_DEFAULT_CANDIDATE")
+    failureInjection = [pscustomobject]@{
+        kind = "missing-studio-assets"
+        profile = "NEXT_DEFAULT_CANDIDATE"
+        passed = $failureInjectionPassed
+        rootKind = if ($failureInjection) { $failureInjection.rootKind } else { $null }
+    }
     sharedDatabase = [pscustomobject]@{
         explicitPath = $databasePath
         reusedAcrossRestarts = $phaseCountPassed

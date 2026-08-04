@@ -39,9 +39,11 @@ const AiWorkbenchPage = () => import('@/capabilities/ai-workbench/AiWorkbenchPag
 const SettingsPage = () => import('@/capabilities/settings/SettingsPage.vue');
 
 const editorRoles = Object.freeze(['Admin', 'Engineer']);
+const workspaceFlagKey = 'Studio2.Workspace';
 const stationFlagKey = 'Studio2.StationsRead';
 const inspectionRunFlagKey = 'Studio2.InspectionRun';
 const aiWorkbenchFlagKey = 'Studio2.AiWorkbench';
+const settingsFlagKey = 'Studio2.Settings';
 
 export const studioRoutes: readonly RouteRecordRaw[] = [
   {
@@ -121,6 +123,7 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
               breadcrumb: '工作区',
               requiresSession: true,
               allowedRoles: editorRoles,
+              requiredFeatureFlag: workspaceFlagKey,
               workspaceMode: true
             }
           },
@@ -199,7 +202,8 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
               title: '设置',
               breadcrumb: '设置',
               requiresSession: true,
-              allowedRoles: editorRoles
+              allowedRoles: editorRoles,
+              requiredFeatureFlag: settingsFlagKey
             }
           },
           {
@@ -341,6 +345,9 @@ export function installAuthRouteGuard(
 
     if (!requiresSession) return true;
     const role = projection.user?.role;
+    if (!role || !startup.profileAllowedRoles.includes(role as typeof startup.profileAllowedRoles[number])) {
+      return to.name === 'forbidden' ? true : { path: '/forbidden', replace: true };
+    }
     const allowedRoles = to.matched.flatMap(record => record.meta.allowedRoles ?? []);
     if (allowedRoles.length > 0 && (!role || !allowedRoles.includes(role))) {
       return to.name === 'forbidden' ? true : { path: '/forbidden', replace: true };

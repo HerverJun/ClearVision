@@ -30,7 +30,7 @@ $desktopExe = if ([string]::IsNullOrWhiteSpace($DesktopExecutablePath)) {
 }
 $sourceSha = (& git -C $repoRoot rev-parse HEAD).Trim().ToLowerInvariant()
 if ($LASTEXITCODE -ne 0 -or $sourceSha -notmatch '^[0-9a-f]{40}$') {
-    throw "Could not resolve a 40-character source SHA for F04 G6 evidence."
+    throw "Could not resolve a 40-character source SHA for F09 final evidence."
 }
 if (-not (Test-Path -LiteralPath $singleRun -PathType Leaf)) {
     throw "The StudioUI WebView2 evidence wrapper was not found: $singleRun"
@@ -47,7 +47,7 @@ if ($BaseWebPort -lt 1 -or $BaseWebPort + 2 -gt 65535 -or
 }
 
 if ([string]::IsNullOrWhiteSpace($RunName)) {
-    $RunName = "g6-final-{0}" -f [DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss-fff")
+    $RunName = "f09-final-{0}" -f [DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss-fff")
 }
 $RunName = ($RunName -replace '[^A-Za-z0-9_.-]+', '-').Trim('-')
 if ([string]::IsNullOrWhiteSpace($RunName)) {
@@ -55,7 +55,7 @@ if ([string]::IsNullOrWhiteSpace($RunName)) {
 }
 
 $relativeEvidenceRoot = if ([string]::IsNullOrWhiteSpace($EvidenceDirectory)) {
-    ".tmp/studio-ui-next/f04/final/$RunName"
+    ".tmp/studio-ui-next/f09/final/$RunName"
 } else {
     $EvidenceDirectory.Replace('\', '/')
 }
@@ -70,10 +70,10 @@ $allowedEvidencePrefix = $allowedEvidenceRoot.TrimEnd(
 if (-not $evidenceRoot.StartsWith(
     $allowedEvidencePrefix,
     [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "F04 G6 final evidence must remain under .tmp/studio-ui-next."
+    throw "F09 final evidence must remain under .tmp/studio-ui-next."
 }
 if (Test-Path -LiteralPath $evidenceRoot) {
-    throw "F04 G6 evidence root already exists; use a unique RunName: $evidenceRoot"
+    throw "F09 evidence root already exists; use a unique RunName: $evidenceRoot"
 }
 New-Item -ItemType Directory -Force -Path $evidenceRoot | Out-Null
 
@@ -91,7 +91,7 @@ try {
 } finally {
     $random.Dispose()
 }
-$username = "f04g6admin"
+$username = "f09finaladmin"
 $password = ([Convert]::ToBase64String($randomBytes) + "Aa1!")
 $runRecords = [System.Collections.Generic.List[object]]::new()
 $desktopBuilt = [bool]$NoBuild
@@ -122,7 +122,7 @@ function Invoke-FinalRun {
     $relativeEvidence = "$relativeEvidenceRoot/runs/$Name/evidence"
     $parameters = @{
         Expectation = "studio-product"
-        EvidencePhase = "f04"
+        EvidencePhase = "f09"
         Configuration = "Debug"
         RuntimeKind = "debug"
         DesktopExecutablePath = $desktopExe
@@ -134,8 +134,7 @@ function Invoke-FinalRun {
         Scale = 1.0
         WindowWidth = 1600
         WindowHeight = 1000
-        WorkspaceCapabilityEnabled = $true
-        StartupProfile = "NEXT_PILOT"
+        StartupProfile = "NEXT_DEFAULT_CANDIDATE"
         AuthMode = $AuthMode
         DatabasePath = $DatabasePath
         Username = $username
@@ -167,11 +166,11 @@ function Invoke-FinalRun {
         @($evidence.meaningfulRequestFailures).Count -ne 0 -or
         -not [bool]$cleanup.passed -or
         -not [bool]$cleanup.startupLog.passed -or
-        [string]$cleanup.startupLog.record.profile -ne "NEXT_PILOT" -or
+        [string]$cleanup.startupLog.record.profile -ne "NEXT_DEFAULT_CANDIDATE" -or
         [string]$cleanup.startupLog.record.sourceSha -ne $sourceSha -or
         [string]$cleanup.startupLog.record.authMode -ne $AuthMode -or
         -not [bool]$cleanup.authenticationDeferredToScenario) {
-        throw "F04 G6 run '$Name' did not satisfy its final-SHA runtime contract."
+        throw "F09 final run '$Name' did not satisfy its final-SHA runtime contract."
     }
 
     $record = [pscustomobject]@{
@@ -213,7 +212,7 @@ try {
         throw "CREATE_RUN_LOGOUT did not retain the shared database and journey state."
     }
     $state = Get-Content -LiteralPath $journeyStatePath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([string]$state.schemaVersion -ne "f04-g6-final-journey.v1" -or
+    if ([string]$state.schemaVersion -ne "f09-final-journey.v1" -or
         [string]$state.sourceSha -ne $sourceSha -or
         [string]$state.user.username -ne $username -or
         [string]::IsNullOrWhiteSpace([string]$state.authority.projectId) -or
@@ -271,7 +270,7 @@ $manifestPassed = -not $finalError -and $runCountPassed -and
     $journeyDatabaseRemoved -and $soakDatabaseRemoved -and $null -ne $state
 $manifest = [pscustomobject]@{
     schemaVersion = 1
-    evidenceKind = "F04_G6_FINAL_USER_JOURNEY_AND_SOAK"
+    evidenceKind = "F09_FINAL_USER_JOURNEY_AND_SOAK"
     sourceSha = $sourceSha
     runName = $RunName
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
@@ -336,7 +335,7 @@ if ($finalError) {
     throw $finalError
 }
 if (-not $manifestPassed) {
-    throw "F04 G6 final evidence did not satisfy every gate: $manifestPath"
+    throw "F09 final evidence did not satisfy every gate: $manifestPath"
 }
 
 $manifest | ConvertTo-Json -Depth 10

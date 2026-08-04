@@ -54,7 +54,7 @@ if ($BaseCdpPort -lt 1 -or $BaseCdpPort + 7 -gt 65535) {
 }
 
 $relativeEvidenceRoot = if ([string]::IsNullOrWhiteSpace($EvidenceDirectory)) {
-    ".tmp/studio-ui-next/f04/profiles/$RunName"
+    ".tmp/studio-ui-next/f09/profiles/$RunName"
 } else {
     $EvidenceDirectory.Replace('\', '/')
 }
@@ -77,7 +77,7 @@ if (Test-Path -LiteralPath $evidenceRoot) {
 New-Item -ItemType Directory -Force -Path $evidenceRoot | Out-Null
 
 $publishCheckBoundary = [System.IO.Path]::GetFullPath((
-    Join-Path $repoRoot ".tmp/publish-check/studio-ui-next-f04"))
+    Join-Path $repoRoot ".tmp/publish-check/studio-ui-next-f09"))
 $publishCheckRoot = Join-Path $publishCheckBoundary $RunName
 $missingAssetsRuntime = Join-Path $publishCheckRoot "missing-assets-runtime"
 
@@ -236,12 +236,20 @@ function Assert-RunContract {
 $runRecords = [System.Collections.Generic.List[object]]::new()
 $nextPortOffset = 0
 $desktopBuilt = [bool]$NoBuild
+$profileDefinitions = @{
+    "LEGACY_DEFAULT" = [pscustomobject]@{ StudioUiEnabled = $false; WorkspaceEnabled = $false }
+    "LEGACY_FALLBACK" = [pscustomobject]@{ StudioUiEnabled = $false; WorkspaceEnabled = $false }
+    "NEXT_INTERNAL_PILOT" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $true }
+    "NEXT_ENGINEER_PILOT" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $true }
+    "NEXT_OPERATOR_PILOT" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $false }
+    "NEXT_DEFAULT_CANDIDATE" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $true }
+    "NEXT_DEFAULT" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $true }
+}
 
 function Invoke-ProfileRun {
     param(
         [string]$Name,
         [string]$Expectation,
-        [bool]$WorkspaceEnabled,
         [string]$StartupProfile,
         [string]$ExpectedProfile,
         [string]$ExpectedPageKind,
@@ -250,13 +258,18 @@ function Invoke-ProfileRun {
         [string]$RuntimeKind = "debug"
     )
 
+    $profileDefinition = $profileDefinitions[$StartupProfile]
+    if ($null -eq $profileDefinition) {
+        throw "Profile evidence has no F09 definition for '$StartupProfile'."
+    }
+
     $webPort = $BaseWebPort + $script:nextPortOffset
     $cdpPort = $BaseCdpPort + $script:nextPortOffset
     $script:nextPortOffset += 1
     $relativeEvidence = "$relativeEvidenceRoot/runs/$Name/evidence"
     $parameters = @{
         Expectation = $Expectation
-        EvidencePhase = "f04"
+        EvidencePhase = "f09"
         Configuration = "Debug"
         RuntimeKind = $RuntimeKind
         DesktopExecutablePath = $ExecutablePath
@@ -270,12 +283,7 @@ function Invoke-ProfileRun {
         WindowWidth = 1600
         WindowHeight = 1000
     }
-    if ($WorkspaceEnabled) {
-        $parameters["WorkspaceCapabilityEnabled"] = $true
-    }
-    if (-not [string]::IsNullOrWhiteSpace($StartupProfile)) {
-        $parameters["StartupProfile"] = $StartupProfile
-    }
+    $parameters["StartupProfile"] = $StartupProfile
     if (-not [string]::IsNullOrWhiteSpace($Route)) {
         $parameters["Route"] = $Route
     }
@@ -295,17 +303,17 @@ function Invoke-ProfileRun {
         -Summary $summary `
         -ExpectedProfile $ExpectedProfile `
         -ExpectedPageKind $ExpectedPageKind `
-        -ExpectedStudioUiEnabled ($Expectation -ne "legacy") `
-        -ExpectedWorkspaceEnabled $WorkspaceEnabled `
+        -ExpectedStudioUiEnabled ([bool]$profileDefinition.StudioUiEnabled) `
+        -ExpectedWorkspaceEnabled ([bool]$profileDefinition.WorkspaceEnabled) `
         -WebPort $webPort
 
     $runRecords.Add([pscustomobject]@{
         name = $Name
         expectation = $Expectation
-        explicitProfile = if ([string]::IsNullOrWhiteSpace($StartupProfile)) { $null } else { $StartupProfile }
+        explicitProfile = $StartupProfile
         resolvedProfile = $ExpectedProfile
-        studioUiEnabled = $Expectation -ne "legacy"
-        workspaceCapabilityEnabled = $WorkspaceEnabled
+        studioUiEnabled = [bool]$profileDefinition.StudioUiEnabled
+        workspaceCapabilityEnabled = [bool]$profileDefinition.WorkspaceEnabled
         pageKind = $ExpectedPageKind
         webPort = $webPort
         cdpPort = $cdpPort
@@ -318,29 +326,60 @@ function Invoke-ProfileRun {
     })
 }
 
+function Add-BlockedProfileRun {
+    param(
+        [string]$Name,
+        [string]$StartupProfile,
+        [string]$Reason
+    )
+
+    $profileDefinition = $profileDefinitions[$StartupProfile]
+    if ($null -eq $profileDefinition) {
+        throw "Profile evidence has no F09 definition for '$StartupProfile'."
+    }
+    $runRecords.Add([pscustomobject]@{
+        name = $Name
+        expectation = "studio-product"
+        explicitProfile = $StartupProfile
+        resolvedProfile = $StartupProfile
+        studioUiEnabled = [bool]$profileDefinition.StudioUiEnabled
+        workspaceCapabilityEnabled = [bool]$profileDefinition.WorkspaceEnabled
+        pageKind = "StudioUi"
+        status = "BLOCKED"
+        blocker = $Reason
+        startup = $null
+        ownerLedger = $null
+        rootKind = $null
+        evidencePath = $null
+        cleanupPath = $null
+    })
+}
+
 $profileError = $null
 try {
-    Invoke-ProfileRun -Name "named-legacy" -Expectation "legacy" -WorkspaceEnabled $false `
+    Invoke-ProfileRun -Name "legacy-default" -Expectation "legacy" `
         -StartupProfile "LEGACY_DEFAULT" -ExpectedProfile "LEGACY_DEFAULT" `
         -ExpectedPageKind "Legacy" -Route "" -ExecutablePath $desktopExe
-    Invoke-ProfileRun -Name "named-next-pilot" -Expectation "studio-product" -WorkspaceEnabled $true `
-        -StartupProfile "NEXT_PILOT" -ExpectedProfile "NEXT_PILOT" `
-        -ExpectedPageKind "StudioUi" -Route "/overview" -ExecutablePath $desktopExe
-    Invoke-ProfileRun -Name "named-next-full" -Expectation "studio-product" -WorkspaceEnabled $true `
-        -StartupProfile "NEXT_FULL_CANDIDATE" -ExpectedProfile "NEXT_FULL_CANDIDATE" `
-        -ExpectedPageKind "StudioUi" -Route "/overview" -ExecutablePath $desktopExe
-
-    Invoke-ProfileRun -Name "truth-00" -Expectation "legacy" -WorkspaceEnabled $false `
-        -StartupProfile "" -ExpectedProfile "LEGACY_DEFAULT" `
+    Invoke-ProfileRun -Name "legacy-fallback" -Expectation "legacy" `
+        -StartupProfile "LEGACY_FALLBACK" -ExpectedProfile "LEGACY_FALLBACK" `
         -ExpectedPageKind "Legacy" -Route "" -ExecutablePath $desktopExe
-    Invoke-ProfileRun -Name "truth-01" -Expectation "legacy" -WorkspaceEnabled $true `
-        -StartupProfile "" -ExpectedProfile "ISOLATED_TRUTH_TABLE" `
-        -ExpectedPageKind "Legacy" -Route "" -ExecutablePath $desktopExe
-    Invoke-ProfileRun -Name "truth-10" -Expectation "studio-product" -WorkspaceEnabled $false `
-        -StartupProfile "" -ExpectedProfile "ISOLATED_TRUTH_TABLE" `
+    Invoke-ProfileRun -Name "next-internal-pilot" -Expectation "studio-product" `
+        -StartupProfile "NEXT_INTERNAL_PILOT" -ExpectedProfile "NEXT_INTERNAL_PILOT" `
         -ExpectedPageKind "StudioUi" -Route "/overview" -ExecutablePath $desktopExe
-    Invoke-ProfileRun -Name "truth-11" -Expectation "studio-product" -WorkspaceEnabled $true `
-        -StartupProfile "" -ExpectedProfile "NEXT_FULL_CANDIDATE" `
+    Invoke-ProfileRun -Name "next-engineer-pilot" -Expectation "studio-product" `
+        -StartupProfile "NEXT_ENGINEER_PILOT" -ExpectedProfile "NEXT_ENGINEER_PILOT" `
+        -ExpectedPageKind "StudioUi" -Route "/overview" -ExecutablePath $desktopExe
+    Add-BlockedProfileRun -Name "next-operator-pilot" `
+        -StartupProfile "NEXT_OPERATOR_PILOT" `
+        -Reason (
+            "The isolated WebView2 harness can bootstrap only an initial Admin and " +
+            "cannot prove the Operator formal-run or continuous-inspection permission contract. " +
+            "This remains an F09 cutover blocker; no backend permission is widened for evidence.")
+    Invoke-ProfileRun -Name "next-default-candidate" -Expectation "studio-product" `
+        -StartupProfile "NEXT_DEFAULT_CANDIDATE" -ExpectedProfile "NEXT_DEFAULT_CANDIDATE" `
+        -ExpectedPageKind "StudioUi" -Route "/overview" -ExecutablePath $desktopExe
+    Invoke-ProfileRun -Name "next-default" -Expectation "studio-product" `
+        -StartupProfile "NEXT_DEFAULT" -ExpectedProfile "NEXT_DEFAULT" `
         -ExpectedPageKind "StudioUi" -Route "/overview" -ExecutablePath $desktopExe
 
     if (-not (Test-Path -LiteralPath $desktopExe -PathType Leaf)) {
@@ -357,8 +396,8 @@ try {
     if (-not (Test-Path -LiteralPath (Join-Path $missingAssetsRuntime "wwwroot/index.html") -PathType Leaf)) {
         throw "Missing-assets sample lost the Legacy entry before the no-fallback test."
     }
-    Invoke-ProfileRun -Name "missing-assets" -Expectation "missing-assets" -WorkspaceEnabled $true `
-        -StartupProfile "NEXT_FULL_CANDIDATE" -ExpectedProfile "NEXT_FULL_CANDIDATE" `
+    Invoke-ProfileRun -Name "missing-assets" -Expectation "missing-assets" `
+        -StartupProfile "NEXT_DEFAULT_CANDIDATE" -ExpectedProfile "NEXT_DEFAULT_CANDIDATE" `
         -ExpectedPageKind "Diagnostic" -Route "" `
         -ExecutablePath (Join-Path $missingAssetsRuntime "ClearVision.Product.Desktop.exe") `
         -RuntimeKind "missing-assets"
@@ -374,43 +413,56 @@ try {
 $appSettingsPath = Join-Path $repoRoot (
     "ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json")
 $appSettings = Get-Content -LiteralPath $appSettingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
-$formalDefaultsPassed = -not [bool]$appSettings.Studio.StudioUiEnabled -and
-    -not [bool]$appSettings.Studio.WorkspaceCapabilityEnabled
-$namedProfilesPassed = @($runRecords | Where-Object { $_.name -like 'named-*' }).Count -eq 3
-$truthTablePassed = @($runRecords | Where-Object { $_.name -like 'truth-*' }).Count -eq 4
+$candidateConfigurationPassed = [string]$appSettings.Studio.StartupProfile -eq "NEXT_DEFAULT_CANDIDATE" -and
+    [bool]$appSettings.Studio.StudioUiEnabled -and
+    [bool]$appSettings.Studio.WorkspaceCapabilityEnabled
+$operatorPilotRecord = @($runRecords | Where-Object { $_.name -eq 'next-operator-pilot' } | Select-Object -First 1)
+$operatorPilotPassed = $operatorPilotRecord.Count -eq 1 -and $operatorPilotRecord[0].status -eq 'PASS'
+$namedProfilesPassed = @($runRecords | Where-Object {
+    $_.name -ne 'missing-assets' -and $_.name -ne 'next-operator-pilot' -and $_.status -eq 'PASS'
+}).Count -eq 6
 $missingAssetsPassed = @($runRecords | Where-Object { $_.name -eq 'missing-assets' }).Count -eq 1
-$canonicalFlagNamesPassed = $runRecords.Count -eq 8
-$doubleRootPassed = @($runRecords | Where-Object {
+$executedRuns = @($runRecords | Where-Object { $_.status -eq 'PASS' })
+$canonicalFlagNamesPassed = $executedRuns.Count -eq 7
+$doubleRootPassed = @($executedRuns | Where-Object {
     ($_.rootKind -eq 'legacy' -and [int]$_.ownerLedger.studioRootCount -eq 0) -or
     ($_.rootKind -eq 'studio-ui' -and [int]$_.ownerLedger.studioRootCount -eq 1) -or
     ($_.rootKind -eq 'diagnostic' -and [int]$_.ownerLedger.studioRootCount -eq 0)
-}).Count -eq $runRecords.Count
-$manifestPassed = -not $profileError -and $formalDefaultsPassed -and
-    $namedProfilesPassed -and $truthTablePassed -and $missingAssetsPassed -and
+}).Count -eq $executedRuns.Count
+$manifestPassed = -not $profileError -and $candidateConfigurationPassed -and
+    $namedProfilesPassed -and $operatorPilotPassed -and $missingAssetsPassed -and
     $canonicalFlagNamesPassed -and $doubleRootPassed
 
 $manifest = [pscustomobject]@{
     schemaVersion = 1
-    evidenceKind = "F04_G5_STARTUP_PROFILES"
+    evidenceKind = "F09_G3_STARTUP_PROFILES"
     sourceSha = $sourceSha
     runName = $RunName
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
-    status = if ($manifestPassed) { "PASS" } else { "FAIL" }
+    status = if ($manifestPassed) { "PASS" } elseif ($profileError) { "FAIL" } else { "PARTIAL" }
     error = if ($profileError) { $profileError.Exception.Message } else { $null }
-    formalDefaults = [pscustomobject]@{
+    defaultEntry = [pscustomobject]@{
         studioUiEnabled = [bool]$appSettings.Studio.StudioUiEnabled
         workspaceCapabilityEnabled = [bool]$appSettings.Studio.WorkspaceCapabilityEnabled
-        profile = "LEGACY_DEFAULT"
-        passed = $formalDefaultsPassed
+        configuredProfile = [string]$appSettings.Studio.StartupProfile
+        nextDefaultActive = [string]$appSettings.Studio.StartupProfile -eq "NEXT_DEFAULT"
+        candidateConfigurationPassed = $candidateConfigurationPassed
     }
     namedProfiles = [pscustomobject]@{
-        expected = @("LEGACY_DEFAULT", "NEXT_PILOT", "NEXT_FULL_CANDIDATE")
+        expected = @(
+            "LEGACY_DEFAULT",
+            "LEGACY_FALLBACK",
+            "NEXT_INTERNAL_PILOT",
+            "NEXT_ENGINEER_PILOT",
+            "NEXT_OPERATOR_PILOT",
+            "NEXT_DEFAULT_CANDIDATE",
+            "NEXT_DEFAULT")
         passed = $namedProfilesPassed
     }
-    startupTruthTable = [pscustomobject]@{
-        combinations = 4
-        independentProcesses = 4
-        passed = $truthTablePassed
+    operatorPilot = [pscustomobject]@{
+        status = if ($operatorPilotRecord.Count -eq 1) { $operatorPilotRecord[0].status } else { "NOT_RECORDED" }
+        blocker = if ($operatorPilotRecord.Count -eq 1) { $operatorPilotRecord[0].blocker } else { $null }
+        passed = $operatorPilotPassed
     }
     missingAssetDiagnostic = [pscustomobject]@{
         noSilentLegacyFallback = $missingAssetsPassed
@@ -440,7 +492,7 @@ if ($profileError) {
     throw $profileError
 }
 if (-not $manifestPassed) {
-    throw "StudioUI G5 profile evidence did not satisfy every gate: $manifestPath"
+    throw "StudioUI F09 profile evidence is incomplete: $manifestPath"
 }
 
 $manifest | ConvertTo-Json -Depth 8

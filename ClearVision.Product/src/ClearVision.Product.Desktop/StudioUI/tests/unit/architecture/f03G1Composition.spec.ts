@@ -33,11 +33,11 @@ describe('F03 G1 composition and startup flag guards', () => {
     expect(runtime).toContain('workspace.dispose();');
   });
 
-  it('keeps Studio and Workspace disabled by default and exposes one startup flag mapping', () => {
+  it('uses the named F09 candidate and exposes one startup flag mapping', () => {
     const settings = JSON.parse(read(join(
       repositoryRoot,
       'ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json'
-    ))) as { Studio: { StudioUiEnabled: boolean; WorkspaceCapabilityEnabled: boolean } };
+    ))) as { Studio: { StartupProfile: string; StudioUiEnabled: boolean; WorkspaceCapabilityEnabled: boolean } };
     const options = read(join(
       repositoryRoot,
       'ClearVision.Product/src/ClearVision.Product.Desktop/Configuration/StudioOptions.cs'
@@ -47,8 +47,9 @@ describe('F03 G1 composition and startup flag guards', () => {
       'ClearVision.Product/src/ClearVision.Product.Desktop/WebView2Host.cs'
     ));
 
-    expect(settings.Studio.StudioUiEnabled).toBe(false);
-    expect(settings.Studio.WorkspaceCapabilityEnabled).toBe(false);
+    expect(settings.Studio.StartupProfile).toBe('NEXT_DEFAULT_CANDIDATE');
+    expect(settings.Studio.StudioUiEnabled).toBe(true);
+    expect(settings.Studio.WorkspaceCapabilityEnabled).toBe(true);
     expect(options).toContain('StudioUiEnabled { get; set; } = false');
     expect(options).toContain('WorkspaceCapabilityEnabled { get; set; } = false');
     expect(host.match(/\["Studio2\.Workspace"\]\s*=\s*studioOptions\.WorkspaceCapabilityEnabled/g))

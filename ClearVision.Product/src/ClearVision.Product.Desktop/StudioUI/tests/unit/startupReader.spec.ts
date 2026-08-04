@@ -18,6 +18,8 @@ function createStartupFixture(
     hostKind: 'desktop-webview2',
     apiBaseUrl: `${localhostOrigin}/api`,
     studioUiBasePath: '/studio/',
+    startupProfile: 'NEXT_DEFAULT',
+    profileAllowedRoles: ['Admin', 'Engineer', 'Operator'],
     featureFlags: {
       'Studio2.Workspace': false,
       'Studio2.PropertyPanel': true,
@@ -59,7 +61,11 @@ describe('readDesktopStudioStartupConfig', () => {
       'Studio2.PropertyPanel': true,
       'Studio2.PreviewPanel': false
     };
-    const source = createStartupFixture({ featureFlags: sourceFeatureFlags });
+    const sourceProfileAllowedRoles = ['Admin', 'Engineer', 'Operator'];
+    const source = createStartupFixture({
+      featureFlags: sourceFeatureFlags,
+      profileAllowedRoles: sourceProfileAllowedRoles
+    });
     const runtimeWindow = createDesktopWindow(source);
 
     const startup = readDesktopStudioStartupConfig(runtimeWindow);
@@ -67,15 +73,19 @@ describe('readDesktopStudioStartupConfig', () => {
     expect(startup).toEqual(source);
     expect(startup).not.toBe(source);
     expect(startup.featureFlags).not.toBe(sourceFeatureFlags);
+    expect(startup.profileAllowedRoles).not.toBe(sourceProfileAllowedRoles);
     expect(Object.isFrozen(startup)).toBe(true);
     expect(Object.isFrozen(startup.featureFlags)).toBe(true);
+    expect(Object.isFrozen(startup.profileAllowedRoles)).toBe(true);
     expect(runtimeWindow.__CLEARVISION_STARTUP__).toBe(source);
 
     source.apiBaseUrl = 'http://localhost:9999/api';
     sourceFeatureFlags['Studio2.PropertyPanel'] = false;
+    sourceProfileAllowedRoles.splice(0, 1);
     expect(startup.apiBaseUrl).toBe(`${localhostOrigin}/api`);
     expect(startup.featureFlags['Studio2.PropertyPanel']).toBe(true);
     expect(startup.featureFlags['Studio2.Workspace']).toBe(false);
+    expect(startup.profileAllowedRoles).toEqual(['Admin', 'Engineer', 'Operator']);
   });
 
   it('fails fast when Desktop did not inject startup configuration', () => {
@@ -97,6 +107,10 @@ describe('readDesktopStudioStartupConfig', () => {
     ['unknown hostKind', createStartupFixture({ hostKind: 'desktop' }), 'invalid-host-kind'],
     ['browser host in Desktop reader', createStartupFixture({ hostKind: 'browser-test' }), 'host-kind-mismatch'],
     ['base path', createStartupFixture({ studioUiBasePath: '/studio' }), 'invalid-studio-ui-base-path'],
+    ['profile', createStartupFixture({ startupProfile: 'next_default' }), 'invalid-startup-profile'],
+    ['unknown profile', createStartupFixture({ startupProfile: 'NEXT_UNLISTED' }), 'invalid-startup-profile'],
+    ['profile roles', createStartupFixture({ profileAllowedRoles: ['Admin', 'Admin'] }), 'invalid-profile-allowed-roles'],
+    ['profile role mapping', createStartupFixture({ profileAllowedRoles: ['Admin'] }), 'invalid-profile-allowed-roles'],
     ['null featureFlags', createStartupFixture({ featureFlags: null }), 'invalid-feature-flags'],
     ['array featureFlags', createStartupFixture({ featureFlags: [] }), 'invalid-feature-flags'],
     ['non-boolean feature flag', createStartupFixture({ featureFlags: { enabled: 1 } }), 'invalid-feature-flags']

@@ -27,6 +27,12 @@ const sessionProbeState = computed(() =>
 const startupItems = computed<readonly CvDescriptionItem[]>(() => [
   { key: 'build', label: '构建', value: `${studioUiBuildMetadata.name} ${studioUiBuildMetadata.version}` },
   { key: 'schema', label: '启动协议版本', value: platform.startup.schemaVersion },
+  { key: 'profile', label: '启动 Profile', value: platform.startup.startupProfile },
+  {
+    key: 'profile-roles',
+    label: 'Profile 可用角色',
+    value: platform.startup.profileAllowedRoles.map(formatRole).join('、')
+  },
   { key: 'ui-kind', label: '界面类型', value: platform.startup.uiKind },
   { key: 'host-kind', label: '宿主类型', value: platform.startup.hostKind },
   { key: 'base', label: '界面基础路径', value: platform.startup.studioUiBasePath },

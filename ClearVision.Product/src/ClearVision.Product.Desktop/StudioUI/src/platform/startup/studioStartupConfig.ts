@@ -4,8 +4,28 @@ export interface StudioStartupConfigV1 {
   readonly hostKind: 'desktop-webview2' | 'browser-test';
   readonly apiBaseUrl: string;
   readonly studioUiBasePath: '/studio/';
+  readonly startupProfile: StudioStartupProfile;
+  readonly profileAllowedRoles: readonly StudioProfileRole[];
   readonly featureFlags: Readonly<Record<string, boolean>>;
 }
+
+export type StudioProfileRole = 'Admin' | 'Engineer' | 'Operator';
+
+const profileAllowedRolesByProfile = Object.freeze({
+  LEGACY_DEFAULT: Object.freeze(['Admin', 'Engineer', 'Operator'] as const),
+  LEGACY_FALLBACK: Object.freeze(['Admin', 'Engineer', 'Operator'] as const),
+  NEXT_INTERNAL_PILOT: Object.freeze(['Admin'] as const),
+  NEXT_ENGINEER_PILOT: Object.freeze(['Admin', 'Engineer'] as const),
+  NEXT_OPERATOR_PILOT: Object.freeze(['Operator'] as const),
+  NEXT_DEFAULT_CANDIDATE: Object.freeze(['Admin', 'Engineer', 'Operator'] as const),
+  NEXT_DEFAULT: Object.freeze(['Admin', 'Engineer', 'Operator'] as const),
+  // Compatibility profiles can be emitted only by existing harnesses or absent-profile truth tables.
+  NEXT_PILOT: Object.freeze(['Admin'] as const),
+  NEXT_FULL_CANDIDATE: Object.freeze(['Admin', 'Engineer', 'Operator'] as const),
+  ISOLATED_TRUTH_TABLE: Object.freeze(['Admin', 'Engineer', 'Operator'] as const)
+} satisfies Readonly<Record<string, readonly StudioProfileRole[]>>);
+
+type StudioStartupProfile = keyof typeof profileAllowedRolesByProfile;
 
 export interface StudioStartupWindow {
   readonly location: {
@@ -33,6 +53,8 @@ export type StudioStartupConfigErrorCode =
   | 'api-base-url-origin-mismatch'
   | 'invalid-page-origin'
   | 'invalid-studio-ui-base-path'
+  | 'invalid-startup-profile'
+  | 'invalid-profile-allowed-roles'
   | 'invalid-feature-flags';
 
 export class StudioStartupConfigError extends Error {
@@ -51,8 +73,12 @@ const startupFieldNames = new Set<string>([
   'hostKind',
   'apiBaseUrl',
   'studioUiBasePath',
+  'startupProfile',
+  'profileAllowedRoles',
   'featureFlags'
 ]);
+
+const knownProfileRoles = new Set<StudioProfileRole>(['Admin', 'Engineer', 'Operator']);
 
 type StudioHostKind = StudioStartupConfigV1['hostKind'];
 type UnknownRecord = Readonly<Record<string, unknown>>;
@@ -205,6 +231,54 @@ function parseFeatureFlags(value: unknown): Readonly<Record<string, boolean>> {
   return Object.freeze(Object.fromEntries(entries));
 }
 
+function parseStartupProfile(value: unknown): StudioStartupProfile {
+  if (typeof value !== 'string' || value.trim() !== value ||
+      !Object.prototype.hasOwnProperty.call(profileAllowedRolesByProfile, value)) {
+    return fail(
+      'invalid-startup-profile',
+      'StudioUI startupProfile must be a supported profile identifier.'
+    );
+  }
+
+  return value as StudioStartupProfile;
+}
+
+function parseProfileAllowedRoles(
+  value: unknown,
+  startupProfile: StudioStartupProfile
+): readonly StudioProfileRole[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    return fail(
+      'invalid-profile-allowed-roles',
+      'StudioUI profileAllowedRoles must be a non-empty array of supported roles.'
+    );
+  }
+
+  const roles: StudioProfileRole[] = [];
+  for (const role of value) {
+    if (typeof role !== 'string' || !knownProfileRoles.has(role as StudioProfileRole) ||
+      roles.includes(role as StudioProfileRole)) {
+      return fail(
+        'invalid-profile-allowed-roles',
+        'StudioUI profileAllowedRoles must contain each supported role at most once.'
+      );
+    }
+
+    roles.push(role as StudioProfileRole);
+  }
+
+  const expectedRoles = profileAllowedRolesByProfile[startupProfile];
+  if (roles.length !== expectedRoles.length ||
+      roles.some((role, index) => role !== expectedRoles[index])) {
+    return fail(
+      'invalid-profile-allowed-roles',
+      'StudioUI profileAllowedRoles must exactly match the injected startupProfile.'
+    );
+  }
+
+  return Object.freeze(roles);
+}
+
 function validateStudioStartupConfig(
   candidate: unknown,
   expectedHostKind: StudioHostKind,
@@ -248,6 +322,8 @@ function validateStudioStartupConfig(
 
     const pageOrigin = parsePageOrigin(environment.pageOrigin);
     const apiBaseUrl = parseApiBaseUrl(candidate.apiBaseUrl, pageOrigin);
+    const startupProfile = parseStartupProfile(candidate.startupProfile);
+    const profileAllowedRoles = parseProfileAllowedRoles(candidate.profileAllowedRoles, startupProfile);
     const featureFlags = parseFeatureFlags(candidate.featureFlags);
 
     return Object.freeze({
@@ -256,6 +332,8 @@ function validateStudioStartupConfig(
       hostKind: candidate.hostKind,
       apiBaseUrl,
       studioUiBasePath: '/studio/',
+      startupProfile,
+      profileAllowedRoles,
       featureFlags
     });
   } catch (error) {

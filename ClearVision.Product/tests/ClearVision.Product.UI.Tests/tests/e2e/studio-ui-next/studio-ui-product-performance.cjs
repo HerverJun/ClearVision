@@ -667,6 +667,8 @@ async function installFrozenBrowserFixture(page, authority, operators, results, 
         hostKind: 'browser-test',
         apiBaseUrl: `${window.location.origin}/api`,
         studioUiBasePath: '/studio/',
+        startupProfile: 'NEXT_DEFAULT',
+        profileAllowedRoles: Object.freeze(['Admin', 'Engineer', 'Operator']),
         featureFlags: Object.freeze({})
       }),
       writable: false,

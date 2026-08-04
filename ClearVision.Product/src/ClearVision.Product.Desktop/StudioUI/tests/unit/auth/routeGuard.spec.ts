@@ -5,13 +5,19 @@ import type { AuthLifecycleOwner, AuthLifecycleProjection } from '@/app/auth';
 import { createStudioRouter, installAuthRouteGuard, resolveSafeReturnRoute } from '@/app/router';
 import type { StudioStartupConfigV1 } from '@/platform/startup';
 
-function startup(featureFlags: Readonly<Record<string, boolean>> = {}, hostKind: StudioStartupConfigV1['hostKind'] = 'desktop-webview2'): StudioStartupConfigV1 {
+function startup(
+  featureFlags: Readonly<Record<string, boolean>> = {},
+  hostKind: StudioStartupConfigV1['hostKind'] = 'desktop-webview2',
+  profileAllowedRoles: StudioStartupConfigV1['profileAllowedRoles'] = ['Admin', 'Engineer', 'Operator']
+): StudioStartupConfigV1 {
   return Object.freeze({
     schemaVersion: 1,
     uiKind: 'studio-ui',
     hostKind,
     apiBaseUrl: 'http://localhost:5000/api',
     studioUiBasePath: '/studio/',
+    startupProfile: 'NEXT_DEFAULT',
+    profileAllowedRoles: Object.freeze([...profileAllowedRoles]),
     featureFlags: Object.freeze({ ...featureFlags })
   });
 }
@@ -76,9 +82,10 @@ describe('G2 route guard', () => {
     async () => {
     const operator = auth('authenticated', 'Operator');
     const router = createStudioRouter(createMemoryHistory());
-    installAuthRouteGuard(router, operator.owner, startup());
+    installAuthRouteGuard(router, operator.owner, startup({ 'Studio2.Workspace': true }));
     await router.push('/projects/00000000-0000-0000-0000-000000000001/workspace');
     expect(router.currentRoute.value.path).toBe('/forbidden');
+
     await router.push('/diagnostics');
     expect(router.currentRoute.value.path).toBe('/forbidden');
     await router.push('/stations');
@@ -91,8 +98,16 @@ describe('G2 route guard', () => {
     expect(router.currentRoute.value.path).toBe('/forbidden');
 
     const engineer = auth('authenticated', 'Engineer');
+    const workspaceFlagOffRouter = createStudioRouter(createMemoryHistory());
+    installAuthRouteGuard(workspaceFlagOffRouter, engineer.owner, startup());
+    await workspaceFlagOffRouter.push('/projects/11111111-1111-1111-1111-111111111111/workspace');
+    expect(workspaceFlagOffRouter.currentRoute.value.path).toBe('/forbidden');
+
     const browserRouter = createStudioRouter(createMemoryHistory());
-    installAuthRouteGuard(browserRouter, engineer.owner, startup({ 'Studio2.StationsRead': true }, 'browser-test'));
+    installAuthRouteGuard(browserRouter, engineer.owner, startup({
+      'Studio2.StationsRead': true,
+      'Studio2.Settings': true
+    }, 'browser-test'));
     await browserRouter.push('/stations');
     expect(browserRouter.currentRoute.value.path).toBe('/stations');
     await browserRouter.push('/settings');
@@ -113,6 +128,11 @@ describe('G2 route guard', () => {
     expect(aiRouter.currentRoute.value.name).toBe('ai-workbench');
     await aiRouter.push('/projects/11111111-1111-1111-1111-111111111111/ai');
     expect(aiRouter.currentRoute.value.name).toBe('project-ai-workbench');
+
+    const internalPilotRouter = createStudioRouter(createMemoryHistory());
+    installAuthRouteGuard(internalPilotRouter, engineer.owner, startup({}, 'desktop-webview2', ['Admin']));
+    await internalPilotRouter.push('/projects');
+    expect(internalPilotRouter.currentRoute.value.path).toBe('/forbidden');
     }
   );
 

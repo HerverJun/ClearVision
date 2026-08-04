@@ -248,6 +248,7 @@ static class Program
             StationSettingsPaths.GetStudioCommunicationSettingsPath(),
             optional: true,
             reloadOnChange: false);
+        builder.Services.AddSingleton<IValidateOptions<StudioOptions>, StudioOptionsValidator>();
         builder.Services.AddSingleton<IValidateOptions<StationIngressOptions>, StationIngressOptionsValidator>();
         builder.Services.AddSingleton<IValidateOptions<AiGenerationOptions>, AiGenerationOptionsValidator>();
         builder.Services.AddOptions<StationIngressOptions>()
@@ -324,6 +325,8 @@ static class Program
         });
 
         var app = builder.Build();
+        // Validate the configured profile before recovery can mutate durable state.
+        _ = RequireValidStudioOptions(app.Services);
         app.UseMiddleware<StationIngressIsolationMiddleware>();
 
         using (var scope = app.Services.CreateScope())
@@ -372,6 +375,12 @@ static class Program
         _host = app;
 
         Debug.WriteLine($"Web服务器已启动: http://localhost:{_webPort}");
+    }
+
+    internal static StudioOptions RequireValidStudioOptions(IServiceProvider services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        return services.GetRequiredService<IOptions<StudioOptions>>().Value;
     }
 
     internal static void UseDesktopStaticAssets(

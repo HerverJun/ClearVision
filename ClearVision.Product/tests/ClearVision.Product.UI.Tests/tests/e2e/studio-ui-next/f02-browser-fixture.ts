@@ -201,6 +201,8 @@ export async function installF02BrowserStartup(
         hostKind: 'browser-test',
         apiBaseUrl: `${window.location.origin}/api`,
         studioUiBasePath: '/studio/',
+        startupProfile: 'NEXT_DEFAULT',
+        profileAllowedRoles: Object.freeze(['Admin', 'Engineer', 'Operator']),
         featureFlags: Object.freeze(flags)
       }),
       writable: false,

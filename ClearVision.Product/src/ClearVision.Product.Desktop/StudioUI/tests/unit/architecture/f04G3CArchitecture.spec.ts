@@ -63,7 +63,7 @@ describe('F04 G3C Project lifecycle architecture guards', () => {
       .toBeLessThan(workspace.indexOf('runtime.openProject(projectId)'));
   });
 
-  it('keeps the existing Project read-query owner and formal flags unchanged', () => {
+  it('keeps the existing Project read-query owner and named F09 candidate projection', () => {
     expect(files
       .filter(path => read(path).includes('createProjectsListQuery('))
       .map(studioRelative))
@@ -71,10 +71,11 @@ describe('F04 G3C Project lifecycle architecture guards', () => {
     const settings = JSON.parse(read(resolve(
       studioRoot,
       '../../../../ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json'
-    ))) as { Studio: { StudioUiEnabled: boolean; WorkspaceCapabilityEnabled: boolean } };
+    ))) as { Studio: { StartupProfile: string; StudioUiEnabled: boolean; WorkspaceCapabilityEnabled: boolean } };
     expect(settings.Studio).toMatchObject({
-      StudioUiEnabled: false,
-      WorkspaceCapabilityEnabled: false
+      StartupProfile: 'NEXT_DEFAULT_CANDIDATE',
+      StudioUiEnabled: true,
+      WorkspaceCapabilityEnabled: true
     });
   });
 });

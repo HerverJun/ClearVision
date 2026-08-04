@@ -22,7 +22,9 @@ function createTestPlatform(): StudioPlatform {
     hostKind: 'browser-test',
     apiBaseUrl: 'http://localhost:5000/api',
     studioUiBasePath: '/studio/',
-    featureFlags: {}
+    startupProfile: 'NEXT_DEFAULT',
+    profileAllowedRoles: ['Admin', 'Engineer', 'Operator'],
+    featureFlags: { 'Studio2.Settings': true }
   }, { pageOrigin: 'http://localhost:5000' });
   const api: ApiTransport = Object.freeze({
     apiBaseUrl: startup.apiBaseUrl,
@@ -79,6 +81,12 @@ describe('mountStudioApp', () => {
     expect(document.querySelector('[data-product-nav="/projects"]')).not.toBeNull();
     expect(document.querySelector('[data-product-nav="/results"]')).not.toBeNull();
     expect(document.querySelector('[data-product-nav="/settings"]')).not.toBeNull();
+    expect(document.querySelector('[data-product-more]')).not.toBeNull();
+    expect(document.querySelector('[data-product-more] [data-product-nav="/overview"]')).not.toBeNull();
+    expect(document.querySelector('[data-product-more] [data-product-nav="/operators"]')).not.toBeNull();
+    expect(document.querySelector('[data-product-more] [data-product-nav="/diagnostics"]')).not.toBeNull();
+    expect(document.querySelector('[data-product-more] [data-product-nav="/about"]')).not.toBeNull();
+    expect(document.querySelector('[data-product-more] [data-product-nav="/stations"]')).toBeNull();
 
     mountedApp.unmount();
     mountedApp.unmount();

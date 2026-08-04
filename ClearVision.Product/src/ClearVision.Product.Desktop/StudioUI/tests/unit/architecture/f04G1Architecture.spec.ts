@@ -92,15 +92,16 @@ describe('F04 G2 auth, owner, route and transport boundary guards', () => {
     expect(router).toContain("path: '/login'");
   });
 
-  it('keeps Labs out of product navigation and formal defaults false/false', () => {
+  it('keeps Labs out of product navigation and preserves the named F09 candidate', () => {
     const navigation = read(join(sourceRoot, 'app/navigation.ts'));
     expect(navigation).not.toContain('/labs');
 
     const settings = JSON.parse(read(join(
       repositoryRoot,
       'ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json'
-    ))) as { Studio: { StudioUiEnabled: boolean; WorkspaceCapabilityEnabled: boolean } };
-    expect(settings.Studio.StudioUiEnabled).toBe(false);
-    expect(settings.Studio.WorkspaceCapabilityEnabled).toBe(false);
+    ))) as { Studio: { StartupProfile: string; StudioUiEnabled: boolean; WorkspaceCapabilityEnabled: boolean } };
+    expect(settings.Studio.StartupProfile).toBe('NEXT_DEFAULT_CANDIDATE');
+    expect(settings.Studio.StudioUiEnabled).toBe(true);
+    expect(settings.Studio.WorkspaceCapabilityEnabled).toBe(true);
   });
 });

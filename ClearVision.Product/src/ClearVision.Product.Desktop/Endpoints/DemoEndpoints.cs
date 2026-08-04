@@ -20,7 +20,8 @@ public static class DemoEndpoints
             {
                 return Results.Problem($"创建演示工程失败: {ex.Message}");
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         app.MapPost("/api/demo/create-simple", async (DemoProjectService demoService) =>
         {
@@ -33,7 +34,8 @@ public static class DemoEndpoints
             {
                 return Results.Problem($"创建简单演示工程失败: {ex.Message}");
             }
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
 
         app.MapGet("/api/demo/guide", (DemoProjectService demoService) =>
         {

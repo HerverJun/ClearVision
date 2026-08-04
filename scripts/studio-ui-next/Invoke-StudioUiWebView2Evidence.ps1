@@ -14,7 +14,7 @@ param(
     [string]$Configuration = "Debug",
     [ValidateSet("debug", "publish", "missing-assets")]
     [string]$RuntimeKind = "debug",
-    [ValidateSet("f01", "f02", "f03", "f04", "f06")]
+    [ValidateSet("f01", "f02", "f03", "f04", "f06", "f09")]
     [string]$EvidencePhase = "f01",
     [string]$DesktopExecutablePath,
     [string]$NodeExecutablePath,
@@ -30,13 +30,20 @@ param(
     [int]$WindowHeight = 1000,
     [switch]$SanitizeDesktopPath,
     [switch]$DeepCanvas,
-    [switch]$WorkspaceCapabilityEnabled,
-    [switch]$AiWorkbenchCapabilityEnabled,
     [switch]$SeedWorkspace,
     [switch]$FormalRun,
     [switch]$GoldenJourney,
     [switch]$DpiOnly,
-    [ValidateSet("LEGACY_DEFAULT", "NEXT_PILOT", "NEXT_FULL_CANDIDATE")]
+    [ValidateSet(
+        "LEGACY_DEFAULT",
+        "LEGACY_FALLBACK",
+        "NEXT_INTERNAL_PILOT",
+        "NEXT_ENGINEER_PILOT",
+        "NEXT_OPERATOR_PILOT",
+        "NEXT_DEFAULT_CANDIDATE",
+        "NEXT_DEFAULT",
+        "NEXT_PILOT",
+        "NEXT_FULL_CANDIDATE")]
     [string]$StartupProfile,
     [string]$AuthMode = "HARNESS_SEEDED_SESSION",
     [string]$RollbackPhase,
@@ -196,12 +203,42 @@ $databasePath = if ([string]::IsNullOrWhiteSpace($configuredDatabasePath)) {
 }
 New-Item -ItemType Directory -Force -Path $evidencePath | Out-Null
 
-$studioUiEnabled = $Expectation -ne "legacy"
+$startupProfileDefinitions = @{
+    "LEGACY_DEFAULT" = [pscustomobject]@{ StudioUiEnabled = $false; WorkspaceEnabled = $false }
+    "LEGACY_FALLBACK" = [pscustomobject]@{ StudioUiEnabled = $false; WorkspaceEnabled = $false }
+    "NEXT_INTERNAL_PILOT" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $true }
+    "NEXT_ENGINEER_PILOT" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $true }
+    "NEXT_OPERATOR_PILOT" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $false }
+    "NEXT_DEFAULT_CANDIDATE" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $true }
+    "NEXT_DEFAULT" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $true }
+    "NEXT_PILOT" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $true }
+    "NEXT_FULL_CANDIDATE" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $true }
+}
+if ([string]::IsNullOrWhiteSpace($StartupProfile)) {
+    $StartupProfile = if ($Expectation -eq "legacy") {
+        "LEGACY_DEFAULT"
+    } else {
+        "NEXT_DEFAULT_CANDIDATE"
+    }
+}
+$StartupProfile = $StartupProfile.Trim().ToUpperInvariant()
+if (-not $startupProfileDefinitions.ContainsKey($StartupProfile)) {
+    throw "Unsupported StartupProfile '$StartupProfile'."
+}
+$startupProfileDefinition = $startupProfileDefinitions[$StartupProfile]
+$studioUiEnabled = [bool]$startupProfileDefinition.StudioUiEnabled
+$workspaceCapabilityEnabled = [bool]$startupProfileDefinition.WorkspaceEnabled
+if ($Expectation -eq "legacy" -and $studioUiEnabled) {
+    throw "StartupProfile '$StartupProfile' cannot be combined with a Legacy expectation."
+}
+if ($Expectation -ne "legacy" -and -not $studioUiEnabled) {
+    throw "StartupProfile '$StartupProfile' cannot be combined with a StudioUI expectation."
+}
 if ($SeedWorkspace -and $Expectation -ne "studio-product") {
     throw "SeedWorkspace is only valid for the studio-product expectation."
 }
-if ($SeedWorkspace -and -not $WorkspaceCapabilityEnabled) {
-    throw "SeedWorkspace requires WorkspaceCapabilityEnabled."
+if ($SeedWorkspace -and -not $workspaceCapabilityEnabled) {
+    throw "SeedWorkspace requires a StartupProfile with Workspace enabled."
 }
 if ($FormalRun -and -not $SeedWorkspace) {
     throw "FormalRun requires SeedWorkspace so the runner can execute a persisted Project authority."
@@ -222,15 +259,6 @@ if ($AllowInitialAdminSetup -and
     ([string]::IsNullOrWhiteSpace($configuredDatabasePath) -or
         [string]::IsNullOrWhiteSpace($Password))) {
     throw "AllowInitialAdminSetup requires an explicit isolated DatabasePath and Password."
-}
-if (-not [string]::IsNullOrWhiteSpace($StartupProfile)) {
-    if ($StartupProfile -eq "LEGACY_DEFAULT" -and $studioUiEnabled) {
-        throw "LEGACY_DEFAULT cannot be combined with a StudioUI expectation."
-    }
-    if ($StartupProfile -in @("NEXT_PILOT", "NEXT_FULL_CANDIDATE") -and
-        (-not $studioUiEnabled -or -not $WorkspaceCapabilityEnabled)) {
-        throw "$StartupProfile requires StudioUI plus WorkspaceCapabilityEnabled."
-    }
 }
 if ([string]::IsNullOrWhiteSpace($AuthMode)) {
     throw "AuthMode must be non-empty."
@@ -259,7 +287,7 @@ if ($normalizedFinalJourneyPhase -and -not $DeferAuthToScenario) {
     throw "FinalJourneyPhase requires DeferAuthToScenario so setup/login remain UI-owned."
 }
 if ($normalizedFinalJourneyPhase -and
-    ($Expectation -ne "studio-product" -or -not $WorkspaceCapabilityEnabled -or
+    ($Expectation -ne "studio-product" -or -not $workspaceCapabilityEnabled -or
         $SeedWorkspace -or $FormalRun -or $DpiOnly -or $normalizedRollbackPhase)) {
     throw "FinalJourneyPhase requires an unseeded studio-product NEXT profile with Workspace enabled."
 }
@@ -329,9 +357,7 @@ $resolvedRoute = if (-not [string]::IsNullOrWhiteSpace($Route)) {
 }
 
 $customEnvironment = [ordered]@{
-    "Studio__StudioUiEnabled" = if ($studioUiEnabled) { "true" } else { "false" }
-    "Studio__WorkspaceCapabilityEnabled" = if ($WorkspaceCapabilityEnabled) { "true" } else { "false" }
-    "Studio__AiWorkbenchCapabilityEnabled" = if ($AiWorkbenchCapabilityEnabled) { "true" } else { "false" }
+    "Studio__StartupProfile" = $StartupProfile
     "CV_STUDIO_UI_EXPECTATION" = $Expectation
     "CV_STUDIO_UI_ROUTE" = $resolvedRoute
     "CV_STUDIO_UI_DESKTOP_EXECUTABLE" = $desktopExe
@@ -346,7 +372,6 @@ $customEnvironment = [ordered]@{
     "CV_STUDIO_UI_FORMAL_RUN" = if ($FormalRun) { "true" } else { "false" }
     "CV_STUDIO_UI_G4B_GOLDEN_JOURNEY" = if ($GoldenJourney) { "true" } else { "false" }
     "CV_STUDIO_UI_DPI_ONLY" = if ($DpiOnly) { "true" } else { "false" }
-    "CV_STUDIO_UI_PROFILE" = if ([string]::IsNullOrWhiteSpace($StartupProfile)) { "" } else { $StartupProfile }
     "CV_STUDIO_UI_AUTH_MODE" = $AuthMode.Trim().ToUpperInvariant()
     "CV_STUDIO_UI_ROLLBACK_PHASE" = $normalizedRollbackPhase
     "CV_STUDIO_UI_ROLLBACK_STATE" = $rollbackStateFullPath
@@ -358,6 +383,28 @@ $customEnvironment = [ordered]@{
 $previousEnvironment = @{}
 foreach ($entry in $customEnvironment.GetEnumerator()) {
     $previousEnvironment[$entry.Key] = [Environment]::GetEnvironmentVariable($entry.Key, "Process")
+}
+$profileRawOptionEnvironmentNames = @(
+    "Studio__StudioUiEnabled",
+    "Studio__WorkspaceCapabilityEnabled",
+    "Studio__NodePreviewInspectorEnabled",
+    "Studio__PropertyPanelCapabilityEnabled",
+    "Studio__PreviewPanelCapabilityEnabled",
+    "Studio__GlobalVariablesCapabilityEnabled",
+    "Studio__SettingsCapabilityEnabled",
+    "Studio__ProjectPageCapabilityEnabled",
+    "Studio__InspectionCapabilityEnabled",
+    "Studio__StationsReadCapabilityEnabled",
+    "Studio__InspectionRunCapabilityEnabled",
+    "Studio__ResultsReviewCapabilityEnabled",
+    "Studio__AiPanelCapabilityEnabled",
+    "Studio__AiWorkbenchCapabilityEnabled",
+    "Studio__CircleSearchV2ToolEnabled",
+    "Studio__NPointCalibrationWorkbenchEnabled"
+)
+$profileRawOptionPreviousEnvironment = @{}
+foreach ($name in $profileRawOptionEnvironmentNames) {
+    $profileRawOptionPreviousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
 }
 $runnerManagedEnvironmentNames = @(
     "Database__Path",
@@ -390,6 +437,12 @@ function Restore-CustomEnvironment {
             $previousEnvironment[$entry.Key],
             "Process")
     }
+    foreach ($name in $profileRawOptionEnvironmentNames) {
+        [Environment]::SetEnvironmentVariable(
+            $name,
+            $profileRawOptionPreviousEnvironment[$name],
+            "Process")
+    }
 }
 
 function Test-EnvironmentRestored {
@@ -406,6 +459,16 @@ function Test-EnvironmentRestored {
     foreach ($name in $runnerManagedEnvironmentNames) {
         $current = [Environment]::GetEnvironmentVariable($name, "Process")
         $expected = $runnerPreviousEnvironment[$name]
+        if (-not [string]::Equals(
+            [string]$current,
+            [string]$expected,
+            [System.StringComparison]::Ordinal)) {
+            return $false
+        }
+    }
+    foreach ($name in $profileRawOptionEnvironmentNames) {
+        $current = [Environment]::GetEnvironmentVariable($name, "Process")
+        $expected = $profileRawOptionPreviousEnvironment[$name]
         if (-not [string]::Equals(
             [string]$current,
             [string]$expected,
@@ -504,6 +567,9 @@ $runnerError = $null
 $startedAtUtc = [DateTime]::UtcNow
 
 try {
+    foreach ($name in $profileRawOptionEnvironmentNames) {
+        [Environment]::SetEnvironmentVariable($name, $null, "Process")
+    }
     foreach ($entry in $customEnvironment.GetEnumerator()) {
         [Environment]::SetEnvironmentVariable($entry.Key, [string]$entry.Value, "Process")
     }
@@ -571,15 +637,7 @@ foreach ($logFile in Get-ChildItem -LiteralPath $hostLogs -Recurse -File -Filter
     }
 }
 $startupRecord = if ($startupRecords.Count -eq 1) { $startupRecords[0] } else { $null }
-$expectedProfile = if (-not [string]::IsNullOrWhiteSpace($StartupProfile)) {
-    $StartupProfile
-} elseif (-not $studioUiEnabled -and -not $WorkspaceCapabilityEnabled) {
-    "LEGACY_DEFAULT"
-} elseif ($studioUiEnabled -and $WorkspaceCapabilityEnabled) {
-    "NEXT_FULL_CANDIDATE"
-} else {
-    "ISOLATED_TRUTH_TABLE"
-}
+$expectedProfile = $StartupProfile
 $expectedPageKind = if ($Expectation -eq "legacy") {
     "Legacy"
 } elseif ($Expectation -eq "missing-assets") {
@@ -595,9 +653,8 @@ $startupRecordPassed = $startupRecord -and
     -not [string]::IsNullOrWhiteSpace([string]$startupRecord.assetRoot) -and
     [bool]$startupRecord.configurationRequiresRestart -and
     [bool]$startupRecord.flags.'Studio:StudioUiEnabled' -eq $studioUiEnabled -and
-    [bool]$startupRecord.flags.'Studio:WorkspaceCapabilityEnabled' -eq [bool]$WorkspaceCapabilityEnabled -and
-    [bool]$startupRecord.flags.'Studio2.Workspace' -eq [bool]$WorkspaceCapabilityEnabled -and
-    [bool]$startupRecord.flags.'Studio2.AiWorkbench' -eq [bool]$AiWorkbenchCapabilityEnabled
+    [bool]$startupRecord.flags.'Studio:WorkspaceCapabilityEnabled' -eq $workspaceCapabilityEnabled -and
+    [bool]$startupRecord.flags.'Studio2.Workspace' -eq $workspaceCapabilityEnabled
 $cleanup = [pscustomobject]@{
     schemaVersion = 1
     runName = $RunName
@@ -608,12 +665,11 @@ $cleanup = [pscustomobject]@{
     runnerSucceeded = $runnerSucceeded
     runnerError = if ($runnerError) { [string]$runnerError.Exception.Message } else { $null }
     studioUiEnabled = $studioUiEnabled
-    workspaceCapabilityEnabled = [bool]$WorkspaceCapabilityEnabled
-    aiWorkbenchCapabilityEnabled = [bool]$AiWorkbenchCapabilityEnabled
+    workspaceCapabilityEnabled = $workspaceCapabilityEnabled
     workspaceSeededByHarness = [bool]$SeedWorkspace
     formalRun = [bool]$FormalRun
     dpiOnly = [bool]$DpiOnly
-    startupProfileRequested = if ([string]::IsNullOrWhiteSpace($StartupProfile)) { $null } else { $StartupProfile }
+    startupProfileRequested = $StartupProfile
     startupProfileExpected = $expectedProfile
     authMode = $AuthMode.Trim().ToUpperInvariant()
     rollbackPhase = $normalizedRollbackPhase

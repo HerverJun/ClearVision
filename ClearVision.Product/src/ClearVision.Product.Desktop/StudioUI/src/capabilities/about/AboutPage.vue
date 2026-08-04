@@ -13,8 +13,9 @@ const platform = useStudioPlatform();
 const buildItems = computed<readonly CvDescriptionItem[]>(() => [
   { key: 'frontend', label: '前端', value: `${studioUiBuildMetadata.name} ${studioUiBuildMetadata.version}` },
   { key: 'schema', label: '启动协议', value: `版本 ${platform.startup.schemaVersion}` },
+  { key: 'profile', label: '启动 Profile', value: platform.startup.startupProfile },
   { key: 'host', label: '宿主类型', value: platform.startup.hostKind },
-  { key: 'entry', label: '入口状态', value: 'StudioUiEnabled 默认关闭' },
+  { key: 'entry', label: '入口状态', value: 'Studio UI Next 已按当前 Profile 启动' },
   { key: 'auth', label: '认证范围', value: '预置会话 authenticated preview', span: 2 }
 ]);
 </script>
@@ -47,7 +48,7 @@ const buildItems = computed<readonly CvDescriptionItem[]>(() => [
       <ul>
         <li>工程、流程、全局变量与正式资源仍由现有应用服务和保存协调器负责。</li>
         <li>执行、检测结果、运行包与 Station 仍由既有后端和现场链路负责。</li>
-        <li>本阶段产品页面只发起冻结合同内的 GET 请求，不提供业务写操作。</li>
+        <li>页面写操作只通过既有应用服务与已认证 HTTP 合同执行。</li>
       </ul>
     </CvPanel>
   </section>

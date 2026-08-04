@@ -140,10 +140,12 @@ public sealed class WebView2Host : IAsyncDisposable
 
     internal static string BuildStudioUiStartupInjectionScript(
         string apiBaseUrl,
-        StudioOptions studioOptions)
+        StudioOptions studioOptions,
+        string startupProfile = StudioStartupProfileCatalog.NextDefaultCandidate)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(apiBaseUrl);
         ArgumentNullException.ThrowIfNull(studioOptions);
+        ArgumentException.ThrowIfNullOrWhiteSpace(startupProfile);
 
         var startup = new
         {
@@ -152,6 +154,8 @@ public sealed class WebView2Host : IAsyncDisposable
             hostKind = "desktop-webview2",
             apiBaseUrl,
             studioUiBasePath = "/studio/",
+            startupProfile,
+            profileAllowedRoles = StudioStartupProfileCatalog.AllowedRolesFor(startupProfile),
             featureFlags = BuildStudioUiFeatureFlags(studioOptions)
         };
         var startupJson = JsonSerializer.Serialize(startup, StartupScriptJsonOptions);
@@ -164,8 +168,19 @@ public sealed class WebView2Host : IAsyncDisposable
                         ? startup.featureFlags
                         : {})
                 });
+                const profileAllowedRoles = Object.freeze([
+                    ...(Array.isArray(startup.profileAllowedRoles)
+                        ? startup.profileAllowedRoles
+                        : [])
+                ]);
                 Object.defineProperty(startup, 'featureFlags', {
                     value: featureFlags,
+                    writable: false,
+                    configurable: false,
+                    enumerable: true
+                });
+                Object.defineProperty(startup, 'profileAllowedRoles', {
+                    value: profileAllowedRoles,
                     writable: false,
                     configurable: false,
                     enumerable: true
@@ -201,8 +216,14 @@ public sealed class WebView2Host : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(studioOptions);
         ArgumentException.ThrowIfNullOrWhiteSpace(cssVersion);
 
+        var profile = StudioStartupProfileCatalog.Resolve(
+            studioOptions,
+            startupProfile);
+        var effectiveOptions = StudioStartupProfileCatalog.CreateEffectiveOptions(
+            studioOptions,
+            profile);
         var decision = StudioStartupPageResolver.Resolve(
-            studioOptions.StudioUiEnabled,
+            effectiveOptions.StudioUiEnabled,
             baseDirectory,
             legacyWebRoot,
             studioUiWebRoot);
@@ -212,21 +233,22 @@ public sealed class WebView2Host : IAsyncDisposable
             StudioStartupPageKind.Legacy => BuildStartupInjectionScript(
                 apiBaseUrl,
                 cssVersion,
-                studioOptions.NodePreviewInspectorEnabled,
-                studioOptions.PropertyPanelCapabilityEnabled,
-                studioOptions.PreviewPanelCapabilityEnabled,
-                studioOptions.GlobalVariablesCapabilityEnabled,
-                studioOptions.SettingsCapabilityEnabled,
-                studioOptions.ProjectPageCapabilityEnabled,
-                studioOptions.InspectionCapabilityEnabled,
-                studioOptions.ResultsReviewCapabilityEnabled,
-                studioOptions.AiPanelCapabilityEnabled,
-                studioOptions.CircleSearchV2ToolEnabled,
-                studioOptions.NPointCalibrationWorkbenchEnabled,
-                studioOptions.AiWorkbenchCapabilityEnabled),
+                effectiveOptions.NodePreviewInspectorEnabled,
+                effectiveOptions.PropertyPanelCapabilityEnabled,
+                effectiveOptions.PreviewPanelCapabilityEnabled,
+                effectiveOptions.GlobalVariablesCapabilityEnabled,
+                effectiveOptions.SettingsCapabilityEnabled,
+                effectiveOptions.ProjectPageCapabilityEnabled,
+                effectiveOptions.InspectionCapabilityEnabled,
+                effectiveOptions.ResultsReviewCapabilityEnabled,
+                effectiveOptions.AiPanelCapabilityEnabled,
+                effectiveOptions.CircleSearchV2ToolEnabled,
+                effectiveOptions.NPointCalibrationWorkbenchEnabled,
+                effectiveOptions.AiWorkbenchCapabilityEnabled),
             StudioStartupPageKind.StudioUi => BuildStudioUiStartupInjectionScript(
                 apiBaseUrl,
-                studioOptions),
+                effectiveOptions,
+                profile),
             _ => null
         };
         var initialPageUri = decision.IsNavigable
@@ -235,9 +257,6 @@ public sealed class WebView2Host : IAsyncDisposable
         var diagnosticHtml = decision.IsNavigable
             ? null
             : BuildStartupDiagnosticHtml(decision);
-        var profile = StudioStartupProfileCatalog.Resolve(
-            studioOptions,
-            startupProfile ?? Environment.GetEnvironmentVariable("CV_STUDIO_UI_PROFILE"));
         var diagnostics = new StudioStartupDiagnostics(
             profile,
             decision.Kind.ToString(),
@@ -253,7 +272,7 @@ public sealed class WebView2Host : IAsyncDisposable
                 "CV_STUDIO_UI_AUTH_MODE",
                 "LOCAL_HTTP_AUTHORITY"),
             ConfigurationRequiresRestart: true,
-            BuildStartupDiagnosticsFlags(studioOptions));
+            BuildStartupDiagnosticsFlags(effectiveOptions));
 
         return new WebView2StartupPlan(
             decision,
