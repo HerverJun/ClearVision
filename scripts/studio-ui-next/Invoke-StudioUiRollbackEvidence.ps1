@@ -12,6 +12,13 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+if ($NoBuild) {
+    throw "F09 rollback evidence requires a fresh candidate build; -NoBuild is not supported."
+}
+if (-not [string]::IsNullOrWhiteSpace($DesktopExecutablePath)) {
+    throw "F09 rollback evidence must use the freshly built canonical Desktop executable."
+}
+
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "../.."))
 $singleRun = Join-Path $scriptRoot "Invoke-StudioUiWebView2Evidence.ps1"
@@ -52,7 +59,7 @@ if (-not (Test-Path -LiteralPath $nodeExe -PathType Leaf)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($RunName)) {
-    $RunName = "g5-rollback-{0}" -f [DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss-fff")
+    $RunName = "f09-rollback-{0}" -f [DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss-fff")
 }
 $RunName = ($RunName -replace '[^A-Za-z0-9_.-]+', '-').Trim('-')
 if ([string]::IsNullOrWhiteSpace($RunName)) {
@@ -259,7 +266,7 @@ function Assert-AuthorityMatches {
 }
 
 $runRecords = [System.Collections.Generic.List[object]]::new()
-$desktopBuilt = [bool]$NoBuild
+$desktopBuilt = $false
 
 function Invoke-RollbackRun {
     param(

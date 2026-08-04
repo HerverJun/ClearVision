@@ -15,6 +15,13 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+if ($NoBuild) {
+    throw "F09 final evidence requires a fresh candidate build; -NoBuild is not supported."
+}
+if (-not [string]::IsNullOrWhiteSpace($DesktopExecutablePath)) {
+    throw "F09 final evidence must use the freshly built canonical Desktop executable."
+}
+
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "../.."))
 $singleRun = Join-Path $scriptRoot "Invoke-StudioUiWebView2Evidence.ps1"
@@ -119,7 +126,7 @@ try {
 $username = "f09finaladmin"
 $password = ([Convert]::ToBase64String($randomBytes) + "Aa1!")
 $runRecords = [System.Collections.Generic.List[object]]::new()
-$desktopBuilt = [bool]$NoBuild
+$desktopBuilt = $false
 
 function Test-DatabaseRemoved {
     param([string]$Path)

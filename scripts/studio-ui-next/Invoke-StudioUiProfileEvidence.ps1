@@ -15,6 +15,13 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+if ($NoBuild) {
+    throw "F09 profile evidence requires a fresh candidate build; -NoBuild is not supported."
+}
+if (-not [string]::IsNullOrWhiteSpace($DesktopExecutablePath)) {
+    throw "F09 profile evidence must use the freshly built canonical Desktop executable."
+}
+
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "../.."))
 $singleRun = Join-Path $scriptRoot "Invoke-StudioUiWebView2Evidence.ps1"
@@ -395,7 +402,7 @@ function Assert-RunContract {
 
 $runRecords = [System.Collections.Generic.List[object]]::new()
 $nextPortOffset = 0
-$desktopBuilt = [bool]$NoBuild
+$desktopBuilt = $false
 $profileDefinitions = @{
     "LEGACY_DEFAULT" = [pscustomobject]@{ StudioUiEnabled = $false; WorkspaceEnabled = $false }
     "LEGACY_FALLBACK" = [pscustomobject]@{ StudioUiEnabled = $false; WorkspaceEnabled = $false }
