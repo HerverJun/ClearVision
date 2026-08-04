@@ -478,7 +478,7 @@ export function createFlowCanvasOwner(options: {
     focus() { assertActive(); host?.focus(); }
   });
 
-  void catalogQuery.refresh({ force: true });
+  void catalogQuery.refresh();
 
   const owner: FlowCanvasOwner = Object.freeze({
     projectId: options.project.id,
