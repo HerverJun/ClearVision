@@ -116,8 +116,8 @@ public sealed class ActiveAiModelSelector : IAiModelSelector
 }
 
 /// <summary>
-/// Stage B+ selector: selects model by RoleBindings and Priority.
-/// Falls back to active model when no role-specific binding exists.
+/// Stage B+ selector: prefers the active model within a role, then uses Priority.
+/// Falls back to the active model when no role-specific binding exists.
 /// </summary>
 public sealed class RoleAwareAiModelSelector : IAiModelSelector
 {
@@ -145,8 +145,8 @@ public sealed class RoleAwareAiModelSelector : IAiModelSelector
             .Where(m => m.IsEnabled
                 && m.RoleBindings != null
                 && m.RoleBindings.Contains(role, StringComparer.OrdinalIgnoreCase))
-            .OrderBy(m => m.Priority ?? 100)
-            .ThenByDescending(m => m.IsActive)
+            .OrderByDescending(m => m.IsActive)
+            .ThenBy(m => m.Priority ?? 100)
             .ToList();
 
         if (candidates.Count > 0)
