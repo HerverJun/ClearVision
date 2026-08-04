@@ -11,6 +11,8 @@ ClearVision 是一个面向工业视觉检测的 .NET 平台工程，覆盖桌�
 
 ## 最近更新
 
+- 2026-08-04：Studio UI Next F09 状态为 `PARTIAL`；默认入口保持 `NEXT_DEFAULT_CANDIDATE`，`NEXT_DEFAULT` 未启用，`LEGACY_FALLBACK` 仍可配置使用。详见 [完成报告](./docs/进行中/StudioUINext/F09_完成报告.md)、[最终证据清单](./docs/进行中/StudioUINext/F09_FinalEvidenceManifest.md)、[问题台账](./docs/进行中/StudioUINext/F09_OPEN_ISSUES.md) 与 [Cutover/回退手册](./docs/进行中/StudioUINext/F09_Cutover与Rollback操作手册.md)。
+
 > 本段只列仓库内已记录的最近事实；真实相机、真实 PLC、真实 Station 现场运行和产线签收仍以现场验收记录为准。
 
 - 2026-07-01：Vision Agent 恢复治理阶段已归档并冻结 G00 基线；AgentRun 事件流、ProjectSave 恢复和 GlobalVariables 状态治理作为 Studio 2.0 既有基线保留，人工重启验收仍未声明通过。见 [G00 基线冻结报告](./docs/进行中/Studio2/baseline/G00-基线冻结报告-2026-07-01.md)。
@@ -155,6 +157,13 @@ ClearVision 把“功能存在”和“可发布证据充分”分开管理：
 CI 当前覆盖构建、编码扫描、密钥扫描、单元测试、桌面端测试、检测回归/性能 gate、OperatorLibrary 打包 smoke、UI 测试、CodeQL 与手动工业 gate。
 
 ## 文档导航
+
+- [Studio UI Next F09 G0 审计与问题台账](./docs/进行中/StudioUINext/F09_G0_进入审计与问题台账.md)
+- [Studio UI Next F09 G1 Legacy/Next 终局能力矩阵](./docs/进行中/StudioUINext/F09_G1_LegacyNext终局能力矩阵.md)
+- [Studio UI Next F09 完成报告](./docs/进行中/StudioUINext/F09_完成报告.md)
+- [Studio UI Next F09 最终证据清单](./docs/进行中/StudioUINext/F09_FinalEvidenceManifest.md)
+- [Studio UI Next F09 Cutover 与 Rollback 手册](./docs/进行中/StudioUINext/F09_Cutover与Rollback操作手册.md)
+- [Studio UI Next F09 Legacy Fallback 保留与退役条件](./docs/进行中/StudioUINext/F09_LegacyFallback保留与退役条件.md)
 
 - [项目总览](./docs/项目总览.md)
 - [文档索引](./docs/README.md)
