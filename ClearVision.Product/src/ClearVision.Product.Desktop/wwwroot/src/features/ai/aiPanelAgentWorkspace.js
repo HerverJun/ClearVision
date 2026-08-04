@@ -380,6 +380,26 @@ const AI_OPERATOR_LABELS = {
     TcpCommunication: 'TCP通讯'
 };
 
+const LEGACY_PORT_DATA_TYPES = Object.freeze({
+    0: 'Image',
+    1: 'Integer',
+    2: 'Float',
+    3: 'Boolean',
+    4: 'String',
+    5: 'Point',
+    6: 'Rectangle',
+    7: 'Contour',
+    8: 'PointList',
+    9: 'DetectionResult',
+    10: 'DetectionList',
+    11: 'CircleData',
+    12: 'LineData',
+    13: 'Region',
+    14: 'BlobList',
+    15: 'BlobFeatureList',
+    99: 'Any'
+});
+
 const AI_PARAMETER_LABELS = {
     ModelId: '模型资源',
     ModelPath: '模型资源',
@@ -4327,6 +4347,10 @@ export const aiPanelAgentWorkspaceMixin = {
         const raw = String(value ?? '').trim();
         if (!raw) return fallback;
 
+        // Older agent-run payloads serialized OperatorType as its numeric .NET enum value.
+        // The caller recovers those values from the canonical operator name instead.
+        if (/^-?\d+$/.test(raw)) return fallback;
+
         const knownTypes = Object.keys(AI_OPERATOR_LABELS);
         const exact = knownTypes.find(type => type.toLowerCase() === raw.toLowerCase());
         if (exact) return exact;
@@ -4338,7 +4362,28 @@ export const aiPanelAgentWorkspaceMixin = {
         return safe && !/[\[<]redacted[\]>]/i.test(safe) ? safe : fallback;
     },
 
+    _inferDraftCanvasOperatorTypeFromLabel(value) {
+        const raw = String(value ?? '').trim();
+        if (!raw) return '';
+
+        const knownTypes = Object.keys(AI_OPERATOR_LABELS);
+        const exact = knownTypes.find(type => type.toLowerCase() === raw.toLowerCase());
+        if (exact) return exact;
+
+        for (let index = knownTypes.length - 1; index >= 0; index -= 1) {
+            const type = knownTypes[index];
+            if (String(AI_OPERATOR_LABELS[type] || '').trim().toLowerCase() === raw.toLowerCase()) {
+                return type;
+            }
+        }
+
+        return '';
+    },
+
     _normalizeDraftCanvasDataType(value, fallback = 'string') {
+        const legacyType = LEGACY_PORT_DATA_TYPES[String(value ?? '').trim()];
+        if (legacyType) return legacyType;
+
         const safe = this._sanitizeDraftCanvasLabel(value || fallback, fallback, 80);
         return safe && !/[\[<]redacted[\]>]/i.test(safe) ? safe : fallback;
     },
@@ -7032,7 +7077,14 @@ export const aiPanelAgentWorkspaceMixin = {
     _normalizeDraftOperatorForCanvas(operator, index) {
         const op = this._asObject?.(operator) || {};
         const id = String(op.id || op.Id || op.tempId || op.TempId || `op_${index + 1}`).trim();
-        const type = this._normalizeDraftCanvasOperatorType(op.type || op.Type || op.operatorType || op.OperatorType || 'DeepLearning');
+        const preferredType = op.operatorType ?? op.OperatorType;
+        const declaredType = String(preferredType ?? '').trim()
+            ? preferredType
+            : (op.type ?? op.Type);
+        const inferredType = [op.displayName, op.DisplayName, op.name, op.Name, op.title, op.Title]
+            .map(label => this._inferDraftCanvasOperatorTypeFromLabel(label))
+            .find(Boolean) || '';
+        const type = this._normalizeDraftCanvasOperatorType(declaredType, inferredType || 'DeepLearning');
         const rawMetadata = this._asObject?.(op.metadata || op.Metadata) || {};
         const agentTempId = String(rawMetadata.agentTempId || rawMetadata.AgentTempId || op.agentTempId || op.AgentTempId || op.tempId || op.TempId || '').trim();
         const metadata = agentTempId
@@ -7131,8 +7183,9 @@ export const aiPanelAgentWorkspaceMixin = {
                 const fallbackName = isOutput ? 'Output' : 'Input';
                 const name = this._sanitizeDraftCanvasLabel(item.name || item.Name || item.portName || item.PortName || fallbackName, fallbackName, 80) || fallbackName;
                 const displayName = this._sanitizeDraftCanvasLabel(item.displayName || item.DisplayName || name, name, 80) || name;
+                const declaredDataType = item.dataType ?? item.DataType ?? item.type ?? item.Type;
                 const dataType = this._normalizeDraftCanvasDataType(
-                    item.dataType || item.DataType || item.type || item.Type || (String(name).toLowerCase().includes('image') ? 'Image' : 'Any'),
+                    declaredDataType,
                     String(name).toLowerCase().includes('image') ? 'Image' : 'Any'
                 );
                 const description = this._sanitizeDraftCanvasLabel(item.description || item.Description || '', '', 180);

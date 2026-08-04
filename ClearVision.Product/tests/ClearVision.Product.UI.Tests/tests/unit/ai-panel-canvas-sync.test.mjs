@@ -316,6 +316,48 @@ test('AI draft normalization ignores leaked tempId labels', async () => {
   );
 });
 
+test('AI draft normalization recovers legacy numeric operator enum values', async () => {
+  installDom();
+  const { AiPanel } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js'
+  );
+
+  const panel = Object.create(AiPanel.prototype);
+  const normalized = panel._normalizeWorkflowDraftForCanvas({
+    operators: [
+      { id: 'node-1', type: 0, name: '\u56fe\u50cf\u91c7\u96c6', parameters: [] },
+      {
+        id: 'node-2',
+        type: 7,
+        name: '\u6a21\u677f\u5339\u914d',
+        inputPorts: [{ id: 'node-2-in-image', name: 'Image', dataType: 0 }],
+        outputPorts: [
+          { id: 'node-2-out-position', name: 'Position', dataType: 5 },
+          { id: 'node-2-out-score', name: 'Score', dataType: 2 },
+          { id: 'node-2-out-match', name: 'IsMatch', dataType: 3 }
+        ],
+        parameters: []
+      },
+      { id: 'node-3', type: 60, name: '\u7ed3\u679c\u5224\u5b9a', parameters: [] },
+      { id: 'node-4', type: 11, name: '\u7ed3\u679c\u8f93\u51fa', parameters: [] }
+    ],
+    connections: []
+  });
+
+  assert.deepEqual(
+    normalized.operators.map(item => item.type),
+    ['ImageAcquisition', 'TemplateMatching', 'ResultJudgment', 'ResultOutput']
+  );
+  assert.deepEqual(
+    normalized.operators.map(item => item.name),
+    ['\u56fe\u50cf\u91c7\u96c6', '\u6a21\u677f\u5339\u914d', '\u7ed3\u679c\u5224\u5b9a', '\u7ed3\u679c\u8f93\u51fa']
+  );
+  assert.deepEqual(
+    normalized.operators[1].outputPorts.map(port => port.dataType),
+    ['Point', 'Float', 'Boolean']
+  );
+});
+
 test('AiPanel undo notifies canvas flow change with restored snapshot', async () => {
   installDom();
   const { AiPanel } = await import(

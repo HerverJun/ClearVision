@@ -27,6 +27,7 @@ public class OperatorDto
     /// <summary>
     /// 算子类型
     /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public OperatorType Type { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -91,7 +92,9 @@ public class PortDto
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public PortDirection Direction { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public PortDataType DataType { get; set; }
     public bool IsRequired { get; set; }
 
