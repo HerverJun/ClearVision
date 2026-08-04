@@ -141,6 +141,29 @@ async function waitForAuthoritativeRunStatus(webPort, token, identity, expectedS
   );
 }
 
+function isFreshFormalRunResponse(response, pathname, previousSnapshotId) {
+  const url = new URL(response.url());
+  if (url.pathname !== pathname || response.request().method() !== 'POST') return false;
+  let body;
+  try {
+    body = response.request().postDataJSON();
+  } catch {
+    return false;
+  }
+  return typeof body?.clientSnapshotId === 'string' && body.clientSnapshotId !== previousSnapshotId;
+}
+
+async function waitForWorkspaceRunEnabled(page, message) {
+  const run = page.locator('[data-testid="workspace-run"]');
+  await run.waitFor({ state: 'visible', timeout: 45_000 });
+  await page.waitForFunction(() => {
+    const element = document.querySelector('[data-testid="workspace-run"]');
+    return element instanceof HTMLButtonElement && !element.disabled;
+  }, null, { timeout: 45_000 });
+  assert(await run.isEnabled(), message);
+  return run;
+}
+
 function metadataField(value, camelName) {
   return value?.[camelName] ?? value?.[camelName[0].toUpperCase() + camelName.slice(1)];
 }
@@ -1633,16 +1656,46 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
   const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
   const projectId = await shell.getAttribute('data-workspace-project-id');
   assert(projectId && /^[0-9a-f-]{36}$/i.test(projectId), 'Formal Run lost the persisted Project identity.');
+  const formalRunRequestRecords = [];
+  const formalRunSnapshotIds = new Set();
+  const captureFormalRunRequest = request => {
+    const url = new URL(request.url());
+    if (!/^\/api\/inspection\/(admission|execute|stop|reconcile)$/.test(url.pathname) ||
+      request.method() !== 'POST') return;
+    let body;
+    try {
+      body = request.postDataJSON();
+    } catch {
+      return;
+    }
+    if (typeof body?.clientSnapshotId !== 'string') return;
+    formalRunRequestRecords.push({
+      method: request.method(),
+      path: url.pathname,
+      clientSnapshotId: body.clientSnapshotId
+    });
+  };
+  page.on('request', captureFormalRunRequest);
   const run = page.locator('[data-testid="workspace-run"]');
-  assert(await run.isEnabled(), 'Formal Run did not enable after the persisted Project save settled.');
+  const runAvailability = await page.evaluate(() => {
+    const surface = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
+    const consoleSurface = document.querySelector('[data-testid="run-console"]');
+    const start = document.querySelector('[data-testid="workspace-run"]');
+    return {
+      workspace: surface ? Object.fromEntries([...surface.attributes].map(item => [item.name, item.value])) : null,
+      startDisabled: start instanceof HTMLButtonElement ? start.disabled : null,
+      consoleText: consoleSurface?.textContent?.trim() || null
+    };
+  });
+  assert(await run.isEnabled(),
+    `Formal Run did not enable after the persisted Project save settled: ${JSON.stringify(runAvailability)}`);
 
+  const normalPreviousSnapshotId = await shell.getAttribute('data-workspace-run-snapshot-id');
   const normalAdmissionResponsePromise = page.waitForResponse(response =>
-    new URL(response.url()).pathname === '/api/inspection/admission' &&
-    response.request().method() === 'POST'
+    isFreshFormalRunResponse(response, '/api/inspection/admission', normalPreviousSnapshotId)
   );
   const normalExecuteResponsePromise = page.waitForResponse(response =>
-    new URL(response.url()).pathname === '/api/inspection/execute' &&
-    response.request().method() === 'POST'
+    isFreshFormalRunResponse(response, '/api/inspection/execute', normalPreviousSnapshotId)
   );
   await run.click();
   const [normalAdmissionResponse, normalExecuteResponse] = await Promise.all([
@@ -1661,6 +1714,7 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
     expectedCanonicalFlowHash: normalAdmission.canonicalFlowHash,
     expectedDecisionConfigurationHash: normalAdmission.decisionConfigurationHash
   };
+  formalRunSnapshotIds.add(normalRunIdentity.clientSnapshotId);
   assert(normalResult.id === normalHandoff.resultId &&
     normalResult.projectId === projectId &&
     normalResult.executionSnapshotId === normalRunIdentity.clientSnapshotId &&
@@ -1675,8 +1729,18 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
   normalHandoff.runIdentity = normalRunIdentity;
 
   await waitForPersistedWorkspace(page, projectId);
+  await waitForWorkspaceRunEnabled(
+    page,
+    'Response-loss Formal Run did not settle its persisted admission before the fixture.'
+  );
   let responseLossSeen = false;
+  let responseLossSnapshotId = null;
   const withholdExecuteResponse = async route => {
+    try {
+      responseLossSnapshotId = route.request().postDataJSON()?.clientSnapshotId ?? null;
+    } catch {
+      responseLossSnapshotId = null;
+    }
     const response = await route.fetch();
     responseLossSeen = true;
     await route.fulfill({
@@ -1688,15 +1752,49 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
   await page.route('**/api/inspection/execute', withholdExecuteResponse);
   let reconcileHandoff;
   try {
-    await page.locator('[data-testid="workspace-run"]').click();
-    await page.waitForFunction(() =>
-      document.querySelector('[data-evidence-surface="f03-workspace-shell"]')
-        ?.getAttribute('data-workspace-run-phase') === 'unknown-outcome',
-      null,
-      { timeout: 45_000 }
+    const withheldExecuteResponsePromise = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/inspection/execute' &&
+      response.status() === 599
     );
+    const reconcileResponsePromise = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/inspection/reconcile' &&
+      response.request().method() === 'POST'
+    );
+    await page.locator('[data-testid="workspace-run"]').click();
+    await withheldExecuteResponsePromise;
+    await page.waitForFunction(() => {
+      const hasVisible = selector => {
+        const element = document.querySelector(selector);
+        return Boolean(element && element.getClientRects().length > 0);
+      };
+      return hasVisible('[data-testid="workspace-run-reconcile"]') ||
+        hasVisible('[data-testid="workspace-current-result"]') ||
+        hasVisible('[data-capability="results-read"]');
+    }, null, { timeout: 45_000 });
     assert(responseLossSeen, 'Real WebView2 execute response-loss fixture did not reach the server.');
-    await page.locator('[data-testid="workspace-run-reconcile"]').click();
+    const reconcileButton = page.locator('[data-testid="workspace-run-reconcile"]');
+    const reconcileOutcome = await Promise.race([
+      reconcileResponsePromise.then(response => ({ kind: 'response', response })),
+      (async () => {
+        if (!await reconcileButton.isVisible()) return { kind: 'no-button' };
+        try {
+          await reconcileButton.click({ timeout: 2_000 });
+          return { kind: 'clicked' };
+        } catch {
+          return { kind: 'click-raced-with-owner' };
+        }
+      })()
+    ]);
+    const reconcileResponse = reconcileOutcome.kind === 'response'
+      ? reconcileOutcome.response
+      : await reconcileResponsePromise;
+    assert(reconcileResponse.status() === 200,
+      `Response-loss reconcile returned ${reconcileResponse.status()}.`);
+    const reconciliation = await reconcileResponse.json();
+    assert(reconciliation.status === 'succeeded',
+      `Response-loss reconcile did not return a succeeded result: ${JSON.stringify(reconciliation)}`);
+    assert(responseLossSnapshotId, 'Response-loss execute request did not expose its Formal Run snapshot identity.');
+    formalRunSnapshotIds.add(responseLossSnapshotId);
     reconcileHandoff = await readFormalResultsHandoff(page, projectId);
   } finally {
     await page.unroute('**/api/inspection/execute', withholdExecuteResponse);
@@ -1704,18 +1802,23 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
 
   await waitForPersistedWorkspace(page, projectId);
   const slowFixtureEnabled = await setFormalRunSlowFixture(page, formalRunSeed, true);
+  const slowRun = await waitForWorkspaceRunEnabled(
+    page,
+    'Slow Formal Run did not settle its persisted admission after enabling the fixture.'
+  );
+  const slowPreviousSnapshotId = await shell.getAttribute('data-workspace-run-snapshot-id');
   let executeResponseCompleted = false;
   const observeExecuteResponse = response => {
     if (new URL(response.url()).pathname === '/api/inspection/execute') executeResponseCompleted = true;
   };
   page.on('response', observeExecuteResponse);
   const admissionResponsePromise = page.waitForResponse(response =>
-    new URL(response.url()).pathname === '/api/inspection/admission' &&
-    response.request().method() === 'POST'
+    isFreshFormalRunResponse(response, '/api/inspection/admission', slowPreviousSnapshotId)
   );
-  await page.locator('[data-testid="workspace-run"]').click();
+  await slowRun.click();
   const admissionResponse = await admissionResponsePromise;
   const admitted = await admissionResponse.json();
+  formalRunSnapshotIds.add(admitted.clientSnapshotId);
   const identity = {
     projectId,
     clientSnapshotId: admitted.clientSnapshotId,
@@ -1830,9 +1933,10 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
     Number(unlockedSave.persistenceRevision) > revisionBeforeUnlockedSave,
   `Cancelled Formal Run save did not reach the authoritative Project service: ${JSON.stringify(unlockedSave)}`);
 
-  const runPaths = runtimeErrors.requests
-    .map(item => new URL(item.url).pathname)
-    .filter(path => /^\/api\/inspection\/(admission|execute|stop|reconcile)$/.test(path));
+  page.off('request', captureFormalRunRequest);
+  const formalRunRequests = formalRunRequestRecords.filter(item =>
+    formalRunSnapshotIds.has(item.clientSnapshotId));
+  const runPaths = formalRunRequests.map(item => item.path);
   return {
     projectId,
     resultId: reconcileHandoff.resultId,
@@ -1853,6 +1957,7 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
     },
     reconcileHandoff,
     runPaths,
+    formalRunRequests,
     responseLoss: {
       transport: 'REAL_WEBVIEW2_ROUTE_WITHHELD_AFTER_SERVER_RESPONSE',
       backendResultRecovered: true
@@ -2502,10 +2607,12 @@ async function verifyProductPage(
     return item.method === 'POST' && /^\/api\/projects\/[0-9a-f-]{36}\/open$/i.test(url.pathname);
   };
   const projectOpenRequests = productRequests.filter(isProjectOpenRequest);
-  const forbiddenRunRequests = productRequests.filter(item => {
-    const url = new URL(item.url);
-    return /\/api\/(?:inspection\/(?:admission|execute|stop|reconcile)|runs)(?:\/|$)/i.test(url.pathname);
-  });
+  const forbiddenRunRequests = formalRun
+    ? (workspaceG6?.formalRunRequests ?? [])
+    : productRequests.filter(item => {
+      const url = new URL(item.url);
+      return /\/api\/(?:inspection\/(?:admission|execute|stop|reconcile)|runs)(?:\/|$)/i.test(url.pathname);
+    });
   const expectedRunPaths = formalRun
     ? [
         '/api/inspection/admission', '/api/inspection/execute',
@@ -2517,7 +2624,7 @@ async function verifyProductPage(
   const unexpectedWriteRequests = writeRequests.filter(item => {
     if (!isWorkspaceRoute) return true;
     const url = new URL(item.url);
-    return !(isF04Evidence && isProjectOpenRequest(item)) &&
+    return !isProjectOpenRequest(item) &&
       !(item.method === 'POST' && url.pathname === '/api/inspection/decision-configuration/validate') &&
       !(item.method === 'POST' && url.pathname === '/api/flows/preview-node') &&
       !(goldenJourney && item.method === 'POST' && url.pathname === '/api/cameras/soft-trigger-capture') &&
@@ -2561,7 +2668,7 @@ async function verifyProductPage(
   assert(unexpectedWriteRequests.length === 0,
     `Product route emitted writes outside approved Project/Preview/Run commands: ${JSON.stringify(unexpectedWriteRequests)}`);
   if (formalRun) {
-    assert(forbiddenRunRequests.map(item => new URL(item.url).pathname).join(',') === expectedRunPaths.join(','),
+    assert(forbiddenRunRequests.map(item => item.path).join(',') === expectedRunPaths.join(','),
       `Formal Run did not issue the expected Admission/Execute/Stop/Reconcile request chain: ${JSON.stringify(forbiddenRunRequests)}`);
     assert(workspaceG6?.projectId && workspaceG6.resultId,
       `Formal Run did not retain the Results handoff identity: ${JSON.stringify(workspaceG6)}`);
@@ -2588,13 +2695,13 @@ async function verifyProductPage(
     const unexpectedWorkspaceRequests = productRequests.filter(item => {
       const url = new URL(item.url);
       return url.pathname !== '/health' &&
-        !(isF04Evidence && item.method === 'GET' && url.pathname === '/api/auth/setup-status') &&
+        !(item.method === 'GET' && url.pathname === '/api/auth/setup-status') &&
         url.pathname !== '/api/auth/me' &&
         !(item.method === 'GET' && url.pathname === '/api/cameras/bindings') &&
         !(item.method === 'GET' && url.pathname === '/api/projects/recent' && url.search === '?count=5') &&
         !(url.pathname === '/api/operators/library' && url.search === '?includeCompatibility=true') &&
         !/^\/api\/operators\/[^/]+\/metadata$/i.test(url.pathname) &&
-        !(isF04Evidence && isProjectOpenRequest(item)) &&
+        !isProjectOpenRequest(item) &&
         !(item.method === 'POST' && url.pathname === '/api/inspection/decision-configuration/validate') &&
         !(item.method === 'GET' &&
           /^\/api\/inspection\/realtime\/[0-9a-f-]{36}\/state$/i.test(url.pathname)) &&
@@ -2609,6 +2716,10 @@ async function verifyProductPage(
         !(formalRun && expectedRunPaths.includes(url.pathname)) &&
         !(formalRun && item.method === 'GET' &&
           /^\/api\/inspection\/history\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/evidence\/manifest$/i.test(url.pathname)) &&
+        !(formalRun && item.method === 'GET' &&
+          /^\/api\/inspection\/statistics\/[0-9a-f-]{36}$/i.test(url.pathname)) &&
+        !(formalRun && item.method === 'GET' &&
+          /^\/api\/images\/[0-9a-f-]{36}$/i.test(url.pathname)) &&
         !(goldenJourney && item.method === 'GET' &&
           /^\/api\/inspection\/history\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/evidence\/export$/i.test(url.pathname)) &&
         !(formalRun && /^\/api\/inspection\/history\/[0-9a-f-]{36}(?:\/[0-9a-f-]{36})?$/i.test(url.pathname));
@@ -3324,12 +3435,12 @@ async function executeFormalRunOnce(page, projectId) {
   const run = page.locator('[data-testid="workspace-run"]');
   await run.waitFor({ state: 'visible', timeout: 30_000 });
   assert(await run.isEnabled(), 'Formal Run was not enabled for the saved final-journey Project.');
+  const previousSnapshotId = await page.locator('[data-evidence-surface="f03-workspace-shell"]')
+    .getAttribute('data-workspace-run-snapshot-id');
   const admissionPromise = page.waitForResponse(response =>
-    response.request().method() === 'POST' &&
-    new URL(response.url()).pathname === '/api/inspection/admission');
+    isFreshFormalRunResponse(response, '/api/inspection/admission', previousSnapshotId));
   const executePromise = page.waitForResponse(response =>
-    response.request().method() === 'POST' &&
-    new URL(response.url()).pathname === '/api/inspection/execute');
+    isFreshFormalRunResponse(response, '/api/inspection/execute', previousSnapshotId));
   await run.click();
   const [admissionResponse, executeResponse] = await Promise.all([admissionPromise, executePromise]);
   const [admission, result] = await Promise.all([admissionResponse.json(), executeResponse.json()]);

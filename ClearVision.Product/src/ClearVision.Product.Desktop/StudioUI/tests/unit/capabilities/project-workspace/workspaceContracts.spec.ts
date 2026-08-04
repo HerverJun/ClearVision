@@ -270,6 +270,41 @@ describe('F03 G1 Workspace persistence contracts', () => {
     );
   });
 
+  it('keeps server-owned parameter metadata stable when Canvas carries an enriched definition', () => {
+    const sourceFlow = flowFixture();
+    const sourceParameter = (sourceFlow.operators as Array<Record<string, unknown>>)[0]!
+      .parameters as Array<Record<string, unknown>>;
+    sourceParameter[0]!.description = null;
+    sourceParameter[0]!.options = null;
+    const decoded = decodeWorkspaceProjectV1(projectFixture({ flow: sourceFlow }));
+    const encodedBaseline = encodeWorkspaceFlowUpdateV1(decoded)!;
+    const operators = structuredClone(encodedBaseline.operators) as Array<Record<string, unknown>>;
+    const parameter = ((operators[0]!.parameters as Array<Record<string, unknown>>)[0])!;
+    parameter.description = 'catalog description';
+    parameter.displayName = 'Catalog label';
+    parameter.dataType = 'select';
+    parameter.defaultValue = 'CatalogDefault';
+    parameter.minValue = 1;
+    parameter.maxValue = 99;
+    parameter.isRequired = false;
+    parameter.options = [{ label: 'Catalog', value: 'catalog' }];
+    parameter.value = 'Auto';
+
+    const encodedDraft = encodeWorkspaceFlowDraftUpdateV1(decoded, {
+      id: decoded.flow!.id,
+      name: decoded.flow!.name,
+      operators,
+      connections: encodedBaseline.connections as readonly Readonly<Record<string, unknown>>[],
+      decisionConfiguration: encodedBaseline.decisionConfiguration,
+      opaquePassthrough: decoded.flow!.opaquePassthrough
+    });
+
+    expect(encodedDraft).toEqual(encodedBaseline);
+    expect(workspacePersistenceFingerprint(encodedDraft)).toBe(
+      workspacePersistenceFingerprint(encodedBaseline)
+    );
+  });
+
   it('merges the typed G2-G4 draft with the G1 baseline without losing null, falsy, ROI, structure or opaque fields', () => {
     const sourceFlow = flowFixture({ futureFlowPolicy: { mode: 'strict' } });
     const sourceOperator = (sourceFlow.operators as Array<Record<string, unknown>>)[0]!;

@@ -1326,16 +1326,27 @@ function mergeParameterDraft(
   path: string
 ): WorkspaceJsonObject {
   const merged = mergeKnownFields(baseline, draft, workspacePersistenceFieldsV1.parameter);
-  if (Array.isArray(draft.options)) {
+  if (baseline) {
+    // Existing parameter definitions come from the server/operator catalog. Canvas may
+    // project an older or enriched definition, but only the parameter value is editable.
+    for (const field of [
+      'displayName', 'description', 'dataType', 'defaultValue',
+      'minValue', 'maxValue', 'isRequired', 'options'
+    ]) {
+      if (Object.prototype.hasOwnProperty.call(baseline, field)) {
+        merged[field] = baseline[field]!;
+      } else {
+        delete merged[field];
+      }
+    }
+  } else if (Array.isArray(draft.options)) {
     merged.options = mergeObjectArrayByIdentity(
-      baseline?.options,
+      undefined,
       draft.options,
       `${path}.options`,
       ['value', 'label'],
       mergeParameterOptionDraft
     );
-  } else if (draft.options === null) {
-    merged.options = null;
   }
   return Object.freeze(merged);
 }
