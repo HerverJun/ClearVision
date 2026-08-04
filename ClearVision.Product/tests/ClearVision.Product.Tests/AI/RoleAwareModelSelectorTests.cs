@@ -73,6 +73,19 @@ public sealed class RoleAwareModelSelectorTests
     }
 
     [Fact]
+    public void SelectGenerationModel_WhenActiveModelHasLowerPriority_PrefersActiveModel()
+    {
+        var lowerPriorityModel = CreateModel("lower-priority", isActive: false, priority: 1, roleBindings: new[] { "generation" });
+        var activeModel = CreateModel("active", isActive: true, priority: 100, roleBindings: new[] { "generation" });
+        var registry = new FakeModelRegistry(lowerPriorityModel, activeModel);
+        var sut = new RoleAwareAiModelSelector(registry);
+
+        var result = sut.SelectGenerationModel();
+
+        result.Id.Should().Be("active");
+    }
+
+    [Fact]
     public void ActiveAiModelSelector_SelectModelForRole_AlwaysReturnsActive()
     {
         var activeModel = CreateModel("active", isActive: true, priority: 10, roleBindings: new[] { "generation" });
