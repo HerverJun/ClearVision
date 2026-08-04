@@ -932,6 +932,14 @@ async function main() {
     }
     const output = path.join(evidenceDir, `webview2-${safeFileName(phase)}-dpi-${scale}.json`);
     fs.writeFileSync(output, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+    const completionSignal = process.env.CV_NODE_COMPLETION_SIGNAL;
+    if (completionSignal) {
+      fs.writeFileSync(
+        completionSignal,
+        `${JSON.stringify({ status: 'PASS', completedAtUtc: result.timestampUtc })}\n`,
+        'utf8'
+      );
+    }
     console.log(JSON.stringify({ ok: true, output, result }, null, 2));
   } finally {
     await browser.close();
