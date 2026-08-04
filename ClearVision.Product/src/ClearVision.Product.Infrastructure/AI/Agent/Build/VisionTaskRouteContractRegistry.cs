@@ -34,7 +34,7 @@ public sealed class VisionTaskRouteContractRegistry
             ["presence_detection"] = Set("BlobAnalysis", "TemplateMatching", "DeepLearning", "SurfaceDefectDetection", "Thresholding", "ColorDetection"),
             ["attribute_classification"] = Set("DeepLearning", "BlobAnalysis", "Thresholding", "ColorDetection", "TemplateMatching"),
             ["object_detection"] = Set("DeepLearning", "BlobAnalysis", "SurfaceDefectDetection", "TemplateMatching"),
-            ["template_matching"] = Set("TemplateMatching"),
+            ["template_matching"] = Set("TemplateMatching", "BlobAnalysis"),
             ["surface_defect_detection"] = Set("SurfaceDefectDetection", "DeepLearning", "BlobAnalysis", "Thresholding"),
             ["measurement"] = Set("Measurement", "CircleMeasurement", "LineMeasurement", "ContourMeasurement", "AngleMeasurement", "UnitConvert"),
             ["sequence_judgment"] = Set("DetectionSequenceJudge")
