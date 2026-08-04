@@ -456,8 +456,10 @@ function Start-DesktopHost {
     param([int]$CdpPort, [double]$Scale, [string]$RunName)
     $stdout = Join-Path $hostLogs "$RunName-host.stdout.log"
     $stderr = Join-Path $hostLogs "$RunName-host.stderr.log"
+    # Reuse one isolated profile across phases so process-restart probes can observe
+    # the localStorage recovery markers written by the preceding phase.
     $runUserData = Assert-RepositoryTemporaryPath `
-        -Path (Join-Path $webView2UserDataRoot $RunName) `
+        -Path $webView2UserDataRoot `
         -Label "WebView2 run user data"
     New-Item -ItemType Directory -Force -Path $runUserData | Out-Null
     $shutdownDiagnosticsPath = Assert-RepositoryTemporaryPath `
