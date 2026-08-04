@@ -4523,6 +4523,25 @@ async function main() {
     evidence.cdpVersion = version;
     if (finalJourneyPhase) {
       runtimeErrors = captureRuntimeErrors(page);
+      const finalFormalRequestRecords = [];
+      const captureFinalFormalRequest = request => {
+        const url = new URL(request.url());
+        if (!/^\/api\/inspection\/(admission|execute)$/.test(url.pathname) ||
+          request.method() !== 'POST') return;
+        let body;
+        try {
+          body = request.postDataJSON();
+        } catch {
+          body = null;
+        }
+        finalFormalRequestRecords.push({
+          method: request.method(),
+          path: url.pathname,
+          clientSnapshotId: typeof body?.clientSnapshotId === 'string'
+            ? body.clientSnapshotId : null
+        });
+      };
+      page.on('request', captureFinalFormalRequest);
       const responseAudit = [];
       page.on('response', response => {
         const url = new URL(response.url());
@@ -4575,10 +4594,26 @@ async function main() {
         admissionPosts: countRequest('POST', '/api/inspection/admission'),
         executePosts: countRequest('POST', '/api/inspection/execute')
       };
+      page.off('request', captureFinalFormalRequest);
+      // Workspace hydration refreshes admission; only an admission paired with execute is a formal run.
+      const formalRunSnapshotIds = new Set(finalFormalRequestRecords
+        .filter(item => item.path === '/api/inspection/execute' && item.clientSnapshotId)
+        .map(item => item.clientSnapshotId));
+      const formalAdmissionPosts = finalFormalRequestRecords.filter(item =>
+        item.path === '/api/inspection/admission' &&
+        item.clientSnapshotId && formalRunSnapshotIds.has(item.clientSnapshotId));
+      requestAudit.formalAdmissionPosts = formalAdmissionPosts.length;
+      requestAudit.formalExecutePosts = finalFormalRequestRecords.filter(item =>
+        item.path === '/api/inspection/execute' &&
+        item.clientSnapshotId && formalRunSnapshotIds.has(item.clientSnapshotId)).length;
+      requestAudit.formalRunSnapshotCount = formalRunSnapshotIds.size;
+      requestAudit.admissionProjectionRefreshPosts =
+        requestAudit.admissionPosts - requestAudit.formalAdmissionPosts;
       evidence.finalJourney.requestAudit = requestAudit;
       if (finalJourneyPhase === 'CREATE_RUN_LOGOUT') {
         assert(requestAudit.setupAdminPosts === 1 && requestAudit.createPosts === 1 &&
-          requestAudit.operationGets === 1 && requestAudit.admissionPosts === 1 &&
+          requestAudit.operationGets === 1 && requestAudit.formalAdmissionPosts === 1 &&
+          requestAudit.formalExecutePosts === 1 && requestAudit.formalRunSnapshotCount === 1 &&
           requestAudit.executePosts === 1 && requestAudit.logoutPosts === 1,
         `Final create/run request audit drifted: ${JSON.stringify(requestAudit)}`);
       } else if (finalJourneyPhase === 'REOPEN_DELETE') {
@@ -4588,7 +4623,10 @@ async function main() {
       } else {
         assert(requestAudit.setupAdminPosts === 1 && requestAudit.createPosts === 1 &&
           requestAudit.loginPosts === soakCycles + 1 && requestAudit.logoutPosts === soakCycles + 2 &&
-          requestAudit.admissionPosts === soakCycles && requestAudit.executePosts === soakCycles &&
+          requestAudit.formalAdmissionPosts === soakCycles &&
+          requestAudit.formalExecutePosts === soakCycles &&
+          requestAudit.formalRunSnapshotCount === soakCycles &&
+          requestAudit.executePosts === soakCycles &&
           requestAudit.deletePosts === 0,
         `20-cycle request audit drifted: ${JSON.stringify({ requestAudit, soakCycles })}`);
       }
