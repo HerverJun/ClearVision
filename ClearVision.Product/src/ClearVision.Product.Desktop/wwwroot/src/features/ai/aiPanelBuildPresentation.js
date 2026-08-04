@@ -197,9 +197,33 @@ function formatGateStatus(panel, value) {
     return labels[status] || sanitize(panel, panel?._formatGateStatus?.(status), 80) || '未设置';
 }
 
+function getLatestEventPayload(events, predicate) {
+    const evt = [...toArray(events)].reverse().find(predicate);
+    return asObject(evt?.payload);
+}
+
+function getDraftProjectionMetrics(events) {
+    const payload = getLatestEventPayload(events, evt =>
+        clean(evt?.stage).toLowerCase() === 'workflow_draft' &&
+        ['workflow.draft.updated', 'stage.completed', 'tool.call.completed'].includes(clean(evt?.eventType).toLowerCase()));
+    const details = asObject(read(payload, 'details', 'Details'));
+    const operatorCount = Number(read(details, 'operatorCount', 'OperatorCount', 'canvasOperatorCount', 'CanvasOperatorCount'));
+    const connectionCount = Number(read(details, 'connectionCount', 'ConnectionCount'));
+    return {
+        operatorCount: Number.isFinite(operatorCount) ? operatorCount : 0,
+        connectionCount: Number.isFinite(connectionCount) ? connectionCount : 0
+    };
+}
+
 function getPipeline(panel, buildResult, flow) {
     const pipeline = toArray(read(buildResult, 'operatorPipeline', 'OperatorPipeline'));
-    const source = pipeline.length ? pipeline : (panel?._extractOperators?.(flow) || []);
+    const effectiveOperators = toArray(read(buildResult, 'effectiveOperators', 'EffectiveOperators'))
+        .map(item => typeof item === 'string' ? { operatorType: item } : item);
+    const source = pipeline.length
+        ? pipeline
+        : effectiveOperators.length
+            ? effectiveOperators
+            : (panel?._extractOperators?.(flow) || []);
     return source.map((item, index) => {
         const type = clean(read(item, 'operatorType', 'OperatorType', 'type', 'Type'));
         const label = sanitize(panel,
@@ -592,6 +616,9 @@ function deriveOverallState(context) {
 export function deriveAiBuildPresentation(panel) {
     const events = Array.isArray(panel?.activeAgentRunEvents) ? panel.activeAgentRunEvents : [];
     const eventPayload = asObject(panel?._getAgentRunResultPayload?.(events));
+    const artifactPayload = getLatestEventPayload(events, evt =>
+        clean(evt?.eventType).toLowerCase() === 'artifact.created');
+    const draftMetrics = getDraftProjectionMetrics(events);
     const currentResult = asObject(panel?.currentResult);
     const workbenchState = clean(panel?.workbenchState || read(eventPayload, 'interactionState', 'InteractionState', 'status', 'Status')).toLowerCase();
     const activeRunPendingResult = BUILD_RUNNING_STATES.has(workbenchState) &&
@@ -603,7 +630,8 @@ export function deriveAiBuildPresentation(panel) {
     const buildResult = asObject(
         (!activeRunPendingResult && panel?._getPayloadBuildResult?.(currentResult)) ||
         panel?._getPayloadBuildResult?.(eventPayload) ||
-        read(result, 'buildResult', 'BuildResult')
+        read(result, 'buildResult', 'BuildResult') ||
+        (!activeRunPendingResult && artifactPayload)
     );
     const flow = (!activeRunPendingResult && panel?._getResultFlowForCanvas?.(currentResult)) ||
         panel?._getResultFlowForCanvas?.(eventPayload) ||
@@ -637,12 +665,16 @@ export function deriveAiBuildPresentation(panel) {
         blockers: rawDiff.blockers.filter(item => !isConfirmedParameterBlocker(panel, item, parameters))
     };
     const gateBlockers = [
-        ...toArray(read(gate, 'blockers', 'Blockers', 'deploymentBlockers', 'DeploymentBlockers')),
+        ...toArray(read(gate, 'applyBlockers', 'ApplyBlockers')),
+        ...toArray(read(gate, 'deploymentBlockers', 'DeploymentBlockers')),
+        ...toArray(read(gate, 'blockers', 'Blockers')),
         ...toArray(read(buildResult, 'unresolvedStrategyBlockers', 'UnresolvedStrategyBlockers')),
         ...diff.blockers
     ].filter(item => !isConfirmedParameterBlocker(panel, item, parameters))
         .map(item => getDiagnosticMessage(panel, item)).filter(Boolean);
     const pipeline = getPipeline(panel, buildResult, flow);
+    const nodeCount = operators.length || pipeline.length || draftMetrics.operatorCount;
+    const connectionCount = connections.length || draftMetrics.connectionCount;
     const applied = !activeRunPendingResult && (workbenchState === 'applied' || panel?._isCurrentResultAppliedToCanvas?.() === true);
     const applying = workbenchState === 'applying';
     const plan = asObject(panel?.pendingVisionPlan);
@@ -672,15 +704,15 @@ export function deriveAiBuildPresentation(panel) {
         applied,
         applying,
         gateBlocked,
-        nodeCount: operators.length,
-        connectionCount: connections.length
+        nodeCount,
+        connectionCount
     });
 
     return {
         overall,
         workbenchState,
-        nodeCount: operators.length,
-        connectionCount: connections.length,
+        nodeCount,
+        connectionCount,
         pipeline,
         parameters,
         resources: {
@@ -702,7 +734,7 @@ export function deriveAiBuildPresentation(panel) {
         actionItems,
         inputSource,
         outputTarget,
-        structureStatus: operators.length > 0
+        structureStatus: nodeCount > 0
             ? (validation.structural.status === 'failed' ? '结构存在问题' : '草稿结构已生成')
             : '等待流程草稿',
         applied
