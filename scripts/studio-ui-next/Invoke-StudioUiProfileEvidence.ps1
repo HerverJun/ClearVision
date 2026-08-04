@@ -383,9 +383,11 @@ function Assert-RunContract {
             throw "Legacy run mounted a Next owner or lost its canonical root."
         }
     } elseif ($ExpectedPageKind -eq "StudioUi") {
+        # Operator is a read-only profile and intentionally has no Project lifecycle write owner.
+        $expectedProjectLifecycleOwnerCount = if ($ExpectedProfile -eq "NEXT_OPERATOR_PILOT") { -1 } else { 1 }
         if ([string]$Summary.rootKind -ne "studio-ui" -or
             [int]$Summary.owners.studioRootCount -ne 1 -or
-            [int]$Summary.owners.projectLifecycleOwnerCount -ne 1 -or
+            [int]$Summary.owners.projectLifecycleOwnerCount -ne $expectedProjectLifecycleOwnerCount -or
             [int]$Summary.owners.leaveGuardOwnerCount -ne 1 -or
             [int]$Summary.owners.workspaceOwnerCount -ne 0) {
             throw "Next run did not retain the single product owner ledger."
