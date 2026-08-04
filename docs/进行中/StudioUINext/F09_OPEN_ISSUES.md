@@ -7,11 +7,23 @@ P0_OPEN=0
 P1_OPEN=1
 P2_OPEN=5
 P3_OPEN=0
+F09_R_STATE=IMPLEMENTED_AWAITING_ROLLBACK
+F09_STATE=PARTIAL
+FRONTEND_MIGRATION_MAINLINE=NEAR_COMPLETE
+F09_R1_SOURCE_SHA=029bcc3beddb20dc136839d30dfd00d2c7a51e65
+F09_R2_SOURCE_SHA=d1c82ba88e351a2d48bcfae7f97e047483dbba98
+AUDIT_BRANCH=audit/f09-r2-d1c82ba88
+AUDIT_REMOTE_SHA=d1c82ba88e351a2d48bcfae7f97e047483dbba98
+OFFICIAL_REMOTE_SHA=7d43af9e19ad5a98240651fd5519a8e0f5a1e9f5
+FINAL_EVIDENCE_SHA=NOT_PRODUCED
+REMOTE_CI=NOT_RUN
+ROLLBACK_DRILL=NOT_RUN
+WORKTREE_STATE=CLEAN
 CONFIGURED_PROFILE=NEXT_DEFAULT
 EFFECTIVE_DEFAULT_UI_ROOT=STUDIO_UI_NEXT
 ```
 
-F09-R reconciliation: `F09-I001` is closed by the product decision removing Operator formal-run authority. The Operator surface remains a read-only UI projection and no frontend or backend permission is widened. `F09-I002` remains open because the repaired Desktop close/flush path has not yet been exercised by a real WebView2 rollback drill. WebView2, DPI, publish/no-Node, Remote CI and field validation remain acceptance debt.
+F09-R2 reconciliation: product source commit `d1c82ba88e351a2d48bcfae7f97e047483dbba98` closes the implementation portion of the Desktop shutdown/isolation repair. `F09-I001` remains closed by the product decision removing Operator formal-run authority. The Operator surface remains a read-only UI projection and no frontend or backend permission is widened. `F09-I002` remains open because the repaired Desktop close/flush path has not yet been exercised by a real WebView2 rollback drill. WebView2, DPI, publish/no-Node, Remote CI and field validation remain acceptance debt.
 
 | IssueId | Severity | Area | Symptom | Evidence | RootCauseStatus | PlannedGoal | Status | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

@@ -11,7 +11,7 @@ ClearVision 是一个面向工业视觉检测的 .NET 平台工程，覆盖桌�
 
 ## 最近更新
 
-- 2026-08-04：Studio UI Next F09 工程修复已完成，配置默认入口为 `NEXT_DEFAULT`，`LEGACY_FALLBACK` 仅保留为回退入口；真实 WebView2、发布、Remote CI 与现场验收仍为 acceptance debt。详见 [完成报告](./docs/进行中/StudioUINext/F09_完成报告.md)、[最终证据清单](./docs/进行中/StudioUINext/F09_FinalEvidenceManifest.md)、[问题台账](./docs/进行中/StudioUINext/F09_OPEN_ISSUES.md) 与 [Cutover/回退手册](./docs/进行中/StudioUINext/F09_Cutover与Rollback操作手册.md)。
+- 2026-08-04：Studio UI Next F09-R2 工程修复已提交于 source SHA `d1c82ba88e351a2d48bcfae7f97e047483dbba98`，审计分支为 `audit/f09-r2-d1c82ba88`；配置默认入口为 `NEXT_DEFAULT`，`LEGACY_FALLBACK` 仅保留为回退入口。真实 rollback、WebView2、发布、Remote CI 与现场验收仍为 acceptance debt。详见 [完成报告](./docs/进行中/StudioUINext/F09_完成报告.md)、[最终证据清单](./docs/进行中/StudioUINext/F09_FinalEvidenceManifest.md)、[问题台账](./docs/进行中/StudioUINext/F09_OPEN_ISSUES.md) 与 [Cutover/回退手册](./docs/进行中/StudioUINext/F09_Cutover与Rollback操作手册.md)。
 
 > 本段只列仓库内已记录的最近事实；真实相机、真实 PLC、真实 Station 现场运行和产线签收仍以现场验收记录为准。
 

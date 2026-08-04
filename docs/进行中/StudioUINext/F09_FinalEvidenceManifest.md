@@ -1,14 +1,25 @@
 # F09 Final Evidence Manifest
 
 ```text
-MANIFEST_STATE=ENGINEERING_DONE_WITH_ACCEPTANCE_DEBT
+MANIFEST_STATE=IMPLEMENTED_AWAITING_ROLLBACK
 CONFIGURED_PROFILE=NEXT_DEFAULT
 EFFECTIVE_DEFAULT_UI_ROOT=STUDIO_UI_NEXT
 NEXT_UI_DEFAULT_ENTRY=ENABLED_IN_CONFIGURATION
 LEGACY_ROLE=FALLBACK_ONLY
-F09_STATE=ENGINEERING_DONE_WITH_ACCEPTANCE_DEBT
+F09_R_STATE=IMPLEMENTED_AWAITING_ROLLBACK
+F09_STATE=PARTIAL
+FRONTEND_MIGRATION_MAINLINE=NEAR_COMPLETE
+F09_R1_SOURCE_SHA=029bcc3beddb20dc136839d30dfd00d2c7a51e65
+F09_R2_SOURCE_SHA=d1c82ba88e351a2d48bcfae7f97e047483dbba98
+AUDIT_BRANCH=audit/f09-r2-d1c82ba88
+AUDIT_REMOTE_SHA=d1c82ba88e351a2d48bcfae7f97e047483dbba98
+OFFICIAL_REMOTE_SHA=7d43af9e19ad5a98240651fd5519a8e0f5a1e9f5
 FINAL_SOURCE_SHA=NOT_PRODUCED
-FINAL_DOC_SHA=WORKTREE_UNCOMMITTED
+FINAL_EVIDENCE_SHA=NOT_PRODUCED
+FINAL_DOC_SHA=DOCUMENTATION_COMMIT
+REMOTE_CI=NOT_RUN
+ROLLBACK_DRILL=NOT_RUN
+WORKTREE_STATE=CLEAN
 ```
 
 本清单只索引实际获得的证据，并把代码候选会话门禁、历史失败和未执行范围明确分开。它不是发布签收，也不把后续文档修改伪装成应用源码或最终宿主证据。
@@ -31,11 +42,11 @@ FINAL_DOC_SHA=WORKTREE_UNCOMMITTED
 
 ## Provenance 规则
 
-- 当前修改尚未形成干净提交；因此不声明 `FINAL_SOURCE_SHA`，也不把工作树状态当作最终源码证据。
+- F09-R2 产品修复已形成源代码提交 `d1c82ba88e351a2d48bcfae7f97e047483dbba98`；`FINAL_SOURCE_SHA`/`FINAL_EVIDENCE_SHA` 仍为 `NOT_PRODUCED`，因为真实 rollback 与最终宿主证据尚未执行。
 - Profile、Rollback、Final runner 拒绝脏工作树、顶层 `-NoBuild` 和 caller-supplied Desktop EXE；首次运行构建 canonical fresh build。
 - runner 为场景隔离仍显式注入 `Studio__StartupProfile`。因此“无显式 Profile 覆盖”的最终启动证据仍为 `NOT RUN`。
 - unattended shutdown 只接受显式 runner 参数，并要求数据库、运行目录和 diagnostics 位于 `.tmp` 隔离边界；强制退出或未知结果会使 cleanup evidence 失败。
-- 所有临时 evidence 必须保留在 `.tmp/studio-ui-next/`；不将临时产物加入发布或文档事实。
+- 所有临时 evidence 必须保留在 `.tmp/studio-ui-next/`；不将临时产物加入发布或文档事实。当前正式远端仍为 `7d43af9e19ad5a98240651fd5519a8e0f5a1e9f5`，审计分支为 `audit/f09-r2-d1c82ba88`。
 
 ## Cutover 判定
 
@@ -44,7 +55,7 @@ P0_COUNT=0
 P1_OPEN=1
 OPERATOR_READONLY_UI_PROJECTION=PASS
 ROLLBACK_REPAIR=IMPLEMENTED_AND_STATICALLY_VERIFIED
-ROLLBACK_DRILL=NOT_RUN_FINAL_CANDIDATE
+ROLLBACK_DRILL=NOT_RUN
 NEXT_RELEASE_STARTUP=NOT_RUN
 LEGACY_FALLBACK_STARTUP=NOT_RUN_FINAL_CANDIDATE
 DATA_COMPATIBILITY=NOT_PROVEN_FINAL_CANDIDATE
@@ -55,6 +66,6 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 
 源码已记录修复后的 shutdown contract，并配置了 `NEXT_DEFAULT` 入口；没有执行真实 WebView2 close/flush rollback drill、DPI matrix、publish/no-Node、Remote CI 或现场验证。`ROLLBACK_DRILL=PASS` 只能在最终候选真实演练完成且数据、owner 和 diagnostics 证据齐全后写入。
 
-当前工作树检查为 StudioUI lint、typecheck、unit、build，Desktop build、Desktop 定向测试和 PowerShell runner parse PASS；这些结果不替代最终源码或真实 WebView2 证据。
+产品源提交检查为 StudioUI lint、typecheck、unit、build，Desktop build、Desktop 定向测试和 PowerShell runner parse PASS；这些结果不替代最终源码或真实 WebView2 证据。
 
 判定依据与执行步骤见 [F09_Cutover与Rollback操作手册.md](./F09_Cutover与Rollback操作手册.md)。
