@@ -101,7 +101,11 @@ describe('G2 route guard', () => {
     const workspaceFlagOffRouter = createStudioRouter(createMemoryHistory());
     installAuthRouteGuard(workspaceFlagOffRouter, engineer.owner, startup());
     await workspaceFlagOffRouter.push('/projects/11111111-1111-1111-1111-111111111111/workspace');
-    expect(workspaceFlagOffRouter.currentRoute.value.path).toBe('/forbidden');
+    expect(workspaceFlagOffRouter.currentRoute.value.name).toBe('project-workspace');
+    // WorkspacePage owns the disabled-state projection so it can mount zero
+    // capability owners and skip the Project read instead of becoming a 403 route.
+    expect(workspaceFlagOffRouter.currentRoute.value.path)
+      .toBe('/projects/11111111-1111-1111-1111-111111111111/workspace');
 
     const browserRouter = createStudioRouter(createMemoryHistory());
     installAuthRouteGuard(browserRouter, engineer.owner, startup({

@@ -15,6 +15,19 @@ $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "../.."))
 $singleRun = Join-Path $scriptRoot "Invoke-StudioUiWebView2Evidence.ps1"
+
+function Assert-CleanEvidenceWorktree {
+    $changes = @(& git -C $repoRoot status --porcelain=v1 --untracked-files=all)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not inspect the Git worktree before rollback evidence."
+    }
+    if ($changes.Count -ne 0) {
+        throw "Rollback evidence requires a clean committed worktree; commit or remove local changes first."
+    }
+}
+
+Assert-CleanEvidenceWorktree
+
 $nodeExe = if ([string]::IsNullOrWhiteSpace($NodeExecutablePath)) {
     (Get-Command node.exe -ErrorAction Stop).Source
 } else {
@@ -167,6 +180,25 @@ function Test-DatabaseRemoved {
         $databasePath,
         ($databasePath + "-shm"),
         ($databasePath + "-wal")) | Where-Object { Test-Path -LiteralPath $_ })
+}
+
+function Remove-IsolatedDatabaseArtifacts {
+    param([string]$Path)
+
+    $resolvedPath = [System.IO.Path]::GetFullPath($Path)
+    $resolvedRoot = [System.IO.Path]::GetFullPath($evidenceRoot)
+    $requiredPrefix = $resolvedRoot.TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $resolvedPath.StartsWith($requiredPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to remove database artifacts outside F09 evidence root: $resolvedPath"
+    }
+
+    foreach ($candidate in @($resolvedPath, ($resolvedPath + "-shm"), ($resolvedPath + "-wal"))) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            Remove-Item -LiteralPath $candidate -Force
+        }
+    }
 }
 
 function Assert-AuthorityShape {
@@ -347,6 +379,7 @@ function Invoke-RollbackRun {
 }
 
 $rollbackError = $null
+$databaseCleanupError = $null
 $state = $null
 $failureInjection = $null
 try {
@@ -448,8 +481,23 @@ try {
 } catch {
     $rollbackError = $_
 } finally {
-    Remove-VerifiedTemporaryDirectory -Path $missingAssetsRuntime -AllowedRoot $publishCheckRoot
-    Remove-VerifiedTemporaryDirectory -Path $publishCheckRoot -AllowedRoot $publishCheckBoundary
+    try {
+        Remove-IsolatedDatabaseArtifacts -Path $databasePath
+    } catch {
+        $databaseCleanupError = $_
+    }
+    try {
+        Remove-VerifiedTemporaryDirectory -Path $missingAssetsRuntime -AllowedRoot $publishCheckRoot
+        Remove-VerifiedTemporaryDirectory -Path $publishCheckRoot -AllowedRoot $publishCheckBoundary
+    } catch {
+        if ($null -eq $databaseCleanupError) {
+            $databaseCleanupError = $_
+        }
+    }
+}
+
+if ($null -eq $rollbackError -and $null -ne $databaseCleanupError) {
+    $rollbackError = $databaseCleanupError
 }
 
 $phaseCountPassed = $runRecords.Count -eq 4
@@ -466,6 +514,11 @@ $manifest = [pscustomobject]@{
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
     status = if ($manifestPassed) { "PASS" } else { "FAIL" }
     error = if ($rollbackError) { $rollbackError.Exception.Message } else { $null }
+    cleanup = [pscustomobject]@{
+        attempted = $true
+        error = if ($databaseCleanupError) { $databaseCleanupError.Exception.Message } else { $null }
+        sharedDatabaseRemoved = $databaseCleanupPassed
+    }
     sequence = @(
         "NEXT_DEFAULT_CANDIDATE",
         "MISSING_ASSETS_FAILURE_INJECTION",
@@ -516,7 +569,7 @@ if ($rollbackError) {
     throw $rollbackError
 }
 if (-not $manifestPassed) {
-    throw "StudioUI G5 rollback evidence did not satisfy every gate: $manifestPath"
+    throw "StudioUI F09 G6 rollback evidence did not satisfy every gate: $manifestPath"
 }
 
 $manifest | ConvertTo-Json -Depth 8

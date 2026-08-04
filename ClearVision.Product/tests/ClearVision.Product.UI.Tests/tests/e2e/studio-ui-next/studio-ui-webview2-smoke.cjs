@@ -2171,6 +2171,9 @@ async function verifyProductPage(
       const activeElement = document.activeElement;
       return {
         state: shell?.getAttribute('data-workspace-state') || null,
+        route: window.location.hash,
+        productWorkspaceMode: document.querySelector('[data-product-shell="ready"]')
+          ?.getAttribute('data-workspace-mode') || null,
         projectId: shell?.getAttribute('data-workspace-project-id') || null,
         persistencePhase: shell?.getAttribute('data-workspace-persistence-phase') || null,
         persistenceRevision: Number(shell?.getAttribute('data-workspace-persistence-revision') ?? -1),
@@ -2199,6 +2202,16 @@ async function verifyProductPage(
         inFlightPreview: Number(diagnostics?.inFlightPreview ?? -1),
         inFlightReads: Number(shell?.getAttribute('data-workspace-in-flight-reads') || -1),
         inFlightWrites: Number(shell?.getAttribute('data-workspace-in-flight-writes') || -1),
+        projectsVisible: (() => {
+          const projects = document.querySelector('[data-capability="projects-read"]');
+          return Boolean(projects && projects.getClientRects().length > 0);
+        })(),
+        leavePromptVisible: (() => {
+          const prompt = document.querySelector('[data-testid="leave-guard-stay"]');
+          return Boolean(prompt && prompt.getClientRects().length > 0);
+        })(),
+        leaveGuard: window.__STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__
+          ? { ...window.__STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__ } : null,
         diagnostics: diagnostics ? { ...diagnostics } : null,
         mainCount: document.querySelectorAll('main').length,
         shellCount: document.querySelectorAll('[data-evidence-surface="f03-workspace-shell"]').length,
@@ -2280,8 +2293,55 @@ async function verifyProductPage(
     let disposed = null;
     let remounted = null;
     for (let cycle = 0; cycle < 20; cycle += 1) {
-      await page.locator('[data-product-nav="/projects"]').click();
-      await page.waitForSelector('[data-capability="projects-read"]', { state: 'visible', timeout: 30_000 });
+      const beforeNavigation = await readWorkspace();
+      assert(beforeNavigation.dirty === 'false' &&
+        ['clean', 'saved'].includes(beforeNavigation.persistencePhase),
+      `Workspace remount was not clean before lifecycle cycle ${cycle}: ${JSON.stringify(beforeNavigation)}`);
+      assert(beforeNavigation.route === `#${route}` &&
+        beforeNavigation.productWorkspaceMode === 'true' && !beforeNavigation.leavePromptVisible &&
+        beforeNavigation.leaveGuard?.ownerCount === 1 &&
+        ['idle', 'allowed'].includes(beforeNavigation.leaveGuard?.phase),
+      `Workspace lifecycle pre-navigation route state drifted in cycle ${cycle}: ${JSON.stringify(beforeNavigation)}`);
+      // Assigning the hash still crosses Vue Router and the leave guard, but avoids
+      // coupling this lifecycle probe to the transient workspace navigation link.
+      await page.evaluate(() => { window.location.hash = '#/projects'; });
+      try {
+        await page.waitForFunction(() => window.location.hash === '#/projects', null, {
+          timeout: 30_000
+        });
+        await page.waitForSelector('[data-capability="projects-read"]', {
+          state: 'visible',
+          timeout: 30_000
+        });
+      } catch (error) {
+        const snapshot = await page.evaluate(() => ({
+          hash: window.location.hash,
+          capability: document.querySelector('[data-capability]')?.getAttribute('data-capability') || null,
+          workspaceShellCount: document.querySelectorAll('[data-evidence-surface="f03-workspace-shell"]').length,
+          projectSurfaceCount: document.querySelectorAll('[data-capability="projects-read"]').length,
+          diagnostics: window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__
+            ? { ...window.__STUDIO_UI_WORKSPACE_DIAGNOSTICS__ }
+            : null,
+          leaveGuard: window.__STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__
+            ? { ...window.__STUDIO_UI_LEAVE_GUARD_DIAGNOSTICS__ }
+            : null,
+          leavePromptVisible: Boolean(document.querySelector('[data-testid="leave-guard-stay"]')
+            ?.getClientRects().length)
+        }));
+        throw new Error(
+          `Workspace lifecycle route leave did not reach Projects: ${JSON.stringify(snapshot)}. ` +
+          `${error?.message || error}`);
+      }
+      const afterNavigation = await readWorkspace();
+      assert(afterNavigation.projectsVisible,
+        `Workspace lifecycle navigation did not reach Projects in cycle ${cycle}: ${JSON.stringify({
+          beforeNavigation,
+          afterNavigation
+        })}`);
+      assert(afterNavigation.route === '#/projects' && afterNavigation.productWorkspaceMode === 'false' &&
+        !afterNavigation.leavePromptVisible && afterNavigation.shellCount === 0 &&
+        afterNavigation.mainCount === 1,
+      `Workspace lifecycle route leave did not settle on Projects in cycle ${cycle}: ${JSON.stringify(afterNavigation)}`);
       const confirmSnapshots = await page.evaluate(() => [...window.__g5LifecycleConfirmSnapshots]);
       assert(confirmSnapshots.length === 0,
         `Clean Workspace navigation unexpectedly prompted: ${JSON.stringify(confirmSnapshots)}`);
@@ -2312,6 +2372,9 @@ async function verifyProductPage(
         mainCount: document.querySelectorAll('main').length
       }));
       await page.evaluate(nextRoute => { window.location.hash = `#${nextRoute}`; }, route);
+      await page.waitForFunction(nextRoute => window.location.hash === `#${nextRoute}`, route, {
+        timeout: 30_000
+      });
       await page.waitForSelector('[data-evidence-surface="f03-workspace-shell"]', {
         state: 'visible',
         timeout: 30_000
@@ -2330,8 +2393,16 @@ async function verifyProductPage(
           diagnostics.persistenceOwnerCount === 1;
       }, null, { timeout: 30_000 });
       remounted = await readWorkspace();
+      assert(remounted.dirty === 'false' && ['clean', 'saved'].includes(remounted.persistencePhase),
+        `Workspace remount was not clean after lifecycle cycle ${cycle}: ${JSON.stringify(remounted)}`);
+      assert(remounted.route === `#${route}` && remounted.productWorkspaceMode === 'true' &&
+        !remounted.leavePromptVisible && remounted.leaveGuard?.ownerCount === 1 &&
+        ['idle', 'allowed'].includes(remounted.leaveGuard?.phase),
+      `Workspace lifecycle route re-entry did not settle in cycle ${cycle}: ${JSON.stringify(remounted)}`);
       lifecycleCycles.push({
         cycle,
+        beforeNavigation,
+        afterNavigation,
         disposedOwnerCount: disposed.diagnostics.workspaceOwnerCount,
         disposedInspectorCount: disposed.diagnostics.inspectorOwnerCount,
         disposedPreviewCount: disposed.diagnostics.previewOwnerCount,

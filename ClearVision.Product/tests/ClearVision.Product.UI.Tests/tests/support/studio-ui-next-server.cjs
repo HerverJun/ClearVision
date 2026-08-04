@@ -1,6 +1,7 @@
-const { spawn, spawnSync } = require('node:child_process');
+const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const httpServer = require('http-server');
 
 const uiTestsRoot = path.resolve(__dirname, '..', '..');
 const repositoryRoot = path.resolve(uiTestsRoot, '..', '..', '..');
@@ -65,38 +66,40 @@ if (!configuredWebRoot) {
   }
 }
 
-const serverEntry = path.join(
-  uiTestsRoot,
-  'node_modules',
-  'http-server',
-  'bin',
-  'http-server'
-);
-const server = spawn(
-  process.execPath,
-  [serverEntry, webRoot, '-p', port, '-a', host, '-c-1', '--silent'],
-  {
-    cwd: uiTestsRoot,
-    env: process.env,
-    stdio: 'inherit'
-  }
-);
+const server = httpServer.createServer({
+  root: webRoot,
+  cache: -1,
+  logFn: () => {}
+});
+let closing = false;
 
-function stop(signal) {
-  if (!server.killed) {
-    server.kill(signal);
-  }
+function stop(exitCode = 0) {
+  if (closing) return;
+  closing = true;
+  const forceExitTimer = setTimeout(() => process.exit(exitCode), 5_000);
+  forceExitTimer.unref();
+
+  server.server.closeAllConnections?.();
+  server.server.close(error => {
+    clearTimeout(forceExitTimer);
+    if (error) {
+      console.error(error);
+      process.exit(1);
+      return;
+    }
+    process.exit(exitCode);
+  });
 }
 
-process.on('SIGINT', () => stop('SIGINT'));
-process.on('SIGTERM', () => stop('SIGTERM'));
-process.on('exit', () => stop('SIGTERM'));
-
-server.on('exit', code => {
-  process.exit(code ?? 0);
-});
-
-server.on('error', error => {
+server.server.on('error', error => {
   console.error(error);
   process.exit(1);
 });
+
+process.once('SIGINT', () => stop());
+process.once('SIGTERM', () => stop());
+process.once('exit', () => {
+  if (!closing) server.server.close();
+});
+
+server.listen(Number(port), host);

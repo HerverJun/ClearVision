@@ -6,6 +6,8 @@ param(
     [string]$EvidenceDirectory,
     [int]$BaseWebPort = 5700,
     [int]$BaseCdpPort = 9823,
+    [ValidateSet("NEXT_DEFAULT_CANDIDATE", "NEXT_DEFAULT")]
+    [string]$ExpectedConfiguredProfile = "NEXT_DEFAULT_CANDIDATE",
     [switch]$NoBuild,
     [switch]$KeepMissingAssetsRuntime
 )
@@ -16,6 +18,19 @@ $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "../.."))
 $singleRun = Join-Path $scriptRoot "Invoke-StudioUiWebView2Evidence.ps1"
+
+function Assert-CleanEvidenceWorktree {
+    $changes = @(& git -C $repoRoot status --porcelain=v1 --untracked-files=all)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not inspect the Git worktree before profile evidence."
+    }
+    if ($changes.Count -ne 0) {
+        throw "Profile evidence requires a clean committed worktree; commit or remove local changes first."
+    }
+}
+
+Assert-CleanEvidenceWorktree
+
 $nodeExe = if ([string]::IsNullOrWhiteSpace($NodeExecutablePath)) {
     (Get-Command node.exe -ErrorAction Stop).Source
 } else {
@@ -144,6 +159,151 @@ function Read-EvidenceSummary {
     return ([string]::Join([Environment]::NewLine, $output) | ConvertFrom-Json)
 }
 
+function Get-JsonProperty {
+    param(
+        [object]$Object,
+        [string]$Name
+    )
+
+    if ($null -eq $Object) {
+        return $null
+    }
+
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        return $null
+    }
+
+    return $property.Value
+}
+
+function Assert-OperatorPilotAuthorityEvidence {
+    param([string]$Path)
+
+    $evidence = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([string](Get-JsonProperty -Object $evidence -Name "status") -ne "pass" -or
+        [string](Get-JsonProperty -Object $evidence -Name "evidenceKind") -ne "F09_NEXT_OPERATOR_PILOT_REAL_AUTHORITY" -or
+        [string](Get-JsonProperty -Object $evidence -Name "credentialSource") -ne
+            "RUNNER_ISSUED_ADMIN_TOKEN_THEN_REAL_OPERATOR_LOGIN") {
+        throw "Operator pilot evidence does not identify a real server-authority scenario: $Path"
+    }
+
+    $admin = Get-JsonProperty -Object $evidence -Name "admin"
+    $operator = Get-JsonProperty -Object $evidence -Name "operator"
+    if ([string](Get-JsonProperty -Object $admin -Name "role") -ne "Admin" -or
+        [string]::IsNullOrWhiteSpace([string](Get-JsonProperty -Object $admin -Name "userId")) -or
+        [string](Get-JsonProperty -Object $operator -Name "role") -ne "Operator" -or
+        [string]::IsNullOrWhiteSpace([string](Get-JsonProperty -Object $operator -Name "userId")) -or
+        [string]::IsNullOrWhiteSpace([string](Get-JsonProperty -Object $operator -Name "username"))) {
+        throw "Operator pilot evidence is missing verified Admin or Operator identity."
+    }
+
+    $browserSession = Get-JsonProperty -Object $evidence -Name "browserSession"
+    $browserUser = Get-JsonProperty -Object $browserSession -Name "user"
+    if ([int](Get-JsonProperty -Object $browserSession -Name "status") -ne 200 -or
+        [string](Get-JsonProperty -Object $browserUser -Name "role") -ne "Operator" -or
+        [string](Get-JsonProperty -Object $browserUser -Name "username") -ne
+            [string](Get-JsonProperty -Object $operator -Name "username")) {
+        throw "Operator pilot browser session is not backed by the verified Operator identity."
+    }
+
+    $adminRejection = Get-JsonProperty -Object $evidence -Name "profileRejectsAdmin"
+    if ([string](Get-JsonProperty -Object $adminRejection -Name "requestedRoute") -ne "/overview" -or
+        [string](Get-JsonProperty -Object $adminRejection -Name "settledRoute") -ne "#/forbidden") {
+        throw "Operator pilot did not prove that the profile rejects an Admin session."
+    }
+
+    $expectedReadOnlyRoutes = @("/overview", "/projects", "/operators", "/results", "/stations", "/about")
+    $readOnlyRoutes = @((Get-JsonProperty -Object $evidence -Name "readOnlyRoutes") | Where-Object { $null -ne $_ })
+    if ($readOnlyRoutes.Count -ne $expectedReadOnlyRoutes.Count) {
+        throw "Operator pilot read-only route count drifted."
+    }
+    foreach ($route in $expectedReadOnlyRoutes) {
+        $match = @($readOnlyRoutes | Where-Object {
+            [string](Get-JsonProperty -Object $_ -Name "route") -eq $route -and
+            [string](Get-JsonProperty -Object $_ -Name "hash") -eq ("#" + $route) -and
+            [string](Get-JsonProperty -Object $_ -Name "pageState") -eq "ready" -and
+            [int](Get-JsonProperty -Object (Get-JsonProperty -Object $_ -Name "authenticatedRead") -Name "status") -eq 200 -and
+            [string](Get-JsonProperty -Object (Get-JsonProperty -Object $_ -Name "authenticatedRead") -Name "role") -eq "Operator"
+        })
+        if ($match.Count -ne 1) {
+            throw "Operator pilot did not prove the read-only route '$route'."
+        }
+    }
+
+    $expectedForbiddenRoutes = @(
+        "/projects/00000000-0000-0000-0000-000000000000/workspace",
+        "/ai",
+        "/inspection",
+        "/settings",
+        "/diagnostics")
+    $forbiddenRoutes = @((Get-JsonProperty -Object $evidence -Name "forbiddenRoutes") | Where-Object { $null -ne $_ })
+    if ($forbiddenRoutes.Count -ne $expectedForbiddenRoutes.Count) {
+        throw "Operator pilot forbidden route count drifted."
+    }
+    foreach ($route in $expectedForbiddenRoutes) {
+        $match = @($forbiddenRoutes | Where-Object {
+            [string](Get-JsonProperty -Object $_ -Name "requestedRoute") -eq $route -and
+            [string](Get-JsonProperty -Object $_ -Name "settledRoute") -eq "#/forbidden"
+        })
+        if ($match.Count -ne 1) {
+            throw "Operator pilot did not prove the forbidden route '$route'."
+        }
+    }
+
+    $expectedDenials = @{
+        "project-create" = "ProjectEditPermissionRequired"
+        "formal-admission" = "HardwareOperationPermissionRequired"
+        "formal-execute" = "HardwareOperationPermissionRequired"
+        "plc-test-connection" = "HardwareOperationPermissionRequired"
+    }
+    $permissionDenials = @((Get-JsonProperty -Object $evidence -Name "permissionDenials") | Where-Object { $null -ne $_ })
+    if ($permissionDenials.Count -ne $expectedDenials.Count) {
+        throw "Operator pilot permission-denial count drifted."
+    }
+    foreach ($name in $expectedDenials.Keys) {
+        $match = @($permissionDenials | Where-Object {
+            [string](Get-JsonProperty -Object $_ -Name "name") -eq $name
+        })
+        if ($match.Count -ne 1 -or
+            [int](Get-JsonProperty -Object $match[0] -Name "status") -ne 403 -or
+            [string](Get-JsonProperty -Object $match[0] -Name "code") -ne $expectedDenials[$name]) {
+            throw "Operator pilot did not prove the expected 403 denial '$name'."
+        }
+    }
+
+    $startup = Get-JsonProperty -Object $evidence -Name "startupProjection"
+    $featureFlags = Get-JsonProperty -Object $startup -Name "featureFlags"
+    $allowedRoles = @((Get-JsonProperty -Object $startup -Name "allowedRoles") | Where-Object { $null -ne $_ })
+    if ([string](Get-JsonProperty -Object $startup -Name "profile") -ne "NEXT_OPERATOR_PILOT" -or
+        $allowedRoles.Count -ne 1 -or
+        [string]$allowedRoles[0] -ne "Operator") {
+        throw "Operator pilot startup projection drifted."
+    }
+    foreach ($flagName in @("Studio2.Workspace", "Studio2.Settings", "Studio2.InspectionRun", "Studio2.AiWorkbench")) {
+        $flag = $featureFlags.PSObject.Properties[$flagName]
+        if ($null -eq $flag -or [bool]$flag.Value) {
+            throw "Operator pilot feature flag '$flagName' was not disabled."
+        }
+    }
+    $stationsReadFlag = $featureFlags.PSObject.Properties["Studio2.StationsRead"]
+    if ($null -eq $stationsReadFlag -or -not [bool]$stationsReadFlag.Value) {
+        throw "Operator pilot did not retain the enabled Studio2.StationsRead projection."
+    }
+
+    return [pscustomobject]@{
+        passed = $true
+        evidenceKind = "F09_NEXT_OPERATOR_PILOT_REAL_AUTHORITY"
+        credentialSource = "RUNNER_ISSUED_ADMIN_TOKEN_THEN_REAL_OPERATOR_LOGIN"
+        adminRole = "Admin"
+        operatorRole = "Operator"
+        readOnlyRouteCount = $readOnlyRoutes.Count
+        forbiddenRouteCount = $forbiddenRoutes.Count
+        permissionDenialCount = $permissionDenials.Count
+        browserSessionBackedByRealOperator = $true
+    }
+}
+
 function Assert-RunContract {
     param(
         [object]$Cleanup,
@@ -245,6 +405,8 @@ $profileDefinitions = @{
     "NEXT_DEFAULT_CANDIDATE" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $true }
     "NEXT_DEFAULT" = [pscustomobject]@{ StudioUiEnabled = $true; WorkspaceEnabled = $true }
 }
+$operatorPilotScenario = Join-Path $repoRoot (
+    "ClearVision.Product/tests/ClearVision.Product.UI.Tests/tests/e2e/studio-ui-next/f09-operator-pilot.cjs")
 
 function Invoke-ProfileRun {
     param(
@@ -255,7 +417,10 @@ function Invoke-ProfileRun {
         [string]$ExpectedPageKind,
         [string]$Route,
         [string]$ExecutablePath,
-        [string]$RuntimeKind = "debug"
+        [string]$RuntimeKind = "debug",
+        [string]$NodeScenarioPath,
+        [switch]$DeferAuthToScenario,
+        [switch]$RequireOperatorPilotAuthority
     )
 
     $profileDefinition = $profileDefinitions[$StartupProfile]
@@ -287,6 +452,12 @@ function Invoke-ProfileRun {
     if (-not [string]::IsNullOrWhiteSpace($Route)) {
         $parameters["Route"] = $Route
     }
+    if (-not [string]::IsNullOrWhiteSpace($NodeScenarioPath)) {
+        $parameters["NodeScenarioPath"] = $NodeScenarioPath
+    }
+    if ($DeferAuthToScenario) {
+        $parameters["DeferAuthToScenario"] = $true
+    }
     if ($script:desktopBuilt -or $RuntimeKind -ne "debug") {
         $parameters["NoBuild"] = $true
     }
@@ -307,6 +478,11 @@ function Invoke-ProfileRun {
         -ExpectedWorkspaceEnabled ([bool]$profileDefinition.WorkspaceEnabled) `
         -WebPort $webPort
 
+    $operatorPilotAuthority = $null
+    if ($RequireOperatorPilotAuthority) {
+        $operatorPilotAuthority = Assert-OperatorPilotAuthorityEvidence -Path $evidencePath
+    }
+
     $runRecords.Add([pscustomobject]@{
         name = $Name
         expectation = $Expectation
@@ -318,40 +494,15 @@ function Invoke-ProfileRun {
         webPort = $webPort
         cdpPort = $cdpPort
         status = "PASS"
+        blocker = $null
+        nodeScenarioPath = if ([string]::IsNullOrWhiteSpace($NodeScenarioPath)) { $null } else { $NodeScenarioPath }
+        authenticationDeferredToScenario = [bool]$DeferAuthToScenario
+        operatorPilotAuthority = $operatorPilotAuthority
         startup = $cleanup.startupLog.record
         ownerLedger = $summary.owners
         rootKind = $summary.rootKind
         evidencePath = $evidencePath
         cleanupPath = $cleanupPath
-    })
-}
-
-function Add-BlockedProfileRun {
-    param(
-        [string]$Name,
-        [string]$StartupProfile,
-        [string]$Reason
-    )
-
-    $profileDefinition = $profileDefinitions[$StartupProfile]
-    if ($null -eq $profileDefinition) {
-        throw "Profile evidence has no F09 definition for '$StartupProfile'."
-    }
-    $runRecords.Add([pscustomobject]@{
-        name = $Name
-        expectation = "studio-product"
-        explicitProfile = $StartupProfile
-        resolvedProfile = $StartupProfile
-        studioUiEnabled = [bool]$profileDefinition.StudioUiEnabled
-        workspaceCapabilityEnabled = [bool]$profileDefinition.WorkspaceEnabled
-        pageKind = "StudioUi"
-        status = "BLOCKED"
-        blocker = $Reason
-        startup = $null
-        ownerLedger = $null
-        rootKind = $null
-        evidencePath = $null
-        cleanupPath = $null
     })
 }
 
@@ -369,12 +520,13 @@ try {
     Invoke-ProfileRun -Name "next-engineer-pilot" -Expectation "studio-product" `
         -StartupProfile "NEXT_ENGINEER_PILOT" -ExpectedProfile "NEXT_ENGINEER_PILOT" `
         -ExpectedPageKind "StudioUi" -Route "/overview" -ExecutablePath $desktopExe
-    Add-BlockedProfileRun -Name "next-operator-pilot" `
-        -StartupProfile "NEXT_OPERATOR_PILOT" `
-        -Reason (
-            "The isolated WebView2 harness can bootstrap only an initial Admin and " +
-            "cannot prove the Operator formal-run or continuous-inspection permission contract. " +
-            "This remains an F09 cutover blocker; no backend permission is widened for evidence.")
+    if (-not (Test-Path -LiteralPath $operatorPilotScenario -PathType Leaf)) {
+        throw "The F09 Operator pilot scenario was not found: $operatorPilotScenario"
+    }
+    Invoke-ProfileRun -Name "next-operator-pilot" -Expectation "studio-product" `
+        -StartupProfile "NEXT_OPERATOR_PILOT" -ExpectedProfile "NEXT_OPERATOR_PILOT" `
+        -ExpectedPageKind "StudioUi" -Route "/overview" -ExecutablePath $desktopExe `
+        -NodeScenarioPath $operatorPilotScenario -RequireOperatorPilotAuthority
     Invoke-ProfileRun -Name "next-default-candidate" -Expectation "studio-product" `
         -StartupProfile "NEXT_DEFAULT_CANDIDATE" -ExpectedProfile "NEXT_DEFAULT_CANDIDATE" `
         -ExpectedPageKind "StudioUi" -Route "/overview" -ExecutablePath $desktopExe
@@ -413,24 +565,29 @@ try {
 $appSettingsPath = Join-Path $repoRoot (
     "ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json")
 $appSettings = Get-Content -LiteralPath $appSettingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
-$candidateConfigurationPassed = [string]$appSettings.Studio.StartupProfile -eq "NEXT_DEFAULT_CANDIDATE" -and
+$configuredProfilePassed = [string]$appSettings.Studio.StartupProfile -eq $ExpectedConfiguredProfile -and
     [bool]$appSettings.Studio.StudioUiEnabled -and
     [bool]$appSettings.Studio.WorkspaceCapabilityEnabled
 $operatorPilotRecord = @($runRecords | Where-Object { $_.name -eq 'next-operator-pilot' } | Select-Object -First 1)
-$operatorPilotPassed = $operatorPilotRecord.Count -eq 1 -and $operatorPilotRecord[0].status -eq 'PASS'
+$operatorReadOnlyAuthorityPassed = $operatorPilotRecord.Count -eq 1 -and
+    $operatorPilotRecord[0].status -eq 'PASS' -and
+    $null -ne $operatorPilotRecord[0].operatorPilotAuthority -and
+    [bool]$operatorPilotRecord[0].operatorPilotAuthority.passed
 $namedProfilesPassed = @($runRecords | Where-Object {
-    $_.name -ne 'missing-assets' -and $_.name -ne 'next-operator-pilot' -and $_.status -eq 'PASS'
-}).Count -eq 6
-$missingAssetsPassed = @($runRecords | Where-Object { $_.name -eq 'missing-assets' }).Count -eq 1
+    $_.name -ne 'missing-assets' -and $_.status -eq 'PASS'
+}).Count -eq $profileDefinitions.Count
+$missingAssetsPassed = @($runRecords | Where-Object {
+    $_.name -eq 'missing-assets' -and $_.status -eq 'PASS'
+}).Count -eq 1
 $executedRuns = @($runRecords | Where-Object { $_.status -eq 'PASS' })
-$canonicalFlagNamesPassed = $executedRuns.Count -eq 7
+$canonicalFlagNamesPassed = $executedRuns.Count -eq ($profileDefinitions.Count + 1)
 $doubleRootPassed = @($executedRuns | Where-Object {
     ($_.rootKind -eq 'legacy' -and [int]$_.ownerLedger.studioRootCount -eq 0) -or
     ($_.rootKind -eq 'studio-ui' -and [int]$_.ownerLedger.studioRootCount -eq 1) -or
     ($_.rootKind -eq 'diagnostic' -and [int]$_.ownerLedger.studioRootCount -eq 0)
 }).Count -eq $executedRuns.Count
-$manifestPassed = -not $profileError -and $candidateConfigurationPassed -and
-    $namedProfilesPassed -and $operatorPilotPassed -and $missingAssetsPassed -and
+$manifestPassed = -not $profileError -and $configuredProfilePassed -and
+    $namedProfilesPassed -and $operatorReadOnlyAuthorityPassed -and $missingAssetsPassed -and
     $canonicalFlagNamesPassed -and $doubleRootPassed
 
 $manifest = [pscustomobject]@{
@@ -445,8 +602,9 @@ $manifest = [pscustomobject]@{
         studioUiEnabled = [bool]$appSettings.Studio.StudioUiEnabled
         workspaceCapabilityEnabled = [bool]$appSettings.Studio.WorkspaceCapabilityEnabled
         configuredProfile = [string]$appSettings.Studio.StartupProfile
+        expectedConfiguredProfile = $ExpectedConfiguredProfile
         nextDefaultActive = [string]$appSettings.Studio.StartupProfile -eq "NEXT_DEFAULT"
-        candidateConfigurationPassed = $candidateConfigurationPassed
+        configuredProfilePassed = $configuredProfilePassed
     }
     namedProfiles = [pscustomobject]@{
         expected = @(
@@ -460,9 +618,24 @@ $manifest = [pscustomobject]@{
         passed = $namedProfilesPassed
     }
     operatorPilot = [pscustomobject]@{
+        evidenceScope = "G3_READ_ONLY_PROFILE_AND_SERVER_AUTHORITY"
         status = if ($operatorPilotRecord.Count -eq 1) { $operatorPilotRecord[0].status } else { "NOT_RECORDED" }
-        blocker = if ($operatorPilotRecord.Count -eq 1) { $operatorPilotRecord[0].blocker } else { $null }
-        passed = $operatorPilotPassed
+        scenarioPath = if ($operatorPilotRecord.Count -eq 1) { $operatorPilotRecord[0].nodeScenarioPath } else { $null }
+        authorityChecks = if ($operatorPilotRecord.Count -eq 1) { $operatorPilotRecord[0].operatorPilotAuthority } else { $null }
+        realServerAuthority = $operatorReadOnlyAuthorityPassed
+        readOnlyProfileContractPassed = $operatorReadOnlyAuthorityPassed
+    }
+    g6CutoverGate = [pscustomobject]@{
+        operatorPilot = [pscustomobject]@{
+            status = "BLOCKED"
+            minimumPilotPassed = $false
+            defaultEntrySwitchAllowed = $false
+            reason = (
+                "The existing backend contract correctly rejects Operator formal admission, formal execution, " +
+                "continuous inspection, and PLC control. This G3 scenario proves a real Operator's read-only " +
+                "profile and denial boundaries only; it does not prove the G6 approved operation, result, and " +
+                "exit/restart workflow required before default entry can switch.")
+        }
     }
     missingAssetDiagnostic = [pscustomobject]@{
         noSilentLegacyFallback = $missingAssetsPassed

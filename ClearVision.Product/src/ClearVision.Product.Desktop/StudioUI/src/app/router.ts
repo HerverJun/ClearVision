@@ -39,7 +39,6 @@ const AiWorkbenchPage = () => import('@/capabilities/ai-workbench/AiWorkbenchPag
 const SettingsPage = () => import('@/capabilities/settings/SettingsPage.vue');
 
 const editorRoles = Object.freeze(['Admin', 'Engineer']);
-const workspaceFlagKey = 'Studio2.Workspace';
 const stationFlagKey = 'Studio2.StationsRead';
 const inspectionRunFlagKey = 'Studio2.InspectionRun';
 const aiWorkbenchFlagKey = 'Studio2.AiWorkbench';
@@ -123,7 +122,6 @@ export const studioRoutes: readonly RouteRecordRaw[] = [
               breadcrumb: '工作区',
               requiresSession: true,
               allowedRoles: editorRoles,
-              requiredFeatureFlag: workspaceFlagKey,
               workspaceMode: true
             }
           },

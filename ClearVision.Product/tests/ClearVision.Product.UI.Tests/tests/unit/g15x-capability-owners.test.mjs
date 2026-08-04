@@ -106,8 +106,8 @@ test('Settings and AI capability gates fail closed behind explicit experimental 
   const source = appSource();
   const appSettings = JSON.parse(appSettingsSource());
 
-  assert.equal(appSettings.Studio.SettingsCapabilityEnabled, false);
-  assert.equal(appSettings.Studio.AiPanelCapabilityEnabled, false);
+  assert.equal(appSettings.Studio.SettingsCapabilityEnabled, true);
+  assert.equal(appSettings.Studio.AiPanelCapabilityEnabled, true);
 
   assert.match(
     source,

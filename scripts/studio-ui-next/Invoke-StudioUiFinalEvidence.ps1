@@ -6,6 +6,8 @@ param(
     [string]$EvidenceDirectory,
     [int]$BaseWebPort = 6000,
     [int]$BaseCdpPort = 10123,
+    [ValidateSet("NEXT_DEFAULT_CANDIDATE", "NEXT_DEFAULT")]
+    [string]$ExpectedConfiguredProfile = "NEXT_DEFAULT_CANDIDATE",
     [int]$SoakCycles = 20,
     [switch]$NoBuild
 )
@@ -16,6 +18,19 @@ $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "../.."))
 $singleRun = Join-Path $scriptRoot "Invoke-StudioUiWebView2Evidence.ps1"
+
+function Assert-CleanEvidenceWorktree {
+    $changes = @(& git -C $repoRoot status --porcelain=v1 --untracked-files=all)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not inspect the Git worktree before final evidence."
+    }
+    if ($changes.Count -ne 0) {
+        throw "Final evidence requires a clean committed worktree; commit or remove local changes first."
+    }
+}
+
+Assert-CleanEvidenceWorktree
+
 $nodeExe = if ([string]::IsNullOrWhiteSpace($NodeExecutablePath)) {
     (Get-Command node.exe -ErrorAction Stop).Source
 } else {
@@ -44,6 +59,16 @@ if ($SoakCycles -lt 20) {
 if ($BaseWebPort -lt 1 -or $BaseWebPort + 2 -gt 65535 -or
     $BaseCdpPort -lt 1 -or $BaseCdpPort + 2 -gt 65535) {
     throw "Base ports must leave room for three isolated Desktop processes."
+}
+
+$appSettingsPath = Join-Path $repoRoot (
+    "ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json")
+$appSettings = Get-Content -LiteralPath $appSettingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$configuredProfilePassed = [string]$appSettings.Studio.StartupProfile -eq $ExpectedConfiguredProfile -and
+    [bool]$appSettings.Studio.StudioUiEnabled -and
+    [bool]$appSettings.Studio.WorkspaceCapabilityEnabled
+if (-not $configuredProfilePassed) {
+    throw "Final evidence requires configured profile '$ExpectedConfiguredProfile' with StudioUI and Workspace enabled."
 }
 
 if ([string]::IsNullOrWhiteSpace($RunName)) {
@@ -105,6 +130,25 @@ function Test-DatabaseRemoved {
         ($Path + "-wal")) | Where-Object { Test-Path -LiteralPath $_ })
 }
 
+function Remove-IsolatedDatabaseArtifacts {
+    param([string]$Path)
+
+    $resolvedPath = [System.IO.Path]::GetFullPath($Path)
+    $resolvedRoot = [System.IO.Path]::GetFullPath($evidenceRoot)
+    $requiredPrefix = $resolvedRoot.TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $resolvedPath.StartsWith($requiredPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to remove database artifacts outside F09 evidence root: $resolvedPath"
+    }
+
+    foreach ($candidate in @($resolvedPath, ($resolvedPath + "-shm"), ($resolvedPath + "-wal"))) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            Remove-Item -LiteralPath $candidate -Force
+        }
+    }
+}
+
 function Invoke-FinalRun {
     param(
         [string]$Name,
@@ -134,7 +178,7 @@ function Invoke-FinalRun {
         Scale = 1.0
         WindowWidth = 1600
         WindowHeight = 1000
-        StartupProfile = "NEXT_DEFAULT_CANDIDATE"
+        StartupProfile = $ExpectedConfiguredProfile
         AuthMode = $AuthMode
         DatabasePath = $DatabasePath
         Username = $username
@@ -166,7 +210,7 @@ function Invoke-FinalRun {
         @($evidence.meaningfulRequestFailures).Count -ne 0 -or
         -not [bool]$cleanup.passed -or
         -not [bool]$cleanup.startupLog.passed -or
-        [string]$cleanup.startupLog.record.profile -ne "NEXT_DEFAULT_CANDIDATE" -or
+        [string]$cleanup.startupLog.record.profile -ne $ExpectedConfiguredProfile -or
         [string]$cleanup.startupLog.record.sourceSha -ne $sourceSha -or
         [string]$cleanup.startupLog.record.authMode -ne $AuthMode -or
         -not [bool]$cleanup.authenticationDeferredToScenario) {
@@ -194,6 +238,7 @@ function Invoke-FinalRun {
 }
 
 $finalError = $null
+$databaseCleanupError = $null
 $state = $null
 try {
     $first = Invoke-FinalRun `
@@ -261,6 +306,17 @@ try {
     }
 } catch {
     $finalError = $_
+} finally {
+    try {
+        Remove-IsolatedDatabaseArtifacts -Path $journeyDatabasePath
+        Remove-IsolatedDatabaseArtifacts -Path $soakDatabasePath
+    } catch {
+        $databaseCleanupError = $_
+    }
+}
+
+if ($null -eq $finalError -and $null -ne $databaseCleanupError) {
+    $finalError = $databaseCleanupError
 }
 
 $journeyDatabaseRemoved = Test-DatabaseRemoved -Path $journeyDatabasePath
@@ -276,7 +332,18 @@ $manifest = [pscustomobject]@{
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
     status = if ($manifestPassed) { "PASS" } else { "FAIL" }
     error = if ($finalError) { $finalError.Exception.Message } else { $null }
+    cleanup = [pscustomobject]@{
+        attempted = $true
+        error = if ($databaseCleanupError) { $databaseCleanupError.Exception.Message } else { $null }
+        journeyDatabaseRemoved = $journeyDatabaseRemoved
+        soakDatabaseRemoved = $soakDatabaseRemoved
+    }
     desktopProcesses = $runRecords.Count
+    defaultEntry = [pscustomobject]@{
+        configuredProfile = [string]$appSettings.Studio.StartupProfile
+        expectedConfiguredProfile = $ExpectedConfiguredProfile
+        configuredProfilePassed = $configuredProfilePassed
+    }
     finalUserJourney = [pscustomobject]@{
         restarts = 2
         freshDatabase = $true
