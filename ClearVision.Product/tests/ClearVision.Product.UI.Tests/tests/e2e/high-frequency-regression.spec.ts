@@ -620,8 +620,7 @@ test.describe('High Frequency Regression', () => {
         await expect.poll(() => cameraBindingPuts.length).toBe(1);
         expect(cameraBindingPuts[0].bindings[0].exposureTimeUs).toBe(16000);
 
-        await expect.poll(() => settingsPuts.length).toBe(1);
-        expect(settingsPuts[0]).toEqual({ saveScope: 'cameras' });
+        expect(settingsPuts).toHaveLength(0);
         expect(plcSettingsPuts).toHaveLength(0);
     });
 
