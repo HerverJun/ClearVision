@@ -3,6 +3,7 @@ const path = require('node:path');
 const { chromium } = require('@playwright/test');
 
 const cdpPort = Number(process.env.CV_CDP_PORT || 9223);
+const webPort = Number(process.env.CV_WEB_PORT || 5000);
 const scale = Number(process.env.CV_DPI_SCALE || 1);
 const phase = String(process.env.CV_SMOKE_PHASE || 'full').trim().toLowerCase();
 const token = String(process.env.CV_SMOKE_TOKEN || '');
@@ -108,6 +109,7 @@ async function activateView(page, view) {
 async function authenticateAndOpenAi(page) {
   assert(token, 'CV_SMOKE_TOKEN is required.');
   assert(user, 'CV_SMOKE_USER is required.');
+  await page.goto(`http://localhost:${webPort}/index.html`, { waitUntil: 'domcontentloaded' });
   const preNavigationState = await page.evaluate(({ authToken, authUser, markerKeyPrefix, recoveryKey }) => {
     sessionStorage.setItem('cv_auth_token', authToken);
     sessionStorage.setItem('cv_current_user', authUser);
@@ -129,7 +131,7 @@ async function authenticateAndOpenAi(page) {
     markerKeyPrefix: 'cv_ai_apply_safety_block_v1',
     recoveryKey: rollbackRecoveryFixtureKey,
   });
-  await page.goto('http://localhost:5000/index.html');
+  await page.goto(`http://localhost:${webPort}/index.html`);
   await page.waitForSelector('#loading-screen', { state: 'hidden', timeout: 45_000 });
   await activateView(page, 'ai');
   await page.waitForFunction(() => Boolean(window.aiPanel && !window.aiPanel._disposed));
