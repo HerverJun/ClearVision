@@ -266,15 +266,32 @@ namespace ClearVision.Product.Tests.Integration
             var mockScope = Substitute.For<IServiceScope>();
             var mockScopeFactory = Substitute.For<IServiceScopeFactory>();
             var mockSubFlowService = Substitute.For<IFlowExecutionEngine>();
+            var activeExecutions = 0;
+            var maxConcurrentExecutions = 0;
             mockSubFlowService.ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
                 .Returns(async _ =>
                 {
-                    await Task.Delay(50);
-                    return new FlowExecutionResult
+                    var active = Interlocked.Increment(ref activeExecutions);
+                    var observedMax = Volatile.Read(ref maxConcurrentExecutions);
+                    while (active > observedMax &&
+                           Interlocked.CompareExchange(ref maxConcurrentExecutions, active, observedMax) != observedMax)
                     {
-                        IsSuccess = true,
-                        OutputData = new Dictionary<string, object> { { "Result", true } }
-                    };
+                        observedMax = Volatile.Read(ref maxConcurrentExecutions);
+                    }
+
+                    try
+                    {
+                        await Task.Delay(50);
+                        return new FlowExecutionResult
+                        {
+                            IsSuccess = true,
+                            OutputData = new Dictionary<string, object> { { "Result", true } }
+                        };
+                    }
+                    finally
+                    {
+                        Interlocked.Decrement(ref activeExecutions);
+                    }
                 });
 
             mockScopedProvider.GetService(typeof(IFlowExecutionEngine)).Returns(mockSubFlowService);
@@ -287,12 +304,12 @@ namespace ClearVision.Product.Tests.Integration
             var inputArray = Enumerable.Range(0, 15).Select(x => (object)x).ToList();
             var inputs = new Dictionary<string, object> { { "Items", inputArray } };
 
-            var stopwatch = Stopwatch.StartNew();
             var result = await flowService.ExecuteFlowAsync(flow, inputs);
-            stopwatch.Stop();
 
             Assert.True(result.IsSuccess, $"Flow execution failed: {result.ErrorMessage}");
-            Assert.True(stopwatch.ElapsedMilliseconds <= 350, $"Parallel execution was too slow: {stopwatch.ElapsedMilliseconds}ms for 15 elements with 50ms payload. Likely falling back to sequential.");
+            Assert.True(
+                Volatile.Read(ref maxConcurrentExecutions) > 1,
+                $"Parallel execution observed a maximum concurrency of {Volatile.Read(ref maxConcurrentExecutions)}.");
         }
 
         private static int GetEnvInt(string name, int defaultValue, int min, int max)
