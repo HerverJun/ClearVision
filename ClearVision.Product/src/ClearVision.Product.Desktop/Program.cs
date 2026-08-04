@@ -84,6 +84,7 @@ static class Program
 
         try
         {
+            ValidateUnattendedIsolation();
             System.Windows.Forms.Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             System.Windows.Forms.Application.ThreadException += (s, e) =>
             {
@@ -147,6 +148,7 @@ static class Program
             }
             catch (Exception stopEx)
             {
+                MarkUnattendedShutdownFailure("process-exit-stop-exception");
                 processExitStage.Complete(DesktopShutdownStageStatus.Failed, stopEx.ToString());
                 Debug.WriteLine($"Stop web server failed: {stopEx}");
             }
@@ -571,7 +573,7 @@ static class Program
             return true;
         }
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        using var cts = new CancellationTokenSource(DesktopShutdownContract.HostStopDeadline);
         try
         {
             await host.StopAsync(cts.Token);
@@ -580,13 +582,15 @@ static class Program
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
+            MarkUnattendedShutdownFailure("host-stop-timeout");
             stage.Complete(
                 DesktopShutdownStageStatus.Timeout,
-                "Kestrel StopAsync exceeded the 60 second shutdown deadline.");
+                $"Kestrel StopAsync exceeded the {DesktopShutdownContract.HostStopDeadline.TotalSeconds:0} second shutdown deadline.");
             return false;
         }
         catch (Exception ex)
         {
+            MarkUnattendedShutdownFailure("host-stop-failed");
             stage.Complete(DesktopShutdownStageStatus.Failed, ex.ToString());
             return false;
         }
@@ -602,6 +606,27 @@ static class Program
             }
 
             _host = null;
+        }
+    }
+
+    private static void ValidateUnattendedIsolation()
+    {
+        if (!DesktopShutdownContract.IsUnattendedShutdownRequested(Environment.GetEnvironmentVariable) ||
+            DesktopShutdownContract.IsUnattendedShutdownEnabled(Environment.GetEnvironmentVariable))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "Unattended shutdown requires an absolute CV_DESKTOP_ISOLATION_ROOT and managed paths " +
+            "fully contained by that root.");
+    }
+
+    private static void MarkUnattendedShutdownFailure(string reason)
+    {
+        if (DesktopShutdownContract.IsUnattendedShutdownEnabled(Environment.GetEnvironmentVariable))
+        {
+            _shutdownDiagnostics.MarkForcedExit(reason);
         }
     }
 

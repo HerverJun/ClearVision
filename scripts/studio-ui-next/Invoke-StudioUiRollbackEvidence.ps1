@@ -95,12 +95,12 @@ if (Test-Path -LiteralPath $evidenceRoot) {
 }
 New-Item -ItemType Directory -Force -Path $evidenceRoot | Out-Null
 
-$sharedRoot = Join-Path $evidenceRoot "shared"
+$isolationRoot = Join-Path $evidenceRoot "isolation"
+$sharedRoot = Join-Path $isolationRoot "shared"
 $databasePath = Join-Path $sharedRoot "vision.db"
 $rollbackStatePath = Join-Path $sharedRoot "rollback-state.json"
 New-Item -ItemType Directory -Force -Path $sharedRoot | Out-Null
-$publishCheckBoundary = [System.IO.Path]::GetFullPath((
-    Join-Path $repoRoot ".tmp/publish-check/studio-ui-next-f09"))
+$publishCheckBoundary = Join-Path $isolationRoot "publish-check"
 $publishCheckRoot = Join-Path $publishCheckBoundary $RunName
 $missingAssetsRuntime = Join-Path $publishCheckRoot "missing-assets-runtime"
 
@@ -193,7 +193,7 @@ function Remove-IsolatedDatabaseArtifacts {
     param([string]$Path)
 
     $resolvedPath = [System.IO.Path]::GetFullPath($Path)
-    $resolvedRoot = [System.IO.Path]::GetFullPath($evidenceRoot)
+    $resolvedRoot = [System.IO.Path]::GetFullPath($isolationRoot)
     $requiredPrefix = $resolvedRoot.TrimEnd(
         [System.IO.Path]::DirectorySeparatorChar,
         [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
@@ -293,6 +293,7 @@ function Invoke-RollbackRun {
         EvidencePhase = "f09"
         Configuration = "Debug"
         RuntimeKind = $RuntimeKind
+        IsolationRoot = $isolationRoot
         DesktopExecutablePath = $ExecutablePath
         NodeExecutablePath = $nodeExe
         RunName = $Name

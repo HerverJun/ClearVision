@@ -25,8 +25,7 @@ public partial class MainForm : Form
     private readonly Handlers.WebMessageHandler? _messageHandler;
     private readonly EnterPhotoelectricTriggerInputService? _triggerInputService;
     private readonly DesktopShutdownDiagnostics _shutdownDiagnostics;
-    private bool _allowClose;
-    private bool _closingInProgress;
+    private DesktopShutdownCloseState _closeState;
     private bool _disposedWebViewHost;
 
     public MainForm()
@@ -154,81 +153,112 @@ public partial class MainForm : Form
         MainMenuStrip = menuStrip;
     }
 
-    private async void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
+    private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
     {
-        if (_allowClose)
+        if (_closeState == DesktopShutdownCloseState.Prepared)
         {
-            await DisposeWebViewHostAsync();
-            return;
-        }
-
-        if (_closingInProgress)
-        {
-            e.Cancel = true;
             return;
         }
 
         e.Cancel = true;
-        _closingInProgress = true;
+        if (!DesktopShutdownContract.TryBeginPreparation(ref _closeState))
+        {
+            return;
+        }
 
+        _ = PrepareCloseAsync(e.CloseReason);
+    }
+
+    private async Task PrepareCloseAsync(CloseReason closeReason)
+    {
+        var closeAuthorized = false;
         var flushStage = _shutdownDiagnostics.BeginStage("flush-start");
         try
         {
-            var timeout = e.CloseReason == CloseReason.WindowsShutDown
-                ? TimeSpan.FromSeconds(2)
-                : TimeSpan.FromSeconds(5);
-            var flush = await FlushWorkspaceBeforeCloseAsync(timeout);
+            var flush = await FlushWorkspaceBeforeCloseAsync(DesktopShutdownContract.FlushDeadline);
             flushStage.Complete(flush.Status, flush.Error);
-            if (!flush.Succeeded)
+            closeAuthorized = flush.Succeeded ||
+                AuthorizeCloseAfterFlushFailure(closeReason, flush.Status);
+            if (!closeAuthorized)
             {
-                var unattended = IsUnattendedShutdownEnabled();
-                if (e.CloseReason == CloseReason.WindowsShutDown || unattended)
-                {
-                    _shutdownDiagnostics.MarkForcedExit(
-                        unattended
-                            ? $"unattended-flush-{flush.Status.ToString().ToLowerInvariant()}"
-                            : $"windows-shutdown-flush-{flush.Status.ToString().ToLowerInvariant()}");
-                }
-                else if (PromptForceClose() != DialogResult.Yes)
-                {
-                    _closingInProgress = false;
-                    return;
-                }
-                else
-                {
-                    _shutdownDiagnostics.MarkForcedExit("user-confirmed-force-close");
-                }
+                return;
             }
 
-            _allowClose = true;
-            BeginInvoke(new Action(Close));
+            var disposeStatus = await DisposeWebViewHostAsync();
+            if (disposeStatus is not DesktopShutdownStageStatus.Succeeded and
+                not DesktopShutdownStageStatus.Skipped)
+            {
+                _shutdownDiagnostics.MarkForcedExit(
+                    $"webview-dispose-{disposeStatus.ToString().ToLowerInvariant()}");
+            }
+
+            RequestFinalClose();
         }
         catch (Exception ex)
         {
             flushStage.Complete(DesktopShutdownStageStatus.Unknown, ex.ToString());
             System.Diagnostics.Debug.WriteLine($"[MainForm] Shutdown coordination failed: {ex}");
-            if (IsUnattendedShutdownEnabled())
+
+            if (!closeAuthorized &&
+                !IsUnattendedShutdownEnabled() &&
+                closeReason != CloseReason.WindowsShutDown)
             {
-                _shutdownDiagnostics.MarkForcedExit("unattended-shutdown-coordination-exception");
-                _allowClose = true;
-                BeginInvoke(new Action(Close));
+                DesktopShutdownContract.RestoreAfterDecline(ref _closeState);
                 return;
             }
 
-            if (PromptForceClose() == DialogResult.Yes)
+            _shutdownDiagnostics.MarkForcedExit(
+                IsUnattendedShutdownEnabled()
+                    ? "unattended-shutdown-coordination-exception"
+                    : "windows-shutdown-coordination-exception");
+            var disposeStatus = await DisposeWebViewHostAsync();
+            if (disposeStatus is not DesktopShutdownStageStatus.Succeeded and
+                not DesktopShutdownStageStatus.Skipped)
             {
-                _shutdownDiagnostics.MarkForcedExit("user-confirmed-force-close-after-exception");
-                _allowClose = true;
-                BeginInvoke(new Action(Close));
-                return;
+                _shutdownDiagnostics.MarkForcedExit(
+                    $"webview-dispose-{disposeStatus.ToString().ToLowerInvariant()}");
             }
 
-            _closingInProgress = false;
+            RequestFinalClose();
         }
         finally
         {
             flushStage.Dispose();
         }
+    }
+
+    private bool AuthorizeCloseAfterFlushFailure(
+        CloseReason closeReason,
+        DesktopShutdownStageStatus status)
+    {
+        var unattended = IsUnattendedShutdownEnabled();
+        if (closeReason == CloseReason.WindowsShutDown || unattended)
+        {
+            _shutdownDiagnostics.MarkForcedExit(
+                unattended
+                    ? $"unattended-flush-{status.ToString().ToLowerInvariant()}"
+                    : $"windows-shutdown-flush-{status.ToString().ToLowerInvariant()}");
+            return true;
+        }
+
+        if (PromptForceClose() != DialogResult.Yes)
+        {
+            DesktopShutdownContract.RestoreAfterDecline(ref _closeState);
+            return false;
+        }
+
+        _shutdownDiagnostics.MarkForcedExit("user-confirmed-force-close");
+        return true;
+    }
+
+    private void RequestFinalClose()
+    {
+        if (!DesktopShutdownContract.TryMarkPrepared(ref _closeState))
+        {
+            return;
+        }
+
+        BeginInvoke(new Action(Close));
     }
 
     private async Task<FlushWorkspaceResult> FlushWorkspaceBeforeCloseAsync(TimeSpan timeout)
@@ -361,47 +391,8 @@ public partial class MainForm : Form
         }
     }
 
-    private static bool IsUnattendedShutdownEnabled()
-    {
-        if (!string.Equals(
-                Environment.GetEnvironmentVariable(DesktopShutdownDiagnostics.UnattendedShutdownEnvironmentVariable),
-                "1",
-                StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var paths = new[]
-        {
-            Environment.GetEnvironmentVariable(DesktopShutdownDiagnostics.DiagnosticsPathEnvironmentVariable),
-            Environment.GetEnvironmentVariable("Database__Path"),
-            Environment.GetEnvironmentVariable("CV_WEBVIEW2_USER_DATA_FOLDER"),
-            Environment.GetEnvironmentVariable("CV_CONVERSATION_STORE_ROOT"),
-            Environment.GetEnvironmentVariable("CV_AGENT_RUN_EVENT_STORE"),
-            Environment.GetEnvironmentVariable("CV_AI_HANDOFF_STORE_ROOT"),
-            Environment.GetEnvironmentVariable("CV_DESKTOP_LOG_PATH")
-        };
-        return paths.All(IsUnderDotTmp);
-    }
-
-    private static bool IsUnderDotTmp(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path)) return false;
-        try
-        {
-            var fullPath = Path.GetFullPath(path.Trim());
-            var root = Path.GetPathRoot(fullPath) ?? string.Empty;
-            var relative = fullPath[root.Length..];
-            return relative.Split(
-                    new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
-                    StringSplitOptions.RemoveEmptyEntries)
-                .Any(part => string.Equals(part, ".tmp", StringComparison.OrdinalIgnoreCase));
-        }
-        catch
-        {
-            return false;
-        }
-    }
+    private static bool IsUnattendedShutdownEnabled() =>
+        DesktopShutdownContract.IsUnattendedShutdownEnabled(Environment.GetEnvironmentVariable);
 
     private async Task<string?> ExecuteScriptWithTimeoutAsync(string script, TimeSpan timeout)
     {
@@ -649,26 +640,36 @@ public partial class MainForm : Form
         DesktopShutdownStageStatus Status,
         string? Error);
 
-    private async Task DisposeWebViewHostAsync()
+    private async Task<DesktopShutdownStageStatus> DisposeWebViewHostAsync()
     {
         using var stage = _shutdownDiagnostics.BeginStage("webview-dispose");
         if (_disposedWebViewHost)
         {
             stage.Complete(DesktopShutdownStageStatus.Skipped, "WebView2 host was already disposed.");
-            return;
+            return DesktopShutdownStageStatus.Skipped;
         }
 
         _disposedWebViewHost = true;
         try
         {
             _messageHandler?.Dispose();
-            await _webView2Host.DisposeAsync();
+            await _webView2Host.DisposeAsync().AsTask().WaitAsync(
+                DesktopShutdownContract.WebViewDisposeDeadline);
             stage.Complete(DesktopShutdownStageStatus.Succeeded);
+            return DesktopShutdownStageStatus.Succeeded;
+        }
+        catch (TimeoutException)
+        {
+            stage.Complete(
+                DesktopShutdownStageStatus.Timeout,
+                "WebView2 disposal exceeded the shutdown deadline.");
+            return DesktopShutdownStageStatus.Timeout;
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] Shutdown cleanup failed: {ex}");
             stage.Complete(DesktopShutdownStageStatus.Failed, ex.ToString());
+            return DesktopShutdownStageStatus.Failed;
         }
     }
 

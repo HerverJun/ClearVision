@@ -29,6 +29,7 @@ param(
     [int]$WindowWidth = 1600,
     [int]$WindowHeight = 1000,
     [switch]$SanitizeDesktopPath,
+    [string]$IsolationRoot,
     [switch]$DeepCanvas,
     [switch]$SeedWorkspace,
     [switch]$FormalRun,
@@ -144,6 +145,7 @@ if ([System.IO.Path]::IsPathRooted($relativeEvidence)) {
 }
 
 $evidencePath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $relativeEvidence))
+$runRoot = Split-Path -Parent $evidencePath
 $allowedEvidenceRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot ".tmp/studio-ui-next"))
 $allowedEvidencePrefix = $allowedEvidenceRoot.TrimEnd(
     [System.IO.Path]::DirectorySeparatorChar,
@@ -158,6 +160,39 @@ $repositoryTemporaryPrefix = $repositoryTemporaryRoot.TrimEnd(
     [System.IO.Path]::DirectorySeparatorChar,
     [System.IO.Path]::AltDirectorySeparatorChar) +
     [System.IO.Path]::DirectorySeparatorChar
+
+$configuredDatabasePath = $DatabasePath
+$isolationRoot = if (-not [string]::IsNullOrWhiteSpace($IsolationRoot)) {
+    [System.IO.Path]::GetFullPath($IsolationRoot)
+} elseif (-not [string]::IsNullOrWhiteSpace($RuntimeDirectory)) {
+    [System.IO.Path]::GetFullPath($RuntimeDirectory)
+} elseif (-not [string]::IsNullOrWhiteSpace($configuredDatabasePath)) {
+    [System.IO.Path]::GetFullPath((Split-Path -Parent $configuredDatabasePath))
+} else {
+    Join-Path $runRoot "isolation"
+}
+if (-not [System.IO.Path]::IsPathFullyQualified($isolationRoot) -or
+    $isolationRoot -match '(^|[\\/])\.\.([\\/]|$)') {
+    throw "IsolationRoot must be an absolute path without parent traversal."
+}
+$isolationRoot = [System.IO.Path]::GetFullPath($isolationRoot)
+$isolationRootTrimmed = $isolationRoot.TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar)
+if ([string]::Equals(
+        $isolationRootTrimmed,
+        $repositoryTemporaryRoot.TrimEnd(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar),
+        [System.StringComparison]::OrdinalIgnoreCase) -or
+    -not $isolationRoot.StartsWith(
+        $repositoryTemporaryPrefix,
+        [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "IsolationRoot must be a child of the repository .tmp directory."
+}
+$isolationRootPrefix = $isolationRootTrimmed + [System.IO.Path]::DirectorySeparatorChar
+New-Item -ItemType Directory -Force -Path $isolationRoot | Out-Null
+
 function Assert-RepositoryTemporaryPath {
     param(
         [Parameter(Mandatory = $true)]
@@ -166,20 +201,17 @@ function Assert-RepositoryTemporaryPath {
         [string]$Label
     )
 
+    if (-not [System.IO.Path]::IsPathFullyQualified($Path) -or
+        $Path -match '(^|[\\/])\.\.([\\/]|$)') {
+        throw "$Label must be an absolute path without parent traversal."
+    }
+
     $resolved = [System.IO.Path]::GetFullPath($Path)
-    if ([string]::Equals(
-            $resolved.TrimEnd(
-                [System.IO.Path]::DirectorySeparatorChar,
-                [System.IO.Path]::AltDirectorySeparatorChar),
-            $repositoryTemporaryRoot.TrimEnd(
-                [System.IO.Path]::DirectorySeparatorChar,
-                [System.IO.Path]::AltDirectorySeparatorChar),
-            [System.StringComparison]::OrdinalIgnoreCase) -or
-        $resolved.StartsWith($repositoryTemporaryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if ($resolved.StartsWith($isolationRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
         return $resolved
     }
 
-    throw "$Label must remain under the repository .tmp directory: $resolved"
+    throw "$Label must remain under the isolation root '$isolationRoot': $resolved"
 }
 $cleanupPath = Join-Path $evidencePath "studio-ui-webview2-$RunName-cleanup.json"
 if ($cleanupPath.Length -gt 240) {
@@ -191,47 +223,18 @@ if (Test-Path -LiteralPath $evidencePath) {
     throw "Evidence directory already exists; use a unique RunName: $evidencePath"
 }
 
-$runRoot = Split-Path -Parent $evidencePath
-$runtimeRoot = if ([string]::IsNullOrWhiteSpace($RuntimeDirectory)) {
-    Join-Path $runRoot "runtime"
-} else {
-    [System.IO.Path]::GetFullPath($RuntimeDirectory)
-}
-$runtimeParent = [System.IO.Path]::GetFullPath((Split-Path -Parent $runtimeRoot))
-$runtimeVolumeRoot = [System.IO.Path]::GetPathRoot($runtimeParent)
-if ([string]::Equals(
-    $runtimeParent.TrimEnd(
-        [System.IO.Path]::DirectorySeparatorChar,
-        [System.IO.Path]::AltDirectorySeparatorChar),
-    $runtimeVolumeRoot.TrimEnd(
-        [System.IO.Path]::DirectorySeparatorChar,
-        [System.IO.Path]::AltDirectorySeparatorChar),
-    [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "RuntimeDirectory must be nested below a dedicated temporary parent."
-}
-if (Test-Path -LiteralPath $runtimeRoot) {
-    throw "RuntimeDirectory already exists; use an isolated path: $runtimeRoot"
-}
-$runtimePrefix = $runtimeParent.TrimEnd(
-    [System.IO.Path]::DirectorySeparatorChar,
-    [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
-if (-not $runtimeRoot.StartsWith(
-    $runtimePrefix,
-    [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "RuntimeDirectory must be a child of its dedicated temporary parent."
-}
-$hostLogs = Join-Path $runRoot "host-logs"
-$webView2UserData = Join-Path $runtimeRoot "webview2"
-$conversationStore = Join-Path $runtimeRoot "conversation"
-$agentRunStore = Join-Path $runtimeRoot "agent-runs"
-$handoffArtifactStore = Join-Path $runtimeRoot "handoffs"
+$runtimeRoot = Join-Path $isolationRoot "runtime"
+$hostLogs = Join-Path $isolationRoot "host-logs"
+$webView2UserData = Join-Path $isolationRoot "webview2"
+$conversationStore = Join-Path $isolationRoot "conversation"
+$agentRunStore = Join-Path $isolationRoot "agent-runs"
+$handoffArtifactStore = Join-Path $isolationRoot "handoffs"
 $runtimeRoot = Assert-RepositoryTemporaryPath -Path $runtimeRoot -Label "RuntimeDirectory"
 $hostLogs = Assert-RepositoryTemporaryPath -Path $hostLogs -Label "HostLogDirectory"
 $webView2UserData = Assert-RepositoryTemporaryPath -Path $webView2UserData -Label "WebView2UserDataDirectory"
 $conversationStore = Assert-RepositoryTemporaryPath -Path $conversationStore -Label "ConversationStoreRoot"
 $agentRunStore = Assert-RepositoryTemporaryPath -Path $agentRunStore -Label "AgentRunStoreRoot"
 $handoffArtifactStore = Assert-RepositoryTemporaryPath -Path $handoffArtifactStore -Label "HandoffArtifactStoreRoot"
-$configuredDatabasePath = $DatabasePath
 $databasePath = if ([string]::IsNullOrWhiteSpace($configuredDatabasePath)) {
     Join-Path $runtimeRoot "database/vision.db"
 } else {
@@ -354,29 +357,15 @@ if ($normalizedFinalJourneyPhase -in @("CREATE_RUN_LOGOUT", "REOPEN_DELETE") -an
     [string]::IsNullOrWhiteSpace($finalJourneyStateFullPath)) {
     throw "$normalizedFinalJourneyPhase requires FinalJourneyStatePath."
 }
-$databaseAllowedPrefix = $allowedEvidenceRoot.TrimEnd(
-    [System.IO.Path]::DirectorySeparatorChar,
-    [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
-if (-not [string]::IsNullOrWhiteSpace($configuredDatabasePath) -and
-    -not $databasePath.StartsWith($databaseAllowedPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "DatabasePath must remain under .tmp/studio-ui-next."
-}
-$runtimeRootPrefix = $runtimeRoot.TrimEnd(
-    [System.IO.Path]::DirectorySeparatorChar,
-    [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
-if ($KeepDatabase -and
-    $databasePath.StartsWith($runtimeRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "A retained DatabasePath must be outside the per-run RuntimeDirectory."
-}
 if ($rollbackStateFullPath -and
     -not $rollbackStateFullPath.StartsWith(
-        $databaseAllowedPrefix,
+        $allowedEvidencePrefix,
         [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "RollbackStatePath must remain under .tmp/studio-ui-next."
 }
 if ($finalJourneyStateFullPath -and
     -not $finalJourneyStateFullPath.StartsWith(
-        $databaseAllowedPrefix,
+        $allowedEvidencePrefix,
         [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "FinalJourneyStatePath must remain under .tmp/studio-ui-next."
 }
@@ -454,6 +443,8 @@ $runnerManagedEnvironmentNames = @(
     "CV_CONVERSATION_STORE_ROOT",
     "CV_AGENT_RUN_EVENT_STORE",
     "CV_AI_HANDOFF_STORE_ROOT",
+    "CV_DESKTOP_ISOLATION_ROOT",
+    "CV_DESKTOP_REPOSITORY_ROOT",
     "CV_DESKTOP_LOG_PATH",
     "CV_DESKTOP_SHUTDOWN_DIAGNOSTICS_PATH",
     "CV_DESKTOP_UNATTENDED_SHUTDOWN",
@@ -577,7 +568,8 @@ $runnerParameters = @{
     ConversationStoreRoot = $conversationStore
     AgentRunStoreRoot = $agentRunStore
     HandoffArtifactStoreRoot = $handoffArtifactStore
-    RuntimeCleanupRoot = $runtimeRoot
+    IsolationRoot = $isolationRoot
+    RuntimeCleanupRoot = $isolationRoot
     DatabasePath = $databasePath
     WindowWidth = $WindowWidth
     WindowHeight = $WindowHeight
@@ -646,6 +638,9 @@ $databaseStatePassed = if ($KeepDatabase) {
 } else {
     $databaseArtifactsRemoved
 }
+$runtimeRootPrefix = $runtimeRoot.TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
 $databaseInsideRuntime = $databasePath.StartsWith(
     $runtimeRootPrefix,
     [System.StringComparison]::OrdinalIgnoreCase)
@@ -705,7 +700,16 @@ $shutdownRequiredStages = @(
     "host-stop",
     "process-exit"
 )
+$shutdownExpectedDeadlinesMilliseconds = [ordered]@{
+    "flush-start" = 5000
+    "workspace-flush" = 5000
+    "ai-flush" = 5000
+    "webview-dispose" = 5000
+    "host-stop" = 10000
+    "process-exit" = 5000
+}
 $shutdownStageStatuses = [ordered]@{}
+$shutdownDeadlineViolations = [System.Collections.Generic.List[string]]::new()
 foreach ($stage in $shutdownRequiredStages) {
     $terminal = @($shutdownRecords | Where-Object {
         [string]$_.stage -eq $stage -and [string]$_.status -ne "started"
@@ -714,6 +718,11 @@ foreach ($stage in $shutdownRequiredStages) {
         $null
     } else {
         [string]$terminal[$terminal.Count - 1].status
+    }
+    $expectedDeadline = $shutdownExpectedDeadlinesMilliseconds[$stage]
+    if ($terminal.Count -eq 0 -or
+        [int64]$terminal[$terminal.Count - 1].deadlineMilliseconds -ne $expectedDeadline) {
+        $shutdownDeadlineViolations.Add($stage)
     }
 }
 $shutdownForcedExit = @($shutdownRecords | Where-Object {
@@ -733,6 +742,7 @@ foreach ($stage in $shutdownRequiredStages) {
 }
 $shutdownDiagnosticsPassed = $shutdownRecords.Count -gt 0 -and
     $shutdownParseErrors.Count -eq 0 -and
+    $shutdownDeadlineViolations.Count -eq 0 -and
     -not $shutdownForcedExit -and
     -not $shutdownUncertain -and
     $shutdownStagesPassed
@@ -779,6 +789,14 @@ $cleanup = [pscustomobject]@{
     soakCycles = $SoakCycles
     authenticationDeferredToScenario = [bool]$DeferAuthToScenario
     sanitizedDesktopPath = [bool]$SanitizeDesktopPath
+    isolationRoot = $isolationRoot
+    shutdownDeadlineContract = [pscustomobject]@{
+        flushSeconds = 5
+        webViewDisposeSeconds = 5
+        hostStopSeconds = 10
+        processMarginSeconds = 5
+        runnerTotalSeconds = 25
+    }
     externalNodeDriver = [pscustomobject]@{
         executablePath = $nodeExe
         isAbsolute = [System.IO.Path]::IsPathRooted($nodeExe)
@@ -821,6 +839,8 @@ $cleanup = [pscustomobject]@{
         forcedExit = $shutdownForcedExit
         uncertain = $shutdownUncertain
         parseErrors = @($shutdownParseErrors)
+        deadlineViolations = @($shutdownDeadlineViolations)
+        expectedDeadlinesMilliseconds = $shutdownExpectedDeadlinesMilliseconds
         stages = $shutdownStageStatuses
         passed = [bool]$shutdownDiagnosticsPassed
     }

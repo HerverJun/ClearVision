@@ -16,7 +16,8 @@ internal enum DesktopShutdownStageStatus
 internal sealed class DesktopShutdownDiagnostics
 {
     internal const string DiagnosticsPathEnvironmentVariable = "CV_DESKTOP_SHUTDOWN_DIAGNOSTICS_PATH";
-    internal const string UnattendedShutdownEnvironmentVariable = "CV_DESKTOP_UNATTENDED_SHUTDOWN";
+    internal const string UnattendedShutdownEnvironmentVariable =
+        DesktopShutdownContract.UnattendedShutdownEnvironmentVariable;
 
     private readonly object _sync = new();
     private readonly string? _path;
@@ -116,6 +117,7 @@ internal sealed class DesktopShutdownDiagnostics
             return;
         }
 
+        var deadline = DesktopShutdownContract.DeadlineForStage(stage);
         var record = new
         {
             schemaVersion = 1,
@@ -123,6 +125,9 @@ internal sealed class DesktopShutdownDiagnostics
             stage,
             status = statusText,
             elapsedMilliseconds,
+            deadlineMilliseconds = deadline.HasValue
+                ? (long?)Math.Round(deadline.Value.TotalMilliseconds)
+                : null,
             error = normalizedError,
             forcedExit
         };
@@ -149,7 +154,30 @@ internal sealed class DesktopShutdownDiagnostics
 
     private static string? NormalizePath(string? path)
     {
-        return string.IsNullOrWhiteSpace(path) ? null : Path.GetFullPath(path.Trim());
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        if (DesktopShutdownContract.IsUnattendedShutdownRequested(Environment.GetEnvironmentVariable) &&
+            !DesktopShutdownContract.IsPathWithinIsolationRoot(
+                path,
+                Environment.GetEnvironmentVariable(DesktopShutdownContract.IsolationRootEnvironmentVariable),
+                Environment.GetEnvironmentVariable(DesktopShutdownContract.RepositoryRootEnvironmentVariable)))
+        {
+            Debug.WriteLine("[DesktopShutdown] Ignoring diagnostics path outside the unattended isolation root.");
+            return null;
+        }
+
+        try
+        {
+            return Path.GetFullPath(path.Trim());
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DesktopShutdown] Could not normalize diagnostics path: {ex}");
+            return null;
+        }
     }
 
     internal sealed class StageScope : IDisposable
