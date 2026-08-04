@@ -2717,7 +2717,7 @@ async function verifyProductPage(
         !(item.method === 'POST' && url.pathname === '/api/inspection/decision-configuration/validate') &&
         !(item.method === 'GET' &&
           /^\/api\/inspection\/realtime\/[0-9a-f-]{36}\/state$/i.test(url.pathname)) &&
-        !isExpectedRollbackAdmissionRefresh(item) &&
+        !isExpectedAdmissionProjectionRefresh(item) &&
         !(goldenJourney && item.method === 'POST' && url.pathname === '/api/cameras/soft-trigger-capture') &&
         !(goldenJourney && item.method === 'POST' &&
           /^\/api\/projects\/[0-9a-f-]{36}\/runtime-package\/export$/i.test(url.pathname)) &&
