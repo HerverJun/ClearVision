@@ -685,8 +685,8 @@ public class GenerateFlowMessageHandlerTests
             PlanId = command.Request.BuildFromPlan?.PlanSnapshot?.PlanId ?? string.Empty,
             PlanHash = command.Request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty
         });
-        var streamService = new AgentRunEventStreamService();
-        var handler = new GenerateFlowMessageHandler(generationService, logger, buildRunService, streamService);
+        using var streamService = new TestAgentRunEventStreamService();
+        var handler = new GenerateFlowMessageHandler(generationService, logger, buildRunService, streamService.Service);
         var messages = new List<(string Type, string Payload)>();
         string? createdRunId = null;
 
@@ -775,8 +775,8 @@ public class GenerateFlowMessageHandlerTests
             PlanId = command.Request.BuildFromPlan?.PlanSnapshot?.PlanId ?? string.Empty,
             PlanHash = command.Request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty
         });
-        var streamService = new AgentRunEventStreamService();
-        var handler = new GenerateFlowMessageHandler(generationService, logger, buildRunService, streamService);
+        using var streamService = new TestAgentRunEventStreamService();
+        var handler = new GenerateFlowMessageHandler(generationService, logger, buildRunService, streamService.Service);
         string? createdRunId = null;
 
         var plan = LegacyBlockedBuildFromPlanSnapshot();
@@ -864,6 +864,31 @@ public class GenerateFlowMessageHandlerTests
             };
 
             return Task.FromResult(new VisionAgentBuildRunResult(outcome, null));
+        }
+    }
+
+    private sealed class TestAgentRunEventStreamService : IDisposable
+    {
+        private readonly string _directory = Path.Combine(
+            Path.GetTempPath(),
+            $"cv-generate-flow-handler-{Guid.NewGuid():N}");
+
+        public TestAgentRunEventStreamService()
+        {
+            var redactor = new AgentRunEventRedactor();
+            Service = new AgentRunEventStreamService(
+                new AgentRunEventStore(_directory, redactor),
+                redactor);
+        }
+
+        public AgentRunEventStreamService Service { get; }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(_directory))
+            {
+                Directory.Delete(_directory, recursive: true);
+            }
         }
     }
 

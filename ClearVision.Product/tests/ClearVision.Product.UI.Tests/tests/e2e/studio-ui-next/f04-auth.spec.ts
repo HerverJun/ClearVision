@@ -248,10 +248,12 @@ test('F04 auth guards reject role/profile and external return routes', async ({ 
   for (const path of ['/projects', '/results']) {
     await expect(navigation.locator(`[data-product-nav="${path}"]`)).toBeVisible();
   }
-  await expect(page.locator('[data-product-more]')).toHaveCount(0);
-  await expect(page.locator('[data-product-nav="/overview"]')).toHaveCount(0);
-  await expect(page.locator('[data-product-nav="/operators"]')).toHaveCount(0);
-  await expect(page.locator('[data-product-nav="/about"]')).toHaveCount(0);
+  const more = page.locator('[data-product-more]');
+  await expect(more).toHaveCount(1);
+  await more.locator('summary').click();
+  for (const path of ['/overview', '/operators', '/about']) {
+    await expect(more.locator(`[data-product-nav="${path}"]`)).toBeVisible();
+  }
   await expect(page.locator('[data-product-nav="/diagnostics"]')).toHaveCount(0);
   await expect(page.locator('[data-product-nav="/stations"]')).toHaveCount(0);
   await page.getByRole('button', { name: '退出', exact: true }).click();
@@ -281,36 +283,42 @@ test('F04 product shell keeps the approved navigation stable across viewport and
       state.validTokens.add(token);
       await installStartup(page, token);
       await installAuthFixture(page, state);
-      await page.goto('/studio/index.html#/projects');
-      await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
-      await expect(page.locator('[data-product-nav="/projects"]')).toBeVisible();
-      await expect(page.locator('[data-product-nav="/results"]')).toBeVisible();
-      await expect(page.locator('[data-product-nav="/diagnostics"]')).toHaveCount(0);
+      try {
+        await page.goto('/studio/index.html#/projects');
+        await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
+        await expect(page.locator('[data-product-nav="/projects"]')).toBeVisible();
+        await expect(page.locator('[data-product-nav="/results"]')).toBeVisible();
+        const more = page.locator('[data-product-more]');
+        await expect(more).toHaveCount(1);
+        await more.locator('summary').click();
+        await expect(more.locator('[data-product-nav="/diagnostics"]')).toBeVisible();
 
-      const projection = await page.evaluate(() => ({
-        dpr: window.devicePixelRatio,
-        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        shellCount: document.querySelectorAll('[data-product-shell="ready"]').length,
-        leaveOwnerCount: document.querySelector('[data-product-shell]')
-          ?.getAttribute('data-leave-guard-owner-count')
-      }));
-      expect(projection, `${viewport.width}x${viewport.height}@${deviceScaleFactor}`).toEqual({
-        dpr: deviceScaleFactor,
-        horizontalOverflow: 0,
-        shellCount: 1,
-        leaveOwnerCount: '1'
-      });
-      expect(runtimeErrors, `${viewport.width}x${viewport.height}@${deviceScaleFactor}`)
-        .toEqual({ consoleErrors: [], pageErrors: [] });
-      if (hasF04VisualEvidenceTarget()) {
-        await captureF04VisualEvidence(page, {
-          scenario: 'shell-matrix',
-          viewport,
-          runtimeErrors,
-          notes: ['Browser-emulated DPR evidence; not native WebView2 DPI evidence.']
+        const projection = await page.evaluate(() => ({
+          dpr: window.devicePixelRatio,
+          horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          shellCount: document.querySelectorAll('[data-product-shell="ready"]').length,
+          leaveOwnerCount: document.querySelector('[data-product-shell]')
+            ?.getAttribute('data-leave-guard-owner-count')
+        }));
+        expect(projection, `${viewport.width}x${viewport.height}@${deviceScaleFactor}`).toEqual({
+          dpr: deviceScaleFactor,
+          horizontalOverflow: 0,
+          shellCount: 1,
+          leaveOwnerCount: '1'
         });
+        expect(runtimeErrors, `${viewport.width}x${viewport.height}@${deviceScaleFactor}`)
+          .toEqual({ consoleErrors: [], pageErrors: [] });
+        if (hasF04VisualEvidenceTarget()) {
+          await captureF04VisualEvidence(page, {
+            scenario: 'shell-matrix',
+            viewport,
+            runtimeErrors,
+            notes: ['Browser-emulated DPR evidence; not native WebView2 DPI evidence.']
+          });
+        }
+      } finally {
+        await context.close();
       }
-      await context.close();
     }
   }
 });

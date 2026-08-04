@@ -171,7 +171,7 @@ async function bootSettings(
   let currentSettings = fullSettingsPayload();
   let currentStation = stationSettingsPayload();
   let currentAiKey = 'fixture-ai-key';
-  await installF02BrowserStartup(page);
+  await installF02BrowserStartup(page, { 'Studio2.Settings': true });
   await page.route('**/health', async route => {
     audit.push(auditF02Request(route.request()));
     await fulfillF02Json(route, 200, { status: 'Healthy', port: 5177 }, fixtureSchema);

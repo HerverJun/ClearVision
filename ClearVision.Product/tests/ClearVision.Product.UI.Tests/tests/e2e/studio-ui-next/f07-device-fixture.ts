@@ -146,7 +146,7 @@ export async function installF07DeviceFixture(page: Page, role: 'Admin' | 'Engin
   let activeCameraId = 'cam-fixture';
   let binding = cameraBinding(true);
 
-  await installF02BrowserStartup(page);
+  await installF02BrowserStartup(page, { 'Studio2.Settings': true });
   await page.route('**/health', async route => {
     audit.push(auditF02Request(route.request()));
     await fulfillF07Json(route, 200, { status: 'Healthy', port: 5177 });
