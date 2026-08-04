@@ -439,6 +439,11 @@ function classifyConsoleErrors(consoleErrors, productPage, finalJourney) {
     Number(finalJourney?.expectedConsoleErrors?.responseLoss || 0);
   const expectedResponseLossMessage = 'Failed to load resource: the server responded with a status of 599 (Unknown)';
   let remainingExpectedResponseLoss = expectedResponseLossCount;
+  const expectedAdmissionProjectionConflictCount =
+    Number(finalJourney?.expectedConsoleErrors?.admissionProjectionConflict || 0);
+  const expectedAdmissionProjectionConflictMessage =
+    'Failed to load resource: the server responded with a status of 409 (Conflict)';
+  let remainingExpectedAdmissionProjectionConflicts = expectedAdmissionProjectionConflictCount;
   const ignoredExpected = [];
   const meaningful = [];
 
@@ -448,6 +453,10 @@ function classifyConsoleErrors(consoleErrors, productPage, finalJourney) {
       ignoredExpected.push(message);
     } else if (remainingExpectedResponseLoss > 0 && message === expectedResponseLossMessage) {
       remainingExpectedResponseLoss -= 1;
+      ignoredExpected.push(message);
+    } else if (remainingExpectedAdmissionProjectionConflicts > 0 &&
+      message === expectedAdmissionProjectionConflictMessage) {
+      remainingExpectedAdmissionProjectionConflicts -= 1;
       ignoredExpected.push(message);
     } else {
       meaningful.push(message);
@@ -4547,7 +4556,19 @@ async function main() {
         const url = new URL(response.url());
         if (url.origin === `http://localhost:${webPort}` && url.pathname.startsWith('/api/') &&
           response.status() >= 400) {
-          responseAudit.push({ method: response.request().method(), path: url.pathname, status: response.status() });
+          let body;
+          try {
+            body = response.request().postDataJSON();
+          } catch {
+            body = null;
+          }
+          responseAudit.push({
+            method: response.request().method(),
+            path: url.pathname,
+            status: response.status(),
+            clientSnapshotId: typeof body?.clientSnapshotId === 'string'
+              ? body.clientSnapshotId : null
+          });
         }
       });
       evidence.targetUrl = await navigateWithAuthenticatedSession(
@@ -4571,10 +4592,6 @@ async function main() {
         soakCycles
       });
       evidence.finalJourney.httpFailureResponses = responseAudit;
-      evidence.finalJourney.expectedConsoleErrors = {
-        responseLoss: responseAudit.filter(item => item.status === 599).length,
-        notFound: responseAudit.filter(item => item.status === 404).length
-      };
       const finalRequests = runtimeErrors.requests
         .map(item => {
           const url = new URL(item.url);
@@ -4610,6 +4627,18 @@ async function main() {
       requestAudit.admissionProjectionRefreshPosts =
         requestAudit.admissionPosts - requestAudit.formalAdmissionPosts;
       evidence.finalJourney.requestAudit = requestAudit;
+      const admissionProjectionConflictCount = responseAudit.filter(item =>
+        item.method === 'POST' &&
+        item.path === '/api/inspection/admission' &&
+        item.status === 409 &&
+        item.clientSnapshotId &&
+        !formalRunSnapshotIds.has(item.clientSnapshotId)
+      ).length;
+      evidence.finalJourney.expectedConsoleErrors = {
+        responseLoss: responseAudit.filter(item => item.status === 599).length,
+        notFound: responseAudit.filter(item => item.status === 404).length,
+        admissionProjectionConflict: admissionProjectionConflictCount
+      };
       if (finalJourneyPhase === 'CREATE_RUN_LOGOUT') {
         assert(requestAudit.setupAdminPosts === 1 && requestAudit.createPosts === 1 &&
           requestAudit.operationGets === 1 && requestAudit.formalAdmissionPosts === 1 &&
