@@ -283,6 +283,29 @@ public sealed class VisionAgentBuildOrchestratorTests
         outcome.Result.BuildResult.PublicWarnings.Should().Contain("safe_scaffold_requires_user_review");
     }
 
+    [Fact(DisplayName = "Build application should admit a Blob-based robot guidance route")]
+    public async Task BuildAsync_BlobRobotGuidance_ShouldPassRouteAdmission()
+    {
+        var applicationService = CreateBuildApplicationService(new CapturingAgentRunEventSink());
+        var plan = Plan(
+            "template_location",
+            ["ImageAcquisition", "RoiManager", "Thresholding", "BlobAnalysis", "ResultJudgment", "ResultOutput"],
+            "Build a blob-analysis robot screw-driving guidance workflow.");
+
+        var outcome = await applicationService.BuildAsync(
+            BuildCommand.FromGenerationRequest(
+                Request(plan, requirementMode: AiRequirementModes.Draft),
+                transport: BuildCommandTransports.Internal,
+                persistResult: false),
+            CancellationToken.None);
+
+        outcome.Result.Success.Should().BeTrue();
+        outcome.Result.Flow.Should().NotBeNull();
+        outcome.Result.BuildResult.Should().NotBeNull();
+        outcome.Result.BuildResult!.RouteSemanticsSatisfied.Should().BeTrue();
+        outcome.Result.BuildResult.ApplyGate.ApplyBlockers.Should().NotContain("route_missing_task_processor");
+    }
+
     [Fact(DisplayName = "BuildFromPlan strawberry draft should append a safe terminal output and round-trip the canvas flow")]
     public async Task BuildAsync_StrawberryDraftWithoutTerminalOutput_ShouldProduceEditableRoundTripFlow()
     {
