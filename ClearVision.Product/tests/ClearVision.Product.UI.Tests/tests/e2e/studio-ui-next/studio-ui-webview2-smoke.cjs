@@ -2706,6 +2706,7 @@ async function verifyProductPage(
         !(item.method === 'GET' && url.pathname === '/api/auth/setup-status') &&
         url.pathname !== '/api/auth/me' &&
         !(item.method === 'GET' && url.pathname === '/api/cameras/bindings') &&
+        !(item.method === 'GET' && url.pathname === '/api/projects') &&
         !(item.method === 'GET' && url.pathname === '/api/projects/recent' && url.search === '?count=5') &&
         !(url.pathname === '/api/operators/library' && url.search === '?includeCompatibility=true') &&
         !/^\/api\/operators\/[^/]+\/metadata$/i.test(url.pathname) &&
@@ -2721,7 +2722,6 @@ async function verifyProductPage(
         !/^\/api\/preview-artifacts\/[A-Za-z0-9_-]{43}$/.test(url.pathname) &&
         !/^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
           .test(url.pathname) &&
-        !(formalRun && url.pathname === '/api/projects') &&
         !(formalRun && expectedRunPaths.includes(url.pathname)) &&
         !(formalRun && item.method === 'GET' &&
           /^\/api\/inspection\/history\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/evidence\/manifest$/i.test(url.pathname)) &&
