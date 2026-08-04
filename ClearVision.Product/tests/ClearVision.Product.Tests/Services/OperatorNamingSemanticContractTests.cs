@@ -83,6 +83,31 @@ public sealed class OperatorNamingSemanticContractTests
         };
 
     [Fact]
+    public void OperatorDtoType_ShouldWriteStableNameAndReadLegacyNumericValue()
+    {
+        var json = JsonSerializer.Serialize(new OperatorDto
+        {
+            Type = OperatorType.TemplateMatching,
+            InputPorts =
+            [
+                new PortDto { Direction = PortDirection.Input, DataType = PortDataType.Image }
+            ]
+        });
+        using var document = JsonDocument.Parse(json);
+
+        document.RootElement.GetProperty(nameof(OperatorDto.Type)).GetString()
+            .Should().Be(nameof(OperatorType.TemplateMatching));
+        var port = document.RootElement.GetProperty(nameof(OperatorDto.InputPorts))[0];
+        port.GetProperty(nameof(PortDto.Direction)).GetString().Should().Be(nameof(PortDirection.Input));
+        port.GetProperty(nameof(PortDto.DataType)).GetString().Should().Be(nameof(PortDataType.Image));
+
+        var legacy = JsonSerializer.Deserialize<OperatorDto>("""{"Type":7,"InputPorts":[{"Direction":0,"DataType":0}]}""");
+        legacy!.Type.Should().Be(OperatorType.TemplateMatching);
+        legacy.InputPorts.Single().Direction.Should().Be(PortDirection.Input);
+        legacy.InputPorts.Single().DataType.Should().Be(PortDataType.Image);
+    }
+
+    [Fact]
     public void SourceRuntimeAndAiCatalog_ShouldExposeTheSameCorrectedDisplayNames()
     {
         var scanned = new OperatorMetadataScanner().Scan();
