@@ -79,12 +79,33 @@ function redactedRuntimeErrors(runtimeErrors) {
   };
 }
 
+function isExpectedStationStreamCancellation(request) {
+  try {
+    const url = new URL(request.url);
+    return request.method === 'GET' &&
+      url.pathname === '/api/stations/events' &&
+      request.errorText === 'net::ERR_ABORTED';
+  } catch {
+    return false;
+  }
+}
+
 function recordRuntimeErrors(evidence, runtimeErrors) {
   const diagnostics = redactedRuntimeErrors(runtimeErrors);
+  const expectedRequestCancellations = runtimeErrors.requestFailures
+    .filter(isExpectedStationStreamCancellation)
+    .map(request => ({
+      method: request.method,
+      path: '/api/stations/events',
+      errorText: redactSensitiveText(request.errorText)
+    }));
   evidence.runtimeErrors = diagnostics;
+  evidence.expectedRequestCancellations = expectedRequestCancellations;
   // Keep evidence aliases independent so recursive redaction does not label them as circular.
   evidence.meaningfulConsoleErrors = [...diagnostics.consoleErrors];
-  evidence.meaningfulRequestFailures = diagnostics.requestFailures.map(failure => ({ ...failure }));
+  evidence.meaningfulRequestFailures = diagnostics.requestFailures
+    .filter((_, index) => !isExpectedStationStreamCancellation(runtimeErrors.requestFailures[index]))
+    .map(failure => ({ ...failure }));
   return diagnostics;
 }
 
@@ -436,8 +457,8 @@ async function main() {
       `Operator pilot browser console errors: ${runtimeErrors.consoleErrors.join(' | ')}`);
     assert(runtimeErrors.pageErrors.length === 0,
       `Operator pilot browser page errors: ${runtimeErrors.pageErrors.join(' | ')}`);
-    assert(runtimeErrors.requestFailures.length === 0,
-      `Operator pilot browser request failures: ${safeJson(runtimeDiagnostics.requestFailures)}`);
+    assert(evidence.meaningfulRequestFailures.length === 0,
+      `Operator pilot browser request failures: ${safeJson(evidence.meaningfulRequestFailures)}`);
 
     evidence.status = 'pass';
     evidence.completedAtUtc = new Date().toISOString();
