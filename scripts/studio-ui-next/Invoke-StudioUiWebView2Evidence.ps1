@@ -660,7 +660,7 @@ $runtimeRootRemoved = -not (Test-Path -LiteralPath $runtimeRoot)
 $webPortReleased = Test-TcpPortAvailable -Port $WebPort
 $cdpPortReleased = Test-TcpPortAvailable -Port $CdpPort
 $startupRecords = [System.Collections.Generic.List[object]]::new()
-foreach ($logFile in Get-ChildItem -LiteralPath $hostLogs -Recurse -File -Filter "*-desktop*.log" -ErrorAction SilentlyContinue) {
+foreach ($logFile in Get-ChildItem -LiteralPath $hostLogs -Recurse -File -Filter "$RunName-desktop*.log" -ErrorAction SilentlyContinue) {
     foreach ($line in Get-Content -LiteralPath $logFile.FullName -Encoding UTF8) {
         $marker = "[StudioStartup] "
         $markerIndex = $line.IndexOf($marker, [System.StringComparison]::Ordinal)
