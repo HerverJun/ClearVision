@@ -100,10 +100,8 @@ internal static class StudioStartupProfileCatalog
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        var selectedProfile = string.IsNullOrWhiteSpace(requestedProfile)
-            ? options.StartupProfile
-            : requestedProfile;
-        if (string.IsNullOrWhiteSpace(selectedProfile))
+        var selectedProfile = requestedProfile ?? options.StartupProfile;
+        if (selectedProfile is null)
         {
             return ResolveLegacyTruthTable(options);
         }

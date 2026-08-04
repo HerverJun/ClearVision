@@ -116,6 +116,8 @@ public class WebView2HostTests
     [Theory]
     [InlineData("UNKNOWN_PROFILE")]
     [InlineData(StudioStartupProfileCatalog.IsolatedTruthTable)]
+    [InlineData("")]
+    [InlineData("   ")]
     public void StudioStartupProfileCatalog_ShouldRejectUnknownConfiguredProfiles(
         string requestedProfile)
     {
@@ -222,6 +224,8 @@ public class WebView2HostTests
     [InlineData(null, true)]
     [InlineData(StudioStartupProfileCatalog.NextDefaultCandidate, true)]
     [InlineData(StudioStartupProfileCatalog.LegacyFallback, true)]
+    [InlineData("", false)]
+    [InlineData("   ", false)]
     [InlineData("UNKNOWN_PROFILE", false)]
     [InlineData(StudioStartupProfileCatalog.IsolatedTruthTable, false)]
     public void StudioOptionsValidator_ShouldAcceptOnlyKnownConfiguredProfiles(

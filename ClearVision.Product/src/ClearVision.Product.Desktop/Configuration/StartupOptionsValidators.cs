@@ -8,7 +8,7 @@ public sealed class StudioOptionsValidator : IValidateOptions<StudioOptions>
 {
     public ValidateOptionsResult Validate(string? name, StudioOptions options)
     {
-        if (string.IsNullOrWhiteSpace(options.StartupProfile))
+        if (options.StartupProfile is null)
         {
             // Keep the pre-F09 truth-table behavior for isolated tests and
             // existing deployments that have not adopted a named profile yet.
