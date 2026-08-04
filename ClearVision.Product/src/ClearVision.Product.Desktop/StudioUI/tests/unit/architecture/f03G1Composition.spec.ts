@@ -33,7 +33,7 @@ describe('F03 G1 composition and startup flag guards', () => {
     expect(runtime).toContain('workspace.dispose();');
   });
 
-  it('uses the named F09 candidate and exposes one startup flag mapping', () => {
+  it('uses the named F09 default and exposes one startup flag mapping', () => {
     const settings = JSON.parse(read(join(
       repositoryRoot,
       'ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json'
@@ -47,7 +47,7 @@ describe('F03 G1 composition and startup flag guards', () => {
       'ClearVision.Product/src/ClearVision.Product.Desktop/WebView2Host.cs'
     ));
 
-    expect(settings.Studio.StartupProfile).toBe('NEXT_DEFAULT_CANDIDATE');
+    expect(settings.Studio.StartupProfile).toBe('NEXT_DEFAULT');
     expect(settings.Studio.StudioUiEnabled).toBe(true);
     expect(settings.Studio.WorkspaceCapabilityEnabled).toBe(true);
     expect(options).toContain('StudioUiEnabled { get; set; } = false');

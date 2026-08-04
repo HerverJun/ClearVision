@@ -162,7 +162,7 @@ onMounted(() => runtime.preferences.apply());
     :data-workspace-mode="workspaceMode"
     :data-leave-guard-phase="leaveGuard.projection.phase"
     :data-leave-guard-owner-count="leaveGuard.diagnostics.ownerCount"
-    :data-project-command-phase="runtime.projectLifecycle.projection.phase"
+    :data-project-command-phase="runtime.projectLifecycle?.projection.phase ?? 'unmounted'"
   >
     <a
       class="product-layout__skip-link"

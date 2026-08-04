@@ -7,7 +7,7 @@ param(
     [int]$BaseWebPort = 6000,
     [int]$BaseCdpPort = 10123,
     [ValidateSet("NEXT_DEFAULT_CANDIDATE", "NEXT_DEFAULT")]
-    [string]$ExpectedConfiguredProfile = "NEXT_DEFAULT_CANDIDATE",
+    [string]$ExpectedConfiguredProfile = "NEXT_DEFAULT",
     [int]$SoakCycles = 20,
     [switch]$NoBuild
 )

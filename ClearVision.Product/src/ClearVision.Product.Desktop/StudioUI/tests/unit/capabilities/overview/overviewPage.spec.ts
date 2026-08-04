@@ -86,6 +86,7 @@ describe('Overview page', () => {
     expect(wrapper.text()).toContain('operator-a');
     expect(wrapper.text()).toContain('操作员');
     expect(wrapper.text()).toContain('最近工程');
+    expect(wrapper.findAll('a').some(link => link.text().includes('诊断'))).toBe(false);
     expect(requestedPaths).toEqual(['projects/recent?count=5']);
     expect(requestedPaths).not.toContain('/health');
     expect(requestedPaths).not.toContain('auth/me');

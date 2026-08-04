@@ -24,6 +24,7 @@ public partial class MainForm : Form
     private readonly WebView2Host _webView2Host;
     private readonly Handlers.WebMessageHandler? _messageHandler;
     private readonly EnterPhotoelectricTriggerInputService? _triggerInputService;
+    private readonly DesktopShutdownDiagnostics _shutdownDiagnostics;
     private bool _allowClose;
     private bool _closingInProgress;
     private bool _disposedWebViewHost;
@@ -42,6 +43,7 @@ public partial class MainForm : Form
         // 创建 WebView2 宿主
         _messageHandler = Program.ServiceProvider?.GetService<Handlers.WebMessageHandler>();
         _triggerInputService = Program.ServiceProvider?.GetService<EnterPhotoelectricTriggerInputService>();
+        _shutdownDiagnostics = Program.ShutdownDiagnostics;
         var studioOptions = Program.ServiceProvider?.GetService<IOptions<StudioOptions>>()?.Value
             ?? new StudioOptions();
         _webView2Host = new WebView2Host(_webView, _messageHandler, studioOptions);
@@ -169,24 +171,32 @@ public partial class MainForm : Form
         e.Cancel = true;
         _closingInProgress = true;
 
+        var flushStage = _shutdownDiagnostics.BeginStage("flush-start");
         try
         {
             var timeout = e.CloseReason == CloseReason.WindowsShutDown
                 ? TimeSpan.FromSeconds(2)
                 : TimeSpan.FromSeconds(5);
-            var flushed = await FlushWorkspaceBeforeCloseAsync(timeout);
-            if (!flushed && e.CloseReason != CloseReason.WindowsShutDown)
+            var flush = await FlushWorkspaceBeforeCloseAsync(timeout);
+            flushStage.Complete(flush.Status, flush.Error);
+            if (!flush.Succeeded)
             {
-                var choice = MessageBox.Show(
-                    ForceCloseWarning,
-                    "ClearVision",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning,
-                    MessageBoxDefaultButton.Button2);
-                if (choice != DialogResult.Yes)
+                var unattended = IsUnattendedShutdownEnabled();
+                if (e.CloseReason == CloseReason.WindowsShutDown || unattended)
+                {
+                    _shutdownDiagnostics.MarkForcedExit(
+                        unattended
+                            ? $"unattended-flush-{flush.Status.ToString().ToLowerInvariant()}"
+                            : $"windows-shutdown-flush-{flush.Status.ToString().ToLowerInvariant()}");
+                }
+                else if (PromptForceClose() != DialogResult.Yes)
                 {
                     _closingInProgress = false;
                     return;
+                }
+                else
+                {
+                    _shutdownDiagnostics.MarkForcedExit("user-confirmed-force-close");
                 }
             }
 
@@ -195,15 +205,19 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            flushStage.Complete(DesktopShutdownStageStatus.Unknown, ex.ToString());
             System.Diagnostics.Debug.WriteLine($"[MainForm] Shutdown coordination failed: {ex}");
-            var choice = MessageBox.Show(
-                ForceCloseWarning,
-                "ClearVision",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button2);
-            if (choice == DialogResult.Yes)
+            if (IsUnattendedShutdownEnabled())
             {
+                _shutdownDiagnostics.MarkForcedExit("unattended-shutdown-coordination-exception");
+                _allowClose = true;
+                BeginInvoke(new Action(Close));
+                return;
+            }
+
+            if (PromptForceClose() == DialogResult.Yes)
+            {
+                _shutdownDiagnostics.MarkForcedExit("user-confirmed-force-close-after-exception");
                 _allowClose = true;
                 BeginInvoke(new Action(Close));
                 return;
@@ -211,9 +225,13 @@ public partial class MainForm : Form
 
             _closingInProgress = false;
         }
+        finally
+        {
+            flushStage.Dispose();
+        }
     }
 
-    private async Task<bool> FlushWorkspaceBeforeCloseAsync(TimeSpan timeout)
+    private async Task<FlushWorkspaceResult> FlushWorkspaceBeforeCloseAsync(TimeSpan timeout)
     {
         try
         {
@@ -222,9 +240,17 @@ public partial class MainForm : Form
             var startResult = await ExecuteScriptWithTimeoutAsync(
                 BuildAiWorkspaceFlushStartScript(operationId, "host_close"),
                 timeout);
+            if (startResult is null)
+            {
+                return RecordFlushFailure(
+                    DesktopShutdownStageStatus.Timeout,
+                    "WebView2 did not acknowledge the flush start script.");
+            }
             if (!ParseBooleanScriptResult(startResult))
             {
-                return false;
+                return RecordFlushFailure(
+                    DesktopShutdownStageStatus.Failed,
+                    "WebView2 rejected the flush start script.");
             }
 
             while (stopwatch.Elapsed < timeout)
@@ -236,7 +262,7 @@ public partial class MainForm : Form
                 var status = ParseAiWorkspaceFlushStatus(rawStatus);
                 if (status.IsTerminal)
                 {
-                    return status.Succeeded;
+                    return RecordFlushStatus(status);
                 }
 
                 var delay = TimeSpan.FromMilliseconds(Math.Min(
@@ -245,11 +271,134 @@ public partial class MainForm : Form
                 await Task.Delay(delay);
             }
 
-            return false;
+            return RecordFlushFailure(
+                DesktopShutdownStageStatus.Timeout,
+                "Workspace flush did not reach a terminal state before the timeout.");
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] workspace flush before close failed: {ex}");
+            return RecordFlushFailure(DesktopShutdownStageStatus.Unknown, ex.ToString());
+        }
+    }
+
+    private FlushWorkspaceResult RecordFlushStatus(AiWorkspaceFlushStatus status)
+    {
+        var workspaceStatus = StageStatusForFlushOutcome(status.WorkspaceOutcome, DesktopShutdownStageStatus.Unknown);
+        var aiStatus = StageStatusForFlushOutcome(status.AiOutcome, DesktopShutdownStageStatus.Unknown);
+        _shutdownDiagnostics.RecordStage(
+            "workspace-flush",
+            workspaceStatus,
+            TimeSpan.Zero,
+            status.Error,
+            _shutdownDiagnostics.ForcedExit);
+        _shutdownDiagnostics.RecordStage(
+            "ai-flush",
+            aiStatus,
+            TimeSpan.Zero,
+            status.Error,
+            _shutdownDiagnostics.ForcedExit);
+        return new(
+            status.Succeeded,
+            status.Succeeded ? DesktopShutdownStageStatus.Succeeded : StageStatusForFlushOutcome(status.Outcome, DesktopShutdownStageStatus.Unknown),
+            status.Error);
+    }
+
+    private FlushWorkspaceResult RecordFlushFailure(DesktopShutdownStageStatus status, string error)
+    {
+        _shutdownDiagnostics.RecordStage(
+            "workspace-flush",
+            status,
+            TimeSpan.Zero,
+            error,
+            _shutdownDiagnostics.ForcedExit);
+        _shutdownDiagnostics.RecordStage(
+            "ai-flush",
+            status,
+            TimeSpan.Zero,
+            error,
+            _shutdownDiagnostics.ForcedExit);
+        return new(false, status, error);
+    }
+
+    private static DesktopShutdownStageStatus StageStatusForFlushOutcome(
+        string outcome,
+        DesktopShutdownStageStatus fallback)
+    {
+        return outcome.Trim().ToLowerInvariant() switch
+        {
+            "succeeded" or "completed" => DesktopShutdownStageStatus.Succeeded,
+            "skipped" => DesktopShutdownStageStatus.Skipped,
+            "failed" => DesktopShutdownStageStatus.Failed,
+            "timeout" => DesktopShutdownStageStatus.Timeout,
+            "unknown" => DesktopShutdownStageStatus.Unknown,
+            _ => fallback
+        };
+    }
+
+    private DialogResult PromptForceClose()
+    {
+        using var stage = _shutdownDiagnostics.BeginStage("messagebox-confirmation");
+        try
+        {
+            var choice = MessageBox.Show(
+                ForceCloseWarning,
+                "ClearVision",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+            stage.Complete(
+                choice == DialogResult.Yes
+                    ? DesktopShutdownStageStatus.Succeeded
+                    : DesktopShutdownStageStatus.Skipped,
+                choice == DialogResult.Yes ? null : "user-declined-force-close");
+            return choice;
+        }
+        catch (Exception ex)
+        {
+            stage.Complete(DesktopShutdownStageStatus.Failed, ex.ToString());
+            throw;
+        }
+    }
+
+    private static bool IsUnattendedShutdownEnabled()
+    {
+        if (!string.Equals(
+                Environment.GetEnvironmentVariable(DesktopShutdownDiagnostics.UnattendedShutdownEnvironmentVariable),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var paths = new[]
+        {
+            Environment.GetEnvironmentVariable(DesktopShutdownDiagnostics.DiagnosticsPathEnvironmentVariable),
+            Environment.GetEnvironmentVariable("Database__Path"),
+            Environment.GetEnvironmentVariable("CV_WEBVIEW2_USER_DATA_FOLDER"),
+            Environment.GetEnvironmentVariable("CV_CONVERSATION_STORE_ROOT"),
+            Environment.GetEnvironmentVariable("CV_AGENT_RUN_EVENT_STORE"),
+            Environment.GetEnvironmentVariable("CV_AI_HANDOFF_STORE_ROOT"),
+            Environment.GetEnvironmentVariable("CV_DESKTOP_LOG_PATH")
+        };
+        return paths.All(IsUnderDotTmp);
+    }
+
+    private static bool IsUnderDotTmp(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        try
+        {
+            var fullPath = Path.GetFullPath(path.Trim());
+            var root = Path.GetPathRoot(fullPath) ?? string.Empty;
+            var relative = fullPath[root.Length..];
+            return relative.Split(
+                    new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                    StringSplitOptions.RemoveEmptyEntries)
+                .Any(part => string.Equals(part, ".tmp", StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
             return false;
         }
     }
@@ -281,34 +430,50 @@ public partial class MainForm : Form
                 const store = window[storeName] || (window[storeName] = {});
                 store[operationId] = { status: 'pending', value: false, error: '', startedAt: Date.now() };
                 try {
+                    const skipped = { status: 'skipped', value: true, error: '' };
                     const flushers = [
-                        window.__clearVisionFlushProjectWorkspace,
-                        window.__clearVisionFlushAiPanelWorkspace
-                    ].filter(flush => typeof flush === 'function');
+                        { name: 'workspace', flush: window.__clearVisionFlushProjectWorkspace },
+                        { name: 'ai', flush: window.__clearVisionFlushAiPanelWorkspace }
+                    ].filter(item => typeof item.flush === 'function');
                     if (flushers.length === 0) {
                         store[operationId] = {
                             status: 'completed',
                             value: true,
                             error: '',
+                            workspace: skipped,
+                            ai: skipped,
                             startedAt: Date.now()
                         };
                         return true;
                     }
 
-                    Promise.all(flushers.map(flush => Promise.resolve(flush(reason))))
-                        .then(values => {
+                    const invoke = item => Promise.resolve()
+                        .then(() => item.flush(reason))
+                        .then(value => ({
+                            name: item.name,
+                            status: 'completed',
+                            value: value === true,
+                            error: ''
+                        }))
+                        .catch(error => ({
+                            name: item.name,
+                            status: 'failed',
+                            value: false,
+                            error: String(error && (error.message || error) || 'unknown')
+                        }));
+                    Promise.all(flushers.map(invoke))
+                        .then(results => {
+                            const workspace = results.find(result => result.name === 'workspace') || skipped;
+                            const ai = results.find(result => result.name === 'ai') || skipped;
+                            const succeeded = [workspace, ai].every(result =>
+                                result.status === 'completed' && result.value === true ||
+                                result.status === 'skipped');
                             store[operationId] = {
                                 status: 'completed',
-                                value: values.every(value => value === true),
-                                error: '',
-                                startedAt: Date.now()
-                            };
-                        })
-                        .catch(error => {
-                            store[operationId] = {
-                                status: 'failed',
-                                value: false,
-                                error: String(error && (error.message || error) || 'unknown'),
+                                value: succeeded,
+                                error: results.filter(result => result.error).map(result => result.error).join('; '),
+                                workspace,
+                                ai,
                                 startedAt: Date.now()
                             };
                         });
@@ -362,6 +527,11 @@ public partial class MainForm : Form
 
     internal static AiWorkspaceFlushStatus ParseAiWorkspaceFlushStatus(string? rawResult)
     {
+        if (rawResult is null)
+        {
+            return AiWorkspaceFlushStatus.Unknown;
+        }
+
         if (string.IsNullOrWhiteSpace(rawResult))
         {
             return AiWorkspaceFlushStatus.Failed;
@@ -399,9 +569,12 @@ public partial class MainForm : Form
             {
                 var succeeded = root.TryGetProperty("value", out var valueElement) &&
                     valueElement.ValueKind == JsonValueKind.True;
-                return succeeded
-                    ? AiWorkspaceFlushStatus.Success
-                    : AiWorkspaceFlushStatus.Failed;
+                return FromStructuredFlushStatus(root, succeeded, "completed");
+            }
+
+            if (status == "failed")
+            {
+                return FromStructuredFlushStatus(root, succeeded: false, "failed");
             }
 
             return AiWorkspaceFlushStatus.Failed;
@@ -412,17 +585,76 @@ public partial class MainForm : Form
         }
     }
 
-    internal readonly record struct AiWorkspaceFlushStatus(bool IsTerminal, bool Succeeded)
+    private static AiWorkspaceFlushStatus FromStructuredFlushStatus(
+        JsonElement root,
+        bool succeeded,
+        string outcome)
     {
-        public static AiWorkspaceFlushStatus Pending { get; } = new(false, false);
-        public static AiWorkspaceFlushStatus Success { get; } = new(true, true);
-        public static AiWorkspaceFlushStatus Failed { get; } = new(true, false);
+        var workspaceOutcome = ReadFlushStageOutcome(root, "workspace", outcome);
+        var aiOutcome = ReadFlushStageOutcome(root, "ai", outcome);
+        var error = root.TryGetProperty("error", out var errorElement) &&
+            errorElement.ValueKind == JsonValueKind.String
+            ? errorElement.GetString()
+            : null;
+        return new(true, succeeded, outcome == "completed" && succeeded ? "succeeded" : "failed",
+            workspaceOutcome, aiOutcome, error);
     }
+
+    private static string ReadFlushStageOutcome(JsonElement root, string property, string fallback)
+    {
+        if (!root.TryGetProperty(property, out var stage) || stage.ValueKind != JsonValueKind.Object)
+        {
+            return fallback == "completed" ? "unknown" : fallback;
+        }
+
+        if (stage.TryGetProperty("status", out var statusElement) &&
+            statusElement.ValueKind == JsonValueKind.String)
+        {
+            var status = statusElement.GetString()?.Trim().ToLowerInvariant();
+            if (status is "pending" or "succeeded" or "completed" or "failed" or "timeout" or "unknown" or "skipped")
+            {
+                if (status is "completed" &&
+                    stage.TryGetProperty("value", out var valueElement) &&
+                    valueElement.ValueKind == JsonValueKind.False)
+                {
+                    return "failed";
+                }
+                return status == "completed" ? "succeeded" : status!;
+            }
+        }
+
+        return fallback == "completed" ? "unknown" : fallback;
+    }
+
+    internal readonly record struct AiWorkspaceFlushStatus(
+        bool IsTerminal,
+        bool Succeeded,
+        string Outcome,
+        string WorkspaceOutcome,
+        string AiOutcome,
+        string? Error)
+    {
+        public static AiWorkspaceFlushStatus Pending { get; } =
+            new(false, false, "pending", "pending", "pending", null);
+        public static AiWorkspaceFlushStatus Success { get; } =
+            new(true, true, "succeeded", "succeeded", "skipped", null);
+        public static AiWorkspaceFlushStatus Failed { get; } =
+            new(true, false, "failed", "failed", "failed", null);
+        public static AiWorkspaceFlushStatus Unknown { get; } =
+            new(true, false, "unknown", "unknown", "unknown", "WebView2 script did not return a result.");
+    }
+
+    private readonly record struct FlushWorkspaceResult(
+        bool Succeeded,
+        DesktopShutdownStageStatus Status,
+        string? Error);
 
     private async Task DisposeWebViewHostAsync()
     {
+        using var stage = _shutdownDiagnostics.BeginStage("webview-dispose");
         if (_disposedWebViewHost)
         {
+            stage.Complete(DesktopShutdownStageStatus.Skipped, "WebView2 host was already disposed.");
             return;
         }
 
@@ -431,10 +663,12 @@ public partial class MainForm : Form
         {
             _messageHandler?.Dispose();
             await _webView2Host.DisposeAsync();
+            stage.Complete(DesktopShutdownStageStatus.Succeeded);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] Shutdown cleanup failed: {ex}");
+            stage.Complete(DesktopShutdownStageStatus.Failed, ex.ToString());
         }
     }
 

@@ -283,15 +283,20 @@ public sealed class StudioUiArchitectureGuardTests
                      "SingleRun",
                      "KeepDatabase",
                      "ReuseDatabase",
-                     "AllowInitialAdminSetup",
-                     "DeferAuthToScenario",
-                     "SanitizeDesktopPath",
-                     "CV_DESKTOP_HTTP_PORT",
-                     "CV_WEBVIEW2_USER_DATA_FOLDER",
-                     "CV_CONVERSATION_STORE_ROOT",
-                     "CV_AGENT_RUN_EVENT_STORE",
-                     "CV_DESKTOP_LOG_PATH",
-                     "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+                      "AllowInitialAdminSetup",
+                      "DeferAuthToScenario",
+                      "SanitizeDesktopPath",
+                      "UnattendedShutdown",
+                      "CV_DESKTOP_HTTP_PORT",
+                      "CV_WEBVIEW2_USER_DATA_FOLDER",
+                      "CV_CONVERSATION_STORE_ROOT",
+                      "CV_AGENT_RUN_EVENT_STORE",
+                      "CV_AI_HANDOFF_STORE_ROOT",
+                      "CV_DESKTOP_LOG_PATH",
+                      "CV_DESKTOP_SHUTDOWN_DIAGNOSTICS_PATH",
+                      "CV_DESKTOP_UNATTENDED_SHUTDOWN",
+                      "Read-ShutdownDiagnostics",
+                      "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
                      "Remove-RepositoryTemporaryDirectory",
                      "-WindowStyle Hidden"
                  })
@@ -313,6 +318,9 @@ public sealed class StudioUiArchitectureGuardTests
         evidenceWrapper.Should().Contain("ReuseDatabase");
         evidenceWrapper.Should().Contain("FinalJourneyPhase");
         evidenceWrapper.Should().Contain("DeferAuthToScenario");
+        evidenceWrapper.Should().Contain("UnattendedShutdown");
+        evidenceWrapper.Should().Contain("shutdownDiagnostics");
+        evidenceWrapper.Should().Contain(".tmp");
         evidenceWrapper.Should().NotContain("Start-Process");
 
         var profileEvidence = File.ReadAllText(RepoPath(
@@ -342,6 +350,7 @@ public sealed class StudioUiArchitectureGuardTests
         rollbackEvidence.Should().Contain("missing-studio-assets");
         rollbackEvidence.Should().Contain("KeepDatabase");
         rollbackEvidence.Should().Contain("ReuseDatabase");
+        rollbackEvidence.Should().Contain("UnattendedShutdown");
         rollbackEvidence.Should().NotContain("Start-Process");
 
         var finalEvidence = File.ReadAllText(RepoPath(
@@ -397,7 +406,7 @@ public sealed class StudioUiArchitectureGuardTests
             .GetProperty("StartupProfile")
             .GetString()
             .Should()
-            .Be("NEXT_DEFAULT_CANDIDATE");
+            .Be("NEXT_DEFAULT");
         settings.RootElement
             .GetProperty("Studio")
             .GetProperty("StudioUiEnabled")

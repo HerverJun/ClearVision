@@ -84,7 +84,7 @@ export interface ProductLeaveGuardParticipant {
 }
 
 export interface CreateProductLeaveGuardOwnerOptions {
-  readonly projectLifecycle: ProjectLifecycleCommandOwner;
+  readonly projectLifecycle?: ProjectLifecycleCommandOwner;
   readonly workspace: WorkspaceRuntime;
   readonly runtimeWindow?: ProductLeaveGuardDiagnosticsWindow;
   readonly publishToWindow?: boolean;
@@ -216,7 +216,8 @@ export function createProductLeaveGuardOwner(
   }
 
   function currentProjectProtection(): ProductLeaveProtectionKind {
-    const projection = options.projectLifecycle.projection;
+    const projection = options.projectLifecycle?.projection;
+    if (!projection) return null;
     if (activeProjectCommandPhases.has(projection.phase)) return 'project-command-active';
     if (projection.phase === 'unknown-outcome') return 'project-command-unknown';
     if (projection.phase === 'conflict' && projection.command === 'update') return 'project-update-conflict';
@@ -283,7 +284,8 @@ export function createProductLeaveGuardOwner(
     state.requestCount += 1;
 
     const projectBefore = currentProjectProtection();
-    if (projectBefore === 'project-command-active' || projectBefore === 'project-command-unknown') {
+    if (options.projectLifecycle &&
+        (projectBefore === 'project-command-active' || projectBefore === 'project-command-unknown')) {
       const settled = await options.projectLifecycle.prepareForProtectedTransition(`leave-${reason}`);
       if (!isCurrent(generation)) return false;
       if (!settled) return block(currentProjectProtection() ?? projectBefore, generation);

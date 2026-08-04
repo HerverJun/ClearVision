@@ -44,6 +44,9 @@ static class Program
     private const string DesktopHttpPortEnvironmentVariable = "CV_DESKTOP_HTTP_PORT";
     private const string DesktopLogPathEnvironmentVariable = "CV_DESKTOP_LOG_PATH";
     private static IHost? _host;
+    private static readonly DesktopShutdownDiagnostics _shutdownDiagnostics =
+        DesktopShutdownDiagnostics.FromEnvironment();
+    private static Task<bool>? _stopWebServerTask;
     private static int _webPort = 0;
     private static IReadOnlyList<Mutex> _singleInstanceLeases = Array.Empty<Mutex>();
 
@@ -51,6 +54,7 @@ static class Program
     private static extern bool SetDllDirectory(string lpPathName);
 
     public static IServiceProvider? ServiceProvider => _host?.Services;
+    internal static DesktopShutdownDiagnostics ShutdownDiagnostics => _shutdownDiagnostics;
 
     [STAThread]
     static void Main()
@@ -120,8 +124,6 @@ static class Program
 
             var mainForm = new MainForm();
             System.Windows.Forms.Application.Run(mainForm);
-
-            StopWebServer().GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
@@ -133,16 +135,20 @@ static class Program
         }
         finally
         {
-            if (_host != null)
+            using var processExitStage = _shutdownDiagnostics.BeginStage("process-exit");
+            try
             {
-                try
-                {
-                    StopWebServer().GetAwaiter().GetResult();
-                }
-                catch (Exception stopEx)
-                {
-                    Debug.WriteLine($"Stop web server failed: {stopEx}");
-                }
+                var hostStopped = StopWebServer().GetAwaiter().GetResult();
+                processExitStage.Complete(
+                    hostStopped
+                        ? DesktopShutdownStageStatus.Succeeded
+                        : DesktopShutdownStageStatus.Failed,
+                    hostStopped ? null : "Kestrel host did not stop cleanly.");
+            }
+            catch (Exception stopEx)
+            {
+                processExitStage.Complete(DesktopShutdownStageStatus.Failed, stopEx.ToString());
+                Debug.WriteLine($"Stop web server failed: {stopEx}");
             }
 
             ReleaseSingleInstanceMutex();
@@ -550,13 +556,51 @@ static class Program
             : OutdatedVisionDatabaseDecision.Keep);
     }
 
-    static async Task StopWebServer()
+    static Task<bool> StopWebServer()
     {
-        if (_host != null)
+        return _stopWebServerTask ??= StopWebServerCoreAsync();
+    }
+
+    private static async Task<bool> StopWebServerCoreAsync()
+    {
+        using var stage = _shutdownDiagnostics.BeginStage("host-stop");
+        var host = _host;
+        if (host == null)
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-            await _host.StopAsync(cts.Token);
-            _host.Dispose();
+            stage.Complete(DesktopShutdownStageStatus.Skipped, "Kestrel host was not started.");
+            return true;
+        }
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        try
+        {
+            await host.StopAsync(cts.Token);
+            stage.Complete(DesktopShutdownStageStatus.Succeeded);
+            return true;
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            stage.Complete(
+                DesktopShutdownStageStatus.Timeout,
+                "Kestrel StopAsync exceeded the 60 second shutdown deadline.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            stage.Complete(DesktopShutdownStageStatus.Failed, ex.ToString());
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                host.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Dispose web server failed: {ex}");
+            }
+
             _host = null;
         }
     }

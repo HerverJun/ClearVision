@@ -31,6 +31,8 @@ describe('F04 G3C Project lifecycle architecture guards', () => {
     expect(files.filter(path => path.endsWith('projectLifecycleCommandOwner.ts'))).toHaveLength(1);
     const runtime = read(join(sourceRoot, 'app/productRuntime.ts'));
     expect(runtime.match(/createProjectLifecycleCommandOwner\(/g)).toHaveLength(1);
+    expect(runtime).toContain("authenticatedUser.role === 'Admin' || authenticatedUser.role === 'Engineer'");
+    expect(runtime).toContain('readonly projectLifecycle?: ProjectLifecycleCommandOwner;');
     expect(runtime).toContain('projectLifecycle.dispose');
     expect(runtime).toContain('leaveGuard.request(reason)');
     expect(runtime).toContain('projectLifecycle.reconcileAfterReauthentication');
@@ -73,7 +75,7 @@ describe('F04 G3C Project lifecycle architecture guards', () => {
       '../../../../ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json'
     ))) as { Studio: { StartupProfile: string; StudioUiEnabled: boolean; WorkspaceCapabilityEnabled: boolean } };
     expect(settings.Studio).toMatchObject({
-      StartupProfile: 'NEXT_DEFAULT_CANDIDATE',
+      StartupProfile: 'NEXT_DEFAULT',
       StudioUiEnabled: true,
       WorkspaceCapabilityEnabled: true
     });

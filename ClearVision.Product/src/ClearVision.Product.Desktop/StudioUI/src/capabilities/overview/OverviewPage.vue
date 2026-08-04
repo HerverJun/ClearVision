@@ -26,6 +26,8 @@ const recentProjectsQuery = createRecentProjectsQuery(runtime.queries);
 const recentProjectsState = computed(() => recentProjectsQuery.state.value);
 const session = computed(() => runtime.session.projection);
 const systemStatus = computed(() => runtime.systemStatus.projection);
+const canViewDiagnostics = computed(() => session.value.user?.role === 'Admin' ||
+  session.value.user?.role === 'Engineer');
 const systemItems = computed<readonly CvDescriptionItem[]>(() => [
   { key: 'port', label: '服务端口', value: systemStatus.value.health?.port ?? null },
   { key: 'message', label: '状态说明', value: systemStatus.value.message, span: 2 }
@@ -235,7 +237,10 @@ onBeforeUnmount(() => {
           <RouterLink to="/projects">
             <strong>工程</strong><span>查看工程列表和正式详情摘要</span>
           </RouterLink>
-          <RouterLink to="/diagnostics">
+          <RouterLink
+            v-if="canViewDiagnostics"
+            to="/diagnostics"
+          >
             <strong>诊断</strong><span>查看 StudioUI 与宿主诊断投影</span>
           </RouterLink>
           <RouterLink to="/about">

@@ -7,7 +7,7 @@ param(
     [int]$BaseWebPort = 5700,
     [int]$BaseCdpPort = 9823,
     [ValidateSet("NEXT_DEFAULT_CANDIDATE", "NEXT_DEFAULT")]
-    [string]$ExpectedConfiguredProfile = "NEXT_DEFAULT_CANDIDATE",
+    [string]$ExpectedConfiguredProfile = "NEXT_DEFAULT",
     [switch]$NoBuild,
     [switch]$KeepMissingAssetsRuntime
 )

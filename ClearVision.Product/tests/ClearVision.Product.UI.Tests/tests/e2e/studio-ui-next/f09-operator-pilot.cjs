@@ -409,8 +409,8 @@ async function main() {
     assert(projection.ownerLedger.studio?.mountCount === 1 &&
       projection.ownerLedger.studio?.activeRoot === 'studio-ui',
     `Operator pilot mounted an invalid Studio root: ${safeJson(projection.ownerLedger)}.`);
-    assert(projection.ownerLedger.projectLifecycle?.ownerCount === 1,
-      `Operator pilot did not retain one project lifecycle owner: ${safeJson(projection.ownerLedger)}.`);
+    assert(projection.ownerLedger.projectLifecycle === null,
+      `Operator pilot mounted a project lifecycle owner: ${safeJson(projection.ownerLedger)}.`);
     assert(projection.ownerLedger.leaveGuard?.ownerCount === 1,
       `Operator pilot did not retain one Leave Guard owner: ${safeJson(projection.ownerLedger)}.`);
     assert(projection.ownerLedger.workspace?.workspaceOwnerCount === 0,

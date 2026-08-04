@@ -27,13 +27,14 @@ param(
     [switch]$AllowInitialAdminSetup,
     [switch]$DeferAuthToScenario,
     [switch]$SanitizeDesktopPath,
+    [switch]$UnattendedShutdown,
     [switch]$NoBuild
 )
 
 $ErrorActionPreference = "Stop"
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repoRoot = Split-Path -Parent $scriptRoot
+$repoRoot = [System.IO.Path]::GetFullPath((Split-Path -Parent $scriptRoot))
 $project = Join-Path $repoRoot "ClearVision.Product/src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj"
 $uiTests = Join-Path $repoRoot "ClearVision.Product/tests/ClearVision.Product.UI.Tests"
 $nodeSmoke = if ([string]::IsNullOrWhiteSpace($NodeSmokePath)) {
@@ -91,6 +92,63 @@ $handoffArtifactRoot = if ([string]::IsNullOrWhiteSpace($HandoffArtifactStoreRoo
 } else {
     [System.IO.Path]::GetFullPath($HandoffArtifactStoreRoot)
 }
+$repositoryTemporaryRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot ".tmp"))
+$repositoryTemporaryPrefix = $repositoryTemporaryRoot.TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar) +
+    [System.IO.Path]::DirectorySeparatorChar
+
+function Assert-RepositoryTemporaryPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Label
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw "$Label must be non-empty."
+    }
+    $resolved = [System.IO.Path]::GetFullPath($Path)
+    if ([string]::Equals(
+            $resolved.TrimEnd(
+                [System.IO.Path]::DirectorySeparatorChar,
+                [System.IO.Path]::AltDirectorySeparatorChar),
+            $repositoryTemporaryRoot.TrimEnd(
+                [System.IO.Path]::DirectorySeparatorChar,
+                [System.IO.Path]::AltDirectorySeparatorChar),
+            [System.StringComparison]::OrdinalIgnoreCase) -or
+        $resolved.StartsWith($repositoryTemporaryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $resolved
+    }
+
+    throw "$Label must remain under the repository .tmp directory: $resolved"
+}
+
+$isolatedAuthDirectory = Assert-RepositoryTemporaryPath `
+    -Path $isolatedAuthDirectory `
+    -Label "Isolated auth directory"
+$isolatedDatabase = Assert-RepositoryTemporaryPath `
+    -Path $isolatedDatabase `
+    -Label "DatabasePath"
+$runtimeCleanupBoundary = Assert-RepositoryTemporaryPath `
+    -Path $runtimeCleanupBoundary `
+    -Label "RuntimeCleanupRoot"
+$webView2UserDataRoot = Assert-RepositoryTemporaryPath `
+    -Path $webView2UserDataRoot `
+    -Label "WebView2UserDataDirectory"
+$conversationRoot = Assert-RepositoryTemporaryPath `
+    -Path $conversationRoot `
+    -Label "ConversationStoreRoot"
+$agentRunRoot = Assert-RepositoryTemporaryPath `
+    -Path $agentRunRoot `
+    -Label "AgentRunStoreRoot"
+$handoffArtifactRoot = Assert-RepositoryTemporaryPath `
+    -Path $handoffArtifactRoot `
+    -Label "HandoffArtifactStoreRoot"
+$hostLogs = Assert-RepositoryTemporaryPath `
+    -Path $hostLogs `
+    -Label "HostLogDirectory"
 
 $environmentNames = @(
     "Database__Path",
@@ -101,6 +159,8 @@ $environmentNames = @(
     "CV_AGENT_RUN_EVENT_STORE",
     "CV_AI_HANDOFF_STORE_ROOT",
     "CV_DESKTOP_LOG_PATH",
+    "CV_DESKTOP_SHUTDOWN_DIAGNOSTICS_PATH",
+    "CV_DESKTOP_UNATTENDED_SHUTDOWN",
     "CV_CDP_PORT",
     "CV_WEB_PORT",
     "CV_DPI_SCALE",
@@ -234,6 +294,9 @@ if (($KeepDatabase -or $ReuseDatabase) -and [string]::IsNullOrWhiteSpace($Databa
 if ($AllowInitialAdminSetup -and [string]::IsNullOrWhiteSpace($DatabasePath)) {
     throw "AllowInitialAdminSetup requires an explicit isolated DatabasePath."
 }
+if ($UnattendedShutdown -and [string]::IsNullOrWhiteSpace($DatabasePath)) {
+    throw "UnattendedShutdown requires an explicit isolated DatabasePath."
+}
 
 Set-ProcessEnvironment -Name "CV_DESKTOP_HTTP_PORT" -Value ([string]$WebPort)
 Set-ProcessEnvironment -Name "CV_CONVERSATION_STORE_ROOT" -Value $conversationRoot
@@ -350,8 +413,13 @@ function Start-DesktopHost {
     $stderr = Join-Path $hostLogs "$RunName-host.stderr.log"
     $runUserData = Join-Path $webView2UserDataRoot $RunName
     New-Item -ItemType Directory -Force -Path $runUserData | Out-Null
+    $shutdownDiagnosticsPath = Assert-RepositoryTemporaryPath `
+        -Path (Join-Path $hostLogs "$RunName-shutdown.jsonl") `
+        -Label "Shutdown diagnostics path"
     Set-ProcessEnvironment -Name "CV_WEBVIEW2_USER_DATA_FOLDER" -Value $runUserData
     Set-ProcessEnvironment -Name "CV_DESKTOP_LOG_PATH" -Value (Join-Path $hostLogs "$RunName-desktop.log")
+    Set-ProcessEnvironment -Name "CV_DESKTOP_SHUTDOWN_DIAGNOSTICS_PATH" -Value $shutdownDiagnosticsPath
+    Set-ProcessEnvironment -Name "CV_DESKTOP_UNATTENDED_SHUTDOWN" -Value $(if ($UnattendedShutdown) { "1" } else { "0" })
     Set-ProcessEnvironment -Name "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS" -Value "--remote-debugging-port=$CdpPort --remote-allow-origins=* --force-device-scale-factor=$Scale"
     $runnerPath = [Environment]::GetEnvironmentVariable("PATH", "Process")
     Set-ProcessEnvironment -Name "PATH" -Value (Resolve-DesktopProcessPath)
@@ -388,6 +456,78 @@ function Stop-DesktopHost {
     if (-not $Process.WaitForExit(15000)) {
         Stop-Process -Id $Process.Id -Force
         throw "Desktop Host did not complete its close/flush path within 15 seconds."
+    }
+}
+
+function Read-ShutdownDiagnostics {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $records = [System.Collections.Generic.List[object]]::new()
+    $parseErrors = [System.Collections.Generic.List[string]]::new()
+    if (Test-Path -LiteralPath $Path -PathType Leaf) {
+        foreach ($line in Get-Content -LiteralPath $Path -Encoding UTF8) {
+            if ([string]::IsNullOrWhiteSpace($line)) {
+                continue
+            }
+            try {
+                $records.Add(($line | ConvertFrom-Json))
+            } catch {
+                $parseErrors.Add($_.Exception.Message)
+            }
+        }
+    }
+
+    $requiredStages = @(
+        "flush-start",
+        "workspace-flush",
+        "ai-flush",
+        "webview-dispose",
+        "host-stop",
+        "process-exit"
+    )
+    $stageStatuses = [ordered]@{}
+    foreach ($stage in $requiredStages) {
+        $terminal = @($records | Where-Object {
+            [string]$_.stage -eq $stage -and [string]$_.status -ne "started"
+        })
+        $stageStatuses[$stage] = if ($terminal.Count -eq 0) {
+            $null
+        } else {
+            [string]$terminal[$terminal.Count - 1].status
+        }
+    }
+
+    $forcedExit = @($records | Where-Object {
+        ([bool]$_.forcedExit) -or
+            [string]$_.stage -eq "forced-exit" -or
+            [string]$_.status -eq "forcedexit"
+    }).Count -gt 0
+    $uncertain = @($records | Where-Object {
+        [string]$_.status -in @("failed", "timeout", "unknown", "forcedexit")
+    }).Count -gt 0
+    $stageResultsPassed = $true
+    foreach ($stage in $requiredStages) {
+        if ([string]$stageStatuses[$stage] -notin @("succeeded", "skipped")) {
+            $stageResultsPassed = $false
+            break
+        }
+    }
+
+    [pscustomobject]@{
+        path = $Path
+        recordCount = $records.Count
+        forcedExit = $forcedExit
+        uncertain = $uncertain
+        parseErrors = @($parseErrors)
+        stages = $stageStatuses
+        passed = $records.Count -gt 0 -and
+            $parseErrors.Count -eq 0 -and
+            -not $forcedExit -and
+            -not $uncertain -and
+            $stageResultsPassed
     }
 }
 
@@ -512,6 +652,7 @@ $runs = if ($SingleRun) {
     )
 }
 
+$shutdownDiagnostics = [System.Collections.Generic.List[object]]::new()
 try {
     foreach ($run in $runs) {
         $process = $null
@@ -525,6 +666,12 @@ try {
                 -DesktopProcess $process
         } finally {
             if ($process) { Stop-DesktopHost -Process $process }
+        }
+        $shutdownPath = Join-Path $hostLogs "$($run.Name)-shutdown.jsonl"
+        $shutdownRecord = Read-ShutdownDiagnostics -Path $shutdownPath
+        $shutdownDiagnostics.Add($shutdownRecord)
+        if (-not [bool]$shutdownRecord.passed) {
+            throw "Desktop Host shutdown diagnostics did not pass for run '$($run.Name)': $shutdownPath"
         }
     }
 } finally {
@@ -553,5 +700,7 @@ try {
     DatabaseReused = [bool]$ReuseDatabase
     InitialAdminSetupAllowed = [bool]$AllowInitialAdminSetup
     AuthenticationDeferredToScenario = [bool]$DeferAuthToScenario
+    UnattendedShutdown = [bool]$UnattendedShutdown
+    ShutdownDiagnostics = @($shutdownDiagnostics)
     CompletedAtUtc = [DateTime]::UtcNow.ToString("O")
 } | ConvertTo-Json -Depth 4

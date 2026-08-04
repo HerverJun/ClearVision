@@ -366,4 +366,48 @@ describe('Projects read pages', () => {
     wrapper.unmount();
     queries.dispose();
   });
+
+  it('renders the project list as read-only when no command owner is mounted', async () => {
+    const queries = createReadQueryClient(apiWith(async path =>
+      path.startsWith('projects/recent') ? [] : [summary()]));
+    const router = createTestRouter();
+    await router.push('/projects');
+    await router.isReady();
+
+    const wrapper = mount(ProjectsPage, {
+      props: { runtime: { queries } },
+      global: { plugins: [router] }
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-capability="projects-read"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="project-create-open"]').exists()).toBe(false);
+    expect(wrapper.find(`[data-testid="project-open-${projectId}"]`).exists()).toBe(false);
+    expect(wrapper.find(`[data-testid="project-delete-${projectId}"]`).exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('新建空白工程');
+
+    wrapper.unmount();
+    queries.dispose();
+  });
+
+  it('renders project details without edit, delete, or workspace controls when no command owner is mounted', async () => {
+    const queries = createReadQueryClient(apiWith(async () => details()));
+    const router = createTestRouter();
+    await router.push(`/projects/${projectId}`);
+    await router.isReady();
+
+    const wrapper = mount(ProjectDetailPage, {
+      props: { projectId, runtime: { queries }, workspaceEnabled: true },
+      global: { plugins: [router] }
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="project-detail-open"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="project-detail-delete"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="project-detail-update"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('编辑工程信息');
+
+    wrapper.unmount();
+    queries.dispose();
+  });
 });

@@ -24,7 +24,7 @@ export interface ProductRuntime {
   readonly session: SessionProjectionOwner;
   readonly systemStatus: SystemStatusOwner;
   readonly preferences: UiPreferencesOwner;
-  readonly projectLifecycle: ProjectLifecycleCommandOwner;
+  readonly projectLifecycle?: ProjectLifecycleCommandOwner;
   readonly leaveGuard: ProductLeaveGuardOwner;
   readonly workspace: WorkspaceRuntime;
   prepareForProtectedTransition(reason: 'logout' | 'change-password'): Promise<boolean>;
@@ -52,19 +52,24 @@ export function createProductRuntime(
   const preferences = createUiPreferencesOwner();
   const systemStatus = createSystemStatusOwner({ queries });
   const leaveGuardHolder: { current?: ProductLeaveGuardOwner } = {};
-  const projectLifecycle = createProjectLifecycleCommandOwner({
-    api: platform.api,
-    prepareProjectLeave(projectId) {
-      return leaveGuardHolder.current?.request('project-delete', projectId) ?? Promise.resolve(true);
-    }
-  });
+  const projectLifecycle = authenticatedUser.role === 'Admin' || authenticatedUser.role === 'Engineer'
+    ? createProjectLifecycleCommandOwner({
+        api: platform.api,
+        prepareProjectLeave(projectId) {
+          return leaveGuardHolder.current?.request('project-delete', projectId) ?? Promise.resolve(true);
+        }
+      })
+    : undefined;
   const workspace = createWorkspaceRuntime({
     queries,
     api: platform.api,
     session,
     featureFlags: platform.startup.featureFlags
   });
-  const leaveGuard = createProductLeaveGuardOwner({ projectLifecycle, workspace });
+  const leaveGuard = createProductLeaveGuardOwner({
+    workspace,
+    ...(projectLifecycle ? { projectLifecycle } : {})
+  });
   leaveGuardHolder.current = leaveGuard;
   let disposed = false;
   let quarantined = false;
@@ -77,7 +82,7 @@ export function createProductRuntime(
     session,
     systemStatus,
     preferences,
-    projectLifecycle,
+    ...(projectLifecycle ? { projectLifecycle } : {}),
     leaveGuard,
     workspace,
     prepareForProtectedTransition(reason: 'logout' | 'change-password'): Promise<boolean> {
@@ -92,7 +97,7 @@ export function createProductRuntime(
       });
       quarantined = true;
       leaveGuard.suspendForSessionExpiration();
-      const projectLifecycleRequiresPreservation = projectLifecycle.quarantineForSessionExpiration();
+      const projectLifecycleRequiresPreservation = projectLifecycle?.quarantineForSessionExpiration() ?? false;
       const result = workspace.quarantineForSessionExpiration();
       systemStatus.dispose();
       return Object.freeze({
@@ -103,7 +108,9 @@ export function createProductRuntime(
     },
     async reconcileAfterReauthentication(): Promise<boolean> {
       if (disposed) return false;
-      const projectLifecycleReconciled = await projectLifecycle.reconcileAfterReauthentication();
+      const projectLifecycleReconciled = projectLifecycle
+        ? await projectLifecycle.reconcileAfterReauthentication()
+        : true;
       if (!projectLifecycleReconciled) return false;
       const reconciled = await workspace.reconcileAfterReauthentication();
       if (reconciled) quarantined = false;
@@ -114,7 +121,9 @@ export function createProductRuntime(
       disposed = true;
       leaveGuard.dispose('product-runtime-disposed');
       workspace.dispose();
-      projectLifecycle.dispose('product-runtime-disposed');
+      if (projectLifecycle) {
+        projectLifecycle.dispose('product-runtime-disposed');
+      }
       systemStatus.dispose();
       queries.dispose();
       preferences.dispose();

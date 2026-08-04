@@ -315,6 +315,7 @@ function Invoke-RollbackRun {
     if ($KeepDatabase) { $parameters["KeepDatabase"] = $true }
     if ($ReuseDatabase) { $parameters["ReuseDatabase"] = $true }
     if ($AllowInitialAdminSetup) { $parameters["AllowInitialAdminSetup"] = $true }
+    $parameters["UnattendedShutdown"] = $true
     if (-not [string]::IsNullOrWhiteSpace($Route)) { $parameters["Route"] = $Route }
     if ($script:desktopBuilt) { $parameters["NoBuild"] = $true }
 

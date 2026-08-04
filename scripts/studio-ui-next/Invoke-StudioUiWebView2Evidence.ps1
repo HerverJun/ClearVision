@@ -58,7 +58,8 @@ param(
     [switch]$ReuseDatabase,
     [switch]$AllowInitialAdminSetup,
     [switch]$DeferAuthToScenario,
-    [switch]$NoBuild
+    [switch]$NoBuild,
+    [switch]$UnattendedShutdown
 )
 
 Set-StrictMode -Version Latest
@@ -148,9 +149,37 @@ $allowedEvidencePrefix = $allowedEvidenceRoot.TrimEnd(
     [System.IO.Path]::DirectorySeparatorChar,
     [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
 if (-not $evidencePath.StartsWith(
-    $allowedEvidencePrefix,
-    [System.StringComparison]::OrdinalIgnoreCase)) {
+        $allowedEvidencePrefix,
+        [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "EvidenceDirectory must remain under .tmp/studio-ui-next."
+}
+$repositoryTemporaryRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot ".tmp"))
+$repositoryTemporaryPrefix = $repositoryTemporaryRoot.TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar) +
+    [System.IO.Path]::DirectorySeparatorChar
+function Assert-RepositoryTemporaryPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Label
+    )
+
+    $resolved = [System.IO.Path]::GetFullPath($Path)
+    if ([string]::Equals(
+            $resolved.TrimEnd(
+                [System.IO.Path]::DirectorySeparatorChar,
+                [System.IO.Path]::AltDirectorySeparatorChar),
+            $repositoryTemporaryRoot.TrimEnd(
+                [System.IO.Path]::DirectorySeparatorChar,
+                [System.IO.Path]::AltDirectorySeparatorChar),
+            [System.StringComparison]::OrdinalIgnoreCase) -or
+        $resolved.StartsWith($repositoryTemporaryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $resolved
+    }
+
+    throw "$Label must remain under the repository .tmp directory: $resolved"
 }
 $cleanupPath = Join-Path $evidencePath "studio-ui-webview2-$RunName-cleanup.json"
 if ($cleanupPath.Length -gt 240) {
@@ -195,12 +224,23 @@ $hostLogs = Join-Path $runRoot "host-logs"
 $webView2UserData = Join-Path $runtimeRoot "webview2"
 $conversationStore = Join-Path $runtimeRoot "conversation"
 $agentRunStore = Join-Path $runtimeRoot "agent-runs"
+$handoffArtifactStore = Join-Path $runtimeRoot "handoffs"
+$runtimeRoot = Assert-RepositoryTemporaryPath -Path $runtimeRoot -Label "RuntimeDirectory"
+$hostLogs = Assert-RepositoryTemporaryPath -Path $hostLogs -Label "HostLogDirectory"
+$webView2UserData = Assert-RepositoryTemporaryPath -Path $webView2UserData -Label "WebView2UserDataDirectory"
+$conversationStore = Assert-RepositoryTemporaryPath -Path $conversationStore -Label "ConversationStoreRoot"
+$agentRunStore = Assert-RepositoryTemporaryPath -Path $agentRunStore -Label "AgentRunStoreRoot"
+$handoffArtifactStore = Assert-RepositoryTemporaryPath -Path $handoffArtifactStore -Label "HandoffArtifactStoreRoot"
 $configuredDatabasePath = $DatabasePath
 $databasePath = if ([string]::IsNullOrWhiteSpace($configuredDatabasePath)) {
     Join-Path $runtimeRoot "database/vision.db"
 } else {
     [System.IO.Path]::GetFullPath($configuredDatabasePath)
 }
+$databasePath = Assert-RepositoryTemporaryPath -Path $databasePath -Label "DatabasePath"
+$shutdownDiagnosticsPath = Assert-RepositoryTemporaryPath `
+    -Path (Join-Path $hostLogs "$RunName-shutdown.jsonl") `
+    -Label "Shutdown diagnostics path"
 New-Item -ItemType Directory -Force -Path $evidencePath | Out-Null
 
 $startupProfileDefinitions = @{
@@ -218,7 +258,7 @@ if ([string]::IsNullOrWhiteSpace($StartupProfile)) {
     $StartupProfile = if ($Expectation -eq "legacy") {
         "LEGACY_DEFAULT"
     } else {
-        "NEXT_DEFAULT_CANDIDATE"
+        "NEXT_DEFAULT"
     }
 }
 $StartupProfile = $StartupProfile.Trim().ToUpperInvariant()
@@ -413,7 +453,10 @@ $runnerManagedEnvironmentNames = @(
     "CV_WEBVIEW2_USER_DATA_FOLDER",
     "CV_CONVERSATION_STORE_ROOT",
     "CV_AGENT_RUN_EVENT_STORE",
+    "CV_AI_HANDOFF_STORE_ROOT",
     "CV_DESKTOP_LOG_PATH",
+    "CV_DESKTOP_SHUTDOWN_DIAGNOSTICS_PATH",
+    "CV_DESKTOP_UNATTENDED_SHUTDOWN",
     "CV_CDP_PORT",
     "CV_WEB_PORT",
     "CV_DPI_SCALE",
@@ -533,6 +576,7 @@ $runnerParameters = @{
     WebView2UserDataDirectory = $webView2UserData
     ConversationStoreRoot = $conversationStore
     AgentRunStoreRoot = $agentRunStore
+    HandoffArtifactStoreRoot = $handoffArtifactStore
     RuntimeCleanupRoot = $runtimeRoot
     DatabasePath = $databasePath
     WindowWidth = $WindowWidth
@@ -560,6 +604,9 @@ if ($SanitizeDesktopPath) {
 }
 if ($NoBuild) {
     $runnerParameters["NoBuild"] = $true
+}
+if ($UnattendedShutdown) {
+    $runnerParameters["UnattendedShutdown"] = $true
 }
 
 $runnerSucceeded = $false
@@ -636,6 +683,59 @@ foreach ($logFile in Get-ChildItem -LiteralPath $hostLogs -Recurse -File -Filter
         }
     }
 }
+$shutdownRecords = [System.Collections.Generic.List[object]]::new()
+$shutdownParseErrors = [System.Collections.Generic.List[string]]::new()
+if (Test-Path -LiteralPath $shutdownDiagnosticsPath -PathType Leaf) {
+    foreach ($line in Get-Content -LiteralPath $shutdownDiagnosticsPath -Encoding UTF8) {
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+        try {
+            $shutdownRecords.Add(($line | ConvertFrom-Json))
+        } catch {
+            $shutdownParseErrors.Add($_.Exception.Message)
+        }
+    }
+}
+$shutdownRequiredStages = @(
+    "flush-start",
+    "workspace-flush",
+    "ai-flush",
+    "webview-dispose",
+    "host-stop",
+    "process-exit"
+)
+$shutdownStageStatuses = [ordered]@{}
+foreach ($stage in $shutdownRequiredStages) {
+    $terminal = @($shutdownRecords | Where-Object {
+        [string]$_.stage -eq $stage -and [string]$_.status -ne "started"
+    })
+    $shutdownStageStatuses[$stage] = if ($terminal.Count -eq 0) {
+        $null
+    } else {
+        [string]$terminal[$terminal.Count - 1].status
+    }
+}
+$shutdownForcedExit = @($shutdownRecords | Where-Object {
+    ([bool]$_.forcedExit) -or
+        [string]$_.stage -eq "forced-exit" -or
+        [string]$_.status -eq "forcedexit"
+}).Count -gt 0
+$shutdownUncertain = @($shutdownRecords | Where-Object {
+    [string]$_.status -in @("failed", "timeout", "unknown", "forcedexit")
+}).Count -gt 0
+$shutdownStagesPassed = $true
+foreach ($stage in $shutdownRequiredStages) {
+    if ([string]$shutdownStageStatuses[$stage] -notin @("succeeded", "skipped")) {
+        $shutdownStagesPassed = $false
+        break
+    }
+}
+$shutdownDiagnosticsPassed = $shutdownRecords.Count -gt 0 -and
+    $shutdownParseErrors.Count -eq 0 -and
+    -not $shutdownForcedExit -and
+    -not $shutdownUncertain -and
+    $shutdownStagesPassed
 $startupRecord = if ($startupRecords.Count -eq 1) { $startupRecords[0] } else { $null }
 $expectedProfile = $StartupProfile
 $expectedPageKind = if ($Expectation -eq "legacy") {
@@ -715,6 +815,15 @@ $cleanup = [pscustomobject]@{
         record = $startupRecord
         passed = [bool]$startupRecordPassed
     }
+    shutdownDiagnostics = [pscustomobject]@{
+        path = $shutdownDiagnosticsPath
+        recordCount = $shutdownRecords.Count
+        forcedExit = $shutdownForcedExit
+        uncertain = $shutdownUncertain
+        parseErrors = @($shutdownParseErrors)
+        stages = $shutdownStageStatuses
+        passed = [bool]$shutdownDiagnosticsPassed
+    }
     environmentRestored = Test-EnvironmentRestored
 }
 $cleanupPassed = $cleanup.processCleanup.passed -and
@@ -725,6 +834,7 @@ $cleanupPassed = $cleanup.processCleanup.passed -and
     $cleanup.runtimeCleanup.databaseStatePassed -and
     $cleanup.runtimeCleanup.runtimeRootRemoved -and
     $cleanup.startupLog.passed -and
+    $cleanup.shutdownDiagnostics.passed -and
     $cleanup.environmentRestored
 $cleanup | Add-Member -NotePropertyName passed -NotePropertyValue $cleanupPassed
 
@@ -748,5 +858,7 @@ if (-not $cleanupPassed) {
     EvidencePhase = $EvidencePhase
     EvidenceDirectory = $evidencePath
     CleanupEvidence = $cleanupPath
+    UnattendedShutdown = [bool]$UnattendedShutdown
+    ShutdownDiagnosticsPath = $shutdownDiagnosticsPath
     CompletedAtUtc = [DateTime]::UtcNow.ToString("O")
 } | ConvertTo-Json -Depth 4

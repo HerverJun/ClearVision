@@ -570,8 +570,11 @@ public class WebView2HostTests
 
         script.Should().Contain("window.__clearVisionFlushProjectWorkspace");
         script.Should().Contain("window.__clearVisionFlushAiPanelWorkspace");
-        script.Should().Contain("Promise.all(flushers.map(flush => Promise.resolve(flush(reason))))");
-        script.Should().Contain("values.every(value => value === true)");
+        script.Should().Contain(".filter(item => typeof item.flush === 'function')");
+        script.Should().Contain("Promise.all(flushers.map(invoke))");
+        script.Should().Contain("const workspace = results.find(result => result.name === 'workspace') || skipped;");
+        script.Should().Contain("const succeeded = [workspace, ai].every(result =>");
+        script.Should().NotContain("values.every(value => value === true)");
         script.Should().Contain("return true;");
         script.Should().NotContain("async()=>");
         script.Should().NotContain("await (window.__clearVisionFlushAiPanelWorkspace");
@@ -597,6 +600,35 @@ public class WebView2HostTests
 
         status.IsTerminal.Should().Be(expectedTerminal);
         status.Succeeded.Should().Be(expectedSucceeded);
+    }
+
+    [Fact]
+    public void ParseAiWorkspaceFlushStatus_ShouldKeepPerStageUnknownAndTimeoutOutcomes()
+    {
+        var status = MainForm.ParseAiWorkspaceFlushStatus(
+            "{\"status\":\"completed\",\"value\":false," +
+            "\"workspace\":{\"status\":\"unknown\",\"value\":false}," +
+            "\"ai\":{\"status\":\"timeout\",\"value\":false}," +
+            "\"error\":\"flush did not settle\"}");
+
+        status.IsTerminal.Should().BeTrue();
+        status.Succeeded.Should().BeFalse();
+        status.Outcome.Should().Be("failed");
+        status.WorkspaceOutcome.Should().Be("unknown");
+        status.AiOutcome.Should().Be("timeout");
+        status.Error.Should().Be("flush did not settle");
+    }
+
+    [Fact]
+    public void ParseAiWorkspaceFlushStatus_ShouldClassifyMissingScriptResultAsUnknown()
+    {
+        var status = MainForm.ParseAiWorkspaceFlushStatus(null);
+
+        status.IsTerminal.Should().BeTrue();
+        status.Succeeded.Should().BeFalse();
+        status.Outcome.Should().Be("unknown");
+        status.WorkspaceOutcome.Should().Be("unknown");
+        status.AiOutcome.Should().Be("unknown");
     }
 
     private static string CreateCompleteStudioUiRoot()

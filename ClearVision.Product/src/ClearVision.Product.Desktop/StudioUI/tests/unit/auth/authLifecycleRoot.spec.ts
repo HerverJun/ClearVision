@@ -23,7 +23,7 @@ function fakeRuntime(requiresPreservation = true): ProductRuntime {
     session: {} as ProductRuntime['session'],
     systemStatus: {} as ProductRuntime['systemStatus'],
     preferences: {} as ProductRuntime['preferences'],
-    projectLifecycle: {} as ProductRuntime['projectLifecycle'],
+    projectLifecycle: {} as NonNullable<ProductRuntime['projectLifecycle']>,
     leaveGuard: {} as ProductRuntime['leaveGuard'],
     workspace: {} as ProductRuntime['workspace'],
     prepareForProtectedTransition: vi.fn(async () => true),
