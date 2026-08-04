@@ -29,6 +29,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
     private readonly WorkflowDiffService _workflowDiffService;
     private readonly ApplyGateResolver _applyGateResolver;
     private readonly BuildResultAssembler _resultAssembler;
+    private readonly VisionTaskRouteContractRegistry _routeContractRegistry;
 
     public VisionAgentBuildOrchestrator(
         BuildPlanContextLoader contextLoader,
@@ -44,7 +45,8 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
         ApplyGateResolver applyGateResolver,
         BuildResultAssembler resultAssembler,
         Microsoft.Extensions.Logging.ILogger<VisionAgentBuildOrchestrator> logger,
-        IAgentRunEventSink? eventSink = null)
+        IAgentRunEventSink? eventSink = null,
+        VisionTaskRouteContractRegistry? routeContractRegistry = null)
     {
         _eventSink = eventSink;
         _logger = logger;
@@ -60,6 +62,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
         _workflowDiffService = workflowDiffService;
         _applyGateResolver = applyGateResolver;
         _resultAssembler = resultAssembler;
+        _routeContractRegistry = routeContractRegistry ?? new VisionTaskRouteContractRegistry();
     }
 
     public async Task<AiFlowGenerationResult> BuildAsync(
@@ -98,6 +101,29 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                     metadataOnly = true,
                     redactionPass = true
                 });
+
+            if (loadPlan.Payload.HashMismatch)
+            {
+                _eventSink?.StageCompleted(
+                    runId,
+                    "plan_hash_validation",
+                    "计划哈希不一致",
+                    "BuildFromPlan 已拒绝继续，未对不可信 Plan 生成任何工作流产物。",
+                    new
+                    {
+                        warningCode = "plan_hash_mismatch",
+                        planId = loadPlan.Payload.PlanId,
+                        providedPlanHash = request.BuildFromPlan?.PlanHash ?? string.Empty,
+                        computedPlanHash = loadPlan.Payload.ComputedPlanHash,
+                        failClosed = true,
+                        metadataOnly = true
+                    });
+                return _resultAssembler.Failure(
+                    buildId,
+                    evidence,
+                    publicWarnings,
+                    failureCode: "plan_hash_mismatch");
+            }
 
             var intent = await _toolRunner.ExecuteEvidenceStepAsync(
                 runId,
@@ -186,7 +212,11 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 new
                 {
                     flow = draft.Payload.WorkflowDraft,
-                    entryOperatorTempId = draft.Payload.EntryOperatorTempId
+                    entryOperatorTempId = draft.Payload.EntryOperatorTempId,
+                    artifactFingerprint = draft.Payload.Artifact.ArtifactFingerprint,
+                    planHash = loadPlan.Payload.PlanHash,
+                    catalogVersion = draft.Payload.Artifact.CatalogVersion,
+                    buildIntent = intent.Payload.BuildIntent
                 },
                 cancellationToken,
                 AgentRunEventTypes.ReadinessChecked);
@@ -204,6 +234,8 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                     $"对可安全修复的校验问题尝试第 {repairRound} 轮自动修复：{string.Join(",", repairIssueCodes)}。",
                     _ => Task.FromResult(_workflowDraftBuilder.Repair(
                         currentDraft,
+                        loadPlan.Payload,
+                        intent.Payload,
                         pipeline.Payload,
                         parameterMapping.Payload,
                         repairIssueCodes,
@@ -222,11 +254,44 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                     new
                     {
                         flow = currentDraft.WorkflowDraft,
-                        entryOperatorTempId = currentDraft.EntryOperatorTempId
+                        entryOperatorTempId = currentDraft.EntryOperatorTempId,
+                        artifactFingerprint = currentDraft.Artifact.ArtifactFingerprint,
+                        planHash = loadPlan.Payload.PlanHash,
+                        catalogVersion = currentDraft.Artifact.CatalogVersion,
+                        buildIntent = intent.Payload.BuildIntent
                     },
                     cancellationToken,
-                    AgentRunEventTypes.ReadinessChecked);
+                 AgentRunEventTypes.ReadinessChecked);
             }
+
+            var routeAssessment = await _toolRunner.ExecuteEvidenceStepAsync(
+                runId,
+                evidence,
+                "route_semantics",
+                "vision_task_route_contract",
+                "按正式任务路由合同检查图像源、任务处理节点、必填数据端口和结果路径。",
+                _ =>
+                {
+                    var assessment = _routeContractRegistry.Assess(
+                        ResolveTaskType(loadPlan.Payload),
+                        currentDraft.Artifact.Graph);
+                    return Task.FromResult(VisionAgentBuildSupport.StepResult(
+                        assessment,
+                        assessment.Satisfied
+                            ? "任务路由语义合同已满足。"
+                            : $"任务路由语义合同已阻断：{string.Join(",", assessment.BlockingReasons)}。",
+                        assessment.Satisfied
+                            ? AgentRunEventStatuses.Completed
+                            : AgentRunEventStatuses.Blocked,
+                        assessment,
+                        warningCode: assessment.Satisfied ? string.Empty : assessment.BlockingReasons.FirstOrDefault() ?? "route_semantics_blocked",
+                        applyImpact: assessment.Satisfied ? "editable_draft_allowed" : "blocked",
+                        deploymentImpact: assessment.Satisfied ? "requires_readiness_checks" : "blocked"));
+                },
+                cancellationToken);
+            WorkflowDraftBuilder.StampRouteAssessment(
+                currentDraft.Artifact.CanvasProjection,
+                routeAssessment.Payload);
 
             var dryRun = await _toolRunner.RunRegisteredToolAsync(
                 runId,
@@ -238,7 +303,11 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 new
                 {
                     flow = currentDraft.WorkflowDraft,
-                    entryOperatorTempId = currentDraft.EntryOperatorTempId
+                    entryOperatorTempId = currentDraft.EntryOperatorTempId,
+                    artifactFingerprint = currentDraft.Artifact.ArtifactFingerprint,
+                    planHash = loadPlan.Payload.PlanHash,
+                    catalogVersion = currentDraft.Artifact.CatalogVersion,
+                    buildIntent = intent.Payload.BuildIntent
                 },
                 cancellationToken,
                 AgentRunEventTypes.ManifestDryRunCompleted);
@@ -255,6 +324,10 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                     flow = currentDraft.WorkflowDraft,
                     validationSummary = validation.Payload.Data,
                     dryRunSummary = dryRun.Payload.Data,
+                    artifactFingerprint = currentDraft.Artifact.ArtifactFingerprint,
+                    planHash = loadPlan.Payload.PlanHash,
+                    catalogVersion = currentDraft.Artifact.CatalogVersion,
+                    buildIntent = intent.Payload.BuildIntent,
                     requireReplay = false
                 },
                 cancellationToken,
@@ -305,7 +378,14 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 "apply_gate",
                 "apply_gate_resolver",
                 "解析画布可应用、运行草稿就绪、部署就绪或阻断状态。",
-                _ => Task.FromResult(_applyGateResolver.Build(validation.Payload, dryRun.Payload, packageReadiness.Payload, workflowDiff.Payload)),
+                _ => Task.FromResult(_applyGateResolver.Build(
+                    validation.Payload,
+                    dryRun.Payload,
+                    packageReadiness.Payload,
+                    workflowDiff.Payload,
+                    currentDraft.Artifact.ArtifactFingerprint,
+                    routeAssessment.Payload,
+                    currentDraft.Artifact.ReturnedFlowSemanticFingerprint)),
                 cancellationToken);
 
             return _resultAssembler.Assemble(new BuildResultAssemblyInput(
@@ -327,6 +407,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 releaseReview.Payload,
                 workflowDiff.Payload,
                 applyGate.Payload,
+                routeAssessment.Payload,
                 evidence,
                 autoRepairs,
                 publicWarnings));
@@ -369,5 +450,10 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
             "missing_calibration_parameter"
         };
         return issueCodes.Any(repairable.Contains);
+    }
+
+    private static string ResolveTaskType(BuildPlanLoad load)
+    {
+        return load.TaskType;
     }
 }

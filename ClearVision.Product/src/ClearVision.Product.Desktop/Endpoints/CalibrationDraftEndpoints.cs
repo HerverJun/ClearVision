@@ -562,7 +562,8 @@ public static class CalibrationDraftEndpoints
                 .Select(port => new ExecutionObservationOutputPortV1
                 {
                     Id = port.Id,
-                    Name = port.Name
+                    Name = port.Name,
+                    DataType = port.DataType
                 })
                 .ToList(),
             TargetOperator = targetOperator,

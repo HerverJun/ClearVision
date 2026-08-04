@@ -1,8 +1,10 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Decisions;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
@@ -40,14 +42,17 @@ public sealed class StationPackageStore
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<StationPackageStore> _logger;
+    private readonly IWorkflowArtifactAdmissionGate? _workflowArtifactAdmissionGate;
     private readonly string _rootDirectory;
 
     public StationPackageStore(
         IServiceScopeFactory scopeFactory,
-        ILogger<StationPackageStore> logger)
+        ILogger<StationPackageStore> logger,
+        IWorkflowArtifactAdmissionGate? workflowArtifactAdmissionGate = null)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _workflowArtifactAdmissionGate = workflowArtifactAdmissionGate;
         _rootDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "ClearVisionStudio",
@@ -252,6 +257,49 @@ public sealed class StationPackageStore
         var runtimeManifestJson = await File.ReadAllTextAsync(runtimeManifestPath, cancellationToken);
         var runtimeManifest = JsonSerializer.Deserialize<RuntimePackageManifest>(runtimeManifestJson, PackageJsonOptions)
             ?? throw new InvalidOperationException("Runtime package manifest could not be read.");
+        if (!string.Equals(runtimeManifest.EntryFlow, "flow.json", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new RuntimePackageException("Station import requires the canonical flow.json entry artifact.");
+        }
+
+        var runtimeFlowPath = Path.Combine(runtimeRoot, "flow.json");
+        if (!File.Exists(runtimeFlowPath))
+        {
+            throw new RuntimePackageException("Runtime package flow.json was not found.");
+        }
+
+        string? admittedFlowJson = null;
+        string? admittedFlowHash = null;
+        string? admittedDecisionConfigurationHash = null;
+        if (_workflowArtifactAdmissionGate == null)
+        {
+            throw WorkflowArtifactAdmissionFailures.GateUnavailable("station.import");
+        }
+
+        if (_workflowArtifactAdmissionGate != null)
+        {
+            var originalFlowJson = await File.ReadAllTextAsync(runtimeFlowPath, cancellationToken);
+            var admission = _workflowArtifactAdmissionGate.InspectJson(originalFlowJson, "station.import");
+            if (!admission.AllowedToSyncStation || admission.Flow == null)
+            {
+                var diagnostic = admission.Report.Diagnostics.FirstOrDefault()?.Code ??
+                    $"workflow_artifact_{admission.Disposition.ToString().ToLowerInvariant()}";
+                throw new RuntimePackageException(
+                    $"Station import blocked by workflow artifact admission: {diagnostic}. {admission.Report.PublicMessage}");
+            }
+
+            if (admission.Disposition == WorkflowArtifactAdmissionDisposition.RepairableLegacy)
+            {
+                admittedFlowJson = JsonSerializer.Serialize(admission.Flow, StablePackageJsonOptions);
+                var admittedEntity = admission.Flow.ToEntity();
+                admittedFlowHash = ExecutionFlowIdentity.ComputeFlowHash(admittedEntity);
+                admittedDecisionConfigurationHash = ExecutionFlowIdentity.ComputeDecisionConfigurationHash(
+                    admittedEntity.DecisionConfiguration);
+                runtimeManifest.FlowHash = admittedFlowHash;
+                runtimeManifest.DecisionConfigurationHash = admittedDecisionConfigurationHash;
+            }
+        }
+
         var packageId = SanitizePackageId(runtimeManifest.PackageId);
         var packageDirectory = Path.Combine(FilesDirectory, packageId);
         Directory.CreateDirectory(packageDirectory);
@@ -264,6 +312,18 @@ public sealed class StationPackageStore
 
         var stagedRuntimeRoot = Path.Combine(staging, "package");
         CopyDirectory(runtimeRoot, stagedRuntimeRoot);
+        if (admittedFlowJson != null)
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(stagedRuntimeRoot, "flow.json"),
+                admittedFlowJson,
+                cancellationToken);
+            await RewriteHashBoundMetadataAsync(
+                stagedRuntimeRoot,
+                admittedFlowHash!,
+                admittedDecisionConfigurationHash!,
+                cancellationToken);
+        }
 
         var manifest = new StationPackageManifestDto
         {
@@ -304,6 +364,80 @@ public sealed class StationPackageStore
         manifest.Sha256 = await ComputeSha256Async(targetFile, cancellationToken);
         Persist(manifest, targetFile);
         return manifest;
+    }
+
+    private static async Task RewriteHashBoundMetadataAsync(
+        string packageRoot,
+        string flowHash,
+        string decisionConfigurationHash,
+        CancellationToken cancellationToken)
+    {
+        var files = new[]
+        {
+            Path.Combine(packageRoot, "quality", "validation-report.json"),
+            Path.Combine(packageRoot, "field", "runtime-parameters.json"),
+            Path.Combine(packageRoot, "field", "station-profile.default.json"),
+            Path.Combine(packageRoot, "field", "station-profile.json"),
+            Path.Combine(packageRoot, "field", "result-mapping-profile.json")
+        };
+
+        foreach (var file in files.Where(File.Exists))
+        {
+            JsonNode? root;
+            try
+            {
+                root = JsonNode.Parse(await File.ReadAllTextAsync(file, cancellationToken));
+            }
+            catch (JsonException)
+            {
+                continue;
+            }
+
+            if (root == null)
+            {
+                continue;
+            }
+
+            RewriteHashProperties(root, flowHash, decisionConfigurationHash);
+            await File.WriteAllTextAsync(file, root.ToJsonString(StablePackageJsonOptions), cancellationToken);
+        }
+    }
+
+    private static void RewriteHashProperties(
+        JsonNode node,
+        string flowHash,
+        string decisionConfigurationHash)
+    {
+        if (node is JsonObject obj)
+        {
+            foreach (var property in obj.ToList())
+            {
+                if (property.Key.Equals("flowHash", StringComparison.OrdinalIgnoreCase) ||
+                    property.Key.Equals("packageFlowHash", StringComparison.OrdinalIgnoreCase) ||
+                    property.Key.Equals("executionFlowHash", StringComparison.OrdinalIgnoreCase))
+                {
+                    obj[property.Key] = flowHash;
+                }
+                else if (property.Key.Equals("decisionConfigurationHash", StringComparison.OrdinalIgnoreCase))
+                {
+                    obj[property.Key] = decisionConfigurationHash;
+                }
+                else if (property.Value != null)
+                {
+                    RewriteHashProperties(property.Value, flowHash, decisionConfigurationHash);
+                }
+            }
+        }
+        else if (node is JsonArray array)
+        {
+            foreach (var item in array)
+            {
+                if (item != null)
+                {
+                    RewriteHashProperties(item, flowHash, decisionConfigurationHash);
+                }
+            }
+        }
     }
 
     private static OperatorFlowDto CreateSmokeFlow(string packageId)

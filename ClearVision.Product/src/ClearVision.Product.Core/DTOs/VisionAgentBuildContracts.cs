@@ -7,6 +7,7 @@ public sealed record VisionAgentBuildResult
     public string PlanHash { get; init; } = string.Empty;
     public string ContractVersion { get; init; } = string.Empty;
     public string BuildIntent { get; init; } = string.Empty;
+    public string TaskType { get; init; } = string.Empty;
     public string AnswerSetFingerprint { get; init; } = string.Empty;
     public string RequestedMode { get; init; } = AiAgentGenerateFlowModes.Scripted;
     public string EffectiveMode { get; init; } = AiAgentGenerateFlowModes.Scripted;
@@ -21,6 +22,17 @@ public sealed record VisionAgentBuildResult
     public string StrategyConfirmationSource { get; init; } = string.Empty;
     public List<string> UnresolvedStrategyBlockers { get; init; } = [];
     public string ParameterStrategy { get; init; } = string.Empty;
+    public string ArtifactFingerprint { get; init; } = string.Empty;
+    public string CompiledFingerprint { get; init; } = string.Empty;
+    public string ValidationFingerprint { get; init; } = string.Empty;
+    public string DryRunFingerprint { get; init; } = string.Empty;
+    public string PrecheckFingerprint { get; init; } = string.Empty;
+    public string ReturnedFlowSemanticFingerprint { get; init; } = string.Empty;
+    public string CatalogVersion { get; init; } = string.Empty;
+    public bool PlanSucceeded { get; init; }
+    public bool CompilationSucceeded { get; init; }
+    public bool RouteSemanticsSatisfied { get; init; }
+    public string ArtifactDisposition { get; init; } = "blocked";
     public object? Flow { get; init; }
     public object? WorkflowDraft { get; init; }
     public List<VisionAgentOperatorPipelineStep> OperatorPipeline { get; init; } = [];
@@ -152,7 +164,23 @@ public sealed record VisionAgentApplyGate
     public List<string> ApplyBlockers { get; init; } = [];
     public List<string> DeploymentBlockers { get; init; } = [];
     public string FirstFixRecommendation { get; init; } = string.Empty;
+    public string ArtifactFingerprint { get; init; } = string.Empty;
+    public string CompiledFingerprint { get; init; } = string.Empty;
+    public string ValidationFingerprint { get; init; } = string.Empty;
+    public string DryRunFingerprint { get; init; } = string.Empty;
+    public string PrecheckFingerprint { get; init; } = string.Empty;
+    public string ReturnedFlowSemanticFingerprint { get; init; } = string.Empty;
+    public bool ArtifactFingerprintConsistent { get; init; }
+    public bool RouteSemanticsSatisfied { get; init; }
+    public string ArtifactDisposition { get; init; } = "blocked";
     public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record VisionAgentPortFingerprint
+{
+    public string Name { get; init; } = string.Empty;
+    public string DataType { get; init; } = string.Empty;
+    public bool Required { get; init; }
 }
 
 public sealed record VisionAgentBuildRepairRecord

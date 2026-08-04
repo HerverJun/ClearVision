@@ -3,6 +3,7 @@
 // 作者：蘅芜君
 
 using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations.Schema;
 using ClearVision.Product.Core.Entities.Base;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
@@ -25,6 +26,14 @@ public class Operator : Entity
     /// </summary>
     [JsonInclude]
     public OperatorType Type { get; set; }
+
+    /// <summary>
+    /// AI artifact admission evidence. It is persisted by the flow DTO/JSON
+    /// boundary, but intentionally excluded from the EF operator table.
+    /// </summary>
+    [JsonInclude]
+    [NotMapped]
+    public Dictionary<string, object?>? Metadata { get; set; }
 
     /// <summary>
     /// 算子在画布上的位置

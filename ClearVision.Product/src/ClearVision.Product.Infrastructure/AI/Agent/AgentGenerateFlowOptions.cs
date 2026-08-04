@@ -8,9 +8,10 @@ public sealed class AgentGenerateFlowOptions
 
     public bool Enabled { get; set; } = true;
 
-    public string Mode { get; set; } = AiAgentGenerateFlowModes.Scripted;
+    // Missing configuration must fail closed. Non-production callers must opt in
+    // explicitly; this option only controls compatibility ingress policy.
+    public string Policy { get; set; } = "production";
 
-    public bool FallbackToScriptedOnPlannerFailure { get; set; } = true;
-
-    public bool FallbackToLegacyOnFailure { get; set; }
+    public AiAgentGenerateFlowPolicyKind PolicyKind =>
+        AiAgentGenerateFlowModePolicy.ParsePolicy(Policy);
 }

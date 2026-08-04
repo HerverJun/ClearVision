@@ -49,17 +49,20 @@ public sealed class RuntimePackageExporter
 
     private readonly IOperatorFactory _operatorFactory;
     private readonly IReadOnlyDictionary<OperatorType, IOperatorExecutor> _executorsByType;
+    private readonly IWorkflowArtifactAdmissionGate? _workflowArtifactAdmissionGate;
     private readonly ILogger<RuntimePackageExporter> _logger;
 
     public RuntimePackageExporter(
         IOperatorFactory operatorFactory,
         ILogger<RuntimePackageExporter> logger,
-        IEnumerable<IOperatorExecutor>? executors = null)
+        IEnumerable<IOperatorExecutor>? executors = null,
+        IWorkflowArtifactAdmissionGate? workflowArtifactAdmissionGate = null)
     {
         _operatorFactory = operatorFactory;
         _executorsByType = (executors ?? Array.Empty<IOperatorExecutor>())
             .GroupBy(executor => executor.OperatorType)
             .ToDictionary(group => group.Key, group => group.Last());
+        _workflowArtifactAdmissionGate = workflowArtifactAdmissionGate;
         _logger = logger;
     }
 
@@ -72,6 +75,26 @@ public sealed class RuntimePackageExporter
 
         var project = request.Project;
         var flow = project.Flow ?? throw new RuntimePackageException("The selected project does not contain an executable flow.");
+        var isAiArtifact = WorkflowArtifactAdmissionClassifier.IsAiArtifact(flow);
+        if (isAiArtifact && _workflowArtifactAdmissionGate == null)
+        {
+            throw WorkflowArtifactAdmissionFailures.GateUnavailable("runtime.export");
+        }
+
+        if (isAiArtifact && _workflowArtifactAdmissionGate != null)
+        {
+            var admission = _workflowArtifactAdmissionGate.Inspect(flow, "runtime.export");
+            if (!admission.AllowedToExport || admission.Flow == null)
+            {
+                var diagnostic = admission.Report.Diagnostics.FirstOrDefault()?.Code ??
+                    $"workflow_artifact_{admission.Disposition.ToString().ToLowerInvariant()}";
+                throw new RuntimePackageException(
+                    $"Export blocked by workflow artifact admission: {diagnostic}. {admission.Report.PublicMessage}");
+            }
+
+            flow = admission.Flow;
+        }
+
         if (flow.Operators.Count == 0)
         {
             throw new RuntimePackageException("The selected project does not contain any operators.");

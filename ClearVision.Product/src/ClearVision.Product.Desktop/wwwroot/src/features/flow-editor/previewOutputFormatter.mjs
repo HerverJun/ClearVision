@@ -1,9 +1,12 @@
+import {
+    findObservationOutputNode,
+    formatPreviewSemanticValue
+} from './previewValueSemantics.mjs';
+
 export const BLOB_PREVIEW_COUNT_MESSAGE = 'BlobCount 为过滤后数量。';
 export const BLOB_PREVIEW_VISUAL_MESSAGE = '绿色轮廓和中心仅标示通过项；底图保留原始目标，未标记不表示通过。';
 export const BLOB_PREVIEW_SEMANTICS_MESSAGE = `${BLOB_PREVIEW_COUNT_MESSAGE}${BLOB_PREVIEW_VISUAL_MESSAGE}`;
 
-const DETECTION_KEYS = new Set(['detections']);
-const SUPPRESSED_DETECTION_KEYS = new Set(['suppresseddetections']);
 const IMAGE_OUTPUT_KEYS = new Set([
     'inputimage',
     'outputimage',
@@ -191,71 +194,6 @@ function normalizeOutputKey(key) {
         .toLowerCase();
 }
 
-function truncateText(text, maxLength) {
-    const value = String(text ?? '');
-    if (value.length <= maxLength) {
-        return {
-            text: value,
-            title: null,
-            truncated: false
-        };
-    }
-
-    if (maxLength <= 6) {
-        return {
-            text: `${value.slice(0, Math.max(1, maxLength - 3))}...`,
-            title: value,
-            truncated: true
-        };
-    }
-
-    return {
-        text: `${value.slice(0, Math.ceil((maxLength - 3) * 0.58))}...${value.slice(-(Math.floor((maxLength - 3) * 0.42)))}`,
-        title: value,
-        truncated: true
-    };
-}
-
-function countNestedArrayItems(value) {
-    if (Array.isArray(value)) {
-        return value.length;
-    }
-
-    if (!value || typeof value !== 'object') {
-        return 0;
-    }
-
-    const nestedArrays = [
-        value.Detections,
-        value.detections,
-        value.Items,
-        value.items
-    ];
-
-    for (const candidate of nestedArrays) {
-        if (Array.isArray(candidate)) {
-            return candidate.length;
-        }
-    }
-
-    const countCandidates = [
-        value.Count,
-        value.count,
-        value.Total,
-        value.total,
-        value.Length,
-        value.length
-    ];
-
-    for (const candidate of countCandidates) {
-        if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-            return candidate;
-        }
-    }
-
-    return 0;
-}
-
 function extractReadableKey(key) {
     const text = String(key ?? '').trim();
     const pathMatch = Array.from(text.matchAll(/\["([^"]+)"\]/g)).at(-1);
@@ -350,74 +288,21 @@ export function isPreviewImageLikePayload(value) {
 
 export function formatPreviewOutputValue(key, value, options = {}) {
     const {
-        stringMaxLength = 48
+        stringMaxLength = 48,
+        declaredPortDataType = null,
+        observationNode = null
     } = options;
-
-    const normalizedKey = normalizeOutputKey(key);
-
-    if (DETECTION_KEYS.has(normalizedKey)) {
-        return {
-            text: `${countNestedArrayItems(value)} 个检测结果`,
-            title: null,
-            kind: 'detections'
-        };
-    }
-
-    if (SUPPRESSED_DETECTION_KEYS.has(normalizedKey)) {
-        return {
-            text: `${countNestedArrayItems(value)} 个已抑制`,
-            title: null,
-            kind: 'suppressed'
-        };
-    }
-
-    if (typeof value === 'number') {
-        return {
-            text: Number.isInteger(value) ? String(value) : value.toFixed(3),
-            title: null,
-            kind: 'number'
-        };
-    }
-
-    if (typeof value === 'boolean') {
-        return {
-            text: value ? '是' : '否',
-            title: null,
-            kind: 'boolean'
-        };
-    }
-
-    if (typeof value === 'string') {
-        const stringValue = value.trim() || '--';
-        const truncated = truncateText(stringValue, stringMaxLength);
-        return {
-            text: truncated.text,
-            title: truncated.title,
-            kind: 'string'
-        };
-    }
-
-    if (Array.isArray(value)) {
-        return {
-            text: `${value.length} 项`,
-            title: null,
-            kind: 'array'
-        };
-    }
-
-    if (value && typeof value === 'object') {
-        const fieldCount = Object.keys(value).length;
-        return {
-            text: fieldCount > 0 ? `${fieldCount} 个字段` : '对象',
-            title: null,
-            kind: 'object'
-        };
-    }
-
+    const formatted = formatPreviewSemanticValue({
+        key,
+        value,
+        declaredPortDataType,
+        observationNode,
+        stringMaxLength
+    });
     return {
-        text: '无',
-        title: null,
-        kind: 'null'
+        text: formatted.text,
+        title: formatted.title,
+        kind: formatted.kind
     };
 }
 
@@ -450,7 +335,13 @@ export function buildPreviewSummaryItems(outputs, options = {}) {
             continue;
         }
 
-        const formattedValue = formatPreviewOutputValue(key, value, { stringMaxLength });
+        const observationNode = findObservationOutputNode(options.observation, key);
+        const declaredPortDataType = options.portTypes?.[key] || options.portTypes?.[normalizeOutputKey(key)] || null;
+        const formattedValue = formatPreviewOutputValue(key, value, {
+            stringMaxLength,
+            observationNode,
+            declaredPortDataType
+        });
         const normalizedKey = normalizeOutputKey(key);
         const label = options.technicalLabels && (normalizedKey === 'score' || normalizedKey === 'result')
             ? String(key)

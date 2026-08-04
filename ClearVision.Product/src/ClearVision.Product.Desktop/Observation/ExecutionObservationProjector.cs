@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ResultPaths;
+using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.PreviewArtifacts;
 using ClearVision.Product.Infrastructure.Operators;
@@ -334,6 +335,11 @@ public static class ExecutionObservationProjector
             return ResourceNode(value, path, safeName, context);
         }
 
+        if (TryProjectDeclaredGeometry(value, path, safeName, depth, context, out var geometryNode))
+        {
+            return geometryNode;
+        }
+
         if (value is CircleCaliperFitV2Result caliperFitV2Result)
         {
             return ProjectCaliperFitV2Result(caliperFitV2Result, path, safeName, depth, context);
@@ -433,17 +439,67 @@ public static class ExecutionObservationProjector
             context.AddDiagnostic("field-limit", $"Object field count {properties.Count} exceeds limit {MaxObjectFields}.", path.Value);
         }
 
-        return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
+        var node = new ExecutionObservationDetailNodeV1
         {
             Kind = "object",
+            SemanticKind = "dictionary",
             DisplayValue = $"{Math.Min(properties.Count, MaxObjectFields)}/{properties.Count} fields",
             OriginalType = typeof(JsonElement).FullName,
             Children = children,
             Truncated = truncated,
             PathHint = path.Value,
             Addressable = false,
-            Name = name
-        }, path, context);
+            Name = name,
+            FieldCount = properties.Count
+        };
+        ApplyDeclaredJsonCollectionCounts(node, element, path);
+        return WithLocatableMetadata(node, path, context);
+    }
+
+    private static void ApplyDeclaredJsonCollectionCounts(
+        ExecutionObservationDetailNodeV1 node,
+        JsonElement element,
+        PathInfo path)
+    {
+        var dataType = path.ResultPathBinding?.IsOutputRoot == true
+            ? path.ResultPathBinding.DataType
+            : PortDataType.Any;
+        if (dataType is not (PortDataType.PointList or PortDataType.DetectionList or PortDataType.BlobList or PortDataType.BlobFeatureList))
+        {
+            return;
+        }
+
+        int? total = null;
+        int? visible = null;
+        foreach (var property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, "Count", StringComparison.OrdinalIgnoreCase) &&
+                property.Value.ValueKind == JsonValueKind.Number &&
+                property.Value.TryGetInt32(out var count) &&
+                count >= 0)
+            {
+                total = count;
+            }
+
+            if ((string.Equals(property.Name, "Items", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(property.Name, "Detections", StringComparison.OrdinalIgnoreCase)) &&
+                property.Value.ValueKind == JsonValueKind.Array)
+            {
+                visible = Math.Min(property.Value.GetArrayLength(), MaxCollectionItems);
+                total ??= property.Value.GetArrayLength();
+            }
+        }
+
+        if (!total.HasValue && !visible.HasValue)
+        {
+            return;
+        }
+
+        var effectiveTotal = total ?? visible!.Value;
+        var effectiveVisible = visible ?? Math.Min(effectiveTotal, MaxCollectionItems);
+        node.VisibleItemCount = effectiveVisible;
+        node.TotalItemCount = effectiveTotal;
+        node.Truncated = node.Truncated || effectiveVisible < effectiveTotal;
     }
 
     private static ExecutionObservationDetailNodeV1 ProjectJsonArray(
@@ -476,13 +532,16 @@ public static class ExecutionObservationProjector
         return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
         {
             Kind = "array",
+            SemanticKind = "collection",
             DisplayValue = $"{Math.Min(total, MaxCollectionItems)}/{total} items",
             OriginalType = typeof(JsonElement).FullName,
             Children = children,
             Truncated = truncated,
             PathHint = path.Value,
             Addressable = false,
-            Name = name
+            Name = name,
+            VisibleItemCount = Math.Min(total, MaxCollectionItems),
+            TotalItemCount = total
         }, path, context);
     }
 
@@ -534,13 +593,15 @@ public static class ExecutionObservationProjector
         return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
         {
             Kind = "dictionary",
+            SemanticKind = "dictionary",
             DisplayValue = $"{Math.Min(entries.Count, MaxObjectFields)}/{entries.Count} fields",
             OriginalType = GetTypeName(dictionary),
             Children = children,
             Truncated = truncated,
             PathHint = path.Value,
             Addressable = false,
-            Name = name
+            Name = name,
+            FieldCount = entries.Count
         }, path, context);
     }
 
@@ -552,62 +613,16 @@ public static class ExecutionObservationProjector
         ProjectionContext context,
         out ExecutionObservationDetailNodeV1 node)
     {
-        if (TryProjectArray(value, path, name, depth, context, out node))
-        {
-            return true;
-        }
-
-        if (TryProjectList(value, path, name, depth, context, out node))
-        {
-            return true;
-        }
-
-        node = new ExecutionObservationDetailNodeV1();
-        return false;
-    }
-
-    private static bool TryProjectArray(
-        object value,
-        PathInfo path,
-        string? name,
-        int depth,
-        ProjectionContext context,
-        out ExecutionObservationDetailNodeV1 node)
-    {
-        if (value is not Array array || array.Rank != 1)
+        if (!KnownFiniteCollectionAccessor.TryCreate(value, out var accessor) ||
+            !accessor.TryReadPrefix(MaxCollectionItems, out var items))
         {
             node = new ExecutionObservationDetailNodeV1();
             return false;
         }
 
         node = ProjectIndexedCollection(
-            array.Length,
-            index => array.GetValue(index),
-            GetTypeName(value),
-            path,
-            name,
-            depth,
-            context);
-        return true;
-    }
-
-    private static bool TryProjectList(
-        object value,
-        PathInfo path,
-        string? name,
-        int depth,
-        ProjectionContext context,
-        out ExecutionObservationDetailNodeV1 node)
-    {
-        if (!IsKnownGenericList(value.GetType()) || value is not IList list)
-        {
-            node = new ExecutionObservationDetailNodeV1();
-            return false;
-        }
-
-        node = ProjectIndexedCollection(
-            list.Count,
-            index => list[index],
+            accessor.Count,
+            index => items[index],
             GetTypeName(value),
             path,
             name,
@@ -640,13 +655,16 @@ public static class ExecutionObservationProjector
         return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
         {
             Kind = "array",
+            SemanticKind = "collection",
             DisplayValue = $"{Math.Min(total, MaxCollectionItems)}/{total} items",
             OriginalType = originalType,
             Children = children,
             Truncated = truncated,
             PathHint = path.Value,
             Addressable = false,
-            Name = name
+            Name = name,
+            VisibleItemCount = Math.Min(total, MaxCollectionItems),
+            TotalItemCount = total
         }, path, context);
     }
 
@@ -676,13 +694,16 @@ public static class ExecutionObservationProjector
         return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
         {
             Kind = "detectionList",
+            SemanticKind = "detection-list",
             DisplayValue = $"{Math.Min(detections.Count, MaxCollectionItems)}/{detections.Count} detections",
             OriginalType = typeof(DetectionList).FullName,
             Children = children,
             Truncated = truncated,
             PathHint = path.Value,
             Addressable = false,
-            Name = name
+            Name = name,
+            VisibleItemCount = Math.Min(detections.Count, MaxCollectionItems),
+            TotalItemCount = detections.Count
         }, path, context);
     }
 
@@ -719,6 +740,251 @@ public static class ExecutionObservationProjector
             Name = name
         }, path, context);
     }
+
+    private static bool TryProjectDeclaredGeometry(
+        object value,
+        PathInfo path,
+        string? name,
+        int depth,
+        ProjectionContext context,
+        out ExecutionObservationDetailNodeV1 node)
+    {
+        node = new ExecutionObservationDetailNodeV1();
+        var binding = path.ResultPathBinding;
+        if (binding == null || !binding.IsOutputRoot)
+        {
+            return false;
+        }
+
+        if (binding.DataType == PortDataType.Region && value is ClearVision.Product.Core.ValueObjects.Region region)
+        {
+            var bounds = region.BoundingBox;
+            var center = region.Center;
+            var fields = new (string Name, object? Value)[]
+            {
+                ("Area", region.Area),
+                ("IsEmpty", region.IsEmpty),
+                ("RunLengthCount", region.RunLengths.Count),
+                ("Center", new Dictionary<string, object> { ["X"] = center.X, ["Y"] = center.Y }),
+                ("BoundingBox", new Dictionary<string, object>
+                {
+                    ["X"] = bounds.X,
+                    ["Y"] = bounds.Y,
+                    ["Width"] = bounds.Width,
+                    ["Height"] = bounds.Height
+                })
+            };
+            node = BuildGeometryNode(
+                "region",
+                $"Area {region.Area.ToString(CultureInfo.InvariantCulture)}, {bounds.X.ToString(CultureInfo.InvariantCulture)}, {bounds.Y.ToString(CultureInfo.InvariantCulture)}, {bounds.Width.ToString(CultureInfo.InvariantCulture)} x {bounds.Height.ToString(CultureInfo.InvariantCulture)}",
+                value,
+                fields,
+                path,
+                name,
+                depth,
+                context);
+            return true;
+        }
+
+        if (binding.DataType == PortDataType.Point && TryReadPoint(value, out var x, out var y))
+        {
+            node = BuildGeometryNode(
+                "point",
+                $"({FormatGeometryNumber(x)}, {FormatGeometryNumber(y)})",
+                value,
+                [("X", x), ("Y", y)],
+                path,
+                name,
+                depth,
+                context);
+            return true;
+        }
+
+        if (binding.DataType == PortDataType.Rectangle &&
+            TryReadGeometryNumber(value, ["X"], out x) &&
+            TryReadGeometryNumber(value, ["Y"], out y) &&
+            TryReadGeometryNumber(value, ["Width", "W"], out var width) &&
+            TryReadGeometryNumber(value, ["Height", "H"], out var height))
+        {
+            node = BuildGeometryNode(
+                "rectangle",
+                $"{FormatGeometryNumber(x)}, {FormatGeometryNumber(y)}, {FormatGeometryNumber(width)} x {FormatGeometryNumber(height)}",
+                value,
+                [("X", x), ("Y", y), ("Width", width), ("Height", height)],
+                path,
+                name,
+                depth,
+                context);
+            return true;
+        }
+
+        if (binding.DataType == PortDataType.CircleData &&
+            TryReadGeometryNumber(value, ["CenterX", "X"], out x) &&
+            TryReadGeometryNumber(value, ["CenterY", "Y"], out y) &&
+            TryReadGeometryNumber(value, ["Radius", "R"], out var radius))
+        {
+            node = BuildGeometryNode(
+                "circle",
+                $"Center ({FormatGeometryNumber(x)}, {FormatGeometryNumber(y)}), radius {FormatGeometryNumber(radius)}",
+                value,
+                [("CenterX", x), ("CenterY", y), ("Radius", radius)],
+                path,
+                name,
+                depth,
+                context);
+            return true;
+        }
+
+        if (binding.DataType == PortDataType.LineData &&
+            TryReadGeometryNumber(value, ["X1", "StartX"], out var x1) &&
+            TryReadGeometryNumber(value, ["Y1", "StartY"], out var y1) &&
+            TryReadGeometryNumber(value, ["X2", "EndX"], out var x2) &&
+            TryReadGeometryNumber(value, ["Y2", "EndY"], out var y2))
+        {
+            var length = Math.Sqrt(Math.Pow(x2 - x1, 2) + Math.Pow(y2 - y1, 2));
+            node = BuildGeometryNode(
+                "line",
+                $"({FormatGeometryNumber(x1)}, {FormatGeometryNumber(y1)}) -> ({FormatGeometryNumber(x2)}, {FormatGeometryNumber(y2)}), length {FormatGeometryNumber(length)}",
+                value,
+                [("X1", x1), ("Y1", y1), ("X2", x2), ("Y2", y2), ("Length", length)],
+                path,
+                name,
+                depth,
+                context);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static ExecutionObservationDetailNodeV1 BuildGeometryNode(
+        string kind,
+        string displayValue,
+        object original,
+        IReadOnlyList<(string Name, object? Value)> fields,
+        PathInfo path,
+        string? name,
+        int depth,
+        ProjectionContext context)
+    {
+        var children = fields
+            .Select(field => ProjectDetailNode(
+                field.Value,
+                AppendObjectKey(path, field.Name, context),
+                field.Name,
+                depth + 1,
+                true,
+                context))
+            .ToList();
+        return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
+        {
+            Kind = kind,
+            SemanticKind = "geometry",
+            DisplayValue = displayValue,
+            OriginalType = GetTypeName(original),
+            Children = children,
+            PathHint = path.Value,
+            Addressable = false,
+            Name = name,
+            FieldCount = fields.Count
+        }, path, context);
+    }
+
+    private static bool TryReadPoint(object value, out double x, out double y)
+    {
+        x = 0;
+        y = 0;
+        switch (value)
+        {
+            case Position position:
+                x = position.X;
+                y = position.Y;
+                return true;
+            case OpenCvSharp.Point point:
+                x = point.X;
+                y = point.Y;
+                return true;
+            case Point2f point:
+                x = point.X;
+                y = point.Y;
+                return true;
+            case Point2d point:
+                x = point.X;
+                y = point.Y;
+                return true;
+            default:
+                var hasX = TryReadGeometryNumber(value, ["X", "CenterX"], out x);
+                var hasY = TryReadGeometryNumber(value, ["Y", "CenterY"], out y);
+                return hasX && hasY;
+        }
+    }
+
+    private static bool TryReadGeometryNumber(object value, IReadOnlyList<string> names, out double number)
+    {
+        object? candidate = null;
+        var found = false;
+        if (value is IDictionary dictionary)
+        {
+            foreach (DictionaryEntry entry in dictionary)
+            {
+                if (entry.Key is string key && names.Contains(key, StringComparer.OrdinalIgnoreCase))
+                {
+                    candidate = entry.Value;
+                    found = true;
+                    break;
+                }
+            }
+        }
+        else if (value is JsonElement element && element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (names.Contains(property.Name, StringComparer.OrdinalIgnoreCase))
+                {
+                    candidate = property.Value;
+                    found = true;
+                    break;
+                }
+            }
+        }
+        else if (value is Rect rect)
+        {
+            candidate = names[0] switch
+            {
+                "X" => rect.X,
+                "Y" => rect.Y,
+                "Width" => rect.Width,
+                "Height" => rect.Height,
+                _ => null
+            };
+            found = candidate != null;
+        }
+
+        if (!found || candidate == null)
+        {
+            number = 0;
+            return false;
+        }
+
+        if (candidate is JsonElement jsonNumber && jsonNumber.ValueKind == JsonValueKind.Number)
+        {
+            return jsonNumber.TryGetDouble(out number) && double.IsFinite(number);
+        }
+
+        try
+        {
+            number = Convert.ToDouble(candidate, CultureInfo.InvariantCulture);
+            return double.IsFinite(number);
+        }
+        catch
+        {
+            number = 0;
+            return false;
+        }
+    }
+
+    private static string FormatGeometryNumber(double value) =>
+        value.ToString("0.###", CultureInfo.InvariantCulture);
 
     private static ExecutionObservationDetailNodeV1 ProjectCaliperFitV2Result(
         CircleCaliperFitV2Result result,
@@ -757,6 +1023,7 @@ public static class ExecutionObservationProjector
         return new ExecutionObservationDetailNodeV1
         {
             Kind = "unsupportedEnumerable",
+            SemanticKind = "unsupported",
             DisplayValue = "Unknown enumerable; content omitted.",
             OriginalType = GetTypeName(value),
             Truncated = true,
@@ -775,6 +1042,7 @@ public static class ExecutionObservationProjector
         return WithLocatableMetadata(new ExecutionObservationDetailNodeV1
         {
             Kind = "objectDescriptor",
+            SemanticKind = "unsupported",
             DisplayValue = "Unsupported object; content omitted.",
             OriginalType = GetTypeName(value),
             Truncated = true,
@@ -903,9 +1171,10 @@ public static class ExecutionObservationProjector
         var bindableVariableTypes = binding == null
             ? null
             : GetBindableVariableTypes(scalarValue);
-        return new ExecutionObservationDetailNodeV1
+        var node = new ExecutionObservationDetailNodeV1
         {
             Kind = kind,
+            SemanticKind = string.Equals(kind, "null", StringComparison.Ordinal) ? "absent" : "scalar",
             DisplayValue = displayValue,
             OriginalType = originalType,
             PathHint = path.Value,
@@ -918,6 +1187,8 @@ public static class ExecutionObservationProjector
             ResultPath = canonicalPath,
             BindableVariableTypes = bindableVariableTypes == null || bindableVariableTypes.Count == 0 ? null : bindableVariableTypes
         };
+        ApplyDeclaredPortMetadata(node, path);
+        return node;
     }
 
     private static ExecutionObservationDetailNodeV1 WithLocatableMetadata(
@@ -925,6 +1196,7 @@ public static class ExecutionObservationProjector
         PathInfo path,
         ProjectionContext context)
     {
+        ApplyDeclaredPortMetadata(node, path);
         var locator = ValidateLocatableResultPath(path.ResultPathBinding, null, path.Value, context, compareScalarValue: false);
         if (locator == null)
         {
@@ -937,6 +1209,42 @@ public static class ExecutionObservationProjector
         node.ResultPathVersion = ResultPathV1.Version;
         node.ResultPath = locator.ResultPath;
         return node;
+    }
+
+    private static void ApplyDeclaredPortMetadata(ExecutionObservationDetailNodeV1 node, PathInfo path)
+    {
+        var dataType = path.ResultPathBinding?.DataType;
+        if (!dataType.HasValue || !path.ResultPathBinding!.IsOutputRoot)
+        {
+            return;
+        }
+
+        node.DeclaredPortDataType = dataType.Value.ToString();
+        if (string.Equals(node.SemanticKind, "absent", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        node.SemanticKind = dataType.Value switch
+        {
+            PortDataType.Integer or
+            PortDataType.Float or
+            PortDataType.Boolean or
+            PortDataType.String => "scalar",
+            PortDataType.PointList => "collection",
+            PortDataType.DetectionList => "detection-list",
+            PortDataType.BlobList => "blob-list",
+            PortDataType.BlobFeatureList => "blob-feature-list",
+            PortDataType.Point or
+            PortDataType.Rectangle or
+            PortDataType.CircleData or
+            PortDataType.LineData or
+            PortDataType.Contour or
+            PortDataType.Region => "geometry",
+            PortDataType.DetectionResult => "detection",
+            PortDataType.Image => "image-resource",
+            _ => node.SemanticKind
+        };
     }
 
     private static LocatableMetadata? ValidateLocatableResultPath(
@@ -1044,9 +1352,10 @@ public static class ExecutionObservationProjector
             context.AddDiagnostic("resource-descriptor", descriptor.DisplayValue, path.Value);
         }
 
-        return new ExecutionObservationDetailNodeV1
+        var node = new ExecutionObservationDetailNodeV1
         {
             Kind = descriptor.Kind,
+            SemanticKind = "image-resource",
             DisplayValue = descriptor.DisplayValue,
             OriginalType = GetTypeName(value),
             Children = descriptor.Metadata
@@ -1059,6 +1368,8 @@ public static class ExecutionObservationProjector
             Name = name,
             Artifact = descriptor.Artifact
         };
+        ApplyDeclaredPortMetadata(node, path);
+        return node;
     }
 
     private static ExecutionObservationDetailNodeV1 TruncatedNode(
@@ -1163,7 +1474,12 @@ public static class ExecutionObservationProjector
                     OutputPortName = current.OutputPortName,
                     ResultPathVersion = current.ResultPathVersion,
                     ResultPath = current.ResultPath,
-                    BindableVariableTypes = current.BindableVariableTypes
+                    BindableVariableTypes = current.BindableVariableTypes,
+                    DeclaredPortDataType = current.DeclaredPortDataType,
+                    SemanticKind = current.SemanticKind,
+                    VisibleItemCount = current.VisibleItemCount,
+                    TotalItemCount = current.TotalItemCount,
+                    FieldCount = current.FieldCount
                 });
             }
 
@@ -1342,20 +1658,19 @@ public static class ExecutionObservationProjector
         LegacySanitizationContext context,
         out object collection)
     {
-        if (value is Array array && array.Rank == 1)
+        if (!KnownFiniteCollectionAccessor.TryCreate(value, out var accessor) ||
+            !accessor.TryReadPrefix(MaxCollectionItems, out var items))
         {
-            collection = SanitizeIndexedCollection(array.Length, index => array.GetValue(index), depth, context);
-            return true;
+            collection = new List<object?>();
+            return false;
         }
 
-        if (IsKnownGenericList(value.GetType()) && value is IList list)
-        {
-            collection = SanitizeIndexedCollection(list.Count, index => list[index], depth, context);
-            return true;
-        }
-
-        collection = new List<object?>();
-        return false;
+        collection = SanitizeIndexedCollection(
+            accessor.Count,
+            index => items[index],
+            depth,
+            context);
+        return true;
     }
 
     private static List<object?> SanitizeIndexedCollection(
@@ -1683,9 +1998,6 @@ public static class ExecutionObservationProjector
                name.EndsWith("Mat", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsKnownGenericList(Type type) =>
-        type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>);
-
     private static bool IsValueTypeLike(object value)
     {
         var type = value.GetType();
@@ -1886,6 +2198,7 @@ public static class ExecutionObservationProjector
     private sealed record ResultPathBindingInfo(
         Guid OutputPortId,
         string OutputPortName,
+        PortDataType DataType,
         object? OutputPortRoot,
         IReadOnlyList<ResultPathSegment> RelativeSegments)
     {
@@ -1902,6 +2215,8 @@ public static class ExecutionObservationProjector
         }
 
         public bool ContainsIndex => RelativeSegments.Any(segment => segment.Kind == ResultPathSegmentKind.Index);
+
+        public bool IsOutputRoot => RelativeSegments.Count == 0;
 
         public string ToCanonicalPath() => ResultPathFormatter.Format(RelativeSegments);
     }
@@ -1953,7 +2268,7 @@ public static class ExecutionObservationProjector
             }
 
             var port = ports[0];
-            return new ResultPathBindingInfo(port.Id, port.Name, outputPortRoot, []);
+            return new ResultPathBindingInfo(port.Id, port.Name, port.DataType, outputPortRoot, []);
         }
 
         public bool TryReserveNode(string pathHint)

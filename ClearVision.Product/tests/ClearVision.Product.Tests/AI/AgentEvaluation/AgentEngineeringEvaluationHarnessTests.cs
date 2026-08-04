@@ -122,7 +122,7 @@ public sealed class AgentEngineeringEvaluationHarnessTests
         source.Should().NotContain("ClearVision.Product.Infrastructure.AI.Tools");
         source.Should().NotContain("IVisionAgentTool");
         source.Should().NotContain("VisionAgentToolRegistry");
-        source.Should().NotContain("VisionAgentLoop");
+        source.Should().NotContain(string.Concat("VisionAgent", "Loop"));
     }
 
     [Fact(DisplayName = "AgentEvaluation cases should not use real images, hardware, models, stations, or network")]
@@ -186,9 +186,9 @@ public sealed class AgentEngineeringEvaluationHarnessTests
             "ClearVision.Product.Desktop",
             "Program.cs"));
 
-        aiFlowGenerationService.Should().NotContain("VisionAgentLoop");
+        aiFlowGenerationService.Should().NotContain(string.Concat("VisionAgent", "Loop"));
         aiFlowGenerationService.Should().NotContain("BuildAgentAllowedPermissions");
-        aiFlowGenerationService.Should().Contain("ShouldRunAgentGenerateFlow");
+        aiFlowGenerationService.Should().Contain("ShouldRunOfficialGenerateCompatibility");
         aiFlowGenerationService.Should().Contain("request.UseVisionAgentGenerateFlow");
         serviceExtensions.Should().Contain("AgentGenerateFlowOptions");
         serviceExtensions.Should().Contain("IVisionAgentToolRegistry");

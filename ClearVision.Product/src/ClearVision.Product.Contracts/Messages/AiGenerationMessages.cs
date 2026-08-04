@@ -99,8 +99,10 @@ public record GenerateFlowResponse
     public List<object> ToolTrace { get; init; } = new();
     public object? BuildResult { get; init; }
     public object? BuildReadiness { get; init; }
+    public string? AgentRunId { get; init; }
     public string? PlanId { get; init; }
     public string? PlanHash { get; init; }
+    public object? PlanSnapshot { get; init; }
     public object? WorkflowDiff { get; init; }
     public object? ApplyGate { get; init; }
     public object? ToolEvidenceTimeline { get; init; }

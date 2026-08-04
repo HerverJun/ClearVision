@@ -1,14 +1,14 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-executable-business-benchmark.v1",
   "benchmarkId": "vision_agent_executable_business_benchmark",
-  "generatedAtUtc": "2026-08-01T07:46:36.7643226+00:00",
+  "generatedAtUtc": "2026-08-04T04:17:55.6674461+00:00",
   "mode": "offline_metadata_only",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-08-01T07:46:36.7643226+00:00"
+    "generatedAtUtc": "2026-08-04T04:17:55.6674461+00:00"
   },
   "summary": {
     "caseCount": 120,
@@ -11610,31 +11610,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_c977266e23c34725bc17e82272fb1cae",
-        "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
-        "generatedAtUtc": "2026-08-01T07:46:30.5375536+00:00",
+        "reportId": "rp_report_e6b288310607423eb24c5330684f127a",
+        "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
+        "generatedAtUtc": "2026-08-04T04:17:49.2469438+00:00",
         "session": {
-          "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
+          "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
           "status": "completed",
-          "createdAtUtc": "2026-08-01T07:46:30.5195931+00:00",
-          "updatedAtUtc": "2026-08-01T07:46:30.5387766+00:00",
+          "createdAtUtc": "2026-08-04T04:17:49.2274193+00:00",
+          "updatedAtUtc": "2026-08-04T04:17:49.247802+00:00",
           "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
           "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
-          "catalogSnapshotId": "rp_catalog_e62d8222a043357f",
+          "catalogSnapshotId": "rp_catalog_9465bd6f2c53a25d",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_b70608bda08442ecbbb0a2c73df07f00",
-            "rp_audit_e8192693107144ab80039a7eb02170b7",
-            "rp_audit_6200cf03e28a4405b0ae0db83e454cb5",
-            "rp_audit_910afc6164b14cedaf14b8ddaacef9f7",
-            "rp_audit_ae078c427990478a9eacc821a649d042",
-            "rp_audit_c1e2445fc60140e48356ff6723b6278b",
-            "rp_audit_2b979157196e4ae49d35f7821f71852f",
-            "rp_audit_2b7783e651cc41bb90158271cdb3e0e7",
-            "rp_audit_885442c1d4f04a34a15d6b88e39239d1"
+            "rp_audit_80581afc095444dfa3316249900155fb",
+            "rp_audit_24fc6ecf19064c73b13ec959a94cefdd",
+            "rp_audit_19c61809a0f54561a7f9c53b35d17855",
+            "rp_audit_a8827b2b51c743439ae6ca35a1f26189",
+            "rp_audit_820169b049374ea09b749f9e85eacf08",
+            "rp_audit_121418ab9dac4866bb08f7910029a7d7",
+            "rp_audit_9b94aa990cc545e48eada5cb96e54306",
+            "rp_audit_20dec3bcc42249b08a9ac52570688992",
+            "rp_audit_9ce9052d21ba488fb169c2b78c269265"
           ],
-          "reportId": "rp_report_c977266e23c34725bc17e82272fb1cae",
+          "reportId": "rp_report_e6b288310607423eb24c5330684f127a",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -11760,12 +11760,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_b70608bda08442ecbbb0a2c73df07f00",
-            "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
+            "eventId": "rp_audit_80581afc095444dfa3316249900155fb",
+            "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
             "eventType": "session_created",
-            "createdAtUtc": "2026-08-01T07:46:30.5225688+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.2309721+00:00",
             "payload": {
-              "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
+              "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
               "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
               "metadataOnly": true
             },
@@ -11773,10 +11773,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_e8192693107144ab80039a7eb02170b7",
-            "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
+            "eventId": "rp_audit_24fc6ecf19064c73b13ec959a94cefdd",
+            "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-08-01T07:46:30.5238214+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.2322483+00:00",
             "payload": {
               "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
               "enabled": true,
@@ -11788,12 +11788,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_6200cf03e28a4405b0ae0db83e454cb5",
-            "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
+            "eventId": "rp_audit_19c61809a0f54561a7f9c53b35d17855",
+            "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-08-01T07:46:30.5259124+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.235089+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_e62d8222a043357f",
+              "catalogSnapshotId": "rp_catalog_9465bd6f2c53a25d",
               "handleCount": 3,
               "sourceSummary": {
                 "appConfig": 0,
@@ -11808,10 +11808,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_910afc6164b14cedaf14b8ddaacef9f7",
-            "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
+            "eventId": "rp_audit_a8827b2b51c743439ae6ca35a1f26189",
+            "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-08-01T07:46:30.5262246+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.2355023+00:00",
             "payload": {
               "camera": 2,
               "model": 0,
@@ -11823,10 +11823,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_ae078c427990478a9eacc821a649d042",
-            "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
+            "eventId": "rp_audit_820169b049374ea09b749f9e85eacf08",
+            "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-08-01T07:46:30.5314853+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.2408218+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -11837,10 +11837,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_c1e2445fc60140e48356ff6723b6278b",
-            "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
+            "eventId": "rp_audit_121418ab9dac4866bb08f7910029a7d7",
+            "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-08-01T07:46:30.5338289+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.2430702+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -11859,23 +11859,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_2b979157196e4ae49d35f7821f71852f",
-            "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
+            "eventId": "rp_audit_9b94aa990cc545e48eada5cb96e54306",
+            "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-08-01T07:46:30.5343859+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.2436278+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_e62d8222a043357f",
+              "catalogSnapshotId": "rp_catalog_9465bd6f2c53a25d",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_2b7783e651cc41bb90158271cdb3e0e7",
-            "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
+            "eventId": "rp_audit_20dec3bcc42249b08a9ac52570688992",
+            "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-08-01T07:46:30.5354888+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.2448278+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -11885,12 +11885,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_885442c1d4f04a34a15d6b88e39239d1",
-            "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
+            "eventId": "rp_audit_9ce9052d21ba488fb169c2b78c269265",
+            "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-08-01T07:46:30.5384998+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.2476349+00:00",
             "payload": {
-              "reportId": "rp_report_c977266e23c34725bc17e82272fb1cae",
+              "reportId": "rp_report_e6b288310607423eb24c5330684f127a",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -11899,19 +11899,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
+          "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_7eca5a96010c4725b60419846933aa48",
+              "status": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_e62d8222a043357f",
+              "status": "rp_catalog_9465bd6f2c53a25d",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -12021,15 +12021,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_c574019afc05",
+              "artifactId": "rp_artifact_cd9e93538ae7",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_7eca5a96010c4725b60419846933aa48",
-                "catalogSnapshotId": "rp_catalog_e62d8222a043357f",
+                "sessionId": "rp_session_a7cae05e96d74cf8bf4d0c2b2a3b4e2b",
+                "catalogSnapshotId": "rp_catalog_9465bd6f2c53a25d",
                 "handleCount": 3,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -13653,31 +13653,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_183bf6252c904d15884c22e91df17ce2",
-        "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
-        "generatedAtUtc": "2026-08-01T07:46:30.9719212+00:00",
+        "reportId": "rp_report_9418433e5ecd4f93854f37063d5e1164",
+        "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
+        "generatedAtUtc": "2026-08-04T04:17:49.7114259+00:00",
         "session": {
-          "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+          "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
           "status": "completed",
-          "createdAtUtc": "2026-08-01T07:46:30.971466+00:00",
-          "updatedAtUtc": "2026-08-01T07:46:30.9719544+00:00",
+          "createdAtUtc": "2026-08-04T04:17:49.710923+00:00",
+          "updatedAtUtc": "2026-08-04T04:17:49.7114631+00:00",
           "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
           "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
-          "catalogSnapshotId": "rp_catalog_68f8418bf854ae05",
+          "catalogSnapshotId": "rp_catalog_5ffc88ad1dac9674",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_6ff3888fe0b44d87ab0bc7321c7b0311",
-            "rp_audit_baeba520e3f54f6f966eb1ab32dc6034",
-            "rp_audit_f0c2622667b14728870b981c53819b48",
-            "rp_audit_be2b5449e3a849499702750fd680fdcf",
-            "rp_audit_cada3e697dc14f0ea4a121ad4b793217",
-            "rp_audit_9b08c3e1703547ba802f22e9e46df89d",
-            "rp_audit_a74aae7488df41eda274e296b3c0b4d8",
-            "rp_audit_cb9b15e94fbf442186ddea8389a2f73f",
-            "rp_audit_c12dd7fcf7894c2490d95d18c3097417"
+            "rp_audit_3270f5ed2d1143648a44cd80db224081",
+            "rp_audit_9abee86c7f60493cb3769fbdaf657325",
+            "rp_audit_e81c5c9840c34ff993bc08046252acc5",
+            "rp_audit_80dbcd9ae29b43cd902128ef40847cbd",
+            "rp_audit_17d33a4daeb84f57ba4f50073d5e849f",
+            "rp_audit_6e6d157317944932866fcd05a337011c",
+            "rp_audit_204388710ee84387a757784daaa0176e",
+            "rp_audit_7ac9b89d9d6c412490ca7eebc462dd26",
+            "rp_audit_265163e1d35446918e823293caa2f9ec"
           ],
-          "reportId": "rp_report_183bf6252c904d15884c22e91df17ce2",
+          "reportId": "rp_report_9418433e5ecd4f93854f37063d5e1164",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -13803,12 +13803,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_6ff3888fe0b44d87ab0bc7321c7b0311",
-            "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+            "eventId": "rp_audit_3270f5ed2d1143648a44cd80db224081",
+            "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
             "eventType": "session_created",
-            "createdAtUtc": "2026-08-01T07:46:30.9715403+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.7109834+00:00",
             "payload": {
-              "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+              "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
               "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
               "metadataOnly": true
             },
@@ -13816,10 +13816,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_baeba520e3f54f6f966eb1ab32dc6034",
-            "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+            "eventId": "rp_audit_9abee86c7f60493cb3769fbdaf657325",
+            "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-08-01T07:46:30.9715863+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.7110263+00:00",
             "payload": {
               "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
               "enabled": true,
@@ -13831,12 +13831,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_f0c2622667b14728870b981c53819b48",
-            "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+            "eventId": "rp_audit_e81c5c9840c34ff993bc08046252acc5",
+            "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-08-01T07:46:30.9716191+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.7110735+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_68f8418bf854ae05",
+              "catalogSnapshotId": "rp_catalog_5ffc88ad1dac9674",
               "handleCount": 3,
               "sourceSummary": {
                 "appConfig": 0,
@@ -13851,10 +13851,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_be2b5449e3a849499702750fd680fdcf",
-            "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+            "eventId": "rp_audit_80dbcd9ae29b43cd902128ef40847cbd",
+            "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-08-01T07:46:30.971632+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.7110906+00:00",
             "payload": {
               "camera": 2,
               "model": 0,
@@ -13866,10 +13866,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_cada3e697dc14f0ea4a121ad4b793217",
-            "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+            "eventId": "rp_audit_17d33a4daeb84f57ba4f50073d5e849f",
+            "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-08-01T07:46:30.9717692+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.7112612+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -13880,10 +13880,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_9b08c3e1703547ba802f22e9e46df89d",
-            "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+            "eventId": "rp_audit_6e6d157317944932866fcd05a337011c",
+            "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-08-01T07:46:30.9718557+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.7113535+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -13902,23 +13902,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_a74aae7488df41eda274e296b3c0b4d8",
-            "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+            "eventId": "rp_audit_204388710ee84387a757784daaa0176e",
+            "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-08-01T07:46:30.9718797+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.7113791+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_68f8418bf854ae05",
+              "catalogSnapshotId": "rp_catalog_5ffc88ad1dac9674",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_cb9b15e94fbf442186ddea8389a2f73f",
-            "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+            "eventId": "rp_audit_7ac9b89d9d6c412490ca7eebc462dd26",
+            "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-08-01T07:46:30.9718998+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.7114042+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -13928,12 +13928,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_c12dd7fcf7894c2490d95d18c3097417",
-            "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+            "eventId": "rp_audit_265163e1d35446918e823293caa2f9ec",
+            "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-08-01T07:46:30.9719479+00:00",
+            "createdAtUtc": "2026-08-04T04:17:49.7114559+00:00",
             "payload": {
-              "reportId": "rp_report_183bf6252c904d15884c22e91df17ce2",
+              "reportId": "rp_report_9418433e5ecd4f93854f37063d5e1164",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -13942,19 +13942,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+          "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
+              "status": "rp_session_93984071d49948b7a4d18e0303ec8f73",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_68f8418bf854ae05",
+              "status": "rp_catalog_5ffc88ad1dac9674",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -14064,15 +14064,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_805004d4dba2",
+              "artifactId": "rp_artifact_c68f920bc2d3",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_4bb7920a065346589e1d097c1d15a4f0",
-                "catalogSnapshotId": "rp_catalog_68f8418bf854ae05",
+                "sessionId": "rp_session_93984071d49948b7a4d18e0303ec8f73",
+                "catalogSnapshotId": "rp_catalog_5ffc88ad1dac9674",
                 "handleCount": 3,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -17117,31 +17117,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_111a178f65ea4c6aacedd2285fe70d63",
-        "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
-        "generatedAtUtc": "2026-08-01T07:46:31.7492567+00:00",
+        "reportId": "rp_report_3dd425f8556d449ebb017207b4c9c02b",
+        "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
+        "generatedAtUtc": "2026-08-04T04:17:50.5845581+00:00",
         "session": {
-          "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+          "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
           "status": "completed",
-          "createdAtUtc": "2026-08-01T07:46:31.7489653+00:00",
-          "updatedAtUtc": "2026-08-01T07:46:31.7492786+00:00",
+          "createdAtUtc": "2026-08-04T04:17:50.5842377+00:00",
+          "updatedAtUtc": "2026-08-04T04:17:50.5845784+00:00",
           "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
           "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
-          "catalogSnapshotId": "rp_catalog_c0edbc6dd06ee1e4",
+          "catalogSnapshotId": "rp_catalog_40f2f1830b7586b3",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_bece74b04b3c4c57982dd2550b758cab",
-            "rp_audit_9ea17d9a37354975afb2276f58893862",
-            "rp_audit_60d3572df574431c9b18a8f0f8bedfd7",
-            "rp_audit_152295f5dfab490498960062b3b121df",
-            "rp_audit_8f9c3e7742ab47529a84093afec2310d",
-            "rp_audit_ed2a1438ee104470ac4b3500d07f353e",
-            "rp_audit_3fdf498c0a994078b93d161ce1d76d02",
-            "rp_audit_a0c0f792ed274a3e981364ce799981b4",
-            "rp_audit_bebf7ad655254103a24ae353fe23dbf4"
+            "rp_audit_0ef8ce8db0534b45bad0e65439c940e3",
+            "rp_audit_e6302092413d4f069fcadad2f4e8ee01",
+            "rp_audit_4bf06093aee6445da05dc3caaab7c8ad",
+            "rp_audit_2a049fc5043844ecb87d098e4c8b4b13",
+            "rp_audit_0ef64da51bdd4175b6604aa5c5f32889",
+            "rp_audit_44e9201005ab49bda07073bf8e2e2c85",
+            "rp_audit_bb3a908205a247b580965e3279faf481",
+            "rp_audit_02e7ff71ea2545f783aaeb71e5fd2638",
+            "rp_audit_5a96490b39d64fa9985ae2d7700a8a79"
           ],
-          "reportId": "rp_report_111a178f65ea4c6aacedd2285fe70d63",
+          "reportId": "rp_report_3dd425f8556d449ebb017207b4c9c02b",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -17267,12 +17267,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_bece74b04b3c4c57982dd2550b758cab",
-            "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+            "eventId": "rp_audit_0ef8ce8db0534b45bad0e65439c940e3",
+            "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
             "eventType": "session_created",
-            "createdAtUtc": "2026-08-01T07:46:31.7490014+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.5842785+00:00",
             "payload": {
-              "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+              "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
               "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
               "metadataOnly": true
             },
@@ -17280,10 +17280,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_9ea17d9a37354975afb2276f58893862",
-            "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+            "eventId": "rp_audit_e6302092413d4f069fcadad2f4e8ee01",
+            "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-08-01T07:46:31.7490275+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.5843089+00:00",
             "payload": {
               "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
               "enabled": true,
@@ -17295,12 +17295,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_60d3572df574431c9b18a8f0f8bedfd7",
-            "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+            "eventId": "rp_audit_4bf06093aee6445da05dc3caaab7c8ad",
+            "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-08-01T07:46:31.7490501+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.5843337+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_c0edbc6dd06ee1e4",
+              "catalogSnapshotId": "rp_catalog_40f2f1830b7586b3",
               "handleCount": 3,
               "sourceSummary": {
                 "appConfig": 0,
@@ -17315,10 +17315,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_152295f5dfab490498960062b3b121df",
-            "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+            "eventId": "rp_audit_2a049fc5043844ecb87d098e4c8b4b13",
+            "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-08-01T07:46:31.7490601+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.5843449+00:00",
             "payload": {
               "camera": 2,
               "model": 0,
@@ -17330,10 +17330,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_8f9c3e7742ab47529a84093afec2310d",
-            "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+            "eventId": "rp_audit_0ef64da51bdd4175b6604aa5c5f32889",
+            "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-08-01T07:46:31.7491568+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.5844505+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -17344,10 +17344,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_ed2a1438ee104470ac4b3500d07f353e",
-            "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+            "eventId": "rp_audit_44e9201005ab49bda07073bf8e2e2c85",
+            "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-08-01T07:46:31.7491994+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.5845139+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -17366,23 +17366,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_3fdf498c0a994078b93d161ce1d76d02",
-            "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+            "eventId": "rp_audit_bb3a908205a247b580965e3279faf481",
+            "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-08-01T07:46:31.7492285+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.5845333+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_c0edbc6dd06ee1e4",
+              "catalogSnapshotId": "rp_catalog_40f2f1830b7586b3",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_a0c0f792ed274a3e981364ce799981b4",
-            "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+            "eventId": "rp_audit_02e7ff71ea2545f783aaeb71e5fd2638",
+            "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-08-01T07:46:31.749242+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.5845458+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -17392,12 +17392,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_bebf7ad655254103a24ae353fe23dbf4",
-            "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+            "eventId": "rp_audit_5a96490b39d64fa9985ae2d7700a8a79",
+            "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-08-01T07:46:31.7492747+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.5845748+00:00",
             "payload": {
-              "reportId": "rp_report_111a178f65ea4c6aacedd2285fe70d63",
+              "reportId": "rp_report_3dd425f8556d449ebb017207b4c9c02b",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -17406,19 +17406,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+          "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
+              "status": "rp_session_5763310592844af9aaf784e8062538fc",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_c0edbc6dd06ee1e4",
+              "status": "rp_catalog_40f2f1830b7586b3",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -17528,15 +17528,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_e495663acd3b",
+              "artifactId": "rp_artifact_deacd9ca54a0",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_a49e535e38c64503a24ab8e6afd3c07b",
-                "catalogSnapshotId": "rp_catalog_c0edbc6dd06ee1e4",
+                "sessionId": "rp_session_5763310592844af9aaf784e8062538fc",
+                "catalogSnapshotId": "rp_catalog_40f2f1830b7586b3",
                 "handleCount": 3,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -18066,31 +18066,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_a775ca8412aa4a59a126df68b2c3d42b",
-        "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
-        "generatedAtUtc": "2026-08-01T07:46:31.8532036+00:00",
+        "reportId": "rp_report_5d203060452a4179a02a37949740313b",
+        "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
+        "generatedAtUtc": "2026-08-04T04:17:50.6831428+00:00",
         "session": {
-          "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
+          "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
           "status": "completed",
-          "createdAtUtc": "2026-08-01T07:46:31.8529006+00:00",
-          "updatedAtUtc": "2026-08-01T07:46:31.8532226+00:00",
+          "createdAtUtc": "2026-08-04T04:17:50.6828492+00:00",
+          "updatedAtUtc": "2026-08-04T04:17:50.6831633+00:00",
           "workflowDraftHash": "d7d93fa8050ae07e9016a074a22cd708ed977220921d2f558876d198f80e041d",
           "pilotConfigRevision": "27f3c8975740eefc9e354224377c4ccca3ccff1e466110affc8840a4c5e7bb36",
-          "catalogSnapshotId": "rp_catalog_c4518638d83807e8",
+          "catalogSnapshotId": "rp_catalog_1e267269ff043147",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_bdc76b41a9074517a34150454900a544",
-            "rp_audit_7b60d71e94f243a98ab7c8027185405e",
-            "rp_audit_97bad16e28a94f77ad63ad620e04d2ca",
-            "rp_audit_9655dbd8cdb5409ab1f2f872ac0d2887",
-            "rp_audit_3dd7a3d52cc54411979432349afa7b81",
-            "rp_audit_bb70887588bf4aff835e5f9142fa6a6b",
-            "rp_audit_7fc51ffcaf024c578a42140b17864557",
-            "rp_audit_ef81303e705b4baeb4b0d1b6f2f563e4",
-            "rp_audit_f070b68b867b4a20be4802065d84d651"
+            "rp_audit_2bbfd5d567fe41c58433e997c23dc99c",
+            "rp_audit_65956391eea64093b0ac25517e72a71b",
+            "rp_audit_993ae2cd4c154d97909ebd0014f43d36",
+            "rp_audit_3124c2ff5ec041dd83c914cf5a2fafdf",
+            "rp_audit_4949509707de4f4f8903fda651c547a7",
+            "rp_audit_ca80350ef38544c5ac67c575a3488382",
+            "rp_audit_53b159eaab2d42b4a6b3ec6925dd9a05",
+            "rp_audit_1c23bceb8ba54900b5e13cc4e887ac29",
+            "rp_audit_8b7ed97cd5124e8cb7fcd293f9076927"
           ],
-          "reportId": "rp_report_a775ca8412aa4a59a126df68b2c3d42b",
+          "reportId": "rp_report_5d203060452a4179a02a37949740313b",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -18181,12 +18181,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_bdc76b41a9074517a34150454900a544",
-            "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
+            "eventId": "rp_audit_2bbfd5d567fe41c58433e997c23dc99c",
+            "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
             "eventType": "session_created",
-            "createdAtUtc": "2026-08-01T07:46:31.8529309+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.6828902+00:00",
             "payload": {
-              "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
+              "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
               "workflowDraftHash": "d7d93fa8050ae07e9016a074a22cd708ed977220921d2f558876d198f80e041d",
               "metadataOnly": true
             },
@@ -18194,10 +18194,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_7b60d71e94f243a98ab7c8027185405e",
-            "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
+            "eventId": "rp_audit_65956391eea64093b0ac25517e72a71b",
+            "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-08-01T07:46:31.8529519+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.6829205+00:00",
             "payload": {
               "pilotConfigRevision": "27f3c8975740eefc9e354224377c4ccca3ccff1e466110affc8840a4c5e7bb36",
               "enabled": true,
@@ -18209,12 +18209,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_97bad16e28a94f77ad63ad620e04d2ca",
-            "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
+            "eventId": "rp_audit_993ae2cd4c154d97909ebd0014f43d36",
+            "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-08-01T07:46:31.8529718+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.6829459+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_c4518638d83807e8",
+              "catalogSnapshotId": "rp_catalog_1e267269ff043147",
               "handleCount": 1,
               "sourceSummary": {
                 "appConfig": 0,
@@ -18229,10 +18229,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_9655dbd8cdb5409ab1f2f872ac0d2887",
-            "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
+            "eventId": "rp_audit_3124c2ff5ec041dd83c914cf5a2fafdf",
+            "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-08-01T07:46:31.8529835+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.6829629+00:00",
             "payload": {
               "camera": 1,
               "model": 0,
@@ -18244,10 +18244,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_3dd7a3d52cc54411979432349afa7b81",
-            "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
+            "eventId": "rp_audit_4949509707de4f4f8903fda651c547a7",
+            "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-08-01T07:46:31.8530925+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.6830415+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -18258,10 +18258,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_bb70887588bf4aff835e5f9142fa6a6b",
-            "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
+            "eventId": "rp_audit_ca80350ef38544c5ac67c575a3488382",
+            "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-08-01T07:46:31.8531357+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.6830986+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -18280,23 +18280,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_7fc51ffcaf024c578a42140b17864557",
-            "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
+            "eventId": "rp_audit_53b159eaab2d42b4a6b3ec6925dd9a05",
+            "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-08-01T07:46:31.8531673+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.6831197+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_c4518638d83807e8",
+              "catalogSnapshotId": "rp_catalog_1e267269ff043147",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_ef81303e705b4baeb4b0d1b6f2f563e4",
-            "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
+            "eventId": "rp_audit_1c23bceb8ba54900b5e13cc4e887ac29",
+            "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-08-01T07:46:31.8531834+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.6831309+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -18306,12 +18306,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_f070b68b867b4a20be4802065d84d651",
-            "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
+            "eventId": "rp_audit_8b7ed97cd5124e8cb7fcd293f9076927",
+            "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-08-01T07:46:31.853219+00:00",
+            "createdAtUtc": "2026-08-04T04:17:50.6831598+00:00",
             "payload": {
-              "reportId": "rp_report_a775ca8412aa4a59a126df68b2c3d42b",
+              "reportId": "rp_report_5d203060452a4179a02a37949740313b",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -18320,19 +18320,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
+          "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_c0891df6952e45c883179d33721da985",
+              "status": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_c4518638d83807e8",
+              "status": "rp_catalog_1e267269ff043147",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -18429,15 +18429,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_d44e8066cbbc",
+              "artifactId": "rp_artifact_4c6dc2c7addf",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_c0891df6952e45c883179d33721da985",
-                "catalogSnapshotId": "rp_catalog_c4518638d83807e8",
+                "sessionId": "rp_session_d6f5232a4df344c6a7548a60f113b8e3",
+                "catalogSnapshotId": "rp_catalog_1e267269ff043147",
                 "handleCount": 1,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -22722,31 +22722,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_54b7aefa38914b788e410d61c077acad",
-        "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
-        "generatedAtUtc": "2026-08-01T07:46:33.0239789+00:00",
+        "reportId": "rp_report_dc2e07d7831b4c6e96eb7fa2476abc35",
+        "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
+        "generatedAtUtc": "2026-08-04T04:17:51.8721324+00:00",
         "session": {
-          "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+          "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
           "status": "completed",
-          "createdAtUtc": "2026-08-01T07:46:33.0237204+00:00",
-          "updatedAtUtc": "2026-08-01T07:46:33.0239919+00:00",
+          "createdAtUtc": "2026-08-04T04:17:51.8718186+00:00",
+          "updatedAtUtc": "2026-08-04T04:17:51.8721484+00:00",
           "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
           "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
-          "catalogSnapshotId": "rp_catalog_5e467a98e979d2f6",
+          "catalogSnapshotId": "rp_catalog_b0c5bb9370763437",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_63f3e1d86d234c36bb95da4017c550ed",
-            "rp_audit_7bff288762504a0484b0deae84b720d6",
-            "rp_audit_c3aa3e2b129a459faf866b101bced391",
-            "rp_audit_6a4ca15402a245bbadd658ad50d992bf",
-            "rp_audit_3eb6d331bc564b05b15938b92a10ec5e",
-            "rp_audit_b7df08843dce404e9a2494337a122929",
-            "rp_audit_d982fe1586504a7a8d6cf69129e1880e",
-            "rp_audit_f5e41e831f804b47addcd92518b1290a",
-            "rp_audit_08c7a1dc713c464a8f50be6a6fc99c81"
+            "rp_audit_56b67c80586e4fad9dd02ae9b0e81860",
+            "rp_audit_c40c5d1c39824deb8d380d0129120e3e",
+            "rp_audit_1e274b8fed794ed7913995b69b714599",
+            "rp_audit_73a367aadaf647fc9cca8f40a89c1048",
+            "rp_audit_001aafa8d6dd497dafc563deafe21074",
+            "rp_audit_563be9a37cf545cdb974e8439f9e4fa0",
+            "rp_audit_113153a136c04781b1e85d061479c053",
+            "rp_audit_8638224fea11488caf0ea00ee2a21cda",
+            "rp_audit_06c6fa37be564012adce316825b8732e"
           ],
-          "reportId": "rp_report_54b7aefa38914b788e410d61c077acad",
+          "reportId": "rp_report_dc2e07d7831b4c6e96eb7fa2476abc35",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -22872,12 +22872,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_63f3e1d86d234c36bb95da4017c550ed",
-            "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+            "eventId": "rp_audit_56b67c80586e4fad9dd02ae9b0e81860",
+            "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
             "eventType": "session_created",
-            "createdAtUtc": "2026-08-01T07:46:33.0237583+00:00",
+            "createdAtUtc": "2026-08-04T04:17:51.8718815+00:00",
             "payload": {
-              "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+              "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
               "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
               "metadataOnly": true
             },
@@ -22885,10 +22885,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_7bff288762504a0484b0deae84b720d6",
-            "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+            "eventId": "rp_audit_c40c5d1c39824deb8d380d0129120e3e",
+            "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-08-01T07:46:33.0237795+00:00",
+            "createdAtUtc": "2026-08-04T04:17:51.8719102+00:00",
             "payload": {
               "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
               "enabled": true,
@@ -22900,12 +22900,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_c3aa3e2b129a459faf866b101bced391",
-            "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+            "eventId": "rp_audit_1e274b8fed794ed7913995b69b714599",
+            "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-08-01T07:46:33.0237984+00:00",
+            "createdAtUtc": "2026-08-04T04:17:51.8719398+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_5e467a98e979d2f6",
+              "catalogSnapshotId": "rp_catalog_b0c5bb9370763437",
               "handleCount": 3,
               "sourceSummary": {
                 "appConfig": 0,
@@ -22920,10 +22920,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_6a4ca15402a245bbadd658ad50d992bf",
-            "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+            "eventId": "rp_audit_73a367aadaf647fc9cca8f40a89c1048",
+            "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-08-01T07:46:33.0238125+00:00",
+            "createdAtUtc": "2026-08-04T04:17:51.8719491+00:00",
             "payload": {
               "camera": 2,
               "model": 0,
@@ -22935,10 +22935,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_3eb6d331bc564b05b15938b92a10ec5e",
-            "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+            "eventId": "rp_audit_001aafa8d6dd497dafc563deafe21074",
+            "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-08-01T07:46:33.0239077+00:00",
+            "createdAtUtc": "2026-08-04T04:17:51.8720494+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -22949,10 +22949,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_b7df08843dce404e9a2494337a122929",
-            "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+            "eventId": "rp_audit_563be9a37cf545cdb974e8439f9e4fa0",
+            "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-08-01T07:46:33.0239401+00:00",
+            "createdAtUtc": "2026-08-04T04:17:51.8720935+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -22971,23 +22971,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_d982fe1586504a7a8d6cf69129e1880e",
-            "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+            "eventId": "rp_audit_113153a136c04781b1e85d061479c053",
+            "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-08-01T07:46:33.0239517+00:00",
+            "createdAtUtc": "2026-08-04T04:17:51.8721082+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_5e467a98e979d2f6",
+              "catalogSnapshotId": "rp_catalog_b0c5bb9370763437",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_f5e41e831f804b47addcd92518b1290a",
-            "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+            "eventId": "rp_audit_8638224fea11488caf0ea00ee2a21cda",
+            "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-08-01T07:46:33.0239615+00:00",
+            "createdAtUtc": "2026-08-04T04:17:51.8721187+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -22997,12 +22997,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_08c7a1dc713c464a8f50be6a6fc99c81",
-            "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+            "eventId": "rp_audit_06c6fa37be564012adce316825b8732e",
+            "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-08-01T07:46:33.0239885+00:00",
+            "createdAtUtc": "2026-08-04T04:17:51.8721447+00:00",
             "payload": {
-              "reportId": "rp_report_54b7aefa38914b788e410d61c077acad",
+              "reportId": "rp_report_dc2e07d7831b4c6e96eb7fa2476abc35",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -23011,19 +23011,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+          "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
+              "status": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_5e467a98e979d2f6",
+              "status": "rp_catalog_b0c5bb9370763437",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -23133,15 +23133,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_d50e535013e5",
+              "artifactId": "rp_artifact_6f1e3b3649af",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_eb9c9d1f28c44309bb1ba6df4a407997",
-                "catalogSnapshotId": "rp_catalog_5e467a98e979d2f6",
+                "sessionId": "rp_session_83749e234c6f48db853f8ef7b2bf4bb9",
+                "catalogSnapshotId": "rp_catalog_b0c5bb9370763437",
                 "handleCount": 3,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -24865,31 +24865,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_b15c40a64aef418d9517e6ed504b1f13",
-        "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
-        "generatedAtUtc": "2026-08-01T07:46:33.4242916+00:00",
+        "reportId": "rp_report_7da1e3658cd5409e884595320ab9b749",
+        "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
+        "generatedAtUtc": "2026-08-04T04:17:52.354769+00:00",
         "session": {
-          "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+          "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
           "status": "completed",
-          "createdAtUtc": "2026-08-01T07:46:33.4240574+00:00",
-          "updatedAtUtc": "2026-08-01T07:46:33.4243036+00:00",
+          "createdAtUtc": "2026-08-04T04:17:52.3545578+00:00",
+          "updatedAtUtc": "2026-08-04T04:17:52.3547814+00:00",
           "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
           "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
-          "catalogSnapshotId": "rp_catalog_1122e97b3c97b3fc",
+          "catalogSnapshotId": "rp_catalog_f0cf108c274a56bd",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_4e6c37108cb44a78bcb08730e2792deb",
-            "rp_audit_a3626784b04d411f9ff9cbe0c290a7fc",
-            "rp_audit_f005241c18aa4ac68b496bcb6e1dcee1",
-            "rp_audit_3dfdc21526704d96a8d1deb5118f6749",
-            "rp_audit_2bded31c6a2b4243bd6f30fd73b817e7",
-            "rp_audit_9a157a19456c43ce8f18544656a537e9",
-            "rp_audit_e9586827f18f4f0a8057733341ed63d1",
-            "rp_audit_4b74e54d3a57481c8f8ea28639499b7e",
-            "rp_audit_c92e4fcf9a8046219e69b58e6d55eee5"
+            "rp_audit_96252c4824134a0d8df515707e6dd13c",
+            "rp_audit_f3a58731afda46f88e0c6dbe6cb222e9",
+            "rp_audit_031728e76c7c41aeb235c545b7b3854d",
+            "rp_audit_b992fe6089f44bf2825cda13bcedad81",
+            "rp_audit_22a617e8c3e340069e0408cc04529652",
+            "rp_audit_3ad80cf72d8249039de5e0ffa9fe7f9c",
+            "rp_audit_4793ec4ffce349ef927602e31c9d8e63",
+            "rp_audit_34e3a9bbe9f04a59bd7c6a9e3032936a",
+            "rp_audit_9731d676fdc54670911801dac5c72e99"
           ],
-          "reportId": "rp_report_b15c40a64aef418d9517e6ed504b1f13",
+          "reportId": "rp_report_7da1e3658cd5409e884595320ab9b749",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -25015,12 +25015,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_4e6c37108cb44a78bcb08730e2792deb",
-            "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+            "eventId": "rp_audit_96252c4824134a0d8df515707e6dd13c",
+            "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
             "eventType": "session_created",
-            "createdAtUtc": "2026-08-01T07:46:33.4240812+00:00",
+            "createdAtUtc": "2026-08-04T04:17:52.354581+00:00",
             "payload": {
-              "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+              "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
               "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
               "metadataOnly": true
             },
@@ -25028,10 +25028,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_a3626784b04d411f9ff9cbe0c290a7fc",
-            "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+            "eventId": "rp_audit_f3a58731afda46f88e0c6dbe6cb222e9",
+            "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-08-01T07:46:33.4240974+00:00",
+            "createdAtUtc": "2026-08-04T04:17:52.354598+00:00",
             "payload": {
               "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
               "enabled": true,
@@ -25043,12 +25043,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_f005241c18aa4ac68b496bcb6e1dcee1",
-            "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+            "eventId": "rp_audit_031728e76c7c41aeb235c545b7b3854d",
+            "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-08-01T07:46:33.4241145+00:00",
+            "createdAtUtc": "2026-08-04T04:17:52.3546168+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_1122e97b3c97b3fc",
+              "catalogSnapshotId": "rp_catalog_f0cf108c274a56bd",
               "handleCount": 3,
               "sourceSummary": {
                 "appConfig": 0,
@@ -25063,10 +25063,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_3dfdc21526704d96a8d1deb5118f6749",
-            "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+            "eventId": "rp_audit_b992fe6089f44bf2825cda13bcedad81",
+            "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-08-01T07:46:33.4241236+00:00",
+            "createdAtUtc": "2026-08-04T04:17:52.3546254+00:00",
             "payload": {
               "camera": 2,
               "model": 0,
@@ -25078,10 +25078,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_2bded31c6a2b4243bd6f30fd73b817e7",
-            "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+            "eventId": "rp_audit_22a617e8c3e340069e0408cc04529652",
+            "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-08-01T07:46:33.4242241+00:00",
+            "createdAtUtc": "2026-08-04T04:17:52.3547036+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -25092,10 +25092,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_9a157a19456c43ce8f18544656a537e9",
-            "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+            "eventId": "rp_audit_3ad80cf72d8249039de5e0ffa9fe7f9c",
+            "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-08-01T07:46:33.4242559+00:00",
+            "createdAtUtc": "2026-08-04T04:17:52.354736+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -25114,23 +25114,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_e9586827f18f4f0a8057733341ed63d1",
-            "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+            "eventId": "rp_audit_4793ec4ffce349ef927602e31c9d8e63",
+            "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-08-01T07:46:33.4242683+00:00",
+            "createdAtUtc": "2026-08-04T04:17:52.3547477+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_1122e97b3c97b3fc",
+              "catalogSnapshotId": "rp_catalog_f0cf108c274a56bd",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_4b74e54d3a57481c8f8ea28639499b7e",
-            "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+            "eventId": "rp_audit_34e3a9bbe9f04a59bd7c6a9e3032936a",
+            "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-08-01T07:46:33.4242794+00:00",
+            "createdAtUtc": "2026-08-04T04:17:52.3547559+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -25140,12 +25140,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_c92e4fcf9a8046219e69b58e6d55eee5",
-            "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+            "eventId": "rp_audit_9731d676fdc54670911801dac5c72e99",
+            "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-08-01T07:46:33.4243005+00:00",
+            "createdAtUtc": "2026-08-04T04:17:52.3547782+00:00",
             "payload": {
-              "reportId": "rp_report_b15c40a64aef418d9517e6ed504b1f13",
+              "reportId": "rp_report_7da1e3658cd5409e884595320ab9b749",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -25154,19 +25154,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+          "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
+              "status": "rp_session_c3981e32247442f7bb14716b92f86a43",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_1122e97b3c97b3fc",
+              "status": "rp_catalog_f0cf108c274a56bd",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -25276,15 +25276,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_c2e669f95554",
+              "artifactId": "rp_artifact_6f7d6b5bc939",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_b4e7ca0f71a1491ebcc628c9724423f8",
-                "catalogSnapshotId": "rp_catalog_1122e97b3c97b3fc",
+                "sessionId": "rp_session_c3981e32247442f7bb14716b92f86a43",
+                "catalogSnapshotId": "rp_catalog_f0cf108c274a56bd",
                 "handleCount": 3,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -28188,31 +28188,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_3c8207c36d944dd6a2961601834575a0",
-        "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
-        "generatedAtUtc": "2026-08-01T07:46:34.1432219+00:00",
+        "reportId": "rp_report_165140b3f3a443a894201cfd09ad725a",
+        "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
+        "generatedAtUtc": "2026-08-04T04:17:53.0711501+00:00",
         "session": {
-          "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
+          "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
           "status": "completed",
-          "createdAtUtc": "2026-08-01T07:46:34.1430126+00:00",
-          "updatedAtUtc": "2026-08-01T07:46:34.1432341+00:00",
+          "createdAtUtc": "2026-08-04T04:17:53.070922+00:00",
+          "updatedAtUtc": "2026-08-04T04:17:53.0711637+00:00",
           "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
           "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
-          "catalogSnapshotId": "rp_catalog_7e29e7a9fd65080a",
+          "catalogSnapshotId": "rp_catalog_0c941184c5916cb7",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_27d25451df5048b0a2fd2679c6aa71bc",
-            "rp_audit_3ce524326ca24eac90d56f336f517601",
-            "rp_audit_5065511f7a2744118afbbc04ae4feb69",
-            "rp_audit_b56af25cda7e4921898cea3c15ddd429",
-            "rp_audit_5c8964d1b45f44979b27923cbdbba9b8",
-            "rp_audit_2e18f9cfee4441878611d93b70819c9e",
-            "rp_audit_f78da718fd104496a4fc1acd3a7e9815",
-            "rp_audit_b0e33c8a9dc44d3ba53b843746112006",
-            "rp_audit_90c3e9b255c74ac5aa2ea7e20c4ef570"
+            "rp_audit_0c39d425c74a485e886df76da9dacf1f",
+            "rp_audit_74024e210bb64731a995cf5c6362eb1d",
+            "rp_audit_1aea2a742e764356a779a36dc9c1b9f3",
+            "rp_audit_7783de6a48784f6fb7420bd4fbb49277",
+            "rp_audit_5a04f897a21e4adab150fb14b8efd69f",
+            "rp_audit_a70fd87d7dd64a408d0f2a3705a4ff40",
+            "rp_audit_f73608e0097d44438488be7f68d6fa6b",
+            "rp_audit_2413ef168dc94dc3ae7975748a77df4e",
+            "rp_audit_cf11a5352f4d4ebc93808be23a2a3f7d"
           ],
-          "reportId": "rp_report_3c8207c36d944dd6a2961601834575a0",
+          "reportId": "rp_report_165140b3f3a443a894201cfd09ad725a",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -28338,12 +28338,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_27d25451df5048b0a2fd2679c6aa71bc",
-            "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
+            "eventId": "rp_audit_0c39d425c74a485e886df76da9dacf1f",
+            "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
             "eventType": "session_created",
-            "createdAtUtc": "2026-08-01T07:46:34.1430351+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.070948+00:00",
             "payload": {
-              "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
+              "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
               "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
               "metadataOnly": true
             },
@@ -28351,10 +28351,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_3ce524326ca24eac90d56f336f517601",
-            "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
+            "eventId": "rp_audit_74024e210bb64731a995cf5c6362eb1d",
+            "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-08-01T07:46:34.1430515+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.0709657+00:00",
             "payload": {
               "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
               "enabled": true,
@@ -28366,12 +28366,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_5065511f7a2744118afbbc04ae4feb69",
-            "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
+            "eventId": "rp_audit_1aea2a742e764356a779a36dc9c1b9f3",
+            "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-08-01T07:46:34.1430672+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.0709844+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_7e29e7a9fd65080a",
+              "catalogSnapshotId": "rp_catalog_0c941184c5916cb7",
               "handleCount": 3,
               "sourceSummary": {
                 "appConfig": 0,
@@ -28386,10 +28386,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_b56af25cda7e4921898cea3c15ddd429",
-            "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
+            "eventId": "rp_audit_7783de6a48784f6fb7420bd4fbb49277",
+            "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-08-01T07:46:34.1430796+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.0709959+00:00",
             "payload": {
               "camera": 2,
               "model": 0,
@@ -28401,10 +28401,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_5c8964d1b45f44979b27923cbdbba9b8",
-            "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
+            "eventId": "rp_audit_5a04f897a21e4adab150fb14b8efd69f",
+            "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-08-01T07:46:34.1431555+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.0710754+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -28415,10 +28415,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_2e18f9cfee4441878611d93b70819c9e",
-            "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
+            "eventId": "rp_audit_a70fd87d7dd64a408d0f2a3705a4ff40",
+            "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-08-01T07:46:34.143188+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.0711138+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -28437,23 +28437,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_f78da718fd104496a4fc1acd3a7e9815",
-            "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
+            "eventId": "rp_audit_f73608e0097d44438488be7f68d6fa6b",
+            "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-08-01T07:46:34.1432006+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.0711267+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_7e29e7a9fd65080a",
+              "catalogSnapshotId": "rp_catalog_0c941184c5916cb7",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_b0e33c8a9dc44d3ba53b843746112006",
-            "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
+            "eventId": "rp_audit_2413ef168dc94dc3ae7975748a77df4e",
+            "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-08-01T07:46:34.143209+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.071135+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -28463,12 +28463,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_90c3e9b255c74ac5aa2ea7e20c4ef570",
-            "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
+            "eventId": "rp_audit_cf11a5352f4d4ebc93808be23a2a3f7d",
+            "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-08-01T07:46:34.1432311+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.0711606+00:00",
             "payload": {
-              "reportId": "rp_report_3c8207c36d944dd6a2961601834575a0",
+              "reportId": "rp_report_165140b3f3a443a894201cfd09ad725a",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -28477,19 +28477,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
+          "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_da57c34a38d741f7a66e3842b769dace",
+              "status": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_7e29e7a9fd65080a",
+              "status": "rp_catalog_0c941184c5916cb7",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -28599,15 +28599,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_be77851b61df",
+              "artifactId": "rp_artifact_b924ad91e03d",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_da57c34a38d741f7a66e3842b769dace",
-                "catalogSnapshotId": "rp_catalog_7e29e7a9fd65080a",
+                "sessionId": "rp_session_e40fb8e1d32a4d96abaf58fe72e300aa",
+                "catalogSnapshotId": "rp_catalog_0c941184c5916cb7",
                 "handleCount": 3,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -31511,31 +31511,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_b4cabaa9c6744568b7b64d408f3012dc",
-        "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
-        "generatedAtUtc": "2026-08-01T07:46:34.8354385+00:00",
+        "reportId": "rp_report_efe779c65046421eac58af0ed53328d8",
+        "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
+        "generatedAtUtc": "2026-08-04T04:17:53.8223777+00:00",
         "session": {
-          "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
+          "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
           "status": "completed",
-          "createdAtUtc": "2026-08-01T07:46:34.8351631+00:00",
-          "updatedAtUtc": "2026-08-01T07:46:34.8354526+00:00",
+          "createdAtUtc": "2026-08-04T04:17:53.8221705+00:00",
+          "updatedAtUtc": "2026-08-04T04:17:53.8223901+00:00",
           "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
           "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
-          "catalogSnapshotId": "rp_catalog_ad6de7ca75bfd69e",
+          "catalogSnapshotId": "rp_catalog_5d56a11644316066",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_ed58119f5b7041c69b97d58d871df66a",
-            "rp_audit_9d85e9460f71431ea2933b3d3d0fe190",
-            "rp_audit_5c7ed408a164470e8e001ddd416e9192",
-            "rp_audit_eef41af2ed2b457bb90373c2ce47072b",
-            "rp_audit_94cf98beea9147d3aad3768611d49b4b",
-            "rp_audit_e832eb0aae5a483c83048ab45c7e71f7",
-            "rp_audit_c702df06a2024c25bea3449d1185f7d8",
-            "rp_audit_143066d711e0470791058251a8359703",
-            "rp_audit_4d8421f8a8f54eee95326cd0efd141c5"
+            "rp_audit_0c7e4255ee38411fbcb6f972f3b9391b",
+            "rp_audit_80e41f8c16e5448da3ed1c9bee364822",
+            "rp_audit_9f6a5888aa594445af222bc14dc0551b",
+            "rp_audit_6623bb3cc25543f2b9d83b59f447a79a",
+            "rp_audit_8727af6dbb97477f852609a7c52a67e5",
+            "rp_audit_cbd3b502e06f433082cb0546d5b47cac",
+            "rp_audit_957bbaff68b242c28b1534c74cc3f55a",
+            "rp_audit_9547b1aab2ca4f279af355eac377717e",
+            "rp_audit_5a348b61a02241e5a47df564bc946754"
           ],
-          "reportId": "rp_report_b4cabaa9c6744568b7b64d408f3012dc",
+          "reportId": "rp_report_efe779c65046421eac58af0ed53328d8",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -31661,12 +31661,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_ed58119f5b7041c69b97d58d871df66a",
-            "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
+            "eventId": "rp_audit_0c7e4255ee38411fbcb6f972f3b9391b",
+            "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
             "eventType": "session_created",
-            "createdAtUtc": "2026-08-01T07:46:34.835186+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.8221934+00:00",
             "payload": {
-              "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
+              "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
               "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
               "metadataOnly": true
             },
@@ -31674,10 +31674,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_9d85e9460f71431ea2933b3d3d0fe190",
-            "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
+            "eventId": "rp_audit_80e41f8c16e5448da3ed1c9bee364822",
+            "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-08-01T07:46:34.8352016+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.82221+00:00",
             "payload": {
               "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
               "enabled": true,
@@ -31689,12 +31689,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_5c7ed408a164470e8e001ddd416e9192",
-            "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
+            "eventId": "rp_audit_9f6a5888aa594445af222bc14dc0551b",
+            "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-08-01T07:46:34.835218+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.8222262+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_ad6de7ca75bfd69e",
+              "catalogSnapshotId": "rp_catalog_5d56a11644316066",
               "handleCount": 3,
               "sourceSummary": {
                 "appConfig": 0,
@@ -31709,10 +31709,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_eef41af2ed2b457bb90373c2ce47072b",
-            "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
+            "eventId": "rp_audit_6623bb3cc25543f2b9d83b59f447a79a",
+            "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-08-01T07:46:34.8352366+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.822234+00:00",
             "payload": {
               "camera": 2,
               "model": 0,
@@ -31724,10 +31724,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_94cf98beea9147d3aad3768611d49b4b",
-            "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
+            "eventId": "rp_audit_8727af6dbb97477f852609a7c52a67e5",
+            "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-08-01T07:46:34.8353582+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.822313+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -31738,10 +31738,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_e832eb0aae5a483c83048ab45c7e71f7",
-            "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
+            "eventId": "rp_audit_cbd3b502e06f433082cb0546d5b47cac",
+            "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-08-01T07:46:34.8353949+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.8223438+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -31760,23 +31760,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_c702df06a2024c25bea3449d1185f7d8",
-            "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
+            "eventId": "rp_audit_957bbaff68b242c28b1534c74cc3f55a",
+            "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-08-01T07:46:34.835407+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.8223557+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_ad6de7ca75bfd69e",
+              "catalogSnapshotId": "rp_catalog_5d56a11644316066",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_143066d711e0470791058251a8359703",
-            "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
+            "eventId": "rp_audit_9547b1aab2ca4f279af355eac377717e",
+            "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-08-01T07:46:34.8354217+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.8223638+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -31786,12 +31786,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_4d8421f8a8f54eee95326cd0efd141c5",
-            "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
+            "eventId": "rp_audit_5a348b61a02241e5a47df564bc946754",
+            "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-08-01T07:46:34.8354487+00:00",
+            "createdAtUtc": "2026-08-04T04:17:53.8223867+00:00",
             "payload": {
-              "reportId": "rp_report_b4cabaa9c6744568b7b64d408f3012dc",
+              "reportId": "rp_report_efe779c65046421eac58af0ed53328d8",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -31800,19 +31800,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
+          "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_8477071a58f646548b9a9cd95210f3db",
+              "status": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_ad6de7ca75bfd69e",
+              "status": "rp_catalog_5d56a11644316066",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -31922,15 +31922,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_019152862784",
+              "artifactId": "rp_artifact_a1203e8f8e9c",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_8477071a58f646548b9a9cd95210f3db",
-                "catalogSnapshotId": "rp_catalog_ad6de7ca75bfd69e",
+                "sessionId": "rp_session_5492a082f5374b85a0d602bbba47d8d9",
+                "catalogSnapshotId": "rp_catalog_5d56a11644316066",
                 "handleCount": 3,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -34834,31 +34834,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_75843459c219428b8b4be51dc07e432a",
-        "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
-        "generatedAtUtc": "2026-08-01T07:46:35.5440242+00:00",
+        "reportId": "rp_report_cac1d8df78fb494d88559e62b4da333f",
+        "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
+        "generatedAtUtc": "2026-08-04T04:17:54.5674732+00:00",
         "session": {
-          "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
+          "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
           "status": "completed",
-          "createdAtUtc": "2026-08-01T07:46:35.5438151+00:00",
-          "updatedAtUtc": "2026-08-01T07:46:35.5440392+00:00",
+          "createdAtUtc": "2026-08-04T04:17:54.5672491+00:00",
+          "updatedAtUtc": "2026-08-04T04:17:54.5674954+00:00",
           "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
           "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
-          "catalogSnapshotId": "rp_catalog_e6dbc4225f11cfda",
+          "catalogSnapshotId": "rp_catalog_4b75a824dc4dfba6",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_f094dd07304e4b389b38aba7af7c60e8",
-            "rp_audit_1b3c2390c2af448cb7bdd023480135d3",
-            "rp_audit_4a9ca91a07e149fbbccb4e454ccb26b6",
-            "rp_audit_a932236333bb4128b161005c660d7249",
-            "rp_audit_a597ddcd017a4a7194d8fe9c52d1d4f1",
-            "rp_audit_3d3d3f18cad04bdea632eb4bae746266",
-            "rp_audit_3e4eed0460ad47d98f79586f379c19a9",
-            "rp_audit_d1d9874962e04495a90e8e7a44e7bf7f",
-            "rp_audit_e757031b27bc40eea1d75a74fa52d52d"
+            "rp_audit_2b63b4bdd8ae4fb9890d1ac82b5a4f86",
+            "rp_audit_b56989f80a9a4f848eb86072d1184161",
+            "rp_audit_b67fff2bef8342a79a7009f809cee09e",
+            "rp_audit_fa78e119b24741b8a7473b921838c0d8",
+            "rp_audit_1f11410e780c4083bed226d3207a476b",
+            "rp_audit_748c0da9ce55408d85468378119782fc",
+            "rp_audit_61d7e5e81df04e689e1e9eaecff063c9",
+            "rp_audit_43b046e16f134550bfa93f67717150bb",
+            "rp_audit_5724b70ea41f4d5a961b0bcb766bf2ac"
           ],
-          "reportId": "rp_report_75843459c219428b8b4be51dc07e432a",
+          "reportId": "rp_report_cac1d8df78fb494d88559e62b4da333f",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -34984,12 +34984,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_f094dd07304e4b389b38aba7af7c60e8",
-            "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
+            "eventId": "rp_audit_2b63b4bdd8ae4fb9890d1ac82b5a4f86",
+            "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
             "eventType": "session_created",
-            "createdAtUtc": "2026-08-01T07:46:35.543837+00:00",
+            "createdAtUtc": "2026-08-04T04:17:54.5672741+00:00",
             "payload": {
-              "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
+              "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
               "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
               "metadataOnly": true
             },
@@ -34997,10 +34997,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_1b3c2390c2af448cb7bdd023480135d3",
-            "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
+            "eventId": "rp_audit_b56989f80a9a4f848eb86072d1184161",
+            "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-08-01T07:46:35.5438529+00:00",
+            "createdAtUtc": "2026-08-04T04:17:54.5672905+00:00",
             "payload": {
               "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
               "enabled": true,
@@ -35012,12 +35012,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_4a9ca91a07e149fbbccb4e454ccb26b6",
-            "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
+            "eventId": "rp_audit_b67fff2bef8342a79a7009f809cee09e",
+            "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-08-01T07:46:35.5438681+00:00",
+            "createdAtUtc": "2026-08-04T04:17:54.5673092+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_e6dbc4225f11cfda",
+              "catalogSnapshotId": "rp_catalog_4b75a824dc4dfba6",
               "handleCount": 3,
               "sourceSummary": {
                 "appConfig": 0,
@@ -35032,10 +35032,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_a932236333bb4128b161005c660d7249",
-            "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
+            "eventId": "rp_audit_fa78e119b24741b8a7473b921838c0d8",
+            "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-08-01T07:46:35.5438764+00:00",
+            "createdAtUtc": "2026-08-04T04:17:54.5673168+00:00",
             "payload": {
               "camera": 2,
               "model": 0,
@@ -35047,10 +35047,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_a597ddcd017a4a7194d8fe9c52d1d4f1",
-            "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
+            "eventId": "rp_audit_1f11410e780c4083bed226d3207a476b",
+            "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-08-01T07:46:35.5439579+00:00",
+            "createdAtUtc": "2026-08-04T04:17:54.5674009+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -35061,10 +35061,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_3d3d3f18cad04bdea632eb4bae746266",
-            "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
+            "eventId": "rp_audit_748c0da9ce55408d85468378119782fc",
+            "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-08-01T07:46:35.5439879+00:00",
+            "createdAtUtc": "2026-08-04T04:17:54.5674358+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -35083,23 +35083,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_3e4eed0460ad47d98f79586f379c19a9",
-            "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
+            "eventId": "rp_audit_61d7e5e81df04e689e1e9eaecff063c9",
+            "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-08-01T07:46:35.5439992+00:00",
+            "createdAtUtc": "2026-08-04T04:17:54.5674473+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_e6dbc4225f11cfda",
+              "catalogSnapshotId": "rp_catalog_4b75a824dc4dfba6",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_d1d9874962e04495a90e8e7a44e7bf7f",
-            "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
+            "eventId": "rp_audit_43b046e16f134550bfa93f67717150bb",
+            "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-08-01T07:46:35.544007+00:00",
+            "createdAtUtc": "2026-08-04T04:17:54.5674563+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -35109,12 +35109,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_e757031b27bc40eea1d75a74fa52d52d",
-            "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
+            "eventId": "rp_audit_5724b70ea41f4d5a961b0bcb766bf2ac",
+            "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-08-01T07:46:35.5440362+00:00",
+            "createdAtUtc": "2026-08-04T04:17:54.5674827+00:00",
             "payload": {
-              "reportId": "rp_report_75843459c219428b8b4be51dc07e432a",
+              "reportId": "rp_report_cac1d8df78fb494d88559e62b4da333f",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -35123,19 +35123,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
+          "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_8683e2348a0a4311aecf52058d576612",
+              "status": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_e6dbc4225f11cfda",
+              "status": "rp_catalog_4b75a824dc4dfba6",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -35245,15 +35245,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_a7900e4a7dbe",
+              "artifactId": "rp_artifact_61dad3e2d5b7",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_8683e2348a0a4311aecf52058d576612",
-                "catalogSnapshotId": "rp_catalog_e6dbc4225f11cfda",
+                "sessionId": "rp_session_edb35d53d75f4410a1dd9e849e842c2a",
+                "catalogSnapshotId": "rp_catalog_4b75a824dc4dfba6",
                 "handleCount": 3,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -38157,31 +38157,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_d868f67672b94c8eb80ca0f376dbf313",
-        "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
-        "generatedAtUtc": "2026-08-01T07:46:36.2891005+00:00",
+        "reportId": "rp_report_0cc6f9ab73444446aeea9874bc19896c",
+        "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
+        "generatedAtUtc": "2026-08-04T04:17:55.3101962+00:00",
         "session": {
-          "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+          "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
           "status": "completed",
-          "createdAtUtc": "2026-08-01T07:46:36.2888767+00:00",
-          "updatedAtUtc": "2026-08-01T07:46:36.2891146+00:00",
+          "createdAtUtc": "2026-08-04T04:17:55.3099677+00:00",
+          "updatedAtUtc": "2026-08-04T04:17:55.3102208+00:00",
           "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
           "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
-          "catalogSnapshotId": "rp_catalog_810ab7fb4cade742",
+          "catalogSnapshotId": "rp_catalog_96c8c326a6b5e831",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_1f0c302dc333462c9f1ce9c6ee4a202b",
-            "rp_audit_c96030b99c39457186b2c7d22352af01",
-            "rp_audit_00e81930bd604536a8847e0ff0e3187c",
-            "rp_audit_05ed6fdbe49f4edfbe64da77b4722160",
-            "rp_audit_4b07c031aa7d4e77bb8c031cf557ebb6",
-            "rp_audit_f1bc25e8b34f4009b5efb31702274161",
-            "rp_audit_29b0b94f32304c2888e3adc5a45ca04e",
-            "rp_audit_5505b663a362480d8e9a8cc46dd9421a",
-            "rp_audit_1d5c7f1246b14c9aaf286f1587825aec"
+            "rp_audit_4355b9246e38453d9c1e64c8fde2cdab",
+            "rp_audit_e69ec9112ebf43cfbfefd3df4d6e459c",
+            "rp_audit_a972f94a7ffd4ad985cfe181eb74a313",
+            "rp_audit_2e90e0fa2a694c6286e19c8d3a4add53",
+            "rp_audit_53b0cfeb75c74fb98fda17cf9e0f8973",
+            "rp_audit_40df1e7252b748f39a883153068cf66e",
+            "rp_audit_448af6bc400045aa8683c4c416110e38",
+            "rp_audit_648e521494254838b638bebabdb05df3",
+            "rp_audit_a70b76a26d424b26bda8718b6b43018b"
           ],
-          "reportId": "rp_report_d868f67672b94c8eb80ca0f376dbf313",
+          "reportId": "rp_report_0cc6f9ab73444446aeea9874bc19896c",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -38307,12 +38307,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_1f0c302dc333462c9f1ce9c6ee4a202b",
-            "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+            "eventId": "rp_audit_4355b9246e38453d9c1e64c8fde2cdab",
+            "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
             "eventType": "session_created",
-            "createdAtUtc": "2026-08-01T07:46:36.2888988+00:00",
+            "createdAtUtc": "2026-08-04T04:17:55.3099931+00:00",
             "payload": {
-              "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+              "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
               "workflowDraftHash": "08e4cdf14bb7ef4df1541bde0dc42f6bc856240eba74b720f8a750573deac9e7",
               "metadataOnly": true
             },
@@ -38320,10 +38320,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_c96030b99c39457186b2c7d22352af01",
-            "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+            "eventId": "rp_audit_e69ec9112ebf43cfbfefd3df4d6e459c",
+            "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-08-01T07:46:36.288915+00:00",
+            "createdAtUtc": "2026-08-04T04:17:55.310011+00:00",
             "payload": {
               "pilotConfigRevision": "b2b4efd086cbc52e4490e65a7ae02c87268b5658a32ac1e4d9e0de950c3370a8",
               "enabled": true,
@@ -38335,12 +38335,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_00e81930bd604536a8847e0ff0e3187c",
-            "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+            "eventId": "rp_audit_a972f94a7ffd4ad985cfe181eb74a313",
+            "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-08-01T07:46:36.288931+00:00",
+            "createdAtUtc": "2026-08-04T04:17:55.3100283+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_810ab7fb4cade742",
+              "catalogSnapshotId": "rp_catalog_96c8c326a6b5e831",
               "handleCount": 3,
               "sourceSummary": {
                 "appConfig": 0,
@@ -38355,10 +38355,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_05ed6fdbe49f4edfbe64da77b4722160",
-            "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+            "eventId": "rp_audit_2e90e0fa2a694c6286e19c8d3a4add53",
+            "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-08-01T07:46:36.2889389+00:00",
+            "createdAtUtc": "2026-08-04T04:17:55.3100375+00:00",
             "payload": {
               "camera": 2,
               "model": 0,
@@ -38370,10 +38370,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_4b07c031aa7d4e77bb8c031cf557ebb6",
-            "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+            "eventId": "rp_audit_53b0cfeb75c74fb98fda17cf9e0f8973",
+            "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-08-01T07:46:36.2890177+00:00",
+            "createdAtUtc": "2026-08-04T04:17:55.3101131+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -38384,10 +38384,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_f1bc25e8b34f4009b5efb31702274161",
-            "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+            "eventId": "rp_audit_40df1e7252b748f39a883153068cf66e",
+            "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-08-01T07:46:36.2890484+00:00",
+            "createdAtUtc": "2026-08-04T04:17:55.3101458+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -38406,23 +38406,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_29b0b94f32304c2888e3adc5a45ca04e",
-            "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+            "eventId": "rp_audit_448af6bc400045aa8683c4c416110e38",
+            "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-08-01T07:46:36.2890698+00:00",
+            "createdAtUtc": "2026-08-04T04:17:55.3101686+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_810ab7fb4cade742",
+              "catalogSnapshotId": "rp_catalog_96c8c326a6b5e831",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_5505b663a362480d8e9a8cc46dd9421a",
-            "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+            "eventId": "rp_audit_648e521494254838b638bebabdb05df3",
+            "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-08-01T07:46:36.2890819+00:00",
+            "createdAtUtc": "2026-08-04T04:17:55.310179+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -38432,12 +38432,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_1d5c7f1246b14c9aaf286f1587825aec",
-            "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+            "eventId": "rp_audit_a70b76a26d424b26bda8718b6b43018b",
+            "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-08-01T07:46:36.2891098+00:00",
+            "createdAtUtc": "2026-08-04T04:17:55.3102062+00:00",
             "payload": {
-              "reportId": "rp_report_d868f67672b94c8eb80ca0f376dbf313",
+              "reportId": "rp_report_0cc6f9ab73444446aeea9874bc19896c",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -38446,19 +38446,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+          "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_673a919d103b4740a4d9b228291f4bdb",
+              "status": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_810ab7fb4cade742",
+              "status": "rp_catalog_96c8c326a6b5e831",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -38568,15 +38568,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_4faa60c45b2b",
+              "artifactId": "rp_artifact_5797c2959b85",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_673a919d103b4740a4d9b228291f4bdb",
-                "catalogSnapshotId": "rp_catalog_810ab7fb4cade742",
+                "sessionId": "rp_session_16fe0ef32ec94484a1d0fcc3a8f92c81",
+                "catalogSnapshotId": "rp_catalog_96c8c326a6b5e831",
                 "handleCount": 3,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false

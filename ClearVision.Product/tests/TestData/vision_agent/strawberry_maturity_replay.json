@@ -1,0 +1,53 @@
+{
+  "fixtureId": "strawberry_maturity_classifier_invalid_identifiers_v1",
+  "userPrompt": "判断草莓成熟度：先做图像预处理，再进行颜色分析和成熟度分类，输出成熟度分数与阈值判定。",
+  "semanticExtraction": {
+    "taskType": "attribute_classification",
+    "attribute": "maturity",
+    "object": "strawberry"
+  },
+  "modelFinalJson": {
+    "summary": "StrawberryMaturityClassifier route",
+    "operators": [
+      { "tempId": "op_image", "operatorType": "ImageAcquisition", "parameters": {} },
+      { "tempId": "op_preprocess", "operatorType": "ImagePreprocessing", "parameters": { "Method": "Gaussian" } },
+      { "tempId": "op_color", "operatorType": "ColorAnalysis", "parameters": { "ColorSpace": "HSV" } },
+      { "tempId": "op_classifier", "operatorType": "StrawberryMaturityClassifier", "parameters": { "MaturityScore": "auto", "RipenessThreshold": "0.72" } },
+      { "tempId": "op_classifier", "operatorType": "MaturityDetection", "parameters": {} },
+      { "tempId": "op_result", "operatorType": "ResultOutput", "parameters": {} }
+    ],
+    "connections": [
+      { "sourceTempId": "op_image", "sourcePortName": "Image", "targetTempId": "op_preprocess", "targetPortName": "Image" },
+      { "sourceTempId": "op_preprocess", "sourcePortName": "ProcessedImage", "targetTempId": "op_color", "targetPortName": "Image" },
+      { "sourceTempId": "op_color", "sourcePortName": "MaturityScore", "targetTempId": "op_classifier", "targetPortName": "MissingInput" },
+      { "sourceTempId": "op_classifier", "sourcePortName": "Label", "targetTempId": "op_result", "targetPortName": "Result" },
+      { "sourceTempId": "missing_operator", "sourcePortName": "Output", "targetTempId": "op_result", "targetPortName": "Image" }
+    ]
+  },
+  "toolTrace": [
+    { "tool": "list_operator_catalog", "status": "completed" },
+    { "tool": "get_operator_schema", "operatorType": "StrawberryMaturityClassifier", "status": "not_found" },
+    { "tool": "validate_flow", "status": "blocked", "blockingIssues": ["unknown_operator", "duplicate_temp_id", "unknown_input_port", "unknown_parameter", "missing_connection_endpoint"] }
+  ],
+  "legacyMappingResult": {
+    "status": "polluted_success",
+    "unknownOperatorsMappedTo": "ResultJudgment",
+    "dynamicPortsCreated": ["ProcessedImage", "MaturityScore", "MissingInput", "Label", "Output"],
+    "dynamicParametersCreated": ["Method", "ColorSpace", "MaturityScore", "RipenessThreshold"],
+    "invalidConnectionsSilentlySkipped": 1
+  },
+  "expectedControlledRejection": {
+    "invalidIdentifierRejected": true,
+    "flowPollution": false,
+    "dynamicPortCreated": false,
+    "dynamicParameterCreated": false,
+    "resultJudgmentFallback": false,
+    "diagnosticCodes": [
+      "unknown_operator",
+      "duplicate_temp_id",
+      "unknown_input_port",
+      "unknown_parameter",
+      "missing_connection_endpoint"
+    ]
+  }
+}

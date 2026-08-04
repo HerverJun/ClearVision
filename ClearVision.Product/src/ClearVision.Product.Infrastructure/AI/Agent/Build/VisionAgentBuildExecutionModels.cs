@@ -53,6 +53,7 @@ internal sealed record BuildPlanLoad
     public string PlcOutputPolicy { get; init; } = string.Empty;
     public string OriginalUserPrompt { get; init; } = string.Empty;
     public string BuildIntentHint { get; init; } = string.Empty;
+    public string TaskType { get; init; } = string.Empty;
     public bool HashMismatch { get; init; }
     public bool HasCurrentFlow { get; init; }
 }
@@ -96,12 +97,40 @@ internal sealed record CanonicalDraft(
     List<string> AddedNodeIds,
     int ConnectionCount);
 
+internal sealed record CanonicalWorkflowGraph(
+    IReadOnlyList<CanonicalWorkflowNode> Nodes,
+    IReadOnlyList<CanonicalWorkflowConnection> Connections,
+    string EntryOperatorTempId);
+
+internal sealed record CanonicalWorkflowNode(
+    string TempId,
+    string OperatorType,
+    string DisplayName,
+    IReadOnlyDictionary<string, string?> Parameters,
+    IReadOnlyList<VisionAgentPortFingerprint> InputPorts,
+    IReadOnlyList<VisionAgentPortFingerprint> OutputPorts);
+
+internal sealed record CanonicalWorkflowConnection(
+    string SourceTempId,
+    string SourcePortName,
+    string TargetTempId,
+    string TargetPortName);
+
+internal sealed record CompiledWorkflowArtifact(
+    CanonicalWorkflowGraph Graph,
+    object WorkflowDraft,
+    OperatorFlowDto CanvasProjection,
+    string ArtifactFingerprint,
+    string CatalogVersion,
+    string ReturnedFlowSemanticFingerprint);
+
 internal sealed record DraftWorkflowResolution(
     AiFlowGenerationResult GenerationResult,
     object WorkflowDraft,
     string EntryOperatorTempId,
     OperatorFlowDto CanvasFlow,
-    List<string> AddedNodeIds);
+    List<string> AddedNodeIds,
+    CompiledWorkflowArtifact Artifact);
 
 internal sealed record RepairDraftResolution(
     DraftWorkflowResolution Draft,
@@ -137,6 +166,7 @@ internal sealed record BuildResultAssemblyInput(
     ReleaseReviewResolution ReleaseReview,
     VisionAgentWorkflowDiff WorkflowDiff,
     VisionAgentApplyGate ApplyGate,
+    VisionTaskRouteAssessment RouteAssessment,
     IReadOnlyList<VisionAgentToolEvidence> Evidence,
     IReadOnlyList<VisionAgentBuildRepairRecord> AutoRepairs,
     IReadOnlyList<string> PublicWarnings);

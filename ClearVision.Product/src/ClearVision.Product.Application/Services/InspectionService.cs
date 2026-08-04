@@ -49,6 +49,7 @@ public class InspectionService : IInspectionService
     private readonly ProjectVariableSessionRegistry? _projectVariableSessions;
     private readonly ProjectSaveCoordinator? _projectSaveCoordinator;
     private readonly IExecutionAdmissionService _executionAdmissionService;
+    private readonly IWorkflowArtifactAdmissionGate? _workflowArtifactAdmissionGate;
     private readonly ILogger<InspectionService> _logger;
     private static readonly JsonSerializerOptions FlowJsonOptions = new()
     {
@@ -72,7 +73,8 @@ public class InspectionService : IInspectionService
         ProjectVariableSessionRegistry? projectVariableSessions = null,
         ProjectSaveCoordinator? projectSaveCoordinator = null,
         IInspectionEvidenceManifestService? evidenceManifestService = null,
-        IExecutionAdmissionService? executionAdmissionService = null)
+        IExecutionAdmissionService? executionAdmissionService = null,
+        IWorkflowArtifactAdmissionGate? workflowArtifactAdmissionGate = null)
     {
         _resultRepository = resultRepository;
         _projectRepository = projectRepository;
@@ -94,6 +96,7 @@ public class InspectionService : IInspectionService
             projectRepository,
             coordinator,
             flowExecutionService as IFlowDefinitionValidator);
+        _workflowArtifactAdmissionGate = workflowArtifactAdmissionGate;
         _logger = logger;
     }
 
@@ -973,9 +976,10 @@ public class InspectionService : IInspectionService
             {
                 var draftProject = await _projectRepository.GetByIdFreshAsync(projectId)
                     ?? throw new ProjectNotFoundException(projectId);
+                var admittedFlow = AdmitExecutionFlow(flow!, "inspection.inline");
                 var snapshot = new ExecutionSnapshot(
                     projectId,
-                    flow!,
+                    admittedFlow,
                     draftProject.PersistenceRevision,
                     ExecutionSnapshotSource.Draft,
                     ExecutionRunMode.FormalPrimary,
@@ -999,9 +1003,10 @@ public class InspectionService : IInspectionService
             // a save artifact and must never become an implicit fallback.
             if (HasExecutableFlow(project.Flow))
             {
+                var admittedFlow = AdmitExecutionFlow(project.Flow, "inspection.persisted");
                 var snapshot = new ExecutionSnapshot(
                     projectId,
-                    project.Flow,
+                    admittedFlow,
                     project.PersistenceRevision,
                     ExecutionSnapshotSource.PersistedProject,
                     ExecutionRunMode.FormalPrimary,
@@ -1029,6 +1034,29 @@ public class InspectionService : IInspectionService
 
             throw new InvalidOperationException($"Project {projectId} does not contain an executable flow.");
         }
+    }
+
+    private OperatorFlow AdmitExecutionFlow(OperatorFlow flow, string source)
+    {
+        if (_workflowArtifactAdmissionGate == null)
+        {
+            if (WorkflowArtifactAdmissionClassifier.IsAiArtifact(flow))
+            {
+                throw WorkflowArtifactAdmissionFailures.GateUnavailable(source);
+            }
+
+            // Hand-authored flows retain the established runtime test seam. An
+            // AI-marked flow never uses this compatibility path.
+            return flow;
+        }
+
+        var admission = _workflowArtifactAdmissionGate.Inspect(flow, source);
+        if (!admission.AllowedToRun || admission.Entity == null)
+        {
+            throw new WorkflowArtifactAdmissionException(admission.Report);
+        }
+
+        return admission.Entity;
     }
 
     private ProjectVariableExecutionContext? CreateProjectVariableContext(

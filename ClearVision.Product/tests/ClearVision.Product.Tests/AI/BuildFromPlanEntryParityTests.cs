@@ -149,33 +149,44 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     }
 
     [Fact]
-    public async Task ToolLoopMode_ShouldMatchAcrossAgentRunWebMessageAndInternalEntries()
+    public async Task ToolLoopMode_ShouldBeRejectedByProductionWebMessageEntry()
     {
         using var harness = CreateHarness();
         var plan = BuildPlan();
-
-        var agentRun = await RunAgentRunEntryAsync(harness, BuildRequest(plan) with
-        {
-            SessionId = "session-tool-agent",
-            AgentGenerateFlowMode = AiAgentGenerateFlowModes.ToolLoop
-        });
-        var webMessage = await RunWebMessageEntryAsync(harness, BuildRequest(plan) with
+        var request = BuildRequest(plan) with
         {
             SessionId = "session-tool-web",
             AgentGenerateFlowMode = AiAgentGenerateFlowModes.ToolLoop
-        });
-        var internalEntry = await RunInternalEntryAsync(harness, BuildRequest(plan) with
-        {
-            SessionId = "session-tool-internal",
-            AgentGenerateFlowMode = AiAgentGenerateFlowModes.ToolLoop
-        });
+        };
+        var handler = new GenerateFlowMessageHandler(
+            Substitute.For<IAiFlowGenerationService>(),
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>(),
+            harness.RunService,
+            harness.Stream);
+        string? runId = null;
 
-        var expected = TerminalBusinessProjection(agentRun.Replay);
-        expected.RequestedMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
-        expected.EffectiveMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
-        expected.ToolLoopEntered.Should().BeTrue();
-        TerminalBusinessProjection(webMessage.Replay).Should().BeEquivalentTo(expected);
-        TerminalBusinessProjection(internalEntry.Replay).Should().BeEquivalentTo(expected);
+        var json = await handler.HandleAsync(
+            request.Description,
+            request.SessionId,
+            request.ExistingFlowJson,
+            request.AdditionalContext,
+            request.Mode,
+            request.DebugPrompt,
+            $"req-web-{Guid.NewGuid():N}",
+            request.Attachments,
+            request.RequirementMode,
+            request.TemplateSelection,
+            request.BuildFromPlan,
+            request.UseVisionAgentGenerateFlow,
+            request.AgentGenerateFlowMode,
+            request.RuntimePreviewConsent,
+            onAgentRunCreated: id => runId = id);
+
+        using var document = JsonDocument.Parse(json);
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeFalse();
+        document.RootElement.GetProperty("failureSummary").GetString()
+            .Should().Contain(AiAgentGenerateFlowModePolicy.ToolLoopUnavailableCode);
+        runId.Should().BeNull();
     }
 
     [Fact]
@@ -872,8 +883,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildApplicationService>>(),
             Options.Create(new AgentGenerateFlowOptions
             {
-                Enabled = enabled,
-                Mode = AiAgentGenerateFlowModes.Scripted
+                Enabled = enabled
             }));
         var projector = new VisionAgentBuildTerminalProjector(
             conversation,
@@ -1163,11 +1173,8 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             Substitute.For<Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService>>(),
             Options.Create(new AgentGenerateFlowOptions
             {
-                Enabled = true,
-                Mode = AiAgentGenerateFlowModes.Scripted,
-                FallbackToLegacyOnFailure = false
+                Enabled = true
             }),
-            Substitute.For<IVisionAgentGenerateFlowService>(),
             harness.RunService,
             harness.Stream);
     }
@@ -1441,12 +1448,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
                 {
                     Stage = "fake_build",
                     ToolName = "fake_build",
-                    Source = string.Equals(
-                        request.AgentGenerateFlowMode,
-                        AiAgentGenerateFlowModes.ToolLoop,
-                        StringComparison.OrdinalIgnoreCase)
-                        ? "tool_loop"
-                        : "fixed_build_orchestrator",
+                    Source = "workflow_compiler",
                     Status = "completed"
                 }
             ],
@@ -1457,7 +1459,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         {
             Success = true,
             CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
-            Flow = new OperatorFlowDto(),
+            Flow = null,
             AiExplanation = "fake build completed",
             BuildResult = buildResult,
             BuildReadiness = new VisionAgentBuildReadinessSnapshot

@@ -364,6 +364,21 @@ public static class AgentRunEndpoints
             }));
         }
 
+        var modeDecision = AiAgentGenerateFlowModePolicy.Evaluate(
+            request.AgentGenerateFlowMode,
+            AiAgentGenerateFlowPolicyKind.Production);
+        if (!modeDecision.Allowed)
+        {
+            return Task.FromResult<IResult>(Results.Json(new
+            {
+                errorCode = modeDecision.FailureCode,
+                publicMessage = modeDecision.FailureMessage,
+                requestedMode = modeDecision.RequestedMode,
+                effectiveMode = modeDecision.EffectiveMode,
+                metadataOnly = true
+            }, statusCode: StatusCodes.Status400BadRequest));
+        }
+
         var sessionId = request.BuildFromPlan == null
             ? conversationService.GetOrCreateSession(request.SessionId).SessionId
             : NormalizeAgentRunSessionId(request.SessionId);

@@ -1,22 +1,18 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-quality-artifact-manifest.v1",
-  "generatedAtUtc": "2026-08-01T07:59:39.391671+00:00",
+  "generatedAtUtc": "2026-08-04T04:30:16.166170+00:00",
   "artifactName": "vision-agent-quality-suite",
   "scanPolicyVersion": "2026-06-07.runtime-preview-final-pre-pilot-hardening-scan.v1",
-  "sourceFilesScanned": 3303,
-  "reportsScanned": 33,
+  "sourceFilesScanned": 3866,
+  "reportsScanned": 30,
   "auditReportsScanned": 2,
-  "sessionReportsScanned": 54,
+  "sessionReportsScanned": 55,
   "forbiddenHitCount": 0,
   "redactionPass": true,
   "files": [
     {
       "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.json",
-      "sizeBytes": 1336490
-    },
-    {
-      "path": "quality/evals/reports/planner_autonomy_benchmark.json",
-      "sizeBytes": 898607
+      "sizeBytes": 1336487
     },
     {
       "path": "quality/evals/reports/runtime_preview_scenario_corpus.json",
@@ -135,20 +131,8 @@
       "sizeBytes": 14236
     },
     {
-      "path": "quality/evals/reports/real_llm_planner_shadow_eval.json",
-      "sizeBytes": 25355
-    },
-    {
-      "path": "quality/evals/reports/real_llm_planner_shadow_eval.holdout.json",
-      "sizeBytes": 58994
-    },
-    {
       "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.md",
       "sizeBytes": 33681
-    },
-    {
-      "path": "quality/evals/reports/planner_autonomy_benchmark.md",
-      "sizeBytes": 5482
     },
     {
       "path": "quality/evals/reports/runtime_preview_scenario_corpus.md",
@@ -267,24 +251,28 @@
       "sizeBytes": 2679
     },
     {
-      "path": "quality/evals/reports/real_llm_planner_shadow_eval.md",
-      "sizeBytes": 5199
-    },
-    {
-      "path": "quality/evals/reports/real_llm_planner_shadow_eval.holdout.md",
-      "sizeBytes": 7601
-    },
-    {
       "path": "test_results/agent_engineering_harness/agent_ui_contract_output.txt",
-      "sizeBytes": 198298
+      "sizeBytes": 195714
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ai_model_config_endpoints.trx",
-      "sizeBytes": 186841
+      "sizeBytes": 187035
+    },
+    {
+      "path": "test_results/agent_engineering_harness/agent_contracts_skeleton.trx",
+      "sizeBytes": 35964
     },
     {
       "path": "test_results/agent_engineering_harness/agent_engineering_harness.trx",
-      "sizeBytes": 1346436
+      "sizeBytes": 1343299
+    },
+    {
+      "path": "test_results/agent_engineering_harness/agent_planner_parity_subset.trx",
+      "sizeBytes": 16369
+    },
+    {
+      "path": "test_results/agent_engineering_harness/runtime_preview_governance_redacted_corpus_fix.trx",
+      "sizeBytes": 3360
     }
   ],
   "reports": [
@@ -296,30 +284,12 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:36.7643226+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.6674461+00:00"
       },
       "summary": {
         "caseCount": 120,
         "runtimePreviewCaseCount": 23,
         "passedCaseCount": 120,
-        "accepted": true
-      }
-    },
-    {
-      "path": "quality/evals/reports/planner_autonomy_benchmark.json",
-      "id": "vision_agent_planner_autonomy_benchmark",
-      "workflowRun": {
-        "commitSha": "local",
-        "branchName": "local",
-        "runId": "local",
-        "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:49.8501374+00:00"
-      },
-      "summary": {
-        "plannerCaseCount": 15,
-        "permissionNegativeCaseCount": 6,
-        "totalCaseCount": 21,
-        "passedCaseCount": 21,
         "accepted": true
       }
     },
@@ -331,7 +301,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -349,7 +319,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -368,7 +338,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -387,7 +357,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -407,7 +377,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -428,7 +398,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -449,7 +419,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -472,7 +442,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "profileCount": 12,
@@ -491,7 +461,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "operatorContractVersion": "operator-contract-registry.final.metadata-only",
@@ -509,7 +479,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "operatorContractVersion": "operator-contract-registry.final.metadata-only",
@@ -528,7 +498,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -550,7 +520,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -572,7 +542,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -595,7 +565,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "eventCount": 19,
@@ -614,7 +584,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "storageVersion": "jsonl.v4",
@@ -664,7 +634,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -687,7 +657,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -710,7 +680,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -729,7 +699,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "profileCount": 12,
@@ -748,7 +718,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "operatorContractVersion": "operator-contract-registry.final.metadata-only",
@@ -766,7 +736,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -788,7 +758,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -810,7 +780,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -833,7 +803,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -854,7 +824,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -877,7 +847,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -911,7 +881,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -934,7 +904,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "storageVersion": "jsonl.v4",
@@ -984,7 +954,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-08-01T07:46:37.041668+00:00"
+        "generatedAtUtc": "2026-08-04T04:17:55.796269+00:00"
       },
       "summary": {
         "reportCount": 28,
@@ -993,97 +963,6 @@
         "metadataOnly": true,
         "realResourcesTouched": false,
         "accepted": true
-      }
-    },
-    {
-      "path": "quality/evals/reports/real_llm_planner_shadow_eval.json",
-      "id": "vision_agent_real_llm_planner_shadow_eval",
-      "workflowRun": {
-        "commitSha": "local",
-        "branchName": "local",
-        "runId": "local",
-        "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T07:39:37.0028825+00:00"
-      },
-      "summary": {
-        "caseCount": 12,
-        "runnerStatus": "skipped",
-        "modelName": "not_configured",
-        "enabledReason": "",
-        "skippedReason": "CV_AGENT_REAL_LLM_SHADOW_EVAL is not true; default CI shadow eval sample does not call real LLM.",
-        "configurationMissingReason": "",
-        "requestCount": 0,
-        "parseSuccessCount": 0,
-        "parseSuccessRate": 0,
-        "invalidJsonRepairUsedCount": 0,
-        "repairUsedRate": 0,
-        "unsafeToolAttemptCount": 0,
-        "unsafeAttemptRate": 0,
-        "fallbackToMockSuggestedCount": 12,
-        "averageToolPlanMatchScore": 0,
-        "averageNextActionMatchScore": 0,
-        "averageFullPlanMatchScore": 0,
-        "averageOrderedPrefixScore": 0,
-        "averagePolicySafetyScore": 1,
-        "badToolNames": [],
-        "missingRequiredLaterTools": [
-          "capture_test_frame",
-          "dryrun_flow",
-          "get_flow_template_skeleton",
-          "get_operator_schema",
-          "inspect_current_flow",
-          "match_flow_template",
-          "replay_flow_with_frame",
-          "runtime_package_precheck",
-          "validate_flow"
-        ],
-        "overPlanningTools": [],
-        "underPlanningCases": [],
-        "completionIntentDistribution": {
-          "invalid": 12
-        },
-        "reportGenerated": true
-      }
-    },
-    {
-      "path": "quality/evals/reports/real_llm_planner_shadow_eval.holdout.json",
-      "id": "vision_agent_real_llm_planner_shadow_eval_holdout",
-      "workflowRun": {
-        "commitSha": "local",
-        "branchName": "local",
-        "runId": "local",
-        "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T07:40:01.8546865+00:00"
-      },
-      "summary": {
-        "caseCount": 24,
-        "runnerStatus": "completed",
-        "modelName": "gpt-5.5",
-        "enabledReason": "CV_AGENT_REAL_LLM_SHADOW_EVAL=true",
-        "skippedReason": "",
-        "configurationMissingReason": "",
-        "requestCount": 29,
-        "parseSuccessCount": 24,
-        "parseSuccessRate": 1,
-        "invalidJsonRepairUsedCount": 5,
-        "repairUsedRate": 0.2083,
-        "unsafeToolAttemptCount": 0,
-        "unsafeAttemptRate": 0,
-        "fallbackToMockSuggestedCount": 0,
-        "averageToolPlanMatchScore": 1,
-        "averageNextActionMatchScore": 1,
-        "averageFullPlanMatchScore": 1,
-        "averageOrderedPrefixScore": 1,
-        "averagePolicySafetyScore": 1,
-        "badToolNames": [],
-        "missingRequiredLaterTools": [],
-        "overPlanningTools": [],
-        "underPlanningCases": [],
-        "completionIntentDistribution": {
-          "final": 5,
-          "full_plan": 19
-        },
-        "reportGenerated": true
       }
     }
   ]

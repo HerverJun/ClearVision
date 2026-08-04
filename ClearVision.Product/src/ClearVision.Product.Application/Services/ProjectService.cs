@@ -28,6 +28,7 @@ public class ProjectService
     private readonly ProjectVariableSessionRegistry? _projectVariableSessions;
     private readonly ProjectSaveCoordinator _saveCoordinator;
     private readonly IProjectAssetStorage? _projectAssetStorage;
+    private readonly IWorkflowArtifactAdmissionGate? _workflowArtifactAdmissionGate;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -58,7 +59,8 @@ public class ProjectService
         ILogger<ProjectService>? logger,
         ProjectVariableSessionRegistry? projectVariableSessions,
         ProjectSaveCoordinator? saveCoordinator = null,
-        IProjectAssetStorage? projectAssetStorage = null)
+        IProjectAssetStorage? projectAssetStorage = null,
+        IWorkflowArtifactAdmissionGate? workflowArtifactAdmissionGate = null)
     {
         _projectRepository = projectRepository;
         _flowStorage = flowStorage;
@@ -66,6 +68,7 @@ public class ProjectService
         _logger = logger;
         _projectVariableSessions = projectVariableSessions;
         _projectAssetStorage = projectAssetStorage;
+        _workflowArtifactAdmissionGate = workflowArtifactAdmissionGate;
         _saveCoordinator = saveCoordinator ?? new ProjectSaveCoordinator(
             projectRepository,
             flowStorage,
@@ -83,7 +86,10 @@ public class ProjectService
         if (request.Flow != null)
         {
             MigrateFlowDto(request.Flow);
+            request.Flow = AdmitFlowForPersistence(request.Flow, "project.create.input");
+
             EnrichFlowDtoWithMetadata(request.Flow);
+            request.Flow = AdmitFlowForPersistence(request.Flow, "project.create");
         }
 
         ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(globalVariables, request.Flow?.ToEntity());
@@ -214,9 +220,16 @@ public class ProjectService
         var flowChanged = request.Flow != null;
         if (nextFlow != null)
         {
+            if (request.Flow != null)
+            {
+                nextFlow = AdmitFlowForPersistence(nextFlow, "project.update.input");
+            }
+
             flowChanged |= MigrateFlowDto(nextFlow);
             EnrichFlowDtoWithMetadata(nextFlow);
             flowChanged |= NormalizeProjectVariableOperatorNames(nextFlow, nextSchema);
+
+            nextFlow = AdmitFlowForPersistence(nextFlow, "project.update");
         }
 
         ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(nextSchema, nextFlow?.ToEntity());
@@ -413,7 +426,12 @@ public class ProjectService
                 canonicalType,
                 opDto.X,
                 opDto.Y
-            );
+            )
+            {
+                Metadata = opDto.Metadata == null
+                    ? null
+                    : new Dictionary<string, object?>(opDto.Metadata, StringComparer.OrdinalIgnoreCase)
+            };
 
             // 设置ID（如果提供了）
             if (opDto.Id != Guid.Empty)
@@ -673,6 +691,31 @@ public class ProjectService
         return JsonSerializer.Deserialize<OperatorFlowDto>(flowJson, _jsonOptions);
     }
 
+    private OperatorFlowDto AdmitFlowForPersistence(OperatorFlowDto flow, string source)
+    {
+        // The admission gate is an AI-artifact boundary. Existing hand-authored
+        // project flows continue through the established persistence validators;
+        // AI-produced flows must never bypass the gate or run without it.
+        if (!WorkflowArtifactAdmissionClassifier.IsAiArtifact(flow))
+        {
+            return flow;
+        }
+
+        if (_workflowArtifactAdmissionGate == null)
+        {
+            throw WorkflowArtifactAdmissionFailures.GateUnavailable(source);
+        }
+
+        var originalSnapshot = JsonSerializer.Serialize(flow, _jsonOptions);
+        var admission = _workflowArtifactAdmissionGate.Inspect(flow, source, originalSnapshot);
+        if (!admission.AllowedToPersist || admission.Flow == null)
+        {
+            throw new WorkflowArtifactAdmissionException(admission.Report);
+        }
+
+        return admission.Flow;
+    }
+
     private async Task<OperatorFlow?> LoadStoredFlowEntityAsync(Guid projectId)
     {
         var flowJson = await _flowStorage.LoadFlowJsonAsync(projectId);
@@ -729,6 +772,9 @@ public class ProjectService
             Id = op.Id,
             Name = op.Name,
             Type = OperatorTypeAliasResolver.Resolve(op.Type),
+            Metadata = op.Metadata == null
+                ? null
+                : new Dictionary<string, object?>(op.Metadata, StringComparer.OrdinalIgnoreCase),
             X = op.Position.X,
             Y = op.Position.Y,
             InputPorts = op.InputPorts.Select(MapPortToDto).ToList(),

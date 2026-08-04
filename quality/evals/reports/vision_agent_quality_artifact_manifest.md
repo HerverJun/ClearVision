@@ -1,19 +1,18 @@
 # Vision Agent Quality Artifact Manifest
 
-- Generated UTC: `2026-08-01T07:59:39.391671+00:00`
+- Generated UTC: `2026-08-04T04:30:16.166170+00:00`
 - Artifact: `vision-agent-quality-suite`
 - Scan policy: `2026-06-07.runtime-preview-final-pre-pilot-hardening-scan.v1`
-- Source files scanned: `3303`
-- Reports scanned: `33`
+- Source files scanned: `3866`
+- Reports scanned: `30`
 - Audit reports scanned: `2`
-- Session reports scanned: `54`
+- Session reports scanned: `55`
 - Forbidden hits: `0`
 - Redaction pass: `True`
 
 | File | Size bytes |
 | --- | ---: |
-| quality/evals/reports/VisionAgent_business_benchmark_baseline.json | 1336490 |
-| quality/evals/reports/planner_autonomy_benchmark.json | 898607 |
+| quality/evals/reports/VisionAgent_business_benchmark_baseline.json | 1336487 |
 | quality/evals/reports/runtime_preview_scenario_corpus.json | 126191 |
 | quality/evals/reports/runtime_preview_redacted_flow_corpus.json | 158912 |
 | quality/evals/reports/runtime_preview_redacted_flow_corpus_v2.json | 158912 |
@@ -43,10 +42,7 @@
 | quality/evals/reports/runtime_preview_agent_explanation_final.json | 139962 |
 | quality/evals/reports/runtime_preview_governance_export_final.json | 2490 |
 | quality/evals/reports/runtime_preview_report_readability_gate.json | 14236 |
-| quality/evals/reports/real_llm_planner_shadow_eval.json | 25355 |
-| quality/evals/reports/real_llm_planner_shadow_eval.holdout.json | 58994 |
 | quality/evals/reports/VisionAgent_business_benchmark_baseline.md | 33681 |
-| quality/evals/reports/planner_autonomy_benchmark.md | 5482 |
 | quality/evals/reports/runtime_preview_scenario_corpus.md | 3166 |
 | quality/evals/reports/runtime_preview_redacted_flow_corpus.md | 3575 |
 | quality/evals/reports/runtime_preview_redacted_flow_corpus_v2.md | 3575 |
@@ -76,8 +72,9 @@
 | quality/evals/reports/runtime_preview_agent_explanation_final.md | 2890 |
 | quality/evals/reports/runtime_preview_governance_export_final.md | 1561 |
 | quality/evals/reports/runtime_preview_report_readability_gate.md | 2679 |
-| quality/evals/reports/real_llm_planner_shadow_eval.md | 5199 |
-| quality/evals/reports/real_llm_planner_shadow_eval.holdout.md | 7601 |
-| test_results/agent_engineering_harness/agent_ui_contract_output.txt | 198298 |
-| test_results/agent_engineering_harness/agent_ai_model_config_endpoints.trx | 186841 |
-| test_results/agent_engineering_harness/agent_engineering_harness.trx | 1346436 |
+| test_results/agent_engineering_harness/agent_ui_contract_output.txt | 195714 |
+| test_results/agent_engineering_harness/agent_ai_model_config_endpoints.trx | 187035 |
+| test_results/agent_engineering_harness/agent_contracts_skeleton.trx | 35964 |
+| test_results/agent_engineering_harness/agent_engineering_harness.trx | 1343299 |
+| test_results/agent_engineering_harness/agent_planner_parity_subset.trx | 16369 |
+| test_results/agent_engineering_harness/runtime_preview_governance_redacted_corpus_fix.trx | 3360 |

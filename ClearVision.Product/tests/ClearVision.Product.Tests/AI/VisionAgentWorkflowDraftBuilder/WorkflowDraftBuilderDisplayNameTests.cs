@@ -155,6 +155,9 @@ public sealed class WorkflowDraftBuilderDisplayNameTests
         flow.Connections.Should().Contain(connection =>
             connection.SourceOperatorId == existingImage.Id &&
             connection.TargetOperatorId == resultOutput.Id);
+        result.Payload.Artifact.ReturnedFlowSemanticFingerprint
+            .Should()
+            .Be(result.Payload.Artifact.ArtifactFingerprint);
     }
 
     [Fact(DisplayName = "WorkflowDraftBuilder should reuse legacy tempId name when metadata is missing")]

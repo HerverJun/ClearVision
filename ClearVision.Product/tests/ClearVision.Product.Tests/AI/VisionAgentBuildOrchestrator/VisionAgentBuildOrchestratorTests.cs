@@ -10,6 +10,7 @@ using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.Runtime;
 using ClearVision.Product.Infrastructure.AI.Tools;
+using ClearVision.Product.Tests.Services;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -256,6 +257,32 @@ public sealed class VisionAgentBuildOrchestratorTests
         draft.TotalIncompleteCount.Should().Be(2);
         draft.AnswerRevision.Should().Be(8);
         sink.Events.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "Build application should retain a safe scaffold for preview while blocking apply")]
+    public async Task BuildAsync_SafeScaffold_ShouldRemainPreviewOnly()
+    {
+        var applicationService = CreateBuildApplicationService(new CapturingAgentRunEventSink());
+        var plan = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "ResultJudgment", "ResultOutput"],
+            "surface defect scaffold requiring manual completion");
+
+        var outcome = await applicationService.BuildAsync(
+            BuildCommand.FromGenerationRequest(
+                Request(plan, requirementMode: AiRequirementModes.Draft),
+                transport: BuildCommandTransports.Internal,
+                persistResult: false),
+            CancellationToken.None);
+
+        outcome.Result.Success.Should().BeTrue();
+        outcome.Result.Flow.Should().NotBeNull();
+        outcome.Result.BuildResult.Should().NotBeNull();
+        outcome.Result.BuildResult!.ApplyGate.CanvasApplyReady.Should().BeFalse();
+        outcome.Result.BuildResult.ApplyGate.RuntimeDraftReady.Should().BeFalse();
+        outcome.Result.BuildResult.ApplyGate.DeploymentReady.Should().BeFalse();
+        outcome.Result.BuildResult.RouteSemanticsSatisfied.Should().BeFalse();
+        outcome.Result.BuildResult.PublicWarnings.Should().Contain("safe_scaffold_requires_user_review");
     }
 
     [Fact(DisplayName = "BuildFromPlan strawberry draft should append a safe terminal output and round-trip the canvas flow")]
@@ -1808,6 +1835,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult.MissingResources.Should().Contain(item =>
             item.ResourceType == "template_artifact" &&
             item.ResourceKey == "op_match.Template");
+        result.BuildResult.ApplyGate.CanvasApplyReady.Should().BeTrue();
         result.BuildResult.FirstFixRecommendation.Should().Contain("模板资源");
         result.BuildResult.ToolEvidenceTimeline.Should().Contain(item =>
             item.Stage == "template_strategy" &&
@@ -1882,10 +1910,12 @@ public sealed class VisionAgentBuildOrchestratorTests
 
         var result = await orchestrator.BuildAsync(Request(plan, planHashOverride: "stale_plan_hash"), CancellationToken.None);
 
-        result.Success.Should().BeTrue();
+        result.Success.Should().BeFalse();
+        result.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusFailed);
+        result.FailureSummary.Should().NotBeNull();
+        result.FailureSummary!.Code.Should().Be("plan_hash_mismatch");
         result.BuildResult!.PublicWarnings.Should().Contain("plan_hash_mismatch");
-        result.BuildResult.PlanHash.Should().Be(VisionAgentOrchestrator.ComputePlanHash(plan));
-        result.BuildResult.PlanHash.Should().NotBe("stale_plan_hash");
+        result.BuildResult.ApplyGate.ApplyBlockers.Should().Contain("plan_hash_mismatch");
         result.BuildResult.ToolEvidenceTimeline.Should().Contain(item =>
             item.Stage == "plan_generation" &&
             item.WarningCode == "plan_hash_mismatch");
@@ -2137,7 +2167,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.InteractionState.Should().Be(AiInteractionStates.Failed);
         result.FailureSummary.Should().NotBeNull();
         result.FailureSummary!.Category.Should().Be("vision_agent_build_from_plan");
-        result.FailureSummary.Code.Should().Be("build_orchestrator_failed");
+        result.FailureSummary.Code.Should().Be("plan_hash_mismatch");
         result.FailureSummary.Message.Should().NotBeNullOrWhiteSpace();
         result.FailureSummary.RepairTarget.Should().Contain("公开工具证据");
         result.BuildResult.Should().NotBeNull();
@@ -2145,7 +2175,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult.ToolEvidenceTimeline.Should().OnlyContain(item => item.MetadataOnly);
         result.BuildResult.PublicWarnings.Should().Contain("plan_hash_mismatch");
         result.BuildResult.ApplyGate.Blocked.Should().BeTrue();
-        result.BuildResult.ApplyGate.ApplyBlockers.Should().Contain("build_orchestrator_failed");
+        result.BuildResult.ApplyGate.ApplyBlockers.Should().Contain("plan_hash_mismatch");
         var publicJson = JsonSerializer.Serialize(new { result, sink.Events }, AgentRunEventJson.Options);
         publicJson.Should().NotContain("C:\\factory");
         publicJson.Should().NotContain("sk-secret");
@@ -2211,11 +2241,10 @@ public sealed class VisionAgentBuildOrchestratorTests
             NullLogger<VisionAgentBuildApplicationService>.Instance,
             Options.Create(new AgentGenerateFlowOptions
             {
-                Enabled = true,
-                Mode = AiAgentGenerateFlowModes.Scripted,
-                FallbackToLegacyOnFailure = false
+                Enabled = true
             }),
-            sink);
+            sink,
+            workflowArtifactAdmissionGate: WorkflowArtifactAdmissionTestSupport.CreateGate());
     }
 
     private static void AssertBuildQuality(
@@ -2363,36 +2392,68 @@ public sealed class VisionAgentBuildOrchestratorTests
             new FakeVisionAgentTool(
                 "validate_flow",
                 VisionAgentToolPermission.Simulation,
-                (_, _) => VisionAgentToolResult.Ok(new
+                (_, arguments) =>
                 {
-                    blockingIssues = Array.Empty<object>(),
-                    warnings = Array.Empty<object>(),
-                    missingResources = Array.Empty<object>(),
-                    pendingParameters = Array.Empty<object>(),
-                    metadataOnly = true
-                })),
+                    var fingerprint = ReadArtifactFingerprint(arguments);
+                    return VisionAgentToolResult.Ok(new
+                    {
+                        blockingIssues = Array.Empty<object>(),
+                        warnings = Array.Empty<object>(),
+                        missingResources = Array.Empty<object>(),
+                        pendingParameters = Array.Empty<object>(),
+                        artifactFingerprint = fingerprint,
+                        validationFingerprint = fingerprint,
+                        compiledFingerprint = fingerprint,
+                        fingerprintConsistent = !string.IsNullOrWhiteSpace(fingerprint),
+                        metadataOnly = true
+                    });
+                }),
             new FakeVisionAgentTool(
                 "dryrun_flow",
                 VisionAgentToolPermission.Simulation,
-                (_, _) => VisionAgentToolResult.Ok(new
+                (_, arguments) =>
                 {
-                    dryRunSucceeded = true,
-                    blockingIssues = Array.Empty<object>(),
-                    missingResources = Array.Empty<object>(),
-                    metadataOnly = true
-                })),
+                    var fingerprint = ReadArtifactFingerprint(arguments);
+                    return VisionAgentToolResult.Ok(new
+                    {
+                        dryRunSucceeded = true,
+                        blockingIssues = Array.Empty<object>(),
+                        missingResources = Array.Empty<object>(),
+                        artifactFingerprint = fingerprint,
+                        dryRunFingerprint = fingerprint,
+                        compiledFingerprint = fingerprint,
+                        fingerprintConsistent = !string.IsNullOrWhiteSpace(fingerprint),
+                        metadataOnly = true
+                    });
+                }),
             new FakeVisionAgentTool(
                 "runtime_package_precheck",
                 VisionAgentToolPermission.DeploymentPrepare,
-                (_, _) => VisionAgentToolResult.Ok(new
+                (_, arguments) =>
                 {
-                    readyForDeployment = false,
-                    blockingIssues = Array.Empty<object>(),
-                    missingResources = Array.Empty<object>(),
-                    pendingActions = Array.Empty<object>(),
-                    metadataOnly = true
-            }))
+                    var fingerprint = ReadArtifactFingerprint(arguments);
+                    return VisionAgentToolResult.Ok(new
+                    {
+                        readyForDeployment = false,
+                        blockingIssues = Array.Empty<object>(),
+                        missingResources = Array.Empty<object>(),
+                        pendingActions = Array.Empty<object>(),
+                        artifactFingerprint = fingerprint,
+                        precheckFingerprint = fingerprint,
+                        compiledFingerprint = fingerprint,
+                        fingerprintConsistent = !string.IsNullOrWhiteSpace(fingerprint),
+                        metadataOnly = true
+                    });
+                })
         ]);
+    }
+
+    private static string ReadArtifactFingerprint(JsonElement arguments)
+    {
+        return arguments.TryGetProperty("artifactFingerprint", out var value) &&
+               value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? string.Empty
+            : string.Empty;
     }
 
     private static AiFlowGenerationRequest Request(

@@ -97,6 +97,25 @@ public class DependencyInjectionTests
     }
 
     [Fact]
+    public void ProductionAiRegistration_ShouldExcludeRetiredPlannerAndToolLoopRuntime()
+    {
+        var services = CreateServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{AgentGenerateFlowOptions.SectionName}:Policy"] = "production"
+            })
+            .Build();
+
+        services.AddAiFlowGeneration(configuration);
+
+        services.Should().Contain(descriptor =>
+            descriptor.ServiceType == typeof(IVisionAgentPlanPlannerService));
+        services.Should().Contain(descriptor =>
+            descriptor.ServiceType == typeof(IVisionAgentGenerateCompatibilityAdapter));
+    }
+
+    [Fact]
     public void ResolveVisionDatabasePath_MigratesMostRecentLegacyDatabase_ToDefaultLocation()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionTests", Guid.NewGuid().ToString("N"));
