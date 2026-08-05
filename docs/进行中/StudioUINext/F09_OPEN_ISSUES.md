@@ -4,29 +4,30 @@
 F09_ISSUE_LEDGER_STATE=ACTIVE
 LAST_REVIEWED=2026-08-05
 P0_OPEN=0
-P1_OPEN=0
+P1_OPEN=1
 P2_OPEN=3
 P3_OPEN=0
-F09_R_STATE=LOCAL_EVIDENCE_COMPLETE
-F09_STATE=ENGINEERING_DONE_WITH_ACCEPTANCE_DEBT
+F09_R_STATE=PARTIAL
+F09_STATE=PARTIAL
 FRONTEND_MIGRATION_MAINLINE=COMPLETE
 F09_R1_SOURCE_SHA=029bcc3beddb20dc136839d30dfd00d2c7a51e65
 F09_R2_PRODUCT_SOURCE_SHA=d1c82ba88e351a2d48bcfae7f97e047483dbba98
 PRODUCT_SOURCE_FOLLOW_UP_SHAS=c83dcc114290cf73e5e8d9b91e7b49732db8ec68,1545bca25
 EVIDENCE_RUN_SHA=9dd69bd2bde44e8ea5b7285bfd18f47e02f95007
 AUDIT_BRANCH=audit/f09-r2-d1c82ba88
-AUDIT_BRANCH_HEAD=PENDING_AUDIT_PUSH
+AUDIT_BRANCH_HEAD=06eddf63c488266f818bc36e1d14d6aa0f798333
 OFFICIAL_REMOTE_SHA=7d43af9e19ad5a98240651fd5519a8e0f5a1e9f5
 FINAL_EVIDENCE_SHA=9dd69bd2bde44e8ea5b7285bfd18f47e02f95007
 FINAL_DOC_SHA=PENDING_DOCUMENTATION_COMMIT
-REMOTE_CI=AWAITING
-FINAL_GATE=AWAITING
+REMOTE_CI_RUN=30966530885
+REMOTE_CI=FAIL
+FINAL_GATE=FAIL
 WORKTREE_STATE=DIRTY_UNRELATED_TRACKED_CHANGES
 CONFIGURED_PROFILE=NEXT_DEFAULT
 EFFECTIVE_DEFAULT_UI_ROOT=STUDIO_UI_NEXT
 ```
 
-F09-R2 reconciliation: product source commit `d1c82ba88e351a2d48bcfae7f97e047483dbba98` closes the implementation portion of the Desktop shutdown/isolation repair; follow-up product fixes are recorded at `c83dcc114290cf73e5e8d9b91e7b49732db8ec68` and `1545bca25`. `F09-I001` remains closed by the product decision removing Operator formal-run authority. The Operator surface remains a read-only UI projection and no frontend or backend permission is widened. `F09-I002` is closed by the `r-9dd-r1` rollback drill: the same ProjectId remained compatible across Next/Legacy/Next, final `PersistenceRevision=4`, with no data loss or double owner. Playwright launcher teardown, independent no-Node, full DPI, field hardware, production soak and Remote CI/Final Gate remain separate evidence boundaries.
+F09-R2 reconciliation: product source commit `d1c82ba88e351a2d48bcfae7f97e047483dbba98` closes the implementation portion of the Desktop shutdown/isolation repair; follow-up product fixes are recorded at `c83dcc114290cf73e5e8d9b91e7b49732db8ec68` and `1545bca25`. `F09-I001` remains closed by the product decision removing Operator formal-run authority. The Operator surface remains a read-only UI projection and no frontend or backend permission is widened. `F09-I002` is closed by the `r-9dd-r1` rollback drill: the same ProjectId remained compatible across Next/Legacy/Next, final `PersistenceRevision=4`, with no data loss or double owner. Remote CI run `30966530885` failed at clean-checkout `Validate Measurement Performance Report` because the committed `ColorMeasurement` entry is `FAIL`; Final Gate failed on that required job. Playwright launcher teardown, independent no-Node, full DPI, field hardware and production soak remain separate evidence boundaries.
 
 | IssueId | Severity | Area | Symptom | Evidence | RootCauseStatus | PlannedGoal | Status | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -40,7 +41,8 @@ F09-R2 reconciliation: product source commit `d1c82ba88e351a2d48bcfae7f97e047483
 | F09-I008 | fixed | Profile contract | `profileAllowedRoles` 原本未被 startup 注入对象冻结 | `WebView2Host.cs`; `WebView2HostTests.cs` | fixed | G3 | fixed | 注入数组、feature flags 和根对象均为只读投影。 |
 | F09-I009 | fixed | Navigation | Operators、Stations、Diagnostics、About 路由未稳定暴露在 Product Shell 的次级导航 | `ProductLayout.vue`; `appMount.spec.ts` | fixed | G2 | fixed | 根据 role/feature flags 派生 More 菜单，owner 不因隐藏入口挂载。 |
 | F09-I010 | P2 | Evidence integrity | Profile、Rollback、Final runner 已在 `9dd69bd2b` 上通过，但受控场景使用显式 Profile 注入，尚未形成独立的无覆盖启动证据 | `Invoke-StudioUiWebView2Evidence.ps1`; `Invoke-StudioUiProfileEvidence.ps1`; `Invoke-StudioUiFinalEvidence.ps1`; `.tmp/studio-ui-next/f09/profiles/9dd-profile-r3/studio-ui-profile-evidence.json` | known_boundary | G5/G7 | open | 当前证据证明 `NEXT_DEFAULT` 配置投影、命名 Profile、权限边界和 owner guard；不把显式 runner profile 扩大解释为无覆盖启动或独立 no-Node 证据。 |
+| F09-I011 | P1 | Remote CI / performance evidence | clean checkout 的 `Validate Measurement Performance Report` 读取已提交 report，并发现 `ColorMeasurement` 状态为 `FAIL`；run `30966530885` 的 Final Gate 因 required job failure 失败 | `measurement_performance_budget_report.json`; [run 30966530885](https://github.com/HerverJun/ClearVision/actions/runs/30966530885); [Final Gate job](https://github.com/HerverJun/ClearVision/actions/runs/30966530885/job/92188299730) | confirmed_repository_artifact_failure | G7 | open | 本地未暂存生成报告的 PASS 不能替代 clean checkout；不得放宽 gate 或将未提交的 `test_results` 纳入本轮 7 文件文档提交。需由产品/质量 owner 按既有性能报告流程修复并重新跑 Remote CI。 |
 
 ## Current cutover rule
 
-`Studio:StartupProfile=NEXT_DEFAULT` 已配置，`STUDIO_UI_NEXT` 是当前默认 UI root，`LEGACY_FALLBACK` 仍是可用的配置级回退入口。当前本地工程证据已完成，`F09-I002` rollback 已关闭，但审计分支推送、Remote CI/Final Gate、独立 no-Node、完整 DPI、现场硬件和生产 soak 仍未完成，因此继续保持 `PRODUCTION_ACCEPTANCE=NOT_GRANTED`。不得把未运行的证据边界伪装成 PASS。
+`Studio:StartupProfile=NEXT_DEFAULT` 已配置，`STUDIO_UI_NEXT` 是当前默认 UI root，`LEGACY_FALLBACK` 仍是可用的配置级回退入口。当前本地工程证据和 rollback 已完成，但 Remote CI run `30966530885` 与 Final Gate 已失败，正式分支不得快进。独立 no-Node、完整 DPI、现场硬件和生产 soak 仍未完成，因此继续保持 `PRODUCTION_ACCEPTANCE=NOT_GRANTED`；不得把本地未提交报告或其他证据边界伪装成远端 PASS。

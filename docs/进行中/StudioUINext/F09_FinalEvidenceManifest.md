@@ -1,13 +1,13 @@
 # F09 Final Evidence Manifest
 
 ```text
-MANIFEST_STATE=LOCAL_EVIDENCE_COMPLETE_AWAITING_REMOTE_CI
+MANIFEST_STATE=LOCAL_EVIDENCE_COMPLETE_REMOTE_CI_FAILED
 CONFIGURED_PROFILE=NEXT_DEFAULT
 EFFECTIVE_DEFAULT_UI_ROOT=STUDIO_UI_NEXT
 NEXT_UI_DEFAULT_ENTRY=ENABLED
 LEGACY_ROLE=FALLBACK_ONLY
-F09_R_STATE=LOCAL_EVIDENCE_COMPLETE
-F09_STATE=ENGINEERING_DONE_WITH_ACCEPTANCE_DEBT
+F09_R_STATE=PARTIAL
+F09_STATE=PARTIAL
 FRONTEND_MIGRATION_MAINLINE=COMPLETE
 F09_R2_PRODUCT_SOURCE_SHA=d1c82ba88e351a2d48bcfae7f97e047483dbba98
 PRODUCT_SOURCE_FOLLOW_UP_SHAS=c83dcc114290cf73e5e8d9b91e7b49732db8ec68,1545bca25
@@ -19,13 +19,14 @@ REMOTE_STUDIO_UI_NEXT_SHA=7d43af9e19ad5a98240651fd5519a8e0f5a1e9f5
 REMOTE_AUDIT_SHA_BEFORE_PUSH=c83dcc114290cf73e5e8d9b91e7b49732db8ec68
 AHEAD_BEHIND=24/0
 AUDIT_BRANCH=audit/f09-r2-d1c82ba88
-AUDIT_BRANCH_HEAD=PENDING_AUDIT_PUSH
+AUDIT_BRANCH_HEAD=06eddf63c488266f818bc36e1d14d6aa0f798333
 OFFICIAL_REMOTE_SHA=7d43af9e19ad5a98240651fd5519a8e0f5a1e9f5
 FINAL_SOURCE_SHA=9dd69bd2bde44e8ea5b7285bfd18f47e02f95007
 FINAL_EVIDENCE_SHA=9dd69bd2bde44e8ea5b7285bfd18f47e02f95007
 FINAL_DOC_SHA=PENDING_DOCUMENTATION_COMMIT
-REMOTE_CI=AWAITING
-FINAL_GATE=AWAITING
+REMOTE_CI_RUN=30966530885
+REMOTE_CI=FAIL
+FINAL_GATE=FAIL
 ROLLBACK_DRILL=PASS
 WORKTREE_STATE=DIRTY_UNRELATED_TRACKED_CHANGES
 ```
@@ -50,6 +51,8 @@ WORKTREE_STATE=DIRTY_UNRELATED_TRACKED_CHANGES
 | F09-E014 | Final user journey / soak | PASS | 2 restarts、20/20 cycles、GC/WeakRef/owner cleanup gates passed。 |
 | F09-E015 | Independent no-Node target | NOT_PERFORMED | 当前证据使用外部 Node/CDP driver；Desktop 子进程树 Node descendant count 为 0，但未执行独立无 Node 目标机。 |
 | F09-E016 | Full DPI matrix / field hardware / production soak | NOT_PERFORMED | 保留为 acceptance debt。 |
+| F09-E017 | Remote CI required jobs | FAIL | [run 30966530885](https://github.com/HerverJun/ClearVision/actions/runs/30966530885)：`detection-measurement-data` 在 `Validate Measurement Performance Report` 因 `ColorMeasurement=FAIL` 失败；其余 required jobs 成功。 |
+| F09-E018 | Final Gate | FAIL | [job 92188299730](https://github.com/HerverJun/ClearVision/actions/runs/30966530885/job/92188299730)：required `detection-measurement-data` 为 failure，故 Final Gate 原始结果为 failure。 |
 
 ## Provenance 规则
 
@@ -57,13 +60,13 @@ WORKTREE_STATE=DIRTY_UNRELATED_TRACKED_CHANGES
 - Profile、Rollback、Final runner 使用 canonical build、独立 `.tmp` 隔离、绝对路径校验和 shutdown diagnostics；当前 SHA 的 Profile/Rollback/Final evidence 均通过。
 - runner 为场景隔离显式注入 `Studio__StartupProfile`，所以证据证明的是每个受控 Profile 合同与 `NEXT_DEFAULT` 配置投影，不把“无覆盖启动”扩大解释为独立 no-Node 证据。
 - unattended shutdown 只接受显式 runner 参数，并要求数据库、运行目录和 diagnostics 位于 `.tmp` 隔离边界；强制退出或未知结果会使 cleanup evidence 失败。
-- 所有临时 evidence 必须保留在 `.tmp/studio-ui-next/`；不将临时产物加入发布或文档事实。当前正式远端仍为 `7d43af9e19ad5a98240651fd5519a8e0f5a1e9f5`，审计分支为 `audit/f09-r2-d1c82ba88`，当前尚未推送本轮最终 HEAD。
+- 所有临时 evidence 必须保留在 `.tmp/studio-ui-next/`；不将临时产物加入发布或文档事实。Remote CI run `30966530885` 的 clean checkout SHA 为 `06eddf63c488266f818bc36e1d14d6aa0f798333`；`detection-measurement-data` 的 validate-only gate 发现已提交 measurement report 中 `ColorMeasurement` 为 `FAIL`，不能通过本地未提交的生成报告替代。当前正式远端仍为 `7d43af9e19ad5a98240651fd5519a8e0f5a1e9f5`，审计分支为 `audit/f09-r2-d1c82ba88`。
 
 ## Cutover 判定
 
 ```text
 P0_COUNT=0
-P1_OPEN=0
+P1_OPEN=1
 OPERATOR_READONLY_UI_PROJECTION=PASS
 ROLLBACK_REPAIR=IMPLEMENTED_AND_RUNTIME_VERIFIED
 ROLLBACK_DRILL=PASS
@@ -71,9 +74,9 @@ NEXT_RELEASE_STARTUP=PASS
 LEGACY_FALLBACK_STARTUP=PASS
 DATA_COMPATIBILITY=PASS
 AUTHORITY_VIOLATION=0
-CUTOVER=LOCAL_EVIDENCE_READY_AWAITING_REMOTE_CI
-REMOTE_CI=AWAITING
-FINAL_GATE=AWAITING
+CUTOVER=REMOTE_CI_FAILED
+REMOTE_CI=FAIL
+FINAL_GATE=FAIL
 PRODUCTION_ACCEPTANCE=NOT_GRANTED
 ```
 
