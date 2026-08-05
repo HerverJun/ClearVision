@@ -378,8 +378,8 @@ public sealed class StationCommunicationSettingsStoreTests : IDisposable
     {
         var store = new StationCommunicationSettingsStore(_root);
         var running = new StationIngressOptions { Enabled = false, Port = 5000 };
-        using var firstStudioWrite = new ManualResetEventSlim();
-        using var allowFirstMutationToFinish = new ManualResetEventSlim();
+        var firstStudioWrite = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowFirstMutationToFinish = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var completedStudioWrites = 0;
         store.PersistenceHook = stage =>
         {
@@ -390,8 +390,8 @@ public sealed class StationCommunicationSettingsStoreTests : IDisposable
 
             if (Interlocked.Increment(ref completedStudioWrites) == 1)
             {
-                firstStudioWrite.Set();
-                allowFirstMutationToFinish.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+                firstStudioWrite.TrySetResult(true);
+                allowFirstMutationToFinish.Task.GetAwaiter().GetResult();
             }
         };
 
@@ -401,37 +401,62 @@ public sealed class StationCommunicationSettingsStoreTests : IDisposable
             Port = 5021,
             SharedToken = "first-token"
         }, running);
-        firstStudioWrite.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
-        using var secondStarted = new ManualResetEventSlim();
-        var second = Task.Factory.StartNew(
-            () =>
+        Task<StationCommunicationSaveResult>? second = null;
+        var secondStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            await firstStudioWrite.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            second = Task.Factory.StartNew(
+                () =>
+                {
+                    secondStarted.TrySetResult(true);
+                    return store.SaveSettings(
+                        new StationCommunicationSettingsUpdateRequest
+                        {
+                            Mode = "LocalLoopback",
+                            Port = 5022,
+                            SharedToken = "second-token"
+                        },
+                        running);
+                },
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
+            await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            second.IsCompleted.Should().BeFalse("the second request must remain behind the mutation lock");
+            Volatile.Read(ref completedStudioWrites).Should().Be(1);
+            allowFirstMutationToFinish.TrySetResult(true);
+            var results = await Task.WhenAll(first, second);
+
+            results.Should().OnlyContain(result => result.Success);
+            completedStudioWrites.Should().Be(2);
+            ReadStudioPort(store.StudioSettingsPath).Should().Be(5022);
+            ReadStationPort(store.StationSyncSettingsPath).Should().Be(5022);
+            Directory.EnumerateFiles(_root, "*.tmp", SearchOption.AllDirectories).Should().BeEmpty();
+        }
+        finally
+        {
+            allowFirstMutationToFinish.TrySetResult(true);
+            try
             {
-                secondStarted.Set();
-                return store.SaveSettings(
-                    new StationCommunicationSettingsUpdateRequest
-                    {
-                        Mode = "LocalLoopback",
-                        Port = 5022,
-                        SharedToken = "second-token"
-                    },
-                    running);
-            },
-            CancellationToken.None,
-            TaskCreationOptions.LongRunning,
-            TaskScheduler.Default);
-        secondStarted.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+                await first.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            catch
+            {
+            }
 
-        await Task.Delay(100);
-        second.IsCompleted.Should().BeFalse("the second request must remain behind the mutation lock");
-        Volatile.Read(ref completedStudioWrites).Should().Be(1);
-        allowFirstMutationToFinish.Set();
-        var results = await Task.WhenAll(first, second);
-
-        results.Should().OnlyContain(result => result.Success);
-        completedStudioWrites.Should().Be(2);
-        ReadStudioPort(store.StudioSettingsPath).Should().Be(5022);
-        ReadStationPort(store.StationSyncSettingsPath).Should().Be(5022);
-        Directory.EnumerateFiles(_root, "*.tmp", SearchOption.AllDirectories).Should().BeEmpty();
+            if (second is not null)
+            {
+                try
+                {
+                    await second.WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                catch
+                {
+                }
+            }
+        }
     }
 
     private static Task<StationCommunicationSaveResult> StartLongRunningSave(

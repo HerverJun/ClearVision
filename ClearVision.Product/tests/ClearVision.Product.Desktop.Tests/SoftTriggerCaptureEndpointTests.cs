@@ -439,10 +439,12 @@ public class SoftTriggerCaptureEndpointTests
     private sealed class SoftTriggerTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
+        private readonly string _aiConfigRoot;
 
-        private SoftTriggerTestHost(WebApplication app)
+        private SoftTriggerTestHost(WebApplication app, string aiConfigRoot)
         {
             _app = app;
+            _aiConfigRoot = aiConfigRoot;
             Client = app.GetTestClient();
         }
 
@@ -471,6 +473,7 @@ public class SoftTriggerCaptureEndpointTests
             configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
             builder.Services.AddSingleton(configService);
 
+            var aiConfigRoot = Path.Combine(Path.GetTempPath(), $"cv-soft-trigger-{Guid.NewGuid():N}");
             var aiConfigStore = new AiConfigStore(
                 Options.Create(new AiGenerationOptions
                 {
@@ -478,7 +481,8 @@ public class SoftTriggerCaptureEndpointTests
                     Model = "gpt-4o-mini",
                     ApiKey = "test-key"
                 }),
-                NullLogger<AiConfigStore>.Instance);
+                NullLogger<AiConfigStore>.Instance,
+                aiConfigRoot);
             builder.Services.AddSingleton(aiConfigStore);
             builder.Services.AddSingleton(new AiApiClient(new HttpClient(), aiConfigStore));
 
@@ -495,7 +499,7 @@ public class SoftTriggerCaptureEndpointTests
             });
             app.MapSettingsEndpoints();
             await app.StartAsync();
-            return new SoftTriggerTestHost(app);
+            return new SoftTriggerTestHost(app, aiConfigRoot);
         }
 
         public async ValueTask DisposeAsync()
@@ -503,6 +507,10 @@ public class SoftTriggerCaptureEndpointTests
             Client.Dispose();
             await _app.StopAsync();
             await _app.DisposeAsync();
+            if (Directory.Exists(_aiConfigRoot))
+            {
+                Directory.Delete(_aiConfigRoot, recursive: true);
+            }
         }
     }
 }

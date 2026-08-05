@@ -88,10 +88,12 @@ public class ContinuousPreviewEndpointTests
     private sealed class PreviewTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
+        private readonly string _aiConfigRoot;
 
-        private PreviewTestHost(WebApplication app)
+        private PreviewTestHost(WebApplication app, string aiConfigRoot)
         {
             _app = app;
+            _aiConfigRoot = aiConfigRoot;
             Client = app.GetTestClient();
         }
 
@@ -117,6 +119,7 @@ public class ContinuousPreviewEndpointTests
             configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
             builder.Services.AddSingleton(configService);
 
+            var aiConfigRoot = Path.Combine(Path.GetTempPath(), $"cv-continuous-preview-{Guid.NewGuid():N}");
             var aiConfigStore = new AiConfigStore(
                 Options.Create(new AiGenerationOptions
                 {
@@ -124,7 +127,8 @@ public class ContinuousPreviewEndpointTests
                     Model = "gpt-4o-mini",
                     ApiKey = "test-key"
                 }),
-                NullLogger<AiConfigStore>.Instance);
+                NullLogger<AiConfigStore>.Instance,
+                aiConfigRoot);
             builder.Services.AddSingleton(aiConfigStore);
             builder.Services.AddSingleton(new AiApiClient(new HttpClient(), aiConfigStore));
 
@@ -141,7 +145,7 @@ public class ContinuousPreviewEndpointTests
             });
             app.MapSettingsEndpoints();
             await app.StartAsync();
-            return new PreviewTestHost(app);
+            return new PreviewTestHost(app, aiConfigRoot);
         }
 
         public async ValueTask DisposeAsync()
@@ -149,6 +153,10 @@ public class ContinuousPreviewEndpointTests
             Client.Dispose();
             await _app.StopAsync();
             await _app.DisposeAsync();
+            if (Directory.Exists(_aiConfigRoot))
+            {
+                Directory.Delete(_aiConfigRoot, recursive: true);
+            }
         }
     }
 }

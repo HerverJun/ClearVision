@@ -383,10 +383,12 @@ public class CameraBindingsEndpointTests
     private sealed class CameraBindingsTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
+        private readonly string _aiConfigRoot;
 
-        private CameraBindingsTestHost(WebApplication app)
+        private CameraBindingsTestHost(WebApplication app, string aiConfigRoot)
         {
             _app = app;
+            _aiConfigRoot = aiConfigRoot;
             Client = app.GetTestClient();
         }
 
@@ -419,6 +421,7 @@ public class CameraBindingsEndpointTests
 
             builder.Services.AddSingleton(configService);
 
+            var aiConfigRoot = Path.Combine(Path.GetTempPath(), $"cv-camera-bindings-{Guid.NewGuid():N}");
             var aiConfigStore = new AiConfigStore(
                 Options.Create(new AiGenerationOptions
                 {
@@ -426,7 +429,8 @@ public class CameraBindingsEndpointTests
                     Model = "gpt-4o-mini",
                     ApiKey = "test-key"
                 }),
-                NullLogger<AiConfigStore>.Instance);
+                NullLogger<AiConfigStore>.Instance,
+                aiConfigRoot);
             builder.Services.AddSingleton(aiConfigStore);
             builder.Services.AddSingleton(new AiApiClient(new HttpClient(), aiConfigStore));
 
@@ -443,7 +447,7 @@ public class CameraBindingsEndpointTests
             });
             app.MapSettingsEndpoints();
             await app.StartAsync();
-            return new CameraBindingsTestHost(app);
+            return new CameraBindingsTestHost(app, aiConfigRoot);
         }
 
         public async ValueTask DisposeAsync()
@@ -451,6 +455,10 @@ public class CameraBindingsEndpointTests
             Client.Dispose();
             await _app.StopAsync();
             await _app.DisposeAsync();
+            if (Directory.Exists(_aiConfigRoot))
+            {
+                Directory.Delete(_aiConfigRoot, recursive: true);
+            }
         }
     }
 }
