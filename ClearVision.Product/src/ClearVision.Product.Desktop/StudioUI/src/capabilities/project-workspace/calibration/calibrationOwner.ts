@@ -190,9 +190,13 @@ function identityKey(flowOwner: FlowCanvasOwner, imageOwner: ImageCanvasOwner): 
   ].join(':');
 }
 
-function errorMessage(error: unknown): string {
+function errorMessage(error: unknown, action: 'solve' | 'save' = 'save'): string {
   if (error instanceof ApiConflictError) return '工程 revision 已变化；请先重新读取工程后再保存标定资产。';
-  if (error instanceof ApiForbiddenError) return '当前账户没有保存标定资产的权限。';
+  if (error instanceof ApiForbiddenError) {
+    return action === 'solve'
+      ? '当前账户没有执行标定计算的权限。'
+      : '当前账户没有保存标定资产的权限。';
+  }
   if (error instanceof ApiNetworkError || error instanceof ApiAbortError) return '标定请求结果未知；请重新读取工程确认资产状态。';
   if (error instanceof ApiHttpError) return error.message;
   return error instanceof Error ? error.message : '标定请求失败。';
@@ -505,7 +509,7 @@ export function createCalibrationOwner(options: {
         if (sequence !== solveSequence || disposed || error instanceof ApiAbortError) return;
         state.phase = 'error';
         state.dirty = true;
-        state.message = errorMessage(error);
+        state.message = errorMessage(error, 'solve');
         state.diagnostics = Object.freeze([state.message]);
       } finally {
         if (solveAbort === controller) solveAbort = undefined;

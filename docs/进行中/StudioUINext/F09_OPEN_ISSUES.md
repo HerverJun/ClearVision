@@ -46,7 +46,7 @@ FINAL_DOC_SHA=7ccbe915dcee42978bb50caea53e51c7539ad18d
 REMOTE_CI_RUN=30966530885
 REMOTE_CI=FAIL
 FINAL_GATE=FAIL
-WORKTREE_STATE=DIRTY_UNRELATED_TRACKED_CHANGES
+WORKTREE_STATE=CLEAN_AFTER_F10_SCOPED_COMMIT
 CONFIGURED_PROFILE=NEXT_DEFAULT
 EFFECTIVE_DEFAULT_UI_ROOT=STUDIO_UI_NEXT
 ```
@@ -59,7 +59,7 @@ F09-R2 reconciliation: product source commit `d1c82ba88e351a2d48bcfae7f97e047483
 | F09-I002 | P1 | Host / rollback | 历史真实 rollback manifest 因 Desktop Host close/flush 超过 15 秒失败 | `.tmp/studio-ui-next/f09/rollback/r-9dd-r1/studio-ui-rollback-evidence.json`; `Invoke-StudioUiRollbackEvidence.ps1`; `MainForm.cs`; `DesktopShutdownDiagnostics.cs` | repair_implemented_runtime_verified | G5/G6 | closed | `r-9dd-r1` 已完成 Next/缺失资源/Legacy/Next 演练；同一 ProjectId、最终 `PersistenceRevision=4`、shutdown diagnostics、owner 清理和 process exit 均通过。 |
 | F09-I003 | P2 | Legacy project lifecycle | Legacy demo/template 创建仍直接通过 `DemoProjectService` repository write，未提供 Next lifecycle 的 `clientOperationId` reconcile | `DemoProjectService.cs`; `projectManager.js` | known | G1/G4 | deferred | 仅保留为 Legacy fallback；不得把它称作 Next 已迁移能力。 |
 | F09-I004 | P2 | Workspace lifecycle evidence | Browser full 已落盘 141 passed / 26 skipped / 0 failed；受管 Playwright launcher 的 Windows `taskkill /T /F` 未自然 teardown，端口随后已释放 | `f03-workspace.spec.ts`; `studio-ui-next-server.cjs`; `.tmp/studio-ui-next/f09/browser/full-9dd-r3/browser-full.log` | known_infrastructure_limitation | G5 | open | 这是证据基础设施问题，不等同于已证实的 Workspace owner 泄漏；需要单独治理 launcher teardown。 |
-| F09-I005 | P2 | Acceptance | 独立 no-Node 目标机、完整 Windows DPI 矩阵、Station/Camera/PLC/TCP、Remote CI/Final Gate 与生产 soak 尚无本次 SHA 的完整验收证据 | F08/F09 evidence boundary | known | G5/G7 | open | 保留为 acceptance debt；当前 Release 125% 证据和 Desktop 子进程 Node descendant count 为 0 不能替代独立 no-Node、完整 DPI 或现场验证。 |
+| F09-I005 | P2 | Acceptance | 独立 no-Node 目标机、完整 Windows DPI 矩阵、现场 Camera/PLC/Station/TCP、Remote CI/Final Gate 与生产 soak 尚无本次 SHA 的完整验收证据 | F08/F09 evidence boundary; F10 local Station endpoint evidence | known | G5/G7 | open | 本轮 `StationEndpointsTests` `30/30` 只证明本地 API/命令合同，不替代现场 Station、Camera、PLC、TCP 联调；Release 125% 和 Desktop 子进程 Node descendant count 为 0 也不能替代独立 no-Node 或完整 DPI。 |
 | F09-I006 | P2 | Database maintenance | database restore/repair/cleanup/global reset 未迁移至 Next | `SettingsDatabasePanel.vue`; Legacy `systemTabs.js` | known | G1/G7 | deferred | 产品决定允许 Legacy fallback。 |
 | F09-I007 | fixed | Authorization | Operator 可调用 `/api/demo/create*` 创建工程 | `DemoEndpoints.cs`; `DemoEndpointsTests.cs` | fixed | G2 | fixed | 两个 POST 都要求 `CanEditProject`；定向测试已通过。 |
 | F09-I008 | fixed | Profile contract | `profileAllowedRoles` 原本未被 startup 注入对象冻结 | `WebView2Host.cs`; `WebView2HostTests.cs` | fixed | G3 | fixed | 注入数组、feature flags 和根对象均为只读投影。 |
@@ -74,16 +74,17 @@ F09-R2 reconciliation: product source commit `d1c82ba88e351a2d48bcfae7f97e047483
 ## Current TODO execution addendum (2026-08-07)
 
 ```text
-CURRENT_AUDIT_BASELINE_HEAD=68e6e4286d008433f804ef90de00c8017184c177
+CURRENT_AUDIT_BASELINE_HEAD=HEAD
 CURRENT_IMPLEMENTATION_COMMIT=418406e620082fdedf46cd2a180b44a27c43d002
 CURRENT_AUDIT_BRANCH=studio-ui-next
-CURRENT_REMOTE_HEAD=7d43af9e19ad5a98240651fd5519a8e0f5a1e9f5
-CURRENT_REMOTE_RELATION=REMOTE_ANCESTOR_AHEAD_37_NO_DIVERGENCE
-CURRENT_WORKTREE=DIRTY_SCOPED_CANDIDATE_BEFORE_COMMIT
-LOCAL_FRONTEND_GATES=PASS
-LOCAL_BROWSER_F03=PASS_59_OF_59
-LOCAL_BROWSER_F04R=PASS_2_OF_2
-CALIBRATION_ENDPOINT_TESTS=PASS_4_OF_4
+CURRENT_REMOTE_HEAD=5ec490727bc9b50c6963b1f955bc16efb594c9fd
+CURRENT_REMOTE_RELATION=LOCAL_AHEAD_1_NO_DIVERGENCE
+CURRENT_WORKTREE=CLEAN_AFTER_F10_SCOPED_COMMIT
+LOCAL_FRONTEND_GATES=PASS_136_FILES_838_TESTS
+LOCAL_BROWSER_F03=NOT_PERFORMED_IN_F10
+LOCAL_BROWSER_F04R=NOT_PERFORMED_IN_F10
+CALIBRATION_ENDPOINT_TESTS=PASS_7_OF_7
+STATION_ENDPOINT_TESTS=PASS_30_OF_30_CONTROLLED_ENVIRONMENT
 PRODUCTION_ACCEPTANCE=NOT_GRANTED
 ```
 
@@ -91,11 +92,17 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 
 | IssueId | Severity | Area | Current finding | Evidence / required owner | Status |
 | --- | --- | --- | --- | --- | --- |
-| CV-AUDIT-045 | P1 | Calibration authorization | formal save endpoint has `CanEditProject` and Operator `403`; draft solve endpoint has no explicit permission guard and its intended authenticated/readonly semantics remain unclear | `CalibrationDraftEndpoints.cs`; `CalibrationDraftEndpointsTests.cs`; Desktop/API owner | `OPEN_BACKEND_AUDIT` |
+| CV-AUDIT-045 | P1 | Calibration authorization | draft solve now requires Engineer/Admin and an existing Project context; formal save keeps `CanEditProject` and Operator `403` | `CalibrationDraftEndpoints.cs`; `CalibrationDraftEndpointsTests.cs`; `calibrationOwner.spec.ts` | `CLOSED_LOCAL_CANDIDATE` |
 | CV-AUDIT-046 | P2 | Template acceptance | Template query/owner/conversion and unit coverage exist, but no complete search -> preview -> apply -> save -> reload Playwright evidence exists at this audit anchor | Template owner / UI evidence owner | `OPEN_EVIDENCE` |
 | CV-AUDIT-047 | P1 | Project JSON lifecycle | no current Next import/export schema, file contract or lifecycle `clientOperationId`/reconcile endpoint was found | Project lifecycle/backend owner | `BLOCKED_BY_CONTRACT` |
 | CV-AUDIT-048 | P1 | Planar calibration | no current Next formal two-dimensional scale/offset wizard and Project asset contract was found | Calibration/backend owner | `BLOCKED_BY_CONTRACT` |
 | CV-AUDIT-049 | P1 | Results bulk export | trend/distribution/report queries exist, but no current full-batch JSON/CSV export contract and progress/unknown semantics were found | Results/export service owner | `BLOCKED_BY_CONTRACT` |
-| CV-AUDIT-050 | P1 | AI and device command scope | AgentRun attachment/resource fields and the line-sequence/Station/settings high-risk command contracts are not sufficient for a safe Next-only owner | AgentRun, device, Station and settings backend owners | `BLOCKED_BY_CONTRACT` |
+| CV-AUDIT-050 | P1 | AI and device command scope | Station package/command subset has stable client-request idempotency, query and expiry/identity projection; AI resources, line-sequence and Settings high-risk commands remain insufficient for a safe Next-only owner | AgentRun, device, Station and settings backend owners; `StationEndpointsTests` | `PARTIAL` |
 
-`CV-AUDIT-045` is intentionally split: formal asset permission is resolved and tested; only draft solve permission semantics remain open. `F09-I003`, `F09-I005`, `F09-I006`, `F09-I010` and `F09-I011` remain open/deferred according to the existing table. No issue was closed solely because `git fetch` showed the remote 37 commits behind; push and Remote CI are separate evidence.
+`CV-AUDIT-045` is closed for the current local candidate: draft solve authorization/context and formal asset permission are both covered by code and tests; this does not imply Remote CI or production acceptance. `F09-I003`, `F09-I005`, `F09-I006`, `F09-I010` and `F09-I011` remain open/deferred according to the existing table. No issue was closed solely because `git fetch` showed the remote state; push and Remote CI are separate evidence.
+
+## F10 follow-up (2026-08-07)
+
+The current `studio-ui-next` candidate is based on `5ec490727bc9b50c6963b1f955bc16efb594c9fd` with no remote divergence. The calibration authorization closure is local and tested: `CalibrationDraftEndpointsTests` passed `7/7`, while the full StudioUI unit gate passed `136` files and `838` tests. Station API evidence passed `StationEndpointsTests` `30/30` after classifying Windows EventLog and AppData write restrictions as test-environment conditions.
+
+The Station result is deliberately limited to local contract evidence. It does not close F09-I005 or authorize field deployment; real WebView2 125%, independent no-Node, Camera/PLC/Station hardware, Remote CI/Final Gate and production soak remain outstanding. `PRODUCTION_ACCEPTANCE=NOT_GRANTED` remains unchanged.

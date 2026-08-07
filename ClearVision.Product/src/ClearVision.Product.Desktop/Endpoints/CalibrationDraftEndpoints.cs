@@ -6,6 +6,7 @@ using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.Configuration;
@@ -30,10 +31,11 @@ public static class CalibrationDraftEndpoints
 
     public static IEndpointRouteBuilder MapCalibrationDraftEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/calibration/npoint-draft/solve", (
+        app.MapPost("/api/calibration/npoint-draft/solve", async (
             NPointCalibrationDraftSolveRequest request,
             PreviewArtifactStore artifactStore,
             IOptions<StudioOptions> studioOptions,
+            IProjectRepository projectRepository,
             CancellationToken cancellationToken) =>
         {
             if (!studioOptions.Value.NPointCalibrationWorkbenchEnabled)
@@ -45,9 +47,28 @@ public static class CalibrationDraftEndpoints
                 });
             }
 
+            if (request.ProjectId == Guid.Empty)
+            {
+                return Results.BadRequest(new
+                {
+                    Code = "PROJECT_CONTEXT_REQUIRED",
+                    Error = "A project context is required for calibration draft solve."
+                });
+            }
+
+            if (await projectRepository.GetByIdAsync(request.ProjectId) == null)
+            {
+                return Results.NotFound(new
+                {
+                    Code = "PROJECT_NOT_FOUND",
+                    Error = "Project was not found."
+                });
+            }
+
             var response = SolveDraft(request, artifactStore, cancellationToken);
             return Results.Ok(response);
-        });
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
 
         app.MapPost("/api/projects/{projectId:guid}/calibration-assets/from-draft", async (
             Guid projectId,

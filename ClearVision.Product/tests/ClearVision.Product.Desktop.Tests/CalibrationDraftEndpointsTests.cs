@@ -175,6 +175,57 @@ public sealed class CalibrationDraftEndpointsTests
         host.AssetStorage.Metadata.Should().BeNull();
     }
 
+    [Fact]
+    public async Task DraftSolveEndpoint_ShouldRejectOperator()
+    {
+        await using var host = await CalibrationEndpointHost.CreateAsync(role: UserRole.Operator.ToString());
+
+        var response = await host.Client.PostAsJsonAsync(
+            "/api/calibration/npoint-draft/solve",
+            new
+            {
+                projectId = host.Project.Id,
+                sessionId = "operator-draft"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task DraftSolveEndpoint_ShouldRejectUnauthenticatedSession()
+    {
+        await using var host = await CalibrationEndpointHost.CreateAsync(role: string.Empty);
+
+        var response = await host.Client.PostAsJsonAsync(
+            "/api/calibration/npoint-draft/solve",
+            new
+            {
+                projectId = host.Project.Id,
+                sessionId = "anonymous-draft"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task DraftSolveEndpoint_ShouldRequireExistingProjectContext()
+    {
+        await using var host = await CalibrationEndpointHost.CreateAsync();
+
+        var response = await host.Client.PostAsJsonAsync(
+            "/api/calibration/npoint-draft/solve",
+            new
+            {
+                projectId = Guid.NewGuid(),
+                sessionId = "missing-project"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        body.Should().NotBeNull();
+        body!["code"].Should().Be("PROJECT_NOT_FOUND");
+    }
+
     private static NPointCalibrationDraftSampleDto CreateSample(
         string sampleId,
         int order,

@@ -1,6 +1,6 @@
 import { reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import { type ApiTransport, type ApiWriteOptions } from '@/platform/api';
+import { ApiForbiddenError, type ApiTransport, type ApiWriteOptions } from '@/platform/api';
 import type { FlowCanvasOwner } from '@/capabilities/project-workspace/flow';
 import type { ImageCanvasClick, ImageCanvasOwner } from '@/capabilities/project-workspace/image/imageCanvasOwner';
 import { createCalibrationOwner } from '@/capabilities/project-workspace/calibration/calibrationOwner';
@@ -140,6 +140,25 @@ describe('CalibrationOwner', () => {
     resolvePost?.(solveResponse());
     await solving;
     expect(harness.owner.projection.phase).toBe('disposed');
+  });
+
+  it('projects draft solve permission failures separately from formal asset save failures', async () => {
+    const post = vi.fn(async () => {
+      throw new ApiForbiddenError({
+        url: 'http://localhost:5000/api/calibration/npoint-draft/solve',
+        status: 403,
+        statusText: 'Forbidden',
+        payload: { code: 'EngineerOrAdminRequired' },
+        responseBody: '{"code":"EngineerOrAdminRequired"}'
+      });
+    });
+    const harness = createHarness(post as unknown as ApiTransport['post']);
+
+    await harness.owner.solve();
+
+    expect(harness.owner.projection.phase).toBe('error');
+    expect(harness.owner.projection.message).toBe('当前账户没有执行标定计算的权限。');
+    harness.owner.dispose();
   });
 
   it('saves an accepted candidate through the project asset endpoint and reconciles once', async () => {
