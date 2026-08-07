@@ -508,6 +508,7 @@ Current HEAD:
 
 ```text
 AUDIT_BASELINE_HEAD=68e6e4286d008433f804ef90de00c8017184c177
+IMPLEMENTATION_COMMIT_SHA=418406e620082fdedf46cd2a180b44a27c43d002
 AUDIT_BRANCH=studio-ui-next
 REMOTE_STUDIO_UI_NEXT_HEAD=7d43af9e19ad5a98240651fd5519a8e0f5a1e9f5
 REMOTE_RELATION=REMOTE_ANCESTOR_AHEAD_37_NO_DIVERGENCE
@@ -563,4 +564,4 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 - `POST /api/projects/{projectId}/calibration-assets/from-draft` 已挂 `CanEditProject` 且 Operator `403` 测试通过；`POST /api/calibration/npoint-draft/solve` 当前代码未挂显式 permission guard。本附录将 `CV-AUDIT-045` 拆为“正式保存权限已解决”和“draft solve 权限语义待后端审计”，不笼统写成正式保存缺少权限。
 - 本轮 Playwright 使用 Chromium 静态 fixture；真实 WebView2、Windows 125%、独立 no-Node 目标机、Camera/PLC/Station/数据库隔离环境、Remote CI、Final Gate 和生产 soak 未执行。`PRODUCTION_ACCEPTANCE` 继续为 `NOT_GRANTED`。
 
-提交后应在本附录末尾的 provenance 记录实际 implementation commit 和 documentation follow-up commit；本附录中的测试 source anchor 是 `AUDIT_BASELINE_HEAD` 加其 scoped working-tree diff。
+本附录中的测试 source anchor 是 `AUDIT_BASELINE_HEAD` 加其 scoped working-tree diff；实现内容已落在 `IMPLEMENTATION_COMMIT_SHA=418406e620082fdedf46cd2a180b44a27c43d002`，后续文档提交仅更新 provenance，不改变实现内容。

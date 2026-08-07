@@ -41,6 +41,8 @@ LEGACY_PHYSICAL_REMOVAL=NOT_IN_F09
 
 以下细粒度状态以 `AUDIT_BASELINE_HEAD=68e6e4286d008433f804ef90de00c8017184c177` 加当前 scoped working-tree diff 为证据锚点；旧表中的主体迁移结论保留，但不能覆盖这里的操作级状态。
 
+实现候选已提交为 `IMPLEMENTATION_SOURCE_COMMIT=418406e620082fdedf46cd2a180b44a27c43d002`；下面的状态和证据仍不扩大解释为真实宿主或生产签收。
+
 | CapabilityId | 当前操作级状态 | 当前 owner / authority | 当前证据 | Issue |
 | --- | --- | --- | --- | --- |
 | inspector-file-color-path | `IMPLEMENTED` | FilePickerPort + InspectorOwner -> canonical Flow draft | FilePickerPort/Inspector unit；F03 file picker test | - |
