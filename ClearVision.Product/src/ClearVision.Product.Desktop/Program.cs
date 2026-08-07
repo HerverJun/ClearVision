@@ -374,6 +374,7 @@ static class Program
         app.MapStationEndpoints();
         app.MapDemoEndpoints();
         app.MapAnalysisEndpoints();
+        app.MapResultsExportEndpoints();
         app.MapAutoTuneEndpoints();
         app.MapInspectionEventEndpoints();
 

@@ -301,6 +301,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IPlanarScaleOffsetCalibrationService, PlanarScaleOffsetCalibrationService>();
         services.AddScoped<DemoProjectService>();
         services.AddScoped<IResultAnalysisService, ResultAnalysisService>();
+        services.AddSingleton<IResultsExportJobService, ResultsExportJobService>();
 
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ClearVision.Product.Application.Commands.Projects.CreateProjectCommand).Assembly));
         services.AddAutoMapper(

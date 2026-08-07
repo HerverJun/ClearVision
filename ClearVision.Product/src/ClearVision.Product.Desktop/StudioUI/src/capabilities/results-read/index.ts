@@ -1,8 +1,10 @@
 export { default as ResultsPage } from './ResultsPage.vue';
 export { default as ResultsAnalysisWorkbench } from './ResultsAnalysisWorkbench.vue';
+export { default as ResultsExportDialog } from './ResultsExportDialog.vue';
 export * from './analysisContracts';
 export * from './analysisQueries';
 export * from './resultAnalysisOwner';
+export * from './resultsExportOwner';
 export * from './resultsContracts';
 export * from './resultsQueries';
 export * from './resultsReadRuntime';

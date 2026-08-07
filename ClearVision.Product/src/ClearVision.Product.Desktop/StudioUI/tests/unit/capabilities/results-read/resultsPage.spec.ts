@@ -8,7 +8,8 @@ import {
   ApiNotFoundError,
   ApiServerError,
   type ApiGetOptions,
-  type ApiTransport
+  type ApiTransport,
+  type ApiWriteOptions
 } from '@/platform/api';
 import { createReadQueryClient } from '@/platform/query';
 
@@ -201,12 +202,17 @@ function httpDetails(status: number) {
 }
 
 type GetImplementation = (path: string, options?: ApiGetOptions) => Promise<unknown>;
+type PostImplementation = (path: string, body: unknown, options?: ApiWriteOptions) => Promise<unknown>;
 
-function apiWith(implementation: GetImplementation): ApiTransport {
+function apiWith(implementation: GetImplementation, postImplementation?: PostImplementation): ApiTransport {
   return {
     apiBaseUrl: 'http://localhost:5000/api',
     async get<T = unknown>(path: string, options?: ApiGetOptions): Promise<T | undefined> {
       return await implementation(path, options) as T | undefined;
+    },
+    async post<T = unknown>(path: string, body: unknown, options?: ApiWriteOptions): Promise<T | undefined> {
+      if (!postImplementation) return undefined;
+      return await postImplementation(path, body, options) as T | undefined;
     },
     async getBlob() {
       return {
@@ -462,6 +468,77 @@ describe('Results page', () => {
     expect(mounted.wrapper.text()).toContain('当前页没有匹配诊断码的结果');
     expect(mounted.wrapper.text()).toContain('不代表后端全量结果计数');
 
+    mounted.wrapper.unmount();
+    mounted.queries.dispose();
+  });
+
+  it('opens a scoped local export and disposes the export owner when switching to Station', async () => {
+    const posted: Array<{ path: string; body: Record<string, unknown> }> = [];
+    const mounted = await mountResults(
+      `/results?source=local&projectId=${projectId}&outcome=Ng&diagnosticCode=CAMERA_TIMEOUT&from=2026-07-15T00:00:00Z&to=2026-07-15T23:59:59Z`,
+      apiWith(
+        async path => {
+          if (path === 'projects') return [project()];
+          if (path.startsWith('inspection/statistics/')) return statistics();
+          if (path.startsWith('inspection/history/')) return localPage();
+          return localPage();
+        },
+        async (path, body) => {
+          posted.push({ path, body: body as Record<string, unknown> });
+          const request = body as { clientOperationId: string; format: 'csv' | 'json' };
+          return {
+            job: {
+              exportId: '22222222-2222-4222-8222-222222222222',
+              projectId,
+              source: 'local',
+              format: request.format,
+              clientOperationId: request.clientOperationId,
+              state: 'completed',
+              createdAtUtc: '2026-08-02T00:00:00Z',
+              updatedAtUtc: '2026-08-02T00:00:01Z',
+              snapshotUpperBoundUtc: '2026-08-02T00:00:00Z',
+              completedAtUtc: '2026-08-02T00:00:01Z',
+              artifactExpiresAtUtc: '2026-08-03T00:00:01Z',
+              fileName: request.format === 'csv' ? 'results.csv' : 'results.json',
+              errorCode: null,
+              errorMessage: null,
+              downloadAvailable: true
+            }
+          };
+        }
+      )
+    );
+
+    const openButton = mounted.wrapper.get('[data-testid="results-open-export"]');
+    expect(openButton.attributes('disabled')).toBeUndefined();
+    await openButton.trigger('click');
+    await flushPromises();
+
+    const modal = document.body.querySelector<HTMLElement>('[data-design-primitive="modal"]');
+    expect(modal).not.toBeNull();
+    const startButton = modal?.querySelector<HTMLButtonElement>('.cv-button--primary');
+    expect(startButton).not.toBeNull();
+    startButton?.click();
+    await flushPromises();
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toMatchObject({ path: 'results/exports' });
+    expect(posted[0]?.body).toMatchObject({
+      projectId,
+      source: 'local',
+      format: 'csv',
+      startTime: '2026-07-15T00:00:00Z',
+      endTime: '2026-07-15T23:59:59Z',
+      status: 'Ng',
+      defectType: null,
+      diagnosticCode: 'CAMERA_TIMEOUT'
+    });
+
+    await mounted.router.push('/results?source=station');
+    await flushPromises();
+
+    expect(document.body.querySelector('[data-capability="results-export"]')).toBeNull();
+    expect(mounted.wrapper.find('.results-page__export-boundary').exists()).toBe(true);
     mounted.wrapper.unmount();
     mounted.queries.dispose();
   });

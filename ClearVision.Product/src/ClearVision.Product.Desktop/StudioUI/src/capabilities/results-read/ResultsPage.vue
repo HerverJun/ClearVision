@@ -66,6 +66,12 @@ import {
   type ResultEvidenceOwner
 } from './resultEvidenceOwner';
 import ResultsAnalysisWorkbench from './ResultsAnalysisWorkbench.vue';
+import ResultsExportDialog from './ResultsExportDialog.vue';
+import {
+  createResultsExportOwner,
+  type ResultsExportOwner,
+  type ResultsExportScopeV1
+} from './resultsExportOwner';
 import {
   createResultAnalysisOwner,
   type ResultAnalysisOwner
@@ -93,6 +99,8 @@ const stationStatisticsOwner = shallowRef<ReadQueryOwner<ResultsOutcomeStatistic
 const previousSuccessOwner = shallowRef<ReadQueryOwner<InspectionPreviousSuccessReference> | null>(null);
 const comparisonOwner = shallowRef<ReadQueryOwner<InspectionHistoryComparison> | null>(null);
 const evidenceOwner = shallowRef<ResultEvidenceOwner | null>(null);
+const resultsExportOwner = shallowRef<ResultsExportOwner | null>(null);
+const resultsExportOpen = shallowRef(false);
 const comparisonLeftId = shallowRef('');
 const advancedFiltersOpen = shallowRef(
   Boolean(firstQueryValue(route.query.diagnosticCode) || firstQueryValue(route.query.from) || firstQueryValue(route.query.to))
@@ -269,6 +277,13 @@ const projectOptions = computed<readonly CvSelectOption[]>(() => [
     label: `${project.name} · ${project.version}`
   }))
 ]);
+const selectedProjectName = computed(() =>
+  projectsState.value.data?.find(project => project.id.toLowerCase() === projectId.value.toLowerCase())?.name
+  ?? (projectId.value ? `工程 ${projectId.value}` : '未选择工程')
+);
+const canOpenResultsExport = computed(() =>
+  source.value === 'local' && Boolean(projectId.value) && !hasInvalidDate.value && Boolean(runtime.api)
+);
 
 const localColumns: readonly CvDataTableColumn<LocalInspectionResultSummary>[] = Object.freeze([
   { key: 'inspectionTime', label: '完成时间', width: '17%' },
@@ -460,6 +475,38 @@ function disposeInvestigation(): void {
 function disposeEvidence(): void {
   evidenceOwner.value?.dispose();
   evidenceOwner.value = null;
+}
+
+function disposeResultsExport(): void {
+  resultsExportOwner.value?.dispose();
+  resultsExportOwner.value = null;
+  resultsExportOpen.value = false;
+}
+
+function ensureResultsExportOwner(): ResultsExportOwner | null {
+  if (!runtime.api || !canOpenResultsExport.value || resultsExportOwner.value) {
+    return resultsExportOwner.value;
+  }
+  const scope: ResultsExportScopeV1 = Object.freeze({
+    projectId: projectId.value,
+    source: 'local',
+    startTime: from.value || null,
+    endTime: to.value || null,
+    status: outcome.value || null,
+    defectType: null,
+    diagnosticCode: diagnosticCode.value || null
+  });
+  resultsExportOwner.value = createResultsExportOwner({ api: runtime.api, scope });
+  return resultsExportOwner.value;
+}
+
+function openResultsExport(): void {
+  if (!ensureResultsExportOwner()) return;
+  resultsExportOpen.value = true;
+}
+
+function closeResultsExport(): void {
+  resultsExportOpen.value = false;
 }
 
 async function refreshEvidence(detail?: LocalInspectionResultDetail): Promise<void> {
@@ -728,6 +775,7 @@ const visibleComparisonDiffs = computed(() => {
 
 watch(source, next => {
   if (!mounted.value) return;
+  disposeResultsExport();
   if (next === 'local') {
     disposeStationList();
     disposeStationStatistics();
@@ -744,9 +792,12 @@ watch(source, next => {
 });
 
 watch(
-  () => [projectId.value, outcome.value, from.value, to.value, page.value, pageSize.value],
+  () => [projectId.value, outcome.value, from.value, to.value, diagnosticCode.value, page.value, pageSize.value],
   (next, previous) => {
     if (!mounted.value || source.value !== 'local') return;
+    if (next.slice(0, 5).some((value, index) => value !== previous[index])) {
+      disposeResultsExport();
+    }
     if (next[0] !== previous[0]) {
       disposeLocalList();
       disposeLocalStatistics();
@@ -792,6 +843,7 @@ onBeforeUnmount(() => {
   disposeLocalStatistics();
   disposeAnalysis();
   disposeEvidence();
+  disposeResultsExport();
   disposeInvestigation();
   disposeStationList();
   disposeStationStatistics();
@@ -834,6 +886,24 @@ onBeforeUnmount(() => {
         >
           查看工作站
         </RouterLink>
+        <CvButton
+          v-if="source === 'local'"
+          size="sm"
+          variant="secondary"
+          :disabled="!canOpenResultsExport"
+          title="按当前本机工程和筛选条件由服务端导出完整结果"
+          data-testid="results-open-export"
+          @click="openResultsExport"
+        >
+          导出完整结果
+        </CvButton>
+        <span
+          v-else
+          class="results-page__export-boundary"
+          role="status"
+        >
+          工作站上报暂不支持完整导出
+        </span>
         <CvButton
           size="sm"
           :loading="localListState.isRefreshing || stationListState.isRefreshing"
@@ -1618,6 +1688,13 @@ onBeforeUnmount(() => {
         </template>
       </CvPanel>
     </section>
+    <ResultsExportDialog
+      v-if="resultsExportOwner"
+      :open="resultsExportOpen"
+      :project-name="selectedProjectName"
+      :owner="resultsExportOwner"
+      @close="closeResultsExport"
+    />
   </section>
 </template>
 
@@ -1630,6 +1707,7 @@ onBeforeUnmount(() => {
 .results-page__nav-link:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
 .results-page__title h1 { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-md); font-weight: var(--cv-font-weight-semibold); letter-spacing: 0; }
 .results-page__meta { align-self: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.results-page__export-boundary { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); white-space: nowrap; }
 .results-page__filters { overflow: hidden; border-block: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
 .results-page__filter-toolbar { padding: var(--cv-space-2); background: var(--cv-surface-raised); }
 .results-page__filter-toolbar :deep(.cv-toolbar__primary) { flex: 1 1 100%; align-items: end; }

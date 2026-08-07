@@ -39,12 +39,26 @@ public interface IResultAnalysisService
     /// <summary>
     /// 导出检测结果为CSV
     /// </summary>
-    Task<string> ExportToCsvAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null);
+    Task<string> ExportToCsvAsync(
+        Guid projectId,
+        DateTime? startTime = null,
+        DateTime? endTime = null,
+        string? status = null,
+        string? defectType = null,
+        CancellationToken cancellationToken = default,
+        string? diagnosticCode = null);
 
     /// <summary>
     /// 导出检测结果为JSON
     /// </summary>
-    Task<string> ExportToJsonAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null);
+    Task<string> ExportToJsonAsync(
+        Guid projectId,
+        DateTime? startTime = null,
+        DateTime? endTime = null,
+        string? status = null,
+        string? defectType = null,
+        CancellationToken cancellationToken = default,
+        string? diagnosticCode = null);
 
     /// <summary>
     /// 生成检测报告
@@ -152,7 +166,12 @@ public class ResultAnalysisService : IResultAnalysisService
             return EmptyConfidenceDistribution(projectId, startTime, endTime);
         }
 
-        var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
+        var results = await _resultRepository.GetByTimeRangeAsync(
+            projectId,
+            startTime ?? DateTime.MinValue,
+            endTime ?? DateTime.MaxValue,
+            status,
+            defectType);
 
         // 按时间筛选
         var filtered = results.Where(r =>
@@ -288,20 +307,36 @@ public class ResultAnalysisService : IResultAnalysisService
     }
 
     /// <inheritdoc />
-    public async Task<string> ExportToCsvAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
+    public async Task<string> ExportToCsvAsync(
+        Guid projectId,
+        DateTime? startTime = null,
+        DateTime? endTime = null,
+        string? status = null,
+        string? defectType = null,
+        CancellationToken cancellationToken = default,
+        string? diagnosticCode = null)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!await IsActiveProjectAsync(projectId))
         {
             return string.Empty;
         }
 
-        var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
+        var results = await GetExportResultsAsync(
+            projectId,
+            startTime,
+            endTime,
+            status,
+            defectType,
+            diagnosticCode,
+            cancellationToken);
 
         var csv = new System.Text.StringBuilder();
         csv.AppendLine(ToCsvRow("检测ID", "工程ID", "检测时间", "兼容状态", "执行结果", "判定结果", "CanonicalOutcome", "原因码", "处理时间(ms)", "置信度", "缺陷数量", "错误信息", "缺陷类型", "X", "Y", "Width", "Height", "缺陷置信度", "缺陷描述"));
 
         foreach (var result in results)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var outcome = result.GetOutcome();
             csv.AppendLine(ToCsvRow(
                 result.Id,
@@ -326,6 +361,7 @@ public class ResultAnalysisService : IResultAnalysisService
 
             foreach (var defect in result.Defects)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 csv.AppendLine(ToCsvRow(
                     null,
                     null,
@@ -385,8 +421,16 @@ public class ResultAnalysisService : IResultAnalysisService
     }
 
     /// <inheritdoc />
-    public async Task<string> ExportToJsonAsync(Guid projectId, DateTime? startTime = null, DateTime? endTime = null, string? status = null, string? defectType = null)
+    public async Task<string> ExportToJsonAsync(
+        Guid projectId,
+        DateTime? startTime = null,
+        DateTime? endTime = null,
+        string? status = null,
+        string? defectType = null,
+        CancellationToken cancellationToken = default,
+        string? diagnosticCode = null)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!await IsActiveProjectAsync(projectId))
         {
             return System.Text.Json.JsonSerializer.Serialize(new InspectionExportDto
@@ -398,7 +442,15 @@ public class ResultAnalysisService : IResultAnalysisService
             }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
         }
 
-        var results = await _resultRepository.GetByTimeRangeAsync(projectId, startTime ?? DateTime.MinValue, endTime ?? DateTime.MaxValue, status, defectType);
+        var results = await GetExportResultsAsync(
+            projectId,
+            startTime,
+            endTime,
+            status,
+            defectType,
+            diagnosticCode,
+            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var exportData = new InspectionExportDto
         {
@@ -406,28 +458,33 @@ public class ResultAnalysisService : IResultAnalysisService
             ExportTime = DateTime.UtcNow,
             StartTime = startTime,
             EndTime = endTime,
-            Results = results.Select(r => new InspectionResultExportItemDto
+            Results = results.Select(r =>
             {
-                Id = r.Id,
-                InspectionTime = r.InspectionTime,
-                Status = r.Status.ToString(),
-                ExecutionOutcome = r.GetOutcome().Execution.ToString(),
-                DecisionOutcome = r.GetOutcome().Decision.ToString(),
-                CanonicalOutcome = InspectionOutcomeClassifier.Classify(r.GetOutcome()).ToString(),
-                ReasonCode = r.GetOutcome().ReasonCode,
-                ProcessingTimeMs = r.ProcessingTimeMs,
-                ConfidenceScore = r.ConfidenceScore,
-                ErrorMessage = r.ErrorMessage,
-                Defects = r.Defects.Select(d => new DefectExportDto
+                cancellationToken.ThrowIfCancellationRequested();
+                var outcome = r.GetOutcome();
+                return new InspectionResultExportItemDto
                 {
-                    Type = d.Type.ToString(),
-                    X = d.X,
-                    Y = d.Y,
-                    Width = d.Width,
-                    Height = d.Height,
-                    ConfidenceScore = d.ConfidenceScore,
-                    Description = d.Description
-                }).ToList()
+                    Id = r.Id,
+                    InspectionTime = r.InspectionTime,
+                    Status = r.Status.ToString(),
+                    ExecutionOutcome = outcome.Execution.ToString(),
+                    DecisionOutcome = outcome.Decision.ToString(),
+                    CanonicalOutcome = InspectionOutcomeClassifier.Classify(outcome).ToString(),
+                    ReasonCode = outcome.ReasonCode,
+                    ProcessingTimeMs = r.ProcessingTimeMs,
+                    ConfidenceScore = r.ConfidenceScore,
+                    ErrorMessage = r.ErrorMessage,
+                    Defects = r.Defects.Select(d => new DefectExportDto
+                    {
+                        Type = d.Type.ToString(),
+                        X = d.X,
+                        Y = d.Y,
+                        Width = d.Width,
+                        Height = d.Height,
+                        ConfidenceScore = d.ConfidenceScore,
+                        Description = d.Description
+                    }).ToList()
+                };
             }).ToList()
         };
 
@@ -435,6 +492,39 @@ public class ResultAnalysisService : IResultAnalysisService
         {
             WriteIndented = true
         });
+    }
+
+    private async Task<IReadOnlyList<InspectionResult>> GetExportResultsAsync(
+        Guid projectId,
+        DateTime? startTime,
+        DateTime? endTime,
+        string? status,
+        string? defectType,
+        string? diagnosticCode,
+        CancellationToken cancellationToken)
+    {
+        var results = await _resultRepository.GetByTimeRangeAsync(
+            projectId,
+            startTime ?? DateTime.MinValue,
+            endTime ?? DateTime.MaxValue,
+            status,
+            defectType);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var normalizedDiagnosticCode = string.IsNullOrWhiteSpace(diagnosticCode)
+            ? null
+            : diagnosticCode.Trim();
+        if (normalizedDiagnosticCode == null)
+        {
+            return results.ToList();
+        }
+
+        return results
+            .Where(result => string.Equals(
+                result.GetOutcome().ReasonCode,
+                normalizedDiagnosticCode,
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
     }
 
     /// <inheritdoc />
