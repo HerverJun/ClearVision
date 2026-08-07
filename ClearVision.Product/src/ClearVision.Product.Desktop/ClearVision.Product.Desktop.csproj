@@ -105,6 +105,22 @@
     <StudioUiBuildInput Include="$(StudioUiRoot)tsconfig*.json" />
     <StudioUiBuildInput Include="$(StudioUiRoot)vite.config.ts" />
     <StudioUiBuildInput Include="$(StudioUiRoot)src\**\*" />
+    <!-- Vite's canonical aliases currently resolve into this shared source closure. -->
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\core\canvas\flowCanvasAdapter.js" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\core\canvas\flowCanvas.js" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\core\canvas\portTypeCompatibility.mjs" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\features\flow-editor\flowEditorInteraction.js" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\shared\components\uiComponents.js" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\shared\operatorVisuals.js" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\core\logging\debugLogger.js" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\features\flow-editor\previewCoordinator.js" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\features\flow-editor\previewOutputFormatter.mjs" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\shared\parameterDependencyRules.js" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\core\canvas\imageCanvas.js" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\features\flow-editor\roiGeometry.mjs" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\features\flow-editor\roiEditorSupport.mjs" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\shared\featureRegistry.js" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\features\flow-editor\imagePixelProbe.mjs" />
   </ItemGroup>
 
   <Target Name="InstallStudioUiDependencies"

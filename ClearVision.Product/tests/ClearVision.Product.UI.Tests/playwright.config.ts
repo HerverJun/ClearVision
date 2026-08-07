@@ -35,6 +35,11 @@ const serverCommand = isStudioUiNext
   ? 'node ./tests/support/studio-ui-next-server.cjs'
   : 'node ./node_modules/http-server/bin/http-server "' + webRoot +
     '" -p ' + port + ' -a ' + host;
+const studioUiNextManagedServer = isStudioUiNext && !configuredBaseUrl;
+const htmlReportOutput = resolve(
+  __dirname,
+  '../../../.tmp/playwright-reports/clearvision-product-ui'
+);
 process.env.CV_UI_PORT = String(port);
 process.env.CV_UI_HOST = host;
 
@@ -50,18 +55,21 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  reporter: [['html', { outputFolder: htmlReportOutput, open: 'never' }]],
   use: {
     baseURL: origin,
     trace: 'on-first-retry',
   },
+  globalSetup: studioUiNextManagedServer
+    ? resolve(__dirname, 'tests/support/studio-ui-next-global-setup.cjs')
+    : undefined,
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: configuredBaseUrl
+  webServer: configuredBaseUrl || isStudioUiNext
     ? undefined
     : {
         command: serverCommand,

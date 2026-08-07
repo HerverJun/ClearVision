@@ -91,13 +91,25 @@ function stop(exitCode = 0) {
   });
 }
 
+function requestShutdown() {
+  stop(0);
+}
+
 server.server.on('error', error => {
   console.error(error);
   process.exit(1);
 });
 
-process.once('SIGINT', () => stop());
-process.once('SIGTERM', () => stop());
+process.once('SIGINT', requestShutdown);
+process.once('SIGTERM', requestShutdown);
+if (typeof process.disconnect === 'function') {
+  process.once('disconnect', requestShutdown);
+}
+if (!process.stdin.isTTY) {
+  process.stdin.once('end', requestShutdown);
+  process.stdin.once('close', requestShutdown);
+  process.stdin.resume();
+}
 process.once('exit', () => {
   if (!closing) server.server.close();
 });
