@@ -7,16 +7,18 @@
 ```text
 F10_STATE=ACTIVE
 F10_BASELINE_SHA=eaafef9f09c2b39542e0a675a995dd00fc9331b2
-CURRENT_HEAD=HEAD
-REMOTE_HEAD=HEAD
+F10_START_HEAD=5056a5cddce36ec4b97e2b4dd2327abd6675091b2
+F10_START_REMOTE_HEAD=5056a5cddce36ec4b97e2b4dd2327abd6675091b2
+CURRENT_HEAD=8846c52e47cdc02e3f003dd5b624fe45083cb0b2
+REMOTE_HEAD=8846c52e47cdc02e3f003dd5b624fe45083cb0b2
 BRANCH=studio-ui-next
 WORKTREE_STATE=CLEAN
 IMPLEMENTATION_BASE=eaafef9f09c2b39542e0a675a995dd00fc9331b2
-PROJECT_IMPORT_EXPORT=BLOCKED_BY_CONTRACT
-DEMO_RECONCILE=BLOCKED_BY_CONTRACT
+PROJECT_IMPORT_EXPORT=DONE
+DEMO_RECONCILE=DONE
 AI_ATTACHMENT_RESOURCE=BLOCKED_BY_CONTRACT
 NPOINT_AUTHORIZATION=DONE
-PLANAR_CALIBRATION=PARTIAL
+PLANAR_CALIBRATION=DONE
 RESULTS_BULK_EXPORT=DONE
 LINE_SEQUENCE=BLOCKED_BY_CONTRACT
 STATION_TEST_PACKAGE=PARTIAL
@@ -33,10 +35,10 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 
 | Gate | 状态 | 当前证据 / blocker |
 | --- | --- | --- |
-| G0_REMOTE_CI | NOT_PERFORMED | `.github/workflows/ci.yml` 不监听 `studio-ui-next` push；本轮未触发远程 workflow。 |
-| G1_PROJECT_CONTRACT | BLOCKED_BY_CONTRACT | 未发现 Next Project JSON import/export schema、文件承载和 lifecycle `clientOperationId`/reconcile 合同；沿用 `CV-AUDIT-047`，不新增第二 repository write。 |
+| G0_REMOTE_CI | NOT_PERFORMED | 当前本地 HEAD 与 `origin/studio-ui-next` 均为 `8846c52e4`；`.github/workflows/ci.yml` 不监听 `studio-ui-next` push，本轮未触发远程 workflow。 |
+| G1_PROJECT_CONTRACT | DONE | 复用 `ProjectLifecycleCoordinator`、`ProjectSaveCoordinator` 和现有 Project Service；JSON schema/version、CREATE/OVERWRITE、权限、revision、clientOperationId、validation、partial-save 防护和 replay/reconcile 已由现有 endpoint/lifecycle tests 覆盖。 |
 | G1_AI_RESOURCE_CONTRACT | BLOCKED_BY_CONTRACT | 现有 FilePicker 只解决 scalar path 参数；正式 attachment/resource reference、上传、版本和权限承载合同仍需后端 owner，不能把本地路径冒充资源绑定。 |
-| G1_CALIBRATION_CONTRACT | PARTIAL | N 点 draft/solve 现在要求 Engineer/Admin、非空且存在的 Project 上下文，formal asset save 继续复用既有权限与保存链；API 定向测试 `7/7`，二维比例/偏移正式资产合同仍缺，见 `CV-AUDIT-048`。 |
+| G1_CALIBRATION_CONTRACT | DONE | N 点 draft/solve 继续要求 Engineer/Admin、非空且存在的 Project 上下文；`ScaleOffset` 复用同一 solver、candidate bundle 和 Project asset save 链。solver/operator `10/10`、`12/12`，Desktop endpoint `8/8`，Studio UI calibration `10/10`；直接 legacy AppData 文件保存测试受环境权限阻塞，不是 canonical Project asset save 路径。 |
 | G2_RESULTS_EXPORT | DONE | 已补齐服务端 CSV/JSON export job、clientOperationId 幂等与对账、快照上界、取消、TTL、SHA-256 产物校验和权限错误映射；Results 页面仅对本机结果开放，Station 来源明确不支持。Application `5/5`、Desktop endpoint `4/4`，Studio UI 全量 `137/137` 文件、`851/851` 测试通过。 |
 | G3_DEVICE_COMMANDS | PARTIAL | Station 测试包/正式包命令已有 `clientRequestId` 幂等、命令查询、过期收敛、权限与运行包身份校验；`StationEndpointsTests` `30/30`，Next 投影覆盖 pending、终态和激活身份不一致。Line sequence、Settings 高风险命令和完整 field reconcile 仍未形成 Next 合同，见 `CV-AUDIT-050`。 |
 | G4_NEXT_UI_CONSUMPTION | PARTIAL | Results 页面已挂载唯一 export owner/dialog，按本机筛选范围创建、轮询、取消、对账和下载；切换来源、工程或筛选条件会卸载 owner。浏览器/WebView2 journey 尚未执行。 |
@@ -68,7 +70,13 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 
 - `POST /api/calibration/npoint-draft/solve` 复用 `RequireEngineerOrAdmin`，拒绝 Operator 和未认证会话；空 `ProjectId` 返回 `PROJECT_CONTEXT_REQUIRED`，不存在工程返回 `PROJECT_NOT_FOUND`。
 - draft solve 仍只产生 draft/candidate/preview artifact，不写正式 Project asset；正式保存继续走既有 `CanEditProject` 和 `ProjectService` 链。
-- `CalibrationDraftEndpointsTests` `7/7` 通过；`calibrationOwner` 对 solve 与 formal save 的 `403` 提示分别投影，相关 UI unit 纳入全量 `851/851`。
+- `CalibrationDraftEndpointsTests` `8/8`、`NPointCalibrationSolverTests` `10/10`、`NPointCalibrationOperatorTests` `12/12`、Planar service 纯计算 `2/2` 通过；`calibrationOwner` 对 solve 与 formal save 的 `403` 提示分别投影，当前 calibration contract/owner UI tests `10/10`。
+- `ScaleOffset` 走 `draft -> solve -> candidate -> Project asset save`；没有新增第二 calibration authority 或第二保存协议。直接 `PlanarScaleOffsetCalibrationService.SaveCalibrationAsync` 测试在当前沙箱无法写真实 `%APPDATA%\\ClearVision\\calibration`，状态保留为环境限制。
+
+### G1 Project lifecycle import/export
+
+- formal persisted export 使用 dedicated `ProjectExportDocumentV1` projection；import 明确区分 `CREATE_NEW` 与 `OVERWRITE_EXISTING`，由后端验证 schema/version、权限、operator/parameter compatibility、revision 和 operation identity。
+- create/overwrite、invalid document no-mutation、unknown operator/parameter、Operator denial、export permission、replay/reconcile 由现有 Desktop endpoint 与 lifecycle service tests 覆盖；没有新增第二 Project repository、第二 save chain 或前端私有持久化。
 
 ### G2 Results bulk export
 
@@ -85,7 +93,7 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 
 ### Contract blockers retained
 
-- Project JSON import/export、AI attachment/resource reference、planar calibration formal asset、line sequence auto-tune 和 Advanced Settings 仍按合同缺口记录，不新增第二套 authority。
+- AI attachment/resource reference、line sequence auto-tune 和 Advanced Settings 仍按合同缺口记录，不新增第二套 authority；Project JSON lifecycle 与 planar calibration formal asset 已关闭。
 - Remote CI、Final Gate、WebView2 125%、独立 no-Node、现场硬件与生产 soak 仍未取得证据。
 
 ## 测试与真实环境
@@ -94,13 +102,17 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 | --- | --- |
 | `npm run lint` | PASS |
 | `npm run typecheck` | PASS |
-| `npm run test:unit` | PASS；137 个文件、851 个测试 |
-| `npm run build` | PASS；Vite 转换 503 modules |
+| `npm run test:unit` | PASS；本轮 calibration targeted `10/10`；此前全量基线 `137` 个文件、`851` 个测试 |
+| `npm run build` | PASS；Desktop targeted build 触发 Vite 转换 `503` modules |
 | Results Application targeted | PASS；`ResultsExportJobServiceTests` `5/5` |
 | Results Desktop targeted | PASS；`ResultsExportEndpointsTests` `4/4` |
+| Project lifecycle targeted | PASS；create/overwrite/reconcile/validation/permission tests 已随 `eaafef9f0` checkpoint 通过 |
+| Calibration solver/operator targeted | PASS；`10/10` + `12/12` |
+| Calibration Desktop endpoint targeted | PASS；`8/8` |
+| Planar service solve targeted | PASS；`2/2`；legacy file-save test `BLOCKED_BY_ENVIRONMENT`（真实 AppData 无写权限） |
 | Browser / Playwright | NOT_PERFORMED |
-| Product/Desktop build | PASS；0 warning、0 error |
-| Product/Desktop targeted | PASS；Calibration `7/7`，StationEndpoints `30/30`（受控日志/AppData 环境） |
+| Product/Desktop build | PASS；targeted build 0 error；还观察到 `NU1900` vulnerability-feed unavailable warning |
+| Product/Desktop targeted | PASS；当前 Calibration endpoint `8/8`，solver/operator `10/10` + `12/12`；StationEndpoints `30/30` 为既有受控日志/AppData 证据 |
 | Remote CI | NOT_PERFORMED |
 | Final Gate | NOT_PERFORMED |
 | WebView2 100% | NOT_PERFORMED |
@@ -111,4 +123,4 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 
 ## 提交
 
-本轮变更保持为权限闭环、定向测试和台账更新的 scoped candidate；提交不会自动授予生产验收。
+本轮 checkpoint：`1af7b2ec6`（Planar calibration workflow）、`8846c52e4`（current-source operator metadata sync）；均已安全推送至 `origin/studio-ui-next`。提交和软件测试不会自动授予生产验收。
