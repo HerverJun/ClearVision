@@ -9,8 +9,8 @@ F10_STATE=ACTIVE
 F10_BASELINE_SHA=eaafef9f09c2b39542e0a675a995dd00fc9331b2
 F10_START_HEAD=5056a5cddce36ec4b97e2b4dd2327abd6675091b2
 F10_START_REMOTE_HEAD=5056a5cddce36ec4b97e2b4dd2327abd6675091b2
-CURRENT_HEAD=8846c52e47cdc02e3f003dd5b624fe45083cb0b2
-REMOTE_HEAD=8846c52e47cdc02e3f003dd5b624fe45083cb0b2
+CURRENT_HEAD=d469a4740730ecf7b62f38c3670e3aa1b6ef8c49
+REMOTE_HEAD=d469a4740730ecf7b62f38c3670e3aa1b6ef8c49
 BRANCH=studio-ui-next
 WORKTREE_STATE=CLEAN
 IMPLEMENTATION_BASE=eaafef9f09c2b39542e0a675a995dd00fc9331b2
@@ -35,14 +35,14 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 
 | Gate | 状态 | 当前证据 / blocker |
 | --- | --- | --- |
-| G0_REMOTE_CI | NOT_PERFORMED | 当前本地 HEAD 与 `origin/studio-ui-next` 均为 `8846c52e4`；`.github/workflows/ci.yml` 不监听 `studio-ui-next` push，本轮未触发远程 workflow。 |
+| G0_REMOTE_CI | NOT_PERFORMED | 当前实现 checkpoint 已安全推送至 `origin/studio-ui-next`（`d469a4740`）；`.github/workflows/ci.yml` 不监听 `studio-ui-next` push，本轮未触发远程 workflow。 |
 | G1_PROJECT_CONTRACT | DONE | 复用 `ProjectLifecycleCoordinator`、`ProjectSaveCoordinator` 和现有 Project Service；JSON schema/version、CREATE/OVERWRITE、权限、revision、clientOperationId、validation、partial-save 防护和 replay/reconcile 已由现有 endpoint/lifecycle tests 覆盖。 |
 | G1_AI_RESOURCE_CONTRACT | BLOCKED_BY_CONTRACT | 现有 FilePicker 只解决 scalar path 参数；正式 attachment/resource reference、上传、版本和权限承载合同仍需后端 owner，不能把本地路径冒充资源绑定。 |
 | G1_CALIBRATION_CONTRACT | DONE | N 点 draft/solve 继续要求 Engineer/Admin、非空且存在的 Project 上下文；`ScaleOffset` 复用同一 solver、candidate bundle 和 Project asset save 链。solver/operator `10/10`、`12/12`，Desktop endpoint `8/8`，Studio UI calibration `10/10`；直接 legacy AppData 文件保存测试受环境权限阻塞，不是 canonical Project asset save 路径。 |
-| G2_RESULTS_EXPORT | DONE | 已补齐服务端 CSV/JSON export job、clientOperationId 幂等与对账、快照上界、取消、TTL、SHA-256 产物校验和权限错误映射；Results 页面仅对本机结果开放，Station 来源明确不支持。Application `5/5`、Desktop endpoint `4/4`，Studio UI 全量 `137/137` 文件、`851/851` 测试通过。 |
-| G3_DEVICE_COMMANDS | PARTIAL | Station 测试包/正式包命令已有 `clientRequestId` 幂等、命令查询、过期收敛、权限与运行包身份校验；`StationEndpointsTests` `30/30`，Next 投影覆盖 pending、终态和激活身份不一致。Line sequence、Settings 高风险命令和完整 field reconcile 仍未形成 Next 合同，见 `CV-AUDIT-050`。 |
+| G2_RESULTS_EXPORT | DONE | 已补齐服务端 CSV/JSON export job、clientOperationId 幂等与对账、快照上界、取消、TTL、SHA-256 产物校验和权限错误映射；Results 页面仅对本机结果开放，Station 来源明确不支持。Application `5/5`、Desktop endpoint `4/4`，Studio UI 全量 `137/137` 文件、`859/859` 测试通过。 |
+| G3_DEVICE_COMMANDS | PARTIAL | Station 测试包/正式包命令已有 `clientRequestId` 幂等、命令查询、过期收敛、权限与运行包身份校验；`StationEndpointsTests` `30/30`，Next 投影现在明确区分提交中、结果未知、核对中、pending、终态和激活身份不一致，且 owner 在核对期间禁止重复提交。Line sequence、Settings 高风险命令和完整 field reconcile 仍未形成 Next 合同，见 `CV-AUDIT-050`。 |
 | G4_NEXT_UI_CONSUMPTION | PARTIAL | Results 页面已挂载唯一 export owner/dialog，按本机筛选范围创建、轮询、取消、对账和下载；切换来源、工程或筛选条件会卸载 owner。浏览器/WebView2 journey 尚未执行。 |
-| G5_PARTIAL_EVIDENCE | PARTIAL | 已有 unit/contract 和部分 journey 证据；本轮补齐 Results export owner/page lifecycle 与 Station 边界的本地证据，但未形成完整浏览器、WebView2 或现场证据。 |
+| G5_PARTIAL_EVIDENCE | PARTIAL | 已有 unit/contract 和部分 journey 证据；本轮补齐 Results export owner/page lifecycle、Results 工程切换延迟响应隔离、Global Variables disposed-owner runtime-read 隔离，以及 Station transient/reconciliation 边界的本地证据，但未形成完整浏览器、WebView2 或现场证据。 |
 | G6_UX_HARDENING | NOT_PERFORMED | 尚未开始本轮集中 UI 收口。 |
 | G7_WEBVIEW2 | NOT_PERFORMED | 当前未取得真实 WebView2 100%/125% 证据。 |
 | G8_NO_NODE | NOT_PERFORMED | 当前未进行独立 no-Node 发布启动验证。 |
@@ -83,13 +83,13 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 - `ResultsExportJobService` 复用现有 `IResultAnalysisService` 生成服务端 CSV/JSON；作业状态、稳定 snapshot upper bound、取消 token、artifact TTL、SHA-256 和 `clientOperationId` fingerprint 均由 Desktop 进程内唯一 owner 管理，不创建第二 Results 持久化权威。
 - `ResultsExportEndpoints` 提供创建、状态、按操作身份对账、取消和下载入口；沿用 Engineer/Admin 权限策略，Station source 在服务端拒绝，过期产物返回明确 `410`。
 - Results UI 只在本机结果页创建 `resultsExportOwner`，把当前工程、时间、结果状态、缺陷类型和诊断码作为范围发送；网络未知结果只允许按操作身份对账，不自动重发创建请求，切换 capability 时 dispose 请求、timer 和 controller。
-- 已通过 `ResultsExportJobServiceTests` `5/5`、`ResultsExportEndpointsTests` `4/4`、Studio UI 全量 `137/137` 文件和 `851/851` 测试；Browser / Playwright、真实 WebView2 和生产环境证据仍未执行。
+- 已通过 `ResultsExportJobServiceTests` `5/5`、`ResultsExportEndpointsTests` `4/4`、Studio UI 全量 `137/137` 文件和 `859/859` 测试；本轮另有 Results 分析工程切换与 Global Variables runtime-read 生命周期竞态测试通过。Browser / Playwright、真实 WebView2 和生产环境证据仍未执行。
 
 ### G3 Station package and command evidence
 
 - 当前 backend 已具备 `clientRequestId` 幂等、同请求查询、过期命令收敛、Station admin 权限、正式包身份完整性与部署准入检查。
 - `StationEndpointsTests` 在 `Logging__EventLog__LogLevel__Default=None` 且允许既有 AppData fixture 写入的受控进程环境下 `30/30` 通过；默认沙箱首次失败归类为 EventLog/AppData 权限，不改产品代码或目录 ACL。
-- Next 只读 Station projection 保留 command-created/in-progress/terminal-failed/awaiting-active-identity/identity-mismatch/succeeded 状态；这不等同于现场 Station、PLC、Camera 或完整 unknown-outcome soak 已验收。
+- Next 只读 Station projection 保留 submitting/unknown/reconciling 与 command-created/in-progress/terminal-failed/awaiting-active-identity/identity-mismatch/succeeded 状态；owner dispose 会把未决提交或核对转为 unknown-outcome，核对期间 reset/重复提交被拒绝。这不等同于现场 Station、PLC、Camera 或完整 unknown-outcome soak 已验收。
 
 ### Contract blockers retained
 
@@ -102,7 +102,7 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 | --- | --- |
 | `npm run lint` | PASS |
 | `npm run typecheck` | PASS |
-| `npm run test:unit` | PASS；本轮 calibration targeted `10/10`；此前全量基线 `137` 个文件、`851` 个测试 |
+| `npm run test:unit` | PASS；本轮 Station/Results/Global Variables 生命周期相关定向测试通过；全量 `137` 个文件、`859` 个测试 |
 | `npm run build` | PASS；Desktop targeted build 触发 Vite 转换 `503` modules |
 | Results Application targeted | PASS；`ResultsExportJobServiceTests` `5/5` |
 | Results Desktop targeted | PASS；`ResultsExportEndpointsTests` `4/4` |
@@ -123,4 +123,4 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 
 ## 提交
 
-本轮 checkpoint：`1af7b2ec6`（Planar calibration workflow）、`8846c52e4`（current-source operator metadata sync）；均已安全推送至 `origin/studio-ui-next`。提交和软件测试不会自动授予生产验收。
+本轮 checkpoint：`1af7b2ec6`（Planar calibration workflow）、`8846c52e4`（current-source operator metadata sync）、`d469a4740`（Station unknown-outcome/reconciliation projection 与 lifecycle race evidence）；均已安全推送至 `origin/studio-ui-next`。提交和软件测试不会自动授予生产验收。
