@@ -6,6 +6,9 @@ import type {
 
 export type StationDeploymentPhase =
   | 'none'
+  | 'submitting'
+  | 'unknown'
+  | 'reconciling'
   | 'command-created'
   | 'in-progress'
   | 'terminal-failed'
@@ -33,6 +36,8 @@ export interface StationDeploymentIdentity {
   readonly flowHash: string;
   readonly decisionConfigurationHash: string;
 }
+
+export type StationDeploymentResolution = 'idle' | 'submitting' | 'unknown' | 'reconciling';
 
 export function mergeStationCommandProjection(
   authoritativeCommands: readonly StationCommand[],
@@ -97,7 +102,43 @@ export function projectStationDeployment(input: {
   readonly commands: readonly StationCommand[];
   readonly packages: readonly StationPackage[];
   readonly station: StationAdminDetails | null;
+  readonly resolution?: StationDeploymentResolution;
+  readonly pendingPackageId?: string | null;
 }): StationDeploymentProjection {
+  const resolution = input.resolution ?? 'idle';
+  if (resolution !== 'idle') {
+    const expectedPackage = input.packages.find(item =>
+      normalize(item.packageId) === normalize(input.pendingPackageId)
+    ) ?? null;
+    const transient = {
+      submitting: {
+        phase: 'submitting' as const,
+        label: '正在创建部署命令',
+        message: '部署命令尚未完成提交；请等待服务端响应，期间不会重复下发。',
+        tone: 'info' as const
+      },
+      unknown: {
+        phase: 'unknown' as const,
+        label: '部署结果未知',
+        message: '网络未确认部署命令是否已受理；请先读取后端命令状态，不要重复下发。',
+        tone: 'warning' as const
+      },
+      reconciling: {
+        phase: 'reconciling' as const,
+        label: '正在核对部署结果',
+        message: '正在按请求标识读取后端命令状态；确认前不允许重复下发。',
+        tone: 'warning' as const
+      }
+    }[resolution];
+    return Object.freeze({
+      ...transient,
+      command: null,
+      expectedPackage,
+      expectedIdentity: null,
+      mismatches: Object.freeze([])
+    });
+  }
+
   const command = latestDeployment(input.commands);
   if (!command) {
     return Object.freeze({

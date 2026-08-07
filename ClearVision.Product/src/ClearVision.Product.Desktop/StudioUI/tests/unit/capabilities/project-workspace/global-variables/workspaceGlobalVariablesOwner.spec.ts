@@ -4,9 +4,10 @@ import { decodeWorkspaceProjectV1 } from '@/capabilities/project-workspace';
 import { createWorkspaceGlobalVariablesOwner } from '@/capabilities/project-workspace/global-variables';
 
 const projectId = '11111111-1111-4111-8111-111111111111';
-function baseline() {
+const nextProjectId = '33333333-3333-4333-8333-333333333333';
+function baseline(id = projectId) {
   return decodeWorkspaceProjectV1({
-    id: projectId, name: 'P', description: null, version: '1', persistenceRevision: 1, flow: null,
+    id, name: 'P', description: null, version: '1', persistenceRevision: 1, flow: null,
     globalSettings: {}, globalVariables: { schemaVersion: '1.0', variables: [], sourceBindings: [], targetBindings: [] },
     assets: { schemaVersion: 1, calibrationAssets: [], spatialAssets: [] },
     createdAt: '2026-07-22T00:00:00Z', modifiedAt: '2026-07-22T00:00:00Z', lastOpenedAt: null
@@ -84,5 +85,47 @@ describe('workspaceGlobalVariablesOwner', () => {
     expect(api.put).not.toHaveBeenCalled();
     expect(api.post).not.toHaveBeenCalled();
     expect(owner.projection.runtimeErrorCode).toBe('GV030');
+  });
+
+  it('does not let a disposed project runtime read overwrite the next project projection', async () => {
+    let resolveOldRead: ((value: unknown) => void) | undefined;
+    const oldApi = {
+      apiBaseUrl: 'http://localhost/api',
+      get: vi.fn(async () => await new Promise<unknown>(resolve => {
+        resolveOldRead = resolve;
+      }))
+    } as unknown as ApiTransport;
+    const oldOwner = createWorkspaceGlobalVariablesOwner({ projectId, baseline: baseline(), api: oldApi });
+    const oldRefresh = oldOwner.refreshRuntimeValues();
+    await Promise.resolve();
+    oldOwner.dispose();
+
+    const nextApi = {
+      apiBaseUrl: 'http://localhost/api',
+      get: vi.fn(async () => [{
+        variableId: '22222222-2222-4222-8222-222222222222', name: 'Count', displayName: '计数',
+        valueType: 'Int64', value: 'new-project', version: 4, updatedAtUtc: '2026-07-22T00:00:00Z',
+        updatedBy: 'InspectionRun', runId: null, operatorId: null
+      }])
+    } as unknown as ApiTransport;
+    const nextOwner = createWorkspaceGlobalVariablesOwner({
+      projectId: nextProjectId,
+      baseline: baseline(nextProjectId),
+      api: nextApi
+    });
+    await nextOwner.refreshRuntimeValues();
+    expect(nextOwner.projection.runtimeValues[0]).toMatchObject({ value: 'new-project', version: 4 });
+
+    resolveOldRead?.([{
+      variableId: '22222222-2222-4222-8222-222222222222', name: 'Count', displayName: '计数',
+      valueType: 'Int64', value: 'old-project', version: 3, updatedAtUtc: '2026-07-22T00:00:00Z',
+      updatedBy: 'InspectionRun', runId: null, operatorId: null
+    }]);
+    await oldRefresh;
+
+    expect(oldOwner.projection.phase).toBe('disposed');
+    expect(oldOwner.projection.runtimeValues).toHaveLength(0);
+    expect(nextOwner.projection.runtimeValues[0]).toMatchObject({ value: 'new-project', version: 4 });
+    nextOwner.dispose();
   });
 });

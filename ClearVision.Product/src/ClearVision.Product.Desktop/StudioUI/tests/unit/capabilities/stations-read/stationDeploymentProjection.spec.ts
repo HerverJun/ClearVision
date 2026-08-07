@@ -5,7 +5,8 @@ import {
   decodeStationPackages,
   mergeStationCommandProjection,
   projectStationDeployment,
-  type StationCommandStatus
+  type StationCommandStatus,
+  type StationDeploymentResolution
 } from '@/capabilities/stations-read';
 import { stationCommand, stationPackage, stationStatus } from './stationFixtures';
 
@@ -14,6 +15,8 @@ function project(overrides: {
   readonly command?: Record<string, unknown>;
   readonly station?: Record<string, unknown> | null;
   readonly packages?: readonly Record<string, unknown>[];
+  readonly resolution?: StationDeploymentResolution;
+  readonly pendingPackageId?: string | null;
 } = {}) {
   const expectedPackage = stationPackage();
   const commands = decodeStationCommands([stationCommand({
@@ -34,10 +37,29 @@ function project(overrides: {
   const station = overrides.station === null
     ? null
     : decodeStationAdminDetails(stationStatus(overrides.station));
-  return projectStationDeployment({ commands, packages, station });
+  return projectStationDeployment({
+    commands,
+    packages,
+    station,
+    resolution: overrides.resolution ?? 'idle',
+    pendingPackageId: overrides.pendingPackageId ?? 'pkg-a'
+  });
 }
 
 describe('station deployment projection', () => {
+  it.each([
+    ['submitting', 'submitting', 'info'],
+    ['unknown', 'unknown', 'warning'],
+    ['reconciling', 'reconciling', 'warning']
+  ] as const)('keeps a transient %s deployment state separate from historical commands', (resolution, phase, tone) => {
+    expect(project({ resolution })).toMatchObject({
+      phase,
+      tone,
+      command: null,
+      expectedPackage: { packageId: 'pkg-a' }
+    });
+  });
+
   it('keeps the temporary command only until the authoritative query returns the same command id', () => {
     const pending = decodeStationCommands([stationCommand({ commandId: 'deploy-a', status: 'Created' })])[0]!;
     const previous = decodeStationCommands([stationCommand({ commandId: 'deploy-old', status: 'Succeeded' })]);

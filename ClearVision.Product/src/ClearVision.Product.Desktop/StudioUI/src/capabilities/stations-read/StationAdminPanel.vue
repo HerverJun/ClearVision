@@ -83,10 +83,20 @@ const projectedCommands = computed<readonly StationCommand[]>(() => {
 const deployment = computed(() => projectStationDeployment({
   commands: projectedCommands.value,
   packages: props.packagesState.data ?? [],
-  station: props.detailsState.data ?? null
+  station: props.detailsState.data ?? null,
+  resolution: props.owner.projection.operation === 'deploy-package'
+    ? props.owner.projection.phase === 'pending'
+      ? 'submitting'
+      : props.owner.projection.phase === 'unknown-outcome'
+        ? 'unknown'
+        : props.owner.projection.phase === 'reconciling'
+          ? 'reconciling'
+          : 'idle'
+    : 'idle',
+  pendingPackageId: selectedCommand.packageId
 }));
 const identityPackage = computed(() => deployment.value.expectedIdentity ?? selectedPackage.value);
-const busy = computed(() => props.owner.projection.phase === 'pending');
+const busy = computed(() => ['pending', 'reconciling'].includes(props.owner.projection.phase));
 const commandInFlight = computed(() => projectedCommands.value.some(command =>
   !['Succeeded', 'Failed', 'TimedOut', 'Cancelled', 'Rejected'].includes(command.status)
 ));
@@ -96,7 +106,7 @@ const submissionLocked = computed(() =>
 const operationTone = computed(() => {
   const phase = props.owner.projection.phase;
   if (phase === 'succeeded') return 'success';
-  if (phase === 'conflict' || phase === 'unknown-outcome') return 'warning';
+  if (phase === 'conflict' || phase === 'unknown-outcome' || phase === 'reconciling') return 'warning';
   if (phase === 'failed') return 'error';
   return 'info';
 });
@@ -183,7 +193,7 @@ async function recover(): Promise<void> {
     <CvInlineAlert
       v-if="owner.projection.phase !== 'idle' && owner.projection.phase !== 'disposed'"
       :tone="operationTone"
-      :title="owner.projection.phase === 'unknown-outcome' ? '操作结果未知' : owner.projection.phase === 'conflict' ? '操作冲突' : undefined"
+      :title="owner.projection.phase === 'unknown-outcome' ? '操作结果未知' : owner.projection.phase === 'reconciling' ? '正在核对操作结果' : owner.projection.phase === 'conflict' ? '操作冲突' : undefined"
     >
       {{ owner.projection.message }}
       <span v-if="owner.projection.errorCode">（{{ owner.projection.errorCode }}）</span>

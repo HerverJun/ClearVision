@@ -113,6 +113,36 @@ describe('stationAdminCommandOwner', () => {
     owner.dispose();
   });
 
+  it('exposes reconciliation as a distinct phase while an unknown deployment is being checked', async () => {
+    let resolveLookup: ((value: unknown) => void) | undefined;
+    const post = vi.fn(async () => {
+      throw new ApiNetworkError('http://localhost/api/stations/station-a/deploy-package', new Error('lost'));
+    });
+    const get = vi.fn(async () => await new Promise<unknown>(resolve => {
+      resolveLookup = resolve;
+    }));
+    const api = { apiBaseUrl: 'http://localhost/api', get, post, patch: vi.fn() } as ApiTransport;
+    const owner = createStationAdminCommandOwner({
+      api,
+      stationId: () => 'station-a',
+      createRequestId: () => 'request-a'
+    });
+
+    await owner.deployPackage('pkg-a');
+    expect(owner.projection.phase).toBe('unknown-outcome');
+
+    const recovery = owner.recover();
+    await Promise.resolve();
+    expect(owner.projection.phase).toBe('reconciling');
+    owner.reset();
+    expect(owner.projection.phase).toBe('reconciling');
+
+    resolveLookup?.(stationCommand({ commandType: 'DeployPackage', clientRequestId: 'request-a' }));
+    await expect(recovery).resolves.toBe(true);
+    expect(owner.projection.phase).toBe('command-created');
+    owner.dispose();
+  });
+
   it('treats an undecodable successful response as unknown instead of safe-to-retry failure', async () => {
     const api = {
       apiBaseUrl: 'http://localhost/api',

@@ -28,6 +28,7 @@ export type StationAdminOperation = 'command' | 'identity' | 'deploy-package' | 
 export type StationAdminCommandPhase =
   | 'idle'
   | 'pending'
+  | 'reconciling'
   | 'command-created'
   | 'succeeded'
   | 'failed'
@@ -190,7 +191,7 @@ export function createStationAdminCommandOwner(options: {
 
   function begin(operation: Exclude<StationAdminOperation, null>, details: Omit<PendingCommand, 'operation'>): AbortController {
     if (disposed) throw new Error('stationAdminCommandOwner has been disposed.');
-    if (flight || state.phase === 'pending' || state.phase === 'unknown-outcome') {
+    if (flight || state.phase === 'pending' || state.phase === 'reconciling' || state.phase === 'unknown-outcome') {
       throw new Error('必须先等待或恢复当前工作站操作，禁止重复提交。');
     }
     state.phase = 'pending';
@@ -236,7 +237,7 @@ export function createStationAdminCommandOwner(options: {
     if (disposed) return false;
     const target = pending;
     if (!target) return false;
-    state.phase = 'pending';
+    state.phase = 'reconciling';
     state.canRecover = false;
     state.message = '正在读取后端权威状态，确认上一次操作结果。';
     controller = new AbortController();
@@ -351,7 +352,7 @@ export function createStationAdminCommandOwner(options: {
       return track(recoverPending);
     },
     reset(): void {
-      if (disposed || flight || state.phase === 'unknown-outcome') return;
+      if (disposed || flight || state.phase === 'unknown-outcome' || state.phase === 'reconciling') return;
       state.phase = 'idle'; state.operation = null; state.message = '工作站控制已就绪。';
       state.errorCode = null; state.canRecover = false; state.command = null; state.identity = null;
     },
@@ -361,7 +362,7 @@ export function createStationAdminCommandOwner(options: {
       activeStationAdminCommandOwnerCount -= 1;
       controller?.abort('station-admin-owner-disposed');
       controller = undefined;
-      if (state.phase === 'pending') {
+      if (state.phase === 'pending' || state.phase === 'reconciling') {
         state.phase = 'unknown-outcome';
         state.errorCode = 'STATION_ADMIN_ABORTED_UNKNOWN';
         state.message = messageFor(state.errorCode);
