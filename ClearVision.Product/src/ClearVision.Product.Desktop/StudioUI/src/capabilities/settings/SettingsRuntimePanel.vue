@@ -87,7 +87,7 @@ onBeforeUnmount(() => detachPanelState());
 <template>
   <CvPanel
     title="运行保护"
-    description="只编辑 Runtime protection 的四个 scoped 字段；RuntimePreview Pilot 继续保持 developer-only。"
+    description="只编辑运行保护的四个范围字段；RuntimePreview Pilot 继续保持仅开发者可用。"
     data-settings-section="runtime"
   >
     <div class="settings-form-grid">
@@ -99,7 +99,7 @@ onBeforeUnmount(() => detachPanelState());
         >
         <span>
           <strong>自动运行</strong>
-          <small>由服务端 Runtime consumer 决定具体生效时机。</small>
+          <small>由服务端运行时使用方决定具体生效时机。</small>
         </span>
       </label>
       <label class="settings-toggle">
@@ -134,9 +134,9 @@ onBeforeUnmount(() => detachPanelState());
     <CvInlineAlert
       class="settings-runtime__developer-note"
       tone="info"
-      title="RuntimePreview Pilot 未进入普通 Settings"
+      title="RuntimePreview Pilot 未进入普通设置"
     >
-      metadata-only Pilot 仍由 developer-only surface 管理，本分区不会显示、保存或扩展它。
+      仅元数据的 Pilot 仍由仅开发者可用的界面管理，本分区不会显示、保存或扩展它。
     </CvInlineAlert>
 
     <CvInlineAlert

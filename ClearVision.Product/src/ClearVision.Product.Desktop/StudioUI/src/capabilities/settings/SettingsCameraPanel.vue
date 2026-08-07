@@ -109,7 +109,7 @@ function stopPreviewOnLeave(): void {
   if (leaveStopPromise) return;
   previewPending.value = true;
   props.owner.refreshPanelState();
-  leaveStopPromise = props.owner.stopCameraPreview('离开相机 Settings 面板。')
+  leaveStopPromise = props.owner.stopCameraPreview('离开相机设置面板。')
     .finally(() => {
       leaveStopPromise = undefined;
       previewPending.value = false;
@@ -130,8 +130,8 @@ onBeforeUnmount(() => {
     :data-camera-phase="phase"
   >
     <CvPanel
-      title="Camera、Trigger 与 Preview"
-      description="系统级相机发现、绑定和诊断与 Workspace 工程 CameraBinding 分离；Preview 仅是可丢弃调试输入。"
+      title="相机、触发与预览"
+      description="系统级相机发现、绑定和诊断与工程内相机绑定分离；预览仅是可丢弃的调试输入。"
     >
       <template #actions>
         <CvStatusBadge
@@ -160,8 +160,8 @@ onBeforeUnmount(() => {
       >
         <header class="camera-section__header">
           <div>
-            <h3>相机 Discovery</h3>
-            <p>按 provider 调用现有发现 endpoint。发现结果是诊断投影，不会自动写入 binding 或切换活动相机。</p>
+            <h3>相机发现</h3>
+            <p>按供应商调用现有发现 endpoint。发现结果是诊断投影，不会自动写入绑定或切换活动相机。</p>
           </div>
           <div class="camera-section__actions">
             <CvButton

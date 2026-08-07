@@ -211,7 +211,7 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
     await flushPromises();
 
     expect(wrapper.find('[data-page-state="error"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain('Settings 投影无法解析');
+    expect(wrapper.text()).toContain('设置投影无法解析');
     expect(wrapper.text()).not.toContain('must-not-render');
 
     wrapper.unmount();

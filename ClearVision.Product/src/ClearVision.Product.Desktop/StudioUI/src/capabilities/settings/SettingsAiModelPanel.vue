@@ -505,11 +505,11 @@ function validateDraft(): string | null {
   }
   if (baseUrlMode.value === 'replace') {
     const value = draft.baseUrl.trim();
-    if (!value || isRedactedPlaceholder(value)) return 'Base URL replacement must be a real URL.';
+    if (!value || isRedactedPlaceholder(value)) return '服务地址替换必须填写有效 URL。';
     try {
       new URL(value);
     } catch {
-      return 'Base URL must be an absolute URL.';
+      return '服务地址必须是绝对 URL。';
     }
   }
   return null;
@@ -856,19 +856,19 @@ onDeactivated(() => {
       tone="info"
       title="当前角色不能读取 AI 模型"
     >
-      AI 模型管理遵循现有 endpoint 权限；Operator 不进入 Settings route，Engineer 只读取 safe projection 和 reasoning-support。
+      AI 模型管理遵循现有 endpoint 权限；操作员不进入设置页面，工程师只读取安全投影和推理支持信息。
     </CvInlineAlert>
 
     <template v-else>
       <CvPanel
         title="AI 模型目录"
-        description="模型 metadata 由 ai/models authority 返回；Admin 看到脱敏 full projection，Engineer 只看到 safe projection。"
+        description="模型元数据由 ai/models authority 返回；管理员看到脱敏完整投影，工程师只看到安全投影。"
         data-settings-ai-model-list
       >
         <template #actions>
           <CvStatusBadge
             :tone="projection?.safeSubset ? 'info' : 'ok'"
-            :label="projection?.safeSubset ? 'safe projection' : 'full projection（已脱敏）'"
+            :label="projection?.safeSubset ? '安全投影' : '完整投影（已脱敏）'"
           />
         </template>
 
@@ -893,11 +893,11 @@ onDeactivated(() => {
             variant="quiet"
             :loading="readBusy"
             :disabled="readBusy || mutationBusy || dirty"
-            loading-label="Refreshing AI authority"
+            loading-label="正在刷新 AI 权威"
             data-settings-ai-authority-refresh
             @click="refreshAuthority"
           >
-            Refresh AI authority
+            刷新 AI 权威
           </CvButton>
           <span class="settings-ai-model__count">{{ models.length }} 个模型配置</span>
           <CvButton
@@ -937,7 +937,7 @@ onDeactivated(() => {
                 />
               </span>
               <span class="settings-ai-model__row-meta">{{ model.provider }} · {{ model.model || '未设置模型名' }}</span>
-              <span class="settings-ai-model__row-meta">{{ model.isEnabled ? '已启用' : '已停用' }} · {{ isFullModel(model) && model.hasApiKey ? 'API key 已配置' : 'safe projection' }}</span>
+              <span class="settings-ai-model__row-meta">{{ model.isEnabled ? '已启用' : '已停用' }} · {{ isFullModel(model) && model.hasApiKey ? 'API key 已配置' : '安全投影' }}</span>
             </button>
             <div
               v-if="canManage && isFullModel(model)"
@@ -1014,7 +1014,7 @@ onDeactivated(() => {
           />
           <CvSelect
             :model-value="providerPreset"
-            label="Provider preset"
+            label="服务商预设"
             :options="providerPresetOptions"
             :disabled="mutationBusy"
             data-settings-ai-provider-preset
@@ -1022,35 +1022,35 @@ onDeactivated(() => {
           />
           <CvField
             :model-value="draft.provider"
-            label="Provider"
+            label="服务商"
             name="aiProvider"
             :readonly="mutationBusy"
             @update:model-value="onProviderInput"
           />
           <CvSelect
             v-model="draft.protocol"
-            label="Protocol"
+            label="协议"
             :options="protocolOptions"
             :disabled="mutationBusy"
             @update:model-value="markPresetOverride('protocol')"
           />
           <CvSelect
             v-model="draft.wireApi"
-            label="Wire API"
+            label="接口协议"
             :options="wireApiOptions"
             :disabled="mutationBusy"
             @update:model-value="markPresetOverride('wireApi')"
           />
           <CvSelect
             v-model="draft.authMode"
-            label="Auth mode"
+            label="认证方式"
             :options="authModeOptions"
             :disabled="mutationBusy"
             @update:model-value="onAuthModeChanged"
           />
           <CvField
             v-model="draft.authHeaderName"
-            label="Auth header"
+            label="认证请求头"
             :readonly="mutationBusy || draft.authMode === 'none'"
             @update:model-value="markPresetOverride('authHeaderName')"
           />
@@ -1064,7 +1064,7 @@ onDeactivated(() => {
           />
           <CvSelect
             :model-value="baseUrlMode"
-            label="Base URL operation"
+            label="服务地址操作"
             :options="baseUrlOptions"
             :disabled="mutationBusy"
             data-settings-ai-base-url-operation
@@ -1073,21 +1073,21 @@ onDeactivated(() => {
           <CvField
             v-if="baseUrlMode === 'replace'"
             v-model="draft.baseUrl"
-            label="Base URL replacement"
+            label="服务地址替换"
             name="aiBaseUrl"
             placeholder="可选；服务端返回值可能已脱敏"
             :readonly="mutationBusy"
           />
           <CvField
             v-model="draft.timeoutMs"
-            label="Timeout（毫秒）"
+            label="超时（毫秒）"
             type="number"
             min="1"
             :readonly="mutationBusy"
           />
           <CvField
             v-model="draft.priority"
-            label="Priority"
+            label="优先级"
             type="number"
             min="0"
             :readonly="mutationBusy"
@@ -1130,20 +1130,20 @@ onDeactivated(() => {
           class="settings-ai-model__last-test"
           data-settings-ai-last-test
         >
-          <span>LastTestStatus: {{ selectedFullModel.lastTestStatus || 'untested' }}</span>
-          <span>LastTestAt: {{ selectedFullModel.lastTestAt || 'not available' }}</span>
-          <span>LastTestLatencyMs: {{ selectedFullModel.lastTestLatencyMs ?? 'not available' }}</span>
+          <span>最近测试状态：{{ selectedFullModel.lastTestStatus || '未测试' }}</span>
+          <span>最近测试时间：{{ selectedFullModel.lastTestAt || '不可用' }}</span>
+          <span>最近测试延迟：{{ selectedFullModel.lastTestLatencyMs ?? '不可用' }} ms</span>
         </div>
         <div
           v-if="selectedFullModel"
           class="settings-ai-model__readonly-secrets"
           data-settings-ai-readonly-extra
         >
-          Extra headers, query and body are read-only redacted projections in Settings; editing is not supported.
+          额外请求头、查询参数和请求体在设置中仅以脱敏投影只读展示，不支持编辑。
         </div>
 
         <div class="settings-ai-model__roles">
-          <span class="settings-ai-model__eyebrow">Role bindings</span>
+          <span class="settings-ai-model__eyebrow">角色绑定</span>
           <label
             v-for="option in roleOptions"
             :key="String(option.value)"
@@ -1162,7 +1162,7 @@ onDeactivated(() => {
         <div class="settings-ai-model__reasoning">
           <div class="settings-ai-model__reasoning-heading">
             <div>
-              <span class="settings-ai-model__eyebrow">Reasoning support</span>
+              <span class="settings-ai-model__eyebrow">推理支持</span>
               <strong>{{ displayReasoningSupport?.familyName ?? '尚未查询' }}</strong>
               <small>{{ displayReasoningSupport?.familyId ?? '点击读取服务端支持矩阵' }}</small>
             </div>
@@ -1175,25 +1175,25 @@ onDeactivated(() => {
               data-settings-ai-reasoning-support
               @click="queryReasoningSupport"
             >
-              读取 reasoning support
+              读取推理支持
             </CvButton>
           </div>
           <div class="settings-ai-model__reasoning-fields">
             <CvSelect
               v-model="draft.reasoningMode"
-              label="Reasoning mode"
+              label="推理模式"
               :options="reasoningModeOptions"
               :disabled="mutationBusy"
             />
             <CvSelect
               v-model="draft.reasoningEffort"
-              label="Reasoning effort"
+              label="推理强度"
               :options="reasoningEffortOptions"
               :disabled="mutationBusy || draft.reasoningMode === 'off'"
             />
           </div>
           <p class="settings-ai-model__help">
-            {{ displayReasoningSupport?.helpText ?? 'reasoning support 只描述服务端能力，不评价真实 LLM 产品质量。' }}
+            {{ displayReasoningSupport?.helpText ?? '推理支持只描述服务端能力，不评价真实 LLM 产品质量。' }}
           </p>
         </div>
 
@@ -1237,19 +1237,19 @@ onDeactivated(() => {
 
       <CvPanel
         v-else-if="selectedModel"
-        title="Safe model projection"
-        description="Engineer 只读取后端 safe projection；不会看到 Base URL、Auth header 或 API key。"
+        title="安全模型投影"
+        description="工程师只读取后端安全投影；不会看到服务地址、认证请求头或 API key。"
         data-settings-ai-model-safe
       >
         <CvDescriptionList
           :items="selectedSafeDetails"
           :columns="2"
-          label="AI 模型 safe projection"
+          label="AI 模型安全投影"
         />
         <div class="settings-ai-model__safe-reasoning">
           <div class="settings-ai-model__reasoning-heading">
             <div>
-              <span class="settings-ai-model__eyebrow">Reasoning support diagnostic</span>
+              <span class="settings-ai-model__eyebrow">推理支持诊断</span>
               <strong>{{ displayReasoningSupport?.familyName ?? '尚未查询' }}</strong>
               <small>{{ displayReasoningSupport?.familyId ?? 'Engineer 可读取服务端支持矩阵' }}</small>
             </div>
@@ -1262,7 +1262,7 @@ onDeactivated(() => {
               data-settings-ai-reasoning-support
               @click="queryReasoningSupport"
             >
-              读取 reasoning support
+              读取推理支持
             </CvButton>
           </div>
           <p class="settings-ai-model__help">

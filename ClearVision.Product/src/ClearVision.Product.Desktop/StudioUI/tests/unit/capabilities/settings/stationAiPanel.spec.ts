@@ -443,7 +443,7 @@ describe('F07 G8 AI model administration panel', () => {
     mountedWrappers.push(wrapper);
     await flushPromises();
 
-    expect(wrapper.get('[data-settings-ai-last-test]').text()).toContain('LastTestStatus: ok');
+    expect(wrapper.get('[data-settings-ai-last-test]').text()).toContain('最近测试状态：ok');
     await wrapper.get('[data-settings-ai-provider-preset] select').setValue('anthropic');
     expect((wrapper.get('[name="aiProvider"]').element as HTMLInputElement).value).toBe('Anthropic');
     await wrapper.get('[data-settings-ai-model-save]').trigger('click');

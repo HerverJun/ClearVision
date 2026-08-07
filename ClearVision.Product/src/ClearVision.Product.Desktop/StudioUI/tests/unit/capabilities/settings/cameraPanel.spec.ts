@@ -114,7 +114,7 @@ describe('F07 G6 Camera/Trigger/Preview panel', () => {
     expect(captureButton?.attributes('disabled')).toBeDefined();
     expect(previewButton?.attributes('disabled')).toBeDefined();
     wrapper.unmount();
-    expect(fixture.stopCameraPreview).toHaveBeenCalledWith('离开相机 Settings 面板。');
+    expect(fixture.stopCameraPreview).toHaveBeenCalledWith('离开相机设置面板。');
     expect(fixture.stopCameraPreview).toHaveBeenCalledTimes(1);
   });
 

@@ -324,7 +324,7 @@ onDeactivated(() => {
         tone="info"
         title="当前角色不可用"
       >
-        Operator 不会挂载 Settings route。
+        操作员不会挂载设置页面。
       </CvInlineAlert>
     </CvPanel>
 

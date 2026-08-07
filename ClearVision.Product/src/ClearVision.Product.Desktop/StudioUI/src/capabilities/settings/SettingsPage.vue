@@ -66,7 +66,7 @@ const statusTone = computed<CvStatusTone>(() => {
   return 'error';
 });
 const statusLabel = computed(() => {
-  if (phase.value === 'ready') return settings.value?.safeSubset ? 'safe subset' : '完整投影';
+  if (phase.value === 'ready') return settings.value?.safeSubset ? '安全子集' : '完整投影';
   if (phase.value === 'stale') return '投影已过期';
   if (phase.value === 'loading') return '读取中';
   if (phase.value === 'forbidden') return '禁止访问';
@@ -76,14 +76,14 @@ const statusLabel = computed(() => {
 const stateTitle = computed(() => {
   if (pageStateKind.value === 'unauthorized') return '会话不可用';
   if (pageStateKind.value === 'forbidden') return '无权访问设置';
-  if (error.value?.code === 'decode') return 'Settings 投影无法解析';
-  return 'Settings 读取失败';
+  if (error.value?.code === 'decode') return '设置投影无法解析';
+  return '设置读取失败';
 });
 const stateDescription = computed(() => {
-  if (pageStateKind.value === 'unauthorized') return '当前会话已失效，请重新登录后再读取 Settings。';
-  if (pageStateKind.value === 'forbidden') return '当前账户没有进入 Settings 的权限；前端不会通过隐藏逻辑绕过后端授权。';
+  if (pageStateKind.value === 'unauthorized') return '当前会话已失效，请重新登录后再读取设置。';
+  if (pageStateKind.value === 'forbidden') return '当前账户没有进入设置的权限；前端不会通过隐藏逻辑绕过后端授权。';
   if (error.value?.code === 'decode') return '服务端响应未通过已冻结 decoder 校验，未验证字段不会显示。';
-  return error.value?.publicMessage ?? '本地 Settings 服务未返回可用投影。';
+  return error.value?.publicMessage ?? '本地设置服务未返回可用投影。';
 });
 const showReadOnlyContent = computed(() =>
   (phase.value === 'ready' || phase.value === 'stale') && settings.value !== null
@@ -92,19 +92,19 @@ let disposed = false;
 let detachLeaveParticipant: (() => void) | undefined;
 
 function reconcileLabel(key: SettingsAuthorityReconcileKey): string {
-  if (key === 'generic-settings') return 'Generic Settings';
-  if (key === 'plc-settings') return 'PLC settings';
-  if (key === 'plc-mappings') return 'PLC mappings';
-  if (key === 'tcp-profiles') return 'TCP profiles';
-  if (key.startsWith('tcp-runtime:')) return `TCP runtime (${key.slice('tcp-runtime:'.length)})`;
-  if (key === 'camera-bindings') return 'Camera bindings';
-  if (key === 'station-communication') return 'Station communication';
-  if (key === 'ai-models') return 'AI model authority';
-  if (key.startsWith('ai-model-test:')) return 'AI model connection test';
-  if (key === 'camera-preview') return 'Camera preview session';
-  if (key === 'users') return 'User authority';
-  if (key === 'change-password') return 'Auth session';
-  return 'Database backup';
+  if (key === 'generic-settings') return '通用设置';
+  if (key === 'plc-settings') return 'PLC 设置';
+  if (key === 'plc-mappings') return 'PLC 映射';
+  if (key === 'tcp-profiles') return 'TCP 配置';
+  if (key.startsWith('tcp-runtime:')) return `TCP 运行状态（${key.slice('tcp-runtime:'.length)}）`;
+  if (key === 'camera-bindings') return '相机绑定';
+  if (key === 'station-communication') return '工作站通信';
+  if (key === 'ai-models') return 'AI 模型';
+  if (key.startsWith('ai-model-test:')) return 'AI 模型连接测试';
+  if (key === 'camera-preview') return '相机预览会话';
+  if (key === 'users') return '用户权限';
+  if (key === 'change-password') return '身份验证会话';
+  return '数据库备份';
 }
 
 function reconcileDescription(key: SettingsAuthorityReconcileKey): string {
@@ -219,7 +219,7 @@ onBeforeUnmount(() => {
     <CvPageHeader
       eyebrow="系统配置"
       title="设置"
-      description="读取现有服务端 Settings 投影，核对 authority 范围与当前生效观察值。"
+      description="读取现有服务端设置投影，核对权威范围与当前生效观察值。"
     >
       <template #meta>
         <CvStatusBadge
@@ -233,11 +233,11 @@ onBeforeUnmount(() => {
           v-if="phase !== 'forbidden'"
           size="sm"
           :loading="phase === 'loading'"
-          loading-label="Refreshing generic Settings projection"
+          loading-label="正在刷新通用设置投影"
           data-settings-generic-refresh
           @click="refresh"
         >
-          Refresh generic projection
+          刷新通用设置投影
         </CvButton>
       </template>
     </CvPageHeader>

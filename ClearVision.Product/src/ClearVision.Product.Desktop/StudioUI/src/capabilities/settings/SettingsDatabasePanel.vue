@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
         <div class="settings-database__heading">
           <div>
             <strong>当前状态</strong>
-            <p>路径字段由 decoder 丢弃，不进入 Settings 投影或截图。</p>
+            <p>路径字段由 decoder 丢弃，不进入设置投影或截图。</p>
           </div>
           <CvStatusBadge
             :tone="statusTone(status.state)"

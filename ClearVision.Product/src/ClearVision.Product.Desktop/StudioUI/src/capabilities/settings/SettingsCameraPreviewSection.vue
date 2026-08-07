@@ -178,6 +178,8 @@ async function togglePreview(): Promise<void> {
       <img
         v-if="preview.imageUrl"
         :src="preview.imageUrl"
+        :width="preview.width ?? 640"
+        :height="preview.height ?? 480"
         alt="相机调试预览帧"
       >
       <div

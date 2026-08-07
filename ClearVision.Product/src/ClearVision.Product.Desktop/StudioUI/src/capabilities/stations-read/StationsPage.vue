@@ -198,8 +198,8 @@ const outcomeOptions: readonly CvSelectOption[] = Object.freeze([
 const columns: readonly CvDataTableColumn<StationStatus>[] = Object.freeze([
   { key: 'station', label: '工作站', width: '17%' },
   { key: 'onlineState', label: '连接', width: '10%' },
-  { key: 'runtimeState', label: '运行 / Run', width: '12%' },
-  { key: 'packageName', label: 'Active 运行包', width: '18%' },
+  { key: 'runtimeState', label: '运行状态', width: '12%' },
+  { key: 'packageName', label: '当前运行包', width: '18%' },
   { key: 'fieldHealth', label: '现场健康', width: '23%' },
   { key: 'lastOutcome', label: '最近结果', width: '10%' },
   { key: 'lastSeenAtUtc', label: '最后心跳', width: '10%' }
@@ -579,7 +579,7 @@ onBeforeUnmount(() => {
             <CvStatusBadge :tone="stationRuntimeTone(row.runtimeState)">
               {{ stationRuntimeLabel(row.runtimeState) }}
             </CvStatusBadge>
-            <small>{{ row.currentRunId || '无活动 Run' }}</small>
+            <small>{{ row.currentRunId || '无活动运行' }}</small>
           </div>
         </template>
         <template #cell-packageName="{ row }">
@@ -592,7 +592,7 @@ onBeforeUnmount(() => {
         <template #cell-fieldHealth="{ row }">
           <div class="stations-page__stack stations-page__field-health">
             <span>{{ spoolReport(row) }}</span>
-            <small>{{ deviceReport('Camera', row.cameraStatusSummary) }}</small>
+            <small>{{ deviceReport('相机', row.cameraStatusSummary) }}</small>
             <small>{{ deviceReport('PLC', row.plcStatusSummary) }}</small>
             <small>TCP 未上报/不可确认</small>
           </div>

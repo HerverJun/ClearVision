@@ -1156,6 +1156,8 @@ onBeforeUnmount(() => {
             <img
               v-if="evidence.image.phase === 'available' && evidence.image.objectUrl"
               :src="evidence.image.objectUrl"
+              width="640"
+              height="480"
               alt="本机检测结果图像"
             >
             <p v-else>
@@ -1244,7 +1246,7 @@ onBeforeUnmount(() => {
                 {{ warning }}
               </CvInlineAlert>
               <dl class="results-page__replay-summary">
-                <div><dt>Scene</dt><dd>{{ comparisonState.data.sceneReplayAvailability.message }}</dd></div>
+                <div><dt>场景重放</dt><dd>{{ comparisonState.data.sceneReplayAvailability.message }}</dd></div>
                 <div><dt>图像</dt><dd>{{ comparisonState.data.imageReplayAvailability.message }}</dd></div>
               </dl>
               <table
