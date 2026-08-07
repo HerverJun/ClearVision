@@ -7,7 +7,7 @@ EVIDENCE_SOURCE_SHA=9800d6045a9f5fdfc62a166242e83529b833dc7d
 M00_BASELINE_SHA=f8f581932469f7c52fe547b7bcabe8ad45d89532
 BRANCH=studio-ui-next
 EVIDENCE_WORKTREE_STATE=DIRTY_SCOPE_CLASSIFIED
-CURRENT_BASELINE_BROWSER=PASS_146_SKIPPED_26_FAILED_0
+CURRENT_BASELINE_BROWSER=PASS_146_SKIPPED_26_FAILED_0_CONTENT_EQUIVALENT_PRECOMMIT_CANDIDATE
 OWNER=COORD-M
 HOST_KIND=CHROMIUM_BROWSER
 STARTUP_PROFILE=STUDIO_UI_NEXT_BROWSER_FIXTURE
@@ -23,8 +23,8 @@ PRODUCT_VISUAL_CONFIRMATION=NOT_GRANTED
 
 M06 的落盘 Browser 回归证据绑定 `EVIDENCE_SOURCE_SHA`：F02/F03/F04/F06 的证据 JSON 共 `26/5/91/32`
 份，全部可解析，source SHA 全部匹配，全部有对应截图，记录的 console/page error 和水平溢出均为 0。
-同一完整测试矩阵已在 `M00_BASELINE_SHA` 上重新运行，结果为
-`172 total / 146 passed / 26 explicit skipped / 0 failed`。
+同一完整测试矩阵已在提交前、随后原样形成 `M00_BASELINE_SHA` 的内容等价候选上运行，结果为
+`172 total / 146 passed / 26 explicit skipped / 0 failed`；未声称命令在 commit SHA 上重跑。
 
 该结论只覆盖 Chromium Browser fixture 和现有静态本地服务。它不授予真实 WebView2、Windows 100%/125% DPI、Release/no-Node 目标机、现场 Camera/PLC/TCP/Station、生产 soak 或产品负责人视觉签收，因此 M06 不能标记为最终完成。
 

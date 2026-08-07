@@ -39,7 +39,7 @@ OWNER_COORD=COORD-M
 | Node/npm | PASS | `v24.14.0` / `11.9.0` |
 | Playwright config load | PASS | `CV_UI_SCENARIO=studio-ui-next npx playwright test --list` exit 0；HTML reporter 指向 ignored `.tmp` |
 | lockfile scope | PASS / RESTORED | 2 个 `packages.lock.json` 仅发生 restore 键序变化，已恢复为 HEAD，未提交 |
-| lint/typecheck/unit/build/bundle | PASS | `f8f581932469f7c52fe547b7bcabe8ad45d89532` 产品基线：`129/129` files、`800/800` tests、476 modules |
+| lint/typecheck/unit/build/bundle | PASS / CONTENT-EQUIVALENT CANDIDATE | 提交前候选内容随后原样形成 `f8f581932469f7c52fe547b7bcabe8ad45d89532`；`129/129` files、`800/800` tests、476 modules；未声称命令在 commit SHA 上重跑 |
 | Browser baseline | PASS | `146 passed / 26 explicit skipped / 0 failed`；不等价于 WebView2 |
 | WebView2 100% | PASS / DIRTY CANDIDATE | 真实 Debug/Release WebView2；native DPI 96；不等价于 final SHA |
 | WebView2 125% | BLOCKED | 当前 Windows 会话为原生 100%，未切换或模拟 125% |
