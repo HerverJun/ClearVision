@@ -1,5 +1,29 @@
 # F09 Open Issues
 
+## M-series reconciliation (2026-08-06)
+
+历史 `30966530885=FAIL` 保留不变；最终计划记录 `31026167704=PASS`。当前产品范围已冻结为
+`f8f581932469f7c52fe547b7bcabe8ad45d89532`，但本会话未对该 baseline 运行 Remote CI。已取得的真实
+WebView2 Windows 100% 与 Release runtime 证据采集自先前 dirty audit candidate，125% 仍未执行。
+因此以下 acceptance debt 仍然有效：
+
+- `P1` 真实 WebView2 Windows 125% 和独立 no-Node 证据不能由当前 100%/本机 audit 或历史 F09 数字替代。
+- `P1` Legacy 生产可达性、WebMessage compatibility 隔离和 Remote CI 当前 SHA 的复核仍需单独完成。
+- `P2` 现场 Camera/PLC/Station、完整 DPI、生产 soak 和用户视觉签收仍未执行。
+
+```text
+AUDIT_HEAD=9800d6045a9f5fdfc62a166242e83529b833dc7d
+M00_BASELINE_SHA=f8f581932469f7c52fe547b7bcabe8ad45d89532
+CURRENT_WORKTREE=CLEAN_AFTER_DOCUMENTATION_COMMIT
+CURRENT_PLAN_REMOTE_CI_RUN=31026167704
+CURRENT_PLAN_REMOTE_CI=PASS
+WEBVIEW2_100=PASS_AUDIT_DIRTY_CANDIDATE_NOT_BASELINE_SHA
+WEBVIEW2_125=BLOCKED
+RELEASE_PUBLISH_RUNTIME=PASS_LOCAL_MACHINE
+INDEPENDENT_NO_NODE=NOT_PERFORMED
+PRODUCTION_ACCEPTANCE=NOT_GRANTED
+```
+
 ```text
 F09_ISSUE_LEDGER_STATE=ACTIVE
 LAST_REVIEWED=2026-08-05

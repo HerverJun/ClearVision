@@ -1,5 +1,43 @@
 # F09 Final Evidence Manifest
 
+## Current M-series reconciliation
+
+```text
+AUDIT_SOURCE_SHA=9800d6045a9f5fdfc62a166242e83529b833dc7d
+M00_BASELINE_SHA=f8f581932469f7c52fe547b7bcabe8ad45d89532
+CURRENT_BRANCH=studio-ui-next
+CURRENT_WORKTREE=CLEAN_AFTER_DOCUMENTATION_COMMIT
+HISTORICAL_REMOTE_CI_RUN=30966530885
+HISTORICAL_REMOTE_CI=FAIL
+CURRENT_PLAN_REMOTE_CI_RUN=31026167704
+CURRENT_PLAN_REMOTE_CI=PASS_PLAN_PROVENANCE
+CURRENT_BROWSER_BASELINE=PASS_146_SKIPPED_26_FAILED_0_CURRENT_BASELINE
+CURRENT_WEBVIEW2_100=PASS_AUDIT_DIRTY_CANDIDATE_NOT_BASELINE_SHA
+CURRENT_WEBVIEW2_125=BLOCKED
+CURRENT_RELEASE_PUBLISH_RUNTIME=PASS_LOCAL_MACHINE
+CURRENT_INDEPENDENT_NO_NODE=NOT_PERFORMED
+CURRENT_FIELD_HARDWARE=NOT_PERFORMED
+PRODUCTION_ACCEPTANCE=NOT_GRANTED
+```
+
+`CURRENT_PLAN_REMOTE_CI=PASS_PLAN_PROVENANCE` means the final TODO plan records the run as passing; this worktree has not refreshed remote state in the current session. It is retained as an input fact, not substituted for current local gates or real WebView2 evidence.
+
+### Current M08 evidence addendum (2026-08-07)
+
+| EvidenceId | 范围 | 状态 | 来源与边界 |
+| --- | --- | --- | --- |
+| M08-E001 | Debug WebView2 Windows 100% DPI | PASS_DIRTY_CANDIDATE | `.tmp/studio-ui-next/m-series/m08/9800d604/webview2-100-dpi-f09/evidence/`；native DPI 96、PerMonitorV2、Canvas/pointer/overflow PASS |
+| M08-E002 | Debug WebView2 Golden Journey | PASS_DIRTY_CANDIDATE | `.tmp/studio-ui-next/m-series/m08/9800d604/webview2-100-golden-f09-v3/evidence/`；20-cycle owner/resource ledger 归零，formal run/reconcile/stop PASS |
+| M08-E003 | Release publish/runtime matrix | PASS_DIRTY_CANDIDATE | `.tmp/studio-ui-next/m-series/m08/9800d604/publish-matrix-f09-v5/studio-ui-webview2-matrix.json`；7/7 runs、static/runtime/local no-Node PASS |
+| M08-E004 | Windows native 125% | BLOCKED_NOT_PERFORMED | 当前 session 为 100%；没有修改系统缩放，也没有用 DPR/forced scale 替代 |
+| M08-E005 | Independent no-Node target | NOT_PERFORMED | 当前机器有 Node，外部 CDP driver 使用 Node；local audit 不等于独立目标机 |
+| M08-E006 | Current SHA Browser full | PASS | `146 passed / 26 explicit skipped / 0 failed`；Chromium only |
+| M08-E007 | Current SHA Remote CI / Final Gate | NOT_RUN | 未 push、未触发、未代签 |
+
+以上 evidence 的 JSON `sourceSha` 为当前 Git HEAD，但采集时 worktree dirty，因此不是 scope-clean final candidate。
+下方 F09-E013 的 Release 125% 记录属于历史 `9dd69bd2b` 证据，不能迁移为当前
+`f8f581932469f7c52fe547b7bcabe8ad45d89532` 产品基线的 125% PASS。
+
 ```text
 MANIFEST_STATE=LOCAL_EVIDENCE_COMPLETE_REMOTE_CI_FAILED
 CONFIGURED_PROFILE=NEXT_DEFAULT
