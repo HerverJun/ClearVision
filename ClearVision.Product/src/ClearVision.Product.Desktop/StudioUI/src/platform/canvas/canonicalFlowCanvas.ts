@@ -252,6 +252,8 @@ interface CanonicalNode {
   readonly title?: unknown;
   readonly x?: unknown;
   readonly y?: unknown;
+  readonly width?: unknown;
+  readonly height?: unknown;
   readonly disabled?: unknown;
   readonly inputs?: readonly CanonicalPort[];
   readonly outputs?: readonly CanonicalPort[];
@@ -480,6 +482,83 @@ function readNodeGeometry(canvas: CanonicalFlowCanvas, node: CanonicalNode): Can
     inputs: Object.freeze(inputs.map((port, index) => readPortPoint(canvas, id, port, index, false))),
     outputs: Object.freeze(outputs.map((port, index) => readPortPoint(canvas, id, port, index, true)))
   });
+}
+
+interface CanonicalNodeBounds {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+function readNodeBounds(canvas: CanonicalFlowCanvas): CanonicalNodeBounds | null {
+  if (canvas.nodes.size === 0) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const node of canvas.nodes.values()) {
+    const x = finiteNumber(node.x);
+    const y = finiteNumber(node.y);
+    const width = Math.max(1, finiteNumber(node.width, 180));
+    const height = Math.max(1, finiteNumber(node.height, 88));
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + width);
+    maxY = Math.max(maxY, y + height);
+  }
+  if (![minX, minY, maxX, maxY].every(Number.isFinite)) return null;
+  return Object.freeze({
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY)
+  });
+}
+
+function resetCanvasView(canvas: CanonicalFlowCanvas): void {
+  const bounds = readNodeBounds(canvas);
+  const viewportWidth = Math.max(
+    1,
+    finiteNumber(canvas._logicalWidth) ||
+      finiteNumber(canvas.canvas.clientWidth) ||
+      finiteNumber(canvas.canvas.width, 800)
+  );
+  const viewportHeight = Math.max(
+    1,
+    finiteNumber(canvas._logicalHeight) ||
+      finiteNumber(canvas.canvas.clientHeight) ||
+      finiteNumber(canvas.canvas.height, 600)
+  );
+  const nextScale = bounds
+    ? (() => {
+        const padding = 48;
+        const fitScale = Math.min(
+          1,
+          (viewportWidth - padding * 2) / bounds.width,
+          (viewportHeight - padding * 2) / bounds.height
+        );
+        // A small graph should stay readable; only larger graphs are allowed to fit down.
+        const minimumScale = canvas.nodes.size <= 3 ? 0.85 : 0.35;
+        return Math.max(minimumScale, fitScale);
+      })()
+    : 1;
+  const safeScale = Math.max(0.2, Math.min(2, nextScale));
+  canvas.scale = safeScale;
+  if (!canvas.offset) return;
+  if (!bounds) {
+    canvas.offset.x = 0;
+    canvas.offset.y = 0;
+  } else {
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerY = (bounds.minY + bounds.maxY) / 2;
+    canvas.offset.x = centerX - viewportWidth / (2 * safeScale);
+    canvas.offset.y = centerY - viewportHeight / (2 * safeScale);
+  }
 }
 
 function connectionMessage(reason: string): string {
@@ -1047,14 +1126,10 @@ export function createCanonicalFlowCanvasHost(
     },
     resetView(): CanonicalFlowCommandResult {
       assertActive();
-      canvas.scale = 1;
-      if (canvas.offset) {
-        canvas.offset.x = 0;
-        canvas.offset.y = 0;
-      }
+      resetCanvasView(canvas);
       canvas.invalidate?.();
       canvas.notifyViewStateChanged?.();
-      return commandResult(true, 'view-reset', '画布视图已重置。');
+      return commandResult(true, 'view-reset', '画布视图已重置并居中。');
     },
     validateConnection(
       sourceId: string,

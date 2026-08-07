@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router';
 import {
   CvButton,
   CvField,
+  CvModal,
   CvPageState,
   CvStatusBadge,
   type CvStatusTone
@@ -22,6 +23,7 @@ import { RuntimePackageExportDialog, type RuntimePackageExportOwner } from './ru
 import WorkspaceHandoffBanner from './handoff/WorkspaceHandoffBanner.vue';
 import type { WorkspaceHandoffReceiveProjection } from './handoff/handoffContracts';
 import RunConsole from '@/capabilities/inspection-run/RunConsole.vue';
+import RunStatusBar from '@/capabilities/inspection-run/RunStatusBar.vue';
 import {
   calculateRunConsoleStatistics,
   type RunConsoleAdmissionCheck,
@@ -65,6 +67,7 @@ const decisionOwner = shallowRef<FinalDecisionOwner | null>(null);
 const modalFlowOwner = shallowRef<FlowCanvasOwner | null>(null);
 const packageOwner = shallowRef<RuntimePackageExportOwner | null>(null);
 const packageOpen = ref(false);
+const runDetailsOpen = ref(false);
 
 function openVariables(): void {
   variablesOwner.value = props.workspaceOwner?.getGlobalVariablesOwner() ?? null;
@@ -331,6 +334,30 @@ const runResults = computed<readonly RunConsoleResultItem[]>(() => {
   })];
 });
 const runStatistics = computed(() => calculateRunConsoleStatistics(runResults.value));
+const showTopStateStack = computed(() => Boolean(newDraft.value || showHandoffReceive.value || handoff.value));
+const blockedAdmissionChecks = computed(() => runAdmissionChecks.value.filter(item => item.state === 'blocked'));
+const runBlockerCount = computed(() => Math.max(blockedAdmissionChecks.value.length, runViolations.value.length));
+const runAdmissionTone = computed<CvStatusTone>(() => {
+  if (runBlockerCount.value > 0) return 'ng';
+  if (run.value?.admission?.allowed === true || run.value?.canRun === true) return 'ok';
+  if (run.value?.phase === 'hydrating' || run.value?.phase === 'admitting') return 'warning';
+  return 'idle';
+});
+const runAdmissionLabel = computed(() => {
+  if (runBlockerCount.value > 0) return `准入阻断 ${runBlockerCount.value} 项`;
+  if (run.value?.admission?.allowed === true || run.value?.canRun === true) return '准入通过';
+  if (run.value?.phase === 'hydrating' || run.value?.phase === 'admitting') return '准入检查中';
+  return '待检查准入';
+});
+const runBlockerMessage = computed(() => {
+  if (persistence.value?.dirty) return '请先保存当前工程';
+  const violation = runViolations.value[0]?.message;
+  if (violation) return violation;
+  if (run.value && ['blocked', 'failed', 'unknown-outcome'].includes(run.value.phase)) {
+    return run.value.message || null;
+  }
+  return null;
+});
 function workspaceResultsLink(resultId?: string): string {
   const projectId = effectiveProjectId.value;
   return createLocalResultsDeepLink({
@@ -344,6 +371,10 @@ function workspaceResultsLink(resultId?: string): string {
 <template>
   <section
     class="workspace-shell"
+    :class="{
+      'workspace-shell--has-run-status': Boolean(run && currentProject),
+      'workspace-shell--has-top-state': showTopStateStack
+    }"
     data-capability="project-workspace"
     data-evidence-surface="f03-workspace-shell"
     :data-workspace-state="state"
@@ -528,44 +559,94 @@ function workspaceResultsLink(resultId?: string): string {
       </div>
     </header>
 
-    <RunConsole
+    <RunStatusBar
       v-if="run && currentProject"
-      mode="formal"
-      :project-name="currentProject.name"
       :phase-label="runLabel"
       :tone="runTone"
-      :message="run.message"
-      :error-code="run.errorCode"
+      :message="runBlockerMessage || run.message"
       :connected="run.connected === true"
       :reconnect-attempt="run.reconnectAttempt ?? 0"
       :pending="runPending"
       :can-start="run.canRun"
       :can-stop="run.canStop"
       :can-reconcile="run.canReconcile"
-      :identity="runIdentity"
-      :admission="runAdmissionChecks"
-      :violations="runViolations"
-      :statistics="runStatistics"
-      :results="runResults"
+      :admission-label="runAdmissionLabel"
+      :admission-tone="runAdmissionTone"
+      :blocker-count="runBlockerCount"
+      :blocker-message="runBlockerMessage"
       start-test-id="workspace-run"
       stop-test-id="workspace-run-stop"
       reconcile-test-id="workspace-run-reconcile"
+      @check-admission="workspaceOwner?.refreshFormalAdmission()"
       @start="workspaceOwner?.runFormal()"
       @stop="workspaceOwner?.stopFormal()"
       @reconcile="workspaceOwner?.reconcileFormalRun()"
-      @refresh-admission="workspaceOwner?.refreshFormalAdmission()"
+      @details="runDetailsOpen = true"
     >
-      <template #result-action="{ result }">
+      <template #result-action>
         <RouterLink
-          :to="workspaceResultsLink(result.id)"
+          v-if="runResults.length > 0"
+          :to="workspaceResultsLink(runResults[0]?.id)"
           data-testid="workspace-current-result"
         >
           查看本次结果
         </RouterLink>
       </template>
-    </RunConsole>
+    </RunStatusBar>
+
+    <CvModal
+      v-if="run && currentProject"
+      :open="runDetailsOpen"
+      title="运行详情"
+      description="身份、准入项、违规详情与近期结果"
+      close-label="关闭运行详情"
+      size="lg"
+      @close="runDetailsOpen = false"
+    >
+      <div
+        class="workspace-shell__run-details"
+        data-testid="workspace-run-details-panel"
+      >
+        <RunConsole
+          mode="formal"
+          :project-name="currentProject.name"
+          :phase-label="runLabel"
+          :tone="runTone"
+          :message="run.message"
+          :error-code="run.errorCode"
+          :connected="run.connected === true"
+          :reconnect-attempt="run.reconnectAttempt ?? 0"
+          :pending="runPending"
+          :can-start="run.canRun"
+          :can-stop="run.canStop"
+          :can-reconcile="run.canReconcile"
+          :identity="runIdentity"
+          :admission="runAdmissionChecks"
+          :violations="runViolations"
+          :statistics="runStatistics"
+          :results="runResults"
+          start-test-id="workspace-run"
+          stop-test-id="workspace-run-stop"
+          reconcile-test-id="workspace-run-reconcile"
+          @start="workspaceOwner?.runFormal()"
+          @stop="workspaceOwner?.stopFormal()"
+          @reconcile="workspaceOwner?.reconcileFormalRun()"
+          @refresh-admission="workspaceOwner?.refreshFormalAdmission()"
+        >
+          <template #result-action="{ result }">
+            <RouterLink
+              :to="workspaceResultsLink(result.id)"
+              data-testid="workspace-current-result-detail"
+            >
+              查看本次结果
+            </RouterLink>
+          </template>
+        </RunConsole>
+      </div>
+    </CvModal>
 
     <div
+      v-show="showTopStateStack"
       class="workspace-shell__top-state-stack"
       data-testid="workspace-top-state-stack"
     >
@@ -796,9 +877,16 @@ function workspaceResultsLink(resultId?: string): string {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) var(--cv-workspace-status-height, 24px);
+  grid-template-rows: auto minmax(0, 1fr) var(--cv-workspace-status-height, 24px);
   overflow: hidden;
   background: var(--cv-surface-page);
+}
+.workspace-shell--has-run-status,
+.workspace-shell--has-top-state {
+  grid-template-rows: auto auto minmax(0, 1fr) var(--cv-workspace-status-height, 24px);
+}
+.workspace-shell--has-run-status.workspace-shell--has-top-state {
+  grid-template-rows: auto auto auto minmax(0, 1fr) var(--cv-workspace-status-height, 24px);
 }
 
 .workspace-shell__toolbar,
@@ -834,7 +922,7 @@ function workspaceResultsLink(resultId?: string): string {
 .workspace-shell__identity > div { min-width: 0; }
 .workspace-shell__identity strong,
 .workspace-shell__identity small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workspace-shell__identity strong { font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); letter-spacing: -0.01em; }
+.workspace-shell__identity strong { font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); letter-spacing: 0; }
 .workspace-shell__identity small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .workspace-shell__project { display: flex; align-items: baseline; gap: var(--cv-space-2); }
 .workspace-shell__save-state { flex: 0 0 auto; }
@@ -975,6 +1063,12 @@ function workspaceResultsLink(resultId?: string): string {
 }
 .workspace-shell__project-status { max-width: 240px; overflow: hidden; color: var(--cv-text-secondary); text-overflow: ellipsis; }
 .workspace-shell__top-state-stack { min-width: 0; min-height: 0; display: grid; }
+.workspace-shell__run-details {
+  min-width: 0;
+  min-height: 0;
+  display: block;
+}
+.workspace-shell__run-details :deep(.run-console) { min-width: 0; }
 .workspace-shell__handoff-receive { display: flex; min-width: 0; align-items: center; gap: var(--cv-space-4); padding: var(--cv-space-3) var(--cv-density-page-padding); border-block-end: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
 .workspace-shell__new-project { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(220px, 320px) minmax(240px, 380px); gap: var(--cv-space-4); align-items: end; padding: var(--cv-space-3) var(--cv-density-page-padding); border-block-end: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
 .workspace-shell__new-project > div { display: grid; gap: 2px; min-width: 0; }

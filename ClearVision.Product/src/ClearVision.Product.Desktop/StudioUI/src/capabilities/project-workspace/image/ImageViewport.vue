@@ -82,6 +82,7 @@ onMounted(async () => {
           data-testid="image-fit"
           size="sm"
           variant="quiet"
+          aria-label="适应预览区"
           title="适应预览区"
           :disabled="projection.phase !== 'ready'"
           @click="owner.fit()"
@@ -98,6 +99,7 @@ onMounted(async () => {
           data-testid="image-actual-size"
           size="sm"
           variant="quiet"
+          aria-label="按图像实际像素显示"
           title="按图像实际像素显示"
           :disabled="projection.phase !== 'ready'"
           @click="owner.actualSize()"
@@ -180,6 +182,8 @@ onMounted(async () => {
         v-if="projection.pixelProbe.phase === 'locked' || projection.pixelProbe.phase === 'roi'"
         size="sm"
         variant="quiet"
+        aria-label="清除像素探针"
+        title="清除像素探针"
         @click="owner.clearPixelLock()"
       >
         清除探针
@@ -208,7 +212,7 @@ onMounted(async () => {
 .image-viewport__status span[data-phase="error"]::before { background: var(--cv-color-status-ng); }
 .image-viewport__scale { min-width: 38px; text-align: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); font-variant-numeric: tabular-nums; }
 .image-viewport__actions :deep(.cv-button--sm) { padding-inline: var(--cv-space-2); }
-.image-viewport__stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--image-canvas-background, #10151d); }
+.image-viewport__stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--cv-surface-image-canvas); }
 .image-viewport__canvas { display: block; width: 100%; height: 100%; outline: none; }
 .image-viewport__canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--cv-focus-ring-color); }
 .image-viewport__empty { position: absolute; inset: 0; padding: var(--cv-space-4); display: grid; place-content: center; justify-items: center; gap: var(--cv-space-1); text-align: center; pointer-events: none; color: var(--cv-text-muted); background: color-mix(in srgb, var(--cv-surface-sunken) 90%, transparent); }

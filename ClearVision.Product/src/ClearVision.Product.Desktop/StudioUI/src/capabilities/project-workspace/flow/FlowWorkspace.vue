@@ -81,6 +81,13 @@ async function toggleNarrowInspector(): Promise<void> {
   focusPane(inspectorHost.value);
 }
 
+async function focusInspectorPane(): Promise<void> {
+  narrowRailOpen.value = false;
+  if (layout.containerWidth <= 1180) narrowInspectorOpen.value = true;
+  await nextTick();
+  focusPane(inspectorHost.value);
+}
+
 async function closeNarrowPane(): Promise<void> {
   if (narrowInspectorOpen.value) {
     narrowInspectorOpen.value = false;
@@ -239,6 +246,7 @@ onBeforeUnmount(() => layoutOwner.dispose());
       :owner="previewWorkbenchOwner"
       :collapsed="layout.previewCollapsed"
       @toggle-collapsed="layoutOwner.togglePreviewCollapsed"
+      @focus-inspector="focusInspectorPane"
     />
     <aside
       v-else
@@ -352,7 +360,7 @@ onBeforeUnmount(() => layoutOwner.dispose());
     overscroll-behavior: contain;
     border-right: 1px solid var(--cv-border-default);
     background: var(--cv-surface-raised);
-    box-shadow: 0 4px 12px rgba(37, 55, 72, 0.16);
+    box-shadow: var(--cv-elevation-floating);
   }
 }
 
@@ -379,7 +387,7 @@ onBeforeUnmount(() => layoutOwner.dispose());
     width: var(--cv-workspace-operator-rail-width);
     display: block;
     overscroll-behavior: contain;
-    box-shadow: 0 4px 12px rgba(37, 55, 72, 0.16);
+    box-shadow: var(--cv-elevation-floating);
   }
   .flow-workspace--preview-collapsed { grid-template-rows: minmax(320px, 1fr) 0 38px; }
 }

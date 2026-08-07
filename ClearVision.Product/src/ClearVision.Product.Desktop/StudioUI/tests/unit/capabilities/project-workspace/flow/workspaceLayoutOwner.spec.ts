@@ -53,7 +53,7 @@ describe('Workspace layout owner', () => {
       inspectorWidth: 240,
       previewMinHeight: 160,
       previewMaxHeight: 240,
-      previewHeight: 220,
+      previewHeight: 160,
       previewWidth: 300
     });
 

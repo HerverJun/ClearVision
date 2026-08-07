@@ -2023,6 +2023,31 @@ test('G6 runs only the saved Project identity, stays in Workspace, and hands off
   await expect(page.locator('[data-capability="results-read"]')).toBeVisible();
 });
 
+test('M07 Workspace run details traps keyboard focus and restores the trigger on Escape', async ({ page }) => {
+  await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
+  });
+
+  const trigger = page.getByTestId('workspace-run-details');
+  await trigger.focus();
+  await trigger.click();
+
+  const dialog = page.getByRole('dialog', { name: '运行详情' });
+  const close = dialog.getByRole('button', { name: '关闭运行详情' });
+  await expect(dialog).toBeVisible();
+  await expect(close).toBeFocused();
+
+  await page.keyboard.press('Shift+Tab');
+  await expect.poll(() => dialog.evaluate(node => node.contains(document.activeElement)))
+    .toBe(true);
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
 for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 768 }] as const) {
   test(`F04-R G3 golden journey closes Camera, Variables, Decision, Preview, Save, Run, Evidence and Package at ${viewport.width}x${viewport.height}`, async ({ page }) => {
     test.setTimeout(60_000);

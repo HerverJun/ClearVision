@@ -303,9 +303,9 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
 .operator-rail__category-button::before { position: absolute; inset: 8px auto 8px 0; width: 3px; border-radius: 0 var(--cv-radius-pill) var(--cv-radius-pill) 0; background: transparent; content: ''; }
 .operator-rail__category-button span { width: 100%; overflow: hidden; font-size: 9px; line-height: 1.15; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .operator-rail__category-button:hover { background: var(--cv-shell-sidebar-hover); color: var(--cv-shell-sidebar-text); }
-.operator-rail__category-button.is-active { background: rgba(182, 69, 60, 0.13); color: #e07168; }
+.operator-rail__category-button.is-active { background: var(--cv-color-brand-soft); color: var(--cv-color-brand-text); }
 .operator-rail__category-button.is-active::before { background: var(--cv-color-brand-500); }
-.operator-rail__category-button:focus-visible { outline: 2px solid #9bbdd1; outline-offset: -2px; }
+.operator-rail__category-button:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
 .operator-rail__separator { height: 1px; margin: 5px var(--cv-space-2); flex: 0 0 auto; background: var(--cv-shell-sidebar-border); }
 .operator-rail__flyout { position: absolute; z-index: calc(var(--cv-z-dropdown) - 1); inset: 0 auto 0 100%; }
 

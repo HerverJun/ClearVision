@@ -222,7 +222,7 @@ function updateCompatibility(event: Event): void {
   border-left: 0;
   border-radius: 0 var(--cv-radius-md) var(--cv-radius-md) 0;
   background: var(--cv-surface-floating);
-  box-shadow: 3px 3px 8px rgba(37, 55, 72, 0.12);
+  box-shadow: var(--cv-elevation-floating);
 }
 .operator-flyout__header,
 .operator-flyout__header-actions,

@@ -420,6 +420,44 @@ describe('production canonical FlowCanvas facade', () => {
     expect(mountedHost.getProjection().runtime.flowRevision).toBe(1);
   });
 
+  it('centers a small graph at readable scale and fits only larger graphs', () => {
+    mountedHost = createCanonicalFlowCanvasHost('canonical-unit-canvas', {
+      id: 'flow-1',
+      name: '流程',
+      operators: [{
+        id: 'node-1', name: '节点', type: 20, x: 40, y: 80, width: 180, height: 88,
+        inputPorts: [], outputPorts: [], parameters: [], isEnabled: true
+      }],
+      connections: []
+    });
+
+    mountedHost.resetView();
+    expect(raw.scale).toBe(1);
+    expect(raw.offset).toEqual({ x: -270, y: -176 });
+
+    mountedHost.replaceFlow({
+      id: 'flow-1',
+      name: '流程',
+      operators: [0, 1, 2, 3].map(index => ({
+        id: `node-${index}`,
+        name: `节点 ${index}`,
+        type: 20,
+        x: index % 2 === 0 ? 0 : 1200,
+        y: index > 1 ? 420 : 0,
+        width: 180,
+        height: 88,
+        inputPorts: [],
+        outputPorts: [],
+        parameters: [],
+        isEnabled: true
+      })),
+      connections: []
+    });
+    mountedHost.resetView();
+    expect(raw.scale).toBeGreaterThan(0.35);
+    expect(raw.scale).toBeLessThan(1);
+  });
+
   it('rejects readonly and running mutations without changing the draft', () => {
     mountedHost = createCanonicalFlowCanvasHost('canonical-unit-canvas', {
       id: 'flow-1', name: '流程', operators: [], connections: []

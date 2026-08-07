@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, shallowRef } from 'vue';
+import { computed, shallowRef, watch } from 'vue';
 import { CvButton, CvIconButton, CvInlineAlert, CvStatusBadge } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 import WorkspacePaneHeader from '../WorkspacePaneHeader.vue';
@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<{
 });
 const emit = defineEmits<{
   toggleCollapsed: [];
+  focusInspector: [];
 }>();
 const preview = props.owner.preview.projection;
 const roi = props.owner.roi.projection;
@@ -65,6 +66,16 @@ const outputFieldCount = computed(() => Object.keys(preview.outputData ?? {}).le
 const previewActionTitle = computed(() => preview.autoPreviewAllowed
   ? '使用当前本地流程执行节点预览'
   : preview.manualReason || '该算子仅允许手动预览');
+const imageEmpty = computed(() => ['empty', 'unmounted'].includes(props.owner.image.projection.phase));
+const needsInspectorConfiguration = computed(() => preview.missingResources.length > 0 ||
+  preview.errorMessage?.includes('路径') === true);
+const configurationGuide = computed(() => preview.missingResources.length > 0
+  ? '请在属性检查器中补齐对应资源或文件路径后重试。'
+  : '请在属性检查器中配置对应字段后重试。');
+
+watch(imageEmpty, empty => {
+  if (empty) imageExpanded.value = false;
+});
 
 async function openArtifact(artifactId: string, isImage: boolean): Promise<void> {
   artifactMessage.value = '正在读取附加结果…';
@@ -89,7 +100,8 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
     class="preview-panel"
     :class="{
       'preview-panel--collapsed': collapsed,
-      'preview-panel--image-expanded': imageExpanded
+      'preview-panel--image-expanded': imageExpanded && !imageEmpty,
+      'preview-panel--image-empty': imageEmpty
     }"
     data-capability="preview-workbench"
     :data-preview-phase="preview.phase"
@@ -185,7 +197,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 
       <div class="preview-panel__details">
         <div
-          v-if="preview.isStale || preview.errorMessage"
+          v-if="preview.isStale || preview.errorMessage || needsInspectorConfiguration"
           class="preview-panel__alerts"
         >
           <CvInlineAlert
@@ -197,7 +209,39 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
             v-if="preview.errorMessage"
             :tone="preview.phase === 'blocked' ? 'warning' : 'error'"
             :title="preview.errorMessage"
-          />
+          >
+            <span v-if="needsInspectorConfiguration">{{ configurationGuide }}</span>
+            <template
+              v-if="needsInspectorConfiguration"
+              #actions
+            >
+              <CvButton
+                data-testid="preview-focus-inspector"
+                size="sm"
+                variant="quiet"
+                @click="emit('focusInspector')"
+              >
+                去属性区配置
+              </CvButton>
+            </template>
+          </CvInlineAlert>
+          <CvInlineAlert
+            v-else-if="needsInspectorConfiguration"
+            tone="warning"
+            title="预览输入未配置"
+          >
+            {{ configurationGuide }}
+            <template #actions>
+              <CvButton
+                data-testid="preview-focus-inspector"
+                size="sm"
+                variant="quiet"
+                @click="emit('focusInspector')"
+              >
+                去属性区配置
+              </CvButton>
+            </template>
+          </CvInlineAlert>
         </div>
 
         <section class="preview-panel__summary">
@@ -430,13 +474,16 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
   display: grid;
   grid-template-rows: 42px minmax(0, 1fr);
   overflow: hidden;
-  background: #ffffff;
+  background: var(--cv-surface-raised);
   container-name: preview;
   container-type: inline-size;
 }
 .preview-panel--collapsed { grid-template-rows: minmax(0, 1fr) 0; }
 .preview-panel--collapsed .preview-panel__body { display: none; }
-.preview-panel :deep(.workspace-pane-header) { min-height: 42px; padding-inline: var(--cv-space-2); background: #ffffff; }
+.preview-panel--image-empty .preview-panel__body { grid-template-rows: 94px minmax(0, 1fr); }
+.preview-panel--image-empty .preview-panel__body > :deep(.image-viewport) { grid-template-rows: 34px minmax(0, 1fr) 26px; }
+.preview-panel--image-empty .preview-panel__body > :deep(.image-viewport__stage) { min-height: 0; }
+.preview-panel :deep(.workspace-pane-header) { min-height: 42px; padding-inline: var(--cv-space-2); background: var(--cv-surface-raised); }
 .preview-panel__revision,
 .preview-panel__manual-reason,
 .preview-panel__node-title { overflow: hidden; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
@@ -460,7 +507,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 .preview-panel__section-heading small { overflow: hidden; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .preview-panel__roi-actions { max-width: 100%; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--cv-space-1); }
 .preview-panel__summary dl { margin: var(--cv-space-2) 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-1); }
-.preview-panel__summary dl div { min-width: 0; padding: 7px 8px; border-radius: var(--cv-radius-sm); background: #f7f8fa; }
+.preview-panel__summary dl div { min-width: 0; padding: 7px 8px; border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); }
 .preview-panel__summary dt { color: var(--cv-text-muted); font-size: 9px; }
 .preview-panel__summary dd { margin: 2px 0 0; overflow: hidden; color: var(--cv-text-primary); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
 .preview-panel__summary dd[data-tone="ok"] { color: var(--cv-color-status-ok-strong); }

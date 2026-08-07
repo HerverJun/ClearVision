@@ -105,6 +105,7 @@ const toggleDisabledLabel = computed(() => {
           data-flow-command="copy"
           :disabled="selectedCount === 0"
           title="复制所选节点（Ctrl+C）"
+          aria-label="复制所选节点"
           aria-keyshortcuts="Control+C"
           @click="emit('copy')"
         >
@@ -120,6 +121,7 @@ const toggleDisabledLabel = computed(() => {
           data-flow-command="paste"
           :disabled="readonly"
           title="粘贴节点（Ctrl+V）"
+          aria-label="粘贴节点"
           aria-keyshortcuts="Control+V"
           @click="emit('paste')"
         >
@@ -135,6 +137,7 @@ const toggleDisabledLabel = computed(() => {
           data-flow-command="duplicate"
           :disabled="readonly || selectedCount === 0"
           title="创建所选节点的副本"
+          aria-label="创建所选节点的副本"
           @click="emit('duplicate')"
         >
           <CvIcon
@@ -156,6 +159,7 @@ const toggleDisabledLabel = computed(() => {
           data-flow-command="toggle-disabled"
           :disabled="readonly || selectedCount === 0"
           :title="`${toggleDisabledLabel}所选节点`"
+          :aria-label="`${toggleDisabledLabel}所选节点`"
           @click="emit('toggleDisabled')"
         >
           <CvIcon
@@ -170,6 +174,7 @@ const toggleDisabledLabel = computed(() => {
           data-flow-command="delete"
           :disabled="readonly || (selectedCount === 0 && !runtime?.selectedConnectionId)"
           title="删除所选对象（Delete）"
+          aria-label="删除所选对象"
           aria-keyshortcuts="Delete"
           @click="emit('delete')"
         >
@@ -331,7 +336,7 @@ const toggleDisabledLabel = computed(() => {
 .flow-canvas-surface__loading { position: absolute; inset: 0; display: grid; place-content: center; gap: var(--cv-space-1); text-align: center; background: color-mix(in srgb, var(--flow-canvas-background) 86%, transparent); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); pointer-events: none; }
 .flow-canvas-surface__loading strong { color: var(--cv-color-status-ng-strong); font-size: var(--cv-font-size-sm); }
 .flow-canvas-surface__loading.is-error { color: var(--cv-color-status-ng-strong); }
-.flow-canvas-surface__status { grid-row: 2; min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); padding: 0 var(--cv-space-2); overflow: hidden; border-top: 1px solid var(--cv-border-subtle); background: rgba(255, 255, 255, .92); color: var(--cv-text-muted); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.flow-canvas-surface__status { grid-row: 2; min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); padding: 0 var(--cv-space-2); overflow: hidden; border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); color: var(--cv-text-muted); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .flow-canvas-surface__counts,
 .flow-canvas-surface__revision,
 .flow-canvas-surface__feedback,
@@ -342,7 +347,7 @@ const toggleDisabledLabel = computed(() => {
 .flow-canvas-surface__feedback[data-tone="success"] { color: var(--cv-color-status-ok-strong); }
 .flow-canvas-surface__spacer { flex: 1; }
 .flow-canvas-surface__stage :deep(.flow-selection-box) { border: 1px solid var(--flow-canvas-selection-border); background: var(--flow-canvas-selection-background); }
-.flow-canvas-surface__stage :deep(.flow-minimap) { width: 168px !important; height: 112px !important; right: 14px !important; bottom: 14px !important; border: 1px solid var(--flow-canvas-minimap-border) !important; border-radius: var(--cv-radius-sm); background: var(--flow-canvas-minimap-background) !important; box-shadow: 0 1px 4px rgba(37, 55, 72, 0.12); }
+.flow-canvas-surface__stage :deep(.flow-minimap) { width: 168px !important; height: 112px !important; right: 14px !important; bottom: 14px !important; border: 1px solid var(--flow-canvas-minimap-border) !important; border-radius: var(--cv-radius-sm); background: var(--flow-canvas-minimap-background) !important; box-shadow: var(--cv-elevation-raised); }
 .flow-canvas-surface__stage :deep(.flow-minimap > canvas) { width: 168px !important; height: 112px !important; }
 .flow-canvas-surface__stage :deep(.flow-minimap-toggle) { border: 1px solid var(--flow-canvas-minimap-border) !important; background: var(--flow-canvas-minimap-background) !important; color: var(--flow-canvas-node-text) !important; }
 
