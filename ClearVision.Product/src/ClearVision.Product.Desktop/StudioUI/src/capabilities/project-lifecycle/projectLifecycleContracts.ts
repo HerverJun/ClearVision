@@ -4,7 +4,7 @@ import {
   type ProjectDetails
 } from '@/capabilities/projects-read/projectContracts';
 
-export type ProjectLifecycleOperationKind = 'create' | 'delete';
+export type ProjectLifecycleOperationKind = 'create' | 'delete' | 'import';
 export type ProjectLifecycleOperationStatus =
   | 'pending'
   | 'completed'
@@ -12,6 +12,7 @@ export type ProjectLifecycleOperationStatus =
   | 'failed-terminal';
 export type ProjectLifecycleCleanupStatus =
   | 'not-required'
+  | 'not-applicable'
   | 'cleanup-pending'
   | 'cleanup-completed'
   | 'cleanup-failed-retryable';
@@ -57,6 +58,31 @@ export interface ProjectDeleteAuthorityResult {
   readonly projectId: string;
   readonly operationReplayed: boolean;
   readonly operation: ProjectLifecycleOperation;
+}
+
+export type ProjectImportMode = 'CREATE_NEW' | 'OVERWRITE_EXISTING';
+
+export interface ProjectExportDocumentV1 extends Record<string, unknown> {
+  readonly documentType: 'clearvision-project';
+  readonly schemaVersion: 1;
+  readonly project: Readonly<Record<string, unknown>>;
+  readonly flow: Readonly<Record<string, unknown>>;
+}
+
+export type ProjectImportDocument = ProjectExportDocumentV1;
+
+export interface ProjectImportAuthorityResult {
+  readonly projectId: string;
+  readonly project: ProjectDetails;
+  readonly operationReplayed: boolean;
+  readonly operation: ProjectLifecycleOperation;
+}
+
+export interface ProjectExportAuthorityResult {
+  readonly projectId: string;
+  readonly blob: Blob;
+  readonly fileName: string;
+  readonly document: ProjectExportDocumentV1;
 }
 
 export interface ProjectOpenAuthorityResult {
@@ -134,6 +160,7 @@ function decodeOperationResult(value: unknown, path: string): ProjectLifecycleOp
     ? null
     : oneOf(source.cleanupStatus, `${path}.cleanupStatus`, [
         'not-required',
+        'not-applicable',
         'cleanup-pending',
         'cleanup-completed',
         'cleanup-failed-retryable'
@@ -155,7 +182,7 @@ export function decodeProjectLifecycleOperation(payload: unknown): ProjectLifecy
   const source = record(payload, '$');
   return Object.freeze({
     clientOperationId: uuid(source.clientOperationId, '$.clientOperationId'),
-    kind: oneOf(source.kind, '$.kind', ['create', 'delete'] as const),
+    kind: oneOf(source.kind, '$.kind', ['create', 'delete', 'import'] as const),
     status: oneOf(source.status, '$.status', [
       'pending',
       'completed',
@@ -168,6 +195,48 @@ export function decodeProjectLifecycleOperation(payload: unknown): ProjectLifecy
     createdAtUtc: dateTime(source.createdAtUtc, '$.createdAtUtc'),
     updatedAtUtc: dateTime(source.updatedAtUtc, '$.updatedAtUtc'),
     expiresAtUtc: nullableDateTime(source.expiresAtUtc, '$.expiresAtUtc')
+  });
+}
+
+export function decodeProjectExportDocument(payload: unknown): ProjectExportDocumentV1 {
+  const source = record(payload, '$');
+  if (source.documentType !== 'clearvision-project') {
+    throw new ProjectLifecycleContractDecodeError('$.documentType', 'clearvision-project');
+  }
+  if (source.schemaVersion !== 1) {
+    throw new ProjectLifecycleContractDecodeError('$.schemaVersion', 'the supported schema version 1');
+  }
+  const project = record(source.project, '$.project');
+  text(project.name, '$.project.name');
+  const flow = record(source.flow, '$.flow');
+  text(flow.name, '$.flow.name');
+  return Object.freeze({
+    ...source,
+    documentType: 'clearvision-project',
+    schemaVersion: 1,
+    project: Object.freeze(project),
+    flow: Object.freeze(flow)
+  });
+}
+
+export const decodeProjectImportDocument = decodeProjectExportDocument;
+
+export function decodeProjectImportAuthorityResult(payload: unknown): ProjectImportAuthorityResult {
+  const source = record(payload, '$');
+  const projectId = uuid(source.projectId, '$.projectId');
+  const project = decodeProjectDetails(source.project);
+  if (project.id !== projectId) {
+    throw new ProjectLifecycleContractDecodeError('$.project.id', 'the matching imported Project identity');
+  }
+  const operation = decodeProjectLifecycleOperation(source.operation);
+  if (operation.kind !== 'import' || operation.projectId !== projectId) {
+    throw new ProjectLifecycleContractDecodeError('$.operation', 'the matching import authority');
+  }
+  return Object.freeze({
+    projectId,
+    project,
+    operationReplayed: boolean(source.operationReplayed, '$.operationReplayed'),
+    operation
   });
 }
 

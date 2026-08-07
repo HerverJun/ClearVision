@@ -111,6 +111,7 @@ public class VisionDbContext : DbContext
             entity.Property(operation => operation.ProjectId).IsRequired();
             entity.Property(operation => operation.ProjectName).HasMaxLength(200);
             entity.Property(operation => operation.ProjectDescription).HasMaxLength(1000);
+            entity.Property(operation => operation.CommandPayloadJson);
             entity.Property(operation => operation.ResultJson);
             entity.Property(operation => operation.ErrorCode).HasMaxLength(100);
             entity.Property(operation => operation.CleanupStatus).HasConversion<string>().IsRequired().HasMaxLength(40);

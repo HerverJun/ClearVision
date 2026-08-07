@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ProjectLifecycleContractDecodeError,
   decodeProjectCreateAuthorityResult,
+  decodeProjectExportDocument,
+  decodeProjectImportAuthorityResult,
   decodeProjectLifecycleOperation,
   decodeProjectOpenAuthorityResult
 } from '@/capabilities/project-lifecycle';
@@ -54,6 +56,18 @@ function operation(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function importDocument() {
+  return {
+    documentType: 'clearvision-project',
+    schemaVersion: 1,
+    identity: { sourceProjectId: projectId, sourcePersistenceRevision: 0 },
+    project: { name: '导入工程', description: null, version: '1.0.0' },
+    flow: { name: '空流程', operators: [], connections: [] },
+    globalVariables: { schemaVersion: '1.0', variables: [], sourceBindings: [], targetBindings: [] },
+    assets: { schemaVersion: 1, calibrationAssets: [], spatialAssets: [] }
+  };
+}
+
 describe('Project lifecycle response contracts', () => {
   it('decodes the server-bound blank create authority', () => {
     const result = decodeProjectCreateAuthorityResult({
@@ -91,6 +105,24 @@ describe('Project lifecycle response contracts', () => {
       operation: operation()
     })).toThrow(ProjectLifecycleContractDecodeError);
     expect(() => decodeProjectOpenAuthorityResult({ projectId, lastOpenedAtUtc: 'not-a-date' }))
+      .toThrow(ProjectLifecycleContractDecodeError);
+  });
+
+  it('decodes the versioned export document and import authority', () => {
+    const document = decodeProjectExportDocument(importDocument());
+    expect(document).toMatchObject({ documentType: 'clearvision-project', schemaVersion: 1 });
+
+    const importOperation = operation({ kind: 'import' });
+    expect(decodeProjectImportAuthorityResult({
+      projectId,
+      project: project(),
+      operationReplayed: true,
+      operation: importOperation
+    })).toMatchObject({ projectId, operation: { kind: 'import' } });
+  });
+
+  it('rejects unsupported export schema before any command can be sent', () => {
+    expect(() => decodeProjectExportDocument({ ...importDocument(), schemaVersion: 2 }))
       .toThrow(ProjectLifecycleContractDecodeError);
   });
 });

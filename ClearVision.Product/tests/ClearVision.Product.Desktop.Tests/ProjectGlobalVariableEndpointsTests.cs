@@ -1049,6 +1049,206 @@ public sealed class ProjectGlobalVariableEndpointsTests
     }
 
     [Fact]
+    public async Task ProjectImportExportEndpoints_ShouldExportCreateReplayAndReconcile()
+    {
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            new ProjectGlobalVariableSchema(),
+            flowStorage: new RecordingProjectFlowStorage());
+
+        using var export = await host.Client.GetAsync($"/api/projects/{host.Project.Id:D}/export");
+        export.StatusCode.Should().Be(HttpStatusCode.OK, await export.Content.ReadAsStringAsync());
+        var exported = await export.Content.ReadFromJsonAsync<JsonElement>();
+        exported.GetProperty("documentType").GetString().Should().Be(ProjectJsonContract.DocumentType);
+        exported.GetProperty("schemaVersion").GetInt32().Should().Be(ProjectJsonContract.SchemaVersion);
+        exported.GetProperty("identity").GetProperty("sourceProjectId").GetGuid().Should().Be(host.Project.Id);
+        exported.GetProperty("project").GetProperty("name").GetString().Should().Be(host.Project.Name);
+
+        var operationId = Guid.NewGuid();
+        var request = new ProjectImportRequest
+        {
+            Mode = "CREATE_NEW",
+            ClientOperationId = operationId,
+            Document = CreateImportDocument("imported project", "imported-flow")
+        };
+
+        using var first = await host.Client.PostAsJsonAsync("/api/projects/import", request);
+        first.StatusCode.Should().Be(HttpStatusCode.Created, await first.Content.ReadAsStringAsync());
+        var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>();
+        var importedProjectId = firstBody.GetProperty("projectId").GetGuid();
+        importedProjectId.Should().NotBe(host.Project.Id);
+        firstBody.GetProperty("operationReplayed").GetBoolean().Should().BeFalse();
+        firstBody.GetProperty("project").GetProperty("name").GetString().Should().Be("imported project");
+        firstBody.GetProperty("project").GetProperty("persistenceRevision").GetInt64().Should().Be(1);
+        firstBody.GetProperty("operation").GetProperty("kind").GetString().Should().Be("import");
+
+        using var replay = await host.Client.PostAsJsonAsync("/api/projects/import", request);
+        replay.StatusCode.Should().Be(HttpStatusCode.OK, await replay.Content.ReadAsStringAsync());
+        var replayBody = await replay.Content.ReadFromJsonAsync<JsonElement>();
+        replayBody.GetProperty("projectId").GetGuid().Should().Be(importedProjectId);
+        replayBody.GetProperty("operationReplayed").GetBoolean().Should().BeTrue();
+
+        using var mismatch = await host.Client.PostAsJsonAsync("/api/projects/import", new ProjectImportRequest
+        {
+            Mode = "CREATE_NEW",
+            ClientOperationId = operationId,
+            Document = CreateImportDocument("different import payload", "different-flow")
+        });
+        mismatch.StatusCode.Should().Be(HttpStatusCode.Conflict, await mismatch.Content.ReadAsStringAsync());
+        var mismatchBody = await mismatch.Content.ReadFromJsonAsync<JsonElement>();
+        mismatchBody.GetProperty("code").GetString().Should().Be("OPERATION_PAYLOAD_MISMATCH");
+
+        using var reconcile = await host.Client.GetAsync($"/api/project-operations/{operationId:D}?kind=import");
+        reconcile.StatusCode.Should().Be(HttpStatusCode.OK, await reconcile.Content.ReadAsStringAsync());
+        var reconcileBody = await reconcile.Content.ReadFromJsonAsync<JsonElement>();
+        reconcileBody.GetProperty("kind").GetString().Should().Be("import");
+        reconcileBody.GetProperty("status").GetString().Should().Be("completed");
+        reconcileBody.GetProperty("projectId").GetGuid().Should().Be(importedProjectId);
+    }
+
+    [Fact]
+    public async Task ProjectImportEndpoint_ShouldEnforceOverwriteRevisionAndRejectInvalidDocumentWithoutMutation()
+    {
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            new ProjectGlobalVariableSchema(),
+            flowStorage: new RecordingProjectFlowStorage());
+        var document = CreateImportDocument("overwritten project", "overwrite-flow");
+
+        using var overwrite = await host.Client.PostAsJsonAsync(
+            "/api/projects/import",
+            new ProjectImportRequest
+            {
+                Mode = "OVERWRITE_EXISTING",
+                ClientOperationId = Guid.NewGuid(),
+                TargetProjectId = host.Project.Id,
+                ExpectedPersistenceRevision = host.Project.PersistenceRevision,
+                Document = document
+            });
+        overwrite.StatusCode.Should().Be(HttpStatusCode.Created, await overwrite.Content.ReadAsStringAsync());
+        var overwriteBody = await overwrite.Content.ReadFromJsonAsync<JsonElement>();
+        overwriteBody.GetProperty("projectId").GetGuid().Should().Be(host.Project.Id);
+        overwriteBody.GetProperty("project").GetProperty("persistenceRevision").GetInt64().Should().Be(1);
+        host.Project.PersistenceRevision.Should().Be(1);
+        host.Project.Name.Should().Be("overwritten project");
+
+        using var stale = await host.Client.PostAsJsonAsync(
+            "/api/projects/import",
+            new ProjectImportRequest
+            {
+                Mode = "OVERWRITE_EXISTING",
+                ClientOperationId = Guid.NewGuid(),
+                TargetProjectId = host.Project.Id,
+                ExpectedPersistenceRevision = 0,
+                Document = CreateImportDocument("stale overwrite", "stale-flow")
+            });
+        stale.StatusCode.Should().Be(HttpStatusCode.Conflict, await stale.Content.ReadAsStringAsync());
+        var staleBody = await stale.Content.ReadFromJsonAsync<JsonElement>();
+        staleBody.GetProperty("code").GetString().Should().Be("PROJECT_REVISION_CONFLICT");
+        host.Project.PersistenceRevision.Should().Be(1);
+        host.Project.Name.Should().Be("overwritten project");
+
+        var invalidJson = ProjectJsonContract.Serialize(CreateImportDocument("invalid", "invalid-flow"));
+        var invalidNode = JsonNode.Parse(invalidJson)!.AsObject();
+        invalidNode["documentType"] = "unsupported-project";
+        var invalidRequest = new JsonObject
+        {
+            ["mode"] = "CREATE_NEW",
+            ["clientOperationId"] = Guid.NewGuid().ToString("D"),
+            ["document"] = invalidNode
+        };
+        using var invalid = await host.Client.PostAsync(
+            "/api/projects/import",
+            new StringContent(invalidRequest.ToJsonString(), Encoding.UTF8, "application/json"));
+        invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest, await invalid.Content.ReadAsStringAsync());
+        var invalidBody = await invalid.Content.ReadFromJsonAsync<JsonElement>();
+        invalidBody.GetProperty("code").GetString().Should().Be("PROJECT_IMPORT_DOCUMENT_TYPE_UNSUPPORTED");
+        host.Project.PersistenceRevision.Should().Be(1);
+        host.Project.Name.Should().Be("overwritten project");
+    }
+
+    [Fact]
+    public async Task ProjectImportEndpoint_ShouldRejectUnknownOperatorAndParameterBeforeCreatingOrUpdating()
+    {
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            new ProjectGlobalVariableSchema(),
+            flowStorage: new RecordingProjectFlowStorage());
+        var factory = new OperatorFactory();
+        var unknownOperatorDocument = CreateImportDocument("unknown operator", "unknown-operator-flow");
+        unknownOperatorDocument.Flow.Operators =
+        [
+            new OperatorDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "Unknown",
+                Type = (OperatorType)999,
+                IsEnabled = true
+            }
+        ];
+
+        using var unknownOperator = await host.Client.PostAsJsonAsync(
+            "/api/projects/import",
+            new ProjectImportRequest
+            {
+                Mode = "CREATE_NEW",
+                ClientOperationId = Guid.NewGuid(),
+                Document = unknownOperatorDocument
+            });
+        unknownOperator.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var unknownOperatorBody = await unknownOperator.Content.ReadFromJsonAsync<JsonElement>();
+        unknownOperatorBody.GetProperty("code").GetString().Should().Be("PROJECT_IMPORT_UNKNOWN_OPERATOR");
+
+        var unknownParameterDocument = CreateImportDocument("unknown parameter", "unknown-parameter-flow");
+        var validOperator = CreateGoldenOperator(factory, OperatorType.ResultOutput, "Result", 0, 0);
+        validOperator.Parameters.Add(new ParameterDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "UnknownParameter",
+            DisplayName = "UnknownParameter",
+            DataType = "string",
+            Value = JsonSerializer.SerializeToElement("unsupported"),
+            DefaultValue = JsonSerializer.SerializeToElement("unsupported")
+        });
+        unknownParameterDocument.Flow.Operators = [validOperator];
+
+        using var unknownParameter = await host.Client.PostAsJsonAsync(
+            "/api/projects/import",
+            new ProjectImportRequest
+            {
+                Mode = "CREATE_NEW",
+                ClientOperationId = Guid.NewGuid(),
+                Document = unknownParameterDocument
+            });
+        unknownParameter.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var unknownParameterBody = await unknownParameter.Content.ReadFromJsonAsync<JsonElement>();
+        unknownParameterBody.GetProperty("code").GetString().Should().Be("PROJECT_IMPORT_UNKNOWN_PARAMETER");
+
+        host.Project.PersistenceRevision.Should().Be(0);
+        host.Project.Name.Should().Be("demo");
+    }
+
+    [Fact]
+    public async Task ProjectImportEndpoint_ShouldDenyOperatorWhileAllowingAuthenticatedExport()
+    {
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            new ProjectGlobalVariableSchema(),
+            role: UserRole.Operator);
+
+        using var export = await host.Client.GetAsync($"/api/projects/{host.Project.Id:D}/export");
+        export.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var import = await host.Client.PostAsJsonAsync(
+            "/api/projects/import",
+            new ProjectImportRequest
+            {
+                Mode = "CREATE_NEW",
+                ClientOperationId = Guid.NewGuid(),
+                Document = CreateImportDocument("operator import", "operator-flow")
+            });
+        import.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var body = await import.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be("ProjectEditPermissionRequired");
+    }
+
+    [Fact]
     public async Task ProjectLifecycleEndpoints_ShouldCreateReplayReconcileAndRejectPayloadMismatch()
     {
         await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
@@ -1258,6 +1458,26 @@ public sealed class ProjectGlobalVariableEndpointsTests
                 ]
             });
     }
+
+    private static ProjectExportDocumentV1 CreateImportDocument(string name, string flowName) =>
+        new()
+        {
+            Project = new ProjectExportMetadataV1
+            {
+                Name = name,
+                Description = "import test",
+                Version = "1.0.0"
+            },
+            Flow = new OperatorFlowDto
+            {
+                Id = Guid.NewGuid(),
+                Name = flowName,
+                Operators = [],
+                Connections = []
+            },
+            GlobalVariables = new ProjectGlobalVariableSchema(),
+            Assets = new ProjectAssetsDto()
+        };
 
     private static OperatorDto CreateGoldenOperator(
         IOperatorFactory factory,
@@ -1533,11 +1753,11 @@ public sealed class ProjectGlobalVariableEndpointsTests
             }
 
             coordinator
-                .TryAcquireMutationLeaseAsync(project.Id, Arg.Any<string>(), Arg.Any<CancellationToken>())
-                .Returns(_ => Task.FromResult<ProjectMutationLease?>(
+                .TryAcquireMutationLeaseAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(call => Task.FromResult<ProjectMutationLease?>(
                     status is RuntimeStatus.Starting or RuntimeStatus.Running or RuntimeStatus.Stopping
                         ? null
-                        : new ProjectMutationLease(project.Id, "test", () => ValueTask.CompletedTask)));
+                        : new ProjectMutationLease(call.ArgAt<Guid>(0), "test", () => ValueTask.CompletedTask)));
 
             var ownedStateStoreRoot = stateStore == null
                 ? Path.Combine(Path.GetTempPath(), "ClearVision.ProjectGlobalVariableEndpointTests", Guid.NewGuid().ToString("N"))

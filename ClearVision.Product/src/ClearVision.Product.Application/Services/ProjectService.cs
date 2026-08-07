@@ -189,6 +189,360 @@ public class ProjectService : IProjectApplicationService
         return dto;
     }
 
+    public async Task<ProjectExportDocumentV1> ExportAsync(Guid id)
+    {
+        var project = await GetByIdAsync(id)
+            ?? throw new ProjectNotFoundException(id);
+        var flow = project.Flow ?? new OperatorFlowDto
+        {
+            Id = id,
+            Name = "MainFlow"
+        };
+
+        return new ProjectExportDocumentV1
+        {
+            DocumentType = ProjectJsonContract.DocumentType,
+            SchemaVersion = ProjectJsonContract.SchemaVersion,
+            Identity = new ProjectExportIdentityV1
+            {
+                SourceProjectId = project.Id,
+                SourcePersistenceRevision = project.PersistenceRevision
+            },
+            Project = new ProjectExportMetadataV1
+            {
+                Name = project.Name,
+                Description = project.Description,
+                Version = project.Version
+            },
+            Flow = CloneFlow(flow),
+            GlobalVariables = CloneSchema(project.GlobalVariables),
+            Assets = ProjectAssetJson.Clone(project.Assets)
+        };
+    }
+
+    public async Task<ProjectDto> ApplyImportAsync(
+        Guid id,
+        ProjectExportDocumentV1 document,
+        long expectedPersistenceRevision)
+    {
+        var normalized = NormalizeAndValidateImportDocument(document);
+        Project project;
+        ProjectGlobalVariableSchema previousGlobalVariables;
+        string? previousFlowJson;
+        await using (await _saveCoordinator.AcquireProjectAccessAsync(id))
+        {
+            project = await _projectRepository.GetByIdAsync(id)
+                ?? throw new ProjectNotFoundException(id);
+            previousGlobalVariables = CloneSchema(project.GlobalVariables);
+            previousFlowJson = await _flowStorage.LoadFlowJsonAsync(id);
+        }
+
+        ProjectAssetSaveCandidate? assetCandidate = null;
+        if (_projectAssetStorage == null)
+        {
+            if (ProjectAssetJson.HasAssets(normalized.Assets))
+            {
+                throw new ProjectLifecycleValidationException(
+                    "PROJECT_IMPORT_ASSET_STORAGE_UNAVAILABLE",
+                    "Formal project assets cannot be imported because asset persistence is unavailable.");
+            }
+        }
+        else
+        {
+            assetCandidate = ProjectAssetSaveCandidate.Create(
+                normalized.Assets,
+                expectedPersistenceRevision,
+                expectedPersistenceRevision + 1,
+                "project-import");
+        }
+
+        var flowJson = JsonSerializer.Serialize(normalized.Flow, _jsonOptions);
+        var saveResult = await _saveCoordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+            project,
+            expectedPersistenceRevision,
+            normalized.Project.Name,
+            normalized.Project.Description,
+            previousGlobalVariables,
+            normalized.GlobalVariables,
+            previousFlowJson,
+            normalized.Flow,
+            flowJson,
+            assetCandidate,
+            normalized.Project.Version));
+
+        var dto = MapToDto(saveResult.Project);
+        dto.Flow = normalized.Flow;
+        dto.Assets = _projectAssetStorage == null
+            ? new ProjectAssetsDto()
+            : await _projectAssetStorage.LoadAssetsAsync(id);
+        return dto;
+    }
+
+    public async Task<bool> IsImportAppliedAsync(
+        Guid id,
+        ProjectExportDocumentV1 document,
+        long expectedPersistenceRevision)
+    {
+        var current = await ExportAsync(id);
+        if (current.Identity.SourcePersistenceRevision != expectedPersistenceRevision + 1)
+        {
+            return false;
+        }
+
+        var normalized = NormalizeAndValidateImportDocument(document);
+        current.Identity = new ProjectExportIdentityV1();
+        normalized.Identity = new ProjectExportIdentityV1();
+        return string.Equals(
+            ProjectJsonContract.Serialize(current),
+            ProjectJsonContract.Serialize(normalized),
+            StringComparison.Ordinal);
+    }
+
+    public async Task<ProjectDto> CreateImportedFromOperationAsync(
+        ProjectLifecycleOperation operation,
+        ProjectExportDocumentV1 document)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        if (operation.Kind != ProjectLifecycleOperationKind.Import)
+        {
+            throw new InvalidOperationException("Project import operation is not executable.");
+        }
+
+        var normalized = NormalizeAndValidateImportDocument(document);
+        var existing = await _projectRepository.GetByIdIncludingDeletedAsync(operation.ProjectId);
+        if (existing is { IsDeleted: true })
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_PROJECT_ID_CONFLICT",
+                "The reserved project identity is already tombstoned.");
+        }
+
+        if (existing == null)
+        {
+            var project = new Project(
+                operation.ProjectId,
+                normalized.Project.Name,
+                normalized.Project.Description);
+            project.UpdateVersion(normalized.Project.Version);
+            await _projectRepository.AddWithLifecycleOperationAsync(project, operation);
+            existing = project;
+        }
+
+        var expectedRevision = operation.ExpectedPersistenceRevision ?? existing.PersistenceRevision;
+        return await ApplyImportAsync(operation.ProjectId, normalized, expectedRevision);
+    }
+
+    private ProjectExportDocumentV1 NormalizeAndValidateImportDocument(ProjectExportDocumentV1? document)
+    {
+        if (document == null)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_DOCUMENT_REQUIRED",
+                "Project import document is required.");
+        }
+
+        if (!string.Equals(document.DocumentType, ProjectJsonContract.DocumentType, StringComparison.Ordinal))
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_DOCUMENT_TYPE_UNSUPPORTED",
+                "The project import document type is not supported.");
+        }
+
+        if (document.SchemaVersion != ProjectJsonContract.SchemaVersion)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_SCHEMA_UNSUPPORTED",
+                $"Project import schema version '{document.SchemaVersion}' is not supported.");
+        }
+
+        var normalized = ProjectJsonContract.Deserialize(ProjectJsonContract.Serialize(document));
+        normalized.GlobalVariables ??= new ProjectGlobalVariableSchema();
+        normalized.GlobalVariables.Variables ??= [];
+        normalized.GlobalVariables.SourceBindings ??= [];
+        normalized.GlobalVariables.TargetBindings ??= [];
+        var metadata = normalized.Project ?? throw new ProjectLifecycleValidationException(
+            "PROJECT_IMPORT_METADATA_REQUIRED",
+            "Project import metadata is required.");
+        metadata.Name = NormalizeImportedName(metadata.Name);
+        metadata.Description = NormalizeImportedDescription(metadata.Description);
+        metadata.Version = NormalizeImportedVersion(metadata.Version);
+
+        var flow = normalized.Flow ?? throw new ProjectLifecycleValidationException(
+            "PROJECT_IMPORT_FLOW_REQUIRED",
+            "Project import flow is required.");
+        flow.Operators ??= [];
+        flow.Connections ??= [];
+        if (string.IsNullOrWhiteSpace(flow.Name))
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_FLOW_NAME_REQUIRED",
+                "Project import flow name is required.");
+        }
+
+        ValidateImportedFlow(flow);
+        normalized.Assets = ProjectAssetJson.Normalize(normalized.Assets ?? new ProjectAssetsDto());
+        if (normalized.Assets.SchemaVersion != 1)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_ASSET_SCHEMA_UNSUPPORTED",
+                $"Project asset schema version '{normalized.Assets.SchemaVersion}' is not supported.");
+        }
+
+        MigrateFlowDto(flow);
+        EnrichFlowDtoWithMetadata(flow);
+        NormalizeProjectVariableOperatorNames(flow, normalized.GlobalVariables);
+        try
+        {
+            ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(normalized.GlobalVariables, flow.ToEntity());
+        }
+        catch (ProjectGlobalVariableSchemaValidationException ex)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_GLOBAL_VARIABLES_INVALID",
+                ex.Message);
+        }
+
+        return normalized;
+    }
+
+    private void ValidateImportedFlow(OperatorFlowDto flow)
+    {
+        var operatorIds = new HashSet<Guid>();
+        var outputPorts = new HashSet<Guid>();
+        var inputPorts = new HashSet<Guid>();
+        foreach (var op in flow.Operators)
+        {
+            op.InputPorts ??= [];
+            op.OutputPorts ??= [];
+            op.Parameters ??= [];
+            if (op.Id == Guid.Empty || !operatorIds.Add(op.Id))
+            {
+                throw new ProjectLifecycleValidationException(
+                    "PROJECT_IMPORT_OPERATOR_ID_INVALID",
+                    "Imported operator ids must be non-empty and unique.");
+            }
+
+            var canonicalType = OperatorTypeAliasResolver.Resolve(op.Type);
+            var metadata = _operatorFactory.GetMetadata(canonicalType);
+            if (metadata == null)
+            {
+                throw new ProjectLifecycleValidationException(
+                    "PROJECT_IMPORT_UNKNOWN_OPERATOR",
+                    $"Imported operator type '{op.Type}' is not registered.");
+            }
+
+            var parameterNames = metadata.Parameters
+                .Select(parameter => parameter.Name)
+                .Concat(metadata.ParameterConstraints.Select(constraint => constraint.Parameter))
+                .Concat(metadata.ParameterConstraints
+                    .Where(constraint => !string.IsNullOrWhiteSpace(constraint.AliasFor))
+                    .Select(constraint => constraint.Parameter))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var seenParameters = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var parameter in op.Parameters)
+            {
+                if (string.IsNullOrWhiteSpace(parameter.Name) || !seenParameters.Add(parameter.Name))
+                {
+                    throw new ProjectLifecycleValidationException(
+                        "PROJECT_IMPORT_PARAMETER_INVALID",
+                        $"Imported parameters for operator '{op.Id}' must have unique names.");
+                }
+
+                if (!parameterNames.Contains(parameter.Name))
+                {
+                    throw new ProjectLifecycleValidationException(
+                        "PROJECT_IMPORT_UNKNOWN_PARAMETER",
+                        $"Parameter '{parameter.Name}' is not registered for operator '{op.Type}'.");
+                }
+            }
+
+            foreach (var port in op.InputPorts)
+            {
+                if (port.Id == Guid.Empty || !inputPorts.Add(port.Id))
+                {
+                    throw new ProjectLifecycleValidationException(
+                        "PROJECT_IMPORT_PORT_INVALID",
+                        "Imported input port ids must be non-empty and unique.");
+                }
+            }
+
+            foreach (var port in op.OutputPorts)
+            {
+                if (port.Id == Guid.Empty || !outputPorts.Add(port.Id))
+                {
+                    throw new ProjectLifecycleValidationException(
+                        "PROJECT_IMPORT_PORT_INVALID",
+                        "Imported output port ids must be non-empty and unique.");
+                }
+            }
+        }
+
+        foreach (var connection in flow.Connections)
+        {
+            if (!operatorIds.Contains(connection.SourceOperatorId) ||
+                !operatorIds.Contains(connection.TargetOperatorId) ||
+                !outputPorts.Contains(connection.SourcePortId) ||
+                !inputPorts.Contains(connection.TargetPortId))
+            {
+                throw new ProjectLifecycleValidationException(
+                    "PROJECT_IMPORT_CONNECTION_INVALID",
+                    "Imported connections must reference existing operator output and input ports.");
+            }
+        }
+    }
+
+    private static string NormalizeImportedName(string? name)
+    {
+        var normalized = name?.Trim() ?? string.Empty;
+        if (normalized.Length == 0)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_VALIDATION_NAME_REQUIRED",
+                "Project name is required.");
+        }
+
+        if (normalized.Length > 200)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_VALIDATION_NAME_TOO_LONG",
+                "Project name cannot exceed 200 characters.");
+        }
+
+        return normalized;
+    }
+
+    private static string? NormalizeImportedDescription(string? description)
+    {
+        var normalized = description?.Trim();
+        if (string.IsNullOrEmpty(normalized)) return null;
+        if (normalized.Length > 1000)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_VALIDATION_DESCRIPTION_TOO_LONG",
+                "Project description cannot exceed 1000 characters.");
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeImportedVersion(string? version)
+    {
+        var normalized = version?.Trim() ?? string.Empty;
+        if (normalized.Length == 0 || normalized.Length > 50)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_VERSION_INVALID",
+                "Project version must contain between 1 and 50 characters.");
+        }
+
+        return normalized;
+    }
+
+    private static OperatorFlowDto CloneFlow(OperatorFlowDto flow) =>
+        JsonSerializer.Deserialize<OperatorFlowDto>(
+            JsonSerializer.Serialize(flow, ProjectJsonContract.Options),
+            ProjectJsonContract.Options) ?? new OperatorFlowDto();
+
     private void EnrichFlowDtoWithMetadata(OperatorFlowDto flowDto)
     {
         foreach (var opDto in flowDto.Operators)

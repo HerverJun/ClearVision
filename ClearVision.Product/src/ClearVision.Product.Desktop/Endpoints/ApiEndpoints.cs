@@ -4,6 +4,7 @@
 
 using System.Linq;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.Analysis;
 using ClearVision.Product.Application.DTOs;
@@ -155,6 +156,56 @@ public static class ApiEndpoints
             }
         });
 
+        app.MapGet("/api/projects/{id:guid}/export", async (
+            Guid id,
+            ProjectService service) =>
+        {
+            try
+            {
+                var document = await service.ExportAsync(id);
+                var json = ProjectJsonContract.Serialize(document);
+                return Results.File(
+                    Encoding.UTF8.GetBytes(json),
+                    "application/json",
+                    $"project-{id:D}.json");
+            }
+            catch (Exception ex)
+            {
+                return ToProjectLifecycleFailure(ex);
+            }
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAuthenticated);
+
+        app.MapPost("/api/projects/import", async (
+            ProjectImportRequest request,
+            ProjectLifecycleCoordinator lifecycleCoordinator,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var result = await lifecycleCoordinator.ImportAsync(
+                    GetAuthenticatedUserId(context),
+                    request,
+                    cancellationToken);
+                var response = new
+                {
+                    projectId = result.ProjectId,
+                    project = result.Project,
+                    operationReplayed = result.OperationReplayed,
+                    operation = result.Operation
+                };
+                return result.OperationReplayed
+                    ? Results.Ok(response)
+                    : Results.Created($"/api/projects/{result.ProjectId:D}", response);
+            }
+            catch (Exception ex)
+            {
+                return ToProjectLifecycleFailure(ex);
+            }
+        })
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.CanEditProject);
+
         // 创建工程
         app.MapPost("/api/projects", async (
             CreateProjectRequest request,
@@ -208,9 +259,10 @@ public static class ApiEndpoints
                 {
                     "create" => ProjectLifecycleOperationKind.Create,
                     "delete" => ProjectLifecycleOperationKind.Delete,
+                    "import" => ProjectLifecycleOperationKind.Import,
                     _ => throw new ProjectLifecycleValidationException(
                         "PROJECT_VALIDATION_OPERATION_KIND_INVALID",
-                        "kind must be create or delete.")
+                        "kind must be create, import, or delete.")
                 };
                 var operation = await lifecycleCoordinator.GetOperationAsync(
                     GetAuthenticatedUserId(context),
@@ -1393,7 +1445,7 @@ public static class ApiEndpoints
             "OPERATION_PAYLOAD_MISMATCH" => "clientOperationId was already used with a different payload.",
             "PROJECT_OPERATION_RETRYABLE" => "Project operation outcome must be reconciled before retrying.",
             "PROJECT_CLEANUP_RETRYABLE" => "Project is deleted; cleanup remains queued for retry.",
-            _ when code.StartsWith("PROJECT_VALIDATION_", StringComparison.Ordinal) => ex.Message,
+            _ when IsProjectLifecycleValidationCode(code) => ex.Message,
             _ => "Project lifecycle operation failed."
         };
 
@@ -1403,10 +1455,14 @@ public static class ApiEndpoints
             "PROJECT_NOT_FOUND" or "PROJECT_OPERATION_NOT_FOUND" => Results.NotFound(body),
             "PROJECT_REVISION_CONFLICT" or "PROJECT_MUTATION_CONFLICT" or "OPERATION_PAYLOAD_MISMATCH" => Results.Conflict(body),
             "PROJECT_OPERATION_RETRYABLE" or "PROJECT_CLEANUP_RETRYABLE" => Results.Json(body, statusCode: StatusCodes.Status503ServiceUnavailable),
-            _ when code.StartsWith("PROJECT_VALIDATION_", StringComparison.Ordinal) => Results.BadRequest(body),
+            _ when IsProjectLifecycleValidationCode(code) => Results.BadRequest(body),
             _ => Results.Json(body, statusCode: StatusCodes.Status500InternalServerError)
         };
     }
+
+    private static bool IsProjectLifecycleValidationCode(string code) =>
+        code.StartsWith("PROJECT_VALIDATION_", StringComparison.Ordinal) ||
+        code.StartsWith("PROJECT_IMPORT_", StringComparison.Ordinal);
 
     private static string GetAuthenticatedUserId(HttpContext context)
     {

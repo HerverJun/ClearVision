@@ -8,6 +8,7 @@ import {
   ApiNetworkError,
   ApiUnauthorizedError,
   type ApiGetOptions,
+  type ApiBlobResponse,
   type ApiTransport,
   type ApiWriteOptions
 } from '@/platform/api';
@@ -49,26 +50,41 @@ function project(projectId = projectA, overrides: Record<string, unknown> = {}) 
   };
 }
 
-function operation(kind: 'create' | 'delete', operationId: string, projectId = projectA, overrides: Record<string, unknown> = {}) {
+function importDocument() {
+  return {
+    documentType: 'clearvision-project' as const,
+    schemaVersion: 1 as const,
+    identity: {
+      sourceProjectId: projectA,
+      sourcePersistenceRevision: 3
+    },
+    project: { name: '导入工程', description: '来自 JSON', version: '1.0.0' },
+    flow: { name: '空流程', operators: [], connections: [] },
+    globalVariables: { schemaVersion: '1.0', variables: [], sourceBindings: [], targetBindings: [] },
+    assets: { schemaVersion: 1, calibrationAssets: [], spatialAssets: [] }
+  };
+}
+
+function operation(kind: 'create' | 'delete' | 'import', operationId: string, projectId = projectA, overrides: Record<string, unknown> = {}) {
   return {
     clientOperationId: operationId,
     kind,
     status: 'completed',
     projectId,
-    result: kind === 'create'
+    result: kind === 'delete'
       ? {
-          project: project(projectId),
-          projectDeleted: false,
-          deleted: false,
-          alreadyDeleted: false,
-          cleanupStatus: 'not-required'
-        }
-      : {
           project: null,
           projectDeleted: true,
           deleted: true,
           alreadyDeleted: false,
           cleanupStatus: 'cleanup-pending'
+        }
+      : {
+          project: project(projectId),
+          projectDeleted: false,
+          deleted: false,
+          alreadyDeleted: false,
+          cleanupStatus: 'not-required'
         },
     errorCode: null,
     createdAtUtc: '2026-07-19T00:00:00Z',
@@ -90,6 +106,7 @@ function httpDetails(status: number, code?: string) {
 
 function apiWith(options: {
   get?: (path: string, requestOptions?: ApiGetOptions) => Promise<unknown>;
+  getBlob?: (path: string, requestOptions?: ApiGetOptions) => Promise<ApiBlobResponse>;
   post?: (path: string, body: unknown, requestOptions?: ApiWriteOptions) => Promise<unknown>;
   put?: (path: string, body: unknown, requestOptions?: ApiWriteOptions) => Promise<unknown>;
 } = {}): ApiTransport {
@@ -103,7 +120,8 @@ function apiWith(options: {
     },
     async put<T>(path: string, body: unknown, requestOptions?: ApiWriteOptions): Promise<T | undefined> {
       return await (options.put?.(path, body, requestOptions) ?? Promise.resolve(undefined)) as T | undefined;
-    }
+    },
+    ...(options.getBlob ? { getBlob: options.getBlob } : {})
   };
 }
 
@@ -266,6 +284,84 @@ describe('projectLifecycleCommandOwner', () => {
     });
     expect(post).toHaveBeenCalledTimes(1);
     expect(get).toHaveBeenCalledTimes(1);
+  });
+
+  it('imports a validated document through one stable operation identity', async () => {
+    const post = vi.fn(async (path: string, body: unknown) => {
+      expect(path).toBe('projects/import');
+      expect(body).toMatchObject({
+        mode: 'CREATE_NEW',
+        clientOperationId: operationA,
+        document: importDocument()
+      });
+      return {
+        projectId: projectA,
+        project: project(projectA, { name: '导入工程' }),
+        operationReplayed: false,
+        operation: operation('import', operationA)
+      };
+    });
+    const commandOwner = createOwner(apiWith({ post }));
+
+    const result = await commandOwner.importProject({
+      mode: 'CREATE_NEW',
+      document: importDocument()
+    });
+
+    expect(result).toMatchObject({ projectId: projectA, project: { name: '导入工程' } });
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(commandOwner.projection).toMatchObject({
+      phase: 'succeeded',
+      command: 'import',
+      projectId: projectA
+    });
+  });
+
+  it('reconciles an overwrite import response loss without posting a second import', async () => {
+    const post = vi.fn(async () => { throw new ApiNetworkError('projects/import', new Error('response lost')); });
+    const get = vi.fn(async (path: string) => {
+      expect(path).toBe(`project-operations/${operationA}?kind=import`);
+      return operation('import', operationA, projectB);
+    });
+    const commandOwner = createOwner(apiWith({ post, get }));
+
+    const result = await commandOwner.importProject({
+      mode: 'OVERWRITE_EXISTING',
+      document: importDocument(),
+      targetProjectId: projectB,
+      expectedPersistenceRevision: 3
+    });
+
+    expect(result).toMatchObject({ projectId: projectB, operation: { kind: 'import' } });
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(commandOwner.diagnostics.totalReconcileCount).toBe(1);
+  });
+
+  it('validates the canonical export blob and returns a safe download name', async () => {
+    const getBlob = vi.fn(async (path: string) => {
+      expect(path).toBe(`projects/${projectA}/export`);
+      const blob = new Blob([JSON.stringify(importDocument())], { type: 'application/json' });
+      return {
+        blob,
+        contentType: 'application/json',
+        contentLength: blob.size,
+        etag: null,
+        sha256: null,
+        headers: new Headers({ 'Content-Disposition': 'attachment; filename="project-export.json"' })
+      };
+    });
+    const commandOwner = createOwner(apiWith({ getBlob }));
+
+    const result = await commandOwner.exportProject(projectA);
+
+    expect(result).toMatchObject({
+      projectId: projectA,
+      fileName: 'project-export.json',
+      document: { documentType: 'clearvision-project', schemaVersion: 1 }
+    });
+    expect(getBlob).toHaveBeenCalledOnce();
+    expect(commandOwner.projection).toMatchObject({ phase: 'succeeded', command: 'export' });
   });
 
   it('hands unauthorized responses to Auth authority and preserves no private token state', async () => {

@@ -3,7 +3,8 @@ namespace ClearVision.Product.Core.Entities;
 public enum ProjectLifecycleOperationKind
 {
     Create = 0,
-    Delete = 1
+    Delete = 1,
+    Import = 2
 }
 
 public enum ProjectLifecycleOperationStatus
@@ -23,7 +24,7 @@ public enum ProjectLifecycleCleanupStatus
 }
 
 /// <summary>
-/// Durable, user-scoped identity and outcome journal for Project create/delete commands.
+/// Durable, user-scoped identity and outcome journal for Project lifecycle commands.
 /// Project data remains authoritative in <see cref="Project"/>; this record only owns
 /// command idempotency, response-loss reconciliation, and delete cleanup progress.
 /// </summary>
@@ -98,6 +99,12 @@ public sealed class ProjectLifecycleOperation
 
     public long? ExpectedPersistenceRevision { get; private set; }
 
+    /// <summary>
+    /// Durable command payload used to resume an import after a lost response or restart.
+    /// It is never exposed as part of the lifecycle projection.
+    /// </summary>
+    public string? CommandPayloadJson { get; private set; }
+
     public string? ResultJson { get; private set; }
 
     public string? ErrorCode { get; private set; }
@@ -163,6 +170,38 @@ public sealed class ProjectLifecycleOperation
         return operation;
     }
 
+    public static ProjectLifecycleOperation ReserveImport(
+        string userId,
+        Guid clientOperationId,
+        string payloadFingerprint,
+        Guid projectId,
+        long? expectedPersistenceRevision,
+        string commandPayloadJson,
+        DateTimeOffset nowUtc)
+    {
+        if (string.IsNullOrWhiteSpace(commandPayloadJson))
+        {
+            throw new ArgumentException("Import command payload is required.", nameof(commandPayloadJson));
+        }
+
+        if (expectedPersistenceRevision is < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(expectedPersistenceRevision));
+        }
+
+        return new ProjectLifecycleOperation(
+            userId,
+            ProjectLifecycleOperationKind.Import,
+            clientOperationId,
+            payloadFingerprint,
+            projectId,
+            nowUtc)
+        {
+            ExpectedPersistenceRevision = expectedPersistenceRevision,
+            CommandPayloadJson = commandPayloadJson
+        };
+    }
+
     public bool MatchesFingerprint(string fingerprint) =>
         string.Equals(PayloadFingerprint, fingerprint, StringComparison.Ordinal);
 
@@ -183,6 +222,16 @@ public sealed class ProjectLifecycleOperation
         ErrorCode = null;
         CleanupStatus = ProjectLifecycleCleanupStatus.CleanupPending;
         CleanupNextAttemptAtUtc = nowUtc;
+        UpdatedAtUtc = nowUtc;
+        ExpiresAtUtc = expiresAtUtc;
+    }
+
+    public void CompleteImport(string resultJson, DateTimeOffset nowUtc, DateTimeOffset expiresAtUtc)
+    {
+        Status = ProjectLifecycleOperationStatus.Completed;
+        ResultJson = resultJson;
+        ErrorCode = null;
+        CleanupStatus = ProjectLifecycleCleanupStatus.NotApplicable;
         UpdatedAtUtc = nowUtc;
         ExpiresAtUtc = expiresAtUtc;
     }

@@ -15,6 +15,7 @@ public sealed class ProjectLifecycleCoordinator
 {
     public const int PayloadFingerprintVersion = 1;
     public static readonly TimeSpan CreateOperationRetention = TimeSpan.FromDays(7);
+    public static readonly TimeSpan ImportOperationRetention = TimeSpan.FromDays(7);
     public static readonly TimeSpan DeleteOperationRetention = TimeSpan.FromDays(30);
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -198,6 +199,131 @@ public sealed class ProjectLifecycleCoordinator
             await ToDtoAsync(operation, cancellationToken));
     }
 
+    public async Task<ProjectImportCommandResult> ImportAsync(
+        string userId,
+        ProjectImportRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var normalizedUserId = NormalizeUserId(userId);
+        if (request.ClientOperationId == Guid.Empty)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_VALIDATION_OPERATION_ID_REQUIRED",
+                "clientOperationId is required for project import.");
+        }
+
+        var mode = NormalizeImportMode(request.Mode);
+        var expectedRevision = request.ExpectedPersistenceRevision;
+        if (expectedRevision is < 0)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_VALIDATION_REVISION_INVALID",
+                "expectedPersistenceRevision cannot be negative.");
+        }
+
+        if (mode == ProjectImportMode.CreateNew && expectedRevision.HasValue)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_CREATE_REVISION_FORBIDDEN",
+                "CREATE_NEW import cannot provide an expectedPersistenceRevision.");
+        }
+
+        var targetProjectId = request.TargetProjectId;
+        if (mode == ProjectImportMode.OverwriteExisting && !targetProjectId.HasValue)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_TARGET_REQUIRED",
+                "OVERWRITE_EXISTING import requires targetProjectId.");
+        }
+        else if (mode == ProjectImportMode.OverwriteExisting && targetProjectId == Guid.Empty)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_TARGET_REQUIRED",
+                "targetProjectId cannot be empty.");
+        }
+
+        if (mode == ProjectImportMode.OverwriteExisting && !expectedRevision.HasValue)
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_REVISION_REQUIRED",
+                "OVERWRITE_EXISTING import requires expectedPersistenceRevision.");
+        }
+
+        var document = request.Document
+            ?? throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_DOCUMENT_REQUIRED",
+                "Project import document is required.");
+        var documentJson = ProjectJsonContract.Serialize(document);
+        var existingOperation = await _operationRepository.GetAsync(
+            normalizedUserId,
+            ProjectLifecycleOperationKind.Import,
+            request.ClientOperationId,
+            cancellationToken);
+        EnsureNotExpired(existingOperation, request.ClientOperationId);
+
+        var projectId = existingOperation?.ProjectId ??
+            (mode == ProjectImportMode.OverwriteExisting
+                ? targetProjectId!.Value
+                : Guid.NewGuid());
+        var fingerprint = ComputeImportFingerprint(
+            mode,
+            mode == ProjectImportMode.OverwriteExisting ? projectId : null,
+            expectedRevision,
+            documentJson);
+        var operation = existingOperation;
+        var replayed = operation != null;
+        if (operation == null)
+        {
+            var payload = new ProjectImportExecutionPayload
+            {
+                Mode = mode,
+                ExpectedPersistenceRevision = mode == ProjectImportMode.CreateNew ? 0 : expectedRevision,
+                Document = document
+            };
+            operation = ProjectLifecycleOperation.ReserveImport(
+                normalizedUserId,
+                request.ClientOperationId,
+                fingerprint,
+                projectId,
+                payload.ExpectedPersistenceRevision,
+                JsonSerializer.Serialize(payload, JsonOptions),
+                DateTimeOffset.UtcNow);
+            try
+            {
+                await _operationRepository.AddAsync(operation, cancellationToken);
+            }
+            catch
+            {
+                operation = await _operationRepository.GetAsync(
+                    normalizedUserId,
+                    ProjectLifecycleOperationKind.Import,
+                    request.ClientOperationId,
+                    cancellationToken);
+                if (operation == null)
+                {
+                    throw;
+                }
+
+                replayed = true;
+            }
+        }
+
+        EnsureNotExpired(operation, request.ClientOperationId);
+        EnsureFingerprint(operation, fingerprint);
+        operation = await ExecuteSingleFlightAsync(
+            operation,
+            () => ExecuteImportAsync(operation.Id, cancellationToken));
+        ThrowIfFailed(operation);
+        var result = DeserializeResult(operation).Project
+            ?? throw new InvalidOperationException("Completed import operation has no Project result.");
+        return new ProjectImportCommandResult(
+            operation.ProjectId,
+            result,
+            replayed,
+            await ToDtoAsync(operation, cancellationToken));
+    }
+
     public async Task DeleteLegacyAsync(
         string userId,
         Guid projectId,
@@ -253,9 +379,14 @@ public sealed class ProjectLifecycleCoordinator
                 {
                     await ExecuteSingleFlightAsync(
                         operation,
-                        operation.Kind == ProjectLifecycleOperationKind.Create
-                            ? () => ExecuteCreateAsync(operation.Id, cancellationToken)
-                            : () => ExecuteDeleteAsync(operation.Id, cancellationToken));
+                        operation.Kind switch
+                        {
+                            ProjectLifecycleOperationKind.Create =>
+                                () => ExecuteCreateAsync(operation.Id, cancellationToken),
+                            ProjectLifecycleOperationKind.Import =>
+                                () => ExecuteImportAsync(operation.Id, cancellationToken),
+                            _ => () => ExecuteDeleteAsync(operation.Id, cancellationToken)
+                        });
                 }
 
                 var current = await _operationRepository.GetByIdAsync(operation.Id, cancellationToken);
@@ -439,6 +570,126 @@ public sealed class ProjectLifecycleCoordinator
         }
     }
 
+    private async Task<ProjectLifecycleOperation> ExecuteImportAsync(
+        Guid operationId,
+        CancellationToken cancellationToken)
+    {
+        var operation = await RequireOperationAsync(operationId, cancellationToken);
+        if (operation.Status is ProjectLifecycleOperationStatus.Completed or ProjectLifecycleOperationStatus.FailedTerminal)
+        {
+            return operation;
+        }
+
+        try
+        {
+            var payload = DeserializeImportPayload(operation);
+            var existing = await _projectRepository.GetByIdIncludingDeletedAsync(operation.ProjectId);
+            var expectedRevision = operation.ExpectedPersistenceRevision ?? 0;
+            if (existing != null &&
+                !existing.IsDeleted &&
+                existing.PersistenceRevision == expectedRevision + 1 &&
+                await _projectService.IsImportAppliedAsync(operation.ProjectId, payload.Document, expectedRevision))
+            {
+                var current = await _projectService.GetByIdAsync(operation.ProjectId)
+                    ?? throw new ProjectNotFoundException(operation.ProjectId);
+                CompleteImportOperation(operation, current);
+                await _operationRepository.UpdateAsync(operation, cancellationToken);
+                return operation;
+            }
+
+            await using var mutationLease = await _runtimeCoordinator.TryAcquireMutationLeaseAsync(
+                operation.ProjectId,
+                "project-lifecycle-import",
+                cancellationToken);
+            if (mutationLease == null)
+            {
+                await MarkRetryableAsync(operation, "PROJECT_MUTATION_CONFLICT", cancellationToken);
+                throw new ProjectMutationConflictException(operation.ProjectId);
+            }
+
+            ProjectDto project;
+            if (payload.Mode == ProjectImportMode.CreateNew)
+            {
+                project = await _projectService.CreateImportedFromOperationAsync(operation, payload.Document);
+            }
+            else
+            {
+                if (existing == null || existing.IsDeleted)
+                {
+                    throw new ProjectNotFoundException(operation.ProjectId);
+                }
+
+                project = await _projectService.ApplyImportAsync(
+                    operation.ProjectId,
+                    payload.Document,
+                    expectedRevision);
+            }
+
+            CompleteImportOperation(operation, project);
+            await _operationRepository.UpdateAsync(operation, cancellationToken);
+            return operation;
+        }
+        catch (ProjectMutationConflictException)
+        {
+            await MarkRetryableAsync(operation, "PROJECT_MUTATION_CONFLICT", cancellationToken);
+            throw;
+        }
+        catch (ProjectSaveRevisionConflictException ex)
+        {
+            await MarkTerminalAsync(operation, "PROJECT_REVISION_CONFLICT", ImportOperationRetention, cancellationToken);
+            throw new ProjectRevisionConflictException(
+                operation.ProjectId,
+                operation.ExpectedPersistenceRevision ?? -1,
+                ex.ActualRevision);
+        }
+        catch (ProjectRevisionConflictException ex)
+        {
+            await MarkTerminalAsync(operation, ex.ErrorCode, ImportOperationRetention, cancellationToken);
+            throw;
+        }
+        catch (ProjectNotFoundException ex)
+        {
+            await MarkTerminalAsync(operation, ex.ErrorCode, ImportOperationRetention, cancellationToken);
+            throw;
+        }
+        catch (ProjectLifecycleValidationException ex)
+        {
+            await MarkTerminalAsync(operation, ex.ErrorCode, ImportOperationRetention, cancellationToken);
+            throw;
+        }
+        catch (Exception ex) when (ex is not ProjectOperationRetryableException)
+        {
+            await MarkRetryableAsync(operation, "PROJECT_OPERATION_RETRYABLE", cancellationToken);
+            throw new ProjectOperationRetryableException(
+                operation.ClientOperationId,
+                "PROJECT_OPERATION_RETRYABLE",
+                ex);
+        }
+    }
+
+    private static void CompleteImportOperation(ProjectLifecycleOperation operation, ProjectDto project)
+    {
+        operation.CompleteImport(
+            JsonSerializer.Serialize(new ProjectLifecycleOperationResultDto { Project = project }, JsonOptions),
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.Add(ImportOperationRetention));
+    }
+
+    private static ProjectImportExecutionPayload DeserializeImportPayload(ProjectLifecycleOperation operation)
+    {
+        if (string.IsNullOrWhiteSpace(operation.CommandPayloadJson))
+        {
+            throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_PAYLOAD_MISSING",
+                "Project import operation payload is missing.");
+        }
+
+        return JsonSerializer.Deserialize<ProjectImportExecutionPayload>(operation.CommandPayloadJson, JsonOptions)
+            ?? throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_PAYLOAD_INVALID",
+                "Project import operation payload is invalid.");
+    }
+
     private async Task<ProjectLifecycleOperation> ProcessCleanupAsync(
         Guid operationId,
         CancellationToken cancellationToken)
@@ -505,7 +756,13 @@ public sealed class ProjectLifecycleCoordinator
         return new ProjectLifecycleOperationDto
         {
             ClientOperationId = operation.ClientOperationId,
-            Kind = operation.Kind == ProjectLifecycleOperationKind.Create ? "create" : "delete",
+            Kind = operation.Kind switch
+            {
+                ProjectLifecycleOperationKind.Create => "create",
+                ProjectLifecycleOperationKind.Delete => "delete",
+                ProjectLifecycleOperationKind.Import => "import",
+                _ => throw new ArgumentOutOfRangeException(nameof(operation.Kind), operation.Kind, null)
+            },
             Status = ToOperationStatus(operation.Status),
             ProjectId = operation.ProjectId,
             Result = result,
@@ -684,6 +941,18 @@ public sealed class ProjectLifecycleCoordinator
         return normalized;
     }
 
+    private static ProjectImportMode NormalizeImportMode(string? mode)
+    {
+        return mode?.Trim().ToUpperInvariant() switch
+        {
+            "CREATE_NEW" => ProjectImportMode.CreateNew,
+            "OVERWRITE_EXISTING" => ProjectImportMode.OverwriteExisting,
+            _ => throw new ProjectLifecycleValidationException(
+                "PROJECT_IMPORT_MODE_INVALID",
+                "Project import mode must be CREATE_NEW or OVERWRITE_EXISTING.")
+        };
+    }
+
     private static string ComputeCreateFingerprint(string name, string? description) =>
         ComputeFingerprint(JsonSerializer.Serialize(new
         {
@@ -698,6 +967,20 @@ public sealed class ProjectLifecycleCoordinator
             version = PayloadFingerprintVersion,
             projectId = projectId.ToString("D").ToLowerInvariant(),
             expectedPersistenceRevision
+        }, JsonOptions));
+
+    private static string ComputeImportFingerprint(
+        ProjectImportMode mode,
+        Guid? targetProjectId,
+        long? expectedPersistenceRevision,
+        string documentJson) =>
+        ComputeFingerprint(JsonSerializer.Serialize(new
+        {
+            version = PayloadFingerprintVersion,
+            mode = mode.ToString(),
+            targetProjectId = targetProjectId?.ToString("D").ToLowerInvariant(),
+            expectedPersistenceRevision,
+            documentJson
         }, JsonOptions));
 
     private static string ComputeFingerprint(string canonicalJson)

@@ -299,7 +299,9 @@ public sealed class ProjectSaveCoordinator
         var schemaChanged = !string.Equals(previousSchemaHash, nextSchemaHash, StringComparison.Ordinal);
         var metadataChanged =
             !string.Equals(project.Name, request.Name, StringComparison.Ordinal) ||
-            !string.Equals(project.Description, request.Description, StringComparison.Ordinal);
+            !string.Equals(project.Description, request.Description, StringComparison.Ordinal) ||
+            (request.NextVersion != null &&
+             !string.Equals(project.Version, request.NextVersion, StringComparison.Ordinal));
         var flowChanged = request.NextFlowJson != null &&
             !string.Equals(previousFlowJson, request.NextFlowJson, StringComparison.Ordinal);
         var variableCandidate = schemaChanged && _projectVariableSessions != null && SchemaHasVariableState(previousSchema, request.NextSchema)
@@ -518,11 +520,13 @@ public sealed class ProjectSaveCoordinator
         {
             var originalName = project.Name;
             var originalDescription = project.Description;
+            var originalVersion = project.Version;
             var originalGlobalVariables = project.GlobalVariables;
             var originalRevision = project.PersistenceRevision;
             try
             {
                 project.UpdateInfo(projectCandidate.Name, projectCandidate.Description);
+                project.UpdateVersion(projectCandidate.Version);
                 project.UpdateGlobalVariables(projectCandidate.GlobalVariables);
                 project.SetPersistenceRevision(manifest.ToRevision);
                 await _projectRepository.UpdateAsync(project);
@@ -530,6 +534,7 @@ public sealed class ProjectSaveCoordinator
             catch
             {
                 project.UpdateInfo(originalName, originalDescription);
+                project.UpdateVersion(originalVersion);
                 project.UpdateGlobalVariables(originalGlobalVariables);
                 project.SetPersistenceRevision(originalRevision);
                 throw;
@@ -854,6 +859,7 @@ public sealed class ProjectSaveCoordinator
         var candidateHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(candidate.GlobalVariables);
         if (!string.Equals(project.Name, candidate.Name, StringComparison.Ordinal) ||
             !string.Equals(project.Description, candidate.Description, StringComparison.Ordinal) ||
+            !string.Equals(project.Version, candidate.Version, StringComparison.Ordinal) ||
             !string.Equals(currentHash, candidateHash, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("PSV008: project candidate does not match target revision.");
@@ -984,7 +990,8 @@ public sealed record ProjectSaveRequest(
     string? PreviousFlowJson,
     OperatorFlowDto? NextFlow,
     string? NextFlowJson,
-    ProjectAssetSaveCandidate? ProjectAssetCandidate = null);
+    ProjectAssetSaveCandidate? ProjectAssetCandidate = null,
+    string? NextVersion = null);
 
 public sealed record ProjectSaveResult(Project Project, OperatorFlowDto? Flow, bool Changed);
 
@@ -1296,7 +1303,7 @@ public sealed record ProjectCandidate(
             project.Id,
             request.Name,
             request.Description,
-            project.Version,
+            request.NextVersion ?? project.Version,
             new Dictionary<string, string>(project.GlobalSettings),
             request.NextSchema,
             fromRevision,

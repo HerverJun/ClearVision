@@ -8,6 +8,7 @@ import {
 import { ProjectDetailPage, ProjectsPage } from '@/capabilities/projects-read';
 import {
   ApiNotFoundError,
+  type ApiBlobResponse,
   type ApiGetOptions,
   type ApiTransport,
   type ApiWriteOptions
@@ -55,26 +56,38 @@ function details(overrides: Record<string, unknown> = {}): Record<string, unknow
   });
 }
 
-function lifecycleOperation(kind: 'create' | 'delete') {
+function importDocument(): Record<string, unknown> {
+  return {
+    documentType: 'clearvision-project',
+    schemaVersion: 1,
+    identity: { sourceProjectId: projectId, sourcePersistenceRevision: 7 },
+    project: { name: '导入工程', description: '导入描述', version: '1.0.0' },
+    flow: { name: '导入流程', operators: [], connections: [] },
+    globalVariables: { schemaVersion: '1.0', variables: [], sourceBindings: [], targetBindings: [] },
+    assets: { schemaVersion: 1, calibrationAssets: [], spatialAssets: [] }
+  };
+}
+
+function lifecycleOperation(kind: 'create' | 'delete' | 'import') {
   return {
     clientOperationId: operationId,
     kind,
     status: 'completed',
     projectId,
-    result: kind === 'create'
+    result: kind === 'delete'
       ? {
-          project: details(),
-          projectDeleted: false,
-          deleted: false,
-          alreadyDeleted: false,
-          cleanupStatus: 'not-required'
-        }
-      : {
           project: null,
           projectDeleted: true,
           deleted: true,
           alreadyDeleted: false,
           cleanupStatus: 'cleanup-pending'
+        }
+      : {
+          project: details(),
+          projectDeleted: false,
+          deleted: false,
+          alreadyDeleted: false,
+          cleanupStatus: 'not-required'
         },
     errorCode: null,
     createdAtUtc: '2026-07-19T00:00:00Z',
@@ -109,6 +122,7 @@ function commandApi(options: {
   get: GetImplementation;
   post: (path: string, body: unknown, requestOptions?: ApiWriteOptions) => Promise<unknown>;
   put?: (path: string, body: unknown, requestOptions?: ApiWriteOptions) => Promise<unknown>;
+  getBlob?: (path: string, requestOptions?: ApiGetOptions) => Promise<ApiBlobResponse>;
 }): ApiTransport {
   return {
     apiBaseUrl: 'http://localhost:5000/api',
@@ -120,7 +134,8 @@ function commandApi(options: {
     },
     async put<T>(path: string, body: unknown, requestOptions?: ApiWriteOptions): Promise<T | undefined> {
       return await (options.put?.(path, body, requestOptions) ?? Promise.resolve(undefined)) as T | undefined;
-    }
+    },
+    ...(options.getBlob ? { getBlob: options.getBlob } : {})
   };
 }
 
@@ -291,6 +306,102 @@ describe('Projects read pages', () => {
     lifecycle.dispose();
     lifecycle = undefined;
     queries.dispose();
+  });
+
+  it('reads a Project JSON file, submits CREATE_NEW through the lifecycle owner, and routes to the result', async () => {
+    const post = vi.fn(async (path: string, body: unknown) => {
+      expect(path).toBe('projects/import');
+      expect(body).toMatchObject({ mode: 'CREATE_NEW', clientOperationId: operationId });
+      return {
+        projectId,
+        project: details({ name: '导入工程', description: '导入描述' }),
+        operationReplayed: false,
+        operation: lifecycleOperation('import')
+      };
+    });
+    const api = commandApi({
+      get: async path => path.startsWith('projects/recent') ? [] : [summary()],
+      post
+    });
+    const queries = createReadQueryClient(api);
+    lifecycle = createProjectLifecycleCommandOwner({
+      api,
+      createOperationId: () => operationId,
+      publishToWindow: false
+    });
+    const router = createTestRouter();
+    await router.push('/projects');
+    await router.isReady();
+    const wrapper = mount(ProjectsPage, {
+      props: { runtime: { queries, projectLifecycle: lifecycle } },
+      global: { plugins: [router] }
+    });
+    await flushPromises();
+
+    const file = new File([JSON.stringify(importDocument())], 'project.json', { type: 'application/json' });
+    const fileInput = wrapper.get('input[type="file"]');
+    Object.defineProperty(fileInput.element, 'files', { value: [file], configurable: true });
+    await fileInput.trigger('change');
+    await flushPromises();
+
+    expect(document.body.textContent).toContain('project.json');
+    (document.body.querySelector('[data-testid="project-import-submit"]') as HTMLButtonElement).click();
+    await flushPromises();
+
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(router.currentRoute.value.path).toBe(`/projects/${projectId}`);
+    wrapper.unmount();
+    lifecycle.dispose();
+    lifecycle = undefined;
+    queries.dispose();
+  });
+
+  it('downloads the canonical server export and releases its temporary object URL', async () => {
+    const getBlob = vi.fn(async (path: string) => {
+      expect(path).toBe(`projects/${projectId}/export`);
+      const blob = new Blob([JSON.stringify(importDocument())], { type: 'application/json' });
+      return {
+        blob,
+        contentType: 'application/json',
+        contentLength: blob.size,
+        etag: null,
+        sha256: null,
+        headers: new Headers({ 'Content-Disposition': 'attachment; filename="project.json"' })
+      };
+    });
+    const api = commandApi({
+      get: async path => path.startsWith('projects/recent') ? [] : [summary()],
+      post: async () => undefined,
+      getBlob
+    });
+    const queries = createReadQueryClient(api);
+    lifecycle = createProjectLifecycleCommandOwner({ api, publishToWindow: false });
+    const createObjectUrl = vi.fn(() => 'blob:project-export');
+    const revokeObjectUrl = vi.fn();
+    vi.stubGlobal('URL', { createObjectURL: createObjectUrl, revokeObjectURL: revokeObjectUrl });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const router = createTestRouter();
+    await router.push('/projects');
+    await router.isReady();
+    const wrapper = mount(ProjectsPage, {
+      props: { runtime: { queries, projectLifecycle: lifecycle } },
+      global: { plugins: [router] }
+    });
+    await flushPromises();
+
+    await wrapper.get(`[data-testid="project-export-${projectId}"]`).trigger('click');
+    await flushPromises();
+
+    expect(getBlob).toHaveBeenCalledOnce();
+    expect(click).toHaveBeenCalledOnce();
+    expect(createObjectUrl).toHaveBeenCalledOnce();
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:project-export');
+    wrapper.unmount();
+    lifecycle.dispose();
+    lifecycle = undefined;
+    queries.dispose();
+    click.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it('keeps a Project visible until delete tombstone authority completes', async () => {

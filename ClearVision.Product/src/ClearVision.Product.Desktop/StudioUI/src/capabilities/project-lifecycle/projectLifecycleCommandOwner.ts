@@ -13,11 +13,16 @@ import { decodeProjectDetails, isProjectId, type ProjectDetails } from '@/capabi
 import {
   decodeProjectCreateAuthorityResult,
   decodeProjectDeleteAuthorityResult,
+  decodeProjectExportDocument,
+  decodeProjectImportAuthorityResult,
   decodeProjectLifecycleOperation,
   decodeProjectOpenAuthorityResult,
   isLifecycleOperationId,
   type ProjectCreateAuthorityResult,
   type ProjectDeleteAuthorityResult,
+  type ProjectExportAuthorityResult,
+  type ProjectImportAuthorityResult,
+  type ProjectImportDocument,
   type ProjectLifecycleOperation,
   type ProjectLifecycleOperationKind,
   type ProjectOpenAuthorityResult
@@ -28,6 +33,8 @@ export type ProjectLifecycleCommandPhase =
   | 'creating'
   | 'updating'
   | 'deleting'
+  | 'importing'
+  | 'exporting'
   | 'reconciling'
   | 'conflict'
   | 'unknown-outcome'
@@ -35,7 +42,7 @@ export type ProjectLifecycleCommandPhase =
   | 'failed'
   | 'disposed';
 
-export type ProjectLifecycleCommandKind = 'create' | 'update' | 'open' | 'delete' | null;
+export type ProjectLifecycleCommandKind = 'create' | 'update' | 'open' | 'delete' | 'import' | 'export' | null;
 
 export interface ProjectLifecycleCommandProjection {
   readonly phase: ProjectLifecycleCommandPhase;
@@ -86,7 +93,14 @@ export interface ProjectLifecycleCommandOwner {
     projectId: string;
     expectedPersistenceRevision: number;
   }>): Promise<ProjectDeleteAuthorityResult | null>;
-  reconcile(): Promise<ProjectCreateAuthorityResult | ProjectDeleteAuthorityResult | null>;
+  importProject(input: Readonly<{
+    mode: 'CREATE_NEW' | 'OVERWRITE_EXISTING';
+    document: ProjectImportDocument;
+    targetProjectId?: string;
+    expectedPersistenceRevision?: number;
+  }>): Promise<ProjectImportAuthorityResult | null>;
+  exportProject(projectId: string): Promise<ProjectExportAuthorityResult | null>;
+  reconcile(): Promise<ProjectCreateAuthorityResult | ProjectImportAuthorityResult | ProjectDeleteAuthorityResult | null>;
   prepareForProtectedTransition(reason?: string): Promise<boolean>;
   quarantineForSessionExpiration(): boolean;
   reconcileAfterReauthentication(): Promise<boolean>;
@@ -143,6 +157,25 @@ function messageForCode(code: string | null): string {
     case 'PROJECT_VALIDATION_NAME_REQUIRED': return '请输入工程名称。';
     case 'PROJECT_VALIDATION_NAME_TOO_LONG': return '工程名称超出允许长度。';
     case 'PROJECT_VALIDATION_DESCRIPTION_TOO_LONG': return '工程描述超出允许长度。';
+    case 'PROJECT_IMPORT_DOCUMENT_REQUIRED': return '请选择有效的工程 JSON 文件。';
+    case 'PROJECT_IMPORT_DOCUMENT_INVALID': return '工程 JSON 结构不完整或无法解析。';
+    case 'PROJECT_IMPORT_DOCUMENT_TYPE_UNSUPPORTED': return '该文件不是 ClearVision 工程导出文件。';
+    case 'PROJECT_IMPORT_SCHEMA_UNSUPPORTED': return '工程 JSON schema 版本不受当前 Studio 支持。';
+    case 'PROJECT_IMPORT_MODE_INVALID': return '工程导入模式无效，请重新选择导入方式。';
+    case 'PROJECT_IMPORT_REVISION_INVALID': return '目标工程 revision 无效，请重新读取工程列表。';
+    case 'PROJECT_IMPORT_METADATA_REQUIRED': return '工程 JSON 缺少工程元数据。';
+    case 'PROJECT_IMPORT_FLOW_REQUIRED': return '工程 JSON 缺少流程数据。';
+    case 'PROJECT_IMPORT_FLOW_NAME_REQUIRED': return '工程 JSON 缺少流程名称。';
+    case 'PROJECT_IMPORT_UNKNOWN_OPERATOR': return '工程包含当前服务端不认识的算子，未执行导入。';
+    case 'PROJECT_IMPORT_UNKNOWN_PARAMETER': return '工程包含当前服务端不认识的算子参数，未执行导入。';
+    case 'PROJECT_IMPORT_PARAMETER_INVALID': return '工程包含不兼容的算子参数，未执行导入。';
+    case 'PROJECT_IMPORT_GLOBAL_VARIABLES_INVALID': return '工程全局变量校验失败，未执行导入。';
+    case 'PROJECT_IMPORT_ASSET_SCHEMA_UNSUPPORTED': return '工程资源 schema 版本不受当前 Studio 支持。';
+    case 'PROJECT_IMPORT_ASSET_STORAGE_UNAVAILABLE': return '当前服务端没有可用的正式资源存储，未执行导入。';
+    case 'PROJECT_IMPORT_TARGET_REQUIRED': return '覆盖导入必须选择目标工程。';
+    case 'PROJECT_IMPORT_REVISION_REQUIRED': return '覆盖导入缺少目标工程的服务端 revision。';
+    case 'PROJECT_IMPORT_PROJECT_ID_CONFLICT': return '导入目标工程身份已被占用或已删除，未执行导入。';
+    case 'PROJECT_IMPORT_CREATE_REVISION_FORBIDDEN': return '新建导入不能携带目标工程 revision。';
     case 'PROJECT_LEAVE_BLOCKED': return '当前工程仍有未完成的保存或运行协调，删除已被阻止。';
     case 'SESSION_UNAUTHORIZED': return '当前会话已失效，认证 owner 正在处理重新登录。';
     case 'PROJECT_FORBIDDEN': return '当前账号无权修改此工程。';
@@ -183,6 +216,23 @@ function assertRevision(value: number): void {
   if (!Number.isInteger(value) || value < 0) {
     throw new TypeError('Expected persistence revision must be a non-negative integer.');
   }
+}
+
+function contentDispositionFileName(headers: Headers, fallback: string): string {
+  const value = headers.get('Content-Disposition') ?? '';
+  const encoded = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(value)?.[1]?.trim();
+  const quoted = /filename="([^"]+)"/i.exec(value)?.[1];
+  const unquoted = /filename=([^;]+)/i.exec(value)?.[1]?.trim();
+  let candidate = encoded ?? quoted ?? unquoted ?? fallback;
+  if (encoded) {
+    try {
+      candidate = decodeURIComponent(encoded.replace(/^"|"$/g, ''));
+    } catch {
+      candidate = fallback;
+    }
+  }
+  const safe = candidate.replace(/[\\/\0]/g, '').trim();
+  return safe || fallback;
 }
 
 export function createProjectLifecycleCommandOwner(
@@ -281,8 +331,11 @@ export function createProjectLifecycleCommandOwner(
     state.command = command;
     state.projectId = projectId;
     state.phase = command === 'create' ? 'creating' : command === 'update' ? 'updating' :
-      command === 'delete' ? 'deleting' : 'updating';
-    state.message = command === 'open' ? '正在确认工程打开 authority。' : '正在提交工程命令。';
+      command === 'delete' ? 'deleting' : command === 'import' ? 'importing' :
+        command === 'export' ? 'exporting' : 'updating';
+    state.message = command === 'open' ? '正在确认工程打开 authority。' :
+      command === 'export' ? '正在读取服务端工程导出文件。' :
+        command === 'import' ? '正在提交工程导入请求。' : '正在提交工程命令。';
     const controller = new AbortController();
     activeController = controller;
     totalCommandCount += 1;
@@ -310,7 +363,7 @@ export function createProjectLifecycleCommandOwner(
   }
 
   function applyCompletedOperation(operation: ProjectLifecycleOperation, operationGeneration: number):
-    ProjectCreateAuthorityResult | ProjectDeleteAuthorityResult | null {
+    ProjectCreateAuthorityResult | ProjectImportAuthorityResult | ProjectDeleteAuthorityResult | null {
     if (!isCurrent(operationGeneration)) return null;
     state.operation = operation;
     if (operation.status === 'pending' || operation.status === 'failed-retryable') {
@@ -355,6 +408,21 @@ export function createProjectLifecycleCommandOwner(
         operation
       });
     }
+    if (operation.kind === 'import') {
+      const project = operation.result?.project;
+      if (!project || project.id !== projectId) {
+        applyFailure(new TypeError('Import operation result did not contain the bound Project.'), operationGeneration, projectId);
+        return null;
+      }
+      state.project = project;
+      state.message = '工程已按服务端校验完成导入。';
+      return Object.freeze({
+        projectId,
+        project,
+        operationReplayed: true,
+        operation
+      });
+    }
     state.message = operation.result?.cleanupStatus === 'cleanup-failed-retryable'
       ? '工程 tombstone 已生效；后台资源清理仍在重试。'
       : '工程已由服务端 tombstone authority 删除。';
@@ -365,7 +433,7 @@ export function createProjectLifecycleCommandOwner(
     });
   }
 
-  async function reconcilePending(): Promise<ProjectCreateAuthorityResult | ProjectDeleteAuthorityResult | null> {
+  async function reconcilePending(): Promise<ProjectCreateAuthorityResult | ProjectImportAuthorityResult | ProjectDeleteAuthorityResult | null> {
     assertActive();
     const pending = pendingOperation;
     if (!pending) return null;
@@ -506,6 +574,150 @@ export function createProjectLifecycleCommandOwner(
         }
       });
     },
+    importProject(input: Readonly<{
+      mode: 'CREATE_NEW' | 'OVERWRITE_EXISTING';
+      document: ProjectImportDocument;
+      targetProjectId?: string;
+      expectedPersistenceRevision?: number;
+    }>): Promise<ProjectImportAuthorityResult | null> {
+      return track('import', async () => {
+        const targetProjectId = input.targetProjectId ?? null;
+        const started = begin('import', targetProjectId);
+        const failImport = (errorCode: string): null => {
+          if (!isCurrent(started.generation, targetProjectId)) return null;
+          pendingOperation = null;
+          state.phase = 'failed';
+          state.command = 'import';
+          state.errorCode = errorCode;
+          state.message = messageForCode(errorCode);
+          state.canReconcile = false;
+          return null;
+        };
+
+        let document: ProjectImportDocument;
+        try {
+          if (input.mode !== 'CREATE_NEW' && input.mode !== 'OVERWRITE_EXISTING') {
+            return failImport('PROJECT_IMPORT_MODE_INVALID');
+          }
+          document = decodeProjectExportDocument(input.document);
+          if (input.mode === 'CREATE_NEW') {
+            if (targetProjectId !== null || input.expectedPersistenceRevision !== undefined) {
+              return failImport('PROJECT_IMPORT_CREATE_REVISION_FORBIDDEN');
+            }
+          } else {
+            if (!targetProjectId || !isProjectId(targetProjectId)) {
+              return failImport('PROJECT_IMPORT_TARGET_REQUIRED');
+            }
+            if (input.expectedPersistenceRevision === undefined) {
+              return failImport('PROJECT_IMPORT_REVISION_REQUIRED');
+            }
+            try {
+              assertRevision(input.expectedPersistenceRevision);
+            } catch {
+              return failImport('PROJECT_IMPORT_REVISION_INVALID');
+            }
+          }
+        } catch {
+          return failImport('PROJECT_IMPORT_DOCUMENT_INVALID');
+        }
+
+        const clientOperationId = (options.createOperationId ?? operationId)();
+        if (!isLifecycleOperationId(clientOperationId)) {
+          throw new TypeError('Project import operation id must be a non-empty UUID.');
+        }
+        pendingOperation = {
+          kind: 'import',
+          clientOperationId,
+          projectId: targetProjectId
+        };
+        state.clientOperationId = clientOperationId;
+        try {
+          const body = {
+            mode: input.mode,
+            clientOperationId,
+            document,
+            ...(targetProjectId ? { targetProjectId } : {}),
+            ...(input.mode === 'OVERWRITE_EXISTING'
+              ? { expectedPersistenceRevision: input.expectedPersistenceRevision }
+              : {})
+          };
+          const payload = await options.api.post?.('projects/import', body, {
+            signal: started.controller.signal
+          });
+          if (!isCurrent(started.generation, targetProjectId)) return null;
+          const result = decodeProjectImportAuthorityResult(payload);
+          if (
+            result.operation.clientOperationId !== clientOperationId ||
+            (targetProjectId !== null && result.projectId !== targetProjectId)
+          ) {
+            throw new TypeError('Import response authority identity changed.');
+          }
+          pendingOperation = null;
+          state.phase = 'succeeded';
+          state.projectId = result.projectId;
+          state.project = result.project;
+          state.operation = result.operation;
+          state.errorCode = null;
+          state.canReconcile = false;
+          state.message = result.operationReplayed
+            ? '工程导入已从既有 operation authority 恢复。'
+            : '工程已导入。';
+          return result;
+        } catch (error) {
+          if (!isCurrent(started.generation, targetProjectId)) return null;
+          if (isUnknownOutcomeFailure(error)) {
+            state.phase = 'unknown-outcome';
+            state.errorCode = payloadCode(error) ?? 'PROJECT_OPERATION_RETRYABLE';
+            state.message = messageForCode(state.errorCode);
+            state.canReconcile = true;
+            return await reconcilePending() as ProjectImportAuthorityResult | null;
+          }
+          pendingOperation = null;
+          applyFailure(error, started.generation, targetProjectId);
+          return null;
+        } finally {
+          if (activeController === started.controller) activeController = undefined;
+        }
+      });
+    },
+    exportProject(projectId: string): Promise<ProjectExportAuthorityResult | null> {
+      return track(`export:${projectId}`, async () => {
+        if (!isProjectId(projectId)) throw new TypeError('Project export requires a Project UUID.');
+        const started = begin('export', projectId);
+        try {
+          if (!options.api.getBlob) {
+            throw new TypeError('Project export requires blob GET on the shared ApiTransport.');
+          }
+          const response = await options.api.getBlob(`projects/${projectId}/export`, {
+            signal: started.controller.signal
+          });
+          if (!isCurrent(started.generation, projectId)) return null;
+          const raw = await response.blob.text();
+          const document = decodeProjectExportDocument(JSON.parse(raw) as unknown);
+          const sourceProjectId = document.identity && typeof document.identity === 'object'
+            ? (document.identity as Record<string, unknown>).sourceProjectId
+            : undefined;
+          if (sourceProjectId !== undefined && sourceProjectId !== null && sourceProjectId !== projectId) {
+            throw new TypeError('Export response Project identity changed.');
+          }
+          state.phase = 'succeeded';
+          state.errorCode = null;
+          state.message = '工程正式导出文件已生成。';
+          return Object.freeze({
+            projectId,
+            blob: response.blob,
+            fileName: contentDispositionFileName(response.headers, `project-${projectId}.json`),
+            document
+          });
+        } catch (error) {
+          if (!isCurrent(started.generation, projectId)) return null;
+          applyFailure(error, started.generation, projectId);
+          return null;
+        } finally {
+          if (activeController === started.controller) activeController = undefined;
+        }
+      });
+    },
     updateProject(input: Readonly<{
       projectId: string;
       name: string;
@@ -631,7 +843,7 @@ export function createProjectLifecycleCommandOwner(
         }
       });
     },
-    reconcile(): Promise<ProjectCreateAuthorityResult | ProjectDeleteAuthorityResult | null> {
+    reconcile(): Promise<ProjectCreateAuthorityResult | ProjectImportAuthorityResult | ProjectDeleteAuthorityResult | null> {
       return track('reconcile', reconcilePending);
     },
     async prepareForProtectedTransition(): Promise<boolean> {

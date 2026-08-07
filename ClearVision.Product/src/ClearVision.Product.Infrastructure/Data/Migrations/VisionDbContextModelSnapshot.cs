@@ -325,6 +325,9 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CommandPayloadJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("ClientOperationId")
                         .HasColumnType("TEXT");
 

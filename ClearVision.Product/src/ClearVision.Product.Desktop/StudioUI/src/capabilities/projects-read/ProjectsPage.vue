@@ -17,6 +17,12 @@ import {
   type CvDataTableColumn,
   type CvSelectOption
 } from '@/design-system';
+import { CvIcon } from '@/design-system/icons';
+import {
+  decodeProjectImportDocument,
+  type ProjectImportDocument,
+  type ProjectImportMode
+} from '@/capabilities/project-lifecycle';
 import {
   createProjectsListQuery,
   createRecentProjectsQuery
@@ -52,6 +58,14 @@ const createName = shallowRef('');
 const createDescription = shallowRef('');
 const createValidationError = shallowRef<string | null>(null);
 const deleteTarget = shallowRef<ProjectSummary | null>(null);
+const importPicker = shallowRef<HTMLInputElement | null>(null);
+const importOpen = shallowRef(false);
+const importFileName = shallowRef<string | null>(null);
+const importDocument = shallowRef<ProjectImportDocument | null>(null);
+const importFileError = shallowRef<string | null>(null);
+const importMode = shallowRef<ProjectImportMode>('CREATE_NEW');
+const importTargetId = shallowRef('');
+const importAcknowledged = shallowRef(false);
 
 const listState = computed(() => listQuery.state.value);
 const recentState = computed(() => recentQuery.state.value);
@@ -61,6 +75,7 @@ const isSearching = computed(() => activeSearch.value.length > 0);
 const commandState = computed(() => commands?.projection ?? null);
 const commandBusy = computed(() => commandState.value?.phase === 'creating' ||
   commandState.value?.phase === 'updating' || commandState.value?.phase === 'deleting' ||
+  commandState.value?.phase === 'importing' || commandState.value?.phase === 'exporting' ||
   commandState.value?.phase === 'reconciling');
 const projectCountLabel = computed(() => {
   if (!listState.value.data) return '工程库';
@@ -80,6 +95,40 @@ const sortOptions: readonly CvSelectOption[] = Object.freeze([
   { value: 'created-desc', label: '最近创建' },
   { value: 'name-asc', label: '名称' }
 ]);
+const importModeModel = computed({
+  get: () => importMode.value,
+  set: value => {
+    importMode.value = value as ProjectImportMode;
+    importAcknowledged.value = false;
+    if (importMode.value === 'CREATE_NEW') importTargetId.value = '';
+  }
+});
+const importTargetModel = computed({
+  get: () => importTargetId.value,
+  set: value => {
+    importTargetId.value = value;
+    importAcknowledged.value = false;
+  }
+});
+const importTarget = computed(() => listState.value.data?.find(project => project.id === importTargetId.value) ?? null);
+const importTargetOptions = computed<readonly CvSelectOption[]>(() => [
+  { value: '', label: '选择目标工程', disabled: true },
+  ...(listState.value.data ?? []).map(project => ({
+    value: project.id,
+    label: `${project.name}（revision ${project.persistenceRevision}）`
+  }))
+]);
+const importOperatorCount = computed(() => {
+  const operators = importDocument.value?.flow.operators;
+  return Array.isArray(operators) ? operators.length : 0;
+});
+const importConnectionCount = computed(() => {
+  const connections = importDocument.value?.flow.connections;
+  return Array.isArray(connections) ? connections.length : 0;
+});
+const canSubmitImport = computed(() => Boolean(importDocument.value) && (
+  importMode.value === 'CREATE_NEW' || Boolean(importTarget.value && importAcknowledged.value)
+));
 const columns: readonly CvDataTableColumn<ProjectSummary>[] = Object.freeze([
   { key: 'name', label: '名称', width: '18%' },
   { key: 'description', label: '描述', width: '26%' },
@@ -114,6 +163,86 @@ function showCreate(): void {
   createDescription.value = '';
   createValidationError.value = null;
   createOpen.value = true;
+}
+
+function showImportPicker(): void {
+  if (!commands || commandBusy.value) return;
+  importPicker.value?.click();
+}
+
+function clearImportDraft(): void {
+  importOpen.value = false;
+  importFileName.value = null;
+  importDocument.value = null;
+  importMode.value = 'CREATE_NEW';
+  importTargetId.value = '';
+  importAcknowledged.value = false;
+}
+
+async function handleImportFileChange(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0] ?? null;
+  input.value = '';
+  if (!file) return;
+  importFileError.value = null;
+  try {
+    const raw = await file.text();
+    const parsed: unknown = JSON.parse(raw);
+    const document = decodeProjectImportDocument(parsed);
+    if (!commands) return;
+    commands.setProjectScope(null);
+    commands.reset();
+    importFileName.value = file.name;
+    importDocument.value = document;
+    importMode.value = 'CREATE_NEW';
+    importTargetId.value = '';
+    importAcknowledged.value = false;
+    importOpen.value = true;
+  } catch {
+    importFileError.value = '无法读取工程 JSON：文件格式或 schema 不符合 ClearVision 工程导出合同。';
+  }
+}
+
+function closeImport(): void {
+  if (commandBusy.value) return;
+  clearImportDraft();
+}
+
+async function submitImport(): Promise<void> {
+  const document = importDocument.value;
+  if (!commands || !document) return;
+  const target = importMode.value === 'OVERWRITE_EXISTING' ? importTarget.value : null;
+  if (importMode.value === 'OVERWRITE_EXISTING' && (!target || !importAcknowledged.value)) return;
+  const result = await commands.importProject({
+    mode: importMode.value,
+    document,
+    ...(target ? {
+      targetProjectId: target.id,
+      expectedPersistenceRevision: target.persistenceRevision
+    } : {})
+  });
+  if (!result) return;
+  clearImportDraft();
+  await Promise.all([
+    listQuery.refresh({ force: true }),
+    recentQuery.refresh({ force: true })
+  ]);
+  await router.push(`/projects/${result.projectId}`);
+}
+
+async function exportProject(project: ProjectSummary): Promise<void> {
+  if (!commands || commandBusy.value) return;
+  const result = await commands.exportProject(project.id);
+  if (!result) return;
+  const url = URL.createObjectURL(result.blob);
+  try {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = result.fileName;
+    anchor.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 function closeCreate(): void {
@@ -188,6 +317,9 @@ async function reconcileUnknownOutcome(): Promise<void> {
   if (result.operation.kind === 'create') {
     createOpen.value = false;
     await router.push(`/projects/${result.projectId}`);
+  } else if (result.operation.kind === 'import') {
+    clearImportDraft();
+    await router.push(`/projects/${result.projectId}`);
   } else {
     deleteTarget.value = null;
   }
@@ -222,6 +354,22 @@ onBeforeUnmount(() => {
         <CvButton
           v-if="commands"
           size="sm"
+          variant="secondary"
+          :disabled="commandBusy"
+          data-testid="project-import-open"
+          @click="showImportPicker"
+        >
+          <template #leading>
+            <CvIcon
+              name="paste"
+              size="sm"
+            />
+          </template>
+          导入工程 JSON
+        </CvButton>
+        <CvButton
+          v-if="commands"
+          size="sm"
           variant="primary"
           data-testid="project-create-open"
           @click="showCreate"
@@ -238,6 +386,24 @@ onBeforeUnmount(() => {
         </CvButton>
       </template>
     </CvPageHeader>
+
+    <input
+      ref="importPicker"
+      class="projects-page__file-input"
+      type="file"
+      accept="application/json,.json"
+      aria-label="选择工程 JSON 文件"
+      @change="handleImportFileChange"
+    >
+
+    <CvInlineAlert
+      v-if="importFileError"
+      tone="error"
+      title="工程 JSON 无法读取"
+      role="alert"
+    >
+      {{ importFileError }}
+    </CvInlineAlert>
 
     <CvInlineAlert
       v-if="commandState?.phase === 'unknown-outcome'"
@@ -430,6 +596,24 @@ onBeforeUnmount(() => {
               <CvButton
                 v-if="commands"
                 size="sm"
+                variant="quiet"
+                :disabled="commandBusy"
+                :loading="commandState?.phase === 'exporting' && commandState.projectId === row.id"
+                loading-label="正在导出"
+                :data-testid="`project-export-${row.id}`"
+                @click="exportProject(row)"
+              >
+                <template #leading>
+                  <CvIcon
+                    name="save"
+                    size="sm"
+                  />
+                </template>
+                导出
+              </CvButton>
+              <CvButton
+                v-if="commands"
+                size="sm"
                 variant="danger"
                 :disabled="commandBusy"
                 :data-testid="`project-delete-${row.id}`"
@@ -556,6 +740,100 @@ onBeforeUnmount(() => {
     </CvModal>
 
     <CvModal
+      :open="importOpen"
+      title="导入工程 JSON"
+      description="先读取正式导出文件，再由服务端校验并进入现有工程保存链。"
+      size="md"
+      :close-on-backdrop="!commandBusy"
+      @close="closeImport"
+    >
+      <div class="projects-page__import-form">
+        <div class="projects-page__file-summary">
+          <span class="projects-page__file-label">文件</span>
+          <strong>{{ importFileName }}</strong>
+          <span>流程 {{ importOperatorCount }} 个算子，{{ importConnectionCount }} 条连接</span>
+        </div>
+
+        <CvSelect
+          v-model="importModeModel"
+          name="projectImportMode"
+          label="导入方式"
+          :options="[
+            { value: 'CREATE_NEW', label: '新建工程' },
+            { value: 'OVERWRITE_EXISTING', label: '覆盖现有工程' }
+          ]"
+          :disabled="commandBusy"
+        />
+
+        <CvSelect
+          v-if="importMode === 'OVERWRITE_EXISTING'"
+          v-model="importTargetModel"
+          name="projectImportTarget"
+          label="目标工程"
+          hint="revision 来自当前服务端工程列表；提交时服务端仍会再次校验。"
+          :options="importTargetOptions"
+          :disabled="commandBusy"
+          required
+        />
+
+        <CvInlineAlert
+          v-if="importMode === 'CREATE_NEW'"
+          tone="info"
+          title="新建工程"
+        >
+          服务端会生成新的工程身份与持久化 lineage，不会沿用 JSON 中的源工程 ID。
+        </CvInlineAlert>
+        <CvInlineAlert
+          v-else
+          tone="warning"
+          title="覆盖会替换目标工程内容"
+        >
+          <template v-if="importTarget">
+            将覆盖“{{ importTarget.name }}”的流程、全局变量和正式资源。当前服务端 revision 为
+            <strong>{{ importTarget.persistenceRevision }}</strong>；revision 变化时请求会被拒绝，不会部分写入。
+          </template>
+          <template v-else>
+            请选择目标工程后查看当前 revision 与覆盖影响。
+          </template>
+        </CvInlineAlert>
+
+        <label
+          v-if="importMode === 'OVERWRITE_EXISTING'"
+          class="projects-page__acknowledge"
+        >
+          <input
+            v-model="importAcknowledged"
+            type="checkbox"
+            :disabled="commandBusy || !importTarget"
+          >
+          <span>我已确认按当前服务端 revision 覆盖目标工程。</span>
+        </label>
+      </div>
+      <template #footer>
+        <CvButton
+          size="sm"
+          variant="quiet"
+          :disabled="commandBusy"
+          data-modal-initial-focus
+          @click="closeImport"
+        >
+          取消
+        </CvButton>
+        <CvButton
+          size="sm"
+          variant="primary"
+          :disabled="!canSubmitImport"
+          :loading="commandState?.phase === 'importing' || commandState?.phase === 'reconciling'"
+          loading-label="正在导入工程"
+          data-testid="project-import-submit"
+          @click="submitImport"
+        >
+          导入工程
+        </CvButton>
+      </template>
+    </CvModal>
+
+    <CvModal
       :open="deleteTarget !== null"
       title="删除工程"
       :description="deleteTarget ? `将删除“${deleteTarget.name}”。服务端确认后才会从工程库移除。` : undefined"
@@ -594,6 +872,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .projects-page { display: grid; max-width: 1580px; gap: var(--cv-density-page-gap); min-width: 0; }
 .projects-page__meta { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-variant-numeric: tabular-nums lining-nums; }
+.projects-page__file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 .projects-page__meta + .projects-page__meta::before { margin-right: var(--cv-space-2); color: var(--cv-border-strong); content: '·'; }
 .projects-page__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(244px, 288px); gap: var(--cv-space-4); align-items: start; }
 .projects-page__library { background: var(--cv-surface-raised); }
@@ -607,6 +886,12 @@ onBeforeUnmount(() => {
 .projects-page__name { color: var(--cv-text-primary); font-weight: var(--cv-font-weight-semibold); }
 .projects-page__actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--cv-space-1); }
 .projects-page__form { display: grid; gap: var(--cv-space-4); }
+.projects-page__import-form { display: grid; gap: var(--cv-space-4); }
+.projects-page__file-summary { display: grid; gap: var(--cv-space-1); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }
+.projects-page__file-summary strong { overflow-wrap: anywhere; color: var(--cv-text-primary); font-weight: var(--cv-font-weight-semibold); }
+.projects-page__file-label { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
+.projects-page__acknowledge { display: flex; align-items: flex-start; gap: var(--cv-space-2); color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); line-height: var(--cv-line-height-normal); }
+.projects-page__acknowledge input { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; accent-color: var(--cv-color-brand-500); }
 .projects-page__recent-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
 .projects-page__recent-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-2); padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
 .projects-page__recent-list li:last-child { border-bottom: 0; }
