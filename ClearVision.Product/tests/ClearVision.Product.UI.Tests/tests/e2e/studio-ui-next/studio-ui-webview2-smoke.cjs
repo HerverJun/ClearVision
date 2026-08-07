@@ -1685,7 +1685,10 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
     });
   };
   page.on('request', captureFormalRunRequest);
-  const run = page.locator('[data-testid="workspace-run"]');
+  const run = await waitForWorkspaceRunEnabled(
+    page,
+    'Formal Run did not enable after the persisted Project save settled.'
+  );
   const runAvailability = await page.evaluate(() => {
     const surface = document.querySelector('[data-evidence-surface="f03-workspace-shell"]');
     const consoleSurface = document.querySelector('[data-testid="run-console"]');
@@ -1851,6 +1854,12 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
     'Real WebView2 Formal Run snapshot identity did not match admission.');
   assert(!executeResponseCompleted,
     'Real WebView2 Stop was attempted after the execute response had already completed.');
+  const preStopReconcileRequestCount = formalRunRequestRecords.filter(item =>
+    item.clientSnapshotId === admitted.clientSnapshotId &&
+    item.path === '/api/inspection/reconcile'
+  ).length;
+  assert(preStopReconcileRequestCount <= 1,
+    `Formal Run issued more than one pre-stop reconcile: ${JSON.stringify(formalRunRequestRecords)}`);
 
   const stopResponsePromise = page.waitForResponse(response =>
     new URL(response.url()).pathname === '/api/inspection/stop' &&
@@ -1955,6 +1964,7 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
       fixture: 'DETERMINISTIC_DELAY_OPERATOR_60000MS',
       slowFixtureEnabled,
       runtimeRunningSignal: runningSignal,
+      preStopReconcileRequestCount,
       executeResponseCompletedBeforeStop: false,
       stopReconciliation,
       cancelledSignal,
@@ -2148,7 +2158,7 @@ async function verifyProductPage(
       return Boolean(state && state !== 'loading');
     }, null, { timeout: 30_000 });
   }
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => {
     const user = document.querySelector('.product-layout__user strong')?.textContent?.trim();
     return Boolean(user && user !== '未认证');
@@ -2189,7 +2199,7 @@ async function verifyProductPage(
     authSource: 'HARNESS_SEEDED_SESSION'
   }));
   const navigationContract = resolveProductNavigationContract(phase, projection.startupFeatureFlags);
-  const isF04Evidence = navigationContract.phase === 'f04';
+  const isFormalWorkspaceEvidence = ['f04', 'f09'].includes(navigationContract.phase);
   const origin = new URL(page.url()).origin;
   const isProductRequest = item => {
     const url = new URL(item.url);
@@ -2235,19 +2245,27 @@ async function verifyProductPage(
           '.results-page__project',
           '.results-page__outcome',
           '.results-page__diagnostic',
-          '.results-page__date',
-          '.results-page__page-size'
+          '.results-page__page-size',
+          '.results-page__advanced-trigger'
         ];
         const controls = selectors.flatMap(selector =>
-          [...document.querySelectorAll(selector)].map(element => ({
-            selector,
-            top: Math.round(element.getBoundingClientRect().top * 100) / 100
-          }))
+          [...document.querySelectorAll(selector)]
+            .filter(element => element.getClientRects().length > 0)
+            .map(element => {
+              const bounds = element.getBoundingClientRect();
+              return {
+                selector,
+                top: Math.round(bounds.top * 100) / 100,
+                bottom: Math.round(bounds.bottom * 100) / 100
+              };
+            })
         );
         const tops = controls.map(item => item.top);
+        const bottoms = controls.map(item => item.bottom);
         return {
           controls,
-          maximumTopDelta: tops.length ? Math.max(...tops) - Math.min(...tops) : null
+          maximumTopDelta: tops.length ? Math.max(...tops) - Math.min(...tops) : null,
+          maximumBottomDelta: bottoms.length ? Math.max(...bottoms) - Math.min(...bottoms) : null
         };
       })
     : null;
@@ -2592,10 +2610,10 @@ async function verifyProductPage(
       }
     }
   }
-  const workspacePointerHit = isF04Evidence && workspaceReady && seededWorkspace
+  const workspacePointerHit = isFormalWorkspaceEvidence && workspaceReady && seededWorkspace
     ? await selectSeededRoiNode(page)
     : null;
-  const workspaceCanvasDpi = isF04Evidence && workspaceReady && seededWorkspace
+  const workspaceCanvasDpi = isFormalWorkspaceEvidence && workspaceReady && seededWorkspace
     ? await readWorkspaceCanvasDpiEvidence(page, workspaceSeedRoiNodeId, workspacePointerHit)
     : null;
   const formalRunInstallation = formalRun ? await installFormalRunDecision(page, formalRunSeed) : null;
@@ -2636,7 +2654,10 @@ async function verifyProductPage(
     ? [
         '/api/inspection/admission', '/api/inspection/execute',
         '/api/inspection/admission', '/api/inspection/execute', '/api/inspection/reconcile',
-        '/api/inspection/admission', '/api/inspection/execute', '/api/inspection/stop',
+        '/api/inspection/admission', '/api/inspection/execute',
+        ...Array(workspaceG6?.genuineRunningStop?.preStopReconcileRequestCount ?? 0)
+          .fill('/api/inspection/reconcile'),
+        '/api/inspection/stop',
         ...(workspaceG6?.genuineRunningStop?.uiReconciliation ? ['/api/inspection/reconcile'] : [])
       ]
     : [];
@@ -2683,8 +2704,8 @@ async function verifyProductPage(
   }
   assert(projection.mainCount === 1, 'Formal product route did not keep exactly one main landmark.');
   assert(productRequests.length > 0, 'Product route emitted no observable API requests.');
-  assert(!isF04Evidence || !isWorkspaceRoute || projectOpenRequests.length > 0,
-    'F04 Workspace navigation did not issue the approved explicit Project open command.');
+  assert(!isFormalWorkspaceEvidence || !isWorkspaceRoute || projectOpenRequests.length > 0,
+    'Formal Workspace evidence did not issue the approved explicit Project open command.');
   assert(unexpectedWriteRequests.length === 0,
     `Product route emitted writes outside approved Project/Preview/Run commands: ${JSON.stringify(unexpectedWriteRequests)}`);
   if (formalRun) {
@@ -2751,10 +2772,10 @@ async function verifyProductPage(
       `ProductLayout did not enter workspaceMode: ${JSON.stringify(projection)}`);
   }
   if (resultsFilterLayout) {
-    assert(resultsFilterLayout.controls.length === 7,
-      `Results filter rail did not expose seven controls: ${JSON.stringify(resultsFilterLayout)}`);
-    assert(resultsFilterLayout.maximumTopDelta <= 1,
-      `Results filter rail wrapped in the 1350px WebView2 client: ${JSON.stringify(resultsFilterLayout)}`);
+    assert(resultsFilterLayout.controls.length === 6,
+      `Results filter rail did not expose six visible primary controls: ${JSON.stringify(resultsFilterLayout)}`);
+    assert(resultsFilterLayout.maximumBottomDelta <= 1,
+      `Results filter rail wrapped in the current WebView2 client: ${JSON.stringify(resultsFilterLayout)}`);
   }
   return {
     ...projection,

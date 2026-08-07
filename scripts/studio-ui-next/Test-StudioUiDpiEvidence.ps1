@@ -178,7 +178,7 @@ $scaleCoverage = @($ExpectedScales | ForEach-Object {
     $expected = [double]$_
     $matches = @($layers | Where-Object {
         ($_.expectation -eq "studio-canvas" -or
-            ($_.phase -eq "f04" -and
+            ($_.phase -in @("f04", "f09") -and
                 $_.expectation -eq "studio-product" -and
                 $_.canvasEvidenceSource -eq "formal-product-workspace")) -and
         [Math]::Abs([double]$_.requestedWebView2ForceScale - $expected) -le 0.001
