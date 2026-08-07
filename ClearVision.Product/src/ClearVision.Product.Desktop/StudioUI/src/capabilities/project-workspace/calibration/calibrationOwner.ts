@@ -287,8 +287,9 @@ export function createCalibrationOwner(options: {
     const usableDraft = state.phase !== 'stale' && state.phase !== 'unavailable' && state.phase !== 'readonly' &&
       state.phase !== 'disposed' && !saving && state.phase !== 'solving' && state.phase !== 'saving';
     state.canCapture = !disposed && selected && imageReady && editable() && usableDraft;
+    const requiredSampleCount = state.mode === 'Perspective' ? 4 : 3;
     state.canSolve = !disposed && selected && imageReady && editable() && usableDraft &&
-      state.samples.some(sample => sample.enabled && isCalibrationSampleComplete(sample));
+      state.samples.filter(sample => sample.enabled && isCalibrationSampleComplete(sample)).length >= requiredSampleCount;
     state.canSave = !disposed && selected && imageReady && editable() && !saving &&
       state.phase !== 'stale' &&
       state.candidateBundleJson !== null && state.lastSolveResult?.accepted === true &&
@@ -338,7 +339,12 @@ export function createCalibrationOwner(options: {
       state.imageIdentity = options.imageOwner.projection.imageIdentity;
       state.imageGeneration = options.imageOwner.projection.imageGeneration;
       const selectedNodeRecord = node ?? Object.freeze({});
-      const mode = text(parameterValue(selectedNodeRecord, 'CalibrationMode')).toLocaleLowerCase() === 'perspective' ? 'Perspective' : 'Affine';
+      const rawMode = text(parameterValue(selectedNodeRecord, 'CalibrationMode')).toLocaleLowerCase();
+      const mode = rawMode === 'perspective'
+        ? 'Perspective'
+        : rawMode === 'scaleoffset' || rawMode === 'planarscaleoffset' || rawMode === 'planar'
+          ? 'ScaleOffset'
+          : 'Affine';
       state.mode = mode;
       state.unit = text(parameterValue(selectedNodeRecord, 'CalibrationUnit')) || 'mm';
       state.samples = parseExistingSamples(node);

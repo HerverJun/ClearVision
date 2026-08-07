@@ -1,4 +1,5 @@
 using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Services;
 using OpenCvSharp;
 
 namespace ClearVision.Product.Infrastructure.Calibration;
@@ -6,7 +7,8 @@ namespace ClearVision.Product.Infrastructure.Calibration;
 public enum NPointCalibrationMode
 {
     Affine,
-    Perspective
+    Perspective,
+    ScaleOffset
 }
 
 public sealed record NPointCalibrationOptions(
@@ -125,9 +127,12 @@ public sealed class NPointCalibrationSolver
             return NPointCalibrationResult.Fail(targetValidationError ?? "WorldPoint set is invalid.");
         }
 
-        return request.Mode == NPointCalibrationMode.Perspective
-            ? ExecutePerspective(pointPairs, srcPoints, dstPoints, request.Options)
-            : ExecuteAffine(pointPairs, srcPoints, dstPoints, request.Options);
+        return request.Mode switch
+        {
+            NPointCalibrationMode.Perspective => ExecutePerspective(pointPairs, srcPoints, dstPoints, request.Options),
+            NPointCalibrationMode.ScaleOffset => ExecuteScaleOffset(pointPairs, request.Options),
+            _ => ExecuteAffine(pointPairs, srcPoints, dstPoints, request.Options)
+        };
     }
 
     public static bool TryValidatePointSet(
@@ -336,6 +341,80 @@ public sealed class NPointCalibrationSolver
             pixelSize: null,
             pixelSizeX: null,
             pixelSizeY: null,
+            errorStats,
+            inlierFlags,
+            bundle);
+    }
+
+    private static NPointCalibrationResult ExecuteScaleOffset(
+        IReadOnlyList<NPointCalibrationPointPair> pointPairs,
+        NPointCalibrationOptions options)
+    {
+        var points = pointPairs
+            .Select(pair => new PlanarScaleOffsetCalibrationPoint
+            {
+                PixelX = pair.ImagePoint.X,
+                PixelY = pair.ImagePoint.Y,
+                PhysicalX = pair.WorldPoint.X,
+                PhysicalY = pair.WorldPoint.Y
+            })
+            .ToArray();
+        var planar = PlanarScaleOffsetCalibrationService.Solve(points);
+        if (!planar.Success)
+        {
+            return NPointCalibrationResult.Fail(planar.Message);
+        }
+
+        var inlierFlags = Enumerable.Repeat(true, pointPairs.Count).ToArray();
+        var errorStats = new NPointCalibrationErrorStats(
+            planar.MeanError,
+            planar.MaxError,
+            planar.MeanError,
+            planar.MaxError,
+            pointPairs.Count,
+            1.0);
+        var accepted = planar.Accepted && IsAccepted(errorStats, options);
+        var diagnostics = new List<string>
+        {
+            "Scale-offset transform estimated from independent X/Y linear fits.",
+            $"MaxAcceptedReprojectionError={options.MaxAcceptedReprojectionError:F6} {options.CalibrationUnit}",
+            $"MeanError={errorStats.MeanError:F6} {options.CalibrationUnit}",
+            $"MaxError={errorStats.MaxError:F6} {options.CalibrationUnit}",
+            $"PointCount={pointPairs.Count}",
+            $"Acceptance={accepted}"
+        };
+        if (!accepted)
+        {
+            diagnostics.Add("Scale-offset acceptance criteria were not met; the candidate remains draft-only.");
+        }
+
+        var transform = new[]
+        {
+            new[] { planar.ScaleX, 0d, planar.OriginX },
+            new[] { 0d, planar.ScaleY, planar.OriginY }
+        };
+        var pixelSizeX = Math.Abs(planar.ScaleX);
+        var pixelSizeY = Math.Abs(planar.ScaleY);
+        double? pixelSize = pixelSizeX > 0 && pixelSizeY > 0
+            ? (pixelSizeX + pixelSizeY) / 2.0
+            : null;
+        var bundle = CreateBundle(
+            TransformModelV2.ScaleOffset,
+            transform,
+            pixelSizeX,
+            pixelSizeY,
+            accepted,
+            diagnostics,
+            errorStats,
+            pointPairs.Count,
+            options);
+
+        return NPointCalibrationResult.Ok(
+            TransformModelV2.ScaleOffset,
+            transform,
+            pixelSize,
+            pixelSizeX,
+            pixelSizeY,
             errorStats,
             inlierFlags,
             bundle);

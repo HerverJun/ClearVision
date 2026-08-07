@@ -6,6 +6,45 @@ namespace ClearVision.Product.Tests.Services;
 public class PlanarScaleOffsetCalibrationServiceTests
 {
     [Fact]
+    public async Task SolveAsync_WithStablePoints_ShouldEstimateAcceptedScaleOffsetTransform()
+    {
+        var service = new PlanarScaleOffsetCalibrationService();
+
+        var result = await service.SolveAsync(
+        [
+            new() { PixelX = 0, PixelY = 0, PhysicalX = 10, PhysicalY = -4 },
+            new() { PixelX = 10, PixelY = 0, PhysicalX = 15, PhysicalY = -4 },
+            new() { PixelX = 0, PixelY = 20, PhysicalX = 10, PhysicalY = 6 },
+            new() { PixelX = 10, PixelY = 20, PhysicalX = 15, PhysicalY = 6 }
+        ]);
+
+        Assert.True(result.Success, result.Message);
+        Assert.True(result.Accepted, result.Message);
+        Assert.Equal(10, result.OriginX, precision: 10);
+        Assert.Equal(-4, result.OriginY, precision: 10);
+        Assert.Equal(0.5, result.ScaleX, precision: 10);
+        Assert.Equal(0.5, result.ScaleY, precision: 10);
+        Assert.Equal(0, result.MeanError, precision: 10);
+        Assert.Equal(0, result.MaxError, precision: 10);
+    }
+
+    [Fact]
+    public async Task SolveAsync_WithDegenerateAxis_ShouldFailClosed()
+    {
+        var service = new PlanarScaleOffsetCalibrationService();
+
+        var result = await service.SolveAsync(
+        [
+            new() { PixelX = 0, PixelY = 0, PhysicalX = 10, PhysicalY = -4 },
+            new() { PixelX = 0, PixelY = 10, PhysicalX = 10, PhysicalY = 1 },
+            new() { PixelX = 0, PixelY = 20, PhysicalX = 10, PhysicalY = 6 }
+        ]);
+
+        Assert.False(result.Success);
+        Assert.Contains("degenerate", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task SaveCalibrationAsync_WithSuccessfulResult_ShouldPersistCalibrationBundleV2()
     {
         var service = new PlanarScaleOffsetCalibrationService();

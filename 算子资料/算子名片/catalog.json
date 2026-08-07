@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-07-15T23:30:27.8052247+08:00",
+  "generatedAt": "2026-08-08T03:09:31.3343663+08:00",
   "totalCount": 158,
   "categories": {
-    "3D": {
+    "3D点云": {
       "count": 6,
       "operators": [
         "EuclideanClusterExtraction",
@@ -13,167 +13,116 @@
         "VoxelDownsample"
       ]
     },
-    "AI Detection": {
-      "count": 1,
-      "operators": [
-        "DualModalVoting"
-      ]
-    },
-    "AI 检测": {
-      "count": 1,
-      "operators": [
-        "DetectionSequenceJudge"
-      ]
-    },
-    "AI检测": {
-      "count": 5,
+    "AI推理": {
+      "count": 4,
       "operators": [
         "AnomalyDetection",
         "DeepLearning",
-        "EdgePairDefect",
-        "SemanticSegmentation",
-        "SurfaceDefectDetection"
+        "OcrRecognition",
+        "SemanticSegmentation"
       ]
     },
-    "Analysis": {
-      "count": 1,
+    "分割与区域": {
+      "count": 17,
       "operators": [
-        "DistanceTransform"
-      ]
-    },
-    "Communication": {
-      "count": 3,
-      "operators": [
-        "MitsubishiMcCommunication",
-        "ModbusCommunication",
-        "MqttPublish"
-      ]
-    },
-    "Detection": {
-      "count": 2,
-      "operators": [
-        "AngleMeasurement",
-        "ContourMeasurement"
-      ]
-    },
-    "Flow Control": {
-      "count": 1,
-      "operators": [
-        "ResultJudgment"
-      ]
-    },
-    "Frequency": {
-      "count": 3,
-      "operators": [
-        "FFT1D",
-        "FrequencyFilter",
-        "InverseFFT1D"
-      ]
-    },
-    "Morphology": {
-      "count": 5,
-      "operators": [
+        "AdaptiveThreshold",
+        "BinaryImageToRegion",
+        "BlobAnalysis",
+        "DistanceTransform",
+        "MorphologicalOperation",
+        "Morphology",
+        "RectangleRegion",
         "RegionClosing",
-        "RegionDilation",
-        "RegionErosion",
-        "RegionOpening",
-        "RegionSkeleton"
-      ]
-    },
-    "Region": {
-      "count": 4,
-      "operators": [
         "RegionComplement",
         "RegionDifference",
+        "RegionDilation",
+        "RegionErosion",
         "RegionIntersection",
-        "RegionUnion"
+        "RegionOpening",
+        "RegionSkeleton",
+        "RegionUnion",
+        "Thresholding"
       ]
     },
-    "Texture": {
-      "count": 2,
-      "operators": [
-        "GlcmTexture",
-        "LawsTextureFilter"
-      ]
-    },
-    "几何": {
-      "count": 1,
-      "operators": [
-        "RectangleRegion"
-      ]
-    },
-    "匹配定位": {
-      "count": 8,
+    "匹配与定位": {
+      "count": 17,
       "operators": [
         "AkazeFeatureMatch",
+        "ContourExtrema",
+        "EdgeIntersection",
         "GradientShapeMatch",
         "LocalDeformableMatching",
         "OrbFeatureMatch",
+        "ParallelLineFind",
         "PlanarMatching",
+        "PointAlignment",
+        "PointCorrection",
+        "PositionCorrection",
         "PyramidShapeMatch",
+        "QuadrilateralFind",
+        "RectangleDetection",
+        "RoiTransform",
         "ShapeMatching",
         "TemplateMatching"
       ]
     },
-    "区域处理": {
-      "count": 1,
-      "operators": [
-        "BinaryImageToRegion"
-      ]
-    },
-    "变量": {
-      "count": 4,
-      "operators": [
-        "CycleCounter",
-        "VariableIncrement",
-        "VariableRead",
-        "VariableWrite"
-      ]
-    },
-    "图像处理": {
-      "count": 4,
+    "图像预处理": {
+      "count": 28,
       "operators": [
         "AffineTransform",
+        "BilateralFilter",
+        "ClaheEnhancement",
+        "ColorConversion",
         "CopyMakeBorder",
-        "ImageStitching",
-        "PolarUnwrap"
-      ]
-    },
-    "定位": {
-      "count": 7,
-      "operators": [
-        "BlobLabeling",
-        "CornerDetection",
-        "EdgeIntersection",
-        "ParallelLineFind",
-        "PositionCorrection",
-        "QuadrilateralFind",
-        "RectangleDetection"
-      ]
-    },
-    "拆分组合": {
-      "count": 2,
-      "operators": [
+        "FFT1D",
+        "Filtering",
+        "FrameAveraging",
+        "FrequencyFilter",
+        "HistogramEqualization",
+        "ImageAdd",
+        "ImageBlend",
         "ImageCompose",
-        "ImageTiling"
+        "ImageCrop",
+        "ImageNormalize",
+        "ImageResize",
+        "ImageRotate",
+        "ImageStitching",
+        "ImageSubtract",
+        "ImageTiling",
+        "InverseFFT1D",
+        "LaplacianSharpen",
+        "MeanFilter",
+        "MedianBlur",
+        "PerspectiveTransform",
+        "PolarUnwrap",
+        "RoiManager",
+        "ShadingCorrection"
       ]
     },
     "数据处理": {
-      "count": 10,
+      "count": 18,
       "operators": [
         "Aggregator",
         "ArrayIndexer",
         "BoxFilter",
         "BoxNms",
-        "DatabaseWrite",
+        "Comparator",
         "JsonExtractor",
+        "LogicGate",
         "MathOperation",
-        "PointAlignment",
-        "PointCorrection",
-        "UnitConvert"
+        "PointSetTool",
+        "ScriptOperator",
+        "Statistics",
+        "StringFormat",
+        "TimerStatistics",
+        "TypeConvert",
+        "UnitConvert",
+        "VariableIncrement",
+        "VariableRead",
+        "VariableWrite"
       ]
     },
-    "标定": {
+    "标定与坐标": {
       "count": 12,
       "operators": [
         "CalibrationLoader",
@@ -191,138 +140,94 @@
       ]
     },
     "检测": {
-      "count": 18,
+      "count": 17,
       "operators": [
+        "AngleMeasurement",
         "ArcCaliper",
         "CaliperTool",
         "CircleMeasurement",
-        "ContourExtrema",
+        "ColorMeasurement",
+        "ContourMeasurement",
         "GapMeasurement",
         "GeoMeasurement",
         "GeometricFitting",
         "GeometricTolerance",
-        "HistogramAnalysis",
         "LineLineDistance",
         "LineMeasurement",
         "Measurement",
         "MinEnclosingGeometry",
         "PhaseClosure",
-        "PixelStatistics",
         "PointLineDistance",
-        "SharpnessEvaluation",
         "WidthMeasurement"
       ]
     },
     "流程控制": {
-      "count": 5,
+      "count": 8,
       "operators": [
-        "Comparator",
         "ConditionalBranch",
+        "CycleCounter",
         "Delay",
         "ForEach",
+        "FrameChangeTrigger",
+        "ResultJudgment",
+        "TriggerModule",
         "TryCatch"
       ]
     },
     "特征提取": {
-      "count": 4,
+      "count": 13,
       "operators": [
-        "BlobAnalysis",
+        "BlobLabeling",
+        "CodeRecognition",
+        "ColorDetection",
         "ContourDetection",
+        "CornerDetection",
         "EdgeDetection",
+        "GlcmTexture",
+        "HistogramAnalysis",
+        "ImageDiff",
+        "LawsTextureFilter",
+        "PixelStatistics",
+        "SharpnessEvaluation",
         "SubpixelEdgeDetection"
       ]
     },
-    "识别": {
-      "count": 2,
+    "缺陷检测": {
+      "count": 4,
       "operators": [
-        "CodeRecognition",
-        "OcrRecognition"
+        "DetectionSequenceJudge",
+        "DualModalVoting",
+        "EdgePairDefect",
+        "SurfaceDefectDetection"
       ]
     },
-    "辅助": {
-      "count": 3,
+    "输出与辅助": {
+      "count": 5,
       "operators": [
         "Comment",
-        "RoiManager",
-        "RoiTransform"
-      ]
-    },
-    "输出": {
-      "count": 2,
-      "operators": [
+        "DatabaseWrite",
         "ImageSave",
-        "ResultOutput"
+        "ResultOutput",
+        "TextSave"
       ]
     },
     "通信": {
-      "count": 5,
+      "count": 8,
       "operators": [
         "HttpRequest",
+        "MitsubishiMcCommunication",
+        "ModbusCommunication",
+        "MqttPublish",
         "OmronFinsCommunication",
         "SerialCommunication",
         "SiemensS7Communication",
         "TcpCommunication"
       ]
     },
-    "通用": {
-      "count": 4,
-      "operators": [
-        "LogicGate",
-        "Statistics",
-        "StringFormat",
-        "TypeConvert"
-      ]
-    },
-    "逻辑工具": {
-      "count": 6,
-      "operators": [
-        "FrameChangeTrigger",
-        "PointSetTool",
-        "ScriptOperator",
-        "TextSave",
-        "TimerStatistics",
-        "TriggerModule"
-      ]
-    },
     "采集": {
       "count": 1,
       "operators": [
         "ImageAcquisition"
-      ]
-    },
-    "预处理": {
-      "count": 23,
-      "operators": [
-        "AdaptiveThreshold",
-        "BilateralFilter",
-        "ClaheEnhancement",
-        "ColorConversion",
-        "Filtering",
-        "FrameAveraging",
-        "HistogramEqualization",
-        "ImageAdd",
-        "ImageBlend",
-        "ImageCrop",
-        "ImageDiff",
-        "ImageNormalize",
-        "ImageResize",
-        "ImageRotate",
-        "ImageSubtract",
-        "LaplacianSharpen",
-        "MeanFilter",
-        "MedianBlur",
-        "MorphologicalOperation",
-        "Morphology",
-        "PerspectiveTransform",
-        "ShadingCorrection",
-        "Thresholding"
-      ]
-    },
-    "颜色处理": {
-      "count": 2,
-      "operators": [
-        "ColorDetection",
-        "ColorMeasurement"
       ]
     }
   },
@@ -466,9 +371,9 @@
     {
       "id": "Filtering",
       "type": 2,
-      "displayName": "Gaussian Blur",
-      "description": "Apply Gaussian filtering to suppress image noise",
-      "category": "预处理",
+      "displayName": "滤波",
+      "description": "统一空间平滑滤波入口，支持高斯、均值/Box、中值和双边滤波；默认保持历史高斯滤波行为。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -573,8 +478,8 @@
     {
       "id": "EdgeDetection",
       "type": 3,
-      "displayName": "Edge Detection",
-      "description": "Detects edges with Canny and optional auto-thresholding.",
+      "displayName": "边缘检测",
+      "description": "使用 Canny 进行边缘检测，并可选自动阈值。",
       "category": "特征提取",
       "version": "1.0.0",
       "tags": [
@@ -814,9 +719,9 @@
     {
       "id": "Thresholding",
       "type": 4,
-      "displayName": "Threshold",
-      "description": "Global thresholding with optional Otsu or Triangle auto-thresholding.",
-      "category": "预处理",
+      "displayName": "全局阈值处理",
+      "description": "执行全局阈值处理，支持二值、反二值、截断、ToZero 以及 Otsu/Triangle 自动阈值。",
+      "category": "分割与区域",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -931,7 +836,7 @@
       "type": 5,
       "displayName": "形态学（旧版）",
       "description": "旧版图像形态学节点；新建图像流程请使用“形态学操作”，区域流程请使用 Region* 系列算子。",
-      "category": "预处理",
+      "category": "分割与区域",
       "version": "1.0.0",
       "tags": [
         "compatibility",
@@ -1043,7 +948,7 @@
       "type": 6,
       "displayName": "Blob分析",
       "description": "连通区域分析",
-      "category": "特征提取",
+      "category": "分割与区域",
       "version": "1.2.1",
       "tags": [
         "功能域:检测",
@@ -1304,8 +1209,8 @@
       "id": "TemplateMatching",
       "type": 7,
       "displayName": "模板匹配",
-      "description": "Classic template matching with optional bounded rotation/scale pose search. Multi-match outputs are filtered by IoU-based NMS.",
-      "category": "匹配定位",
+      "description": "执行经典模板匹配，可限制旋转和尺度搜索范围；多目标结果通过基于 IoU 的 NMS 去重。",
+      "category": "匹配与定位",
       "version": "1.2.0",
       "tags": [
         "功能域:检测",
@@ -1701,8 +1606,8 @@
       "id": "Measurement",
       "type": 8,
       "displayName": "测量",
-      "description": "两点/水平/垂直距离测量，支持参数坐标与 PointA/PointB 输入。",
-      "category": "检测",
+      "description": "统一基础二维几何测量入口，支持点点距离、点线距离、线线距离/夹角和三点角度；默认保持旧版点点测量行为。",
+      "category": "测量",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -1830,7 +1735,7 @@
       "type": 9,
       "displayName": "条码识别",
       "description": "一维码/二维码识别，支持 QR、Code128、DataMatrix 等多种码制",
-      "category": "识别",
+      "category": "特征提取",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -1936,8 +1841,8 @@
       "id": "DeepLearning",
       "type": 10,
       "displayName": "深度学习",
-      "description": "AI 深度学习推理，支持 YOLOv5/v6/v8/v11 等模型，用于缺陷检测和目标分类",
-      "category": "AI检测",
+      "description": "统一 ONNX 深度学习推理入口，支持目标检测、图像分类和语义分割；默认保持历史 YOLO 目标检测行为。",
+      "category": "AI推理",
       "version": "1.0.0",
       "tags": [
         "功能域:AI",
@@ -2254,7 +2159,7 @@
       "type": 11,
       "displayName": "结果输出",
       "description": "汇总检测结果并输出，支持 JSON/CSV/Text 格式，可选保存到文件",
-      "category": "输出",
+      "category": "输出与辅助",
       "version": "1.0.1",
       "tags": [
         "功能域:流程",
@@ -2617,7 +2522,7 @@
       "type": 13,
       "displayName": "中值滤波",
       "description": "有效去除椒盐噪声同时保留边缘",
-      "category": "预处理",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -2670,7 +2575,7 @@
       "type": 14,
       "displayName": "双边滤波",
       "description": "边缘保留的平滑滤波",
-      "category": "预处理",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -2745,7 +2650,7 @@
       "type": 15,
       "displayName": "图像缩放",
       "description": "调整图像尺寸",
-      "category": "预处理",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -2859,7 +2764,7 @@
       "type": 16,
       "displayName": "图像裁剪",
       "description": "ROI区域提取",
-      "category": "预处理",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -2945,7 +2850,7 @@
       "type": 17,
       "displayName": "图像旋转",
       "description": "任意角度旋转",
-      "category": "预处理",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -3042,7 +2947,7 @@
       "type": 18,
       "displayName": "透视变换",
       "description": "四边形透视校正",
-      "category": "预处理",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -3316,7 +3221,7 @@
       "type": 19,
       "displayName": "圆测量",
       "description": "霍夫变换检测圆形并测量半径与圆心坐标，适用于孔径检测和圆形定位",
-      "category": "检测",
+      "category": "测量",
       "version": "1.1.2",
       "tags": [
         "功能域:测量",
@@ -3752,8 +3657,8 @@
       "id": "LineMeasurement",
       "type": 20,
       "displayName": "直线测量",
-      "description": "Detects line features and reports line direction, span and fitting diagnostics.",
-      "category": "检测",
+      "description": "检测直线特征，输出方向、跨度和拟合质量诊断。",
+      "category": "测量",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -3874,9 +3779,9 @@
     {
       "id": "ContourMeasurement",
       "type": 21,
-      "displayName": "Contour Measurement",
-      "description": "Measures contour area, perimeter, and centroid with grayscale-weighted area estimation.",
-      "category": "Detection",
+      "displayName": "轮廓测量",
+      "description": "计算轮廓面积、周长和质心，并支持按灰度权重估算面积。",
+      "category": "测量",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -3987,9 +3892,9 @@
     {
       "id": "AngleMeasurement",
       "type": 22,
-      "displayName": "Angle Measurement",
-      "description": "Measures angle from three points or two lines with subpixel-compatible inputs.",
-      "category": "Detection",
+      "displayName": "角度测量",
+      "description": "通过三点或两线计算角度，兼容亚像素级输入。",
+      "category": "测量",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -4159,7 +4064,7 @@
       "type": 23,
       "displayName": "二维几何公差判定",
       "description": "基于特征与基准评估平行度、垂直度、位置度、同心度等受限二维公差带并输出判定。",
-      "category": "检测",
+      "category": "测量",
       "version": "1.0.1",
       "tags": [
         "功能域:测量",
@@ -4344,9 +4249,9 @@
     {
       "id": "CameraCalibration",
       "type": 24,
-      "displayName": "Camera Calibration",
-      "description": "Calibrates camera intrinsics from chessboard or circle grid images.",
-      "category": "标定",
+      "displayName": "相机标定",
+      "description": "根据棋盘格或圆点阵图像标定相机内参。",
+      "category": "标定与坐标",
       "version": "1.0.0",
       "tags": [
         "功能域:标定",
@@ -4487,9 +4392,9 @@
     {
       "id": "Undistort",
       "type": 25,
-      "displayName": "Undistort",
-      "description": "Correct lens distortion using calibration data.",
-      "category": "标定",
+      "displayName": "畸变校正",
+      "description": "使用标定数据校正镜头畸变。",
+      "category": "标定与坐标",
       "version": "1.0.0",
       "tags": [
         "功能域:标定",
@@ -4534,9 +4439,9 @@
     {
       "id": "CoordinateTransform",
       "type": 26,
-      "displayName": "Coordinate Transform",
-      "description": "Converts pixel coordinates to physical coordinates using CalibrationBundleV2 Transform2D.",
-      "category": "标定",
+      "displayName": "像素到物理坐标（单点）",
+      "description": "使用 CalibrationBundleV2 的二维标定变换，将单个像素坐标转换为物理坐标。",
+      "category": "标定与坐标",
       "version": "1.0.0",
       "tags": [
         "功能域:标定",
@@ -4628,9 +4533,9 @@
     {
       "id": "ModbusCommunication",
       "type": 27,
-      "displayName": "Modbus Communication",
-      "description": "Industrial Modbus TCP communication. RTU is declared but not packaged in this operator.",
-      "category": "Communication",
+      "displayName": "Modbus TCP通信",
+      "description": "通过 Modbus TCP 读写线圈和保持寄存器；当前算子不执行 Modbus RTU 通信。",
+      "category": "通信",
       "version": "1.0.0",
       "tags": [
         "功能域:通信",
@@ -5425,7 +5330,7 @@
       "type": 29,
       "displayName": "数据库写入",
       "description": "将输入数据写入 SQLite / SQL Server / MySQL 表。",
-      "category": "数据处理",
+      "category": "输出与辅助",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -5806,7 +5711,7 @@
       "type": 38,
       "displayName": "颜色空间转换",
       "description": "BGR/GRAY/HSV/Lab/YUV等颜色空间转换",
-      "category": "预处理",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -5893,9 +5798,9 @@
     {
       "id": "AdaptiveThreshold",
       "type": 39,
-      "displayName": "Adaptive Threshold",
-      "description": "Local mean or Gaussian adaptive thresholding.",
-      "category": "预处理",
+      "displayName": "自适应阈值",
+      "description": "根据局部均值或高斯加权均值进行自适应阈值分割，适合光照不均场景。",
+      "category": "分割与区域",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -6009,8 +5914,8 @@
       "id": "HistogramEqualization",
       "type": 40,
       "displayName": "直方图均衡化",
-      "description": "Supports global histogram equalization and CLAHE.",
-      "category": "预处理",
+      "description": "支持全局直方图均衡与 CLAHE，用于增强图像对比度。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -6103,9 +6008,9 @@
     {
       "id": "GeometricFitting",
       "type": 41,
-      "displayName": "Geometric Fitting",
-      "description": "Fits line, circle or ellipse from contour points.",
-      "category": "检测",
+      "displayName": "几何拟合",
+      "description": "根据轮廓点拟合直线、圆或椭圆。",
+      "category": "测量",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -6270,9 +6175,9 @@
     {
       "id": "RoiManager",
       "type": 42,
-      "displayName": "ROI管理器",
-      "description": "矩形/圆形/多边形区域选择",
-      "category": "辅助",
+      "displayName": "ROI裁剪与掩膜",
+      "description": "按矩形、圆形或多边形 ROI 裁剪图像或应用掩膜，并输出空间上下文。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -6457,8 +6362,8 @@
       "id": "ShapeMatching",
       "type": 43,
       "displayName": "旋转尺度模板匹配",
-      "description": "Rotation-scale template matching with pyramid coarse-to-fine search. This is not a generic contour-descriptor matcher.",
-      "category": "匹配定位",
+      "description": "基于金字塔粗到细搜索的旋转/尺度模板匹配；不是通用轮廓描述子匹配。",
+      "category": "匹配与定位",
       "version": "1.2.0",
       "tags": [
         "功能域:检测",
@@ -6666,8 +6571,8 @@
     {
       "id": "SubpixelEdgeDetection",
       "type": 44,
-      "displayName": "Subpixel Edge Detection",
-      "description": "Non-industrial reference subpixel edge extraction; requires application validation before metrology use.",
+      "displayName": "亚像素边缘",
+      "description": "非工业定型的亚像素边缘参考实现；用于计量前必须完成应用级验证。",
       "category": "特征提取",
       "version": "1.0.0",
       "tags": [
@@ -6787,7 +6692,7 @@
       "type": 45,
       "displayName": "颜色分析",
       "description": "对图像执行平均色、主色和范围分析，并支持 HSV 区间检查与 Lab DeltaE 色差分析。",
-      "category": "颜色处理",
+      "category": "特征提取",
       "version": "2.0.1",
       "tags": [
         "color-inspection",
@@ -7646,9 +7551,9 @@
     {
       "id": "MitsubishiMcCommunication",
       "type": 51,
-      "displayName": "Mitsubishi MC Communication",
-      "description": "Mitsubishi MC protocol PLC read/write communication.",
-      "category": "Communication",
+      "displayName": "三菱MC通信",
+      "description": "三菱 MC 协议 PLC 读写通信。",
+      "category": "通信",
       "version": "1.0.0",
       "tags": [
         "功能域:通信",
@@ -8172,9 +8077,9 @@
     {
       "id": "ResultJudgment",
       "type": 60,
-      "displayName": "Result Judgment",
-      "description": "Generic business judgment with numeric/string condition checks.",
-      "category": "Flow Control",
+      "displayName": "结果判定",
+      "description": "对数值、字符串等结果执行业务判定，输出条件检查结果。",
+      "category": "流程控制",
       "version": "1.0.1",
       "tags": [
         "功能域:流程",
@@ -8363,7 +8268,7 @@
       "type": 61,
       "displayName": "检测顺序判定",
       "description": "对检测结果排序，并与期望标签序列进行比对。",
-      "category": "AI 检测",
+      "category": "缺陷检测",
       "version": "1.0.1",
       "tags": [
         "experimental",
@@ -8703,8 +8608,8 @@
       "id": "ClaheEnhancement",
       "type": 71,
       "displayName": "CLAHE增强",
-      "description": "Adaptive histogram equalization for local contrast enhancement.",
-      "category": "预处理",
+      "description": "使用自适应直方图均衡提升局部对比度，适合低对比或光照不均的图像。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -8837,9 +8742,9 @@
     {
       "id": "MorphologicalOperation",
       "type": 72,
-      "displayName": "Morphological Operation",
-      "description": "Erode, Dilate, Open, Close, Gradient, TopHat, BlackHat.",
-      "category": "预处理",
+      "displayName": "形态学操作",
+      "description": "支持腐蚀、膨胀、开运算、闭运算、梯度、顶帽、黑帽等形态学操作。",
+      "category": "分割与区域",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -9000,7 +8905,7 @@
       "type": 74,
       "displayName": "拉普拉斯锐化",
       "description": "基于拉普拉斯算子的边缘增强",
-      "category": "预处理",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -9075,7 +8980,7 @@
       "type": 76,
       "displayName": "图像加法",
       "description": "两幅图像叠加/合并",
-      "category": "预处理",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -9204,9 +9109,9 @@
     {
       "id": "ImageSubtract",
       "type": 77,
-      "displayName": "Image Subtract",
-      "description": "Computes subtraction or absolute difference between two images.",
-      "category": "预处理",
+      "displayName": "图像减法",
+      "description": "计算两张图像的相减结果或绝对差值。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -9283,7 +9188,7 @@
       "type": 78,
       "displayName": "图像融合",
       "description": "加权混合/透明叠加",
-      "category": "预处理",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -9364,7 +9269,7 @@
       "type": 80,
       "displayName": "变量读取",
       "description": "从单次运行变量或项目全局变量读取值",
-      "category": "变量",
+      "category": "数据处理",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -9626,7 +9531,7 @@
       "type": 81,
       "displayName": "变量写入",
       "description": "写入单次运行变量或项目全局变量",
-      "category": "变量",
+      "category": "数据处理",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -9911,7 +9816,7 @@
       "type": 82,
       "displayName": "变量递增",
       "description": "递增单次运行变量或项目全局 Int64 变量",
-      "category": "变量",
+      "category": "数据处理",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -10071,8 +9976,8 @@
     {
       "id": "TryCatch",
       "type": 83,
-      "displayName": "异常捕获",
-      "description": "Try-Catch 流程控制",
+      "displayName": "Try分支透传",
+      "description": "将输入透传到 Try 分支并输出空 Catch/无错误状态；本算子不捕获下游异常。",
       "category": "流程控制",
       "version": "1.0.0",
       "tags": [
@@ -10166,7 +10071,7 @@
       "type": 84,
       "displayName": "循环计数器",
       "description": "获取当前循环次数和统计信息",
-      "category": "变量",
+      "category": "流程控制",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -10259,8 +10164,8 @@
       "id": "AkazeFeatureMatch",
       "type": 90,
       "displayName": "AKAZE特征匹配",
-      "description": "AKAZE feature matching with verified homography gating for robust template localization.",
-      "category": "匹配定位",
+      "description": "使用 AKAZE 局部特征与单应性校验进行模板定位，适合纹理目标的稳健匹配。",
+      "category": "匹配与定位",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -10555,8 +10460,8 @@
       "id": "OrbFeatureMatch",
       "type": 91,
       "displayName": "ORB特征匹配",
-      "description": "ORB feature matching with homography verification for fast template localization.",
-      "category": "匹配定位",
+      "description": "使用 ORB 特征和单应性校验进行快速模板定位。",
+      "category": "匹配与定位",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -10885,7 +10790,7 @@
       "type": 92,
       "displayName": "梯度形状匹配",
       "description": "基于梯度方向特征的形状匹配，支持可选 ROI 搜索。",
-      "category": "匹配定位",
+      "category": "匹配与定位",
       "version": "1.1.0",
       "tags": [
         "功能域:检测",
@@ -11095,7 +11000,7 @@
       "type": 93,
       "displayName": "金字塔形状匹配",
       "description": "基于 LINEMOD 的金字塔模板匹配。",
-      "category": "匹配定位",
+      "category": "匹配与定位",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -11352,9 +11257,9 @@
     {
       "id": "DualModalVoting",
       "type": 94,
-      "displayName": "Dual Modal Voting",
-      "description": "Combines deep learning and traditional inspection results into a final judgment.",
-      "category": "AI Detection",
+      "displayName": "双模态投票",
+      "description": "融合深度学习与传统视觉检测结果，输出最终判定。",
+      "category": "缺陷检测",
       "version": "1.0.0",
       "tags": [
         "功能域:AI",
@@ -11910,7 +11815,7 @@
       "type": 111,
       "displayName": "逻辑门",
       "description": "布尔逻辑运算 (AND, OR, NOT, XOR, NAND, NOR)",
-      "category": "通用",
+      "category": "数据处理",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -11992,9 +11897,9 @@
     {
       "id": "TypeConvert",
       "type": 112,
-      "displayName": "Type Convert",
-      "description": "Converts input data across String/Float/Integer/Boolean types.",
-      "category": "通用",
+      "displayName": "类型转换",
+      "description": "在字符串、浮点、整数、布尔等类型之间转换输入数据。",
+      "category": "数据处理",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -12246,9 +12151,9 @@
     {
       "id": "MqttPublish",
       "type": 114,
-      "displayName": "MQTT Publish",
-      "description": "Publishes inspection data to MQTT when the optional MQTT integration is enabled.",
-      "category": "Communication",
+      "displayName": "MQTT 发布",
+      "description": "在启用可选 MQTT 集成时发布检测数据。",
+      "category": "通信",
       "version": "0.1.0",
       "tags": [
         "experimental",
@@ -12365,7 +12270,7 @@
       "type": 115,
       "displayName": "字符串格式化",
       "description": "按模板生成字符串",
-      "category": "通用",
+      "category": "数据处理",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -12424,7 +12329,7 @@
       "type": 116,
       "displayName": "图像保存",
       "description": "保存检测图像到本地硬盘",
-      "category": "输出",
+      "category": "输出与辅助",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -12505,7 +12410,7 @@
       "type": 117,
       "displayName": "OCR 识别",
       "description": "识别图像中的文本内容",
-      "category": "识别",
+      "category": "AI推理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -12552,7 +12457,7 @@
       "type": 118,
       "displayName": "图像差异率分析",
       "description": "计算两幅同尺寸图像的绝对差异图，并输出非零差异像素占比。",
-      "category": "预处理",
+      "category": "特征提取",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -12603,9 +12508,9 @@
     {
       "id": "Statistics",
       "type": 119,
-      "displayName": "Statistics",
-      "description": "Computes Mean/StdDev/Cpk statistics over rolling history.",
-      "category": "通用",
+      "displayName": "统计分析",
+      "description": "基于滚动历史计算均值、标准差和 Cpk 统计结果。",
+      "category": "数据处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -12850,7 +12755,7 @@
       "type": 121,
       "displayName": "注释",
       "description": "在工作流中添加说明文本，不影响数据流，仅用于标注设计意图",
-      "category": "辅助",
+      "category": "输出与辅助",
       "version": "1.0.1",
       "tags": [
         "功能域:流程",
@@ -12909,7 +12814,7 @@
       "type": 122,
       "displayName": "数值比较",
       "description": "比较两个数值的大小关系，输出布尔判定结果与差值",
-      "category": "流程控制",
+      "category": "数据处理",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -13105,8 +13010,8 @@
       "id": "CaliperTool",
       "type": 130,
       "displayName": "卡尺工具",
-      "description": "Detects edge pairs along a scan line and reports width.",
-      "category": "检测",
+      "description": "沿扫描线检测边缘对并输出宽度。",
+      "category": "测量",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -13345,8 +13250,8 @@
       "id": "WidthMeasurement",
       "type": 131,
       "displayName": "宽度测量",
-      "description": "Measures width between parallel edges or lines.",
-      "category": "检测",
+      "description": "测量平行边缘或直线之间的宽度。",
+      "category": "测量",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -13547,8 +13452,8 @@
       "id": "PointLineDistance",
       "type": 132,
       "displayName": "点线距离",
-      "description": "Computes distance from a point to a line or segment.",
-      "category": "检测",
+      "description": "计算点到直线或线段的最短距离。",
+      "category": "测量",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -13637,8 +13542,8 @@
       "id": "LineLineDistance",
       "type": 133,
       "displayName": "线线距离",
-      "description": "Computes distance and angle between two lines or segments.",
-      "category": "检测",
+      "description": "计算两条直线或线段之间的距离与夹角。",
+      "category": "测量",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -13756,7 +13661,7 @@
       "id": "BoxNms",
       "type": 140,
       "displayName": "候选框抑制",
-      "description": "Runs non-maximum suppression on detection boxes.",
+      "description": "对检测框执行非极大值抑制。",
       "category": "数据处理",
       "version": "1.0.0",
       "tags": [
@@ -13889,8 +13794,8 @@
     {
       "id": "BoxFilter",
       "type": 141,
-      "displayName": "候选框过滤 (Bounding Box)",
-      "description": "Filters detections by area, class, region, or score.",
+      "displayName": "候选框筛选",
+      "description": "按面积、类别、区域或分数过滤检测结果。",
       "category": "数据处理",
       "version": "1.0.0",
       "tags": [
@@ -14066,8 +13971,8 @@
       "id": "SharpnessEvaluation",
       "type": 142,
       "displayName": "清晰度评估",
-      "description": "Evaluates focus quality of an image.",
-      "category": "检测",
+      "description": "评估图像的对焦清晰度。",
+      "category": "特征提取",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -14248,7 +14153,7 @@
       "type": 143,
       "displayName": "ROI位姿补偿（像素）",
       "description": "根据参考点与基准点的像素偏差，对 ROI 坐标执行平移或平移旋转补偿并输出变换信息；作为物理世界补偿使用前需先完成标定。",
-      "category": "定位",
+      "category": "匹配与定位",
       "version": "1.0.3",
       "tags": [
         "功能域:定位",
@@ -14402,9 +14307,9 @@
     {
       "id": "NPointCalibration",
       "type": 150,
-      "displayName": "N Point Calibration",
-      "description": "Builds robust affine or homography calibration from all point pairs.",
-      "category": "标定",
+      "displayName": "N点标定",
+      "description": "基于全部点对鲁棒估计仿射或单应性标定模型。",
+      "category": "标定与坐标",
       "version": "1.0.0",
       "tags": [
         "功能域:标定",
@@ -14611,9 +14516,9 @@
     {
       "id": "CalibrationLoader",
       "type": 151,
-      "displayName": "Calibration Loader",
-      "description": "Loads CalibrationBundleV2 JSON and exposes typed calibration outputs.",
-      "category": "标定",
+      "displayName": "标定加载",
+      "description": "从 CalibrationBundleV2 JSON 文件加载标定数据并输出强类型结果。",
+      "category": "标定与坐标",
       "version": "1.0.0",
       "tags": [
         "功能域:标定",
@@ -14670,7 +14575,7 @@
       "id": "UnitConvert",
       "type": 152,
       "displayName": "单位换算",
-      "description": "Converts value between pixel, mm, um and inch.",
+      "description": "在像素、mm、um 和英寸之间进行数值换算。",
       "category": "数据处理",
       "version": "1.0.0",
       "tags": [
@@ -14802,8 +14707,8 @@
       "id": "TimerStatistics",
       "type": 153,
       "displayName": "计时统计",
-      "description": "Measures elapsed and cycle time statistics.",
-      "category": "逻辑工具",
+      "description": "统计耗时和周期时间。",
+      "category": "数据处理",
       "version": "1.0.1",
       "tags": [
         "功能域:流程",
@@ -14915,8 +14820,8 @@
       "id": "ScriptOperator",
       "type": 160,
       "displayName": "脚本算子",
-      "description": "Runs user-defined expression or script snippet.",
-      "category": "逻辑工具",
+      "description": "运行用户自定义表达式或脚本片段。",
+      "category": "数据处理",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -15023,8 +14928,8 @@
       "id": "TriggerModule",
       "type": 161,
       "displayName": "触发模块",
-      "description": "Generates software, timer, or external triggers.",
-      "category": "逻辑工具",
+      "description": "生成软件、定时或外部触发信号。",
+      "category": "流程控制",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -15124,7 +15029,7 @@
       "type": 162,
       "displayName": "点位偏差计算",
       "description": "计算当前点相对参考点的 X/Y 偏差与距离；属于像素空间偏差工具，按 PixelSize 换算 mm 前需确认标定尺度。",
-      "category": "数据处理",
+      "category": "匹配与定位",
       "version": "1.0.4",
       "tags": [
         "功能域:定位",
@@ -15215,7 +15120,7 @@
       "type": 163,
       "displayName": "点位刚性补偿",
       "description": "根据检测点/角度与参考点/角度计算像素空间二维刚性补偿量和变换矩阵；按 PixelSize 输出 mm 前需确认标定尺度。",
-      "category": "数据处理",
+      "category": "匹配与定位",
       "version": "1.0.4",
       "tags": [
         "功能域:定位",
@@ -15360,8 +15265,8 @@
       "id": "GapMeasurement",
       "type": 164,
       "displayName": "间隙测量",
-      "description": "Measures spacing using points or image projection.",
-      "category": "检测",
+      "description": "通过点或图像投影方式测量间距。",
+      "category": "测量",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -15557,8 +15462,8 @@
       "id": "PolarUnwrap",
       "type": 170,
       "displayName": "极坐标展开",
-      "description": "Unwraps annular image regions into rectangular view.",
-      "category": "图像处理",
+      "description": "将环形图像区域展开为矩形视图。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -15693,8 +15598,8 @@
       "id": "ShadingCorrection",
       "type": 171,
       "displayName": "光照校正",
-      "description": "Corrects uneven illumination by background or model-based methods.",
-      "category": "预处理",
+      "description": "通过背景法或模型法校正光照不均。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -15796,8 +15701,8 @@
       "id": "FrameAveraging",
       "type": 172,
       "displayName": "帧平均",
-      "description": "Averages multi-frame input to reduce temporal noise.",
-      "category": "预处理",
+      "description": "对多帧输入取平均以降低时域噪声。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -15875,8 +15780,8 @@
       "id": "AffineTransform",
       "type": 173,
       "displayName": "仿射变换",
-      "description": "Applies 2D affine transform using 3-point or rotate-scale-translate mode.",
-      "category": "图像处理",
+      "description": "使用三点或旋转-缩放-平移模式执行二维仿射变换。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -16031,8 +15936,8 @@
       "id": "ColorMeasurement",
       "type": 174,
       "displayName": "颜色测量",
-      "description": "Measures Lab delta-E or HSV statistics over a selected ROI.",
-      "category": "颜色处理",
+      "description": "在选定 ROI 内统计 Lab 色差或 HSV 颜色特征。",
+      "category": "测量",
       "version": "2.0.0",
       "tags": [
         "功能域:测量",
@@ -16238,8 +16143,8 @@
       "id": "SurfaceDefectDetection",
       "type": 180,
       "displayName": "表面缺陷检测",
-      "description": "Detects surface defects using gradient, aligned reference diff, or local contrast.",
-      "category": "AI检测",
+      "description": "使用梯度、配准后的参考差分或局部对比度检测表面缺陷。",
+      "category": "缺陷检测",
       "version": "2.0.0",
       "tags": [
         "experimental",
@@ -16700,7 +16605,7 @@
       "type": 181,
       "displayName": "边缘间距缺陷检测",
       "description": "沿边缘对采样间距，按期望宽度与容差判定偏差点并输出缺陷数量和最大偏差。",
-      "category": "AI检测",
+      "category": "缺陷检测",
       "version": "1.0.1",
       "tags": [
         "功能域:AI",
@@ -16824,8 +16729,8 @@
       "id": "RectangleDetection",
       "type": 182,
       "displayName": "矩形检测",
-      "description": "Detects rectangular/quadrilateral objects from contours.",
-      "category": "定位",
+      "description": "根据轮廓检测矩形/四边形目标。",
+      "category": "匹配与定位",
       "version": "1.0.0",
       "tags": [
         "功能域:定位",
@@ -16964,8 +16869,8 @@
       "id": "TranslationRotationCalibration",
       "type": 183,
       "displayName": "平移旋转标定",
-      "description": "Fits robust 2D rigid or similarity transform from image-to-robot point pairs.",
-      "category": "标定",
+      "description": "从图像-机器人点对鲁棒拟合二维刚性或相似变换。",
+      "category": "标定与坐标",
       "version": "1.0.0",
       "tags": [
         "功能域:标定",
@@ -17060,8 +16965,8 @@
       "id": "CornerDetection",
       "type": 190,
       "displayName": "角点检测",
-      "description": "Detects corner points using Harris or Shi-Tomasi.",
-      "category": "定位",
+      "description": "使用 Harris 或 Shi-Tomasi 检测角点。",
+      "category": "特征提取",
       "version": "1.0.0",
       "tags": [
         "功能域:定位",
@@ -17178,8 +17083,8 @@
       "id": "EdgeIntersection",
       "type": 191,
       "displayName": "边线交点",
-      "description": "Computes line intersection and angle between two lines.",
-      "category": "定位",
+      "description": "计算两条直线的交点和夹角。",
+      "category": "匹配与定位",
       "version": "1.0.0",
       "tags": [
         "功能域:定位",
@@ -17264,8 +17169,8 @@
       "id": "ParallelLineFind",
       "type": 192,
       "displayName": "平行线查找",
-      "description": "Finds best pair of near-parallel lines in an image.",
-      "category": "定位",
+      "description": "在图像中查找最佳近似平行线对。",
+      "category": "匹配与定位",
       "version": "1.0.0",
       "tags": [
         "功能域:定位",
@@ -17380,8 +17285,8 @@
       "id": "QuadrilateralFind",
       "type": 193,
       "displayName": "四边形查找",
-      "description": "Finds quadrilateral contours without right-angle constraints.",
-      "category": "定位",
+      "description": "查找不受直角约束的四边形轮廓。",
+      "category": "匹配与定位",
       "version": "1.0.0",
       "tags": [
         "功能域:定位",
@@ -17496,8 +17401,8 @@
       "id": "GeoMeasurement",
       "type": 194,
       "displayName": "几何测量",
-      "description": "General geometry measurement between point/line/circle elements.",
-      "category": "检测",
+      "description": "对点、线、圆等几何元素进行通用几何测量。",
+      "category": "测量",
       "version": "1.0.0",
       "tags": [
         "功能域:测量",
@@ -17644,8 +17549,8 @@
       "id": "ImageStitching",
       "type": 200,
       "displayName": "图像拼接",
-      "description": "Stitches two images into a larger panorama-like output.",
-      "category": "图像处理",
+      "description": "将两张图像拼接成更大的全景式输出。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -17749,8 +17654,8 @@
       "id": "ImageTiling",
       "type": 201,
       "displayName": "图像切片",
-      "description": "Splits an image into tiled regions with optional overlap.",
-      "category": "拆分组合",
+      "description": "将图像切分为可选重叠的分块区域。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -17856,8 +17761,8 @@
       "id": "ImageNormalize",
       "type": 202,
       "displayName": "图像归一化",
-      "description": "Normalizes pixel distribution for robust downstream processing.",
-      "category": "预处理",
+      "description": "归一化像素分布，以提升下游处理稳定性。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -17964,8 +17869,8 @@
       "id": "ImageCompose",
       "type": 203,
       "displayName": "图像组合",
-      "description": "Composes multiple images by concat/grid/channel merge.",
-      "category": "拆分组合",
+      "description": "通过拼接、网格或通道合并方式组合多张图像。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -18074,8 +17979,8 @@
       "id": "CopyMakeBorder",
       "type": 204,
       "displayName": "边界填充",
-      "description": "Pads image border using OpenCV border policies.",
-      "category": "图像处理",
+      "description": "使用 OpenCV 边界策略填充图像边缘。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -18198,9 +18103,9 @@
     {
       "id": "TextSave",
       "type": 210,
-      "displayName": "Text Save",
-      "description": "Saves text or structured data to text/csv/json file.",
-      "category": "逻辑工具",
+      "displayName": "文本保存",
+      "description": "将文本或结构化数据保存为 text/csv/json 文件。",
+      "category": "输出与辅助",
       "version": "1.0.0",
       "tags": [
         "功能域:流程",
@@ -18330,8 +18235,8 @@
       "id": "PointSetTool",
       "type": 211,
       "displayName": "点集工具",
-      "description": "Merges/sorts/filters point lists and computes set properties.",
-      "category": "逻辑工具",
+      "description": "合并、排序、过滤点列表并计算集合属性。",
+      "category": "数据处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -18497,7 +18402,7 @@
       "type": 212,
       "displayName": "Blob分类标注",
       "description": "按面积、圆度、宽高比或位置对 Blob/连通区域分类，输出标签列表并可绘制标签。",
-      "category": "定位",
+      "category": "特征提取",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -18606,8 +18511,8 @@
       "id": "HistogramAnalysis",
       "type": 213,
       "displayName": "直方图分析",
-      "description": "Computes histogram and intensity-domain distribution statistics for a selected channel.",
-      "category": "检测",
+      "description": "统计指定通道的直方图及灰度/强度分布指标。",
+      "category": "特征提取",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -18791,8 +18696,8 @@
       "id": "PixelStatistics",
       "type": 214,
       "displayName": "像素统计",
-      "description": "Computes ROI/masked pixel-level statistics.",
-      "category": "检测",
+      "description": "计算 ROI 或掩码区域内的像素级统计信息。",
+      "category": "特征提取",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -18945,8 +18850,8 @@
       "id": "MeanFilter",
       "type": 215,
       "displayName": "均值滤波",
-      "description": "Applies mean (box blur) filtering to smooth image noise.",
-      "category": "预处理",
+      "description": "使用均值（方框）滤波平滑图像噪声。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -19031,7 +18936,7 @@
       "type": 216,
       "displayName": "ROI位姿变换",
       "description": "根据匹配位姿（中心、角度、尺度）变换基础 ROI，并输出矩形 SearchRegion。",
-      "category": "辅助",
+      "category": "匹配与定位",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -19089,8 +18994,8 @@
       "id": "VoxelDownsample",
       "type": 217,
       "displayName": "体素下采样",
-      "description": "Voxel grid downsampling for point clouds (centroid per voxel).",
-      "category": "3D",
+      "description": "对点云执行体素网格下采样（每个体素取质心）。",
+      "category": "3D点云",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -19149,7 +19054,7 @@
       "type": 218,
       "displayName": "点云统计离群点去除（SOR）",
       "description": "对点云执行统计离群点去除（SOR），输出过滤点云、保留点数和移除点数。",
-      "category": "3D",
+      "category": "3D点云",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -19224,8 +19129,8 @@
       "id": "RansacPlaneSegmentation",
       "type": 219,
       "displayName": "RANSAC平面分割",
-      "description": "RANSAC plane segmentation for point clouds. Outputs plane coefficients and inliers.",
-      "category": "3D",
+      "description": "对点云执行 RANSAC 平面分割，输出平面系数和内点。",
+      "category": "3D点云",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -19352,8 +19257,8 @@
       "id": "EuclideanClusterExtraction",
       "type": 220,
       "displayName": "欧氏聚类分割",
-      "description": "Euclidean Cluster Extraction for point clouds (3D connected components by distance).",
-      "category": "3D",
+      "description": "对点云执行欧式聚类提取（按距离划分三维连通分量）。",
+      "category": "3D点云",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -19439,8 +19344,8 @@
       "id": "PPFEstimation",
       "type": 221,
       "displayName": "PPF点对特征",
-      "description": "Compute Point Pair Features (PPF) for a point cloud and build a per-point feature map.",
-      "category": "3D",
+      "description": "为点云计算点对特征（PPF）并构建逐点特征图。",
+      "category": "3D点云",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -19527,7 +19432,7 @@
       "type": 222,
       "displayName": "PPF点云粗匹配",
       "description": "基于 PPF 对模型点云与场景点云执行三维粗匹配，输出候选位姿、内点与稳定性诊断。",
-      "category": "3D",
+      "category": "3D点云",
       "version": "1.0.5",
       "tags": [
         "功能域:检测",
@@ -19773,9 +19678,9 @@
     {
       "id": "LawsTextureFilter",
       "type": 223,
-      "displayName": "Laws Texture Filter",
-      "description": "Apply 5x5 Laws texture filtering and compute local energy.",
-      "category": "Texture",
+      "displayName": "Laws纹理滤波",
+      "description": "应用 5x5 Laws 纹理滤波并计算局部能量。",
+      "category": "特征提取",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -19895,9 +19800,9 @@
     {
       "id": "GlcmTexture",
       "type": 224,
-      "displayName": "GLCM Texture Features",
-      "description": "Compute Gray-Level Co-occurrence Matrix (GLCM) texture features.",
-      "category": "Texture",
+      "displayName": "GLCM纹理特征",
+      "description": "计算灰度共生矩阵（GLCM）纹理特征。",
+      "category": "特征提取",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -20067,8 +19972,8 @@
       "id": "SemanticSegmentation",
       "type": 225,
       "displayName": "语义分割",
-      "description": "Runs an ONNX semantic segmentation model and returns class map, colored visualization, and per-class masks.",
-      "category": "AI检测",
+      "description": "运行 ONNX 语义分割模型，输出类别图、着色可视化结果和各类别掩码。",
+      "category": "AI推理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -20325,8 +20230,8 @@
       "id": "AnomalyDetection",
       "type": 226,
       "displayName": "异常检测",
-      "description": "Runs a simplified PatchCore-style anomaly detector with train/inference modes and feature-bank persistence.",
-      "category": "AI检测",
+      "description": "运行简化版 PatchCore 异常检测器，支持训练/推理模式和特征库持久化。",
+      "category": "AI推理",
       "version": "1.0.0",
       "tags": [
         "anomaly-detection",
@@ -20620,9 +20525,9 @@
     {
       "id": "HandEyeCalibration",
       "type": 227,
-      "displayName": "Hand-Eye Calibration",
-      "description": "Solves eye-in-hand or simplified eye-to-hand calibration from robot poses and calibration-board poses.",
-      "category": "标定",
+      "displayName": "手眼标定",
+      "description": "根据机器人位姿和标定板位姿求解手眼或简化眼在手外标定。",
+      "category": "标定与坐标",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -20778,9 +20683,9 @@
     {
       "id": "HandEyeCalibrationValidator",
       "type": 228,
-      "displayName": "Hand-Eye Calibration Validator",
-      "description": "Validates a hand-eye CalibrationBundleV2 payload and produces quality metrics, HTML report, and pose suggestions.",
-      "category": "标定",
+      "displayName": "手眼标定验证",
+      "description": "验证手眼标定 CalibrationBundleV2 并生成质量指标、HTML 报告和位姿建议。",
+      "category": "标定与坐标",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -20894,9 +20799,9 @@
     {
       "id": "FisheyeCalibration",
       "type": 229,
-      "displayName": "Fisheye Calibration",
-      "description": "Calibrates fisheye camera intrinsics and distortion parameters using chessboard or circle grid patterns.",
-      "category": "标定",
+      "displayName": "鱼眼标定",
+      "description": "使用棋盘格或圆点阵图案标定鱼眼相机内参和畸变参数。",
+      "category": "标定与坐标",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -21059,9 +20964,9 @@
     {
       "id": "FisheyeUndistort",
       "type": 230,
-      "displayName": "Fisheye Undistort",
-      "description": "Correct fisheye lens distortion using calibration data with LUT acceleration.",
-      "category": "标定",
+      "displayName": "鱼眼去畸变",
+      "description": "使用标定数据校正鱼眼镜头畸变，并支持 LUT 加速。",
+      "category": "标定与坐标",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -21157,9 +21062,9 @@
     {
       "id": "StereoCalibration",
       "type": 231,
-      "displayName": "Stereo Calibration",
-      "description": "Calibrates stereo camera pair and generates rectification maps for epipolar alignment.",
-      "category": "标定",
+      "displayName": "双目标定",
+      "description": "标定双目相机并生成极线校正映射。",
+      "category": "标定与坐标",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -21374,9 +21279,9 @@
     {
       "id": "PixelToWorldTransform",
       "type": 232,
-      "displayName": "Pixel To World Transform",
-      "description": "Transforms coordinates via CalibrationBundleV2 using either Transform2D or camera ray-plane intersection.",
-      "category": "标定",
+      "displayName": "像素世界映射",
+      "description": "通过 CalibrationBundleV2 执行坐标转换，可使用 Transform2D 或相机射线与平面求交。",
+      "category": "标定与坐标",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -21614,7 +21519,7 @@
       "type": 233,
       "displayName": "平面特征匹配",
       "description": "基于局部特征匹配和单应性验证定位纹理平面目标，输出投影角点、评分与诊断。",
-      "category": "匹配定位",
+      "category": "匹配与定位",
       "version": "1.1.3",
       "tags": [
         "功能域:检测",
@@ -22001,9 +21906,9 @@
     {
       "id": "LocalDeformableMatching",
       "type": 234,
-      "displayName": "Local Deformable Matching",
-      "description": "Experimental local deformable matching backed by moving least squares deformation and verified rigid fallback.",
-      "category": "匹配定位",
+      "displayName": "局部可变形匹配",
+      "description": "实验性局部可变形匹配，基于移动最小二乘形变估计，并提供刚性匹配校验回退。",
+      "category": "匹配与定位",
       "version": "1.1.1",
       "tags": [
         "功能域:检测",
@@ -22244,9 +22149,9 @@
     {
       "id": "DistanceTransform",
       "type": 235,
-      "displayName": "Distance Transform",
-      "description": "Computes the distance from each pixel to the nearest zero pixel. Supports multiple distance metrics and signed distances.",
-      "category": "Analysis",
+      "displayName": "距离变换",
+      "description": "计算每个像素到最近零像素的距离，支持多种距离度量和有符号距离。",
+      "category": "分割与区域",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -22402,9 +22307,9 @@
     {
       "id": "MinEnclosingGeometry",
       "type": 236,
-      "displayName": "Min Enclosing Geometry",
-      "description": "Computes minimum enclosing geometry (circle, rectangle, triangle) and robust arc fitting with RANSAC.",
-      "category": "检测",
+      "displayName": "最小外接几何体",
+      "description": "计算最小包围几何（圆、矩形、三角形），并支持基于 RANSAC 的鲁棒圆弧拟合。",
+      "category": "测量",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -22604,7 +22509,7 @@
       "type": 237,
       "displayName": "矩形框定义",
       "description": "根据 X、Y、宽度和高度参数生成 Rectangle 矩形框，供需要 Rectangle 输入的算子使用。",
-      "category": "几何",
+      "category": "分割与区域",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -22683,7 +22588,7 @@
       "type": 238,
       "displayName": "二值图转区域",
       "description": "将二值图、掩膜或灰度阈值结果转换为像素区域 Region，供区域形态学和区域布尔算子使用。",
-      "category": "区域处理",
+      "category": "分割与区域",
       "version": "1.1.0",
       "tags": [
         "功能域:检测",
@@ -22777,9 +22682,9 @@
     {
       "id": "RegionErosion",
       "type": 240,
-      "displayName": "Region Erosion",
-      "description": "Erodes a region using a specified structuring element (Region-based morphology).",
-      "category": "Morphology",
+      "displayName": "区域腐蚀",
+      "description": "使用指定结构元素对区域执行腐蚀（基于区域的形态学）。",
+      "category": "分割与区域",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -22894,9 +22799,9 @@
     {
       "id": "RegionDilation",
       "type": 241,
-      "displayName": "Region Dilation",
-      "description": "Dilates a region using a specified structuring element (Region-based morphology).",
-      "category": "Morphology",
+      "displayName": "区域膨胀",
+      "description": "使用指定结构元素对区域执行膨胀（基于区域的形态学）。",
+      "category": "分割与区域",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23011,9 +22916,9 @@
     {
       "id": "RegionOpening",
       "type": 242,
-      "displayName": "Region Opening",
-      "description": "Opening operation (erosion followed by dilation) for noise removal and smooth region boundaries.",
-      "category": "Morphology",
+      "displayName": "区域开运算",
+      "description": "执行开运算（先腐蚀后膨胀），用于去噪并平滑区域边界。",
+      "category": "分割与区域",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23117,9 +23022,9 @@
     {
       "id": "RegionClosing",
       "type": 243,
-      "displayName": "Region Closing",
-      "description": "Closing operation (dilation followed by erosion) for filling small holes and connecting nearby regions.",
-      "category": "Morphology",
+      "displayName": "区域闭运算",
+      "description": "执行闭运算（先膨胀后腐蚀），用于填补小孔洞并连接相近区域。",
+      "category": "分割与区域",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23223,9 +23128,9 @@
     {
       "id": "RegionSkeleton",
       "type": 244,
-      "displayName": "Region Skeleton",
-      "description": "Extracts skeleton using Zhang-Suen thinning algorithm. Preserves topology and connectivity.",
-      "category": "Morphology",
+      "displayName": "区域骨架化",
+      "description": "使用 Zhang-Suen 细化算法提取骨架，并保持拓扑与连通性。",
+      "category": "分割与区域",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23317,9 +23222,9 @@
     {
       "id": "RegionUnion",
       "type": 245,
-      "displayName": "Region Union",
-      "description": "Computes the union of two regions (A ∪ B).",
-      "category": "Region",
+      "displayName": "区域并集",
+      "description": "计算两个区域的并集（A ∪ B）。",
+      "category": "分割与区域",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23376,9 +23281,9 @@
     {
       "id": "RegionIntersection",
       "type": 246,
-      "displayName": "Region Intersection",
-      "description": "Computes the intersection of two regions (A ∩ B).",
-      "category": "Region",
+      "displayName": "区域交集",
+      "description": "计算两个区域的交集（A ∩ B）。",
+      "category": "分割与区域",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23435,9 +23340,9 @@
     {
       "id": "RegionDifference",
       "type": 247,
-      "displayName": "Region Difference",
-      "description": "Computes the difference of two regions (A - B).",
-      "category": "Region",
+      "displayName": "区域差集",
+      "description": "计算两个区域的差集（A - B）。",
+      "category": "分割与区域",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23494,9 +23399,9 @@
     {
       "id": "RegionComplement",
       "type": 248,
-      "displayName": "Region Complement",
-      "description": "Computes the complement of a region relative to an image size.",
-      "category": "Region",
+      "displayName": "区域补集",
+      "description": "相对于图像尺寸计算区域补集。",
+      "category": "分割与区域",
       "version": "1.0.2",
       "tags": [
         "功能域:检测",
@@ -23565,9 +23470,9 @@
     {
       "id": "ArcCaliper",
       "type": 249,
-      "displayName": "Arc Caliper",
-      "description": "Detects edges along an arc path with subpixel accuracy.",
-      "category": "检测",
+      "displayName": "圆弧卡尺",
+      "description": "沿圆弧路径检测边缘，支持亚像素精度。",
+      "category": "测量",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -23648,9 +23553,9 @@
     {
       "id": "ContourExtrema",
       "type": 250,
-      "displayName": "Contour Extrema",
-      "description": "Finds extremal points of a contour in specified directions.",
-      "category": "检测",
+      "displayName": "轮廓极值",
+      "description": "在指定方向上查找轮廓极值点。",
+      "category": "匹配与定位",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -23731,9 +23636,9 @@
     {
       "id": "FFT1D",
       "type": 251,
-      "displayName": "FFT 1D",
-      "description": "Performs FFT on 1D signals and emits a full complex spectrum for image inputs.",
-      "category": "Frequency",
+      "displayName": "信号/图像傅里叶变换（FFT）",
+      "description": "对一维数值信号执行 FFT；图像输入执行完整二维 DFT，并输出复数频谱、幅度和相位。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -23796,9 +23701,9 @@
     {
       "id": "FrequencyFilter",
       "type": 252,
-      "displayName": "Frequency Filter",
-      "description": "Applies frequency-domain filters to 1D or 2D complex spectra.",
-      "category": "Frequency",
+      "displayName": "频域滤波",
+      "description": "对一维或二维复数频谱执行频域滤波，用于保留或抑制指定频率成分。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -23873,9 +23778,9 @@
     {
       "id": "InverseFFT1D",
       "type": 253,
-      "displayName": "Inverse FFT 1D",
-      "description": "Performs inverse FFT on 1D spectra and reconstructs images from 2D complex spectra.",
-      "category": "Frequency",
+      "displayName": "信号/图像逆傅里叶变换（IFFT）",
+      "description": "对一维复数频谱执行逆 FFT；二维复数频谱输入执行逆 DFT 并重建图像信号。",
+      "category": "图像预处理",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",
@@ -23938,9 +23843,9 @@
     {
       "id": "PhaseClosure",
       "type": 254,
-      "displayName": "Phase Closure",
-      "description": "Unwraps wrapped phase maps while preserving the original phase domain semantics.",
-      "category": "检测",
+      "displayName": "相位解缠绕",
+      "description": "对二维包裹相位图执行 Itoh、质量引导或洪泛式解缠绕，并输出解缠相位与不连续区域。",
+      "category": "测量",
       "version": "1.0.1",
       "tags": [
         "功能域:检测",
@@ -24017,7 +23922,7 @@
       "type": 1620,
       "displayName": "帧变化触发",
       "description": "通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空帧进入深度学习。",
-      "category": "逻辑工具",
+      "category": "流程控制",
       "version": "1.0.0",
       "tags": [
         "功能域:检测",

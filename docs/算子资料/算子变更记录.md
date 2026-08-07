@@ -1,173 +1,173 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-07-15 23:30:27 +08:00`
+> 生成时间 / Generated At: `2026-08-08 03:09:31 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 当前版本快照 / Current Snapshot
 | 枚举 (Enum) | 显示名 (DisplayName) | 分类 (Category) | 版本 (Version) |
 |------|------|------|------|
-| `OperatorType.EuclideanClusterExtraction` | 欧氏聚类分割 | 3D | `1.0.0` |
-| `OperatorType.PPFEstimation` | PPF点对特征 | 3D | `1.0.0` |
-| `OperatorType.PPFMatch` | PPF点云粗匹配 | 3D | `1.0.5` |
-| `OperatorType.RansacPlaneSegmentation` | RANSAC平面分割 | 3D | `1.0.0` |
-| `OperatorType.StatisticalOutlierRemoval` | 点云统计离群点去除（SOR） | 3D | `1.0.1` |
-| `OperatorType.VoxelDownsample` | 体素下采样 | 3D | `1.0.1` |
-| `OperatorType.DualModalVoting` | Dual Modal Voting | AI Detection | `1.0.0` |
-| `OperatorType.DetectionSequenceJudge` | 检测顺序判定 | AI 检测 | `1.0.1` |
-| `OperatorType.AnomalyDetection` | 异常检测 | AI检测 | `1.0.0` |
-| `OperatorType.DeepLearning` | 深度学习 | AI检测 | `1.0.0` |
-| `OperatorType.EdgePairDefect` | 边缘间距缺陷检测 | AI检测 | `1.0.1` |
-| `OperatorType.SemanticSegmentation` | 语义分割 | AI检测 | `1.0.0` |
-| `OperatorType.SurfaceDefectDetection` | 表面缺陷检测 | AI检测 | `2.0.0` |
-| `OperatorType.DistanceTransform` | Distance Transform | Analysis | `1.0.1` |
-| `OperatorType.MitsubishiMcCommunication` | Mitsubishi MC Communication | Communication | `1.0.0` |
-| `OperatorType.ModbusCommunication` | Modbus Communication | Communication | `1.0.0` |
-| `OperatorType.MqttPublish` | MQTT Publish | Communication | `0.1.0` |
-| `OperatorType.AngleMeasurement` | Angle Measurement | Detection | `1.0.0` |
-| `OperatorType.ContourMeasurement` | Contour Measurement | Detection | `1.0.0` |
-| `OperatorType.ResultJudgment` | Result Judgment | Flow Control | `1.0.1` |
-| `OperatorType.FFT1D` | FFT 1D | Frequency | `1.0.0` |
-| `OperatorType.FrequencyFilter` | Frequency Filter | Frequency | `1.0.0` |
-| `OperatorType.InverseFFT1D` | Inverse FFT 1D | Frequency | `1.0.0` |
-| `OperatorType.RegionClosing` | Region Closing | Morphology | `1.0.2` |
-| `OperatorType.RegionDilation` | Region Dilation | Morphology | `1.0.2` |
-| `OperatorType.RegionErosion` | Region Erosion | Morphology | `1.0.2` |
-| `OperatorType.RegionOpening` | Region Opening | Morphology | `1.0.2` |
-| `OperatorType.RegionSkeleton` | Region Skeleton | Morphology | `1.0.2` |
-| `OperatorType.RegionComplement` | Region Complement | Region | `1.0.2` |
-| `OperatorType.RegionDifference` | Region Difference | Region | `1.0.2` |
-| `OperatorType.RegionIntersection` | Region Intersection | Region | `1.0.2` |
-| `OperatorType.RegionUnion` | Region Union | Region | `1.0.2` |
-| `OperatorType.GlcmTexture` | GLCM Texture Features | Texture | `1.0.1` |
-| `OperatorType.LawsTextureFilter` | Laws Texture Filter | Texture | `1.0.1` |
-| `OperatorType.RectangleRegion` | 矩形框定义 | 几何 | `1.0.1` |
-| `OperatorType.AkazeFeatureMatch` | AKAZE特征匹配 | 匹配定位 | `1.0.0` |
-| `OperatorType.GradientShapeMatch` | 梯度形状匹配 | 匹配定位 | `1.1.0` |
-| `OperatorType.LocalDeformableMatching` | Local Deformable Matching | 匹配定位 | `1.1.1` |
-| `OperatorType.OrbFeatureMatch` | ORB特征匹配 | 匹配定位 | `1.0.0` |
-| `OperatorType.PlanarMatching` | 平面特征匹配 | 匹配定位 | `1.1.3` |
-| `OperatorType.PyramidShapeMatch` | 金字塔形状匹配 | 匹配定位 | `1.0.0` |
-| `OperatorType.ShapeMatching` | 旋转尺度模板匹配 | 匹配定位 | `1.2.0` |
-| `OperatorType.TemplateMatching` | 模板匹配 | 匹配定位 | `1.2.0` |
-| `OperatorType.BinaryImageToRegion` | 二值图转区域 | 区域处理 | `1.1.0` |
-| `OperatorType.CycleCounter` | 循环计数器 | 变量 | `1.0.0` |
-| `OperatorType.VariableIncrement` | 变量递增 | 变量 | `1.0.0` |
-| `OperatorType.VariableRead` | 变量读取 | 变量 | `1.0.0` |
-| `OperatorType.VariableWrite` | 变量写入 | 变量 | `1.0.0` |
-| `OperatorType.AffineTransform` | 仿射变换 | 图像处理 | `1.0.0` |
-| `OperatorType.CopyMakeBorder` | 边界填充 | 图像处理 | `1.0.0` |
-| `OperatorType.ImageStitching` | 图像拼接 | 图像处理 | `1.0.0` |
-| `OperatorType.PolarUnwrap` | 极坐标展开 | 图像处理 | `1.0.0` |
-| `OperatorType.BlobLabeling` | Blob分类标注 | 定位 | `1.0.1` |
-| `OperatorType.CornerDetection` | 角点检测 | 定位 | `1.0.0` |
-| `OperatorType.EdgeIntersection` | 边线交点 | 定位 | `1.0.0` |
-| `OperatorType.ParallelLineFind` | 平行线查找 | 定位 | `1.0.0` |
-| `OperatorType.PositionCorrection` | ROI位姿补偿（像素） | 定位 | `1.0.3` |
-| `OperatorType.QuadrilateralFind` | 四边形查找 | 定位 | `1.0.0` |
-| `OperatorType.RectangleDetection` | 矩形检测 | 定位 | `1.0.0` |
-| `OperatorType.ImageCompose` | 图像组合 | 拆分组合 | `1.0.0` |
-| `OperatorType.ImageTiling` | 图像切片 | 拆分组合 | `1.0.0` |
+| `OperatorType.EuclideanClusterExtraction` | 欧氏聚类分割 | 3D点云 | `1.0.0` |
+| `OperatorType.PPFEstimation` | PPF点对特征 | 3D点云 | `1.0.0` |
+| `OperatorType.PPFMatch` | PPF点云粗匹配 | 3D点云 | `1.0.5` |
+| `OperatorType.RansacPlaneSegmentation` | RANSAC平面分割 | 3D点云 | `1.0.0` |
+| `OperatorType.StatisticalOutlierRemoval` | 点云统计离群点去除（SOR） | 3D点云 | `1.0.1` |
+| `OperatorType.VoxelDownsample` | 体素下采样 | 3D点云 | `1.0.1` |
+| `OperatorType.AnomalyDetection` | 异常检测 | AI推理 | `1.0.0` |
+| `OperatorType.DeepLearning` | 深度学习 | AI推理 | `1.0.0` |
+| `OperatorType.OcrRecognition` | OCR 识别 | AI推理 | `1.0.0` |
+| `OperatorType.SemanticSegmentation` | 语义分割 | AI推理 | `1.0.0` |
+| `OperatorType.AdaptiveThreshold` | 自适应阈值 | 分割与区域 | `1.0.0` |
+| `OperatorType.BinaryImageToRegion` | 二值图转区域 | 分割与区域 | `1.1.0` |
+| `OperatorType.BlobAnalysis` | Blob分析 | 分割与区域 | `1.2.1` |
+| `OperatorType.DistanceTransform` | 距离变换 | 分割与区域 | `1.0.1` |
+| `OperatorType.MorphologicalOperation` | 形态学操作 | 分割与区域 | `1.0.0` |
+| `OperatorType.Morphology` | 形态学（旧版） | 分割与区域 | `1.0.0` |
+| `OperatorType.RectangleRegion` | 矩形框定义 | 分割与区域 | `1.0.1` |
+| `OperatorType.RegionClosing` | 区域闭运算 | 分割与区域 | `1.0.2` |
+| `OperatorType.RegionComplement` | 区域补集 | 分割与区域 | `1.0.2` |
+| `OperatorType.RegionDifference` | 区域差集 | 分割与区域 | `1.0.2` |
+| `OperatorType.RegionDilation` | 区域膨胀 | 分割与区域 | `1.0.2` |
+| `OperatorType.RegionErosion` | 区域腐蚀 | 分割与区域 | `1.0.2` |
+| `OperatorType.RegionIntersection` | 区域交集 | 分割与区域 | `1.0.2` |
+| `OperatorType.RegionOpening` | 区域开运算 | 分割与区域 | `1.0.2` |
+| `OperatorType.RegionSkeleton` | 区域骨架化 | 分割与区域 | `1.0.2` |
+| `OperatorType.RegionUnion` | 区域并集 | 分割与区域 | `1.0.2` |
+| `OperatorType.Thresholding` | 全局阈值处理 | 分割与区域 | `1.0.0` |
+| `OperatorType.AkazeFeatureMatch` | AKAZE特征匹配 | 匹配与定位 | `1.0.0` |
+| `OperatorType.ContourExtrema` | 轮廓极值 | 匹配与定位 | `1.0.1` |
+| `OperatorType.EdgeIntersection` | 边线交点 | 匹配与定位 | `1.0.0` |
+| `OperatorType.GradientShapeMatch` | 梯度形状匹配 | 匹配与定位 | `1.1.0` |
+| `OperatorType.LocalDeformableMatching` | 局部可变形匹配 | 匹配与定位 | `1.1.1` |
+| `OperatorType.OrbFeatureMatch` | ORB特征匹配 | 匹配与定位 | `1.0.0` |
+| `OperatorType.ParallelLineFind` | 平行线查找 | 匹配与定位 | `1.0.0` |
+| `OperatorType.PlanarMatching` | 平面特征匹配 | 匹配与定位 | `1.1.3` |
+| `OperatorType.PointAlignment` | 点位偏差计算 | 匹配与定位 | `1.0.4` |
+| `OperatorType.PointCorrection` | 点位刚性补偿 | 匹配与定位 | `1.0.4` |
+| `OperatorType.PositionCorrection` | ROI位姿补偿（像素） | 匹配与定位 | `1.0.3` |
+| `OperatorType.PyramidShapeMatch` | 金字塔形状匹配 | 匹配与定位 | `1.0.0` |
+| `OperatorType.QuadrilateralFind` | 四边形查找 | 匹配与定位 | `1.0.0` |
+| `OperatorType.RectangleDetection` | 矩形检测 | 匹配与定位 | `1.0.0` |
+| `OperatorType.RoiTransform` | ROI位姿变换 | 匹配与定位 | `1.0.2` |
+| `OperatorType.ShapeMatching` | 旋转尺度模板匹配 | 匹配与定位 | `1.2.0` |
+| `OperatorType.TemplateMatching` | 模板匹配 | 匹配与定位 | `1.2.0` |
+| `OperatorType.AffineTransform` | 仿射变换 | 图像预处理 | `1.0.0` |
+| `OperatorType.BilateralFilter` | 双边滤波 | 图像预处理 | `1.0.0` |
+| `OperatorType.ClaheEnhancement` | CLAHE增强 | 图像预处理 | `1.0.0` |
+| `OperatorType.ColorConversion` | 颜色空间转换 | 图像预处理 | `1.0.0` |
+| `OperatorType.CopyMakeBorder` | 边界填充 | 图像预处理 | `1.0.0` |
+| `OperatorType.FFT1D` | 信号/图像傅里叶变换（FFT） | 图像预处理 | `1.0.0` |
+| `OperatorType.Filtering` | 滤波 | 图像预处理 | `1.0.0` |
+| `OperatorType.FrameAveraging` | 帧平均 | 图像预处理 | `1.0.0` |
+| `OperatorType.FrequencyFilter` | 频域滤波 | 图像预处理 | `1.0.0` |
+| `OperatorType.HistogramEqualization` | 直方图均衡化 | 图像预处理 | `1.0.0` |
+| `OperatorType.ImageAdd` | 图像加法 | 图像预处理 | `1.0.0` |
+| `OperatorType.ImageBlend` | 图像融合 | 图像预处理 | `1.0.0` |
+| `OperatorType.ImageCompose` | 图像组合 | 图像预处理 | `1.0.0` |
+| `OperatorType.ImageCrop` | 图像裁剪 | 图像预处理 | `1.0.0` |
+| `OperatorType.ImageNormalize` | 图像归一化 | 图像预处理 | `1.0.0` |
+| `OperatorType.ImageResize` | 图像缩放 | 图像预处理 | `1.0.0` |
+| `OperatorType.ImageRotate` | 图像旋转 | 图像预处理 | `1.0.0` |
+| `OperatorType.ImageStitching` | 图像拼接 | 图像预处理 | `1.0.0` |
+| `OperatorType.ImageSubtract` | 图像减法 | 图像预处理 | `1.0.0` |
+| `OperatorType.ImageTiling` | 图像切片 | 图像预处理 | `1.0.0` |
+| `OperatorType.InverseFFT1D` | 信号/图像逆傅里叶变换（IFFT） | 图像预处理 | `1.0.0` |
+| `OperatorType.LaplacianSharpen` | 拉普拉斯锐化 | 图像预处理 | `1.0.0` |
+| `OperatorType.MeanFilter` | 均值滤波 | 图像预处理 | `1.0.0` |
+| `OperatorType.MedianBlur` | 中值滤波 | 图像预处理 | `1.0.0` |
+| `OperatorType.PerspectiveTransform` | 透视变换 | 图像预处理 | `1.0.0` |
+| `OperatorType.PolarUnwrap` | 极坐标展开 | 图像预处理 | `1.0.0` |
+| `OperatorType.RoiManager` | ROI裁剪与掩膜 | 图像预处理 | `1.0.0` |
+| `OperatorType.ShadingCorrection` | 光照校正 | 图像预处理 | `1.0.0` |
 | `OperatorType.Aggregator` | 数据聚合 | 数据处理 | `1.0.0` |
 | `OperatorType.ArrayIndexer` | 数组索引器 | 数据处理 | `1.0.0` |
-| `OperatorType.BoxFilter` | 候选框过滤 (Bounding Box) | 数据处理 | `1.0.0` |
+| `OperatorType.BoxFilter` | 候选框筛选 | 数据处理 | `1.0.0` |
 | `OperatorType.BoxNms` | 候选框抑制 | 数据处理 | `1.0.0` |
-| `OperatorType.DatabaseWrite` | 数据库写入 | 数据处理 | `1.0.0` |
+| `OperatorType.Comparator` | 数值比较 | 数据处理 | `1.0.0` |
 | `OperatorType.JsonExtractor` | JSON 提取器 | 数据处理 | `1.0.0` |
+| `OperatorType.LogicGate` | 逻辑门 | 数据处理 | `1.0.0` |
 | `OperatorType.MathOperation` | 数值计算 | 数据处理 | `1.0.0` |
-| `OperatorType.PointAlignment` | 点位偏差计算 | 数据处理 | `1.0.4` |
-| `OperatorType.PointCorrection` | 点位刚性补偿 | 数据处理 | `1.0.4` |
+| `OperatorType.PointSetTool` | 点集工具 | 数据处理 | `1.0.0` |
+| `OperatorType.ScriptOperator` | 脚本算子 | 数据处理 | `1.0.0` |
+| `OperatorType.Statistics` | 统计分析 | 数据处理 | `1.0.0` |
+| `OperatorType.StringFormat` | 字符串格式化 | 数据处理 | `1.0.0` |
+| `OperatorType.TimerStatistics` | 计时统计 | 数据处理 | `1.0.1` |
+| `OperatorType.TypeConvert` | 类型转换 | 数据处理 | `1.0.0` |
 | `OperatorType.UnitConvert` | 单位换算 | 数据处理 | `1.0.0` |
-| `OperatorType.CalibrationLoader` | Calibration Loader | 标定 | `1.0.0` |
-| `OperatorType.CameraCalibration` | Camera Calibration | 标定 | `1.0.0` |
-| `OperatorType.CoordinateTransform` | Coordinate Transform | 标定 | `1.0.0` |
-| `OperatorType.FisheyeCalibration` | Fisheye Calibration | 标定 | `1.0.0` |
-| `OperatorType.FisheyeUndistort` | Fisheye Undistort | 标定 | `1.0.0` |
-| `OperatorType.HandEyeCalibration` | Hand-Eye Calibration | 标定 | `1.0.0` |
-| `OperatorType.HandEyeCalibrationValidator` | Hand-Eye Calibration Validator | 标定 | `1.0.1` |
-| `OperatorType.NPointCalibration` | N Point Calibration | 标定 | `1.0.0` |
-| `OperatorType.PixelToWorldTransform` | Pixel To World Transform | 标定 | `1.0.1` |
-| `OperatorType.StereoCalibration` | Stereo Calibration | 标定 | `1.0.0` |
-| `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | 标定 | `1.0.0` |
-| `OperatorType.Undistort` | Undistort | 标定 | `1.0.0` |
-| `OperatorType.ArcCaliper` | Arc Caliper | 检测 | `1.0.1` |
-| `OperatorType.CaliperTool` | 卡尺工具 | 检测 | `1.0.0` |
-| `OperatorType.CircleMeasurement` | 圆测量 | 检测 | `1.1.2` |
-| `OperatorType.ContourExtrema` | Contour Extrema | 检测 | `1.0.1` |
-| `OperatorType.GapMeasurement` | 间隙测量 | 检测 | `1.0.0` |
-| `OperatorType.GeoMeasurement` | 几何测量 | 检测 | `1.0.0` |
-| `OperatorType.GeometricFitting` | Geometric Fitting | 检测 | `1.0.0` |
-| `OperatorType.GeometricTolerance` | 二维几何公差判定 | 检测 | `1.0.1` |
-| `OperatorType.HistogramAnalysis` | 直方图分析 | 检测 | `1.0.0` |
-| `OperatorType.LineLineDistance` | 线线距离 | 检测 | `1.0.0` |
-| `OperatorType.LineMeasurement` | 直线测量 | 检测 | `1.0.0` |
-| `OperatorType.Measurement` | 测量 | 检测 | `1.0.0` |
-| `OperatorType.MinEnclosingGeometry` | Min Enclosing Geometry | 检测 | `1.0.1` |
-| `OperatorType.PhaseClosure` | Phase Closure | 检测 | `1.0.1` |
-| `OperatorType.PixelStatistics` | 像素统计 | 检测 | `1.0.0` |
-| `OperatorType.PointLineDistance` | 点线距离 | 检测 | `1.0.0` |
-| `OperatorType.SharpnessEvaluation` | 清晰度评估 | 检测 | `1.0.0` |
-| `OperatorType.WidthMeasurement` | 宽度测量 | 检测 | `1.0.0` |
-| `OperatorType.Comparator` | 数值比较 | 流程控制 | `1.0.0` |
+| `OperatorType.VariableIncrement` | 变量递增 | 数据处理 | `1.0.0` |
+| `OperatorType.VariableRead` | 变量读取 | 数据处理 | `1.0.0` |
+| `OperatorType.VariableWrite` | 变量写入 | 数据处理 | `1.0.0` |
+| `OperatorType.CalibrationLoader` | 标定加载 | 标定与坐标 | `1.0.0` |
+| `OperatorType.CameraCalibration` | 相机标定 | 标定与坐标 | `1.0.0` |
+| `OperatorType.CoordinateTransform` | 像素到物理坐标（单点） | 标定与坐标 | `1.0.0` |
+| `OperatorType.FisheyeCalibration` | 鱼眼标定 | 标定与坐标 | `1.0.0` |
+| `OperatorType.FisheyeUndistort` | 鱼眼去畸变 | 标定与坐标 | `1.0.0` |
+| `OperatorType.HandEyeCalibration` | 手眼标定 | 标定与坐标 | `1.0.0` |
+| `OperatorType.HandEyeCalibrationValidator` | 手眼标定验证 | 标定与坐标 | `1.0.1` |
+| `OperatorType.NPointCalibration` | N点标定 | 标定与坐标 | `1.0.0` |
+| `OperatorType.PixelToWorldTransform` | 像素世界映射 | 标定与坐标 | `1.0.1` |
+| `OperatorType.StereoCalibration` | 双目标定 | 标定与坐标 | `1.0.0` |
+| `OperatorType.TranslationRotationCalibration` | 平移旋转标定 | 标定与坐标 | `1.0.0` |
+| `OperatorType.Undistort` | 畸变校正 | 标定与坐标 | `1.0.0` |
 | `OperatorType.ConditionalBranch` | 条件分支 | 流程控制 | `1.0.0` |
+| `OperatorType.CycleCounter` | 循环计数器 | 流程控制 | `1.0.0` |
 | `OperatorType.Delay` | 延时 | 流程控制 | `1.0.0` |
 | `OperatorType.ForEach` | ForEach 循环 | 流程控制 | `1.0.0` |
-| `OperatorType.TryCatch` | 异常捕获 | 流程控制 | `1.0.0` |
-| `OperatorType.BlobAnalysis` | Blob分析 | 特征提取 | `1.2.1` |
+| `OperatorType.FrameChangeTrigger` | 帧变化触发 | 流程控制 | `1.0.0` |
+| `OperatorType.ResultJudgment` | 结果判定 | 流程控制 | `1.0.1` |
+| `OperatorType.TriggerModule` | 触发模块 | 流程控制 | `1.0.0` |
+| `OperatorType.TryCatch` | Try分支透传 | 流程控制 | `1.0.0` |
+| `OperatorType.AngleMeasurement` | 角度测量 | 测量 | `1.0.0` |
+| `OperatorType.ArcCaliper` | 圆弧卡尺 | 测量 | `1.0.1` |
+| `OperatorType.CaliperTool` | 卡尺工具 | 测量 | `1.0.0` |
+| `OperatorType.CircleMeasurement` | 圆测量 | 测量 | `1.1.2` |
+| `OperatorType.ColorMeasurement` | 颜色测量 | 测量 | `2.0.0` |
+| `OperatorType.ContourMeasurement` | 轮廓测量 | 测量 | `1.0.0` |
+| `OperatorType.GapMeasurement` | 间隙测量 | 测量 | `1.0.0` |
+| `OperatorType.GeoMeasurement` | 几何测量 | 测量 | `1.0.0` |
+| `OperatorType.GeometricFitting` | 几何拟合 | 测量 | `1.0.0` |
+| `OperatorType.GeometricTolerance` | 二维几何公差判定 | 测量 | `1.0.1` |
+| `OperatorType.LineLineDistance` | 线线距离 | 测量 | `1.0.0` |
+| `OperatorType.LineMeasurement` | 直线测量 | 测量 | `1.0.0` |
+| `OperatorType.Measurement` | 测量 | 测量 | `1.0.0` |
+| `OperatorType.MinEnclosingGeometry` | 最小外接几何体 | 测量 | `1.0.1` |
+| `OperatorType.PhaseClosure` | 相位解缠绕 | 测量 | `1.0.1` |
+| `OperatorType.PointLineDistance` | 点线距离 | 测量 | `1.0.0` |
+| `OperatorType.WidthMeasurement` | 宽度测量 | 测量 | `1.0.0` |
+| `OperatorType.BlobLabeling` | Blob分类标注 | 特征提取 | `1.0.1` |
+| `OperatorType.CodeRecognition` | 条码识别 | 特征提取 | `1.0.0` |
+| `OperatorType.ColorDetection` | 颜色分析 | 特征提取 | `2.0.1` |
 | `OperatorType.ContourDetection` | 轮廓检测 | 特征提取 | `1.0.0` |
-| `OperatorType.EdgeDetection` | Edge Detection | 特征提取 | `1.0.0` |
-| `OperatorType.SubpixelEdgeDetection` | Subpixel Edge Detection | 特征提取 | `1.0.0` |
-| `OperatorType.CodeRecognition` | 条码识别 | 识别 | `1.0.0` |
-| `OperatorType.OcrRecognition` | OCR 识别 | 识别 | `1.0.0` |
-| `OperatorType.Comment` | 注释 | 辅助 | `1.0.1` |
-| `OperatorType.RoiManager` | ROI管理器 | 辅助 | `1.0.0` |
-| `OperatorType.RoiTransform` | ROI位姿变换 | 辅助 | `1.0.2` |
-| `OperatorType.ImageSave` | 图像保存 | 输出 | `1.0.0` |
-| `OperatorType.ResultOutput` | 结果输出 | 输出 | `1.0.1` |
+| `OperatorType.CornerDetection` | 角点检测 | 特征提取 | `1.0.0` |
+| `OperatorType.EdgeDetection` | 边缘检测 | 特征提取 | `1.0.0` |
+| `OperatorType.GlcmTexture` | GLCM纹理特征 | 特征提取 | `1.0.1` |
+| `OperatorType.HistogramAnalysis` | 直方图分析 | 特征提取 | `1.0.0` |
+| `OperatorType.ImageDiff` | 图像差异率分析 | 特征提取 | `1.0.1` |
+| `OperatorType.LawsTextureFilter` | Laws纹理滤波 | 特征提取 | `1.0.1` |
+| `OperatorType.PixelStatistics` | 像素统计 | 特征提取 | `1.0.0` |
+| `OperatorType.SharpnessEvaluation` | 清晰度评估 | 特征提取 | `1.0.0` |
+| `OperatorType.SubpixelEdgeDetection` | 亚像素边缘 | 特征提取 | `1.0.0` |
+| `OperatorType.DetectionSequenceJudge` | 检测顺序判定 | 缺陷检测 | `1.0.1` |
+| `OperatorType.DualModalVoting` | 双模态投票 | 缺陷检测 | `1.0.0` |
+| `OperatorType.EdgePairDefect` | 边缘间距缺陷检测 | 缺陷检测 | `1.0.1` |
+| `OperatorType.SurfaceDefectDetection` | 表面缺陷检测 | 缺陷检测 | `2.0.0` |
+| `OperatorType.Comment` | 注释 | 输出与辅助 | `1.0.1` |
+| `OperatorType.DatabaseWrite` | 数据库写入 | 输出与辅助 | `1.0.0` |
+| `OperatorType.ImageSave` | 图像保存 | 输出与辅助 | `1.0.0` |
+| `OperatorType.ResultOutput` | 结果输出 | 输出与辅助 | `1.0.1` |
+| `OperatorType.TextSave` | 文本保存 | 输出与辅助 | `1.0.0` |
 | `OperatorType.HttpRequest` | HTTP 请求 | 通信 | `1.0.0` |
+| `OperatorType.MitsubishiMcCommunication` | 三菱MC通信 | 通信 | `1.0.0` |
+| `OperatorType.ModbusCommunication` | Modbus TCP通信 | 通信 | `1.0.0` |
+| `OperatorType.MqttPublish` | MQTT 发布 | 通信 | `0.1.0` |
 | `OperatorType.OmronFinsCommunication` | 欧姆龙FINS通信 | 通信 | `1.0.0` |
 | `OperatorType.SerialCommunication` | 串口通信 | 通信 | `1.0.0` |
 | `OperatorType.SiemensS7Communication` | 西门子S7通信 | 通信 | `1.0.0` |
 | `OperatorType.TcpCommunication` | TCP通信 | 通信 | `1.0.0` |
-| `OperatorType.LogicGate` | 逻辑门 | 通用 | `1.0.0` |
-| `OperatorType.Statistics` | Statistics | 通用 | `1.0.0` |
-| `OperatorType.StringFormat` | 字符串格式化 | 通用 | `1.0.0` |
-| `OperatorType.TypeConvert` | Type Convert | 通用 | `1.0.0` |
-| `OperatorType.FrameChangeTrigger` | 帧变化触发 | 逻辑工具 | `1.0.0` |
-| `OperatorType.PointSetTool` | 点集工具 | 逻辑工具 | `1.0.0` |
-| `OperatorType.ScriptOperator` | 脚本算子 | 逻辑工具 | `1.0.0` |
-| `OperatorType.TextSave` | Text Save | 逻辑工具 | `1.0.0` |
-| `OperatorType.TimerStatistics` | 计时统计 | 逻辑工具 | `1.0.1` |
-| `OperatorType.TriggerModule` | 触发模块 | 逻辑工具 | `1.0.0` |
 | `OperatorType.ImageAcquisition` | 图像采集 | 采集 | `1.0.0` |
-| `OperatorType.AdaptiveThreshold` | Adaptive Threshold | 预处理 | `1.0.0` |
-| `OperatorType.BilateralFilter` | 双边滤波 | 预处理 | `1.0.0` |
-| `OperatorType.ClaheEnhancement` | CLAHE增强 | 预处理 | `1.0.0` |
-| `OperatorType.ColorConversion` | 颜色空间转换 | 预处理 | `1.0.0` |
-| `OperatorType.Filtering` | Gaussian Blur | 预处理 | `1.0.0` |
-| `OperatorType.FrameAveraging` | 帧平均 | 预处理 | `1.0.0` |
-| `OperatorType.HistogramEqualization` | 直方图均衡化 | 预处理 | `1.0.0` |
-| `OperatorType.ImageAdd` | 图像加法 | 预处理 | `1.0.0` |
-| `OperatorType.ImageBlend` | 图像融合 | 预处理 | `1.0.0` |
-| `OperatorType.ImageCrop` | 图像裁剪 | 预处理 | `1.0.0` |
-| `OperatorType.ImageDiff` | 图像差异率分析 | 预处理 | `1.0.1` |
-| `OperatorType.ImageNormalize` | 图像归一化 | 预处理 | `1.0.0` |
-| `OperatorType.ImageResize` | 图像缩放 | 预处理 | `1.0.0` |
-| `OperatorType.ImageRotate` | 图像旋转 | 预处理 | `1.0.0` |
-| `OperatorType.ImageSubtract` | Image Subtract | 预处理 | `1.0.0` |
-| `OperatorType.LaplacianSharpen` | 拉普拉斯锐化 | 预处理 | `1.0.0` |
-| `OperatorType.MeanFilter` | 均值滤波 | 预处理 | `1.0.0` |
-| `OperatorType.MedianBlur` | 中值滤波 | 预处理 | `1.0.0` |
-| `OperatorType.MorphologicalOperation` | Morphological Operation | 预处理 | `1.0.0` |
-| `OperatorType.Morphology` | 形态学（旧版） | 预处理 | `1.0.0` |
-| `OperatorType.PerspectiveTransform` | 透视变换 | 预处理 | `1.0.0` |
-| `OperatorType.ShadingCorrection` | 光照校正 | 预处理 | `1.0.0` |
-| `OperatorType.Thresholding` | Threshold | 预处理 | `1.0.0` |
-| `OperatorType.ColorDetection` | 颜色分析 | 颜色处理 | `2.0.1` |
-| `OperatorType.ColorMeasurement` | 颜色测量 | 颜色处理 | `2.0.0` |
 
 ## 历史变更 / Historical Changes
 
-### OperatorType.AdaptiveThreshold / Adaptive Threshold
+### OperatorType.AdaptiveThreshold / 自适应阈值
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `ADCB78859597` |
@@ -234,7 +234,7 @@
 | `1.0.0` | `2026-03-04T10:35:29.6469155+08:00` | `6F966F31BFBE` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `7826C15D141A` |
 
-### OperatorType.AngleMeasurement / Angle Measurement
+### OperatorType.AngleMeasurement / 角度测量
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `D2D4B6255795` |
@@ -268,7 +268,7 @@
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `0C14CFAF3486` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `C16C20BC74A9` |
 
-### OperatorType.ArcCaliper / Arc Caliper
+### OperatorType.ArcCaliper / 圆弧卡尺
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.1` | `2026-07-15T23:30:27.8052247+08:00` | `7BA3C3856A96` |
@@ -363,7 +363,7 @@
 | `1.0.0` | `2026-03-04T19:17:03.2031512+08:00` | `10BC8AC0A2DD` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `CB8C33825ABA` |
 
-### OperatorType.BoxFilter / 候选框过滤 (Bounding Box)
+### OperatorType.BoxFilter / 候选框筛选
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `898A7A451131` |
@@ -397,7 +397,7 @@
 | `1.0.0` | `2026-03-04T19:17:03.2031512+08:00` | `96FD137BF2A1` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `C0B7D3338B2D` |
 
-### OperatorType.CalibrationLoader / Calibration Loader
+### OperatorType.CalibrationLoader / 标定加载
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `9772DFDD3722` |
@@ -434,7 +434,7 @@
 | `1.0.0` | `2026-03-04T19:17:03.2031512+08:00` | `BE0CC297B91B` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `18247D9E6FB3` |
 
-### OperatorType.CameraCalibration / Camera Calibration
+### OperatorType.CameraCalibration / 相机标定
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `C585B29ADB4C` |
@@ -612,7 +612,7 @@
 | `1.0.0` | `2026-03-15T14:24:43.1972535+08:00` | `D73488938EDD` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `62F866A1DD98` |
 
-### OperatorType.ContourExtrema / Contour Extrema
+### OperatorType.ContourExtrema / 轮廓极值
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.1` | `2026-07-15T23:30:27.8052247+08:00` | `B65CCB0FA5A6` |
@@ -627,7 +627,7 @@
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `89D3C64A1F06` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `CF1814DC72D3` |
 
-### OperatorType.ContourMeasurement / Contour Measurement
+### OperatorType.ContourMeasurement / 轮廓测量
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `F432B90C5D9E` |
@@ -641,7 +641,7 @@
 | `1.0.0` | `2026-04-12T12:53:52.9929473+08:00` | `9E59A9BBDB9F` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `54B6127392FC` |
 
-### OperatorType.CoordinateTransform / Coordinate Transform
+### OperatorType.CoordinateTransform / 像素到物理坐标（单点）
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `5BFCAB39E166` |
@@ -780,7 +780,7 @@
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `8A2065048793` |
 | `1.0.0` | `2026-03-19T21:05:20.9090050+08:00` | `FBDBEFB1AF7F` |
 
-### OperatorType.DistanceTransform / Distance Transform
+### OperatorType.DistanceTransform / 距离变换
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.1` | `2026-07-15T23:30:27.8052247+08:00` | `E8B0ADB92C9E` |
@@ -795,7 +795,7 @@
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `F7E7D8FDA5AC` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `067E9764FAD3` |
 
-### OperatorType.DualModalVoting / Dual Modal Voting
+### OperatorType.DualModalVoting / 双模态投票
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `42087A627743` |
@@ -812,7 +812,7 @@
 | `1.0.0` | `2026-03-26T18:46:50.6676488+08:00` | `B50F970BACFE` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `F7DA5BDB66C7` |
 
-### OperatorType.EdgeDetection / Edge Detection
+### OperatorType.EdgeDetection / 边缘检测
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `38FFF9FBB0E3` |
@@ -877,7 +877,7 @@
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `24432AA1D437` |
 | `1.0.0` | `2026-03-17T15:49:49.5980240+08:00` | `80F7E85D31B4` |
 
-### OperatorType.FFT1D / FFT 1D
+### OperatorType.FFT1D / 信号/图像傅里叶变换（FFT）
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `B659D1564E85` |
@@ -890,7 +890,7 @@
 | `1.0.0` | `2026-04-18T22:49:10.0250597+08:00` | `9C0C2BD10FA0` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `0A819319AA59` |
 
-### OperatorType.Filtering / Gaussian Blur
+### OperatorType.Filtering / 滤波
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `2A1686DD9A03` |
@@ -904,7 +904,7 @@
 | `1.0.0` | `2026-03-26T18:46:50.6676488+08:00` | `D9C1A51FA92C` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `10556AD6D71E` |
 
-### OperatorType.FisheyeCalibration / Fisheye Calibration
+### OperatorType.FisheyeCalibration / 鱼眼标定
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `32D00208651B` |
@@ -918,7 +918,7 @@
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `990EBD083DE8` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `72B2E9BED29F` |
 
-### OperatorType.FisheyeUndistort / Fisheye Undistort
+### OperatorType.FisheyeUndistort / 鱼眼去畸变
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `ECE6582AD3EB` |
@@ -979,7 +979,7 @@
 | `1.0.0` | `2026-05-20T23:16:04.5632818+08:00` | `38926D226ABC` |
 | `1.0.0` | `2026-05-16T11:53:47.4328965+08:00` | `4A6E36C8EA66` |
 
-### OperatorType.FrequencyFilter / Frequency Filter
+### OperatorType.FrequencyFilter / 频域滤波
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `A1ED695BA4D7` |
@@ -1029,7 +1029,7 @@
 | `1.0.0` | `2026-03-04T19:17:03.2031512+08:00` | `20AC7D63887E` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `8F4ECDF2968D` |
 
-### OperatorType.GeometricFitting / Geometric Fitting
+### OperatorType.GeometricFitting / 几何拟合
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `67FCFB64D826` |
@@ -1073,7 +1073,7 @@
 | `1.0.0` | `2026-03-04T19:17:03.2031512+08:00` | `9BDF9252DECC` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `CC1399C0B8AD` |
 
-### OperatorType.GlcmTexture / GLCM Texture Features
+### OperatorType.GlcmTexture / GLCM纹理特征
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.1` | `2026-07-15T23:30:27.8052247+08:00` | `2B85D51265CF` |
@@ -1107,7 +1107,7 @@
 | `1.0.0` | `2026-03-15T14:24:43.1972535+08:00` | `BE1DD761D410` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `C4917CE7BE0A` |
 
-### OperatorType.HandEyeCalibration / Hand-Eye Calibration
+### OperatorType.HandEyeCalibration / 手眼标定
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `55D75C479F07` |
@@ -1122,7 +1122,7 @@
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `2958261D0E81` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `0E8F8C1E43EC` |
 
-### OperatorType.HandEyeCalibrationValidator / Hand-Eye Calibration Validator
+### OperatorType.HandEyeCalibrationValidator / 手眼标定验证
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.1` | `2026-07-15T23:30:27.8052247+08:00` | `6C858E6A5BCB` |
@@ -1339,7 +1339,7 @@
 | `1.0.0` | `2026-03-04T19:17:03.2031512+08:00` | `6E49A6E1A982` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `648EE37D0E05` |
 
-### OperatorType.ImageSubtract / Image Subtract
+### OperatorType.ImageSubtract / 图像减法
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `82848B21C846` |
@@ -1369,7 +1369,7 @@
 | `1.0.0` | `2026-03-04T19:17:03.2031512+08:00` | `98FA118539D1` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `E5252D9D290F` |
 
-### OperatorType.InverseFFT1D / Inverse FFT 1D
+### OperatorType.InverseFFT1D / 信号/图像逆傅里叶变换（IFFT）
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `9AE118408700` |
@@ -1408,7 +1408,7 @@
 | `1.0.0` | `2026-05-16T11:53:47.4328965+08:00` | `8BE0560EBB60` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `7F718355AFC8` |
 
-### OperatorType.LawsTextureFilter / Laws Texture Filter
+### OperatorType.LawsTextureFilter / Laws纹理滤波
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.1` | `2026-07-15T23:30:27.8052247+08:00` | `559E3C797E42` |
@@ -1456,7 +1456,7 @@
 | `1.0.0` | `2026-04-12T12:53:52.9929473+08:00` | `2FF0E868B0A4` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `FB7CB0898D13` |
 
-### OperatorType.LocalDeformableMatching / Local Deformable Matching
+### OperatorType.LocalDeformableMatching / 局部可变形匹配
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.1.1` | `2026-07-15T23:30:27.8052247+08:00` | `5BE809CECF41` |
@@ -1543,7 +1543,7 @@
 | `1.0.0` | `2026-05-16T11:53:47.4328965+08:00` | `A9FDA79A012E` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `2809B653B975` |
 
-### OperatorType.MinEnclosingGeometry / Min Enclosing Geometry
+### OperatorType.MinEnclosingGeometry / 最小外接几何体
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.1` | `2026-07-15T23:30:27.8052247+08:00` | `7443182E1DC9` |
@@ -1557,7 +1557,7 @@
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `1575F5D91455` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `9A00C29AC41A` |
 
-### OperatorType.MitsubishiMcCommunication / Mitsubishi MC Communication
+### OperatorType.MitsubishiMcCommunication / 三菱MC通信
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `D7329F8F0462` |
@@ -1576,7 +1576,7 @@
 | `1.0.0` | `2026-02-27T21:13:09.9008744+08:00` | `6FCA4034036C` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `5CBB32DC2CED` |
 
-### OperatorType.ModbusCommunication / Modbus Communication
+### OperatorType.ModbusCommunication / Modbus TCP通信
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `AFEDD857BA15` |
@@ -1597,7 +1597,7 @@
 | `1.0.0` | `2026-03-26T18:46:50.6676488+08:00` | `2FB888EEAEA1` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `EAC52E7749F1` |
 
-### OperatorType.MorphologicalOperation / Morphological Operation
+### OperatorType.MorphologicalOperation / 形态学操作
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `A56DCA7D70AF` |
@@ -1629,7 +1629,7 @@
 | `1.0.0` | `2026-02-27T09:08:37.3873065+08:00` | `3161073CD194` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `7D8DED829483` |
 
-### OperatorType.MqttPublish / MQTT Publish
+### OperatorType.MqttPublish / MQTT 发布
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `0.1.0` | `2026-07-15T23:30:27.8052247+08:00` | `FBB646D8068D` |
@@ -1643,9 +1643,10 @@
 | `1.0.0` | `2026-03-16T01:00:41.9846479+08:00` | `FFCB190578C7` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `7F475495E079` |
 
-### OperatorType.NPointCalibration / N Point Calibration
+### OperatorType.NPointCalibration / N点标定
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.0` | `2026-08-08T03:09:31.3343663+08:00` | `ECEAA8C462F5` |
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `9E84376360AF` |
 | `1.0.0` | `2026-07-14T20:14:37.8217755+08:00` | `0D5E991D8429` |
 | `1.0.0` | `2026-07-06T21:35:46.7699945+08:00` | `8146925C3F26` |
@@ -1772,7 +1773,7 @@
 | `1.0.0` | `2026-02-27T09:08:37.3873065+08:00` | `683816ED05A1` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `386962DF7E0B` |
 
-### OperatorType.PhaseClosure / Phase Closure
+### OperatorType.PhaseClosure / 相位解缠绕
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.1` | `2026-07-15T23:30:27.8052247+08:00` | `30BC8DAA30EB` |
@@ -1810,7 +1811,7 @@
 | `1.0.0` | `2026-03-04T19:17:03.2031512+08:00` | `82DC78427BAF` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `4EB06D674A3D` |
 
-### OperatorType.PixelToWorldTransform / Pixel To World Transform
+### OperatorType.PixelToWorldTransform / 像素世界映射
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.1` | `2026-07-15T23:30:27.8052247+08:00` | `2D341C3E15D1` |
@@ -2032,7 +2033,7 @@
 | `1.0.1` | `2026-07-13T11:24:34.6274067+08:00` | `18565944D1CE` |
 | `1.0.0` | `2026-07-13T11:23:19.7870903+08:00` | `6121B78706A3` |
 
-### OperatorType.RegionClosing / Region Closing
+### OperatorType.RegionClosing / 区域闭运算
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.2` | `2026-07-15T23:30:27.8052247+08:00` | `6B693062FF99` |
@@ -2051,7 +2052,7 @@
 | `1.0.0` | `2026-04-22T00:42:55.8987044+08:00` | `98C3BA2E149D` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `51C06A810144` |
 
-### OperatorType.RegionComplement / Region Complement
+### OperatorType.RegionComplement / 区域补集
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.2` | `2026-07-15T23:30:27.8052247+08:00` | `94EBFC8E6B90` |
@@ -2071,7 +2072,7 @@
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `AE6829D33D5A` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `8BD7259C4E0C` |
 
-### OperatorType.RegionDifference / Region Difference
+### OperatorType.RegionDifference / 区域差集
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.2` | `2026-07-15T23:30:27.8052247+08:00` | `0F64B735BE91` |
@@ -2088,7 +2089,7 @@
 | `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `352DD8966BC9` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `4035E96533FB` |
 
-### OperatorType.RegionDilation / Region Dilation
+### OperatorType.RegionDilation / 区域膨胀
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.2` | `2026-07-15T23:30:27.8052247+08:00` | `5FD121C803B4` |
@@ -2106,7 +2107,7 @@
 | `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `4498ABDC40C9` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `665F8400F9BB` |
 
-### OperatorType.RegionErosion / Region Erosion
+### OperatorType.RegionErosion / 区域腐蚀
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.2` | `2026-07-15T23:30:27.8052247+08:00` | `C0E8DA588025` |
@@ -2124,7 +2125,7 @@
 | `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `30B22EB3B176` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `08885F6CC301` |
 
-### OperatorType.RegionIntersection / Region Intersection
+### OperatorType.RegionIntersection / 区域交集
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.2` | `2026-07-15T23:30:27.8052247+08:00` | `82EF8E501027` |
@@ -2141,7 +2142,7 @@
 | `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `52CB74CC5F93` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `B29DEF5EB888` |
 
-### OperatorType.RegionOpening / Region Opening
+### OperatorType.RegionOpening / 区域开运算
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.2` | `2026-07-15T23:30:27.8052247+08:00` | `AF879B2B877A` |
@@ -2161,7 +2162,7 @@
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `BFA8EED40F07` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `B1DA89F6441D` |
 
-### OperatorType.RegionSkeleton / Region Skeleton
+### OperatorType.RegionSkeleton / 区域骨架化
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.2` | `2026-07-15T23:30:27.8052247+08:00` | `AFABE6AC77B4` |
@@ -2181,7 +2182,7 @@
 | `1.0.0` | `2026-04-12T12:53:52.9929473+08:00` | `618A97A0B08E` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `0B331757C5AA` |
 
-### OperatorType.RegionUnion / Region Union
+### OperatorType.RegionUnion / 区域并集
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.2` | `2026-07-15T23:30:27.8052247+08:00` | `8A689C1ACECD` |
@@ -2198,7 +2199,7 @@
 | `1.0.1` | `2026-04-24T21:36:45.8180800+08:00` | `346E066817F1` |
 | `1.0.0` | `2026-03-18T19:00:25.2910689+08:00` | `148881C196DD` |
 
-### OperatorType.ResultJudgment / Result Judgment
+### OperatorType.ResultJudgment / 结果判定
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.1` | `2026-07-15T23:30:27.8052247+08:00` | `29779CBE7C7E` |
@@ -2239,7 +2240,7 @@
 | `1.0.0` | `2026-03-04T11:07:12.6855371+08:00` | `F230E925DC3A` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `CD53E822B204` |
 
-### OperatorType.RoiManager / ROI管理器
+### OperatorType.RoiManager / ROI裁剪与掩膜
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `82BEA9FE2FB2` |
@@ -2405,7 +2406,7 @@
 | `1.0.0` | `2026-03-21T01:38:49.8374844+08:00` | `6824980A49D6` |
 | `1.0.0` | `2026-03-17T15:25:05.6682201+08:00` | `39F96B06A2E6` |
 
-### OperatorType.Statistics / Statistics
+### OperatorType.Statistics / 统计分析
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `DD0D3F0B8A5F` |
@@ -2421,7 +2422,7 @@
 | `1.0.0` | `2026-02-27T09:08:37.3873065+08:00` | `284782E31077` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `332ECE5D2E91` |
 
-### OperatorType.StereoCalibration / Stereo Calibration
+### OperatorType.StereoCalibration / 双目标定
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `58ACA1A27A44` |
@@ -2452,7 +2453,7 @@
 | `1.0.0` | `2026-03-26T18:46:50.6676488+08:00` | `4CCDDE88F48F` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `2A4462CE9D5A` |
 
-### OperatorType.SubpixelEdgeDetection / Subpixel Edge Detection
+### OperatorType.SubpixelEdgeDetection / 亚像素边缘
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `E3862E9B1882` |
@@ -2530,7 +2531,7 @@
 | `1.0.0` | `2026-03-04T10:35:29.6469155+08:00` | `9D6ABB27BF04` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `19F60BB66DE8` |
 
-### OperatorType.TextSave / Text Save
+### OperatorType.TextSave / 文本保存
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `A470E98CEA22` |
@@ -2547,7 +2548,7 @@
 | `1.0.0` | `2026-03-04T19:17:03.2031512+08:00` | `BD1CB4079308` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `23E51E9AEF58` |
 
-### OperatorType.Thresholding / Threshold
+### OperatorType.Thresholding / 全局阈值处理
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `B7FA502962CA` |
@@ -2615,7 +2616,7 @@
 | `1.0.0` | `2026-03-04T19:17:03.2031512+08:00` | `4325D6D6D8A0` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `8EBA52E49F78` |
 
-### OperatorType.TryCatch / 异常捕获
+### OperatorType.TryCatch / Try分支透传
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `8E2C7F4F1A9D` |
@@ -2632,7 +2633,7 @@
 | `1.0.0` | `2026-03-15T14:24:43.1972535+08:00` | `4063A03C1DD0` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `92086F4126B2` |
 
-### OperatorType.TypeConvert / Type Convert
+### OperatorType.TypeConvert / 类型转换
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `0273B948BFA7` |
@@ -2650,7 +2651,7 @@
 | `1.0.0` | `2026-03-04T19:17:03.2031512+08:00` | `8BCC83E53180` |
 | `1.0.0` | `2026-02-26T21:18:02.8071504+08:00` | `A92AC259F970` |
 
-### OperatorType.Undistort / Undistort
+### OperatorType.Undistort / 畸变校正
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
 | `1.0.0` | `2026-07-15T23:30:27.8052247+08:00` | `E80A369C10A6` |

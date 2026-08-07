@@ -365,7 +365,7 @@ public static class CalibrationDraftEndpoints
     {
         imageX = 0;
         imageY = 0;
-        if (solve.TransformModel == TransformModelV2.Affine &&
+        if (solve.TransformModel is (TransformModelV2.Affine or TransformModelV2.ScaleOffset) &&
             TryInvertAffine(solve.TransformMatrix, out var affine))
         {
             imageX = affine[0][0] * world.X + affine[0][1] * world.Y + affine[0][2];
@@ -605,6 +605,13 @@ public static class CalibrationDraftEndpoints
         if (string.Equals(raw, "Perspective", StringComparison.OrdinalIgnoreCase))
         {
             return NPointCalibrationMode.Perspective;
+        }
+
+        if (string.Equals(raw, "ScaleOffset", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(raw, "PlanarScaleOffset", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(raw, "Planar", StringComparison.OrdinalIgnoreCase))
+        {
+            return NPointCalibrationMode.ScaleOffset;
         }
 
         if (!string.Equals(raw, "Affine", StringComparison.OrdinalIgnoreCase))

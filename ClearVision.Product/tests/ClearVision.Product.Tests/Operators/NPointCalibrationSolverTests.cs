@@ -14,6 +14,7 @@ public class NPointCalibrationSolverTests
     [Theory]
     [InlineData(NPointCalibrationMode.Affine)]
     [InlineData(NPointCalibrationMode.Perspective)]
+    [InlineData(NPointCalibrationMode.ScaleOffset)]
     public async Task Solve_WithStableSamples_ShouldMatchOperatorLegacyOutputs(NPointCalibrationMode mode)
     {
         var pairs = mode == NPointCalibrationMode.Affine
@@ -30,7 +31,12 @@ public class NPointCalibrationSolverTests
         var operatorExecutor = new NPointCalibrationOperator(Substitute.For<ILogger<NPointCalibrationOperator>>());
         var op = CreateOperator(new Dictionary<string, object>
         {
-            ["CalibrationMode"] = mode == NPointCalibrationMode.Perspective ? "Perspective" : "Affine",
+            ["CalibrationMode"] = mode switch
+            {
+                NPointCalibrationMode.Perspective => "Perspective",
+                NPointCalibrationMode.ScaleOffset => "ScaleOffset",
+                _ => "Affine"
+            },
             ["PointPairs"] = ToPointPairsJson(pairs),
             ["RansacReprojectionThreshold"] = options.RansacReprojectionThreshold,
             ["RansacMaxIterations"] = options.RansacMaxIterations,

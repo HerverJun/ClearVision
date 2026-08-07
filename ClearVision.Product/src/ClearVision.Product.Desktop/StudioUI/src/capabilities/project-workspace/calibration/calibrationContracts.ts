@@ -1,4 +1,4 @@
-export type CalibrationMode = 'Affine' | 'Perspective';
+export type CalibrationMode = 'Affine' | 'Perspective' | 'ScaleOffset';
 
 export interface CalibrationSample {
   readonly sampleId: string;
@@ -230,7 +230,14 @@ export function decodeNPointCalibrationSolveResponse(input: unknown): NPointCali
     projectId: text(required(source, '$', 'projectId', 'ProjectId'), '$.projectId'),
     targetNodeId: text(required(source, '$', 'targetNodeId', 'TargetNodeId'), '$.targetNodeId'),
     imageIdentity: text(value(source, 'imageIdentity', 'ImageIdentity') ?? '', '$.imageIdentity', true),
-    mode: String(value(source, 'mode', 'Mode') ?? 'Affine').toLowerCase() === 'perspective' ? 'Perspective' : 'Affine',
+    mode: (() => {
+      const normalized = String(value(source, 'mode', 'Mode') ?? 'Affine').toLowerCase();
+      return normalized === 'perspective'
+        ? 'Perspective'
+        : normalized === 'scaleoffset' || normalized === 'planarscaleoffset' || normalized === 'planar'
+          ? 'ScaleOffset'
+          : 'Affine';
+    })(),
     unit: text(value(source, 'unit', 'Unit') ?? 'mm', '$.unit'),
     status: text(value(source, 'status', 'Status') ?? (success ? 'Solved' : 'Failed'), '$.status'),
     success,

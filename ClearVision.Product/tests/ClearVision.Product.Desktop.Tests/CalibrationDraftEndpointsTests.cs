@@ -12,6 +12,7 @@ using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Configuration;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Desktop.PreviewArtifacts;
+using ClearVision.Product.Infrastructure.Calibration;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
@@ -103,6 +104,49 @@ public sealed class CalibrationDraftEndpointsTests
         response.Observation.VisualScene!.Primitives.Should().Contain(primitive =>
             primitive.Layer == "calibration-reprojection" &&
             primitive.ResultPath == "$[\"samples\"][0]");
+    }
+
+    [Fact]
+    public void SolveDraft_WithScaleOffsetMode_ShouldReturnPlanarCandidateBundle()
+    {
+        using var store = new PreviewArtifactStore();
+        var request = new NPointCalibrationDraftSolveRequest
+        {
+            SessionId = "session-scale-offset",
+            ProjectId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            TargetNodeId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            ImageIdentity = "image-hash",
+            Mode = "PlanarScaleOffset",
+            Unit = "mm",
+            SolverOptions = new NPointCalibrationDraftSolverOptionsDto
+            {
+                MaxAcceptedReprojectionError = 0.05,
+                MinInlierCount = 3,
+                MinInlierRatio = 1.0
+            },
+            Samples =
+            [
+                CreateSample("s1", 1, 0, 0, 10, -4),
+                CreateSample("s2", 2, 10, 0, 15, -4),
+                CreateSample("s3", 3, 0, 20, 10, 6),
+                CreateSample("s4", 4, 10, 20, 15, 6)
+            ]
+        };
+
+        var response = CalibrationDraftEndpoints.SolveDraft(request, store);
+
+        response.Success.Should().BeTrue(response.ErrorMessage);
+        response.Mode.Should().Be("ScaleOffset");
+        response.LastSolveResult.Should().NotBeNull();
+        response.LastSolveResult!.TransformModel.Should().Be("ScaleOffset");
+        response.LastSolveResult.Accepted.Should().BeTrue();
+        response.LastSolveResult.TotalSampleCount.Should().Be(4);
+        response.CandidateBundle.Should().NotBeNull();
+        response.CandidateBundle!.TransformModel.Should().Be(TransformModelV2.ScaleOffset);
+        response.CandidateBundle.Transform2D!.Model.Should().Be(TransformModelV2.ScaleOffset);
+        response.CandidateBundle.Transform2D.Matrix[0][0].Should().BeApproximately(0.5, 1e-9);
+        response.CandidateBundle.Transform2D.Matrix[1][1].Should().BeApproximately(0.5, 1e-9);
+        response.Samples.Should().OnlyContain(sample => sample.Inlier == true && sample.Error < 1e-9);
     }
 
     [Fact]

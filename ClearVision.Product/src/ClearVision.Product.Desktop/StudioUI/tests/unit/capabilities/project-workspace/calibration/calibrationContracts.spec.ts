@@ -47,6 +47,21 @@ describe('calibration contracts', () => {
     expect(decoded.lastSolveResult?.accepted).toBe(true);
   });
 
+  it('normalizes planar scale-offset mode aliases to the shared UI mode', () => {
+    const decoded = decodeNPointCalibrationSolveResponse({
+      sessionId: 'calibration-draft-planar',
+      projectId,
+      targetNodeId: nodeId,
+      mode: 'PlanarScaleOffset',
+      success: true,
+      samples: [],
+      candidateBundle: { schemaVersion: 'calibration-candidate-bundle.v1' },
+      candidateBundleJson: '{"schemaVersion":"calibration-candidate-bundle.v1"}'
+    });
+
+    expect(decoded.mode).toBe('ScaleOffset');
+  });
+
   it('fails closed when a successful solve omits its candidate bundle', () => {
     expect(() => decodeNPointCalibrationSolveResponse({
       sessionId: 'calibration-draft-1',

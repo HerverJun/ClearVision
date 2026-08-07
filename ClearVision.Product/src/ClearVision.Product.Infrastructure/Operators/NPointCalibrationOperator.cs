@@ -14,10 +14,10 @@ namespace ClearVision.Product.Infrastructure.Operators;
 
 [OperatorMeta(
     DisplayName = "N点标定",
-    Description = "基于全部点对鲁棒估计仿射或单应性标定模型。",
+    Description = "基于全部点对估计比例偏移、仿射或单应性标定模型。",
     CategoryId = OperatorCategoryId.CalibrationAndCoordinates,
     IconName = "n-point",
-    Keywords = new[] { "n-point", "affine", "homography", "calibration", "ransac" }
+    Keywords = new[] { "n-point", "scale-offset", "affine", "homography", "calibration", "ransac" }
 )]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = false)]
 [OutputPort("CalibrationData", "Calibration Data", PortDataType.String)]
@@ -29,7 +29,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("AllSampleMeanReprojectionError", "All Sample Mean Reprojection Error", PortDataType.Float)]
 [OutputPort("AllSampleMaxReprojectionError", "All Sample Max Reprojection Error", PortDataType.Float)]
 [OutputPort("ReprojectionErrorScope", "Reprojection Error Scope", PortDataType.String)]
-[OperatorParam("CalibrationMode", "Calibration Mode", "enum", DefaultValue = "Affine", Options = new[] { "Affine|Affine", "Perspective|Perspective" })]
+[OperatorParam("CalibrationMode", "Calibration Mode", "enum", DefaultValue = "Affine", Options = new[] { "Affine|Affine", "Perspective|Perspective", "ScaleOffset|ScaleOffset" })]
 [OperatorParam("PointPairs", "Point Pairs", "string", DefaultValue = "")]
 [OperatorParam("SavePath", "Save Path", "file", DefaultValue = "")]
 [OperatorParam("RansacReprojectionThreshold", "RANSAC Reprojection Threshold", "double", DefaultValue = 3.0, Min = 0.000001, Max = 100000.0)]
@@ -69,7 +69,7 @@ public class NPointCalibrationOperator : OperatorBase
 
         if (!TryResolveMode(mode, out var calibrationMode))
         {
-            return Task.FromResult(OperatorExecutionOutput.Failure("CalibrationMode must be Affine or Perspective."));
+            return Task.FromResult(OperatorExecutionOutput.Failure("CalibrationMode must be Affine, Perspective, or ScaleOffset."));
         }
 
         var requiredCount = GetRequiredPointCount(calibrationMode);
@@ -92,9 +92,12 @@ public class NPointCalibrationOperator : OperatorBase
     {
         var mode = GetStringParam(@operator, "CalibrationMode", "Affine");
         if (!mode.Equals("Affine", StringComparison.OrdinalIgnoreCase) &&
-            !mode.Equals("Perspective", StringComparison.OrdinalIgnoreCase))
+            !mode.Equals("Perspective", StringComparison.OrdinalIgnoreCase) &&
+            !mode.Equals("ScaleOffset", StringComparison.OrdinalIgnoreCase) &&
+            !mode.Equals("PlanarScaleOffset", StringComparison.OrdinalIgnoreCase) &&
+            !mode.Equals("Planar", StringComparison.OrdinalIgnoreCase))
         {
-            return ValidationResult.Invalid("CalibrationMode must be Affine or Perspective.");
+            return ValidationResult.Invalid("CalibrationMode must be Affine, Perspective, or ScaleOffset.");
         }
 
         var pointPairsRaw = ResolvePointPairsRaw(@operator, null);
@@ -110,7 +113,7 @@ public class NPointCalibrationOperator : OperatorBase
 
         if (!TryResolveMode(mode, out var calibrationMode))
         {
-            return ValidationResult.Invalid("CalibrationMode must be Affine or Perspective.");
+            return ValidationResult.Invalid("CalibrationMode must be Affine, Perspective, or ScaleOffset.");
         }
 
         var requiredCount = GetRequiredPointCount(calibrationMode);
@@ -251,6 +254,14 @@ public class NPointCalibrationOperator : OperatorBase
         if (mode.Equals("Affine", StringComparison.OrdinalIgnoreCase))
         {
             calibrationMode = NPointCalibrationMode.Affine;
+            return true;
+        }
+
+        if (mode.Equals("ScaleOffset", StringComparison.OrdinalIgnoreCase) ||
+            mode.Equals("PlanarScaleOffset", StringComparison.OrdinalIgnoreCase) ||
+            mode.Equals("Planar", StringComparison.OrdinalIgnoreCase))
+        {
+            calibrationMode = NPointCalibrationMode.ScaleOffset;
             return true;
         }
 

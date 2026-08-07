@@ -43,6 +43,10 @@ public class PlanarScaleOffsetCalibrationResult
 
     public double MeanErrorY { get; set; }
 
+    public double MeanError { get; set; }
+
+    public double MaxError { get; set; }
+
     public double Rmse { get; set; }
 
     public int PointCount { get; set; }
@@ -71,15 +75,32 @@ public class PlanarScaleOffsetCalibrationService : IPlanarScaleOffsetCalibration
 {
     private const string CalibrationDirectoryName = "calibration";
 
-    public Task<PlanarScaleOffsetCalibrationResult> SolveAsync(List<PlanarScaleOffsetCalibrationPoint> points)
+    public Task<PlanarScaleOffsetCalibrationResult> SolveAsync(List<PlanarScaleOffsetCalibrationPoint> points) =>
+        Task.FromResult(Solve(points));
+
+    public static PlanarScaleOffsetCalibrationResult Solve(
+        IReadOnlyList<PlanarScaleOffsetCalibrationPoint> points)
     {
         if (points == null || points.Count < 2)
         {
-            return Task.FromResult(new PlanarScaleOffsetCalibrationResult
+            return new PlanarScaleOffsetCalibrationResult
             {
                 Success = false,
                 Message = "Point count is insufficient. At least 2 non-overlapping points are required."
-            });
+            };
+        }
+
+        if (points.Any(point =>
+                !double.IsFinite(point.PixelX) ||
+                !double.IsFinite(point.PixelY) ||
+                !double.IsFinite(point.PhysicalX) ||
+                !double.IsFinite(point.PhysicalY)))
+        {
+            return new PlanarScaleOffsetCalibrationResult
+            {
+                Success = false,
+                Message = "Calibration points must contain finite coordinates."
+            };
         }
 
         var count = points.Count;
@@ -98,11 +119,11 @@ public class PlanarScaleOffsetCalibrationService : IPlanarScaleOffsetCalibration
 
         if (Math.Abs(denominatorX) < 1e-10 || Math.Abs(denominatorY) < 1e-10)
         {
-            return Task.FromResult(new PlanarScaleOffsetCalibrationResult
+            return new PlanarScaleOffsetCalibrationResult
             {
                 Success = false,
                 Message = "Input points are degenerate. Use more spatially distributed points."
-            });
+            };
         }
 
         var scaleX = (count * sumPxPhysicalX - sumPx * sumPhysicalX) / denominatorX;
@@ -110,9 +131,20 @@ public class PlanarScaleOffsetCalibrationService : IPlanarScaleOffsetCalibration
         var scaleY = (count * sumPyPhysicalY - sumPy * sumPhysicalY) / denominatorY;
         var originY = (sumPhysicalY - scaleY * sumPy) / count;
 
+        if (!double.IsFinite(scaleX) || !double.IsFinite(scaleY) ||
+            !double.IsFinite(originX) || !double.IsFinite(originY))
+        {
+            return new PlanarScaleOffsetCalibrationResult
+            {
+                Success = false,
+                Message = "The estimated scale-offset transform contains non-finite values."
+            };
+        }
+
         var errorSquaredSum = 0.0;
         var meanErrorXSum = 0.0;
         var meanErrorYSum = 0.0;
+        var errors = new List<double>(count);
 
         foreach (var point in points)
         {
@@ -124,6 +156,7 @@ public class PlanarScaleOffsetCalibrationService : IPlanarScaleOffsetCalibration
             meanErrorXSum += errorX;
             meanErrorYSum += errorY;
             errorSquaredSum += errorX * errorX + errorY * errorY;
+            errors.Add(Math.Sqrt(errorX * errorX + errorY * errorY));
         }
 
         var rawResult = new PlanarScaleOffsetCalibrationResult
@@ -135,11 +168,13 @@ public class PlanarScaleOffsetCalibrationService : IPlanarScaleOffsetCalibration
             ScaleY = scaleY,
             MeanErrorX = meanErrorXSum / count,
             MeanErrorY = meanErrorYSum / count,
+            MeanError = errors.Average(),
+            MaxError = errors.Max(),
             Rmse = Math.Sqrt(errorSquaredSum / count),
             PointCount = count
         };
 
-        return Task.FromResult(new PlanarScaleOffsetCalibrationResult
+        return new PlanarScaleOffsetCalibrationResult
         {
             Success = rawResult.Success,
             Accepted = rawResult.MeetsAcceptanceCriteria(),
@@ -152,9 +187,11 @@ public class PlanarScaleOffsetCalibrationService : IPlanarScaleOffsetCalibration
             ScaleY = rawResult.ScaleY,
             MeanErrorX = rawResult.MeanErrorX,
             MeanErrorY = rawResult.MeanErrorY,
+            MeanError = rawResult.MeanError,
+            MaxError = rawResult.MaxError,
             Rmse = rawResult.Rmse,
             PointCount = rawResult.PointCount
-        });
+        };
     }
 
     public async Task<bool> SaveCalibrationAsync(PlanarScaleOffsetCalibrationResult result, string fileName)
@@ -192,7 +229,9 @@ public class PlanarScaleOffsetCalibrationService : IPlanarScaleOffsetCalibration
                 {
                     Accepted = accepted,
                     MeanError = result.Rmse,
-                    MaxError = Math.Max(result.MeanErrorX, result.MeanErrorY),
+                    MaxError = result.MaxError > 0
+                        ? result.MaxError
+                        : Math.Max(result.MeanErrorX, result.MeanErrorY),
                     InlierCount = result.PointCount,
                     TotalSampleCount = result.PointCount,
                     Diagnostics = new List<string>

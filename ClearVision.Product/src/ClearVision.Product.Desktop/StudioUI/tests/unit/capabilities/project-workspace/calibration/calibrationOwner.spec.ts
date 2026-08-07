@@ -12,7 +12,7 @@ function point(sampleId: string, x: number, y: number, worldX: number, worldY: n
   return { sampleId, ImageX: x, ImageY: y, WorldX: worldX, WorldY: worldY, Enabled: true };
 }
 
-function createHarness(post: ApiTransport['post'] = async () => undefined) {
+function createHarness(post: ApiTransport['post'] = async () => undefined, calibrationMode = 'Affine') {
   const flowProjection = reactive({
     mutationGate: 'editable' as const,
     runtime: {
@@ -25,7 +25,7 @@ function createHarness(post: ApiTransport['post'] = async () => undefined) {
         id: nodeId,
         type: 'NPointCalibration',
         parameters: [
-          { name: 'CalibrationMode', value: 'Affine' },
+          { name: 'CalibrationMode', value: calibrationMode },
           { name: 'CalibrationUnit', value: 'mm' },
           { name: 'PointPairs', value: JSON.stringify([
             point('sample-1', 10, 20, 1, 2),
@@ -104,6 +104,16 @@ describe('CalibrationOwner', () => {
     harness.owner.updateSample(added.sampleId, { worldX: 7, worldY: 8 });
     expect(harness.owner.projection.samples[3]).toMatchObject({ worldX: 7, worldY: 8, valid: true });
 
+    harness.owner.dispose();
+  });
+
+  it('projects ScaleOffset mode and requires three complete samples before solving', () => {
+    const harness = createHarness(async () => undefined, 'PlanarScaleOffset');
+
+    expect(harness.owner.projection.mode).toBe('ScaleOffset');
+    expect(harness.owner.projection.canSolve).toBe(true);
+    harness.owner.removeSample('sample-3');
+    expect(harness.owner.projection.canSolve).toBe(false);
     harness.owner.dispose();
   });
 
