@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-08T03:09:31.3343663+08:00",
+  "generatedAt": "2026-08-08T03:14:44.2702535+08:00",
   "totalCount": 158,
   "categories": {
     "3D点云": {
@@ -14308,7 +14308,7 @@
       "id": "NPointCalibration",
       "type": 150,
       "displayName": "N点标定",
-      "description": "基于全部点对鲁棒估计仿射或单应性标定模型。",
+      "description": "基于全部点对估计比例偏移、仿射或单应性标定模型。",
       "category": "标定与坐标",
       "version": "1.0.0",
       "tags": [
@@ -14399,6 +14399,10 @@
             {
               "value": "Perspective",
               "label": "Perspective"
+            },
+            {
+              "value": "ScaleOffset",
+              "label": "ScaleOffset"
             }
           ]
         },
