@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onUnmounted, ref, useId, watch } from 'vue';
+import { CvIcon } from '../icons';
 
 const props = withDefaults(defineProps<{
   open: boolean;
@@ -156,9 +157,13 @@ onUnmounted(() => {
             class="cv-modal__close"
             type="button"
             :aria-label="closeLabel"
+            :title="closeLabel"
             @click="emit('close')"
           >
-            ×
+            <CvIcon
+              name="close"
+              size="sm"
+            />
           </button>
         </header>
         <div class="cv-modal__body">

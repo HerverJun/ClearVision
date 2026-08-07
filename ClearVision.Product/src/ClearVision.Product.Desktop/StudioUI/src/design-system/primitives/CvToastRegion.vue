@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onUnmounted, watch } from 'vue';
+import { CvIcon } from '../icons';
 import type { CvToastItem } from './types';
 
 const props = withDefaults(defineProps<{
@@ -102,9 +103,13 @@ onUnmounted(() => {
           type="button"
           class="cv-toast__close"
           :aria-label="`关闭通知：${toast.title}`"
+          :title="`关闭通知：${toast.title}`"
           @click="emit('dismiss', toast.id)"
         >
-          ×
+          <CvIcon
+            name="close"
+            size="sm"
+          />
         </button>
       </article>
     </TransitionGroup>

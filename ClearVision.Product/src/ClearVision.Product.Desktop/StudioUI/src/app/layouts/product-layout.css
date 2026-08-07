@@ -51,7 +51,7 @@
   gap: var(--cv-space-2);
   border-bottom: 1px solid var(--cv-border-subtle);
   background: var(--cv-surface-raised);
-  box-shadow: 0 1px 3px rgba(38, 57, 74, 0.06);
+  box-shadow: var(--cv-elevation-raised);
 }
 
 .product-layout__workspace-chrome {
@@ -75,11 +75,15 @@
 }
 
 .product-layout__workspace-nav {
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: stretch;
   gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.product-layout__workspace-nav::-webkit-scrollbar { display: none; }
 
 .product-layout__workspace-nav-item {
   position: relative;
@@ -214,7 +218,7 @@
   border: 1px solid var(--cv-border-subtle);
   border-radius: var(--cv-radius-md);
   background: var(--cv-surface-floating);
-  box-shadow: 0 2px 6px rgba(37, 55, 72, 0.12);
+  box-shadow: var(--cv-elevation-floating);
 }
 .product-layout__more nav a {
   min-height: 32px;
@@ -297,7 +301,7 @@
   padding: 0 18px;
   gap: var(--cv-space-2);
   background: var(--cv-surface-raised);
-  box-shadow: 0 1px 3px rgba(38, 57, 74, 0.08);
+  box-shadow: var(--cv-elevation-raised);
 }
 .product-layout--workspace .product-layout__topbar-actions { min-width: 0; gap: 3px; }
 .product-layout--workspace .product-layout__service-status :where(.cv-status-badge) { padding-inline: 4px; border-color: transparent; background: transparent; }
@@ -354,8 +358,6 @@
 }
 
 @media (max-width: 1120px) {
-  .product-layout__workspace-nav-item:nth-child(3):not([data-product-nav="/settings"]),
-  .product-layout__workspace-nav-item:nth-child(6):not([data-product-nav="/settings"]) { display: none; }
   .product-layout__user-copy { display: none; }
   .product-layout__appearance-trigger small { display: none; }
 }

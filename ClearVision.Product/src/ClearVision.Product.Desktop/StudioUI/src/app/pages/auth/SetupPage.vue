@@ -57,6 +57,7 @@ async function submit(): Promise<void> {
           id="setup-username"
           v-model="username"
           class="auth-form__control"
+          name="username"
           autocomplete="username"
           :minlength="root.auth.projection.setupPolicy?.usernameMinLength ?? 3"
           required
@@ -70,6 +71,7 @@ async function submit(): Promise<void> {
             id="setup-password"
             v-model="password"
             class="auth-form__control"
+            name="new-password"
             :type="showPassword ? 'text' : 'password'"
             autocomplete="new-password"
             :minlength="root.auth.projection.setupPolicy?.passwordMinLength ?? 6"
@@ -94,6 +96,7 @@ async function submit(): Promise<void> {
           id="setup-confirm-password"
           v-model="confirmPassword"
           class="auth-form__control"
+          name="confirm-password"
           :type="showPassword ? 'text' : 'password'"
           autocomplete="new-password"
           required

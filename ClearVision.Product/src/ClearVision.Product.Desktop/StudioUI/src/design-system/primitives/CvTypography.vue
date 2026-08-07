@@ -87,7 +87,7 @@ withDefaults(defineProps<{
 }
 
 .cv-typography--label {
-  letter-spacing: 0.035em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -95,7 +95,7 @@ withDefaults(defineProps<{
   font-family: var(--cv-font-numeric);
   font-size: var(--cv-type-numeric-size);
   font-variant-numeric: tabular-nums lining-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: var(--cv-line-height-tight);
 }
 

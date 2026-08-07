@@ -85,7 +85,7 @@ const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() =>
     const boundProjectId = typeof route.params.id === 'string' ? route.params.id : null;
     const aiPath = boundProjectId ? `/projects/${encodeURIComponent(boundProjectId)}/ai` : '/ai';
     items.push({
-      label: 'AI',
+      label: 'AI 工程工作台',
       to: aiPath,
       description: 'AI 工程工作台',
       current: route.path === '/ai' || route.path.endsWith('/ai')

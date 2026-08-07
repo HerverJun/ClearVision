@@ -96,7 +96,7 @@ const isDisabled = computed(() => props.disabled || props.loading);
   border-color: var(--cv-color-brand-600);
   background: var(--cv-color-brand-500);
   color: var(--cv-color-on-brand);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cv-color-on-brand) 12%, transparent);
 }
 
 .cv-button--primary:hover:not(:disabled) { background: var(--cv-color-brand-600); }

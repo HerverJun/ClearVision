@@ -50,6 +50,7 @@ async function submit(): Promise<void> {
           id="old-password"
           v-model="oldPassword"
           class="auth-form__control"
+          name="current-password"
           :type="showPassword ? 'text' : 'password'"
           autocomplete="current-password"
           required
@@ -62,6 +63,7 @@ async function submit(): Promise<void> {
           id="new-password"
           v-model="newPassword"
           class="auth-form__control"
+          name="new-password"
           :type="showPassword ? 'text' : 'password'"
           autocomplete="new-password"
           required

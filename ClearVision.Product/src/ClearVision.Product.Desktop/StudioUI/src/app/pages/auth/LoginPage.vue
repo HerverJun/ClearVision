@@ -60,6 +60,7 @@ async function retryRecovery(): Promise<void> {
           id="login-username"
           v-model="username"
           class="auth-form__control"
+          name="username"
           autocomplete="username"
           required
           autofocus
@@ -72,6 +73,7 @@ async function retryRecovery(): Promise<void> {
             id="login-password"
             v-model="password"
             class="auth-form__control"
+            name="password"
             :type="showPassword ? 'text' : 'password'"
             autocomplete="current-password"
             required

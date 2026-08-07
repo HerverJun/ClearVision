@@ -39,7 +39,7 @@
 
 .design-lab__grid { display: grid; max-width: 1600px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-density-content-gap); margin: 0 auto var(--cv-density-content-gap); }
 .design-lab__button-matrix, .design-lab__feedback-actions { flex-wrap: wrap; gap: var(--cv-space-2); }
-.design-lab__guidance { margin-top: var(--cv-space-3); padding: var(--cv-space-3); border-left: 3px solid var(--cv-color-brand-500); background: var(--cv-color-brand-soft); }
+.design-lab__guidance { margin-top: var(--cv-space-3); padding: var(--cv-space-3); border: 1px solid var(--cv-color-brand-border); border-radius: var(--cv-radius-sm); background: var(--cv-color-brand-soft); }
 .design-lab__form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-4); }
 
 .design-lab__status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--cv-space-2); }

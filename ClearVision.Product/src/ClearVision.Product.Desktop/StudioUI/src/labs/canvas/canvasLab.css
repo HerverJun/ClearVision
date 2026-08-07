@@ -52,7 +52,7 @@
 
 .canvas-lab h1 {
   font-size: clamp(var(--cv-font-size-xl), 2vw, var(--cv-font-size-2xl));
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
 }
 
 .canvas-lab__title-block p {
