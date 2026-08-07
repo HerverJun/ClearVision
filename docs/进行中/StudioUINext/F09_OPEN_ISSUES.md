@@ -70,3 +70,31 @@ F09-R2 reconciliation: product source commit `d1c82ba88e351a2d48bcfae7f97e047483
 ## Current cutover rule
 
 `Studio:StartupProfile=NEXT_DEFAULT` 已配置，`STUDIO_UI_NEXT` 是当前默认 UI root，`LEGACY_FALLBACK` 仍是可用的配置级回退入口。当前本地工程证据和 rollback 已完成，但 Remote CI run `30966530885` 与 Final Gate 已失败，正式分支不得快进。独立 no-Node、完整 DPI、现场硬件和生产 soak 仍未完成，因此继续保持 `PRODUCTION_ACCEPTANCE=NOT_GRANTED`；不得把本地未提交报告或其他证据边界伪装成远端 PASS。
+
+## Current TODO execution addendum (2026-08-07)
+
+```text
+CURRENT_AUDIT_BASELINE_HEAD=68e6e4286d008433f804ef90de00c8017184c177
+CURRENT_AUDIT_BRANCH=studio-ui-next
+CURRENT_REMOTE_HEAD=7d43af9e19ad5a98240651fd5519a8e0f5a1e9f5
+CURRENT_REMOTE_RELATION=REMOTE_ANCESTOR_AHEAD_37_NO_DIVERGENCE
+CURRENT_WORKTREE=DIRTY_SCOPED_CANDIDATE_BEFORE_COMMIT
+LOCAL_FRONTEND_GATES=PASS
+LOCAL_BROWSER_F03=PASS_59_OF_59
+LOCAL_BROWSER_F04R=PASS_2_OF_2
+CALIBRATION_ENDPOINT_TESTS=PASS_4_OF_4
+PRODUCTION_ACCEPTANCE=NOT_GRANTED
+```
+
+本次 audit 只关闭有当前代码和测试证据的细分操作；历史 F09 issue 不因本地 Chromium 或 unit 自动关闭。新增/拆分的合同台账如下：
+
+| IssueId | Severity | Area | Current finding | Evidence / required owner | Status |
+| --- | --- | --- | --- | --- | --- |
+| CV-AUDIT-045 | P1 | Calibration authorization | formal save endpoint has `CanEditProject` and Operator `403`; draft solve endpoint has no explicit permission guard and its intended authenticated/readonly semantics remain unclear | `CalibrationDraftEndpoints.cs`; `CalibrationDraftEndpointsTests.cs`; Desktop/API owner | `OPEN_BACKEND_AUDIT` |
+| CV-AUDIT-046 | P2 | Template acceptance | Template query/owner/conversion and unit coverage exist, but no complete search -> preview -> apply -> save -> reload Playwright evidence exists at this audit anchor | Template owner / UI evidence owner | `OPEN_EVIDENCE` |
+| CV-AUDIT-047 | P1 | Project JSON lifecycle | no current Next import/export schema, file contract or lifecycle `clientOperationId`/reconcile endpoint was found | Project lifecycle/backend owner | `BLOCKED_BY_CONTRACT` |
+| CV-AUDIT-048 | P1 | Planar calibration | no current Next formal two-dimensional scale/offset wizard and Project asset contract was found | Calibration/backend owner | `BLOCKED_BY_CONTRACT` |
+| CV-AUDIT-049 | P1 | Results bulk export | trend/distribution/report queries exist, but no current full-batch JSON/CSV export contract and progress/unknown semantics were found | Results/export service owner | `BLOCKED_BY_CONTRACT` |
+| CV-AUDIT-050 | P1 | AI and device command scope | AgentRun attachment/resource fields and the line-sequence/Station/settings high-risk command contracts are not sufficient for a safe Next-only owner | AgentRun, device, Station and settings backend owners | `BLOCKED_BY_CONTRACT` |
+
+`CV-AUDIT-045` is intentionally split: formal asset permission is resolved and tested; only draft solve permission semantics remain open. `F09-I003`, `F09-I005`, `F09-I006`, `F09-I010` and `F09-I011` remain open/deferred according to the existing table. No issue was closed solely because `git fetch` showed the remote 37 commits behind; push and Remote CI are separate evidence.

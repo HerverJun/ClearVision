@@ -44,6 +44,10 @@ import {
   createRuntimePackageExportOwner,
   type RuntimePackageExportOwner
 } from './runtime-package';
+import {
+  createTemplateOwner,
+  type TemplateOwner
+} from './templates';
 import type {
   WorkspaceLifecycleDiagnosticsOwner,
   WorkspaceOwnerDiagnosticsLease
@@ -90,9 +94,11 @@ export interface WorkspaceOwner {
   getGlobalVariablesOwner(): WorkspaceGlobalVariablesOwner | null;
   getFinalDecisionOwner(): FinalDecisionOwner | null;
   getRuntimePackageExportOwner(): RuntimePackageExportOwner | null;
+  getTemplateOwner(): TemplateOwner | null;
   save(): Promise<WorkspaceSaveAttemptResult>;
   retrySave(): Promise<WorkspaceSaveAttemptResult>;
   reconcileSave(): Promise<WorkspaceSaveAttemptResult>;
+  reconcileExternalProject(): Promise<boolean>;
   reapplyConflict(): void;
   discardConflict(): void;
   hydrateFormalRun(): Promise<void>;
@@ -126,7 +132,8 @@ export function createWorkspaceOwner(
   diagnostics: WorkspaceLifecycleDiagnosticsOwner,
   queries: ReadQueryClient,
   api: ApiTransport | undefined,
-  featureFlags: Readonly<Record<string, boolean>>
+  featureFlags: Readonly<Record<string, boolean>>,
+  canWriteTemplates = false
 ): WorkspaceOwner {
   const lease: WorkspaceOwnerDiagnosticsLease = diagnostics.reserveWorkspaceOwner(project.id);
   const isEmpty = project.flow === null || project.flow.operators.length === 0;
@@ -145,6 +152,7 @@ export function createWorkspaceOwner(
   let globalVariablesOwner: WorkspaceGlobalVariablesOwner | undefined;
   let finalDecisionOwner: FinalDecisionOwner | undefined;
   let runtimePackageExportOwner: RuntimePackageExportOwner | undefined;
+  let templateOwner: TemplateOwner | undefined;
 
   function projectHandoffSave(result: WorkspaceSaveAttemptResult): WorkspaceSaveAttemptResult {
     if (!state.handoff) return result;
@@ -216,6 +224,15 @@ export function createWorkspaceOwner(
         persistenceOwner,
         api
       });
+      templateOwner = createTemplateOwner({
+        projectId: project.id,
+        projectName: project.name,
+        flowOwner,
+        queries,
+        api,
+        canWrite: canWriteTemplates,
+        isDirty: () => persistenceOwner?.projection.dirty === true
+      });
       runOwner = createWorkspaceRunCommandOwner({
         projectId: project.id,
         persistenceOwner,
@@ -239,6 +256,9 @@ export function createWorkspaceOwner(
     getRuntimePackageExportOwner(): RuntimePackageExportOwner | null {
       return runtimePackageExportOwner ?? null;
     },
+    getTemplateOwner(): TemplateOwner | null {
+      return templateOwner ?? null;
+    },
     async save(): Promise<WorkspaceSaveAttemptResult> {
       if (!persistenceOwner) {
         return Object.freeze({ status: 'failed', project: null });
@@ -256,6 +276,15 @@ export function createWorkspaceOwner(
         return Object.freeze({ status: 'failed', project: null });
       }
       return projectHandoffSave(await persistenceOwner.reconcile());
+    },
+    async reconcileExternalProject(): Promise<boolean> {
+      if (!persistenceOwner || !api) return false;
+      try {
+        const externalProject = await createWorkspaceProjectPersistencePort(api, project.id).getProject();
+        return persistenceOwner.acceptExternalProject(externalProject);
+      } catch {
+        return false;
+      }
     },
     reapplyConflict(): void {
       persistenceOwner?.reapplyConflict();
@@ -419,34 +448,39 @@ export function createWorkspaceOwner(
         try {
           persistenceOwner?.dispose(reason);
         } finally {
-          try {
-            runtimePackageExportOwner?.dispose();
-          } finally {
             try {
-              finalDecisionOwner?.dispose();
+              runtimePackageExportOwner?.dispose();
             } finally {
               try {
-                globalVariablesOwner?.dispose();
+                templateOwner?.dispose(reason);
               } finally {
                 try {
-                  flowOwner?.dispose(reason);
+                  finalDecisionOwner?.dispose();
                 } finally {
                   try {
-                    lease.dispose(reason);
+                    globalVariablesOwner?.dispose();
                   } finally {
-                    runOwner = undefined;
-                    persistenceOwner = undefined;
-                    runtimePackageExportOwner = undefined;
-                    finalDecisionOwner = undefined;
-                    globalVariablesOwner = undefined;
-                    flowOwner = undefined;
-                    state.persistence = null;
-                    state.run = null;
-                    state.handoff = null;
-                    state.readonlyReason = null;
+                    try {
+                      flowOwner?.dispose(reason);
+                    } finally {
+                      try {
+                        lease.dispose(reason);
+                      } finally {
+                        runOwner = undefined;
+                        persistenceOwner = undefined;
+                        runtimePackageExportOwner = undefined;
+                        templateOwner = undefined;
+                        finalDecisionOwner = undefined;
+                        globalVariablesOwner = undefined;
+                        flowOwner = undefined;
+                        state.persistence = null;
+                        state.run = null;
+                        state.handoff = null;
+                        state.readonlyReason = null;
+                      }
+                    }
                   }
                 }
-              }
             }
           }
         }

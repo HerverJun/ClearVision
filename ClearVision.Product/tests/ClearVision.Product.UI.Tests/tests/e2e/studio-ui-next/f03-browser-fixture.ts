@@ -74,6 +74,7 @@ export function isF03G4RequestAllowlist(
       return entry.path === '/api/flows/preview-node' ||
         entry.path === '/api/inspection/decision-configuration/validate' ||
         entry.path === '/api/inspection/admission' ||
+        entry.path === '/api/templates' ||
         /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/open$/i
           .test(entry.path);
     }
@@ -82,6 +83,10 @@ export function isF03G4RequestAllowlist(
     return entry.path === '/api/auth/setup-status' || entry.path === '/api/auth/me' ||
       entry.path === '/api/projects' ||
       entry.path === '/api/operators/library?includeCompatibility=true' ||
+      /^\/api\/templates(?:\?industry=[^&]*)?$/.test(entry.path) ||
+      /^\/api\/templates\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entry.path) ||
+      /^\/api\/analysis\/(?:defect-distribution|report)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\?.*)?$/i.test(entry.path) ||
+      /^\/api\/analysis\/trend\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\?interval=(?:Hour|Day|Week|Month)&startTime=[^&]+&endTime=[^&]+(?:&.*)?$/i.test(entry.path) ||
       entry.path === '/api/cameras/bindings' ||
       /^\/api\/inspection\/realtime\/[0-9a-f-]{36}\/state$/i.test(entry.path) ||
       /^\/api\/operators\/(?:\d+|[A-Za-z][A-Za-z0-9_]*)\/metadata$/.test(entry.path) ||
@@ -96,8 +101,8 @@ export function isF03G5RequestAllowlist(
 ): boolean {
   return audit.every(entry => {
     if (entry.method === 'PUT') {
-      return /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-        .test(entry.path);
+      return /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entry.path) ||
+        /^\/api\/templates\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entry.path);
     }
     return isF03G4RequestAllowlist([entry]);
   });
@@ -110,12 +115,17 @@ export function isF03G6RequestAllowlist(
     if (entry.method === 'POST') {
       return entry.path === '/api/flows/preview-node' ||
         entry.path === '/api/inspection/decision-configuration/validate' ||
+        entry.path === '/api/templates' ||
         /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/open$/i
           .test(entry.path) || entry.path === '/api/inspection/admission' ||
         entry.path === '/api/inspection/execute' || entry.path === '/api/inspection/stop' ||
         entry.path === '/api/inspection/reconcile';
     }
     if (entry.method === 'GET' && (entry.path === '/api/projects' ||
+      /^\/api\/templates(?:\?industry=[^&]*)?$/.test(entry.path) ||
+      /^\/api\/templates\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entry.path) ||
+      /^\/api\/analysis\/(?:defect-distribution|report)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\?.*)?$/i.test(entry.path) ||
+      /^\/api\/analysis\/trend\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\?interval=(?:Hour|Day|Week|Month)&startTime=[^&]+&endTime=[^&]+(?:&.*)?$/i.test(entry.path) ||
       /^\/api\/inspection\/realtime\/[0-9a-f-]{36}\/state$/i.test(entry.path) ||
       /^\/api\/inspection\/history\/[0-9a-f-]{36}(?:\/[0-9a-f-]{36})?(?:\?.*)?$/i.test(entry.path))) {
       return true;

@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, shallowRef, watch, type WatchStopHandle } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useProductRuntime } from '@/app/productRuntime';
+import { useStudioPlatform } from '@/app/studioPlatform';
 import { CvPageHeader, CvPageState } from '@/design-system/patterns';
 import { CvIcon } from '@/design-system/icons';
 import { CvIconButton, CvInlineAlert, CvStatusBadge } from '@/design-system/primitives';
@@ -27,6 +28,7 @@ import { initialAiWorkbenchState } from './reducer';
 const route = useRoute();
 const router = useRouter();
 const runtime = useProductRuntime();
+const platform = useStudioPlatform();
 const owner = shallowRef<AiSessionOwner | null>(null);
 const historyOpen = shallowRef(false);
 const diagnosticsOpen = shallowRef(false);
@@ -303,6 +305,7 @@ onUnmounted(() => {
             :parameters="state.build.parameterMapping"
             :confirmed-values="state.session.snapshot.buildParameterValues"
             :busy="projection.busy"
+            :file-picker="platform.filePicker"
             @confirm="values => owner?.confirmParameters(values)"
           />
           <AiResourceDecisionPanel

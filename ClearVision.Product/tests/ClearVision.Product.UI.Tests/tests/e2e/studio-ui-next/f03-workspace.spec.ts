@@ -657,6 +657,72 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
       await fulfillF03Json(route, 200, options.operatorCatalogBody ?? operatorCatalog, fixtureSchema);
       return;
     }
+    if (url.pathname === '/api/templates' && request.method() === 'GET') {
+      await fulfillF03Json(route, 200, [], fixtureSchema);
+      return;
+    }
+    if (/^\/api\/templates\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(url.pathname)) {
+      await fulfillF03Json(route, 404, { code: 'TEMPLATE_NOT_FOUND' }, fixtureSchema);
+      return;
+    }
+    const analysisMatch = url.pathname.match(
+      /^\/api\/analysis\/(defect-distribution|trend|report)\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i
+    );
+    if (analysisMatch && request.method() === 'GET') {
+      const kind = analysisMatch[1]!.toLowerCase();
+      const projectId = analysisMatch[2]!;
+      const startTime = url.searchParams.get('startTime');
+      const endTime = url.searchParams.get('endTime');
+      if (kind === 'defect-distribution') {
+        await fulfillF03Json(route, 200, {
+          projectId,
+          startTime,
+          endTime,
+          totalDefects: 0,
+          items: []
+        }, fixtureSchema);
+        return;
+      }
+      const trend = {
+        projectId,
+        interval: url.searchParams.get('interval') ?? 'Hour',
+        startTime: startTime ?? '2026-07-22T00:00:00.000Z',
+        endTime: endTime ?? '2026-07-23T00:00:00.000Z',
+        dataPoints: []
+      };
+      if (kind === 'trend') {
+        await fulfillF03Json(route, 200, trend, fixtureSchema);
+        return;
+      }
+      await fulfillF03Json(route, 200, {
+        projectId,
+        generatedAt: '2026-07-23T00:00:00.000Z',
+        period: { startTime, endTime },
+        summary: {
+          projectId,
+          totalCount: 0,
+          okCount: 0,
+          ngCount: 0,
+          errorCount: 0,
+          okRate: 0,
+          yieldRate: 0,
+          totalDefects: 0,
+          averageProcessingTimeMs: 0
+        },
+        defectDistribution: { projectId, startTime, endTime, totalDefects: 0, items: [] },
+        confidenceDistribution: {
+          projectId,
+          startTime,
+          endTime,
+          totalDefects: 0,
+          buckets: [],
+          averageConfidence: 0
+        },
+        hourlyTrend: trend,
+        recommendations: []
+      }, fixtureSchema);
+      return;
+    }
     const operatorMatch = url.pathname.match(/^\/api\/operators\/(\d+|[A-Za-z][A-Za-z0-9_]*)\/metadata$/);
     if (operatorMatch) {
       const metadata = operatorCatalog.find(item => String(item.type) === operatorMatch[1]);
@@ -872,6 +938,32 @@ async function ensureOperatorFlyout(page: Page): Promise<void> {
   if (await page.locator('[data-capability="operator-flyout"]').count()) return;
   await page.getByRole('button', { name: '搜索与全部算子' }).click();
   await expect(page.locator('[data-capability="operator-flyout"]')).toBeVisible();
+}
+
+async function expectDesktopInspectorUnobscured(page: Page): Promise<void> {
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  await expect(inspector).toBeVisible();
+  await expect(page.locator('[data-capability="operator-flyout"]')).toHaveCount(0);
+  const visibility = await inspector.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const sample = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + Math.min(rect.height / 2, 160)
+    };
+    const hit = document.elementFromPoint(sample.x, sample.y);
+    return {
+      width: rect.width,
+      height: rect.height,
+      insideViewport: rect.left >= 0 && rect.top >= 0 &&
+        rect.right <= document.documentElement.clientWidth &&
+        rect.bottom <= document.documentElement.clientHeight,
+      hitInside: hit !== null && element.contains(hit)
+    };
+  });
+  expect(visibility.width).toBeGreaterThanOrEqual(240);
+  expect(visibility.height).toBeGreaterThan(0);
+  expect(visibility.insideViewport).toBe(true);
+  expect(visibility.hitInside).toBe(true);
 }
 
 async function dragOperator(page: Page, name: string, x: number, y: number) {
@@ -1547,6 +1639,131 @@ test('Operator Rail supports search, category, click-add and drag-add', async ({
   await expect(canvas).toHaveAttribute('data-node-count', '2');
   await expect(canvas).toHaveAttribute('data-flow-revision', '2');
   expect(isF03G4RequestAllowlist(audit)).toBe(true);
+});
+
+test('Operator Flyout closes after click-add and exposes the selected node Inspector', async ({ page }) => {
+  const viewport = { width: 1920, height: 1080 } as const;
+  await page.setViewportSize(viewport);
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
+  const audit = await bootWorkspace(page);
+  const canvas = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+  const operator = await searchOperator(page, '二值化');
+
+  await expect(page.locator('[data-capability="operator-flyout"]')).toBeVisible();
+  await expect(operator).toHaveCount(1);
+  await operator.click();
+
+  await expect(canvas).toHaveAttribute('data-node-count', '1');
+  await expect(canvas).toHaveAttribute('data-selected-count', '1');
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'node');
+  await expect(inspector.locator('[data-parameter-name="Count"] input[type="number"]')).toBeVisible();
+  await expectDesktopInspectorUnobscured(page);
+  if (hasF04VisualEvidenceTarget()) {
+    await captureF04VisualEvidence(page, {
+      scenario: 'workspace-operator-click-add-inspector',
+      viewport,
+      runtimeErrors,
+      requestAudit: audit,
+      notes: ['Click-added operator is selected; temporary Operator Flyout is unmounted and Inspector is unobscured.']
+    });
+  }
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
+});
+
+test('canvas node and connection selection dismiss the Operator Flyout before Inspector updates', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const runtimeErrors = createF03RuntimeErrorAudit(page);
+  const audit = await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
+  });
+  const inspector = page.locator('[data-evidence-surface="f03-g3-inspector"]');
+
+  await ensureOperatorFlyout(page);
+  const { box } = await selectInspectorNode(page, 120, 125);
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'node');
+  await expect(inspector).toContainText('Inspector Source');
+  await expectDesktopInspectorUnobscured(page);
+
+  await ensureOperatorFlyout(page);
+  await page.mouse.click(box.x + 290, box.y + 142);
+  await expect(inspector).toHaveAttribute('data-inspector-mode', 'connection');
+  await expect(inspector).toContainText('Inspector Target');
+  await expectDesktopInspectorUnobscured(page);
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+  expect(isF03G4RequestAllowlist(audit)).toBe(true);
+});
+
+test('G3 file parameters use the shared browser host picker and keep cancellation non-mutating', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await bootWorkspace(page, {
+    projectBody: projectId => projectPayload(projectId, { flow: inspectorFlow() })
+  });
+  await selectInspectorNode(page, 120, 125);
+
+  const parameter = page.locator('[data-parameter-name="FilePath"]');
+  const pathInput = parameter.locator('input.file-parameter-editor__path');
+  const choose = parameter.getByRole('button', { name: '选择文件' });
+  await expect(choose).toBeVisible();
+  await choose.click();
+  await expect.poll(async () => page.evaluate(() => {
+    const hook = (window as typeof window & {
+      __CLEARVISION_BROWSER_HOST_TEST_HOOK__?: { getPostedMessages: () => readonly unknown[] };
+    }).__CLEARVISION_BROWSER_HOST_TEST_HOOK__;
+    return hook?.getPostedMessages().length ?? 0;
+  })).toBeGreaterThan(0);
+
+  await page.evaluate(() => {
+    const hook = (window as typeof window & {
+      __CLEARVISION_BROWSER_HOST_TEST_HOOK__?: { emitMessage: (message: unknown) => void };
+    }).__CLEARVISION_BROWSER_HOST_TEST_HOOK__;
+    hook?.emitMessage({
+      type: 'FilePickedEvent',
+      parameterName: 'FilePath',
+      filePath: 'C:\\fixture\\input.png',
+      isCancelled: false
+    });
+  });
+  await expect(pathInput).toHaveValue('C:\\fixture\\input.png');
+
+  await choose.click();
+  await page.evaluate(() => {
+    const hook = (window as typeof window & {
+      __CLEARVISION_BROWSER_HOST_TEST_HOOK__?: { emitMessage: (message: unknown) => void };
+    }).__CLEARVISION_BROWSER_HOST_TEST_HOOK__;
+    hook?.emitMessage({
+      type: 'FilePickedEvent',
+      parameterName: 'FilePath',
+      filePath: null,
+      isCancelled: true
+    });
+  });
+  await expect(pathInput).toHaveValue('C:\\fixture\\input.png');
+});
+
+test('active Operator Rail entries toggle the Flyout and Escape restores the trigger', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await bootWorkspace(page);
+  const flyout = page.locator('[data-capability="operator-flyout"]');
+  const searchEntry = page.getByRole('button', { name: '搜索与全部算子' });
+  const preprocessingEntry = page.getByRole('button', { name: '图像预处理', exact: true });
+
+  await searchEntry.click();
+  await expect(flyout).toBeVisible();
+  await searchEntry.click();
+  await expect(flyout).toHaveCount(0);
+
+  await preprocessingEntry.click();
+  await expect(flyout).toBeVisible();
+  await preprocessingEntry.click();
+  await expect(flyout).toHaveCount(0);
+
+  await preprocessingEntry.click();
+  await page.locator('[data-testid="operator-search"]').focus();
+  await page.keyboard.press('Escape');
+  await expect(flyout).toHaveCount(0);
+  await expect(preprocessingEntry).toBeFocused();
 });
 
 test('node selection, move, copy/paste, undo/redo, delete and focus/IME gates stay scoped', async ({ page }) => {
@@ -3643,6 +3860,12 @@ test('narrow Workspace overlays restore focus and remain inside the viewport', a
     element.contains(document.activeElement))).toBe(true);
   const railBounds = await page.locator('#workspace-operator-pane').boundingBox();
   expect((railBounds?.x ?? 0) + (railBounds?.width ?? 0)).toBeLessThanOrEqual(741);
+  await ensureOperatorFlyout(page);
+  const flyoutBounds = await page.locator('[data-capability="operator-flyout"]').boundingBox();
+  expect((flyoutBounds?.x ?? 0) + (flyoutBounds?.width ?? 0)).toBeLessThanOrEqual(741);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-capability="operator-flyout"]')).toHaveCount(0);
+  await expect(page.locator('#workspace-operator-pane')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(railToggle).toBeFocused();
   await expect(page.locator('#workspace-operator-pane')).toBeHidden();

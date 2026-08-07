@@ -42,4 +42,47 @@ describe('workspaceGlobalVariablesOwner', () => {
     owner.setServerDiagnostics({ diagnostics: [{ code: 'GV011', message: 'missing', field: 'globalVariables.targetBindings[0].parameterId', variableId: null, operatorId: 'op', portId: null, parameterId: 'parameter', severity: 'Error' }] });
     expect(owner.projection.fieldErrors[0]).toMatchObject({ code: 'GV011', field: 'globalVariables.targetBindings[0].parameterId', parameterId: 'parameter' });
   });
+
+  it('keeps runtime writes and resets separate from the definition draft', async () => {
+    const variableId = '22222222-2222-4222-8222-222222222222';
+    const runtime = (value: string, version: number) => [{
+      variableId, name: 'Count', displayName: '计数', valueType: 'Int64', value, version,
+      updatedAtUtc: '2026-07-22T00:00:00Z', updatedBy: 'StudioManual', runId: null, operatorId: null
+    }];
+    const api = {
+      apiBaseUrl: 'http://localhost/api',
+      get: vi.fn(async () => runtime('5', 0)),
+      put: vi.fn(async () => runtime('8', 1)),
+      post: vi.fn(async (path: string) => path.endsWith('/reset') ? runtime('5', 2) : runtime('5', 2))
+    } as unknown as ApiTransport;
+    const owner = createWorkspaceGlobalVariablesOwner({ projectId, baseline: baseline(), api });
+    owner.upsertDefinition({ id: variableId, name: 'Count', displayName: '计数', valueType: 'Int64', initialValue: 5, manualWriteAllowed: true });
+    expect(owner.apply()).toBe(true);
+    await owner.refreshRuntimeValues();
+    expect(await owner.writeRuntimeValue(variableId, 8, 0)).toBe(true);
+    expect(owner.projection.dirty).toBe(false);
+    expect(api.put).toHaveBeenCalledWith(`projects/${projectId}/global-variable-values/${variableId}`, { value: 8, expectedVersion: 0 });
+    expect(await owner.resetRuntimeValue(variableId, 1)).toBe(true);
+    expect(api.post).toHaveBeenCalledWith(`projects/${projectId}/global-variable-values/${variableId}/reset`, { expectedVersion: 1 });
+    expect(await owner.resetAllRuntimeValues({ [variableId]: 2 })).toBe(true);
+    expect(api.post).toHaveBeenCalledWith(`projects/${projectId}/global-variable-values/reset`, { expectedVersions: { [variableId]: 2 } });
+  });
+
+  it('rejects runtime mutation for variables that do not allow manual writes', async () => {
+    const variableId = '22222222-2222-4222-8222-222222222222';
+    const api = {
+      apiBaseUrl: 'http://localhost/api',
+      put: vi.fn(),
+      post: vi.fn()
+    } as unknown as ApiTransport;
+    const owner = createWorkspaceGlobalVariablesOwner({ projectId, baseline: baseline(), api });
+    owner.upsertDefinition({ id: variableId, name: 'Count', displayName: '计数', valueType: 'Int64', initialValue: 5 });
+    expect(owner.apply()).toBe(true);
+    expect(await owner.writeRuntimeValue(variableId, 8)).toBe(false);
+    expect(await owner.resetRuntimeValue(variableId)).toBe(false);
+    expect(await owner.resetAllRuntimeValues()).toBe(false);
+    expect(api.put).not.toHaveBeenCalled();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(owner.projection.runtimeErrorCode).toBe('GV030');
+  });
 });

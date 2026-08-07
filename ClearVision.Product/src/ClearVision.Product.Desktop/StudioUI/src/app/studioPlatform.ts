@@ -12,7 +12,10 @@ import {
 } from '@/platform/auth';
 import {
   createBrowserHostFake,
+  createFilePickerPort,
   createWebView2HostAdapter,
+  type BrowserHostFake,
+  type FilePickerPort,
   type StudioHostAdapter
 } from '@/platform/host';
 import {
@@ -24,11 +27,19 @@ import {
 
 export interface DesktopStudioRuntimeWindow extends StudioStartupWindow {
   readonly sessionStorage?: AuthTokenStorage;
+  readonly __CLEARVISION_BROWSER_HOST_TEST_HOOK__?: BrowserHostTestHook;
+}
+
+/** Test-only access to the existing browser fake host; never available to WebView2. */
+export interface BrowserHostTestHook {
+  readonly emitMessage: BrowserHostFake['emitMessage'];
+  readonly getPostedMessages: () => readonly unknown[];
 }
 
 export interface StudioPlatform {
   readonly startup: StudioStartupConfigV1;
   readonly host: StudioHostAdapter;
+  readonly filePicker: FilePickerPort;
   readonly api: ApiTransport;
   readonly tokenPort: AuthTokenPort;
   hasToken(): boolean;
@@ -89,11 +100,19 @@ export function createStudioPlatform(options: CreateStudioPlatformOptions): Stud
   }
 
   const tokenPort = options.tokenPort ?? createMemoryTokenPort(options.tokenProvider?.() ?? undefined);
+  let filePicker: FilePickerPort;
+  try {
+    filePicker = createFilePickerPort(options.host);
+  } catch (error) {
+    options.host.dispose();
+    throw error;
+  }
   let disposed = false;
 
   return Object.freeze({
     startup: options.startup,
     host: options.host,
+    filePicker,
     api: options.api,
     tokenPort,
     hasToken(): boolean {
@@ -109,6 +128,7 @@ export function createStudioPlatform(options: CreateStudioPlatformOptions): Stud
       }
 
       disposed = true;
+      filePicker.dispose();
       options.host.dispose();
     }
   });
@@ -149,6 +169,14 @@ export function createBrowserTestStudioPlatform(
   );
   const tokenPort = createSessionStorageTokenPort(runtimeWindow.sessionStorage);
   const host = createBrowserHostFake();
+  const testWindow = runtimeWindow as DesktopStudioRuntimeWindow & {
+    __CLEARVISION_BROWSER_HOST_TEST_HOOK__?: BrowserHostTestHook;
+  };
+  const removeTestHook = (): void => {
+    if (testWindow.__CLEARVISION_BROWSER_HOST_TEST_HOOK__) {
+      delete testWindow.__CLEARVISION_BROWSER_HOST_TEST_HOOK__;
+    }
+  };
 
   try {
     const api = createApiTransport({
@@ -157,13 +185,29 @@ export function createBrowserTestStudioPlatform(
       tokenProvider: tokenPort.readToken
     });
 
-    return createStudioPlatform({
+    const platform = createStudioPlatform({
       startup,
       host,
       api,
       tokenPort
     });
+    Object.defineProperty(testWindow, '__CLEARVISION_BROWSER_HOST_TEST_HOOK__', {
+      configurable: true,
+      enumerable: false,
+      value: Object.freeze({
+        emitMessage: host.emitMessage,
+        getPostedMessages: () => host.postedMessages
+      } satisfies BrowserHostTestHook)
+    });
+    return Object.freeze({
+      ...platform,
+      dispose(): void {
+        removeTestHook();
+        platform.dispose();
+      }
+    });
   } catch (error) {
+    removeTestHook();
     host.dispose();
     throw error;
   }

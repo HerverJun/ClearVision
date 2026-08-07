@@ -43,6 +43,9 @@ export interface WorkspaceGlobalVariablesProjection {
   readonly dirty: boolean;
   readonly fieldErrors: readonly WorkspaceGlobalVariableFieldError[];
   readonly runtimeValues: readonly WorkspaceGlobalVariableRuntimeValueV1[];
+  readonly runtimeOperation: 'idle' | 'loading' | 'writing' | 'resetting' | 'error' | 'disposed';
+  readonly runtimeErrorCode: string | null;
+  readonly runtimeTargetVariableId: string | null;
   readonly message: string;
 }
 
@@ -96,6 +99,9 @@ export interface WorkspaceGlobalVariablesOwner {
   apply(): boolean;
   cancel(): void;
   refreshRuntimeValues(): Promise<void>;
+  writeRuntimeValue(variableId: string, value: WorkspaceJsonValue, expectedVersion?: number | null): Promise<boolean>;
+  resetRuntimeValue(variableId: string, expectedVersion?: number | null): Promise<boolean>;
+  resetAllRuntimeValues(expectedVersions?: Readonly<Record<string, number>>): Promise<boolean>;
   getApplied(): WorkspaceGlobalVariablesV1;
   acceptServerBaseline(schema: WorkspaceGlobalVariablesV1, preserveApplied: boolean): void;
   replaceApplied(schema: WorkspaceGlobalVariablesV1): void;
@@ -194,6 +200,15 @@ function decodeRuntimeValues(payload: unknown): readonly WorkspaceGlobalVariable
   }));
 }
 
+function errorDetails(error: unknown): Readonly<{ code: string | null; message: string }> {
+  const source = error as { payload?: unknown; message?: unknown } | null;
+  const payload = record(source?.payload);
+  const code = nullableText(field(payload, 'code'));
+  const message = nullableText(field(payload, 'error')) ?? nullableText(field(payload, 'message')) ??
+    (typeof source?.message === 'string' ? source.message : null) ?? '运行值命令失败。';
+  return Object.freeze({ code, message });
+}
+
 export function createWorkspaceGlobalVariablesOwner(options: {
   readonly projectId: string;
   readonly baseline: WorkspaceGlobalVariablesV1;
@@ -212,6 +227,9 @@ export function createWorkspaceGlobalVariablesOwner(options: {
     dirty: false,
     fieldErrors: Object.freeze([]),
     runtimeValues: Object.freeze([]),
+    runtimeOperation: 'idle',
+    runtimeErrorCode: null,
+    runtimeTargetVariableId: null,
     message: '变量定义与绑定已就绪。'
   });
 
@@ -332,19 +350,170 @@ export function createWorkspaceGlobalVariablesOwner(options: {
     },
     async refreshRuntimeValues(): Promise<void> {
       if (disposed || !options.api.get) return;
+      if (state.runtimeOperation !== 'idle' && state.runtimeOperation !== 'error') return;
       const operation = ++requestGeneration;
       state.phase = 'loading-runtime';
+      state.runtimeOperation = 'loading';
+      state.runtimeErrorCode = null;
+      state.runtimeTargetVariableId = null;
       state.message = '正在读取运行值。';
       try {
         const values = decodeRuntimeValues(await options.api.get(`projects/${encodeURIComponent(options.projectId)}/global-variable-values`));
         if (disposed || operation !== requestGeneration) return;
         state.runtimeValues = values;
         state.phase = 'ready';
-        state.message = '运行值为只读投影，不会写回变量定义。';
+        state.runtimeOperation = 'idle';
+        state.message = '运行值来自当前运行会话，不会写回变量定义。';
       } catch (error) {
         if (disposed || operation !== requestGeneration) return;
+        const details = errorDetails(error);
         state.phase = 'error';
-        state.message = `运行值读取失败：${error instanceof Error ? error.message : '响应不可用。'}`;
+        state.runtimeOperation = 'error';
+        state.runtimeErrorCode = details.code;
+        state.message = `运行值读取失败：${details.message}`;
+      }
+    },
+    async writeRuntimeValue(variableId: string, value: WorkspaceJsonValue, expectedVersion?: number | null): Promise<boolean> {
+      const put = options.api.put;
+      if (disposed || !put) return false;
+      if (state.runtimeOperation !== 'idle' && state.runtimeOperation !== 'error') {
+        state.message = '已有运行值命令正在处理，请等待结果。';
+        return false;
+      }
+      const definition = applied.variables.find(item => item.id === variableId);
+      if (!definition) {
+        state.runtimeOperation = 'error';
+        state.runtimeErrorCode = 'GV_NOT_FOUND';
+        state.message = '运行值写入失败：变量不存在。';
+        return false;
+      }
+      if (!definition.manualWriteAllowed) {
+        state.runtimeOperation = 'error';
+        state.runtimeErrorCode = 'GV030';
+        state.message = '运行值写入失败：该变量未允许手动写入。';
+        return false;
+      }
+      const operation = ++requestGeneration;
+      state.phase = 'loading-runtime';
+      state.runtimeOperation = 'writing';
+      state.runtimeErrorCode = null;
+      state.runtimeTargetVariableId = variableId;
+      state.message = `正在写入变量“${definition.displayName}”的运行值。`;
+      try {
+        const response = await put(
+          `projects/${encodeURIComponent(options.projectId)}/global-variable-values/${encodeURIComponent(variableId)}`,
+          expectedVersion === null || expectedVersion === undefined ? { value } : { value, expectedVersion }
+        );
+        const values = decodeRuntimeValues(response);
+        if (disposed || operation !== requestGeneration) return false;
+        state.runtimeValues = values;
+        state.phase = 'ready';
+        state.runtimeOperation = 'idle';
+        state.runtimeErrorCode = null;
+        state.runtimeTargetVariableId = null;
+        state.message = '运行值已写入；工程定义和保存状态未改变。';
+        return true;
+      } catch (error) {
+        if (disposed || operation !== requestGeneration) return false;
+        const details = errorDetails(error);
+        state.phase = 'error';
+        state.runtimeOperation = 'error';
+        state.runtimeErrorCode = details.code;
+        state.runtimeTargetVariableId = null;
+        state.message = `运行值写入失败：${details.message}`;
+        return false;
+      }
+    },
+    async resetRuntimeValue(variableId: string, expectedVersion?: number | null): Promise<boolean> {
+      if (disposed || !options.api.post) return false;
+      if (state.runtimeOperation !== 'idle' && state.runtimeOperation !== 'error') {
+        state.message = '已有运行值命令正在处理，请等待结果。';
+        return false;
+      }
+      const definition = applied.variables.find(item => item.id === variableId);
+      if (!definition) {
+        state.runtimeOperation = 'error';
+        state.runtimeErrorCode = 'GV_NOT_FOUND';
+        state.message = '运行值重置失败：变量不存在。';
+        return false;
+      }
+      if (!definition.manualWriteAllowed) {
+        state.runtimeOperation = 'error';
+        state.runtimeErrorCode = 'GV030';
+        state.message = '运行值重置失败：该变量未允许手动写入。';
+        return false;
+      }
+      const operation = ++requestGeneration;
+      state.phase = 'loading-runtime';
+      state.runtimeOperation = 'resetting';
+      state.runtimeErrorCode = null;
+      state.runtimeTargetVariableId = variableId;
+      state.message = `正在将变量“${definition.displayName}”重置为定义初始值。`;
+      try {
+        const response = await options.api.post(
+          `projects/${encodeURIComponent(options.projectId)}/global-variable-values/${encodeURIComponent(variableId)}/reset`,
+          expectedVersion === null || expectedVersion === undefined ? {} : { expectedVersion }
+        );
+        const values = decodeRuntimeValues(response);
+        if (disposed || operation !== requestGeneration) return false;
+        state.runtimeValues = values;
+        state.phase = 'ready';
+        state.runtimeOperation = 'idle';
+        state.runtimeErrorCode = null;
+        state.runtimeTargetVariableId = null;
+        state.message = '运行值已重置为定义初始值；工程定义未改变。';
+        return true;
+      } catch (error) {
+        if (disposed || operation !== requestGeneration) return false;
+        const details = errorDetails(error);
+        state.phase = 'error';
+        state.runtimeOperation = 'error';
+        state.runtimeErrorCode = details.code;
+        state.runtimeTargetVariableId = null;
+        state.message = `运行值重置失败：${details.message}`;
+        return false;
+      }
+    },
+    async resetAllRuntimeValues(expectedVersions?: Readonly<Record<string, number>>): Promise<boolean> {
+      if (disposed || !options.api.post) return false;
+      if (state.runtimeOperation !== 'idle' && state.runtimeOperation !== 'error') {
+        state.message = '已有运行值命令正在处理，请等待结果。';
+        return false;
+      }
+      const blocked = applied.variables.find(item => !item.manualWriteAllowed);
+      if (blocked) {
+        state.runtimeOperation = 'error';
+        state.runtimeErrorCode = 'GV030';
+        state.message = `运行值重置失败：变量“${blocked.displayName}”未允许手动写入。`;
+        return false;
+      }
+      const operation = ++requestGeneration;
+      state.phase = 'loading-runtime';
+      state.runtimeOperation = 'resetting';
+      state.runtimeErrorCode = null;
+      state.runtimeTargetVariableId = null;
+      state.message = '正在将全部运行值重置为定义初始值。';
+      try {
+        const response = await options.api.post(
+          `projects/${encodeURIComponent(options.projectId)}/global-variable-values/reset`,
+          expectedVersions && Object.keys(expectedVersions).length > 0 ? { expectedVersions } : {}
+        );
+        const values = decodeRuntimeValues(response);
+        if (disposed || operation !== requestGeneration) return false;
+        state.runtimeValues = values;
+        state.phase = 'ready';
+        state.runtimeOperation = 'idle';
+        state.runtimeErrorCode = null;
+        state.message = '全部运行值已重置；工程定义未改变。';
+        return true;
+      } catch (error) {
+        if (disposed || operation !== requestGeneration) return false;
+        const details = errorDetails(error);
+        state.phase = 'error';
+        state.runtimeOperation = 'error';
+        state.runtimeErrorCode = details.code;
+        state.message = `全部运行值重置失败：${details.message}`;
+        return false;
       }
     },
     getApplied(): WorkspaceGlobalVariablesV1 {
@@ -398,6 +567,8 @@ export function createWorkspaceGlobalVariablesOwner(options: {
       disposed = true;
       requestGeneration += 1;
       state.phase = 'disposed';
+      state.runtimeOperation = 'disposed';
+      state.runtimeTargetVariableId = null;
       state.runtimeValues = Object.freeze([]);
       state.message = '全局变量 owner 已释放。';
     }

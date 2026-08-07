@@ -127,7 +127,8 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
         diagnosticsOwner,
         options.queries,
         options.api,
-        options.featureFlags
+        options.featureFlags,
+        options.session.projection.user?.role === 'Admin' || options.session.projection.user?.role === 'Engineer'
       );
       let ownerDisposed = false;
       const owner: WorkspaceOwner = Object.freeze({
@@ -138,9 +139,11 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
         getGlobalVariablesOwner: inner.getGlobalVariablesOwner,
         getFinalDecisionOwner: inner.getFinalDecisionOwner,
         getRuntimePackageExportOwner: inner.getRuntimePackageExportOwner,
+        getTemplateOwner: inner.getTemplateOwner,
         save: inner.save,
         retrySave: inner.retrySave,
         reconcileSave: inner.reconcileSave,
+        reconcileExternalProject: inner.reconcileExternalProject,
         reapplyConflict: inner.reapplyConflict,
         discardConflict: inner.discardConflict,
         hydrateFormalRun: inner.hydrateFormalRun,

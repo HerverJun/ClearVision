@@ -65,6 +65,15 @@ import {
   createResultEvidenceOwner,
   type ResultEvidenceOwner
 } from './resultEvidenceOwner';
+import ResultsAnalysisWorkbench from './ResultsAnalysisWorkbench.vue';
+import {
+  createResultAnalysisOwner,
+  type ResultAnalysisOwner
+} from './resultAnalysisOwner';
+import {
+  normalizeAnalysisTrendWindow,
+} from './analysisQueries';
+import type { ResultsAnalysisFilters } from './analysisContracts';
 
 const props = defineProps<{
   runtime?: ResultsReadRuntime;
@@ -78,6 +87,7 @@ const projectsOwner = shallowRef<ReadQueryOwner<readonly ResultsProjectOption[]>
 const localListOwner = shallowRef<ReadQueryOwner<LocalInspectionResultPage> | null>(null);
 const localDetailOwner = shallowRef<ReadQueryOwner<LocalInspectionResultDetail> | null>(null);
 const localStatisticsOwner = shallowRef<ReadQueryOwner<ResultsOutcomeStatistics> | null>(null);
+const analysisOwner = shallowRef<ResultAnalysisOwner | null>(null);
 const stationListOwner = shallowRef<ReadQueryOwner<StationInspectionResultPage> | null>(null);
 const stationStatisticsOwner = shallowRef<ReadQueryOwner<ResultsOutcomeStatistics> | null>(null);
 const previousSuccessOwner = shallowRef<ReadQueryOwner<InspectionPreviousSuccessReference> | null>(null);
@@ -150,7 +160,10 @@ const pageSize = computed(() => Math.min(
 ));
 const invalidFrom = computed(() => from.value.length > 0 && Number.isNaN(Date.parse(from.value)));
 const invalidTo = computed(() => to.value.length > 0 && Number.isNaN(Date.parse(to.value)));
-const hasInvalidDate = computed(() => invalidFrom.value || invalidTo.value);
+const reversedDateRange = computed(() =>
+  !invalidFrom.value && !invalidTo.value && Boolean(from.value && to.value) &&
+  Date.parse(from.value) > Date.parse(to.value));
+const hasInvalidDate = computed(() => invalidFrom.value || invalidTo.value || reversedDateRange.value);
 const filters = computed<ResultsListFilters>(() => Object.freeze({
   stationId: stationId.value,
   outcome: outcome.value,
@@ -160,6 +173,13 @@ const filters = computed<ResultsListFilters>(() => Object.freeze({
   page: page.value,
   pageSize: pageSize.value
 }));
+const analysisFilters = computed<ResultsAnalysisFilters>(() => Object.freeze({
+  from: from.value,
+  to: to.value,
+  outcome: outcome.value,
+  defectType: ''
+}));
+const analysisTrendWindow = computed(() => normalizeAnalysisTrendWindow(from.value, to.value));
 
 const projectsState = computed(() => projectsOwner.value?.state.value ?? idleState<readonly ResultsProjectOption[]>());
 const localListState = computed(() => localListOwner.value?.state.value ?? idleState<LocalInspectionResultPage>());
@@ -370,6 +390,21 @@ function ensureStationStatisticsOwner(): ReadQueryOwner<ResultsOutcomeStatistics
   return stationStatisticsOwner.value;
 }
 
+function ensureAnalysisOwner(): ResultAnalysisOwner | null {
+  if (!runtime.api || !projectId.value) return null;
+  if (analysisOwner.value?.projection.projectId !== projectId.value) {
+    analysisOwner.value?.dispose('analysis-project-changed');
+    analysisOwner.value = createResultAnalysisOwner({
+      projectId: projectId.value,
+      queries: runtime.queries,
+      filters: () => analysisFilters.value,
+      trendStart: () => analysisTrendWindow.value.start,
+      trendEnd: () => analysisTrendWindow.value.end
+    });
+  }
+  return analysisOwner.value;
+}
+
 function ensurePreviousSuccessOwner(): ReadQueryOwner<InspectionPreviousSuccessReference> {
   previousSuccessOwner.value ??= createPreviousSuccessQuery(
     runtime.queries,
@@ -407,6 +442,11 @@ function disposeLocalDetail(): void {
 function disposeLocalStatistics(): void {
   localStatisticsOwner.value?.dispose();
   localStatisticsOwner.value = null;
+}
+
+function disposeAnalysis(): void {
+  analysisOwner.value?.dispose('results-analysis-disposed');
+  analysisOwner.value = null;
 }
 
 function disposeInvestigation(): void {
@@ -480,6 +520,14 @@ async function refreshLocalStatistics(force = false): Promise<void> {
   await ensureLocalStatisticsOwner().refresh({ force });
 }
 
+async function refreshAnalysis(force = false): Promise<void> {
+  if (source.value !== 'local' || !projectId.value || hasInvalidDate.value || !runtime.api) {
+    disposeAnalysis();
+    return;
+  }
+  await ensureAnalysisOwner()?.refresh({ force });
+}
+
 async function refreshLocalDetail(force = false): Promise<void> {
   if (!projectId.value || !resultId.value) {
     disposeLocalDetail();
@@ -516,6 +564,7 @@ async function refreshActive(force = false): Promise<void> {
       refreshProjects(force),
       refreshLocalList(force),
       refreshLocalStatistics(force),
+      refreshAnalysis(force),
       refreshLocalDetail(force)
     ]);
     return;
@@ -687,6 +736,7 @@ watch(source, next => {
     disposeLocalList();
     disposeLocalDetail();
     disposeLocalStatistics();
+    disposeAnalysis();
     disposeEvidence();
     disposeInvestigation();
   }
@@ -700,8 +750,9 @@ watch(
     if (next[0] !== previous[0]) {
       disposeLocalList();
       disposeLocalStatistics();
+      disposeAnalysis();
     }
-    void Promise.all([refreshLocalList(true), refreshLocalStatistics(true)]);
+    void Promise.all([refreshLocalList(true), refreshLocalStatistics(true), refreshAnalysis(true)]);
   }
 );
 
@@ -739,6 +790,7 @@ onBeforeUnmount(() => {
   disposeLocalList();
   disposeLocalDetail();
   disposeLocalStatistics();
+  disposeAnalysis();
   disposeEvidence();
   disposeInvestigation();
   disposeStationList();
@@ -933,6 +985,11 @@ onBeforeUnmount(() => {
     >
       当前没有可用的双分母统计摘要。
     </CvInlineAlert>
+
+    <ResultsAnalysisWorkbench
+      v-if="source === 'local' && analysisOwner && !hasInvalidDate"
+      :owner="analysisOwner"
+    />
 
     <section
       v-if="source === 'local'"

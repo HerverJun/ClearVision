@@ -31,11 +31,26 @@ describe('G3 parameter editor registry', () => {
     }).kind).toBe('slider');
   });
 
-  it('keeps file-picker deferred while describing the connected camera-binding editor accurately', () => {
+  it('maps file and Legacy path-like parameters to the shared picker contract', () => {
     expect(editor({ dataType: 'file' })).toMatchObject({
-      kind: 'extension',
+      kind: 'file',
       extensionSlot: 'file-picker',
-      message: '文件选择器尚未接入当前工作区。'
+      filePickerFilter: 'All Files|*.*',
+      message: null
+    });
+    expect(editor({ dataType: 'string', parameterName: 'TemplatePath' })).toMatchObject({
+      kind: 'file',
+      filePickerFilter: 'Template Files|*.png;*.jpg;*.jpeg;*.bmp;*.json|All Files|*.*'
+    });
+    expect(editor({ dataType: 'string', parameterName: 'IPAddress' }).kind).toBe('text');
+    expect(editor({ dataType: 'string', parameterName: 'Description' }).kind).toBe('text');
+  });
+
+  it('maps color metadata to a swatch/text editor', () => {
+    expect(editor({ dataType: 'color' })).toMatchObject({
+      kind: 'color',
+      extensionSlot: null,
+      filePickerFilter: null
     });
     expect(editor({ dataType: 'cameraBinding' })).toMatchObject({
       kind: 'extension',

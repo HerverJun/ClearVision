@@ -123,3 +123,37 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 产品源提交检查为 StudioUI lint、typecheck、unit、build、bundle reproducibility，Product/Desktop full、Desktop endpoints、architecture guards、Browser full 和当前 SHA 宿主证据均通过；Playwright 受管 webServer 在用例结束后的 teardown 仍需单独治理，不改变已落盘的 141/26/0 用例结果。
 
 判定依据与执行步骤见 [F09_Cutover与Rollback操作手册.md](./F09_Cutover与Rollback操作手册.md)。
+
+## Current TODO execution addendum (2026-08-07)
+
+本节是当前 TODO 实现候选的新增证据，不覆盖上面的历史 F09/M-series 证据。当前 source anchor 是 `68e6e4286d008433f804ef90de00c8017184c177` 加 scoped working-tree diff；提交后会在 provenance follow-up 中记录实际 commit。
+
+```text
+CURRENT_TODO_AUDIT_BASELINE_HEAD=68e6e4286d008433f804ef90de00c8017184c177
+CURRENT_TODO_BRANCH=studio-ui-next
+CURRENT_TODO_REMOTE_HEAD=7d43af9e19ad5a98240651fd5519a8e0f5a1e9f5
+CURRENT_TODO_REMOTE_RELATION=REMOTE_ANCESTOR_AHEAD_37_NO_DIVERGENCE
+CURRENT_TODO_WORKTREE=DIRTY_SCOPED_CANDIDATE_BEFORE_COMMIT
+CURRENT_TODO_PRODUCTION_ACCEPTANCE=NOT_GRANTED
+```
+
+| EvidenceId | 范围 | 状态 | 命令/来源 | 边界 |
+| --- | --- | --- | --- | --- |
+| TODO-E001 | StudioUI lint | `PASS` | `npm run lint` | 当前工作树；不是 release gate |
+| TODO-E002 | StudioUI typecheck | `PASS` | `npm run typecheck` | Vue/Vitest/Node tsconfig |
+| TODO-E003 | StudioUI unit | `PASS` | `npm run test:unit`，136 files / 837 tests | jsdom/Vitest |
+| TODO-E004 | StudioUI build | `PASS` | `npm run build` | Vite build；`build:production` 未运行 |
+| TODO-E005 | F03 workspace | `PASS` | Playwright Chromium，`f03-workspace.spec.ts` | 59/59；静态 fixture，不是 WebView2 |
+| TODO-E006 | F04-R project lifecycle | `PASS` | Playwright Chromium，`f04-project-lifecycle.spec.ts` | 2/2；不证明 Template/Import/Demo 已全迁移 |
+| TODO-E007 | Calibration endpoint authority | `PASS` | 串行 Desktop test，CalibrationDraftEndpointsTests | 4/4；formal save Operator 403，draft solve 权限仍 open |
+| TODO-E008 | Contract/owner audit | `PASS_WITH_BLOCKED_SCOPE` | current source/config and route search | 无第二 transport/bridge/save chain；缺合同项停止 |
+| TODO-E009 | `git diff --check` | `PASS` | repository worktree | 无 whitespace error |
+| TODO-E010 | WebView2 125% / no-Node / field / Remote CI / Final Gate / soak | `NOT_PERFORMED` or `BLOCKED` | no command run in this session | 不以 Chromium 或历史证据代替 |
+
+### Current implementation ledger
+
+`FilePickerPort`、Inspector file/path/color、AI Pending file parameter、Template owner、N 点 calibration draft/solve/formal-save、GlobalVariables runtime values，以及 Results trend/distribution/report query owner属于当前候选实现范围。Template 完整 E2E、Project JSON import/export、AI attachments/resource binding、二维 calibration、results bulk export、line-sequence analysis、Station test package 和 advanced settings maintenance 仍分别受 `CV-AUDIT-045` 至 `CV-AUDIT-050` 或既有 F09 issue 阻断/部分证据限制。
+
+正式 Project/Flow/GlobalVariables/assets authority、ProjectSaveCoordinator、AgentRun、authenticated HTTP/SSE、HostBridge 和 Canvas ownership 均保持既有边界；本轮没有新增第二 API transport、EventBus、ServiceRegistry、Canvas kernel、HostBridge 或 Project save client。
+
+`PRODUCTION_ACCEPTANCE=NOT_GRANTED` 必须保持，直到产品负责人和真实宿主/目标机/现场证据完成签收。

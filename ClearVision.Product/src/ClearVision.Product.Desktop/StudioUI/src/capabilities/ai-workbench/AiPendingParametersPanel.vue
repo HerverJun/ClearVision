@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue';
+import { computed, reactive, shallowRef, watch } from 'vue';
 import { CvButton, CvStatusBadge } from '@/design-system/primitives';
+import { resolveFilePickerFilter, type FilePickerPort } from '@/platform/host';
 import type { AiBuildParameterV1, AiScalarValue } from './contracts';
 import { validateBuildParameterValues } from './parameterValidation';
 
@@ -8,6 +9,7 @@ const props = defineProps<{
   parameters: readonly AiBuildParameterV1[];
   confirmedValues: Readonly<Record<string, AiScalarValue>>;
   busy: boolean;
+  filePicker?: FilePickerPort | null;
 }>();
 
 const emit = defineEmits<{
@@ -16,6 +18,9 @@ const emit = defineEmits<{
 
 const drafts = reactive<Record<string, string>>({});
 const nullValues = reactive<Record<string, boolean>>({});
+const pickerBusy = reactive<Record<string, boolean>>({});
+const pickerErrors = reactive<Record<string, string>>({});
+const pickerGeneration = shallowRef(0);
 const pending = computed(() => props.parameters.filter(item => item.pending && !item.resourceDependent));
 const groups = computed(() => {
   const byOperator = new Map<string, { label: string; items: AiBuildParameterV1[] }>();
@@ -65,6 +70,37 @@ const canSubmit = computed(() => pending.value.length > 0 && pending.value.every
   const key = parameter.canonicalKey;
   return !errors.value[key] && (nullValues[key] || key in drafts);
 }));
+
+function isFileParameter(parameter: AiBuildParameterV1): boolean {
+  const normalized = parameter.dataType.trim().toLowerCase();
+  const name = parameter.parameterName.trim().toLowerCase();
+  return normalized === 'file' || normalized === 'path' || name.endsWith('path') || name.endsWith('filepath');
+}
+
+async function chooseFile(parameter: AiBuildParameterV1): Promise<void> {
+  if (props.busy || pickerBusy[parameter.canonicalKey] || !props.filePicker) {
+    if (!props.filePicker) pickerErrors[parameter.canonicalKey] = '文件选择服务尚未就绪。';
+    return;
+  }
+  const generation = pickerGeneration.value;
+  pickerBusy[parameter.canonicalKey] = true;
+  delete pickerErrors[parameter.canonicalKey];
+  try {
+    const result = await props.filePicker.pick({
+      parameterName: parameter.parameterName,
+      filter: resolveFilePickerFilter(parameter.parameterName)
+    });
+    if (generation !== pickerGeneration.value || result.status === 'cancelled') return;
+    drafts[parameter.canonicalKey] = result.filePath;
+    nullValues[parameter.canonicalKey] = false;
+  } catch (error) {
+    if (generation === pickerGeneration.value) {
+      pickerErrors[parameter.canonicalKey] = error instanceof Error ? error.message : '文件选择失败。';
+    }
+  } finally {
+    if (generation === pickerGeneration.value) pickerBusy[parameter.canonicalKey] = false;
+  }
+}
 
 function suggested(parameter: AiBuildParameterV1): string {
   if (parameter.valueSummary === 'null') return '建议使用 null';
@@ -146,6 +182,26 @@ function submit(): void {
               否
             </option>
           </select>
+          <template v-else-if="isFileParameter(parameter)">
+            <input
+              :id="`ai-param-${parameter.canonicalKey}`"
+              :value="drafts[parameter.canonicalKey] ?? ''"
+              type="text"
+              readonly
+              :disabled="busy || Boolean(pickerBusy[parameter.canonicalKey]) || nullValues[parameter.canonicalKey]"
+              :title="drafts[parameter.canonicalKey] || '尚未选择文件'"
+            >
+            <CvButton
+              size="sm"
+              variant="quiet"
+              :disabled="Boolean(busy || pickerBusy[parameter.canonicalKey] || nullValues[parameter.canonicalKey])"
+              :loading="Boolean(pickerBusy[parameter.canonicalKey])"
+              loading-label="等待文件窗口"
+              @click="chooseFile(parameter)"
+            >
+              选择文件
+            </CvButton>
+          </template>
           <input
             v-else
             :id="`ai-param-${parameter.canonicalKey}`"
@@ -157,6 +213,13 @@ function submit(): void {
             :disabled="busy || nullValues[parameter.canonicalKey]"
             :placeholder="suggested(parameter)"
           >
+          <p
+            v-if="pickerErrors[parameter.canonicalKey]"
+            class="ai-parameters__error"
+            role="alert"
+          >
+            {{ pickerErrors[parameter.canonicalKey] }}
+          </p>
           <label
             v-if="!parameter.isRequired"
             class="ai-parameters__null"

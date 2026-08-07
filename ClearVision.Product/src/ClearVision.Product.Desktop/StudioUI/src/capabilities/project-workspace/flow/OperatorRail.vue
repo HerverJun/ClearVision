@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, shallowRef } from 'vue';
+import { computed, nextTick, shallowRef, useTemplateRef } from 'vue';
 import type { OperatorCatalogItem, OperatorCategoryId } from '@/capabilities/operators-read/operatorContracts';
 import { operatorCategoryLabels } from '@/capabilities/operators-read/operatorViewModel';
 import { CvIcon } from '@/design-system/icons';
@@ -12,11 +12,13 @@ type OperatorRailMode = 'all' | 'recent' | 'favorites' | 'category';
 const props = defineProps<{
   catalog: OperatorCatalogProjection;
   readonly: boolean;
+  flyoutOpen: boolean;
 }>();
 
 const emit = defineEmits<{
   add: [operator: OperatorCatalogItem];
   refresh: [];
+  'update:flyoutOpen': [value: boolean];
 }>();
 
 const favoritesStorageKey = 'clearvision.studio-ui.operator-favorites.v1';
@@ -26,9 +28,9 @@ const activeCategory = shallowRef<'' | OperatorCategoryId>('');
 const activeMode = shallowRef<OperatorRailMode>('all');
 const showCompatibility = shallowRef(false);
 const draggingOperatorType = shallowRef<string | null>(null);
-const flyoutOpen = shallowRef(false);
 const recentOperatorTypes = shallowRef<readonly string[]>([]);
 const favoriteOperatorTypes = shallowRef<readonly string[]>(readFavorites());
+const categoriesNavigation = useTemplateRef<HTMLElement>('categoriesNavigation');
 
 function readFavorites(): readonly string[] {
   try {
@@ -118,9 +120,13 @@ function categoryIcon(category: OperatorCategoryId): CvIconName {
 }
 
 function openMode(mode: OperatorRailMode, category: '' | OperatorCategoryId = ''): void {
+  if (props.flyoutOpen && activeMode.value === mode && activeCategory.value === category) {
+    emit('update:flyoutOpen', false);
+    return;
+  }
   activeMode.value = mode;
   activeCategory.value = category;
-  flyoutOpen.value = true;
+  emit('update:flyoutOpen', true);
 }
 
 function updateSearch(value: string): void {
@@ -128,14 +134,30 @@ function updateSearch(value: string): void {
   if (value.trim()) {
     activeMode.value = 'all';
     activeCategory.value = '';
-    flyoutOpen.value = true;
+    emit('update:flyoutOpen', true);
   }
 }
 
 function updateCategory(value: '' | OperatorCategoryId): void {
   activeCategory.value = value;
   activeMode.value = value ? 'category' : 'all';
-  flyoutOpen.value = true;
+  emit('update:flyoutOpen', true);
+}
+
+async function closeFlyout(restoreFocus = false): Promise<void> {
+  const trigger = categoriesNavigation.value
+    ?.querySelector<HTMLElement>('.operator-rail__category-button.is-active');
+  emit('update:flyoutOpen', false);
+  if (!restoreFocus) return;
+  await nextTick();
+  trigger?.focus({ preventScroll: true });
+}
+
+function handleEscape(event: KeyboardEvent): void {
+  if (!props.flyoutOpen) return;
+  event.preventDefault();
+  event.stopPropagation();
+  void closeFlyout(true);
 }
 
 function addOperator(operator: OperatorCatalogItem): void {
@@ -190,16 +212,20 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
     :data-operator-count="visibleOperators.length"
     :data-active-category="activeCategory || 'all'"
     :data-dragging-operator="draggingOperatorType ?? ''"
-    :data-flyout-open="flyoutOpen"
+    :data-flyout-open="props.flyoutOpen"
+    @keydown.esc="handleEscape"
   >
     <nav
+      ref="categoriesNavigation"
       class="operator-rail__categories"
       aria-label="算子分类"
     >
       <button
         type="button"
         class="operator-rail__category-button"
-        :class="{ 'is-active': flyoutOpen && activeMode === 'all' }"
+        :class="{ 'is-active': props.flyoutOpen && activeMode === 'all' }"
+        :aria-expanded="props.flyoutOpen && activeMode === 'all'"
+        aria-controls="operator-flyout"
         title="搜索与全部算子"
         aria-label="搜索与全部算子"
         @click="openMode('all')"
@@ -213,7 +239,9 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
       <button
         type="button"
         class="operator-rail__category-button"
-        :class="{ 'is-active': flyoutOpen && activeMode === 'recent' }"
+        :class="{ 'is-active': props.flyoutOpen && activeMode === 'recent' }"
+        :aria-expanded="props.flyoutOpen && activeMode === 'recent'"
+        aria-controls="operator-flyout"
         title="最近使用的算子"
         @click="openMode('recent')"
       >
@@ -226,7 +254,9 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
       <button
         type="button"
         class="operator-rail__category-button"
-        :class="{ 'is-active': flyoutOpen && activeMode === 'favorites' }"
+        :class="{ 'is-active': props.flyoutOpen && activeMode === 'favorites' }"
+        :aria-expanded="props.flyoutOpen && activeMode === 'favorites'"
+        aria-controls="operator-flyout"
         title="收藏的算子"
         @click="openMode('favorites')"
       >
@@ -245,7 +275,9 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
         :key="category.id"
         type="button"
         class="operator-rail__category-button"
-        :class="{ 'is-active': flyoutOpen && activeMode === 'category' && activeCategory === category.id }"
+        :class="{ 'is-active': props.flyoutOpen && activeMode === 'category' && activeCategory === category.id }"
+        :aria-expanded="props.flyoutOpen && activeMode === 'category' && activeCategory === category.id"
+        aria-controls="operator-flyout"
         :title="`${category.label}（${category.count}）`"
         @click="openMode('category', category.id)"
       >
@@ -258,7 +290,8 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
     </nav>
 
     <OperatorFlyout
-      v-if="flyoutOpen"
+      v-if="props.flyoutOpen"
+      id="operator-flyout"
       class="operator-rail__flyout"
       :operators="visibleOperators"
       :available-count="availableOperators.length"
@@ -272,7 +305,7 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
       :message="catalog.message"
       :dragging-operator-type="draggingOperatorType"
       :favorite-operator-types="favoriteOperatorTypes"
-      @close="flyoutOpen = false"
+      @close="closeFlyout(true)"
       @refresh="emit('refresh')"
       @add="addOperator"
       @toggle-favorite="toggleFavorite"

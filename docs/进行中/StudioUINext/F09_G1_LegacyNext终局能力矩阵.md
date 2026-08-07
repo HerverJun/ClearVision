@@ -36,3 +36,23 @@ LEGACY_PHYSICAL_REMOVAL=NOT_IN_F09
 ## Product decision
 
 主体能力已具备 Next 承载；仍保留的数据库高级维护和示例工程创建归 Legacy fallback。Operator 已有结果和工作站的只读投影，但 `/inspection`、正式运行、PLC 操作与工程写入仍由服务端拒绝，因此不能把 G3 只读验证写成 G6 运行 Pilot。任何默认入口切换都不得同时挂载 Legacy 与 Next 的写 owner，也不得以 feature flag 的 CSS 隐藏冒充卸载。
+
+## Current TODO execution reconciliation (2026-08-07)
+
+以下细粒度状态以 `AUDIT_BASELINE_HEAD=68e6e4286d008433f804ef90de00c8017184c177` 加当前 scoped working-tree diff 为证据锚点；旧表中的主体迁移结论保留，但不能覆盖这里的操作级状态。
+
+| CapabilityId | 当前操作级状态 | 当前 owner / authority | 当前证据 | Issue |
+| --- | --- | --- | --- | --- |
+| inspector-file-color-path | `IMPLEMENTED` | FilePickerPort + InspectorOwner -> canonical Flow draft | FilePickerPort/Inspector unit；F03 file picker test | - |
+| ai-pending-file-parameter | `IMPLEMENTED_PARTIAL` | AI Pending owner -> shared FilePickerPort；AgentRun 仍是后端 authority | unit + F03 fixture coverage | CV-AUDIT-050 |
+| flow-templates | `IMPLEMENTED_PARTIAL_EVIDENCE` | Template owner -> canonical Flow draft -> ProjectSaveCoordinator | template contract/owner unit | CV-AUDIT-046 |
+| projects-json-import-export | `BLOCKED_BY_CONTRACT` | 未建立 owner；Project lifecycle remains authority | 当前 API/route audit 未发现 Next contract | CV-AUDIT-047 |
+| npoint-calibration-draft | `PARTIAL` | Calibration owner -> draft solve / Project asset formal save | calibration unit + Desktop endpoint 4/4 | CV-AUDIT-045 |
+| planar-scale-offset-calibration | `BLOCKED_BY_CONTRACT` | 未建立第二 calibration owner | 当前后端合同取证 | CV-AUDIT-048 |
+| global-variables-runtime-values | `IMPLEMENTED_PARTIAL_EVIDENCE` | runtime value owner 与 ProjectSaveCoordinator 分离 | owner unit + current workspace integration | - |
+| results-analysis | `IMPLEMENTED_PARTIAL_EVIDENCE` | read-only analysis owner -> existing results queries | analysis contract/owner unit；source switch dispose regression | CV-AUDIT-049 |
+| line-sequence-auto-tune | `BLOCKED_BY_CONTRACT` | 不在前端实现检测算法或私有 command | endpoint/authority gap audit | CV-AUDIT-050 |
+| station-test-package-deploy | `BLOCKED_BY_CONTRACT` | 不建立第二 Station command owner | Station command/package contract gap audit | CV-AUDIT-050 |
+| settings-advanced-maintenance | `DEFERRED_WITH_LEGACY_FALLBACK` | Legacy controlled endpoint；Next 不触碰数据库文件 | 既有 F09-I006 source audit | F09-I006 |
+
+`npoint-calibration-draft` 的正式 asset save 已有 `CanEditProject`，不要因为 draft solve 的权限语义未闭合而把正式保存描述成无权限保护。真实 WebView2、125% DPI、独立 no-Node、现场硬件、Remote CI/Final Gate 和生产 soak 仍属于 `real-host-deployment` 的 acceptance debt。

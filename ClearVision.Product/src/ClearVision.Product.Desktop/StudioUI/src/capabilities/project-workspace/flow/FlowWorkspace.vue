@@ -9,7 +9,9 @@ import {
   watch,
   type CSSProperties
 } from 'vue';
+import { useStudioPlatform } from '@/app/studioPlatform';
 import { CvSplitter } from '@/design-system';
+import type { OperatorCatalogItem } from '@/capabilities/operators-read/operatorContracts';
 import type { WorkspaceCanvasProjectV1 } from '../workspaceContracts';
 import type { WorkspaceOwner } from '../workspaceOwner';
 import type { WorkspaceNewDraftOwner } from '../workspaceNewDraftOwner';
@@ -17,6 +19,7 @@ import FlowCanvasSurface from './FlowCanvasSurface.vue';
 import OperatorRail from './OperatorRail.vue';
 import InspectorPanel from '../inspector/InspectorPanel.vue';
 import PreviewPanel from '../preview/PreviewPanel.vue';
+import { createCalibrationOwner, type CalibrationOwner } from '../calibration';
 import {
   createWorkspaceLayoutOwner,
   workspaceInspectorDefaultWidth,
@@ -28,11 +31,26 @@ const props = defineProps<{
   project: WorkspaceCanvasProjectV1;
 }>();
 
+const platform = useStudioPlatform();
 const flowOwner = props.workspaceOwner.getFlowCanvasOwner() ?? props.workspaceOwner.openFlowCanvas();
 const inspectorOwner = flowOwner.openInspector();
 const cameraBindingEditorOwner = props.project.id ? flowOwner.openCameraBindingEditor() : null;
 const previewWorkbenchOwner = cameraBindingEditorOwner
   ? flowOwner.openPreviewWorkbench(inspectorOwner)
+  : null;
+const persistedWorkspaceOwner = 'reconcileExternalProject' in props.workspaceOwner
+  ? props.workspaceOwner
+  : null;
+const calibrationOwner: CalibrationOwner | null = previewWorkbenchOwner && persistedWorkspaceOwner && props.project.id
+  ? createCalibrationOwner({
+    projectId: props.project.id,
+    flowOwner,
+    inspectorOwner,
+    imageOwner: previewWorkbenchOwner.image,
+    api: platform.api,
+    getPersistenceRevision: () => persistedWorkspaceOwner.projection.persistence?.persistenceRevision ?? null,
+    reconcileAfterSave: () => persistedWorkspaceOwner.reconcileExternalProject()
+  })
   : null;
 const projection = flowOwner.projection;
 const layoutOwner = createWorkspaceLayoutOwner();
@@ -44,6 +62,7 @@ const narrowRailToggle = useTemplateRef<HTMLButtonElement>('narrowRailToggle');
 const narrowInspectorToggle = useTemplateRef<HTMLButtonElement>('narrowInspectorToggle');
 const narrowRailOpen = shallowRef(false);
 const narrowInspectorOpen = shallowRef(false);
+const operatorFlyoutOpen = shallowRef(false);
 const canvasId = props.project.id
   ? `flow-canvas-${props.project.id.replaceAll('-', '')}`
   : 'flow-canvas-new-handoff-draft';
@@ -68,13 +87,17 @@ function focusPane(host: HTMLElement | null): void {
 async function toggleNarrowRail(): Promise<void> {
   narrowInspectorOpen.value = false;
   narrowRailOpen.value = !narrowRailOpen.value;
-  if (!narrowRailOpen.value) return;
+  if (!narrowRailOpen.value) {
+    operatorFlyoutOpen.value = false;
+    return;
+  }
   await nextTick();
   focusPane(operatorRailHost.value);
 }
 
 async function toggleNarrowInspector(): Promise<void> {
   narrowRailOpen.value = false;
+  operatorFlyoutOpen.value = false;
   narrowInspectorOpen.value = !narrowInspectorOpen.value;
   if (!narrowInspectorOpen.value) return;
   await nextTick();
@@ -83,6 +106,7 @@ async function toggleNarrowInspector(): Promise<void> {
 
 async function focusInspectorPane(): Promise<void> {
   narrowRailOpen.value = false;
+  operatorFlyoutOpen.value = false;
   if (layout.containerWidth <= 1180) narrowInspectorOpen.value = true;
   await nextTick();
   focusPane(inspectorHost.value);
@@ -102,6 +126,28 @@ async function closeNarrowPane(): Promise<void> {
   }
 }
 
+function setOperatorFlyoutOpen(value: boolean): void {
+  operatorFlyoutOpen.value = value;
+  if (value) narrowInspectorOpen.value = false;
+}
+
+function addOperator(operator: OperatorCatalogItem): void {
+  const result = flowOwner.commands.addOperator(operator);
+  if (result.ok) operatorFlyoutOpen.value = false;
+}
+
+function engageCanvas(): void {
+  operatorFlyoutOpen.value = false;
+}
+
+async function closeTemporaryPane(): Promise<void> {
+  if (operatorFlyoutOpen.value) {
+    operatorFlyoutOpen.value = false;
+    return;
+  }
+  await closeNarrowPane();
+}
+
 watch(
   () => props.workspaceOwner.projection.phase,
   phase => flowOwner.setMutationGate(phase === 'readonly' ? 'readonly' : 'editable'),
@@ -113,6 +159,7 @@ watch(
   width => {
     if (width > 980) narrowInspectorOpen.value = false;
     if (width > 760) narrowRailOpen.value = false;
+    if (width <= 820 && !narrowRailOpen.value) operatorFlyoutOpen.value = false;
   }
 );
 
@@ -128,7 +175,10 @@ onMounted(async () => {
   flowOwner.commands.focus();
 });
 
-onBeforeUnmount(() => layoutOwner.dispose());
+onBeforeUnmount(() => {
+  calibrationOwner?.dispose('flow-workspace-unmounted');
+  layoutOwner.dispose();
+});
 
 </script>
 
@@ -159,7 +209,8 @@ onBeforeUnmount(() => layoutOwner.dispose());
     :data-preview-max-width="layout.previewMaxWidth"
     :data-container-width="layout.containerWidth"
     :data-container-height="layout.containerHeight"
-    @keydown.esc="closeNarrowPane"
+    :data-operator-flyout-open="operatorFlyoutOpen"
+    @keydown.esc="closeTemporaryPane"
   >
     <div
       id="workspace-operator-pane"
@@ -170,7 +221,9 @@ onBeforeUnmount(() => layoutOwner.dispose());
       <OperatorRail
         :catalog="projection.catalog"
         :readonly="isReadonly"
-        @add="flowOwner.commands.addOperator"
+        :flyout-open="operatorFlyoutOpen"
+        @update:flyout-open="setOperatorFlyoutOpen"
+        @add="addOperator"
         @refresh="flowOwner.refreshOperators(true)"
       />
     </div>
@@ -184,6 +237,7 @@ onBeforeUnmount(() => layoutOwner.dispose());
       <InspectorPanel
         :owner="inspectorOwner"
         :camera-owner="cameraBindingEditorOwner"
+        :calibration-owner="calibrationOwner"
       />
     </div>
 
@@ -202,7 +256,11 @@ onBeforeUnmount(() => layoutOwner.dispose());
       @resize-end="layoutOwner.commit"
     />
 
-    <div class="flow-workspace__center">
+    <div
+      class="flow-workspace__center"
+      @pointerdown.capture="engageCanvas"
+      @drop.capture="engageCanvas"
+    >
       <FlowCanvasSurface
         class="flow-workspace__canvas"
         :canvas-id="canvasId"

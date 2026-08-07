@@ -22,6 +22,8 @@ const definition = reactive({
 });
 const sourceDraft = reactive({ variableId: '', outputKey: '', resultPath: '', expression: '' });
 const targetDraft = reactive({ variableId: '', parameterKey: '', expression: '' });
+const runtimeDrafts = reactive<Record<string, string>>({});
+const runtimeInputError = shallowRef<string | null>(null);
 const selectedDefinition = computed(() => props.owner.projection.draft.variables.find(item => item.id === editingId.value) ?? null);
 const statusTone = computed<CvStatusTone>(() => {
   if (props.owner.projection.phase === 'error' || props.owner.projection.fieldErrors.length > 0) return 'error';
@@ -85,6 +87,14 @@ const parameterCandidates = computed(() => props.flowOwner.projection.draft.oper
     return { key: `${operatorId}:${parameterId}`, operatorId, operatorName, parameterId, parameterName };
   }).filter(item => item.parameterId) : [];
 }));
+const runtimeRows = computed(() => {
+  const values = new Map(props.owner.projection.runtimeValues.map(value => [value.variableId, value]));
+  return props.owner.projection.draft.variables.map(variable => ({
+    variable,
+    runtime: values.get(variable.id) ?? null
+  }));
+});
+const runtimeBusy = computed(() => ['loading', 'writing', 'resetting'].includes(props.owner.projection.runtimeOperation));
 
 function resetDefinition(): void {
   editingId.value = null;
@@ -155,14 +165,78 @@ function addTargetBinding(): void {
   });
 }
 
+function formatRuntimeValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try { return JSON.stringify(value); } catch { return String(value); }
+}
+
+function runtimeInput(row: (typeof runtimeRows.value)[number]): string {
+  const existing = runtimeDrafts[row.variable.id];
+  if (existing !== undefined) return existing;
+  return formatRuntimeValue(row.runtime?.value ?? row.variable.initialValue);
+}
+
+function parseRuntimeValue(row: (typeof runtimeRows.value)[number], raw: string): Readonly<{ value: WorkspaceJsonValue } | { error: string }> {
+  const value = raw.trim();
+  if (row.variable.valueType.value === 'String') return { value: raw };
+  if (row.variable.valueType.value === 'Boolean') {
+    if (value.toLowerCase() === 'true' || value === '1') return { value: true };
+    if (value.toLowerCase() === 'false' || value === '0') return { value: false };
+    return { error: '布尔值只能填写 true、false、1 或 0。' };
+  }
+  const number = Number(value);
+  if (!value || !Number.isFinite(number)) return { error: '请输入有限数值。' };
+  if (row.variable.valueType.value === 'Int64' && !/^[+-]?\d+$/.test(value)) {
+    return { error: '整数变量只能填写整数。' };
+  }
+  const min = row.variable.min === null ? null : Number(row.variable.min);
+  const max = row.variable.max === null ? null : Number(row.variable.max);
+  if (min !== null && number < min) return { error: `运行值不能小于 ${min}。` };
+  if (max !== null && number > max) return { error: `运行值不能大于 ${max}。` };
+  if (row.variable.valueType.value === 'Int64' && !Number.isSafeInteger(number)) return { value };
+  return { value: number };
+}
+
+async function writeRuntime(row: (typeof runtimeRows.value)[number]): Promise<void> {
+  runtimeInputError.value = null;
+  const parsed = parseRuntimeValue(row, runtimeInput(row));
+  if ('error' in parsed) {
+    runtimeInputError.value = parsed.error;
+    return;
+  }
+  await props.owner.writeRuntimeValue(row.variable.id, parsed.value, row.runtime?.version ?? null);
+}
+
+async function resetRuntime(row: (typeof runtimeRows.value)[number]): Promise<void> {
+  runtimeInputError.value = null;
+  if (typeof window !== 'undefined' && !window.confirm(`将“${row.variable.displayName}”的运行值重置为定义初始值？`)) return;
+  await props.owner.resetRuntimeValue(row.variable.id, row.runtime?.version ?? null);
+}
+
+async function resetAllRuntime(): Promise<void> {
+  runtimeInputError.value = null;
+  if (typeof window !== 'undefined' && !window.confirm('将全部允许运行值手动写入的变量重置为定义初始值？')) return;
+  const expectedVersions = Object.fromEntries(
+    runtimeRows.value.filter(row => row.runtime).map(row => [row.variable.id, row.runtime!.version])
+  );
+  await props.owner.resetAllRuntimeValues(expectedVersions);
+}
+
 watch(() => props.open, open => { if (open && tab.value === 'runtime') void props.owner.refreshRuntimeValues(); });
+watch(() => props.owner.projection.runtimeValues, values => {
+  values.forEach(value => {
+    if (runtimeDrafts[value.variableId] === undefined) runtimeDrafts[value.variableId] = formatRuntimeValue(value.value);
+  });
+}, { immediate: true });
 </script>
 
 <template>
   <CvModal
     :open="open"
     title="全局变量"
-    description="定义、来源与参数绑定随本工程统一保存；运行值仅供查看。"
+    description="定义、来源与参数绑定随本工程统一保存；运行值可单独写入或重置，不会改动工程定义。"
     size="lg"
     :close-on-backdrop="false"
     @close="emit('close')"
@@ -448,24 +522,81 @@ watch(() => props.open, open => { if (open && tab.value === 'runtime') void prop
         class="variables-workbench__runtime"
       >
         <div class="variables-workbench__row">
-          <p>运行值来自当前运行会话，只读且不会成为工程初始值。</p><CvButton
-            size="sm"
-            :disabled="owner.projection.phase === 'loading-runtime'"
-            @click="owner.refreshRuntimeValues"
-          >
-            刷新运行值
-          </CvButton>
+          <p>运行值来自当前运行会话。手动写入和重置需要变量允许，并且不会标记工程未保存。</p><div class="variables-workbench__row">
+            <CvButton
+              size="sm"
+              variant="danger"
+              :disabled="readonly || runtimeBusy || !runtimeRows.length"
+              @click="resetAllRuntime"
+            >
+              全部重置
+            </CvButton><CvButton
+              size="sm"
+              :disabled="runtimeBusy"
+              @click="owner.refreshRuntimeValues"
+            >
+              刷新运行值
+            </CvButton>
+          </div>
         </div>
         <table>
-          <thead><tr><th>变量</th><th>值</th><th>版本</th><th>来源</th><th>更新时间</th></tr></thead><tbody>
+          <thead><tr><th>变量</th><th>定义初始值</th><th>当前运行值</th><th>版本</th><th>来源</th><th>更新时间</th><th>操作</th></tr></thead><tbody>
             <tr
-              v-for="item in owner.projection.runtimeValues"
-              :key="item.variableId"
+              v-for="row in runtimeRows"
+              :key="row.variable.id"
             >
-              <td>{{ item.displayName }}</td><td><code>{{ item.value }}</code></td><td>{{ item.version }}</td><td>{{ item.updatedBy }}</td><td>{{ formatTimestamp(item.updatedAtUtc) }}</td>
+              <td><strong>{{ row.variable.displayName }}</strong><small>{{ valueTypeLabel(row.variable.valueType.value) }}</small></td>
+              <td><code>{{ formatRuntimeValue(row.variable.initialValue) }}</code></td>
+              <td>
+                <input
+                  v-model="runtimeDrafts[row.variable.id]"
+                  :disabled="readonly || runtimeBusy || !row.variable.manualWriteAllowed"
+                  :aria-label="`${row.variable.displayName}运行值`"
+                  autocomplete="off"
+                  @keyup.enter="writeRuntime(row)"
+                >
+              </td>
+              <td>{{ row.runtime?.version ?? '—' }}</td>
+              <td>{{ row.runtime?.updatedBy || '尚未运行' }}</td>
+              <td>{{ formatTimestamp(row.runtime?.updatedAtUtc ?? null) }}</td>
+              <td class="variables-workbench__runtime-actions">
+                <CvButton
+                  size="sm"
+                  :disabled="readonly || runtimeBusy || !row.variable.manualWriteAllowed"
+                  @click="writeRuntime(row)"
+                >
+                  写入
+                </CvButton><CvButton
+                  size="sm"
+                  variant="quiet"
+                  :disabled="readonly || runtimeBusy || !row.variable.manualWriteAllowed"
+                  @click="resetRuntime(row)"
+                >
+                  重置
+                </CvButton>
+              </td>
+            </tr>
+            <tr v-if="!runtimeRows.length">
+              <td colspan="7">
+                当前工程没有全局变量。
+              </td>
             </tr>
           </tbody>
         </table>
+        <p
+          v-if="runtimeInputError"
+          class="variables-workbench__runtime-error"
+          role="alert"
+        >
+          {{ runtimeInputError }}
+        </p>
+        <p
+          v-if="owner.projection.runtimeErrorCode"
+          class="variables-workbench__runtime-error"
+          role="alert"
+        >
+          诊断码：{{ owner.projection.runtimeErrorCode }}
+        </p>
       </section>
 
       <div

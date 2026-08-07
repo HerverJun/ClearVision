@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
+import { CvIcon } from '@/design-system/icons';
+import type { FilePickerPort } from '@/platform/host';
 import type { InspectorParameterProjection } from './inspectorOwner';
+import FileParameterEditor from './FileParameterEditor.vue';
 
 const props = defineProps<{
   parameter: InspectorParameterProjection;
   disabled: boolean;
+  filePicker?: FilePickerPort | null;
+  selectionKey?: string;
 }>();
 
 const emit = defineEmits<{
@@ -14,6 +19,8 @@ const emit = defineEmits<{
 
 const draftText = shallowRef('');
 const draftBoolean = shallowRef(false);
+const colorDraft = shallowRef('');
+const colorText = shallowRef('');
 const nullSelected = shallowRef(false);
 
 const controlId = computed(() => `inspector-param-${props.parameter.id ?? props.parameter.name}`);
@@ -74,12 +81,23 @@ function reset(): void {
   const value = props.parameter.value;
   draftText.value = value === null || value === undefined ? '' : String(value);
   draftBoolean.value = value === true;
+  const colorValue = value === null || value === undefined ? '' : String(value);
+  colorText.value = colorValue;
+  const colorInput = document.createElement('input');
+  colorInput.type = 'color';
+  colorInput.value = colorValue;
+  colorDraft.value = colorInput.value;
   nullSelected.value = value === null && props.parameter.nullable;
 }
 
 const dirty = computed(() => {
   if (nullSelected.value) return props.parameter.value !== null;
   if (props.parameter.editorKind === 'boolean') return draftBoolean.value !== props.parameter.value;
+  if (props.parameter.editorKind === 'color') {
+    return colorText.value !== (props.parameter.value === null || props.parameter.value === undefined
+      ? ''
+      : String(props.parameter.value));
+  }
   if (props.parameter.editorKind === 'number' || props.parameter.editorKind === 'slider') {
     if (String(draftText.value).trim() === '') return props.parameter.value !== undefined && props.parameter.value !== null;
     const parsed = Number(draftText.value);
@@ -114,12 +132,22 @@ function commit(): void {
     emit('commit', draftBoolean.value);
     return;
   }
+  if (props.parameter.editorKind === 'color') {
+    emit('commit', colorText.value.trim());
+    return;
+  }
   if (props.parameter.editorKind === 'number' || props.parameter.editorKind === 'slider') {
     const raw = String(draftText.value).trim();
     emit('commit', raw === '' ? '' : Number(raw));
     return;
   }
   emit('commit', draftText.value);
+}
+
+function commitColor(): void {
+  if (effectiveDisabled.value) return;
+  colorText.value = colorDraft.value;
+  emit('commit', colorDraft.value);
 }
 
 function toggleNull(): void {
@@ -227,6 +255,17 @@ onBeforeUnmount(() => emit('draftActive', false));
         @keydown.escape.stop.prevent="reset"
       >
 
+      <FileParameterEditor
+        v-else-if="parameter.editorKind === 'file'"
+        :parameter="parameter"
+        :disabled="effectiveDisabled || nullSelected"
+        :file-picker="props.filePicker ?? null"
+        :control-id="controlId"
+        :described-by="describedBy"
+        :selection-key="props.selectionKey"
+        @commit="emit('commit', $event)"
+      />
+
       <input
         v-else-if="parameter.editorKind === 'number'"
         :id="controlId"
@@ -262,6 +301,39 @@ onBeforeUnmount(() => emit('draftActive', false));
         >
         <span>{{ draftBoolean ? '是' : '否' }}</span>
       </label>
+
+      <div
+        v-else-if="parameter.editorKind === 'color'"
+        class="parameter-editor__color"
+      >
+        <input
+          :id="controlId"
+          v-model="colorDraft"
+          type="color"
+          :name="parameter.name"
+          :disabled="effectiveDisabled || nullSelected"
+          :aria-describedby="describedBy"
+          @input="commitColor"
+        >
+        <input
+          v-model="colorText"
+          type="text"
+          :name="`${parameter.name}-value`"
+          autocomplete="off"
+          spellcheck="false"
+          :disabled="effectiveDisabled || nullSelected"
+          :aria-invalid="parameter.errors.length > 0"
+          :aria-describedby="describedBy"
+          @blur="commit"
+          @keydown.enter.stop.prevent="commit"
+          @keydown.escape.stop.prevent="reset"
+        >
+        <CvIcon
+          name="square"
+          size="sm"
+          :style="{ color: colorDraft }"
+        />
+      </div>
 
       <select
         v-else-if="parameter.editorKind === 'enum'"
@@ -397,6 +469,11 @@ onBeforeUnmount(() => emit('draftActive', false));
 .parameter-editor__boolean input { margin: 0; }
 .parameter-editor__slider { display: grid; grid-template-columns: minmax(0, 1fr) 72px; align-items: center; gap: var(--cv-space-2); }
 .parameter-editor__slider input[type="range"] { width: 100%; min-width: 0; accent-color: var(--cv-color-link); }
+.parameter-editor__color { min-width: 0; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: var(--cv-space-2); }
+.parameter-editor__color input[type="color"] { width: 32px; height: var(--cv-density-control-height); padding: 2px; border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); cursor: pointer; }
+.parameter-editor__color input[type="text"] { min-width: 0; height: var(--cv-density-control-height); padding: 0 var(--cv-space-2); border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); color: var(--cv-text-primary); font: inherit; font-size: var(--cv-font-size-xs); }
+.parameter-editor__color input:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
+.parameter-editor__color input:disabled { color: var(--cv-text-muted); cursor: not-allowed; opacity: .62; }
 .parameter-editor__extension { padding: var(--cv-space-2); border-radius: var(--cv-radius-sm); background: var(--cv-color-status-info-soft); color: var(--cv-color-status-info-strong); font-size: var(--cv-font-size-2xs); line-height: 1.45; overflow-wrap: anywhere; }
 .parameter-editor__errors { margin: var(--cv-space-1) 0 0; padding-left: 16px; color: var(--cv-color-status-ng-strong); font-size: var(--cv-font-size-2xs); line-height: 1.4; overflow-wrap: anywhere; }
 </style>

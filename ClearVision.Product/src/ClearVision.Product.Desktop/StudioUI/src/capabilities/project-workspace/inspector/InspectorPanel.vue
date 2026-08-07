@@ -1,17 +1,22 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
+import { useStudioPlatform } from '@/app/studioPlatform';
 import { CvStatusBadge, type CvStatusTone } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 import WorkspacePaneHeader from '../WorkspacePaneHeader.vue';
 import type { InspectorOwner, InspectorParameterProjection } from './inspectorOwner';
 import ParameterEditor from './ParameterEditor.vue';
 import { CameraBindingEditor, type CameraBindingEditorOwner } from '../camera';
+import CalibrationWorkbench from '../calibration/CalibrationWorkbench.vue';
+import type { CalibrationOwner } from '../calibration';
 
 const props = defineProps<{
   owner: InspectorOwner;
   cameraOwner: CameraBindingEditorOwner | null;
+  calibrationOwner?: CalibrationOwner | null;
 }>();
 
+const platform = useStudioPlatform();
 const projection = props.owner.projection;
 const nameDraft = shallowRef('');
 const lastMessage = shallowRef<string | null>(null);
@@ -319,6 +324,8 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
               v-else
               :parameter="parameter"
               :disabled="editingDisabled || projection.node.metadataPhase !== 'ready'"
+              :file-picker="platform.filePicker"
+              :selection-key="projection.node.id"
               @commit="commitParameter(parameter.name, $event)"
               @draft-active="owner.setDraftActive(`parameter:${parameter.name}`, $event)"
             />
@@ -347,6 +354,8 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
             <ParameterEditor
               :parameter="parameter"
               :disabled="editingDisabled || projection.node.metadataPhase !== 'ready'"
+              :file-picker="platform.filePicker"
+              :selection-key="projection.node.id"
               @commit="commitParameter(parameter.name, $event)"
               @draft-active="owner.setDraftActive(`parameter:${parameter.name}`, $event)"
             />
@@ -368,11 +377,18 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
             :key="parameterKey(parameter)"
             :parameter="parameter"
             :disabled="editingDisabled || projection.node.metadataPhase !== 'ready'"
+            :file-picker="platform.filePicker"
+            :selection-key="projection.node.id"
             @commit="commitParameter(parameter.name, $event)"
             @draft-active="owner.setDraftActive(`parameter:${parameter.name}`, $event)"
           />
         </div>
       </details>
+
+      <CalibrationWorkbench
+        v-if="props.calibrationOwner && projection.node?.type.toLocaleLowerCase() === 'npointcalibration'"
+        :owner="props.calibrationOwner"
+      />
     </div>
 
     <section

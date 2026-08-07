@@ -61,6 +61,7 @@ export interface InspectorParameterProjection extends InspectorParameterValidati
   readonly valueSource: InspectorValueSource;
   readonly editorKind: InspectorParameterEditorKind;
   readonly extensionSlot: 'file-picker' | 'camera-binding' | 'image-backed' | null;
+  readonly filePickerFilter: string | null;
   readonly extensionMessage: string | null;
   readonly persisted: boolean;
   readonly visible: boolean;
@@ -244,6 +245,7 @@ function buildParameters(
     const values = parameterValue(stored, parameter);
     const raw = Object.freeze({ ...(stored ?? {}) });
     const editor = resolveInspectorParameterEditor({
+      parameterName: parameter?.name ?? text(field(raw, 'name')),
       dataType: parameter?.dataType ?? text(field(raw, 'dataType'), 'unknown'),
       options: parameter?.options ?? (Array.isArray(field(raw, 'options'))
         ? array(field(raw, 'options')).map(option => Object.freeze({
@@ -276,6 +278,7 @@ function buildParameters(
       valueSource: values.source,
       editorKind: editor.kind,
       extensionSlot: editor.extensionSlot,
+      filePickerFilter: editor.filePickerFilter,
       extensionMessage: editor.message,
       persisted: stored !== undefined,
       visible: true,

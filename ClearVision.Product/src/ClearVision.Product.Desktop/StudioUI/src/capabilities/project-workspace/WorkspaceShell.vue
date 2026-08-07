@@ -20,6 +20,7 @@ import { GlobalVariablesWorkbench, type WorkspaceGlobalVariablesOwner } from './
 import { FinalDecisionWorkbench, type FinalDecisionOwner } from './final-decision';
 import type { FlowCanvasOwner } from './flow';
 import { RuntimePackageExportDialog, type RuntimePackageExportOwner } from './runtime-package';
+import { TemplateWorkbench, type TemplateOwner } from './templates';
 import WorkspaceHandoffBanner from './handoff/WorkspaceHandoffBanner.vue';
 import type { WorkspaceHandoffReceiveProjection } from './handoff/handoffContracts';
 import RunConsole from '@/capabilities/inspection-run/RunConsole.vue';
@@ -67,6 +68,8 @@ const decisionOwner = shallowRef<FinalDecisionOwner | null>(null);
 const modalFlowOwner = shallowRef<FlowCanvasOwner | null>(null);
 const packageOwner = shallowRef<RuntimePackageExportOwner | null>(null);
 const packageOpen = ref(false);
+const templateOwner = shallowRef<TemplateOwner | null>(null);
+const templateOpen = ref(false);
 const runDetailsOpen = ref(false);
 
 function openVariables(): void {
@@ -83,6 +86,11 @@ function openDecision(): void {
 function openRuntimePackage(): void {
   packageOwner.value = props.workspaceOwner?.getRuntimePackageExportOwner() ?? null;
   packageOpen.value = packageOwner.value !== null;
+}
+
+function openTemplates(): void {
+  templateOwner.value = props.workspaceOwner?.getTemplateOwner() ?? null;
+  templateOpen.value = templateOwner.value !== null;
 }
 
 const pageStateKind = computed(() => {
@@ -515,6 +523,22 @@ function workspaceResultsLink(resultId?: string): string {
           >
             运行包
           </CvButton>
+          <CvButton
+            data-testid="workspace-templates"
+            size="sm"
+            variant="quiet"
+            :disabled="!persistence || !currentProject || isReadonly"
+            title="搜索、应用和维护流程模板"
+            @click="openTemplates"
+          >
+            <template #leading>
+              <CvIcon
+                name="copy"
+                size="sm"
+              />
+            </template>
+            模板
+          </CvButton>
           <RouterLink
             v-if="!newDraftOwner"
             class="workspace-shell__results-link"
@@ -866,6 +890,14 @@ function workspaceResultsLink(resultId?: string): string {
       :dirty="persistence?.dirty ?? false"
       :owner="packageOwner"
       @close="packageOpen = false"
+    />
+    <TemplateWorkbench
+      v-if="templateOwner && currentProject"
+      :open="templateOpen"
+      :owner="templateOwner"
+      :dirty="persistence?.dirty ?? false"
+      :readonly="isReadonly"
+      @close="templateOpen = false"
     />
   </section>
 </template>

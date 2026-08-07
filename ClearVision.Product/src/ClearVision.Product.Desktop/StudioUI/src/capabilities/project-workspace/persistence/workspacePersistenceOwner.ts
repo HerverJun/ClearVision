@@ -84,6 +84,7 @@ export interface WorkspacePersistenceOwner {
   reconcile(): Promise<WorkspaceSaveAttemptResult>;
   reapplyConflict(): void;
   discardConflict(): void;
+  acceptExternalProject(project: WorkspaceProjectV1): boolean;
   setRunning(reason?: string): boolean;
   clearRunning(reason?: string): void;
   setReadonly(reason: string): void;
@@ -319,6 +320,44 @@ export function createWorkspacePersistenceOwner(options: {
     });
     state.persistenceRevision = project.persistenceRevision;
     options.onBaselineChanged(project);
+  }
+
+  function acceptExternalProject(project: WorkspaceProjectV1): boolean {
+    if (disposed || project.id !== baseline.id) return false;
+    const serverContentFingerprint = workspacePersistenceFingerprint({
+      flow: encodeWorkspaceFlowUpdateV1(project),
+      globalVariables: encodeWorkspaceGlobalVariablesV1(project.globalVariables)
+    });
+    const contentChangedOnServer = serverContentFingerprint !== baselineContentFingerprint;
+    const hadLocalDraft = state.dirty;
+    if (contentChangedOnServer && hadLocalDraft) {
+      state.phase = 'conflict';
+      state.errorCode = 'PSV011';
+      state.message = `服务器 revision ${project.persistenceRevision} 同时包含工程修改；本地 draft 已保留，请使用现有保存冲突处理。`;
+      options.flowOwner.setMutationGate('readonly');
+      syncAvailability();
+      return false;
+    }
+
+    const currentVariables = options.globalVariablesOwner.getApplied();
+    acceptServerBaseline(project);
+    if (contentChangedOnServer || !hadLocalDraft) {
+      replaceFlow(encodeWorkspaceFlowUpdateV1(project), project.name);
+      options.globalVariablesOwner.replaceApplied(project.globalVariables);
+      state.dirty = false;
+      state.phase = 'saved';
+    } else {
+      options.globalVariablesOwner.acceptServerBaseline(project.globalVariables, true);
+      options.globalVariablesOwner.replaceApplied(currentVariables);
+      state.dirty = true;
+      state.phase = 'dirty';
+    }
+    state.persistenceRevision = project.persistenceRevision;
+    state.errorCode = null;
+    state.conflictServerRevision = null;
+    state.message = `外部资产提交已协调到工程 revision ${project.persistenceRevision}。`;
+    syncAvailability();
+    return true;
   }
 
   function applySuccessfulProject(
@@ -592,6 +631,7 @@ export function createWorkspacePersistenceOwner(options: {
       options.flowOwner.setMutationGate('editable');
       syncAvailability();
     },
+    acceptExternalProject,
     setRunning(reason = 'Formal Run is active.'): boolean {
       if (disposed || !state.canRun) return false;
       state.phase = 'running';

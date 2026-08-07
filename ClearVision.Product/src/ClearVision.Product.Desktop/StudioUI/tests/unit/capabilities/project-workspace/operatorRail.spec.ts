@@ -34,6 +34,7 @@ async function mountRail(readonly = false) {
   const wrapper = mount(OperatorRail, {
     props: {
       readonly,
+      flyoutOpen: true,
       catalog: {
         phase: 'success',
         operators,
@@ -42,7 +43,6 @@ async function mountRail(readonly = false) {
       }
     }
   });
-  await wrapper.get('.operator-rail__category-button[aria-label="搜索与全部算子"]').trigger('click');
   return wrapper;
 }
 
@@ -79,6 +79,22 @@ describe('F03 G2 Operator Rail', () => {
     await wrapper.get('.operator-flyout__favorite').trigger('click');
     await wrapper.get('.operator-rail__category-button[title="收藏的算子"]').trigger('click');
     expect(wrapper.findAll('.operator-item')).toHaveLength(1);
+  });
+
+  it('requests a controlled close when the active entry is repeated or Escape is pressed', async () => {
+    const wrapper = await mountRail();
+    const searchEntry = wrapper.get('.operator-rail__category-button[aria-label="搜索与全部算子"]');
+
+    await searchEntry.trigger('click');
+    expect(wrapper.emitted('update:flyoutOpen')?.at(-1)).toEqual([false]);
+
+    await wrapper.setProps({ flyoutOpen: false });
+    await searchEntry.trigger('click');
+    expect(wrapper.emitted('update:flyoutOpen')?.at(-1)).toEqual([true]);
+
+    await wrapper.setProps({ flyoutOpen: true });
+    await wrapper.get('[data-testid="operator-search"]').trigger('keydown', { key: 'Escape' });
+    expect(wrapper.emitted('update:flyoutOpen')?.at(-1)).toEqual([false]);
   });
 
   it('writes a complete drag payload without a global OperatorLibrary owner', async () => {

@@ -379,6 +379,37 @@ describe('Results page', () => {
     mounted.queries.dispose();
   });
 
+  it('disposes local result analysis when switching to Station results', async () => {
+    const analysisSignals: AbortSignal[] = [];
+    const mounted = await mountResults(
+      `/results?source=local&projectId=${projectId}`,
+      apiWith(async (path, options) => {
+        if (path === 'projects') return [project()];
+        if (path.startsWith('analysis/')) {
+          const signal = options?.signal;
+          if (!signal) throw new Error(`Missing analysis abort signal for ${path}`);
+          analysisSignals.push(signal);
+          return await new Promise<never>((_resolve, reject) => {
+            const abort = () => reject(new ApiAbortError(path, signal.reason));
+            if (signal.aborted) abort();
+            else signal.addEventListener('abort', abort, { once: true });
+          });
+        }
+        if (path === `inspection/statistics/${projectId}`) return statistics();
+        if (path.startsWith(`inspection/history/${projectId}?`)) return localPage();
+        throw new Error(`Unexpected request: ${path}`);
+      })
+    );
+
+    expect(analysisSignals).toHaveLength(3);
+    await mounted.router.push('/results?source=station');
+    await flushPromises();
+
+    expect(analysisSignals.every(signal => signal.aborted)).toBe(true);
+    mounted.wrapper.unmount();
+    mounted.queries.dispose();
+  });
+
   it('re-reads a Station deep link by canonical station id and preserves a safe return route', async () => {
     const requested: string[] = [];
     const mounted = await mountResults(

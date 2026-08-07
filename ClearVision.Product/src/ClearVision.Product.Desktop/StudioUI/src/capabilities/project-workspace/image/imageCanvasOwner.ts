@@ -50,10 +50,20 @@ export interface ImageCanvasRoiPort {
   showStatistics(geometry: unknown): void;
 }
 
+export interface ImageCanvasClick {
+  readonly x: number;
+  readonly y: number;
+  readonly imageIdentity: string;
+  readonly imageGeneration: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface ImageCanvasOwner {
   readonly projectId: string;
   readonly projection: DeepReadonly<ImageCanvasOwnerProjection>;
   readonly roi: ImageCanvasRoiPort;
+  subscribeImageClick(listener: (click: ImageCanvasClick) => void): () => void;
   mount(canvasId: string): void;
   fit(): void;
   actualSize(): void;
@@ -158,6 +168,7 @@ export function createImageCanvasOwner(options: {
   let primarySource: string | null = null;
   let primaryIdentity: string | null = null;
   let roiChanged: ((geometry: unknown, phase: string) => void) | undefined;
+  const imageClickListeners = new Set<(click: ImageCanvasClick) => void>();
   const domCleanup: Array<() => void> = [];
 
   function imageElement(): (CanvasImageSource & { readonly width: number; readonly height: number }) | null {
@@ -279,6 +290,17 @@ export function createImageCanvasOwner(options: {
       rgba: sample.rgba as ArrayLike<number>,
       neighborhoods
     });
+    if (state.imageIdentity) {
+      const click = Object.freeze({
+        x,
+        y,
+        imageIdentity: state.imageIdentity,
+        imageGeneration: state.imageGeneration,
+        width: image.width,
+        height: image.height
+      });
+      for (const listener of [...imageClickListeners]) listener(click);
+    }
   }
 
   function bindCanvasEvents(element: HTMLCanvasElement): void {
@@ -396,6 +418,11 @@ export function createImageCanvasOwner(options: {
     projectId: options.projectId,
     projection: readonly(state),
     roi: roiPort,
+    subscribeImageClick(listener: (click: ImageCanvasClick) => void): () => void {
+      if (disposed) return () => {};
+      imageClickListeners.add(listener);
+      return () => imageClickListeners.delete(listener);
+    },
     mount(nextCanvasId: string): void {
       if (disposed) throw new Error('ImageCanvas owner has been disposed.');
       if (canvas) throw new Error(`ImageCanvas owner already mounted for project ${options.projectId}.`);
@@ -454,6 +481,7 @@ export function createImageCanvasOwner(options: {
       stopPreviewWatch();
       while (domCleanup.length > 0) domCleanup.pop()?.();
       roiChanged = undefined;
+      imageClickListeners.clear();
       canvas?.setRoiChanged(null);
       canvas?.dispose();
       canvas = undefined;

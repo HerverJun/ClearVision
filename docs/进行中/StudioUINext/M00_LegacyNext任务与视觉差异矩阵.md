@@ -39,3 +39,31 @@ DIFFERENT_SOURCE=NON_COMPARABLE
 
 2026-08-07 已在真实 Debug/Release WebView2 的 Windows 原生 100%（96 DPI）会话取得 Workspace、Golden
 Journey 与 publish route 证据；该结果不改变 `M00-R05`，也不替代产品负责人对 Legacy 任务熟悉度的签收。
+
+## Current TODO execution addendum (2026-08-07)
+
+```text
+SOURCE_SHA=68e6e4286d008433f804ef90de00c8017184c177_PLUS_SCOPED_WORKTREE
+BRANCH=studio-ui-next
+F03_BROWSER=PASS_59_OF_59
+F04R_BROWSER=PASS_2_OF_2
+REAL_WEBVIEW2_125=NOT_PERFORMED
+INDEPENDENT_NO_NODE=NOT_PERFORMED
+FIELD_HARDWARE=NOT_PERFORMED
+```
+
+本次实现把“主体已迁移”与“细分操作已闭合”分开记录：
+
+| 任务语义 | 当前细分状态 | 视觉/交互证据 | authority 边界 |
+| --- | --- | --- | --- |
+| Inspector file/path/color | `IMPLEMENTED` | F03 可见交互 + unit | FilePickerPort、InspectorOwner 和 canonical Flow draft |
+| AI pending file parameter | `IMPLEMENTED_PARTIAL` | unit + workspace fixture | AgentRun 合同仍由后端决定；附件/资源绑定未伪造 |
+| Flow template | `IMPLEMENTED_PARTIAL_EVIDENCE` | owner/decoder unit | 应用只改 canonical draft，显式保存走既有 lifecycle |
+| Project JSON import/export | `BLOCKED_BY_CONTRACT` | 无可比较 Next journey | 不复制 Legacy repository write |
+| N 点标定 | `PARTIAL` | owner/contract unit；无完整 Playwright | draft、candidate、formal asset 三种身份分离 |
+| 二维比例/偏移标定 | `BLOCKED_BY_CONTRACT` | 无当前 Next contract | 不建立第二 calibration authority |
+| GlobalVariables runtime value | `IMPLEMENTED_PARTIAL_EVIDENCE` | owner unit + workspace integration | 运行值写入不回写工程定义 JSON |
+| Results trend/distribution/report | `IMPLEMENTED_PARTIAL_EVIDENCE` | analysis owner/contract unit | 只读查询；整批 export contract 尚缺 |
+| Line sequence / Station test package / advanced settings | `BLOCKED_BY_CONTRACT` | 不产生伪造场景 | 复用后端 command authority，缺口先停 |
+
+本附录不把 Chromium viewport/DPR、已有 100% WebView2 证据或本机 Node 子进程计数扩大解释为 Windows 125%、独立 no-Node 或现场通过；短屏的 Chromium 旅程通过不改变 `M00-R05` 与 `M00-R06`。

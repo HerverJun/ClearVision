@@ -1,7 +1,8 @@
 import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import ParameterEditor from '@/capabilities/project-workspace/inspector/ParameterEditor.vue';
 import type { InspectorParameterProjection } from '@/capabilities/project-workspace/inspector';
+import type { FilePickerPort, FilePickerResult } from '@/platform/host';
 
 function parameter(overrides: Partial<InspectorParameterProjection> = {}): InspectorParameterProjection {
   return Object.freeze({
@@ -22,6 +23,7 @@ function parameter(overrides: Partial<InspectorParameterProjection> = {}): Inspe
     valueSource: 'explicit',
     editorKind: 'text',
     extensionSlot: null,
+    filePickerFilter: null,
     extensionMessage: null,
     persisted: true,
     visible: true,
@@ -128,6 +130,99 @@ describe('G3 ParameterEditor', () => {
     });
     expect(wrapper.get('.parameter-editor__extension').text()).toContain('G4 extension slot');
     expect(wrapper.find('input[type="text"]').exists()).toBe(false);
+  });
+
+  it('uses the shared picker for file parameters and does not commit cancellation', async () => {
+    const picker: FilePickerPort = {
+      pick: vi.fn()
+        .mockResolvedValueOnce({ status: 'selected', parameterName: 'ModelPath', filePath: 'C:\\models\\demo.onnx' })
+        .mockResolvedValueOnce({ status: 'cancelled', parameterName: 'ModelPath' }),
+      getDiagnostics: () => ({
+        disposed: false,
+        activeRequest: false,
+        queuedRequestCount: 0,
+        activeSubscriptionCount: 1,
+        lateResponseCount: 0,
+        ignoredResponseCount: 0
+      }),
+      dispose: vi.fn()
+    };
+    const wrapper = mount(ParameterEditor, {
+      props: {
+        parameter: parameter({
+          name: 'ModelPath',
+          dataType: 'file',
+          editorKind: 'file',
+          extensionSlot: 'file-picker',
+          filePickerFilter: 'Model Files|*.onnx|All Files|*.*'
+        }),
+        disabled: false,
+        filePicker: picker
+      }
+    });
+
+    await wrapper.get('.file-parameter-editor__choose').trigger('click');
+    await vi.waitFor(() => expect(wrapper.emitted('commit')).toEqual([['C:\\models\\demo.onnx']]));
+    expect(picker.pick).toHaveBeenCalledWith({
+      parameterName: 'ModelPath',
+      filter: 'Model Files|*.onnx|All Files|*.*'
+    });
+
+    await wrapper.get('.file-parameter-editor__choose').trigger('click');
+    await vi.waitFor(() => expect(picker.pick).toHaveBeenCalledTimes(2));
+    expect(wrapper.emitted('commit')).toEqual([['C:\\models\\demo.onnx']]);
+  });
+
+  it('ignores a file result after the selected node changes and blocks picker in readonly mode', async () => {
+    let resolvePick!: (result: FilePickerResult) => void;
+    const picker: FilePickerPort = {
+      pick: vi.fn(() => new Promise<FilePickerResult>(resolve => { resolvePick = resolve; })),
+      getDiagnostics: () => ({
+        disposed: false,
+        activeRequest: true,
+        queuedRequestCount: 0,
+        activeSubscriptionCount: 1,
+        lateResponseCount: 0,
+        ignoredResponseCount: 0
+      }),
+      dispose: vi.fn()
+    };
+    const wrapper = mount(ParameterEditor, {
+      props: {
+        parameter: parameter({ id: 'file-a', name: 'InputPath', dataType: 'file', editorKind: 'file', extensionSlot: 'file-picker' }),
+        disabled: false,
+        filePicker: picker
+      }
+    });
+
+    await wrapper.get('.file-parameter-editor__choose').trigger('click');
+    await wrapper.setProps({
+      parameter: parameter({ id: 'file-b', name: 'OtherPath', dataType: 'file', editorKind: 'file', extensionSlot: 'file-picker' })
+    });
+    resolvePick({ status: 'selected', parameterName: 'InputPath', filePath: 'C:\\old\\path.png' });
+    await vi.waitFor(() => expect(wrapper.emitted('commit')).toBeUndefined());
+
+    const readonly = mount(ParameterEditor, {
+      props: {
+        parameter: parameter({ dataType: 'file', editorKind: 'file', extensionSlot: 'file-picker' }),
+        disabled: true,
+        filePicker: picker
+      }
+    });
+    expect(readonly.get('.file-parameter-editor__choose').attributes('disabled')).toBeDefined();
+    expect(picker.pick).toHaveBeenCalledTimes(1);
+  });
+
+  it('commits a color swatch value while preserving the text representation', async () => {
+    const wrapper = mount(ParameterEditor, {
+      props: {
+        parameter: parameter({ dataType: 'color', editorKind: 'color', value: '#112233' }),
+        disabled: false
+      }
+    });
+    await wrapper.get('input[type="color"]').setValue('#445566');
+    expect(wrapper.emitted('commit')).toEqual([['#445566']]);
+    expect((wrapper.get('input[type="text"]').element as HTMLInputElement).value).toBe('#445566');
   });
 
   it('uses Chinese parameter states and associates long help and validation text with the control', () => {
