@@ -221,7 +221,8 @@ export async function captureF04VisualEvidence(
           tagName: document.activeElement.tagName,
           testId: document.activeElement.dataset.testid ?? null,
           ariaLabel: document.activeElement.getAttribute('aria-label'),
-          text: document.activeElement.textContent?.trim() ?? null
+          // Keep diagnostic text single-line so evidence remains valid JSON when nested UI text has line breaks.
+          text: document.activeElement.textContent?.replace(/\s+/g, ' ').trim() ?? null
         }
       : null
   }));

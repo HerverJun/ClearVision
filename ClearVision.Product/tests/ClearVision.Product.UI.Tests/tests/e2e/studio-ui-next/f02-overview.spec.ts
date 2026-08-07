@@ -206,16 +206,16 @@ for (const visual of [
 }
 
 for (const state of [
-  { id: 'diagnostics', route: '/diagnostics', selector: '[data-studio-page="diagnostics"]' },
-  { id: 'about', route: '/about', selector: '[data-studio-page="about"]' },
-  { id: 'not-found', route: '/not-a-product-route', selector: '[data-studio-page="not-found"]' }
+  { id: 'diagnostics', route: '/diagnostics', selector: '[data-studio-page="diagnostics"]', role: 'Engineer' as const },
+  { id: 'about', route: '/about', selector: '[data-studio-page="about"]', role: 'Operator' as const },
+  { id: 'not-found', route: '/not-a-product-route', selector: '[data-studio-page="not-found"]', role: 'Operator' as const }
 ] as const) {
   test(`captures ${state.id} product-state evidence`, async ({ page }) => {
     test.skip(!hasF02VisualEvidenceTarget(), 'F02 visual evidence output was not requested.');
     await page.setViewportSize({ width: 1366, height: 768 });
     await installF02VisualPreferences(page, 'light', 'compact');
     const runtimeErrors = createF02RuntimeErrorAudit(page);
-    const audit = await bootOverview(page);
+    const audit = await bootOverview(page, true, 200, state.role);
     await page.goto(`/studio/index.html#${state.route}`);
     await expect(page.locator(state.selector)).toBeVisible();
     await captureF02VisualEvidence(page, {
@@ -258,6 +258,7 @@ for (const state of [
       density: 'compact',
       requests: audit,
       runtimeErrors,
+      requireVisualPreferenceProjection: state.authenticated,
       expectedHttpStatuses: [state.recentProjectsStatus]
     });
     expect(expectGetOnly(audit)).toBe(true);

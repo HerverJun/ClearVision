@@ -31,6 +31,7 @@ export interface F02VisualEvidenceOptions {
   readonly viewport: Readonly<{ width: number; height: number }>;
   readonly theme: 'light' | 'dark';
   readonly density: 'compact' | 'comfortable';
+  readonly requireVisualPreferenceProjection?: boolean;
   readonly requests: readonly F02MethodAuditEntry[];
   readonly runtimeErrors: F02RuntimeErrorAudit;
   readonly expectedHttpStatuses?: readonly number[];
@@ -132,7 +133,8 @@ export async function captureF02VisualEvidence(
       document.body.scrollWidth - document.body.clientWidth
     )
   }));
-  if (projection.theme !== options.theme || projection.density !== options.density) {
+  const preferenceProjectionRequired = options.requireVisualPreferenceProjection ?? true;
+  if (preferenceProjectionRequired && (projection.theme !== options.theme || projection.density !== options.density)) {
     throw new Error(`Visual preference projection drifted: ${JSON.stringify(projection)}.`);
   }
   if (projection.viewport.width !== options.viewport.width || projection.viewport.height !== options.viewport.height) {
@@ -150,7 +152,7 @@ export async function captureF02VisualEvidence(
   const screenshot = await page.screenshot({ animations: 'disabled', fullPage: false, type: 'png' });
   await writeFile(screenshotPath, screenshot);
   const metadata = {
-    schemaVersion: 'f02-1-visual-evidence.v1',
+    schemaVersion: 'f02-1-visual-evidence.v2',
     capturedAtUtc: new Date().toISOString(),
     sourceSha: candidateSha,
     finalCandidateSha: candidateSha,
@@ -165,6 +167,13 @@ export async function captureF02VisualEvidence(
     observedTheme: projection.theme,
     density: options.density,
     observedDensity: projection.density,
+    preferenceProjection: {
+      required: preferenceProjectionRequired,
+      status: preferenceProjectionRequired ? 'APPLICABLE' : 'NOT_APPLICABLE',
+      reason: preferenceProjectionRequired
+        ? 'Authenticated ProductRuntime owns the UI preference projection.'
+        : 'Unauthenticated auth pages do not mount ProductRuntime by design.'
+    },
     dpr: {
       type: 'BROWSER_EMULATED_DPR',
       value: projection.devicePixelRatio,

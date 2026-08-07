@@ -206,6 +206,78 @@ async function boot(page: Page, options: { initialProject?: FixtureProject; conf
       await json(route, 200, []);
       return;
     }
+    if (path === '/api/cameras/bindings' && request.method() === 'GET') {
+      await json(route, 200, [{
+        id: 'camera-a',
+        displayName: '一号工位面阵相机',
+        deviceId: 'CAM-G3-001',
+        manufacturer: 'ClearVision Fixture',
+        modelName: 'CV-FRAME-01',
+        triggerMode: 'Software',
+        isEnabled: true,
+        connectionStatus: 'Connected'
+      }]);
+      return;
+    }
+    if (path === '/api/inspection/decision-configuration/validate' && request.method() === 'POST') {
+      const flow = request.postDataJSON() as Readonly<Record<string, unknown>>;
+      const configured = (flow.decisionConfiguration as Readonly<Record<string, unknown>> | null)
+        ?.finalDecisionBinding;
+      await json(route, 200, {
+        isValid: Boolean(configured),
+        issues: configured ? [] : [{
+          code: 'DECISION_BINDING_REQUIRED',
+          message: '请选择最终判定输出。',
+          field: 'decisionConfiguration.finalDecisionBinding',
+          operatorId: null,
+          outputName: null
+        }],
+        eligibleOutputs: []
+      });
+      return;
+    }
+    const realtimeStateMatch = path.match(
+      /^\/api\/inspection\/realtime\/([0-9a-f-]{36})\/state$/i
+    );
+    if (realtimeStateMatch && request.method() === 'GET') {
+      await json(route, 200, {
+        projectId: realtimeStateMatch[1],
+        status: 'Idle',
+        isBusy: false,
+        sessionId: null,
+        startedAt: null,
+        stoppedAt: null,
+        clientSnapshotId: null,
+        persistenceRevision: null,
+        canonicalFlowHash: null,
+        decisionConfigurationHash: null,
+        executionSource: null,
+        sessionType: null
+      });
+      return;
+    }
+    if (path === '/api/inspection/admission' && request.method() === 'POST') {
+      const body = request.postDataJSON() as Readonly<Record<string, unknown>>;
+      await json(route, 200, {
+        allowed: false,
+        code: 'FLOW_EMPTY',
+        message: '当前流程为空，无法正式运行。',
+        projectId: body.projectId,
+        clientSnapshotId: body.clientSnapshotId,
+        projectPersistenceRevision: body.expectedPersistenceRevision,
+        canonicalFlowHash: null,
+        decisionConfigurationHash: null,
+        violations: [{
+          code: 'FLOW_EMPTY',
+          reason: '请先在流程画布中添加算子。',
+          operatorId: null,
+          operatorName: null,
+          operatorType: null,
+          parameterName: null
+        }]
+      });
+      return;
+    }
     const openMatch = path.match(/^\/api\/projects\/([0-9a-f-]{36})\/open$/i);
     if (openMatch && request.method() === 'POST') {
       state.openPosts += 1;

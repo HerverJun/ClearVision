@@ -281,7 +281,7 @@ test('G5 survives 20 AI route and drawer mount cycles with one owner and zero re
   });
 
   for (let cycle = 0; cycle < 20; cycle += 1) {
-    await page.getByRole('link', { name: 'AI', exact: true }).click();
+    await page.locator('[data-product-nav="/ai"]').click();
     await expect(page).toHaveURL(/#\/ai$/);
     const owner = page.locator('[data-ai-owner-phase]');
     await expect(owner).toHaveCount(1);
