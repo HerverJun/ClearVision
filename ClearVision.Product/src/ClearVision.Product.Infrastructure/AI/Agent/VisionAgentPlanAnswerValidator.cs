@@ -15,7 +15,10 @@ public sealed record VisionAgentPlanAnswerValidationResult(
     List<string> InvalidValues,
     List<string> ConflictedFields,
     string AnswerSetFingerprint,
-    List<string> Warnings);
+    List<string> Warnings)
+{
+    public List<string> DeferredFields { get; init; } = [];
+}
 
 public sealed class VisionAgentPlanAnswerValidator
 {
@@ -50,9 +53,17 @@ public sealed class VisionAgentPlanAnswerValidator
         var invalidValues = new List<string>();
         var warnings = new List<string>();
         var parameterSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var deferred = ResolveDeferredSelections(questions.Values, blockingReasons, legacySelections);
 
         foreach (var answer in confirmedAnswers ?? [])
         {
+            var answerField = VisionAgentPlanFieldPolicy.NormalizeField(answer.Field);
+            if (deferred.QuestionIds.Contains(Clean(answer.QuestionId)) ||
+                (!string.IsNullOrWhiteSpace(answerField) && deferred.Fields.Contains(answerField)))
+            {
+                warnings.Add($"confirmed_answer_suppressed_by_defer:{answerField}");
+                continue;
+            }
             if (TryValidateAnswer(answer, questions, blockingReasons, false, candidates, invalidQuestionIds, invalidValues, warnings))
             {
                 continue;
@@ -165,7 +176,12 @@ public sealed class VisionAgentPlanAnswerValidator
             invalidValues.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             conflictedFields.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             ComputeFingerprint(accepted),
-            warnings.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+            warnings.Distinct(StringComparer.OrdinalIgnoreCase).ToList())
+        {
+            DeferredFields = deferred.Fields
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+        };
     }
 
     private static bool TryValidateAnswer(
@@ -436,6 +452,50 @@ public sealed class VisionAgentPlanAnswerValidator
         return VisionAgentPlanFieldPolicy.IsPlaceholderValue(value) ? string.Empty : value;
     }
 
+    private static DeferredSelections ResolveDeferredSelections(
+        IEnumerable<VisionAgentClarificationQuestion> questions,
+        IReadOnlyList<string> blockingReasons,
+        IReadOnlyDictionary<string, string>? selections)
+    {
+        var questionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var fields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (selections == null || selections.Count == 0)
+        {
+            return new DeferredSelections(questionIds, fields);
+        }
+
+        foreach (var question in questions)
+        {
+            var questionId = Clean(question.Id);
+            var field = VisionAgentPlanFieldPolicy.ResolveQuestionField(question, blockingReasons);
+            if (string.IsNullOrWhiteSpace(field))
+            {
+                field = FallbackQuestionField(question);
+            }
+            if (!selections.TryGetValue(questionId, out var selected) &&
+                (string.IsNullOrWhiteSpace(field) || !selections.TryGetValue(field, out selected)))
+            {
+                continue;
+            }
+
+            var option = question.Options.FirstOrDefault(candidate =>
+                Clean(candidate.Value).Equals(CleanValue(selected), StringComparison.OrdinalIgnoreCase));
+            if (option == null ||
+                !string.Equals(
+                    VisionAgentPlanFieldPolicy.NormalizeAnswerEffect(option),
+                    VisionAgentClarificationAnswerEffects.Defer,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            questionIds.Add(questionId);
+            if (!string.IsNullOrWhiteSpace(field)) fields.Add(field);
+        }
+
+        return new DeferredSelections(questionIds, fields);
+    }
+
     private static bool IsParameterSelectionKey(string key)
     {
         return ParameterSelectionKeys.Contains(key) ||
@@ -502,4 +562,8 @@ public sealed class VisionAgentPlanAnswerValidator
         VisionAgentPlanAnswer Answer,
         int Priority,
         bool GeneratedRecommended);
+
+    private sealed record DeferredSelections(
+        HashSet<string> QuestionIds,
+        HashSet<string> Fields);
 }

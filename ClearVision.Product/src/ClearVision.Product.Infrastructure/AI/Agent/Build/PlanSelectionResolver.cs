@@ -228,12 +228,13 @@ public sealed class PlanSelectionResolver
     {
         return !load.RequirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) ||
                load.EffectiveRequirement.Maturity.CanPlan != true ||
-               !HasSupportedPlannerRoute(route, template);
+               !HasSupportedPlannerRoute(route, template, load.RequirementMode);
     }
 
     private static bool HasSupportedPlannerRoute(
         VisionAgentRecommendedRoute route,
-        TemplateStrategyResolution template)
+        TemplateStrategyResolution template,
+        string requirementMode)
     {
         if (template.TemplateSkeleton != null)
         {
@@ -244,9 +245,13 @@ public sealed class PlanSelectionResolver
             .Select(VisionAgentBuildSupport.Clean)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .ToList();
-        return operators.Any(op => !op.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
-                                   !op.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase)) &&
-               operators.Any(op => op.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase));
+        var hasProcessingOperator = operators.Any(op =>
+            !op.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+            !op.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase));
+        var hasTerminalOutput = operators.Any(op =>
+            op.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase));
+        return hasProcessingOperator &&
+               (hasTerminalOutput || requirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase));
     }
 
     private VisionAgentRecommendedRoute RouteFromTemplate(

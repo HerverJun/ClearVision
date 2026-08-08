@@ -951,6 +951,84 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
     }
 
     [Fact]
+    public void Evaluate_StrawberryDraftWithRepairablePlannerRoute_ShouldAllowEditableDraft()
+    {
+        var plan = StrawberryDraftPlan();
+        var selections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["classification_strategy"] = "strategy_pending",
+            ["ok_ng_rule"] = "threshold_pending",
+            ["q_fallback_image_source"] = "camera_pending"
+        };
+        var validation = new VisionAgentPlanAnswerValidator().Validate(
+            plan,
+            plan.ConfirmedPlanAnswers,
+            selections,
+            false);
+        var effective = new VisionAgentPlanRequirementOverlay().Build(
+            plan,
+            validation,
+            new VisionAgentRequirementMaturityRequest
+            {
+                Description = plan.OriginalUserPrompt,
+                HasPendingPlan = true,
+                RequirementMode = AiRequirementModes.Draft
+            });
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            validation.BuildDecisions,
+            validatedAnswers: validation,
+            effectiveRequirement: effective,
+            requirementMode: AiRequirementModes.Draft);
+
+        effective.Maturity.CanPlan.Should().BeTrue();
+        validation.DeferredFields.Should().Contain(VisionAgentPlanAnswerFields.AcceptanceCriteria);
+        validation.AcceptedAnswers.Should().NotContain(answer =>
+            answer.Field == VisionAgentPlanAnswerFields.AlgorithmStrategy);
+        effective.Values.Should().NotContainKey(VisionAgentPlanAnswerFields.AcceptanceCriteria);
+        effective.ResolvedFields.Should().NotContain(VisionAgentPlanAnswerFields.AcceptanceCriteria);
+        effective.Maturity.MissingFields.Should().Contain(VisionAgentPlanAnswerFields.AcceptanceCriteria);
+        readiness.CanBuild.Should().BeTrue();
+        readiness.ResolvedFields.Should().Contain([
+            VisionAgentPlanAnswerFields.InspectionObject,
+            VisionAgentPlanAnswerFields.TaskType
+        ]);
+        readiness.ResolvedFields.Should().NotContain(VisionAgentPlanAnswerFields.AcceptanceCriteria);
+        readiness.RemainingFields.Should().BeEquivalentTo([
+            VisionAgentPlanAnswerFields.AcceptanceCriteria,
+            VisionAgentPlanAnswerFields.AlgorithmStrategy,
+            VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.OutputTarget
+        ]);
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Resource != null &&
+            blocker.Resource.ResourceType == "camera_binding" &&
+            blocker.Resource.DraftPolicy == VisionAgentResourceDraftPolicies.DraftAllowed &&
+            blocker.Resource.BlockingScope == VisionAgentResourceBlockingScopes.DeployRun &&
+            blocker.BlocksBuild == false);
+        readiness.Blockers.Should().NotContain(blocker => blocker.BlocksBuild);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
+    public void Evaluate_StrawberryStrictWithIncompletePlannerRoute_ShouldRemainBlocked()
+    {
+        var plan = StrawberryDraftPlan();
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            requirementMode: AiRequirementModes.Strict);
+
+        readiness.CanBuild.Should().BeFalse();
+        readiness.Blockers.Should().Contain(blocker =>
+            blocker.Resource != null &&
+            blocker.Resource.ResourceType == "camera_binding" &&
+            blocker.BlocksBuild);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
     public void Evaluate_NestedCanonicalLocalOutputResource_ShouldNotCreateABogusBuildRequiredResource()
     {
         var plan = Plan([
@@ -1196,6 +1274,118 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
                 MetadataOnly = true
             },
             MetadataOnly = true
+        };
+    }
+
+    private static VisionAgentPlanModeResult StrawberryDraftPlan()
+    {
+        return new VisionAgentPlanModeResult
+        {
+            PlanId = "plan_strawberry_draft",
+            OriginalUserPrompt = "为我构建一个检测果园里草莓是否成熟的视觉检测应用。",
+            Goal = "构建一个检测果园中草莓成熟度的视觉检测应用。",
+            Intent = AiVisionTaskTypes.AttributeClassification,
+            Confidence = "medium",
+            RecommendedRoute = new VisionAgentRecommendedRoute
+            {
+                RouteId = "strawberry_maturity_attribute_classification",
+                Operators = ["imageacquisition", "colorconversion", "roimanager", "thresholding", "blobanalysis"],
+                TemplateDecision = "planner_route"
+            },
+            ClarificationQuestions =
+            [
+                DeferredQuestion("classification_strategy", VisionAgentPlanAnswerFields.AlgorithmStrategy, "model_strategy", "strategy_pending"),
+                DeferredQuestion("ok_ng_rule", VisionAgentPlanAnswerFields.AcceptanceCriteria, "use_extracted_conditions", "threshold_pending"),
+                DeferredQuestion("q_fallback_image_source", VisionAgentPlanAnswerFields.ImageSource, "station_camera", "camera_pending")
+            ],
+            ConfirmedPlanAnswers =
+            [
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.InspectionObject,
+                    Value = "草莓",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                },
+                new VisionAgentPlanAnswer
+                {
+                    QuestionId = "classification_strategy",
+                    Field = VisionAgentPlanAnswerFields.AlgorithmStrategy,
+                    Value = "model_strategy",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
+                }
+            ],
+            ResolvedPlanFields = [VisionAgentPlanAnswerFields.InspectionObject],
+            RemainingPlanFields =
+            [
+                VisionAgentPlanAnswerFields.ImageSource,
+                VisionAgentPlanAnswerFields.TaskType,
+                VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                VisionAgentPlanAnswerFields.OutputTarget,
+                VisionAgentPlanAnswerFields.AlgorithmStrategy
+            ],
+            BlockingReasons = ["resource_pending:image_source_missing"],
+            SemanticExtraction = new VisionAgentSemanticExtractionResult
+            {
+                IsVisionRequest = true,
+                TaskType = AiVisionTaskTypes.AttributeClassification,
+                InspectionObject = "草莓",
+                TargetAttribute = "成熟度",
+                OkCondition = "草莓已成熟",
+                NgCondition = "草莓未成熟",
+                CanPlanCandidate = false,
+                CanBuildCandidate = false,
+                ObjectSignals = ["果园环境", "草莓果实", "草莓"],
+                TaskSignals = ["成熟度判断", "视觉检测", "OK/NG分类", "成熟度"],
+                Source = VisionAgentSemanticSources.Model,
+                MetadataOnly = true
+            },
+            RequirementMaturity = new AiRequirementMaturityResult
+            {
+                Maturity = AiRequirementMaturity.Ambiguous,
+                TaskType = AiVisionTaskTypes.AttributeClassification,
+                CanPlan = true,
+                CanBuild = false,
+                ObjectSignals = ["果园环境", "草莓果实", "草莓"],
+                TaskSignals = ["成熟度判断", "视觉检测", "OK/NG分类", "成熟度"],
+                MissingFields =
+                [
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    VisionAgentPlanAnswerFields.TaskType,
+                    VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                    VisionAgentPlanAnswerFields.OutputTarget,
+                    VisionAgentPlanAnswerFields.AlgorithmStrategy
+                ],
+                MetadataOnly = true
+            },
+            MetadataOnly = true
+        };
+    }
+
+    private static VisionAgentClarificationQuestion DeferredQuestion(
+        string id,
+        string field,
+        string resolvedValue,
+        string deferredValue)
+    {
+        return new VisionAgentClarificationQuestion
+        {
+            Id = id,
+            Field = field,
+            Options =
+            [
+                new VisionAgentClarificationOption
+                {
+                    Value = resolvedValue,
+                    Label = resolvedValue,
+                    AnswerEffect = VisionAgentClarificationAnswerEffects.ResolveField
+                },
+                new VisionAgentClarificationOption
+                {
+                    Value = deferredValue,
+                    Label = deferredValue,
+                    AnswerEffect = VisionAgentClarificationAnswerEffects.Defer
+                }
+            ]
         };
     }
 

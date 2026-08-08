@@ -226,10 +226,23 @@ export function deriveAgentWorkspaceProjection(state) {
         };
     }
 
+    const questions = asArray(read(plan, 'clarificationQuestions') || read(plan, 'questions')).map(normalizeQuestion).filter(Boolean);
+    const deferredFields = new Set(questions.map(item => {
+        const questionId = clean(item.questionId || item.id);
+        const selectedValue = questionId ? state.answers.selectionByQuestion[questionId] : '';
+        const selectedOption = asArray(item.options).find(option => option.value === selectedValue);
+        return selectedOption?.answerEffect === 'defer'
+            ? normalizeCanonicalField(item.field)
+            : '';
+    }).filter(Boolean));
     const confirmed = normalizeAnswerMap(
         read(plan, 'confirmedPlanAnswers') || read(read(plan, 'rawPlanSnapshot'), 'confirmedPlanAnswers'));
     Object.assign(confirmed, state.answers.confirmedByField);
     const optimistic = cloneMap(state.answers.optimisticByField);
+    deferredFields.forEach(field => {
+        delete confirmed[field];
+        delete optimistic[field];
+    });
     const answersByField = { ...confirmed };
     Object.values(optimistic).forEach(answer => {
         const current = answersByField[answer.field];
@@ -250,7 +263,6 @@ export function deriveAgentWorkspaceProjection(state) {
         ...asArray(readiness.missingResources),
         ...Object.values(state.resources.missingByKey)
     ].map(normalizeMissingResource);
-    const questions = asArray(read(plan, 'clarificationQuestions') || read(plan, 'questions')).map(normalizeQuestion).filter(Boolean);
     const blockers = asArray(readiness.blockers).map(item => item?.source ? item : normalizeBlocker(item)).filter(Boolean);
     const blockersByField = new Map();
     blockers.filter(item => item.kind !== 'resource').forEach(item => {
