@@ -6,28 +6,30 @@
 
 ```text
 F10_STATE=ACTIVE
-F10_BASELINE_SHA=eaafef9f09c2b39542e0a675a995dd00fc9331b2
-F10_START_HEAD=5056a5cddce36ec4b97e2b4dd2327abd6675091b2
-F10_START_REMOTE_HEAD=5056a5cddce36ec4b97e2b4dd2327abd6675091b2
-CURRENT_HEAD=d469a4740730ecf7b62f38c3670e3aa1b6ef8c49
-REMOTE_HEAD=d469a4740730ecf7b62f38c3670e3aa1b6ef8c49
+F10_START_HEAD=38b80b0dfcb66db67a9eab5ff84f80b994104606
+F10_START_REMOTE_HEAD=38b80b0dfcb66db67a9eab5ff84f80b994104606
+IMPLEMENTATION_HEAD=026768cf41552f8b7da11cfad496820901edfe22
+DOCUMENTATION_HEAD=SELF
+BRANCH_HEAD_AT_REVIEW=SELF
+REMOTE_IMPLEMENTATION_HEAD=026768cf41552f8b7da11cfad496820901edfe22
 BRANCH=studio-ui-next
-WORKTREE_STATE=CLEAN
-IMPLEMENTATION_BASE=eaafef9f09c2b39542e0a675a995dd00fc9331b2
 PROJECT_IMPORT_EXPORT=DONE
-DEMO_RECONCILE=DONE
 AI_ATTACHMENT_RESOURCE=BLOCKED_BY_CONTRACT
+AI_MODEL_RESOURCE=BLOCKED_BY_CONTRACT
+AI_TEMPLATE_ARTIFACT=BLOCKED_BY_CONTRACT
+AI_CALIBRATION_PROJECTION=BLOCKED_BY_CONTRACT
 NPOINT_AUTHORIZATION=DONE
 PLANAR_CALIBRATION=DONE
 RESULTS_BULK_EXPORT=DONE
-LINE_SEQUENCE=BLOCKED_BY_CONTRACT
+LINE_SEQUENCE=DONE
+F10_BROWSER_JOURNEYS=DONE
 STATION_TEST_PACKAGE=PARTIAL
 DATABASE_ADVANCED=BLOCKED_BY_CONTRACT
 PARTIAL_EVIDENCE=PARTIAL
 WEBVIEW2_125=NOT_PERFORMED
 INDEPENDENT_NO_NODE=NOT_PERFORMED
-REMOTE_CI=NOT_PERFORMED
-FINAL_GATE=NOT_PERFORMED
+REMOTE_CI=BLOCKED_BY_ENVIRONMENT
+FINAL_GATE=PARTIAL
 PRODUCTION_ACCEPTANCE=NOT_GRANTED
 ```
 
@@ -35,19 +37,19 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 
 | Gate | 状态 | 当前证据 / blocker |
 | --- | --- | --- |
-| G0_REMOTE_CI | NOT_PERFORMED | 当前实现 checkpoint 已安全推送至 `origin/studio-ui-next`（`d469a4740`）；`.github/workflows/ci.yml` 不监听 `studio-ui-next` push，本轮未触发远程 workflow。 |
+| G0_REMOTE_CI | BLOCKED_BY_ENVIRONMENT | `026768cf4` 已推送至 `origin/studio-ui-next`。`ci.yml` 支持 `workflow_dispatch`，但本机 `gh` token 失效、内置浏览器未登录 GitHub、Chrome 会话不可用；未创建 run，未改 trigger。 |
 | G1_PROJECT_CONTRACT | DONE | 复用 `ProjectLifecycleCoordinator`、`ProjectSaveCoordinator` 和现有 Project Service；JSON schema/version、CREATE/OVERWRITE、权限、revision、clientOperationId、validation、partial-save 防护和 replay/reconcile 已由现有 endpoint/lifecycle tests 覆盖。 |
-| G1_AI_RESOURCE_CONTRACT | BLOCKED_BY_CONTRACT | 现有 FilePicker 只解决 scalar path 参数；正式 attachment/resource reference、上传、版本和权限承载合同仍需后端 owner，不能把本地路径冒充资源绑定。 |
-| G1_CALIBRATION_CONTRACT | DONE | N 点 draft/solve 继续要求 Engineer/Admin、非空且存在的 Project 上下文；`ScaleOffset` 复用同一 solver、candidate bundle 和 Project asset save 链。solver/operator `10/10`、`12/12`，Desktop endpoint `8/8`，Studio UI calibration `10/10`；直接 legacy AppData 文件保存测试受环境权限阻塞，不是 canonical Project asset save 路径。 |
-| G2_RESULTS_EXPORT | DONE | 已补齐服务端 CSV/JSON export job、clientOperationId 幂等与对账、快照上界、取消、TTL、SHA-256 产物校验和权限错误映射；Results 页面仅对本机结果开放，Station 来源明确不支持。Application `5/5`、Desktop endpoint `4/4`，Studio UI 全量 `137/137` 文件、`859/859` 测试通过。 |
-| G3_DEVICE_COMMANDS | PARTIAL | Station 测试包/正式包命令已有 `clientRequestId` 幂等、命令查询、过期收敛、权限与运行包身份校验；`StationEndpointsTests` `30/30`，Next 投影现在明确区分提交中、结果未知、核对中、pending、终态和激活身份不一致，且 owner 在核对期间禁止重复提交。Line sequence、Settings 高风险命令和完整 field reconcile 仍未形成 Next 合同，见 `CV-AUDIT-050`。 |
-| G4_NEXT_UI_CONSUMPTION | PARTIAL | Results 页面已挂载唯一 export owner/dialog，按本机筛选范围创建、轮询、取消、对账和下载；切换来源、工程或筛选条件会卸载 owner。浏览器/WebView2 journey 尚未执行。 |
-| G5_PARTIAL_EVIDENCE | PARTIAL | 已有 unit/contract 和部分 journey 证据；本轮补齐 Results export owner/page lifecycle、Results 工程切换延迟响应隔离、Global Variables disposed-owner runtime-read 隔离，以及 Station transient/reconciliation 边界的本地证据，但未形成完整浏览器、WebView2 或现场证据。 |
+| G1_AI_RESOURCE_CONTRACT | BLOCKED_BY_CONTRACT | Camera resource identity/revision/decision 已有 authority；attachment、CV model artifact、TemplateMatching artifact 与 calibration asset-to-scale 投影仍缺正式后端合同，详见本轮 AI 结论。 |
+| G1_CALIBRATION_CONTRACT | DONE | N 点 draft/solve 继续要求 Engineer/Admin、非空且存在的 Project 上下文；`ScaleOffset` 复用同一 solver、candidate bundle 和 Project asset save 链。本轮新增 Chromium/fixture solve + formal asset save/reconcile journey，未新增 calibration authority。 |
+| G2_RESULTS_EXPORT | DONE | 已补齐服务端 CSV/JSON export job、clientOperationId 幂等与对账、快照上界、取消、TTL、SHA-256 产物校验和权限错误映射；Results 页面仅对本机结果开放，Station 来源明确不支持。Studio UI 全量 `138/138` 文件、`869/869` 测试通过。 |
+| G3_DEVICE_COMMANDS | PARTIAL | Station unknown/reconcile 已有 Chromium/fixture journey。Line Sequence 本轮不执行设备写入，Apply 仅修改 canonical flow draft；未引入新 command authority。现场 Station/PLC 仍未验证。 |
+| G4_NEXT_UI_CONSUMPTION | DONE | Line Sequence 唯一 owner 挂载于 FlowWorkspace，只使用 shared `ApiTransport` 和 `FlowCanvasOwner.commands.patchNodeParameters`；Project/Results/Station/Template/Calibration 用户路径已有本轮 Chromium/fixture 证据。 |
+| G5_PARTIAL_EVIDENCE | PARTIAL | F10 Chromium/fixture 定向 journey `7/7`；仍不等同于真实 WebView2、DPI、no-Node 或现场硬件证据。 |
 | G6_UX_HARDENING | NOT_PERFORMED | 尚未开始本轮集中 UI 收口。 |
 | G7_WEBVIEW2 | NOT_PERFORMED | 当前未取得真实 WebView2 100%/125% 证据。 |
 | G8_NO_NODE | NOT_PERFORMED | 当前未进行独立 no-Node 发布启动验证。 |
 | G9_FIELD_HARDWARE | NOT_PERFORMED | 当前环境没有现场 Camera、PLC、Station 验证条件。 |
-| G10_FINAL_CI | NOT_PERFORMED | 远程 workflow 尚未对当前 F10 baseline 运行。 |
+| G10_FINAL_CI | PARTIAL | 当前 implementation SHA 本地 gates 通过；clean-checkout Remote CI 未运行，不授予 final/production acceptance。 |
 
 状态枚举：`DONE`、`PARTIAL`、`BLOCKED_BY_CONTRACT`、`BLOCKED_BY_ENVIRONMENT`、`NOT_PERFORMED`、`FAILED_RELATED`、`FAILED_UNRELATED`、`DEFERRED`。
 
@@ -58,7 +60,37 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 - 本轮不新增第二 API transport、HostBridge、EventBus、Project repository、Calibration asset authority、Station command authority 或前端私有持久化链。
 - Production acceptance 不由本台账自动授予；软件门禁与真实 WebView2、DPI、no-Node、现场硬件、生产 soak 和产品 owner 签收分别记录。
 
-## 当前工作记录
+## 本轮工作记录（2026-08-08）
+
+### AI Resource Contract
+
+- 可复用：Camera resource 已有 identity、revision、binding decision 与工程关联合同，不需要新建前端资源库。
+- `model_resource=BLOCKED_BY_CONTRACT`：CV 算子消费 `ModelPath/ModelId`；`/api/ai/models` 是 LLM provider/model 配置，不是视觉模型 asset authority。
+- `template_artifact=BLOCKED_BY_CONTRACT`：`/api/templates` 拥有 flow template，不拥有 TemplateMatching 图像模板产物。
+- `calibration_resource=BLOCKED_BY_CONTRACT`：Project assets 拥有正式 calibration bundle，但 AI/UnitConvert 当前消费 numeric `Scale`，尚无权威 asset-to-scale projection。
+- `attachment_resource=BLOCKED_BY_CONTRACT`：Legacy 本地路径只是主机路径；AgentRun 会剥离路径，当前没有上传、版本、权限和 resource reference store。
+- 因此本轮不把本地路径冒充正式资源，不为 model/template/calibration 创建前端私有绑定。
+
+### Line Sequence authority 与闭环
+
+- Analyze authority：`POST /api/autotune/flow-node/preview`，要求 Engineer/Admin，使用 `ExecutionAdmissionSurface.AutoTunePreview` 拒绝真实外部副作用。
+- Recommendation authority：`POST /api/autotune/scenario`，仅接受 `wire-sequence-terminal`，迭代限制为 1..5 轮；允许 flow-owned File 输入，非收敛但已有迭代结果时返回可审查 recommendation。
+- Apply authority：Next 只通过 `FlowCanvasOwner.commands.patchNodeParameters` 修改最近上游 `BoxNms`/`DeepLearning` 草稿；白名单仅含 `ScoreThreshold`、`IouThreshold`、`Confidence`，值必须是 `[0,1]` 内有限数。
+- Formal save authority：仍为现有 Project save chain；Analyze/Recommendation/Apply 不写设备、不保存 Project、不实现生产算法。如未来需要设备 Apply，必须进入现有 command authority 并补身份、冲突、unknown-outcome/reconcile，不在 Vue 内扩展。
+- Lifecycle：owner 在节点选择、flow revision 变化或 dispose 时 abort/丢弃旧响应；保留 `stale` 以防止过期 recommendation Apply。持久化数值算子 identity（`61/140/150`）已纳入 owner 与工作台识别。
+
+### Browser evidence
+
+- Chromium/fixture 定向组 `7/7` 通过：Project canonical JSON import/export、Results server-side full-batch export/download、Station lost-response + duplicate lock + request identity reconcile、Template apply-to-draft、N Point solve + Project asset save/reconcile、Line Sequence Analyze/Recommendation/Apply，以及 draft stale/backend safety rejection。
+- 该证据只代表 Playwright Chromium + fixture contract，不代表真实 WebView2、DPI、Desktop endpoint 联调或现场设备。
+
+### Remote CI / Final Gate
+
+- `026768cf4` 已安全推送，push 前 fetch 确认远程未前进且 merge-base 与起始 SHA 一致。
+- `ci.yml` 存在 `workflow_dispatch`，但 `gh auth status` 显示 token 失效，内置浏览器 GitHub 未登录，Chrome 会话不可用。本轮未创建 remote run，未修改 trigger，未跳过 required job。
+- `FINAL_GATE=PARTIAL`：当前 implementation SHA 本地 gates 通过；clean-checkout CI、WebView2、no-Node 与现场硬件仍缺失。
+
+## 前序工作记录（历史 checkpoint）
 
 ### G0 Remote CI
 
@@ -93,8 +125,8 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 
 ### Contract blockers retained
 
-- AI attachment/resource reference、line sequence auto-tune 和 Advanced Settings 仍按合同缺口记录，不新增第二套 authority；Project JSON lifecycle 与 planar calibration formal asset 已关闭。
-- Remote CI、Final Gate、WebView2 125%、独立 no-Node、现场硬件与生产 soak 仍未取得证据。
+- AI attachment、CV model artifact、TemplateMatching artifact、calibration asset-to-scale projection 与 Advanced Settings 仍按合同缺口记录，不新增第二套 authority。
+- Line Sequence 软件闭环已完成，但未包含设备写入；Remote CI、WebView2 100%/125%、独立 no-Node、现场硬件与生产 soak 仍未取得证据。
 
 ## 测试与真实环境
 
@@ -102,19 +134,21 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 | --- | --- |
 | `npm run lint` | PASS |
 | `npm run typecheck` | PASS |
-| `npm run test:unit` | PASS；本轮 Station/Results/Global Variables 生命周期相关定向测试通过；全量 `137` 个文件、`859` 个测试 |
-| `npm run build` | PASS；Desktop targeted build 触发 Vite 转换 `503` modules |
+| `npm run test:unit` | PASS；全量 `138` 个文件、`869` 个测试 |
+| `npm run build` | PASS；Vite 转换 `509` modules |
 | Results Application targeted | PASS；`ResultsExportJobServiceTests` `5/5` |
 | Results Desktop targeted | PASS；`ResultsExportEndpointsTests` `4/4` |
 | Project lifecycle targeted | PASS；create/overwrite/reconcile/validation/permission tests 已随 `eaafef9f0` checkpoint 通过 |
 | Calibration solver/operator targeted | PASS；`10/10` + `12/12` |
 | Calibration Desktop endpoint targeted | PASS；`8/8` |
 | Planar service solve targeted | PASS；`2/2`；legacy file-save test `BLOCKED_BY_ENVIRONMENT`（真实 AppData 无写权限） |
-| Browser / Playwright | NOT_PERFORMED |
-| Product/Desktop build | PASS；targeted build 0 error；还观察到 `NU1900` vulnerability-feed unavailable warning |
-| Product/Desktop targeted | PASS；当前 Calibration endpoint `8/8`，solver/operator `10/10` + `12/12`；StationEndpoints `30/30` 为既有受控日志/AppData 证据 |
-| Remote CI | NOT_PERFORMED |
-| Final Gate | NOT_PERFORMED |
+| Line Sequence owner targeted | PASS；`9/9`，连同 Calibration owner 定向组 `16/16` |
+| Browser / Playwright | PASS；F10 Chromium/fixture 定向 journey `7/7` |
+| Product/Desktop build | PASS；Desktop targeted test invocation 完成 build，0 error；观察到环境 `NU1900` vulnerability-feed unavailable warning |
+| Product/Desktop targeted | PASS；`AutoTuneEndpointsTests` `10/10`；`AutoTuneServiceTests` + `ExecutionAdmissionServiceTests` 合并 `101/101` |
+| `git diff --check` | PASS |
+| Remote CI | BLOCKED_BY_ENVIRONMENT；workflow 可 dispatch，但当前无有效 GitHub 认证入口，未创建 run |
+| Final Gate | PARTIAL；本地 gates 通过，remote clean-checkout 与真实环境未通过 |
 | WebView2 100% | NOT_PERFORMED |
 | WebView2 125% | NOT_PERFORMED |
 | Independent no-Node | NOT_PERFORMED |
@@ -123,4 +157,4 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 
 ## 提交
 
-本轮 checkpoint：`1af7b2ec6`（Planar calibration workflow）、`8846c52e4`（current-source operator metadata sync）、`d469a4740`（Station unknown-outcome/reconciliation projection 与 lifecycle race evidence）；均已安全推送至 `origin/studio-ui-next`。提交和软件测试不会自动授予生产验收。
+本轮 implementation checkpoint：`026768cf4` （Line Sequence authority/Next 闭环、AutoTune 权限与 preview admission、核心 Browser journeys），已安全推送至 `origin/studio-ui-next`。前序 checkpoint：`1af7b2ec6`、`8846c52e4`、`d469a4740`。提交和软件测试不会自动授予生产验收。
