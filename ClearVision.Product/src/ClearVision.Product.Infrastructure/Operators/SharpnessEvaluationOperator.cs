@@ -13,12 +13,15 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "评估图像的对焦清晰度。",
     CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "focus",
-    Keywords = new[] { "sharpness", "focus", "blur", "laplacian", "tenengrad" }
+    Keywords = new[] { "sharpness", "focus", "blur", "laplacian", "tenengrad" },
+    Version = "1.1.0"
 )]
+[OperatorImageContractProvider(typeof(SharpnessImageContractProvider))]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Score", "Score", PortDataType.Float)]
-[OutputPort("IsSharp", "Is Sharp", PortDataType.Boolean)]
+[OutputPort("IsSharp", "Is Sharp", PortDataType.Boolean, Description = "仅 DecisionReady=true 时产生。")]
 [OutputPort("Image", "Image", PortDataType.Image)]
+[OperatorOutputRule("Image", AvailableWhenAll = new[] { "OutputImagePolicy!=None" }, ReasonCode = "SHARPNESS_IMAGE_POLICY")]
 [OperatorParam("Method", "Method", "enum", DefaultValue = "Laplacian", Options = new[] { "Laplacian|Laplacian", "Brenner|Brenner", "Tenengrad|Tenengrad", "SMD|SMD" })]
 [OperatorParam("ThresholdMode", "Threshold Mode", "enum", DefaultValue = "PerMethodDefault", Options = new[] { "PerMethodDefault|PerMethodDefault", "Manual|Manual" })]
 [OperatorParam("Threshold", "Threshold", "double", DefaultValue = 100.0, Min = 0.0)]
@@ -87,8 +90,21 @@ public class SharpnessEvaluationOperator : OperatorBase
         var roiGray = roiSource;
         if (roiSource.Channels() != 1)
         {
-            Cv2.CvtColor(roiSource, convertedRoiGray, ColorConversionCodes.BGR2GRAY);
+            Cv2.CvtColor(
+                roiSource,
+                convertedRoiGray,
+                roiSource.Channels() == 4 ? ColorConversionCodes.BGRA2GRAY : ColorConversionCodes.BGR2GRAY);
             roiGray = convertedRoiGray;
+        }
+
+        if ((method == "Brenner" && roiGray.Cols < 3) ||
+            (method == "SMD" && (roiGray.Cols < 2 || roiGray.Rows < 2)))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(BuildFailure(
+                "IMAGE_MODE_DEPTH_UNSUPPORTED",
+                src,
+                method,
+                "ROI is too small for the selected sharpness method.")));
         }
 
         var score = method switch
@@ -105,21 +121,27 @@ public class SharpnessEvaluationOperator : OperatorBase
             : 0.0;
         var tileStdError = MeasurementStatisticsHelper.ComputeStandardError(tileStdDev, tileScores.Count);
 
-        var decisionReady = DefaultThresholds.ContainsKey(method);
-        var isSharp = score >= thresholdUsed;
-        var marginToThreshold = score - thresholdUsed;
-        var normalizedScore = thresholdUsed > 1e-9 ? score / thresholdUsed : double.NaN;
+        var usesManualThreshold = thresholdMode.Equals("Manual", StringComparison.OrdinalIgnoreCase);
+        var decisionReady = usesManualThreshold || roiGray.Depth() == MatType.CV_8U;
+        var isSharp = decisionReady ? score >= thresholdUsed : (bool?)null;
+        var marginToThreshold = decisionReady ? score - thresholdUsed : double.NaN;
+        var normalizedScore = decisionReady && thresholdUsed > 1e-9 ? score / thresholdUsed : double.NaN;
+        var scoreUnit = method == "SMD" ? "NativeIntensity" : "NativeIntensitySquared";
+        var thresholdCalibration = usesManualThreshold
+            ? "ManualNativeScoreUnit"
+            : roiGray.Depth() == MatType.CV_8U
+                ? "PerMethodDefault8U"
+                : "PerMethodDefault8UOnly_NotCalibratedForInputDepth";
 
         var additionalData = new Dictionary<string, object>
         {
             { "Score", score },
-            { "IsSharp", isSharp },
             { "Method", method },
             { "ThresholdMode", thresholdMode },
             { "ThresholdUsed", thresholdUsed },
             { "DecisionReady", decisionReady },
-            { "NormalizedScore", normalizedScore },
-            { "MarginToThreshold", marginToThreshold },
+            { "ScoreUnit", scoreUnit },
+            { "ThresholdCalibration", thresholdCalibration },
             { "TileCount", tileScores.Count },
             { "ScoreStdDev", tileStdDev },
             { "ScoreStdError", tileStdError },
@@ -128,6 +150,12 @@ public class SharpnessEvaluationOperator : OperatorBase
             { "Confidence", MeasurementStatisticsHelper.ComputeConfidenceFromUncertainty(tileStdError) },
             { "UncertaintyPx", tileStdError }
         };
+        if (decisionReady)
+        {
+            additionalData["IsSharp"] = isSharp!.Value;
+            additionalData["NormalizedScore"] = normalizedScore;
+            additionalData["MarginToThreshold"] = marginToThreshold;
+        }
 
         var output = outputImagePolicy switch
         {
@@ -155,9 +183,9 @@ public class SharpnessEvaluationOperator : OperatorBase
         }
 
         var threshold = GetDoubleParam(@operator, "Threshold", 100);
-        if (threshold < 0)
+        if (!double.IsFinite(threshold) || threshold < 0)
         {
-            return ValidationResult.Invalid("Threshold must be >= 0");
+            return ValidationResult.Invalid("Threshold must be finite and >= 0");
         }
 
         if (ResolveOutputImagePolicy(GetStringParam(@operator, "OutputImagePolicy", "FullOverlay")) == null)
@@ -227,12 +255,17 @@ public class SharpnessEvaluationOperator : OperatorBase
         }
     }
 
-    private static Mat CreateOverlayImage(Mat src, Rect roi, string method, double score, bool isSharp)
+    private static Mat CreateOverlayImage(Mat src, Rect roi, string method, double score, bool? isSharp)
     {
         var resultImage = src.Clone();
-        Cv2.Rectangle(resultImage, roi, new Scalar(0, 255, 255), 1);
-        Cv2.PutText(resultImage, $"Sharpness[{method}]={score:F2}", new Point(8, 24), HersheyFonts.HersheySimplex, 0.6, new Scalar(255, 255, 255), 2);
-        Cv2.PutText(resultImage, isSharp ? "Sharp" : "Blur", new Point(8, 48), HersheyFonts.HersheySimplex, 0.7, isSharp ? new Scalar(0, 255, 0) : new Scalar(0, 0, 255), 2);
+        var palette = ResolveOverlayPalette(resultImage);
+        Cv2.Rectangle(resultImage, roi, palette.Accent, 1);
+        Cv2.PutText(resultImage, $"Sharpness[{method}]={score:F2}", new Point(8, 24), HersheyFonts.HersheySimplex, 0.6, palette.Text, 2);
+        var decisionText = isSharp.HasValue ? (isSharp.Value ? "Sharp" : "Blur") : "Decision N/A";
+        var decisionColor = isSharp.HasValue
+            ? (isSharp.Value ? palette.Positive : palette.Negative)
+            : palette.Accent;
+        Cv2.PutText(resultImage, decisionText, new Point(8, 48), HersheyFonts.HersheySimplex, 0.7, decisionColor, 2);
         return resultImage;
     }
 
@@ -254,34 +287,40 @@ public class SharpnessEvaluationOperator : OperatorBase
 
     private static double ComputeLaplacianVariance(Mat gray)
     {
+        using var gray64 = new Mat();
+        gray.ConvertTo(gray64, MatType.CV_64FC1);
         using var lap = new Mat();
-        Cv2.Laplacian(gray, lap, MatType.CV_64F);
+        Cv2.Laplacian(gray64, lap, MatType.CV_64F);
         Cv2.MeanStdDev(lap, out _, out var stddev);
         return stddev[0] * stddev[0];
     }
 
     private static double ComputeBrenner(Mat gray)
     {
+        using var gray64 = new Mat();
+        gray.ConvertTo(gray64, MatType.CV_64FC1);
         var sum = 0.0;
-        var idx = gray.GetGenericIndexer<byte>();
-        for (var y = 0; y < gray.Rows; y++)
+        var idx = gray64.GetGenericIndexer<double>();
+        for (var y = 0; y < gray64.Rows; y++)
         {
-            for (var x = 0; x < gray.Cols - 2; x++)
+            for (var x = 0; x < gray64.Cols - 2; x++)
             {
                 var diff = idx[y, x + 2] - idx[y, x];
                 sum += diff * diff;
             }
         }
 
-        return sum / Math.Max(1, gray.Rows * gray.Cols);
+        return sum / Math.Max(1, gray64.Rows * gray64.Cols);
     }
 
     private static double ComputeTenengrad(Mat gray)
     {
+        using var gray64 = new Mat();
+        gray.ConvertTo(gray64, MatType.CV_64FC1);
         using var gradX = new Mat();
         using var gradY = new Mat();
-        Cv2.Sobel(gray, gradX, MatType.CV_64F, 1, 0, 3);
-        Cv2.Sobel(gray, gradY, MatType.CV_64F, 0, 1, 3);
+        Cv2.Sobel(gray64, gradX, MatType.CV_64F, 1, 0, 3);
+        Cv2.Sobel(gray64, gradY, MatType.CV_64F, 0, 1, 3);
 
         var idxX = gradX.GetGenericIndexer<double>();
         var idxY = gradY.GetGenericIndexer<double>();
@@ -302,18 +341,20 @@ public class SharpnessEvaluationOperator : OperatorBase
 
     private static double ComputeSmd(Mat gray)
     {
-        var idx = gray.GetGenericIndexer<byte>();
+        using var gray64 = new Mat();
+        gray.ConvertTo(gray64, MatType.CV_64FC1);
+        var idx = gray64.GetGenericIndexer<double>();
         var sum = 0.0;
-        for (var y = 0; y < gray.Rows - 1; y++)
+        for (var y = 0; y < gray64.Rows - 1; y++)
         {
-            for (var x = 0; x < gray.Cols - 1; x++)
+            for (var x = 0; x < gray64.Cols - 1; x++)
             {
                 sum += Math.Abs(idx[y, x] - idx[y, x + 1]);
                 sum += Math.Abs(idx[y, x] - idx[y + 1, x]);
             }
         }
 
-        return sum / Math.Max(1, gray.Rows * gray.Cols);
+        return sum / Math.Max(1, gray64.Rows * gray64.Cols);
     }
 
     private static List<double> ComputeTileScores(Mat gray, string method)
@@ -350,5 +391,43 @@ public class SharpnessEvaluationOperator : OperatorBase
         }
 
         return tileScores;
+    }
+
+    private static string BuildFailure(string code, Mat src, string method, string diagnostic)
+    {
+        var contract = new SharpnessImageContractProvider()
+            .GetContracts(OperatorType.SharpnessEvaluation, ["Image"], OperatorLifecycle.Stable)
+            .Single();
+        return ImageInputRuntimeContractEvaluator.FormatFailure(
+            code,
+            OperatorType.SharpnessEvaluation,
+            contract,
+            src,
+            method,
+            diagnostic);
+    }
+
+    private static (Scalar Text, Scalar Accent, Scalar Positive, Scalar Negative) ResolveOverlayPalette(Mat image)
+    {
+        var max = image.Depth() == MatType.CV_16U ? ushort.MaxValue : byte.MaxValue;
+        if (image.Channels() == 1)
+        {
+            return (new Scalar(max), new Scalar(max * 0.75), new Scalar(max), new Scalar(max * 0.5));
+        }
+
+        if (image.Channels() == 4)
+        {
+            return (
+                new Scalar(max, max, max, max),
+                new Scalar(0, max, max, max),
+                new Scalar(0, max, 0, max),
+                new Scalar(0, 0, max, max));
+        }
+
+        return (
+            new Scalar(max, max, max),
+            new Scalar(0, max, max),
+            new Scalar(0, max, 0),
+            new Scalar(0, 0, max));
     }
 }

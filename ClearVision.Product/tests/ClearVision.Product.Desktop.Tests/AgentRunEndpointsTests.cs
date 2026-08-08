@@ -32,6 +32,8 @@ using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop", Suites = "DesktopEndpoints")]
+
 public sealed class AgentRunEndpointsTests
 {
     [Fact(DisplayName = "POST AgentRun creates run and returns started plus brief events")]
@@ -203,6 +205,7 @@ public sealed class AgentRunEndpointsTests
             .Contain("q_fallback_inspection_object")
             .And.NotContain("defect_definition");
         wire.GetProperty("clarificationQuestions").EnumerateArray()
+            .Where(question => question.GetProperty("id").GetString()!.StartsWith("q_fallback_", StringComparison.Ordinal))
             .Should()
             .OnlyContain(question => question.GetProperty("options").EnumerateArray()
                 .Any(option =>

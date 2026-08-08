@@ -1,5 +1,5 @@
 // RoiManagerOperator.cs
-// ROI管理器算子 - 矩形// 功能实现圆形// 功能实现多边形区域选择
+// ROI 裁剪与掩膜算子 - 支持矩形、圆形和多边形区域
 // 作者：蘅芜君
 
 using System.Text.Json;
@@ -13,7 +13,7 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 /// <summary>
-/// ROI管理器算子 - 矩形/圆形/多边形区域选择
+/// ROI 裁剪与掩膜算子 - 矩形/圆形/多边形区域选择
 /// </summary>
 [OperatorMeta(
     DisplayName = "ROI裁剪与掩膜",

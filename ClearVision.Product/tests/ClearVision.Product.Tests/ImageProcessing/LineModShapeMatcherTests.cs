@@ -11,6 +11,7 @@ namespace ClearVision.Product.Tests.ImageProcessing;
 /// <summary>
 /// LINEMOD 形状匹配算法单元测试
 /// </summary>
+[TestClassification(TestDomain.Preprocessing, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public class LineModShapeMatcherTests : IDisposable
 {
     private readonly LineModShapeMatcher _matcher;

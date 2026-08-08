@@ -11,6 +11,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class ImageAcquisitionOperatorTests
 {
     private readonly ImageAcquisitionOperator _operator;
@@ -487,6 +488,7 @@ public class ImageAcquisitionOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class GaussianBlurOperatorTests
 {
     private readonly GaussianBlurOperator _operator;
@@ -545,6 +547,7 @@ public class GaussianBlurOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class CannyEdgeOperatorTests
 {
     private readonly CannyEdgeOperator _operator;
@@ -698,6 +701,7 @@ public class CannyEdgeOperatorTests
     }
 }
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class ThresholdOperatorTests
 {
     private readonly ThresholdOperator _operator;
@@ -726,16 +730,14 @@ public class ThresholdOperatorTests
     }
 
     [Fact]
-    public void ValidateParameters_WithNegativeThreshold_ShouldReturnInvalid()
+    public void ValidateParameters_WithFiniteNegativeThreshold_ShouldDeferToRuntimeDepthValidation()
     {
         var op = CreateTestOperator();
-        op.AddParameter(TestHelpers.CreateParameter(
-            "Threshold", "Threshold", "double", -10.0, 0.0, 255.0, true));
+        op.AddParameter(TestHelpers.CreateParameter("Threshold", -10.0, "double"));
 
         var result = _operator.ValidateParameters(op);
 
-        result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain("Threshold must be between 0 and 255.");
+        result.IsValid.Should().BeTrue();
     }
 
     [Fact]

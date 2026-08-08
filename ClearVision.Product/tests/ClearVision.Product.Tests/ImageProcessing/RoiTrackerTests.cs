@@ -3,6 +3,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Infrastructure.ImageProcessing.Tests;
 
+[TestClassification(TestDomain.Preprocessing, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public class RoiTrackerTests
 {
     [Fact]
@@ -65,4 +66,3 @@ public class RoiTrackerTests
         resultCenter.Y.Should().BeApproximately(matchPosition.Y, 1.0f);
     }
 }
-

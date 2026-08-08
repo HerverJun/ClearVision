@@ -1,5 +1,7 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
@@ -7,9 +9,11 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Tests.Services;
 
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public sealed class OperatorNamingSemanticContractTests
 {
     private static readonly NamingContract[] Contracts =
@@ -27,8 +31,50 @@ public sealed class OperatorNamingSemanticContractTests
         new(OperatorType.GeometricTolerance, typeof(GeometricToleranceOperator), 23, "二维几何公差判定", "几何公差", 5, 7, 5),
         new(OperatorType.DetectionSequenceJudge, typeof(DetectionSequenceJudgeOperator), 61, "检测顺序判定", "线序判定", 4, 13, 13),
         new(OperatorType.ImageDiff, typeof(ImageDiffOperator), 118, "图像差异率分析", "图像对比", 2, 2, 0),
-        new(OperatorType.RectangleRegion, typeof(RectangleRegionOperator), 237, "矩形框定义", "矩形区域", 0, 1, 4)
+        new(OperatorType.RectangleRegion, typeof(RectangleRegionOperator), 237, "矩形框定义", "矩形区域", 0, 1, 4),
+        new(OperatorType.CoordinateTransform, typeof(CoordinateTransformOperator), 26, "像素到物理坐标（单点）", "坐标转换", 4, 3, 2, ["Coordinate Transform"]),
+        new(OperatorType.RoiManager, typeof(RoiManagerOperator), 42, "ROI裁剪与掩膜", "ROI管理器", 1, 3, 10),
+        new(OperatorType.TryCatch, typeof(TryCatchOperator), 83, "Try分支透传", "异常捕获", 1, 4, 3, ["Try-Catch 流程控制"]),
+        new(OperatorType.ModbusCommunication, typeof(ModbusCommunicationOperator), 27, "Modbus TCP通信", "Modbus通信", 1, 2, 9, ["Modbus Communication"]),
+        new(OperatorType.Thresholding, typeof(ThresholdOperator), 4, "全局阈值处理", "二值化", 1, 1, 4, ["Threshold"]),
+        new(OperatorType.FFT1D, typeof(FFT1DOperator), 251, "信号/图像傅里叶变换（FFT）", "一维FFT", 2, 4, 0, ["FFT 1D"]),
+        new(OperatorType.InverseFFT1D, typeof(InverseFFT1DOperator), 253, "信号/图像逆傅里叶变换（IFFT）", "一维逆FFT", 2, 4, 0, ["Inverse FFT 1D"]),
+        new(OperatorType.PhaseClosure, typeof(PhaseClosureOperator), 254, "相位解缠绕", "Phase Closure", 4, 4, 0, ["相位闭合"])
     ];
+
+    private static readonly IReadOnlyDictionary<OperatorType, string[]> CompatibilitySearchAliases =
+        new Dictionary<OperatorType, string[]>
+        {
+            [OperatorType.ImageAcquisition] = ["Image Acquisition"],
+            [OperatorType.Filtering] = ["Filtering", "滤波处理"],
+            [OperatorType.RoiManager] = ["ROI管理", "ROI Manager"],
+            [OperatorType.TemplateMatching] = ["Template Matching"],
+            [OperatorType.BlobAnalysis] = ["Blob Analysis", "斑点分析"],
+            [OperatorType.EdgeDetection] = ["Edge Detection"],
+            [OperatorType.ShapeMatching] = ["Shape Matching"],
+            [OperatorType.DeepLearning] = ["Deep Learning", "深度学习检测", "深度学习推理"],
+            [OperatorType.SemanticSegmentation] = ["Semantic Segmentation"],
+            [OperatorType.SurfaceDefectDetection] = ["Surface Defect Detection"],
+            [OperatorType.CircleMeasurement] = ["Circle Measurement"],
+            [OperatorType.Measurement] = ["Measurement", "几何测量"],
+            [OperatorType.UnitConvert] = ["Unit Convert"],
+            [OperatorType.DetectionSequenceJudge] = ["序列判定"],
+            [OperatorType.ImageAdd] = ["Image Add", "图像叠加"],
+            [OperatorType.ImageCompose] = ["图像合成"],
+            [OperatorType.ResultJudgment] = ["Result Judgment"],
+            [OperatorType.ResultOutput] = ["Result Output"],
+            [OperatorType.Thresholding] = ["阈值分割", "Thresholding"],
+            [OperatorType.HttpRequest] = ["HTTP Request", "HTTP请求"],
+            [OperatorType.ScriptOperator] = ["Script Operator"],
+            [OperatorType.GeoMeasurement] = ["几何距离测量"],
+            [OperatorType.TcpCommunication] = ["TCP通讯"],
+            [OperatorType.ForEach] = ["循环处理"],
+            [OperatorType.ArrayIndexer] = ["数组索引"],
+            [OperatorType.JsonExtractor] = ["JSON提取"],
+            [OperatorType.MathOperation] = ["数学运算"],
+            [OperatorType.MqttPublish] = ["MQTT Publish", "MQTT发布"],
+            [OperatorType.SiemensS7Communication] = ["西门子S7"]
+        };
 
     [Fact]
     public void OperatorDtoType_ShouldWriteStableNameAndReadLegacyNumericValue()

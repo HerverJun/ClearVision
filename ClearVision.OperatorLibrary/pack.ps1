@@ -20,6 +20,7 @@ $serialTestRunnerPath = Join-Path $repoRoot "scripts/run-dotnet-test-serial.ps1"
 $dotnetShimPath = Join-Path $repoRoot "scripts/dotnet.ps1"
 $smokePackageRoot = Join-Path $repoRoot ".tmp/nuget-packages/operator-library-smoke"
 $smokeLockPath = Join-Path $smokePackageRoot "packages.lock.json"
+$smokeRuntimeIdentifier = "win-x64"
 
 $dotnetPathOutput = & $dotnetShimPath -InstallIfMissing -PrintPath -ReturnExitCode
 if ($LASTEXITCODE -ne 0) {
@@ -131,7 +132,8 @@ if ($RunSmokeTest) {
         --packages $smokePackageRoot `
         --no-cache `
         -p:NuGetLockFilePath=$smokeLockPath `
-        -p:ClearVisionOperatorLibraryPackageVersion=$resolvedPackageVersion
+        -p:ClearVisionOperatorLibraryPackageVersion=$resolvedPackageVersion `
+        -p:RuntimeIdentifier=$smokeRuntimeIdentifier
     if ($LASTEXITCODE -ne 0) {
         throw "[pack] dotnet restore (smoke test) failed with exit code $LASTEXITCODE"
     }
@@ -141,7 +143,7 @@ if ($RunSmokeTest) {
         -Configuration $Configuration `
         -NoRestore `
         -Verbosity minimal `
-        -DotNetTestArguments "-p:ClearVisionOperatorLibraryPackageVersion=$resolvedPackageVersion"
+        -DotNetTestArguments "-p:ClearVisionOperatorLibraryPackageVersion=$resolvedPackageVersion", "-p:RuntimeIdentifier=$smokeRuntimeIdentifier"
     if ($LASTEXITCODE -ne 0) {
         throw "[pack] dotnet test (smoke test) failed with exit code $LASTEXITCODE"
     }

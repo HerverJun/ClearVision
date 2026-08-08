@@ -9,6 +9,7 @@ namespace ClearVision.Product.Infrastructure.ImageProcessing.Tests;
 /// <summary>
 /// 灰度重心法亚像素边缘检测器单元测试
 /// </summary>
+[TestClassification(TestDomain.Preprocessing, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public class SubPixelEdgeDetectorTests : IDisposable
 {
     private readonly SubPixelEdgeDetector _detector;
@@ -27,7 +28,7 @@ public class SubPixelEdgeDetectorTests : IDisposable
     /// 测试1: 理想阶梯边缘
     /// 输入: [0, 0, 0, 255, 255, 255]
     /// 期望输出: 2.5 (理想边缘位于第3和第4像素之间)
-    /// 
+    ///
     /// 计算公式:
     /// Σ(i * gray[i]) = 0*0 + 1*0 + 2*0 + 3*255 + 4*255 + 5*255 = 3060
     /// Σ(gray[i]) = 0 + 0 + 0 + 255 + 255 + 255 = 765
@@ -81,7 +82,7 @@ public class SubPixelEdgeDetectorTests : IDisposable
     /// 测试2: 斜边（渐变边缘）
     /// 输入: [0, 64, 128, 192, 255]
     /// 计算重心位置
-    /// 
+    ///
     /// 计算公式:
     /// Σ(i * gray[i]) = 0*0 + 1*64 + 2*128 + 3*192 + 4*255 = 1916
     /// Σ(gray[i]) = 0 + 64 + 128 + 192 + 255 = 639
@@ -357,7 +358,7 @@ public class SubPixelEdgeDetectorTests : IDisposable
 
     /// <summary>
     /// 测试11: 精度验证
-    /// 
+    ///
     /// 灰度重心法的理论精度约为 0.01-0.1 像素
     /// 本测试验证对于已知灰度分布，重心计算是否准确
     /// </summary>
@@ -404,7 +405,7 @@ public class SubPixelEdgeDetectorTests : IDisposable
         lineProfile3.Reshape(1, 1);
 
         float result3 = _detector.DetectCentroid(lineProfile3, threshold: 0);
-        // 理论值: (0*0 + 1*50 + 2*150 + 3*250 + 4*255) / (0+50+150+250+255) 
+        // 理论值: (0*0 + 1*50 + 2*150 + 3*250 + 4*255) / (0+50+150+250+255)
         //       = (0 + 50 + 300 + 750 + 1020) / 705 = 2120/705 ≈ 3.007
         float expected3 = 2120.0f / 705.0f;
         float error3 = Math.Abs(result3 - expected3);

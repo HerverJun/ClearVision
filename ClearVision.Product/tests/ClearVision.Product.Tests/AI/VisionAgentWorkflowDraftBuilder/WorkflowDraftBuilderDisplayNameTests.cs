@@ -8,6 +8,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentWorkflowDraftBuilder;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class WorkflowDraftBuilderDisplayNameTests
 {
     [Fact(DisplayName = "WorkflowDraftBuilder should use contract display name for canvas operators")]

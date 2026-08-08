@@ -654,7 +654,7 @@ test('buildOperatorNodeConfig → addNode → serialize preserves explicit-empty
   // RectangleRegion：metadata 明确声明 inputPorts: []，是真正的无输入源头算子。
   const config = buildOperatorNodeConfig('RectangleRegion', {
     type: 'RectangleRegion',
-    displayName: '矩形区域',
+    displayName: '矩形框定义',
     inputPorts: [],
     outputPorts: [{ name: 'Rectangle', displayName: '矩形', dataType: 'Rectangle' }]
   });

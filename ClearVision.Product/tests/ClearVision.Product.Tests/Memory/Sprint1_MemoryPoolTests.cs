@@ -16,6 +16,7 @@ namespace ClearVision.Product.Tests.Memory;
 /// <summary>
 /// Sprint 1 Task 1.1: 分桶内存池单元测试
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class Sprint1_MemoryPoolTests
 {
     /// <summary>

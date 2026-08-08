@@ -53,7 +53,7 @@ function isRectanglePort(port) {
 function createRectangleRegionMetadataFallback() {
     return {
         type: 'RectangleRegion',
-        displayName: '矩形区域',
+        displayName: '矩形框定义',
         category: '几何',
         parameters: [
             { name: 'X', displayName: 'X', dataType: 'int', value: 0, defaultValue: 0, minValue: 0 },
@@ -493,13 +493,20 @@ export class PropertyPanelCapabilityAdapter {
             type: node.type,
             title: node.title || displayName,
             displayName,
+            categoryId: metadata.categoryId || metadata.CategoryId || '',
+            category: metadata.category || metadata.Category || '',
+            categoryOrder: metadata.categoryOrder ?? metadata.CategoryOrder,
+            lifecycle: metadata.lifecycle || metadata.Lifecycle || 'Stable',
+            lifecycleNote: metadata.lifecycleNote || metadata.LifecycleNote || '',
+            defaultHidden: metadata.defaultHidden ?? metadata.DefaultHidden ?? false,
             iconPath: node.iconPath || metadata.iconPath || metadata.IconPath || null,
             color: node.color || null,
             disabled: node.disabled === true,
             inputPorts: node.inputs || metadata.inputPorts || metadata.InputPorts || [],
             outputPorts: node.outputs || metadata.outputPorts || metadata.OutputPorts || [],
             parameters: mergeParameters(metadata.parameters || metadata.Parameters || [], node.parameters || []),
-            parameterConstraints: metadata.parameterConstraints || metadata.ParameterConstraints || []
+            parameterConstraints: metadata.parameterConstraints || metadata.ParameterConstraints || [],
+            outputAvailabilityRules: metadata.outputAvailabilityRules || metadata.OutputAvailabilityRules || []
         };
     }
 

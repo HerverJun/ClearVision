@@ -15,6 +15,7 @@ namespace ClearVision.Product.Tests.Services;
 /// 预览（NodePreview/OperatorPreview/AutoTunePreview）除已实现的 safe dry-run 外阻断真实 I/O；
 /// LegacyWebMessageExecution 恒定禁用。
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public sealed class ExecutionAdmissionServiceTests
 {
     // 预览 surface 下必须被阻断的副作用算子类型（覆盖写盘/网络/PLC/数据库/标定）。

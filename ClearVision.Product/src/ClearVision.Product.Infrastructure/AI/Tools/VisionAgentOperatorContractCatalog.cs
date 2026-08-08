@@ -38,11 +38,6 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
             .Select(ToContract)
             .GroupBy(item => item.OperatorType, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-        foreach (var supplemental in SupplementalContracts())
-        {
-            contracts.TryAdd(supplemental.OperatorType, supplemental);
-        }
-
         _contracts = contracts;
     }
 
@@ -79,37 +74,39 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
 
     private static VisionAgentOperatorContract ToContract(OperatorMetadata metadata)
     {
-        var outputPorts = metadata.OutputPorts.Select(ToPort).ToList();
-        if (metadata.Type == OperatorType.DeepLearning)
-        {
-            AddPortIfMissing(outputPorts, Port("TopClassLabel", "Top Class Label", PortDataType.String, false));
-            AddPortIfMissing(outputPorts, Port("TopClassConfidence", "Top Class Confidence", PortDataType.Float, false));
-            AddPortIfMissing(outputPorts, Port("ClassificationResult", "Classification Result", PortDataType.Any, false));
-        }
-
+        var defaultAiRecommendation = ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+            metadata.Lifecycle,
+            metadata.ImageInputContracts);
+        var requiresDisclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
+            metadata.Lifecycle,
+            metadata.ImageInputContracts);
         return new VisionAgentOperatorContract(
             metadata.Type.ToString(),
             metadata.DisplayName,
+            metadata.CategoryId,
+            OperatorCategoryCatalog.GetOrder(metadata.CategoryId),
             metadata.Category,
             metadata.Description,
+            metadata.Lifecycle,
+            metadata.LifecycleNote ?? string.Empty,
+            metadata.DefaultHidden,
+            defaultAiRecommendation,
+            requiresDisclosure,
             metadata.InputPorts.Select(ToPort).ToList(),
-            outputPorts,
+            metadata.OutputPorts.Select(ToPort).ToList(),
             metadata.Parameters.Select(ToParameter).ToList(),
-            metadata.ParameterConstraints,
+            metadata.ParameterConstraints.ToList(),
+            metadata.OutputAvailabilityRules.ToList(),
+            metadata.ImageInputContracts.ToList(),
             (metadata.Keywords ?? Array.Empty<string>())
                 .Where(keyword => !string.IsNullOrWhiteSpace(keyword))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList());
-    }
-
-    private static void AddPortIfMissing(
-        List<VisionAgentPortContract> ports,
-        VisionAgentPortContract port)
-    {
-        if (ports.All(existing => !existing.Name.Equals(port.Name, StringComparison.OrdinalIgnoreCase)))
-        {
-            ports.Add(port);
-        }
+                .ToList(),
+            (metadata.Tags ?? Array.Empty<string>())
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            metadata);
     }
 
     private static VisionAgentPortContract ToPort(PortDefinition port)
@@ -142,114 +139,29 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
                 .ToList());
     }
 
-    private static IEnumerable<VisionAgentOperatorContract> SupplementalContracts()
-    {
-        yield return new VisionAgentOperatorContract(
-            "DeepLearning",
-            "深度学习",
-            "AI检测",
-            "AI 深度学习推理，支持 YOLO 系列模型，用于缺陷检测和目标分类。",
-            [
-                Port("Image", "输入图像", PortDataType.Image, true)
-            ],
-            [
-                Port("Image", "结果图像", PortDataType.Image, false),
-                Port("OriginalImage", "原始图像", PortDataType.Image, false),
-                Port("DetectionList", "检测列表", PortDataType.DetectionList, false),
-                Port("Defects", "缺陷列表", PortDataType.DetectionList, false),
-                Port("DefectCount", "缺陷数量", PortDataType.Integer, false),
-                Port("Objects", "目标列表", PortDataType.DetectionList, false),
-                Port("ObjectCount", "目标数量", PortDataType.Integer, false)
-            ],
-            [
-                Param("ModelPath", "模型路径", "file", true, ""),
-                Param("Confidence", "置信度阈值", "double", false, 0.5, 0.0, 1.0),
-                Param("ModelVersion", "YOLO版本", "enum", false, "Auto"),
-                Param("InputSize", "输入尺寸", "int", false, 640, 320, 1280),
-                Param("UseGpu", "使用GPU", "bool", false, true),
-                Param("GpuDeviceId", "GPU设备ID", "int", false, 0, 0, 15),
-                Param("TargetClasses", "目标类别", "string", false, ""),
-                Param("ModelId", "Model Id", "string", false, ""),
-                Param("ModelCatalogPath", "Model Catalog Path", "file", false, "")
-            ],
-            null,
-            []);
-
-        yield return new VisionAgentOperatorContract(
-            "DetectionSequenceJudge",
-            "检测顺序判定",
-            "AI 检测",
-            "对检测结果排序，并与期望标签序列进行比对。",
-            [
-                Port("Detections", "检测结果", PortDataType.DetectionList, true),
-                Port("SlotPoints", "槽位点", PortDataType.PointList, false),
-                Port("PerspectiveSrcPoints", "透视源点", PortDataType.PointList, false),
-                Port("PerspectiveDstPoints", "透视目标点", PortDataType.PointList, false)
-            ],
-            [
-                Port("IsMatch", "是否匹配", PortDataType.Boolean, false),
-                Port("ActualOrder", "实际顺序", PortDataType.Any, false),
-                Port("Count", "数量", PortDataType.Integer, false),
-                Port("MissingLabels", "缺失标签", PortDataType.Any, false),
-                Port("DuplicateLabels", "重复标签", PortDataType.Any, false),
-                Port("SortedDetections", "排序后检测", PortDataType.DetectionList, false),
-                Port("Assignment", "分配结果", PortDataType.Any, false),
-                Port("UnassignedDetections", "未分配检测", PortDataType.DetectionList, false),
-                Port("Diagnostics", "诊断信息", PortDataType.Any, false),
-                Port("Message", "消息", PortDataType.String, false)
-            ],
-            [
-                Param("ExpectedLabels", "期望标签序列", "string", true, ""),
-                Param("SortBy", "排序字段", "enum", false, "CenterX"),
-                Param("Direction", "排序方向", "enum", false, "Ascending"),
-                Param("ExpectedCount", "期望数量", "int", false, 0, 0, 256),
-                Param("MinConfidence", "最低置信度", "double", false, 0.0, 0.0, 1.0)
-            ],
-            null,
-            []);
-    }
-
-    private static VisionAgentPortContract Port(
-        string name,
-        string displayName,
-        PortDataType dataType,
-        bool required)
-    {
-        return new VisionAgentPortContract(name, displayName, dataType, required, string.Empty);
-    }
-
-    private static VisionAgentParameterContract Param(
-        string name,
-        string displayName,
-        string dataType,
-        bool required,
-        object? defaultValue,
-        object? minValue = null,
-        object? maxValue = null)
-    {
-        return new VisionAgentParameterContract(
-            name,
-            displayName,
-            dataType,
-            required,
-            defaultValue,
-            minValue,
-            maxValue,
-            string.Empty,
-            null);
-    }
 }
 
 internal sealed record VisionAgentOperatorContract(
     string OperatorType,
     string DisplayName,
+    OperatorCategoryId CategoryId,
+    int CategoryOrder,
     string Category,
     string Description,
+    OperatorLifecycle Lifecycle,
+    string LifecycleNote,
+    bool DefaultHidden,
+    bool DefaultAiRecommendation,
+    bool RequiresLifecycleDisclosure,
     IReadOnlyList<VisionAgentPortContract> InputPorts,
     IReadOnlyList<VisionAgentPortContract> OutputPorts,
     IReadOnlyList<VisionAgentParameterContract> Parameters,
-    IReadOnlyList<OperatorParameterConstraint>? ParameterConstraints,
-    IReadOnlyList<string> Keywords);
+    IReadOnlyList<OperatorParameterConstraint> ParameterConstraints,
+    IReadOnlyList<OperatorOutputAvailabilityRule> OutputAvailabilityRules,
+    IReadOnlyList<ImageInputContract> ImageInputContracts,
+    IReadOnlyList<string> Keywords,
+    IReadOnlyList<string> Tags,
+    OperatorMetadata Metadata);
 
 internal sealed record VisionAgentPortContract(
     string Name,

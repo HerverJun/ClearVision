@@ -9,7 +9,6 @@ public static class OperatorParameterRequiredPolicies
     public const string Required = "required";
     public const string Optional = "optional";
 }
-
 public static class OperatorParameterConditionComparisons
 {
     public const string Equal = "equals";
@@ -38,541 +37,30 @@ public sealed record OperatorParameterConstraint(
     string? AliasFor,
     bool Deprecated,
     string? ResourceKind,
+    string ReasonCode,
+    OperatorParameterConditionSet? VisibleWhen = null,
+    OperatorParameterConditionSet? HiddenWhen = null,
+    OperatorParameterConditionSet? IgnoredWhen = null,
+    IReadOnlyList<string>? SatisfiedByInputPorts = null);
+
+public sealed record OperatorOutputAvailabilityRule(
+    string Output,
+    OperatorParameterConditionSet? AvailableWhen,
     string ReasonCode);
-
-public interface IOperatorParameterConstraintProvider
-{
-    IReadOnlyList<OperatorParameterConstraint> GetConstraints(OperatorType operatorType);
-}
-
-public sealed class OperatorParameterConstraintProvider : IOperatorParameterConstraintProvider
-{
-    public static OperatorParameterConstraintProvider Instance { get; } = new();
-
-    private static readonly IReadOnlyDictionary<OperatorType, IReadOnlyList<OperatorParameterConstraint>> Constraints =
-        new ReadOnlyDictionary<OperatorType, IReadOnlyList<OperatorParameterConstraint>>(
-            new Dictionary<OperatorType, IReadOnlyList<OperatorParameterConstraint>>
-            {
-                [OperatorType.ImageAcquisition] = ImageAcquisitionConstraints(),
-                [OperatorType.DeepLearning] = DeepLearningConstraints(),
-                [OperatorType.EdgeDetection] = EdgeDetectionConstraints(),
-                [OperatorType.ResultOutput] = ResultOutputConstraints(),
-                [OperatorType.BlobAnalysis] = BlobAnalysisConstraints(),
-                [OperatorType.ImageSave] = ImageSaveConstraints(),
-                [OperatorType.TextSave] = TextSaveConstraints(),
-                [OperatorType.MitsubishiMcCommunication] = MitsubishiMcCommunicationConstraints(),
-                [OperatorType.TcpCommunication] = TcpCommunicationConstraints()
-            });
-
-    public IReadOnlyList<OperatorParameterConstraint> GetConstraints(OperatorType operatorType)
-    {
-        var canonical = OperatorTypeAliasResolver.Resolve(operatorType);
-        return Constraints.TryGetValue(canonical, out var constraints) ? constraints : [];
-    }
-
-    private static IReadOnlyList<OperatorParameterConstraint> ImageAcquisitionConstraints()
-    {
-        var fileMode = All(Equals("SourceType", "File"));
-        var cameraMode = All(Equals("SourceType", "Camera"));
-        return
-        [
-            Constraint("SourceType", OperatorParameterRequiredPolicies.Required, reasonCode: "IMAGE_SOURCE_TYPE_REQUIRED"),
-            Constraint(
-                "FilePath",
-                OperatorParameterRequiredPolicies.Optional,
-                requiredWhen: fileMode,
-                disabledWhen: cameraMode,
-                resourceKind: "image_file",
-                reasonCode: "IMAGE_FILE_REQUIRED_FOR_FILE_SOURCE"),
-            Constraint(
-                "CameraId",
-                OperatorParameterRequiredPolicies.Optional,
-                requiredWhen: cameraMode,
-                disabledWhen: fileMode,
-                atLeastOneGroup: "image-camera-source",
-                resourceKind: "camera_binding",
-                reasonCode: "IMAGE_CAMERA_REQUIRED_FOR_CAMERA_SOURCE"),
-            Constraint(
-                "CameraBindingId",
-                OperatorParameterRequiredPolicies.Optional,
-                aliasFor: "CameraId",
-                deprecated: true,
-                reasonCode: "IMAGE_CAMERA_BINDING_ALIAS"),
-            Constraint("ExposureTime", disabledWhen: fileMode, reasonCode: "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE"),
-            Constraint("Gain", disabledWhen: fileMode, reasonCode: "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE"),
-            Constraint("TriggerMode", disabledWhen: fileMode, reasonCode: "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE"),
-            Constraint("sourceType", OperatorParameterRequiredPolicies.Optional, aliasFor: "SourceType", deprecated: true, reasonCode: "IMAGE_SOURCE_TYPE_LEGACY_ALIAS"),
-            Constraint("cameraId", OperatorParameterRequiredPolicies.Optional, aliasFor: "CameraId", deprecated: true, reasonCode: "IMAGE_CAMERA_ID_LEGACY_ALIAS")
-        ];
-    }
-
-    private static IReadOnlyList<OperatorParameterConstraint> DeepLearningConstraints()
-    {
-        return
-        [
-            Constraint(
-                "ModelPath",
-                OperatorParameterRequiredPolicies.Required,
-                atLeastOneGroup: "deep-learning-model-source",
-                mutuallyExclusiveGroup: "deep-learning-model-source",
-                resourceKind: "model_resource",
-                reasonCode: "DEEP_LEARNING_MODEL_SOURCE_REQUIRED"),
-            Constraint(
-                "ModelId",
-                OperatorParameterRequiredPolicies.Required,
-                atLeastOneGroup: "deep-learning-model-source",
-                mutuallyExclusiveGroup: "deep-learning-model-source",
-                resourceKind: "model_resource",
-                reasonCode: "DEEP_LEARNING_MODEL_SOURCE_REQUIRED"),
-            Constraint(
-                "ModelCatalogPath",
-                OperatorParameterRequiredPolicies.Optional,
-                disabledWhen: Any(Empty("ModelId"), NotEmpty("ModelPath")),
-                resourceKind: "model_catalog",
-                reasonCode: "DEEP_LEARNING_CATALOG_REQUIRES_MODEL_ID"),
-            Constraint(
-                "LabelsPath",
-                OperatorParameterRequiredPolicies.Optional,
-                resourceKind: "model_labels",
-                reasonCode: "DEEP_LEARNING_LABELS_OPTIONAL_FALLBACK"),
-            Constraint(
-                "GpuDeviceId",
-                disabledWhen: All(Equals("UseGpu", false)),
-                reasonCode: "DEEP_LEARNING_GPU_DEVICE_DISABLED_WITHOUT_GPU"),
-            Constraint(
-                "EnableInternalNms",
-                disabledWhen: All(Equals("OutputFormat", "EndToEndNms")),
-                reasonCode: "DEEP_LEARNING_MODEL_OWNS_END_TO_END_NMS"),
-            Constraint(
-                "NmsIouThreshold",
-                requiredWhen: All(Equals("OutputFormat", "RawYolo"), Equals("EnableInternalNms", true)),
-                disabledWhen: Any(Equals("OutputFormat", "EndToEndNms"), Equals("EnableInternalNms", false)),
-                reasonCode: "DEEP_LEARNING_NMS_THRESHOLD_ACTIVE_FOR_INTERNAL_NMS")
-        ];
-    }
-
-    private static IReadOnlyList<OperatorParameterConstraint> EdgeDetectionConstraints()
-    {
-        var onnxMode = All(Equals("Method", "OnnxEdge"));
-        var cannyMode = All(NotEquals("Method", "OnnxEdge"));
-        return
-        [
-            Constraint(
-                "EdgeModelPath",
-                OperatorParameterRequiredPolicies.Optional,
-                requiredWhen: onnxMode,
-                disabledWhen: cannyMode,
-                atLeastOneGroup: "edge-model-source",
-                mutuallyExclusiveGroup: "edge-model-source",
-                resourceKind: "model_resource",
-                reasonCode: "EDGE_ONNX_MODEL_SOURCE_REQUIRED"),
-            Constraint(
-                "EdgeModelId",
-                OperatorParameterRequiredPolicies.Optional,
-                requiredWhen: onnxMode,
-                disabledWhen: cannyMode,
-                atLeastOneGroup: "edge-model-source",
-                mutuallyExclusiveGroup: "edge-model-source",
-                resourceKind: "model_resource",
-                reasonCode: "EDGE_ONNX_MODEL_SOURCE_REQUIRED"),
-            Constraint(
-                "ModelCatalogPath",
-                OperatorParameterRequiredPolicies.Optional,
-                disabledWhen: Any(NotEquals("Method", "OnnxEdge"), Empty("EdgeModelId"), NotEmpty("EdgeModelPath")),
-                resourceKind: "model_catalog",
-                reasonCode: "EDGE_MODEL_CATALOG_REQUIRES_MODEL_ID"),
-            Constraint(
-                "EdgeBinarizationThreshold",
-                OperatorParameterRequiredPolicies.Optional,
-                disabledWhen: cannyMode,
-                reasonCode: "EDGE_BINARIZATION_ONLY_FOR_ONNX")
-        ];
-    }
-
-    private static IReadOnlyList<OperatorParameterConstraint> ResultOutputConstraints()
-    {
-        return
-        [
-            Constraint(
-                "SaveToFile",
-                resourceKind: "output_file",
-                reasonCode: "RESULT_OUTPUT_OPTIONAL_INTERNAL_FILE_WRITE")
-        ];
-    }
-
-    private static IReadOnlyList<OperatorParameterConstraint> BlobAnalysisConstraints()
-    {
-        var colorFilterDisabled = All(Equals("EnableColorFilter", false));
-        return
-        [
-            Constraint(
-                "FeatureFilter",
-                OperatorParameterRequiredPolicies.Optional,
-                reasonCode: "BLOB_FEATURE_FILTER_OPTIONAL"),
-            Constraint("HueLow", disabledWhen: colorFilterDisabled, reasonCode: "BLOB_HSV_ONLY_WITH_COLOR_FILTER"),
-            Constraint("HueHigh", disabledWhen: colorFilterDisabled, reasonCode: "BLOB_HSV_ONLY_WITH_COLOR_FILTER"),
-            Constraint("SatLow", disabledWhen: colorFilterDisabled, reasonCode: "BLOB_HSV_ONLY_WITH_COLOR_FILTER"),
-            Constraint("SatHigh", disabledWhen: colorFilterDisabled, reasonCode: "BLOB_HSV_ONLY_WITH_COLOR_FILTER"),
-            Constraint("ValLow", disabledWhen: colorFilterDisabled, reasonCode: "BLOB_HSV_ONLY_WITH_COLOR_FILTER"),
-            Constraint("ValHigh", disabledWhen: colorFilterDisabled, reasonCode: "BLOB_HSV_ONLY_WITH_COLOR_FILTER")
-        ];
-    }
-
-    private static IReadOnlyList<OperatorParameterConstraint> ImageSaveConstraints()
-    {
-        return
-        [
-            Constraint(
-                "Directory",
-                OperatorParameterRequiredPolicies.Required,
-                resourceKind: "output_file",
-                reasonCode: "IMAGE_SAVE_DIRECTORY_REQUIRED"),
-            Constraint(
-                "FileNameTemplate",
-                OperatorParameterRequiredPolicies.Required,
-                reasonCode: "IMAGE_SAVE_FILE_NAME_REQUIRED"),
-            Constraint("Quality", reasonCode: "IMAGE_SAVE_QUALITY"),
-            Constraint(
-                "FolderPath",
-                OperatorParameterRequiredPolicies.Optional,
-                aliasFor: "Directory",
-                deprecated: true,
-                resourceKind: "output_file",
-                reasonCode: "IMAGE_SAVE_DIRECTORY_LEGACY_ALIAS"),
-            Constraint(
-                "FileName",
-                OperatorParameterRequiredPolicies.Optional,
-                aliasFor: "FileNameTemplate",
-                deprecated: true,
-                reasonCode: "IMAGE_SAVE_FILE_NAME_LEGACY_ALIAS"),
-            Constraint(
-                "JpegQuality",
-                OperatorParameterRequiredPolicies.Optional,
-                aliasFor: "Quality",
-                deprecated: true,
-                reasonCode: "IMAGE_SAVE_QUALITY_LEGACY_ALIAS")
-        ];
-    }
-
-    private static IReadOnlyList<OperatorParameterConstraint> TextSaveConstraints()
-    {
-        return
-        [
-            Constraint(
-                "FilePath",
-                OperatorParameterRequiredPolicies.Required,
-                resourceKind: "output_file",
-                reasonCode: "TEXT_SAVE_FILE_PATH_REQUIRED")
-        ];
-    }
-
-    private static IReadOnlyList<OperatorParameterConstraint> MitsubishiMcCommunicationConstraints()
-    {
-        var operatorEndpointRequired = All(Equals("UseGlobalFallback", false));
-        var readOperation = All(Equals("Operation", "Read"));
-        var writeOperation = All(Equals("Operation", "Write"));
-        var pollingOperation = All(
-            Equals("Operation", "Read"),
-            Equals("PollingMode", "WaitForValue"));
-
-        return
-        [
-            Constraint(
-                "IpAddress",
-                requiredWhen: operatorEndpointRequired,
-                resourceKind: "plc_endpoint",
-                reasonCode: "MITSUBISHI_OPERATOR_IP_REQUIRED_WITHOUT_GLOBAL_FALLBACK"),
-            Constraint(
-                "Port",
-                requiredWhen: operatorEndpointRequired,
-                reasonCode: "MITSUBISHI_OPERATOR_PORT_REQUIRED_WITHOUT_GLOBAL_FALLBACK"),
-            Constraint(
-                "Address",
-                OperatorParameterRequiredPolicies.Required,
-                resourceKind: "plc_address",
-                reasonCode: "MITSUBISHI_PLC_ADDRESS_REQUIRED"),
-            Constraint(
-                "Length",
-                enabledWhen: readOperation,
-                reasonCode: "MITSUBISHI_READ_LENGTH_ONLY_FOR_READ"),
-            Constraint(
-                "WriteValue",
-                OperatorParameterRequiredPolicies.Optional,
-                enabledWhen: writeOperation,
-                reasonCode: "MITSUBISHI_WRITE_VALUE_ONLY_FOR_WRITE"),
-            Constraint(
-                "PollingMode",
-                enabledWhen: readOperation,
-                reasonCode: "MITSUBISHI_POLLING_ONLY_FOR_READ"),
-            Constraint(
-                "PollingCondition",
-                enabledWhen: pollingOperation,
-                reasonCode: "MITSUBISHI_POLLING_CONDITION_ONLY_WHEN_WAITING"),
-            Constraint(
-                "PollingValue",
-                enabledWhen: pollingOperation,
-                reasonCode: "MITSUBISHI_POLLING_VALUE_ONLY_WHEN_WAITING"),
-            Constraint(
-                "PollingTimeout",
-                enabledWhen: pollingOperation,
-                reasonCode: "MITSUBISHI_POLLING_TIMEOUT_ONLY_WHEN_WAITING"),
-            Constraint(
-                "PollingInterval",
-                enabledWhen: pollingOperation,
-                reasonCode: "MITSUBISHI_POLLING_INTERVAL_ONLY_WHEN_WAITING")
-        ];
-    }
-
-    private static IReadOnlyList<OperatorParameterConstraint> TcpCommunicationConstraints()
-    {
-        var profileRequired = Any(
-            Equals("UseGlobalProfile", true),
-            Equals("Mode", "Server"));
-        var legacyClient = All(
-            Empty("ProfileId"),
-            Equals("UseGlobalProfile", false),
-            Equals("Mode", "Client"));
-        var waitResponse = All(Equals("WaitResponse", true));
-        var parseEnabled = All(
-            Equals("WaitResponse", true),
-            NotEquals("ResponseParseMode", "None"));
-        var regexParse = All(
-            Equals("WaitResponse", true),
-            Equals("ResponseParseMode", "Regex"));
-        var keyValueParse = All(
-            Equals("WaitResponse", true),
-            Equals("ResponseParseMode", "KeyValue"));
-        var delimitedParse = All(
-            Equals("WaitResponse", true),
-            Equals("ResponseParseMode", "Delimited"));
-        var fixedWidthParse = All(
-            Equals("WaitResponse", true),
-            Equals("ResponseParseMode", "FixedWidth"));
-        var delimitedOrFixedWidth = When(
-            all: [Equals("WaitResponse", true)],
-            any:
-            [
-                Equals("ResponseParseMode", "Delimited"),
-                Equals("ResponseParseMode", "FixedWidth")
-            ]);
-        return
-        [
-            Constraint(
-                "ProfileId",
-                OperatorParameterRequiredPolicies.Optional,
-                requiredWhen: profileRequired,
-                resourceKind: "tcp_profile",
-                reasonCode: "TCP_PROFILE_REQUIRED_FOR_GLOBAL_OR_SERVER_MODE"),
-            Constraint(
-                "Mode",
-                disabledWhen: All(NotEmpty("ProfileId")),
-                reasonCode: "TCP_MODE_IGNORED_WHEN_PROFILE_CONFIGURED"),
-            Constraint(
-                "IpAddress",
-                requiredWhen: legacyClient,
-                enabledWhen: legacyClient,
-                resourceKind: "network_endpoint",
-                reasonCode: "TCP_LEGACY_CLIENT_HOST_REQUIRED"),
-            Constraint(
-                "Port",
-                requiredWhen: legacyClient,
-                enabledWhen: legacyClient,
-                reasonCode: "TCP_LEGACY_CLIENT_PORT_REQUIRED"),
-            Constraint(
-                "Timeout",
-                enabledWhen: legacyClient,
-                reasonCode: "TCP_LEGACY_CLIENT_TIMEOUT_ONLY_WITHOUT_PROFILE"),
-            Constraint(
-                "Encoding",
-                enabledWhen: legacyClient,
-                reasonCode: "TCP_LEGACY_CLIENT_ENCODING_ONLY_WITHOUT_PROFILE"),
-            Constraint(
-                "UseFixedSendData",
-                disabledWhen: All(NotEmpty("PayloadTemplate")),
-                reasonCode: "TCP_PAYLOAD_TEMPLATE_OWNS_PAYLOAD_SELECTION"),
-            Constraint(
-                "ResponseTimeoutMs",
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_RESPONSE_TIMEOUT_ONLY_WHEN_WAITING"),
-            Constraint(
-                "FailOnParseError",
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_PARSE_FAILURE_POLICY_ONLY_WHEN_WAITING"),
-            Constraint(
-                "FailOnUnexpectedResponse",
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_RESPONSE_FAILURE_POLICY_ONLY_WHEN_WAITING"),
-            Constraint(
-                "ResponseParseMode",
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_RESPONSE_PARSE_ONLY_WHEN_WAITING"),
-            Constraint(
-                "ResponseFieldName",
-                OperatorParameterRequiredPolicies.Optional,
-                enabledWhen: parseEnabled,
-                reasonCode: "TCP_RESPONSE_FIELD_ONLY_WHEN_PARSING"),
-            Constraint(
-                "ResponseFieldNames",
-                OperatorParameterRequiredPolicies.Optional,
-                enabledWhen: delimitedOrFixedWidth,
-                reasonCode: "TCP_RESPONSE_FIELD_NAMES_ONLY_FOR_POSITIONAL_PARSE"),
-            Constraint(
-                "RequiredResponseFields",
-                OperatorParameterRequiredPolicies.Optional,
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_REQUIRED_RESPONSE_FIELDS_ONLY_WHEN_WAITING"),
-            Constraint(
-                "ResponseFieldWidths",
-                requiredWhen: fixedWidthParse,
-                enabledWhen: fixedWidthParse,
-                reasonCode: "TCP_FIXED_WIDTHS_REQUIRED_FOR_FIXED_WIDTH_PARSE"),
-            Constraint(
-                "ResponseRegexPattern",
-                requiredWhen: regexParse,
-                enabledWhen: regexParse,
-                reasonCode: "TCP_REGEX_PATTERN_REQUIRED_FOR_REGEX_PARSE"),
-            Constraint(
-                "ResponseRegexIgnoreCase",
-                enabledWhen: regexParse,
-                reasonCode: "TCP_REGEX_OPTIONS_ONLY_FOR_REGEX_PARSE"),
-            Constraint(
-                "ResponseKeyValuePairDelimiter",
-                requiredWhen: keyValueParse,
-                enabledWhen: keyValueParse,
-                atLeastOneGroup: "tcp-key-value-pair-delimiters",
-                reasonCode: "TCP_KEY_VALUE_PAIR_DELIMITER_ONLY_FOR_KEY_VALUE_PARSE"),
-            Constraint(
-                "ResponseKeyValuePairDelimiters",
-                requiredWhen: keyValueParse,
-                enabledWhen: keyValueParse,
-                atLeastOneGroup: "tcp-key-value-pair-delimiters",
-                reasonCode: "TCP_KEY_VALUE_PAIR_DELIMITERS_ONLY_FOR_KEY_VALUE_PARSE"),
-            Constraint(
-                "ResponseKeyValueSeparator",
-                requiredWhen: keyValueParse,
-                enabledWhen: keyValueParse,
-                atLeastOneGroup: "tcp-key-value-separators",
-                reasonCode: "TCP_KEY_VALUE_SEPARATOR_ONLY_FOR_KEY_VALUE_PARSE"),
-            Constraint(
-                "ResponseKeyValueSeparators",
-                requiredWhen: keyValueParse,
-                enabledWhen: keyValueParse,
-                atLeastOneGroup: "tcp-key-value-separators",
-                reasonCode: "TCP_KEY_VALUE_SEPARATORS_ONLY_FOR_KEY_VALUE_PARSE"),
-            Constraint(
-                "ResponseDelimiter",
-                requiredWhen: delimitedParse,
-                enabledWhen: delimitedParse,
-                atLeastOneGroup: "tcp-response-delimiters",
-                reasonCode: "TCP_DELIMITER_ONLY_FOR_DELIMITED_PARSE"),
-            Constraint(
-                "ResponseDelimiters",
-                requiredWhen: delimitedParse,
-                enabledWhen: delimitedParse,
-                atLeastOneGroup: "tcp-response-delimiters",
-                reasonCode: "TCP_DELIMITERS_ONLY_FOR_DELIMITED_PARSE"),
-            Constraint(
-                "ResponseIndex",
-                enabledWhen: delimitedOrFixedWidth,
-                reasonCode: "TCP_RESPONSE_INDEX_ONLY_FOR_POSITIONAL_PARSE"),
-            Constraint(
-                "TrimResponseBeforeParse",
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_RESPONSE_TRIM_ONLY_WHEN_WAITING"),
-            Constraint(
-                "ResponseStartMarker",
-                OperatorParameterRequiredPolicies.Optional,
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_RESPONSE_FRAME_ONLY_WHEN_WAITING"),
-            Constraint(
-                "ResponseEndMarker",
-                OperatorParameterRequiredPolicies.Optional,
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_RESPONSE_FRAME_ONLY_WHEN_WAITING"),
-            Constraint(
-                "FailOnMissingResponseFrame",
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_RESPONSE_FRAME_POLICY_ONLY_WHEN_WAITING"),
-            Constraint(
-                "ExpectedResponse",
-                OperatorParameterRequiredPolicies.Optional,
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_EXPECTED_RESPONSE_ONLY_WHEN_WAITING"),
-            Constraint(
-                "RejectedResponse",
-                OperatorParameterRequiredPolicies.Optional,
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_REJECTED_RESPONSE_ONLY_WHEN_WAITING"),
-            Constraint(
-                "ResponseMatchMode",
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING"),
-            Constraint(
-                "ResponseMatchIgnoreCase",
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING"),
-            Constraint(
-                "ResponseMatchSource",
-                enabledWhen: waitResponse,
-                reasonCode: "TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING")
-        ];
-    }
-
-    private static OperatorParameterConstraint Constraint(
-        string parameter,
-        string requiredPolicy = OperatorParameterRequiredPolicies.Metadata,
-        OperatorParameterConditionSet? requiredWhen = null,
-        OperatorParameterConditionSet? enabledWhen = null,
-        OperatorParameterConditionSet? disabledWhen = null,
-        string? atLeastOneGroup = null,
-        string? mutuallyExclusiveGroup = null,
-        string? aliasFor = null,
-        bool deprecated = false,
-        string? resourceKind = null,
-        string reasonCode = "PARAMETER_CONSTRAINT")
-    {
-        return new OperatorParameterConstraint(
-            parameter,
-            requiredPolicy,
-            requiredWhen,
-            enabledWhen,
-            disabledWhen,
-            atLeastOneGroup,
-            mutuallyExclusiveGroup,
-            aliasFor,
-            deprecated,
-            resourceKind,
-            reasonCode);
-    }
-
-    private static OperatorParameterCondition Equals(string parameter, object value) =>
-        new(parameter, OperatorParameterConditionComparisons.Equal, value);
-
-    private static OperatorParameterCondition NotEquals(string parameter, object value) =>
-        new(parameter, OperatorParameterConditionComparisons.NotEquals, value);
-
-    private static OperatorParameterCondition Empty(string parameter) =>
-        new(parameter, OperatorParameterConditionComparisons.Empty);
-
-    private static OperatorParameterCondition NotEmpty(string parameter) =>
-        new(parameter, OperatorParameterConditionComparisons.NotEmpty);
-
-    private static OperatorParameterConditionSet All(params OperatorParameterCondition[] conditions) =>
-        new(All: conditions);
-
-    private static OperatorParameterConditionSet Any(params OperatorParameterCondition[] conditions) =>
-        new(Any: conditions);
-
-    private static OperatorParameterConditionSet When(
-        IReadOnlyList<OperatorParameterCondition>? all = null,
-        IReadOnlyList<OperatorParameterCondition>? any = null) =>
-        new(All: all, Any: any);
-}
 
 public sealed record OperatorParameterConstraintState(
     OperatorParameterConstraint Constraint,
     bool EffectiveRequired,
-    bool EffectiveDisabled);
+    bool EffectiveDisabled,
+    bool EffectiveVisible = true,
+    bool EffectiveIgnored = false);
+
+public sealed record OperatorOutputAvailabilityState(
+    OperatorOutputAvailabilityRule? Rule,
+    string Output,
+    bool IsAvailable,
+    bool IsGuaranteed,
+    string ReasonCode);
 
 public sealed record OperatorParameterConstraintViolation(
     string Code,
@@ -661,7 +149,7 @@ public static class OperatorParameterConstraintEvaluator
     {
         var metadataByName = metadata.Parameters.ToDictionary(item => item.Name, StringComparer.OrdinalIgnoreCase);
 
-        return metadata.ParameterConstraints
+        var states = metadata.ParameterConstraints
             .Select(constraint =>
             {
                 var rawRequired = metadataByName.TryGetValue(constraint.Parameter, out var parameter) && parameter.IsRequired;
@@ -674,16 +162,53 @@ public static class OperatorParameterConstraintEvaluator
 
                 if (constraint.RequiredWhen is not null)
                 {
-                    required = Evaluate(constraint.RequiredWhen, normalizedValues);
+                    required = EvaluateConditionSet(constraint.RequiredWhen, normalizedValues);
                 }
 
-                var enabled = constraint.EnabledWhen is null || Evaluate(constraint.EnabledWhen, normalizedValues);
+                var visible = constraint.VisibleWhen is null || EvaluateConditionSet(constraint.VisibleWhen, normalizedValues);
+                if (constraint.HiddenWhen is not null && EvaluateConditionSet(constraint.HiddenWhen, normalizedValues))
+                {
+                    visible = false;
+                }
+
+                var ignored = constraint.IgnoredWhen is not null &&
+                              EvaluateConditionSet(constraint.IgnoredWhen, normalizedValues);
+                var enabled = constraint.EnabledWhen is null || EvaluateConditionSet(constraint.EnabledWhen, normalizedValues);
                 var disabled = !enabled ||
-                               (constraint.DisabledWhen is not null && Evaluate(constraint.DisabledWhen, normalizedValues));
+                               ignored ||
+                               (constraint.DisabledWhen is not null && EvaluateConditionSet(constraint.DisabledWhen, normalizedValues));
                 return new OperatorParameterConstraintState(
                     constraint,
                     EffectiveRequired: required && !disabled,
-                    EffectiveDisabled: disabled);
+                    EffectiveDisabled: disabled,
+                    EffectiveVisible: visible,
+                    EffectiveIgnored: ignored);
+            })
+            .ToArray();
+
+        return states
+            .Select(state =>
+            {
+                if (state.EffectiveDisabled ||
+                    string.IsNullOrWhiteSpace(state.Constraint.MutuallyExclusiveGroup) ||
+                    !IsMissing(GetValue(normalizedValues, state.Constraint.Parameter)))
+                {
+                    return state;
+                }
+
+                var hasConfiguredPeer = states.Any(peer =>
+                    !ReferenceEquals(peer, state) &&
+                    string.Equals(
+                        peer.Constraint.MutuallyExclusiveGroup,
+                        state.Constraint.MutuallyExclusiveGroup,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    !peer.EffectiveDisabled &&
+                    !peer.EffectiveIgnored &&
+                    !IsMissing(GetValue(normalizedValues, peer.Constraint.Parameter)));
+
+                return hasConfiguredPeer
+                    ? state with { EffectiveRequired = false, EffectiveDisabled = true }
+                    : state;
             })
             .ToArray();
     }
@@ -692,7 +217,8 @@ public static class OperatorParameterConstraintEvaluator
         OperatorMetadata metadata,
         IReadOnlyDictionary<string, object?> values,
         IReadOnlySet<string>? explicitParameterNames = null,
-        bool requireExplicitResourceConfiguration = false)
+        bool requireExplicitResourceConfiguration = false,
+        IReadOnlySet<string>? satisfiedInputPorts = null)
     {
         var canonicalization = Canonicalize(metadata, values, explicitParameterNames);
         var normalizedValues = canonicalization.EffectiveValues;
@@ -701,6 +227,11 @@ public static class OperatorParameterConstraintEvaluator
 
         bool IsConfigured(OperatorParameterConstraintState state)
         {
+            if (IsSatisfiedByInputPort(state.Constraint, satisfiedInputPorts))
+            {
+                return true;
+            }
+
             var effectiveValue = GetValue(normalizedValues, state.Constraint.Parameter);
             if (IsMissing(effectiveValue))
             {
@@ -753,7 +284,9 @@ public static class OperatorParameterConstraintEvaluator
                      .Where(item => !string.IsNullOrWhiteSpace(item.Constraint.MutuallyExclusiveGroup))
                      .GroupBy(item => item.Constraint.MutuallyExclusiveGroup!, StringComparer.OrdinalIgnoreCase))
         {
-            var active = group.Where(item => !item.EffectiveDisabled).ToArray();
+            var active = group
+                .Where(item => !item.EffectiveDisabled && !item.EffectiveIgnored)
+                .ToArray();
             if (active.Length == 0)
             {
                 continue;
@@ -793,6 +326,15 @@ public static class OperatorParameterConstraintEvaluator
             .GroupBy(item => $"{item.Code}|{string.Join('|', item.ParameterNames.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))}", StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
             .ToArray();
+    }
+
+    public static bool IsSatisfiedByInputPort(
+        OperatorParameterConstraint constraint,
+        IReadOnlySet<string>? satisfiedInputPorts)
+    {
+        return satisfiedInputPorts is { Count: > 0 } &&
+               constraint.SatisfiedByInputPorts is { Count: > 0 } &&
+               constraint.SatisfiedByInputPorts.Any(satisfiedInputPorts.Contains);
     }
 
     public static bool IsMissing(object? value)
@@ -943,18 +485,18 @@ public static class OperatorParameterConstraintEvaluator
             diagnostics);
     }
 
-    private static bool Evaluate(
+    public static bool EvaluateConditionSet(
         OperatorParameterConditionSet set,
         IReadOnlyDictionary<string, object?> values)
     {
         var all = set.All;
         var any = set.Any;
-        var allMatches = all is null || all.Count == 0 || all.All(condition => Evaluate(condition, values));
-        var anyMatches = any is null || any.Count == 0 || any.Any(condition => Evaluate(condition, values));
+        var allMatches = all is null || all.Count == 0 || all.All(condition => EvaluateCondition(condition, values));
+        var anyMatches = any is null || any.Count == 0 || any.Any(condition => EvaluateCondition(condition, values));
         return allMatches && anyMatches;
     }
 
-    private static bool Evaluate(
+    private static bool EvaluateCondition(
         OperatorParameterCondition condition,
         IReadOnlyDictionary<string, object?> values)
     {
@@ -993,5 +535,56 @@ public static class OperatorParameterConstraintEvaluator
         }
 
         return string.Equals(left?.ToString()?.Trim(), right?.ToString()?.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+}
+
+public static class OperatorOutputAvailabilityEvaluator
+{
+    public static IReadOnlyList<OperatorOutputAvailabilityState> ResolveStates(
+        OperatorMetadata metadata,
+        IReadOnlyDictionary<string, object?> values,
+        IReadOnlySet<string>? explicitParameterNames = null)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+        ArgumentNullException.ThrowIfNull(values);
+
+        var normalized = OperatorParameterConstraintEvaluator
+            .Canonicalize(metadata, values, explicitParameterNames)
+            .EffectiveValues;
+        var rulesByOutput = metadata.OutputAvailabilityRules
+            .GroupBy(rule => rule.Output, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        return metadata.OutputPorts.Select(port =>
+        {
+            if (!rulesByOutput.TryGetValue(port.Name, out var rule))
+            {
+                return new OperatorOutputAvailabilityState(
+                    null,
+                    port.Name,
+                    IsAvailable: true,
+                    IsGuaranteed: true,
+                    ReasonCode: "OUTPUT_ALWAYS_AVAILABLE");
+            }
+
+            var available = rule.AvailableWhen is null ||
+                            OperatorParameterConstraintEvaluator.EvaluateConditionSet(rule.AvailableWhen, normalized);
+            return new OperatorOutputAvailabilityState(
+                rule,
+                port.Name,
+                IsAvailable: available,
+                IsGuaranteed: available,
+                ReasonCode: rule.ReasonCode);
+        }).ToArray();
+    }
+
+    public static bool IsAvailable(
+        OperatorMetadata metadata,
+        string output,
+        IReadOnlyDictionary<string, object?> values)
+    {
+        return ResolveStates(metadata, values)
+            .FirstOrDefault(state => state.Output.Equals(output, StringComparison.OrdinalIgnoreCase))?
+            .IsAvailable ?? false;
     }
 }

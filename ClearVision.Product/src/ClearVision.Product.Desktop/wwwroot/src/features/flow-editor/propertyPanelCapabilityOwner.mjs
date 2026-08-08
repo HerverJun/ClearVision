@@ -3,6 +3,7 @@ import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import httpClient from '../../core/messaging/httpClient.js';
 import {
     collectEffectiveRequiredParameterErrors,
+    getOperatorOutputAvailabilityStates,
     getParameterEffectiveState,
     normalizeAcquisitionSourceType
 } from '../../shared/parameterDependencyRules.js';
@@ -320,27 +321,7 @@ function getFormValue(input) {
 }
 
 function getPanelParameterEffectiveState(operator, paramOrName, options = {}) {
-    const state = getParameterEffectiveState(operator, paramOrName, options);
-    const groupNames = Array.isArray(state.rule?.atLeastOneOf) ? state.rule.atLeastOneOf : [];
-    if (!state.effectiveDisabled || groupNames.length < 2) {
-        return state;
-    }
-
-    const parameterName = state.parameterName;
-    const parameters = Array.isArray(operator?.parameters) ? operator.parameters : [];
-    const nonEmptyNames = getNonEmptyMutuallyExclusiveNames(operator, parameters, options.values || null, groupNames);
-    if (
-        nonEmptyNames.length > 1 &&
-        nonEmptyNames.some(name => normalizeParameterName(name) === normalizeParameterName(parameterName))
-    ) {
-        return {
-            ...state,
-            effectiveDisabled: false,
-            disabledReason: ''
-        };
-    }
-
-    return state;
+    return getParameterEffectiveState(operator, paramOrName, options);
 }
 
 function validationErrorTargetsParameter(error, parameterName) {
@@ -418,7 +399,7 @@ function collectMutuallyExclusiveParameterErrors(operator, parameters = [], valu
     parameters.forEach(parameter => {
         const state = getPanelParameterEffectiveState(operator, parameter, { values });
         const rule = state.rule;
-        const names = Array.isArray(rule?.atLeastOneOf) ? rule.atLeastOneOf : [];
+        const names = Array.isArray(rule?.mutuallyExclusiveWith) ? rule.mutuallyExclusiveWith : [];
         if (!rule?.mutuallyExclusiveGroup || names.length < 2) {
             return;
         }
@@ -1197,8 +1178,7 @@ export class PropertyPanelCapabilityOwner {
 
     shouldHideDisabledParameter(input, state) {
         void input;
-        void state;
-        return false;
+        return state?.effectiveVisible === false;
     }
 
     updateParameterRuleHint(group, state) {
@@ -1256,8 +1236,11 @@ export class PropertyPanelCapabilityOwner {
 
                 group?.classList.toggle('hidden', this.shouldHideDisabledParameter(input, state));
                 group?.classList.toggle('is-rule-disabled', state.effectiveDisabled);
+                group?.classList.toggle('is-rule-ignored', state.effectiveIgnored);
                 group?.setAttribute('data-effective-disabled', state.effectiveDisabled ? 'true' : 'false');
                 group?.setAttribute('data-effective-required', state.effectiveRequired ? 'true' : 'false');
+                group?.setAttribute('data-effective-visible', state.effectiveVisible ? 'true' : 'false');
+                group?.setAttribute('data-effective-ignored', state.effectiveIgnored ? 'true' : 'false');
                 this.updateParameterRuleHint(group, state);
 
                 if (label && state.effectiveRequired && !requiredMark) {
@@ -1273,6 +1256,92 @@ export class PropertyPanelCapabilityOwner {
     syncImageAcquisitionSourceControls(options = {}) {
         this.syncParameterDependencyControls(options);
         this.refreshImageAcquisitionCaptureControls();
+    }
+
+    getLifecycleLabel(lifecycle) {
+        return ({
+            Stable: '稳定',
+            Experimental: '实验',
+            Reference: '参考',
+            Legacy: '旧版',
+            Deprecated: '已弃用'
+        })[String(lifecycle || 'Stable')] || String(lifecycle || 'Stable');
+    }
+
+    renderLifecycleBadge(operator) {
+        const lifecycle = String(operator?.lifecycle || operator?.Lifecycle || 'Stable');
+        if (lifecycle === 'Stable') {
+            return '';
+        }
+
+        const note = operator?.lifecycleNote || operator?.LifecycleNote || this.getLifecycleLabel(lifecycle);
+        return `<span class="operator-lifecycle-badge operator-lifecycle-${escapeAttribute(lifecycle.toLowerCase())}" title="${escapeAttribute(note)}">${escapeHtml(this.getLifecycleLabel(lifecycle))}</span>`;
+    }
+
+    renderOutputAvailabilitySummary(operator) {
+        const rules = operator?.outputAvailabilityRules || operator?.OutputAvailabilityRules || [];
+        if (!Array.isArray(rules) || rules.length === 0) {
+            return '';
+        }
+
+        const outputPorts = Array.isArray(operator?.outputPorts)
+            ? operator.outputPorts
+            : (Array.isArray(operator?.OutputPorts)
+                ? operator.OutputPorts
+                : (Array.isArray(operator?.outputs) ? operator.outputs : []));
+        const states = getOperatorOutputAvailabilityStates(operator, outputPorts);
+        const conditionalStates = Array.from(states.values()).filter(state => state.rule);
+        if (conditionalStates.length === 0) {
+            return '';
+        }
+
+        return `
+            <section class="property-summary-section property-output-availability" data-output-availability-summary="true">
+                <h5>当前模式输出</h5>
+                <div class="property-port-list">
+                    ${conditionalStates.map(state => {
+                        const port = outputPorts.find(item => normalizeParameterName(item?.name || item?.Name) === normalizeParameterName(state.outputName));
+                        const displayName = port?.displayName || port?.DisplayName || state.outputName;
+                        return `
+                            <div class="property-port-row ${state.isAvailable ? 'is-output-available' : 'is-output-unavailable'}"
+                                 data-output-name="${escapeAttribute(state.outputName)}"
+                                 data-output-available="${state.isAvailable ? 'true' : 'false'}">
+                                <span class="property-port-direction">输出</span>
+                                <span class="property-port-name">${escapeHtml(displayName)}</span>
+                                <span class="property-output-state">${state.isAvailable ? '可用' : '当前模式不可用'}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </section>
+        `;
+    }
+
+    syncOutputAvailabilitySummary(values = null) {
+        if (!this.currentOperator) {
+            return;
+        }
+
+        const outputPorts = Array.isArray(this.currentOperator.outputPorts)
+            ? this.currentOperator.outputPorts
+            : (Array.isArray(this.currentOperator.OutputPorts)
+                ? this.currentOperator.OutputPorts
+                : (Array.isArray(this.currentOperator.outputs) ? this.currentOperator.outputs : []));
+        const states = getOperatorOutputAvailabilityStates(this.currentOperator, outputPorts, { values });
+        this.container.querySelectorAll('[data-output-name]').forEach(row => {
+            const state = states.get(normalizeParameterName(row.dataset.outputName));
+            if (!state) {
+                return;
+            }
+
+            row.classList.toggle('is-output-available', state.isAvailable);
+            row.classList.toggle('is-output-unavailable', !state.isAvailable);
+            row.setAttribute('data-output-available', state.isAvailable ? 'true' : 'false');
+            const label = row.querySelector('.property-output-state');
+            if (label) {
+                label.textContent = state.isAvailable ? '可用' : '当前模式不可用';
+            }
+        });
     }
 
     getFilePickerFilter(parameterName = '') {
@@ -1806,7 +1875,7 @@ export class PropertyPanelCapabilityOwner {
             }
 
             const state = getPanelParameterEffectiveState(operator, parameter, { values });
-            if (state.effectiveDisabled) {
+            if (state.effectiveDisabled || state.effectiveIgnored) {
                 return;
             }
 
@@ -2020,7 +2089,7 @@ export class PropertyPanelCapabilityOwner {
                 <header class="property-header property-capability-header">
                     <div class="header-text">
                         <div class="property-capability-title">属性面板</div>
-                        <h4>${escapeHtml(title)}</h4>
+                        <h4>${escapeHtml(title)} ${this.renderLifecycleBadge(operator)}</h4>
                         <span class="property-type">${escapeHtml(typeDisplay)}</span>
                     </div>
                 </header>
@@ -2038,6 +2107,10 @@ export class PropertyPanelCapabilityOwner {
                             </div>
                         </dl>
                     </section>
+                    ${(operator.lifecycle || operator.Lifecycle) && (operator.lifecycle || operator.Lifecycle) !== 'Stable'
+                        ? `<div class="operator-lifecycle-note">${escapeHtml(operator.lifecycleNote || operator.LifecycleNote || '该算子具有非稳定生命周期状态，使用前请确认能力边界。')}</div>`
+                        : ''}
+                    ${this.renderOutputAvailabilitySummary(operator)}
                     ${this.renderGeometrySection(geometryConfig)}
                     <section class="property-summary-section">
                         <h5>参数</h5>
@@ -2101,11 +2174,18 @@ export class PropertyPanelCapabilityOwner {
         const effectiveState = getPanelParameterEffectiveState(this.currentOperator, parameter, { values });
         const requiredMark = effectiveState.effectiveRequired ? '<span class="required">*</span>' : '';
         const isDisabled = effectiveState.effectiveDisabled;
-        const disabled = isDisabled ? 'disabled aria-disabled="true"' : '';
-        const disabledHint = '';
+        const disabled = isDisabled ? 'disabled aria-disabled="true"' : 'aria-disabled="false"';
+        const disabledHint = isDisabled && effectiveState.disabledReason
+            ? `<p class="form-description parameter-rule-hint" data-parameter-rule-hint="true">${escapeHtml(getLocalizedDisabledReason(effectiveState.disabledReason))}</p>`
+            : '';
 
         return `
-            <div class="form-group ${effectiveState.effectiveDisabled ? 'is-rule-disabled' : ''}" data-parameter-name="${escapeAttribute(name)}">
+            <div class="form-group ${effectiveState.effectiveVisible ? '' : 'hidden'} ${effectiveState.effectiveDisabled ? 'is-rule-disabled' : ''} ${effectiveState.effectiveIgnored ? 'is-rule-ignored' : ''}"
+                 data-parameter-name="${escapeAttribute(name)}"
+                 data-effective-required="${effectiveState.effectiveRequired ? 'true' : 'false'}"
+                 data-effective-disabled="${effectiveState.effectiveDisabled ? 'true' : 'false'}"
+                 data-effective-visible="${effectiveState.effectiveVisible ? 'true' : 'false'}"
+                 data-effective-ignored="${effectiveState.effectiveIgnored ? 'true' : 'false'}">
                 <label for="${escapeAttribute(getParameterInputId(name))}" class="form-label">${escapeHtml(label)} ${requiredMark}</label>
                 ${this.renderInput(parameter, { name, label, dataType, value, disabled, isDisabled })}
                 ${description ? `<p class="form-description">${escapeHtml(description)}</p>` : ''}

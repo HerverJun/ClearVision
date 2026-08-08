@@ -17,6 +17,7 @@ namespace ClearVision.Product.Tests.Integration;
 /// ImageAcquisitionService 集成测试
 /// Sprint 4: S4-009 实现
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "product")]
 public class ImageAcquisitionServiceIntegrationTests
 {
     private readonly ImageAcquisitionService _acquisitionService;

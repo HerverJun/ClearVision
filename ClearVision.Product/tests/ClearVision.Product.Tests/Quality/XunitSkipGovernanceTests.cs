@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace ClearVision.Product.Tests.Quality;
 
+[TestClassification(TestDomain.Quality, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public sealed class XunitSkipGovernanceTests
 {
     private static readonly Regex SkipAttributePattern = new(

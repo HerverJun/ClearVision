@@ -11,6 +11,7 @@ namespace ClearVision.Product.Tests.Memory;
 /// <summary>
 /// Sprint 1 Task 1.2: 端口类型扩展单元测试
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class Sprint1_ValueObjectTests
 {
     #region DetectionResult Tests

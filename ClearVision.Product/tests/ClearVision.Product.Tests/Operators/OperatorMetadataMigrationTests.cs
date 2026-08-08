@@ -5,6 +5,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "Stage12Regression")]
 [Trait("Category", "Sprint7_AiEvolution")]
 public class OperatorMetadataMigrationTests
 {
@@ -218,16 +219,17 @@ public class OperatorMetadataMigrationTests
     public void MetadataCatalog_ShouldUseSupportedOperatorLibraryCategories()
     {
         var supportedCategories = OperatorCategoryCatalog.All
-            .Select(category => category.DisplayName)
-            .ToHashSet(StringComparer.Ordinal);
+            .ToDictionary(category => category.Id);
 
         var metadataByType = new OperatorFactory()
             .GetAllMetadata()
             .ToDictionary(m => m.Type, m => m);
 
         var unsupported = metadataByType.Values
-            .Where(metadata => !supportedCategories.Contains(metadata.Category))
-            .Select(metadata => $"{metadata.Type}:{metadata.Category}")
+            .Where(metadata =>
+                !supportedCategories.TryGetValue(metadata.CategoryId, out var category) ||
+                !string.Equals(metadata.Category, category.DisplayName, StringComparison.Ordinal))
+            .Select(metadata => $"{metadata.Type}:{metadata.CategoryId}:{metadata.Category}")
             .OrderBy(item => item)
             .ToList();
 
@@ -235,6 +237,7 @@ public class OperatorMetadataMigrationTests
             unsupported.Count == 0,
             $"Unsupported operator library categories: {string.Join(", ", unsupported)}");
 
+        Assert.Equal(OperatorCategoryId.DataProcessing, metadataByType[OperatorType.Comparator].CategoryId);
         Assert.Equal("数据处理", metadataByType[OperatorType.Comparator].Category);
         Assert.Equal("特征提取", metadataByType[OperatorType.SubpixelEdgeDetection].Category);
         Assert.Equal("标定与坐标", metadataByType[OperatorType.HandEyeCalibration].Category);

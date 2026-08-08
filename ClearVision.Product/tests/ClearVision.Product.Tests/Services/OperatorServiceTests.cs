@@ -10,6 +10,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.Services;
 
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public class OperatorServiceTests
 {
     [Fact]
@@ -25,6 +26,23 @@ public class OperatorServiceTests
     }
 
     [Fact]
+    public async Task GetLibraryAsync_DisplayNames_ShouldMatchFactoryMetadata()
+    {
+        var factory = new OperatorFactory();
+        var sut = new OperatorService(Substitute.For<IOperatorRepository>(), factory);
+        var library = (await sut.GetLibraryAsync())
+            .ToDictionary(item => item.Type, StringComparer.Ordinal);
+
+        foreach (var metadata in factory.GetAllMetadata())
+        {
+            library.Should().ContainKey(metadata.Type.ToString());
+            library[metadata.Type.ToString()].DisplayName.Should().Be(
+                metadata.DisplayName,
+                metadata.Type.ToString());
+        }
+    }
+
+    [Fact]
     public async Task GetMetadataAsync_ForAnomalyDetection_ShouldExposeFactoryParameters()
     {
         var sut = CreateSut();
@@ -34,6 +52,65 @@ public class OperatorServiceTests
         metadata.Should().NotBeNull();
         metadata!.Parameters.Should().Contain(parameter => parameter.Name == "FeatureExtractorId");
         metadata.Outputs.Should().Contain(output => output.Name == "Diagnostics");
+    }
+
+    [Theory]
+    [InlineData(OperatorType.Filtering, "FilterMode", "FilterDiagnostics")]
+    [InlineData(OperatorType.Measurement, "MeasureType", "MeasurementType")]
+    [InlineData(OperatorType.DeepLearning, "TaskType", "TaskResolutionSource")]
+    public async Task GetMetadataAsync_GeneralizedOperators_ShouldMatchFactoryContracts(
+        OperatorType type,
+        string expectedParameter,
+        string expectedOutput)
+    {
+        var factory = new OperatorFactory();
+        var sut = new OperatorService(Substitute.For<IOperatorRepository>(), factory);
+
+        var serviceMetadata = await sut.GetMetadataAsync(type);
+        var factoryMetadata = factory.GetMetadata(type)!;
+
+        serviceMetadata.Should().NotBeNull();
+        serviceMetadata!.Description.Should().Be(factoryMetadata.Description);
+        serviceMetadata.Inputs.Select(port => port.Name).Should().Equal(factoryMetadata.InputPorts.Select(port => port.Name));
+        serviceMetadata.Outputs.Select(port => port.Name).Should().Equal(factoryMetadata.OutputPorts.Select(port => port.Name));
+        serviceMetadata.Parameters.Select(parameter => parameter.Name).Should().Equal(factoryMetadata.Parameters.Select(parameter => parameter.Name));
+        serviceMetadata.Parameters.Should().Contain(parameter => parameter.Name == expectedParameter);
+        serviceMetadata.Outputs.Should().Contain(output => output.Name == expectedOutput);
+    }
+
+    [Fact]
+    public async Task ValidateParametersAsync_CameraSource_ShouldIgnoreFileOnlyRequirement()
+    {
+        var sut = CreateSut();
+        var metadata = await sut.GetMetadataAsync(OperatorType.ImageAcquisition);
+
+        var result = await sut.ValidateParametersAsync(metadata!.Id, new Dictionary<string, object>
+        {
+            ["SourceType"] = "Camera",
+            ["CameraId"] = "camera-fixture",
+            ["FilePath"] = string.Empty
+        });
+
+        result.IsValid.Should().BeTrue(string.Join(Environment.NewLine, result.Errors));
+        result.Errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ValidateParametersAsync_FileSourceWithoutPath_ShouldExposeSharedRuleReason()
+    {
+        var sut = CreateSut();
+        var metadata = await sut.GetMetadataAsync(OperatorType.ImageAcquisition);
+
+        var result = await sut.ValidateParametersAsync(metadata!.Id, new Dictionary<string, object>
+        {
+            ["SourceType"] = "File",
+            ["FilePath"] = string.Empty,
+            ["CameraId"] = string.Empty
+        });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle(error =>
+            error.Contains("IMAGE_FILE_REQUIRED_FOR_FILE_SOURCE", StringComparison.Ordinal));
     }
 
     [Fact]

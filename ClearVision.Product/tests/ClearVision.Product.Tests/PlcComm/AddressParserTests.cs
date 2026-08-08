@@ -6,6 +6,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.PlcComm;
 
+[TestClassification(TestDomain.Plc, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "plc", Suites = "PlcRegression")]
 public class AddressParserTests
 {
     [Fact]

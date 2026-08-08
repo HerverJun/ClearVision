@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Tests.Runtime;
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class RuntimeParameterContractsTests
 {
     [Fact]
@@ -38,6 +39,7 @@ public sealed class RuntimeParameterContractsTests
     }
 }
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class RuntimePackageExporterTests
 {
     [Fact]
@@ -52,6 +54,15 @@ public sealed class RuntimePackageExporterTests
             var exporter = new RuntimePackageExporter(
                 new ClearVision.Product.Infrastructure.Services.OperatorFactory(),
                 NullLogger<RuntimePackageExporter>.Instance);
+            var project = RuntimeParameterTestData.CreateResultOnlyProject();
+            project.Name = "runtime-parameters";
+            project.Flow!.Operators.Insert(
+                0,
+                RuntimeParameterTestData.CreateDeepLearningOperator(
+                    operatorId,
+                    "线序检测",
+                    modelPath,
+                    confidence: 0.62d));
 
             var export = await exporter.ExportAsync(new RuntimePackageExportRequest
             {
@@ -117,6 +128,58 @@ public sealed class RuntimePackageExporterTests
     }
 
     [Fact]
+    public async Task ExportAsync_ClassificationTask_ShouldNotExposeDetectionConfidenceAsSiteParameter()
+    {
+        var root = RuntimeParameterTestData.CreateTempDirectory("ClearVisionRuntimeParameterExporterTests");
+        try
+        {
+            var modelPath = Path.Combine(root, "classifier.onnx");
+            await File.WriteAllBytesAsync(modelPath, [1, 2, 3, 4]);
+            var deepLearning = RuntimeParameterTestData.CreateDeepLearningOperator(
+                Guid.NewGuid(),
+                "图像分类",
+                modelPath,
+                confidence: 0.62d);
+            deepLearning.Parameters.Add(new ParameterDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "TaskType",
+                DisplayName = "任务类型",
+                DataType = "enum",
+                Value = "ImageClassification",
+                DefaultValue = "ObjectDetection"
+            });
+            var exporter = new RuntimePackageExporter(
+                new ClearVision.Product.Infrastructure.Services.OperatorFactory(),
+                NullLogger<RuntimePackageExporter>.Instance);
+            var project = RuntimeParameterTestData.CreateResultOnlyProject();
+            project.Name = "classification-runtime-parameters";
+            project.Flow!.Operators.Insert(0, deepLearning);
+
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                TargetRootDirectory = root,
+                Project = project
+            });
+
+            var schema = JsonSerializer.Deserialize<RuntimeParameterSchema>(
+                await File.ReadAllTextAsync(Path.Combine(export.PackageRootPath, "field", "runtime-parameters.json")),
+                RuntimeParameterTestData.JsonOptions)!;
+            var packagedFlow = JsonSerializer.Deserialize<OperatorFlowDto>(
+                await File.ReadAllTextAsync(Path.Combine(export.PackageRootPath, "flow.json")),
+                RuntimeParameterTestData.JsonOptions)!;
+            var packagedDeepLearning = packagedFlow.Operators.Single(op => op.Type == OperatorType.DeepLearning);
+            packagedDeepLearning.Parameters.Single(parameter => parameter.Name == "TaskType").Value?.ToString()
+                .Should().Be("ImageClassification");
+            schema.Parameters.Should().BeEmpty();
+        }
+        finally
+        {
+            RuntimeParameterTestData.SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task ExportAsync_WhenGlobalVariableTargetsSiteProfileParameter_ShouldRejectConflict()
     {
         var root = RuntimeParameterTestData.CreateTempDirectory("ClearVisionRuntimeParameterConflictTests");
@@ -135,6 +198,35 @@ public sealed class RuntimePackageExporterTests
             var exporter = new RuntimePackageExporter(
                 new ClearVision.Product.Infrastructure.Services.OperatorFactory(),
                 NullLogger<RuntimePackageExporter>.Instance);
+            var project = RuntimeParameterTestData.CreateResultOnlyProject();
+            project.Name = "runtime-parameters-conflict";
+            project.Flow!.Operators.Insert(0, deepLearning);
+            project.GlobalVariables = new ProjectGlobalVariableSchema
+            {
+                Variables =
+                [
+                    new ProjectGlobalVariableDefinition
+                    {
+                        Id = variableId,
+                        Name = "dl.confidence",
+                        DisplayName = "dl.confidence",
+                        ValueType = ProjectGlobalVariableValueType.Double,
+                        InitialValue = JsonSerializer.SerializeToElement(0.5d)
+                    }
+                ],
+                TargetBindings =
+                [
+                    new ProjectGlobalVariableTargetBinding
+                    {
+                        Id = Guid.NewGuid(),
+                        VariableId = variableId,
+                        OperatorId = operatorId,
+                        ParameterId = confidenceParameter.Id,
+                        OperatorName = deepLearning.Name,
+                        ParameterName = confidenceParameter.Name
+                    }
+                ]
+            };
 
             var act = () => exporter.ExportAsync(new RuntimePackageExportRequest
             {
@@ -198,6 +290,53 @@ public sealed class RuntimePackageExporterTests
             var exporter = new RuntimePackageExporter(
                 new ClearVision.Product.Infrastructure.Services.OperatorFactory(),
                 NullLogger<RuntimePackageExporter>.Instance);
+            var project = RuntimeParameterTestData.CreateResultOnlyProject();
+            project.Name = "traditional-runtime-parameters";
+            project.Flow!.Operators.InsertRange(
+                0,
+                [
+                    new OperatorDto
+                    {
+                        Id = templateOperatorId,
+                        Name = "TemplateMatch",
+                        Type = OperatorType.TemplateMatching,
+                        Parameters =
+                        [
+                            new ParameterDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "threshold",
+                                DisplayName = "Match threshold",
+                                DataType = "double",
+                                Value = 0.82d,
+                                DefaultValue = 0.8d,
+                                MinValue = 0.0d,
+                                MaxValue = 1.0d,
+                                IsRequired = true
+                            }
+                        ]
+                    },
+                    new OperatorDto
+                    {
+                        Id = blobOperatorId,
+                        Name = "BlobFilter",
+                        Type = OperatorType.BlobAnalysis,
+                        Parameters =
+                        [
+                            new ParameterDto
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = "maxArea",
+                                DisplayName = "Max area",
+                                DataType = "int",
+                                Value = 100_000,
+                                DefaultValue = 100_000,
+                                MinValue = 0,
+                                IsRequired = true
+                            }
+                        ]
+                    }
+                ]);
 
             var export = await exporter.ExportAsync(new RuntimePackageExportRequest
             {
@@ -289,6 +428,7 @@ public sealed class RuntimePackageExporterTests
     }
 }
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class RuntimePackageLoaderTests
 {
     [Fact]
@@ -325,6 +465,7 @@ public sealed class RuntimePackageLoaderTests
     }
 }
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class RuntimeParameterValidatorTests
 {
     [Fact]
@@ -417,6 +558,7 @@ public sealed class RuntimeParameterValidatorTests
     }
 }
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class RuntimeParameterOverrideApplierTests
 {
     [Fact]
@@ -439,6 +581,7 @@ public sealed class RuntimeParameterOverrideApplierTests
     }
 }
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public sealed class StationSiteProfileStoreTests
 {
     [Fact]

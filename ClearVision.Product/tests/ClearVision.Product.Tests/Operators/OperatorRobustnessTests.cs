@@ -10,6 +10,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Core, TestPurpose.Robustness, TestLane.Nightly, TestEvidenceType.StatisticalDistribution, TestOracleType.Metamorphic, TestResourceRequirement.None, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "product")]
 [Trait("Category", "Sprint7_Robustness")]
 public class OperatorRobustnessTests
 {

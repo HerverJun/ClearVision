@@ -5,6 +5,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.Entities;
 
+[TestClassification(TestDomain.Detection, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public class OperatorFlowCycleDetectionTests
 {
     [Fact]
@@ -82,4 +83,3 @@ public class OperatorFlowCycleDetectionTests
             target.Id,
             target.InputPorts[targetPortIndex].Id);
 }
-

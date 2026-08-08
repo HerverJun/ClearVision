@@ -18,6 +18,7 @@ namespace ClearVision.Product.Tests.Operators;
 /// 深度学习算子测试
 /// 支持多种 YOLO 版本：YOLOv5, YOLOv6, YOLOv8, YOLOv11
 /// </summary>
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class DeepLearningOperatorTests
 {
     private readonly DeepLearningOperator _operator;

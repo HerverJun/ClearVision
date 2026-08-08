@@ -4,6 +4,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Utilities;
 
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public sealed class ImageStreamUtilityTests
 {
     private static readonly byte[] JpegSignature = [0xFF, 0xD8, 0xFF];

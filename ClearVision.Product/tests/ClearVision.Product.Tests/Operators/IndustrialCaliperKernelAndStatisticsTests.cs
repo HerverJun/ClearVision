@@ -6,6 +6,7 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Measurement, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public class IndustrialCaliperKernelAndStatisticsTests
 {
     private static readonly Assembly InfrastructureAssembly = typeof(CaliperToolOperator).Assembly;

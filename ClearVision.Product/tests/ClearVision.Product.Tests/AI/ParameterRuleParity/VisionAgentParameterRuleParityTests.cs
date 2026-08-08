@@ -6,6 +6,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.AI.ParameterRuleParity;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentParameterRuleParityTests
 {
     [Fact(DisplayName = "parameter rule parity spec should cover required Vision Agent operator families")]
@@ -13,9 +14,11 @@ public sealed class VisionAgentParameterRuleParityTests
     {
         var spec = LoadSpec();
 
-        spec.SchemaVersion.Should().Be("2026-07-10.vision-agent-parameter-rule-parity.v3");
+        spec.SchemaVersion.Should().Be("2026-07-13.vision-agent-parameter-rule-parity.v4");
         spec.Cases.Select(item => item.OperatorType).Should().Contain([
             "ImageAcquisition",
+            "Filtering",
+            "Measurement",
             "TemplateMatching",
             "DeepLearning",
             "EdgeDetection",
@@ -40,6 +43,9 @@ public sealed class VisionAgentParameterRuleParityTests
         var migratedOperators = new[]
         {
             "ImageAcquisition",
+            "Filtering",
+            "Measurement",
+            "TemplateMatching",
             "DeepLearning",
             "EdgeDetection",
             "ResultOutput",
@@ -51,7 +57,6 @@ public sealed class VisionAgentParameterRuleParityTests
         };
 
         spec.OperatorConstraints.Keys.Should().BeEquivalentTo(migratedOperators);
-        spec.OperatorConstraints.Should().NotContainKey("TemplateMatching");
         foreach (var operatorType in migratedOperators)
         {
             catalog.TryGet(operatorType, out var contract).Should().BeTrue(operatorType);

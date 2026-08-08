@@ -18,7 +18,8 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Integration
 {
-    [Collection(PerformanceAcceptanceCollection.Name)]
+        [TestClassification(TestDomain.General, TestPurpose.Performance, TestLane.Nightly, TestEvidenceType.PerformanceProfile, TestOracleType.PerformanceBudget, TestResourceRequirement.CpuProfile, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "product", PerformanceProfile = "standard: documented warmup, scale and percentile budget")]
+[Collection(PerformanceAcceptanceCollection.Name)]
     [Trait("Category", "PerformanceBudget")]
     public class PerformanceAcceptanceTests : IDisposable
     {

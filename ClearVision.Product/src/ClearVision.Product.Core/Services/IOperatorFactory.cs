@@ -124,6 +124,28 @@ public class OperatorMetadata
     /// 正式 metadata 无法表达的条件、分组、别名和资源约束。
     /// </summary>
     public List<OperatorParameterConstraint> ParameterConstraints { get; set; } = new();
+
+    /// <summary>
+    /// Mode-dependent output guarantees declared on the operator class.
+    /// </summary>
+    public List<OperatorOutputAvailabilityRule> OutputAvailabilityRules { get; set; } = new();
+
+    /// <summary>
+    /// Explicit source dependencies used by deterministic documentation fingerprints.
+    /// </summary>
+    public List<string> GenerationDependencies { get; set; } = new();
+
+    /// <summary>
+    /// Authoritative image depth/channel/dynamic-range contracts for Image input ports.
+    /// </summary>
+    public List<ImageInputContract> ImageInputContracts { get; set; } = new();
+
+    /// <summary>
+    /// Compact exact-combination projection for UI and other presentation surfaces.
+    /// Runtime admission continues to use <see cref="ImageInputContracts"/> variants.
+    /// </summary>
+    public IReadOnlyList<ImageInputContractPresentation> ImageInputContractPresentations =>
+        ImageContractPresentationBuilder.Build(ImageInputContracts);
 }
 
 /// <summary>

@@ -27,6 +27,7 @@ using NSubstitute;
 namespace ClearVision.Product.Desktop.Tests;
 
 [Collection(ProjectSaveCoordinatorTestCollections.ProjectSaveCoordinatorState)]
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop", Suites = "DesktopEndpoints")]
 public sealed class CalibrationDraftEndpointsTests
 {
     [Fact]

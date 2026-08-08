@@ -1,8 +1,11 @@
 // OperatorBase.cs
 // 算子执行器抽象基类 - 提供统一的参数获取、输入检查、日志记录和执行计时功能
 
+using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
@@ -21,6 +24,7 @@ public abstract class OperatorBase : IOperatorExecutor
 {
     private sealed record ParameterLookupCache(DateTime? ModifiedAt, int ParameterCount, Dictionary<string, Parameter> Lookup);
     private static readonly ConditionalWeakTable<Operator, ParameterLookupCache> ParameterLookupCaches = new();
+    private static readonly ConcurrentDictionary<Type, OperatorParameterRuleAttribute[]> ParameterRuleCaches = new();
 
     /// <summary>
     /// 日志记录器
@@ -90,6 +94,19 @@ public abstract class OperatorBase : IOperatorExecutor
             // Check cancellation before executing core logic.
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (!ImageInputRuntimeContractEvaluator.TryValidate(
+                    GetType(),
+                    OperatorType,
+                    @operator,
+                    inputs,
+                    out var imageContractError))
+            {
+                stopwatch.Stop();
+                var failure = OperatorExecutionOutput.Failure(imageContractError);
+                failure.ExecutionTimeMs = stopwatch.ElapsedMilliseconds;
+                return failure;
+            }
+
             // 执行核心逻辑
             var result = await ExecuteCoreAsync(@operator, inputs, cancellationToken);
             stopwatch.Stop();
@@ -119,6 +136,17 @@ public abstract class OperatorBase : IOperatorExecutor
                 "[{OperatorType}] 执行被取消, 算子ID={OperatorId}, 耗时={ElapsedMs}ms",
                 OperatorType, @operator.Id, stopwatch.ElapsedMilliseconds);
             throw;
+        }
+        catch (OpenCVException ex)
+        {
+            stopwatch.Stop();
+            Logger.LogError(ex,
+                "[{OperatorType}] OpenCV execution failure, 算子ID={OperatorId}, 耗时={ElapsedMs}ms",
+                OperatorType, @operator.Id, stopwatch.ElapsedMilliseconds);
+
+            return OperatorExecutionOutput.Failure(
+                $"IMAGE_RUNTIME_FAILURE: OperatorType={OperatorType}; ExceptionType={ex.GetType().Name}; " +
+                "Diagnostic=OpenCV rejected an input combination that was not admitted by the product contract.");
         }
         catch (Exception ex)
         {
@@ -572,11 +600,13 @@ public abstract class OperatorBase : IOperatorExecutor
     private Parameter? ResolveParameter(Operator @operator, string paramName)
     {
         var canonical = FindParameter(@operator, paramName);
-        var aliases = OperatorParameterConstraintProvider.Instance
-            .GetConstraints(OperatorType)
-            .Where(constraint =>
-                !string.IsNullOrWhiteSpace(constraint.AliasFor) &&
-                constraint.AliasFor.Equals(paramName, StringComparison.OrdinalIgnoreCase))
+        var aliases = ParameterRuleCaches
+            .GetOrAdd(
+                GetType(),
+                static type => type.GetCustomAttributes<OperatorParameterRuleAttribute>(inherit: false).ToArray())
+            .Where(rule =>
+                !string.IsNullOrWhiteSpace(rule.AliasFor) &&
+                rule.AliasFor.Equals(paramName, StringComparison.OrdinalIgnoreCase))
             .ToArray();
         if (aliases.Length == 0)
         {
@@ -584,7 +614,7 @@ public abstract class OperatorBase : IOperatorExecutor
         }
 
         var configuredAliases = aliases
-            .Select(alias => (Constraint: alias, Parameter: FindParameter(@operator, alias.Parameter)))
+            .Select(alias => (Rule: alias, Parameter: FindParameter(@operator, alias.Parameter)))
             .Where(item => item.Parameter != null)
             .ToArray();
         if (canonical != null)
@@ -596,7 +626,7 @@ public abstract class OperatorBase : IOperatorExecutor
                     "[{OperatorType}] {CanonicalParameter} overrides conflicting alias {AliasParameter}.",
                     OperatorType,
                     paramName,
-                    alias.Constraint.Parameter);
+                    alias.Rule.Parameter);
             }
 
             return canonical;

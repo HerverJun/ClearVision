@@ -4,6 +4,7 @@ using Xunit;
 
 namespace ClearVision.Product.Infrastructure.ImageProcessing.Tests;
 
+[TestClassification(TestDomain.Preprocessing, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public sealed class ColorDifferenceTests
 {
     [Theory]
@@ -29,4 +30,3 @@ public sealed class ColorDifferenceTests
         ColorDifference.DeltaE76(c, c).Should().BeApproximately(0.0, 1e-12);
     }
 }
-

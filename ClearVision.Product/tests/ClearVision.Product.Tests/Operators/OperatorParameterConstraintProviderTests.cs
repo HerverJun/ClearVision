@@ -7,27 +7,35 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public sealed class OperatorParameterConstraintProviderTests
 {
     private readonly OperatorFactory _factory = new();
 
     [Fact]
-    public void Provider_ShouldExposeTheFirstAndSecondMigratedBatchesOnly()
+    public void DeclaredMetadata_ShouldExposeMigratedParameterRuleFamiliesWithoutProviderTable()
     {
-        var provider = OperatorParameterConstraintProvider.Instance;
+        foreach (var operatorType in new[]
+                 {
+                     OperatorType.ImageAcquisition,
+                     OperatorType.Filtering,
+                     OperatorType.Measurement,
+                     OperatorType.DeepLearning,
+                     OperatorType.EdgeDetection,
+                     OperatorType.ResultOutput,
+                     OperatorType.BlobAnalysis,
+                     OperatorType.ImageSave,
+                     OperatorType.TextSave,
+                     OperatorType.MitsubishiMcCommunication,
+                     OperatorType.TcpCommunication
+                 })
+        {
+            _factory.GetMetadata(operatorType)!.ParameterConstraints.Should().NotBeEmpty(operatorType.ToString());
+        }
 
-        provider.GetConstraints(OperatorType.ImageAcquisition).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.DeepLearning).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.EdgeDetection).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.ResultOutput).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.BlobAnalysis).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.ImageSave).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.TextSave).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.MitsubishiMcCommunication).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.TcpCommunication).Should().NotBeEmpty();
-        provider.GetConstraints(OperatorType.TemplateMatching).Should().BeEmpty();
-        provider.GetConstraints(OperatorType.HttpRequest).Should().BeEmpty();
-        provider.GetConstraints(OperatorType.MqttPublish).Should().BeEmpty();
+        typeof(OperatorMetadata).Assembly
+            .GetType("ClearVision.Product.Core.Services.OperatorParameterConstraintProvider")
+            .Should().BeNull("parameter rules now come from operator declarations instead of a provider table");
 
         typeof(OperatorParameterConstraint).GetProperties().Select(property => property.Name).Should().Contain(
         [
@@ -35,6 +43,9 @@ public sealed class OperatorParameterConstraintProviderTests
             nameof(OperatorParameterConstraint.RequiredWhen),
             nameof(OperatorParameterConstraint.EnabledWhen),
             nameof(OperatorParameterConstraint.DisabledWhen),
+            nameof(OperatorParameterConstraint.VisibleWhen),
+            nameof(OperatorParameterConstraint.HiddenWhen),
+            nameof(OperatorParameterConstraint.IgnoredWhen),
             nameof(OperatorParameterConstraint.AtLeastOneGroup),
             nameof(OperatorParameterConstraint.MutuallyExclusiveGroup),
             nameof(OperatorParameterConstraint.AliasFor),
@@ -206,6 +217,39 @@ public sealed class OperatorParameterConstraintProviderTests
     }
 
     [Fact]
+    public void ImageAcquisition_RuntimeImageInput_ShouldSatisfyDeclaredSourceResource()
+    {
+        var metadata = _factory.GetMetadata(OperatorType.ImageAcquisition)!;
+        var satisfiedInputPorts = new HashSet<string>(["Image"], StringComparer.OrdinalIgnoreCase);
+
+        var fileViolations = OperatorParameterConstraintEvaluator.Validate(
+            metadata,
+            new Dictionary<string, object?>
+            {
+                ["SourceType"] = "File",
+                ["FilePath"] = string.Empty
+            },
+            requireExplicitResourceConfiguration: true,
+            satisfiedInputPorts: satisfiedInputPorts);
+
+        fileViolations.Should().BeEmpty();
+        metadata.ParameterConstraints.Single(rule => rule.Parameter == "FilePath")
+            .SatisfiedByInputPorts.Should().Contain("Image");
+
+        var cameraViolations = OperatorParameterConstraintEvaluator.Validate(
+            metadata,
+            new Dictionary<string, object?>
+            {
+                ["SourceType"] = "Camera",
+                ["CameraId"] = string.Empty
+            },
+            requireExplicitResourceConfiguration: true,
+            satisfiedInputPorts: satisfiedInputPorts);
+
+        cameraViolations.Should().BeEmpty();
+    }
+
+    [Fact]
     public void DeepLearning_ShouldRequirePathOrModelIdAndGateCatalogPath()
     {
         var metadata = _factory.GetMetadata(OperatorType.DeepLearning)!;
@@ -235,6 +279,99 @@ public sealed class OperatorParameterConstraintProviderTests
                     ["ModelPath"] = "models/detector.onnx"
                 })
             .Should().ContainSingle(item => item.Code == "mutually-exclusive");
+    }
+
+    [Fact]
+    public void Filtering_ShouldHideParametersThatTheSelectedKernelDoesNotUse()
+    {
+        var metadata = _factory.GetMetadata(OperatorType.Filtering)!;
+
+        var gaussian = States(metadata, new Dictionary<string, object?> { ["FilterMode"] = "Gaussian" });
+        gaussian["KernelSize"].EffectiveDisabled.Should().BeFalse();
+        gaussian["SigmaX"].EffectiveDisabled.Should().BeFalse();
+        gaussian["BorderType"].EffectiveDisabled.Should().BeFalse();
+        gaussian["Diameter"].EffectiveDisabled.Should().BeTrue();
+
+        var median = States(metadata, new Dictionary<string, object?> { ["FilterMode"] = "Median" });
+        median["KernelSize"].EffectiveDisabled.Should().BeFalse();
+        median["SigmaX"].EffectiveDisabled.Should().BeTrue();
+        median["BorderType"].EffectiveDisabled.Should().BeTrue();
+        median["Diameter"].EffectiveDisabled.Should().BeTrue();
+
+        var bilateral = States(metadata, new Dictionary<string, object?> { ["FilterMode"] = "Bilateral" });
+        bilateral["KernelSize"].EffectiveDisabled.Should().BeTrue();
+        bilateral["SigmaX"].EffectiveDisabled.Should().BeTrue();
+        bilateral["BorderType"].EffectiveDisabled.Should().BeFalse();
+        bilateral["Diameter"].EffectiveDisabled.Should().BeFalse();
+        bilateral["SigmaColor"].EffectiveDisabled.Should().BeFalse();
+        bilateral["SigmaSpace"].EffectiveDisabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Measurement_ShouldHideParametersOutsideTheSelectedGeometryMode()
+    {
+        var metadata = _factory.GetMetadata(OperatorType.Measurement)!;
+
+        var point = States(metadata, new Dictionary<string, object?> { ["MeasureType"] = "PointToPoint" });
+        point["X1"].EffectiveDisabled.Should().BeFalse();
+        point["DistanceModel"].EffectiveDisabled.Should().BeTrue();
+        point["ParallelThreshold"].EffectiveDisabled.Should().BeTrue();
+        point["AngleUnit"].EffectiveDisabled.Should().BeTrue();
+
+        var pointLine = States(metadata, new Dictionary<string, object?> { ["MeasureType"] = "PointToLine" });
+        pointLine["X1"].EffectiveDisabled.Should().BeTrue();
+        pointLine["DistanceModel"].EffectiveDisabled.Should().BeFalse();
+        pointLine["ParallelThreshold"].EffectiveDisabled.Should().BeTrue();
+        pointLine["AngleUnit"].EffectiveDisabled.Should().BeTrue();
+
+        var lineLine = States(metadata, new Dictionary<string, object?> { ["MeasureType"] = "LineToLine" });
+        lineLine["DistanceModel"].EffectiveDisabled.Should().BeFalse();
+        lineLine["ParallelThreshold"].EffectiveDisabled.Should().BeFalse();
+
+        var angle = States(metadata, new Dictionary<string, object?> { ["MeasureType"] = "ThreePointAngle" });
+        angle["X1"].EffectiveDisabled.Should().BeTrue();
+        angle["DistanceModel"].EffectiveDisabled.Should().BeTrue();
+        angle["ParallelThreshold"].EffectiveDisabled.Should().BeTrue();
+        angle["AngleUnit"].EffectiveDisabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void DeepLearning_ShouldExposeOnlyParametersUsedByTheExplicitTask()
+    {
+        var metadata = _factory.GetMetadata(OperatorType.DeepLearning)!;
+
+        var detection = States(metadata, new Dictionary<string, object?> { ["TaskType"] = "ObjectDetection" });
+        detection["Confidence"].EffectiveDisabled.Should().BeFalse();
+        detection["TopK"].EffectiveDisabled.Should().BeTrue();
+        detection["SegmentationInputSize"].EffectiveDisabled.Should().BeTrue();
+        detection["ScaleToUnitRange"].EffectiveDisabled.Should().BeTrue();
+        detection["ClassNames"].EffectiveDisabled.Should().BeTrue();
+        detection["LabelsPath"].EffectiveDisabled.Should().BeFalse();
+
+        var classification = States(metadata, new Dictionary<string, object?> { ["TaskType"] = "ImageClassification" });
+        classification["Confidence"].EffectiveDisabled.Should().BeTrue();
+        classification["OutputFormat"].EffectiveDisabled.Should().BeTrue();
+        classification["TopK"].EffectiveDisabled.Should().BeFalse();
+        classification["ClassificationInputSize"].EffectiveDisabled.Should().BeFalse();
+        classification["SegmentationInputSize"].EffectiveDisabled.Should().BeTrue();
+        classification["ScaleToUnitRange"].EffectiveDisabled.Should().BeFalse();
+        classification["ClassNames"].EffectiveDisabled.Should().BeFalse();
+        classification["LabelsPath"].EffectiveDisabled.Should().BeFalse();
+
+        var segmentation = States(metadata, new Dictionary<string, object?> { ["TaskType"] = "SemanticSegmentation" });
+        segmentation["Confidence"].EffectiveDisabled.Should().BeTrue();
+        segmentation["TopK"].EffectiveDisabled.Should().BeTrue();
+        segmentation["SegmentationInputSize"].EffectiveDisabled.Should().BeFalse();
+        segmentation["NumClasses"].EffectiveDisabled.Should().BeFalse();
+        segmentation["ScaleToUnitRange"].EffectiveDisabled.Should().BeFalse();
+        segmentation["ClassNames"].EffectiveDisabled.Should().BeFalse();
+        segmentation["LabelsPath"].EffectiveDisabled.Should().BeTrue();
+
+        var auto = States(metadata, new Dictionary<string, object?> { ["TaskType"] = "Auto" });
+        auto["Confidence"].EffectiveDisabled.Should().BeFalse();
+        auto["TopK"].EffectiveDisabled.Should().BeFalse();
+        auto["SegmentationInputSize"].EffectiveDisabled.Should().BeFalse();
+        auto["ScaleToUnitRange"].EffectiveDisabled.Should().BeFalse();
     }
 
     [Fact]
@@ -541,8 +678,8 @@ public sealed class OperatorParameterConstraintProviderTests
     [Fact]
     public void VisionAgentConditionProjection_ShouldPreserveAllAndAnyGroups()
     {
-        var constraint = OperatorParameterConstraintProvider.Instance
-            .GetConstraints(OperatorType.TcpCommunication)
+        var constraint = _factory.GetMetadata(OperatorType.TcpCommunication)!
+            .ParameterConstraints
             .Single(item => item.Parameter == "ResponseFieldNames");
 
         var projected = ParameterMappingService.ProjectConditionSet(constraint.EnabledWhen);

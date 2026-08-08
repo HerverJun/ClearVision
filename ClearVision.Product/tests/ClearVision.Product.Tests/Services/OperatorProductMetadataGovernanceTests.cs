@@ -5,6 +5,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.Services;
 
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public sealed class OperatorProductMetadataGovernanceTests
 {
     private static readonly IReadOnlyDictionary<OperatorCategoryId, int> ExpectedCategoryCounts =
@@ -112,13 +113,13 @@ public sealed class OperatorProductMetadataGovernanceTests
     }
 
     [Fact]
-    public void DeferredStableLineContracts_ShouldNotBeDeclaredByTheScopedMetadataModel()
+    public void SynchronizedContracts_ShouldBeDeclaredByTheScopedMetadataModel()
     {
         var properties = typeof(OperatorMetadata).GetProperties().Select(property => property.Name).ToList();
 
-        properties.Should().NotContain("OutputAvailabilityRules");
-        properties.Should().NotContain("GenerationDependencies");
-        properties.Should().NotContain("ImageInputContracts");
+        properties.Should().Contain("OutputAvailabilityRules");
+        properties.Should().Contain("GenerationDependencies");
+        properties.Should().Contain("ImageInputContracts");
         properties.Should().NotContain("SideEffect");
         properties.Should().NotContain("Readiness");
     }

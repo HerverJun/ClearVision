@@ -8,6 +8,7 @@ using OpenCvSharp;
 
 namespace ClearVision.OperatorLibrary.SmokeTests;
 
+[TestClassification(TestDomain.OperatorLibrary, TestPurpose.Smoke, TestLane.Pr, TestEvidenceType.PackageSmoke, TestOracleType.Contract, TestResourceRequirement.PackageFeed, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-library", Suites = "OperatorLibrarySmoke")]
 public class RepresentativeOperatorAcceptanceTests
 {
     [Fact]
@@ -19,7 +20,7 @@ public class RepresentativeOperatorAcceptanceTests
         using var inputImage = new ImageWrapper(source.Clone());
         var op = CreateOperator(
             OperatorType.MeanFilter,
-            ("KernelSize", 64), // out of range and even; runtime should clamp then force odd
+            ("KernelSize", 63), // exact declared upper boundary; no hidden out-of-range clamping
             ("BorderType", 4));
         var executor = new MeanFilterOperator(NullLogger<MeanFilterOperator>.Instance);
 

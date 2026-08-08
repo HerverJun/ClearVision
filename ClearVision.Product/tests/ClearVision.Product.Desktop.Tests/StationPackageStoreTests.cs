@@ -19,6 +19,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop")]
 public sealed class StationPackageStoreTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -276,7 +277,7 @@ public sealed class StationPackageStoreTests
                 }
             ],
             Connections = []
-        };
+        }.WithStringDecisionBinding();
         var flowBytes = JsonSerializer.SerializeToUtf8Bytes(flow, JsonOptions);
         var flowEntity = flow.ToEntity();
         var flowHash = ExecutionFlowIdentity.ComputeFlowHash(flowEntity);

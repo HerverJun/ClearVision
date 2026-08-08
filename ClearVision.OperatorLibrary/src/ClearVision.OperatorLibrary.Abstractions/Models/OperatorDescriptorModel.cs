@@ -4,6 +4,7 @@
 // 作者：蘅芜君
 using System.Collections.Generic;
 using ClearVision.OperatorLibrary.Abstractions.Contracts;
+using ClearVision.Product.Core.Services;
 
 namespace ClearVision.OperatorLibrary.Abstractions.Models;
 
@@ -31,6 +32,8 @@ public sealed class OperatorDescriptorModel : IOperatorDescriptor
     public IReadOnlyList<IOperatorPort> OutputPorts { get; init; } = [];
 
     public IReadOnlyList<IOperatorParameter> Parameters { get; init; } = [];
+
+    public IReadOnlyList<ImageInputContract> ImageInputContracts { get; init; } = [];
 }
 
 public sealed class OperatorPortModel : IOperatorPort

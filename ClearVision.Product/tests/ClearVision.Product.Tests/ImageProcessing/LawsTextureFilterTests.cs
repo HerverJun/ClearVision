@@ -5,6 +5,7 @@ using Xunit;
 
 namespace ClearVision.Product.Infrastructure.ImageProcessing.Tests;
 
+[TestClassification(TestDomain.Preprocessing, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public sealed class LawsTextureFilterTests
 {
     [Fact]
@@ -49,4 +50,3 @@ public sealed class LawsTextureFilterTests
         return mat;
     }
 }
-

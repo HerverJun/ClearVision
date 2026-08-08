@@ -13,6 +13,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop")]
 public sealed class ExecutionObservationProjectorTests
 {
     private static readonly JsonSerializerOptions CamelCaseJson = new()

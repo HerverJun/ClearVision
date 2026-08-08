@@ -6,6 +6,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.AI.AgentRun;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentRunKindResolverTests : IDisposable
 {
     private readonly string _tempRoot = Path.Combine(

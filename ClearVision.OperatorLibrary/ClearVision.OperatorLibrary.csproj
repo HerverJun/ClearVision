@@ -84,6 +84,8 @@
              Link="Memory\MatPool.cs" />
     <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Services\DetectionOutputInspector.cs"
              Link="Services\DetectionOutputInspector.cs" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Services\PlanarScaleOffsetCalibrationService.cs"
+             Link="Services\PlanarScaleOffsetCalibrationService.cs" />
     <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Services\DeepLearningLabelResolver.cs"
              Link="Services\DeepLearningLabelResolver.cs" />
     <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Services\OcrEngineProvider.cs"

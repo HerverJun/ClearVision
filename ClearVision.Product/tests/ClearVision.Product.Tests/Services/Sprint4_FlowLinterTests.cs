@@ -6,6 +6,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Services;
+using FluentAssertions;
 using Xunit;
 
 namespace ClearVision.Product.Tests.Services;
@@ -13,6 +14,7 @@ namespace ClearVision.Product.Tests.Services;
 /// <summary>
 /// Sprint 4 Task 4.1: FlowLinter 静态检查器单元测试
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 public class Sprint4_FlowLinterTests
 {
     private readonly FlowLinter _linter;
@@ -83,6 +85,51 @@ public class Sprint4_FlowLinterTests
         // AddConnection 也会检查类型兼容性
         var conn = new OperatorConnection(sourceOp.Id, sourceOp.OutputPorts.First().Id, targetOp.Id, targetOp.InputPorts.First().Id);
         Assert.Throws<InvalidOperationException>(() => flow.AddConnection(conn));
+    }
+
+    [Fact]
+    public void FlowLinter_Struct_006_UnavailableModeOutput_ReturnsErrorUsingHistoricalDefault()
+    {
+        var factory = new OperatorFactory();
+        var source = factory.CreateOperator(OperatorType.Measurement, "Measurement", 0, 0);
+        source.Parameters.RemoveAll(parameter => parameter.Name.Equals("MeasureType", StringComparison.OrdinalIgnoreCase));
+        var anglePort = source.OutputPorts.Single(port => port.Name == "Angle");
+
+        var target = new Operator(Guid.NewGuid(), "Target", OperatorType.ResultOutput, 100, 0);
+        target.LoadInputPort(Guid.NewGuid(), "Input", PortDataType.Any, true);
+
+        var flow = new OperatorFlow("ModeOutputFlow");
+        flow.AddOperator(source);
+        flow.AddOperator(target);
+        flow.AddConnection(new OperatorConnection(source.Id, anglePort.Id, target.Id, target.InputPorts.Single().Id));
+
+        var result = _linter.Lint(flow);
+
+        result.Issues.Should().Contain(issue =>
+            issue.Code == "STRUCT_006" &&
+            issue.OperatorId == source.Id &&
+            issue.Message.Contains("Angle", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void FlowLinter_Struct_006_AvailableModeOutput_DoesNotReturnError()
+    {
+        var factory = new OperatorFactory();
+        var source = factory.CreateOperator(OperatorType.Measurement, "Measurement", 0, 0);
+        source.UpdateParameter("MeasureType", "ThreePointAngle");
+        var anglePort = source.OutputPorts.Single(port => port.Name == "Angle");
+
+        var target = new Operator(Guid.NewGuid(), "Target", OperatorType.ResultOutput, 100, 0);
+        target.LoadInputPort(Guid.NewGuid(), "Input", PortDataType.Any, true);
+
+        var flow = new OperatorFlow("ModeOutputFlow");
+        flow.AddOperator(source);
+        flow.AddOperator(target);
+        flow.AddConnection(new OperatorConnection(source.Id, anglePort.Id, target.Id, target.InputPorts.Single().Id));
+
+        var result = _linter.Lint(flow);
+
+        result.Issues.Should().NotContain(issue => issue.Code == "STRUCT_006");
     }
 
     #endregion
@@ -269,6 +316,27 @@ public class Sprint4_FlowLinterTests
 
         Assert.True(result.HasErrors);
         Assert.Contains(result.Issues, i => i.Code == "PARAM_003");
+    }
+
+    [Theory]
+    [InlineData("ImageClassification")]
+    [InlineData("SemanticSegmentation")]
+    public void FlowLinter_NonDetectionTask_ShouldIgnoreStaleDetectionThresholds(string taskType)
+    {
+        var flow = new OperatorFlow("TestFlow");
+        var dlOp = new Operator(Guid.NewGuid(), "DL", OperatorType.DeepLearning, 0, 0);
+        dlOp.AddParameter(new Parameter(Guid.NewGuid(), "TaskType", "TaskType", "", "enum", taskType));
+        dlOp.AddParameter(new Parameter(Guid.NewGuid(), "Confidence", "Conf", "", "float", 1.5f, 0.0f, 1.0f));
+        dlOp.AddParameter(new Parameter(Guid.NewGuid(), "NmsIouThreshold", "NMS", "", "double", 1.5d, 0.0d, 1.0d));
+        flow.AddOperator(dlOp);
+
+        var result = _linter.Lint(flow);
+
+        result.Issues.Should().NotContain(issue =>
+            issue.Code == "PARAM_003" ||
+            (issue.Code == "PARAM_002" &&
+             (issue.Message.Contains("Confidence", StringComparison.OrdinalIgnoreCase) ||
+              issue.Message.Contains("NmsIouThreshold", StringComparison.OrdinalIgnoreCase))));
     }
 
     [Fact]

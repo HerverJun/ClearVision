@@ -7,6 +7,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Measurement, TestPurpose.Performance, TestLane.Nightly, TestEvidenceType.PerformanceProfile, TestOracleType.PerformanceBudget, TestResourceRequirement.CpuProfile, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "operator-quality", PerformanceProfile = "standard: documented warmup, scale and percentile budget")]
 public class CircleCaliperFitV2BenchmarkTests
 {
     [Fact]

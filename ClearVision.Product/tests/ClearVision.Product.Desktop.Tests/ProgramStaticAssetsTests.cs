@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop")]
 public sealed class ProgramStaticAssetsTests : IDisposable
 {
     private readonly string _tempRoot = Path.Combine(

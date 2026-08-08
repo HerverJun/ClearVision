@@ -3,6 +3,7 @@
 // 定义算子元数据与端口信息的统一契约
 // 作者：蘅芜君
 using System.Collections.Generic;
+using ClearVision.Product.Core.Services;
 
 namespace ClearVision.OperatorLibrary.Abstractions.Contracts;
 
@@ -27,6 +28,8 @@ public interface IOperatorDescriptor
     IReadOnlyList<IOperatorPort> OutputPorts { get; }
 
     IReadOnlyList<IOperatorParameter> Parameters { get; }
+
+    IReadOnlyList<ImageInputContract> ImageInputContracts { get; }
 }
 
 public interface IOperatorPort

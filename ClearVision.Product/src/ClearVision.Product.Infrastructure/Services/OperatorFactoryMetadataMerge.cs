@@ -186,7 +186,11 @@ internal static class OperatorFactoryMetadataMerge
                         })
                         .ToList()
                 })
-                .ToList()
+                .ToList(),
+            ParameterConstraints = source.ParameterConstraints.ToList(),
+            OutputAvailabilityRules = source.OutputAvailabilityRules.ToList(),
+            GenerationDependencies = source.GenerationDependencies.ToList(),
+            ImageInputContracts = source.ImageInputContracts.ToList()
         };
     }
 }

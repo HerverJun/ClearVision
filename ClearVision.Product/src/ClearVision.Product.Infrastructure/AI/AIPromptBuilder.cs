@@ -6,6 +6,8 @@
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.Services;
 
 namespace ClearVision.Product.Infrastructure.AI;
 
@@ -23,7 +25,6 @@ public class AIPromptBuilder
     public AIPromptBuilder()
     {
         InitializeOperatorLibrary();
-        NormalizeDataOperatorContracts();
     }
 
     /// <summary>
@@ -31,106 +32,50 @@ public class AIPromptBuilder
     /// </summary>
     private void InitializeOperatorLibrary()
     {
-        // 图像采集与处理
-        _operators.Add(new PromptOperatorInfo(OperatorType.ImageAcquisition, "图像采集", "从相机获取图像", "Image"));
-        _operators.Add(new PromptOperatorInfo(OperatorType.GaussianBlur, "高斯滤波", "图像平滑降噪", "Image", "Image"));
-        _operators.Add(new PromptOperatorInfo(OperatorType.Thresholding, "二值化", "阈值分割", "Image", "Image"));
-        _operators.Add(new PromptOperatorInfo(OperatorType.EdgeDetection, "边缘检测", "Canny 边缘检测", "Image", "Image"));
+        foreach (var metadata in new OperatorFactory()
+                     .GetAllMetadata()
+                     .Where(item => !item.DefaultHidden)
+                     .OrderByDescending(item => ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                         item.Lifecycle,
+                         item.ImageInputContracts))
+                     .ThenBy(item => OperatorCategoryCatalog.GetOrder(item.CategoryId))
+                     .ThenBy(item => item.DisplayName, StringComparer.Ordinal))
+        {
+            var parameters = metadata.Parameters
+                .Select(parameter => new PromptParamInfo(
+                    parameter.Name,
+                    parameter.DataType,
+                    parameter.Description ?? parameter.DisplayName,
+                    parameter.IsRequired,
+                    parameter.DefaultValue?.ToString() ?? string.Empty,
+                    parameter.MinValue?.ToString() ?? string.Empty,
+                    parameter.MaxValue?.ToString() ?? string.Empty,
+                    parameter.Options?
+                        .Select(option => option.Value?.ToString() ?? string.Empty)
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .ToArray()))
+                .ToArray();
+            var contractSummary = ImageContractPresentationBuilder.Summarize(metadata.ImageInputContracts);
+            var lifecycleNote = ImageContractPresentationBuilder.RequiresAiDisclosure(
+                metadata.Lifecycle,
+                metadata.ImageInputContracts)
+                ? string.Join(" ", new[]
+                {
+                    $"生命周期={metadata.Lifecycle}。{metadata.LifecycleNote}".Trim(),
+                    contractSummary.ContractCount > 0 ? contractSummary.EvidenceSummary : string.Empty
+                }.Where(item => !string.IsNullOrWhiteSpace(item)))
+                : string.Empty;
 
-        // 深度学习
-        _operators.Add(new PromptOperatorInfo(OperatorType.DeepLearning, "深度学习检测", "YOLO 目标检测", "Image", "DetectionList", new[] {
-            new PromptParamInfo("ModelPath", "string", "模型文件路径", true),
-            new PromptParamInfo("Confidence", "float", "置信度阈值(0-1)", true, "0.5", "0.0", "1.0")
-        }));
-
-        // 几何测量
-        _operators.Add(new PromptOperatorInfo(OperatorType.CircleMeasurement, "圆测量", "霍夫圆检测", "Image", "CircleData"));
-        _operators.Add(new PromptOperatorInfo(OperatorType.LineMeasurement, "直线测量", "霍夫直线检测", "Image", "LineData"));
-
-        // 数据操作（Sprint 1-2）
-        _operators.Add(new PromptOperatorInfo(OperatorType.ForEach, "循环处理", "对集合中的每个元素执行子图", "List", "Result", new[] {
-            new PromptParamInfo("IoMode", "enum", "执行模式", true, "Parallel", options: new[] { "Parallel", "Sequential" }),
-            new PromptParamInfo("MaxParallelism", "int", "最大并行度", false, "8", "1", "64")
-        }, specialNotes: "IoMode=Parallel 用于纯计算，IoMode=Sequential 用于含通信的子图"));
-
-        _operators.Add(new PromptOperatorInfo(OperatorType.ArrayIndexer, "数组索引", "从列表中提取单个元素", "List", "Any"));
-        _operators.Add(new PromptOperatorInfo(OperatorType.JsonExtractor, "JSON提取", "从 JSON 中提取字段", "String", "Any"));
-
-        // 数值与逻辑（Sprint 3）
-        _operators.Add(new PromptOperatorInfo(OperatorType.MathOperation, "数学运算", "加减乘除等运算", "Float", "Float", new[] {
-            new PromptParamInfo("Operation", "enum", "运算类型", true, "Add", options: new[] { "Add", "Subtract", "Multiply", "Divide", "Abs", "Min", "Max", "Power", "Sqrt", "Round", "Modulo" })
-        }));
-
-        _operators.Add(new PromptOperatorInfo(OperatorType.LogicGate, "逻辑门", "AND/OR/NOT/XOR 等", "Boolean", "Boolean", new[] {
-            new PromptParamInfo("Operation", "enum", "逻辑操作", true, "AND", options: new[] { "AND", "OR", "NOT", "XOR", "NAND", "NOR" })
-        }));
-
-        _operators.Add(new PromptOperatorInfo(OperatorType.TypeConvert, "类型转换", "类型转换", "Any", "Any"));
-
-        // 通信（Sprint 3）
-        _operators.Add(new PromptOperatorInfo(OperatorType.HttpRequest, "HTTP请求", "调用 REST API", "Any", "String", new[] {
-            new PromptParamInfo("Url", "string", "请求地址", true),
-            new PromptParamInfo("Method", "enum", "请求方法", true, "POST", options: new[] { "GET", "POST", "PUT", "DELETE", "PATCH" })
-        }, specialNotes: "通信算子上游必须有 ConditionalBranch 或 ResultJudgment 保护"));
-
-        _operators.Add(new PromptOperatorInfo(OperatorType.MqttPublish, "MQTT发布", "发布 MQTT 消息", "Any", "Boolean", new[] {
-            new PromptParamInfo("Broker", "string", "Broker 地址", true),
-            new PromptParamInfo("Topic", "string", "主题", true)
-        }, specialNotes: "通信算子上游必须有 ConditionalBranch 或 ResultJudgment 保护"));
-
-        // 工业通信
-        _operators.Add(new PromptOperatorInfo(OperatorType.ModbusCommunication, "Modbus通信", "Modbus TCP 通信", "Any", "Any"));
-        _operators.Add(new PromptOperatorInfo(OperatorType.SiemensS7Communication, "西门子S7", "S7 协议通信", "Any", "Any"));
-
-        // 流程控制
-        _operators.Add(new PromptOperatorInfo(OperatorType.ConditionalBranch, "条件分支", "根据条件走不同分支", "Any", "Any", specialNotes: "必须提供 True 和 False 两个分支的输出"));
-        _operators.Add(new PromptOperatorInfo(OperatorType.ResultJudgment, "结果判定", "判定检测结果", "Any", "Boolean"));
-    }
-
-    private void NormalizeDataOperatorContracts()
-    {
-        _operators.RemoveAll(op =>
-            op.Type == OperatorType.ArrayIndexer ||
-            op.Type == OperatorType.JsonExtractor ||
-            op.Type == OperatorType.MathOperation);
-
-        _operators.Add(new PromptOperatorInfo(
-            OperatorType.ArrayIndexer,
-            "数组索引",
-            "从列表中按索引或条件提取单个元素",
-            "List",
-            "Any",
-            new[]
-            {
-                new PromptParamInfo("Mode", "enum", "提取模式", true, "Index", options: new[] { "Index", "MaxConfidence", "MaxArea", "MinArea", "First", "Last" }),
-                new PromptParamInfo("Index", "int", "索引", false, "0", "0"),
-                new PromptParamInfo("LabelFilter", "string", "标签过滤", false, string.Empty)
-            }));
-
-        _operators.Add(new PromptOperatorInfo(
-            OperatorType.JsonExtractor,
-            "JSON提取",
-            "从 JSON 中按 JSONPath 提取字段",
-            "Json",
-            "Any",
-            new[]
-            {
-                new PromptParamInfo("JsonPath", "string", "JSONPath", true, "$.data"),
-                new PromptParamInfo("OutputType", "string", "输出类型", false, "Any", options: new[] { "Any", "String", "Float", "Double", "Integer", "Int", "Boolean", "Bool" }),
-                new PromptParamInfo("DefaultValue", "string", "默认值", false, string.Empty),
-                new PromptParamInfo("Required", "bool", "是否必需", false, "false")
-            }));
-
-        _operators.Add(new PromptOperatorInfo(
-            OperatorType.MathOperation,
-            "数学运算",
-            "加减乘除等运算",
-            "ValueA",
-            "Float",
-            new[]
-            {
-                new PromptParamInfo("Operation", "enum", "运算类型", true, "Add", options: new[] { "Add", "Subtract", "Multiply", "Divide", "Abs", "Min", "Max", "Power", "Sqrt", "Round", "Modulo" })
-            }));
+            _operators.Add(new PromptOperatorInfo(
+                metadata.Type,
+                metadata.DisplayName,
+                metadata.Description,
+                string.Join(", ", metadata.InputPorts.Select(port => $"{port.Name}:{port.DataType}")),
+                string.Join(", ", metadata.OutputPorts.Select(port => $"{port.Name}:{port.DataType}")),
+                parameters,
+                lifecycleNote,
+                metadata.Category));
+        }
     }
 
     /// <summary>
@@ -282,7 +227,7 @@ public class AIPromptBuilder
   ""operators"": [
     { ""id"": ""op1"", ""name"": ""图像采集"", ""type"": ""ImageAcquisition"", ""outputPorts"": [{ ""id"": ""p1"", ""name"": ""Image"", ""dataType"": ""Image"" }] },
     { ""id"": ""op2"", ""name"": ""YOLO检测"", ""type"": ""DeepLearning"", ""parameters"": [{ ""name"": ""ModelPath"", ""value"": ""models/defect.onnx"" }, { ""name"": ""Confidence"", ""value"": ""0.5"" }], ""inputPorts"": [{ ""id"": ""p2"", ""name"": ""Image"" }], ""outputPorts"": [{ ""id"": ""p3"", ""name"": ""DetectionList"" }] },
-    { ""id"": ""op3"", ""name"": ""循环处理"", ""type"": ""ForEach"", ""parameters"": [{ ""name"": ""IoMode"", ""value"": ""Sequential"" }], ""inputPorts"": [{ ""id"": ""p4"", ""name"": ""Items"" }] }
+    { ""id"": ""op3"", ""name"": ""ForEach 循环"", ""type"": ""ForEach"", ""parameters"": [{ ""name"": ""IoMode"", ""value"": ""Sequential"" }], ""inputPorts"": [{ ""id"": ""p4"", ""name"": ""Items"" }] }
   ],
   ""connections"": [
     { ""sourceOperatorId"": ""op1"", ""sourcePortId"": ""p1"", ""targetOperatorId"": ""op2"", ""targetPortId"": ""p2"" },
@@ -350,7 +295,7 @@ public class PromptOperatorInfo
     public string OutputType { get; }
     public List<PromptParamInfo> Parameters { get; }
     public string SpecialNotes { get; }
-    public string Category => GetCategory(Type);
+    public string Category { get; }
 
     public PromptOperatorInfo(
         OperatorType type,
@@ -359,7 +304,8 @@ public class PromptOperatorInfo
         string inputType = "",
         string outputType = "",
         PromptParamInfo[]? parameters = null,
-        string specialNotes = "")
+        string specialNotes = "",
+        string category = "其他")
     {
         Type = type;
         Name = name;
@@ -368,21 +314,7 @@ public class PromptOperatorInfo
         OutputType = outputType;
         Parameters = parameters?.ToList() ?? new List<PromptParamInfo>();
         SpecialNotes = specialNotes;
-    }
-
-    private string GetCategory(OperatorType type)
-    {
-        return type switch
-        {
-            OperatorType.ImageAcquisition or OperatorType.GaussianBlur or OperatorType.Thresholding or OperatorType.EdgeDetection => "图像处理",
-            OperatorType.DeepLearning => "深度学习",
-            OperatorType.CircleMeasurement or OperatorType.LineMeasurement => "几何测量",
-            OperatorType.ForEach or OperatorType.ArrayIndexer or OperatorType.JsonExtractor => "数据操作",
-            OperatorType.MathOperation or OperatorType.LogicGate or OperatorType.TypeConvert => "数值逻辑",
-            OperatorType.HttpRequest or OperatorType.MqttPublish or OperatorType.ModbusCommunication or OperatorType.SiemensS7Communication => "通信",
-            OperatorType.ConditionalBranch or OperatorType.ResultJudgment => "流程控制",
-            _ => "其他"
-        };
+        Category = category;
     }
 }
 

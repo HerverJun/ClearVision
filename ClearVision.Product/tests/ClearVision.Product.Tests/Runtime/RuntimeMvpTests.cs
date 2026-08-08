@@ -20,6 +20,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.Runtime;
 
+[TestClassification(TestDomain.Runtime, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "runtime")]
 public class RuntimeMvpTests
 {
     private static readonly TimeSpan RuntimeHostAsyncSignalTimeout = TimeSpan.FromMinutes(5);

@@ -8,15 +8,17 @@ import {
   clampScrollState,
   createFlyoutViewModel,
   createOperatorPayload,
-  filterOperatorsForFlyout
+  filterOperatorsForFlyout,
+  OperatorPaletteShell
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/operatorPaletteShell.js';
+import { getOperatorTypeDisplayName } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/operatorDisplayNames.js';
 
 const operators = [
   {
     type: 'Thresholding',
-    displayName: '阈值分割',
+    displayName: '全局阈值处理',
     category: '预处理',
-    description: '按灰度阈值生成二值图',
+    description: '执行全局阈值处理',
     inputPorts: [{ name: 'Image', dataType: 'Image' }],
     outputPorts: [{ name: 'Mask', dataType: 'Image' }],
     parameters: [{ name: 'Threshold', displayName: '阈值', dataType: 'int' }]
@@ -68,7 +70,7 @@ test('OperatorPaletteShell groups operators by category for the rail', () => {
     ['预处理', 2]
   ]);
   assert.equal(groups[2].operators[0].displayName, '高斯滤波');
-  assert.equal(groups[2].operators[1].displayName, '阈值分割');
+  assert.equal(groups[2].operators[1].displayName, '全局阈值处理');
 });
 
 test('OperatorPaletteShell search keeps name, type, description, port, parameter and keyword matches', () => {
@@ -118,21 +120,180 @@ test('OperatorPaletteShell keeps corrected operators searchable by legacy displa
       type: 'RoiTransform',
       displayName: 'ROI位姿变换',
       keywords: ['ROI跟踪']
+    },
+    {
+      type: 'PositionCorrection',
+      displayName: 'ROI位姿补偿（像素）',
+      keywords: ['位置修正']
+    },
+    {
+      type: 'PointCorrection',
+      displayName: '点位刚性补偿',
+      keywords: ['点位修正']
+    },
+    {
+      type: 'EdgePairDefect',
+      displayName: '边缘间距缺陷检测',
+      keywords: ['边缘对缺陷']
+    },
+    {
+      type: 'StatisticalOutlierRemoval',
+      displayName: '点云统计离群点去除（SOR）',
+      keywords: ['统计滤波']
+    },
+    {
+      type: 'PPFMatch',
+      displayName: 'PPF点云粗匹配',
+      keywords: ['PPF表面匹配']
+    },
+    {
+      type: 'PlanarMatching',
+      displayName: '平面特征匹配',
+      keywords: ['透视匹配', 'Planar Matching']
+    },
+    {
+      type: 'ColorDetection',
+      displayName: '颜色分析',
+      keywords: ['颜色检测']
+    },
+    {
+      type: 'GeometricTolerance',
+      displayName: '二维几何公差判定',
+      keywords: ['几何公差']
+    },
+    {
+      type: 'DetectionSequenceJudge',
+      displayName: '检测顺序判定',
+      keywords: ['线序判定', '序列判定']
+    },
+    {
+      type: 'ImageDiff',
+      displayName: '图像差异率分析',
+      keywords: ['图像对比']
+    },
+    {
+      type: 'RectangleRegion',
+      displayName: '矩形框定义',
+      keywords: ['矩形区域']
+    },
+    {
+      type: 'CoordinateTransform',
+      displayName: '像素到物理坐标（单点）',
+      keywords: ['坐标转换', 'Coordinate Transform']
+    },
+    {
+      type: 'RoiManager',
+      displayName: 'ROI裁剪与掩膜',
+      keywords: ['ROI管理器']
+    },
+    {
+      type: 'TryCatch',
+      displayName: 'Try分支透传',
+      keywords: ['异常捕获']
+    },
+    {
+      type: 'ModbusCommunication',
+      displayName: 'Modbus TCP通信',
+      keywords: ['Modbus通信']
+    },
+    {
+      type: 'Thresholding',
+      displayName: '全局阈值处理',
+      keywords: ['二值化']
+    },
+    {
+      type: 'FFT1D',
+      displayName: '信号/图像傅里叶变换（FFT）',
+      keywords: ['一维FFT']
+    },
+    {
+      type: 'InverseFFT1D',
+      displayName: '信号/图像逆傅里叶变换（IFFT）',
+      keywords: ['一维逆FFT']
+    },
+    {
+      type: 'PhaseClosure',
+      displayName: '相位解缠绕',
+      keywords: ['Phase Closure', '相位闭合']
     }
   ];
 
-  assert.deepEqual(
-    filterOperatorsForFlyout(renamedOperators, '连通域标注').map(operator => operator.type),
-    ['BlobLabeling']
-  );
-  assert.deepEqual(
-    filterOperatorsForFlyout(renamedOperators, '点位对齐').map(operator => operator.type),
-    ['PointAlignment']
-  );
-  assert.deepEqual(
-    filterOperatorsForFlyout(renamedOperators, 'ROI跟踪').map(operator => operator.type),
-    ['RoiTransform']
-  );
+  const expectations = [
+    ['连通域标注', 'BlobLabeling'],
+    ['点位对齐', 'PointAlignment'],
+    ['ROI跟踪', 'RoiTransform'],
+    ['位置修正', 'PositionCorrection'],
+    ['点位修正', 'PointCorrection'],
+    ['边缘对缺陷', 'EdgePairDefect'],
+    ['统计滤波', 'StatisticalOutlierRemoval'],
+    ['PPF表面匹配', 'PPFMatch'],
+    ['透视匹配', 'PlanarMatching'],
+    ['Planar Matching', 'PlanarMatching'],
+    ['颜色检测', 'ColorDetection'],
+    ['几何公差', 'GeometricTolerance'],
+    ['线序判定', 'DetectionSequenceJudge'],
+    ['序列判定', 'DetectionSequenceJudge'],
+    ['图像对比', 'ImageDiff'],
+    ['矩形区域', 'RectangleRegion'],
+    ['坐标转换', 'CoordinateTransform'],
+    ['Coordinate Transform', 'CoordinateTransform'],
+    ['ROI管理器', 'RoiManager'],
+    ['异常捕获', 'TryCatch'],
+    ['Modbus通信', 'ModbusCommunication'],
+    ['二值化', 'Thresholding'],
+    ['一维FFT', 'FFT1D'],
+    ['一维逆FFT', 'InverseFFT1D'],
+    ['Phase Closure', 'PhaseClosure'],
+    ['相位闭合', 'PhaseClosure']
+  ];
+
+  for (const [legacyName, expectedType] of expectations) {
+    assert.deepEqual(
+      filterOperatorsForFlyout(renamedOperators, legacyName).map(operator => operator.type),
+      [expectedType]
+    );
+  }
+});
+
+test('Shared operator labels stay aligned with corrected runtime display names', () => {
+  const expectedNames = {
+    BlobLabeling: 'Blob分类标注',
+    PointAlignment: '点位偏差计算',
+    RoiTransform: 'ROI位姿变换',
+    PositionCorrection: 'ROI位姿补偿（像素）',
+    PointCorrection: '点位刚性补偿',
+    EdgePairDefect: '边缘间距缺陷检测',
+    StatisticalOutlierRemoval: '点云统计离群点去除（SOR）',
+    PPFMatch: 'PPF点云粗匹配',
+    PlanarMatching: '平面特征匹配',
+    ColorDetection: '颜色分析',
+    GeometricTolerance: '二维几何公差判定',
+    DetectionSequenceJudge: '检测顺序判定',
+    ImageDiff: '图像差异率分析',
+    RectangleRegion: '矩形框定义',
+    CoordinateTransform: '像素到物理坐标（单点）',
+    ROIManager: 'ROI裁剪与掩膜',
+    RoiManager: 'ROI裁剪与掩膜',
+    TryCatch: 'Try分支透传',
+    ModbusCommunication: 'Modbus TCP通信',
+    Threshold: '全局阈值处理',
+    Thresholding: '全局阈值处理',
+    FFT1D: '信号/图像傅里叶变换（FFT）',
+    InverseFFT1D: '信号/图像逆傅里叶变换（IFFT）',
+    PhaseClosure: '相位解缠绕',
+    DeepLearning: '深度学习',
+    GeoMeasurement: '几何测量',
+    Measurement: '测量',
+    TcpCommunication: 'TCP通信',
+    ImageAdd: '图像加法',
+    ImageCompose: '图像组合',
+    BlobAnalysis: 'Blob分析',
+    Filtering: '滤波'
+  };
+
+  for (const [operatorType, displayName] of Object.entries(expectedNames)) {
+    assert.equal(getOperatorTypeDisplayName(operatorType), displayName, operatorType);
+  }
 });
 
 test('OperatorPaletteShell exposes a global search rail entry before categories', () => {
@@ -206,4 +367,53 @@ test('OperatorPaletteShell drag payload keeps operator metadata from global sear
   assert.equal(payload.type, 'CircleMeasurement');
   assert.deepEqual(payload.inputPorts, [{ name: 'Region', displayName: '区域', dataType: 'Region' }]);
   assert.deepEqual(payload.parameters, operators[3].parameters);
+});
+
+test('OperatorPaletteShell renders lifecycle badges for Experimental and Reference operators', () => {
+  const shell = Object.create(OperatorPaletteShell.prototype);
+  const experimental = shell.renderOperatorItem({
+    type: 'ColorDetection',
+    displayName: '颜色分析',
+    lifecycle: 'Experimental',
+    lifecycleNote: '实验能力边界'
+  }, 0);
+  const reference = shell.renderOperatorItem({
+    type: 'SubpixelEdgeDetection',
+    displayName: '亚像素边缘',
+    lifecycle: 'Reference',
+    lifecycleNote: '参考实现边界'
+  }, 1);
+  const stable = shell.renderOperatorItem({
+    type: 'Thresholding',
+    displayName: '全局阈值处理',
+    lifecycle: 'Stable'
+  }, 2);
+
+  assert.match(experimental, /operator-lifecycle-experimental/);
+  assert.match(experimental, />实验<\/span>/);
+  assert.match(experimental, /实验能力边界/);
+  assert.match(reference, /operator-lifecycle-reference/);
+  assert.match(reference, />参考<\/span>/);
+  assert.match(reference, /参考实现边界/);
+  assert.doesNotMatch(stable, /operator-lifecycle-badge/);
+});
+
+test('OperatorPaletteShell compatibility checkbox updates the shared library filter', () => {
+  const shell = Object.create(OperatorPaletteShell.prototype);
+  let includeCompatibility = null;
+  shell.libraryPanel = {
+    setIncludeCompatibility(value) {
+      includeCompatibility = value;
+      return Promise.resolve();
+    }
+  };
+
+  shell.handleFlyoutInput({
+    target: {
+      checked: true,
+      dataset: { paletteCompatibility: 'true' }
+    }
+  });
+
+  assert.equal(includeCompatibility, true);
 });

@@ -938,6 +938,10 @@ test('PropertyPanelCapabilityOwner filters dependency-disabled values from full 
     currentOperator: {
       id: 'template-1',
       type: 'TemplateMatching',
+      parameterConstraints: [
+        { parameter: 'TemplatePath', mutuallyExclusiveGroup: 'template-source' },
+        { parameter: 'TemplateId', mutuallyExclusiveGroup: 'template-source' }
+      ],
       parameters: [
         { name: 'TemplatePath', value: '', dataType: 'string' },
         { name: 'TemplateId', value: 'tpl-01', dataType: 'string' }
@@ -1004,7 +1008,7 @@ test('PropertyPanelCapabilityOwner skips full apply when dependency filtering le
       type: 'DeepLearning',
       parameterConstraints: canonicalConstraintsFor('DeepLearning'),
       parameters: [
-        { name: 'UseGpu', value: false, dataType: 'bool' },
+        { name: 'ExecutionProvider', value: 'CPU', dataType: 'enum' },
         { name: 'GpuDeviceId', value: '', dataType: 'string' }
       ]
     },
@@ -2173,6 +2177,69 @@ test('PropertyPanelCapabilityOwner keeps migrated file and camera controls', () 
   assert.match(ownerSource, /normalizeParameterName\(parameterName\) === 'filepath'/);
   assert.match(ownerSource, /this\.propertyAdapter\.writeParameters\(this\.currentNodeId, writeValues\)/);
   assert.match(ownerSource, /this\.propertyAdapter\.upsertCaliperSearchRegion\?\.\(this\.currentNodeId, writeValues\)/);
+});
+
+test('PropertyPanelCapabilityOwner renders Experimental and Reference lifecycle badges', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  const cleanupDocument = installFakeDocument();
+
+  try {
+    const experimental = owner.renderLifecycleBadge({
+      lifecycle: 'Experimental',
+      lifecycleNote: '实验能力边界'
+    });
+    const reference = owner.renderLifecycleBadge({
+      lifecycle: 'Reference',
+      lifecycleNote: '参考实现边界'
+    });
+
+    assert.match(experimental, /operator-lifecycle-experimental/);
+    assert.match(experimental, />实验<\/span>/);
+    assert.match(experimental, /实验能力边界/);
+    assert.match(reference, /operator-lifecycle-reference/);
+    assert.match(reference, />参考<\/span>/);
+    assert.match(reference, /参考实现边界/);
+    assert.equal(owner.renderLifecycleBadge({ lifecycle: 'Stable' }), '');
+  } finally {
+    cleanupDocument();
+  }
+});
+
+test('PropertyPanelCapabilityOwner renders the lifecycle boundary note in the property panel', async () => {
+  const PropertyPanelCapabilityOwner = await loadPropertyPanelCapabilityOwner();
+  const owner = Object.create(PropertyPanelCapabilityOwner.prototype);
+  const cleanupDocument = installFakeDocument();
+  owner.disposed = false;
+  owner.currentConnection = null;
+  owner.currentOperator = {
+    title: '亚像素边缘',
+    type: 'SubpixelEdgeDetection',
+    lifecycle: 'Reference',
+    lifecycleNote: '参考实现，仅用于能力对照。',
+    parameters: []
+  };
+  owner.container = { innerHTML: '' };
+  owner.statusMessage = '';
+  owner.teardownGeometryEditor = () => {};
+  owner.getGeometryConfig = () => null;
+  owner.renderOutputAvailabilitySummary = () => '';
+  owner.renderGeometrySection = () => '';
+  owner.renderValidationErrors = () => {};
+  owner.syncParameterDependencyControls = () => {};
+  owner.loadCameraBindingsForSelects = () => Promise.resolve();
+  owner.updateStatus = () => {};
+  owner.initGeometryEditor = () => {};
+
+  try {
+    owner.render();
+
+    assert.match(owner.container.innerHTML, /operator-lifecycle-reference/);
+    assert.match(owner.container.innerHTML, /operator-lifecycle-note/);
+    assert.match(owner.container.innerHTML, /参考实现，仅用于能力对照。/);
+  } finally {
+    cleanupDocument();
+  }
 });
 
 test('all backend operator parameter types are covered by migrated Inspector controls', () => {

@@ -71,9 +71,9 @@ public class PromptBuilder
         1. Defect detection:
            ImageAcquisition -> Filtering -> Thresholding -> BlobAnalysis -> ResultJudgment -> ResultOutput
         2. AI detection:
-           ImageAcquisition -> ImageResize -> DeepLearning(OutputFormat=EndToEndNms) -> optional BoxFilter -> ResultJudgment -> ResultOutput
+           ImageAcquisition -> ImageResize -> DeepLearning(TaskType=ObjectDetection, OutputFormat=EndToEndNms) -> optional BoxFilter -> ResultJudgment -> ResultOutput
         3. Measurement:
-           ImageAcquisition -> Filtering -> EdgeDetection -> CircleMeasurement/LineMeasurement -> CoordinateTransform -> ResultOutput
+           ImageAcquisition -> Filtering -> feature extraction -> Measurement(choose PointToPoint/PointToLine/LineToLine/ThreePointAngle) -> UnitConvert/ResultOutput
         4. OCR or barcode:
            ImageAcquisition -> CodeRecognition/OcrRecognition -> ConditionalBranch -> DatabaseWrite/PLC output -> ResultOutput
         5. PLC decision:
@@ -82,6 +82,10 @@ public class PromptBuilder
            include ResultOutput or DatabaseWrite when the request mentions traceability, reporting, or production records.
         7. Traditional template matching:
            ImageAcquisition(current image) + ImageAcquisition(reference template) -> TemplateMatching -> ResultJudgment -> ResultOutput
+        8. AI classification:
+           ImageAcquisition -> DeepLearning(TaskType=ImageClassification) -> ResultJudgment -> ResultOutput
+        9. AI semantic segmentation:
+           ImageAcquisition -> DeepLearning(TaskType=SemanticSegmentation) -> region/statistics/judgment -> ResultOutput
 
         ## Practical defaults
         - Start with ImageAcquisition unless the user explicitly says the image already exists in the flow.
@@ -205,6 +209,8 @@ public class PromptBuilder
         5. Every operator except pure source/resource loaders should be connected to the flow. Avoid isolated nodes.
         6. Prefer safe defaults and explain assumptions briefly in explanation.
         7. When asked to use Chinese text, localize only user-visible displayName, explanation, and notes. Never translate operatorType, port names, parameter names, or runtime JSON keys.
+        8. Prefer operators with default_ai_recommendation=true. Never choose Legacy or Deprecated operators for a new flow. Use Reference only when no Stable/Experimental alternative fits, and disclose its lifecycle boundary. Always disclose Experimental lifecycle notes.
+        9. Respect parameter_conditions and output_conditions for the selected mode; do not configure ignored parameters or connect outputs that are unavailable.
         """;
 
     private string GetParameterInferenceGuide() => """
@@ -220,12 +226,19 @@ public class PromptBuilder
         - Feed calibration consumers through CalibrationData when possible, and mark calibration bundle paths and coordinate-system choices for review.
 
         3. AI models
-        - For DeepLearning, include ModelPath, InputSize, Confidence, OutputFormat=EndToEndNms, and TargetClasses when known.
-        - Do not set EnableInternalNms=false unless the user explicitly says the ONNX model emits raw YOLO candidates for downstream platform-side NMS.
-        - Do not add BoxNms after DeepLearning when OutputFormat=EndToEndNms; the ONNX model owns candidate suppression/NMS.
+        - Always set DeepLearning.TaskType explicitly unless the model catalog type or ONNX output shape can reliably resolve Auto.
+        - For ObjectDetection, use InputSize, Confidence, OutputFormat, TargetClasses, and NMS parameters; prefer OutputFormat=EndToEndNms when the model owns NMS.
+        - For ImageClassification, use ClassificationInputSize, ClassificationScoreMode, TopK, and ClassNames when metadata/catalog labels are unavailable. Do not add detection thresholds or BoxNms.
+        - For SemanticSegmentation, use SegmentationInputSize, NumClasses, MaxClassMasks, and ClassNames. Do not require detection labels, Confidence, or NMS parameters.
+        - Do not set EnableInternalNms=false unless the user explicitly says an ObjectDetection ONNX model emits raw YOLO candidates for downstream platform-side NMS.
+        - Do not add BoxNms after ObjectDetection when OutputFormat=EndToEndNms; the ONNX model owns candidate suppression/NMS.
         - If any model resource is missing, list it in parametersNeedingReview.
 
-        4. Hardware and database output
+        4. Generalized operators
+        - Set Filtering.FilterMode to Gaussian, Mean, Median, or Bilateral and only configure parameters used by that mode.
+        - Set Measurement.MeasureType explicitly and connect the matching PointA/PointB/PointC or Line1/Line2 inputs; use legacy X1/Y1/X2/Y2 only for point-distance modes without point inputs.
+
+        5. Hardware and database output
         - Do not invent IP addresses, PLC station numbers, register addresses, credentials, or table names.
         - Use placeholder-safe defaults only when the operator requires a value, and mark them for review.
         """;
@@ -234,7 +247,12 @@ public class PromptBuilder
     {
         var allMetadata = _operatorFactory
             .GetAllMetadata()
-            .OrderBy(m => m.Type.ToString(), StringComparer.OrdinalIgnoreCase)
+            .Where(metadata => !metadata.DefaultHidden)
+            .OrderByDescending(metadata => ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                metadata.Lifecycle,
+                metadata.ImageInputContracts))
+            .ThenBy(metadata => OperatorCategoryCatalog.GetOrder(metadata.CategoryId))
+            .ThenBy(metadata => metadata.Type.ToString(), StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         OperatorKnowledgeSlice? slice = null;
@@ -244,7 +262,11 @@ public class PromptBuilder
             relevantMetadata = string.IsNullOrWhiteSpace(userDescription)
                 ? allMetadata
                 : GetRelevantOperators(userDescription)
-                    .OrderBy(meta => meta.Type.ToString(), StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(meta => ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                        meta.Lifecycle,
+                        meta.ImageInputContracts))
+                    .ThenBy(meta => OperatorCategoryCatalog.GetOrder(meta.CategoryId))
+                    .ThenBy(meta => meta.Type.ToString(), StringComparer.OrdinalIgnoreCase)
                     .ToList();
         }
         else
@@ -262,7 +284,11 @@ public class PromptBuilder
                 ? allMetadata
                 : allMetadata
                     .Where(meta => slice.PrioritizedOperatorTypes.Contains(meta.Type.ToString(), StringComparer.OrdinalIgnoreCase))
-                    .OrderBy(meta => meta.Type.ToString(), StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(meta => ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                        meta.Lifecycle,
+                        meta.ImageInputContracts))
+                    .ThenBy(meta => OperatorCategoryCatalog.GetOrder(meta.CategoryId))
+                    .ThenBy(meta => meta.Type.ToString(), StringComparer.OrdinalIgnoreCase)
                     .ToList();
         }
 
@@ -397,10 +423,22 @@ public class PromptBuilder
                 {
                     operatorType = card.OperatorType,
                     displayName = card.DisplayName,
+                    categoryId = card.CategoryId,
+                    categoryOrder = card.CategoryOrder,
                     category = card.Category,
+                    lifecycle = card.Lifecycle,
+                    lifecycleNote = card.LifecycleNote,
+                    defaultAiRecommendation = card.DefaultAiRecommendation,
+                    requiresLifecycleDisclosure = card.RequiresLifecycleDisclosure,
                     intentTags = card.IntentTags,
                     scenarioTags = card.ScenarioTags,
                     requiredResources = card.RequiredResources,
+                    resourceRequirements = card.ResourceRequirements,
+                    parameterConditions = card.ParameterConditions,
+                    outputConditions = card.OutputConditions,
+                    imageInputContracts = card.ImageInputContracts.Count > 0
+                        ? ImageContractPresentationBuilder.BuildModeIndex(card.ImageInputContracts)
+                        : ImageContractPresentationBuilder.BuildModeIndex(card.ImageInputContractPresentations),
                     typicalUpstream = card.TypicalUpstream,
                     typicalDownstream = card.TypicalDownstream,
                     antiPatterns = card.AntiPatterns,
@@ -430,7 +468,18 @@ public class PromptBuilder
             {
                 operator_id = m.Type.ToString(),
                 name = m.DisplayName,
-                category = m.Category
+                category_id = m.CategoryId.ToString(),
+                category_order = OperatorCategoryCatalog.GetOrder(m.CategoryId),
+                category = m.Category,
+                lifecycle = m.Lifecycle.ToString(),
+                lifecycle_note = m.LifecycleNote,
+                default_ai_recommendation = ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                    m.Lifecycle,
+                    m.ImageInputContracts),
+                requires_lifecycle_disclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
+                    m.Lifecycle,
+                    m.ImageInputContracts),
+                image_contract = ImageContractPresentationBuilder.Summarize(m.ImageInputContracts)
             });
 
             return JsonSerializer.Serialize(fallbackCatalog, _catalogJsonOptions);
@@ -440,8 +489,19 @@ public class PromptBuilder
         {
             operator_id = m.Type.ToString(),
             name = m.DisplayName,
+            category_id = m.CategoryId.ToString(),
+            category_order = OperatorCategoryCatalog.GetOrder(m.CategoryId),
             category = m.Category,
             description = m.Description,
+            lifecycle = m.Lifecycle.ToString(),
+            lifecycle_note = m.LifecycleNote,
+            default_hidden = m.DefaultHidden,
+            default_ai_recommendation = ImageContractPresentationBuilder.IsDefaultAiRecommendation(
+                m.Lifecycle,
+                m.ImageInputContracts),
+            requires_lifecycle_disclosure = ImageContractPresentationBuilder.RequiresAiDisclosure(
+                m.Lifecycle,
+                m.ImageInputContracts),
             keywords = m.Keywords ?? Array.Empty<string>(),
             inputs = m.InputPorts.Select(p => new
             {
@@ -467,7 +527,11 @@ public class PromptBuilder
                 min_value = p.MinValue?.ToString(),
                 max_value = p.MaxValue?.ToString(),
                 options = p.Options?.Select(o => new { label = o.Label, value = o.Value })
-            })
+            }),
+            parameter_conditions = m.ParameterConstraints,
+            output_conditions = m.OutputAvailabilityRules,
+            image_input_contracts = ImageContractPresentationBuilder.BuildModeIndex(m.ImageInputContracts),
+            generation_dependencies = m.GenerationDependencies
         });
 
         return JsonSerializer.Serialize(detailedCatalog, _catalogJsonOptions);
@@ -488,14 +552,15 @@ public class PromptBuilder
         {
             var categoryHints = keywords
                 .Select(GetCategoryHint)
-                .Where(hint => !string.IsNullOrWhiteSpace(hint))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(hint => hint.HasValue)
+                .Select(hint => hint!.Value)
+                .Distinct()
                 .ToList();
 
             if (categoryHints.Count > 0)
             {
                 matched.AddRange(allMetadata.Where(metadata =>
-                    categoryHints.Any(hint => ContainsIgnoreCase(metadata.Category, hint!))));
+                    categoryHints.Contains(metadata.CategoryId)));
             }
         }
 
@@ -571,48 +636,67 @@ public class PromptBuilder
         return source.Contains(keyword, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string? GetCategoryHint(string keyword)
+    private static OperatorCategoryId? GetCategoryHint(string keyword)
     {
         if (keyword.Contains("measure", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("distance", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("width", StringComparison.OrdinalIgnoreCase))
         {
-            return "measurement";
+            return OperatorCategoryId.Measurement;
         }
 
         if (keyword.Contains("defect", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("blob", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("ng", StringComparison.OrdinalIgnoreCase))
         {
-            return "defect";
+            return OperatorCategoryId.DefectDetection;
         }
 
         if (keyword.Contains("communication", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("plc", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("modbus", StringComparison.OrdinalIgnoreCase))
         {
-            return "communication";
+            return OperatorCategoryId.Communication;
         }
 
         if (keyword.Contains("ocr", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("barcode", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("recognition", StringComparison.OrdinalIgnoreCase))
         {
-            return "ocr";
+            return OperatorCategoryId.FeatureExtraction;
         }
 
         if (keyword.Contains("calibration", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("undistort", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("coordinate", StringComparison.OrdinalIgnoreCase))
         {
-            return "calibration";
+            return OperatorCategoryId.CalibrationAndCoordinates;
         }
 
         if (keyword.Contains("template", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("match", StringComparison.OrdinalIgnoreCase) ||
             keyword.Contains("模板", StringComparison.OrdinalIgnoreCase))
         {
-            return "匹配";
+            return OperatorCategoryId.MatchingAndLocalization;
+        }
+
+        if (keyword.Contains("ai", StringComparison.OrdinalIgnoreCase) ||
+            keyword.Contains("onnx", StringComparison.OrdinalIgnoreCase) ||
+            keyword.Contains("inference", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperatorCategoryId.AiInference;
+        }
+
+        if (keyword.Contains("segment", StringComparison.OrdinalIgnoreCase) ||
+            keyword.Contains("region", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperatorCategoryId.SegmentationAndRegion;
+        }
+
+        if (keyword.Contains("pointcloud", StringComparison.OrdinalIgnoreCase) ||
+            keyword.Contains("3d", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperatorCategoryId.PointCloud3D;
         }
 
         return null;
@@ -726,7 +810,7 @@ public class PromptBuilder
           "explanation": "Capture an image, smooth noise, threshold bright regions, count blobs, judge OK/NG, and output the result. Blob area limits need site tuning.",
           "operators": [
             {"tempId": "op_1", "operatorType": "ImageAcquisition", "displayName": "Image Acquisition", "parameters": {"SourceType": "Camera", "TriggerMode": "Software"}},
-            {"tempId": "op_2", "operatorType": "Filtering", "displayName": "Noise Filter", "parameters": {"KernelSize": "5"}},
+            {"tempId": "op_2", "operatorType": "Filtering", "displayName": "Noise Filter", "parameters": {"FilterMode": "Gaussian", "KernelSize": "5"}},
             {"tempId": "op_3", "operatorType": "Thresholding", "displayName": "Bright Region Threshold", "parameters": {"UseOtsu": "true"}},
             {"tempId": "op_4", "operatorType": "BlobAnalysis", "displayName": "Defect Blob Analysis", "parameters": {"MinArea": "50", "MaxArea": "5000"}},
             {"tempId": "op_5", "operatorType": "ResultOutput", "displayName": "Result Output", "parameters": {"Format": "JSON", "SaveToFile": "false"}}
@@ -766,7 +850,7 @@ public class PromptBuilder
           "explanation": "Load calibration data, convert the pixel point into physical coordinates, and output the converted values. The calibration file path needs review.",
           "operators": [
             {"tempId": "op_1", "operatorType": "CalibrationLoader", "displayName": "Calibration Loader", "parameters": {"FilePath": "calibration_bundle_v2.json"}},
-            {"tempId": "op_2", "operatorType": "CoordinateTransform", "displayName": "Coordinate Transform", "parameters": {"PixelX": "120", "PixelY": "160"}},
+            {"tempId": "op_2", "operatorType": "CoordinateTransform", "displayName": "像素到物理坐标（单点）", "parameters": {"PixelX": "120", "PixelY": "160"}},
             {"tempId": "op_3", "operatorType": "ResultOutput", "displayName": "Result Output", "parameters": {"Format": "JSON", "SaveToFile": "false"}}
           ],
           "connections": [

@@ -8,7 +8,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 
 var repoRoot = ResolveRepoRoot(args);
 var overwrite = args.Any(arg => string.Equals(arg, "--overwrite", StringComparison.OrdinalIgnoreCase));
@@ -18,11 +20,14 @@ var operatorDocsRoot = Path.Combine(repoRoot, "docs", "算子资料");
 var docsRoot = Path.Combine(operatorDocsRoot, "算子名片");
 var legacyOperatorsRoot = Path.Combine(repoRoot, "docs", "operators");
 var legacyMirrorRoot = Path.Combine(repoRoot, "算子资料");
-var generatedAt = DateTimeOffset.Now;
 var qualityContext = BuildQualityContext(repoRoot, docsRoot);
 
 Directory.CreateDirectory(operatorDocsRoot);
 Directory.CreateDirectory(docsRoot);
+
+var runtimeMetadataByType = new OperatorFactory()
+    .GetAllMetadata()
+    .ToDictionary(metadata => metadata.Type);
 
 var candidates = typeof(OperatorBase).Assembly
     .GetTypes()
@@ -31,34 +36,43 @@ var candidates = typeof(OperatorBase).Assembly
     .Select(type => new
     {
         Type = type,
-        Meta = type.GetCustomAttribute<OperatorMetaAttribute>(inherit: false),
         Algo = type.GetCustomAttribute<AlgorithmInfoAttribute>(inherit: false),
-        Inputs = type.GetCustomAttributes<InputPortAttribute>(inherit: false).ToArray(),
-        Outputs = type.GetCustomAttributes<OutputPortAttribute>(inherit: false).ToArray(),
-        Parameters = type.GetCustomAttributes<OperatorParamAttribute>(inherit: false).ToArray()
+        OperatorType = ResolveOperatorType(type)
     })
-    .Where(x => x.Meta != null)
+    .Where(x => x.OperatorType != null)
     .Select(x => new OperatorDocModel(
         x.Type,
-        x.Meta!,
         x.Algo,
-        x.Inputs,
-        x.Outputs,
-        x.Parameters,
-        ResolveOperatorType(x.Type)))
-    .Where(x => x.OperatorType != null)
-    .OrderBy(x => x.OperatorType!.Value.ToString(), StringComparer.Ordinal)
+        x.OperatorType!.Value,
+        runtimeMetadataByType.TryGetValue(x.OperatorType.Value, out var metadata)
+            ? metadata
+            : throw new InvalidOperationException($"Runtime metadata missing for OperatorType.{x.OperatorType.Value}.")))
+    .OrderBy(x => OperatorCategoryCatalog.GetOrder(x.Metadata.CategoryId))
+    .ThenBy(x => x.OperatorType.ToString(), StringComparer.Ordinal)
     .ToList();
 
-var (generated, skipped) = GenerateOperatorDocuments(candidates, docsRoot, overwrite, onlyOperators, qualityContext);
 var operators = candidates
     .Select(item => ToCatalogOperator(item, qualityContext))
-    .OrderBy(item => item.Type)
+    .OrderBy(item => item.CategoryOrder)
+    .ThenBy(item => item.Id, StringComparer.Ordinal)
     .ToList();
+var catalogFingerprint = ComputeCatalogFingerprint(operators);
+var generatedAt = ResolveGeneratedAt(Path.Combine(docsRoot, "catalog.json"), catalogFingerprint);
+var operatorChangelogDates = ResolveOperatorChangelogDates(
+    Path.Combine(docsRoot, "version-history.json"),
+    operators,
+    generatedAt);
+var (generated, skipped) = GenerateOperatorDocuments(
+    candidates,
+    docsRoot,
+    overwrite,
+    onlyOperators,
+    qualityContext,
+    operatorChangelogDates);
 
-GenerateCatalogJson(operators, docsRoot, generatedAt);
+GenerateCatalogJson(operators, docsRoot, generatedAt, catalogFingerprint);
 GenerateCatalogMarkdown(operators, docsRoot, "./", generatedAt);
-var versionTracking = GenerateVersionTrackingArtifacts(candidates, operators, qualityContext, docsRoot, generatedAt);
+var versionTracking = GenerateVersionTrackingArtifacts(operators, docsRoot, generatedAt);
 SyncRootCatalogArtifacts(operators, docsRoot, operatorDocsRoot, generatedAt);
 SyncLegacyOperatorsArtifacts(operators, docsRoot, legacyOperatorsRoot, repoRoot, generatedAt);
 SyncLegacyMirrorArtifacts(operatorDocsRoot, docsRoot, legacyMirrorRoot);
@@ -89,7 +103,8 @@ static (int generated, int skipped) GenerateOperatorDocuments(
     string docsRoot,
     bool overwrite,
     IReadOnlySet<string> onlyOperators,
-    QualityContext qualityContext)
+    QualityContext qualityContext,
+    IReadOnlyDictionary<OperatorType, DateTimeOffset> operatorChangelogDates)
 {
     var generated = 0;
     var skipped = 0;
@@ -97,7 +112,7 @@ static (int generated, int skipped) GenerateOperatorDocuments(
     foreach (var item in candidates)
     {
         var fileName = $"{item.OperatorType}.md";
-        var operatorId = item.OperatorType!.Value.ToString();
+        var operatorId = item.OperatorType.ToString();
         if (onlyOperators.Count > 0 && !onlyOperators.Contains(operatorId))
         {
             skipped++;
@@ -111,7 +126,8 @@ static (int generated, int skipped) GenerateOperatorDocuments(
             continue;
         }
 
-        File.WriteAllText(filePath, BuildDocument(item, qualityContext), new UTF8Encoding(false));
+        var changelogDate = operatorChangelogDates[item.OperatorType];
+        File.WriteAllText(filePath, BuildDocument(item, qualityContext, changelogDate), new UTF8Encoding(false));
         generated++;
     }
 
@@ -146,15 +162,22 @@ static HashSet<string> ParseOnlyOperators(string[] args)
     return selected;
 }
 
-static void GenerateCatalogJson(IReadOnlyList<CatalogOperator> operators, string docsRoot, DateTimeOffset generatedAt)
+static void GenerateCatalogJson(
+    IReadOnlyList<CatalogOperator> operators,
+    string docsRoot,
+    DateTimeOffset generatedAt,
+    string generationFingerprint)
 {
     var categories = operators
-        .GroupBy(item => NormalizeCategory(item.Category))
-        .OrderBy(group => group.Key, StringComparer.Ordinal)
+        .GroupBy(item => new { item.CategoryId, item.CategoryOrder, item.Category })
+        .OrderBy(group => group.Key.CategoryOrder)
         .ToDictionary(
-            group => group.Key,
+            group => group.Key.Category,
             group => new CatalogCategorySummary
             {
+                CategoryId = group.Key.CategoryId,
+                DisplayName = group.Key.Category,
+                Order = group.Key.CategoryOrder,
                 Count = group.Count(),
                 Operators = group
                     .Select(op => op.Id)
@@ -166,6 +189,7 @@ static void GenerateCatalogJson(IReadOnlyList<CatalogOperator> operators, string
     var model = new CatalogDocument
     {
         GeneratedAt = generatedAt.ToString("o", CultureInfo.InvariantCulture),
+        GenerationFingerprint = generationFingerprint,
         TotalCount = operators.Count,
         Categories = categories,
         Operators = operators.ToList()
@@ -182,6 +206,90 @@ static void GenerateCatalogJson(IReadOnlyList<CatalogOperator> operators, string
     File.WriteAllText(Path.Combine(docsRoot, "catalog.json"), json + Environment.NewLine, new UTF8Encoding(false));
 }
 
+static string ComputeCatalogFingerprint(IReadOnlyList<CatalogOperator> operators)
+{
+    var canonical = JsonSerializer.Serialize(
+        operators
+            .OrderBy(item => item.CategoryOrder)
+            .ThenBy(item => item.Id, StringComparer.Ordinal)
+            .ToList(),
+        new JsonSerializerOptions
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        });
+
+    return ComputeSha256(canonical);
+}
+
+static DateTimeOffset ResolveGeneratedAt(string catalogPath, string generationFingerprint)
+{
+    if (File.Exists(catalogPath))
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(catalogPath));
+            var root = document.RootElement;
+            var previousFingerprint = root.TryGetProperty("generationFingerprint", out var fingerprintElement)
+                ? fingerprintElement.GetString()
+                : null;
+            var previousGeneratedAt = root.TryGetProperty("generatedAt", out var generatedAtElement)
+                ? generatedAtElement.GetString()
+                : null;
+
+            if (string.Equals(previousFingerprint, generationFingerprint, StringComparison.Ordinal) &&
+                DateTimeOffset.TryParse(
+                    previousGeneratedAt,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind,
+                    out var parsed))
+            {
+                return parsed;
+            }
+        }
+        catch (JsonException)
+        {
+            // Regenerate invalid or legacy catalogs using a fresh timestamp.
+        }
+    }
+
+    return DateTimeOffset.Now;
+}
+
+static IReadOnlyDictionary<OperatorType, DateTimeOffset> ResolveOperatorChangelogDates(
+    string historyPath,
+    IReadOnlyList<CatalogOperator> operators,
+    DateTimeOffset fallback)
+{
+    var historyById = LoadVersionHistory(historyPath).Operators
+        .Where(item => !string.IsNullOrWhiteSpace(item.Id))
+        .ToDictionary(item => item.Id, item => item, StringComparer.Ordinal);
+    var dates = new Dictionary<OperatorType, DateTimeOffset>();
+
+    foreach (var op in operators)
+    {
+        var recordedAt = historyById.TryGetValue(op.Id, out var entry)
+            ? entry.Records.FirstOrDefault(record =>
+                string.Equals(record.Version, op.Version, StringComparison.Ordinal) &&
+                string.Equals(record.SourceHash, op.GenerationFingerprint, StringComparison.Ordinal) &&
+                string.Equals(
+                    record.FingerprintVersion,
+                    OperatorGenerationFingerprintBuilder.SchemeVersion,
+                    StringComparison.Ordinal))?.RecordedAt
+            : null;
+        dates[Enum.Parse<OperatorType>(op.Id)] = DateTimeOffset.TryParse(
+            recordedAt,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out var parsed)
+            ? parsed
+            : fallback;
+    }
+
+    return dates;
+}
+
 static void GenerateCatalogMarkdown(IReadOnlyList<CatalogOperator> operators, string docsRoot, string docLinkPrefix, DateTimeOffset generatedAt)
 {
     var markdown = BuildCatalogMarkdown(operators, generatedAt, docLinkPrefix);
@@ -191,8 +299,8 @@ static void GenerateCatalogMarkdown(IReadOnlyList<CatalogOperator> operators, st
 static string BuildCatalogMarkdown(IReadOnlyList<CatalogOperator> operators, DateTimeOffset generatedAt, string docLinkPrefix)
 {
     var grouped = operators
-        .GroupBy(item => NormalizeCategory(item.Category))
-        .OrderBy(group => group.Key, StringComparer.Ordinal)
+        .GroupBy(item => new { item.CategoryId, item.CategoryOrder, item.Category })
+        .OrderBy(group => group.Key.CategoryOrder)
         .ToList();
 
     var normalizedPrefix = string.IsNullOrWhiteSpace(docLinkPrefix) ? "./" : docLinkPrefix.Trim();
@@ -208,12 +316,12 @@ static string BuildCatalogMarkdown(IReadOnlyList<CatalogOperator> operators, Dat
     sb.AppendLine($"> 算子总数 / Total Operators: **{operators.Count}**");
     sb.AppendLine();
     sb.AppendLine("## 分类统计 / Category Summary");
-    sb.AppendLine("| 分类 (Category) | 数量 (Count) | 占比 (Ratio) |");
-    sb.AppendLine("|------|------:|------:|");
+    sb.AppendLine("| 分类 ID | 分类 (Category) | 数量 (Count) | 占比 (Ratio) |");
+    sb.AppendLine("|------|------|------:|------:|");
     foreach (var categoryGroup in grouped)
     {
         var ratio = operators.Count == 0 ? 0 : categoryGroup.Count() * 100.0 / operators.Count;
-        sb.AppendLine($"| {EscapeCell(categoryGroup.Key)} | {categoryGroup.Count()} | {ratio.ToString("0.0", CultureInfo.InvariantCulture)}% |");
+        sb.AppendLine($"| `{categoryGroup.Key.CategoryId}` | {EscapeCell(categoryGroup.Key.Category)} | {categoryGroup.Count()} | {ratio.ToString("0.0", CultureInfo.InvariantCulture)}% |");
     }
 
     var averageQuality = operators.Count == 0
@@ -240,9 +348,9 @@ static string BuildCatalogMarkdown(IReadOnlyList<CatalogOperator> operators, Dat
     foreach (var categoryGroup in grouped)
     {
         sb.AppendLine();
-        sb.AppendLine($"### {categoryGroup.Key} ({categoryGroup.Count()})");
-        sb.AppendLine("| 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |");
-        sb.AppendLine("|------|------|------:|------:|------:|------|------|------|------|");
+        sb.AppendLine($"### {categoryGroup.Key.Category} / `{categoryGroup.Key.CategoryId}` ({categoryGroup.Count()})");
+        sb.AppendLine("| 枚举 (Enum) | 显示名 (DisplayName) | 生命周期 | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |");
+        sb.AppendLine("|------|------|------|------:|------:|------:|------|------|------|------|");
 
         foreach (var op in categoryGroup.OrderBy(item => item.Id, StringComparer.Ordinal))
         {
@@ -250,7 +358,7 @@ static string BuildCatalogMarkdown(IReadOnlyList<CatalogOperator> operators, Dat
             var linkPath = $"{normalizedPrefix}{op.Id}.md";
             var quality = $"{op.Quality.TotalScore} ({op.Quality.Level})";
             sb.AppendLine(
-                $"| `OperatorType.{op.Id}` | {EscapeCell(op.DisplayName)} | {op.InputPorts.Count} | {op.OutputPorts.Count} | {op.Parameters.Count} | {quality} | `{op.Version}` | {algorithm} | [{op.Id}]({linkPath}) |");
+                $"| `OperatorType.{op.Id}` | {EscapeCell(op.DisplayName)} | `{op.Lifecycle}` | {op.InputPorts.Count} | {op.OutputPorts.Count} | {op.Parameters.Count} | {quality} | `{op.Version}` | {algorithm} | [{op.Id}]({linkPath}) |");
         }
     }
 
@@ -424,9 +532,13 @@ static OperatorType? ResolveOperatorType(Type operatorType)
     return Enum.TryParse<OperatorType>(className, out var parsed) ? parsed : null;
 }
 
-static string BuildDocument(OperatorDocModel item, QualityContext qualityContext)
+static string BuildDocument(
+    OperatorDocModel item,
+    QualityContext qualityContext,
+    DateTimeOffset changelogDate)
 {
     var sb = new StringBuilder();
+    var metadata = item.Metadata;
     var className = item.ClrType.Name;
     var englishName = className.EndsWith("Operator", StringComparison.Ordinal)
         ? className[..^"Operator".Length]
@@ -434,17 +546,24 @@ static string BuildDocument(OperatorDocModel item, QualityContext qualityContext
     var category = OperatorCategoryCatalog.GetDisplayName(item.Meta.CategoryId);
     var facts = AnalyzeOperatorSource(item, qualityContext);
     var tags = BuildOperatorTags(item);
+    var generationFingerprint = ComputeOperatorGenerationFingerprint(item, qualityContext);
 
-    sb.AppendLine($"# {item.Meta.DisplayName} / {englishName}");
+    sb.AppendLine($"# {metadata.DisplayName} / {englishName}");
     sb.AppendLine();
     sb.AppendLine("## 基本信息 / Basic Info");
     sb.AppendLine("| 项目 (Field) | 值 (Value) |");
     sb.AppendLine("|------|------|");
     sb.AppendLine($"| 类名 (Class) | `{className}` |");
     sb.AppendLine($"| 枚举值 (Enum) | `OperatorType.{item.OperatorType}` |");
+    sb.AppendLine($"| 分类 ID (CategoryId) | `{metadata.CategoryId}` |");
     sb.AppendLine($"| 分类 (Category) | {EscapeCell(category)} |");
-    sb.AppendLine($"| 版本 (Version) | `{NormalizeSemVersion(item.Meta.Version)}` |");
-    sb.AppendLine("| 成熟度 (Maturity) | 稳定 Stable |");
+    sb.AppendLine($"| 分类顺序 (CategoryOrder) | {OperatorCategoryCatalog.GetOrder(metadata.CategoryId)} |");
+    sb.AppendLine($"| 版本 (Version) | `{NormalizeSemVersion(metadata.Version)}` |");
+    sb.AppendLine($"| 生命周期 (Lifecycle) | {GetLifecycleDisplayName(metadata.Lifecycle)} `{metadata.Lifecycle}` |");
+    sb.AppendLine($"| 生命周期说明 (Lifecycle Note) | {EscapeCell(Fallback(metadata.LifecycleNote, "-"))} |");
+    sb.AppendLine($"| 默认隐藏 (Default Hidden) | {BoolToMark(metadata.DefaultHidden)} |");
+    sb.AppendLine($"| AI 默认推荐 (Default AI Recommendation) | {BoolToMark(ImageContractPresentationBuilder.IsDefaultAiRecommendation(metadata.Lifecycle, metadata.ImageInputContracts))} |");
+    sb.AppendLine($"| AI 必须披露状态 (Requires Disclosure) | {BoolToMark(ImageContractPresentationBuilder.RequiresAiDisclosure(metadata.Lifecycle, metadata.ImageInputContracts))} |");
     sb.AppendLine($"| 标签 (Tags) | {EscapeCell(string.Join(", ", tags.Select(tag => $"`{tag}`")))} |");
 
     sb.AppendLine();
@@ -473,13 +592,13 @@ static string BuildDocument(OperatorDocModel item, QualityContext qualityContext
     sb.AppendLine("## 参数说明 / Parameters");
     sb.AppendLine("| 参数名 (Name) | 显示名 (DisplayName) | 类型 (Type) | 默认值 (Default) | 范围/选项 (Range/Options) | 必填 (Required) | 说明 (Description) |");
     sb.AppendLine("|--------|------|------|--------|------|------|------|");
-    if (item.Parameters.Length == 0)
+    if (metadata.Parameters.Count == 0)
     {
         sb.AppendLine("| - | - | - | - | - | - | - |");
     }
     else
     {
-        foreach (var parameter in item.Parameters)
+        foreach (var parameter in metadata.Parameters)
         {
             var range = BuildParameterRangeAndOptions(parameter);
             sb.AppendLine(
@@ -492,13 +611,13 @@ static string BuildDocument(OperatorDocModel item, QualityContext qualityContext
     sb.AppendLine("### 输入 / Inputs");
     sb.AppendLine("| 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 必填 (Required) | 说明 (Description) |");
     sb.AppendLine("|------|------|------|------|------|");
-    if (item.Inputs.Length == 0)
+    if (metadata.InputPorts.Count == 0)
     {
         sb.AppendLine("| - | - | - | - | - |");
     }
     else
     {
-        foreach (var input in item.Inputs)
+        foreach (var input in metadata.InputPorts)
         {
             sb.AppendLine(
                 $"| `{input.Name}` | {EscapeCell(input.DisplayName)} | `{input.DataType}` | {BoolToMark(input.IsRequired)} | {EscapeCell(BuildInputDescription(input))} |");
@@ -509,15 +628,111 @@ static string BuildDocument(OperatorDocModel item, QualityContext qualityContext
     sb.AppendLine("### 输出 / Outputs");
     sb.AppendLine("| 名称 (Name) | 显示名 (DisplayName) | 数据类型 (DataType) | 说明 (Description) |");
     sb.AppendLine("|------|------|------|------|");
-    if (item.Outputs.Length == 0)
+    if (metadata.OutputPorts.Count == 0)
     {
         sb.AppendLine("| - | - | - | - |");
     }
     else
     {
-        foreach (var output in item.Outputs)
+        foreach (var output in metadata.OutputPorts)
         {
             sb.AppendLine($"| `{output.Name}` | {EscapeCell(output.DisplayName)} | `{output.DataType}` | {EscapeCell(BuildOutputDescription(output))} |");
+        }
+    }
+
+    sb.AppendLine();
+    sb.AppendLine("## 模式与资源契约 / Mode & Resource Contracts");
+    sb.AppendLine("### 参数条件 / Parameter Conditions");
+    sb.AppendLine("| 参数 (Parameter) | 必填条件 (Required) | 可见条件 (Visible) | 启用/禁用条件 (Enabled/Disabled) | 忽略条件 (Ignored) | 资源 (Resource) | 输入可满足 (Satisfied By Inputs) | 原因码 (Reason) |");
+    sb.AppendLine("|------|------|------|------|------|------|------|------|");
+    if (metadata.ParameterConstraints.Count == 0)
+    {
+        sb.AppendLine("| - | - | - | - | - | - | - | - |");
+    }
+    else
+    {
+        foreach (var constraint in metadata.ParameterConstraints
+                     .OrderBy(item => item.Parameter, StringComparer.Ordinal)
+                     .ThenBy(item => item.ReasonCode, StringComparer.Ordinal))
+        {
+            var enabled = $"enabled: {DescribeConditionSet(constraint.EnabledWhen)}; disabled: {DescribeConditionSet(constraint.DisabledWhen)}";
+            sb.AppendLine(
+                $"| `{constraint.Parameter}` | {EscapeCell($"{constraint.RequiredPolicy}; {DescribeConditionSet(constraint.RequiredWhen)}")} | {EscapeCell($"visible: {DescribeConditionSet(constraint.VisibleWhen)}; hidden: {DescribeConditionSet(constraint.HiddenWhen)}")} | {EscapeCell(enabled)} | {EscapeCell(DescribeConditionSet(constraint.IgnoredWhen))} | {EscapeCell(Fallback(constraint.ResourceKind, "-"))} | {EscapeCell(constraint.SatisfiedByInputPorts is { Count: > 0 } ? string.Join(", ", constraint.SatisfiedByInputPorts) : "-")} | `{constraint.ReasonCode}` |");
+        }
+    }
+
+    if (metadata.ImageInputContracts.Count > 0)
+    {
+        sb.AppendLine();
+        sb.AppendLine("## 图像输入域合同 / Image Input Domain Contracts");
+        sb.AppendLine("| 输入端口 | 准入摘要 | 验证摘要 | 支持位深（摘要） | 原生位深（摘要） | 支持通道（摘要） | 输入策略 | 隐式转换 | 输出位深 | 动态范围 | 非有限值 | 默认失败码 | 版本 |");
+        sb.AppendLine("|------|------|------|------|------|------|------|------|------|------|------|------|------|");
+        foreach (var contract in metadata.ImageInputContracts.OrderBy(item => item.InputPort, StringComparer.Ordinal))
+        {
+            var presentation = contract.Presentation;
+            var admissionSummary = $"Allowed:{presentation.AllowedVariantCount}, " +
+                                   $"Rejected:{presentation.VerifiedRejectionVariantCount}, " +
+                                   $"Unknown:{presentation.UnknownVariantCount}";
+            var verificationSummary = presentation.EvidenceSummary;
+            sb.AppendLine(
+                $"| `{contract.InputPort}` | {EscapeCell(admissionSummary)} | {EscapeCell(verificationSummary)} | {EscapeCell(string.Join(", ", contract.SupportedDepths))} | {EscapeCell(string.Join(", ", contract.NativeDepths))} | {EscapeCell(string.Join(", ", contract.SupportedChannels))} | {EscapeCell(contract.InputDepthPolicy)} | {EscapeCell(contract.ImplicitConversionPolicy)} | {EscapeCell(contract.OutputDepthPolicy)} | {EscapeCell(contract.DynamicRangePolicy)} | {EscapeCell(contract.NonFinitePolicy)} | `{contract.FailureCode}` | `{contract.ContractVersion}` |");
+        }
+
+        var variants = metadata.ImageInputContracts
+            .SelectMany(contract => contract.Presentation.ExactVariantGroups
+                .Select(variant => (contract.InputPort, Variant: variant)))
+            .ToList();
+        sb.AppendLine();
+        sb.AppendLine("### 精确运行变体 / Exact Runtime Variants");
+        sb.AppendLine("| 输入端口 | 实际模式 | 精确输入类型（非笛卡尔积） | 条件 | 准入 | 验证 | 转换 | 输出 | 动态范围 | 输入值策略 | 失败码 | 证据 |");
+        sb.AppendLine("|------|------|------|------|------|------|------|------|------|------|------|------|");
+        if (variants.Count == 0)
+        {
+            sb.AppendLine("| - | - | - | - | - | - | - | - | - | - | - | - |");
+        }
+        else
+        {
+            foreach (var (inputPort, variant) in variants
+                         .OrderBy(item => item.InputPort, StringComparer.Ordinal)
+                         .ThenBy(item => item.Variant.Mode, StringComparer.Ordinal)
+                         .ThenBy(item => item.Variant.Condition, StringComparer.Ordinal))
+            {
+                sb.AppendLine(
+                    $"| `{inputPort}` | {EscapeCell(variant.Mode)} | {EscapeCell(string.Join(", ", variant.ExactInputTypes))} | {EscapeCell(variant.Condition)} | `{variant.Admission}` | `{variant.Verification}` | {EscapeCell(variant.ConversionPolicy)} | {EscapeCell(variant.OutputDepthPolicy)} | {EscapeCell(variant.DynamicRangePolicy)} | `{variant.InputValuePolicy}` | `{variant.FailureCode}` | `{variant.EvidenceLevel}` |");
+            }
+        }
+    }
+
+    sb.AppendLine();
+    sb.AppendLine("### 输出条件 / Output Conditions");
+    sb.AppendLine("| 输出 (Output) | 保证可用条件 (Available When) | 原因码 (Reason) |");
+    sb.AppendLine("|------|------|------|");
+    if (metadata.OutputAvailabilityRules.Count == 0)
+    {
+        sb.AppendLine("| - | - | - |");
+    }
+    else
+    {
+        foreach (var rule in metadata.OutputAvailabilityRules
+                     .OrderBy(item => item.Output, StringComparer.Ordinal)
+                     .ThenBy(item => item.ReasonCode, StringComparer.Ordinal))
+        {
+            sb.AppendLine($"| `{rule.Output}` | {EscapeCell(DescribeConditionSet(rule.AvailableWhen))} | `{rule.ReasonCode}` |");
+        }
+    }
+
+    sb.AppendLine();
+    sb.AppendLine("## 生成依赖 / Generation Dependencies");
+    sb.AppendLine($"- 组合指纹 (Generation Fingerprint)：`{generationFingerprint}`");
+    if (metadata.GenerationDependencies.Count == 0)
+    {
+        sb.AppendLine("- 显式共享依赖：无；指纹由最终运行时元数据与算子源码组成。");
+    }
+    else
+    {
+        foreach (var dependency in metadata.GenerationDependencies.OrderBy(item => item, StringComparer.Ordinal))
+        {
+            sb.AppendLine($"- `{dependency}`");
         }
     }
 
@@ -576,7 +791,7 @@ static string BuildDocument(OperatorDocModel item, QualityContext qualityContext
     sb.AppendLine("## 变更记录 / Changelog");
     sb.AppendLine("| 版本 (Version) | 日期 (Date) | 变更内容 (Changes) |");
     sb.AppendLine("|------|------|----------|");
-    sb.AppendLine($"| {NormalizeSemVersion(item.Meta.Version)} | {DateTime.UtcNow:yyyy-MM-dd} | 按当前 `OperatorMetadataScanner` 口径重刷参数、端口、运行时附加输出、算法说明和限制 / Regenerated from current source metadata |");
+    sb.AppendLine($"| {NormalizeSemVersion(metadata.Version)} | {changelogDate:yyyy-MM-dd} | 按当前最终运行时元数据、条件契约和显式依赖口径重生成 / Regenerated from effective runtime metadata and declared dependencies |");
 
     return sb.ToString();
 }
@@ -610,7 +825,7 @@ static OperatorSourceFacts AnalyzeOperatorSource(OperatorDocModel item, QualityC
 static List<string> BuildAlgorithmPrinciple(OperatorDocModel item, string category, OperatorSourceFacts facts)
 {
     var lines = new List<string>();
-    var description = Fallback(item.Meta.Description, $"{item.Meta.DisplayName} 算子执行当前声明的视觉/流程处理逻辑");
+    var description = Fallback(item.Metadata.Description, $"{item.Metadata.DisplayName} 算子执行当前声明的视觉/流程处理逻辑");
 
     var descriptionSentence = ContainsCjk(description)
         ? $"该算子用于{TrimSentence(description)}。"
@@ -649,8 +864,8 @@ static List<string> BuildAlgorithmPrinciple(OperatorDocModel item, string catego
 static List<string> BuildImplementationStrategy(OperatorDocModel item, OperatorSourceFacts facts)
 {
     var lines = new List<string>();
-    var requiredInputs = item.Inputs.Where(port => port.IsRequired).Select(port => $"`{port.Name}`").ToList();
-    var optionalInputs = item.Inputs.Where(port => !port.IsRequired).Select(port => $"`{port.Name}`").ToList();
+    var requiredInputs = item.Metadata.InputPorts.Where(port => port.IsRequired).Select(port => $"`{port.Name}`").ToList();
+    var optionalInputs = item.Metadata.InputPorts.Where(port => !port.IsRequired).Select(port => $"`{port.Name}`").ToList();
 
     if (requiredInputs.Count > 0)
     {
@@ -666,8 +881,8 @@ static List<string> BuildImplementationStrategy(OperatorDocModel item, OperatorS
         lines.Add($"- 可选输入用于覆盖或补充参数配置：{string.Join("、", optionalInputs)}。");
     }
 
-    lines.Add(item.Parameters.Length > 0
-        ? $"- 参数解析覆盖 {item.Parameters.Length} 个当前元数据字段，默认值、范围和枚举项以参数表为准。"
+    lines.Add(item.Metadata.Parameters.Count > 0
+        ? $"- 参数解析覆盖 {item.Metadata.Parameters.Count} 个当前元数据字段，默认值、范围和枚举项以参数表为准。"
         : "- 当前元数据未声明参数，执行逻辑主要由输入数据和源码默认策略决定。");
 
     if (facts.HasValidation)
@@ -774,9 +989,9 @@ static List<string> ExtractCoreApiCalls(string sourceText)
 static List<RuntimeOutputField> ExtractRuntimeAdditionalOutputs(OperatorDocModel item, string sourceText)
 {
     var fields = new Dictionary<string, RuntimeOutputField>(StringComparer.Ordinal);
-    var declared = item.Outputs.Select(port => port.Name).ToHashSet(StringComparer.Ordinal);
-    var inputs = item.Inputs.Select(port => port.Name).ToHashSet(StringComparer.Ordinal);
-    var parameters = item.Parameters.Select(parameter => parameter.Name).ToHashSet(StringComparer.Ordinal);
+    var declared = item.Metadata.OutputPorts.Select(port => port.Name).ToHashSet(StringComparer.Ordinal);
+    var inputs = item.Metadata.InputPorts.Select(port => port.Name).ToHashSet(StringComparer.Ordinal);
+    var parameters = item.Metadata.Parameters.Select(parameter => parameter.Name).ToHashSet(StringComparer.Ordinal);
 
     void Add(string? key, string reason)
     {
@@ -1009,34 +1224,47 @@ static string InferRuntimeOutputType(string key)
     return "Any";
 }
 
-static string BuildParameterRangeAndOptions(OperatorParamAttribute parameter)
+static string BuildParameterRangeAndOptions(ParameterDefinition parameter)
 {
     var parts = new List<string>();
-    var range = BuildRange(parameter.Min, parameter.Max);
+    var range = BuildRange(parameter.MinValue, parameter.MaxValue);
     if (range != "-")
     {
         parts.Add(range);
     }
 
-    if (parameter.Options is { Length: > 0 })
+    if (parameter.Options is { Count: > 0 })
     {
         parts.Add(string.Join("；", parameter.Options
-            .Where(option => !string.IsNullOrWhiteSpace(option))
-            .Select(option => option.Replace("|", "/", StringComparison.Ordinal))));
+            .Where(option => !string.IsNullOrWhiteSpace(option.Value))
+            .Select(option => !string.IsNullOrWhiteSpace(option.Label) &&
+                              !string.Equals(option.Value, option.Label, StringComparison.Ordinal)
+                ? $"{option.Value}/{option.Label}"
+                : option.Value)));
     }
 
     return parts.Count == 0 ? "-" : string.Join("；", parts);
 }
 
-static string BuildInputDescription(InputPortAttribute input)
+static string BuildInputDescription(PortDefinition input)
 {
+    if (!string.IsNullOrWhiteSpace(input.Description))
+    {
+        return input.Description;
+    }
+
     return input.IsRequired
         ? "必填输入，缺失时算子通常返回失败或无法产生有效结果。"
         : "可选输入；提供时会参与当前算子处理或覆盖部分参数配置。";
 }
 
-static string BuildOutputDescription(OutputPortAttribute output)
+static string BuildOutputDescription(PortDefinition output)
 {
+    if (!string.IsNullOrWhiteSpace(output.Description))
+    {
+        return output.Description;
+    }
+
     return output.DataType switch
     {
         PortDataType.Image => "图像输出，可供后续图像处理、显示或保存节点使用。",
@@ -1061,7 +1289,7 @@ static string InferTimeComplexity(OperatorDocModel item, OperatorSourceFacts fac
         return "主要受外部 I/O、网络或设备响应时间影响；本地处理通常随输入规模线性增长。";
     }
 
-    if (facts.UsesOpenCv || facts.UsesImageOutput || item.Inputs.Any(input => input.DataType == PortDataType.Image))
+    if (facts.UsesOpenCv || facts.UsesImageOutput || item.Metadata.InputPorts.Any(input => input.DataType == PortDataType.Image))
     {
         return "多数图像路径近似 `O(W*H)`；涉及轮廓、匹配或排序时会叠加候选数量相关开销。";
     }
@@ -1114,7 +1342,7 @@ static IEnumerable<string> BuildEvidenceAndFailureContracts(
     OperatorSourceFacts facts,
     QualityContext qualityContext)
 {
-    var operatorId = item.OperatorType!.Value.ToString();
+    var operatorId = item.OperatorType.ToString();
     var hasTests =
         qualityContext.TestIndex.Contains(item.ClrType.Name) ||
         qualityContext.TestIndex.Contains(operatorId);
@@ -1177,7 +1405,7 @@ static IEnumerable<string> BuildSuitableUseCases(OperatorDocModel item, string c
         return new[] { "需要对上游结果做判断、转换、聚合、计数、延时或流程路由的场景。" };
     }
 
-    if (facts.UsesOpenCv || item.Inputs.Any(input => input.DataType == PortDataType.Image))
+    if (facts.UsesOpenCv || item.Metadata.InputPorts.Any(input => input.DataType == PortDataType.Image))
     {
         return new[] { "输入图像质量稳定、参数范围明确，需要在流程中完成图像处理、定位、测量或可视化输出的场景。" };
     }
@@ -1221,12 +1449,12 @@ static IEnumerable<string> BuildKnownLimitations(OperatorDocModel item, Operator
 {
     var limitations = NonEmptyItems(item.Algo?.KnownLimitations).ToList();
 
-    if (item.Inputs.Any(input => input.IsRequired))
+    if (item.Metadata.InputPorts.Any(input => input.IsRequired))
     {
         limitations.Add("必填输入必须由上游节点提供；缺失输入时无法依靠默认参数自动补齐业务数据。");
     }
 
-    if (item.Parameters.Any(parameter => parameter.Min != null || parameter.Max != null || parameter.Options is { Length: > 0 }))
+    if (item.Metadata.Parameters.Any(parameter => parameter.MinValue != null || parameter.MaxValue != null || parameter.Options is { Count: > 0 }))
     {
         limitations.Add("参数范围和枚举项来自当前元数据；旧流程若保存了过期参数值，加载后需要重新校验。");
     }
@@ -1272,9 +1500,10 @@ static bool ContainsCjk(string text) =>
 
 static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext qualityContext)
 {
-    var id = item.OperatorType!.Value.ToString();
+    var metadata = item.Metadata;
+    var id = item.OperatorType.ToString();
 
-    var inputPorts = item.Inputs
+    var inputPorts = metadata.InputPorts
         .Select(port => new CatalogPort
         {
             Name = port.Name,
@@ -1284,17 +1513,17 @@ static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext q
         })
         .ToList();
 
-    var outputPorts = item.Outputs
+    var outputPorts = metadata.OutputPorts
         .Select(port => new CatalogPort
         {
             Name = port.Name,
             DisplayName = port.DisplayName,
             DataType = port.DataType.ToString(),
-            IsRequired = null
+            IsRequired = port.IsRequired
         })
         .ToList();
 
-    var parameters = item.Parameters
+    var parameters = metadata.Parameters
         .Select(parameter => new CatalogParameter
         {
             Name = parameter.Name,
@@ -1302,10 +1531,16 @@ static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext q
             DataType = parameter.DataType,
             Description = parameter.Description,
             DefaultValue = NormalizeParameterValue(parameter.DefaultValue),
-            Min = NormalizeParameterValue(parameter.Min),
-            Max = NormalizeParameterValue(parameter.Max),
+            Min = NormalizeParameterValue(parameter.MinValue),
+            Max = NormalizeParameterValue(parameter.MaxValue),
             IsRequired = parameter.IsRequired,
-            Options = ParseParameterOptions(parameter.Options)
+            Options = parameter.Options?
+                .Select(option => new CatalogParameterOption
+                {
+                    Value = option.Value,
+                    Label = option.Label
+                })
+                .ToList()
         })
         .ToList();
 
@@ -1322,6 +1557,35 @@ static CatalogOperator ToCatalogOperator(OperatorDocModel item, QualityContext q
         InputPorts = inputPorts,
         OutputPorts = outputPorts,
         Parameters = parameters,
+        ParameterConditions = metadata.ParameterConstraints
+            .OrderBy(constraint => constraint.Parameter, StringComparer.Ordinal)
+            .ThenBy(constraint => constraint.ReasonCode, StringComparer.Ordinal)
+            .ToList(),
+        OutputConditions = metadata.OutputAvailabilityRules
+            .OrderBy(rule => rule.Output, StringComparer.Ordinal)
+            .ThenBy(rule => rule.ReasonCode, StringComparer.Ordinal)
+            .ToList(),
+        ImageInputContracts = metadata.ImageInputContracts
+            .OrderBy(contract => contract.InputPort, StringComparer.Ordinal)
+            .Select(ImageContractPresentationBuilder.Build)
+            .ToList(),
+        ResourceRequirements = metadata.ParameterConstraints
+            .Where(constraint => !string.IsNullOrWhiteSpace(constraint.ResourceKind))
+            .OrderBy(constraint => constraint.Parameter, StringComparer.Ordinal)
+            .Select(constraint => new CatalogResourceRequirement
+            {
+                Parameter = constraint.Parameter,
+                ResourceKind = constraint.ResourceKind!,
+                ReasonCode = constraint.ReasonCode,
+                AtLeastOneGroup = constraint.AtLeastOneGroup,
+                RequiredWhen = constraint.RequiredWhen,
+                SatisfiedByInputPorts = constraint.SatisfiedByInputPorts?.ToList() ?? []
+            })
+            .ToList(),
+        GenerationDependencies = metadata.GenerationDependencies
+            .OrderBy(dependency => dependency, StringComparer.Ordinal)
+            .ToList(),
+        GenerationFingerprint = ComputeOperatorGenerationFingerprint(item, qualityContext),
         Quality = ComputeQuality(item, qualityContext),
         DocPath = $"算子资料/算子名片/{id}.md"
     };
@@ -1334,33 +1598,8 @@ static string? ResolveCatalogAlgorithm(OperatorDocModel item, QualityContext qua
         return item.Algo!.Name.Trim();
     }
 
-    if (item.OperatorType is null)
-    {
-        return null;
-    }
-
-    var docPath = Path.Combine(qualityContext.DocsRoot, $"{item.OperatorType.Value}.md");
-    if (!File.Exists(docPath))
-    {
-        return null;
-    }
-
-    var content = File.ReadAllText(docPath);
-    const string marker = "## 算法原理 / Algorithm Principle";
-    var startIndex = content.IndexOf(marker, StringComparison.Ordinal);
-    if (startIndex < 0)
-    {
-        return null;
-    }
-
-    startIndex += marker.Length;
-    var nextIndex = content.IndexOf("\n## ", startIndex, StringComparison.Ordinal);
-    var body = nextIndex >= 0
-        ? content[startIndex..nextIndex]
-        : content[startIndex..];
-
-    var summary = body
-        .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+    var facts = AnalyzeOperatorSource(item, qualityContext);
+    var summary = BuildAlgorithmPrinciple(item, item.Metadata.Category, facts)
         .Select(line => line.Trim())
         .FirstOrDefault(line =>
             !string.IsNullOrWhiteSpace(line) &&
@@ -1372,7 +1611,7 @@ static string? ResolveCatalogAlgorithm(OperatorDocModel item, QualityContext qua
         return null;
     }
 
-    summary = summary
+    summary = summary!
         .Replace("`", string.Empty, StringComparison.Ordinal)
         .Replace("**", string.Empty, StringComparison.Ordinal)
         .Replace("__", string.Empty, StringComparison.Ordinal);
@@ -1382,38 +1621,14 @@ static string? ResolveCatalogAlgorithm(OperatorDocModel item, QualityContext qua
         : summary[..42] + "…";
 }
 
-static string NormalizeCategory(string? category)
-{
-    if (string.IsNullOrWhiteSpace(category))
-    {
-        return "未分类";
-    }
-
-    return category.Trim() switch
-    {
-        "Preprocessing" => "预处理",
-        "Filtering" => "预处理",
-        "Calibration" => "标定",
-        "Feature Extraction" => "特征提取",
-        "General" => "通用",
-        "Logic Tools" => "逻辑工具",
-        "Matching" => "匹配定位",
-        "Measurement" => "检测",
-        "测量" => "检测",
-        "控制" => "流程控制",
-        "逻辑控制" => "流程控制",
-        "数据" => "数据处理",
-        _ => category.Trim()
-    };
-}
-
 static List<string> BuildOperatorTags(OperatorDocModel item)
 {
     var tags = new HashSet<string>(StringComparer.Ordinal);
+    var metadata = item.Metadata;
 
-    if (item.Meta.Tags != null)
+    if (metadata.Tags != null)
     {
-        foreach (var rawTag in item.Meta.Tags)
+        foreach (var rawTag in metadata.Tags)
         {
             if (!string.IsNullOrWhiteSpace(rawTag))
             {
@@ -1422,108 +1637,14 @@ static List<string> BuildOperatorTags(OperatorDocModel item)
         }
     }
 
-    tags.Add($"功能域:{ResolveDomainTag(item)}");
+    tags.Add($"分类:{metadata.CategoryId}");
+    tags.Add($"分类显示:{metadata.Category}");
+    tags.Add($"生命周期:{metadata.Lifecycle}");
     tags.Add($"算法类型:{ResolveAlgorithmTag(item)}");
-    tags.Add("成熟度:稳定");
 
     return tags
         .OrderBy(tag => tag, StringComparer.Ordinal)
         .ToList();
-}
-
-static string ResolveDomainTag(OperatorDocModel item)
-{
-    if (item.OperatorType is null)
-    {
-        return "检测";
-    }
-
-    return item.OperatorType.Value switch
-    {
-        OperatorType.CameraCalibration
-            or OperatorType.Undistort
-            or OperatorType.CoordinateTransform
-            or OperatorType.NPointCalibration
-            or OperatorType.CalibrationLoader
-            or OperatorType.TranslationRotationCalibration
-            => "标定",
-
-        OperatorType.ModbusCommunication
-            or OperatorType.TcpCommunication
-            or OperatorType.SerialCommunication
-            or OperatorType.SiemensS7Communication
-            or OperatorType.MitsubishiMcCommunication
-            or OperatorType.OmronFinsCommunication
-            or OperatorType.ModbusRtuCommunication
-            or OperatorType.HttpRequest
-            or OperatorType.MqttPublish
-            => "通信",
-
-        OperatorType.DeepLearning
-            or OperatorType.OnnxInference
-            or OperatorType.DualModalVoting
-            or OperatorType.SurfaceDefectDetection
-            or OperatorType.EdgePairDefect
-            or OperatorType.BoxNms
-            or OperatorType.BoxFilter
-            => "AI",
-
-        OperatorType.ConditionalBranch
-            or OperatorType.ResultJudgment
-            or OperatorType.ResultOutput
-            or OperatorType.DatabaseWrite
-            or OperatorType.VariableRead
-            or OperatorType.VariableWrite
-            or OperatorType.VariableIncrement
-            or OperatorType.TryCatch
-            or OperatorType.CycleCounter
-            or OperatorType.ForEach
-            or OperatorType.ArrayIndexer
-            or OperatorType.JsonExtractor
-            or OperatorType.MathOperation
-            or OperatorType.LogicGate
-            or OperatorType.TypeConvert
-            or OperatorType.StringFormat
-            or OperatorType.Aggregator
-            or OperatorType.Comment
-            or OperatorType.Comparator
-            or OperatorType.Delay
-            or OperatorType.UnitConvert
-            or OperatorType.TimerStatistics
-            or OperatorType.ScriptOperator
-            or OperatorType.TriggerModule
-            or OperatorType.TextSave
-            => "流程",
-
-        OperatorType.Measurement
-            or OperatorType.CircleMeasurement
-            or OperatorType.LineMeasurement
-            or OperatorType.ContourMeasurement
-            or OperatorType.AngleMeasurement
-            or OperatorType.GeometricTolerance
-            or OperatorType.GeometricFitting
-            or OperatorType.CaliperTool
-            or OperatorType.WidthMeasurement
-            or OperatorType.PointLineDistance
-            or OperatorType.LineLineDistance
-            or OperatorType.GapMeasurement
-            or OperatorType.GeoMeasurement
-            or OperatorType.SharpnessEvaluation
-            or OperatorType.ColorMeasurement
-            => "测量",
-
-        OperatorType.CornerDetection
-            or OperatorType.EdgeIntersection
-            or OperatorType.ParallelLineFind
-            or OperatorType.QuadrilateralFind
-            or OperatorType.RectangleDetection
-            or OperatorType.PositionCorrection
-            or OperatorType.PointAlignment
-            or OperatorType.PointCorrection
-            => "定位",
-
-        _ => "检测"
-    };
 }
 
 static string ResolveAlgorithmTag(OperatorDocModel item)
@@ -1539,49 +1660,13 @@ static string ResolveAlgorithmTag(OperatorDocModel item)
         return "第三方SDK";
     }
 
-    if (item.Meta.Keywords != null && item.Meta.Keywords.Any(keyword =>
+    if (item.Metadata.Keywords != null && item.Metadata.Keywords.Any(keyword =>
             keyword.Contains("OpenCV", StringComparison.OrdinalIgnoreCase)))
     {
         return "基于OpenCV";
     }
 
     return "自研";
-}
-
-static List<CatalogParameterOption>? ParseParameterOptions(string[]? options)
-{
-    if (options == null || options.Length == 0)
-    {
-        return null;
-    }
-
-    var parsed = new List<CatalogParameterOption>(options.Length);
-    foreach (var option in options)
-    {
-        if (string.IsNullOrWhiteSpace(option))
-        {
-            continue;
-        }
-
-        var parts = option.Split('|', 2, StringSplitOptions.TrimEntries);
-        var value = parts[0];
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            continue;
-        }
-
-        var label = parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1])
-            ? parts[1]
-            : value;
-
-        parsed.Add(new CatalogParameterOption
-        {
-            Value = value,
-            Label = label
-        });
-    }
-
-    return parsed.Count == 0 ? null : parsed;
 }
 
 static string NormalizeSemVersion(string? version)
@@ -1601,9 +1686,7 @@ static string NormalizeSemVersion(string? version)
 }
 
 static VersionTrackingResult GenerateVersionTrackingArtifacts(
-    IReadOnlyList<OperatorDocModel> candidates,
     IReadOnlyList<CatalogOperator> operators,
-    QualityContext qualityContext,
     string docsRoot,
     DateTimeOffset generatedAt)
 {
@@ -1615,33 +1698,23 @@ static VersionTrackingResult GenerateVersionTrackingArtifacts(
         .Where(item => !string.IsNullOrWhiteSpace(item.Id))
         .ToDictionary(item => item.Id, item => item, StringComparer.Ordinal);
 
-    var operatorById = candidates
-        .Where(item => item.OperatorType != null)
-        .ToDictionary(item => item.OperatorType!.Value.ToString(), item => item, StringComparer.Ordinal);
-
     var violations = new List<VersionBumpViolation>();
     var recordedAt = generatedAt.ToString("o", CultureInfo.InvariantCulture);
 
     foreach (var op in operators)
     {
-        if (!operatorById.TryGetValue(op.Id, out var docModel))
-        {
-            continue;
-        }
-
-        if (!qualityContext.SourceTextByTypeName.TryGetValue(docModel.ClrType.Name, out var sourceText))
-        {
-            sourceText = string.Empty;
-        }
-
-        var sourceHash = ComputeSha256(sourceText);
+        var sourceHash = op.GenerationFingerprint;
+        var fingerprintVersion = OperatorGenerationFingerprintBuilder.GetHistorySchemeVersion(
+            op.ImageInputContracts.Count > 0);
         if (!historyById.TryGetValue(op.Id, out var historyEntry))
         {
             historyEntry = new OperatorVersionHistoryEntry
             {
                 Id = op.Id,
                 DisplayName = op.DisplayName,
-                Category = op.Category
+                CategoryId = op.CategoryId,
+                Category = op.Category,
+                Lifecycle = op.Lifecycle
             };
             historyById[op.Id] = historyEntry;
         }
@@ -1656,6 +1729,9 @@ static VersionTrackingResult GenerateVersionTrackingArtifacts(
             {
                 historyEntry.Category = op.Category;
             }
+
+            historyEntry.CategoryId = op.CategoryId;
+            historyEntry.Lifecycle = op.Lifecycle;
         }
 
         var latest = historyEntry.Records.LastOrDefault();
@@ -1665,31 +1741,46 @@ static VersionTrackingResult GenerateVersionTrackingArtifacts(
             {
                 Version = op.Version,
                 SourceHash = sourceHash,
+                FingerprintVersion = fingerprintVersion,
                 RecordedAt = recordedAt
             });
             continue;
         }
 
+        var fingerprintSchemeChanged = !string.Equals(
+            latest.FingerprintVersion,
+            fingerprintVersion,
+            StringComparison.Ordinal);
         var sourceChanged = !string.Equals(latest.SourceHash, sourceHash, StringComparison.Ordinal);
         var versionChanged = !string.Equals(latest.Version, op.Version, StringComparison.Ordinal);
 
-        if (sourceChanged && !versionChanged)
+        if (fingerprintSchemeChanged && !versionChanged)
         {
-            violations.Add(new VersionBumpViolation
-            {
-                OperatorId = op.Id,
-                CurrentVersion = op.Version
-            });
+            latest.SourceHash = sourceHash;
+            latest.FingerprintVersion = fingerprintVersion;
+            latest.RecordedAt = recordedAt;
         }
-
-        if (sourceChanged || versionChanged)
+        else
         {
-            historyEntry.Records.Add(new OperatorVersionRecord
+            if (sourceChanged && !versionChanged)
             {
-                Version = op.Version,
-                SourceHash = sourceHash,
-                RecordedAt = recordedAt
-            });
+                violations.Add(new VersionBumpViolation
+                {
+                    OperatorId = op.Id,
+                    CurrentVersion = op.Version
+                });
+            }
+
+            if (sourceChanged || versionChanged || fingerprintSchemeChanged)
+            {
+                historyEntry.Records.Add(new OperatorVersionRecord
+                {
+                    Version = op.Version,
+                    SourceHash = sourceHash,
+                    FingerprintVersion = fingerprintVersion,
+                    RecordedAt = recordedAt
+                });
+            }
         }
     }
 
@@ -1758,11 +1849,11 @@ static string BuildVersionChangelogMarkdown(
     sb.AppendLine();
 
     sb.AppendLine("## 当前版本快照 / Current Snapshot");
-    sb.AppendLine("| 枚举 (Enum) | 显示名 (DisplayName) | 分类 (Category) | 版本 (Version) |");
-    sb.AppendLine("|------|------|------|------|");
-    foreach (var op in operators.OrderBy(item => item.Category, StringComparer.Ordinal).ThenBy(item => item.Id, StringComparer.Ordinal))
+    sb.AppendLine("| 枚举 (Enum) | 显示名 (DisplayName) | 分类 ID | 分类 (Category) | 生命周期 | 版本 (Version) |");
+    sb.AppendLine("|------|------|------|------|------|------|");
+    foreach (var op in operators.OrderBy(item => item.CategoryOrder).ThenBy(item => item.Id, StringComparer.Ordinal))
     {
-        sb.AppendLine($"| `OperatorType.{op.Id}` | {EscapeCell(op.DisplayName)} | {EscapeCell(op.Category)} | `{op.Version}` |");
+        sb.AppendLine($"| `OperatorType.{op.Id}` | {EscapeCell(op.DisplayName)} | `{op.CategoryId}` | {EscapeCell(op.Category)} | `{op.Lifecycle}` | `{op.Version}` |");
     }
 
     var historyById = history.Operators
@@ -1787,12 +1878,12 @@ static string BuildVersionChangelogMarkdown(
         var historyEntry = historyById[op.Id];
         sb.AppendLine();
         sb.AppendLine($"### OperatorType.{op.Id} / {EscapeCell(historyEntry.DisplayName)}");
-        sb.AppendLine("| 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |");
-        sb.AppendLine("|------|------|------|");
+        sb.AppendLine("| 版本 (Version) | 记录时间 (Recorded At) | 组合指纹 (Generation Fingerprint) | 指纹方案 |");
+        sb.AppendLine("|------|------|------|------|");
         foreach (var record in historyEntry.Records.AsEnumerable().Reverse())
         {
             var hash = record.SourceHash.Length > 12 ? record.SourceHash[..12] : record.SourceHash;
-            sb.AppendLine($"| `{record.Version}` | `{record.RecordedAt}` | `{hash}` |");
+            sb.AppendLine($"| `{record.Version}` | `{record.RecordedAt}` | `{hash}` | `{Fallback(record.FingerprintVersion, "legacy-source-only")}` |");
         }
     }
 
@@ -1804,6 +1895,61 @@ static string ComputeSha256(string text)
     var bytes = Encoding.UTF8.GetBytes(text);
     var hash = SHA256.HashData(bytes);
     return Convert.ToHexString(hash);
+}
+
+static string ComputeOperatorGenerationFingerprint(OperatorDocModel item, QualityContext qualityContext)
+{
+    if (!qualityContext.SourceTextByTypeName.TryGetValue(item.ClrType.Name, out var operatorSource))
+    {
+        throw new InvalidOperationException($"Source file was not resolved for {item.ClrType.FullName}.");
+    }
+
+    var dependencySources = new Dictionary<string, string>(StringComparer.Ordinal);
+    foreach (var dependency in item.Metadata.GenerationDependencies
+                 .Where(value => !string.IsNullOrWhiteSpace(value))
+                 .Distinct(StringComparer.Ordinal))
+    {
+        if (dependency.StartsWith("type:", StringComparison.Ordinal))
+        {
+            var qualifiedType = dependency["type:".Length..];
+            var simpleType = qualifiedType
+                .Split('.', StringSplitOptions.RemoveEmptyEntries)
+                .LastOrDefault()?
+                .Split('+', StringSplitOptions.RemoveEmptyEntries)
+                .LastOrDefault();
+            if (string.IsNullOrWhiteSpace(simpleType) ||
+                !qualityContext.SourceTextByTypeName.TryGetValue(simpleType, out var sourceText))
+            {
+                throw new InvalidOperationException(
+                    $"Generation dependency '{dependency}' for OperatorType.{item.OperatorType} has no source file.");
+            }
+
+            dependencySources[dependency] = sourceText;
+            continue;
+        }
+
+        if (dependency.StartsWith("source:", StringComparison.Ordinal))
+        {
+            var relativePath = dependency["source:".Length..]
+                .Replace('/', Path.DirectorySeparatorChar);
+            var fullPath = Path.GetFullPath(Path.Combine(qualityContext.RepoRoot, relativePath));
+            var repoPrefix = Path.GetFullPath(qualityContext.RepoRoot)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (!fullPath.StartsWith(repoPrefix, StringComparison.OrdinalIgnoreCase) || !File.Exists(fullPath))
+            {
+                throw new InvalidOperationException(
+                    $"Generation dependency '{dependency}' for OperatorType.{item.OperatorType} is outside the repository or missing.");
+            }
+
+            dependencySources[dependency] = File.ReadAllText(fullPath);
+            continue;
+        }
+
+        throw new InvalidOperationException(
+            $"Unsupported generation dependency '{dependency}' for OperatorType.{item.OperatorType}.");
+    }
+
+    return OperatorGenerationFingerprintBuilder.Compute(item.Metadata, operatorSource, dependencySources);
 }
 
 static QualityContext BuildQualityContext(string repoRoot, string docsRoot)
@@ -1822,18 +1968,18 @@ static QualityContext BuildQualityContext(string repoRoot, string docsRoot)
 
 static (Dictionary<string, string> SourcePathByTypeName, Dictionary<string, string> SourceTextByTypeName) BuildOperatorSourceIndex(string repoRoot)
 {
-    var operatorsRoot = Path.Combine(repoRoot, "ClearVision.Product", "src", "ClearVision.Product.Infrastructure", "Operators");
+    var infrastructureRoot = Path.Combine(repoRoot, "ClearVision.Product", "src", "ClearVision.Product.Infrastructure");
     var pathByType = new Dictionary<string, string>(StringComparer.Ordinal);
     var textByType = new Dictionary<string, string>(StringComparer.Ordinal);
 
-    if (!Directory.Exists(operatorsRoot))
+    if (!Directory.Exists(infrastructureRoot))
     {
         return (pathByType, textByType);
     }
 
     var classPattern = new Regex(@"\bclass\s+([A-Za-z_][A-Za-z0-9_]*)\b", RegexOptions.Compiled);
 
-    foreach (var filePath in Directory.EnumerateFiles(operatorsRoot, "*.cs", SearchOption.AllDirectories))
+    foreach (var filePath in Directory.EnumerateFiles(infrastructureRoot, "*.cs", SearchOption.AllDirectories))
     {
         var sourceText = File.ReadAllText(filePath);
         var matches = classPattern.Matches(sourceText);
@@ -1937,7 +2083,7 @@ static void AddGoldenEvidenceFromBaseline(string baselinePath, HashSet<string> i
 
 static CatalogQuality ComputeQuality(OperatorDocModel item, QualityContext qualityContext)
 {
-    var operatorId = item.OperatorType!.Value.ToString();
+    var operatorId = item.OperatorType.ToString();
     var typeName = item.ClrType.Name;
 
     var documentationScore = EvaluateDocumentationScore(operatorId, qualityContext);
@@ -2151,6 +2297,53 @@ static string FormatValue(object? value)
 
 static string BoolToMark(bool value) => value ? "Yes" : "No";
 
+static string GetLifecycleDisplayName(OperatorLifecycle lifecycle) => lifecycle switch
+{
+    OperatorLifecycle.Stable => "稳定",
+    OperatorLifecycle.Experimental => "实验",
+    OperatorLifecycle.Reference => "参考",
+    OperatorLifecycle.Legacy => "旧版",
+    OperatorLifecycle.Deprecated => "已弃用",
+    _ => lifecycle.ToString()
+};
+
+static string DescribeConditionSet(OperatorParameterConditionSet? conditionSet)
+{
+    if (conditionSet is null)
+    {
+        return "-";
+    }
+
+    var parts = new List<string>();
+    if (conditionSet.All is { Count: > 0 })
+    {
+        parts.Add("ALL(" + string.Join(" && ", conditionSet.All.Select(DescribeCondition)) + ")");
+    }
+
+    if (conditionSet.Any is { Count: > 0 })
+    {
+        parts.Add("ANY(" + string.Join(" || ", conditionSet.Any.Select(DescribeCondition)) + ")");
+    }
+
+    return parts.Count == 0 ? "-" : string.Join("; ", parts);
+}
+
+static string DescribeCondition(OperatorParameterCondition condition)
+{
+    var comparison = condition.Comparison switch
+    {
+        OperatorParameterConditionComparisons.Equal => "==",
+        OperatorParameterConditionComparisons.NotEquals => "!=",
+        OperatorParameterConditionComparisons.Empty => "is empty",
+        OperatorParameterConditionComparisons.NotEmpty => "is not empty",
+        _ => condition.Comparison
+    };
+
+    return condition.Value is null
+        ? $"{condition.Parameter} {comparison}"
+        : $"{condition.Parameter} {comparison} {FormatValue(condition.Value)}";
+}
+
 static string Fallback(string? value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value;
 
 static IEnumerable<string> NonEmptyItems(string[]? values) =>
@@ -2163,12 +2356,9 @@ static string EscapeCell(string input) => input.Replace("|", "\\|", StringCompar
 
 internal sealed record OperatorDocModel(
     Type ClrType,
-    OperatorMetaAttribute Meta,
     AlgorithmInfoAttribute? Algo,
-    InputPortAttribute[] Inputs,
-    OutputPortAttribute[] Outputs,
-    OperatorParamAttribute[] Parameters,
-    OperatorType? OperatorType);
+    OperatorType OperatorType,
+    OperatorMetadata Metadata);
 
 internal sealed record OperatorSourceFacts(
     string SourceText,
@@ -2193,6 +2383,8 @@ internal sealed class CatalogDocument
 {
     public string GeneratedAt { get; set; } = string.Empty;
 
+    public string GenerationFingerprint { get; set; } = string.Empty;
+
     public int TotalCount { get; set; }
 
     public Dictionary<string, CatalogCategorySummary> Categories { get; set; } = new(StringComparer.Ordinal);
@@ -2202,6 +2394,12 @@ internal sealed class CatalogDocument
 
 internal sealed class CatalogCategorySummary
 {
+    public string CategoryId { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public int Order { get; set; }
+
     public int Count { get; set; }
 
     public List<string> Operators { get; set; } = new();
@@ -2217,9 +2415,25 @@ internal sealed class CatalogOperator
 
     public string Description { get; set; } = string.Empty;
 
+    public string CategoryId { get; set; } = string.Empty;
+
+    public int CategoryOrder { get; set; }
+
     public string Category { get; set; } = string.Empty;
 
+    public string Lifecycle { get; set; } = string.Empty;
+
+    public string? LifecycleNote { get; set; }
+
+    public bool DefaultHidden { get; set; }
+
+    public bool DefaultAiRecommendation { get; set; }
+
+    public bool RequiresLifecycleDisclosure { get; set; }
+
     public string Version { get; set; } = "1.0.0";
+
+    public List<string> Keywords { get; set; } = new();
 
     public List<string> Tags { get; set; } = new();
 
@@ -2230,6 +2444,18 @@ internal sealed class CatalogOperator
     public List<CatalogPort> OutputPorts { get; set; } = new();
 
     public List<CatalogParameter> Parameters { get; set; } = new();
+
+    public List<OperatorParameterConstraint> ParameterConditions { get; set; } = new();
+
+    public List<OperatorOutputAvailabilityRule> OutputConditions { get; set; } = new();
+
+    public List<ImageInputContractPresentation> ImageInputContracts { get; set; } = new();
+
+    public List<CatalogResourceRequirement> ResourceRequirements { get; set; } = new();
+
+    public List<string> GenerationDependencies { get; set; } = new();
+
+    public string GenerationFingerprint { get; set; } = string.Empty;
 
     public CatalogQuality Quality { get; set; } = new();
 
@@ -2275,6 +2501,21 @@ internal sealed class CatalogParameterOption
     public string Label { get; set; } = string.Empty;
 }
 
+internal sealed class CatalogResourceRequirement
+{
+    public string Parameter { get; set; } = string.Empty;
+
+    public string ResourceKind { get; set; } = string.Empty;
+
+    public string ReasonCode { get; set; } = string.Empty;
+
+    public string? AtLeastOneGroup { get; set; }
+
+    public OperatorParameterConditionSet? RequiredWhen { get; set; }
+
+    public List<string> SatisfiedByInputPorts { get; set; } = new();
+}
+
 internal sealed class CatalogQuality
 {
     public int TotalScore { get; set; }
@@ -2305,7 +2546,11 @@ internal sealed class OperatorVersionHistoryEntry
 
     public string DisplayName { get; set; } = string.Empty;
 
+    public string CategoryId { get; set; } = string.Empty;
+
     public string Category { get; set; } = string.Empty;
+
+    public string Lifecycle { get; set; } = string.Empty;
 
     public List<OperatorVersionRecord> Records { get; set; } = new();
 }
@@ -2315,6 +2560,8 @@ internal sealed class OperatorVersionRecord
     public string Version { get; set; } = "1.0.0";
 
     public string SourceHash { get; set; } = string.Empty;
+
+    public string FingerprintVersion { get; set; } = string.Empty;
 
     public string RecordedAt { get; set; } = string.Empty;
 }

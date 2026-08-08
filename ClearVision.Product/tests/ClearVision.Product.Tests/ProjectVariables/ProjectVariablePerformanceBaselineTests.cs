@@ -6,6 +6,7 @@ using Xunit.Abstractions;
 
 namespace ClearVision.Product.Tests.ProjectVariables;
 
+[TestClassification(TestDomain.Data, TestPurpose.Performance, TestLane.Nightly, TestEvidenceType.PerformanceProfile, TestOracleType.PerformanceBudget, TestResourceRequirement.CpuProfile, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "data-platform", PerformanceProfile = "standard: documented warmup, scale and percentile budget")]
 public sealed class ProjectVariablePerformanceBaselineTests
 {
     private readonly ITestOutputHelper _output;

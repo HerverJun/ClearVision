@@ -25,7 +25,7 @@ const IMAGE_ACQUISITION_METADATA = {
 // RectangleRegion：真正的「无输入」几何源头算子，metadata 明确声明 inputPorts: []。
 const RECTANGLE_REGION_METADATA = {
   type: 'RectangleRegion',
-  displayName: '矩形区域',
+  displayName: '矩形框定义',
   category: '几何',
   inputPorts: [],
   outputPorts: [

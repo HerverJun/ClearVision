@@ -18,6 +18,7 @@ using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentBuildOrchestratorTests;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentBuildOrchestratorTests
 {
     private static readonly string[] RequiredBuildStages =
@@ -1608,6 +1609,13 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.OperatorType == "ResultJudgment" &&
             item.ParameterName == "ExpectValue" &&
             item.ValueSummary == "expected class");
+        build.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "DeepLearning" &&
+            item.ParameterName == "TaskType" &&
+            item.ValueSummary == "ImageClassification");
+        build.ParameterMapping.Should().NotContain(item =>
+            item.OperatorType == "DeepLearning" &&
+            item.ParameterName == "Confidence");
         build.MissingResources.Should().Contain(item =>
             item.ResourceType == "model_resource" &&
             item.ResourceKey == "op_detect.ModelPath");

@@ -15,6 +15,7 @@ namespace ClearVision.Product.Tests.Integration;
 /// <summary>
 /// ResultAnalysisService 集成测试
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "product")]
 public class ResultAnalysisServiceIntegrationTests
 {
     private readonly IInspectionResultRepository _resultRepository;

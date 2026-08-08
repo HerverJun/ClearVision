@@ -6,6 +6,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.Queries;
 
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public sealed class GetInspectionHistoryQueryHandlerTests
 {
     [Fact]

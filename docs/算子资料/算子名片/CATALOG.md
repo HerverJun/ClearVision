@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-08-08 12:52:39 +08:00`
+> 生成时间 / Generated At: `2026-08-08 13:54:24 +08:00`
 > 算子总数 / Total Operators: **158**
 
 ## 分类统计 / Category Summary
@@ -22,7 +22,7 @@
 | 采集 | 1 | 0.6% |
 
 ## 质量评分 / Quality Score
-- 平均分 / Average: **95.3**
+- 平均分 / Average: **95.5**
 | 等级 (Level) | 数量 (Count) |
 |------|------:|
 | A | 153 |
@@ -67,7 +67,7 @@
 | `OperatorType.RegionOpening` | 区域开运算 | 2 | 3 | 3 | 90 (A) | `1.0.2` | Region morphology opening | [RegionOpening](./RegionOpening.md) |
 | `OperatorType.RegionSkeleton` | 区域骨架化 | 2 | 5 | 2 | 90 (A) | `1.0.2` | Zhang-Suen thinning | [RegionSkeleton](./RegionSkeleton.md) |
 | `OperatorType.RegionUnion` | 区域并集 | 2 | 3 | 0 | 89 (A) | `1.0.2` | Run-length region union | [RegionUnion](./RegionUnion.md) |
-| `OperatorType.Thresholding` | 全局阈值处理 | 1 | 1 | 4 | 94 (A) | `1.0.0` | 当前元数据描述为：Global thresholding with optional… | [Thresholding](./Thresholding.md) |
+| `OperatorType.Thresholding` | 全局阈值处理 | 1 | 1 | 4 | 96 (A) | `1.0.0` | 当前元数据描述为：Global thresholding with optional… | [Thresholding](./Thresholding.md) |
 
 ### 匹配与定位 (17)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
@@ -99,7 +99,7 @@
 | `OperatorType.ColorConversion` | 颜色空间转换 | 1 | 1 | 2 | 94 (A) | `1.0.0` | 该算子用于BGR/GRAY/HSV/Lab/YUV等颜色空间转换。运行时从声明输入端… | [ColorConversion](./ColorConversion.md) |
 | `OperatorType.CopyMakeBorder` | 边界填充 | 1 | 1 | 6 | 94 (A) | `1.0.0` | 当前元数据描述为：Pads image border using OpenCV bo… | [CopyMakeBorder](./CopyMakeBorder.md) |
 | `OperatorType.FFT1D` | 信号/图像傅里叶变换（FFT） | 2 | 4 | 0 | 89 (A) | `1.0.0` | 当前元数据描述为：Performs FFT on 1D signals and em… | [FFT1D](./FFT1D.md) |
-| `OperatorType.Filtering` | 滤波 | 1 | 1 | 4 | 94 (A) | `1.0.0` | Gaussian Blur (OpenCV) | [Filtering](./Filtering.md) |
+| `OperatorType.Filtering` | 滤波 | 1 | 1 | 4 | 100 (A) | `1.0.0` | Gaussian Blur (OpenCV) | [Filtering](./Filtering.md) |
 | `OperatorType.FrameAveraging` | 帧平均 | 1 | 2 | 2 | 94 (A) | `1.0.0` | 当前元数据描述为：Averages multi-frame input to red… | [FrameAveraging](./FrameAveraging.md) |
 | `OperatorType.FrequencyFilter` | 频域滤波 | 5 | 3 | 0 | 81 (B) | `1.0.0` | 当前元数据描述为：Applies frequency-domain filters … | [FrequencyFilter](./FrequencyFilter.md) |
 | `OperatorType.HistogramEqualization` | 直方图均衡化 | 1 | 1 | 4 | 94 (A) | `1.0.0` | 当前元数据描述为：Supports global histogram equaliz… | [HistogramEqualization](./HistogramEqualization.md) |
@@ -107,16 +107,16 @@
 | `OperatorType.ImageBlend` | 图像融合 | 2 | 1 | 3 | 94 (A) | `1.0.0` | 该算子用于加权混合/透明叠加。运行时从声明输入端口读取数据，按参数表解析配置，并把处… | [ImageBlend](./ImageBlend.md) |
 | `OperatorType.ImageCompose` | 图像组合 | 4 | 1 | 3 | 94 (A) | `1.0.0` | 当前元数据描述为：Composes multiple images by conca… | [ImageCompose](./ImageCompose.md) |
 | `OperatorType.ImageCrop` | 图像裁剪 | 1 | 1 | 4 | 94 (A) | `1.0.0` | 该算子用于ROI区域提取。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结… | [ImageCrop](./ImageCrop.md) |
-| `OperatorType.ImageNormalize` | 图像归一化 | 1 | 1 | 4 | 94 (A) | `1.0.0` | 当前元数据描述为：Normalizes pixel distribution for… | [ImageNormalize](./ImageNormalize.md) |
+| `OperatorType.ImageNormalize` | 图像归一化 | 1 | 1 | 4 | 100 (A) | `1.0.0` | 当前元数据描述为：Normalizes pixel distribution for… | [ImageNormalize](./ImageNormalize.md) |
 | `OperatorType.ImageResize` | 图像缩放 | 1 | 1 | 5 | 94 (A) | `1.0.0` | 该算子用于调整图像尺寸。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果… | [ImageResize](./ImageResize.md) |
 | `OperatorType.ImageRotate` | 图像旋转 | 1 | 1 | 5 | 94 (A) | `1.0.0` | 该算子用于任意角度旋转。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结果… | [ImageRotate](./ImageRotate.md) |
 | `OperatorType.ImageStitching` | 图像拼接 | 2 | 2 | 3 | 94 (A) | `1.0.0` | 当前元数据描述为：Stitches two images into a larger… | [ImageStitching](./ImageStitching.md) |
 | `OperatorType.ImageSubtract` | 图像减法 | 2 | 4 | 1 | 89 (A) | `1.0.0` | 当前元数据描述为：Computes subtraction or absolute … | [ImageSubtract](./ImageSubtract.md) |
 | `OperatorType.ImageTiling` | 图像切片 | 1 | 3 | 4 | 94 (A) | `1.0.0` | 当前元数据描述为：Splits an image into tiled region… | [ImageTiling](./ImageTiling.md) |
 | `OperatorType.InverseFFT1D` | 信号/图像逆傅里叶变换（IFFT） | 2 | 4 | 0 | 89 (A) | `1.0.0` | 当前元数据描述为：Performs inverse FFT on 1D spectr… | [InverseFFT1D](./InverseFFT1D.md) |
-| `OperatorType.LaplacianSharpen` | 拉普拉斯锐化 | 1 | 1 | 3 | 94 (A) | `1.0.0` | 该算子用于基于拉普拉斯算子的边缘增强。运行时从声明输入端口读取数据，按参数表解析配置… | [LaplacianSharpen](./LaplacianSharpen.md) |
-| `OperatorType.MeanFilter` | 均值滤波 | 1 | 1 | 2 | 94 (A) | `1.0.0` | 当前元数据描述为：Applies mean (box blur) filtering… | [MeanFilter](./MeanFilter.md) |
-| `OperatorType.MedianBlur` | 中值滤波 | 1 | 1 | 1 | 94 (A) | `1.0.0` | 该算子用于有效去除椒盐噪声同时保留边缘。运行时从声明输入端口读取数据，按参数表解析配… | [MedianBlur](./MedianBlur.md) |
+| `OperatorType.LaplacianSharpen` | 拉普拉斯锐化 | 1 | 1 | 3 | 96 (A) | `1.0.0` | 该算子用于基于拉普拉斯算子的边缘增强。运行时从声明输入端口读取数据，按参数表解析配置… | [LaplacianSharpen](./LaplacianSharpen.md) |
+| `OperatorType.MeanFilter` | 均值滤波 | 1 | 1 | 2 | 100 (A) | `1.0.0` | 当前元数据描述为：Applies mean (box blur) filtering… | [MeanFilter](./MeanFilter.md) |
+| `OperatorType.MedianBlur` | 中值滤波 | 1 | 1 | 1 | 100 (A) | `1.0.0` | 该算子用于有效去除椒盐噪声同时保留边缘。运行时从声明输入端口读取数据，按参数表解析配… | [MedianBlur](./MedianBlur.md) |
 | `OperatorType.PerspectiveTransform` | 透视变换 | 3 | 1 | 20 | 100 (A) | `1.0.0` | 该算子用于四边形透视校正。运行时从声明输入端口读取数据，按参数表解析配置，并把处理结… | [PerspectiveTransform](./PerspectiveTransform.md) |
 | `OperatorType.PolarUnwrap` | 极坐标展开 | 2 | 1 | 8 | 100 (A) | `1.0.0` | 当前元数据描述为：Unwraps annular image regions int… | [PolarUnwrap](./PolarUnwrap.md) |
 | `OperatorType.RoiManager` | ROI裁剪与掩膜 | 1 | 3 | 10 | 100 (A) | `1.0.0` | 该算子用于矩形/圆形/多边形区域选择。运行时从声明输入端口读取数据，按参数表解析配置… | [RoiManager](./RoiManager.md) |
@@ -203,7 +203,7 @@
 | `OperatorType.CornerDetection` | 角点检测 | 1 | 3 | 5 | 94 (A) | `1.0.0` | 当前元数据描述为：Detects corner points using Harri… | [CornerDetection](./CornerDetection.md) |
 | `OperatorType.EdgeDetection` | 边缘检测 | 1 | 2 | 14 | 100 (A) | `1.0.0` | 当前元数据描述为：Detects edges with Canny and opti… | [EdgeDetection](./EdgeDetection.md) |
 | `OperatorType.GlcmTexture` | GLCM纹理特征 | 1 | 6 | 9 | 100 (A) | `1.0.1` | Quantized gray-level co-occurrence matrix | [GlcmTexture](./GlcmTexture.md) |
-| `OperatorType.HistogramAnalysis` | 直方图分析 | 1 | 11 | 6 | 94 (A) | `1.0.0` | 当前元数据描述为：Computes histogram and intensity-… | [HistogramAnalysis](./HistogramAnalysis.md) |
+| `OperatorType.HistogramAnalysis` | 直方图分析 | 1 | 11 | 6 | 96 (A) | `1.0.0` | 当前元数据描述为：Computes histogram and intensity-… | [HistogramAnalysis](./HistogramAnalysis.md) |
 | `OperatorType.ImageDiff` | 图像差异率分析 | 2 | 2 | 0 | 89 (A) | `1.0.1` | 该算子用于计算两幅同尺寸图像的绝对差异图，并输出非零差异像素占比。运行时从声明输入端… | [ImageDiff](./ImageDiff.md) |
 | `OperatorType.LawsTextureFilter` | Laws纹理滤波 | 1 | 3 | 5 | 100 (A) | `1.0.1` | Laws 5x5 texture energy filtering | [LawsTextureFilter](./LawsTextureFilter.md) |
 | `OperatorType.PixelStatistics` | 像素统计 | 2 | 6 | 5 | 96 (A) | `1.0.0` | 当前元数据描述为：Computes ROI/masked pixel-level s… | [PixelStatistics](./PixelStatistics.md) |

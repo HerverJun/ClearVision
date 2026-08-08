@@ -14,6 +14,7 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Integration;
 
+[TestClassification(TestDomain.Measurement, TestPurpose.Performance, TestLane.Nightly, TestEvidenceType.PerformanceProfile, TestOracleType.PerformanceBudget, TestResourceRequirement.CpuProfile, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "operator-quality", PerformanceProfile = "standard: documented warmup, scale and percentile budget")]
 [Collection(PerformanceAcceptanceCollection.Name)]
 [Trait("Category", "PerformanceBudget")]
 public sealed class MeasurementPerformanceBudgetAcceptanceTests

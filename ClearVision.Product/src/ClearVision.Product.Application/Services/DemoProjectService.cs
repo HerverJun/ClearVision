@@ -97,9 +97,9 @@ public class DemoProjectService
             blurOp.Id, blurOutputPort.Id,
             cannyOp.Id, cannyInputPort.Id));
 
-        // 4. 二值化算子
+        // 4. 全局阈值处理算子
         var thresholdOp = new Core.Entities.Operator(
-            "二值化",
+            "全局阈值处理",
             Core.Enums.OperatorType.Thresholding,
             700, 100);
         thresholdOp.AddInputPort("input", PortDataType.Image, true);
@@ -112,7 +112,7 @@ public class DemoProjectService
             Guid.NewGuid(), "ThresholdType", "阈值类型", "阈值处理方式", "enum", "Binary", null, null, true));
         flow.AddOperator(thresholdOp);
 
-        // 连接：Canny边缘检测 -> 二值化
+        // 连接：Canny边缘检测 -> 全局阈值处理
         var cannyOutputPort = cannyOp.OutputPorts.First();
         var thresholdInputPort = thresholdOp.InputPorts.First();
         flow.AddConnection(new OperatorConnection(
@@ -137,7 +137,7 @@ public class DemoProjectService
             Guid.NewGuid(), "MaxArea", "最大面积", "最大轮廓面积", "int", 10000, 1, 1000000, true));
         flow.AddOperator(contourOp);
 
-        // 连接：二值化 -> 轮廓查找
+        // 连接：全局阈值处理 -> 轮廓查找
         var thresholdOutputPort = thresholdOp.OutputPorts.First();
         var contourInputPort = contourOp.InputPorts.First();
         flow.AddConnection(new OperatorConnection(

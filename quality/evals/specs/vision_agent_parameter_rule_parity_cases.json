@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "2026-07-10.vision-agent-parameter-rule-parity.v3",
+  "schemaVersion": "2026-07-13.vision-agent-parameter-rule-parity.v4",
   "operatorConstraints": {
     "ImageAcquisition": [
       {
@@ -117,7 +117,541 @@
         "reasonCode": "IMAGE_CAMERA_ID_LEGACY_ALIAS"
       }
     ],
+    "Filtering": [
+      {
+        "parameter": "FilterMode",
+        "requiredPolicy": "metadata",
+        "reasonCode": "FILTERING_MODE"
+      },
+      {
+        "parameter": "KernelSize",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "FilterMode",
+              "comparison": "equals",
+              "value": "Bilateral"
+            }
+          ]
+        },
+        "reasonCode": "FILTERING_KERNEL_SIZE_NOT_USED_BY_BILATERAL"
+      },
+      {
+        "parameter": "SigmaX",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "FilterMode",
+              "comparison": "not-equals",
+              "value": "Gaussian"
+            }
+          ]
+        },
+        "reasonCode": "FILTERING_SIGMA_ONLY_FOR_GAUSSIAN"
+      },
+      {
+        "parameter": "SigmaY",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "FilterMode",
+              "comparison": "not-equals",
+              "value": "Gaussian"
+            }
+          ]
+        },
+        "reasonCode": "FILTERING_SIGMA_ONLY_FOR_GAUSSIAN"
+      },
+      {
+        "parameter": "BorderType",
+        "requiredPolicy": "required",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "FilterMode",
+              "comparison": "equals",
+              "value": "Median"
+            }
+          ]
+        },
+        "reasonCode": "FILTERING_BORDER_NOT_USED_BY_MEDIAN"
+      },
+      {
+        "parameter": "Diameter",
+        "requiredPolicy": "required",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "FilterMode",
+              "comparison": "not-equals",
+              "value": "Bilateral"
+            }
+          ]
+        },
+        "reasonCode": "FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL"
+      },
+      {
+        "parameter": "SigmaColor",
+        "requiredPolicy": "required",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "FilterMode",
+              "comparison": "not-equals",
+              "value": "Bilateral"
+            }
+          ]
+        },
+        "reasonCode": "FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL"
+      },
+      {
+        "parameter": "SigmaSpace",
+        "requiredPolicy": "required",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "FilterMode",
+              "comparison": "not-equals",
+              "value": "Bilateral"
+            }
+          ]
+        },
+        "reasonCode": "FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL"
+      }
+    ],
+    "Measurement": [
+      {
+        "parameter": "MeasureType",
+        "requiredPolicy": "metadata",
+        "reasonCode": "MEASUREMENT_TYPE"
+      },
+      {
+        "parameter": "X1",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "PointToLine"
+            },
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "LineToLine"
+            },
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "ThreePointAngle"
+            }
+          ]
+        },
+        "reasonCode": "MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE"
+      },
+      {
+        "parameter": "Y1",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "PointToLine"
+            },
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "LineToLine"
+            },
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "ThreePointAngle"
+            }
+          ]
+        },
+        "reasonCode": "MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE"
+      },
+      {
+        "parameter": "X2",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "PointToLine"
+            },
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "LineToLine"
+            },
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "ThreePointAngle"
+            }
+          ]
+        },
+        "reasonCode": "MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE"
+      },
+      {
+        "parameter": "Y2",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "PointToLine"
+            },
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "LineToLine"
+            },
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "ThreePointAngle"
+            }
+          ]
+        },
+        "reasonCode": "MEASUREMENT_COORDINATES_ONLY_FOR_POINT_DISTANCE"
+      },
+      {
+        "parameter": "DistanceModel",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "PointToPoint"
+            },
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "Horizontal"
+            },
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "Vertical"
+            },
+            {
+              "parameter": "MeasureType",
+              "comparison": "equals",
+              "value": "ThreePointAngle"
+            }
+          ]
+        },
+        "reasonCode": "MEASUREMENT_DISTANCE_MODEL_ONLY_FOR_LINE_DISTANCE"
+      },
+      {
+        "parameter": "ParallelThreshold",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "MeasureType",
+              "comparison": "not-equals",
+              "value": "LineToLine"
+            }
+          ]
+        },
+        "reasonCode": "MEASUREMENT_PARALLEL_THRESHOLD_ONLY_FOR_LINE_TO_LINE"
+      },
+      {
+        "parameter": "AngleUnit",
+        "requiredPolicy": "required",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "MeasureType",
+              "comparison": "not-equals",
+              "value": "ThreePointAngle"
+            }
+          ]
+        },
+        "reasonCode": "MEASUREMENT_ANGLE_UNIT_ONLY_FOR_ANGLE"
+      }
+    ],
+    "TemplateMatching": [
+      {
+        "parameter": "RoiX",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "UseRoi",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_ROI_ONLY_WHEN_ENABLED"
+      },
+      {
+        "parameter": "RoiY",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "UseRoi",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_ROI_ONLY_WHEN_ENABLED"
+      },
+      {
+        "parameter": "RoiWidth",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "UseRoi",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "UseRoi",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_ROI_ONLY_WHEN_ENABLED"
+      },
+      {
+        "parameter": "RoiHeight",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "UseRoi",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "UseRoi",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_ROI_ONLY_WHEN_ENABLED"
+      },
+      {
+        "parameter": "OriginX",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "OriginMode",
+              "comparison": "equals",
+              "value": "Custom"
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "OriginMode",
+              "comparison": "not-equals",
+              "value": "Custom"
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_CUSTOM_ORIGIN"
+      },
+      {
+        "parameter": "OriginY",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "OriginMode",
+              "comparison": "equals",
+              "value": "Custom"
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "OriginMode",
+              "comparison": "not-equals",
+              "value": "Custom"
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_CUSTOM_ORIGIN"
+      },
+      {
+        "parameter": "AngleStart",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      },
+      {
+        "parameter": "AngleExtent",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      },
+      {
+        "parameter": "AngleStep",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      },
+      {
+        "parameter": "ScaleMin",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      },
+      {
+        "parameter": "ScaleMax",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      },
+      {
+        "parameter": "ScaleStep",
+        "requiredPolicy": "metadata",
+        "requiredWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": true
+            }
+          ]
+        },
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      },
+      {
+        "parameter": "PyramidLevels",
+        "requiredPolicy": "metadata",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "EnablePoseSearch",
+              "comparison": "equals",
+              "value": false
+            }
+          ]
+        },
+        "reasonCode": "TEMPLATE_MATCHING_POSE_SEARCH"
+      }
+    ],
     "DeepLearning": [
+      {
+        "parameter": "TaskType",
+        "reasonCode": "DEEP_LEARNING_TASK_TYPE"
+      },
       {
         "parameter": "ModelPath",
         "requiredPolicy": "required",
@@ -155,26 +689,136 @@
       {
         "parameter": "LabelsPath",
         "requiredPolicy": "optional",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "SemanticSegmentation"
+            }
+          ]
+        },
         "resourceKind": "model_labels",
-        "reasonCode": "DEEP_LEARNING_LABELS_OPTIONAL_FALLBACK"
+        "reasonCode": "DEEP_LEARNING_LABELS_FOR_DETECTION_OR_CLASSIFICATION"
+      },
+      {
+        "parameter": "Confidence",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ImageClassification"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "SemanticSegmentation"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_CONFIDENCE_ONLY_FOR_DETECTION"
+      },
+      {
+        "parameter": "ModelVersion",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ImageClassification"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "SemanticSegmentation"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_YOLO_VERSION_ONLY_FOR_DETECTION"
+      },
+      {
+        "parameter": "InputSize",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ImageClassification"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "SemanticSegmentation"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_DETECTION_INPUT_SIZE_ONLY_FOR_DETECTION"
+      },
+      {
+        "parameter": "TargetClasses",
+        "requiredPolicy": "optional",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ImageClassification"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "SemanticSegmentation"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_TARGET_CLASSES_ONLY_FOR_DETECTION"
       },
       {
         "parameter": "GpuDeviceId",
         "disabledWhen": {
           "all": [
             {
-              "parameter": "UseGpu",
+              "parameter": "ExecutionProvider",
               "comparison": "equals",
-              "value": false
+              "value": "CPU"
             }
           ]
         },
         "reasonCode": "DEEP_LEARNING_GPU_DEVICE_DISABLED_WITHOUT_GPU"
       },
       {
+        "parameter": "UseGpu",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "ExecutionProvider",
+              "comparison": "equals",
+              "value": "CPU"
+            },
+            {
+              "parameter": "ExecutionProvider",
+              "comparison": "equals",
+              "value": "CUDA"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_USE_GPU_ONLY_FOR_AUTO_PROVIDER"
+      },
+      {
         "parameter": "EnableInternalNms",
         "disabledWhen": {
-          "all": [
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ImageClassification"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "SemanticSegmentation"
+            },
             {
               "parameter": "OutputFormat",
               "comparison": "equals",
@@ -198,10 +842,32 @@
               "comparison": "equals",
               "value": true
             }
+          ],
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ObjectDetection"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "Auto"
+            }
           ]
         },
         "disabledWhen": {
           "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ImageClassification"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "SemanticSegmentation"
+            },
             {
               "parameter": "OutputFormat",
               "comparison": "equals",
@@ -215,6 +881,220 @@
           ]
         },
         "reasonCode": "DEEP_LEARNING_NMS_THRESHOLD_ACTIVE_FOR_INTERNAL_NMS"
+      },
+      {
+        "parameter": "OutputFormat",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ImageClassification"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "SemanticSegmentation"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_OUTPUT_FORMAT_ONLY_FOR_DETECTION"
+      },
+      {
+        "parameter": "DetectionMode",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ImageClassification"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "SemanticSegmentation"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_DETECTION_MODE_ONLY_FOR_DETECTION"
+      },
+      {
+        "parameter": "TopK",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ObjectDetection"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "SemanticSegmentation"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_TOP_K_ONLY_FOR_CLASSIFICATION"
+      },
+      {
+        "parameter": "ClassificationInputSize",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ObjectDetection"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "SemanticSegmentation"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_INPUT_SIZE_ONLY_FOR_CLASSIFICATION"
+      },
+      {
+        "parameter": "ClassificationScoreMode",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ObjectDetection"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "SemanticSegmentation"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_SCORE_MODE_ONLY_FOR_CLASSIFICATION"
+      },
+      {
+        "parameter": "ClassNames",
+        "requiredPolicy": "optional",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ObjectDetection"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_CLASS_NAMES_FOR_CLASSIFICATION_OR_SEGMENTATION"
+      },
+      {
+        "parameter": "SegmentationInputSize",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ObjectDetection"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ImageClassification"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_INPUT_SIZE_ONLY_FOR_SEGMENTATION"
+      },
+      {
+        "parameter": "NumClasses",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ObjectDetection"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ImageClassification"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_CLASS_COUNT_ONLY_FOR_SEGMENTATION"
+      },
+      {
+        "parameter": "MaxClassMasks",
+        "disabledWhen": {
+          "any": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ObjectDetection"
+            },
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ImageClassification"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_CLASS_MASKS_ONLY_FOR_SEGMENTATION"
+      },
+      {
+        "parameter": "ExecutionProvider",
+        "reasonCode": "DEEP_LEARNING_EXECUTION_PROVIDER"
+      },
+      {
+        "parameter": "ScaleToUnitRange",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ObjectDetection"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION"
+      },
+      {
+        "parameter": "ChannelOrder",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ObjectDetection"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION"
+      },
+      {
+        "parameter": "Mean",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ObjectDetection"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION"
+      },
+      {
+        "parameter": "Std",
+        "disabledWhen": {
+          "all": [
+            {
+              "parameter": "TaskType",
+              "comparison": "equals",
+              "value": "ObjectDetection"
+            }
+          ]
+        },
+        "reasonCode": "DEEP_LEARNING_PREPROCESS_ONLY_FOR_CLASSIFICATION_OR_SEGMENTATION"
       }
     ],
     "EdgeDetection": [
@@ -1441,17 +2321,82 @@
       ]
     },
     {
-      "caseId": "template_matching_requires_runtime_template_input",
-      "operatorType": "TemplateMatching",
-      "parameters": {},
+      "caseId": "filtering_bilateral_hides_kernel_and_enables_bilateral_parameters",
+      "operatorType": "Filtering",
+      "parameters": {
+        "FilterMode": "Bilateral"
+      },
       "uiStates": {
-        "TemplatePath": {
+        "KernelSize": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "SigmaX": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "BorderType": {
           "effectiveRequired": true,
           "effectiveDisabled": false
         },
-        "TemplateId": {
+        "Diameter": {
           "effectiveRequired": true,
           "effectiveDisabled": false
+        },
+        "SigmaColor": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "SigmaSpace": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "measurement_angle_hides_distance_parameters",
+      "operatorType": "Measurement",
+      "parameters": {
+        "MeasureType": "ThreePointAngle"
+      },
+      "uiStates": {
+        "X1": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "DistanceModel": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "ParallelThreshold": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "AngleUnit": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        }
+      },
+      "flowValidationMissingParameters": [],
+      "deploymentPrecheckMissingParameters": []
+    },
+    {
+      "caseId": "template_matching_requires_runtime_template_input",
+      "operatorType": "TemplateMatching",
+      "parameters": {
+        "UseRoi": false,
+        "EnablePoseSearch": false
+      },
+      "uiStates": {
+        "RoiWidth": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
+        },
+        "AngleExtent": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
         }
       },
       "flowValidationMissingParameters": [
@@ -1462,23 +2407,34 @@
       ]
     },
     {
-      "caseId": "template_matching_legacy_metadata_accepts_template_id",
+      "caseId": "template_matching_roi_requires_dimensions",
       "operatorType": "TemplateMatching",
       "parameters": {
-        "TemplateId": "mock-template-catalog-item"
+        "UseRoi": true,
+        "RoiWidth": "",
+        "RoiHeight": "",
+        "EnablePoseSearch": false
       },
       "uiStates": {
-        "TemplatePath": {
-          "effectiveRequired": false,
-          "effectiveDisabled": true
-        },
-        "TemplateId": {
+        "RoiWidth": {
           "effectiveRequired": true,
           "effectiveDisabled": false
+        },
+        "RoiHeight": {
+          "effectiveRequired": true,
+          "effectiveDisabled": false
+        },
+        "AngleExtent": {
+          "effectiveRequired": false,
+          "effectiveDisabled": true
         }
       },
-      "flowValidationMissingParameters": [],
-      "deploymentPrecheckMissingParameters": []
+      "flowValidationMissingParameters": [
+        "Template"
+      ],
+      "deploymentPrecheckMissingParameters": [
+        "Template"
+      ]
     },
     {
       "caseId": "deep_learning_requires_model_path_or_id",

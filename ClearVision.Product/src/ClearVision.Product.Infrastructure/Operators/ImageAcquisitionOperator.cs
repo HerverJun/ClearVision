@@ -25,6 +25,23 @@ namespace ClearVision.Product.Infrastructure.Operators;
     IconName = "camera",
     Keywords = new[] { "采集", "相机", "拍照", "取图", "摄像头", "图像输入", "Acquire", "Camera", "Capture" }
 )]
+[OperatorParameterRule("SourceType", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ReasonCode = "IMAGE_SOURCE_TYPE_REQUIRED")]
+[OperatorParameterRule("FilePath", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    RequiredWhenAll = new[] { "SourceType==File" }, DisabledWhenAll = new[] { "SourceType==Camera" },
+    HiddenWhenAll = new[] { "SourceType==Camera" }, IgnoredWhenAll = new[] { "SourceType==Camera" },
+    ResourceKind = OperatorResourceKind.ImageFile, SatisfiedByInputPorts = new[] { "Image" },
+    ReasonCode = "IMAGE_FILE_REQUIRED_FOR_FILE_SOURCE")]
+[OperatorParameterRule("CameraId", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    RequiredWhenAll = new[] { "SourceType==Camera" }, DisabledWhenAll = new[] { "SourceType==File" },
+    HiddenWhenAll = new[] { "SourceType==File" }, IgnoredWhenAll = new[] { "SourceType==File" },
+    AtLeastOneGroup = "image-camera-source", ResourceKind = OperatorResourceKind.CameraBinding,
+    SatisfiedByInputPorts = new[] { "Image" }, ReasonCode = "IMAGE_CAMERA_REQUIRED_FOR_CAMERA_SOURCE")]
+[OperatorParameterRule("CameraBindingId", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, AliasFor = "CameraId", Deprecated = true, ReasonCode = "IMAGE_CAMERA_BINDING_ALIAS")]
+[OperatorParameterRule("ExposureTime", DisabledWhenAll = new[] { "SourceType==File" }, HiddenWhenAll = new[] { "SourceType==File" }, IgnoredWhenAll = new[] { "SourceType==File" }, ReasonCode = "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE")]
+[OperatorParameterRule("Gain", DisabledWhenAll = new[] { "SourceType==File" }, HiddenWhenAll = new[] { "SourceType==File" }, IgnoredWhenAll = new[] { "SourceType==File" }, ReasonCode = "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE")]
+[OperatorParameterRule("TriggerMode", DisabledWhenAll = new[] { "SourceType==File" }, HiddenWhenAll = new[] { "SourceType==File" }, IgnoredWhenAll = new[] { "SourceType==File" }, ReasonCode = "IMAGE_CAMERA_SETTING_DISABLED_FOR_FILE_SOURCE")]
+[OperatorParameterRule("sourceType", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, AliasFor = "SourceType", Deprecated = true, ReasonCode = "IMAGE_SOURCE_TYPE_LEGACY_ALIAS")]
+[OperatorParameterRule("cameraId", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, AliasFor = "CameraId", Deprecated = true, ReasonCode = "IMAGE_CAMERA_ID_LEGACY_ALIAS")]
 [InputPort("Image", "Runtime supplied image", PortDataType.Image, IsRequired = false)]
 [InputPort("FilePath", "文件路径输入", PortDataType.String, IsRequired = false)]
 [OutputPort("Image", "图像", PortDataType.Image)]

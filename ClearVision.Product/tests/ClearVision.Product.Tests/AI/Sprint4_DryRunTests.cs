@@ -10,6 +10,7 @@ namespace ClearVision.Product.Tests.AI;
 /// <summary>
 /// Sprint 4 Task 4.2: DryRunStubRegistry 单元测试
 /// </summary>
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public class Sprint4_DryRunTests
 {
     [Fact]

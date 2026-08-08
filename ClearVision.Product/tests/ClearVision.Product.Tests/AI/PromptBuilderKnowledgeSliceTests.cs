@@ -5,6 +5,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.AI;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public class PromptBuilderKnowledgeSliceTests
 {
     [Fact(DisplayName = "PromptBuilder should include operator knowledge slice when retriever is available")]
@@ -102,6 +103,31 @@ public class PromptBuilderKnowledgeSliceTests
         prompt.Should().NotContain("UnknownOperator");
     }
 
+    [Fact(DisplayName = "PromptBuilder should include compact exact image contracts and compatibility evidence")]
+    public void BuildSystemPrompt_WithImageContractCard_ShouldEmbedExactPairsWithoutCartesianExpansion()
+    {
+        var factory = new OperatorFactory();
+        var compatibilityMetadata = factory.GetAllMetadata()
+            .First(item => ImageContractPresentationBuilder.Summarize(item.ImageInputContracts).CompatibilityOnly);
+        var retriever = new FakeOperatorKnowledgeRetriever(new OperatorKnowledgeSlice
+        {
+            RetrievalSummary = "operator_count=1",
+            PrioritizedOperatorTypes = [compatibilityMetadata.Type.ToString()],
+            Cards = [CreateValidatedCard(factory, compatibilityMetadata.Type.ToString())]
+        });
+
+        var prompt = new PromptBuilder(factory, retriever)
+            .BuildSystemPrompt(compatibilityMetadata.DisplayName);
+
+        prompt.Should().Contain(ImageContractPresentationBuilder.LegacyCompatibilityNotice);
+        prompt.Should().Contain("LegacyCompatibilityAllowance");
+        prompt.Should().Contain("CV_8UC1");
+        prompt.Should().Contain("CV_8UC3");
+        prompt.Should().Contain("CV_8UC4");
+        prompt.Should().Contain("\"ModeGroups\"");
+        prompt.Should().Contain("\"Inputs\"");
+    }
+
     private static OperatorKnowledgeCard CreateValidatedCard(
         IOperatorFactory factory,
         string operatorType,
@@ -141,7 +167,9 @@ public class PromptBuilderKnowledgeSliceTests
                 MaxValue = parameter.MaxValue?.ToString(),
                 IsRequired = parameter.IsRequired,
                 AllowedValues = parameter.Options?.Select(option => option.Label).ToList() ?? []
-            }).ToList()
+            }).ToList(),
+            ImageInputContracts = metadata.ImageInputContracts.ToList(),
+            ImageInputContractPresentations = metadata.ImageInputContractPresentations.ToList()
         };
 
         configure?.Invoke(card);

@@ -14,6 +14,7 @@ namespace ClearVision.Product.Tests.Integration;
 /// <summary>
 /// DemoProjectService 集成测试
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "product")]
 public class DemoProjectServiceIntegrationTests
 {
     private readonly IProjectRepository _projectRepository;
@@ -50,7 +51,7 @@ public class DemoProjectServiceIntegrationTests
         operators[1].Type.Should().Be(OperatorType.Preprocessing);
         operators[2].Name.Should().Be("边缘检测");
         operators[2].Type.Should().Be(OperatorType.EdgeDetection);
-        operators[3].Name.Should().Be("二值化");
+        operators[3].Name.Should().Be("全局阈值处理");
         operators[3].Type.Should().Be(OperatorType.Thresholding);
         operators[4].Name.Should().Be("轮廓查找");
         operators[4].Type.Should().Be(OperatorType.ContourDetection);

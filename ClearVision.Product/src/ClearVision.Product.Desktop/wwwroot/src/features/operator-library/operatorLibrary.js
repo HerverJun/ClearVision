@@ -35,6 +35,136 @@ import {
     searchOperators
 } from '../../shared/operatorSearch.js';
 
+export const LEGACY_IMAGE_COMPATIBILITY_NOTICE = 'Legacy 8U compatibility allowance — unverified';
+
+function readContractField(value, camelName, pascalName, fallback = undefined) {
+    return value?.[camelName] ?? value?.[pascalName] ?? fallback;
+}
+
+function formatExactInputType(depth, channels) {
+    return `${depth}C${channels}`;
+}
+
+function buildPresentationFromVariants(contract) {
+    const variants = readContractField(contract, 'variants', 'Variants', []);
+    const normalizedVariants = Array.isArray(variants) ? variants : [];
+    const groups = new Map();
+    let allowedVariantCount = 0;
+    let verifiedSupportVariantCount = 0;
+    let verifiedConversionVariantCount = 0;
+    let legacyCompatibilityVariantCount = 0;
+    let verifiedRejectionVariantCount = 0;
+    let unknownVariantCount = 0;
+
+    normalizedVariants.forEach(variant => {
+        const admission = String(readContractField(variant, 'admission', 'Admission', 'Unknown'));
+        const verification = String(readContractField(variant, 'verification', 'Verification', 'Unknown'));
+        if (admission === 'Allowed') allowedVariantCount += 1;
+        if (verification === 'VerifiedSupport') verifiedSupportVariantCount += 1;
+        if (verification === 'VerifiedConversion') verifiedConversionVariantCount += 1;
+        if (verification === 'LegacyCompatibilityAllowance') legacyCompatibilityVariantCount += 1;
+        if (verification === 'VerifiedRejection') verifiedRejectionVariantCount += 1;
+        if (verification === 'Unknown') unknownVariantCount += 1;
+
+        const group = {
+            mode: String(readContractField(variant, 'mode', 'Mode', 'Default')),
+            condition: String(readContractField(variant, 'condition', 'Condition', '-')),
+            admission,
+            verification,
+            conversionPolicy: String(readContractField(variant, 'conversionPolicy', 'ConversionPolicy', 'None')),
+            outputDepthPolicy: String(readContractField(variant, 'outputDepthPolicy', 'OutputDepthPolicy', '-')),
+            dynamicRangePolicy: String(readContractField(variant, 'dynamicRangePolicy', 'DynamicRangePolicy', '-')),
+            inputValuePolicy: String(readContractField(variant, 'inputValuePolicy', 'InputValuePolicy', 'Any')),
+            failureCode: String(readContractField(variant, 'failureCode', 'FailureCode', 'IMAGE_CONTRACT_UNKNOWN')),
+            evidenceLevel: String(readContractField(variant, 'evidenceLevel', 'EvidenceLevel', 'Unknown'))
+        };
+        const key = JSON.stringify(group);
+        if (!groups.has(key)) {
+            groups.set(key, { ...group, exactInputTypes: [] });
+        }
+        const depth = String(readContractField(variant, 'depth', 'Depth', 'Unknown'));
+        const channels = Number(readContractField(variant, 'channels', 'Channels', 0));
+        groups.get(key).exactInputTypes.push(formatExactInputType(depth, channels));
+    });
+
+    const hasProductionSupport = verifiedSupportVariantCount + verifiedConversionVariantCount > 0;
+    const compatibilityOnly = legacyCompatibilityVariantCount > 0 && !hasProductionSupport;
+    const evidenceSummary = compatibilityOnly
+        ? LEGACY_IMAGE_COMPATIBILITY_NOTICE
+        : hasProductionSupport
+            ? (legacyCompatibilityVariantCount > 0
+                ? `Verified production support is present; ${LEGACY_IMAGE_COMPATIBILITY_NOTICE}.`
+                : 'Verified production support is present.')
+            : 'Unknown — no verified executable image support is registered.';
+
+    return {
+        inputPort: String(readContractField(contract, 'inputPort', 'InputPort', 'Image')),
+        contractVersion: String(readContractField(contract, 'contractVersion', 'ContractVersion', '')),
+        allowedVariantCount,
+        verifiedSupportVariantCount,
+        verifiedConversionVariantCount,
+        legacyCompatibilityVariantCount,
+        verifiedRejectionVariantCount,
+        unknownVariantCount,
+        hasProductionSupport,
+        compatibilityOnly,
+        evidenceSummary,
+        exactVariantGroups: Array.from(groups.values()).map(group => ({
+            ...group,
+            exactInputTypes: [...new Set(group.exactInputTypes)]
+        }))
+    };
+}
+
+export function normalizeImageInputContracts(rawContracts, rawPresentations = []) {
+    if (!Array.isArray(rawContracts)) {
+        return [];
+    }
+
+    const presentationsByPort = new Map((Array.isArray(rawPresentations) ? rawPresentations : [])
+        .map(presentation => [
+            String(readContractField(presentation, 'inputPort', 'InputPort', '')),
+            presentation
+        ]));
+
+    return rawContracts.map(contract => {
+        const inputPort = String(readContractField(contract, 'inputPort', 'InputPort', 'Image'));
+        const presentation = readContractField(contract, 'presentation', 'Presentation') ||
+            presentationsByPort.get(inputPort);
+        if (!presentation) {
+            return buildPresentationFromVariants(contract);
+        }
+
+        const groups = readContractField(presentation, 'exactVariantGroups', 'ExactVariantGroups', []);
+        return {
+            inputPort: String(readContractField(presentation, 'inputPort', 'InputPort', readContractField(contract, 'inputPort', 'InputPort', 'Image'))),
+            contractVersion: String(readContractField(presentation, 'contractVersion', 'ContractVersion', readContractField(contract, 'contractVersion', 'ContractVersion', ''))),
+            allowedVariantCount: Number(readContractField(presentation, 'allowedVariantCount', 'AllowedVariantCount', 0)),
+            verifiedSupportVariantCount: Number(readContractField(presentation, 'verifiedSupportVariantCount', 'VerifiedSupportVariantCount', 0)),
+            verifiedConversionVariantCount: Number(readContractField(presentation, 'verifiedConversionVariantCount', 'VerifiedConversionVariantCount', 0)),
+            legacyCompatibilityVariantCount: Number(readContractField(presentation, 'legacyCompatibilityVariantCount', 'LegacyCompatibilityVariantCount', 0)),
+            verifiedRejectionVariantCount: Number(readContractField(presentation, 'verifiedRejectionVariantCount', 'VerifiedRejectionVariantCount', 0)),
+            unknownVariantCount: Number(readContractField(presentation, 'unknownVariantCount', 'UnknownVariantCount', 0)),
+            hasProductionSupport: Boolean(readContractField(presentation, 'hasProductionSupport', 'HasProductionSupport', false)),
+            compatibilityOnly: Boolean(readContractField(presentation, 'compatibilityOnly', 'CompatibilityOnly', false)),
+            evidenceSummary: String(readContractField(presentation, 'evidenceSummary', 'EvidenceSummary', '')),
+            exactVariantGroups: (Array.isArray(groups) ? groups : []).map(group => ({
+                mode: String(readContractField(group, 'mode', 'Mode', 'Default')),
+                condition: String(readContractField(group, 'condition', 'Condition', '-')),
+                admission: String(readContractField(group, 'admission', 'Admission', 'Unknown')),
+                verification: String(readContractField(group, 'verification', 'Verification', 'Unknown')),
+                exactInputTypes: readContractField(group, 'exactInputTypes', 'ExactInputTypes', []),
+                conversionPolicy: String(readContractField(group, 'conversionPolicy', 'ConversionPolicy', 'None')),
+                outputDepthPolicy: String(readContractField(group, 'outputDepthPolicy', 'OutputDepthPolicy', '-')),
+                dynamicRangePolicy: String(readContractField(group, 'dynamicRangePolicy', 'DynamicRangePolicy', '-')),
+                inputValuePolicy: String(readContractField(group, 'inputValuePolicy', 'InputValuePolicy', 'Any')),
+                failureCode: String(readContractField(group, 'failureCode', 'FailureCode', 'IMAGE_CONTRACT_UNKNOWN')),
+                evidenceLevel: String(readContractField(group, 'evidenceLevel', 'EvidenceLevel', 'Unknown'))
+            }))
+        };
+    });
+}
+
 export class OperatorLibraryPanel {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
@@ -45,6 +175,7 @@ export class OperatorLibraryPanel {
         this.metadataByType = new Map();
         this.operatorLoadState = 'idle';
         this.operatorLoadError = '';
+        this.includeCompatibility = false;
 
         // 事件回调
         this.onOperatorDragStart = null;
@@ -329,7 +460,8 @@ export class OperatorLibraryPanel {
 
     async loadOperatorsFromMetadata() {
         try {
-            const operators = await httpClient.get('/operators/library');
+            const compatibilityQuery = this.includeCompatibility ? '?includeCompatibility=true' : '';
+            const operators = await httpClient.get(`/operators/library${compatibilityQuery}`);
             if (Array.isArray(operators) && operators.length > 0) {
                 const normalizedOperators = operators
                     .map(operator => this.normalizeOperatorMetadata(operator, operator.type || operator.Type))
@@ -343,7 +475,8 @@ export class OperatorLibraryPanel {
             debugLogger.warn('[OperatorLibraryPanel] 获取算子库接口失败，回退到类型元数据接口:', error);
         }
 
-        const types = await httpClient.get('/operators/types');
+        const compatibilityQuery = this.includeCompatibility ? '?includeCompatibility=true' : '';
+        const types = await httpClient.get(`/operators/types${compatibilityQuery}`);
         if (!Array.isArray(types) || types.length === 0) {
             return [];
         }
@@ -379,29 +512,57 @@ export class OperatorLibraryPanel {
         }
 
         const category = metadata.category || metadata.Category || '其他';
+        const categoryId = metadata.categoryId || metadata.CategoryId || '';
+        const categoryOrder = Number(metadata.categoryOrder ?? metadata.CategoryOrder ?? Number.MAX_SAFE_INTEGER);
+        const lifecycle = String(metadata.lifecycle || metadata.Lifecycle || 'Stable');
+        const lifecycleNote = metadata.lifecycleNote || metadata.LifecycleNote || '';
+        const defaultHidden = Boolean(metadata.defaultHidden ?? metadata.DefaultHidden ?? false);
         const displayName = metadata.displayName || metadata.DisplayName || metadata.name || metadata.Name || type;
         const parameters = metadata.parameters || metadata.Parameters || [];
         const inputPorts = metadata.inputPorts || metadata.InputPorts || [];
         const outputPorts = metadata.outputPorts || metadata.OutputPorts || [];
         const tags = metadata.tags || metadata.Tags || [];
         const keywords = metadata.keywords || metadata.Keywords || [];
+        const imageInputContracts = normalizeImageInputContracts(
+            metadata.imageInputContracts || metadata.ImageInputContracts || [],
+            metadata.imageInputContractPresentations || metadata.ImageInputContractPresentations || []);
         const iconName = normalizeOperatorIconName(metadata);
 
         return {
             ...metadata,
             type,
+            categoryId,
+            categoryOrder,
             category,
             displayName,
+            lifecycle,
+            lifecycleNote,
+            defaultHidden,
             iconName,
             description: metadata.description || metadata.Description || '暂无描述',
             parameters,
             inputPorts,
             outputPorts,
+            imageInputContracts,
             tags: Array.isArray(tags) ? tags : [],
             keywords: Array.isArray(keywords) ? keywords : [],
             inputType: metadata.inputType || metadata.InputType || (inputPorts[0]?.dataType || inputPorts[0]?.DataType || '图像'),
             outputType: metadata.outputType || metadata.OutputType || (outputPorts[0]?.dataType || outputPorts[0]?.DataType || '图像/数据')
         };
+    }
+
+    async setIncludeCompatibility(includeCompatibility) {
+        const nextValue = Boolean(includeCompatibility);
+        if (this.includeCompatibility === nextValue) {
+            return;
+        }
+
+        this.includeCompatibility = nextValue;
+        await this.loadOperators();
+    }
+
+    getIncludeCompatibility() {
+        return this.includeCompatibility;
     }
 
     getOperatorIconName(operator) {
@@ -605,6 +766,43 @@ export class OperatorLibraryPanel {
         });
     }
 
+    renderImageInputContracts(contracts) {
+        if (!Array.isArray(contracts) || contracts.length === 0) {
+            return '';
+        }
+
+        return `
+            <div class="detail-section image-contract-section" data-image-contracts="true">
+                <h5>图像输入合同</h5>
+                ${contracts.map(contract => `
+                    <div class="image-contract-card" data-image-contract-port="${this.escapeHtml(contract.inputPort)}">
+                        <p><strong>${this.escapeHtml(contract.inputPort)}</strong> · v${this.escapeHtml(contract.contractVersion || '-')}</p>
+                        <p class="image-contract-evidence">${this.escapeHtml(contract.evidenceSummary || 'Unknown')}</p>
+                        <p class="params-empty">
+                            Verified support: ${contract.verifiedSupportVariantCount};
+                            Verified conversion: ${contract.verifiedConversionVariantCount};
+                            Compatibility-only: ${contract.legacyCompatibilityVariantCount};
+                            Rejected: ${contract.verifiedRejectionVariantCount};
+                            Unknown: ${contract.unknownVariantCount}
+                        </p>
+                        <ul class="params-list image-contract-variants">
+                            ${(contract.exactVariantGroups || []).map(group => `
+                                <li class="param-item image-contract-variant">
+                                    <span class="param-name">${this.escapeHtml(group.mode)}</span>
+                                    <span class="param-type">${this.escapeHtml(group.admission)} / ${this.escapeHtml(group.verification)}</span>
+                                    <span class="param-default">${this.escapeHtml((group.exactInputTypes || []).join(', '))}</span>
+                                    <span class="param-description">条件: ${this.escapeHtml(group.condition || '-')}</span>
+                                    <span class="param-description">转换: ${this.escapeHtml(group.conversionPolicy || 'None')}; 输出: ${this.escapeHtml(group.outputDepthPolicy || '-')}; 动态范围: ${this.escapeHtml(group.dynamicRangePolicy || '-')}</span>
+                                    <span class="param-description">失败码: ${this.escapeHtml(group.failureCode || 'IMAGE_CONTRACT_UNKNOWN')}; 证据: ${this.escapeHtml(group.evidenceLevel || 'Unknown')}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
     /**
      * 显示算子预览
      */
@@ -628,6 +826,9 @@ export class OperatorLibraryPanel {
         const usage = this.escapeHtml(resolvedOperator.usage || resolvedOperator.Usage || resolvedOperator.purpose || resolvedOperator.Purpose || resolvedOperator.description || '用于流程中的图像处理、检测或数据转换步骤。');
         const scenario = this.escapeHtml(resolvedOperator.scenario || resolvedOperator.Scenario || resolvedOperator.typicalScenario || resolvedOperator.TypicalScenario || '根据输入/输出端口接入合适的上游图像或结构化数据。');
         const notes = this.escapeHtml(resolvedOperator.notes || resolvedOperator.Notes || resolvedOperator.attention || resolvedOperator.Attention || '请确认必填参数、端口类型和上游图像来源后再运行。');
+        const imageInputContracts = Array.isArray(resolvedOperator.imageInputContracts)
+            ? resolvedOperator.imageInputContracts
+            : normalizeImageInputContracts(resolvedOperator.ImageInputContracts || []);
         const featureBadge = this.escapeHtml(getFeatureBadge('operator.autotuneStrategies'));
         const featureDescription = this.escapeHtml(getFeatureDescription('operator.autotuneStrategies'));
         const renderPortLabel = (port, fallbackName = '未命名', direction = 'output') => {
@@ -702,6 +903,7 @@ export class OperatorLibraryPanel {
                             `}
                     </div>
                 </div>
+                ${this.renderImageInputContracts(imageInputContracts)}
                 <div class="detail-actions" style="margin-top:16px;">
                     <button class="cv-btn cv-btn-secondary" id="btn-show-autotune-strategies">查看自动调参策略</button>
                     <div class="params-empty" style="margin-top:8px;">${featureBadge}：${featureDescription}</div>

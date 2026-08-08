@@ -6,6 +6,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.AI;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public class OperatorKnowledgeGraphTests
 {
     [Fact(DisplayName = "OperatorKnowledgeGraph should include all operator cards and key edge types")]
@@ -32,6 +33,12 @@ public class OperatorKnowledgeGraphTests
             graph.Edges.Should().Contain(edge => edge.RelationType == "HAS_EVIDENCE");
             graph.Edges.Should().Contain(edge => edge.RelationType == "ALIAS_OF");
             graph.Edges.Should().Contain(edge => edge.RelationType == "REQUIRES_RESOURCE");
+
+            var deepLearning = graph.Cards.Single(card => card.OperatorType == "DeepLearning");
+            deepLearning.Aliases.Should().Contain(
+                ["目标检测", "图像分类", "分类推理", "语义分割", "像素级分割"]);
+            deepLearning.IntentTags.Should().Contain(
+                ["object_detection", "image_classification", "semantic_segmentation"]);
         }
         finally
         {

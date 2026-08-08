@@ -22,6 +22,15 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Keywords = new[] { "semantic segmentation", "segmentation", "onnx", "mask", "语义分割" },
     Version = "1.0.0"
 )]
+[OperatorParameterRule("ModelPath", RequiredPolicy = OperatorParameterRequiredPolicy.Required,
+    AtLeastOneGroup = "semantic-segmentation-model-source", MutuallyExclusiveGroup = "semantic-segmentation-model-source",
+    ResourceKind = OperatorResourceKind.ModelResource, ReasonCode = "SEMANTIC_SEGMENTATION_MODEL_SOURCE_REQUIRED")]
+[OperatorParameterRule("ModelId", RequiredPolicy = OperatorParameterRequiredPolicy.Required,
+    AtLeastOneGroup = "semantic-segmentation-model-source", MutuallyExclusiveGroup = "semantic-segmentation-model-source",
+    ResourceKind = OperatorResourceKind.ModelResource, ReasonCode = "SEMANTIC_SEGMENTATION_MODEL_SOURCE_REQUIRED")]
+[OperatorParameterRule("ModelCatalogPath", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    DisabledWhenAny = new[] { "ModelId:empty", "ModelPath:not-empty" },
+    ResourceKind = OperatorResourceKind.ModelCatalog, ReasonCode = "SEMANTIC_SEGMENTATION_CATALOG_REQUIRES_MODEL_ID")]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("SegmentationMap", "Segmentation Map", PortDataType.Image)]
 [OutputPort("ColoredMap", "Colored Map", PortDataType.Image)]
@@ -169,12 +178,43 @@ public sealed class SemanticSegmentationOperator : OperatorBase
         }
 
         var modelPath = modelTarget.ResolvedPath;
-        var modelCatalogEntry = modelTarget.Entry;
         if (!File.Exists(modelPath))
         {
             return OperatorExecutionOutput.Failure($"Model file not found: {modelPath}");
         }
 
+        var executionProvider = NormalizeExecutionProvider(GetStringParam(@operator, "ExecutionProvider", "cpu"));
+
+        SessionLease sessionLease;
+        try
+        {
+            sessionLease = await GetOrCreateSessionLeaseAsync(modelPath, executionProvider, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load segmentation model.");
+            return OperatorExecutionOutput.Failure($"Failed to load segmentation model: {ex.Message}");
+        }
+
+        using (sessionLease)
+        {
+            return await ExecuteWithSessionAsync(
+                @operator,
+                src,
+                sessionLease.Session,
+                modelTarget,
+                cancellationToken);
+        }
+    }
+
+    internal async Task<OperatorExecutionOutput> ExecuteWithSessionAsync(
+        Operator @operator,
+        Mat sourceImage,
+        InferenceSession session,
+        ResolvedModelTarget modelTarget,
+        CancellationToken cancellationToken)
+    {
+        var modelCatalogEntry = modelTarget.Entry;
         var rawInputSize = GetStringParam(@operator, "InputSize", "512,512");
         var effectiveInputSize = ShouldUseCatalogInputSize(rawInputSize, modelCatalogEntry)
             ? $"{modelCatalogEntry!.InputSize[0]},{modelCatalogEntry.InputSize[1]}"
@@ -193,33 +233,37 @@ public sealed class SemanticSegmentationOperator : OperatorBase
             return OperatorExecutionOutput.Failure("Mean/Std must contain 3 numeric values and Std must be > 0.");
         }
 
-        var executionProvider = NormalizeExecutionProvider(GetStringParam(@operator, "ExecutionProvider", "cpu"));
         var useUnitRange = GetBoolParam(@operator, "ScaleToUnitRange", true);
-        var channelOrder = ParseChannelOrder(GetStringParam(@operator, "ChannelOrder", "RGB"));
-        var classNames = ResolveClassNames(@operator, modelCatalogEntry, numClasses);
-        var maxClassMasks = GetIntParam(@operator, "MaxClassMasks", 32, min: 0, max: 4096);
-
-        SessionLease sessionLease;
+        SegmentationChannelOrder channelOrder;
         try
         {
-            sessionLease = await GetOrCreateSessionLeaseAsync(modelPath, executionProvider, cancellationToken);
+            channelOrder = ParseChannelOrder(GetStringParam(@operator, "ChannelOrder", "RGB"));
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to load segmentation model.");
-            return OperatorExecutionOutput.Failure($"Failed to load segmentation model: {ex.Message}");
+            return OperatorExecutionOutput.Failure(ex.Message);
         }
+
+        var classNames = ResolveClassNames(@operator, modelCatalogEntry, numClasses);
+        var maxClassMasks = GetIntParam(@operator, "MaxClassMasks", 32, min: 0, max: 4096);
 
         SegmentationExecutionResult executionResult;
         try
         {
-            using (sessionLease)
-            {
-                var session = sessionLease.Session;
-                executionResult = await RunCpuBoundWork(
-                    () => ExecuteSegmentation(session, src, inputWidth, inputHeight, numClasses, classNames, maxClassMasks, channelOrder, mean, std, useUnitRange),
-                    cancellationToken);
-            }
+            executionResult = await RunCpuBoundWork(
+                () => ExecuteSegmentation(
+                    session,
+                    sourceImage,
+                    inputWidth,
+                    inputHeight,
+                    numClasses,
+                    classNames,
+                    maxClassMasks,
+                    channelOrder,
+                    mean,
+                    std,
+                    useUnitRange),
+                cancellationToken);
         }
         catch (OnnxRuntimeException ex)
         {

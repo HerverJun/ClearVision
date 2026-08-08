@@ -9,6 +9,7 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Detection, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 [Trait("Category", "Sprint5_Phase2")]
 public class SurfaceDefectDetectionOperatorTests
 {
@@ -224,7 +225,9 @@ public class SurfaceDefectDetectionOperatorTests
         var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
 
         Assert.False(result.IsSuccess);
-        Assert.Contains("Unsupported image channel count", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith("IMAGE_CHANNELS_UNSUPPORTED:", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("OperatorType=SurfaceDefectDetection", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("InputMatType=CV_8UC2", result.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]

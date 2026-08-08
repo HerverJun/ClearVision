@@ -304,7 +304,7 @@ test('AI draft normalization ignores leaked tempId labels', async () => {
 
   assert.deepEqual(
     normalizedChain.operators.map(item => item.name),
-    ['图像采集', 'ROI管理器', '二值化', '二值图转区域', '斑点分析', '条件判断', '结果输出']
+    ['图像采集', 'ROI裁剪与掩膜', '全局阈值处理', '二值图转区域', 'Blob分析', '条件判断', '结果输出']
   );
   assert.deepEqual(
     normalizedChain.operators.map(item => item.metadata.agentTempId),

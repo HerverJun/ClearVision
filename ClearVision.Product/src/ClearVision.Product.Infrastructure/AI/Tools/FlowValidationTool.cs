@@ -587,9 +587,22 @@ internal static class VisionAgentFlowDraftValidator
         string parameterName,
         VisionAgentOperatorContract contract)
     {
-        return contract.ParameterConstraints?.Any(constraint =>
-                   constraint.Parameter.Equals(parameterName, StringComparison.OrdinalIgnoreCase)) == true ||
-               GetLegacyMetadataParameterGroup(operatorType, parameterName).Count > 0;
+        if (contract.ParameterConstraints?.Any(constraint =>
+                constraint.Parameter.Equals(parameterName, StringComparison.OrdinalIgnoreCase)) == true)
+        {
+            return true;
+        }
+
+        var resourceKind = VisionAgentResourceClassifier.Classify(operatorType, parameterName);
+        if (string.IsNullOrWhiteSpace(resourceKind))
+        {
+            return false;
+        }
+
+        return contract.Parameters.Any(parameter =>
+                   HasResourceKind(operatorType, parameter.Name, parameter.DataType, resourceKind)) ||
+               contract.InputPorts.Any(input =>
+                   HasResourceKind(operatorType, input.Name, input.DataType.ToString(), resourceKind));
     }
 
     private static bool IsRuleCenterManagedMetadata(
@@ -601,52 +614,19 @@ internal static class VisionAgentFlowDraftValidator
                    constraint.Parameter.Equals(parameterName, StringComparison.OrdinalIgnoreCase) &&
                    (!string.IsNullOrWhiteSpace(constraint.ResourceKind) ||
                     !string.IsNullOrWhiteSpace(constraint.AtLeastOneGroup) ||
-                    !string.IsNullOrWhiteSpace(constraint.AliasFor))) == true ||
-               GetLegacyMetadataParameterGroup(operatorType, parameterName).Count > 0;
+                    !string.IsNullOrWhiteSpace(constraint.AliasFor))) == true;
     }
 
-    private static IReadOnlyList<string> GetLegacyMetadataParameterGroup(
+    private static bool HasResourceKind(
         string operatorType,
-        string parameterName)
+        string name,
+        string? dataType,
+        string expectedResourceKind)
     {
-        if (!IsOperatorType(operatorType, "DeepLearning") &&
-            IsDeepLearningOperator(operatorType) &&
-            IsAny(parameterName, "ModelPath", "ModelId", "ModelCatalogPath"))
-        {
-            return ["ModelPath", "ModelId", "ModelCatalogPath"];
-        }
-
-        if (IsOperatorType(operatorType, "TemplateMatching") &&
-            IsAny(parameterName, "Template", "TemplatePath", "TemplateId"))
-        {
-            return ["TemplatePath", "TemplateId", "Template"];
-        }
-
-        if (operatorType.Contains("Plc", StringComparison.OrdinalIgnoreCase) &&
-            IsAny(parameterName, "PlcAddress", "PLCParameters"))
-        {
-            return ["PlcAddress", "PLCParameters"];
-        }
-
-        return [];
-    }
-
-    private static bool IsDeepLearningOperator(string operatorType)
-    {
-        return IsOperatorType(operatorType, "DeepLearning") ||
-               IsOperatorType(operatorType, "OnnxInference") ||
-               IsOperatorType(operatorType, "SemanticSegmentation") ||
-               IsOperatorType(operatorType, "AnomalyDetection");
-    }
-
-    private static bool IsOperatorType(string operatorType, string expected)
-    {
-        return string.Equals(operatorType, expected, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsAny(string value, params string[] candidates)
-    {
-        return candidates.Any(candidate => string.Equals(value, candidate, StringComparison.OrdinalIgnoreCase));
+        return string.Equals(
+            VisionAgentResourceClassifier.Classify(operatorType, name, dataType),
+            expectedResourceKind,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static void AddMissingResource(

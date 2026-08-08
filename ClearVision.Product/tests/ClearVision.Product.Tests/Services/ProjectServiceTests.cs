@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
@@ -24,6 +24,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Services;
 
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product", Suites = "ServicesRegression")]
 [Collection(ProjectSaveCoordinatorTestCollections.ProjectSaveCoordinatorState)]
 public class ProjectServiceTests : IDisposable
 {

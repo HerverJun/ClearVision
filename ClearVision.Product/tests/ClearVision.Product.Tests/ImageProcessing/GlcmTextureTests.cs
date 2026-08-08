@@ -5,6 +5,7 @@ using Xunit;
 
 namespace ClearVision.Product.Infrastructure.ImageProcessing.Tests;
 
+[TestClassification(TestDomain.Preprocessing, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public sealed class GlcmTextureTests
 {
     [Fact]
@@ -51,4 +52,3 @@ public sealed class GlcmTextureTests
         return mat;
     }
 }
-

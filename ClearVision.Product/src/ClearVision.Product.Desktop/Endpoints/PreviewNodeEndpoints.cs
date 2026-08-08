@@ -2888,23 +2888,6 @@ public static class PreviewNodeEndpoints
         Dictionary<string, object> OutputData,
         List<string> Diagnostics);
 
-    private sealed record CapturedFramePreviewPreparation(
-        bool IsValid,
-        ClearVision.Product.Core.Entities.OperatorFlow? Flow,
-        byte[]? ImageData,
-        string? ErrorMessage)
-    {
-        public static CapturedFramePreviewPreparation Valid(
-            ClearVision.Product.Core.Entities.OperatorFlow flow,
-            byte[] imageData) =>
-            new(true, flow, imageData, null);
-
-        public static CapturedFramePreviewPreparation Invalid(string? errorMessage) =>
-            new(false, null, null, string.IsNullOrWhiteSpace(errorMessage)
-                ? "单帧预览输入无效。"
-                : errorMessage);
-    }
-
     private static ExecutionSnapshot CreatePreviewSnapshot(Guid projectId, OperatorFlow flow) =>
         new(
             projectId == Guid.Empty

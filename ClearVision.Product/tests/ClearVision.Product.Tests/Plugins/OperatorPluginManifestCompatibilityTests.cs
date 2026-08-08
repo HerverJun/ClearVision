@@ -4,6 +4,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.Plugins;
 
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class OperatorPluginManifestCompatibilityTests
 {
     [Fact]

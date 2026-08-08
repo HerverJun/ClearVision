@@ -34,6 +34,11 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $runner = Join-Path $scriptRoot "run-dotnet-test-serial.ps1"
 $project = Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj"
+$gateConfiguration = Get-Content -LiteralPath (Join-Path $repoRoot "quality\test-gates.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+$gateDefinition = @($gateConfiguration.gates | Where-Object { $_.name -ceq "measurement-performance" })
+if ($gateDefinition.Count -ne 1) {
+    throw "Expected exactly one measurement-performance gate in quality/test-gates.json; found $($gateDefinition.Count)."
+}
 $defaultResultsDirectory = Join-Path $repoRoot ".tmp\test_results\measurement-performance"
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $defaultLogFileName = "measurement-performance-$timestamp.trx"
@@ -288,9 +293,7 @@ if ($ValidateReportOnly) {
 
 $parameters = @{
     Project = $project
-    FullyQualifiedName = @(
-        "MeasurementPerformanceBudgetAcceptanceTests"
-    )
+    Filter = [string]$gateDefinition[0].filter
     Verbosity = $Verbosity
     ResultsDirectory = if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) { $defaultResultsDirectory } else { $ResultsDirectory }
     LogFileName = if ([string]::IsNullOrWhiteSpace($LogFileName)) { $defaultLogFileName } else { $LogFileName }

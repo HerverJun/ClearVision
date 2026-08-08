@@ -73,12 +73,21 @@ public class AngleMeasurementOperator : OperatorBase
         }
 
         var angleRad = geometry.HasLineOverlay && geometry.Line1 != null && geometry.Line2 != null
-            ? ComputeLineAngleRadians(geometry.Line1, geometry.Line2)
-            : ComputeAngleRadians(v1x, v1y, v2x, v2y, len1, len2);
+            ? MeasurementGeometryHelper.AngleBetweenLineDirections(geometry.Line1, geometry.Line2) * Math.PI / 180.0
+            : MeasurementGeometryHelper.ThreePointAngleRadians(
+                geometry.Point1,
+                geometry.Point2,
+                geometry.Point3);
         var angle = unit.Equals("Radian", StringComparison.OrdinalIgnoreCase)
             ? angleRad
             : angleRad * 180.0 / Math.PI;
-        var uncertaintyDeg = ComputeAngleUncertaintyDegrees(geometry, len1, len2);
+        var uncertaintyDeg = MeasurementGeometryHelper.PropagateThreePointAngleUncertaintyDegrees(
+            geometry.Point1,
+            geometry.Point1SigmaPx,
+            geometry.Point2,
+            geometry.VertexSigmaPx,
+            geometry.Point3,
+            geometry.Point3SigmaPx);
 
         var resultImage = src.Clone();
         if (geometry.HasLineOverlay)
@@ -116,31 +125,6 @@ public class AngleMeasurementOperator : OperatorBase
         }
 
         return ValidationResult.Valid();
-    }
-
-    private static double ComputeAngleRadians(double v1x, double v1y, double v2x, double v2y, double len1, double len2)
-    {
-        var dot = v1x * v2x + v1y * v2y;
-        var cosTheta = Math.Clamp(dot / (len1 * len2), -1.0, 1.0);
-        return Math.Acos(cosTheta);
-    }
-
-    private static double ComputeLineAngleRadians(LineData line1, LineData line2)
-    {
-        var v1x = line1.EndX - line1.StartX;
-        var v1y = line1.EndY - line1.StartY;
-        var v2x = line2.EndX - line2.StartX;
-        var v2y = line2.EndY - line2.StartY;
-        var len1 = Math.Sqrt(v1x * v1x + v1y * v1y);
-        var len2 = Math.Sqrt(v2x * v2x + v2y * v2y);
-        if (len1 < 1e-9 || len2 < 1e-9)
-        {
-            return 0.0;
-        }
-
-        var dot = Math.Abs(v1x * v2x + v1y * v2y);
-        var cosTheta = Math.Clamp(dot / (len1 * len2), -1.0, 1.0);
-        return Math.Acos(cosTheta);
     }
 
     private bool TryResolveAngleGeometry(
@@ -226,39 +210,14 @@ public class AngleMeasurementOperator : OperatorBase
 
     private static bool TryParsePoint(object raw, out Position point, out double sigmaPx)
     {
-        point = new Position(0, 0);
-        sigmaPx = 0.0;
-
-        switch (raw)
+        if (!MeasurementGeometryHelper.TryParsePoint(raw, out point))
         {
-            case Position position:
-                point = position;
-                sigmaPx = 0.05;
-                return true;
-            case Point2d point2d:
-                point = new Position(point2d.X, point2d.Y);
-                sigmaPx = 0.05;
-                return true;
-            case Point2f point2f:
-                point = new Position(point2f.X, point2f.Y);
-                sigmaPx = 0.08;
-                return true;
-            case Point pointInt:
-                point = new Position(pointInt.X, pointInt.Y);
-                sigmaPx = 0.5;
-                return true;
-            case IDictionary<string, object> dict:
-                if (TryReadDouble(dict, "X", out var x) && TryReadDouble(dict, "Y", out var y))
-                {
-                    point = new Position(x, y);
-                    sigmaPx = HasFractionalComponent(x) || HasFractionalComponent(y) ? 0.05 : 0.5;
-                    return true;
-                }
-
-                break;
+            sigmaPx = 0.0;
+            return false;
         }
 
-        return false;
+        sigmaPx = MeasurementGeometryHelper.EstimateAnglePointSigma(raw, point);
+        return true;
     }
 
     private static bool TryResolveLine(
@@ -275,68 +234,13 @@ public class AngleMeasurementOperator : OperatorBase
             return false;
         }
 
-        if (raw is LineData lineData)
-        {
-            line = lineData;
-            sigmaPx = HasFractionalComponent(line.StartX) ||
-                      HasFractionalComponent(line.StartY) ||
-                      HasFractionalComponent(line.EndX) ||
-                      HasFractionalComponent(line.EndY)
-                ? 0.05
-                : 0.5;
-            return true;
-        }
-
-        if (raw is IDictionary<string, object> dict &&
-            TryReadDouble(dict, "StartX", out var startX) &&
-            TryReadDouble(dict, "StartY", out var startY) &&
-            TryReadDouble(dict, "EndX", out var endX) &&
-            TryReadDouble(dict, "EndY", out var endY))
-        {
-            line = new LineData((float)startX, (float)startY, (float)endX, (float)endY);
-            sigmaPx = HasFractionalComponent(startX) ||
-                      HasFractionalComponent(startY) ||
-                      HasFractionalComponent(endX) ||
-                      HasFractionalComponent(endY)
-                ? 0.05
-                : 0.5;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryReadDouble(IDictionary<string, object> dict, string key, out double value)
-    {
-        value = 0.0;
-        if (!dict.TryGetValue(key, out var raw) || raw == null)
+        if (!MeasurementGeometryHelper.TryParseLine(raw, out line))
         {
             return false;
         }
 
-        return raw switch
-        {
-            double d => (value = d) == d,
-            float f => (value = f) == f,
-            int i => (value = i) == i,
-            long l => (value = l) == l,
-            _ => double.TryParse(raw.ToString(), out value)
-        };
-    }
-
-    private static bool HasFractionalComponent(double value)
-    {
-        return Math.Abs(value - Math.Round(value)) > 1e-6;
-    }
-
-    private static double ComputeAngleUncertaintyDegrees(AngleGeometry geometry, double len1, double len2)
-    {
-        var sigmaArm1 = Math.Sqrt((geometry.Point1SigmaPx * geometry.Point1SigmaPx) + (geometry.VertexSigmaPx * geometry.VertexSigmaPx));
-        var sigmaArm2 = Math.Sqrt((geometry.Point3SigmaPx * geometry.Point3SigmaPx) + (geometry.VertexSigmaPx * geometry.VertexSigmaPx));
-        var sigmaAngleRad = Math.Sqrt(
-            Math.Pow(sigmaArm1 / Math.Max(len1, 1e-6), 2) +
-            Math.Pow(sigmaArm2 / Math.Max(len2, 1e-6), 2));
-        return sigmaAngleRad * 180.0 / Math.PI;
+        sigmaPx = MeasurementGeometryHelper.EstimateLineSigma(line);
+        return true;
     }
 
     private static double ComputeConfidence(double uncertaintyDeg)

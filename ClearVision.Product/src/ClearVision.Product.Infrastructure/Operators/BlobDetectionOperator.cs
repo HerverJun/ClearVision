@@ -22,6 +22,13 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Keywords = new[] { "连通域", "缺陷区域", "斑点", "面积提取", "缺陷分析", "Blob", "Connected components" },
     Version = "1.2.1"
 )]
+[OperatorParameterRule("FeatureFilter", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, ReasonCode = "BLOB_FEATURE_FILTER_OPTIONAL")]
+[OperatorParameterRule("HueLow", DisabledWhenAll = new[] { "EnableColorFilter==false" }, HiddenWhenAll = new[] { "EnableColorFilter==false" }, IgnoredWhenAll = new[] { "EnableColorFilter==false" }, ReasonCode = "BLOB_HSV_ONLY_WITH_COLOR_FILTER")]
+[OperatorParameterRule("HueHigh", DisabledWhenAll = new[] { "EnableColorFilter==false" }, HiddenWhenAll = new[] { "EnableColorFilter==false" }, IgnoredWhenAll = new[] { "EnableColorFilter==false" }, ReasonCode = "BLOB_HSV_ONLY_WITH_COLOR_FILTER")]
+[OperatorParameterRule("SatLow", DisabledWhenAll = new[] { "EnableColorFilter==false" }, HiddenWhenAll = new[] { "EnableColorFilter==false" }, IgnoredWhenAll = new[] { "EnableColorFilter==false" }, ReasonCode = "BLOB_HSV_ONLY_WITH_COLOR_FILTER")]
+[OperatorParameterRule("SatHigh", DisabledWhenAll = new[] { "EnableColorFilter==false" }, HiddenWhenAll = new[] { "EnableColorFilter==false" }, IgnoredWhenAll = new[] { "EnableColorFilter==false" }, ReasonCode = "BLOB_HSV_ONLY_WITH_COLOR_FILTER")]
+[OperatorParameterRule("ValLow", DisabledWhenAll = new[] { "EnableColorFilter==false" }, HiddenWhenAll = new[] { "EnableColorFilter==false" }, IgnoredWhenAll = new[] { "EnableColorFilter==false" }, ReasonCode = "BLOB_HSV_ONLY_WITH_COLOR_FILTER")]
+[OperatorParameterRule("ValHigh", DisabledWhenAll = new[] { "EnableColorFilter==false" }, HiddenWhenAll = new[] { "EnableColorFilter==false" }, IgnoredWhenAll = new[] { "EnableColorFilter==false" }, ReasonCode = "BLOB_HSV_ONLY_WITH_COLOR_FILTER")]
 [InputPort("Image", "二值图像", PortDataType.Image, IsRequired = true, Description = "用于连通域分析的二值图或可自动阈值化的灰度图。")]
 [InputPort("SourceImage", "参考图像", PortDataType.Image, IsRequired = false, Description = "可选，仅作为标注结果的参考底图，不替代主 Image 输入。")]
 [OutputPort("Image", "标记图像", PortDataType.Image, Description = "绘制 Blob 边界与中心点的可视化图像。")]

@@ -1741,6 +1741,47 @@ function assertNoSensitiveLeak(text) {
   assert.doesNotMatch(text, /C:\\|D:\\|\\.onnx|192\\.168\\.|DB1\\.DBX|base64|data:image|sk-secret|token|key/i);
 }
 
+test('AI agent workspace uses corrected operator display names', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const expectedNames = {
+    BlobLabeling: 'Blob分类标注',
+    PointAlignment: '点位偏差计算',
+    RoiTransform: 'ROI位姿变换',
+    PositionCorrection: 'ROI位姿补偿（像素）',
+    PointCorrection: '点位刚性补偿',
+    EdgePairDefect: '边缘间距缺陷检测',
+    StatisticalOutlierRemoval: '点云统计离群点去除（SOR）',
+    PPFMatch: 'PPF点云粗匹配',
+    PlanarMatching: '平面特征匹配',
+    ColorDetection: '颜色分析',
+    GeometricTolerance: '二维几何公差判定',
+    DetectionSequenceJudge: '检测顺序判定',
+    ImageDiff: '图像差异率分析',
+    RectangleRegion: '矩形框定义',
+    CoordinateTransform: '像素到物理坐标（单点）',
+    ROIManager: 'ROI裁剪与掩膜',
+    RoiManager: 'ROI裁剪与掩膜',
+    TryCatch: 'Try分支透传',
+    ModbusCommunication: 'Modbus TCP通信',
+    Threshold: '全局阈值处理',
+    Thresholding: '全局阈值处理',
+    FFT1D: '信号/图像傅里叶变换（FFT）',
+    InverseFFT1D: '信号/图像逆傅里叶变换（IFFT）',
+    PhaseClosure: '相位解缠绕',
+    DeepLearning: '深度学习',
+    GeoMeasurement: '几何测量',
+    Measurement: '测量',
+    TcpCommunication: 'TCP通信',
+    ImageAdd: '图像加法',
+    BlobAnalysis: 'Blob分析'
+  };
+
+  for (const [operatorType, displayName] of Object.entries(expectedNames)) {
+    assert.equal(panel._localizeDisplayText(operatorType), displayName, operatorType);
+  }
+});
+
 test('Assistant failure cards redact unsafe backend diagnostics', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -9440,33 +9481,35 @@ test('parameter rules cover TemplateMatching template and ROI dependencies', asy
     getParameterEffectiveState,
     shouldIncludePendingParameter
   } = await loadParameterRules();
-  const missingTemplate = {
+  const missingRoi = withCanonicalConstraints({
     type: 'TemplateMatching',
     parameters: [
-      { name: 'TemplatePath', value: '' },
-      { name: 'TemplateId', value: '' },
       { name: 'UseRoi', value: true },
       { name: 'RoiWidth', value: '' },
-      { name: 'RoiHeight', value: '' }
+      { name: 'RoiHeight', value: '' },
+      { name: 'EnablePoseSearch', value: false },
+      { name: 'AngleExtent', value: 0 }
     ]
-  };
-  const configuredTemplate = {
+  });
+  const fixedPose = withCanonicalConstraints({
     type: 'TemplateMatching',
     parameters: {
-      TemplateId: 'tmpl-fixture',
       UseRoi: false,
-      EnablePoseSearch: false
+      RoiWidth: 0,
+      RoiHeight: 0,
+      EnablePoseSearch: false,
+      AngleExtent: 0
     }
-  };
+  });
 
-  assert.equal(getParameterEffectiveState(configuredTemplate, 'TemplatePath').effectiveDisabled, true);
-  assert.equal(getParameterEffectiveState(configuredTemplate, 'RoiWidth').effectiveDisabled, true);
-  assert.equal(shouldIncludePendingParameter(configuredTemplate, 'TemplatePath'), false);
-  assert.equal(
-    collectEffectiveRequiredParameterErrors(missingTemplate, missingTemplate.parameters)
-      .some(error => error.kind === 'atLeastOneOf' && error.parameterNames.includes('TemplatePath')),
-    true
-  );
+  assert.equal(getParameterEffectiveState(fixedPose, 'RoiWidth').effectiveDisabled, true);
+  assert.equal(getParameterEffectiveState(fixedPose, 'AngleExtent').effectiveDisabled, true);
+  assert.equal(shouldIncludePendingParameter(fixedPose, 'RoiWidth'), false);
+  assert.equal(shouldIncludePendingParameter(fixedPose, 'AngleExtent'), false);
+
+  const errors = collectEffectiveRequiredParameterErrors(missingRoi, missingRoi.parameters);
+  assert.equal(errors.some(error => error.kind === 'required' && error.name === 'RoiWidth'), true);
+  assert.equal(errors.some(error => error.kind === 'required' && error.name === 'RoiHeight'), true);
 });
 
 test('parameter rules cover DeepLearning model source and NMS dependencies', async () => {
@@ -9479,7 +9522,7 @@ test('parameter rules cover DeepLearning model source and NMS dependencies', asy
     type: 'DeepLearning',
     parameters: {
       ModelId: 'wire-sequence-model',
-      UseGpu: false,
+      ExecutionProvider: 'CPU',
       OutputFormat: 'EndToEndNms',
       EnableInternalNms: true
     }

@@ -19,8 +19,11 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "使用均值（方框）滤波平滑图像噪声。",
     CategoryId = OperatorCategoryId.ImagePreprocessing,
     IconName = "filter",
-    Keywords = new[] { "mean filter", "box blur", "box filter", "smooth", "denoise" }
+    Keywords = new[] { "mean filter", "box blur", "box filter", "smooth", "denoise" },
+    Version = "1.1.0"
 )]
+[OperatorImageContractProvider(typeof(SpatialFilterImageContractProvider))]
+[OperatorGenerationDependency(typeof(SpatialFilterKernel))]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Image", PortDataType.Image)]
 [OperatorParam("KernelSize", "Kernel Size", "int", DefaultValue = 5, Min = 1, Max = 63)]
@@ -52,32 +55,51 @@ public class MeanFilterOperator : OperatorBase
         var kernelSize = GetIntParam(@operator, "KernelSize", 5, min: 1, max: 63);
         var borderType = GetIntParam(@operator, "BorderType", 4, min: 0, max: 7);
 
-        // Force odd kernel size to keep a symmetric anchor at center.
-        if (kernelSize % 2 == 0)
-        {
-            kernelSize++;
-        }
-
         var src = imageWrapper.GetMat();
         if (src.Empty())
         {
             return Task.FromResult(OperatorExecutionOutput.Failure("Input image is invalid"));
         }
 
-        var dst = new Mat();
-        Cv2.Blur(src, dst, new Size(kernelSize, kernelSize), new Point(-1, -1), (BorderTypes)borderType);
+        var settings = new SpatialFilterSettings(
+            SpatialFilterMode.Mean,
+            KernelSize: kernelSize,
+            BorderType: borderType);
+        if (!SpatialFilterKernel.TryValidate(settings, out var validationError) ||
+            !SpatialFilterKernel.TryValidateInput(src, settings, OperatorType.MeanFilter, out validationError))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(validationError));
+        }
 
-        return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(dst)));
+        var dst = new Mat();
+        SpatialFilterAppliedSettings applied;
+        try
+        {
+            applied = SpatialFilterKernel.Apply(src, dst, settings, OperatorType.MeanFilter);
+        }
+        catch
+        {
+            dst.Dispose();
+            throw;
+        }
+
+        return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(dst, new Dictionary<string, object>
+        {
+            ["FilterMode"] = applied.Mode.ToString(),
+            ["KernelSizeApplied"] = applied.KernelSize,
+            ["BorderTypeApplied"] = applied.BorderType
+        })));
     }
 
     public override ValidationResult ValidateParameters(Operator @operator)
     {
         var kernelSize = GetIntParam(@operator, "KernelSize", 5);
-        if (kernelSize < 1 || kernelSize > 63)
-        {
-            return ValidationResult.Invalid("KernelSize must be in [1, 63]");
-        }
-
-        return ValidationResult.Valid();
+        var settings = new SpatialFilterSettings(
+            SpatialFilterMode.Mean,
+            KernelSize: kernelSize,
+            BorderType: GetIntParam(@operator, "BorderType", 4));
+        return SpatialFilterKernel.TryValidate(settings, out var error)
+            ? ValidationResult.Valid()
+            : ValidationResult.Invalid(error);
     }
 }

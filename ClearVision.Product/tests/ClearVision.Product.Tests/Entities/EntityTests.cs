@@ -11,6 +11,7 @@ namespace ClearVision.Product.Tests.Entities;
 /// <summary>
 /// 工程实体测试
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class ProjectTests
 {
     [Fact]
@@ -136,6 +137,7 @@ public class ProjectTests
 /// <summary>
 /// 算子实体测试
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class OperatorTests
 {
     [Fact]
@@ -265,6 +267,7 @@ public class OperatorTests
 /// <summary>
 /// 检测结果实体测试
 /// </summary>
+[TestClassification(TestDomain.General, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 public class InspectionResultTests
 {
     [Fact]

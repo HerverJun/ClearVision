@@ -21,9 +21,25 @@ namespace ClearVision.Product.Infrastructure.Operators;
     IconName = "filter",
     Keywords = new[] { "gaussian", "mean", "box", "median", "bilateral", "blur", "filter", "denoise", "滤波" }
 )]
+[OperatorImageContractProvider(typeof(SpatialFilterImageContractProvider))]
+[OperatorParameterRule("FilterMode", ReasonCode = "FILTERING_MODE")]
+[OperatorParameterRule("KernelSize", DisabledWhenAll = new[] { "FilterMode==Bilateral" }, HiddenWhenAll = new[] { "FilterMode==Bilateral" }, IgnoredWhenAll = new[] { "FilterMode==Bilateral" }, ReasonCode = "FILTERING_KERNEL_SIZE_NOT_USED_BY_BILATERAL")]
+[OperatorParameterRule("SigmaX", DisabledWhenAll = new[] { "FilterMode!=Gaussian" }, HiddenWhenAll = new[] { "FilterMode!=Gaussian" }, IgnoredWhenAll = new[] { "FilterMode!=Gaussian" }, ReasonCode = "FILTERING_SIGMA_ONLY_FOR_GAUSSIAN")]
+[OperatorParameterRule("SigmaY", DisabledWhenAll = new[] { "FilterMode!=Gaussian" }, HiddenWhenAll = new[] { "FilterMode!=Gaussian" }, IgnoredWhenAll = new[] { "FilterMode!=Gaussian" }, ReasonCode = "FILTERING_SIGMA_ONLY_FOR_GAUSSIAN")]
+[OperatorParameterRule("BorderType", RequiredPolicy = OperatorParameterRequiredPolicy.Required, DisabledWhenAll = new[] { "FilterMode==Median" }, HiddenWhenAll = new[] { "FilterMode==Median" }, IgnoredWhenAll = new[] { "FilterMode==Median" }, ReasonCode = "FILTERING_BORDER_NOT_USED_BY_MEDIAN")]
+[OperatorParameterRule("Diameter", RequiredPolicy = OperatorParameterRequiredPolicy.Required, DisabledWhenAll = new[] { "FilterMode!=Bilateral" }, HiddenWhenAll = new[] { "FilterMode!=Bilateral" }, IgnoredWhenAll = new[] { "FilterMode!=Bilateral" }, ReasonCode = "FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL")]
+[OperatorParameterRule("SigmaColor", RequiredPolicy = OperatorParameterRequiredPolicy.Required, DisabledWhenAll = new[] { "FilterMode!=Bilateral" }, HiddenWhenAll = new[] { "FilterMode!=Bilateral" }, IgnoredWhenAll = new[] { "FilterMode!=Bilateral" }, ReasonCode = "FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL")]
+[OperatorParameterRule("SigmaSpace", RequiredPolicy = OperatorParameterRequiredPolicy.Required, DisabledWhenAll = new[] { "FilterMode!=Bilateral" }, HiddenWhenAll = new[] { "FilterMode!=Bilateral" }, IgnoredWhenAll = new[] { "FilterMode!=Bilateral" }, ReasonCode = "FILTERING_BILATERAL_PARAMETERS_ONLY_FOR_BILATERAL")]
+[OperatorOutputRule("Image", ReasonCode = "FILTERING_OUTPUT")]
+[OperatorOutputRule("FilterMode", ReasonCode = "FILTERING_OUTPUT")]
+[OperatorOutputRule("FilterDiagnostics", ReasonCode = "FILTERING_OUTPUT")]
+[OperatorGenerationDependency(typeof(SpatialFilterKernel))]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Image", PortDataType.Image)]
-[OperatorParam("KernelSize", "Kernel Size", "int", DefaultValue = 5, Min = 1, Max = 31)]
+[OutputPort("FilterMode", "实际滤波模式", PortDataType.String)]
+[OutputPort("FilterDiagnostics", "滤波诊断", PortDataType.Any)]
+[OperatorParam("FilterMode", "滤波模式", "enum", Description = "默认 Gaussian 保持旧流程行为。", DefaultValue = "Gaussian", Options = new[] { "Gaussian|高斯滤波", "Mean|均值/Box滤波", "Median|中值滤波", "Bilateral|双边滤波" })]
+[OperatorParam("KernelSize", "Kernel Size", "int", Description = "Gaussian/Median 范围 1-31 且偶数核向上调整为奇数；Mean/Box 范围 1-63 并保留配置尺寸。", DefaultValue = 5, Min = 1, Max = 63)]
 [OperatorParam("SigmaX", "Sigma X", "double", DefaultValue = 1.0, Min = 0.1, Max = 10.0)]
 [OperatorParam("SigmaY", "Sigma Y", "double", DefaultValue = 0.0, Min = 0.0, Max = 10.0)]
 [OperatorParam(
@@ -33,9 +49,12 @@ namespace ClearVision.Product.Infrastructure.Operators;
     DefaultValue = "4",
     Options = new[] { "0|Constant", "1|Replicate", "2|Reflect", "3|Wrap", "4|Default" }
 )]
+[OperatorParam("Diameter", "双边直径", "int", DefaultValue = 9, Min = 1, Max = 25)]
+[OperatorParam("SigmaColor", "双边色彩Sigma", "double", DefaultValue = 75.0, Min = 1.0, Max = 255.0)]
+[OperatorParam("SigmaSpace", "双边空间Sigma", "double", DefaultValue = 75.0, Min = 1.0, Max = 255.0)]
 [AlgorithmInfo(
-    Name = "Gaussian Blur (OpenCV)",
-    CoreApi = "Cv2.GaussianBlur",
+    Name = "Unified spatial smoothing filters (OpenCV)",
+    CoreApi = "Cv2.GaussianBlur / Cv2.Blur / Cv2.MedianBlur / Cv2.BilateralFilter",
     TimeComplexity = "O(W*H*K^2)",
     Dependencies = new[] { "OpenCvSharp" }
 )]
@@ -68,18 +87,34 @@ public class GaussianBlurOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("未提供输入图像"));
         }
 
-        // 获取参数（使用基类方法）
-        var kernelSize = GetIntParam(@operator, "KernelSize", 5, min: 1, max: 31);
+        var modeRaw = GetStringParam(@operator, "FilterMode", "Gaussian");
+        if (!SpatialFilterKernel.TryParseMode(modeRaw, out var mode))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(
+                "FilterMode must be Gaussian, Mean, Box, Median or Bilateral."));
+        }
+
+        var kernelSize = GetIntParam(@operator, "KernelSize", 5, min: 1, max: 63);
         var sigmaX = GetDoubleParam(@operator, "SigmaX", 1.0);
-        var sigmaY = GetDoubleParam(@operator, "SigmaY", 0.0); // 0表示与sigmaX相同
-        var borderType = GetIntParam(@operator, "BorderType", 4, min: 0, max: 7); // 默认BORDER_DEFAULT
+        var sigmaY = GetDoubleParam(@operator, "SigmaY", 0.0);
+        var borderType = GetIntParam(@operator, "BorderType", 4, min: 0, max: 7);
+        var diameter = GetIntParam(@operator, "Diameter", 9, min: 1, max: 25);
+        var sigmaColor = GetDoubleParam(@operator, "SigmaColor", 75.0, min: 1, max: 255);
+        var sigmaSpace = GetDoubleParam(@operator, "SigmaSpace", 75.0, min: 1, max: 255);
 
-        // 确保核大小为奇数
-        if (kernelSize % 2 == 0)
-            kernelSize++;
-
-        // 【优化】不再手动覆盖sigmaY。OpenCV本身支持sigmaY=0时自动使用sigmaX
-        // 手动覆盖反而去除了使用不同sigmaX/sigmaY的灵活性
+        var settings = new SpatialFilterSettings(
+            mode,
+            kernelSize,
+            sigmaX,
+            sigmaY,
+            borderType,
+            diameter,
+            sigmaColor,
+            sigmaSpace);
+        if (!SpatialFilterKernel.TryValidate(settings, out var validationError))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(validationError));
+        }
 
         var src = imageWrapper.GetMat();
         if (src.Empty())
@@ -87,12 +122,41 @@ public class GaussianBlurOperator : OperatorBase
             return Task.FromResult(OperatorExecutionOutput.Failure("无法解码输入图像"));
         }
 
-        var dst = new Mat();
-        var borderMode = (BorderTypes)borderType;
-        Cv2.GaussianBlur(src, dst, new Size(kernelSize, kernelSize), sigmaX, sigmaY, borderMode);
+        if (!SpatialFilterKernel.TryValidateInput(src, settings, OperatorType.Filtering, out validationError))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(validationError));
+        }
 
-        // P0: 使用ImageWrapper实现零拷贝输出
-        return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(dst)));
+        var dst = new Mat();
+        SpatialFilterAppliedSettings applied;
+        try
+        {
+            applied = SpatialFilterKernel.Apply(src, dst, settings, OperatorType.Filtering);
+        }
+        catch
+        {
+            dst.Dispose();
+            throw;
+        }
+
+        var diagnostics = new Dictionary<string, object>
+        {
+            ["Mode"] = applied.Mode.ToString(),
+            ["KernelSizeApplied"] = applied.KernelSize,
+            ["BorderTypeApplied"] = applied.BorderType,
+            ["SigmaXApplied"] = applied.SigmaX,
+            ["SigmaYApplied"] = applied.SigmaY,
+            ["DiameterApplied"] = applied.Diameter,
+            ["SigmaColorApplied"] = applied.SigmaColor,
+            ["SigmaSpaceApplied"] = applied.SigmaSpace
+        };
+        return Task.FromResult(OperatorExecutionOutput.Success(CreateImageOutput(dst, new Dictionary<string, object>
+        {
+            ["FilterMode"] = applied.Mode.ToString(),
+            ["FilterDiagnostics"] = diagnostics,
+            ["KernelSizeApplied"] = applied.KernelSize,
+            ["BorderTypeApplied"] = applied.BorderType
+        })));
     }
 
     /// <summary>
@@ -100,11 +164,29 @@ public class GaussianBlurOperator : OperatorBase
     /// </summary>
     public override ValidationResult ValidateParameters(Operator @operator)
     {
+        if (!SpatialFilterKernel.TryParseMode(GetStringParam(@operator, "FilterMode", "Gaussian"), out var mode))
+        {
+            return ValidationResult.Invalid("FilterMode must be Gaussian, Mean, Box, Median or Bilateral.");
+        }
+
         var kernelSize = GetIntParam(@operator, "KernelSize", 5);
-        if (kernelSize < 1 || kernelSize > 31)
+        if (mode == SpatialFilterMode.Gaussian && kernelSize is < 1 or > 31)
         {
             return ValidationResult.Invalid("核大小必须在 1-31 之间");
         }
-        return ValidationResult.Valid();
+
+        var settings = new SpatialFilterSettings(
+            mode,
+            kernelSize,
+            GetDoubleParam(@operator, "SigmaX", 1.0),
+            GetDoubleParam(@operator, "SigmaY", 0.0),
+            GetIntParam(@operator, "BorderType", 4),
+            GetIntParam(@operator, "Diameter", 9),
+            GetDoubleParam(@operator, "SigmaColor", 75.0),
+            GetDoubleParam(@operator, "SigmaSpace", 75.0));
+
+        return SpatialFilterKernel.TryValidate(settings, out var error)
+            ? ValidationResult.Valid()
+            : ValidationResult.Invalid(error);
     }
 }

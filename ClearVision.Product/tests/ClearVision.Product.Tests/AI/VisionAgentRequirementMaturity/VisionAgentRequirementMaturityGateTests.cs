@@ -13,6 +13,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentRequirementMaturity;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentRequirementMaturityGateTests
 {
     [Theory(DisplayName = "Requirement maturity gate should match golden intent cases")]

@@ -1,90 +1,27 @@
 param(
     [ValidateSet("quiet", "minimal", "normal", "detailed", "diagnostic")]
     [string]$Verbosity = "minimal",
-
     [string]$Configuration,
-
     [switch]$NoBuild,
-
     [switch]$NoRestore,
-
     [string]$ResultsDirectory,
-
     [string]$LogFileName,
-
-    [int]$MinimumTotalTests = 140,
-
+    [int]$MinimumTotalTests = -1,
     [switch]$ReturnExitCode
 )
 
 $ErrorActionPreference = "Stop"
-
-$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repoRoot = Split-Path -Parent $scriptRoot
-$runner = Join-Path $scriptRoot "run-dotnet-test-serial.ps1"
-$project = Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj"
-$defaultResultsDirectory = Join-Path $repoRoot ".tmp\test_results\measurement-regression"
-$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$defaultLogFileName = "measurement-regression-$timestamp.trx"
-
-$testClasses = @(
-    "AngleMeasurementOperatorTests",
-    "CaliperToolOperatorTests",
-    "CircleMeasurementOperatorTests",
-    "ColorMeasurementOperatorTests",
-    "ContourMeasurementOperatorTests",
-    "GapMeasurementOperatorTests",
-    "GeoMeasurementOperatorTests",
-    "GeometricFittingOperatorTests",
-    "GeometricToleranceOperatorTests",
-    "HistogramAnalysisOperatorTests",
-    "IndustrialMeasurementBenchmarkTests",
-    "LineLineDistanceOperatorTests",
-    "LineMeasurementOperatorTests",
-    "MeasureDistanceOperatorTests",
-    "OperatorContractReconciliationTests",
-    "PixelStatisticsOperatorTests",
-    "PointLineDistanceOperatorTests",
-    "SharpnessEvaluationOperatorTests",
-    "Week11_TextureColorFlowIntegrationTests",
-    "WidthMeasurementOperatorTests"
-)
-
-Write-Host "[measurement-regression] Selected test classes: $($testClasses -join ', ')"
-
-$parameters = @{
-    Project = $project
-    FullyQualifiedName = $testClasses
-    Verbosity = $Verbosity
-    ResultsDirectory = if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) { $defaultResultsDirectory } else { $ResultsDirectory }
-    LogFileName = if ([string]::IsNullOrWhiteSpace($LogFileName)) { $defaultLogFileName } else { $LogFileName }
+$runner = Join-Path $PSScriptRoot "run-classified-test-gate.ps1"
+$parameters = @{ Gate = "measurement-regression"; Verbosity = $Verbosity; ReturnExitCode = $true }
+foreach ($name in @("Configuration", "ResultsDirectory", "LogFileName")) {
+    $value = Get-Variable -Name $name -ValueOnly
+    if (-not [string]::IsNullOrWhiteSpace($value)) { $parameters[$name] = $value }
 }
-
-if ($MinimumTotalTests -gt 0) {
-    $parameters.MinimumTotalTests = $MinimumTotalTests
-}
-
-if (-not [string]::IsNullOrWhiteSpace($Configuration)) {
-    $parameters.Configuration = $Configuration
-}
-
-if ($NoBuild) {
-    $parameters.NoBuild = $true
-}
-
-if ($NoRestore) {
-    $parameters.NoRestore = $true
-}
-
-$parameters.ReturnExitCode = $true
-
+if ($MinimumTotalTests -ge 0) { $parameters.MinimumTotalTests = $MinimumTotalTests }
+if ($NoBuild) { $parameters.NoBuild = $true }
+if ($NoRestore) { $parameters.NoRestore = $true }
 & $runner @parameters
-
-$exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+$exitCode = [int]$LASTEXITCODE
 $global:LASTEXITCODE = $exitCode
-
-if ($ReturnExitCode) {
-    return
-}
-
+if ($ReturnExitCode) { return }
 exit $exitCode

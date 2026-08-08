@@ -1,4 +1,6 @@
 ﻿using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.Services;
 
@@ -34,6 +36,19 @@ var cardsOutputPath = Path.GetFullPath(Path.Combine(workspaceRoot, options.Cards
 var reportOutputPath = string.IsNullOrWhiteSpace(options.ReportOutputPath)
     ? null
     : Path.GetFullPath(Path.Combine(workspaceRoot, options.ReportOutputPath));
+var catalogInputPath = Path.Combine(workspaceRoot, "docs", "算子资料", "算子名片", "catalog.json");
+
+await ApplyGenerationFingerprintsAsync(graph, catalogInputPath);
+
+var existingGraph = await LoadExistingGraphAsync(graphOutputPath);
+if (existingGraph is not null &&
+    string.Equals(
+        ComputeSemanticFingerprint(existingGraph),
+        ComputeSemanticFingerprint(graph),
+        StringComparison.Ordinal))
+{
+    graph.GeneratedAtUtc = existingGraph.GeneratedAtUtc;
+}
 
 Directory.CreateDirectory(Path.GetDirectoryName(graphOutputPath)!);
 Directory.CreateDirectory(Path.GetDirectoryName(cardsOutputPath)!);
@@ -67,6 +82,110 @@ catch
 
 return 0;
 
+static async Task<OperatorKnowledgeGraph?> LoadExistingGraphAsync(string path)
+{
+    if (!File.Exists(path))
+    {
+        return null;
+    }
+
+    try
+    {
+        await using var stream = File.OpenRead(path);
+        return await JsonSerializer.DeserializeAsync<OperatorKnowledgeGraph>(stream);
+    }
+    catch (JsonException)
+    {
+        return null;
+    }
+}
+
+static async Task ApplyGenerationFingerprintsAsync(OperatorKnowledgeGraph graph, string catalogPath)
+{
+    if (!File.Exists(catalogPath))
+    {
+        throw new FileNotFoundException(
+            "The governed operator catalog must be generated before the knowledge graph.",
+            catalogPath);
+    }
+
+    await using var stream = File.OpenRead(catalogPath);
+    using var document = await JsonDocument.ParseAsync(stream);
+    var root = document.RootElement;
+    var catalogFingerprint = root.GetProperty("generationFingerprint").GetString();
+    if (string.IsNullOrWhiteSpace(catalogFingerprint))
+    {
+        throw new InvalidDataException($"Catalog '{catalogPath}' has no generation fingerprint.");
+    }
+
+    var entries = new Dictionary<string, CatalogGenerationEntry>(StringComparer.Ordinal);
+    foreach (var item in root.GetProperty("operators").EnumerateArray())
+    {
+        var operatorType = item.GetProperty("id").GetString();
+        var fingerprint = item.GetProperty("generationFingerprint").GetString();
+        if (string.IsNullOrWhiteSpace(operatorType) || string.IsNullOrWhiteSpace(fingerprint))
+        {
+            throw new InvalidDataException(
+                $"Catalog '{catalogPath}' contains an operator without an id or generation fingerprint.");
+        }
+
+        var dependencies = item.GetProperty("generationDependencies")
+            .EnumerateArray()
+            .Select(value => value.GetString())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+        if (!entries.TryAdd(operatorType, new CatalogGenerationEntry(fingerprint, dependencies)))
+        {
+            throw new InvalidDataException(
+                $"Catalog '{catalogPath}' contains duplicate operator id '{operatorType}'.");
+        }
+    }
+
+    var graphOperatorTypes = graph.Cards
+        .Select(card => card.OperatorType)
+        .ToHashSet(StringComparer.Ordinal);
+    if (entries.Count != graph.Cards.Count ||
+        !entries.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(graphOperatorTypes))
+    {
+        throw new InvalidDataException(
+            $"Catalog/knowledge-graph operator mismatch: catalog={entries.Count}, graph={graph.Cards.Count}.");
+    }
+
+    foreach (var card in graph.Cards)
+    {
+        var entry = entries[card.OperatorType];
+        var graphDependencies = card.GenerationDependencies
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+        if (!entry.Dependencies.SequenceEqual(graphDependencies, StringComparer.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"Catalog/knowledge-graph generation dependency mismatch for '{card.OperatorType}'.");
+        }
+
+        card.GenerationFingerprint = entry.Fingerprint;
+    }
+
+    graph.GenerationFingerprint = catalogFingerprint;
+}
+
+static string ComputeSemanticFingerprint(OperatorKnowledgeGraph graph)
+{
+    var generatedAt = graph.GeneratedAtUtc;
+    try
+    {
+        graph.GeneratedAtUtc = DateTime.UnixEpoch;
+        var canonical = JsonSerializer.Serialize(graph);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
+    }
+    finally
+    {
+        graph.GeneratedAtUtc = generatedAt;
+    }
+}
+
 static string ResolveWorkspaceRoot()
 {
     var current = new DirectoryInfo(AppContext.BaseDirectory);
@@ -81,6 +200,10 @@ static string ResolveWorkspaceRoot()
 
     return Directory.GetCurrentDirectory();
 }
+
+internal sealed record CatalogGenerationEntry(
+    string Fingerprint,
+    IReadOnlyList<string> Dependencies);
 
 internal sealed record RunnerOptions(
     string GraphOutputPath,
@@ -170,6 +293,7 @@ internal static class MarkdownReport
             $"GeneratedAtUtc: `{graph.GeneratedAtUtc:O}`",
             $"SchemaVersion: `{graph.SchemaVersion}`",
             $"Source: `{graph.Source}`",
+            $"GenerationFingerprint: `{graph.GenerationFingerprint}`",
             string.Empty,
             "## Summary",
             string.Empty,

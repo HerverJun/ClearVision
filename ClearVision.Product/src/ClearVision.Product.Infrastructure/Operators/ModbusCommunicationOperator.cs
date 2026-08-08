@@ -17,10 +17,14 @@ namespace ClearVision.Product.Infrastructure.Operators;
     IconName = "modbus",
     Keywords = new[] { "Modbus", "PLC", "Communication", "Register", "RTU", "TCP", "Industrial", "Modbus通信", "Modbus Communication" }
 )]
+[OperatorParameterRule("IpAddress", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcEndpoint, ReasonCode = "MODBUS_TCP_ENDPOINT_REQUIRED")]
+[OperatorParameterRule("RegisterAddress", RequiredPolicy = OperatorParameterRequiredPolicy.Required, ResourceKind = OperatorResourceKind.PlcAddress, ReasonCode = "MODBUS_REGISTER_ADDRESS_REQUIRED")]
+[OperatorParameterRule("RegisterCount", EnabledWhenAny = new[] { "FunctionCode==ReadCoils", "FunctionCode==ReadHolding" }, HiddenWhenAny = new[] { "FunctionCode==WriteSingle", "FunctionCode==WriteMultiple" }, IgnoredWhenAny = new[] { "FunctionCode==WriteSingle", "FunctionCode==WriteMultiple" }, ReasonCode = "MODBUS_REGISTER_COUNT_ONLY_FOR_READ")]
+[OperatorParameterRule("WriteValue", RequiredWhenAny = new[] { "FunctionCode==WriteSingle", "FunctionCode==WriteMultiple" }, EnabledWhenAny = new[] { "FunctionCode==WriteSingle", "FunctionCode==WriteMultiple" }, HiddenWhenAny = new[] { "FunctionCode==ReadCoils", "FunctionCode==ReadHolding" }, IgnoredWhenAny = new[] { "FunctionCode==ReadCoils", "FunctionCode==ReadHolding" }, ReasonCode = "MODBUS_WRITE_VALUE_ONLY_FOR_WRITE")]
 [InputPort("Data", "Data", PortDataType.Any, IsRequired = false)]
 [OutputPort("Response", "Response", PortDataType.String)]
 [OutputPort("Status", "Status", PortDataType.Boolean)]
-[OperatorParam("Protocol", "Protocol", "enum", DefaultValue = "TCP", Options = new[] { "TCP|TCP", "RTU|RTU" })]
+[OperatorParam("Protocol", "Protocol", "enum", Description = "当前仅支持 TCP；RTU 选项用于旧流程兼容，执行时返回不支持。", DefaultValue = "TCP", Options = new[] { "TCP|TCP", "RTU|RTU" })]
 [OperatorParam("IpAddress", "IP Address", "string", DefaultValue = "192.168.1.1")]
 [OperatorParam("Port", "Port", "int", DefaultValue = 502, Min = 1, Max = 65535)]
 [OperatorParam("SlaveId", "Slave ID", "int", DefaultValue = 1, Min = 1, Max = 247)]

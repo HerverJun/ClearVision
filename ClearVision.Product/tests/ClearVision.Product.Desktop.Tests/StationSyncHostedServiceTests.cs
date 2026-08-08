@@ -19,6 +19,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop")]
 public sealed class StationSyncHostedServiceTests
 {
     [Fact]
@@ -614,7 +615,8 @@ public sealed class StationSyncHostedServiceTests
                     CreateParameter("Port", "int", 102),
                     CreateParameter("CpuType", "enum", "S71200"),
                     CreateParameter("Rack", "int", 0),
-                    CreateParameter("Slot", "int", 1)
+                    CreateParameter("Slot", "int", 1),
+                    CreateParameter("Address", "string", "DB1.DBD0")
                 ],
                 ExecutionStatus = OperatorExecutionStatus.NotExecuted
             });
@@ -674,7 +676,7 @@ public sealed class StationSyncHostedServiceTests
                     },
                     Operators = packagedOperators
                 }
-            }
+            }.WithStringDecisionBinding()
         });
     }
 

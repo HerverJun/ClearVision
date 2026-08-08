@@ -48,6 +48,23 @@ public abstract class VisionAgentToolBase : IVisionAgentTool
         };
     }
 
+    protected static bool? ReadBool(JsonElement arguments, string propertyName)
+    {
+        if (arguments.ValueKind != JsonValueKind.Object ||
+            !arguments.TryGetProperty(propertyName, out var value))
+        {
+            return null;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(value.GetString(), out var parsed) => parsed,
+            _ => null
+        };
+    }
+
     protected static JsonElement? ReadObject(JsonElement arguments, string propertyName)
     {
         return arguments.ValueKind == JsonValueKind.Object &&

@@ -17,6 +17,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\quality\testing\ClearVision.Testing\ClearVision.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="ClearVision.Testing" />
     <Using Include="Xunit" />
   </ItemGroup>
 

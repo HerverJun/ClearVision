@@ -1,0 +1,242 @@
+{
+  "schemaVersion": "2026-07-15.test-gates.v1",
+  "authoritativeClassification": "TestClassificationAttribute on every xUnit test class or method",
+  "projects": {
+    "Product": "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj",
+    "Desktop": "ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj",
+    "OperatorLibrary": "ClearVision.OperatorLibrary/tests/ClearVision.OperatorLibrary.SmokeTests/ClearVision.OperatorLibrary.SmokeTests.csproj"
+  },
+  "gates": [
+    {
+      "name": "product-pr",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "desktop-pr",
+      "project": "Desktop",
+      "lane": "Pr",
+      "filter": "Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "operator-library-smoke",
+      "project": "OperatorLibrary",
+      "lane": "Pr",
+      "filter": "Suite=OperatorLibrarySmoke&Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "stage12-regression",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Suite=Stage12Regression&Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "services-regression",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Suite=ServicesRegression&Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "desktop-endpoints",
+      "project": "Desktop",
+      "lane": "Pr",
+      "filter": "Suite=DesktopEndpoints&Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "recognition-regression",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Suite=RecognitionRegression&Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "data-processing-phase1",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Suite=DataProcessingPhase1&Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "data-processing-phase2",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Suite=DataProcessingPhase2&Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "data-processing-docker",
+      "project": "Product",
+      "lane": "ReleaseManual",
+      "filter": "Suite=DataProcessingPhase1&ResourceRequirement=Database&Lane=ReleaseManual",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "measurement-regression",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Domain=Measurement&Purpose=Regression&Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "measurement-accuracy",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Domain=Measurement&Purpose=Accuracy",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "measurement-determinism",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Domain=Measurement&Purpose=Determinism",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "measurement-stability",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Domain=Measurement&Purpose=Stability",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "measurement-performance",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Domain=Measurement&Purpose=Performance",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "detection-regression",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Domain=Detection&Purpose=Regression&Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "detection-accuracy",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Domain=Detection&Purpose=Accuracy",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "detection-stability",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Domain=Detection&Purpose=Stability",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "detection-performance",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Domain=Detection&Purpose=Performance",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "matching-determinism",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Domain=Matching&Purpose=Determinism",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "matching-stability",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Domain=Matching&Purpose=Stability",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "preprocessing-robustness",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Domain=Preprocessing&Purpose=Robustness",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "calibration-regression",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Domain=Calibration&Purpose=Regression&Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "calibration-accuracy-pr",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Domain=Calibration&Purpose=Accuracy&Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "calibration-integration",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Domain=Calibration&Purpose=Integration",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "product-nightly",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Lane=Nightly&Purpose!=Performance",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "product-nightly-performance",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Lane=Nightly&Purpose=Performance",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "product-nightly-performance-other",
+      "project": "Product",
+      "lane": "Nightly",
+      "filter": "Lane=Nightly&Purpose=Performance&Domain!=Measurement&Domain!=Detection",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "plc-regression",
+      "project": "Product",
+      "lane": "Pr",
+      "filter": "Domain=Plc&Purpose=Regression&Lane=Pr",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "plc-release-manual",
+      "project": "Product",
+      "lane": "ReleaseManual",
+      "filter": "Domain=Plc&Lane=ReleaseManual",
+      "minimumTotalTests": 1
+    },
+    {
+      "name": "product-release-manual",
+      "project": "Product",
+      "lane": "ReleaseManual",
+      "filter": "Lane=ReleaseManual",
+      "minimumTotalTests": 1
+    }
+  ],
+  "lanes": {
+    "Pr": [
+      "product-pr",
+      "desktop-pr",
+      "operator-library-smoke"
+    ],
+    "Nightly": [
+      "product-nightly",
+      "product-nightly-performance"
+    ],
+    "ReleaseManual": [
+      "product-release-manual"
+    ]
+  }
+}

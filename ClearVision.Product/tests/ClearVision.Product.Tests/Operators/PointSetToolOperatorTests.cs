@@ -8,6 +8,7 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Core, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "product")]
 [Trait("Category", "Sprint6_Phase3")]
 public class PointSetToolOperatorTests
 {
@@ -64,4 +65,3 @@ public class PointSetToolOperatorTests
         return op;
     }
 }
-

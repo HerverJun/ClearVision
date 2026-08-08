@@ -12,6 +12,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentRuntimePreviewAdapter;
 
+[TestClassification(TestDomain.Ai, TestPurpose.Regression, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "vision-agent")]
 public sealed class VisionAgentRuntimePreviewAdapterTests
 {
     private static readonly JsonSerializerOptions CamelCaseJsonOptions = new()

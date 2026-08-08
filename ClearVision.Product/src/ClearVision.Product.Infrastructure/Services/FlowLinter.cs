@@ -9,6 +9,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Calibration;
 using ClearVision.Product.Infrastructure.Operators;
@@ -35,6 +36,7 @@ public class FlowLinter
         "当前输出是 BlobList/Blob结果列表，不是 Region/像素区域。区域形态学需要 Region；请从二值图使用 BinaryImageToRegion 生成 Region，或改用 Blob 特征处理算子。";
 
     private static readonly Lazy<IReadOnlySet<OperatorType>> ExecutableOperatorTypes = new(BuildExecutableOperatorTypes);
+    private static readonly Lazy<OperatorFactory> ConstraintMetadataFactory = new(() => new OperatorFactory());
 
     private static readonly HashSet<OperatorType> CalibrationBundleConsumers = new()
     {
@@ -204,6 +206,48 @@ public class FlowLinter
                     Suggestion = BuildTypeMismatchSuggestion(sourceType.Value, targetType.Value)
                 };
             }
+        }
+
+        // STRUCT_006: 当前模式下不可用的输出不得继续连线
+        foreach (var conn in flow.Connections)
+        {
+            var sourceOp = flow.Operators.FirstOrDefault(op => op.Id == conn.SourceOperatorId);
+            var sourcePort = sourceOp?.OutputPorts.FirstOrDefault(port => port.Id == conn.SourcePortId);
+            if (sourceOp == null || sourcePort == null)
+            {
+                continue;
+            }
+
+            var metadata = ConstraintMetadataFactory.Value.GetMetadata(sourceOp.Type);
+            if (metadata == null || metadata.OutputAvailabilityRules.Count == 0)
+            {
+                continue;
+            }
+
+            var values = sourceOp.Parameters
+                .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First().Value,
+                    StringComparer.OrdinalIgnoreCase);
+            var explicitNames = values.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var outputState = OperatorOutputAvailabilityEvaluator
+                .ResolveStates(metadata, values, explicitNames)
+                .FirstOrDefault(state => state.Output.Equals(sourcePort.Name, StringComparison.OrdinalIgnoreCase));
+            if (outputState?.IsAvailable != false)
+            {
+                continue;
+            }
+
+            yield return new LintIssue
+            {
+                Code = "STRUCT_006",
+                Severity = LintSeverity.Error,
+                OperatorId = sourceOp.Id,
+                OperatorName = sourceOp.Name,
+                Message = $"算子 [{sourceOp.Name}] 的输出 [{sourcePort.Name}] 在当前模式下不可用。",
+                Suggestion = "切换到会生成该输出的模式，或将连线改接到当前模式保证可用的输出端口。"
+            };
         }
         foreach (var calibOp in flow.Operators.Where(op => RequiresAcceptedCalibrationBundle(op.Type)))
         {
@@ -678,6 +722,8 @@ public class FlowLinter
     {
         foreach (var op in flow.Operators)
         {
+            var disabledParameters = ResolveDisabledParameters(op);
+
             // PARAM_001: 标定消费者的 CalibrationData 必须是 Accepted 的 CalibrationBundleV2
             if (RequiresAcceptedCalibrationBundle(op.Type))
             {
@@ -717,6 +763,11 @@ public class FlowLinter
             // PARAM_002: 任意数值参数超出 minValue~maxValue
             foreach (var param in op.Parameters)
             {
+                if (disabledParameters.Contains(param.Name))
+                {
+                    continue;
+                }
+
                 if (IsNumericParameter(param) &&
                     double.TryParse(GetParamStringValue(param), out var value))
                 {
@@ -752,7 +803,7 @@ public class FlowLinter
             }
 
             // PARAM_003: DeepLearning.Confidence 超出 (0, 1]
-            if (op.Type == OperatorType.DeepLearning)
+            if (op.Type == OperatorType.DeepLearning && !disabledParameters.Contains("Confidence"))
             {
                 var confidenceParam = op.Parameters.FirstOrDefault(p =>
                     p.Name.Equals("Confidence", StringComparison.OrdinalIgnoreCase));
@@ -800,6 +851,27 @@ public class FlowLinter
                 }
             }
         }
+    }
+
+    private static IReadOnlySet<string> ResolveDisabledParameters(Operator op)
+    {
+        var metadata = ConstraintMetadataFactory.Value.GetMetadata(op.Type);
+        if (metadata == null || metadata.ParameterConstraints.Count == 0)
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var values = op.Parameters
+            .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().Value,
+                StringComparer.OrdinalIgnoreCase);
+
+        return OperatorParameterConstraintEvaluator.ResolveStates(metadata, values)
+            .Where(state => state.EffectiveDisabled)
+            .Select(state => state.Constraint.Parameter)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>

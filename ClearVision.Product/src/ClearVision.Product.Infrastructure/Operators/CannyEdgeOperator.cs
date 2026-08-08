@@ -21,6 +21,23 @@ namespace ClearVision.Product.Infrastructure.Operators;
     IconName = "edge",
     Keywords = new[] { "Edge", "Canny", "Contour", "Threshold" }
 )]
+[OperatorImageContractProvider(typeof(EdgeDetectionImageContractProvider))]
+[OperatorParameterRule("EdgeModelPath", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    RequiredWhenAll = new[] { "Method==OnnxEdge" }, DisabledWhenAll = new[] { "Method!=OnnxEdge" },
+    HiddenWhenAll = new[] { "Method!=OnnxEdge" }, IgnoredWhenAll = new[] { "Method!=OnnxEdge" },
+    AtLeastOneGroup = "edge-model-source", MutuallyExclusiveGroup = "edge-model-source",
+    ResourceKind = OperatorResourceKind.ModelResource, ReasonCode = "EDGE_ONNX_MODEL_SOURCE_REQUIRED")]
+[OperatorParameterRule("EdgeModelId", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    RequiredWhenAll = new[] { "Method==OnnxEdge" }, DisabledWhenAll = new[] { "Method!=OnnxEdge" },
+    HiddenWhenAll = new[] { "Method!=OnnxEdge" }, IgnoredWhenAll = new[] { "Method!=OnnxEdge" },
+    AtLeastOneGroup = "edge-model-source", MutuallyExclusiveGroup = "edge-model-source",
+    ResourceKind = OperatorResourceKind.ModelResource, ReasonCode = "EDGE_ONNX_MODEL_SOURCE_REQUIRED")]
+[OperatorParameterRule("ModelCatalogPath", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    DisabledWhenAny = new[] { "Method!=OnnxEdge", "EdgeModelId:empty", "EdgeModelPath:not-empty" },
+    ResourceKind = OperatorResourceKind.ModelCatalog, ReasonCode = "EDGE_MODEL_CATALOG_REQUIRES_MODEL_ID")]
+[OperatorParameterRule("EdgeBinarizationThreshold", RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    DisabledWhenAll = new[] { "Method!=OnnxEdge" }, HiddenWhenAll = new[] { "Method!=OnnxEdge" },
+    IgnoredWhenAll = new[] { "Method!=OnnxEdge" }, ReasonCode = "EDGE_BINARIZATION_ONLY_FOR_ONNX")]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Image", PortDataType.Image)]
 [OutputPort("Edges", "Edges", PortDataType.Image)]

@@ -4,6 +4,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Desktop.Tests.Architecture;
 
+[TestClassification(TestDomain.Desktop, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "desktop")]
 public sealed class Studio2ArchitectureGuardTests
 {
     private static readonly string Root = FindRepositoryRoot();

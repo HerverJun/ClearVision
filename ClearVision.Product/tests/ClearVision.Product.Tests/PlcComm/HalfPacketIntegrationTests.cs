@@ -7,6 +7,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.PlcComm;
 
+[TestClassification(TestDomain.Plc, TestPurpose.Integration, TestLane.ReleaseManual, TestEvidenceType.IntegrationEvidence, TestOracleType.ExternalSystem, TestResourceRequirement.VirtualPlc, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "plc", Suites = "PlcRegression")]
 [Collection("PLC Operator Integration")]
 public class HalfPacketIntegrationTests
 {

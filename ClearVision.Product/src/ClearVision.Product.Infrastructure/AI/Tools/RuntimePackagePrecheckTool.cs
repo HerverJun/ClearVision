@@ -10,15 +10,24 @@ namespace ClearVision.Product.Infrastructure.AI.Tools;
 public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
 {
     private readonly IVisionAgentStationStatusReader _stationStatusReader;
+    private readonly IOperatorFactory _operatorFactory;
 
     public RuntimePackagePrecheckTool()
-        : this(new NoOpVisionAgentStationStatusReader())
+        : this(new NoOpVisionAgentStationStatusReader(), new OperatorFactory())
     {
     }
 
     public RuntimePackagePrecheckTool(IVisionAgentStationStatusReader stationStatusReader)
+        : this(stationStatusReader, new OperatorFactory())
+    {
+    }
+
+    public RuntimePackagePrecheckTool(
+        IVisionAgentStationStatusReader stationStatusReader,
+        IOperatorFactory operatorFactory)
     {
         _stationStatusReader = stationStatusReader;
+        _operatorFactory = operatorFactory;
     }
 
     public override string Name => "runtime_package_precheck";
@@ -210,13 +219,21 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         }
     }
 
-    private static int AddManualConfirmationChecks(
+    private int AddManualConfirmationChecks(
         VisionAgentFlowDraft flow,
         JsonElement arguments,
         List<PrecheckIssue> warnings,
         List<PrecheckMissingResource> missingResources)
     {
         var confirmations = ReadManualConfirmations(arguments);
+        missingResources.RemoveAll(resource => HasMetadataOnlyManualConfirmation(
+            confirmations,
+            new DeploymentResourceRequirement(
+                resource.ResourceKind,
+                resource.ParameterName,
+                resource.TempId,
+                resource.OperatorType)));
+
         foreach (var resource in CollectConfiguredDeploymentResources(flow))
         {
             if (missingResources.Any(item =>
@@ -423,11 +440,11 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
                     ReadStringProperty(item, "resourceKey") ??
                     ReadStringProperty(item, "resourceRef") ??
                     string.Empty,
-                    ReadBool(item, "metadataOnly") == true)));
+                    ReadBoolProperty(item, "metadataOnly") == true)));
         }
     }
 
-    private static bool HasMetadataOnlyManualConfirmation(
+    private bool HasMetadataOnlyManualConfirmation(
         IReadOnlyList<ManualResourceConfirmation> confirmations,
         DeploymentResourceRequirement resource)
     {
@@ -444,7 +461,7 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
                   resource.ParameterName))));
     }
 
-    private static bool ResourceKeysMatch(
+    private bool ResourceKeysMatch(
         string confirmationKey,
         DeploymentResourceRequirement resource,
         string canonicalResourceKey)
@@ -470,7 +487,7 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
                    resource.ParameterName);
     }
 
-    private static bool ParameterNamesMatch(string operatorType, string left, string right)
+    private bool ParameterNamesMatch(string operatorType, string left, string right)
     {
         return string.Equals(
             CanonicalizeParameterName(operatorType, left),
@@ -478,15 +495,16 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string CanonicalizeParameterName(string operatorType, string parameterName)
+    private string CanonicalizeParameterName(string operatorType, string parameterName)
     {
         if (!Enum.TryParse<OperatorType>(operatorType, ignoreCase: true, out var parsedType))
         {
             return parameterName;
         }
 
-        var constraint = OperatorParameterConstraintProvider.Instance
-            .GetConstraints(parsedType)
+        var constraint = _operatorFactory
+            .GetMetadata(parsedType)?
+            .ParameterConstraints
             .FirstOrDefault(item =>
                 item.Parameter.Equals(parameterName, StringComparison.Ordinal) &&
                 !string.IsNullOrWhiteSpace(item.AliasFor));
@@ -531,7 +549,7 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             return;
         }
 
-        if (ReadBool(dryRunSummary, "dryRunSucceeded") == false)
+        if (ReadBoolProperty(dryRunSummary, "dryRunSucceeded") == false)
         {
             blockingIssues.Add(new PrecheckIssue(
                 "dryrun_failed",
@@ -546,7 +564,7 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         JsonElement arguments,
         List<PrecheckIssue> blockingIssues)
     {
-        if (ReadBool(arguments, "requireReplay") != true)
+        if (ReadBoolProperty(arguments, "requireReplay") != true)
         {
             return;
         }
@@ -560,8 +578,8 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             return;
         }
 
-        if (ReadBool(replaySummary, "success") == false ||
-            ReadBool(replaySummary, "replaySucceeded") == false)
+        if (ReadBoolProperty(replaySummary, "success") == false ||
+            ReadBoolProperty(replaySummary, "replaySucceeded") == false)
         {
             blockingIssues.Add(new PrecheckIssue(
                 "replay_failed",
@@ -742,7 +760,7 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             : null;
     }
 
-    private static bool? ReadBool(JsonElement element, string propertyName)
+    private static bool? ReadBoolProperty(JsonElement element, string propertyName)
     {
         if (element.ValueKind != JsonValueKind.Object ||
             !TryGetProperty(element, propertyName, out var value))

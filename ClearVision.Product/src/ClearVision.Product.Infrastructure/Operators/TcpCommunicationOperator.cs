@@ -81,6 +81,58 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("ResponseMatchMode", "Response Match Mode", "enum", Description = "响应判断方式：包含、等于、开头、结尾或正则。", DefaultValue = "Contains", Options = new[] { "Contains|Contains", "Equals|Equals", "StartsWith|Starts with", "EndsWith|Ends with", "Regex|Regex" })]
 [OperatorParam("ResponseMatchIgnoreCase", "Response Match Ignore Case", "bool", Description = "启用后，期望/拒绝响应匹配忽略大小写。", DefaultValue = false)]
 [OperatorParam("ResponseMatchSource", "Response Match Source", "enum", Description = "选择响应判断的数据来源：原始响应、归一化响应或解析值。", DefaultValue = "Response", Options = new[] { "Response|Raw response", "NormalizedResponse|Normalized response", "ParsedValue|Parsed value" })]
+[OperatorParameterRule(
+    "ProfileId",
+    RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    RequiredWhenAny = new[] { "UseGlobalProfile==true", "Mode==Server" },
+    ResourceKind = OperatorResourceKind.TcpProfile,
+    ReasonCode = "TCP_PROFILE_REQUIRED_FOR_GLOBAL_OR_SERVER_MODE")]
+[OperatorParameterRule("Mode", DisabledWhenAll = new[] { "ProfileId:not-empty" }, ReasonCode = "TCP_MODE_IGNORED_WHEN_PROFILE_CONFIGURED")]
+[OperatorParameterRule(
+    "IpAddress",
+    RequiredWhenAll = new[] { "ProfileId:empty", "UseGlobalProfile==false", "Mode==Client" },
+    EnabledWhenAll = new[] { "ProfileId:empty", "UseGlobalProfile==false", "Mode==Client" },
+    ResourceKind = OperatorResourceKind.NetworkEndpoint,
+    ReasonCode = "TCP_LEGACY_CLIENT_HOST_REQUIRED")]
+[OperatorParameterRule(
+    "Port",
+    RequiredWhenAll = new[] { "ProfileId:empty", "UseGlobalProfile==false", "Mode==Client" },
+    EnabledWhenAll = new[] { "ProfileId:empty", "UseGlobalProfile==false", "Mode==Client" },
+    ReasonCode = "TCP_LEGACY_CLIENT_PORT_REQUIRED")]
+[OperatorParameterRule("Timeout", EnabledWhenAll = new[] { "ProfileId:empty", "UseGlobalProfile==false", "Mode==Client" }, ReasonCode = "TCP_LEGACY_CLIENT_TIMEOUT_ONLY_WITHOUT_PROFILE")]
+[OperatorParameterRule("Encoding", EnabledWhenAll = new[] { "ProfileId:empty", "UseGlobalProfile==false", "Mode==Client" }, ReasonCode = "TCP_LEGACY_CLIENT_ENCODING_ONLY_WITHOUT_PROFILE")]
+[OperatorParameterRule("UseFixedSendData", DisabledWhenAll = new[] { "PayloadTemplate:not-empty" }, ReasonCode = "TCP_PAYLOAD_TEMPLATE_OWNS_PAYLOAD_SELECTION")]
+[OperatorParameterRule("ResponseTimeoutMs", EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_RESPONSE_TIMEOUT_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("FailOnParseError", EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_PARSE_FAILURE_POLICY_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("FailOnUnexpectedResponse", EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_RESPONSE_FAILURE_POLICY_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("ResponseParseMode", EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_RESPONSE_PARSE_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("ResponseFieldName", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, EnabledWhenAll = new[] { "WaitResponse==true", "ResponseParseMode!=None" }, ReasonCode = "TCP_RESPONSE_FIELD_ONLY_WHEN_PARSING")]
+[OperatorParameterRule(
+    "ResponseFieldNames",
+    RequiredPolicy = OperatorParameterRequiredPolicy.Optional,
+    EnabledWhenAll = new[] { "WaitResponse==true" },
+    EnabledWhenAny = new[] { "ResponseParseMode==Delimited", "ResponseParseMode==FixedWidth" },
+    ReasonCode = "TCP_RESPONSE_FIELD_NAMES_ONLY_FOR_POSITIONAL_PARSE")]
+[OperatorParameterRule("RequiredResponseFields", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_REQUIRED_RESPONSE_FIELDS_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("ResponseFieldWidths", RequiredWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==FixedWidth" }, EnabledWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==FixedWidth" }, ReasonCode = "TCP_FIXED_WIDTHS_REQUIRED_FOR_FIXED_WIDTH_PARSE")]
+[OperatorParameterRule("ResponseRegexPattern", RequiredWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==Regex" }, EnabledWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==Regex" }, ReasonCode = "TCP_REGEX_PATTERN_REQUIRED_FOR_REGEX_PARSE")]
+[OperatorParameterRule("ResponseRegexIgnoreCase", EnabledWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==Regex" }, ReasonCode = "TCP_REGEX_OPTIONS_ONLY_FOR_REGEX_PARSE")]
+[OperatorParameterRule("ResponseKeyValuePairDelimiter", RequiredWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==KeyValue" }, EnabledWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==KeyValue" }, AtLeastOneGroup = "tcp-key-value-pair-delimiters", ReasonCode = "TCP_KEY_VALUE_PAIR_DELIMITER_ONLY_FOR_KEY_VALUE_PARSE")]
+[OperatorParameterRule("ResponseKeyValuePairDelimiters", RequiredWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==KeyValue" }, EnabledWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==KeyValue" }, AtLeastOneGroup = "tcp-key-value-pair-delimiters", ReasonCode = "TCP_KEY_VALUE_PAIR_DELIMITERS_ONLY_FOR_KEY_VALUE_PARSE")]
+[OperatorParameterRule("ResponseKeyValueSeparator", RequiredWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==KeyValue" }, EnabledWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==KeyValue" }, AtLeastOneGroup = "tcp-key-value-separators", ReasonCode = "TCP_KEY_VALUE_SEPARATOR_ONLY_FOR_KEY_VALUE_PARSE")]
+[OperatorParameterRule("ResponseKeyValueSeparators", RequiredWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==KeyValue" }, EnabledWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==KeyValue" }, AtLeastOneGroup = "tcp-key-value-separators", ReasonCode = "TCP_KEY_VALUE_SEPARATORS_ONLY_FOR_KEY_VALUE_PARSE")]
+[OperatorParameterRule("ResponseDelimiter", RequiredWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==Delimited" }, EnabledWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==Delimited" }, AtLeastOneGroup = "tcp-response-delimiters", ReasonCode = "TCP_DELIMITER_ONLY_FOR_DELIMITED_PARSE")]
+[OperatorParameterRule("ResponseDelimiters", RequiredWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==Delimited" }, EnabledWhenAll = new[] { "WaitResponse==true", "ResponseParseMode==Delimited" }, AtLeastOneGroup = "tcp-response-delimiters", ReasonCode = "TCP_DELIMITERS_ONLY_FOR_DELIMITED_PARSE")]
+[OperatorParameterRule("ResponseIndex", EnabledWhenAll = new[] { "WaitResponse==true" }, EnabledWhenAny = new[] { "ResponseParseMode==Delimited", "ResponseParseMode==FixedWidth" }, ReasonCode = "TCP_RESPONSE_INDEX_ONLY_FOR_POSITIONAL_PARSE")]
+[OperatorParameterRule("TrimResponseBeforeParse", EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_RESPONSE_TRIM_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("ResponseStartMarker", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_RESPONSE_FRAME_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("ResponseEndMarker", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_RESPONSE_FRAME_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("FailOnMissingResponseFrame", EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_RESPONSE_FRAME_POLICY_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("ExpectedResponse", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_EXPECTED_RESPONSE_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("RejectedResponse", RequiredPolicy = OperatorParameterRequiredPolicy.Optional, EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_REJECTED_RESPONSE_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("ResponseMatchMode", EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("ResponseMatchIgnoreCase", EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING")]
+[OperatorParameterRule("ResponseMatchSource", EnabledWhenAll = new[] { "WaitResponse==true" }, ReasonCode = "TCP_RESPONSE_MATCH_ONLY_WHEN_WAITING")]
 public class TcpCommunicationOperator : OperatorBase
 {
     private static readonly Regex PayloadPlaceholderRegex = new(

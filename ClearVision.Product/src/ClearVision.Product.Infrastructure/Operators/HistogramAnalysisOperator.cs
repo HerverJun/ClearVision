@@ -12,8 +12,10 @@ namespace ClearVision.Product.Infrastructure.Operators;
     Description = "统计指定通道的直方图及灰度/强度分布指标。",
     CategoryId = OperatorCategoryId.FeatureExtraction,
     IconName = "histogram",
-    Keywords = new[] { "histogram", "distribution", "peak", "median" }
+    Keywords = new[] { "histogram", "distribution", "peak", "median" },
+    Version = "1.1.0"
 )]
+[OperatorImageContractProvider(typeof(HistogramImageContractProvider))]
 [InputPort("Image", "Image", PortDataType.Image, IsRequired = true)]
 [OutputPort("Image", "Image", PortDataType.Image)]
 [OutputPort("Mean", "Mean", PortDataType.Float)]
@@ -27,7 +29,7 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OutputPort("PeakBinIndex", "Peak Bin Index", PortDataType.Integer)]
 [OutputPort("ValleyBinIndex", "Valley Bin Index", PortDataType.Integer)]
 [OperatorParam("Channel", "Channel", "enum", DefaultValue = "Gray", Options = new[] { "Gray|Gray", "R|R", "G|G", "B|B" })]
-[OperatorParam("BinCount", "Bin Count", "int", DefaultValue = 256, Min = 2, Max = 1024)]
+[OperatorParam("BinCount", "Bin Count", "int", Description = "8U 原生域的离散直方图箱数。", DefaultValue = 256, Min = 2, Max = 256)]
 [OperatorParam("RoiX", "ROI X", "int", DefaultValue = 0, Min = 0)]
 [OperatorParam("RoiY", "ROI Y", "int", DefaultValue = 0, Min = 0)]
 [OperatorParam("RoiW", "ROI W", "int", DefaultValue = 0, Min = 0)]
@@ -57,7 +59,12 @@ public class HistogramAnalysisOperator : OperatorBase
         }
 
         var channelName = GetStringParam(@operator, "Channel", "Gray");
-        var binCount = GetIntParam(@operator, "BinCount", 256, 2, 1024);
+        var binCount = GetIntParam(@operator, "BinCount", 256);
+        if (binCount is < 2 or > 256)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure(
+                "IMAGE_DYNAMIC_RANGE_UNDEFINED: OperatorType=HistogramAnalysis; Mode=Fixed8BitDomain; Supported=BinCount[2,256]."));
+        }
         var roi = MeasurementRoiHelper.ResolveRoi(@operator, src.Width, src.Height);
         if (roi.Width <= 0 || roi.Height <= 0)
         {
@@ -108,6 +115,11 @@ public class HistogramAnalysisOperator : OperatorBase
             { "HistogramMass", total },
             { "ModeCount", values[modeBinIndex] },
             { "SampleCount", roi.Width * roi.Height },
+            { "HistogramRangeMin", 0.0 },
+            { "HistogramRangeMax", 256.0 },
+            { "RangePolicy", "Fixed8BitDomain" },
+            { "ValueUnit", "InputIntensity8U" },
+            { "OutputMatType", MatType.CV_8UC3.ToString() },
             { "StatusCode", "OK" },
             { "StatusMessage", "Success" },
             { "Confidence", MeasurementStatisticsHelper.ComputeConfidenceFromUncertainty(quantizationUncertainty) },
@@ -128,9 +140,9 @@ public class HistogramAnalysisOperator : OperatorBase
         }
 
         var binCount = GetIntParam(@operator, "BinCount", 256);
-        if (binCount < 2)
+        if (binCount is < 2 or > 256)
         {
-            return ValidationResult.Invalid("BinCount must be >= 2");
+            return ValidationResult.Invalid("BinCount must be in [2, 256] for the fixed 8U histogram domain");
         }
 
         return ValidationResult.Valid();
@@ -146,7 +158,10 @@ public class HistogramAnalysisOperator : OperatorBase
             }
 
             var gray = new Mat();
-            Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+            Cv2.CvtColor(
+                src,
+                gray,
+                src.Channels() == 4 ? ColorConversionCodes.BGRA2GRAY : ColorConversionCodes.BGR2GRAY);
             return gray;
         }
 
@@ -294,5 +309,19 @@ public class HistogramAnalysisOperator : OperatorBase
         }
 
         return image;
+    }
+
+    private static string BuildChannelFailure(Mat src, string channelName)
+    {
+        var contract = new HistogramImageContractProvider()
+            .GetContracts(OperatorType.HistogramAnalysis, ["Image"], OperatorLifecycle.Stable)
+            .Single();
+        return ImageInputRuntimeContractEvaluator.FormatFailure(
+            "IMAGE_CHANNELS_UNSUPPORTED",
+            OperatorType.HistogramAnalysis,
+            contract,
+            src,
+            $"Channel={channelName}",
+            "Single-channel input supports Channel=Gray only; B/G/R require C3 or C4 input.");
     }
 }

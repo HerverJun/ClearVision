@@ -1,4 +1,4 @@
-using ClearVision.Product.Core.Entities;
+﻿using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
@@ -9,10 +9,11 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Operators;
 
-public class MatchingRegressionStabilityTests
+[TestClassification(TestDomain.Matching, TestPurpose.Determinism, TestLane.Nightly, TestEvidenceType.Contract, TestOracleType.Metamorphic, TestResourceRequirement.None, TestExpectedDuration.Long, TestFlakyPolicy.Blocking, "operator-quality", SeedControl = "Fixed: Cv2.SetTheRNG(20260715) is called before every execution")]
+public class MatchingDeterminismTests
 {
     [Fact]
-    public async Task TemplateMatching_ShouldBeStableAcrossRepeatedRuns()
+    public async Task TemplateMatching_ShouldBeDeterministicAcrossRepeatedRuns()
     {
         var op = new Operator("template_stable", OperatorType.TemplateMatching, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("Domain", "Gradient", "string"));
@@ -32,6 +33,7 @@ public class MatchingRegressionStabilityTests
         var positions = new List<Position>();
         for (var iteration = 0; iteration < 5; iteration++)
         {
+            Cv2.SetTheRNG(20260715UL);
             var result = await matcher.ExecuteAsync(op, new Dictionary<string, object>
             {
                 ["Image"] = sceneBytes,
@@ -45,13 +47,13 @@ public class MatchingRegressionStabilityTests
         }
 
         scores.Should().OnlyContain(score => score > 0.45);
-        scores.Max().Should().BeApproximately(scores.Min(), 1e-6);
-        positions.Select(position => position.X).Should().OnlyContain(x => Math.Abs(x - positions[0].X) < 1e-6);
-        positions.Select(position => position.Y).Should().OnlyContain(y => Math.Abs(y - positions[0].Y) < 1e-6);
+        AssertBitwiseDeterministic(scores);
+        AssertBitwiseDeterministic(positions.Select(position => position.X).ToArray());
+        AssertBitwiseDeterministic(positions.Select(position => position.Y).ToArray());
     }
 
     [Fact]
-    public async Task ShapeMatching_ShouldBeStableAcrossRepeatedRuns()
+    public async Task ShapeMatching_ShouldBeDeterministicAcrossRepeatedRuns()
     {
         var op = new Operator("shape_stable", OperatorType.ShapeMatching, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("MinScore", "MinScore", "double", 0.45, 0.1, 1.0, true));
@@ -80,6 +82,7 @@ public class MatchingRegressionStabilityTests
         var centerYs = new List<double>();
         for (var iteration = 0; iteration < 3; iteration++)
         {
+            Cv2.SetTheRNG(20260715UL);
             var result = await matcher.ExecuteAsync(op, new Dictionary<string, object>
             {
                 ["Image"] = sceneBytes,
@@ -99,13 +102,13 @@ public class MatchingRegressionStabilityTests
             centerYs.Add(Convert.ToDouble(match["CenterY"]));
         }
 
-        scores.Max().Should().BeApproximately(scores.Min(), 1e-6);
-        centerXs.Max().Should().BeApproximately(centerXs.Min(), 1e-6);
-        centerYs.Max().Should().BeApproximately(centerYs.Min(), 1e-6);
+        AssertBitwiseDeterministic(scores);
+        AssertBitwiseDeterministic(centerXs);
+        AssertBitwiseDeterministic(centerYs);
     }
 
     [Fact]
-    public async Task PlanarMatching_ShouldBeStableAcrossRepeatedRuns()
+    public async Task PlanarMatching_ShouldBeDeterministicAcrossRepeatedRuns()
     {
         var op = new Operator("planar_stable", OperatorType.PlanarMatching, 0, 0);
         op.Parameters.Add(TestHelpers.CreateParameter("DetectorType", "ORB"));
@@ -124,6 +127,7 @@ public class MatchingRegressionStabilityTests
         var inlierCounts = new List<int>();
         for (var iteration = 0; iteration < 3; iteration++)
         {
+            Cv2.SetTheRNG(20260715UL);
             var result = await matcher.ExecuteAsync(op, new Dictionary<string, object>
             {
                 ["Image"] = sceneBytes,
@@ -137,8 +141,15 @@ public class MatchingRegressionStabilityTests
             inlierCounts.Add(Convert.ToInt32(result.OutputData["InlierCount"]));
         }
 
-        scores.Max().Should().BeApproximately(scores.Min(), 1e-6);
+        AssertBitwiseDeterministic(scores);
         inlierCounts.Should().OnlyContain(count => count == inlierCounts[0]);
+    }
+
+    private static void AssertBitwiseDeterministic(IReadOnlyList<double> values)
+    {
+        values.Should().NotBeEmpty();
+        var expectedBits = BitConverter.DoubleToInt64Bits(values[0]);
+        values.Should().OnlyContain(value => BitConverter.DoubleToInt64Bits(value) == expectedBits);
     }
 
     private static ImageWrapper CreatePatternTemplate()

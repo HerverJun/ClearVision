@@ -9,6 +9,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[TestClassification(TestDomain.Measurement, TestPurpose.Regression, TestLane.Pr, TestEvidenceType.Contract, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Fast, TestFlakyPolicy.Blocking, "operator-quality")]
 public class MeasureDistanceOperatorTests
 {
     private readonly MeasureDistanceOperator _operator;
@@ -89,5 +90,119 @@ public class MeasureDistanceOperatorTests
     {
         var op = new Operator("measure", OperatorType.Measurement, 0, 0);
         (await _operator.ExecuteAsync(op, null)).IsSuccess.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PointToLine_ShouldMatchProfessionalOperator()
+    {
+        var unified = new Operator("measure", OperatorType.Measurement, 0, 0);
+        unified.AddParameter(TestHelpers.CreateParameter("MeasureType", "PointToLine", "enum"));
+        unified.AddParameter(TestHelpers.CreateParameter("DistanceModel", "Segment", "enum"));
+        var professional = new Operator("point-line", OperatorType.PointLineDistance, 0, 0);
+        professional.AddParameter(TestHelpers.CreateParameter("DistanceModel", "Segment", "enum"));
+        professional.AddParameter(TestHelpers.CreateParameter("Unit", "Pixel", "enum"));
+        var point = new Position(5.5, 8.0);
+        var line = new LineData(0, 0, 20, 0);
+        var inputs = new Dictionary<string, object> { ["PointA"] = point, ["Line1"] = line };
+        var professionalInputs = new Dictionary<string, object> { ["Point"] = point, ["Line"] = line };
+        var professionalExecutor = new PointLineDistanceOperator(
+            Substitute.For<ILogger<PointLineDistanceOperator>>());
+
+        var unifiedResult = await _operator.ExecuteAsync(unified, inputs);
+        var professionalResult = await professionalExecutor.ExecuteAsync(professional, professionalInputs);
+
+        unifiedResult.IsSuccess.Should().BeTrue(unifiedResult.ErrorMessage);
+        professionalResult.IsSuccess.Should().BeTrue(professionalResult.ErrorMessage);
+        Convert.ToDouble(unifiedResult.OutputData!["Distance"])
+            .Should().BeApproximately(Convert.ToDouble(professionalResult.OutputData!["Distance"]), 1e-9);
+        unifiedResult.OutputData["FootPoint"].Should().Be(professionalResult.OutputData["FootPoint"]);
+        unifiedResult.OutputData["MeasurementType"].Should().Be("PointToLine");
+        unifiedResult.OutputData["Unit"].Should().Be("Pixel");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_LineToLine_ShouldMatchProfessionalDistanceAndAngle()
+    {
+        var unified = new Operator("measure", OperatorType.Measurement, 0, 0);
+        unified.AddParameter(TestHelpers.CreateParameter("MeasureType", "LineToLine", "enum"));
+        unified.AddParameter(TestHelpers.CreateParameter("DistanceModel", "Segment", "enum"));
+        unified.AddParameter(TestHelpers.CreateParameter("ParallelThreshold", 2.0, "double"));
+        var professional = new Operator("line-line", OperatorType.LineLineDistance, 0, 0);
+        professional.AddParameter(TestHelpers.CreateParameter("DistanceModel", "Segment", "enum"));
+        professional.AddParameter(TestHelpers.CreateParameter("ParallelThreshold", 2.0, "double"));
+        professional.AddParameter(TestHelpers.CreateParameter("Unit", "Pixel", "enum"));
+        var line1 = new LineData(0, 0, 20, 0);
+        var line2 = new LineData(0, 8, 20, 8);
+        var inputs = new Dictionary<string, object> { ["Line1"] = line1, ["Line2"] = line2 };
+        var professionalExecutor = new LineLineDistanceOperator(
+            Substitute.For<ILogger<LineLineDistanceOperator>>());
+
+        var unifiedResult = await _operator.ExecuteAsync(unified, inputs);
+        var professionalResult = await professionalExecutor.ExecuteAsync(professional, inputs);
+
+        unifiedResult.IsSuccess.Should().BeTrue(unifiedResult.ErrorMessage);
+        professionalResult.IsSuccess.Should().BeTrue(professionalResult.ErrorMessage);
+        Convert.ToDouble(unifiedResult.OutputData!["Distance"])
+            .Should().BeApproximately(Convert.ToDouble(professionalResult.OutputData!["Distance"]), 1e-9);
+        Convert.ToDouble(unifiedResult.OutputData["Angle"])
+            .Should().BeApproximately(Convert.ToDouble(professionalResult.OutputData["Angle"]), 1e-9);
+        unifiedResult.OutputData["IsParallel"].Should().Be(true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ThreePointAngle_ShouldMatchProfessionalOperator()
+    {
+        var unified = new Operator("measure", OperatorType.Measurement, 0, 0);
+        unified.AddParameter(TestHelpers.CreateParameter("MeasureType", "ThreePointAngle", "enum"));
+        unified.AddParameter(TestHelpers.CreateParameter("AngleUnit", "Degree", "enum"));
+        var professional = new Operator("angle", OperatorType.AngleMeasurement, 0, 0);
+        professional.AddParameter(TestHelpers.CreateParameter("Unit", "Degree", "enum"));
+        var pointA = new Position(0, 0);
+        var vertex = new Position(10, 0);
+        var pointC = new Position(10, 10);
+        using var unifiedImage = TestHelpers.CreateShapeTestImage();
+        using var professionalImage = TestHelpers.CreateShapeTestImage();
+        var unifiedInputs = TestHelpers.CreateImageInputs(unifiedImage);
+        unifiedInputs["PointA"] = pointA;
+        unifiedInputs["PointB"] = vertex;
+        unifiedInputs["PointC"] = pointC;
+        var professionalInputs = TestHelpers.CreateImageInputs(professionalImage);
+        professionalInputs["Point1"] = pointA;
+        professionalInputs["Point2"] = vertex;
+        professionalInputs["Point3"] = pointC;
+        var professionalExecutor = new AngleMeasurementOperator(
+            Substitute.For<ILogger<AngleMeasurementOperator>>());
+
+        var unifiedResult = await _operator.ExecuteAsync(unified, unifiedInputs);
+        var professionalResult = await professionalExecutor.ExecuteAsync(professional, professionalInputs);
+
+        unifiedResult.IsSuccess.Should().BeTrue(unifiedResult.ErrorMessage);
+        professionalResult.IsSuccess.Should().BeTrue(professionalResult.ErrorMessage);
+        Convert.ToDouble(unifiedResult.OutputData!["Angle"])
+            .Should().BeApproximately(Convert.ToDouble(professionalResult.OutputData!["Angle"]), 1e-9);
+        Convert.ToDouble(unifiedResult.OutputData["UncertaintyDeg"])
+            .Should().BeApproximately(Convert.ToDouble(professionalResult.OutputData["UncertaintyDeg"]), 1e-6);
+        Convert.ToDouble(unifiedResult.OutputData["UncertaintyPx"]).Should().BeGreaterThan(0.0);
+        Convert.ToDouble(unifiedResult.OutputData["Confidence"])
+            .Should().BeApproximately(Convert.ToDouble(professionalResult.OutputData["Confidence"]), 1e-6);
+        unifiedResult.OutputData["Value"].Should().Be(unifiedResult.OutputData["Angle"]);
+        unifiedResult.OutputData["Unit"].Should().Be("Degree");
+        (unifiedResult.OutputData["Image"] as IDisposable)?.Dispose();
+        (professionalResult.OutputData["Image"] as IDisposable)?.Dispose();
+    }
+
+    [Theory]
+    [InlineData("PointToLine", "PointToLine requires PointA")]
+    [InlineData("LineToLine", "LineToLine requires Line1 and Line2")]
+    [InlineData("ThreePointAngle", "ThreePointAngle requires PointA, PointB and PointC")]
+    public async Task ExecuteAsync_ModeMissingInputs_ShouldFailActionably(string mode, string expectedMessage)
+    {
+        var op = new Operator("measure", OperatorType.Measurement, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("MeasureType", mode, "enum"));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>());
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain(expectedMessage);
     }
 }

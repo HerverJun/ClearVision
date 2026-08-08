@@ -15,6 +15,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Integration;
 
+[TestClassification(TestDomain.General, TestPurpose.Integration, TestLane.Nightly, TestEvidenceType.IntegrationEvidence, TestOracleType.Contract, TestResourceRequirement.None, TestExpectedDuration.Medium, TestFlakyPolicy.Blocking, "product")]
 public class FlowConnectionScenariosTests
 {
     [Fact]
@@ -232,7 +233,7 @@ public class FlowConnectionScenariosTests
     }
 
     [Fact]
-    public async Task ExecuteFlowAsync_ImageAcquisitionToMeasurement_ShouldRetainInspectionInputSnapshotWithoutPollutingOutputData()
+    public async Task ExecuteFlowAsync_ImageAcquisitionToMeasurement_ShouldRetainInspectionInputSnapshotWithoutPollutingOutputData_WhenSequential()
     {
         var sourceExecutor = new TestImageSourceOperator(NullLogger<TestImageSourceOperator>.Instance);
         var measurementExecutor = new TestInitialImageConsumerOperator(NullLogger<TestInitialImageConsumerOperator>.Instance);
@@ -267,7 +268,7 @@ public class FlowConnectionScenariosTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ExecuteFlowAsync_ImageAcquisitionToMeasurement_ShouldRetainInspectionInputSnapshotWithoutPollutingOutputData(bool enableParallel)
+    public async Task ExecuteFlowAsync_ImageAcquisitionToMeasurement_ShouldRetainInspectionInputSnapshotWithoutPollutingOutputData_WhenParallelSettingChanges(bool enableParallel)
     {
         var sourceExecutor = new TestImageSourceOperator(NullLogger<TestImageSourceOperator>.Instance);
         var measurementExecutor = new TestInitialImageConsumerOperator(NullLogger<TestInitialImageConsumerOperator>.Instance);
