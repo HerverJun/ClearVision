@@ -1021,8 +1021,8 @@ export class NodePreviewCoordinator {
                 ? imageValue.then(imageBase64 => ({ imageBase64, sourceNodeId: null, frameId: null }))
                 : { imageBase64: imageValue, sourceNodeId: null, frameId: null };
         });
-        this.previewExecutor = options.previewExecutor;
-        this.artifactClient = options.artifactClient;
+        this.previewExecutor = options.previewExecutor ?? (async () => null);
+        this.artifactClient = options.artifactClient ?? httpClient;
         this.debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
         const maxCacheEntries = Number(options.maxCacheEntries ?? 30);
         this.maxCacheEntries = Number.isFinite(maxCacheEntries)
