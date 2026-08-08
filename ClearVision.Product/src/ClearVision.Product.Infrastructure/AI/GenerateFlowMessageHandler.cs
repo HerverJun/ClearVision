@@ -70,6 +70,16 @@ public class GenerateFlowMessageHandler
                     requestId
                 }, _jsonOptions));
 
+            var modeDecision = AiAgentGenerateFlowModePolicy.Evaluate(
+                agentGenerateFlowMode,
+                AiAgentGenerateFlowPolicyKind.Production);
+            if (!modeDecision.Allowed)
+            {
+                return SerializeResponse(
+                    BuildModeRejectedResult(modeDecision, sessionId, requestId),
+                    AiFlowGenerationResult.FailureTypeSystemError);
+            }
+
             var generationRequest = new AiFlowGenerationRequest(
                 Description: description,
                 AdditionalContext: hint,
@@ -82,7 +92,7 @@ public class GenerateFlowMessageHandler
             {
                 RequirementMode = requirementMode ?? AiRequirementModes.Strict,
                 UseVisionAgentGenerateFlow = useVisionAgentGenerateFlow,
-                AgentGenerateFlowMode = AiAgentGenerateFlowModes.Normalize(agentGenerateFlowMode),
+                AgentGenerateFlowMode = modeDecision.EffectiveMode,
                 RuntimePreviewConsent = runtimePreviewConsent,
                 BuildFromPlan = buildFromPlan
             };
@@ -145,8 +155,10 @@ public class GenerateFlowMessageHandler
                 ToolTrace = result.ToolTrace,
                 BuildResult = result.BuildResult,
                 BuildReadiness = result.BuildReadiness,
+                AgentRunId = result.AgentRunId,
                 PlanId = ResolveResponsePlanId(result, buildFromPlan),
                 PlanHash = ResolveResponsePlanHash(result, buildFromPlan),
+                PlanSnapshot = result.PlanSnapshot,
                 WorkflowDiff = result.BuildResult?.WorkflowDiff,
                 ApplyGate = result.BuildResult?.ApplyGate,
                 ToolEvidenceTimeline = result.BuildResult?.ToolEvidenceTimeline,
@@ -303,6 +315,33 @@ public class GenerateFlowMessageHandler
         };
     }
 
+    private static GenerateFlowResponse BuildModeRejectedResult(
+        AiAgentGenerateFlowModeDecision decision,
+        string? sessionId,
+        string? requestId)
+    {
+        return new GenerateFlowResponse
+        {
+            Success = false,
+            Status = AiFlowGenerationResult.CompletionStatusFailed,
+            ErrorMessage = decision.FailureMessage,
+            FailureSummary = $"{decision.FailureCode}: {decision.FailureMessage}",
+            SessionId = sessionId,
+            RequestId = requestId,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+            LastAttemptDiagnostics = new[]
+            {
+                new AiAttemptDiagnostic
+                {
+                    AttemptNumber = 0,
+                    Stage = "mode_policy",
+                    Summary = decision.FailureCode,
+                    OutputSummary = decision.FailureMessage
+                }
+            }
+        };
+    }
+
     private static string SerializeResponse(GenerateFlowResponse response, string? failureType)
     {
         return JsonSerializer.Serialize(new
@@ -334,8 +373,10 @@ public class GenerateFlowMessageHandler
             response.ToolTrace,
             response.BuildResult,
             response.BuildReadiness,
+            response.AgentRunId,
             response.PlanId,
             response.PlanHash,
+            response.PlanSnapshot,
             response.WorkflowDiff,
             response.ApplyGate,
             response.ToolEvidenceTimeline,

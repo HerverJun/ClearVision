@@ -526,7 +526,7 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         var result = await CreateRegistry().ExecuteAsync(
             RuntimePreviewPermissionGate.ReplayToolName,
             RuntimePreviewContext(),
-            Args(new { frameId = "offline-frame", flow = ValidFlow() }),
+            Args(new { frameId = "offline-frame", flow = MissingResourceFlow() }),
             CancellationToken.None);
 
         var payload = Json(result.Data);
@@ -534,7 +534,7 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         payload.GetProperty("missingResources").EnumerateArray()
             .Select(item => item.GetProperty("parameterName").GetString())
             .Should()
-            .Contain(["CameraId", "Template"]);
+            .Contain("CameraId");
         payload.GetProperty("previewReady").GetBoolean().Should().BeTrue();
     }
 
@@ -579,33 +579,6 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         result.Success.Should().BeFalse();
         result.ErrorCode.Should().Be("runtime_preview_adapter_not_found");
         Json(result.Data).GetProperty("adapterName").GetString().Should().Be("missing_adapter");
-    }
-
-    [Fact(DisplayName = "ToolTrace should record RuntimePreview permission decision and adapterName")]
-    public async Task ToolTrace_ShouldRecordPermissionDecisionAndAdapterName()
-    {
-        var flow = ValidFlow();
-        var service = CreatePlannerService(new DelegatePlannerCompletionSource((_, index) => index switch
-        {
-            0 => ToolCall(RuntimePreviewPermissionGate.ReplayToolName, new { frameId = "offline-frame", flow }),
-            _ => FinalWorkflowDraft(flow)
-        }));
-
-        var result = await service.GenerateFlowAsync(
-            PlannerRequest("offline replay") with { RuntimePreviewConsent = true },
-            CancellationToken.None);
-
-        var trace = Trace(result).Single(item =>
-            item.GetProperty("toolName").GetString() == RuntimePreviewPermissionGate.ReplayToolName);
-        trace.GetProperty("permission").GetString().Should().Be(nameof(VisionAgentToolPermission.RuntimePreview));
-        trace.GetProperty("adapterName").GetString().Should().Be(OfflineRuntimePreviewAdapter.AdapterName);
-        trace.GetProperty("permissionDecision").GetProperty("runtimePreviewConsent").GetBoolean().Should().BeTrue();
-        Json(result.ValidationPreview)
-            .GetProperty("runtimePreview")
-            .GetProperty("adapterName")
-            .GetString()
-            .Should()
-            .Be(OfflineRuntimePreviewAdapter.AdapterName);
     }
 
     [Fact(DisplayName = "RuntimePreview adapter source guard should avoid real hardware station network and process APIs")]
@@ -683,40 +656,6 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         ]);
     }
 
-    private static VisionAgentGenerateFlowService CreatePlannerService(
-        IVisionAgentPlannerCompletionSource completionSource)
-    {
-        var loopOptions = new VisionAgentLoopOptions
-        {
-            MaxToolRounds = 8,
-            MaxToolCallsPerRound = 4,
-            MaxToolResultChars = 64_000
-        };
-        var parser = new VisionAgentProtocolParser();
-        var planner = new VisionAgentPlannerService(
-            completionSource,
-            parser,
-            new AgentToolCallPolicy(),
-            new AgentPlannerPromptBuilder());
-
-        return new VisionAgentGenerateFlowService(
-            new VisionAgentLoop(
-                CreateRegistry(),
-                new VisionAgentProtocolParser(),
-                new AgentPromptBuilder(),
-                Options.Create(loopOptions)),
-            Options.Create(loopOptions),
-            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentGenerateFlowService>>(),
-            Options.Create(new AgentGenerateFlowOptions
-            {
-                Mode = AiAgentGenerateFlowModes.Planner,
-                FallbackToScriptedOnPlannerFailure = false
-            }),
-            planner,
-            parser,
-            new AgentWorkflowDraftEditor());
-    }
-
     private static VisionAgentToolContext RuntimePreviewContext(RuntimePreviewPilotConfig? pilotConfig = null)
     {
         return new VisionAgentToolContext
@@ -764,15 +703,6 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
             directory);
     }
 
-    private static AiFlowGenerationRequest PlannerRequest(string description)
-    {
-        return new AiFlowGenerationRequest(description)
-        {
-            UseVisionAgentGenerateFlow = true,
-            AgentGenerateFlowMode = AiAgentGenerateFlowModes.Planner
-        };
-    }
-
     private static object ValidFlow()
     {
         return new
@@ -781,15 +711,47 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
             {
                 Operator("op_cam", "ImageAcquisition", new Dictionary<string, string>
                 {
-                    ["SourceType"] = "Camera",
-                    ["CameraBindingId"] = "<pending-camera-binding>"
+                    ["SourceType"] = "File",
+                    ["FilePath"] = "fixture://input"
                 }),
-                Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "<pending-template-path>" })
+                Operator("op_template", "ImageAcquisition", new Dictionary<string, string>
+                {
+                    ["SourceType"] = "File",
+                    ["FilePath"] = "fixture://template"
+                }),
+                Operator("op_match", "TemplateMatching")
             },
             connections = new object[]
             {
-                Connection("op_cam", "Image", "op_match", "Image")
-            }
+                Connection("op_cam", "Image", "op_match", "Image"),
+                Connection("op_template", "Image", "op_match", "Template")
+            },
+            entryOperatorTempId = "op_cam"
+        };
+    }
+
+    private static object MissingResourceFlow()
+    {
+        return new
+        {
+            operators = new object[]
+            {
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string>
+                {
+                    ["SourceType"] = "Camera"
+                }),
+                Operator("op_template", "ImageAcquisition", new Dictionary<string, string>
+                {
+                    ["SourceType"] = "Camera"
+                }),
+                Operator("op_match", "TemplateMatching")
+            },
+            connections = new object[]
+            {
+                Connection("op_cam", "Image", "op_match", "Image"),
+                Connection("op_template", "Image", "op_match", "Template")
+            },
+            entryOperatorTempId = "op_cam"
         };
     }
 
@@ -928,14 +890,6 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         return doc.RootElement.Clone();
     }
 
-    private static IReadOnlyList<JsonElement> Trace(AiFlowGenerationResult result)
-    {
-        return Json(result.ToolTrace)
-            .EnumerateArray()
-            .Select(item => item.Clone())
-            .ToList();
-    }
-
     private static string ReadSourceUnder(string directory)
     {
         return string.Join(
@@ -948,25 +902,6 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
     private static string GetProductRoot()
     {
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
-    }
-
-    private sealed class DelegatePlannerCompletionSource : IVisionAgentPlannerCompletionSource
-    {
-        private readonly Func<AgentPlannerCompletionRequest, int, string> _next;
-        private int _index;
-
-        public DelegatePlannerCompletionSource(Func<AgentPlannerCompletionRequest, int, string> next)
-        {
-            _next = next;
-        }
-
-        public Task<string> CompleteAsync(
-            AgentPlannerCompletionRequest request,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(_next(request, _index++));
-        }
     }
 
     private sealed class ThrowingRuntimePreviewAdapter : IRuntimePreviewAdapter

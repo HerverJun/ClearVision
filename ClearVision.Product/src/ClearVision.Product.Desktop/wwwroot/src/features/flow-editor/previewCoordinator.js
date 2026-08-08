@@ -637,7 +637,8 @@ function createPresenterState(state) {
             maxItems: 3,
             stringMaxLength: 42,
             skipImageLikeValues: true,
-            technicalLabels: true
+            technicalLabels: true,
+            observation: state.observation
         }),
         overlayEnabled: state.canvasEligibility.eligible,
         canOpenImage: Boolean(state.outputImageBase64),

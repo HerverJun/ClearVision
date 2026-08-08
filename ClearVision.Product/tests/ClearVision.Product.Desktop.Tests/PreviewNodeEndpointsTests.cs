@@ -24,6 +24,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using OpenCvSharp;
@@ -839,6 +840,256 @@ public class PreviewNodeEndpointsTests
         secondDocument.RootElement.GetProperty("outputData").TryGetProperty("Blobs", out _).Should().BeTrue();
         ReadIntValue(blobExecutor.LastExecutedOperator!.Parameters.Single(parameter => parameter.Name == "MaxArea").GetValue())
             .Should().Be(1000);
+    }
+
+    [Fact]
+    public async Task PreviewNode_BlobAnalysis_ShouldPreserveFiveItemListSemanticsAndDetailedFeatureSwitch()
+    {
+        var project = new Project("preview-blob-list-semantics");
+        var acquisitionId = Guid.NewGuid();
+        var blobId = Guid.NewGuid();
+        var acquisitionOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var blobInput = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+        var outputPorts = new List<PortDto>
+        {
+            CreatePort("Image", PortDataType.Image, PortDirection.Output),
+            CreatePort("Blobs", PortDataType.BlobList, PortDirection.Output),
+            CreatePort("BlobFeatures", PortDataType.BlobFeatureList, PortDirection.Output),
+            CreatePort("BlobCount", PortDataType.Integer, PortDirection.Output)
+        };
+        var acquisition = CreateOperatorDto(
+            acquisitionId,
+            "ImageAcquisition",
+            OperatorType.ImageAcquisition,
+            outputPorts: [acquisitionOutput],
+            parameters: new Dictionary<string, object> { ["SourceType"] = "File", ["FilePath"] = string.Empty });
+        var blob = CreateOperatorDto(
+            blobId,
+            "BlobAnalysis",
+            OperatorType.BlobAnalysis,
+            inputPorts: [blobInput],
+            outputPorts: outputPorts,
+            parameters: new Dictionary<string, object>
+            {
+                ["MinArea"] = 1,
+                ["MaxArea"] = 1000,
+                ["Color"] = "White",
+                ["OutputDetailedFeatures"] = false
+            });
+
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            new ProjectVariableSessionRegistry(),
+            [
+                new ImageAcquisitionOperator(NullLogger<ImageAcquisitionOperator>.Instance, Substitute.For<ICameraManager>()),
+                new BlobDetectionOperator(NullLogger<BlobDetectionOperator>.Instance)
+            ]);
+        var request = new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = blobId,
+            DebugSessionId = Guid.NewGuid(),
+            ClientRequestSequence = 1,
+            FlowRevision = 1,
+            ArtifactMode = "references",
+            InputImageBase64 = Convert.ToBase64String(CreateFiveBlobPreviewImageBytes()),
+            FlowData = CreateUpdateFlowRequest(
+                acquisition,
+                blob,
+                CreateConnection(acquisitionId, acquisitionOutput.Id, blobId, blobInput.Id))
+        };
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", request);
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        var outputData = document.RootElement.GetProperty("outputData");
+        outputData.GetProperty("BlobCount").GetInt32().Should().Be(5);
+        outputData.GetProperty("Blobs").GetArrayLength().Should().Be(5);
+        outputData.GetProperty("BlobFeatures").GetArrayLength().Should().Be(0);
+        var blobsNode = GetObservationOutputNode(document.RootElement, "Blobs");
+        blobsNode.GetProperty("semanticKind").GetString().Should().Be("blob-list");
+        blobsNode.GetProperty("declaredPortDataType").GetString().Should().Be("BlobList");
+        blobsNode.GetProperty("visibleItemCount").GetInt32().Should().Be(5);
+        blobsNode.GetProperty("totalItemCount").GetInt32().Should().Be(5);
+        var firstBlob = blobsNode.GetProperty("children")[0];
+        firstBlob.GetProperty("children").EnumerateArray().Select(item => item.GetProperty("name").GetString())
+            .Should().Contain(["Id", "Area", "X", "Y", "Width", "Height", "CenterX", "CenterY", "Circularity"]);
+
+        blob.Parameters.Single(parameter => parameter.Name == "OutputDetailedFeatures").Value = true;
+        request.DebugSessionId = Guid.NewGuid();
+        request.ClientRequestSequence = 2;
+        request.FlowRevision = 2;
+        using var detailedResponse = await host.Client.PostAsJsonAsync("/api/flows/preview-node", request);
+        var detailedPayload = await detailedResponse.Content.ReadAsStringAsync();
+        detailedResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, detailedPayload);
+        using var detailedDocument = JsonDocument.Parse(detailedPayload);
+        detailedDocument.RootElement.GetProperty("outputData").GetProperty("BlobFeatures").GetArrayLength().Should().Be(5);
+        var featuresNode = GetObservationOutputNode(detailedDocument.RootElement, "BlobFeatures");
+        featuresNode.GetProperty("semanticKind").GetString().Should().Be("blob-feature-list");
+        featuresNode.GetProperty("totalItemCount").GetInt32().Should().Be(5);
+    }
+
+    [Fact]
+    public async Task PreviewNode_BoxNms_ShouldExposeRealDetectionCountsInsteadOfWrapperFieldCounts()
+    {
+        var project = new Project("preview-box-nms-semantics");
+        var sourceId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var sourceOutput = CreatePort("Detections", PortDataType.DetectionList, PortDirection.Output);
+        var targetInput = CreatePort("Detections", PortDataType.DetectionList, PortDirection.Input, isRequired: true);
+        var targetOutputs = new List<PortDto>
+        {
+            CreatePort("Detections", PortDataType.DetectionList, PortDirection.Output),
+            CreatePort("Count", PortDataType.Integer, PortDirection.Output),
+            CreatePort("InputCount", PortDataType.Integer, PortDirection.Output),
+            CreatePort("SuppressedCount", PortDataType.Integer, PortDirection.Output),
+            CreatePort("SuppressedDetections", PortDataType.DetectionList, PortDirection.Output),
+            CreatePort("Diagnostics", PortDataType.Any, PortDirection.Output)
+        };
+        var detections = new DetectionList([
+            new DetectionResultValue("a", 0.99f, 0, 0, 10, 10),
+            new DetectionResultValue("b", 0.98f, 20, 0, 10, 10),
+            new DetectionResultValue("c", 0.97f, 40, 0, 10, 10),
+            new DetectionResultValue("d", 0.96f, 60, 0, 10, 10),
+            new DetectionResultValue("e", 0.95f, 80, 0, 10, 10)
+        ]);
+        var source = CreateOperatorDto(sourceId, "DetectionSource", OperatorType.ConditionalBranch, outputPorts: [sourceOutput]);
+        var target = CreateOperatorDto(
+            targetId,
+            "BoxNms",
+            OperatorType.BoxNms,
+            inputPorts: [targetInput],
+            outputPorts: targetOutputs,
+            parameters: new Dictionary<string, object> { ["ScoreThreshold"] = 0.1, ["IouThreshold"] = 0.5 });
+
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            new ProjectVariableSessionRegistry(),
+            [
+                new FixedOutputOperatorExecutor(OperatorType.ConditionalBranch, new Dictionary<string, object> { ["Detections"] = detections }),
+                new BoxNmsOperator(NullLogger<BoxNmsOperator>.Instance)
+            ]);
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = targetId,
+            DebugSessionId = Guid.NewGuid(),
+            ClientRequestSequence = 1,
+            FlowRevision = 1,
+            ArtifactMode = "references",
+            FlowData = CreateUpdateFlowRequest(source, target, CreateConnection(sourceId, sourceOutput.Id, targetId, targetInput.Id))
+        });
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("outputData").GetProperty("Detections").GetProperty("Count").GetInt32().Should().Be(5);
+        var node = GetObservationOutputNode(document.RootElement, "Detections");
+        node.GetProperty("children").EnumerateArray().Select(item => item.GetProperty("name").GetString())
+            .Should().Contain(["Count", "Detections", "AverageConfidence"]);
+        node.GetProperty("totalItemCount").GetInt32().Should().Be(5);
+        node.GetProperty("semanticKind").GetString().Should().Be("detection-list");
+        GetObservationOutputNode(document.RootElement, "SuppressedDetections").GetProperty("totalItemCount").GetInt32().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task PreviewNode_PointSetTool_ShouldExposePointListAndGeometrySemantics()
+    {
+        var project = new Project("preview-point-set-semantics");
+        var sourceId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var sourceOutput = CreatePort("Points", PortDataType.PointList, PortDirection.Output);
+        var targetInput = CreatePort("Points1", PortDataType.PointList, PortDirection.Input, isRequired: true);
+        var targetOutputs = new List<PortDto>
+        {
+            CreatePort("Points", PortDataType.PointList, PortDirection.Output),
+            CreatePort("Count", PortDataType.Integer, PortDirection.Output),
+            CreatePort("Center", PortDataType.Point, PortDirection.Output),
+            CreatePort("BoundingBox", PortDataType.Rectangle, PortDirection.Output)
+        };
+        var points = Enumerable.Range(0, 5).Select(index => new Position(index * 10, index * 2)).ToList();
+        var source = CreateOperatorDto(sourceId, "PointSource", OperatorType.ConditionalBranch, outputPorts: [sourceOutput]);
+        var target = CreateOperatorDto(targetId, "PointSetTool", OperatorType.PointSetTool, inputPorts: [targetInput], outputPorts: targetOutputs);
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            new ProjectVariableSessionRegistry(),
+            [
+                new FixedOutputOperatorExecutor(OperatorType.ConditionalBranch, new Dictionary<string, object> { ["Points"] = points }),
+                new PointSetToolOperator(NullLogger<PointSetToolOperator>.Instance)
+            ]);
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = targetId,
+            DebugSessionId = Guid.NewGuid(),
+            ClientRequestSequence = 1,
+            FlowRevision = 1,
+            ArtifactMode = "references",
+            FlowData = CreateUpdateFlowRequest(source, target, CreateConnection(sourceId, sourceOutput.Id, targetId, targetInput.Id))
+        });
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        GetObservationOutputNode(document.RootElement, "Points").GetProperty("totalItemCount").GetInt32().Should().Be(5);
+        GetObservationOutputNode(document.RootElement, "Center").GetProperty("displayValue").GetString().Should().Be("(20, 4)");
+        GetObservationOutputNode(document.RootElement, "BoundingBox").GetProperty("displayValue").GetString().Should().Be("0, 0, 40 x 8");
+    }
+
+    [Fact]
+    public async Task PreviewNode_BinaryImageToRegion_ShouldExposeRegionSemanticInsteadOfObjectFieldCount()
+    {
+        var project = new Project("preview-region-semantics");
+        var acquisitionId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var acquisitionOutput = CreatePort("Image", PortDataType.Image, PortDirection.Output);
+        var targetInput = CreatePort("Image", PortDataType.Image, PortDirection.Input, isRequired: true);
+        var targetOutputs = new List<PortDto>
+        {
+            CreatePort("Region", PortDataType.Region, PortDirection.Output),
+            CreatePort("Image", PortDataType.Image, PortDirection.Output),
+            CreatePort("Area", PortDataType.Integer, PortDirection.Output)
+        };
+        var acquisition = CreateOperatorDto(
+            acquisitionId,
+            "ImageAcquisition",
+            OperatorType.ImageAcquisition,
+            outputPorts: [acquisitionOutput],
+            parameters: new Dictionary<string, object> { ["SourceType"] = "File", ["FilePath"] = string.Empty });
+        var target = CreateOperatorDto(
+            targetId,
+            "BinaryImageToRegion",
+            OperatorType.BinaryImageToRegion,
+            inputPorts: [targetInput],
+            outputPorts: targetOutputs);
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            new ProjectVariableSessionRegistry(),
+            [
+                new ImageAcquisitionOperator(NullLogger<ImageAcquisitionOperator>.Instance, Substitute.For<ICameraManager>()),
+                new BinaryImageToRegionOperator(NullLogger<BinaryImageToRegionOperator>.Instance)
+            ]);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = project.Id,
+            TargetNodeId = targetId,
+            DebugSessionId = Guid.NewGuid(),
+            ClientRequestSequence = 1,
+            FlowRevision = 1,
+            ArtifactMode = "references",
+            InputImageBase64 = Convert.ToBase64String(CreateBinaryPreviewImageBytes()),
+            FlowData = CreateUpdateFlowRequest(
+                acquisition,
+                target,
+                CreateConnection(acquisitionId, acquisitionOutput.Id, targetId, targetInput.Id))
+        });
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        document.RootElement.GetProperty("outputData").GetProperty("Area").GetInt32().Should().Be(2);
+        var region = GetObservationOutputNode(document.RootElement, "Region");
+        region.GetProperty("declaredPortDataType").GetString().Should().Be("Region");
+        region.GetProperty("semanticKind").GetString().Should().Be("geometry");
     }
 
     [Fact]
@@ -3642,6 +3893,27 @@ public class PreviewNodeEndpointsTests
         return image.ToBytes(".png");
     }
 
+    private static byte[] CreateFiveBlobPreviewImageBytes()
+    {
+        using var image = new Mat(100, 140, MatType.CV_8UC1, Scalar.Black);
+        for (var index = 0; index < 5; index++)
+        {
+            Cv2.Rectangle(image, new OpenCvSharp.Rect(8 + (index * 25), 20, 10, 10), Scalar.White, -1);
+        }
+
+        return image.ToBytes(".png");
+    }
+
+    private static JsonElement GetObservationOutputNode(JsonElement responseRoot, string outputName)
+    {
+        return responseRoot
+            .GetProperty("observation")
+            .GetProperty("detail")
+            .GetProperty("children")
+            .EnumerateArray()
+            .Single(item => string.Equals(item.GetProperty("name").GetString(), outputName, StringComparison.Ordinal));
+    }
+
     private static int CountGreenPixels(Mat image, OpenCvSharp.Rect region)
     {
         using var roi = new Mat(image, region);
@@ -3912,6 +4184,7 @@ public class PreviewNodeEndpointsTests
             });
 
             builder.WebHost.UseTestServer();
+            builder.Services.AddLogging(logging => logging.ClearProviders());
 
             var flowExecution = Substitute.For<IFlowExecutionService>();
             var projectRepository = Substitute.For<IProjectRepository>();
@@ -3961,6 +4234,7 @@ public class PreviewNodeEndpointsTests
             });
 
             builder.WebHost.UseTestServer();
+            builder.Services.AddLogging(logging => logging.ClearProviders());
             accessor ??= new ProjectVariableExecutionContextAccessor();
             projectRepository ??= Substitute.For<IProjectRepository>();
             flowStorage ??= Substitute.For<IProjectFlowStorage>();
@@ -4035,5 +4309,26 @@ public class PreviewNodeEndpointsTests
         {
             return _inner.ValidateParameters(@operator);
         }
+    }
+
+    private sealed class FixedOutputOperatorExecutor : IOperatorExecutor
+    {
+        private readonly Dictionary<string, object> _output;
+
+        public FixedOutputOperatorExecutor(OperatorType operatorType, Dictionary<string, object> output)
+        {
+            OperatorType = operatorType;
+            _output = output;
+        }
+
+        public OperatorType OperatorType { get; }
+
+        public Task<OperatorExecutionOutput> ExecuteAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>(_output, StringComparer.OrdinalIgnoreCase)));
+
+        public ValidationResult ValidateParameters(Operator @operator) => ValidationResult.Valid();
     }
 }

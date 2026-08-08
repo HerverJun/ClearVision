@@ -44,9 +44,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly IPromptVersionManager _promptVersionManager;
     private readonly Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> _logger;
     private readonly AgentGenerateFlowOptions _agentGenerateFlowOptions;
-    private readonly IVisionAgentGenerateFlowService? _agentGenerateFlowService;
     private readonly IVisionAgentBuildRunService? _buildRunService;
     private readonly IAgentRunEventStreamService? _agentRunStreamService;
+    private readonly IVisionAgentGenerateCompatibilityAdapter? _generateCompatibilityAdapter;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -75,9 +75,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         IPromptVersionManager promptVersionManager,
         Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger,
         IOptions<AgentGenerateFlowOptions>? agentGenerateFlowOptions = null,
-        IVisionAgentGenerateFlowService? agentGenerateFlowService = null,
         IVisionAgentBuildRunService? buildRunService = null,
-        IAgentRunEventStreamService? agentRunStreamService = null)
+        IAgentRunEventStreamService? agentRunStreamService = null,
+        IVisionAgentGenerateCompatibilityAdapter? generateCompatibilityAdapter = null)
     {
         _aiOrchestrator = aiOrchestrator;
         _promptBuilder = promptBuilder;
@@ -96,9 +96,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _promptVersionManager = promptVersionManager;
         _logger = logger;
         _agentGenerateFlowOptions = agentGenerateFlowOptions?.Value ?? new AgentGenerateFlowOptions();
-        _agentGenerateFlowService = agentGenerateFlowService;
         _buildRunService = buildRunService;
         _agentRunStreamService = agentRunStreamService;
+        _generateCompatibilityAdapter = generateCompatibilityAdapter;
     }
 
     public async Task<AiFlowGenerationResult> GenerateFlowAsync(
@@ -123,54 +123,26 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             return await GenerateFlowFromPlanAsync(request, ReportProgress, cancellationToken);
         }
 
-        if (ShouldRunAgentGenerateFlow(request))
+        if (ShouldRunOfficialGenerateCompatibility(request))
         {
-            try
+            var modeDecision = AiAgentGenerateFlowModePolicy.Evaluate(
+                request.AgentGenerateFlowMode,
+                AiAgentGenerateFlowPolicyKind.Production);
+            if (!modeDecision.Allowed)
             {
-                ReportProgress("视觉智能体受控构建模式已启用。");
-                if (_agentGenerateFlowService == null)
-                {
-                    throw new InvalidOperationException("视觉智能体 GenerateFlow 服务未注册。");
-                }
+                return CreateProductionModeRejectedResult(request, modeDecision);
+            }
 
-                var agentResult = await _agentGenerateFlowService.GenerateFlowAsync(request, cancellationToken);
-                if (agentResult.Success || !_agentGenerateFlowOptions.FallbackToLegacyOnFailure)
-                {
-                    TryPersistAgentGenerateFlowResult(request, agentResult, progressMessages);
-                    return agentResult;
-                }
+            if (_generateCompatibilityAdapter == null)
+            {
+                return CreateProductionCompatibilityUnavailableResult(request);
+            }
 
-                _logger.LogWarning(
-                    "Vision Agent GenerateFlow failed and will fall back to legacy GenerateFlow. Error={Error}",
-                    agentResult.ErrorMessage);
-                ReportProgress("视觉智能体受控模式失败，已切换旧版 GenerateFlow。");
-            }
-            catch (Exception ex) when (_agentGenerateFlowOptions.FallbackToLegacyOnFailure)
-            {
-                _logger.LogWarning(ex, "Vision Agent GenerateFlow failed and will fall back to legacy GenerateFlow.");
-                ReportProgress("视觉智能体受控模式失败，已切换旧版 GenerateFlow。");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Vision Agent GenerateFlow failed with controlled error mode.");
-                return new AiFlowGenerationResult
-                {
-                    Success = false,
-                    CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
-                    FailureType = AiFlowGenerationResult.FailureTypeSystemError,
-                    ErrorMessage = $"Vision Agent GenerateFlow 失败：{ex.Message}",
-                    FailureSummary = new AiFailureSummary
-                    {
-                        Category = "vision_agent",
-                        Code = "controlled_agent_generate_flow_failed",
-                        Message = $"Vision Agent GenerateFlow 失败：{ex.Message}",
-                        RepairTarget = "请切换旧版 GenerateFlow，或稍后重试。"
-                    },
-                    InteractionState = AiInteractionStates.Failed,
-                    TurnIntent = AiTurnIntents.NewFlow,
-                    RouterConfidence = AiRouterConfidence.Low
-                };
-            }
+            ReportProgress("普通 Generate 已切换到正式 Plan -> Build 链路。");
+            return await _generateCompatibilityAdapter.GenerateAsync(
+                request,
+                ReportProgress,
+                cancellationToken);
         }
 
         var pipeline = new AiGenerationPipelineContext();
@@ -927,10 +899,62 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return mode is GenerateFlowMode.Modify or GenerateFlowMode.Explain or GenerateFlowMode.ReviewPendingParameters;
     }
 
-    private bool ShouldRunAgentGenerateFlow(AiFlowGenerationRequest request)
+    private bool ShouldRunOfficialGenerateCompatibility(AiFlowGenerationRequest request) =>
+        _agentGenerateFlowOptions.Enabled &&
+        (_agentGenerateFlowOptions.PolicyKind == AiAgentGenerateFlowPolicyKind.Production ||
+         request.UseVisionAgentGenerateFlow);
+
+    private static AiFlowGenerationResult CreateProductionCompatibilityUnavailableResult(
+        AiFlowGenerationRequest request)
     {
-        return _agentGenerateFlowOptions.Enabled &&
-               request.UseVisionAgentGenerateFlow;
+        return new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+            FailureType = AiFlowGenerationResult.FailureTypeSystemError,
+            ErrorMessage = "生产普通 Generate 未注册正式 Plan -> Build 兼容适配器。",
+            FailureSummary = new AiFailureSummary
+            {
+                Category = "vision_agent_generate_compatibility",
+                Code = "official_generate_compatibility_not_registered",
+                Message = "生产普通 Generate 未注册正式 Plan -> Build 兼容适配器。",
+                RepairTarget = "注册 IVisionAgentGenerateCompatibilityAdapter；禁止回退到旧物化器。"
+            },
+            SessionId = request.SessionId,
+            InteractionState = AiInteractionStates.Failed,
+            TurnIntent = AiTurnIntents.NewFlow,
+            RouterConfidence = AiRouterConfidence.High,
+            GenerationMode = "official_plan_build",
+            RequestedMode = AiAgentGenerateFlowModes.Scripted,
+            EffectiveMode = AiAgentGenerateFlowModes.Scripted
+        };
+    }
+
+    private static AiFlowGenerationResult CreateProductionModeRejectedResult(
+        AiFlowGenerationRequest request,
+        AiAgentGenerateFlowModeDecision decision)
+    {
+        return new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+            FailureType = AiFlowGenerationResult.FailureTypeSystemError,
+            ErrorMessage = decision.FailureMessage,
+            FailureSummary = new AiFailureSummary
+            {
+                Category = "vision_agent_generate_compatibility",
+                Code = decision.FailureCode,
+                Message = decision.FailureMessage,
+                RepairTarget = "请返回 Plan 视图修正需求或使用正式 BuildFromPlan 重试。"
+            },
+            SessionId = request.SessionId,
+            InteractionState = AiInteractionStates.Failed,
+            TurnIntent = AiTurnIntents.NewFlow,
+            RouterConfidence = AiRouterConfidence.High,
+            GenerationMode = "official_plan_build",
+            RequestedMode = decision.RequestedMode,
+            EffectiveMode = string.Empty
+        };
     }
 
     private async Task<AiFlowGenerationResult> GenerateFlowFromPlanAsync(
@@ -994,79 +1018,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
         return runResult.Outcome.Result;
     }
-    private AiPersistenceWarning? PersistAgentGenerateFlowResult(
-        AiFlowGenerationRequest request,
-        AiFlowGenerationResult result,
-        IReadOnlyList<string> progressMessages)
-    {
-        var session = _conversationalFlowService.GetOrCreateSession(request.SessionId);
-        result.SessionId = session.SessionId;
-
-        var assistantMessage = result.Success
-            ? result.AiExplanation ?? "视觉智能体已完成仅元数据流程草稿构建。"
-            : result.ErrorMessage ?? result.FailureSummary?.Message ?? "视觉智能体运行失败。";
-        var flowJson = result.Flow == null ? null : JsonSerializer.Serialize(result.Flow, _jsonOptions);
-        var buildResult = result.BuildResult;
-        var payload = new ConversationTurnPayload
-        {
-            Kind = result.Success ? "assistant_agent_result" : "assistant_agent_failure",
-            Status = result.CompletionStatus,
-            InteractionState = result.InteractionState,
-            TurnIntent = result.TurnIntent,
-            RouterConfidence = result.RouterConfidence,
-            Reply = result.Success ? assistantMessage : null,
-            Reasoning = null,
-            Progress = progressMessages.Where(item => !string.IsNullOrWhiteSpace(item)).ToList(),
-            ClarificationRequired = result.ClarificationRequired,
-            RequirementBrief = result.RequirementBrief,
-            BuildResult = buildResult,
-            WorkflowDiff = buildResult?.WorkflowDiff,
-            ApplyGate = buildResult?.ApplyGate,
-            ToolEvidenceTimeline = buildResult?.ToolEvidenceTimeline,
-            FirstFixRecommendation = buildResult?.FirstFixRecommendation,
-            BlockingClarificationFields = result.BlockingClarificationFields.ToList(),
-            NonBlockingMissingFields = result.NonBlockingMissingFields.ToList(),
-            Failure = result.Success || result.FailureSummary == null
-                ? null
-                : new ConversationTurnFailurePayload
-                {
-                    Summary = assistantMessage,
-                    FailureSummary = CloneFailureSummary(result.FailureSummary),
-                    Diagnostics = result.LastAttemptDiagnostics.Select(CloneAttemptDiagnostic).ToList()
-                }
-        };
-
-        return RecordAssistantResponseWithPersistenceWarning(
-            session.SessionId,
-            assistantMessage,
-            flowJson,
-            flowJson,
-            payload);
-    }
-
-    private void TryPersistAgentGenerateFlowResult(
-        AiFlowGenerationRequest request,
-        AiFlowGenerationResult result,
-        IReadOnlyList<string> progressMessages)
-    {
-        try
-        {
-            var persistenceWarning = PersistAgentGenerateFlowResult(request, result, progressMessages);
-            result.PersistenceWarning ??= persistenceWarning;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "Vision Agent GenerateFlow result persistence failed; returning agent result without legacy fallback.");
-            result.PersistenceWarning ??= new AiPersistenceWarning
-            {
-                Code = "session_persistence_failed",
-                Message = "结果已生成，但本次会话尚未成功保存。"
-            };
-        }
-    }
-
     private AiPersistenceWarning? RecordAssistantResponseWithPersistenceWarning(
         string sessionId,
         string assistantMessage,
@@ -4081,6 +4032,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         {
             var op = _operatorFactory.CreateOperator(o.Type, o.Name, o.X, o.Y);
             typeof(Operator).GetProperty("Id")?.SetValue(op, o.Id);
+            op.Metadata = o.Metadata == null
+                ? null
+                : new Dictionary<string, object?>(o.Metadata, StringComparer.OrdinalIgnoreCase);
 
             // 简单复制核心参数
             foreach (var pDto in o.Parameters)

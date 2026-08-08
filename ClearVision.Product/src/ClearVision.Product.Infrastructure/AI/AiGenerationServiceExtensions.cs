@@ -29,13 +29,9 @@ public static class AiGenerationServiceExtensions
         services.AddOptions<AgentGenerateFlowOptions>()
             .Bind(configuration.GetSection(AgentGenerateFlowOptions.SectionName))
             .Validate(options =>
-                string.Equals(AiAgentGenerateFlowModes.Normalize(options.Mode), options.Mode, StringComparison.OrdinalIgnoreCase),
-                "AI:VisionAgent:GenerateFlow:Mode must be scripted, planner, or tool_loop.")
+                AiAgentGenerateFlowModePolicy.IsKnownPolicy(options.Policy),
+                "AI:VisionAgent:GenerateFlow:Policy must be production, developer_only, offline_evaluation, or deprecated.")
             .ValidateOnStart();
-        services.Configure<VisionAgentLoopOptions>(
-            configuration.GetSection("AI:VisionAgent:Loop"));
-        services.Configure<AgentPlannerCompletionOptions>(
-            configuration.GetSection(AgentPlannerCompletionOptions.SectionName));
         services.Configure<VisionAgentPlanPlannerOptions>(
             configuration.GetSection(VisionAgentPlanPlannerOptions.SectionName));
         services.Configure<VisionAgentIntentRouterOptions>(
@@ -69,24 +65,13 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IAiFlowValidator, AiFlowValidator>();
         services.AddScoped<IAiFlowResponseParser, AiFlowResponseParser>();
         services.AddScoped<AutoLayoutService>();
-        services.AddScoped<AgentPromptBuilder>();
         services.AddSingleton<AgentRunEventRedactor>();
         services.AddSingleton<AgentRunEventStore>();
         services.AddSingleton<IAiOperationReceiptStore, AiOperationReceiptStore>();
         services.AddSingleton<IAiWorkspaceHandoffArtifactStore, AiWorkspaceHandoffArtifactStore>();
         services.AddSingleton<IAgentRunEventStreamService, AgentRunEventStreamService>();
         services.AddScoped<IAgentRunEventSink, AgentRunEventSink>();
-        services.AddScoped<AgentPlannerPromptBuilder>();
-        services.AddScoped<AgentPlannerPromptComposer>();
         services.AddScoped<VisionAgentPlanPromptComposer>();
-        services.AddScoped<JsonToolCallRepair>();
-        services.AddScoped<AgentToolCallPolicy>();
-        services.AddScoped<AgentWorkflowDraftEditor>();
-        services.AddScoped<VisionAgentProtocolParser>();
-        services.AddScoped<VisionAgentLoop>();
-        services.AddScoped<IVisionAgentLoopCompletionSource, VisionAgentLoopCompletionSource>();
-        services.AddScoped<IVisionAgentPlannerCompletionSource, LlmVisionAgentPlannerCompletionSource>();
-        services.AddScoped<IVisionAgentPlannerService, VisionAgentPlannerService>();
         services.AddScoped<IVisionAgentPlanCompletionSource, LlmVisionAgentPlanCompletionSource>();
         services.AddScoped<IVisionAgentPlanPlannerService, VisionAgentPlanPlannerService>();
         services.AddScoped<IVisionAgentIntentRouterCompletionSource, LlmVisionAgentIntentRouterCompletionSource>();
@@ -106,6 +91,7 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<WorkflowDraftBuilder>();
         services.AddScoped<BuildReadinessReviewService>();
         services.AddScoped<WorkflowDiffService>();
+        services.AddScoped<VisionTaskRouteContractRegistry>();
         services.AddScoped<ApplyGateResolver>();
         services.AddScoped<BuildResultAssembler>();
         services.AddScoped<IVisionAgentBuildOrchestrator, VisionAgentBuildOrchestrator>();
@@ -114,6 +100,7 @@ public static class AiGenerationServiceExtensions
         services.AddSingleton<IVisionAgentBuildProjectionJournal, VisionAgentBuildProjectionJournal>();
         services.AddScoped<IVisionAgentBuildTerminalProjector, VisionAgentBuildTerminalProjector>();
         services.AddScoped<IVisionAgentBuildRunService, VisionAgentBuildRunService>();
+        services.AddScoped<IVisionAgentGenerateCompatibilityAdapter, VisionAgentGenerateCompatibilityAdapter>();
         services.AddHostedService<VisionAgentRunRecoveryReconciliationService>();
         services.AddHostedService<VisionAgentBuildProjectionReconciliationService>();
         services.AddScoped<IVisionAgentStationStatusReader, NoOpVisionAgentStationStatusReader>();
@@ -159,7 +146,6 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IVisionAgentTool, RuntimePreviewCaptureStubTool>();
         services.AddScoped<IVisionAgentTool, RuntimePreviewReplayStubTool>();
         services.AddScoped<IVisionAgentToolRegistry, VisionAgentToolRegistry>();
-        services.AddScoped<IVisionAgentGenerateFlowService, VisionAgentGenerateFlowService>();
         services.AddScoped<IAiFlowGenerationService, AiFlowGenerationService>();
         services.AddScoped<IVisionAgentOrchestrator, VisionAgentOrchestrator>();
         services.AddScoped<GenerateFlowMessageHandler>();

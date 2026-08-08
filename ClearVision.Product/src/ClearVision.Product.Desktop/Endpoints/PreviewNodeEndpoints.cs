@@ -2458,7 +2458,8 @@ public static class PreviewNodeEndpoints
                 .Select(port => new ExecutionObservationOutputPortV1
                 {
                     Id = port.Id,
-                    Name = port.Name
+                    Name = port.Name,
+                    DataType = port.DataType
                 })
                 .ToList() ?? [],
             TargetOperator = targetOperator,

@@ -2,6 +2,7 @@ using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI.Agent;
 
 namespace ClearVision.Product.Infrastructure.AI.Tools;
 
@@ -30,7 +31,11 @@ public sealed class FlowValidationTool : VisionAgentToolBase
           "properties": {
             "flow": { "type": ["object", "string"] },
             "flowJson": { "type": "string" },
-            "entryOperatorTempId": { "type": "string" }
+            "entryOperatorTempId": { "type": "string" },
+            "planHash": { "type": "string" },
+            "catalogVersion": { "type": "string" },
+            "buildIntent": { "type": "string" },
+            "artifactFingerprint": { "type": "string" }
           }
         }
         """);
@@ -49,8 +54,22 @@ public sealed class FlowValidationTool : VisionAgentToolBase
                 normalized.ErrorMessage ?? "Flow draft could not be normalized."));
         }
 
+        var observation = WorkflowArtifactFingerprint.Observe(arguments, normalized.Flow, _contractCatalog);
         var validation = VisionAgentFlowDraftValidator.Validate(normalized.Flow, _contractCatalog);
-        return Task.FromResult(VisionAgentToolResult.Ok(FlowValidationPayload.Create(validation)));
+        if (!observation.IsConsistent)
+        {
+            validation = validation with
+            {
+                BlockingIssues = validation.BlockingIssues
+                    .Concat([new VisionAgentFlowIssue(
+                        "artifact_fingerprint_mismatch",
+                        "The normalized flow does not match the compiled artifact fingerprint.")])
+                    .ToList()
+            };
+        }
+
+        return Task.FromResult(VisionAgentToolResult.Ok(
+            FlowValidationPayload.Create(validation, observation)));
     }
 }
 
@@ -703,7 +722,9 @@ internal sealed record VisionAgentPendingParameter(
 
 internal static class FlowValidationPayload
 {
-    public static object Create(VisionAgentFlowValidation validation)
+    public static object Create(
+        VisionAgentFlowValidation validation,
+        ArtifactFingerprintObservation? fingerprint = null)
     {
         return new
         {
@@ -713,6 +734,10 @@ internal static class FlowValidationPayload
             operatorCount = validation.Flow.Operators.Count,
             connectionCount = validation.Flow.Connections.Count,
             entryOperatorTempId = validation.Flow.EntryOperatorTempId,
+            artifactFingerprint = fingerprint?.ComputedFingerprint ?? string.Empty,
+            validationFingerprint = fingerprint?.ComputedFingerprint ?? string.Empty,
+            compiledFingerprint = fingerprint?.ExpectedFingerprint ?? string.Empty,
+            fingerprintConsistent = fingerprint?.IsConsistent ?? false,
             imageAcquisitionCount = validation.Flow.Operators.Count(op =>
                 string.Equals(op.OperatorType, "ImageAcquisition", StringComparison.OrdinalIgnoreCase)),
             blockingIssues = validation.BlockingIssues.Select(IssuePayload).ToList(),
@@ -730,7 +755,8 @@ internal static class FlowValidationPayload
                 "known_ports",
                 "port_type_compatibility",
                 "image_acquisition_entry",
-                "required_resources"
+                "required_resources",
+                "artifact_fingerprint"
             }
         };
     }

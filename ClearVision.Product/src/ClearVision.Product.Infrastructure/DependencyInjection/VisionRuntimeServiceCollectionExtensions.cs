@@ -43,6 +43,10 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IExecutionAdmissionService, ExecutionAdmissionService>();
         services.AddSingleton<IOperatorParameterConstraintProvider, OperatorParameterConstraintProvider>();
         services.AddSingleton<IOperatorFactory, OperatorFactory>();
+        services.AddSingleton<WorkflowLegacyScanner>();
+        services.AddSingleton<WorkflowLegacyRepairService>();
+        services.AddSingleton<IWorkflowArtifactQuarantineStore, WorkflowArtifactQuarantineStore>();
+        services.AddSingleton<IWorkflowArtifactAdmissionGate, WorkflowArtifactAdmissionGate>();
         services.AddSingleton<ParameterRecommender>();
         services.AddSingleton<ITcpDeviceManager>(sp => new TcpDeviceManager(
             sp.GetService<IConfigurationService>(),

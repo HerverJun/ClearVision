@@ -1,3 +1,5 @@
+using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
@@ -15,6 +17,7 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
     private readonly IAgentRunEventSink? _eventSink;
     private readonly Microsoft.Extensions.Logging.ILogger<VisionAgentBuildApplicationService> _logger;
     private readonly AgentGenerateFlowOptions _options;
+    private readonly IWorkflowArtifactAdmissionGate? _workflowArtifactAdmissionGate;
 
     public VisionAgentBuildApplicationService(
         IVisionAgentOrchestrator execution,
@@ -22,15 +25,16 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         VisionAgentPlanRequirementOverlay requirementOverlay,
         Microsoft.Extensions.Logging.ILogger<VisionAgentBuildApplicationService> logger,
         IOptions<AgentGenerateFlowOptions>? options = null,
-        IAgentRunEventSink? eventSink = null)
+        IAgentRunEventSink? eventSink = null,
+        IWorkflowArtifactAdmissionGate? workflowArtifactAdmissionGate = null)
     {
         _execution = execution;
         _answerValidator = answerValidator;
         _requirementOverlay = requirementOverlay;
         _logger = logger;
         _options = options?.Value ?? new AgentGenerateFlowOptions();
-        _options.Mode = AiAgentGenerateFlowModes.Normalize(_options.Mode);
         _eventSink = eventSink;
+        _workflowArtifactAdmissionGate = workflowArtifactAdmissionGate;
     }
 
     public Task<VisionAgentBuildReadinessPreviewResult> PreviewBuildReadinessAsync(
@@ -41,8 +45,11 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         cancellationToken.ThrowIfCancellationRequested();
 
         var request = BuildPreviewGenerationRequest(previewRequest);
-        var requestedMode = ResolveRequestedMode(request);
-        var effectiveMode = requestedMode;
+        var modeDecision = AiAgentGenerateFlowModePolicy.Evaluate(
+            request.AgentGenerateFlowMode,
+            AiAgentGenerateFlowPolicyKind.Production);
+        var requestedMode = modeDecision.RequestedMode;
+        var effectiveMode = modeDecision.EffectiveMode;
 
         if (!_options.Enabled)
         {
@@ -50,6 +57,14 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
                 previewRequest,
                 VisionAgentBuildFailureCodes.Disabled,
                 "Vision Agent BuildFromPlan is disabled by configuration."));
+        }
+
+        if (!modeDecision.Allowed)
+        {
+            return Task.FromResult(InvalidPreviewResult(
+                previewRequest,
+                modeDecision.FailureCode,
+                modeDecision.FailureMessage));
         }
 
         var contract = ValidateContract(request, requestedMode, effectiveMode);
@@ -87,8 +102,11 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         var request = string.IsNullOrWhiteSpace(runId)
             ? command.Request
             : command.Request with { AgentRunId = runId };
-        var requestedMode = ResolveRequestedMode(request);
-        var effectiveMode = requestedMode;
+        var modeDecision = AiAgentGenerateFlowModePolicy.Evaluate(
+            request.AgentGenerateFlowMode,
+            AiAgentGenerateFlowPolicyKind.Production);
+        var requestedMode = modeDecision.RequestedMode;
+        var effectiveMode = modeDecision.EffectiveMode;
 
         if (!_options.Enabled)
         {
@@ -101,6 +119,21 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
                 VisionAgentBuildFailureCodes.Disabled,
                 "Vision Agent BuildFromPlan is disabled by configuration.",
                 "Enable AI:VisionAgent:GenerateFlow before starting BuildFromPlan.",
+                AiFlowGenerationResult.FailureTypeSystemError,
+                AiFlowGenerationResult.CompletionStatusFailed));
+        }
+
+        if (!modeDecision.Allowed)
+        {
+            return Complete(command, request, Failure(
+                command,
+                request,
+                null,
+                requestedMode,
+                effectiveMode,
+                modeDecision.FailureCode,
+                modeDecision.FailureMessage,
+                "请返回 Plan 视图修正需求或使用正式 BuildFromPlan 重试。",
                 AiFlowGenerationResult.FailureTypeSystemError,
                 AiFlowGenerationResult.CompletionStatusFailed));
         }
@@ -766,27 +799,18 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         VisionAgentBuildReadinessSnapshot readiness,
         string answerSetFingerprint)
     {
-        var fallbackReason = ResolveFallbackReason(result);
-        var toolLoopEntered = string.Equals(requestedMode, AiAgentGenerateFlowModes.ToolLoop, StringComparison.OrdinalIgnoreCase) ||
-                              HasToolLoopEvidence(result);
-        var actualEffectiveMode = !string.IsNullOrWhiteSpace(fallbackReason)
-            ? AiAgentGenerateFlowModes.Scripted
-            : effectiveMode;
         var publicWarnings = result.BuildResult?.PublicWarnings?.ToList() ?? [];
         publicWarnings.AddRange(contract.PublicWarnings);
-        if (!string.IsNullOrWhiteSpace(fallbackReason))
-        {
-            publicWarnings.Add($"tool_loop_fallback:{fallbackReason}");
-        }
 
         result.PlanId = contract.PlanId;
         result.PlanHash = contract.PlanHash;
         result.ContractVersion = contract.ContractVersion;
         result.AnswerSetFingerprint = answerSetFingerprint;
         result.RequestedMode = requestedMode;
-        result.EffectiveMode = actualEffectiveMode;
-        result.ToolLoopEntered = toolLoopEntered;
-        result.FallbackReason = fallbackReason;
+        result.EffectiveMode = effectiveMode;
+        // Retained for wire compatibility; the retired runtime cannot enter or fall back to Tool Loop.
+        result.ToolLoopEntered = false;
+        result.FallbackReason = string.Empty;
         result.BuildReadiness = result.BuildReadiness == null
             ? readiness
             : result.BuildReadiness with { ContractVersion = contract.ContractVersion };
@@ -799,11 +823,111 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
             ContractVersion = contract.ContractVersion,
             AnswerSetFingerprint = answerSetFingerprint,
             RequestedMode = requestedMode,
-            EffectiveMode = actualEffectiveMode,
-            ToolLoopEntered = toolLoopEntered,
-            FallbackReason = fallbackReason,
+            EffectiveMode = effectiveMode,
+            ToolLoopEntered = false,
+            FallbackReason = string.Empty,
             Flow = buildResult.Flow ?? result.Flow,
             PublicWarnings = publicWarnings.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+        };
+
+        EnforceBuildArtifactAdmission(result);
+    }
+
+    private void EnforceBuildArtifactAdmission(AiFlowGenerationResult result)
+    {
+        var flow = result.BuildResult?.Flow as OperatorFlowDto ?? result.Flow as OperatorFlowDto;
+        if (flow == null)
+        {
+            return;
+        }
+
+        if (_workflowArtifactAdmissionGate == null)
+        {
+            throw WorkflowArtifactAdmissionFailures.GateUnavailable("vision_agent.build_result");
+        }
+
+        var admittedBuildResult = result.BuildResult;
+        var admission = _workflowArtifactAdmissionGate.Inspect(
+            flow,
+            "vision_agent.build_result",
+            context: admittedBuildResult == null
+                ? null
+                : new WorkflowArtifactAdmissionContext
+                {
+                    TaskType = admittedBuildResult.TaskType,
+                    RouteSemanticsSatisfied = admittedBuildResult.RouteSemanticsSatisfied,
+                    ArtifactFingerprint = admittedBuildResult.ArtifactFingerprint
+                });
+        if (admission.Disposition == WorkflowArtifactAdmissionDisposition.Canonical && admission.Flow != null)
+        {
+            result.Flow = admission.Flow;
+            result.BuildResult = result.BuildResult! with { Flow = admission.Flow };
+            return;
+        }
+
+        if (admission.Report.PreviewOnly && admission.Flow != null)
+        {
+            result.Flow = admission.Flow;
+            if (result.BuildResult != null)
+            {
+                result.BuildResult = result.BuildResult with
+                {
+                    Flow = admission.Flow,
+                    PublicWarnings = result.BuildResult.PublicWarnings
+                        .Append("safe_scaffold_requires_user_review")
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList()
+                };
+            }
+
+            return;
+        }
+
+        var diagnostic = admission.Report.Diagnostics.FirstOrDefault()?.Code ??
+            $"workflow_artifact_{admission.Disposition.ToString().ToLowerInvariant()}";
+        var message = admission.Report.PublicMessage;
+        result.Success = false;
+        result.CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed;
+        result.FailureType = AiFlowGenerationResult.FailureTypeSystemError;
+        result.ErrorMessage = $"Build result was blocked by workflow artifact admission: {diagnostic}. {message}";
+        result.FailureSummary = new AiFailureSummary
+        {
+            Category = "workflow_artifact_admission",
+            Code = diagnostic,
+            Message = result.ErrorMessage,
+            RepairTarget = "修复并重新构建完整 Workflow Artifact；禁止将当前结果直接应用或部署。"
+        };
+        result.Flow = null;
+        result.InteractionState = AiInteractionStates.Failed;
+        var buildResult = result.BuildResult ?? new VisionAgentBuildResult();
+        var blockedGate = buildResult.ApplyGate with
+        {
+            Blocked = true,
+            CanvasApplyReady = false,
+            RuntimeDraftReady = false,
+            DeploymentReady = false,
+            Status = "blocked",
+            ApplyBlockers = buildResult.ApplyGate.ApplyBlockers
+                .Append(diagnostic)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            DeploymentBlockers = buildResult.ApplyGate.DeploymentBlockers
+                .Append(diagnostic)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            ArtifactDisposition = admission.Disposition.ToString().ToLowerInvariant(),
+            MetadataOnly = true
+        };
+        result.BuildResult = buildResult with
+        {
+            Flow = null,
+            ArtifactDisposition = admission.Disposition.ToString().ToLowerInvariant(),
+            ApplyGate = blockedGate,
+            PublicWarnings = buildResult.PublicWarnings
+                .Append(diagnostic)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            MetadataOnly = true
         };
     }
 
@@ -924,7 +1048,9 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         }
 
         return string.IsNullOrWhiteSpace(version)
-            ? VisionAgentPlanContractVersions.V1
+            ? plan.ClarificationQuestions.Any(question => !string.IsNullOrWhiteSpace(question.Field))
+                ? VisionAgentPlanContractVersions.V2
+                : VisionAgentPlanContractVersions.V1
             : string.Empty;
     }
 
@@ -933,26 +1059,6 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         return string.Equals(value, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase)
             ? AiRequirementModes.Draft
             : AiRequirementModes.Strict;
-    }
-
-    private static bool HasToolLoopEvidence(AiFlowGenerationResult result)
-    {
-        return result.BuildResult?.ToolEvidenceTimeline.Any(evidence =>
-            evidence.ToolName.Contains("tool_loop", StringComparison.OrdinalIgnoreCase) ||
-            evidence.Source.Contains("tool_loop", StringComparison.OrdinalIgnoreCase)) == true;
-    }
-
-    private static string ResolveFallbackReason(AiFlowGenerationResult result)
-    {
-        if (!string.IsNullOrWhiteSpace(result.FallbackReason))
-        {
-            return Clean(result.FallbackReason);
-        }
-
-        var evidence = result.BuildResult?.ToolEvidenceTimeline.FirstOrDefault(item =>
-            item.ToolName.Equals("tool_loop_fallback", StringComparison.OrdinalIgnoreCase) ||
-            item.Source.Equals("fallback_build_orchestrator", StringComparison.OrdinalIgnoreCase));
-        return Clean(evidence?.WarningCode);
     }
 
     private static string FirstNonBlank(params string?[] values)

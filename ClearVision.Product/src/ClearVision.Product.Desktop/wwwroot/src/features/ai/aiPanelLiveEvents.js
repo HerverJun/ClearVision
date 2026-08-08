@@ -799,13 +799,13 @@ export const aiPanelLiveEventsMixin = {
             };
         }
 
-        if (eventType.startsWith('tool.call.') || eventType.startsWith('tool_call.')) {
+        if (eventType.startsWith('tool.call.')) {
             const toolName = this._payloadString?.(payload, 'toolName') ||
                 this._payloadString?.(payload, 'name') ||
                 this._deriveToolNameFromTitle?.(evt.title) ||
                 '';
             const toolLabel = this._formatToolName?.(toolName) || this._localizeDisplayText?.(toolName) || toolName || '工具';
-            const failed = status === 'failed' || status === 'warning' || eventType === 'tool.call.failed' || eventType === 'tool_call.denied';
+            const failed = status === 'failed' || status === 'warning' || eventType === 'tool.call.failed';
             const completed = status === 'completed' || eventType.endsWith('.completed');
             return {
                 channel: 'tool',
@@ -814,36 +814,6 @@ export const aiPanelLiveEventsMixin = {
                 title: failed
                     ? `工具调用异常: ${toolLabel}`
                     : (completed ? `工具已完成: ${toolLabel}` : `正在执行工具: ${toolLabel}`),
-                summary: evt.summary || '',
-                status: failed ? 'warning' : (completed ? 'completed' : 'running'),
-                visibility: failed ? 'persistent' : 'ephemeral',
-                ttlMs: completed ? PUBLIC_LIVE_DEFAULT_TTL_MS : PUBLIC_LIVE_RUNNING_TTL_MS
-            };
-        }
-
-        if (eventType === 'tool_result.appended') {
-            return {
-                channel: 'tool',
-                kind: 'status',
-                phase: evt.stage || 'tool',
-                title: '工具结果已回填',
-                summary: evt.summary || '',
-                status: 'completed',
-                visibility: 'ephemeral',
-                ttlMs: PUBLIC_LIVE_DEFAULT_TTL_MS
-            };
-        }
-
-        if (eventType.startsWith('tool_loop.')) {
-            const failed = status === 'failed' || status === 'warning' || eventType === 'tool_loop.fallback' || eventType === 'tool_loop.draft.rejected';
-            const completed = status === 'completed';
-            return {
-                channel: 'build',
-                kind: failed ? 'warning' : 'status',
-                phase: evt.stage || 'tool_loop',
-                title: failed
-                    ? (eventType === 'tool_loop.fallback' ? 'Tool Loop 已回退稳定链路' : 'Tool Loop 需要处理')
-                    : (completed ? 'Tool Loop 步骤已完成' : 'Tool Loop 正在执行...'),
                 summary: evt.summary || '',
                 status: failed ? 'warning' : (completed ? 'completed' : 'running'),
                 visibility: failed ? 'persistent' : 'ephemeral',
@@ -1197,7 +1167,6 @@ export const aiPanelLiveEventsMixin = {
     _inferPublicLiveFailureCode(evt) {
         const eventType = String(evt?.eventType || '').trim();
         const stage = String(evt?.stage || '').trim();
-        if (eventType === 'tool_call.denied') return 'tool_permission_denied';
         if (eventType === 'tool.call.failed') return `${stage || 'tool'}_failed`;
         if (eventType === 'readiness.checked') return 'readiness_blocked';
         if (eventType === 'package.readiness.checked') return 'package_readiness_blocked';

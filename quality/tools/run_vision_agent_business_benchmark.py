@@ -22,6 +22,16 @@ RUNNER_PROJECT = (
     / "VisionAgentBusinessBenchmarkRunner"
     / "VisionAgentBusinessBenchmarkRunner.csproj"
 )
+RUNNER_DLL = (
+    REPO_ROOT
+    / "quality"
+    / "tools"
+    / "VisionAgentBusinessBenchmarkRunner"
+    / "bin"
+    / "Debug"
+    / "net8.0"
+    / "VisionAgentBusinessBenchmarkRunner.dll"
+)
 DEFAULT_OUTPUT = (
     REPO_ROOT
     / "quality"
@@ -47,17 +57,24 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    command = [
-        "dotnet",
-        "run",
-        "--project",
-        str(RUNNER_PROJECT),
-        "--",
+    runner_arguments = [
         "--output",
         str(Path(args.output)),
         "--report",
         str(Path(args.report)),
     ]
+    if RUNNER_DLL.exists():
+        # Reuse an already-built runner so offline quality runs do not trigger NuGet restore.
+        command = ["dotnet", str(RUNNER_DLL), *runner_arguments]
+    else:
+        command = [
+            "dotnet",
+            "run",
+            "--project",
+            str(RUNNER_PROJECT),
+            "--",
+            *runner_arguments,
+        ]
     completed = subprocess.run(command, cwd=REPO_ROOT, check=False)
     return completed.returncode
 

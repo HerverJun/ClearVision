@@ -2,13 +2,6 @@ import httpClient from '../../core/messaging/httpClient.js';
 import { AiWorkbenchStates } from './aiPanelWorkbench.js';
 
 const TERMINAL_EVENT_TYPES = new Set(['run.completed', 'run.failed', 'run.cancelled']);
-const TOOL_LOOP_SEGMENT_TERMINAL_EVENT_TYPES = new Set([
-    'tool_loop.finalized',
-    'tool_loop.fallback',
-    'tool_loop.failed',
-    'tool_loop.draft.accepted',
-    'tool_loop.draft.rejected'
-]);
 const PLAN_EVENT_TYPES = new Set([
     'plan.created',
     'plan.started',
@@ -33,10 +26,7 @@ const PLAN_EVENT_TYPES = new Set([
 const TOOL_EVENT_TYPES = new Set([
     'tool.call.started',
     'tool.call.completed',
-    'tool.call.failed',
-    'tool_call.requested',
-    'tool_call.completed',
-    'tool_call.denied'
+    'tool.call.failed'
 ]);
 const ARTIFACT_EVENT_TYPES = new Set([
     'artifact.created',
@@ -61,7 +51,6 @@ const STAGE_LABELS = {
     requirement_parsing: '需求归一',
     planner: '规划器',
     tool_policy: '工具策略',
-    tool_loop: 'Tool Loop 实验',
     workflow_draft: '流程草稿',
     readiness: '就绪检查',
     manifest_dry_run: '运行包预演',
@@ -80,17 +69,6 @@ const AGENT_RUN_EVENT_TYPES = [
     'tool.call.started',
     'tool.call.completed',
     'tool.call.failed',
-    'tool_loop.started',
-    'tool_loop.round.started',
-    'tool_call.requested',
-    'tool_call.completed',
-    'tool_call.denied',
-    'tool_result.appended',
-    'tool_loop.finalized',
-    'tool_loop.draft.accepted',
-    'tool_loop.draft.rejected',
-    'tool_loop.fallback',
-    'tool_loop.failed',
     'workflow.draft.updated',
     'readiness.checked',
     'package.readiness.checked',
@@ -711,8 +689,6 @@ export const aiPanelAgentRunMixin = {
 
         if (TERMINAL_EVENT_TYPES.has(evt.eventType)) {
             this._handleAgentRunTerminalEvent(evt);
-        } else if (TOOL_LOOP_SEGMENT_TERMINAL_EVENT_TYPES.has(evt.eventType)) {
-            this._handleAgentRunSegmentTerminalEvent(evt);
         } else {
             this._updateAgentRunWorkbenchState(evt);
         }
@@ -966,36 +942,19 @@ export const aiPanelAgentRunMixin = {
                 this._formatToolName?.(rawToolName) || this._localizeDisplayText?.(rawToolName) || rawToolName,
                 120)
             : '';
-        const round = this._payloadNumber(payload, 'round');
-        const reason = this._payloadString(payload, evt.eventType === 'tool_loop.draft.rejected' ? 'rejectionReason' : 'fallbackReason');
+        const reason = this._payloadString(payload, 'failureReason') || this._payloadString(payload, 'reason');
         const reasonLabel = reason
             ? this._sanitizeAgentRunPublicText(this._localizeDisplayText?.(reason) || reason, 120)
             : '';
         const summary = fallback.summary || '';
 
         switch (evt.eventType) {
-            case 'tool_loop.started':
-                return `Tool Loop 实验已启动${summary ? `\n${summary}` : ''}`;
-            case 'tool_loop.round.started':
-                return `第 ${round || '?'} 轮工具决策${summary ? `\n${summary}` : ''}`;
-            case 'tool_call.requested':
-                return `请求工具：${toolLabel || '未命名工具'}${summary ? `\n${summary}` : ''}`;
-            case 'tool_call.completed':
-                return `工具完成：${toolLabel || '未命名工具'}${summary ? `\n${summary}` : ''}`;
-            case 'tool_call.denied':
-                return `工具被拒绝：${toolLabel || '未命名工具'}${summary ? `\n${summary}` : ''}`;
-            case 'tool_result.appended':
-                return `工具结果已回填${summary ? `\n${summary}` : ''}`;
-            case 'tool_loop.finalized':
-                return `LLM 已给出 final${summary ? `\n${summary}` : ''}`;
-            case 'tool_loop.draft.accepted':
-                return `实验草稿已通过校验${summary ? `\n${summary}` : ''}`;
-            case 'tool_loop.draft.rejected':
-                return `实验草稿未通过校验${reasonLabel ? `：${reasonLabel}` : ''}${summary ? `\n${summary}` : ''}`;
-            case 'tool_loop.fallback':
-                return `已回退稳定构建链路${reasonLabel ? `：${reasonLabel}` : ''}${summary ? `\n${summary}` : ''}`;
-            case 'tool_loop.failed':
-                return `实验失败${summary ? `\n${summary}` : ''}`;
+            case 'tool.call.started':
+                return `正在执行工具：${toolLabel || '未命名工具'}${summary ? `\n${summary}` : ''}`;
+            case 'tool.call.completed':
+                return `工具已完成：${toolLabel || '未命名工具'}${summary ? `\n${summary}` : ''}`;
+            case 'tool.call.failed':
+                return `工具执行失败：${toolLabel || '未命名工具'}${reasonLabel ? `：${reasonLabel}` : ''}${summary ? `\n${summary}` : ''}`;
             default:
                 return '';
         }
@@ -1149,32 +1108,6 @@ export const aiPanelAgentRunMixin = {
         }
     },
 
-    _handleAgentRunSegmentTerminalEvent(evt) {
-        this._finalizeAgentRunUiState('tool_loop_segment_terminal', evt, {
-            closeTransports: false,
-            clearActiveRunId: false
-        });
-
-        if (evt.eventType === 'tool_loop.fallback') {
-            this._setAssistantTurnStatus(this.activeAssistantTurn, '已回退稳定链路', 'warning');
-            this._setResultStatusNote('Tool Loop 实验已回退稳定构建链路，输入框已释放；稳定构建结果返回后会刷新可应用草稿。', 'warning');
-        } else if (evt.eventType === 'tool_loop.draft.rejected') {
-            this._setAssistantTurnStatus(this.activeAssistantTurn, '草稿验收未通过', 'warning');
-            this._setResultStatusNote('Tool Loop 草稿未通过验收，已回退稳定构建链路。', 'warning');
-        } else if (evt.eventType === 'tool_loop.failed') {
-            this._setAssistantTurnStatus(this.activeAssistantTurn, '实验失败', 'failed');
-            this._setResultStatusNote(
-                this._sanitizeAgentRunPublicText(evt.summary || 'Tool Loop 实验失败，已等待稳定链路或终止事件收尾。', 260),
-                'warning'
-            );
-        } else if (evt.eventType === 'tool_loop.draft.accepted') {
-            this._setAssistantTurnStatus(this.activeAssistantTurn, '草稿验收通过', 'success');
-            this._setResultStatusNote('Tool Loop 草稿已通过验收，稳定构建链路正在补全 BuildResult。', 'info');
-        } else if (evt.eventType === 'tool_loop.finalized') {
-            this._setAssistantTurnStatus(this.activeAssistantTurn, 'LLM final 已返回', 'success');
-        }
-    },
-
     _finalizeAgentRunUiState(reason = '', payload = null, options = {}) {
         const closeTransports = options.closeTransports !== false;
         if (closeTransports) {
@@ -1207,7 +1140,7 @@ export const aiPanelAgentRunMixin = {
             evt.stage === 'assumption_confirmation' ||
             evt.stage === 'requirement_parsing') {
             this._setWorkbenchState(AiWorkbenchStates.PARSING);
-        } else if (evt.stage === 'planner' || evt.stage === 'tool_policy' || evt.stage === 'tool_loop') {
+        } else if (evt.stage === 'planner' || evt.stage === 'tool_policy') {
             this._setWorkbenchState(AiWorkbenchStates.GENERATING);
         } else if (evt.stage === 'readiness' || evt.stage === 'manifest_dry_run') {
             this._setWorkbenchState(AiWorkbenchStates.DRY_RUNNING);
@@ -1220,17 +1153,12 @@ export const aiPanelAgentRunMixin = {
         }
 
         const payload = this._asObject(evt.payload);
-        if (String(evt.eventType || '').startsWith('tool_call.')) {
+        if (String(evt.eventType || '').startsWith('tool.call.')) {
             const toolName = this._payloadString(payload, 'toolName') ||
                 this._payloadString(payload, 'name') ||
                 this._deriveToolNameFromTitle(evt.title);
             const round = this._payloadNumber(payload, 'round');
             return `${evt.eventType}:${round || evt.stage || 'round'}:${toolName || evt.sequence}`;
-        }
-
-        if (evt.eventType === 'tool_result.appended' || evt.eventType === 'tool_loop.round.started') {
-            const round = this._payloadNumber(payload, 'round');
-            return `${evt.eventType}:${round || evt.sequence}`;
         }
 
         return `${evt.eventType}:${evt.stage || evt.sequence}`;
@@ -1263,10 +1191,10 @@ export const aiPanelAgentRunMixin = {
 
     _getAgentRunTone(status, eventType = '') {
         const normalizedStatus = String(status || '').trim().toLowerCase();
-        if (normalizedStatus === 'failed' || eventType === 'run.failed' || eventType === 'tool.call.failed' || eventType === 'tool_loop.failed') {
+        if (normalizedStatus === 'failed' || eventType === 'run.failed' || eventType === 'tool.call.failed') {
             return 'failed';
         }
-        if (normalizedStatus === 'blocked' || normalizedStatus === 'warning' || eventType === 'tool_call.denied' || eventType === 'tool_loop.fallback' || eventType === 'tool_loop.draft.rejected') {
+        if (normalizedStatus === 'blocked' || normalizedStatus === 'warning') {
             return 'warning';
         }
         if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled' || eventType === 'run.cancelled') {

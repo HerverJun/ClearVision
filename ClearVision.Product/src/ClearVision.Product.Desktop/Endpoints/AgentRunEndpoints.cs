@@ -610,6 +610,21 @@ public static class AgentRunEndpoints
             });
         }
 
+        var modeDecision = AiAgentGenerateFlowModePolicy.Evaluate(
+            request.AgentGenerateFlowMode,
+            AiAgentGenerateFlowPolicyKind.Production);
+        if (!modeDecision.Allowed)
+        {
+            return Results.Json(new
+            {
+                errorCode = modeDecision.FailureCode,
+                publicMessage = modeDecision.FailureMessage,
+                requestedMode = modeDecision.RequestedMode,
+                effectiveMode = modeDecision.EffectiveMode,
+                metadataOnly = true
+            }, statusCode: StatusCodes.Status400BadRequest);
+        }
+
         var ownerHash = AiOwnerIdentity.Resolve(context);
         var reservation = operations.Reserve(
             ownerHash,
@@ -628,7 +643,6 @@ public static class AgentRunEndpoints
             return BuildExistingOperationResponse(
                 reservation.Receipt!, ownerHash, streamService, conversationService);
         }
-
         var baseline = await AiProjectBaselineValidator.ValidateAsync(request.Target, projects);
         if (!baseline.Success || baseline.Identity == null)
         {

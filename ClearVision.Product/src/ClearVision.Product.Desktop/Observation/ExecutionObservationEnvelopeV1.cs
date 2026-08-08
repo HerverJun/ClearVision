@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Desktop.PreviewArtifacts;
 
 namespace ClearVision.Product.Desktop.Observation;
@@ -121,6 +122,26 @@ public sealed class ExecutionObservationSummaryItemV1
     [JsonPropertyOrder(10)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? BindableVariableTypes { get; init; }
+
+    [JsonPropertyOrder(11)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DeclaredPortDataType { get; init; }
+
+    [JsonPropertyOrder(12)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SemanticKind { get; init; }
+
+    [JsonPropertyOrder(13)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? VisibleItemCount { get; init; }
+
+    [JsonPropertyOrder(14)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? TotalItemCount { get; init; }
+
+    [JsonPropertyOrder(15)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? FieldCount { get; init; }
 }
 
 public sealed class ExecutionObservationDetailNodeV1
@@ -175,6 +196,26 @@ public sealed class ExecutionObservationDetailNodeV1
     [JsonPropertyOrder(14)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? BindableVariableTypes { get; init; }
+
+    [JsonPropertyOrder(15)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DeclaredPortDataType { get; set; }
+
+    [JsonPropertyOrder(16)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SemanticKind { get; set; }
+
+    [JsonPropertyOrder(17)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? VisibleItemCount { get; set; }
+
+    [JsonPropertyOrder(18)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? TotalItemCount { get; set; }
+
+    [JsonPropertyOrder(19)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? FieldCount { get; set; }
 }
 
 public sealed class ExecutionObservationDiagnosticV1
@@ -236,6 +277,8 @@ public sealed class ExecutionObservationOutputPortV1
     public Guid Id { get; init; }
 
     public string Name { get; init; } = string.Empty;
+
+    public PortDataType DataType { get; init; } = PortDataType.Any;
 }
 
 public sealed class ExecutionVisualSceneV1

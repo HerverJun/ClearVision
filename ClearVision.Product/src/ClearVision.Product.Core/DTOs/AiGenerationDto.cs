@@ -247,6 +247,10 @@ public class AiFlowGenerationResult
 
     public string PlanHash { get; set; } = string.Empty;
 
+    public string? AgentRunId { get; set; }
+
+    public VisionAgentPlanModeResult? PlanSnapshot { get; set; }
+
     public string ContractVersion { get; set; } = string.Empty;
 
     public string AnswerSetFingerprint { get; set; } = string.Empty;

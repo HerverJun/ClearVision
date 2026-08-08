@@ -69,6 +69,14 @@ function node(kind, fields = {}) {
     pathHint: fields.pathHint ?? `$["${fields.name ?? kind}"]`,
     resultPathVersion: fields.resultPathVersion ?? null,
     resultPath: fields.resultPath ?? null,
+    outputPortId: fields.outputPortId ?? null,
+    outputPortName: fields.outputPortName ?? null,
+    declaredPortDataType: fields.declaredPortDataType ?? null,
+    semanticKind: fields.semanticKind ?? null,
+    visibleItemCount: fields.visibleItemCount ?? null,
+    totalItemCount: fields.totalItemCount ?? null,
+    fieldCount: fields.fieldCount ?? null,
+    truncated: fields.truncated ?? false,
     artifact: fields.artifact ?? null,
     children: fields.children ?? []
   };
@@ -1104,6 +1112,66 @@ test('OperatorResultViewModel productizes noisy preview observations without los
   assert.ok(model.advancedDiagnostics.some(item => /输出键不属于声明端口/.test(item.message)));
   assert.ok(model.rawDataSections.some(section => section.items.some(item => item.meta === '类型：JSON 对象')));
   assert.doesNotMatch(model.keyOutputs.map(item => `${item.label}:${item.value}:${item.meta}`).join('\n'), /System\.Text\.Json\.JsonElement|depth-limit|resource-descriptor/);
+});
+
+test('OperatorResultViewModel uses declared semantics for Blob, detection, point-list, and geometry outputs', () => {
+  const operator = {
+    id: 'node-1',
+    type: 'SemanticProbe',
+    parameters: [],
+    outputs: [
+      { name: 'BusinessA', type: 'BlobList' },
+      { name: 'BusinessB', type: 'BlobFeatureList' },
+      { name: 'BusinessC', type: 'PointList' },
+      { name: 'BusinessD', type: 'DetectionList' },
+      { name: 'GeometryA', type: 'Point' }
+    ]
+  };
+  const semanticObservation = observation();
+  semanticObservation.detail = node('dictionary', {
+    pathHint: '$',
+    children: [
+      node('array', { name: 'BusinessA', outputPortId: 'a', outputPortName: 'BusinessA', declaredPortDataType: 'BlobList', semanticKind: 'blob-list', visibleItemCount: 5, totalItemCount: 5 }),
+      node('array', { name: 'BusinessB', outputPortId: 'b', outputPortName: 'BusinessB', declaredPortDataType: 'BlobFeatureList', semanticKind: 'blob-feature-list', visibleItemCount: 0, totalItemCount: 0 }),
+      node('array', { name: 'BusinessC', outputPortId: 'c', outputPortName: 'BusinessC', declaredPortDataType: 'PointList', semanticKind: 'collection', visibleItemCount: 5, totalItemCount: 5 }),
+      node('detectionList', {
+        name: 'BusinessD',
+        outputPortId: 'd',
+        outputPortName: 'BusinessD',
+        declaredPortDataType: 'DetectionList',
+        semanticKind: 'detection-list',
+        visibleItemCount: 5,
+        totalItemCount: 5,
+        children: [node('number', { name: 'Count', displayValue: '5' }), node('array', { name: 'Detections' })]
+      }),
+      node('point', {
+        name: 'GeometryA',
+        outputPortId: 'e',
+        outputPortName: 'GeometryA',
+        declaredPortDataType: 'Point',
+        semanticKind: 'geometry',
+        children: [node('number', { name: 'X', displayValue: '10' }), node('number', { name: 'Y', displayValue: '20' })]
+      })
+    ]
+  });
+
+  const model = buildOperatorResultViewModel(operator, successState({
+    observation: semanticObservation,
+    outputData: {
+      BusinessA: Array.from({ length: 5 }, (_, id) => ({ Id: id })),
+      BusinessB: [],
+      BusinessC: Array.from({ length: 5 }, (_, id) => ({ X: id, Y: id })),
+      BusinessD: { Count: 5, Detections: Array.from({ length: 5 }, () => ({})) },
+      GeometryA: { X: 10, Y: 20 }
+    }
+  }), { flowRevision: 3 });
+
+  const values = Object.fromEntries(model.keyOutputs.map(item => [item.label, item.value]));
+  assert.equal(values.BusinessA, '5 项');
+  assert.equal(values.BusinessB, '0 项');
+  assert.equal(values.BusinessC, '5 项');
+  assert.equal(values.BusinessD, '5 个检测结果');
+  assert.equal(values.GeometryA, '(10, 20)');
 });
 
 test('OperatorResultViewModel fails soft when scene is missing', () => {

@@ -19,7 +19,6 @@ SCAN_POLICY_VERSION = "2026-06-07.runtime-preview-final-pre-pilot-hardening-scan
 
 JSON_REPORTS = [
     REPORTS_DIR / "VisionAgent_business_benchmark_baseline.json",
-    REPORTS_DIR / "planner_autonomy_benchmark.json",
     REPORTS_DIR / "runtime_preview_scenario_corpus.json",
     REPORTS_DIR / "runtime_preview_redacted_flow_corpus.json",
     REPORTS_DIR / "runtime_preview_redacted_flow_corpus_v2.json",
@@ -49,13 +48,10 @@ JSON_REPORTS = [
     REPORTS_DIR / "runtime_preview_agent_explanation_final.json",
     REPORTS_DIR / "runtime_preview_governance_export_final.json",
     REPORTS_DIR / "runtime_preview_report_readability_gate.json",
-    REPORTS_DIR / "real_llm_planner_shadow_eval.json",
-    REPORTS_DIR / "real_llm_planner_shadow_eval.holdout.json",
 ]
 
 MARKDOWN_REPORTS = [
     REPORTS_DIR / "VisionAgent_business_benchmark_baseline.md",
-    REPORTS_DIR / "planner_autonomy_benchmark.md",
     REPORTS_DIR / "runtime_preview_scenario_corpus.md",
     REPORTS_DIR / "runtime_preview_redacted_flow_corpus.md",
     REPORTS_DIR / "runtime_preview_redacted_flow_corpus_v2.md",
@@ -85,8 +81,6 @@ MARKDOWN_REPORTS = [
     REPORTS_DIR / "runtime_preview_agent_explanation_final.md",
     REPORTS_DIR / "runtime_preview_governance_export_final.md",
     REPORTS_DIR / "runtime_preview_report_readability_gate.md",
-    REPORTS_DIR / "real_llm_planner_shadow_eval.md",
-    REPORTS_DIR / "real_llm_planner_shadow_eval.holdout.md",
 ]
 
 TEXT_OUTPUTS = [
@@ -187,12 +181,6 @@ SOURCE_SECRET_PATTERNS = [
     ),
 ]
 
-UNREDACTED_BASE_URL_PATTERN = re.compile(
-    r"https?://(?:[^/\s@]+@)?(?:\d{1,3}(?:\.\d{1,3}){3}|[A-Za-z0-9.-]+\.[A-Za-z]{2,})(?:/[^\s`\"']*)?(?:\?[^\s`\"']*)?",
-    re.IGNORECASE,
-)
-
-
 def repo_relative(path: Path) -> str:
     try:
         return path.relative_to(REPO_ROOT).as_posix()
@@ -230,47 +218,6 @@ def validate_workflow_run(
             errors.append(f"{repo_relative(path)} workflowRun.{field} must not be local in CI artifacts.")
 
     return result
-
-
-def validate_shadow_report(path: Path, report: dict[str, Any], errors: list[str]) -> None:
-    text = path.read_text(encoding="utf-8")
-    validate_no_secret_leaks(path, text, errors)
-
-    config = report.get("llmConfiguration")
-    if not isinstance(config, dict):
-        errors.append(f"{repo_relative(path)} missing llmConfiguration object.")
-        return
-
-    for field in ["provider", "protocol", "wireApi", "authMode", "modelRole"]:
-        value = config.get(field)
-        if not isinstance(value, str) or not value.strip():
-            errors.append(f"{repo_relative(path)} llmConfiguration.{field} must be a non-empty string.")
-
-    base_url = config.get("baseUrl")
-    if isinstance(base_url, str) and ("?" in base_url or "@" in base_url or "<redacted-host>" not in base_url):
-        errors.append(f"{repo_relative(path)} llmConfiguration.baseUrl must be redacted.")
-    for match in UNREDACTED_BASE_URL_PATTERN.finditer(text):
-        value = match.group(0)
-        if "<redacted-host>" not in value and not value.startswith("https://github.com"):
-            errors.append(f"{repo_relative(path)} contains an unredacted URL-like BaseUrl: {value[:80]}")
-            break
-
-    summary = report.get("summary")
-    if not isinstance(summary, dict):
-        errors.append(f"{repo_relative(path)} missing summary object.")
-        return
-
-    for field in [
-        "enabledReason",
-        "skippedReason",
-        "configurationMissingReason",
-        "requestCount",
-        "parseSuccessRate",
-        "unsafeAttemptRate",
-        "averageToolPlanMatchScore",
-    ]:
-        if field not in summary:
-            errors.append(f"{repo_relative(path)} summary missing {field}.")
 
 
 def validate_runtime_preview_case_counts(path: Path, report: dict[str, Any], errors: list[str]) -> None:
@@ -614,8 +561,6 @@ def main() -> int:
             continue
         report = load_json(path)
         workflow_run = validate_workflow_run(path, report, args.require_non_local_workflow_run, errors)
-        if path.name in {"real_llm_planner_shadow_eval.json", "real_llm_planner_shadow_eval.holdout.json"}:
-            validate_shadow_report(path, report, errors)
         validate_runtime_preview_case_counts(path, report, errors)
         validate_runtime_preview_final_contract(path, report, errors)
         report_summaries.append(

@@ -382,45 +382,6 @@ public sealed class VisionAgentDeploymentPrepareTests
         blockedDeploy.ExecuteCount.Should().Be(0);
     }
 
-    [Fact(DisplayName = "VisionAgentLoop scripted chain should reach runtime_package_precheck then final")]
-    public async Task VisionAgentLoop_ShouldReachPrecheckThenFinal()
-    {
-        var flow = ValidFlow();
-        var responses = new Queue<string>(
-        [
-            ToolCall("validate_flow", new { flow }),
-            ToolCall("dryrun_flow", new { flow }),
-            ToolCall(
-                "runtime_package_precheck",
-                new
-                {
-                    flow,
-                    validationSummary = await ValidateAsync(flow),
-                    dryRunSummary = await DryRunAsync(flow),
-                    targetStationId = "station_1"
-                }),
-            "precheck final"
-        ]);
-        var registry = new VisionAgentToolRegistry(
-        [
-            new FlowValidationTool(),
-            new DryRunFlowTool(),
-            new RuntimePackagePrecheckTool(new FakeStationStatusReader(true))
-        ]);
-
-        var result = await CreateLoop(registry, new VisionAgentLoopOptions { MaxToolRounds = 4 })
-            .RunAsync(Request(responses, DeploymentContext()), CancellationToken.None);
-
-        result.Success.Should().BeTrue();
-        result.FinalContent.Should().Be("precheck final");
-        result.ToolTrace.Select(trace => trace.ToolName).Should().Equal(
-            "validate_flow",
-            "dryrun_flow",
-            "runtime_package_precheck");
-        result.ToolTrace.Last().Permission.Should().Be(nameof(VisionAgentToolPermission.DeploymentPrepare));
-        result.ToolTrace.Last().Success.Should().BeTrue();
-    }
-
     [Fact(DisplayName = "DeploymentPrepare source guard should exclude camera replay hardware network and process APIs")]
     public void SourceGuard_ShouldExcludeRuntimePreviewAndExternalAccess()
     {
@@ -452,29 +413,6 @@ public sealed class VisionAgentDeploymentPrepareTests
 
         forbidden.Should().OnlyContain(fragment =>
             !source.Contains(fragment, StringComparison.OrdinalIgnoreCase));
-    }
-
-    [Fact(DisplayName = "DeploymentPrepare should not wire VisionAgentLoop into AI default mainline or frontend")]
-    public void MainlineGuard_ShouldNotWireVisionAgentLoopOrFrontend()
-    {
-        var productRoot = GetProductRoot();
-        var aiFlowGenerationService = File.ReadAllText(Path.Combine(
-            productRoot,
-            "src",
-            "ClearVision.Product.Infrastructure",
-            "AI",
-            "AiFlowGenerationService.cs"));
-        var frontendSource = ReadSourceUnder(Path.Combine(
-            productRoot,
-            "src",
-            "ClearVision.Product.Desktop",
-            "wwwroot",
-            "src"));
-
-        aiFlowGenerationService.Should().NotContain("VisionAgentLoop");
-        frontendSource.Should().NotContain("runtime_package_precheck");
-        frontendSource.Should().NotContain("capture_test_frame");
-        frontendSource.Should().NotContain("replay_flow_with_frame");
     }
 
     private static async Task<object> ValidateAsync(object flow)
@@ -683,59 +621,6 @@ public sealed class VisionAgentDeploymentPrepareTests
             targetTempId,
             targetPortName
         };
-    }
-
-    private static VisionAgentLoop CreateLoop(
-        IVisionAgentToolRegistry registry,
-        VisionAgentLoopOptions? options = null)
-    {
-        return new VisionAgentLoop(
-            registry,
-            new VisionAgentProtocolParser(),
-            new AgentPromptBuilder(),
-            Options.Create(options ?? new VisionAgentLoopOptions()));
-    }
-
-    private static VisionAgentLoopRequest Request(
-        Queue<string> responses,
-        VisionAgentToolContext context)
-    {
-        return new VisionAgentLoopRequest
-        {
-            UserPrompt = "scripted deployment prepare test",
-            ToolContext = context,
-            CompleteAsync = (_, _) => Task.FromResult(responses.Dequeue())
-        };
-    }
-
-    private static VisionAgentToolContext DeploymentContext()
-    {
-        return new VisionAgentToolContext
-        {
-            AllowedPermissions = new HashSet<VisionAgentToolPermission>
-            {
-                VisionAgentToolPermission.ReadOnly,
-                VisionAgentToolPermission.Simulation,
-                VisionAgentToolPermission.DeploymentPrepare
-            }
-        };
-    }
-
-    private static string ToolCall(string name, object? arguments = null)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            kind = "tool_call",
-            toolCalls = new[]
-            {
-                new
-                {
-                    id = "call_1",
-                    name,
-                    arguments = arguments ?? new { }
-                }
-            }
-        });
     }
 
     private static JsonElement Args(params (string Key, object? Value)[] values)

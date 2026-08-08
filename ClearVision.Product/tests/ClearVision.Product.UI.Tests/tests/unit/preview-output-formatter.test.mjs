@@ -8,6 +8,10 @@ import {
   getPreviewTypeLabel,
   isPreviewTechnicalDiagnostic
 } from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewOutputFormatter.mjs';
+import {
+  classifyPreviewValue,
+  formatPreviewSemanticValue
+} from '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/previewValueSemantics.mjs';
 
 test('formatPreviewOutputValue summarizes detections payloads by count', () => {
   assert.deepEqual(
@@ -131,4 +135,51 @@ test('preview result formatter localizes labels, diagnostics, and internal type 
     '图像内容已省略，可点击查看摘要/预览。'
   );
   assert.equal(isPreviewTechnicalDiagnostic('resource-descriptor depth-limit'), true);
+});
+
+test('preview semantic classifier distinguishes empty, absent, wrapped, and truncated collections', () => {
+  assert.equal(formatPreviewSemanticValue({ value: [] }).text, '0 项');
+  assert.equal(formatPreviewSemanticValue({ value: [1, 2, 3, 4, 5] }).text, '5 项');
+  assert.equal(formatPreviewSemanticValue({ value: null, declaredPortDataType: 'PointList' }).text, '无输出');
+  assert.equal(formatPreviewSemanticValue({ value: { Count: 5, Items: [{}, {}] }, declaredPortDataType: 'PointList' }).text, '2 / 5 项，已截断');
+  assert.equal(formatPreviewSemanticValue({ value: { Count: 5, Detections: [{}, {}, {}, {}, {}] }, declaredPortDataType: 'DetectionList' }).text, '5 个检测结果');
+  assert.equal(formatPreviewSemanticValue({
+    value: Array.from({ length: 64 }),
+    declaredPortDataType: 'PointList',
+    observationNode: { semanticKind: 'collection', visibleItemCount: 64, totalItemCount: 120, truncated: true }
+  }).text, '64 / 120 项，已截断');
+});
+
+test('preview semantic classifier does not confuse child or descriptor fields with business counts', () => {
+  const detectionObservation = {
+    kind: 'detectionList',
+    semanticKind: 'detection-list',
+    visibleItemCount: 5,
+    totalItemCount: 5,
+    children: [{ name: 'Count' }, { name: 'Detections' }]
+  };
+  assert.equal(formatPreviewSemanticValue({
+    key: 'Result',
+    value: { Count: 5, Detections: [{}, {}, {}, {}, {}] },
+    declaredPortDataType: 'DetectionList',
+    observationNode: detectionObservation
+  }).text, '5 个检测结果');
+
+  assert.equal(formatPreviewSemanticValue({ value: { a: 1, b: 2, c: 3 } }).text, '3 个字段');
+  assert.equal(formatPreviewSemanticValue({
+    value: { kind: 'unsupportedEnumerable', displayValue: 'Unknown enumerable', originalType: 'LazyRows' }
+  }).text, '暂不支持展示此结果类型');
+});
+
+test('preview semantic classifier prioritizes declared list types and formats geometry', () => {
+  for (const dataType of ['BlobList', 'BlobFeatureList', 'PointList']) {
+    const classification = classifyPreviewValue({ value: Array.from({ length: 5 }), declaredPortDataType: dataType });
+    assert.equal(classification.totalItemCount, 5);
+  }
+  assert.equal(formatPreviewSemanticValue({ value: Array.from({ length: 5 }), declaredPortDataType: 'BlobList' }).text, '5 项');
+  assert.equal(formatPreviewSemanticValue({ value: [], declaredPortDataType: 'BlobFeatureList' }).text, '0 项');
+  assert.equal(formatPreviewSemanticValue({ value: { X: 10, Y: 20 }, declaredPortDataType: 'Point' }).text, '(10, 20)');
+  assert.equal(formatPreviewSemanticValue({ value: { X: 1, Y: 2, Width: 30, Height: 40 }, declaredPortDataType: 'Rectangle' }).text, '1, 2, 30 × 40');
+  assert.equal(formatPreviewSemanticValue({ value: { CenterX: 4, CenterY: 5, Radius: 6 }, declaredPortDataType: 'CircleData' }).text, '中心 (4, 5)，半径 6');
+  assert.match(formatPreviewSemanticValue({ value: { X1: 0, Y1: 0, X2: 3, Y2: 4 }, declaredPortDataType: 'LineData' }).text, /长度 5$/);
 });

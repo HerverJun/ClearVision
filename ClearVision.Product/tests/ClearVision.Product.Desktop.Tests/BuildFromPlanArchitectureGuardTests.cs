@@ -75,7 +75,7 @@ public sealed class BuildFromPlanArchitectureGuardTests
             Root,
             "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiFlowGenerationService.cs"));
         var start = text.IndexOf("private async Task<AiFlowGenerationResult> GenerateFlowFromPlanAsync", StringComparison.Ordinal);
-        var end = text.IndexOf("private AiPersistenceWarning? PersistAgentGenerateFlowResult", start, StringComparison.Ordinal);
+        var end = text.IndexOf("private AiPersistenceWarning? RecordAssistantResponseWithPersistenceWarning", start, StringComparison.Ordinal);
         start.Should().BeGreaterThanOrEqualTo(0);
         end.Should().BeGreaterThan(start);
         var adapterBody = text[start..end];

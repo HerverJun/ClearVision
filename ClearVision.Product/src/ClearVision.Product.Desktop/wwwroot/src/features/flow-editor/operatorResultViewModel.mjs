@@ -9,6 +9,7 @@ import {
     isPreviewImageLikePayload
 } from './previewOutputFormatter.mjs';
 import { buildPreviewParameterSnapshot } from './previewCoordinator.js';
+import { classifyPreviewValue } from './previewValueSemantics.mjs';
 
 export const MAX_OPERATOR_RESULT_RAW_JSON_CHARS = 4096;
 export const MAX_OPERATOR_RESULT_STRING_CHARS = 512;
@@ -160,7 +161,13 @@ function normalizeObservationNode(node) {
         resultPathVersion: readOwn(node, 'resultPathVersion', 'ResultPathVersion') ?? null,
         resultPath: readOwn(node, 'resultPath', 'ResultPath') ?? null,
         artifact,
-        childCount: Array.isArray(children) ? children.length : 0
+        childCount: Array.isArray(children) ? children.length : 0,
+        declaredPortDataType: readOwn(node, 'declaredPortDataType', 'DeclaredPortDataType') ?? null,
+        semanticKind: asString(readOwn(node, 'semanticKind', 'SemanticKind')).trim().toLowerCase() || null,
+        visibleItemCount: readOwn(node, 'visibleItemCount', 'VisibleItemCount') ?? null,
+        totalItemCount: readOwn(node, 'totalItemCount', 'TotalItemCount') ?? null,
+        fieldCount: readOwn(node, 'fieldCount', 'FieldCount') ?? null,
+        sourceNode: node
     };
 }
 
@@ -215,7 +222,12 @@ function classifyObservationRow(normalized) {
         return 'geometry';
     }
 
-    if (normalized.kindKey === 'array' || normalized.kindKey === 'detectionlist' || normalized.childCount > 0) {
+    if (normalized.semanticKind === 'geometry' || normalized.semanticKind === 'detection') {
+        return 'geometry';
+    }
+
+    if (['collection', 'detection-list', 'blob-list', 'blob-feature-list'].includes(normalized.semanticKind) ||
+        normalized.kindKey === 'array' || normalized.kindKey === 'detectionlist' || normalized.childCount > 0) {
         return 'table';
     }
 
@@ -717,18 +729,39 @@ function collectDiagnostics(state, observation, scene) {
 }
 
 function getObservationDisplayValue(normalized, formatted) {
-    if (normalized.childCount > 0 &&
-        (isPreviewTechnicalDiagnostic(normalized.displayValue) ||
-            ['array', 'dictionary', 'object', 'jsonelement', 'detectionlist'].includes(normalized.kindKey))) {
-        return normalized.kindKey === 'array' || normalized.kindKey === 'detectionlist'
-            ? `${normalized.childCount} 项`
-            : `${normalized.childCount} 个字段`;
-    }
-
     return formatted.text || clipText(normalized.displayValue, 96);
 }
 
-function buildOutputSections(observation, outputData, artifacts) {
+function buildOutputPortTypeMap(operator, liveNode) {
+    const map = new Map();
+    const candidates = [
+        operator?.outputs,
+        operator?.outputPorts,
+        operator?.OutputPorts,
+        liveNode?.outputs,
+        liveNode?.outputPorts,
+        liveNode?.OutputPorts
+    ];
+    candidates.filter(Array.isArray).flat().forEach(port => {
+        const name = readOwn(port, 'name', 'Name');
+        const dataType = readOwn(port, 'dataType', 'DataType', 'type', 'Type');
+        if (name && dataType !== undefined && dataType !== null) {
+            map.set(normalizeDedupKey(name), asString(dataType));
+        }
+    });
+    return map;
+}
+
+function readOutputValue(outputData, key) {
+    if (!outputData || typeof outputData !== 'object') {
+        return undefined;
+    }
+    const normalized = normalizeDedupKey(key);
+    const match = Object.entries(outputData).find(([candidate]) => normalizeDedupKey(candidate) === normalized);
+    return match?.[1];
+}
+
+function buildOutputSections(observation, outputData, artifacts, portTypes = new Map()) {
     const detail = getObservationDetail(observation);
     const collected = collectObservationRows(detail);
     const sections = {
@@ -745,15 +778,26 @@ function buildOutputSections(observation, outputData, artifacts) {
         }
 
         const normalized = row.normalized;
-        const formatted = formatPreviewOutputValue(normalized.name || normalized.pathHint, normalized.displayValue, {
-            stringMaxLength: 96
-        });
         const outputName = normalized.outputPortName || normalized.name || normalized.pathHint;
+        const declaredPortDataType = normalized.declaredPortDataType || portTypes.get(normalizeDedupKey(outputName)) || null;
+        const runtimeValue = row.depth === 1 ? readOutputValue(outputData, outputName) : undefined;
+        const classification = classifyPreviewValue({
+            key: normalized.name || normalized.pathHint,
+            value: runtimeValue,
+            declaredPortDataType,
+            observationNode: normalized.sourceNode
+        });
+        const formatted = formatPreviewOutputValue(normalized.name || normalized.pathHint, runtimeValue, {
+            stringMaxLength: 96,
+            declaredPortDataType,
+            observationNode: normalized.sourceNode
+        });
         const item = {
             key: normalized.name || normalized.pathHint,
             label: getPreviewResultLabel(outputName),
             pathHint: normalized.pathHint,
             kind: normalized.kind,
+            semanticKind: classification.semanticKind,
             depth: row.depth,
             value: getObservationDisplayValue(normalized, formatted),
             title: formatted.title || null,
@@ -765,6 +809,9 @@ function buildOutputSections(observation, outputData, artifacts) {
             resultPath: normalized.resultPath,
             artifact: normalized.artifact,
             truncated: normalized.truncated,
+            visibleItemCount: classification.visibleItemCount,
+            totalItemCount: classification.totalItemCount,
+            fieldCount: classification.fieldCount,
             technical: isPreviewTechnicalDiagnostic(`${normalized.name || ''} ${normalized.kind || ''} ${normalized.displayValue || ''} ${normalized.originalType || ''}`) &&
                 !isPreviewKeyOutputKey(outputName)
         };
@@ -802,8 +849,11 @@ function buildOutputSections(observation, outputData, artifacts) {
             .filter(([, value]) => !(typeof value === 'string' && isPreviewImageLikePayload(value)))
             .slice(0, 16)
             .forEach(([key, value]) => {
+                const declaredPortDataType = portTypes.get(normalizeDedupKey(key)) || null;
+                const classification = classifyPreviewValue({ key, value, declaredPortDataType });
                 const formatted = formatPreviewOutputValue(key, value, {
-                    stringMaxLength: 96
+                    stringMaxLength: 96,
+                    declaredPortDataType
                 });
                 const category = Array.isArray(value)
                     ? 'table'
@@ -813,6 +863,7 @@ function buildOutputSections(observation, outputData, artifacts) {
                     label: getPreviewResultLabel(key),
                     pathHint: `$["${key}"]`,
                     kind: formatted.kind,
+                    semanticKind: classification.semanticKind,
                     depth: 1,
                     value: formatted.text,
                     title: formatted.title || null,
@@ -824,6 +875,9 @@ function buildOutputSections(observation, outputData, artifacts) {
                     resultPath: null,
                     artifact: null,
                     truncated: false,
+                    visibleItemCount: classification.visibleItemCount,
+                    totalItemCount: classification.totalItemCount,
+                    fieldCount: classification.fieldCount,
                     technical: isPreviewTechnicalDiagnostic(`${key} ${formatted.text}`)
                 });
             });
@@ -1416,9 +1470,10 @@ export function buildOperatorResultViewModel(operator, previewState, options = {
     });
     const sceneSummary = summarizeScene(scene);
     const diagnostics = collectDiagnostics(previewState, observation, scene);
+    const outputPortTypes = buildOutputPortTypeMap(operator, liveNode);
     const outputSections = statusInfo.kind === 'loading'
         ? []
-        : buildOutputSections(observation, previewState?.outputData, artifacts);
+        : buildOutputSections(observation, previewState?.outputData, artifacts, outputPortTypes);
     const rawSource = {
         request: previewState?.request || null,
         observation,

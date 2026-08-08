@@ -134,4 +134,7 @@ public static class VisionAgentBuildFailureCodes
     public const string BuildOrchestratorNotRegistered = "build_orchestrator_not_registered";
     public const string SystemException = "build_from_plan_system_exception";
     public const string Cancelled = "build_cancelled";
+    public const string PlannerRetired = AiAgentGenerateFlowModePolicy.PlannerRetiredCode;
+    public const string ToolLoopNotAvailable = AiAgentGenerateFlowModePolicy.ToolLoopUnavailableCode;
+    public const string InvalidMode = AiAgentGenerateFlowModePolicy.InvalidModeCode;
 }

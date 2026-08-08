@@ -2,6 +2,8 @@ using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Infrastructure.AI.Agent;
 
 namespace ClearVision.Product.Infrastructure.AI.Tools;
 
@@ -35,7 +37,11 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             "targetStationId": { "type": "string" },
             "requireReplay": { "type": "boolean" },
             "replaySummary": { "type": "object" },
-            "manualResourceConfirmations": { "type": "array" }
+            "manualResourceConfirmations": { "type": "array" },
+            "planHash": { "type": "string" },
+            "catalogVersion": { "type": "string" },
+            "buildIntent": { "type": "string" },
+            "artifactFingerprint": { "type": "string" }
           }
         }
         """);
@@ -54,7 +60,9 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
                 normalized.ErrorMessage ?? "Flow draft could not be normalized.");
         }
 
-        var contractValidation = VisionAgentFlowDraftValidator.Validate(normalized.Flow);
+        var contractCatalog = new VisionAgentOperatorContractCatalog();
+        var fingerprint = WorkflowArtifactFingerprint.Observe(arguments, normalized.Flow, contractCatalog);
+        var contractValidation = VisionAgentFlowDraftValidator.Validate(normalized.Flow, contractCatalog);
         var flow = contractValidation.Flow;
         var blockingIssues = new List<PrecheckIssue>();
         var warnings = new List<PrecheckIssue>();
@@ -67,6 +75,12 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         CheckDryRun(arguments, blockingIssues, warnings);
         CheckReplay(arguments, blockingIssues);
         await CheckTargetStationAsync(arguments, blockingIssues, warnings, cancellationToken);
+        if (!fingerprint.IsConsistent)
+        {
+            blockingIssues.Add(new PrecheckIssue(
+                "artifact_fingerprint_mismatch",
+                "The normalized flow does not match the compiled artifact fingerprint."));
+        }
 
         var pendingActions = BuildPendingActions(missingResources, blockingIssues);
         var readyForDeployment = blockingIssues.Count == 0 && missingResources.Count == 0;
@@ -74,6 +88,10 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         {
             source = "deployment_prepare_static_precheck",
             readyForDeployment,
+            artifactFingerprint = fingerprint.ComputedFingerprint,
+            precheckFingerprint = fingerprint.ComputedFingerprint,
+            compiledFingerprint = fingerprint.ExpectedFingerprint,
+            fingerprintConsistent = fingerprint.IsConsistent,
             workflowDraftAllowed = true,
             deploymentBlocked = !readyForDeployment,
             blockingIssues = blockingIssues.Select(IssuePayload).ToList(),

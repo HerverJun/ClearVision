@@ -28,6 +28,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Desktop.Tests;
 
@@ -1486,8 +1487,8 @@ public sealed class AgentRunEndpointsTests
         host.Generation.LastRequest.BuildFromPlan.PlanSnapshot!.CanBuild.Should().BeFalse();
     }
 
-    [Fact(DisplayName = "AgentRun create preserves tool_loop GenerateFlow mode")]
-    public async Task CreateRun_ShouldPreserveToolLoopMode()
+    [Fact(DisplayName = "AgentRun create rejects tool_loop GenerateFlow mode in production")]
+    public async Task CreateRun_ShouldRejectToolLoopModeInProduction()
     {
         await using var host = await AgentRunEndpointTestHost.CreateAsync();
 
@@ -1500,13 +1501,13 @@ public sealed class AgentRunEndpointsTests
             agentGenerateFlowMode = "tool_loop"
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        await host.Generation.WaitForCallAsync();
-
-        host.Generation.LastRequest!.AgentGenerateFlowMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
-        await host.WaitForTerminalAsync(host.Generation.LastRequest.AgentRunId!);
-        var replay = host.StreamService.Replay(host.Generation.LastRequest.AgentRunId!)!;
-        replay.Events.Last().EventType.Should().Be(AgentRunEventTypes.RunCompleted);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        using var errorDoc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        errorDoc.RootElement.GetProperty("errorCode").GetString()
+            .Should().Be(AiAgentGenerateFlowModePolicy.ToolLoopUnavailableCode);
+        errorDoc.RootElement.GetProperty("effectiveMode").GetString()
+            .Should().BeEmpty();
+        host.Generation.LastRequest.Should().BeNull();
     }
 
     [Fact(DisplayName = "POST AgentRun preserves structured BuildFromPlan input and replays Plan Build payload")]
@@ -4273,7 +4274,7 @@ public sealed class AgentRunEndpointsTests
                 EnvironmentName = Environments.Development
             });
             builder.WebHost.UseTestServer();
-            builder.Services.AddLogging();
+            builder.Services.AddLogging(logging => logging.ClearProviders());
 
             var directory = Path.Combine(Path.GetTempPath(), $"cv-agent-run-endpoints-{Guid.NewGuid():N}");
             var redactor = new AgentRunEventRedactor();

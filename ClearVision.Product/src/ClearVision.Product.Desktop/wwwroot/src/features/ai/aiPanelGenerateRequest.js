@@ -410,9 +410,8 @@ export const aiPanelGenerateRequestMixin = {
     },
 
     _normalizeAgentGenerateFlowMode(mode) {
-        const normalized = String(mode || '').trim().toLowerCase();
-        if (normalized === 'planner') return 'planner';
-        if (normalized === 'tool_loop') return 'tool_loop';
+        // GenerateFlow is a compatibility transport; planning and building stay
+        // on the official Plan -> Build path.
         return 'scripted';
     },
 
@@ -464,7 +463,6 @@ export const aiPanelGenerateRequestMixin = {
         }
 
         const enabled = Boolean(this.useVisionAgentGenerateFlow);
-        const mode = this._normalizeAgentGenerateFlowMode(this.agentGenerateFlowMode);
         const directBuildDebugActive = Boolean(this.directBuildDebugNextRequest);
         return `
             <div class="ai-agent-dev-controls" id="ai-agent-dev-controls">
@@ -472,12 +470,6 @@ export const aiPanelGenerateRequestMixin = {
                     <input id="ai-agent-generate-toggle" type="checkbox" ${enabled ? 'checked' : ''} />
                     <span>Agent GenerateFlow</span>
                 </label>
-                <div class="ai-agent-dev-mode-toggle" id="ai-agent-generate-mode-toggle" role="group" aria-label="Agent GenerateFlow 模式">
-                    <button class="ai-mode-chip ${mode === 'scripted' ? 'is-active' : ''}" type="button" data-agent-generate-mode="scripted" ${enabled ? '' : 'disabled'}>固定构建链路：稳定</button>
-                    <button class="ai-mode-chip ${mode === 'planner' ? 'is-active' : ''}" type="button" data-agent-generate-mode="planner" ${enabled ? '' : 'disabled'}>planner</button>
-                    <button class="ai-mode-chip ${mode === 'tool_loop' ? 'is-active' : ''}" type="button" data-agent-generate-mode="tool_loop" ${enabled ? '' : 'disabled'}>Tool Loop 实验</button>
-                </div>
-                <div class="ai-agent-dev-note" ${mode === 'tool_loop' ? '' : 'hidden'}>实验模式：LLM 会在权限门禁内自主选择工具；失败会回退稳定构建链路。</div>
                 <label class="ai-agent-dev-toggle ai-agent-preview-consent">
                     <input id="ai-agent-runtime-preview-consent" type="checkbox" ${enabled && this.runtimePreviewConsent ? 'checked' : ''} ${enabled ? '' : 'disabled'} />
                     <span>允许本轮 RuntimePreview</span>
@@ -508,23 +500,12 @@ export const aiPanelGenerateRequestMixin = {
 
         const toggle = this.container?.querySelector('#ai-agent-generate-toggle');
         const previewConsentToggle = this.container?.querySelector('#ai-agent-runtime-preview-consent');
-        const modeButtons = Array.from(this.container?.querySelectorAll('[data-agent-generate-mode]') || []);
         const directBuildDebugButton = this.container?.querySelector('#ai-agent-direct-build-debug');
         const replayLatestButton = this.container?.querySelector('#ai-agent-replay-latest');
         const refresh = () => {
-            const mode = this._normalizeAgentGenerateFlowMode(this.agentGenerateFlowMode);
-            modeButtons.forEach(button => {
-                const isActive = String(button.dataset.agentGenerateMode || '').toLowerCase() === mode;
-                button.classList.toggle('is-active', isActive);
-                button.disabled = !this.useVisionAgentGenerateFlow;
-            });
             if (previewConsentToggle) {
                 previewConsentToggle.disabled = !this.useVisionAgentGenerateFlow;
                 previewConsentToggle.checked = Boolean(this.useVisionAgentGenerateFlow && this.runtimePreviewConsent);
-            }
-            const note = this.container?.querySelector('.ai-agent-dev-note');
-            if (note) {
-                note.hidden = mode !== 'tool_loop';
             }
             if (directBuildDebugButton) {
                 directBuildDebugButton.disabled = false;
@@ -559,18 +540,6 @@ export const aiPanelGenerateRequestMixin = {
                 refresh();
             });
         }
-
-        modeButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                if (!this.useVisionAgentGenerateFlow) {
-                    return;
-                }
-
-                this.agentGenerateFlowMode = this._normalizeAgentGenerateFlowMode(button.dataset.agentGenerateMode);
-                this._saveAgentGenerateFlowPreference();
-                refresh();
-            });
-        });
 
         if (directBuildDebugButton) {
             directBuildDebugButton.addEventListener('click', () => {

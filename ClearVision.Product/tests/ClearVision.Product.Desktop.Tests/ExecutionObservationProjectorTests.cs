@@ -1379,6 +1379,87 @@ public sealed class ExecutionObservationProjectorTests
         primitive.Geometry.Y.Should().Be(17.0);
     }
 
+    [Fact]
+    public void CreatePreviewObservation_ShouldProjectCommonFiniteCollectionsWithStructuredCounts()
+    {
+        var readOnly = new StableReadOnlyCollection<int>([1, 2, 3, 4, 5]);
+        var values = new Dictionary<string, object>
+        {
+            ["List"] = new List<int> { 1, 2, 3, 4, 5 },
+            ["Array"] = new[] { 1, 2, 3, 4, 5 },
+            ["IList"] = new ArrayList { 1, 2, 3, 4, 5 },
+            ["ReadOnly"] = readOnly,
+            ["Long"] = Enumerable.Range(0, 120).ToArray()
+        };
+
+        var observation = CreateObservation(values);
+
+        foreach (var name in new[] { "List", "Array", "IList", "ReadOnly" })
+        {
+            var node = FindNode(observation.Detail, name)!;
+            node.SemanticKind.Should().Be("collection");
+            node.VisibleItemCount.Should().Be(5);
+            node.TotalItemCount.Should().Be(5);
+            node.Children.Should().HaveCount(5);
+        }
+
+        var longNode = FindNode(observation.Detail, "Long")!;
+        longNode.VisibleItemCount.Should().Be(ExecutionObservationProjector.MaxCollectionItems);
+        longNode.TotalItemCount.Should().Be(120);
+        longNode.Truncated.Should().BeTrue();
+        readOnly.MoveNextCount.Should().Be(5);
+    }
+
+    [Fact]
+    public void CreatePreviewObservation_ShouldPreferDeclaredPortSemanticsWithoutOutputNameHeuristics()
+    {
+        var blobPort = Guid.NewGuid();
+        var featuresPort = Guid.NewGuid();
+        var pointsPort = Guid.NewGuid();
+        var detectionsPort = Guid.NewGuid();
+        var pointPort = Guid.NewGuid();
+        var rectanglePort = Guid.NewGuid();
+        var regionPort = Guid.NewGuid();
+        var observation = CreateObservation(
+            new Dictionary<string, object>
+            {
+                ["BusinessA"] = Enumerable.Range(0, 5).Select(index => new Dictionary<string, object> { ["Id"] = index }).ToList(),
+                ["BusinessB"] = new List<Dictionary<string, object>>(),
+                ["BusinessC"] = Enumerable.Range(0, 5).Select(index => new Position(index, index + 1)).ToList(),
+                ["BusinessD"] = new DetectionList(Enumerable.Range(0, 5)
+                    .Select(index => new DetectionResult($"d{index}", 0.9f, index, index, 2, 3))
+                    .ToList()),
+                ["GeometryA"] = new Position(12.5, 7.25),
+                ["GeometryB"] = new Dictionary<string, object> { ["X"] = 1, ["Y"] = 2, ["Width"] = 30, ["Height"] = 40 },
+                ["GeometryC"] = new ClearVision.Product.Core.ValueObjects.Region([
+                    new RunLength(2, 3, 7),
+                    new RunLength(3, 3, 7)
+                ])
+            },
+            [
+                new ExecutionObservationOutputPortV1 { Id = blobPort, Name = "BusinessA", DataType = PortDataType.BlobList },
+                new ExecutionObservationOutputPortV1 { Id = featuresPort, Name = "BusinessB", DataType = PortDataType.BlobFeatureList },
+                new ExecutionObservationOutputPortV1 { Id = pointsPort, Name = "BusinessC", DataType = PortDataType.PointList },
+                new ExecutionObservationOutputPortV1 { Id = detectionsPort, Name = "BusinessD", DataType = PortDataType.DetectionList },
+                new ExecutionObservationOutputPortV1 { Id = pointPort, Name = "GeometryA", DataType = PortDataType.Point },
+                new ExecutionObservationOutputPortV1 { Id = rectanglePort, Name = "GeometryB", DataType = PortDataType.Rectangle },
+                new ExecutionObservationOutputPortV1 { Id = regionPort, Name = "GeometryC", DataType = PortDataType.Region }
+            ]);
+
+        FindNode(observation.Detail, "BusinessA")!.Should().Match<ExecutionObservationDetailNodeV1>(node =>
+            node.SemanticKind == "blob-list" && node.TotalItemCount == 5 && node.DeclaredPortDataType == "BlobList");
+        FindNode(observation.Detail, "BusinessB")!.Should().Match<ExecutionObservationDetailNodeV1>(node =>
+            node.SemanticKind == "blob-feature-list" && node.TotalItemCount == 0);
+        FindNode(observation.Detail, "BusinessC")!.Should().Match<ExecutionObservationDetailNodeV1>(node =>
+            node.SemanticKind == "collection" && node.TotalItemCount == 5);
+        FindNode(observation.Detail, "BusinessD")!.Should().Match<ExecutionObservationDetailNodeV1>(node =>
+            node.SemanticKind == "detection-list" && node.TotalItemCount == 5 && node.Children.Count == 2);
+        FindNode(observation.Detail, "GeometryA")!.DisplayValue.Should().Be("(12.5, 7.25)");
+        FindNode(observation.Detail, "GeometryB")!.DisplayValue.Should().Be("1, 2, 30 x 40");
+        FindNode(observation.Detail, "GeometryC")!.Should().Match<ExecutionObservationDetailNodeV1>(node =>
+            node.Kind == "region" && node.SemanticKind == "geometry" && node.DisplayValue!.Contains("Area 10"));
+    }
+
     private static ExecutionObservationEnvelopeV1 CreateObservation(
         IReadOnlyDictionary<string, object> outputData,
         IReadOnlyList<ExecutionObservationOutputPortV1>? outputPorts = null,
@@ -1573,5 +1654,30 @@ public sealed class ExecutionObservationProjectorTests
                 yield return MoveNextCount;
             }
         }
+    }
+
+    private sealed class StableReadOnlyCollection<T> : IReadOnlyCollection<T>
+    {
+        private readonly IReadOnlyList<T> _items;
+
+        public StableReadOnlyCollection(IReadOnlyList<T> items)
+        {
+            _items = items;
+        }
+
+        public int Count => _items.Count;
+
+        public int MoveNextCount { get; private set; }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            foreach (var item in _items)
+            {
+                MoveNextCount++;
+                yield return item;
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

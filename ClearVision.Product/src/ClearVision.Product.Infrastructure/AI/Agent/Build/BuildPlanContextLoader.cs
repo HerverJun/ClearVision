@@ -73,6 +73,14 @@ public sealed class BuildPlanContextLoader
             build?.UserSelections,
             build?.AcceptedRecommendedDefaults == true);
         var effectiveRequirement = _requirementOverlay.Build(plan, validatedAnswers, maturityRequest);
+        validatedAnswers.RequirementAnswers.TryGetValue(
+            VisionAgentPlanAnswerFields.TaskType,
+            out var answerTaskType);
+        var taskType = VisionTaskRouteContractRegistry.NormalizeTaskType(
+            VisionAgentBuildSupport.FirstNonEmpty(
+                effectiveRequirement.Maturity.TaskType,
+                answerTaskType,
+                plan?.SemanticExtraction?.TaskType));
         var payload = new BuildPlanLoad
         {
             PlanId = VisionAgentBuildSupport.Clean(plan?.PlanId) is { Length: > 0 } planId
@@ -111,6 +119,7 @@ public sealed class BuildPlanContextLoader
             PlcOutputPolicy = VisionAgentBuildSupport.FirstNonEmpty(build?.PlcOutputPolicy, plan?.PlcOutputPolicy),
             OriginalUserPrompt = VisionAgentBuildSupport.FirstNonEmpty(build?.OriginalUserPrompt, plan?.OriginalUserPrompt, request.Description),
             BuildIntentHint = build?.BuildIntent ?? request.Mode.ToWireValue(),
+            TaskType = taskType,
             HashMismatch = hashMismatch,
             HasCurrentFlow = !string.IsNullOrWhiteSpace(currentFlowSnapshot)
         };
@@ -118,9 +127,9 @@ public sealed class BuildPlanContextLoader
         return VisionAgentBuildSupport.StepResult(
             payload,
             hashMismatch
-                ? "计划已加载，并带有 plan_hash_mismatch 警告。"
+                ? "计划哈希不一致，已拒绝继续构建。"
                 : "计划快照和结构化 BuildFromPlan 上下文已加载。",
-            AgentRunEventStatuses.Completed,
+            hashMismatch ? AgentRunEventStatuses.Failed : AgentRunEventStatuses.Completed,
             new
             {
                 planId = payload.PlanId,
@@ -143,8 +152,8 @@ public sealed class BuildPlanContextLoader
                 metadataOnly = true
             },
             warningCode: hashMismatch ? "plan_hash_mismatch" : string.Empty,
-            applyImpact: "editable_draft_allowed",
-            deploymentImpact: hashMismatch ? "requires_plan_provenance_review" : "no_deployment_blocker");
+            applyImpact: hashMismatch ? "blocked" : "editable_draft_allowed",
+            deploymentImpact: hashMismatch ? "blocked" : "no_deployment_blocker");
     }
 
     internal VisionAgentToolContext BuildToolContext(

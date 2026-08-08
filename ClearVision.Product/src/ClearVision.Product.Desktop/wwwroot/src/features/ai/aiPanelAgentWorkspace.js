@@ -27,7 +27,6 @@ const BUILD_STAGE_ORDER = [
     'template_strategy',
     'operator_pipeline',
     'parameter_mapping',
-    'tool_loop',
     'planner',
     'workflow_draft',
     'validate_schema',
@@ -55,7 +54,6 @@ const BUILD_STAGE_LABELS = {
     template_strategy: '模板策略',
     operator_pipeline: '算子链',
     parameter_mapping: '参数映射',
-    tool_loop: 'Tool Loop 实验',
     planner: '规划与工具',
     tool_policy: '工具策略',
     workflow_draft: '流程草稿',
@@ -277,10 +275,6 @@ const AI_DISPLAY_TEXT_MAP = {
     'NG when scratch candidate exceeds pending threshold.': '当划痕候选超过待确认阈值时判为 NG。',
     'Bind model_resource metadata before deployment.': '部署前绑定模型资源元数据。',
     'Bind missing model_resource metadata for op_detect.ModelId before deployment.': '部署前绑定 op_detect.模型资源 的模型资源元数据。',
-    'Tool Loop fallback': 'Tool Loop 已回退',
-    'Experimental Tool Loop could not safely produce a complete Build payload; using stable BuildOrchestrator.': '实验 Tool Loop 未能安全产出完整构建结果，已回退稳定构建链路。',
-    'Tool Loop completion source is not registered; using stable BuildOrchestrator.': 'Tool Loop completion source 未注册，已回退稳定构建链路。',
-    'Experimental Tool Loop fallback decision.': '实验 Tool Loop 回退决策。',
     'LLM-requested tool completed with public metadata.': 'LLM 主动调用的工具已返回公开元数据。'
 };
 
@@ -346,24 +340,10 @@ const AI_CODE_TEXT_MAP = {
     camera_binding: '相机绑定',
     output_channel: '输出通道',
     plc_address: 'PLC 地址',
-    llm_tool_loop: 'LLM 工具循环',
     fixed_build_orchestrator: '固定构建链路',
     fallback_build_orchestrator: '回退构建链路',
-    partial_final_requires_stable_completion: 'Tool Loop 草稿不完整，已回退稳定构建链路',
-    completion_failed: 'Tool Loop completion 失败，已回退稳定构建链路',
-    failed_with_tool_limit: 'Tool Loop 超过最大轮次，已回退稳定构建链路',
-    max_tool_calls_per_round: '单轮工具调用超限，已回退稳定构建链路',
-    duplicate_tool_call: '重复工具调用超限，已回退稳定构建链路',
-    invalid_json: 'final JSON 无效，已回退稳定构建链路',
-    validate_flow_failed: '流程校验未通过，已回退稳定构建链路',
-    dryrun_flow_failed: '元数据预演未通过，已回退稳定构建链路',
-    runtime_package_precheck_failed: '运行包预检查未通过，已回退稳定构建链路',
-    unsafe_final_payload: 'final 草稿含敏感信息，已回退稳定构建链路',
-    draft_edits_require_stable_completion: 'draftEdits 需要稳定链路补全，已回退稳定构建链路',
-    completion_source_missing: 'Tool Loop completion source 未注册，已回退稳定构建链路',
     mode_mismatch: 'mode 不匹配',
     not_enabled: '未启用',
-    completion_disabled: 'completion disabled',
     permission_denied: '权限拒绝',
     protocol_failed: '协议失败',
     max_tool_rounds_exceeded: 'MaxToolRounds 超限',
@@ -372,7 +352,6 @@ const AI_CODE_TEXT_MAP = {
     tool_permission_denied: '工具权限被拒绝，已回退稳定构建链路',
     unknown_tool: '未知工具被拒绝，已回退稳定构建链路',
     runtime_preview_consent_required: 'RuntimePreview 需要显式授权，已回退稳定构建链路',
-    tool_loop_fallback: 'Tool Loop 回退'
 };
 
 const AI_OPERATOR_LABELS = {
@@ -1400,8 +1379,8 @@ export const aiPanelAgentWorkspaceMixin = {
             return false;
         }
 
-        if (mode && !['auto', 'new', 'build', 'stable', 'scripted', 'planner', 'tool_loop'].includes(mode)) {
-            return false;
+        if (mode && !['auto', 'new', 'build', 'stable', 'scripted'].includes(mode)) {
+            return true;
         }
 
         if (hasCurrentFlowContext) {
@@ -4734,6 +4713,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 <span><small>总计</small><b>${this._escapeHtml(String(missingSummary?.totalCount || 0))} 项</b></span>
                 <span><small>构建前确认</small><b>${this._escapeHtml(String(missingSummary?.mustConfirmCount || 0))} 项</b></span>
                 <span><small>可后补</small><b>${this._escapeHtml(String(missingSummary?.fillLaterCount || 0))} 项</b></span>
+                <span><small>构建入口</small><b>正式 Plan→Build</b></span>
                 <span><small>状态</small><b>${this._escapeHtml(executable ? '可以构建' : '暂不能构建')}</b></span>
             `
             : `<span><small>置信度</small><b>${this._escapeHtml(confidence)}</b></span>
@@ -4751,8 +4731,8 @@ export const aiPanelAgentWorkspaceMixin = {
                 </div>
                 <div class="ai-agent-overview-metrics">
                     ${showBuildExecutionPath
-                        ? `<span><small>当前模式</small><b>${this._escapeHtml(executionPath.modeLabel || mode)}</b></span>
-                           <span><small>VisionAgentLoop</small><b>${this._escapeHtml(executionPath.enteredLabel)}</b></span>`
+                        ? `<span><small>构建入口</small><b>${this._escapeHtml(executionPath.modeLabel || mode)}</b></span>
+                           <span><small>公开事件</small><b>${this._escapeHtml(executionPath.enteredLabel)}</b></span>`
                         : planOverviewMetrics}
                     ${showBuildExecutionPath
                         ? `<span><small>阻断项</small><b>${this._escapeHtml(String(blockerCount))}</b></span>
@@ -4823,62 +4803,11 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _getBuildExecutionPath(events = []) {
         const list = Array.isArray(events) ? events : [];
-        const started = list.find(evt => evt?.eventType === 'run.started');
-        const startedPayload = this._asObject(started?.payload);
-        const configuredMode = this._payloadString(startedPayload, 'agentGenerateFlowMode') ||
-            this._normalizeAgentGenerateFlowMode?.(this.agentGenerateFlowMode) ||
-            this.agentGenerateFlowMode ||
-            'scripted';
-        const enabledFromPayload = startedPayload.useVisionAgentGenerateFlow ?? startedPayload.UseVisionAgentGenerateFlow;
-        const enabled = typeof enabledFromPayload === 'boolean'
-            ? enabledFromPayload
-            : Boolean(this.useVisionAgentGenerateFlow);
-        const normalizedMode = String(configuredMode || '').trim().toLowerCase();
-        const requestedToolLoop = enabled && normalizedMode === 'tool_loop';
-        const entered = list.some(evt => {
-            const type = String(evt?.eventType || '');
-            return type === 'tool_loop.started' ||
-                type.startsWith('tool_call.') ||
-                type.startsWith('tool_result.') ||
-                (type.startsWith('tool_loop.') && type !== 'tool_loop.fallback');
-        });
-        const reason = this._getBuildExecutionPathReason(list, { enabled, requestedToolLoop, entered, normalizedMode });
-
         return {
-            modeLabel: requestedToolLoop ? 'Tool Loop 实验' : '稳定构建链路',
-            entered,
-            enteredLabel: entered ? '已进入' : '未进入',
-            reasonLabel: reason ? this._localizeDisplayText(reason) : ''
+            modeLabel: '正式 Plan→Build',
+            enteredLabel: list.length > 0 ? '已连接' : '等待事件',
+            reasonLabel: ''
         };
-    },
-
-    _getBuildExecutionPathReason(events, state) {
-        const terminal = [...events].reverse().find(evt => {
-            const type = String(evt?.eventType || '');
-            return type === 'tool_loop.fallback' ||
-                type === 'tool_loop.failed' ||
-                type === 'tool_loop.draft.rejected' ||
-                type === 'tool_call.denied';
-        });
-        if (terminal) {
-            const payload = this._asObject(terminal.payload);
-            return this._payloadString(payload, 'fallbackReason') ||
-                this._payloadString(payload, 'rejectionReason') ||
-                this._payloadString(payload, 'failureType') ||
-                this._payloadString(payload, 'reason') ||
-                this._payloadString(payload, 'errorCode') ||
-                terminal.summary ||
-                terminal.title ||
-                '';
-        }
-
-        if (!state.entered) {
-            if (!state.enabled) return 'not_enabled';
-            if (!state.requestedToolLoop) return 'mode_mismatch';
-            return 'completion_disabled';
-        }
-
-        return '';
     },
 
     _getAgentWorkspacePhase() {

@@ -1,6 +1,7 @@
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
+using ClearVision.Product.Infrastructure.AI.Tools;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
@@ -8,13 +9,23 @@ public sealed class BuildResultAssembler
 {
     private readonly AgentRunEventRedactor _redactor;
     private readonly IAgentRunEventSink? _eventSink;
+    private readonly IVisionAgentOperatorContractCatalog _contractCatalog;
 
     public BuildResultAssembler(
         AgentRunEventRedactor redactor,
         IAgentRunEventSink? eventSink = null)
+        : this(redactor, eventSink, null)
+    {
+    }
+
+    internal BuildResultAssembler(
+        AgentRunEventRedactor redactor,
+        IAgentRunEventSink? eventSink,
+        IVisionAgentOperatorContractCatalog? contractCatalog)
     {
         _redactor = redactor;
         _eventSink = eventSink;
+        _contractCatalog = contractCatalog ?? new VisionAgentOperatorContractCatalog();
     }
 
     internal AiFlowGenerationResult Assemble(BuildResultAssemblyInput input)
@@ -29,22 +40,31 @@ public sealed class BuildResultAssembler
             input.ParameterMapping.MissingResources,
             input.Validation,
             input.PackageReadiness);
-        var firstFix = FirstFixRecommendation(
-            input.ApplyGate,
-            missingResources,
-            pendingParameters);
         var globalVariableDrafts = BuildGlobalVariableDrafts(input);
         var globalVariableDiagnostics = BuildGlobalVariableDiagnostics(globalVariableDrafts, input);
         var result = input.CurrentDraft.GenerationResult;
-        result.Success = input.CurrentDraft.CanvasFlow.Operators.Count > 0;
-        result.CompletionStatus = result.Success
-            ? AiFlowGenerationResult.CompletionStatusCompleted
-            : AiFlowGenerationResult.CompletionStatusFailed;
-        result.Flow ??= input.CurrentDraft.CanvasFlow;
-        if (VisionAgentBuildSupport.FlowOperatorCount(result.Flow) == 0)
-        {
-            result.Flow = input.CurrentDraft.CanvasFlow;
-        }
+        var artifact = input.CurrentDraft.Artifact;
+        var returnedFlowFingerprint = WorkflowArtifactFingerprint.ComputeCanvasProjection(
+            artifact.CanvasProjection,
+            input.LoadPlan.PlanHash,
+            artifact.CatalogVersion,
+            input.Intent.BuildIntent,
+            artifact.Graph,
+            _contractCatalog);
+        var applyGate = NormalizeApplyGate(input.ApplyGate, returnedFlowFingerprint);
+        var firstFix = FirstFixRecommendation(
+            applyGate,
+            missingResources,
+            pendingParameters);
+        var planReadiness = input.LoadPlan.Plan?.BuildReadiness;
+        var compilationSucceeded = VisionAgentBuildSupport.ReadCount(input.Validation.Data, "blockingIssues") == 0 &&
+                                    string.Equals(
+                                        artifact.ArtifactFingerprint,
+                                        returnedFlowFingerprint,
+                                        StringComparison.OrdinalIgnoreCase);
+        result.Success = true;
+        result.CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted;
+        result.Flow = artifact.CanvasProjection;
 
         result.ClarificationRequired = false;
         result.RequirementBrief = null;
@@ -72,10 +92,8 @@ public sealed class BuildResultAssembler
         result.AnswerSetFingerprint = input.LoadPlan.AnswerSetFingerprint;
         result.RequestedMode = AiAgentGenerateFlowModes.Normalize(input.Request.AgentGenerateFlowMode);
         result.EffectiveMode = result.RequestedMode;
-        result.ToolLoopEntered = string.Equals(
-            result.RequestedMode,
-            AiAgentGenerateFlowModes.ToolLoop,
-            StringComparison.OrdinalIgnoreCase);
+        // Retained for wire compatibility; production BuildFromPlan has no Tool Loop branch.
+        result.ToolLoopEntered = false;
         result.FallbackReason = string.Empty;
         result.ToolTrace.AddRange(input.Evidence.Select(item => (object)item));
         result.StageTimeline.AddRange(input.Evidence.Select(item => new AiGenerationStageDiagnostic
@@ -100,13 +118,11 @@ public sealed class BuildResultAssembler
             PlanHash = input.LoadPlan.PlanHash,
             ContractVersion = input.Request.BuildFromPlan?.PlanSnapshot?.PlanContractVersion ?? VisionAgentPlanContractVersions.V2,
             BuildIntent = input.Intent.BuildIntent,
+            TaskType = input.LoadPlan.TaskType,
             AnswerSetFingerprint = input.LoadPlan.AnswerSetFingerprint,
             RequestedMode = AiAgentGenerateFlowModes.Normalize(input.Request.AgentGenerateFlowMode),
             EffectiveMode = AiAgentGenerateFlowModes.Normalize(input.Request.AgentGenerateFlowMode),
-            ToolLoopEntered = string.Equals(
-                AiAgentGenerateFlowModes.Normalize(input.Request.AgentGenerateFlowMode),
-                AiAgentGenerateFlowModes.ToolLoop,
-                StringComparison.OrdinalIgnoreCase),
+            ToolLoopEntered = false,
             FallbackReason = string.Empty,
             ResolvedFields = input.LoadPlan.ResolvedFields.ToList(),
             RemainingFields = input.LoadPlan.RemainingFields.ToList(),
@@ -119,8 +135,21 @@ public sealed class BuildResultAssembler
             ParameterStrategy = string.IsNullOrWhiteSpace(input.ParameterMapping.ParameterStrategy)
                 ? input.Selection.ParameterStrategy
                 : input.ParameterMapping.ParameterStrategy,
-            Flow = input.CurrentDraft.CanvasFlow,
-            WorkflowDraft = input.CurrentDraft.WorkflowDraft,
+            Flow = artifact.CanvasProjection,
+            WorkflowDraft = artifact.WorkflowDraft,
+            ArtifactFingerprint = artifact.ArtifactFingerprint,
+            CompiledFingerprint = artifact.ArtifactFingerprint,
+            ValidationFingerprint = applyGate.ValidationFingerprint,
+            DryRunFingerprint = applyGate.DryRunFingerprint,
+            PrecheckFingerprint = applyGate.PrecheckFingerprint,
+            ReturnedFlowSemanticFingerprint = returnedFlowFingerprint,
+            CatalogVersion = artifact.CatalogVersion,
+            PlanSucceeded = input.LoadPlan.Plan != null &&
+                            !input.LoadPlan.HashMismatch &&
+                            !string.IsNullOrWhiteSpace(input.LoadPlan.PlanHash),
+            CompilationSucceeded = compilationSucceeded,
+            RouteSemanticsSatisfied = input.RouteAssessment.Supported && input.RouteAssessment.Satisfied,
+            ArtifactDisposition = applyGate.ArtifactDisposition,
             OperatorPipeline = input.Pipeline.Steps,
             ParameterMapping = input.ParameterMapping.Mappings,
             PendingParameters = pendingParameters,
@@ -136,7 +165,7 @@ public sealed class BuildResultAssembler
             OperatorContractReport = input.OperatorContract.Report,
             ReleaseReview = input.ReleaseReview.Report,
             WorkflowDiff = input.WorkflowDiff,
-            ApplyGate = input.ApplyGate with
+            ApplyGate = applyGate with
             {
                 FirstFixRecommendation = firstFix
             },
@@ -146,17 +175,9 @@ public sealed class BuildResultAssembler
             PublicWarnings = input.PublicWarnings.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             MetadataOnly = true
         };
-        result.BuildReadiness = result.Success
-            ? new VisionAgentBuildReadinessSnapshot
-            {
-                CanBuild = true,
-                Blockers = [],
-                ResolvedFields = input.LoadPlan.ResolvedFields.ToList(),
-                RemainingFields = [],
-                PrimaryMessage = "已基于确认计划生成可编辑草稿",
-                ContractVersion = VisionAgentPlanContractVersions.V2
-            }
-            : null;
+        // BuildReadiness is owned by the formal Plan contract. Never infer it from
+        // the compiled node count or from the returned canvas projection.
+        result.BuildReadiness = planReadiness;
         result.AiExplanation = string.IsNullOrWhiteSpace(result.AiExplanation)
             ? "构建模式已基于确认计划执行仅元数据工具链，并生成可编辑流程草稿。"
             : _redactor.RedactText(result.AiExplanation);
@@ -180,6 +201,9 @@ public sealed class BuildResultAssembler
                 parameterStrategy = result.BuildResult.ParameterStrategy,
                 workflowDiff = result.BuildResult.WorkflowDiff,
                 applyGate = result.BuildResult.ApplyGate,
+                routeAssessment = input.RouteAssessment,
+                artifactFingerprint = result.BuildResult.ArtifactFingerprint,
+                returnedFlowSemanticFingerprint = result.BuildResult.ReturnedFlowSemanticFingerprint,
                 firstFixRecommendation = firstFix,
                 globalVariableDraftCount = globalVariableDrafts.Count,
                 globalVariableDiagnosticCount = globalVariableDiagnostics.Count,
@@ -192,10 +216,40 @@ public sealed class BuildResultAssembler
         return result;
     }
 
+    private static VisionAgentApplyGate NormalizeApplyGate(
+        VisionAgentApplyGate gate,
+        string returnedFlowFingerprint)
+    {
+        if (string.Equals(
+                gate.ReturnedFlowSemanticFingerprint,
+                returnedFlowFingerprint,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return gate;
+        }
+
+        return gate with
+        {
+            CanvasApplyReady = false,
+            RuntimeDraftReady = false,
+            DeploymentReady = false,
+            Blocked = true,
+            Status = "blocked",
+            ApplyBlockers = gate.ApplyBlockers
+                .Concat(["returned_flow_fingerprint_recomputed_mismatch"])
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            ArtifactFingerprintConsistent = false,
+            ReturnedFlowSemanticFingerprint = returnedFlowFingerprint,
+            ArtifactDisposition = "blocked"
+        };
+    }
+
     internal AiFlowGenerationResult Failure(
         string buildId,
         IReadOnlyList<VisionAgentToolEvidence> evidence,
-        IReadOnlyList<string> publicWarnings)
+        IReadOnlyList<string> publicWarnings,
+        string failureCode = "build_orchestrator_failed")
     {
         return new AiFlowGenerationResult
         {
@@ -206,7 +260,7 @@ public sealed class BuildResultAssembler
             FailureSummary = new AiFailureSummary
             {
                 Category = "vision_agent_build_from_plan",
-                Code = "build_orchestrator_failed",
+                Code = failureCode,
                 Message = "Vision Agent Build failed before completion.",
                 RepairTarget = "请查看公开工具证据和后端日志，修复 BuildFromPlan 构建异常后重试。"
             },
@@ -224,7 +278,7 @@ public sealed class BuildResultAssembler
                 {
                     Blocked = true,
                     Status = "blocked",
-                    ApplyBlockers = ["build_orchestrator_failed"],
+                    ApplyBlockers = [failureCode],
                     FirstFixRecommendation = "请查看公开工具证据，修复被阻断的元数据步骤后重试构建。"
                 }
             }

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Globalization;
 using System.Text.Json;
 using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Desktop.Observation;
 using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
@@ -337,13 +338,17 @@ public sealed class PreviewArtifactMaterializer
         out object? materialized)
     {
         materialized = null;
-        if (!TryReadKnownFiniteCollection(value, out var count, out var readItem, out var itemKind, out var itemType))
+        if (!KnownFiniteCollectionAccessor.TryCreate(value, out var accessor))
         {
             return false;
         }
 
+        var count = accessor.Count;
+        var itemType = accessor.ItemType;
+        var itemKind = "collection";
+        var supportsArtifact = itemType != null && IsSupportedFiniteArtifactItemType(itemType, out itemKind);
         var forceArtifact = itemType == typeof(CircleCaliperFitV2ProfileEvidence) && count > 0;
-        if (!forceArtifact && count <= InlineCollectionThreshold)
+        if (!forceArtifact && (count <= InlineCollectionThreshold || !supportsArtifact))
         {
             materialized = value;
             return true;
@@ -366,11 +371,16 @@ public sealed class PreviewArtifactMaterializer
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        if (!accessor.TryReadPrefix(count, out var sourceItems))
+        {
+            return false;
+        }
+
         var jsonSafeItems = new List<object?>(count);
         for (var index = 0; index < count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            jsonSafeItems.Add(ToJsonSafeCollectionItem(readItem(index)));
+            jsonSafeItems.Add(ToJsonSafeCollectionItem(sourceItems[index]));
         }
 
         var bytes = JsonSerializer.SerializeToUtf8Bytes(jsonSafeItems, JsonOptions);

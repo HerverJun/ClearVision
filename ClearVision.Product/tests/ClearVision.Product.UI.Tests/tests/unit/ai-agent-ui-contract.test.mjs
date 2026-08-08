@@ -2029,7 +2029,7 @@ test('default UI payload uses Agent GenerateFlow for Build Mode', async () => {
 
   assert.deepEqual(panel._buildAgentGenerateFlowRequestPayload(), {
     useVisionAgentGenerateFlow: true,
-    agentGenerateFlowMode: 'planner'
+    agentGenerateFlowMode: 'scripted'
   });
 });
 
@@ -2169,13 +2169,13 @@ test('developer mode payload includes useVisionAgentGenerateFlow=true', async ()
   assert.equal(panel._buildAgentGenerateFlowRequestPayload().useVisionAgentGenerateFlow, true);
 });
 
-test('planner mode payload includes agentGenerateFlowMode=planner', async () => {
+test('retired GenerateFlow modes are coerced to the official compatibility mode', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'planner' });
 
   assert.deepEqual(panel._buildAgentGenerateFlowRequestPayload(), {
     useVisionAgentGenerateFlow: true,
-    agentGenerateFlowMode: 'planner'
+    agentGenerateFlowMode: 'scripted'
   });
 });
 
@@ -2189,26 +2189,18 @@ test('scripted mode payload includes agentGenerateFlowMode=scripted', async () =
   });
 });
 
-test('developer mode can select Tool Loop experimental mode', async () => {
+test('developer mode exposes no retired GenerateFlow mode selectors', async () => {
   const { AiPanel } = await loadAiPanel();
-  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
 
-  const html = panel._renderAgentDeveloperControls();
-  assert.match(html, /data-agent-generate-mode="tool_loop"/);
-  assert.match(html, /Tool Loop 实验/);
-  assert.match(html, /实验模式：LLM 会在权限门禁内自主选择工具；失败会回退稳定构建链路。/);
-  assert.deepEqual(panel._buildAgentGenerateFlowRequestPayload(), {
-    useVisionAgentGenerateFlow: true,
-    agentGenerateFlowMode: 'tool_loop'
-  });
+  assert.doesNotMatch(panel._renderAgentDeveloperControls(), /data-agent-generate-mode/);
 });
 
-test('ordinary UI still hides Tool Loop developer controls by default', async () => {
+test('ordinary UI still hides developer controls by default', async () => {
   const { AiPanel } = await loadAiPanel();
-  const panel = createPanel(AiPanel, { developer: false, enabled: true, mode: 'tool_loop' });
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
 
   assert.equal(panel._renderAgentDeveloperControls(), '');
-  assert.doesNotMatch(panel._renderAgentDeveloperControls(), /tool_loop|Tool Loop 实验/);
 });
 
 test('developer direct Build debug control is labeled as Plan skip debug only', async () => {
@@ -2282,13 +2274,13 @@ test('RuntimePreview consent payload is one request only', async () => {
 
   assert.deepEqual(panel._buildAgentGenerateFlowRequestPayload(), {
     useVisionAgentGenerateFlow: true,
-    agentGenerateFlowMode: 'planner',
+    agentGenerateFlowMode: 'scripted',
     runtimePreviewConsent: true
   });
   assert.equal(panel.runtimePreviewConsent, false);
   assert.deepEqual(panel._buildAgentGenerateFlowRequestPayload(), {
     useVisionAgentGenerateFlow: true,
-    agentGenerateFlowMode: 'planner'
+    agentGenerateFlowMode: 'scripted'
   });
 });
 
@@ -2335,7 +2327,7 @@ test('AgentRun create payload is metadata-only and does not send attachment path
   assert.equal(payload.additionalContext, 'safe hint');
   assert.equal(payload.mode, 'modify');
   assert.equal(payload.useVisionAgentGenerateFlow, true);
-  assert.equal(payload.agentGenerateFlowMode, 'planner');
+  assert.equal(payload.agentGenerateFlowMode, 'scripted');
   assert.equal(payload.runtimePreviewConsent, true);
   assert.equal(payload.attachmentCount, 1);
   assert.deepEqual(payload.attachments, []);
@@ -3531,9 +3523,9 @@ test('Plan workspace public fields redact unsafe backend metadata', async () => 
   assert.match(normalized.originalDescription, /C:\\factory\\secret\.onnx/);
 });
 
-test('ordinary build prompt stays Plan-first even when Tool Loop mode is selected', async () => {
+test('ordinary build prompt stays Plan-first', async () => {
   const { AiPanel } = await loadAiPanel();
-  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
   const input = createFakeElement();
   const overview = createFakeElement();
   const plan = createFakeElement();
@@ -3574,7 +3566,7 @@ test('ordinary build prompt stays Plan-first even when Tool Loop mode is selecte
   assert.match(plan.innerHTML, /关键假设/);
   assert.match(plan.innerHTML, /开始构建/);
   assert.doesNotMatch(plan.innerHTML, /按推荐方案开始构建/);
-  assert.doesNotMatch(overview.innerHTML, /VisionAgentLoop/);
+  assert.match(overview.innerHTML, /正式 Plan→Build/);
 });
 
 test('quick example selection only fills the shared composer without sending', async () => {
@@ -3600,11 +3592,11 @@ test('quick example selection only fills the shared composer without sending', a
 
 test('unknown skipPlan and build-like explicit modes cannot bypass Plan', async () => {
   const { AiPanel } = await loadAiPanel();
-  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
 
   assert.equal(panel._shouldOpenPlanModeBeforeBuild({ explicitMode: 'build' }), true);
   assert.equal(panel._shouldOpenPlanModeBeforeBuild({ explicitMode: 'stable' }), true);
-  assert.equal(panel._shouldOpenPlanModeBeforeBuild({ explicitMode: 'tool_loop' }), true);
+  assert.equal(panel._shouldOpenPlanModeBeforeBuild({ explicitMode: 'deprecated' }), true);
   assert.equal(panel._shouldOpenPlanModeBeforeBuild({ explicitMode: 'auto', skipPlan: true }), true);
   assert.equal(panel._shouldOpenPlanModeBeforeBuild({
     explicitMode: 'new',
@@ -6385,7 +6377,7 @@ test('Build Workspace redacts unsafe workflow diff text in final draft', async (
   assert.doesNotMatch(rendered, unsafePattern);
 });
 
-test('Tool Evidence Timeline distinguishes LLM tool loop and fallback fixed chain sources', async () => {
+test('Tool Evidence Timeline renders compiler-owned evidence', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const { elements, container } = createBuildWorkspaceContainer();
@@ -6394,32 +6386,11 @@ test('Tool Evidence Timeline distinguishes LLM tool loop and fallback fixed chai
   const payload = buildResultContractPayload();
   payload.buildResult.toolEvidenceTimeline = [
     {
-      stage: 'tool_loop',
-      toolName: 'inspect_current_flow',
-      source: 'llm_tool_loop',
-      status: 'completed',
-      durationMs: 8,
-      outputSummary: 'LLM-requested tool completed with public metadata.',
-      metadataOnly: true,
-      redactionPass: true
-    },
-    {
       stage: 'workflow_draft',
       toolName: 'stable_build_tool',
       source: 'fixed_build_orchestrator',
       status: 'completed',
       durationMs: 10,
-      outputSummary: 'Stable BuildOrchestrator completed.',
-      metadataOnly: true,
-      redactionPass: true
-    },
-    {
-      stage: 'workflow_draft',
-      toolName: 'stable_build_tool',
-      source: 'fallback_build_orchestrator',
-      status: 'completed',
-      warningCode: 'partial_final_requires_stable_completion',
-      durationMs: 12,
       outputSummary: 'Stable BuildOrchestrator completed.',
       metadataOnly: true,
       redactionPass: true
@@ -6438,7 +6409,7 @@ test('Tool Evidence Timeline distinguishes LLM tool loop and fallback fixed chai
   ];
   panel.activeAgentRunEvents = [
     {
-      runId: 'ar_tool_loop_build',
+      runId: 'ar_compiler_build',
       sequence: 20,
       eventType: 'run.completed',
       stage: 'run',
@@ -6456,10 +6427,7 @@ test('Tool Evidence Timeline distinguishes LLM tool loop and fallback fixed chai
 
   const timelineHtml = elements['#ai-build-event-timeline'].innerHTML;
   assert.match(timelineHtml, /Build 工具证据/);
-  assert.match(timelineHtml, /LLM 工具循环/);
   assert.match(timelineHtml, /固定构建链路/);
-  assert.match(timelineHtml, /回退构建链路/);
-  assert.match(timelineHtml, /Tool Loop 草稿不完整，已回退稳定构建链路/);
   assert.match(timelineHtml, /未找到匹配模板骨架，已改用算子链生成/);
 });
 
@@ -6522,79 +6490,6 @@ test('Build Workspace redacts unsafe tool evidence template and readiness check 
   ].join('\n');
   assert.match(rendered, /redacted/);
   assert.doesNotMatch(rendered, unsafePattern);
-});
-
-test('Build Workspace displays Tool Loop execution path and fallback reason', async () => {
-  const { AiPanel } = await loadAiPanel();
-  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
-  const { elements, container } = createBuildWorkspaceContainer();
-  panel.container = container;
-  panel.agentWorkspaceMode = 'build';
-  const payload = buildResultContractPayload();
-  panel.activeAgentRunEvents = [
-    {
-      runId: 'ar_tool_loop_path',
-      sequence: 1,
-      eventType: 'run.started',
-      stage: 'run',
-      title: 'Run started',
-      status: 'running',
-      payload: {
-        useVisionAgentGenerateFlow: true,
-        agentGenerateFlowMode: 'tool_loop',
-        metadataOnly: true
-      },
-      metadataOnly: true,
-      redactionPass: true
-    },
-    {
-      runId: 'ar_tool_loop_path',
-      sequence: 3,
-      eventType: 'tool_loop.started',
-      stage: 'tool_loop',
-      title: 'Tool Loop started',
-      status: 'running',
-      metadataOnly: true,
-      redactionPass: true
-    },
-    {
-      runId: 'ar_tool_loop_path',
-      sequence: 12,
-      eventType: 'tool_loop.fallback',
-      stage: 'tool_loop',
-      title: 'Tool Loop fallback',
-      status: 'blocked',
-      payload: {
-        fallbackReason: 'duplicate_tool_call',
-        metadataOnly: true
-      },
-      metadataOnly: true,
-      redactionPass: true
-    },
-    {
-      runId: 'ar_tool_loop_path',
-      sequence: 20,
-      eventType: 'run.completed',
-      stage: 'run',
-      title: 'Run completed',
-      summary: 'Build completed.',
-      status: 'completed',
-      payload,
-      metadataOnly: true,
-      redactionPass: true
-    }
-  ];
-
-  panel._renderAgentWorkspaceOverview();
-  panel._renderBuildWorkspaceFromAgentRun();
-
-  const overviewHtml = elements['#ai-agent-workspace-overview'].innerHTML;
-  assert.match(overviewHtml, /当前模式/);
-  assert.match(overviewHtml, /Tool Loop 实验/);
-  assert.match(overviewHtml, /VisionAgentLoop/);
-  assert.match(overviewHtml, /已进入/);
-  assert.match(overviewHtml, /路径原因/);
-  assert.match(overviewHtml, /重复工具调用超限，已回退稳定构建链路/);
 });
 
 test('Canvas apply remains enabled when deployment is blocked by missing resources', async () => {
@@ -7845,210 +7740,6 @@ test('AgentRun transport and cancel failure messages redact unsafe diagnostics',
   assert.match(messages, /取消生成未生效/);
   assert.match(messages, /redacted/);
   assertNoSensitiveLeak(messages);
-});
-
-test('AgentRun tool_loop events render realtime public progress with fallback copy', async () => {
-  const { AiPanel } = await loadAiPanel();
-  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
-  const turn = attachAgentRunTurn(panel);
-  panel.activeAgentRunId = 'ar_tool_loop';
-  panel.isGenerating = true;
-  panel.isCancellingGenerate = true;
-  let transportClosed = false;
-  panel.activeAgentRunTransport = {
-    close() {
-      transportClosed = true;
-    }
-  };
-
-  panel._handleAgentRunEvent({
-    runId: 'ar_tool_loop',
-    sequence: 3,
-    eventType: 'tool_loop.started',
-    stage: 'tool_loop',
-    title: 'Tool Loop started',
-    summary: 'Tool Loop started.',
-    status: 'running',
-    metadataOnly: true,
-    redactionPass: true
-  });
-  panel._handleAgentRunEvent({
-    runId: 'ar_tool_loop',
-    sequence: 4,
-    eventType: 'tool_loop.round.started',
-    stage: 'tool_loop',
-    title: 'Tool Loop 第 1 轮',
-    summary: 'request next tool',
-    status: 'running',
-    payload: { round: 1, metadataOnly: true },
-    metadataOnly: true,
-    redactionPass: true
-  });
-  panel._handleAgentRunEvent({
-    runId: 'ar_tool_loop',
-    sequence: 5,
-    eventType: 'tool_call.requested',
-    stage: 'tool_loop',
-    title: 'Tool call requested: inspect_current_flow',
-    summary: 'metadata-only tool',
-    status: 'running',
-    payload: { round: 1, toolName: 'inspect_current_flow', metadataOnly: true },
-    metadataOnly: true,
-    redactionPass: true
-  });
-  panel._handleAgentRunEvent({
-    runId: 'ar_tool_loop',
-    sequence: 6,
-    eventType: 'tool_call.completed',
-    stage: 'tool_loop',
-    title: 'Tool call completed: inspect_current_flow',
-    summary: 'metadata returned',
-    status: 'completed',
-    payload: { round: 1, toolName: 'inspect_current_flow', metadataOnly: true },
-    metadataOnly: true,
-    redactionPass: true
-  });
-  panel._handleAgentRunEvent({
-    runId: 'ar_tool_loop',
-    sequence: 7,
-    eventType: 'tool_result.appended',
-    stage: 'tool_loop',
-    title: 'Tool result appended',
-    summary: 'tool result appended',
-    status: 'completed',
-    payload: { round: 1, metadataOnly: true },
-    metadataOnly: true,
-    redactionPass: true
-  });
-  panel._handleAgentRunEvent({
-    runId: 'ar_tool_loop',
-    sequence: 8,
-    eventType: 'tool_loop.finalized',
-    stage: 'tool_loop',
-    title: 'Tool Loop finalized',
-    summary: 'final returned',
-    status: 'completed',
-    metadataOnly: true,
-    redactionPass: true
-  });
-  panel._handleAgentRunEvent({
-    runId: 'ar_tool_loop',
-    sequence: 9,
-    eventType: 'tool_loop.draft.accepted',
-    stage: 'tool_loop',
-    title: 'Tool Loop draft accepted',
-    summary: 'accepted',
-    status: 'completed',
-    payload: { metadataOnly: true },
-    metadataOnly: true,
-    redactionPass: true
-  });
-  panel._handleAgentRunEvent({
-    runId: 'ar_tool_loop',
-    sequence: 10,
-    eventType: 'tool_loop.fallback',
-    stage: 'tool_loop',
-    title: 'Tool Loop fallback',
-    summary: 'Experimental Tool Loop could not safely produce a complete Build payload; using stable BuildOrchestrator.',
-    status: 'blocked',
-    payload: {
-      fallbackReason: 'tool_permission_denied',
-      userMessage: '实验 Tool Loop 已回退到稳定构建链路。',
-      metadataOnly: true
-    },
-    metadataOnly: true,
-    redactionPass: true
-  });
-
-  const text = collectProcessText(turn);
-  assert.match(text, /Tool Loop 实验已启动/);
-  assert.match(text, /第 1 轮工具决策/);
-  assert.match(text, /请求工具：inspect_current_flow/);
-  assert.match(text, /工具完成：inspect_current_flow/);
-  assert.match(text, /工具结果已回填/);
-  assert.match(text, /LLM 已给出 final/);
-  assert.match(text, /实验草稿已通过校验/);
-  assert.match(text, /已回退稳定构建链路：工具权限被拒绝，已回退稳定构建链路/);
-  assert.equal(panel.isGenerating, false);
-  assert.equal(panel.isCancellingGenerate, false);
-  assert.equal(transportClosed, false);
-  assert.equal(panel.activeAgentRunTransport !== null, true);
-});
-
-test('AgentRun tool_call events render LLM requested tool cards', async () => {
-  const { AiPanel } = await loadAiPanel();
-  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
-  const turn = attachAgentRunTurn(panel);
-  panel.activeAgentRunId = 'ar_tool_call';
-
-  panel._handleAgentRunEvent({
-    runId: 'ar_tool_call',
-    sequence: 5,
-    eventType: 'tool_call.requested',
-    stage: 'tool_loop',
-    title: 'Tool call requested: inspect_current_flow',
-    summary: 'LLM requested a metadata-only Vision Agent tool.',
-    status: 'running',
-    payload: {
-      toolName: 'inspect_current_flow',
-      permission: 'ReadOnly',
-      metadataOnly: true
-    },
-    metadataOnly: true,
-    redactionPass: true
-  });
-  panel._handleAgentRunEvent({
-    runId: 'ar_tool_call',
-    sequence: 6,
-    eventType: 'tool_call.denied',
-    stage: 'tool_loop',
-    title: 'Tool call denied: runtime_package_precheck',
-    summary: 'LLM requested tool was denied by the experimental permission gate.',
-    status: 'blocked',
-    payload: {
-      toolName: 'runtime_package_precheck',
-      errorCode: 'tool_permission_denied',
-      firstFixRecommendation: 'Remove the blocked tool intent or retry in a mode that only uses metadata-only review tools.',
-      metadataOnly: true
-    },
-    metadataOnly: true,
-    redactionPass: true
-  });
-
-  assert.equal(turn.toolsSection.hidden, false);
-  assert.match(turn.toolsBody.innerHTML, /inspect_current_flow/);
-  assert.match(turn.toolsBody.innerHTML, /runtime_package_precheck/);
-  assert.match(turn.toolsBody.innerHTML, /已阻断|blocked|warning/);
-});
-
-test('AgentRun tool_loop draft rejected releases generating state', async () => {
-  const { AiPanel } = await loadAiPanel();
-  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
-  const turn = attachAgentRunTurn(panel);
-  panel.activeAgentRunId = 'ar_tool_loop_rejected';
-  panel.isGenerating = true;
-  panel.isCancellingGenerate = true;
-
-  panel._handleAgentRunEvent({
-    runId: 'ar_tool_loop_rejected',
-    sequence: 11,
-    eventType: 'tool_loop.draft.rejected',
-    stage: 'tool_loop',
-    title: 'Tool Loop draft rejected',
-    summary: 'draft rejected',
-    status: 'warning',
-    payload: {
-      rejectionReason: 'validate_flow_failed',
-      metadataOnly: true
-    },
-    metadataOnly: true,
-    redactionPass: true
-  });
-
-  assert.match(collectProcessText(turn), /实验草稿未通过校验：流程校验未通过，已回退稳定构建链路/);
-  assert.equal(panel.isGenerating, false);
-  assert.equal(panel.isCancellingGenerate, false);
-  assert.equal(turn.statusEl.textContent, '草稿验收未通过');
 });
 
 test('AgentRun duplicate replay events are ignored by run sequence and type', async () => {
@@ -10153,203 +9844,6 @@ test('executable business benchmark report exposes actual toolchain fields', () 
   assert.equal(expectedTools.includes('runtime_preview_metadata'), false);
 });
 
-test('planner autonomy benchmark report exposes planner and permission negative fields', () => {
-  const reportPath = path.resolve(
-    getRepoRoot(),
-    'quality',
-    'evals',
-    'reports',
-    'planner_autonomy_benchmark.json'
-  );
-  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-
-  assert.equal(report.benchmarkId, 'vision_agent_planner_autonomy_benchmark');
-  assert.equal(report.mode, 'offline_metadata_only');
-  assertWorkflowRunMetadata(report.workflowRun);
-  assert.equal(report.summary.plannerCaseCount, 15);
-  assert.equal(report.summary.permissionNegativeCaseCount, 6);
-  assert.equal(report.summary.accepted, true);
-
-  for (const item of [...report.cases, ...report.permissionNegativeCases]) {
-    assert.ok(Array.isArray(item.expectedBusinessActions), item.caseId);
-    assert.ok(Array.isArray(item.allowedTools), item.caseId);
-    assert.ok(Array.isArray(item.plannerMessages), item.caseId);
-    assert.ok(Array.isArray(item.plannedToolCalls), item.caseId);
-    assert.ok(Array.isArray(item.policyDecisions), item.caseId);
-    assert.ok(Array.isArray(item.actualToolCalls), item.caseId);
-    assert.ok(Object.prototype.hasOwnProperty.call(item, 'actualValidationResult'), item.caseId);
-    assert.ok(Object.prototype.hasOwnProperty.call(item, 'actualDryRunResult'), item.caseId);
-    assert.ok(Object.prototype.hasOwnProperty.call(item, 'actualPrecheckResult'), item.caseId);
-    assert.ok(Object.prototype.hasOwnProperty.call(item, 'actualRuntimePreviewResult'), item.caseId);
-    assert.ok(Object.prototype.hasOwnProperty.call(item, 'finalWorkflowDraftAllowed'), item.caseId);
-    assert.equal(item.passed, true, item.caseId);
-  }
-
-  const permissionErrors = report.permissionNegativeCases
-    .flatMap(item => item.policyDecisions)
-    .filter(item => item.errorCode)
-    .map(item => item.errorCode);
-  assert.ok(permissionErrors.includes('runtime_preview_consent_required'));
-  assert.ok(permissionErrors.includes('runtime_preview_permission_denied'));
-  assert.ok(permissionErrors.includes('tool_permission_denied'));
-  assert.ok(permissionErrors.includes('config_write_denied'));
-  assert.ok(permissionErrors.includes('tool_not_whitelisted'));
-  assert.ok(permissionErrors.includes('deployment_prepare_tool_denied'));
-});
-
-test('real LLM planner shadow eval report remains default-off and policy-only', () => {
-  const reportPath = path.resolve(
-    getRepoRoot(),
-    'quality',
-    'evals',
-    'reports',
-    'real_llm_planner_shadow_eval.json'
-  );
-  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-
-  assert.equal(report.evalId, 'vision_agent_real_llm_planner_shadow_eval');
-  assert.equal(report.mode, 'offline_metadata_only');
-  assert.equal(report.enabled, false);
-  assert.equal(report.summary.runnerStatus, 'skipped');
-  assert.equal(report.summary.caseCount, 12);
-  assert.equal(report.summary.reportGenerated, true);
-  assert.equal(report.summary.enabledReason, '');
-  assert.match(report.summary.skippedReason, /CV_AGENT_REAL_LLM_SHADOW_EVAL/);
-  assert.equal(report.summary.configurationMissingReason, '');
-  assert.equal(report.summary.requestCount, 0);
-  assert.equal(report.summary.parseSuccessRate, 0);
-  assert.equal(report.summary.unsafeAttemptRate, 0);
-  assert.equal(report.summary.averageToolPlanMatchScore, 0);
-  assert.equal(report.summary.averageNextActionMatchScore, 0);
-  assert.equal(report.summary.averageFullPlanMatchScore, 0);
-  assert.equal(report.summary.averageOrderedPrefixScore, 0);
-  assert.equal(report.summary.averagePolicySafetyScore, 1);
-  assert.ok(Array.isArray(report.summary.badToolNames));
-  assert.ok(Array.isArray(report.summary.missingRequiredLaterTools));
-  assert.ok(Array.isArray(report.summary.overPlanningTools));
-  assert.ok(Array.isArray(report.summary.underPlanningCases));
-  assert.equal(report.llmConfiguration.provider, 'not_read_when_disabled');
-  assert.equal(report.llmConfiguration.protocol, 'not_read_when_disabled');
-  assert.equal(report.llmConfiguration.wireApi, 'not_read_when_disabled');
-  assert.equal(report.llmConfiguration.authMode, 'not_read_when_disabled');
-  assert.equal(report.llmConfiguration.modelRole, 'not_read_when_disabled');
-  assertWorkflowRunMetadata(report.workflowRun);
-  assert.equal(report.safety.workflowExecutionAttempted, false);
-  assert.equal(report.safety.deploymentPrepareExecuted, false);
-  assert.equal(report.safety.realCameraSdkTouched, false);
-  assert.equal(report.safety.realStationTouched, false);
-  assert.equal(report.safety.realImageFilesRead, false);
-  assert.equal(report.safety.realModelFilesLoaded, false);
-  assert.equal(report.safety.plcWriteAttempted, false);
-
-  for (const item of report.cases) {
-    assert.ok(Array.isArray(item.expectedToolCalls), item.caseId);
-    assert.ok(Array.isArray(item.mockPlannerToolCalls), item.caseId);
-    assert.ok(Array.isArray(item.plannedToolCalls), item.caseId);
-    assert.ok(Array.isArray(item.policyDecision), item.caseId);
-    assert.equal(typeof item.nextActionMatchScore, 'number', item.caseId);
-    assert.equal(typeof item.fullPlanMatchScore, 'number', item.caseId);
-    assert.equal(typeof item.orderedPrefixScore, 'number', item.caseId);
-    assert.equal(typeof item.policySafetyScore, 'number', item.caseId);
-    assert.ok(['next_action', 'full_plan', 'final', 'invalid'].includes(item.completionIntent), item.caseId);
-    assert.ok(Array.isArray(item.missingRequiredLaterTools), item.caseId);
-    assert.ok(Array.isArray(item.overPlanningTools), item.caseId);
-    assert.equal(item.requestCount, 0, item.caseId);
-    assert.equal(item.fallbackToMockSuggested, true, item.caseId);
-  }
-});
-
-test('real LLM shadow eval report exposes split planner scoring fields', () => {
-  const reportPath = path.resolve(
-    getRepoRoot(),
-    'quality',
-    'evals',
-    'reports',
-    'real_llm_planner_shadow_eval.manual.json'
-  );
-  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-
-  assert.equal(typeof report.summary.averageNextActionMatchScore, 'number');
-  assert.equal(typeof report.summary.averageFullPlanMatchScore, 'number');
-  assert.equal(typeof report.summary.averageOrderedPrefixScore, 'number');
-  assert.equal(typeof report.summary.averagePolicySafetyScore, 'number');
-  assert.ok(Array.isArray(report.summary.badToolNames));
-  assert.ok(Array.isArray(report.summary.missingRequiredLaterTools));
-  assert.ok(Array.isArray(report.summary.overPlanningTools));
-  assert.ok(Array.isArray(report.summary.underPlanningCases));
-
-  for (const item of report.cases) {
-    assert.equal(typeof item.nextActionMatchScore, 'number', item.caseId);
-    assert.equal(typeof item.fullPlanMatchScore, 'number', item.caseId);
-    assert.equal(typeof item.orderedPrefixScore, 'number', item.caseId);
-    assert.equal(typeof item.policySafetyScore, 'number', item.caseId);
-    assert.ok(['next_action', 'full_plan', 'final', 'invalid'].includes(item.completionIntent), item.caseId);
-    assert.ok(Array.isArray(item.missingRequiredLaterTools), item.caseId);
-    assert.ok(Array.isArray(item.overPlanningTools), item.caseId);
-  }
-});
-
-test('holdout shadow eval report exposes robustness metrics and case set', () => {
-  const reportPath = path.resolve(
-    getRepoRoot(),
-    'quality',
-    'evals',
-    'reports',
-    'real_llm_planner_shadow_eval.holdout.json'
-  );
-  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-
-  assert.equal(report.caseSet, 'holdout');
-  assert.equal(report.evalId, 'vision_agent_real_llm_planner_shadow_eval_holdout');
-  assert.ok(report.summary.caseCount >= 20 && report.summary.caseCount <= 30);
-  assert.equal(typeof report.summary.averageNextActionMatchScore, 'number');
-  assert.equal(typeof report.summary.averageFullPlanMatchScore, 'number');
-  assert.equal(typeof report.summary.averageOrderedPrefixScore, 'number');
-  assert.equal(typeof report.summary.averagePolicySafetyScore, 'number');
-  assert.equal(typeof report.summary.completionIntentDistribution, 'object');
-  assert.ok(Array.isArray(report.summary.badToolNames));
-  assert.ok(Array.isArray(report.summary.missingRequiredLaterTools));
-  assert.ok(Array.isArray(report.summary.overPlanningTools));
-  assert.ok(Array.isArray(report.summary.underPlanningCases));
-
-  const categories = new Set(report.cases.map(item => item.category));
-  assert.ok([...categories].some(item => item.includes('chinese')));
-  assert.ok([...categories].some(item => item.includes('mixed')));
-  assert.ok([...categories].some(item => item.includes('overreach') || item.includes('denied')));
-  assert.ok(report.cases.some(item => item.runtimePreviewConsent === true || item.allowedTools.includes('capture_test_frame')));
-});
-
-test('shadow eval prompt defaults to complete ordered plan wording', () => {
-  const repoRoot = getRepoRoot();
-  const runner = fs.readFileSync(path.resolve(repoRoot, 'quality', 'tools', 'VisionAgentPlannerShadowEvalRunner', 'Program.cs'), 'utf8');
-  const composer = fs.readFileSync(path.resolve(repoRoot, 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Agent', 'AgentPlannerPromptComposer.cs'), 'utf8');
-  const builder = fs.readFileSync(path.resolve(repoRoot, 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Agent', 'AgentPlannerPromptBuilder.cs'), 'utf8');
-
-  for (const source of [runner, composer, builder]) {
-    assert.doesNotMatch(source, /Plan the next tool call/);
-    assert.match(source, /Plan the complete ordered tool sequence or return final draft/);
-  }
-});
-
-test('real LLM shadow eval report does not expose API keys and keeps BaseUrl redacted', () => {
-  const reportPath = path.resolve(
-    getRepoRoot(),
-    'quality',
-    'evals',
-    'reports',
-    'real_llm_planner_shadow_eval.json'
-  );
-  const reportText = fs.readFileSync(reportPath, 'utf8');
-  const report = JSON.parse(reportText);
-
-  assert.doesNotMatch(reportText, /apiKey|ApiKey|CV_AGENT_REAL_LLM_API_KEY|Bearer\s+|x-api-key|Authorization/);
-  assert.ok(report.llmConfiguration);
-  assert.equal(Object.prototype.hasOwnProperty.call(report.llmConfiguration, 'apiKey'), false);
-  if (typeof report.llmConfiguration.baseUrl === 'string') {
-    assert.doesNotMatch(report.llmConfiguration.baseUrl, /\?|@/);
-  }
-});
-
 test('CI artifact assertion enforces non-local workflow metadata before upload', () => {
   const repoRoot = getRepoRoot();
   const scriptPath = path.resolve(repoRoot, 'quality', 'tools', 'assert_vision_agent_report_artifacts.py');
@@ -10368,9 +9862,6 @@ test('CI artifact assertion enforces non-local workflow metadata before upload',
     assert.match(workflow, /--scan-source-files/);
     assert.match(workflow, /vision_agent_quality_artifact_manifest\.json/);
     assert.match(workflow, /VisionAgent_business_benchmark_baseline\.json/);
-    assert.match(workflow, /planner_autonomy_benchmark\.json/);
-    assert.match(workflow, /real_llm_planner_shadow_eval\.json/);
-    assert.match(workflow, /real_llm_planner_shadow_eval\.holdout\.json/);
     assert.match(workflow, /agent_ui_contract_output\.txt/);
     assert.match(workflow, /\*\*\/\*\.trx/);
   }
@@ -10443,84 +9934,6 @@ test('repository naming guard blocks legacy package names and NuGet package arti
   assert.deepEqual(legacyHits, []);
 });
 
-test('shadow eval source guard confines HttpClient to shadow runner only', () => {
-  const repoRoot = getRepoRoot();
-  const shadowRunner = fs.readFileSync(
-    path.resolve(repoRoot, 'quality', 'tools', 'VisionAgentPlannerShadowEvalRunner', 'Program.cs'),
-    'utf8'
-  );
-  assert.match(shadowRunner, /new HttpClient/);
-
-  const guardedRoots = [
-    path.resolve(repoRoot, 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Agent'),
-    path.resolve(repoRoot, 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools'),
-    path.resolve(repoRoot, 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai')
-  ];
-  for (const root of guardedRoots) {
-    for (const sourcePath of fs.readdirSync(root, { recursive: true })
-      .filter(fileName => String(fileName).endsWith('.cs') || String(fileName).endsWith('.js'))
-      .map(fileName => path.resolve(root, fileName))) {
-      const source = fs.readFileSync(sourcePath, 'utf8');
-      assert.doesNotMatch(source, /new\s+HttpClient|HttpClient\s*\(/, sourcePath);
-    }
-  }
-});
-
-test('CPA shadow bridge reads only explicit CPA or Codex CPA provider config', () => {
-  const repoRoot = getRepoRoot();
-  const bridgePath = path.resolve(repoRoot, 'quality', 'tools', 'run_real_llm_shadow_eval_from_codex_config.ps1');
-  const bridge = fs.readFileSync(bridgePath, 'utf8');
-
-  assert.match(bridge, /CODEX_CONFIG_PATH/);
-  assert.match(bridge, /CODEX_HOME/);
-  assert.match(bridge, /\$HOME.*\.codex\/config\.toml/s);
-  assert.match(bridge, /\[model_providers\\\./);
-  assert.match(bridge, /function Test-IsCpaProvider/);
-  assert.match(bridge, /Read-CpaProviderAliases/);
-  assert.match(bridge, /CV_AGENT_CPA_PROVIDER_ALIASES/);
-  assert.match(bridge, /cpa,ccswitch/);
-  assert.match(bridge, /ProviderKey -match 'cpa'/);
-  assert.match(bridge, /ProviderAliases -contains/);
-  assert.match(bridge, /env_key/);
-  assert.match(bridge, /CV_AGENT_CPA_MODEL/);
-  assert.match(bridge, /CV_AGENT_CPA_BASE_URL/);
-  assert.match(bridge, /CV_AGENT_CPA_API_KEY/);
-  assert.match(bridge, /InspectConfigOnly/);
-  assert.match(bridge, /shadowEvalWouldRun/);
-  assert.doesNotMatch(bridge, /model_provider.*ccswitch/i);
-});
-
-test('CPA shadow bridge reports missing config without printing secrets', () => {
-  const repoRoot = getRepoRoot();
-  const bridge = fs.readFileSync(
-    path.resolve(repoRoot, 'quality', 'tools', 'run_real_llm_shadow_eval_from_codex_config.ps1'),
-    'utf8'
-  );
-  const manualReport = JSON.parse(fs.readFileSync(
-    path.resolve(repoRoot, 'quality', 'evals', 'reports', 'real_llm_planner_shadow_eval.manual.json'),
-    'utf8'
-  ));
-  const manualText = JSON.stringify(manualReport);
-
-  assert.match(bridge, /CV_AGENT_REAL_LLM_CONFIGURATION_MISSING_REASON/);
-  assert.match(bridge, /No CPA provider was found/);
-  assert.match(bridge, /Secrets and full BaseUrl are not printed/);
-  assert.match(bridge, /mode = "inspect_config_only"/);
-  assert.match(bridge, /apiKeyConfigured/);
-  assert.match(bridge, /Redact-BaseUrlForReport/);
-  assert.ok(['configuration_missing', 'completed'].includes(manualReport.summary.runnerStatus));
-  if (manualReport.summary.runnerStatus === 'configuration_missing') {
-    assert.match(manualReport.summary.configurationMissingReason, /CPA model is missing|CPA API key is missing/);
-    assert.equal(manualReport.summary.requestCount, 0);
-  } else {
-    assert.equal(manualReport.summary.configurationMissingReason, '');
-    assert.ok(manualReport.summary.requestCount > 0);
-  }
-  assert.equal(manualReport.safety.workflowExecutionAttempted, false);
-  assert.equal(manualReport.safety.deploymentPrepareExecuted, false);
-  assert.doesNotMatch(manualText, /Bearer\s+|Authorization|x-api-key|sk-[A-Za-z0-9_-]{8,}/);
-});
-
 test('quality suite tracks raised UI contract minimum', () => {
   const suitePath = path.resolve(getRepoRoot(), 'quality', 'evals', 'suites', 'agent_engineering_harness_suite.json');
   const suite = JSON.parse(fs.readFileSync(suitePath, 'utf8'));
@@ -10531,11 +9944,8 @@ test('quality suite tracks raised UI contract minimum', () => {
   assert.ok(uiEntry);
   assert.equal(uiEntry.minimumTests, 190);
 
-  const shadowEntry = suite.stages
-    .flatMap(stage => stage.entries)
-    .find(entry => entry.id === 'vision_agent_real_llm_planner_shadow_eval');
-  assert.ok(shadowEntry);
-  assert.equal(shadowEntry.status, 'manual');
+  assert.equal(suite.stages.flatMap(stage => stage.entries)
+    .some(entry => String(entry.id || '').includes('planner_shadow')), false);
 });
 
 test('RuntimePreview pilot gate document keeps real adapter gated and offline-fallback safe', () => {

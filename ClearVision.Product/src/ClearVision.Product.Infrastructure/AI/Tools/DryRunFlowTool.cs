@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
+using ClearVision.Product.Infrastructure.AI.Agent;
 
 namespace ClearVision.Product.Infrastructure.AI.Tools;
 
@@ -16,7 +17,11 @@ public sealed class DryRunFlowTool : VisionAgentToolBase
           "properties": {
             "flow": { "type": ["object", "string"] },
             "flowJson": { "type": "string" },
-            "entryOperatorTempId": { "type": "string" }
+            "entryOperatorTempId": { "type": "string" },
+            "planHash": { "type": "string" },
+            "catalogVersion": { "type": "string" },
+            "buildIntent": { "type": "string" },
+            "artifactFingerprint": { "type": "string" }
           }
         }
         """);
@@ -35,16 +40,28 @@ public sealed class DryRunFlowTool : VisionAgentToolBase
                 normalized.ErrorMessage ?? "Flow draft could not be normalized."));
         }
 
-        var validation = VisionAgentFlowDraftValidator.Validate(normalized.Flow);
-        var dryrun = BuildDryRun(validation);
+        var catalog = new VisionAgentOperatorContractCatalog();
+        var observation = WorkflowArtifactFingerprint.Observe(arguments, normalized.Flow, catalog);
+        var validation = VisionAgentFlowDraftValidator.Validate(normalized.Flow, catalog);
+        var dryrun = BuildDryRun(validation, observation);
         return Task.FromResult(VisionAgentToolResult.Ok(dryrun));
     }
 
-    internal static object BuildDryRun(VisionAgentFlowValidation validation)
+    internal static object BuildDryRun(
+        VisionAgentFlowValidation validation,
+        ArtifactFingerprintObservation fingerprint)
     {
+        var blockingIssues = validation.BlockingIssues.ToList();
+        if (!fingerprint.IsConsistent)
+        {
+            blockingIssues.Add(new VisionAgentFlowIssue(
+                "artifact_fingerprint_mismatch",
+                "The normalized flow does not match the compiled artifact fingerprint."));
+        }
+
         var executedOperators = new List<object>();
         var skippedOperators = new List<object>();
-        if (validation.BlockingIssues.Count > 0)
+        if (blockingIssues.Count > 0)
         {
             skippedOperators.AddRange(validation.Flow.Operators.Select(op => new
             {
@@ -86,15 +103,19 @@ public sealed class DryRunFlowTool : VisionAgentToolBase
         {
             source = "simulation_static_flow_dryrun",
             dryRunMode = "structure_only_stub",
-            dryRunSucceeded = validation.BlockingIssues.Count == 0,
+            dryRunSucceeded = blockingIssues.Count == 0,
+            artifactFingerprint = fingerprint.ComputedFingerprint,
+            dryRunFingerprint = fingerprint.ComputedFingerprint,
+            compiledFingerprint = fingerprint.ExpectedFingerprint,
+            fingerprintConsistent = fingerprint.IsConsistent,
             executedOperators,
             skippedOperators,
             warnings,
-            blockingIssues = validation.BlockingIssues.Select(FlowValidationPayload.IssuePayload).ToList(),
+            blockingIssues = blockingIssues.Select(FlowValidationPayload.IssuePayload).ToList(),
             missingResources = validation.MissingResources.Select(FlowValidationPayload.ResourcePayload).ToList(),
             dryRunSummary = new
             {
-                summary = validation.BlockingIssues.Count == 0
+                    summary = blockingIssues.Count == 0
                     ? $"Simulated {executedOperators.Count} operators without real resources."
                     : "Dryrun stopped because validation produced blocking issues.",
                 executedCount = executedOperators.Count,

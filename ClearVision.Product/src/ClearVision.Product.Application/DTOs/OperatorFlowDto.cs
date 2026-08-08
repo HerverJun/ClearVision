@@ -57,7 +57,12 @@ public class OperatorFlowDto
         {
             var canonicalType = OperatorTypeAliasResolver.Resolve(op.Type);
             // 使用 5 参数构造函数创建算子 (保留原始ID)
-            var operatorEntity = new Operator(op.Id, op.Name, canonicalType, op.X, op.Y);
+            var operatorEntity = new Operator(op.Id, op.Name, canonicalType, op.X, op.Y)
+            {
+                Metadata = op.Metadata == null
+                    ? null
+                    : new Dictionary<string, object?>(op.Metadata, StringComparer.OrdinalIgnoreCase)
+            };
             if (!op.IsEnabled)
             {
                 operatorEntity.Disable();
