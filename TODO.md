@@ -1,239 +1,290 @@
-# ClearVision Studio 2.0 开发 TODO
-
-<!-- DOC_AUDIT_STATUS_START -->
-## 文档审计状态（自动更新）
-- 审计日期：2026-07-02
-- 完成状态：未完成
-- 任务统计：总计 0，已完成 0，未完成 0，待办关键词命中 5
-- 判定依据：检测到待办关键词（TODO/待办/未完成/TBD/FIXME/WIP）
-<!-- DOC_AUDIT_STATUS_END -->
-
-> 文档版本：V1.1（仓库安装回填版）
-> 审计日期：2026-07-01
-> 目标仓库：`HerverJun/ClearVision`
-> 目标分支：`codex初稿`
-> GitHub 审计参考快照：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
-> G00 Initial SHA：`58c7569958f3bf8ab627f5c5b76ff0a77cc86914`
-> G00 完成 SHA：`3481d5a35f47bbf1f58c3f042cff6a679e720e0c`
-> 结构：**本文件只做薄账本；每个 Goal 的详细上下文在独立执行卡。**
-
-## 1. Codex 每轮读取规则
-
-每轮只读取：
-
-1. 根目录 `AGENTS.md`；
-2. 本文件的“架构红线”“当前执行项”“本轮固定协议”；
-3. 当前 Goal 对应的一张执行卡；
-4. 执行卡列出的代码锚点；
-5. 上位总纲仅在发生架构争议时按需读取。
-
-禁止一次加载全部 Goal 卡；禁止同时执行两个 Goal。
-
-## 2. 架构红线
-
-- 保留 WinForms + WebView2 + ASP.NET Core Desktop；不引入 Electron。
-- Station 独立运行；不依赖 Vue、Node 或 Studio。
-- 不重写 `FlowCanvas`；V2 复用并扩展现有 `FlowCanvasAdapter`。
-- 新 V2 typed API 必须包裹现有 `httpClient`，不得重做 auth、端口发现和网络错误策略。
-- 同一 capability 任一时刻只有一个 mounted owner、一个订阅集合、一个写入口。
-- Pinia 不得成为 Project、Flow、Variables、Agent 的业务权威。
-- `flowRevision` 是 UI 本地 revision；`PersistenceRevision` 是后端持久化 authority，二者不得混淆。
-- 正式工程资产只经 Application Service 与 `ProjectSaveCoordinator`。
-- `ExecutionObservationEnvelopeV1` 无持久化、只读、可丢弃，不替代执行结果。
-- Scene/Geometry 复用现有 `ImageCanvas`；不得再造第二图像渲染内核。
-- `CalibrationBundleV2` 是唯一正式标定产物。
-- 不重构 AgentRun、EventStore、Workspace Snapshot、terminal/recovery 权威。
-- Feature Flag 必须登记创建、owner、关闭行为、cutover 和删除 Goal。
-- 旧实现不能仅被 CSS 隐藏；flag on 时必须不挂载、不订阅、不运行 timer。
-
-出现违反红线的必要前提时，状态改为 `BLOCKED`，输出 `BLOCKED_ARCHITECTURE_DEVIATION`，不得自行扩大重构。
-
-## 3. 当前执行项
-
-- 当前 Goal：`G16`
-- 当前卡片：`docs/进行中/Studio2/goals/G16.md`
-- 当前阶段：`Release`
-- 总状态：`BLOCKED`
-- 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
-- G00 Initial SHA：`58c7569958f3bf8ab627f5c5b76ff0a77cc86914`
-- G00 完成 SHA：`3481d5a35f47bbf1f58c3f042cff6a679e720e0c`
-- 当前基线报告：[`docs/进行中/Studio2/baseline/G00-基线冻结报告-2026-07-01.md`](docs/进行中/Studio2/baseline/G00-基线冻结报告-2026-07-01.md)
-- 状态权威与恢复边界：[`docs/进行中/Studio2/状态权威与恢复边界.md`](docs/进行中/Studio2/状态权威与恢复边界.md)
-- Vision Agent 恢复治理阶段归档：[`docs/归档/已关闭事项/2026-07-01-VisionAgent-恢复治理阶段归档/闭环说明.md`](docs/归档/已关闭事项/2026-07-01-VisionAgent-恢复治理阶段归档/闭环说明.md)
-
-## 4. 本轮固定协议
-
-1. `git fetch origin`。
-2. 确认分支为 `codex初稿`、工作树干净、本地 HEAD 与 `origin/codex初稿` 一致。
-3. 若不一致，停止并输出 `BLOCKED_REMOTE_DIVERGED`；不得强推或悄悄 rebase。
-4. 读取当前卡片和代码锚点；先核实真实代码，再修改。
-5. 在工作树中把当前状态改为 `IN_PROGRESS`，回填开始时间、Initial SHA 和修改白名单。
-6. 只做当前卡片；遇到旁支问题记技术债。
-7. 按 `AGENTS.md` 串行运行测试；禁止同一测试项目并行。
-8. 回填当前卡片与本账本；未运行写 `NOT RUN`，人工验证未做写 `NOT PERFORMED`。
-9. `git diff --check`，确认无生成物、密钥、临时文件。
-10. 提交前再次 `git fetch origin`；远端前进则停止 `BLOCKED_REMOTE_DIVERGED`。
-11. 一个 Goal 原则上一个提交；提交并 push。
-12. 核对本地 HEAD、`origin/codex初稿`、GitHub 远端 SHA。
-13. 当前改为 `DONE`，下一项改为 `READY`，更新“当前执行项”和“最近完成记录”。
-14. 完整 CI 必须以 PR checks、workflow_dispatch 或实际支持该分支的 workflow 作为证据；普通分支 push 不等于完整 CI。
-
-## 5. Goal 状态总览
-
-状态：`LOCKED / READY / IN_PROGRESS / BLOCKED / DONE / DEFERRED`
-
-| ID | 阶段 | Goal | 状态 | 前置 | 执行卡 | 完成 SHA |
-|---|---|---|---|---|---|---|
-| G00 | Foundation | 归档旧阶段并冻结可复现基线 | DONE | 无 | `docs/进行中/Studio2/goals/G00.md` | `3481d5a35f47bbf1f58c3f042cff6a679e720e0c` |
-| G01 | Foundation | ADR、状态权威与迁移白名单 | DONE | G00 | `docs/进行中/Studio2/goals/G01.md` | 见 G01 完成提交与最终报告 |
-| G02A | Foundation | FrontendV2 构建与发布底座 | DONE | G01 | `docs/进行中/Studio2/goals/G02A.md` | 见 G02A 完成提交与最终报告 |
-| G02B | Foundation | V2 挂载、HostBridge 与现有通信适配 | DONE | G02A | `docs/进行中/Studio2/goals/G02B.md` | 见 G02B 完成提交与最终报告 |
-| G03 | Foundation | Workspace Shell MVP | DONE | G02B | `docs/进行中/Studio2/goals/G03.md` | 见 G03 完成提交与最终报告 |
-| G04A | Foundation | V2 Flow 编辑端口与本地 stale 防护 | DONE | G03 | `docs/进行中/Studio2/goals/G04A.md` | 见 G04A 完成提交与最终报告 |
-| G04B | Foundation | V2 单请求工程保存与持久化身份 | DONE | G04A | `docs/进行中/Studio2/goals/G04B.md` | 见 G04B 完成提交与最终报告 |
-| G05A | Observation | Execution Observation 投影与身份 | DONE | G04B | `docs/进行中/Studio2/goals/G05A.md` | 见 G05A 完成提交与最终报告 |
-| G05B | Observation | Preview Artifact 生命周期与安全读取 | DONE | G05A | `docs/进行中/Studio2/goals/G05B.md` | 见 G05B follow-up 完成提交与最终报告 |
-| G06 | Observation | 节点预览结果检查器 MVP | DONE | G05B | `docs/进行中/Studio2/goals/G06.md` | 见 G06 follow-up 完成提交与最终报告 |
-| G07A | Observation | Canonical ResultPath 解析器 | DONE | G06 | `docs/进行中/Studio2/goals/G07A.md` | 见 G07A follow-up 完成提交与最终报告 |
-| G07B | Observation | 字段级全局变量绑定 V1 | DONE | G07A | `docs/进行中/Studio2/goals/G07B.md` | 见 G07B final follow-up 完成提交与最终报告 |
-| G08 | Observation | Visual Scene V1（只读投影） | DONE | G07B | `docs/进行中/Studio2/goals/G08.md` | 见 G08 完成提交与最终报告 |
-| G09A | Geometry/Spatial | Geometry 纯数学内核与矩形等价迁移 | DONE | G08 | `docs/进行中/Studio2/goals/G09A.md` | 见 G09A 完成提交与最终报告 |
-| G09B | Geometry/Spatial | Circle、Annulus 与 Arc 编辑 | DONE | G09A | `docs/进行中/Studio2/goals/G09B.md` | 见 G09B 完成提交与最终报告 |
-| G09C | Geometry/Spatial | Polygon 与 PointSequence 编辑 | DONE | G09B | `docs/进行中/Studio2/goals/G09C.md` | 见 G09C 完成提交与最终报告 |
-| G10A | Geometry/Spatial | Spatial Context 数学与 sidecar 契约 | DONE | G09C | `docs/进行中/Studio2/goals/G10A.md` | 见 G10A 完成提交与最终报告 |
-| G10B | Geometry/Spatial | RoiManager Crop 空间传播 | DONE | G10A | `docs/进行中/Studio2/goals/G10B.md` | 见 G10B 完成提交与最终报告 |
-| G08-G10B-FOLLOWUP | Geometry/Spatial | Visual Geometry 与 SpatialContext 联合收口 | DONE | G10B | `docs/进行中/Studio2/goals/G08-G10B-FOLLOWUP.md` | 见 G08-G10B-FOLLOWUP 完成提交与最终报告 |
-| G08-G10B-FOLLOWUP-2 | Geometry/Spatial | Scene 定位与 Spatial fail-closed 最终收口 | DONE | G08-G10B-FOLLOWUP | `docs/进行中/Studio2/goals/G08-G10B-FOLLOWUP-2.md` | 见本轮最终报告；未执行 G10C |
-| G08-G10B-FOLLOWUP-3 | Geometry/Spatial | Spatial 通用传播与 Scene 有界诊断收口 | DONE | G08-G10B-FOLLOWUP-2 | `docs/进行中/Studio2/goals/G08-G10B-FOLLOWUP-3.md` | 见本轮最终报告；未执行 G10C |
-| G10C | Geometry/Spatial | PixelToWorld 与 Scene 空间投影 | DONE | G08-G10B-FOLLOWUP-3 | `docs/进行中/Studio2/goals/G10C.md` | 见 G10C 完成提交与最终报告 |
-| G10C-FOLLOWUP | Geometry/Spatial | 坐标方向、精度报告与 PointList SpatialContext 最终收口 | DONE | G10C | `docs/进行中/Studio2/goals/G10C-FOLLOWUP.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G10C-FOLLOWUP-2 | Geometry/Spatial | RoundTrip 与 PointList 世界单位权威收口 | DONE | G10C-FOLLOWUP | `docs/进行中/Studio2/goals/G10C-FOLLOWUP-2.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G11A | Vertical Product | Circle Search V2 kernel、契约与数据集 | DONE | G10C-FOLLOWUP-2 | `docs/进行中/Studio2/goals/G11A.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G11A-FOLLOWUP | Vertical Product | CaliperFitV2 失败证据、Huber 语义与复杂度门禁收口 | DONE | G11A | `docs/进行中/Studio2/goals/G11A-FOLLOWUP.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G11B | Vertical Product | Circle Search Tool、Geometry 与 Scene | DONE | G11A-FOLLOWUP | `docs/进行中/Studio2/goals/G11B.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G11B-FOLLOWUP | Vertical Product | Circle Search evidence、Scene 与 flag 权威收口 | DONE | G11B | `docs/进行中/Studio2/goals/G11B-FOLLOWUP.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G11C | Vertical Product | Circle Search 连续预览、性能与兼容收口 | DONE | G11B-FOLLOWUP | `docs/进行中/Studio2/goals/G11C.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G12A | Vertical Product | NPoint CalibrationSolver 抽取与 parity | DONE | G11C | `docs/进行中/Studio2/goals/G12A.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G12B | Vertical Product | N 点标定工作台 draft 与可视化 | DONE | G12A | `docs/进行中/Studio2/goals/G12B.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G13A | Vertical Product | Project 正式资产权威与保存恢复 | DONE | G12B | `docs/进行中/Studio2/goals/G13A.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G13B | Vertical Product | Runtime Package 可选 Calibration/Spatial 扩展 | DONE | G13A | `docs/进行中/Studio2/goals/G13B.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G13X | Vertical Product | VM 式算子模块结果面板 MVP | DONE | G13B | `docs/进行中/Studio2/goals/G13X.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G13C | Vertical Product | Station/Runtime 标定加载与 PixelToWorld E2E | DONE | G13X | `docs/进行中/Studio2/goals/G13C.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G14A | Productization | 正式 Inspection 历史投影与分页 | DONE | G13C | `docs/进行中/Studio2/goals/G14A.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G14B | Productization | 结果对比、基线与 Scene 回放 | DONE | G14A | `docs/进行中/Studio2/goals/G14B.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G14C | Productization | Evidence manifest、导出与留存策略 | DONE | G14B | `docs/进行中/Studio2/goals/G14C.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G15.1 | Productization | Property Panel capability 迁移 | DONE | G14C | `docs/进行中/Studio2/goals/G15_1.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G15.2 | Productization | Preview Panel capability 迁移 | DONE | G15.1 | `docs/进行中/Studio2/goals/G15_2.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G15.3 | Productization | Global Variables capability 迁移 | DONE | G15.2 | `docs/进行中/Studio2/goals/G15_3.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G15.5 | Productization | Settings capability 迁移 | DONE | G15.3 | `docs/进行中/Studio2/goals/G15_5.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G15.8 | Productization | Project 页面 capability 迁移 | DONE | G15.5 | `docs/进行中/Studio2/goals/G15_8.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G15.6 | Productization | Inspection capability 迁移 | DONE | G15.8 | `docs/进行中/Studio2/goals/G15_6.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G15.7 | Productization | Results/Review capability 迁移 | DONE | G15.6 | `docs/进行中/Studio2/goals/G15_7.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G15.4 | Productization | AI Panel 外壳与展示 capability 迁移 | DONE | G15.7 | `docs/进行中/Studio2/goals/G15_4.md` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 |
-| G16 | Release | 性能、发布与唯一入口收口 | BLOCKED | G15.4 | `docs/进行中/Studio2/goals/G16.md` | PARTIAL；business owner 默认切换已完成，真实 `/v2` production root 与完整 release evidence 留 `RELEASE-FOLLOWUP` |
-
-## 6. 阶段 Gate
-
-### Foundation Gate
-
-- V2 build/publish 可复现，无 Node 运行依赖。
-- flag off 不初始化 V2；flag on 只有一个 V2 root。
-- FlowCanvas 只有一个实例且未重写。
-- V2 Flow 编辑与保存路径明确，ProjectSave/Agent 无回退。
-
-### Observation Gate
-
-- 当前节点 Summary/Detail/Artifact 可安全查看。
-- Artifact 有 TTL/容量/生命周期，SSE 不携带大载荷。
-- canonical ResultPath 在 preview/正式运行一致。
-- Scene 与字段双向定位且 fail-soft。
-
-### Geometry/Spatial Gate
-
-- Rectangle/Circle/Annulus/Arc/Polygon/PointSequence 分阶段可编辑。
-- draft/commit 边界清楚，无第二 command bus。
-- ROI local->Full->World2D 可组合并有 round-trip 测试。
-
-### Vertical Product Gate
-
-- Circle Search V2 算法、Tool、Scene、Inspector、连续预览闭环。
-- NPoint solver parity 和九点工作台完成。
-- ProjectSave->重启->Runtime Package->Station PixelToWorld 闭环。
-
-### Release Gate
-
-- 每个 capability 只有一个生产 owner。
-- 旧 app.js 不再作为第二业务 composition root；保留的底层库无 top-level 业务副作用。
-- clean clone build/publish、无 Node 启动、DPI/分辨率/性能/内存通过。
-- 旧工程、旧 package、Station、Agent、Project Save 回归通过。
-
-## 7. 最近完成记录
-
-| 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
-|---|---|---|---|---|---|
-| 2026-07-05 | RELEASE-FOLLOWUP-1 | `0394a2ba0e994b5e6720de2ee65e08b87edda1d7` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | FrontendV2 npm ci/lint/typecheck/unit/build PASS（43/43）；UI focused PASS（120/120）；UI full unit PASS（655/655）；preview smoke PASS；Playwright full PASS（85 passed / 1 skipped）；edited Playwright targeted PASS（1/1）；Desktop focused WebView2/architecture/endpoints/AgentRun/Station PASS（188/188）；Desktop full serial PASS（501/501）；Product services PASS（65/65）；calibration PASS（115/115）；Product broad PASS（363/363）；Product full serial PASS（3289 passed / 4 skipped）；OperatorLibrary package smoke PASS（40/40）；operator contract quick PASS（86/86）；Desktop Release publish PASS；publish static no-Node scan PASS；G16 benchmark PASS（300/1000）；`node --check` JS/MJS PASS（129 files）；JSON artifact parse PASS；`git diff --check` PASS；真实 WebView2 NOT PERFORMED；No-Node target startup NOT PERFORMED；DPI/分辨率矩阵 NOT PERFORMED；GitHub CI NOT RUN（`gh` 未登录） | 总体验收 verdict `BLOCKED_RELEASE_CUTOVER_GAP`。工业视觉 Studio + Runtime + Station + evidence 主线保持，未发现 Electron/Station/FlowCanvas/ImageCanvas/ProjectSaveCoordinator/AgentRun/G14 权威偏移；修复 stale NPoint Playwright guard、迁移台账 evidence token、AI operator knowledge graph、CircleCaliperFitV2 checksum，并刷新 G16 benchmark。阻断仍是 `Studio:WorkspaceV2Enabled=false`、旧 `app.js` release root 保留、`/v2/index.html` 尚非唯一 production root；完整 WebView2/no-Node/CI/DPI 证据留 follow-up。 |
-| 2026-07-04 | G15X | `2b8043c2b7ccfcb63f9d67a6261fdc33fa57a73e` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | UI focused `g15x-capability-owners,property-panel-capability-owner,preview-panel-memory,app-infrastructure,global-variable-panel,inspection-panel-state,result-panel-memory,ai-agent-ui-contract,ai-panel-canvas-sync` PASS（492/492）；Desktop focused `WebView2HostTests,Studio2ArchitectureGuardTests` PASS（33/33）；`node --check` touched JS/MJS PASS；`git diff --check` PASS（仅 Git LF→CRLF normalization warnings）；Product full serial NOT RUN；Desktop full serial NOT RUN；UI full unit NOT RUN；Playwright NOT RUN；真实 WebView2 NOT PERFORMED；GitHub CI NOT RUN；Release publish NOT RUN | 完成 G15 剩余 capability 默认关闭 runtime flags：`Studio2.GlobalVariables`、`Studio2.Settings`、`Studio2.ProjectPage`、`Studio2.Inspection`、`Studio2.ResultsReview`、`Studio2.AiPanel`；flag off 保持 legacy；flag on 分别只挂载 `GlobalVariablesCapabilityOwner`、`SettingsCapabilityOwner`、`ProjectPageCapabilityOwner`、`InspectionCapabilityOwner`、`ResultsReviewCapabilityOwner`、`AiPanelCapabilityOwner`；旧实现不 mounted/subscribed/timer/SSE/request/write，非 CSS-only hide；Project/Settings/Inspection/G14A/B/C/AgentRun/Runtime/Station authority 未改；legacy 删除统一留 G16。 |
-| 2026-07-04 | G15.2 | `cc317c798a08012b19747406a2e88996cfd54ead` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | UI focused `preview-coordinator,preview-panel,property-panel,property-panel-capability-owner` PASS（48/48）；ROI/inspector focused PASS（49/49）；app/property-sidebar focused PASS（25/25）；Desktop focused `WebView2HostTests,Studio2ArchitectureGuardTests` PASS（32/32）；`node --check` for preview/property/app touched modules PASS；`git diff --check` PASS（仅 Git LF→CRLF normalization warnings）；Product full serial NOT RUN；Desktop full serial NOT RUN；UI full unit NOT RUN；Playwright NOT RUN；真实 WebView2 NOT PERFORMED；GitHub CI NOT RUN；Release publish NOT RUN | 新增默认关闭 `Studio2.PreviewPanel` / `Studio:PreviewPanelCapabilityEnabled=false`；flag off 保持 legacy preview；flag on 只挂载 `PreviewPanelCapabilityOwner`，legacy PreviewPanel/overlay/inspector/ROI preview 子资源不构造、不 mounted、不订阅、不运行 timer/debounce、不请求、不读 artifact；唯一 preview/artifact entry 为 `PreviewPanelCapabilityOwner -> PreviewPanelCapabilityAdapter -> NodePreviewCoordinator`；G13X 结果 view-model 继续复用 coordinator，无第二 ImageCanvas/Scene/artifact client；未迁移 GlobalVariables/Results/Runtime/Station/AgentRun。 |
-| 2026-07-04 | G15.1 | `eb26224b97c6c05b6da54eab7057334d17307d15` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | UI focused `property-sidebar-controller,property-panel-capability-owner,property-panel-memory,app-infrastructure` PASS（40/40）；Desktop focused `WebView2HostTests,Studio2ArchitectureGuardTests` PASS（31/31）；`node --check` for `propertyPanel.js`/`propertySidebarController.mjs`/`propertyPanelCapabilityOwner.mjs`/`app.js` PASS；`git diff --check` PASS；Product full serial NOT RUN；Desktop full serial NOT RUN；UI full unit NOT RUN；Playwright NOT RUN；真实 WebView2 NOT PERFORMED；GitHub CI NOT RUN；Release publish NOT RUN | 新增默认关闭 `Studio2.PropertyPanel` / `Studio:PropertyPanelCapabilityEnabled=false`；flag off 保持 legacy `PropertyPanel` 为唯一 owner；flag on 只挂载 `PropertyPanelCapabilityOwner`，legacy 不构造、不 mounted、不订阅、不运行 timer、不写参数；V2 owner 通过 `PropertyPanelCapabilityAdapter -> FlowCanvasAdapter.patchNodeParameters()` 唯一写入，支持空状态、基础信息、参数编辑和校验；旧实现作为 flag-off legacy library 保留至 G15.1 follow-up 或 G16。 |
-| 2026-07-04 | G14C-FOLLOWUP | `8c450a73a314b1170c8ed963fec771646ae5d724` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product build PASS；Product focused `InspectionServiceSingleRunTests,InspectionResultPersistenceSnapshotTests,InspectionEvidenceManifestServiceTests` PASS（21/21）；`git diff --check` PASS；Product full serial NOT RUN；Desktop full serial NOT RUN；UI full unit NOT RUN；GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED；Release publish NOT RUN | 修复 `InspectionService.ExecuteSingleCoreAsync` 单次检测成功路径：正式 DB 写入改为 `InspectionResultPersistenceSnapshot.WithoutOutputImage(result)`，随后用原始 result 调用 `CaptureEvidenceManifestAsync(result)`；返回给调用方的 result 仍保留即时 `OutputImage`/ImageId/traceability，repository 收到的 persisted result 无 `OutputImage`，evidence capture 收到的 result 保留 `OutputImage`；未修改 Runtime/Station/AgentRun/G14A/G14B/Evidence schema/export/retention/UI。 |
-| 2026-07-04 | G14C | `527433e0d5bebad666a5f73309f2ba191c43a3a8` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product build PASS；Product focused `InspectionEvidenceManifestServiceTests,InspectionResultPersistenceSnapshotTests,InspectionImagePersistenceServiceTests,InspectionImagePersistencePolicyTests,InspectionServiceSingleRunTests` PASS（40/40）；Desktop build PASS；Desktop focused `ApiEndpointsInspectionHistoryTests,Studio2ArchitectureGuardTests` PASS（36/36）；UI focused `result-panel-memory.test.mjs` PASS（21/21）；`node --check` for `resultPanel.js`/`app.js` PASS；`git diff --check` PASS；Product full serial NOT RUN；Desktop full serial NOT RUN；UI full unit NOT RUN；Station Release build NOT RUN；GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED；Release publish NOT RUN | 新增可选 `InspectionEvidenceManifestV1` sidecar manifest、bounded JSON export、OK/NG/Error 分级留存与容量淘汰；manifest/items 只使用相对路径和 SHA-256，manifest checksum 排除 checksum 字段；缺失/损坏/过期 fail-soft，不破坏正式 Inspection summary/detail；正式 DB persistence 使用 summary-only snapshot 不保存 `OutputImage` 大对象；导出复用 safe JSON 脱敏并省略二进制项，ZIP NOT IMPLEMENTED；未混入 PreviewArtifact/preview cache，未修改 G14A/G14B 语义，未改 Runtime/Station/AgentRun。 |
-| 2026-07-04 | G14B | `45c2eca2723f3fea53d43074e08a154cd3637101` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product build PASS；Product focused `InspectionResultRepositoryTests,InspectionServiceHistoryComparisonTests,GetInspectionHistoryQueryHandlerTests,InspectionServiceSingleRunTests` PASS（26/26）；Desktop build PASS；Desktop focused `ApiEndpointsInspectionHistoryTests,Studio2ArchitectureGuardTests` PASS（31/31）；UI focused `result-panel-memory.test.mjs` PASS（19/19）；`node --check` for `resultPanel.js`/`app.js` PASS；`git diff --check` PASS；Product full serial NOT RUN；Desktop full serial NOT RUN；UI full unit NOT RUN；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED；Release publish NOT RUN | 正式 Inspection history 增加 project-scoped compare 与 previous-success 契约；对比仅消费 `InspectionResult`/G14A detail safe preview，输出 traceability、diagnostics、defect summary、output/analysis preview 结构化 diff 与 FlowVersionHash/CalibrationBundleId warning；baseline/left-right selection 只为 `ResultPanel` UI session 状态；缺 Scene/图像 fail-soft 为摘要/引用回放；未重新执行历史 flow，未混入 preview cache/PreviewArtifact，未新增 Evidence manifest/ZIP/retention，未修改 G13X / Runtime / Station / AgentRun。 |
-| 2026-07-04 | G14A | `8e2237c1892d4b7747866cf351856a267b481122` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product build PASS；Product focused `InspectionResultRepositoryTests,GetInspectionHistoryQueryHandlerTests,InspectionServiceSingleRunTests` PASS（19/19）；Desktop build PASS；Desktop focused `ApiEndpointsInspectionHistoryTests,Studio2ArchitectureGuardTests` PASS（26/26）；UI focused `result-panel-memory.test.mjs` PASS（12/12）；`git diff --check` PASS；Product full serial NOT RUN；Desktop full serial NOT RUN；UI full unit NOT RUN；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED；Release publish NOT RUN | 正式 Inspection history 来源收敛到 `InspectionResult`/Repository/Service；列表 server-side paging、稳定倒序、pageSize clamp、project/status/time/flow hash 过滤且只返回轻量字段与 traceability/has-data flags；详情按 resultId/projectId 按需加载 safe JSON preview、图像引用、缺图提示、diagnostics 与 FlowVersionHash/CalibrationBundleId/SessionId；secret/path/大 JSON/Image/Scene/artifact payload 有界脱敏/截断；未混入 preview debug cache、ExecutionObservationEnvelopeV1、PreviewArtifact、G13X observation cache；未修改 G13X / Runtime / Station / AgentRun。 |
-| 2026-07-04 | G13C | `5752a68fe3b20f0ac57edcf03bdd88a7c49344fb` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product build PASS；Product focused `RuntimePackageExporterValidationTests,PixelToWorldTransformOperatorTests,RuntimeMvpTests` PASS（79/79）；Product extra focused `RuntimePackageLoaderTests,RuntimePackageExporterTests,FlowExecutionServiceTests` PASS（38/38）；Desktop build PASS；Desktop focused `StationResultMapperTests,StationPackageDeploymentServiceTests,Studio2ArchitectureGuardTests` PASS（27/27）；Desktop extra `StationPackageStoreTests` PASS（3/3）；Station Debug build PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 Station 进程 E2E NOT PERFORMED；真实 WebView2 NOT PERFORMED | Station/Runtime package loader 在 G13B optional assets 通过 validator 后构建只读 runtime asset context，RuntimeHost 以 ambient input 传入 FlowExecutionService，PixelToWorld 可按 assetId/bundleId/kind 解析正式 `CalibrationBundleV2` 并输出 `CalibrationBundleId`/`FlowHash`/坐标摘要；缺失/歧义 bundle fail closed，Station result/Runtime primary output 默认剥离 Image/Scene/artifact payload；Station 不依赖 Studio/Vue/Node/WebView2，未修改或弱化 G13X 模块结果面板，未新增第二 Runtime manifest、ProjectAssetIndex 或 preview candidate 读取。 |
-| 2026-07-04 | G13X | `fe0c23bf4d6bb8ba1dd88ba1b9b843321dba27cb` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | UI focused `preview-panel-memory.test.mjs` PASS（10/10）；UI focused `property-panel-memory.test.mjs` PASS（12/12）；Desktop focused `Studio2ArchitectureGuardTests` PASS（17/17）；UI unit full PASS（636/636）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 在既有 Property/Preview 右侧区域新增 VM 式当前算子模块结果面板：覆盖未选择、未运行、loading、失败、stale、disabled，展示 overview、scalar/table/list/geometry/artifact/Scene 摘要、diagnostics 与脱敏截断 raw JSON；Artifact 仅经 `previewCoordinator.readArtifactForCurrentState()` 有界读取并 fail-soft；节点结果列表通过既有 FlowCanvasAdapter 同步选择；未重写 FlowCanvas，未新增第二 ImageCanvas/Scene renderer，未做 Runtime/Station/AgentRun/Inspection history/Evidence ZIP。 |
-| 2026-07-04 | G13B | `1a86837d3efce57f45de716888f7a8536b87bd8f` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product focused `RuntimePackageExporterValidationTests,RuntimeParameterContractsTests,RuntimePackageLoaderTests` PASS（21/21）；Product affected `ProjectSaveCoordinatorTests,ProjectServiceTests,RuntimeMvpTests` PASS（56/56）；Desktop focused `ProjectGlobalVariableEndpointsTests,Studio2ArchitectureGuardTests` PASS（42/42）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | Runtime exporter confirmed directory package output and now packages G13A Project authority Calibration/Spatial assets into additive optional `assets` manifest section with relative asset files, `contentHash` payload authority hash and `fileHash` package file hash; loader/validator fail closed for missing file, checksum mismatch, traversal, absolute path, malformed asset JSON, bad payload hash and unsupported assets schema; old packages missing assets section and empty assets section remain compatible；未做 Station 消费/Station UI/PixelToWorld E2E/PLC/机器人；当前 Goal 推进到 G13C READY。 |
-| 2026-07-04 | G13A | `00797812407f949bb87fe1612272d40794c1634c` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product focused `ProjectSaveCoordinatorTests,ProjectServiceTests` PASS（39/39）；Desktop focused `CalibrationDraftEndpointsTests,Studio2ArchitectureGuardTests` PASS（19/19）；UI focused `property-panel-memory.test.mjs` PASS（12/12）；Product full serial PASS（3252 passed, 4 skipped）；Desktop full serial PASS（479/479）；UI unit full PASS（627/627）；Playwright `npoint-calibration-workbench.spec.ts` PASS（2/2）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 新增 ProjectAssets DTO/JSON storage 与 `ProjectSaveCoordinator` `ProjectAssets` participant，formal `CalibrationBundleV2` draft candidate 通过 staging/hash/commit-intent/apply/recovery/rollback 成为 Project authority；Project DTO additive `assets` 缺省空集合；G12B Formal Save 接入正式入口并显示 asset id/revision；覆盖 stale、checksum mismatch、prepared rollback、asset write/apply recovery、tamper fail-closed、旧工程无资产、DTO roundtrip、architecture guard；未做 Runtime Package/Station/PLC/机器人；当前 Goal 推进到 G13B READY。 |
-| 2026-07-04 | G12B | `04ed17aafa97608fedc5bfc4374714d62f8c4ce5` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Desktop focused `CalibrationDraftEndpointsTests,ExecutionObservationProjectorTests,WebView2HostTests,Studio2ArchitectureGuardTests` PASS（61/61）；Product focused `NPointCalibrationSolverTests,NPointCalibrationOperatorTests` PASS（21/21）；Product full serial PASS（3242 passed, 4 skipped）；Desktop full serial PASS（476/476）；UI unit PASS（625/625）；Playwright `npoint-calibration-workbench.spec.ts` PASS（2/2）；calibration regression `-Gate all` PASS（111/111）；desktop endpoints PASS（40/40）；measurement accuracy PASS（122/122）；Station Debug/Release build PASS；Desktop Release publish PASS；`git diff --check` PASS；secret/large/process/scratch audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 新增 NPoint draft workbench、draft solve endpoint、feature flag、preview artifacts、visual scene layers、candidate bundle export、flag-off generic fallback 与 tests/screenshots；draft remains ephemeral and no ProjectSave participant, Project schema migration, Runtime Package, Station calibration loading, PLC/robot provider, second solver, or frontend matrix math was added；current Goal advances to G13A READY. |
-| 2026-07-04 | G12A | `d2d247a30b4ff34fbc09832976dd2428e66e5275` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | `dotnet build ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj --no-restore -v:minimal` PASS；NPoint focused `NPointCalibrationOperatorTests,NPointCalibrationSolverTests` PASS（21/21）；calibration regression `-Gate all` PASS（111/111）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 抽取唯一 `NPointCalibrationSolver`，覆盖 Affine/Perspective、RANSAC、误差统计、acceptance、退化/fail-closed 与 `CalibrationBundleV2` 生成；`NPointCalibrationOperator` 收敛为 PointPairs/参数适配、solver 调用、旧 outputs 映射、可选 SavePath 和图像标注 owner；新增 solver/operator parity、异常点集、无第二 OpenCV solve path 审计；未做 UI、正式资产保存、PLC/机器人 provider；当前 Goal 推进到 G12B READY。 |
-| 2026-07-04 | G11C | `38e9c1a19197556b316a4c93e95c19d9e8354748` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | UI focused `preview-coordinator-memory.test.mjs` PASS（17/17）；UI focused preview/property/ROI batch PASS（54/54）；Product focused Circle Search/preview/formal variable binding/ResultPath compatibility PASS（97/97）；Desktop focused Observation/Artifact/Architecture PASS（63/63）；`previewCoordinator.js` node check PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 Circle Search 连续预览同节点 Method/工程切换 scope invalidation、主动取消、latest-wins、迟到 artifact 删除与资源释放；补齐 typical/upper-bounded 320x240/640x480/1920x1080 p50/p95 benchmark 与 work-budget fail-closed 证据；验证 HoughCircle/FitEllipse/CaliperFitV2 JSON 保存重启兼容、preview/formal ResultPath 与变量绑定一致；未修改 Station、未引入 WebGL、未创建第二套 Preview owner；当前 Goal 推进到 G12A READY。 |
-| 2026-07-04 | G11B-FOLLOWUP | `e1b079df2e4d43cbba44dd4ba4037fe4ca249d50` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product focused CaliperFitV2/CircleMeasurement PASS（30/30）；Desktop focused ExecutionObservation/Artifact PASS（48/48）；UI focused `property-panel-memory.test.mjs` PASS（8/8）；`roiEditorSupport.mjs` node check PASS；OperatorDocGenerator PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 Circle Search V2 有界 profile evidence、profile artifact、Inspector bounded summary、CaliperFitV2 typed result 客户端载荷边界、全圆 Scene point 选择、CaliperIndex primitive identity、startup flag 权威，以及 Auto polarity/Huber/MAD 诊断债；未执行 G11C 连续预览/性能 benchmark，当前 Goal 保持 G11C READY。 |
-| 2026-07-04 | G11B | `2a8b44d0cb70324924fc0ff13ed060c63f869a85` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Desktop focused ExecutionObservation/Artifact/WebView2/Architecture PASS（70 tests）；Product CaliperFitV2/CircleMeasurement focused PASS（41 tests）；measurement accuracy PASS（122/122）；measurement regression PASS（144/144）；Product full serial PASS（3229 passed, 4 skipped）；Desktop full serial PASS（472/472）；UI `test:unit` PASS（618/618）；`test:preview-smoke` PASS；Playwright `roi-editor.spec.ts` PASS（20/20）与 `roi-editor.spec.ts + node-preview.spec.ts` PASS（33/33）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；publish audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 完成 Circle Search V2 Tool 参数分组与 ImageCenter 显示、复合 search ring/nominal geometry 编辑、Scene/Inspector 同一 Observation identity 对齐、CaliperFitV2 point-set artifacts、feature flag on/off 兼容；未修改 CircleCaliperFitV2 数学内核，未执行 G11C 连续预览/性能收口；G11C 技术债已登记，当前 Goal 推进到 G11C READY。 |
-| 2026-07-03 | G11A | `5251fe65b8ec059a8521384c8f48a3a5ee929413` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Legacy golden PASS（3/3）；CaliperFitV2 focused PASS（45/45）；final focused rerun PASS（29/29）；measurement accuracy PASS（122/122）；measurement regression PASS（144/144）；Product full serial PASS（3219 passed, 4 skipped）；Desktop full serial PASS（466 tests）；OperatorDocGenerator PASS（最终无 source-hash/version warning）；OperatorKnowledgeGraphRunner PASS（156 cards, 1845 edges，既有 `System.Collections.Immutable` warning）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；publish audit PASS；`git diff --check` PASS；diff hygiene PASS；secret/large/untracked/scratch/process audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 完成 Circle Search V2 纯 CaliperFitV2 kernel、版本化 request/result/diagnostic contract、fail-closed failure codes、CircleMeasurement additive adapter、legacy Hough/FitEllipse golden、16-case deterministic synthetic/field-substitute dataset（manifest SHA `73ac0fb7384fcc453f9bc804b30aecb02560d81a92bef043dd70b75a5f41384e`）和 benchmark baseline；未执行 G11B Tool UI/Canvas/Geometry；当前 Goal 已推进到 G11B READY。 |
-| 2026-07-03 | G10C-FOLLOWUP-2 | `0b96b0a1f78a785c3ee28f0135eaecc490bcaf97` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product focused PixelToWorld/SpatialContext/FlowExecution PASS（83 tests）；Calibration regression PASS（111 tests）；Services regression PASS（65 tests）；Phase42 regression PASS（128 tests）；Product full serial PASS（3195 passed, 4 skipped；一次性能长尾失败后隔离重跑 9/9 PASS 并 full 重跑 PASS）；Desktop full serial PASS（466 tests）；UI `test:unit` PASS（611 tests）；`test:preview-smoke` PASS；Playwright `node-preview.spec.ts` PASS（13 tests）；OperatorDocGenerator PASS（无 source-hash/version warning）；OperatorKnowledgeGraphRunner PASS（156 cards, 1843 edges，既有 `System.Collections.Immutable` warning）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；publish audit PASS；`git diff --check` PASS；secret/large/untracked/scratch/process audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 RoundTrip 与 PointList 世界单位权威：AccuracyReport 执行真实双向数学链路且 fail closed；WorldToPixel 以 PointsSpatialContext 的 World2D frame/unit 为输入权威；唯一 WorldUnitContract 固定 mm/cm/m/um 物理比例并拒绝冲突 UnitScale；Points/Image/legacy SpatialContext 分离 ownership；synthetic visualization 不输出业务 ImageFull sidecar；PixelToWorldTransform 升级到 1.0.1 并重生成 operator catalog/knowledge/中英文镜像资料；当前 Goal 已推进到 G11A READY，未执行 G11A。 |
-| 2026-07-03 | G10C-FOLLOWUP | `d1c3bfa74dfbfdbbd063c46bc43b632b78b90ba1` | 提交自身 SHA 不写入 tracked 文件；以 push 后核对值为准 | Product focused PixelToWorld/SpatialContext/FlowExecution PASS（73 tests）；UI unit PASS（611 tests）；Desktop focused ExecutionObservationProjector PASS（30 tests）；Calibration regression PASS（104 tests）；Phase42 regression PASS（121 tests）；Services regression PASS（62 tests）；Product full serial PASS（3185 passed, 4 skipped）；Desktop full serial PASS（466 tests）；`test:preview-smoke` PASS；Playwright `node-preview.spec.ts` PASS（13 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；publish audit PASS；`git diff --check` PASS；secret/large/untracked/scratch/process audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 G10C 坐标语义缺口：PixelToWorld/WorldToPixel frame direction fail closed；Points 与 Image SpatialContext 分开 ownership；PointList sidecar 通过 port-aware resolver 传播；AccuracyReport 记录 round-trip frame/unit/transform count；World2D 使用可序列化物理单位；World2D Scene 强制 neutral plane 而不复用真实图像；当前 Goal 已推进到 G11A READY。 |
-| 2026-07-03 | G10C | `915f97f79e6f299ff217afa927ae6b217cad6299` | `d1c3bfa74dfbfdbbd063c46bc43b632b78b90ba1` | Desktop Debug build PASS；Product focused PixelToWorld/FlowExecution PASS（54 tests）；Desktop focused ExecutionObservationProjector PASS（30 tests）；Phase42 regression PASS（116 tests）；Calibration regression PASS（99 tests）；Services regression PASS（61 tests）；`git diff --check` PASS；process audit PASS after build-server shutdown（no residual dotnet/testhost）；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | PixelToWorld 使用统一 Spatial/Calibration resolver 接通 ROI local/ImageFull/Undistorted 到 World2D，planar 与 ray-plane 路径均 fail-closed 且输出 frame/unit/bundle traceability；Scene 增加 World2D neutral plane 与 frame-aware diagnostics；无新增 CalibrationArtifact，未在前端重复世界坐标计算；当前 Goal 已推进到 G11A READY。 |
-| 2026-07-03 | G08-G10B-FOLLOWUP-3 | `64235d6d925189b9d2fc2ebf153bdc53b0e4a872` | 见本轮最终报告 | Product focused sidecar 回归 PASS（199 tests）；Desktop focused Scene/Preview/Architecture PASS（90 tests）；Product full serial PASS（3164 passed, 4 skipped）；Desktop full serial PASS（464 tests）；UI `test:unit` PASS（610 tests）；`test:preview-smoke` PASS；Playwright `roi-editor.spec.ts` PASS（17 tests）与 `node-preview.spec.ts` PASS（12 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；publish audit PASS（no source maps/TS/TSX/Vue/package config；`wwwroot/src` JS/CSS 与 PDB 保持现有发布形态）；`git diff --check` PASS；secret/large/untracked/scratch/process audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 SpatialContext 通用传播与 Scene 有界诊断：Image target 不再按目标 OperatorType 硬编码；sidecar 按当前源输出端口与 binding 隔离，其他端口 malformed 不污染当前连接；sequential/AutoSafeParallel/debug/cache 目标 executor 前 fail-closed；Scene diagnostics 最终上限 64 并输出 aggregate truncation diagnostic；ROI editor 未释放拖拽在 preview/节点/销毁切换时取消且迟到旧 preview 不覆盖新图；G10C 已置 READY，未执行 G10C。 |
-| 2026-07-03 | G08-G10B-FOLLOWUP | `6a0a18bdd398dda71849bdc7715e01737f8ea4a0` | 见 G08-G10B-FOLLOWUP 完成提交与最终报告 | UI `test:unit` PASS（605 tests）；`test:preview-smoke` PASS；Playwright node-preview + roi-editor PASS（24 tests）；Product focused ResultPath/ProjectVariables/Schema/FlowExecution/RoiManager/Spatial/NPoint/Polar PASS（147 tests）；Desktop focused Observation/Preview/Artifact/Continuous/Architecture PASS（85 tests）；Product full serial PASS（3150 passed, 4 skipped）；Desktop full serial PASS（459 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；publish asset/source/dev artifact audit PASS（0 prohibited）；`git diff --check` PASS；secret/large/untracked/scratch/process audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 G08-G10B 之间的 Visual Geometry/SpatialContext 一致性缺口：Scene 底图按尺寸验证或 neutral plane fail-closed，RoiManager Scene 投影真实 Rectangle/Circle/Polygon 和独立 Crop Bounds，selectable primitive 必须有 canonical ResultPath；ResultPath V1 支持 canonical `[index]`；ROI pointer capture/cancel/destroy 生命周期只在 commit 写入；Circle/Annulus/Arc no-op round-trip 保留 raw 参数；PointSequence 不再空白新增或伪造 world 坐标；SpatialContext sidecar 按连接端口和 binding 精确传播到 input-scoped key；G10C 已置 READY，未执行 G10C。 |
-| 2026-07-03 | G10B | `68acaca16e8c0c71162bb8bb1bcc1c89372fa0eb` | 见 G10B 完成提交与最终报告 | Product focused RoiManager/SpatialContext PASS（18 tests）；Desktop focused ExecutionObservationProjector PASS（22 tests）；Product targeted RoiManager/SpatialContext/FlowExecution sidecar PASS（19 tests）；Product targeted SpatialContext/PixelToWorld/CalibrationV2/LegacyCalibration/FlowExecution PASS（39 tests）；Desktop targeted Observation/Preview/Artifact/Architecture PASS（84 tests）；`git diff --check` PASS；process audit PASS after compiler-server cleanup（no residual dotnet/testhost/node）；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | RoiManager Rectangle/Circle/Polygon Crop 输出 clamped local→parent sidecar，Mask 保持 full-frame 语义，FlowExecutionService 既有 output propagation 传递 `SpatialContext` sidecar，Scene 可按 sidecar 将 Crop 结果投回 Full Image；当前 Goal 已推进到 G10C READY，未执行 G10C。 |
-| 2026-07-03 | G10A | `55b14652121d4e7b11fd80686b1f8ca996d2b01d` | 见 G10A 完成提交与最终报告 | Product focused `SpatialContextV1Tests` PASS（10 tests）；Product targeted SpatialContext/PixelToWorld/CalibrationV2/LegacyCalibration PASS（30 tests）；`git diff --check` PASS；process audit PASS（no residual dotnet/testhost/node）；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 新增 `SpatialContextV1` sidecar contract、FrameRef、3x3 transform apply/inverse/compose、legacy ImageFull/px 默认语义、flow output 与 preview artifact identity binding；ADR 采用 sidecar 而不是扩展 `ImageWrapper`；当前 Goal 已推进到 G10B，未执行 G10C。 |
-| 2026-07-03 | G09C | `736b3e98629d8cf948f80b02c9c7f4de661baff7` | 见 G09C 完成提交与最终报告 | UI focused ROI geometry PASS（26 tests）；canvas-core PASS（25 tests）；Playwright ROI editor PASS（10 tests single-worker and 10 tests normal）；UI `test:unit` PASS（605 tests）；`test:preview-smoke` PASS；Product targeted NPoint/RoiManager PASS（15 tests）；Desktop targeted Observation/Preview/Artifact/Architecture PASS（83 tests）；`git diff --check` PASS；process audit PASS（no residual dotnet/testhost/node）；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 完成 Polygon/PointSequence 编辑：Polygon fail-closed，PointPairs optional `Enabled=false` additive and ignored by runtime/scene projection，Scene/edit overlay group isolated；当前 Goal 已推进到 G10A，未执行 G10C。 |
-| 2026-07-02 | G07B final follow-up | `de327a5e0f0d48abb79a2791211eea6189ac5737` | 见 G07B final follow-up 完成提交与最终报告 | UI focused `app-infrastructure`/`global-variable-panel` PASS（66 tests）；UI `test:unit` PASS（588 tests）；`test:preview-smoke` PASS；Playwright field-binding focused PASS（2 tests）；Product targeted G07A/G07B PASS（95 tests）；Desktop targeted Observation/Preview/Artifact/Architecture Guard PASS（71 tests）；Product full serial PASS（3128 passed, 4 skipped）；Desktop full serial PASS（453 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；publish V2 asset audit PASS（0 prohibited files/dirs）；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 修复全局变量异步保存跨工程污染：`ProjectManager.saveGlobalVariables` 冻结 targetProjectId，并在迟到响应返回旧工程 schema 时不写入当前工程、signal、cache、baseline 或 dirty 状态；`GlobalVariablePanel.save`/`bindPreviewField` 传入 expectedProjectId，await 后同时确认 panel project 与 ProjectManager 当前工程仍匹配才应用 schema、同步 FlowCanvas、刷新值和显示成功 toast；新增 A->B 延迟保存与字段绑定竞态测试；G08 仅标记 READY，未执行 G08。 |
-| 2026-07-02 | G07B follow-up | `b83fcbeab63941ba1f6f053b441f3ee2b15d8907` | 见 G07B follow-up 完成提交与最终报告 | UI focused global-variable/Inspector/selectionStore unit PASS（57 tests）；Desktop targeted G05A/G05B/G06/G07A/G07B PASS（71 tests）；Product targeted G07A/G07B PASS（95 tests）；Playwright field-binding focused PASS（2 tests）；UI `test:unit` PASS（586 tests）；`test:preview-smoke` PASS；Playwright `node-preview.spec.ts` PASS（11 tests）；Desktop full serial PASS（453 tests）；Product failed performance filters isolated PASS（4 tests）after load-sensitive full run；Product full serial final isolated PASS（3128 passed, 4 skipped）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收紧字段绑定 stale/TOCTOU 防线：`bindPreviewField` 在打开选择器前、选择返回后、替换确认后、保存前统一 `validatePreviewFieldBindingContext`；非法/缺失 flowRevision fail closed；mutation owner 独立验证 addressable/scalar/truncated/artifact/canonical metadata/selectionStore；nested ResultPath 不再用根端口结构类型误判不兼容，legacy 与 explicit root 仍按根类型校验；延迟选择器竞态不发 PUT 且保留旧 SourceBinding；未执行 G08。 |
-| 2026-07-02 | G07B | `295363ecfad05711ecb7d214513a6aa090fd64ed` | 见 G07B 完成提交与最终报告 | UI focused global-variable/Inspector unit PASS（51 tests）；Desktop targeted Observation/Architecture PASS（32 tests）；Product targeted ResultPath/ProjectVariables/FlowExecution PASS（95 tests）；Playwright field-binding focused PASS（1 test）；UI `test:unit` PASS（580 tests）；`test:preview-smoke` PASS；Playwright `node-preview.spec.ts` PASS（10 tests）；`ClearVision.Product.Tests` full serial PASS（3128 passed, 4 skipped）；Desktop full serial PASS（453 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 增加字段级全局变量绑定 V1：SourceBinding 前端 round-trip 保留 optional ResultPath 字段且不迁移 legacy root；Observation 投影后端权威 `bindableVariableTypes`；Inspector 仅对当前 identity 的可绑定 scalar canonical metadata 显示入口并通过注入 callback 出口；GlobalVariablePanel 为唯一 UI mutation owner，经现有 ProjectManager 保存链完成已有变量绑定、替换、取消和失败回滚；未执行 G08。 |
-| 2026-07-02 | G07A follow-up | `746bbe52c4405b63d474508efd49813f895fad41` | 见 G07A follow-up 完成提交与最终报告 | Product targeted ResultPath/ProjectVariables/FlowExecution PASS（95 tests）；Desktop targeted Observation/Preview/Architecture PASS（60 tests）；Desktop endpoint isolation PASS（37 tests）；`ClearVision.Product.Tests` full PASS（3128 passed, 4 skipped）；Desktop full serial PASS（453 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；build/publish V2 asset audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 修复 Observation canonical metadata 仅在生产 `ResultPathResolver` 可从真实 output-port 根值解析到同一 scalar 时输出；非字符串 dictionary key 与格式化冲突保持只读显示；SourceBinding nested ResultPath schema 不再误用根结构类型产生 `GV017`；运行时 version/path 配对 fail closed；stable-ID 全集合唯一；未执行 G07B。 |
-| 2026-07-02 | G07A | `9244979e3dde5534bf92121c374c34e7e5126f31` | 见 G07A 完成提交与最终报告 | Product directed ResultPath/ProjectVariables/FlowExecution PASS（86 tests）；Desktop directed Observation/Preview/Architecture PASS（57 tests）；`ClearVision.Product.Tests` full PASS（3119 passed, 4 skipped）；Desktop full serial PASS（450 tests）；Desktop Debug build PASS；Station Debug/Release build PASS；Desktop Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 建立 Core/shared Canonical ResultPath V1 parser/formatter/resolver；SourceBinding additive nullable `ResultPathVersion`/`ResultPath`，缺失兼容 `$`；FlowExecutionService 在 output port 根值上先解析 ResultPath 再执行 Expression 和变量转换；Observation 为唯一映射到 declared output port 的 scalar leaf 生成 canonical metadata；stable-ID selector 仅通过显式 adapter 支持；未执行 G07B。 |
-| 2026-07-02 | G06 follow-up | `414dc70d7644326140e97e966af976a6f54413bd` | 见 G06 follow-up 完成提交与最终报告 | Desktop targeted serial tests PASS（74 tests）；UI focused Inspector/Coordinator unit PASS（25 tests）；Playwright `node-preview.spec.ts` PASS（9 tests：legacy 6，Inspector 3）；UI `test:unit` PASS（575 tests）；`test:preview-smoke` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 G06 follow-up：`Studio:NodePreviewInspectorEnabled` 决策收敛到 frozen `featureFlags` 单一来源；flag off 不创建 Inspector/selectionStore，flag on 不构造 legacy Overlay；Artifact 文本预览按声明长度和实际 Blob slice 双重上限读取；renderer 改为确定优先级和大小写归一化；补齐快速节点切换 stale、大文本 Artifact、flag mutation 与架构守卫；未执行 G07A。 |
-| 2026-07-02 | G06 | `52f7c07dfe2842e5ec17649e8b0de203edcaf5ea` | 见 G06 完成提交与最终报告 | UI focused unit PASS（19 tests）；Playwright `node-preview.spec.ts` PASS（6 tests）；Desktop targeted serial tests PASS（73 tests）；UI `test:unit` PASS（569 tests）；`test:preview-smoke` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口节点预览结果检查器 MVP：新增默认关闭 `Studio:NodePreviewInspectorEnabled` 与 flag ledger；flag on 时仅挂载 `NodePreviewInspector`，legacy overlay 不构造/不订阅/无 timer；Summary/Detail/Artifact、受控 renderer、搜索/copy/分页增量、selectionStore 与 stale artifact 读取均经现有 coordinator；未执行 G07A。 |
-| 2026-07-02 | G05B follow-up | `1c8f1c25194d8e2d169ff710bfa3c604e262bf92` | 见 G05B follow-up 完成提交与最终报告 | Desktop targeted tests PASS，60 tests；FlowExecutionService targeted PASS，13 tests；UI `test:unit` PASS，563 tests；`test:preview-smoke` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；publish no Node/source/dev artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 G05B Artifact follow-up：Store public API 不再暴露 pending bytes，commit 使用正式 bytes copy 和 SHA-256；batch 先预检/规划再原子替换 owner、淘汰旧项并插入全部当前批次；取消/异常未 commit batch rollback；前端 artifact URL 与服务端 artifact 释放覆盖 uncached、live camera bypass、cache replacement/eviction、node switch、stale/partial read/destroy；下一项为 G06，未执行 G06。 |
-| 2026-07-02 | G05B | `633635569249a53b1e55bce98410e5e5a5d4e5cf` | 见 G05B 完成提交与最终报告 | Desktop targeted tests PASS，67 tests；FlowExecutionService targeted PASS，13 tests；UI `test:unit` PASS，559 tests；`test:preview-smoke` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；publish no Node artifacts PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 建立 Desktop-only Preview Artifact 生命周期：独立 `PreviewArtifactStore`、`PreviewArtifactMaterializer`、opaque bearer artifactId、TTL/容量/checksum/DELETE/revoke/dispose；preview `ArtifactMode=references` 不再把大图塞入主 JSON；旧 Base64 兼容保留为 G16 删除债；下一项为 G06，未执行 G06。 |
-| 2026-07-02 | G05A follow-up | `18cd539cccca3b3ec7d570768661fc88ce9a8ec1` | 见 G05A follow-up 完成提交与最终报告 | `ExecutionObservationProjectorTests` + `PreviewNodeEndpointsTests` + `Studio2ArchitectureGuardTests` + `BuildFromPlanArchitectureGuardTests` targeted PASS，59 tests；UI `preview-coordinator-memory.test.mjs` PASS，7 tests；UI `test:unit` PASS，557 tests；`preview-regression.smoke.mjs` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 收口 G05A Observation fail-soft：未知对象不再调用 `ToString()`、任意 public getter 或任意自定义 enumerable；`Detail` 使用最终 UTF-8 byte 硬上限；legacy outputData 和 metrics 输入均有界；endpoint adversarial 场景保持 HTTP 200 且普通 `Score`/`Seen` 可读；当前 Goal 仍为 G05B，未执行 G05B。 |
-| 2026-07-02 | G05A | `ef676b193f6f955db56ac79c4fc13190916d92cb` | 见 G05A 完成提交与最终报告 | `ExecutionObservationProjectorTests` + `PreviewNodeEndpointsTests` + `Studio2ArchitectureGuardTests` + `BuildFromPlanArchitectureGuardTests` targeted PASS，54 tests；UI `preview-coordinator-memory.test.mjs` PASS，7 tests；UI `test:unit` PASS，557 tests；`preview-regression.smoke.mjs` PASS；Desktop Debug build PASS；Release publish PASS；build/publish V2 asset audit PASS；`git diff --check` PASS；文本编码 PASS；diff hygiene PASS；文档审计执行但生成性副作用未提交；完整 GitHub CI NOT RUN；真实 WebView2 NOT PERFORMED | 建立 `ExecutionObservationEnvelopeV1` 与 Desktop 边界 `ExecutionObservationProjector`，preview success/failure additive 返回 Observation；旧 outputData 安全降级且 detection metrics 兼容；NodePreviewCoordinator 发送 sequence/flowRevision 并在 Observation identity mismatch 时丢弃响应；未执行 G05B、未实现 Artifact Store/ResultPath parser/Inspector UI。 |
-| 2026-07-02 | G04B follow-up | `7e089a17cbaf4862cb0ea63839131563feae8120` | 见 G04B follow-up 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS，8 files/43 unit tests；`studioProjectPersistencePort.test.ts` PASS，11 tests；Project persistence/concurrency + Repository + ProjectService + ProjectSaveCoordinator targeted PASS，39 tests；ProjectGlobalVariableEndpoints + Studio2/BuildFromPlan Architecture Guard targeted PASS，43 tests；`app-infrastructure.test.mjs` PASS，20 tests；Playwright `studio2-flow-editor-port.spec.ts` PASS，3 tests；Desktop build PASS；Desktop publish PASS；build/publish V2 asset audit PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 收口保存时 EF tracked stale revision：新增 `IProjectRepository.GetByIdForUpdateAsync`，`ProjectSaveCoordinator` 的 expected revision、commit-intent apply 和 recovery apply 均使用数据库当前 tracked 实体；补齐双 DbContext/双 service scope 竞争测试；`StudioProjectPersistencePort` open intent 在发请求前生效，旧响应不污染 snapshot，save 响应校验 `saved.id`；未执行 G05A。 |
-| 2026-07-02 | G04B | `b4936ce22f380b00b5ff9e211c95219b10863b46` | 见 G04B 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS，8 files/40 unit tests；ProjectService + ProjectSaveCoordinator targeted PASS，29 tests；ProjectGlobalVariableEndpoints + Studio2ArchitectureGuard targeted PASS，36 tests；`app-infrastructure.test.mjs` PASS，20 tests；Playwright `studio2-flow-editor-port.spec.ts` PASS，3 tests；Desktop build PASS；Desktop publish PASS；build/publish V2 asset audit PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 建立 `StudioProjectPersistencePort` 与 `studio2.projectPersistencePort`，V2 单次调用既有 `PUT /api/projects/{id}` 提交 metadata/Flow/GlobalVariables；后端使用 `ExpectedPersistenceRevision`/`PersistenceRevision` 与 `ProjectSaveCoordinator` 判定并发，`PSV011` 映射 409；旧 Project 页面、`projectManager.saveProject()`、`/flow` 兼容入口保留；未执行 G05A。 |
-| 2026-07-02 | G04A follow-up | `59544fa7d6384d06828c8eaa3b3d183de9c96dcd` | 见 G04A follow-up 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS；`canvas-core.test.mjs` PASS，25/25；`ai-agent-ui-contract.test.mjs` PASS，351/351；committed Playwright `studio2-flow-editor-port.spec.ts` PASS，2/2；Studio2 + BuildFromPlan architecture guard PASS，17/17；Desktop build PASS；Release publish PASS；build/publish V2 asset audit PASS；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 收口 Flow Editor Port request sequence authority、单一 allocator、节点拖拽 `moveNode` revision 和 dirty draft stale 行为；未执行 G04B、未新增 Project 保存/API/后端持久化身份，当前 Goal 仍为 G04B。 |
-| 2026-07-01 | G04A | `33c8276332fe6543036d260bfb39f50a815c1c17` | 见 G04A 完成提交与最终报告 | FrontendV2 lint/typecheck/unit/build PASS；`canvas-core.test.mjs` PASS，23/23；`ai-agent-ui-contract.test.mjs` PASS，351/351；committed Playwright `studio2-flow-editor-port.spec.ts` PASS，2/2；Desktop build PASS；Release publish PASS；build/publish V2 asset audit PASS；Studio2 + BuildFromPlan architecture guard PASS，16/16；`git diff --check` PASS；完整 GitHub CI NOT RUN；真实 WebView2 人工启动 NOT PERFORMED | 新增 `StudioFlowEditorPort`，V2 只公开 `studio2.flowEditorPort`；补齐 snapshot/select/replace/patch/subscribe/dispose、本地 stale disposition 和最小参数 draft/commit；修复 hosted adapter 旧实例二次 dispose；未执行 G04B、未保存 Project、未改 Agent/Station/Runtime。 |
-| 2026-07-01 | G03 | `b359a35aafc7c37ec24bb4f27f1f4364040495d2` | 见 G03 完成提交与最终报告 | FrontendV2 npm ci/lint/typecheck/unit/build PASS；`canvas-core.test.mjs` PASS，21/21；Desktop build PASS；Release publish PASS；build/publish V2 asset audit PASS；Studio2 + BuildFromPlan architecture guard PASS，16/16；浏览器级 1366×768、1920×1080、2560×1440 screenshot PASS；flag off/on 回归 PASS；WebView2 人工启动 NOT PERFORMED；完整 GitHub CI NOT RUN | 建立 V2 Workspace Shell MVP、Flow/Tool/Review 模式、唯一 hosted FlowCanvas 创建链和 lifecycle 并发 mount 修复；未迁移业务模块；下一项为 G04A。 |
-| 2026-07-01 | G02B | `656645d3a653eee238fe41f1764e1254f8c879a3` | 见 G02B 完成提交与最终报告 | FrontendV2 npm ci/lint/typecheck/unit/build PASS；Desktop build PASS；Desktop.Tests build PASS；G02B targeted + Studio2/BuildFromPlan architecture guard PASS，30/30；Release publish PASS；build/publish V2 asset audit PASS；WebView2 人工启动 NOT PERFORMED；完整 CI NOT RUN | 新增 `Studio:WorkspaceV2Enabled` 默认 false；flag off 只导航 `/index.html`，flag on 只导航 `/v2/index.html`；`/v2` 静态资产独立映射输出目录；V2 测试岛复用 legacy httpClient/WebMessageBridge/EventBus/ServiceRegistry，未迁移业务 capability；下一项为 G03。 |
-| 2026-07-01 | G02A follow-up | `d89c7d6e1c6c2b083f780f7957e75d29505a2ef2` | 见 G02A 收口修复提交与最终报告 | FrontendV2 npm ci/lint/typecheck/unit/build PASS；clean Debug build + repeat incremental build PASS；Release publish PASS；build/publish V2 asset audit PASS；Studio2 + BuildFromPlan architecture guard PASS，13/13；CI YAML lint/order check PASS；Markdown links/encoding/diff hygiene PASS；完整 CI NOT RUN | 修复 `/v2/` public base、收敛 MSBuild/CI 唯一 production build、调整 HostBridge/AgentRun guard 为长期白名单规则；当前 Goal 仍为 G02B，未执行 G02B。 |
-| 2026-07-01 | G02A | `ff9a9430c0eb84e9b9f8e88beac9140c987bd4e8` | 见 G02A 完成提交与最终报告 | FrontendV2 npm ci/lint/typecheck/unit/build PASS；Desktop build PASS；Desktop publish PASS；Studio2 + BuildFromPlan architecture guard PASS；发布内容审计 PASS；完整 CI NOT RUN | 建立 `Desktop/FrontendV2` 独立 Vue 3/TypeScript/Vite/Pinia 构建底座，MSBuild/CI 复制发布资产到 `wwwroot/v2/`；下一项为 G02B。 |
-| 2026-07-01 | G01 | `789e9ec643390f5a79c68cfa6c4b401c1a679be3` | 见 G01 完成提交与最终报告 | Desktop.Tests build PASS；Studio2ArchitectureGuardTests + BuildFromPlanArchitectureGuardTests targeted PASS；链接/编码/diff hygiene 待提交前验证；完整 CI NOT RUN | 建立 Studio 2.0 架构 ADR、capability 迁移白名单、Feature Flag 台账和最小自动架构守卫；下一项为 G02A。 |
-| 2026-07-01 | G00 | `58c7569958f3bf8ab627f5c5b76ff0a77cc86914` | `3481d5a35f47bbf1f58c3f042cff6a679e720e0c` | Desktop build PASS；Product/Desktop targeted tests PASS；services regression PASS；UI unit PASS；链接/编码/diff hygiene PASS | Vision Agent 恢复治理阶段归档，Studio 2.0 基线冻结；下一项为 G01。 |
-
-## 8. 通用最终汇报格式
-
-- Goal / 结果：`DONE`、`BLOCKED_*` 或 `DEFERRED`
-- Initial SHA / Final SHA / 远端 SHA
-- 修改文件与核心行为变化
-- active owner、唯一写入口、Legacy 是否仍 mounted/订阅
-- API / Project format / Runtime / Station / AgentRun 影响
-- 测试命令、通过/失败/未运行数量
-- 截图、benchmark、artifact 路径
-- 技术债与明确未完成项
-- 已回填的 TODO/card 路径
-- 下一 Goal（只报告，不提前实施）
-
-## 9. 固定启动提示词
+# ClearVision Studio UI Next 收口 TODO
 
 ```text
-读取 AGENTS.md、根目录 TODO.md 的架构红线/当前执行项/本轮协议，以及当前 Goal 指向的唯一执行卡。先 fetch 并确认本地 HEAD 与 origin/codex初稿 一致；不一致则 BLOCKED_REMOTE_DIVERGED。只执行当前 Goal，不读取和实施其他 Goal。先审计执行卡列出的真实代码锚点，再按清单实现。遵守单一 active owner、单一写入口、ProjectSaveCoordinator 权威、FlowCanvas/ImageCanvas 复用和 AgentRun 不重构红线。测试必须按 AGENTS.md 串行执行。完成后回填执行卡与 TODO.md，提交、push，并核对本地/跟踪分支/GitHub SHA；完整 CI 只能以真实 PR checks 或 workflow run 为证据。
+DOCUMENT_ROLE=EXECUTION_PLAN
+DOCUMENT_STATE=READY_FOR_G0
+CURRENT_BRANCH=studio-ui-next
+PLANNING_BASELINE_HEAD=f8569fa85244d19a18ba7308051e4d2b2ed4060a
+IMPLEMENTATION_BASELINE_HEAD=026768cf41552f8b7da11cfad496820901edfe22
+REFERENCE_STABLE_REF=origin/codex初稿@e76c74e392bb14ffe02ef9ea9c7a614cb8987f04
+PLANNING_MERGE_BASE=e1bad492fecb6dff2c0a8f848db9ebfa18acf093
+PLANNING_DIVERGENCE=STABLE_ONLY_81_NEXT_ONLY_294
+REFS_REFRESHED_FOR_THIS_PLAN=NO
+CURRENT_STATUS_SOURCE=docs/进行中/StudioUINext/F10_ContractAndProductionPlan.md
+EXECUTION_POLICY=ONE_GATE_AT_A_TIME
+PRODUCTION_ACCEPTANCE=NOT_GRANTED
+LEGACY_RETIREMENT=NOT_APPROVED
 ```
+
+> 本文件只定义下一阶段的执行顺序、Owner、退出条件和验证门禁。当前事实状态以代码、配置和
+> `F10_ContractAndProductionPlan.md` 为准；本文件与 F10 冲突时，先停止执行并按当前代码修正文档，
+> 不得选择对实施更方便的旧结论。
+
+## 1. 当前判断
+
+Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但尚未完成生产切换：
+
+- Next 已建立 Router、Auth/Session、Leave Guard、唯一 API transport、Host adapter、query owner、
+  workspace owner、canonical FlowCanvas/ImageCanvas 和 capability-local lifecycle owner。
+- Project import/export、NPoint authorization、planar calibration、Results bulk export、Line Sequence
+  软件闭环已在 F10 标记为 `DONE`，不得按旧 TODO 重复实现。
+- Station 测试包/设备命令与整体证据仍为 `PARTIAL`。
+- AI attachment、CV model artifact、TemplateMatching artifact、calibration asset projection、数据库高级维护
+  仍为 `BLOCKED_BY_CONTRACT`。
+- F10 已记录 implementation SHA 的 Chromium/fixture 定向 journey `7/7`；该结果不代表真实宿主通过。
+- Remote CI 当前为 `BLOCKED_BY_ENVIRONMENT`，Final Gate 为 `PARTIAL`，生产验收仍为 `NOT_GRANTED`。
+- 真实 WebView2 100%/125%、独立 no-Node、现场 Camera/PLC/Station、生产 soak 尚未完成。
+- `NEXT_DEFAULT` 不等于 Legacy 已退役；Legacy 页面、静态文件和 compatibility chain 仍需受控隔离。
+
+规划基线只是进入点。开始任何实现前必须执行 G0，刷新远端并重新冻结 clean SHA。
+
+## 2. 状态与勾选规则
+
+- 状态只使用：`LOCKED`、`READY`、`IN_PROGRESS`、`BLOCKED_BY_CONTRACT`、
+  `BLOCKED_BY_ENVIRONMENT`、`DONE`、`DEFERRED`。
+- `[x]` 表示当前代码和绑定 SHA 的证据已确认；`[ ]` 表示尚未执行或当前 SHA 尚无证据。
+- 历史 PASS、历史截图、旧测试数量和旧 SHA 不得外推到新的候选 SHA。
+- Browser/Chromium fixture 不得替代真实 WebView2、Windows DPI、no-Node 或现场硬件。
+- 未运行写 `NOT RUN`；环境或人工验收未执行写 `NOT PERFORMED`。
+- 每个 Gate 完成后先更新 F10、复审并冻结新 SHA，再解锁下一 Gate。
+- Gate 表允许的只读审计可以并行；任何代码或共享文档实施仍服从前置 Gate 和唯一 Owner。
+
+## 3. Gate 总览
+
+| Gate | 优先级 | 工作包 | 当前状态 | 唯一 Owner | 解锁条件 |
+| --- | --- | --- | --- | --- | --- |
+| G0 | P0 | 候选冻结、稳定线语义同步、文档收敛 | READY | 主协调 Owner | 无 |
+| G1 | P0 | 请求/写入生命周期与跨工程状态安全 | LOCKED | Workspace lifecycle Owner | G0 DONE |
+| G2 | P0/P1 | 后端合同解阻与功能差距决策 | LOCKED | 主协调 Owner + 对应后端 Owner | G0 DONE 可只读取证；G1 DONE 才实现 |
+| G3 | P1/P2 | 产品体验、视觉、中文与 Vue 可维护性收口 | LOCKED | UI Owner；共享面由主协调 Owner | G0 DONE 可只读审计；G2 合同冻结才实现 |
+| G4 | P0 | Legacy profile 隔离、rollback 与退役准备 | LOCKED | Host/Release Owner | G0-G3 DONE |
+| G5 | P0 | 同一 clean SHA 的本地软件证据 | LOCKED | Final Evidence Owner | G4 DONE |
+| G6 | P0 | 真实宿主、目标机、远程与现场验收 | LOCKED | Release/Field Owner | G5 DONE |
+
+## 4. G0：候选冻结与稳定线语义同步
+
+**目标**：消除 `studio-ui-next` 与稳定维护线之间未经审计的 authority、contract、security 和修复差异，
+建立后续工作的唯一 clean 基线。
+
+**文件边界**：可能触及 Host、contracts、endpoints、AI、Preview、operator metadata、CI、配置和共享文档，
+因此仅由主协调 Owner 集成；不并行修改共享文件。
+
+- [ ] G0.1 记录 `git status --short --branch`、当前 HEAD、upstream、merge-base 和分叉计数。
+- [ ] G0.2 执行 `git fetch origin --prune`；若远端 `studio-ui-next` 前进或历史分叉，停止并报告。
+- [ ] G0.3 冻结 clean 候选 SHA；审计期间禁止继续向候选混入无关功能。
+- [ ] G0.4 对 stable-only commits 建立语义矩阵：`MERGE` / `SUPERSEDED` / `NOT_APPLICABLE` /
+  `BLOCKED`，每项记录代码锚点、风险、冲突和验证。
+- [ ] G0.5 第一批同步 AI workflow artifact authority：旧 Planner 退役、artifact admission、route registry、
+  fingerprint、readiness/recovery、failed artifact summary、active model 和 enum compatibility。
+- [ ] G0.6 第二批同步 acquisition、Unicode 图像路径、Camera 厂商探测、Preview/ROI 和 1080P 修复。
+- [ ] G0.7 第三批同步 operator metadata/contracts、性能报告与 CI/测试稳定性修复。
+- [ ] G0.8 共享 `appsettings.json`、API contracts、Host、CI 和测试配置逐项语义合并，禁止整文件选择
+  `ours` / `theirs`。
+- [ ] G0.9 每批完成后串行运行受影响项目的定向测试；同一 `.csproj` 不并发测试。
+- [ ] G0.10 更新 F10 当前 SHA、stable 同步 disposition 和证据；README、F09、M00、M09 标记
+  `SUPERSEDED_FOR_CURRENT_STATUS_BY_F10`，不再维护第二套状态。
+
+**G0 退出条件**：
+
+- [ ] 所有 stable-only authority/security/contract 提交都有明确 disposition。
+- [ ] 当前代码不再无说明地保留稳定线已退役的旧 Planner/Loop 权威。
+- [ ] F10 的 `IMPLEMENTATION_HEAD` 指向冻结实现 SHA，文档提交来源可追溯；当前 HEAD/upstream 包含该实现与
+  对应文档提交，工作树 clean 且无无关修改。
+- [ ] 受影响定向测试有当前 SHA 结果，未运行项明确记录。
+
+## 5. G1：生命周期与状态安全
+
+**目标**：关闭“组件已卸载，但旧 owner、请求或写操作仍存活”的架构红线，并修复跨工程错误状态。
+
+**Owner 约束**：Project save + GlobalVariables 由一个纵向 Owner 处理；FlowCanvas + Inspector + Preview
+不得拆成多个并行实现 owner。
+
+- [ ] G1.1 盘点所有 capability 的 request、timer、SSE、subscription、AbortController 和写入口，生成
+  `mount -> active -> dispose` 资源账本。
+- [ ] G1.2 所有可取消 GET/read 查询在 selection、project、route、session、flag 变化和 dispose 时 abort。
+- [ ] G1.3 为 PUT/POST 写入冻结统一语义：写操作由能跨组件卸载存活的唯一 Owner 持有，或阻止离开直到
+  settle；网络结果未知必须按 `clientOperationId` reconcile。不得用“abort 后当作未提交”伪造确定性。
+- [ ] G1.4 修复 workspace save GET/PUT、Template GET/POST/PUT、GlobalVariables runtime GET/PUT/POST、
+  Camera binding read 的生命周期缺口。
+- [ ] G1.5 修复跨工程切换时 variables/decision/package/template 弹窗继续持有旧 disposed owner；切换前
+  关闭旧弹窗或以工程 identity 强制 remount。
+- [ ] G1.6 为 AI handoff 的 `stage -> acknowledge` 增加可恢复协议：acknowledge 失败时能够回滚 staging，
+  或按 operation identity reconcile，不能留下来源不明的本地 Flow 草稿。
+- [ ] G1.7 连续检测工程选择页显式投影 `unauthorized`、`forbidden`、`stale`、`partial-failure` 和
+  `aborted`，不得把 401/403 显示为“暂无工程”。
+- [ ] G1.8 为 artifact DELETE、Camera stop 等 dispose 后 cleanup 请求建立 ADR：明确唯一 Owner、幂等、
+  超时、失败和允许的 cleanup 豁免范围。
+- [ ] G1.9 增加 route param 切换、Feature Flag on/off、session 失效、运行中离开和晚到响应测试。
+- [ ] G1.10 diagnostics 证明 unmount 后旧 owner、subscription、timer、SSE 和可取消 request 数量归零。
+
+**G1 退出条件**：
+
+- [ ] 任何 capability 切换后只有一个 mounted owner、一个订阅集合和一个写入口。
+- [ ] 不存在跨工程旧 owner 与新 Project 投影混用。
+- [ ] 每类写请求都有 committed / rejected / unknown-outcome / reconciled 的可证明终态。
+- [ ] cleanup ADR 获得批准，未批准的 dispose 后请求保持阻断。
+
+## 6. G2：合同解阻与功能差距
+
+### 6.1 后端合同先行
+
+以下任务在合同批准前只能取证和提出方案，不得由 Vue、localStorage 或第二 endpoint 替代：
+
+- [ ] G2.1 AI attachment：冻结上传、resource reference、版本、权限、TTL 和 AgentRun 恢复合同。
+- [ ] G2.2 CV model artifact：区分视觉模型资产与 `/api/ai/models` 的 LLM 配置，指定唯一资产 Owner。
+- [ ] G2.3 TemplateMatching artifact：冻结图像模板产物 identity、版本、权限和 Project 关联。
+- [ ] G2.4 Calibration projection：冻结正式 calibration asset 到算子 numeric scale/offset 的权威投影。
+- [ ] G2.5 Database advanced：逐项冻结 repair、restore、cleanup、global reset 的权限、备份前置、互斥、
+  审计与 unknown-outcome/reconcile。
+- [ ] G2.6 Station test package/device command：冻结 package identity、target Station、幂等操作身份、过期、
+  查询、取消和终态 reconcile。
+
+### 6.2 旧版能力逐项决策
+
+每项必须得到 `MIGRATE`、`RELOCATE`、`DEFER` 或 `RETIRE_WITH_APPROVAL` 之一；不得因页面更简洁而静默删除。
+
+- [ ] G2.7 N 点标定高级工作流：9 点模板、候选提取、粘贴导入、复制/JSON 导出、备注、排序、像素编辑、
+  启用状态和重投影误差 overlay。
+- [ ] G2.8 GlobalVariables：按端口/参数 data type 过滤候选，并校验变量、端口、参数存在性与兼容性。
+- [ ] G2.9 通用 AutoTune：核对 Thresholding、Filtering、GaussianBlur、BlobAnalysis、
+  SharpnessEvaluation 等旧入口，决定迁移范围。
+- [ ] G2.10 Line Sequence：核对当前 Preview/最近检测图输入、返回预览图和 AI parameter-only follow-up。
+- [ ] G2.11 连续检测：核对缺料超时、连续 NG 保护和现场恢复策略；保护规则保持在既有 Runtime/Inspection authority。
+- [ ] G2.12 Demo/示例工程：决定迁移到受控 Project lifecycle，或正式保留为 Legacy-only/deferred；不得复制
+  demo Flow JSON 到前端。
+- [ ] G2.13 Camera 标定入口与 Settings 高风险操作分别决定重定位或退役，不以隐藏入口代替产品决策。
+
+**G2 退出条件**：
+
+- [ ] 每个合同项都有明确结论：已冻结可实施的后端 contract，或由产品/后端 Owner 批准 `DEFER` / `RETIRE`。
+- [ ] 对可实施项，contract 已覆盖 Owner、权限、并发身份、错误和 reconcile；对延期项，影响、fallback 和
+  重新进入条件已记录。
+- [ ] 每个旧版用户任务都有明确 disposition、入口、测试和中文状态语义。
+- [ ] 未获批准的能力保持 `BLOCKED_BY_CONTRACT`，没有前端私有替代实现；存在此类未决项时 G2 不得标记 DONE。
+
+## 7. G3：产品体验、视觉与 Vue 工程收口
+
+**目标**：在不减少能力、不改变 authority 的前提下完成 Quiet Precision、工业高信息密度和简体中文体验。
+
+- [ ] G3.1 Results 建立“态势总览 / 调查详情”两层视图；保留执行状态与判定结果双轴，不恢复虚假的空 KPI。
+- [ ] G3.2 Stations 建立全站概览、异常优先排序和详情调查层，兼顾鸟瞰扫描与命令真实性。
+- [ ] G3.3 Projects 改善 1920 宽屏利用率、空数据布局和最近工程密度，不增加营销式卡片或大标题。
+- [ ] G3.4 清理页面整圈 Panel、卡片套卡片和无效留白；每个轴只保留一个明确滚动 Owner。
+- [ ] G3.5 解决 Results 短屏 `overflow:hidden`、Workspace 9/10/11px 文本、26px 命中区和长中文截断。
+- [ ] G3.6 外观/更多菜单支持点击外部关闭、Escape、焦点返回和 viewport 边界约束。
+- [ ] G3.7 统一简体中文词表，移除面向用户的 `authority`、`Profile`、`Admin only`、`safe read`、
+  `G3`、`下一阶段` 等研发语言。
+- [ ] G3.8 修正 Diagnostics/About 的默认入口、产品版本、宿主/后端版本、许可证和支持信息。
+- [ ] G3.9 拆分超大 SFC 的渲染/组合责任：Results、AI Settings、WorkspaceShell、TCP Settings、Projects；
+  capability lifecycle owner 和写入口保持唯一，不因拆组件复制状态树。
+- [ ] G3.10 覆盖 loading、empty、error、401、403、offline、stale、conflict、unknown-outcome、长中文、
+  reduced motion 和键盘路径。
+
+**G3 退出条件**：
+
+- [ ] 1920x1080、1536x864、1366x768 在 light/dark、compact/comfortable 下无非预期水平滚动、
+  双层滚动、越界浮层或文本遮挡。
+- [ ] Canvas、Inspector、Preview、保存、正式运行和核心状态在 125% 等效短屏首屏可达。
+- [ ] Browser 截图完成方向性复审；真实 WebView2/DPI 仍留到 G6，不提前写 PASS。
+
+## 8. G4：Legacy 隔离与退役准备
+
+**目标**：让 `NEXT_DEFAULT` 只挂载 Next composition root，同时保留可审计、可演练的命名式 Legacy fallback。
+
+- [ ] G4.1 盘点 Next build 仍复用的 Legacy canonical Canvas、Preview、ROI、参数依赖和 visual metadata 模块；
+  标记为共享底层依赖，而不是第二业务 composition root。
+- [ ] G4.2 按 Startup Profile 隔离静态入口：Next profile 不挂载、订阅或执行 Legacy `app.js`；
+  `LEGACY_FALLBACK` 仅通过显式配置和重启启用。
+- [ ] G4.3 隔离 Legacy WebMessage compatibility chain；Next 只保留 Host capability adapter，不恢复执行旁路。
+- [ ] G4.4 Studio UI 资源缺失继续 fail-closed 到诊断页，不静默回退 Legacy。
+- [ ] G4.5 证明 profile 切换会 unmount/dispose 旧 owner，并停止 subscription、timer、SSE、request 和写入口。
+- [ ] G4.6 进行 Next -> Legacy -> Next rollback drill，验证同一 Project、PersistenceRevision、启动诊断和进程退出。
+- [ ] G4.7 在 G6 全部通过前不删除 Legacy 源码；物理删除必须是单独批准的最终工作包。
+
+**G4 退出条件**：
+
+- [ ] Next profile 不存在可运行的第二前端业务 root。
+- [ ] Legacy fallback 入口、适用范围、恢复步骤和删除条件均有文档与自动证据。
+- [ ] canonical Canvas/ImageCanvas 仍只有一个内核和一个 mounted owner。
+
+## 9. G5：同一 clean SHA 的本地软件证据
+
+所有命令绑定同一个 clean source SHA；任一实现修改都会使本 Gate 重新开始。
+
+- [ ] G5.1 StudioUI：`npm run lint`。
+- [ ] G5.2 StudioUI：`npm run typecheck`。
+- [ ] G5.3 StudioUI：`npm run test:unit`。
+- [ ] G5.4 StudioUI：`npm run build`、production build 和既有 bundle gate。
+- [ ] G5.5 Studio UI Next Playwright：Project、Workspace、Results、Stations、Settings、AI、Inspection、
+  lifecycle/flag/session、responsive/accessibility 全部受影响 journey。
+- [ ] G5.6 .NET：按仓库固定脚本串行运行受影响的 Product、Desktop endpoints、Services、Runtime、Station 测试；
+  同一 `.csproj` 合并过滤条件，不并发启动。
+- [ ] G5.7 Release publish 只写 `./.tmp/publish-check/`，验证 hashed assets、manifest、Next/Legacy profile 和 stale chunk。
+- [ ] G5.8 静态 no-Node 扫描、启动配置、rollback runner、性能/内存基线分别记录；不把扫描冒充目标机启动。
+- [ ] G5.9 运行 `git diff --check`，确认无未忽略 publish、截图、日志和测试结果产物。
+- [ ] G5.10 更新 F10 evidence manifest：source SHA、命令、环境、结果、产物、失败分类和未执行项完整。
+
+**G5 退出条件**：当前 clean SHA 的所有软件 Gate 为 PASS 或有经批准的明确 blocker；历史 F09/M00/M09 PASS
+不得充当当前证据。
+
+## 10. G6：真实环境与生产验收
+
+- [ ] G6.1 真实 WinForms + WebView2：Windows 100% 和 125%，Debug/Release，启动、登录、会话失效、关闭。
+- [ ] G6.2 1920x1080、1536x864、1366x768/等效 client size；light/dark、compact/comfortable。
+- [ ] G6.3 独立无 Node 目标机安装、启动、升级、资源加载和卸载验证。
+- [ ] G6.4 Remote CI clean checkout；required jobs 和 Final Gate 全部通过，不放宽性能/质量阈值。
+- [ ] G6.5 真实 Camera：发现、绑定、单帧、连续预览、触发、断连恢复、标定。
+- [ ] G6.6 真实 PLC/TCP：连接、收发、超时、断连、重连和高风险命令状态。
+- [ ] G6.7 真实 Station：运行包、测试包、部署、命令 unknown-outcome/reconcile、结果/日志/健康回流。
+- [ ] G6.8 真实 AI 模型与资源：澄清、Build、attachment/resource、handoff、恢复、取消和正式保存。
+- [ ] G6.9 rollback drill、长时间运行、生产 soak、内存/SSE/request 资源稳定性。
+- [ ] G6.10 产品 Owner 签收；只有签收后才能设置 `PRODUCTION_ACCEPTANCE=GRANTED`，另行批准
+  `LEGACY_RETIREMENT`。
+
+## 11. Owner 与并行规则
+
+| 范围 | 执行规则 |
+| --- | --- |
+| G0 stable 同步、Host、contracts、CI、配置、Router、App Shell | 主协调 Owner 串行处理 |
+| G1 实施 + G2/G3 只读审计 | G0 完成后可并行；G2/G3 在前置 Gate 完成前不得修改代码或共享文档 |
+| FlowCanvas + Inspector + Preview + ROI + Calibration | 一个纵向实现 Owner，不拆并行 |
+| Project lifecycle + Project save + GlobalVariables | 一个纵向实现 Owner，不拆并行 |
+| G2 独立叶子 capability | 合同冻结后可并行；每个 capability 只有一个 Owner 和文件白名单 |
+| Design tokens、共享 primitives、App Shell | 仅主协调 Owner 修改 |
+| Results/Stations/Settings 独立页面视觉 | 文件无重叠、状态无共享时可并行 |
+| 同一 `.csproj` 测试 | 必须串行；不同项目仅在端口、数据库、设备和输出目录完全隔离时并行 |
+
+共享文件包括 `package.json`、lockfile、Vite、Router、App Shell、Design Tokens、API contracts、HostBridge、
+`.csproj`、CI、Feature Flags、根 `AGENTS.md`、根 `TODO.md` 和 F10。
+
+## 12. 通用 Definition of Done
+
+- [ ] 完整用户路径可完成，不只证明路由、按钮或 DOM 存在。
+- [ ] 旧版能力已标记为保留、优化、重定位、只读、隐藏、延后或经批准退役。
+- [ ] 后端 authority、`ProjectSaveCoordinator`、Runtime/Station、AgentRun 和正式结果权威未改变。
+- [ ] 没有第二 API transport、HostBridge、EventBus、ServiceRegistry、Canvas 或保存链。
+- [ ] 唯一 owner、subscription、request、timer、SSE 和写入口具有 mount/dispose 证据。
+- [ ] 权限、readonly、running、loading、empty、error、offline、stale、conflict、unknown outcome 已覆盖。
+- [ ] 简体中文术语一致；错误说明发生原因、影响和下一步，不用诊断码代替解释。
+- [ ] 1920x1080 和 125% 等效短屏下核心操作可达，无水平滚动、双层滚动或越界浮层。
+- [ ] unit/component、Playwright、相关 .NET 测试和真实环境证据按风险完成。
+- [ ] 所有证据绑定当前 clean SHA；未运行项诚实记录。
+- [ ] 文件白名单、`git diff --stat`、`git diff --check` 和临时产物检查通过。
+- [ ] F10 已更新并经过复审；未由自动测试自行授予生产验收。
+
+## 13. 停止条件
+
+出现以下任一情况立即停止当前子项并报告：
+
+- 后端缺少所需 authority、权限、并发身份、文件承载或 reconcile 合同。
+- 正式 Project/Flow/GlobalVariables/assets 保存无法进入现有 Application Service 和 `ProjectSaveCoordinator`。
+- 需要第二 API、HostBridge、Canvas、EventBus、ServiceRegistry 或保存链才能继续。
+- capability 与其他实现 Owner、共享文件或其他 worktree 发生重叠。
+- 远端 `studio-ui-next` 历史前进、分叉或与冻结 SHA 不一致。
+- 测试依赖真实设备或目标机而环境不具备；此时记录 `NOT PERFORMED`，不写 PASS。
+
+## 14. 下一步唯一动作
+
+- [ ] 只执行 **G0.1-G0.4**：刷新远端、冻结 clean 候选、生成 stable-only commit 语义矩阵。
+- [ ] G0.4 复审通过前，不开始 G1 生命周期修改、G2 capability 实现、G3 视觉精修或 G4 Legacy 隔离。
+- [ ] 第一份交付只包含：基线、语义矩阵、拟合批次、共享文件冲突、测试计划和 blocker；不混入实现。
