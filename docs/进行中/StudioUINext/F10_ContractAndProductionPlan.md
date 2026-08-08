@@ -48,7 +48,8 @@ G0_DIVERGENCE=HEAD_ONLY_309_STABLE_ONLY_81
 G0_STABLE_COMMITS_AUDITED=81
 G0_STABLE_COMMITS_LEFT_ONLY=77
 G0_STABLE_COMMITS_PATCH_EQUIVALENT=4
-G0_GENERATED_CATALOGS=NOT_APPLICABLE_HISTORICAL_SNAPSHOT
+G0_GENERATED_CATALOGS=CONTROLLED_SOURCE_DERIVED_OUTPUTS_PLUS_NOT_APPLICABLE_HISTORICAL_SNAPSHOTS
+G0_CONTROLLED_GENERATED_OUTPUTS=docs/算子资料/{算子目录.md,算子目录.json,算子变更记录.md,算子版本记录.json,算子名片/*catalog.json,算子名片/*version-history.json,算子名片/CATALOG.md,算子名片/CHANGELOG.md}
 G0_REMOTE_REFRESH=PASS_NO_REMOTE_ADVANCE_OR_FORK
 G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 ```
@@ -68,7 +69,7 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 | 范围与稳定线提交 | disposition | 当前代码锚点 | 冲突/风险处理 | 验证与边界 |
 | --- | --- | --- | --- | --- |
 | `ac7701ffd`, `fe4b42f13`, `0ebbb6ecc`, `58545fab1`, `924e3afaf`, `2d941da14`, `dca452867`, `01e88c5e8`, `fe39d379c`, `988681cf6`, `59a6aede4`, `d5ef2232a` | `MERGE` | `OperatorMetadataScanner`、`OperatorFactory`、`OperatorService`、operator display-name/parameter contract tests | 以当前 metadata source 和 `OperatorCategoryId` 为准，保留 Next 现有 UI 投影；未使用整文件 ours/theirs | Product metadata/operator 定向 `49/49`；Product solution build `0 errors` |
-| `4485c1d07`, `6976c7bcc` | `NOT_APPLICABLE`（生成快照） | 运行时继续使用当前 source metadata；未把 `docs/ai/operator-knowledge/*`、`docs/operators/catalog.json`、card/version-history 快照当作 authority | 这些提交主要重生成 catalog/card/knowledge snapshot；当前分支保留历史快照，避免未审计的大批生成物混入 G0 | 旧 `OperatorKnowledgeGraphTests` 因历史 graph 的 DeepLearning 输出为 14、当前 source 为 31 而失败；记录为 `NOT_APPLICABLE_HISTORICAL_SNAPSHOT`，未静默改 fixture |
+| `4485c1d07`, `6976c7bcc` | `NOT_APPLICABLE`（历史生成快照） | 运行时继续使用当前 source metadata；未把 `docs/ai/operator-knowledge/*`、`docs/operators/catalog.json`、card/version-history 快照当作 authority | 稳定线旧提交主要重生成历史 catalog/card/knowledge snapshot；这些旧快照留在原状。实现提交中的 8 个 `docs/算子资料` 输出是仓库钩子从当前 source metadata 受控重算的独立输出，已在本次提交中明确纳入 | 旧 `OperatorKnowledgeGraphTests` 因历史 graph 的 DeepLearning 输出为 14、当前 source 为 31 而失败；记录为 `NOT_APPLICABLE_HISTORICAL_SNAPSHOT`，未静默改 fixture |
 | `08125e8a7`, `82e34837a`, `6c0fa1f02`, `5667bfbe7`, `ce266626e`, `0a827d78c`, `97d25440b` | `MERGE` | `OperatorImageContracts`、depth/domain evaluators、operator quality contracts、classification/precision tests | Image depth 约束保持后端/operator contract 权威；quality lane 与 functional lane 分开，不改变 Runtime authority | Product image-contract/quality 定向测试通过；OperatorLibrary smoke `41/41` |
 | `f1efcfc11`, `6e4906656` | `MERGE`（源码/门禁）+ `NOT_APPLICABLE`（生成 evidence） | `quality/test-gates.json`、`TestGovernanceRunner`、`OperatorQualityState`、CI quality jobs | 合并可执行的 governance runner 和 source contract；历史 generated quality/catalog report 不作为当前 SHA 证据 | Product/OperatorLibrary 本地门禁通过；生成报告不冒充当前 clean-checkout/Remote CI 证据 |
 | `505a33a5f`, `f7fcd2fac`, `9df0fa73d`, `ef103c899`, `727414e2c`, `f7e9eea40`, `dcd16e005`, `549f56af1`, `5b9324d02`, `5306a570d`, `e7b34f591`, `afcbfd686`, `dfa5ea1ef` | `MERGE`（脚本/测试/质量规则）+ `NOT_APPLICABLE`（历史 benchmark 输出） | `scripts/run-test-quality-lane.ps1`、measurement/benchmark runners、`.gitattributes`、package smoke | 保留 evidence identity、顺序执行和 fixture byte identity；benchmark 数字必须由当前命令重现，不能复制历史结果 | OperatorLibrary pack + smoke `41/41`；性能/质量报告未宣称为 Remote CI 当前通过 |
@@ -80,10 +81,11 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 | `c17a30ff2`, `80ef45cd8`, `f79582f61`, `e76c74e39` | `SUPERSEDED` | `c5d6c1c23`、`521fb7e70`、`effb42642`、`5c239db5b` 已提供 patch-equivalent 语义 | `git log --cherry-pick` 证明等价；不重复合入，不创建第二 AI/acquisition owner | 由当前 branch history 和本轮相关 Product/Desktop tests 覆盖 |
 
 矩阵结论：所有 stable-only authority/security/contract、operator metadata、acquisition/Preview、质量和 CI
-语义均有 `MERGE` 或 `SUPERSEDED` disposition；生成 catalog/card/version-history、AI knowledge snapshot
-和旧远端报告均已明确 `NOT_APPLICABLE`。没有 `BLOCKED` 的稳定线提交，也没有通过前端私有模型替代后端
-authority 的改动。`DeepLearning` 当前 source metadata 仍有 31 个输出，旧 knowledge graph 14 个输出
-是已知文档漂移，后续如需重生成必须作为受控 artifact 变更单独审计。
+语义均有 `MERGE` 或 `SUPERSEDED` disposition；旧 catalog/card/version-history、AI knowledge snapshot
+和旧远端报告均已明确 `NOT_APPLICABLE`，当前 source-derived `docs/算子资料` 输出则由提交钩子受控纳入
+实现提交。没有 `BLOCKED` 的稳定线提交，也没有通过前端私有模型替代后端 authority 的改动。
+`DeepLearning` 当前 source metadata 仍有 31 个输出，旧 knowledge graph 14 个输出是已知文档漂移，
+后续如需更新该历史 snapshot 必须作为受控 artifact 变更单独审计。
 
 ### G0 当前候选验证
 
@@ -97,6 +99,7 @@ authority 的改动。`DeepLearning` 当前 source metadata 仍有 31 个输出�
 | Desktop 同步定向组 | `PASS` | `106/106` |
 | Desktop 扩展定向组 | `BLOCKED_BY_ENVIRONMENT` | `113/114`；唯一失败为无权限写 Windows Event Log，未改产品代码或 ACL |
 | OperatorLibrary pack + smoke | `PASS` | `41/41`；smoke restore/test 固定 `RuntimeIdentifier=win-x64`，避免无关 native asset 失败 |
+| 当前 source-derived operator docs | `PASS_SOURCE_DERIVED` | 提交钩子生成并纳入 `docs/算子资料` 的 8 个目录/变更记录/version-history 输出；它们是文档投影，不是运行时 authority |
 | `git diff --check` | `PASS` | 实现提交前通过；文档提交前及 push 前再次复核 |
 | 真实 WebView2、Windows 100%/125%、独立 no-Node、Remote CI、Camera/PLC/Station、生产 soak | `NOT_PERFORMED` / `BLOCKED_BY_ENVIRONMENT` | 不以 Chromium、DPR、本机 build 或历史 report 替代 |
 
