@@ -36,6 +36,7 @@ import {
 } from './aiPanelBuildPresentation.js';
 import {
     AgentWorkspaceModes,
+    PLANNING_DEADLINE_FALLBACK,
     aiPanelAgentWorkspaceMixin
 } from './aiPanelAgentWorkspace.js';
 import {
@@ -150,6 +151,7 @@ export class AiPanel {
         this.workspacePendingMutationCount = 0;
         this.workspaceSaveErrorGeneration = 0;
         this.workspaceBoundaryInProgress = false;
+        this.planningDeadlineContract = { ...PLANNING_DEADLINE_FALLBACK };
         this.workspaceBuildRunId = '';
         this.workspaceSubmittedBuildFingerprint = '';
         this.workspacePersistenceWarning = null;
@@ -249,6 +251,7 @@ export class AiPanel {
         this._setupComposerLayoutSync();
         this._setupExamplesFolding();
         this._setupAccessibility?.();
+        this._refreshPlanningDeadlineContract?.();
     }
 
     activate() {

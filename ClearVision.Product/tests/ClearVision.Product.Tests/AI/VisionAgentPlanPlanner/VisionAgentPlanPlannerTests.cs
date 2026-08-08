@@ -673,6 +673,93 @@ public sealed class VisionAgentPlanPlannerTests
         JsonSerializer.Serialize(result).Should().NotContain("tmpl-model-hallucinated");
     }
 
+    [Fact(DisplayName = "Planner should keep source reasons separate from canonical readiness blockers")]
+    public async Task CreatePlanAsync_ChineseCameraReason_ShouldNotFeedDerivedReadinessIdBackIntoSourceReasons()
+    {
+        var service = CreateService(_ => PlannerPlanJson(
+            "surface_defect",
+            "image_source",
+            OperatorsFor("surface_defect"),
+            blockingReasons: ["未提供现场相机或代表性图像样本"],
+            canBuildCandidate: false));
+        var baseline = Baseline("检测金属表面划痕", "surface_defect") with
+        {
+            SemanticExtraction = new VisionAgentSemanticExtractionResult
+            {
+                IsVisionRequest = true,
+                TaskType = AiVisionTaskTypes.SurfaceDefect,
+                InspectionObject = "金属表面",
+                ImageSource = string.Empty,
+                CanPlanCandidate = true,
+                CanBuildCandidate = false,
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                Source = VisionAgentSemanticSources.Model,
+                MetadataOnly = true
+            },
+            RemainingPlanFields = [VisionAgentPlanAnswerFields.ImageSource],
+            RequirementMaturity = new AiRequirementMaturityResult
+            {
+                Maturity = AiRequirementMaturity.Actionable,
+                TaskType = AiVisionTaskTypes.SurfaceDefect,
+                CanPlan = true,
+                CanBuild = false,
+                ObjectSignals = ["金属表面"],
+                TaskSignals = ["划痕检测"],
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                BlockingReasons = ["image_source_missing"],
+                MetadataOnly = true
+            }
+        };
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "检测金属表面划痕",
+                RequirementMode = AiRequirementModes.Draft,
+                SemanticExtraction = baseline.SemanticExtraction
+            },
+            baseline,
+            CancellationToken.None);
+
+        result.BuildReadiness.CanBuild.Should().BeTrue();
+        result.BuildReadiness.MissingResources.Should().ContainSingle(resource =>
+            resource.ResourceType == "camera_binding" &&
+            resource.DraftPolicy == VisionAgentResourceDraftPolicies.DraftAllowed);
+        result.BlockingReasons.Should().NotContain(reason =>
+            reason.Contains("resourcev1", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact(DisplayName = "Planner JSON repair should be skipped when the shared deadline has insufficient budget")]
+    public async Task CreatePlanAsync_RepairBudgetInsufficient_ShouldSkipSecondCompletion()
+    {
+        var completionCalls = 0;
+        var service = CreateService(
+            async (_, cancellationToken) =>
+            {
+                completionCalls++;
+                await Task.Delay(650, cancellationToken);
+                return "not-json";
+            },
+            new VisionAgentPlanPlannerOptions { Enabled = true, TimeoutSeconds = 5 });
+        using var deadline = VisionAgentPlanningDeadline.Begin(
+            new VisionAgentPlanningDeadlineOptions
+            {
+                TotalBudgetMs = 1_000,
+                ClientNetworkMarginMs = 1_000,
+                MinimumRepairBudgetMs = 500
+            },
+            CancellationToken.None);
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest { Description = "detect scratches" },
+            Baseline("detect scratches", "surface_defect"),
+            deadline.Token);
+
+        completionCalls.Should().Be(1);
+        result.PlannerFailureCode.Should().Be("planner_json_repair_skipped_budget");
+        result.PublicEvents.Should().Contain(evt => evt.Stage == "planner_json_repair_skipped");
+    }
+
     private static VisionAgentPlanPlannerService CreateService(
         Func<VisionAgentPlanCompletionRequest, string> completion)
     {
@@ -848,7 +935,9 @@ public sealed class VisionAgentPlanPlannerTests
         IReadOnlyList<string> operators,
         string? goal = null,
         string plcPolicy = "Local ResultOutput first; PLC writes disabled until review.",
-        string? templateId = null)
+        string? templateId = null,
+        IReadOnlyList<string>? blockingReasons = null,
+        bool canBuildCandidate = true)
     {
         var payload = new
         {
@@ -886,8 +975,8 @@ public sealed class VisionAgentPlanPlannerTests
             risks = new[] { "Representative samples are required before release." },
             acceptanceCriteria = new[] { "Workflow draft contains acquisition, inspection, judgment, and output stages." },
             executablePlan = new[] { "Confirm defaults.", "Generate draft.", "Run readiness checks." },
-            canBuildCandidate = true,
-            blockingReasons = Array.Empty<string>(),
+            canBuildCandidate,
+            blockingReasons = blockingReasons ?? Array.Empty<string>(),
             nextAction = "Accept recommended defaults and Build.",
             templateSelection = templateId == null
                 ? null

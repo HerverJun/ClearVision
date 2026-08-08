@@ -41,6 +41,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     private readonly VisionAgentLoop? _toolLoop;
     private readonly IVisionAgentLoopCompletionSource? _toolLoopCompletionSource;
     private readonly VisionAgentLoopOptions _loopOptions;
+    private readonly VisionAgentPlanningDeadlineOptions _planningDeadlineOptions;
     private readonly AgentRunEventRedactor _redactor;
 
     public VisionAgentOrchestrator(
@@ -52,7 +53,8 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         VisionAgentLoop? toolLoop = null,
         IVisionAgentLoopCompletionSource? toolLoopCompletionSource = null,
         IOptions<VisionAgentLoopOptions>? loopOptions = null,
-        AgentRunEventRedactor? redactor = null)
+        AgentRunEventRedactor? redactor = null,
+        IOptions<VisionAgentPlanningDeadlineOptions>? planningDeadlineOptions = null)
     {
         _toolRegistry = toolRegistry;
         _planPlannerService = planPlannerService;
@@ -63,6 +65,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         _toolLoopCompletionSource = toolLoopCompletionSource;
         _loopOptions = loopOptions?.Value ?? new VisionAgentLoopOptions();
         _loopOptions.Normalize();
+        _planningDeadlineOptions = (planningDeadlineOptions?.Value ?? new VisionAgentPlanningDeadlineOptions()).Normalize();
         _redactor = redactor ?? new AgentRunEventRedactor();
     }
 
@@ -71,14 +74,25 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var deadline = VisionAgentPlanningDeadline.Begin(
+            _planningDeadlineOptions,
+            cancellationToken,
+            request.PlanningBudgetMs);
         var semanticEvents = new List<VisionAgentPlanPublicEvent>();
         var semantic = VisionAgentSemanticExtractionSafety.Sanitize(request.SemanticExtraction);
         if (semantic == null && _semanticExtractor != null)
         {
             semanticEvents.Add(BuildSemanticStartedEvent());
-            semantic = await _semanticExtractor.ExtractAsync(
-                ToSemanticRequest(request),
-                cancellationToken);
+            try
+            {
+                semantic = await _semanticExtractor.ExtractAsync(
+                    ToSemanticRequest(request),
+                    deadline.Token);
+            }
+            catch (OperationCanceledException) when (deadline.TotalBudgetExceeded)
+            {
+                throw new VisionAgentPlanningDeadlineExceededException("semantic_extraction");
+            }
             semanticEvents.AddRange(BuildSemanticResultEvents(semantic));
         }
 
@@ -94,10 +108,17 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 "Planner 服务未注册，已使用规则兜底方案。");
         }
 
-        return await _planPlannerService.CreatePlanAsync(
-            planRequest,
-            ruleBaseline,
-            cancellationToken);
+        try
+        {
+            return await _planPlannerService.CreatePlanAsync(
+                planRequest,
+                ruleBaseline,
+                deadline.Token);
+        }
+        catch (OperationCanceledException) when (deadline.TotalBudgetExceeded)
+        {
+            throw new VisionAgentPlanningDeadlineExceededException("plan_orchestration");
+        }
     }
 
     private static VisionAgentSemanticExtractionRequest ToSemanticRequest(VisionAgentPlanModeRequest request)
@@ -1050,13 +1071,6 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         result = result with
         {
             CanBuild = finalCanBuild,
-            BlockingReasons = readiness.Blockers
-                .Where(blocker => blocker.BlocksBuild)
-                .Select(blocker => blocker.Id)
-                .Where(reason => !string.IsNullOrWhiteSpace(reason))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Take(12)
-                .ToList(),
             BuildReadiness = readiness with { CanBuild = finalCanBuild }
         };
 

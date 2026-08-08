@@ -49,6 +49,7 @@ public static class VisionAgentPlanReadinessEvaluator
         {
             var initialAnswers = validatedAnswers?.AcceptedAnswers ?? planSnapshot.ConfirmedPlanAnswers ?? [];
             var validated = validatedAnswers ?? new VisionAgentPlanAnswerValidator().Validate(planSnapshot, initialAnswers, null, false);
+            validatedAnswers = validated;
             var maturityRequest = new VisionAgentRequirementMaturityRequest
             {
                 Description = planSnapshot.OriginalUserPrompt ?? planSnapshot.Goal ?? string.Empty,
@@ -164,9 +165,13 @@ public static class VisionAgentPlanReadinessEvaluator
                 "规划包含当前不支持的算子，暂不能构建。"));
         }
 
+        var effectiveRemainingFields = remainingFields
+            .Where(field => !IsFieldSatisfiedByBoundResource(planSnapshot, field, resourceDecisions))
+            .ToList();
         var distinctBlockers = blockers
             .Where(item => !string.IsNullOrWhiteSpace(item.Id))
             .Where(item => item.Resource == null || !IsResourceBound(item.Resource, resourceDecisions))
+            .Where(item => !IsFieldSatisfiedByBoundResource(planSnapshot, item.Field, resourceDecisions))
             .GroupBy(item => item.Resource?.CanonicalId is { Length: > 0 } canonicalId
                     ? $"resource:{canonicalId}"
                     : item.Id,
@@ -174,13 +179,13 @@ public static class VisionAgentPlanReadinessEvaluator
             .Select(group => group.OrderByDescending(item => item.BlocksBuild).First())
             .Take(16)
             .ToList();
-        var hasBlockingRemaining = remainingFields.Any(field => ShouldBlockField(plan, field, requirementMode, maturity, explicitOutputTargetBlocker: false));
+        var hasBlockingRemaining = effectiveRemainingFields.Any(field => ShouldBlockField(plan, field, requirementMode, maturity, explicitOutputTargetBlocker: false));
         var canBuild = !hasBlockingRemaining && distinctBlockers.All(blocker => !blocker.BlocksBuild);
         return Snapshot(
             canBuild,
             distinctBlockers,
             resolvedFields,
-            remainingFields,
+            effectiveRemainingFields,
             PrimaryMessage(canBuild, distinctBlockers, maturity),
             VisionAgentPlanContractVersions.V2);
     }
@@ -391,7 +396,7 @@ public static class VisionAgentPlanReadinessEvaluator
 
         if (parsed.Kind.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase))
         {
-            var normalizedResourceKey = VisionAgentResourceIdentity.NormalizeToken(idKey);
+            var normalizedResourceKey = VisionAgentResourceIdentity.NormalizeToken(parsed.Key);
             if ((normalizedResourceKey.Contains("localoutput", StringComparison.Ordinal) ||
                  VisionAgentPlanFieldPolicy.NormalizeField(field).Equals(VisionAgentPlanAnswerFields.OutputTarget, StringComparison.OrdinalIgnoreCase)) &&
                 AllowsDefaultLocalOutput(plan, validatedAnswers))
@@ -406,7 +411,7 @@ public static class VisionAgentPlanReadinessEvaluator
                     "默认使用本地结构化结果输出，不需要额外输出资源。");
             }
 
-            var resource = BuildLegacyResourceRequirement(plan, idKey, field, questionId);
+            var resource = BuildLegacyResourceRequirement(plan, parsed.Key, field, questionId);
             var blocksResource = ResourceBlocksBuild(resource, requirementMode, maturity, hasSupportedRoute);
             resource = resource with
             {
@@ -855,10 +860,31 @@ public static class VisionAgentPlanReadinessEvaluator
         string field,
         string questionId)
     {
-        var normalized = VisionAgentResourceIdentity.NormalizeToken($"{key}_{field}");
-        if (normalized.Contains("camera", StringComparison.Ordinal) ||
-            VisionAgentPlanFieldPolicy.NormalizeField(field).Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase))
+        if (IsCameraResourceSignal(plan, key, field))
+        {
             return BuildCameraRequirement(plan) with { Source = "legacy_blocker" };
+        }
+
+        if (VisionAgentResourceIdentity.TryParseCanonicalId(
+                key,
+                out var canonicalType,
+                out var canonicalOperator,
+                out var canonicalParameter) &&
+            !canonicalType.Equals("resource", StringComparison.OrdinalIgnoreCase))
+        {
+            return CreateResourceRequirement(
+                canonicalType,
+                ResourceName(canonicalType),
+                canonicalOperator,
+                string.Empty,
+                -1,
+                canonicalParameter,
+                ResolutionTarget(canonicalType),
+                VisionAgentResourceDraftPolicies.DraftAllowed,
+                "canonical_blocker");
+        }
+
+        var normalized = VisionAgentResourceIdentity.NormalizeToken($"{key}_{field}");
         if (normalized.Contains("model", StringComparison.Ordinal))
         {
             var operatorType = (plan.RecommendedRoute?.Operators ?? []).FirstOrDefault(op =>
@@ -874,6 +900,65 @@ public static class VisionAgentPlanReadinessEvaluator
             return CreateResourceRequirement("plc_output", "外部输出资源", "resultoutput#1", "ResultOutput", 0, "OutputChannel", VisionAgentResourceResolutionTargets.OutputSettings, VisionAgentResourceDraftPolicies.BuildRequired, "legacy_blocker");
         return CreateResourceRequirement("resource", "工程资源", string.Empty, string.Empty, -1, field, VisionAgentResourceResolutionTargets.Replan, VisionAgentResourceDraftPolicies.BuildRequired, "legacy_blocker", key);
     }
+
+    private static bool IsCameraResourceSignal(VisionAgentPlanModeResult plan, string key, string field)
+    {
+        var normalizedField = VisionAgentPlanFieldPolicy.NormalizeField(field);
+        if (normalizedField.Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var hasAcquisition = (plan.RecommendedRoute?.Operators ?? [])
+            .Any(op => op.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase));
+        if (!hasAcquisition)
+        {
+            return false;
+        }
+
+        var imageSourceMissing = (plan.SemanticExtraction?.MissingFields ?? [])
+                .Concat(plan.RequirementMaturity?.MissingFields ?? [])
+                .Any(item => VisionAgentPlanFieldPolicy.NormalizeField(item)
+                    .Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase)) ||
+            (string.IsNullOrWhiteSpace(plan.SemanticExtraction?.ImageSource) &&
+             (plan.RemainingPlanFields ?? []).Any(item => VisionAgentPlanFieldPolicy.NormalizeField(item)
+                 .Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase)));
+        var normalizedKey = VisionAgentResourceIdentity.NormalizeToken(key);
+        var genericCanonical = VisionAgentResourceIdentity.TryParseCanonicalId(
+            key,
+            out var canonicalType,
+            out _,
+            out _) && canonicalType.Equals("resource", StringComparison.OrdinalIgnoreCase);
+        if (imageSourceMissing &&
+            (genericCanonical || string.IsNullOrWhiteSpace(normalizedKey) ||
+             !ContainsAny(normalizedKey, "model", "template", "calibration", "plc", "output")))
+        {
+            return true;
+        }
+
+        // Compatibility only: structured field, semantic and route evidence above remain authoritative.
+        return ContainsAny(key, "camera", "image source", "image sample", "相机", "图像", "样本");
+    }
+
+    private static string ResourceName(string resourceType) => resourceType switch
+    {
+        "camera_binding" => "相机绑定",
+        "model_resource" => "模型资源",
+        "template_artifact" => "模板资源",
+        "calibration_resource" => "标定参数",
+        "plc_output" => "外部输出资源",
+        _ => "工程资源"
+    };
+
+    private static string ResolutionTarget(string resourceType) => resourceType switch
+    {
+        "camera_binding" => VisionAgentResourceResolutionTargets.CameraSettings,
+        "model_resource" => VisionAgentResourceResolutionTargets.ModelPicker,
+        "template_artifact" => VisionAgentResourceResolutionTargets.TemplatePicker,
+        "calibration_resource" => VisionAgentResourceResolutionTargets.CalibrationSettings,
+        "plc_output" or "output_channel" => VisionAgentResourceResolutionTargets.OutputSettings,
+        _ => VisionAgentResourceResolutionTargets.Replan
+    };
 
     private static VisionAgentResourceRequirement CreateResourceRequirement(
         string resourceType,
@@ -916,11 +1001,21 @@ public static class VisionAgentPlanReadinessEvaluator
             decision.Status.Equals(VisionAgentResourceStatuses.Bound, StringComparison.OrdinalIgnoreCase) &&
             (decision.CanonicalId.Equals(resource.CanonicalId, StringComparison.OrdinalIgnoreCase) ||
              (!string.IsNullOrWhiteSpace(decision.OperatorKey) &&
-              VisionAgentResourceIdentity.CreateCanonicalId(
+             VisionAgentResourceIdentity.CreateCanonicalId(
                   decision.ResourceType,
                   decision.OperatorKey,
                   decision.ParameterName,
                   decision.ResourceKey).Equals(resource.CanonicalId, StringComparison.OrdinalIgnoreCase)))) == true;
+    }
+
+    private static bool IsFieldSatisfiedByBoundResource(
+        VisionAgentPlanModeResult plan,
+        string? field,
+        IReadOnlyList<VisionAgentResourceDecision>? decisions)
+    {
+        return VisionAgentPlanFieldPolicy.NormalizeField(field)
+                   .Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase) &&
+               IsResourceBound(BuildCameraRequirement(plan), decisions);
     }
 
     private static bool ResourceBlocksBuild(
@@ -935,7 +1030,7 @@ public static class VisionAgentPlanReadinessEvaluator
     }
 
     private static string ResourceBlockerId(VisionAgentResourceRequirement resource) =>
-        $"resource_pending:{VisionAgentResourceIdentity.NormalizeToken(resource.CanonicalId)}";
+        $"resource_pending:{VisionAgentResourceIdentity.Canonicalize(resource.CanonicalId)}";
 
     private static string ResourceField(VisionAgentResourceRequirement resource) =>
         resource.ResourceType.Equals("camera_binding", StringComparison.OrdinalIgnoreCase)

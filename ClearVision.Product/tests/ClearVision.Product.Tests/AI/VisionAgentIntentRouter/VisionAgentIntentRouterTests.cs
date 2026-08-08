@@ -519,6 +519,120 @@ public sealed class VisionAgentIntentRouterTests
         json.Should().NotContain("DB1.DBX0.0");
     }
 
+    [Fact(DisplayName = "Intent Router stage timeout should be distinct from caller abort")]
+    public async Task RouteAsync_RouterTimeout_ShouldReturnExplicitTimeoutFallback()
+    {
+        var service = new VisionAgentIntentRouterService(
+            new DelegateCompletionSource(async (_, cancellationToken) =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return string.Empty;
+            }),
+            Options.Create(new VisionAgentIntentRouterOptions { Enabled = true, TimeoutSeconds = 1 }),
+            NullLogger<VisionAgentIntentRouterService>.Instance);
+
+        var result = await service.RouteAsync(
+            new VisionAgentIntentRouterRequest
+            {
+                Description = "检测包装表面划痕",
+                SemanticExtraction = PendingDraftSemantic()
+            },
+            CancellationToken.None);
+
+        result.RouterSource.Should().Be("rule_fallback");
+        result.FallbackReason.Should().Contain("router_timeout");
+    }
+
+    [Fact(DisplayName = "Intent Router caller abort should propagate without becoming timeout fallback")]
+    public async Task RouteAsync_CallerAbort_ShouldPropagateCancellation()
+    {
+        var service = new VisionAgentIntentRouterService(
+            new DelegateCompletionSource(async (_, cancellationToken) =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return string.Empty;
+            }),
+            Options.Create(new VisionAgentIntentRouterOptions { Enabled = true, TimeoutSeconds = 5 }),
+            NullLogger<VisionAgentIntentRouterService>.Instance);
+        using var caller = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        var act = () => service.RouteAsync(
+            new VisionAgentIntentRouterRequest
+            {
+                Description = "检测包装表面划痕",
+                SemanticExtraction = PendingDraftSemantic()
+            },
+            caller.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact(DisplayName = "Intent Router total planning budget should throw an explicit deadline exception")]
+    public async Task RouteAsync_TotalBudgetExceeded_ShouldThrowPlanningDeadlineException()
+    {
+        var service = new VisionAgentIntentRouterService(
+            new DelegateCompletionSource(async (_, cancellationToken) =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return string.Empty;
+            }),
+            Options.Create(new VisionAgentIntentRouterOptions { Enabled = true, TimeoutSeconds = 2 }),
+            NullLogger<VisionAgentIntentRouterService>.Instance,
+            deadlineOptions: Options.Create(new VisionAgentPlanningDeadlineOptions
+            {
+                TotalBudgetMs = 120_000,
+                ClientNetworkMarginMs = 1_000,
+                MinimumRepairBudgetMs = 500
+            }));
+
+        var request = JsonSerializer.Deserialize<VisionAgentIntentRouterRequest>(JsonSerializer.Serialize(new
+        {
+            Description = "检测包装表面划痕",
+            SemanticExtraction = PendingDraftSemantic(),
+            PlanningBudgetMs = 1_000
+        }))!;
+
+        var act = () => service.RouteAsync(
+            request,
+            CancellationToken.None);
+
+        var error = await act.Should().ThrowAsync<VisionAgentPlanningDeadlineExceededException>();
+        error.Which.Stage.Should().Be("intent_router");
+    }
+
+    [Fact(DisplayName = "Intent Router repair should be skipped when total budget is below repair minimum")]
+    public async Task RouteAsync_RepairBudgetInsufficient_ShouldSkipSecondCompletion()
+    {
+        var completionCalls = 0;
+        var service = new VisionAgentIntentRouterService(
+            new DelegateCompletionSource(async (_, cancellationToken) =>
+            {
+                completionCalls++;
+                await Task.Delay(650, cancellationToken);
+                return "not-json";
+            }),
+            Options.Create(new VisionAgentIntentRouterOptions { Enabled = true, TimeoutSeconds = 5 }),
+            NullLogger<VisionAgentIntentRouterService>.Instance,
+            deadlineOptions: Options.Create(new VisionAgentPlanningDeadlineOptions
+            {
+                TotalBudgetMs = 1_000,
+                ClientNetworkMarginMs = 1_000,
+                MinimumRepairBudgetMs = 500
+            }));
+
+        var result = await service.RouteAsync(
+            new VisionAgentIntentRouterRequest
+            {
+                Description = "检测包装表面划痕",
+                SemanticExtraction = PendingDraftSemantic()
+            },
+            CancellationToken.None);
+
+        completionCalls.Should().Be(1);
+        result.RouterSource.Should().Be("rule_fallback");
+        result.FallbackReason.Should().StartWith("router_repair_skipped_budget");
+    }
+
     private static VisionAgentIntentRouterService CreateService(
         Func<VisionAgentIntentRouterCompletionRequest, string> completion)
     {

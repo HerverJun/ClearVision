@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Desktop.Endpoints;
 
@@ -75,12 +76,27 @@ public static class AgentRunEndpoints
             .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
         app.MapGet("/api/ai/agent-runs/{runId}", HandleReplayRun)
             .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
+        app.MapGet("/api/ai/vision-agent/planning-deadline", HandleGetPlanningDeadline)
+            .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
         app.MapGet("/api/ai/agent-runs/{runId}/events", HandleRunEventsAsync);
         app.MapPost("/api/ai/agent-runs/{runId}/stream-token", HandleCreateStreamToken)
             .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
         app.MapPost("/api/ai/agent-runs/{runId}/cancel", HandleCancelRun)
             .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
         return app;
+    }
+
+    private static IResult HandleGetPlanningDeadline(IOptions<VisionAgentPlanningDeadlineOptions> options)
+    {
+        var value = options.Value.Normalize();
+        return Results.Ok(new
+        {
+            contractVersion = VisionAgentPlanningDeadlineOptions.ContractVersion,
+            totalBudgetMs = value.TotalBudgetMs,
+            clientNetworkMarginMs = value.ClientNetworkMarginMs,
+            minimumRepairBudgetMs = value.MinimumRepairBudgetMs,
+            metadataOnly = true
+        });
     }
 
     private static async Task<IResult> HandlePreviewPlanReadinessAsync(
@@ -272,8 +288,15 @@ public static class AgentRunEndpoints
             });
         }
 
-        var result = await router.RouteAsync(request, ct);
-        return Results.Ok(result);
+        try
+        {
+            var result = await router.RouteAsync(request, ct);
+            return Results.Ok(result);
+        }
+        catch (VisionAgentPlanningDeadlineExceededException error)
+        {
+            return PlanningDeadlineExceeded(error);
+        }
     }
 
     private static async Task<IResult> HandleCreatePlanAsync(
@@ -332,7 +355,15 @@ public static class AgentRunEndpoints
                 : StatusCodes.Status503ServiceUnavailable);
         }
 
-        var result = await orchestrator.CreatePlanAsync(request, ct);
+        VisionAgentPlanModeResult result;
+        try
+        {
+            result = await orchestrator.CreatePlanAsync(request, ct);
+        }
+        catch (VisionAgentPlanningDeadlineExceededException error)
+        {
+            return PlanningDeadlineExceeded(error);
+        }
         var terminalPersistence = conversationService.TryUpdateOwnedWorkspaceSnapshot(ownerHash, session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             LifecycleState = result.CanBuild ? "plan_ready" : "plan_blocked",
@@ -357,6 +388,16 @@ public static class AgentRunEndpoints
             metadataOnly = true
         });
     }
+
+    private static IResult PlanningDeadlineExceeded(VisionAgentPlanningDeadlineExceededException error) =>
+        Results.Json(new
+        {
+            errorCode = "planning_deadline_exceeded",
+            timeoutKind = "total_budget_exceeded",
+            stage = error.Stage,
+            publicMessage = "Vision Agent planning exceeded the published total time budget. Please retry.",
+            metadataOnly = true
+        }, statusCode: StatusCodes.Status504GatewayTimeout);
 
     private static Task<IResult> HandleCreatePlanRunAsync(
         VisionAgentPlanModeRequest request,
@@ -1446,6 +1487,8 @@ public static class AgentRunEndpoints
         catch (Exception ex)
         {
             logger.LogWarning(ex, "AgentRun PlanMode background task failed. RunId={RunId}", runId);
+            var deadlineError = ex as VisionAgentPlanningDeadlineExceededException;
+            var errorCode = deadlineError == null ? "plan_failed" : "planning_deadline_exceeded";
             var failReservation = streamService.TryReserveTerminal(runId, AgentRunEventStatuses.Failed);
             if (!failReservation.Acquired)
             {
@@ -1456,6 +1499,9 @@ public static class AgentRunEndpoints
                 "规划失败", "规划在完成前失败，请检查公开诊断后重试。", AgentRunEventStatuses.Failed, new
                 {
                     sessionId = request.SessionId,
+                    errorCode,
+                    timeoutKind = deadlineError == null ? string.Empty : "total_budget_exceeded",
+                    stage = deadlineError?.Stage ?? string.Empty,
                     error = ex.Message,
                     metadataOnly = true
                 });
@@ -1499,6 +1545,9 @@ public static class AgentRunEndpoints
                 {
                     status = "plan_failed",
                     mode = "plan",
+                    errorCode,
+                    timeoutKind = deadlineError == null ? string.Empty : "total_budget_exceeded",
+                    stage = deadlineError?.Stage ?? string.Empty,
                     publicMessage = "规划在完成前失败。",
                     error = ex.Message,
                     workspaceSnapshot = finalWorkspaceSnapshot,

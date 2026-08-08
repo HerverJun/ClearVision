@@ -435,16 +435,7 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
     {
         var readiness = readinessContext.Readiness;
         var deferredQuestionIds = FindDeferredQuestionIds(contract.Plan!, contract.Build!.UserSelections);
-        var pendingConfirmationCount = CountPendingConfirmations(readiness);
-        var resourcePendingCount = readiness.Blockers
-            .Where(blocker => blocker.Category.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase))
-            .Select(blocker => FirstNonBlank(blocker.QuestionId, blocker.Field, blocker.Id))
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Count();
-        var hardBlockerCount = readiness.Blockers.Count(blocker =>
-            blocker.BlocksBuild &&
-            !blocker.Category.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase));
+        var partition = PartitionIncompleteItems(readiness);
 
         return new VisionAgentBuildReadinessPreviewResult
         {
@@ -457,9 +448,16 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
             AnswerSetFingerprint = readinessContext.AnswerSetFingerprint,
             BuildReadiness = readiness,
             DeferredQuestionIds = deferredQuestionIds,
-            PendingConfirmationCount = pendingConfirmationCount,
-            ResourcePendingCount = resourcePendingCount,
-            HardBlockerCount = hardBlockerCount,
+            PendingConfirmationCount = partition.BuildBlockingConfirmationCount + partition.DeferredFieldCount,
+            ResourcePendingCount = partition.BuildRequiredResourceCount + partition.DraftAllowedResourceCount,
+            HardBlockerCount = partition.BuildBlockingConfirmationCount,
+            BuildBlockingConfirmationCount = partition.BuildBlockingConfirmationCount,
+            BuildRequiredResourceCount = partition.BuildRequiredResourceCount,
+            DeferredFieldCount = partition.DeferredFieldCount,
+            DraftAllowedResourceCount = partition.DraftAllowedResourceCount,
+            MustConfirmBeforeBuildCount = partition.MustConfirmBeforeBuildCount,
+            FillLaterCount = partition.FillLaterCount,
+            TotalIncompleteCount = partition.TotalIncompleteCount,
             ContractValid = true,
             MetadataOnly = true
         };
@@ -495,7 +493,11 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
                 PrimaryMessage = failureMessage,
                 ContractVersion = FirstNonBlank(contractVersion, request.PlanSnapshot?.PlanContractVersion, VisionAgentPlanContractVersions.V2)
             },
+            PendingConfirmationCount = 1,
             HardBlockerCount = 1,
+            BuildBlockingConfirmationCount = 1,
+            MustConfirmBeforeBuildCount = 1,
+            TotalIncompleteCount = 1,
             ContractValid = false,
             FailureCode = failureCode,
             FailureMessage = failureMessage,
@@ -542,35 +544,114 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         return deferred.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    private static int CountPendingConfirmations(VisionAgentBuildReadinessSnapshot readiness)
+    private static IncompleteItemPartition PartitionIncompleteItems(VisionAgentBuildReadinessSnapshot readiness)
     {
-        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var resources = readiness.Blockers
+            .Where(blocker => blocker.Resource != null)
+            .Select(blocker => (Blocker: blocker, Resource: blocker.Resource!))
+            .GroupBy(item => ResourceItemKey(item.Resource), StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(item => item.Blocker.BlocksBuild).First())
+            .ToList();
+
+        var resourceFields = resources
+            .Select(item => CanonicalField(item.Blocker.Field))
+            .Where(field => !string.IsNullOrWhiteSpace(field))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var blockingResourceKeys = resources
+            .Where(item => item.Blocker.BlocksBuild)
+            .Select(item => ResourceItemKey(item.Resource))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var deferredResourceKeys = resources
+            .Where(item => !item.Blocker.BlocksBuild)
+            .Select(item => ResourceItemKey(item.Resource))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var buildRequiredResourceCount = resources.Count(item =>
+            item.Resource.DraftPolicy.Equals(VisionAgentResourceDraftPolicies.BuildRequired, StringComparison.OrdinalIgnoreCase));
+        var draftAllowedResourceCount = resources.Count - buildRequiredResourceCount;
+
+        var blockingFieldKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var deferredFieldKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var blocker in readiness.Blockers)
         {
-            if (blocker.Category.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase) ||
-                blocker.Category.Equals(VisionAgentBuildBlockerCategories.ContractWarning, StringComparison.OrdinalIgnoreCase) ||
-                blocker.Category.Equals(VisionAgentBuildBlockerCategories.SafetyBlocker, StringComparison.OrdinalIgnoreCase))
+            if (blocker.Resource != null ||
+                blocker.Category.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase) ||
+                blocker.Category.Equals(VisionAgentBuildBlockerCategories.ContractWarning, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            var key = FirstNonBlank(blocker.QuestionId, blocker.Field, blocker.Id);
-            if (!string.IsNullOrWhiteSpace(key))
+            var field = CanonicalField(blocker.Field);
+            if (!string.IsNullOrWhiteSpace(field) && resourceFields.Contains(field))
             {
-                keys.Add(key);
+                continue;
             }
+
+            var key = FieldItemKey(blocker);
+            if (string.IsNullOrWhiteSpace(key)) continue;
+            if (blocker.BlocksBuild) blockingFieldKeys.Add(key);
+            else deferredFieldKeys.Add(key);
         }
 
         foreach (var field in readiness.RemainingFields)
         {
-            if (!string.IsNullOrWhiteSpace(field))
-            {
-                keys.Add(field);
-            }
+            var canonicalField = CanonicalField(field);
+            if (string.IsNullOrWhiteSpace(canonicalField) || resourceFields.Contains(canonicalField)) continue;
+            var key = $"field:{canonicalField}";
+            if (!blockingFieldKeys.Contains(key)) deferredFieldKeys.Add(key);
         }
 
-        return keys.Count;
+        deferredFieldKeys.ExceptWith(blockingFieldKeys);
+        var mustConfirmKeys = new HashSet<string>(blockingFieldKeys, StringComparer.OrdinalIgnoreCase);
+        mustConfirmKeys.UnionWith(blockingResourceKeys);
+        var fillLaterKeys = new HashSet<string>(deferredFieldKeys, StringComparer.OrdinalIgnoreCase);
+        fillLaterKeys.UnionWith(deferredResourceKeys);
+        fillLaterKeys.ExceptWith(mustConfirmKeys);
+        var allKeys = new HashSet<string>(mustConfirmKeys, StringComparer.OrdinalIgnoreCase);
+        allKeys.UnionWith(fillLaterKeys);
+
+        return new IncompleteItemPartition(
+            blockingFieldKeys.Count,
+            buildRequiredResourceCount,
+            deferredFieldKeys.Count,
+            draftAllowedResourceCount,
+            mustConfirmKeys.Count,
+            fillLaterKeys.Count,
+            allKeys.Count);
     }
+
+    private static string ResourceItemKey(VisionAgentResourceRequirement resource)
+    {
+        var canonicalId = VisionAgentResourceIdentity.TryParseCanonicalId(resource.CanonicalId, out _, out _, out _)
+            ? VisionAgentResourceIdentity.Canonicalize(resource.CanonicalId)
+            : VisionAgentResourceIdentity.CreateCanonicalId(
+                resource.ResourceType,
+                resource.OperatorKey,
+                resource.ParameterName,
+                resource.ResourceKey);
+        return $"resource:{canonicalId}";
+    }
+
+    private static string FieldItemKey(VisionAgentBuildBlocker blocker)
+    {
+        var field = CanonicalField(blocker.Field);
+        if (!string.IsNullOrWhiteSpace(field)) return $"field:{field}";
+        var questionId = Clean(blocker.QuestionId);
+        if (!string.IsNullOrWhiteSpace(questionId)) return $"question:{questionId}";
+        var blockerId = Clean(blocker.Id);
+        return string.IsNullOrWhiteSpace(blockerId) ? string.Empty : $"blocker:{blockerId}";
+    }
+
+    private static string CanonicalField(string? field) =>
+        VisionAgentPlanFieldPolicy.NormalizeField(field);
+
+    private sealed record IncompleteItemPartition(
+        int BuildBlockingConfirmationCount,
+        int BuildRequiredResourceCount,
+        int DeferredFieldCount,
+        int DraftAllowedResourceCount,
+        int MustConfirmBeforeBuildCount,
+        int FillLaterCount,
+        int TotalIncompleteCount);
 
     private AiFlowGenerationResult Failure(
         BuildCommand command,

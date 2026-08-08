@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ClearVision.Product.Core.DTOs;
 
 public sealed record BuildCommand
@@ -101,6 +103,20 @@ public sealed record VisionAgentBuildReadinessPreviewResult
     public int PendingConfirmationCount { get; init; }
     public int ResourcePendingCount { get; init; }
     public int HardBlockerCount { get; init; }
+    [JsonPropertyName("buildBlockingConfirmationCount")]
+    public int BuildBlockingConfirmationCount { get; init; }
+    [JsonPropertyName("buildRequiredResourceCount")]
+    public int BuildRequiredResourceCount { get; init; }
+    [JsonPropertyName("deferredFieldCount")]
+    public int DeferredFieldCount { get; init; }
+    [JsonPropertyName("draftAllowedResourceCount")]
+    public int DraftAllowedResourceCount { get; init; }
+    [JsonPropertyName("mustConfirmBeforeBuildCount")]
+    public int MustConfirmBeforeBuildCount { get; init; }
+    [JsonPropertyName("fillLaterCount")]
+    public int FillLaterCount { get; init; }
+    [JsonPropertyName("totalIncompleteCount")]
+    public int TotalIncompleteCount { get; init; }
     public bool ContractValid { get; init; } = true;
     public string FailureCode { get; init; } = string.Empty;
     public string FailureMessage { get; init; } = string.Empty;

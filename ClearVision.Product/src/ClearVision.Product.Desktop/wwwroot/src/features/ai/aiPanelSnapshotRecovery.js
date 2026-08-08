@@ -5,6 +5,7 @@ const SAFE_LIFECYCLE_STATES = new Set([
     'clarifying',
     'plan_running',
     'plan_ready',
+    'plan_blocked',
     'plan_failed',
     'plan_cancelled',
     'plan',
@@ -34,6 +35,23 @@ function safeRunStatus(value) {
     return SAFE_RUN_STATUSES.has(normalized) ? normalized : 'idle';
 }
 
+function hasDoubleEncodedDerivedResource(preview) {
+    const readiness = safeObject(read(preview, 'buildReadiness'));
+    const resources = [
+        ...(Array.isArray(read(readiness, 'missingResources')) ? read(readiness, 'missingResources') : []),
+        ...(Array.isArray(read(readiness, 'blockers'))
+            ? read(readiness, 'blockers').map(blocker => read(blocker, 'resource')).filter(Boolean)
+            : [])
+    ];
+    return resources.some(resource => {
+        const canonicalId = String(read(resource, 'canonicalId') || '').trim().toLowerCase();
+        const parts = canonicalId.split('|');
+        if (parts.length !== 4 || parts[0] !== 'resource:v1' || parts[1] !== 'resource') return false;
+        const encodedIdentity = `${parts[2]}${parts[3]}`.replace(/[^a-z0-9]/g, '');
+        return encodedIdentity.includes('resourcev1resource');
+    });
+}
+
 export function normalizeWorkspaceSnapshotForRestore(raw) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
         return { snapshot: null, trusted: false, degraded: true, reason: 'invalid_snapshot' };
@@ -51,6 +69,22 @@ export function normalizeWorkspaceSnapshotForRestore(raw) {
     const trusted = versionSupported && lifecycleSupported && (Object.keys(pendingPlanSnapshot).length === 0 || hasPlanIdentity);
     const appliedDowngraded = trusted && lifecycleState === 'applied';
     const safeLifecycle = trusted ? (appliedDowngraded ? 'build' : lifecycleState) : 'idle';
+    const requirementMode = trusted && String(read(raw, 'requirementMode')).trim().toLowerCase() === 'draft' ? 'draft' : 'strict';
+    const answerRevision = trusted ? finiteNonNegative(read(raw, 'answerRevision')) : 0;
+    const resourceRevision = trusted ? finiteNonNegative(read(raw, 'resourceRevision')) : 0;
+    const candidateReadiness = trusted && !appliedDowngraded ? (read(raw, 'readinessPreview') || null) : null;
+    const readinessMatches = Boolean(candidateReadiness && hasPlanIdentity &&
+        String(read(candidateReadiness, 'planId') || '').trim() === String(pendingPlanSnapshot.planId || pendingPlanSnapshot.PlanId || '').trim() &&
+        String(read(candidateReadiness, 'planHash') || '').trim() === String(pendingPlanSnapshot.planHash || pendingPlanSnapshot.PlanHash || '').trim() &&
+        (String(read(candidateReadiness, 'requirementMode') || '').trim().toLowerCase() === 'draft' ? 'draft' : 'strict') === requirementMode &&
+        finiteNonNegative(read(candidateReadiness, 'answerRevision')) === answerRevision &&
+        finiteNonNegative(read(candidateReadiness, 'resourceRevision')) === resourceRevision &&
+        !hasDoubleEncodedDerivedResource(candidateReadiness));
+    const readinessStale = Boolean(trusted && !appliedDowngraded && hasPlanIdentity && !readinessMatches);
+    const persistedMissingResources = trusted && Array.isArray(read(raw, 'missingResources')) ? read(raw, 'missingResources') : [];
+    const previewMissingResources = readinessMatches && Array.isArray(read(read(candidateReadiness, 'buildReadiness'), 'missingResources'))
+        ? read(read(candidateReadiness, 'buildReadiness'), 'missingResources')
+        : [];
 
     const snapshot = {
         schemaVersion: versionSupported ? schemaVersion : 0,
@@ -60,12 +94,15 @@ export function normalizeWorkspaceSnapshotForRestore(raw) {
         planQuestionSelections: trusted ? safeObject(read(raw, 'planQuestionSelections')) : {},
         confirmedPlanAnswers: trusted && Array.isArray(read(raw, 'confirmedPlanAnswers')) ? read(raw, 'confirmedPlanAnswers') : [],
         optimisticPlanAnswers: trusted && Array.isArray(read(raw, 'optimisticPlanAnswers')) ? read(raw, 'optimisticPlanAnswers') : [],
-        answerRevision: trusted ? finiteNonNegative(read(raw, 'answerRevision')) : 0,
-        readinessPreview: trusted && !appliedDowngraded ? (read(raw, 'readinessPreview') || null) : null,
-        missingResources: trusted && Array.isArray(read(raw, 'missingResources')) ? read(raw, 'missingResources') : [],
+        answerRevision,
+        readinessPreview: readinessMatches ? candidateReadiness : null,
+        readinessStale,
+        missingResources: readinessMatches
+            ? previewMissingResources
+            : (readinessStale ? [] : persistedMissingResources),
         resourceDecisions: trusted ? safeObject(read(raw, 'resourceDecisions')) : {},
-        resourceRevision: trusted ? finiteNonNegative(read(raw, 'resourceRevision')) : 0,
-        requirementMode: trusted && String(read(raw, 'requirementMode')).trim().toLowerCase() === 'draft' ? 'draft' : 'strict',
+        resourceRevision,
+        requirementMode,
         workspaceViewMode: trusted && String(read(raw, 'workspaceViewMode')).trim().toLowerCase() === 'build' ? 'build' : 'plan',
         planAcceptedRecommendedDefaults: trusted && read(raw, 'planAcceptedRecommendedDefaults') === true,
         planRunId: trusted ? String(read(raw, 'planRunId') || '').trim() : '',

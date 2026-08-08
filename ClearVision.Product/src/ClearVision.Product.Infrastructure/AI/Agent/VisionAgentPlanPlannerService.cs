@@ -226,6 +226,10 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
                 "模型规划鉴权失败，已使用规则兜底，请检查 Planner API Key/接口/模型名。",
                 diagnostic);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             var diagnostic = BuildDiagnostic(
@@ -438,7 +442,8 @@ PlannerCandidateParsed:
         var classifiedPlannerBlocking = ClassifyPlannerBlockingReasons(
             blockingReasons,
             candidate.CanBuildCandidate,
-            questions);
+            questions,
+            baseline);
         var semantic = VisionAgentSemanticExtractionSafety.Sanitize(baseline.SemanticExtraction);
 
         var redactionNotes = new List<string>();
@@ -520,13 +525,13 @@ PlannerCandidateParsed:
                 Intent = maturity.Maturity,
                 CanBuild = false,
                 RecommendedRoute = baseline.RecommendedRoute,
-                BlockingReasons = blockedReadiness.Blockers
-                    .Where(blocker => blocker.BlocksBuild)
-                    .Select(blocker => blocker.Id)
-                    .DefaultIfEmpty("hard_requirement:inspection_goal_missing")
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Take(12)
-                    .ToList(),
+                BlockingReasons = result.BlockingReasons.Count > 0
+                    ? result.BlockingReasons.ToList()
+                    : maturity.BlockingReasons
+                        .Select(reason => $"hard_requirement:{SafeIdentifier(reason, "inspection_goal_missing")}")
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Take(12)
+                        .ToList(),
                 BuildReadiness = blockedReadiness,
                 RequirementMaturity = maturity,
                 DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
@@ -540,7 +545,9 @@ PlannerCandidateParsed:
         }
         else
         {
-            var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(result with { RequirementMaturity = maturity });
+            var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+                result with { RequirementMaturity = maturity },
+                requirementMode: request.RequirementMode);
             var buildBlockingReasons = readiness.Blockers
                 .Where(blocker => blocker.BlocksBuild)
                 .Select(blocker => blocker.Id)
@@ -551,14 +558,7 @@ PlannerCandidateParsed:
             result = result with
             {
                 CanBuild = canBuild,
-                BlockingReasons = buildBlockingReasons.Count > 0
-                        ? buildBlockingReasons
-                        : readiness.Blockers
-                            .Where(blocker => !blocker.BlocksBuild)
-                            .Select(blocker => blocker.Id)
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .Take(12)
-                            .ToList(),
+                BlockingReasons = result.BlockingReasons.ToList(),
                 BuildReadiness = readiness,
                 RequirementMaturity = maturity,
                 DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
@@ -598,6 +598,24 @@ PlannerCandidateParsed:
         CancellationToken repairCancellationToken,
         CancellationToken callerCancellationToken)
     {
+        var deadline = VisionAgentPlanningDeadline.Current;
+        if (deadline != null && deadline.RemainingMs < deadline.Options.MinimumRepairBudgetMs)
+        {
+            var skippedDiagnostic = BuildDiagnostic(
+                PlannerFailureStageJsonParse,
+                "planner_json_repair_skipped_budget",
+                "planner_json_repair_skipped_budget",
+                "Planner JSON repair was skipped because the total planning budget was nearly exhausted.",
+                null);
+            events.Add(Event("planner_json_repair_skipped", "completed", "Planner JSON repair skipped",
+                "Planner JSON repair was skipped because the remaining total budget was below the repair minimum.",
+                BuildDiagnosticMetadata("planner_json_repair_skipped_budget", skippedDiagnostic)));
+            return new JsonRepairAttempt(
+                string.Empty,
+                skippedDiagnostic,
+                "planner_json_repair_skipped_budget");
+        }
+
         events.Add(Event("planner_json_repair_started", "started", "Planner JSON repair started",
             "Planner JSON parse failed; requesting one sanitized repair completion.",
             BuildDiagnosticMetadata("planner_json_repair", parseDiagnostic)));
@@ -1077,10 +1095,11 @@ PlannerCandidateParsed:
     private static List<string> ClassifyPlannerBlockingReasons(
         IEnumerable<string> reasons,
         bool canBuildCandidate,
-        IEnumerable<VisionAgentClarificationQuestion>? questions)
+        IEnumerable<VisionAgentClarificationQuestion>? questions,
+        VisionAgentPlanModeResult baseline)
     {
         var classified = reasons
-            .Select(ClassifyPlannerBlockingReason)
+            .Select(reason => ClassifyPlannerBlockingReason(reason, questions, baseline))
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(12)
@@ -1101,16 +1120,29 @@ PlannerCandidateParsed:
         return classified;
     }
 
-    private static string ClassifyPlannerBlockingReason(string reason)
+    private static string ClassifyPlannerBlockingReason(
+        string reason,
+        IEnumerable<VisionAgentClarificationQuestion>? questions,
+        VisionAgentPlanModeResult baseline)
     {
         var raw = Clean(reason);
         foreach (var prefix in new[] { "hard_requirement:", "strategy_confirmation:", "resource_pending:", "contract_warning:" })
         {
             if (raw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
+                if (prefix.Equals("resource_pending:", StringComparison.OrdinalIgnoreCase) &&
+                    IsStructuredImageResourceReason(raw[prefix.Length..], questions, baseline))
+                {
+                    return "resource_pending:image_source_missing";
+                }
                 var tail = SafeIdentifier(raw[prefix.Length..], "planner_blocker");
                 return $"{prefix}{tail}";
             }
+        }
+
+        if (IsStructuredImageResourceReason(raw, questions, baseline))
+        {
+            return "resource_pending:image_source_missing";
         }
 
         var clean = SafeIdentifier(raw, "planner_blocker");
@@ -1135,6 +1167,37 @@ PlannerCandidateParsed:
         }
 
         return $"contract_warning:{clean}";
+    }
+
+    private static bool IsStructuredImageResourceReason(
+        string reason,
+        IEnumerable<VisionAgentClarificationQuestion>? questions,
+        VisionAgentPlanModeResult baseline)
+    {
+        var hasAcquisition = (baseline.RecommendedRoute?.Operators ?? [])
+            .Any(op => op.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase));
+        var imageSourceMissing = (baseline.SemanticExtraction?.MissingFields ?? [])
+                .Concat(baseline.RequirementMaturity?.MissingFields ?? [])
+                .Any(field => VisionAgentPlanFieldPolicy.NormalizeField(field)
+                    .Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase)) ||
+            (string.IsNullOrWhiteSpace(baseline.SemanticExtraction?.ImageSource) &&
+             (baseline.RemainingPlanFields ?? []).Any(field => VisionAgentPlanFieldPolicy.NormalizeField(field)
+                 .Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase)));
+        if (!hasAcquisition || !imageSourceMissing)
+        {
+            return false;
+        }
+
+        var hasStructuredQuestion = questions?.Any(question =>
+            VisionAgentPlanFieldPolicy.ResolveQuestionField(question, [reason])
+                .Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase)) == true;
+        if (hasStructuredQuestion)
+        {
+            return true;
+        }
+
+        // Compatibility only after semantic, field and route evidence have been checked.
+        return ContainsAny(reason, "camera", "image source", "image sample", "相机", "图像", "样本");
     }
 
     private static bool IsBuildBlockingReason(string reason)

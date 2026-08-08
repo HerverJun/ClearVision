@@ -5047,6 +5047,206 @@ test('Plan requirement mode is scoped to plan identity and never restored from l
   assert.equal(planB.planHash, 'sha256:mode-b');
 });
 
+test('Strict to Draft persistence clears stale readiness before saving matching readiness in a second mutation', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const plan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult({ requirementMode: 'strict' }));
+  panel.pendingVisionPlan = plan;
+  panel._dispatchAgentWorkspaceEvent({ type: 'workspace/plan-received', payload: { plan } });
+  const strictRequest = panel._buildPlanReadinessPreviewRequest(plan);
+  panel._applyPlanReadinessPreviewResult(plan, {
+    ...panel._buildTestPlanReadinessPreview(strictRequest),
+    requirementMode: 'strict',
+    buildReadiness: {
+      canBuild: false,
+      blockers: [{ id: 'hard_requirement:image_source_missing', category: 'hard_requirement', field: 'image_source', blocksBuild: true }],
+      resolvedFields: [],
+      remainingFields: ['image_source'],
+      contractVersion: 'v2'
+    }
+  });
+
+  const saved = [];
+  panel._queueWorkspaceSnapshotFlush = async reason => {
+    saved.push({ reason, mode: panel.requirementMode, preview: panel.agentWorkspaceState.readinessPreview });
+    return { saved: true };
+  };
+  let resolveDraft;
+  panel._requestBackendPlanReadinessPreview = request => new Promise(resolve => {
+    resolveDraft = () => resolve({
+      ...panel._buildTestPlanReadinessPreview(request),
+      requirementMode: 'draft',
+      buildReadiness: {
+        canBuild: true,
+        blockers: [],
+        resolvedFields: [],
+        remainingFields: ['image_source'],
+        contractVersion: 'v2'
+      }
+    });
+  });
+
+  panel._setRequirementMode('draft', { silent: true });
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].mode, 'draft');
+  assert.equal(saved[0].preview, null);
+
+  resolveDraft();
+  await waitFor(() => saved.length === 2, 'matching readiness second persistence');
+  assert.equal(saved[1].mode, 'draft');
+  assert.equal(saved[1].preview.requirementMode, 'draft');
+});
+
+test('planning lifecycle client deadline covers backend public budget plus network margin', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.planningDeadlineContract = { totalBudgetMs: 120000, clientNetworkMarginMs: 15000 };
+  const scheduled = [];
+  const originalSetTimeout = window.setTimeout;
+  const originalClearTimeout = window.clearTimeout;
+  try {
+    window.setTimeout = (callback, delay) => {
+      scheduled.push({ callback, delay });
+      return scheduled.length;
+    };
+    window.clearTimeout = () => {};
+    panel._beginPlanningLifecycle({ requestId: 'router-budget', phase: 'understand' });
+    const timeout = Math.max(...scheduled.map(item => item.delay));
+    assert.equal(timeout, 135000);
+    assert.ok(timeout > 45000);
+  } finally {
+    panel._clearPlanningLifecycleTimers();
+    window.setTimeout = originalSetTimeout;
+    window.clearTimeout = originalClearTimeout;
+  }
+});
+
+test('planning lifecycle keeps one absolute budget across Router and Planner phases', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.planningDeadlineContract = { totalBudgetMs: 120000, clientNetworkMarginMs: 15000 };
+  const scheduled = [];
+  const originalSetTimeout = window.setTimeout;
+  const originalClearTimeout = window.clearTimeout;
+  const originalNow = Date.now;
+  let now = 1000;
+  try {
+    Date.now = () => now;
+    window.setTimeout = (callback, delay) => {
+      scheduled.push({ callback, delay });
+      return scheduled.length;
+    };
+    window.clearTimeout = () => {};
+    panel._beginPlanningLifecycle({ requestId: 'router-shared-budget', phase: 'understand' });
+
+    now += 30000;
+    scheduled.length = 0;
+    panel._advancePlanningLifecycle('context', 'Router completed.');
+
+    assert.equal(Math.max(...scheduled.map(item => item.delay)), 105000);
+    const planRequest = panel._buildPlanModeRequest({ description: 'detect scratches' });
+    assert.equal(planRequest.planningBudgetMs, 90000);
+
+    panel.planningLifecycle = { backendDeadlineAt: now - 1, status: 'completed' };
+    panel._beginPlanningLifecycle({ requestId: 'new-router-budget', phase: 'understand' });
+    assert.equal(panel._getPlanningBackendRemainingMs(), 120000);
+  } finally {
+    panel._clearPlanningLifecycleTimers();
+    Date.now = originalNow;
+    window.setTimeout = originalSetTimeout;
+    window.clearTimeout = originalClearTimeout;
+  }
+});
+
+test('backend planning deadline stops Router fallback from starting a new Planner budget', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel._startAssistantTurn = () => ({});
+  const error = new Error('published planning budget exceeded');
+  error.status = 504;
+  error.payload = {
+    errorCode: 'planning_deadline_exceeded',
+    timeoutKind: 'total_budget_exceeded',
+    stage: 'intent_router',
+    publicMessage: 'Planning deadline exceeded.'
+  };
+  let plannerCalls = 0;
+  panel._requestBackendIntentRouterRun = async () => { throw error; };
+  panel._enterPlanModeFromPrompt = () => {
+    plannerCalls += 1;
+    return true;
+  };
+
+  panel._enterIntentRouterFromPrompt({
+    description: 'detect scratches',
+    userMessage: 'detect scratches',
+    addUserMessage: false
+  });
+  await flushAsync(5);
+
+  try {
+    assert.equal(plannerCalls, 0);
+    assert.equal(panel.planningLifecycle.status, 'timeout');
+    assert.equal(panel.planningLifecycle.timeoutKind, 'total_budget_exceeded');
+  } finally {
+    panel._clearPlanningLifecycleTimers();
+  }
+});
+
+test('backend Plan deadline is presented as timeout rather than generic planning failure', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel._startAssistantTurn = () => ({});
+  const error = new Error('published planning budget exceeded');
+  error.payload = {
+    errorCode: 'planning_deadline_exceeded',
+    timeoutKind: 'total_budget_exceeded',
+    stage: 'plan_orchestration',
+    publicMessage: 'Planning deadline exceeded.'
+  };
+  panel._requestBackendVisionPlanLive = async () => { throw error; };
+
+  panel._enterPlanModeFromPrompt({
+    description: 'detect scratches',
+    userMessage: 'detect scratches',
+    addUserMessage: false
+  });
+  await flushAsync(5);
+
+  try {
+    assert.equal(panel.planningLifecycle.status, 'timeout');
+    assert.equal(panel.planningLifecycle.timeoutKind, 'total_budget_exceeded');
+  } finally {
+    panel._clearPlanningLifecycleTimers();
+  }
+});
+
+test('plan missing summary uses authoritative disjoint counts without subtracting resource totals', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const plan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult());
+  panel.pendingVisionPlan = plan;
+  panel._getCurrentCanonicalPreview = () => ({
+    buildReadiness: { canBuild: false, blockers: [], remainingFields: [] },
+    pendingConfirmationCount: 99,
+    resourcePendingCount: 98,
+    hardBlockerCount: 97,
+    buildBlockingConfirmationCount: 1,
+    buildRequiredResourceCount: 1,
+    deferredFieldCount: 1,
+    draftAllowedResourceCount: 2,
+    mustConfirmBeforeBuildCount: 2,
+    fillLaterCount: 3,
+    totalIncompleteCount: 5
+  });
+
+  const summary = panel._buildPlanMissingSummary(plan, []);
+
+  assert.equal(summary.mustConfirmCount, 2);
+  assert.equal(summary.fillLaterCount, 3);
+  assert.equal(summary.totalCount, 5);
+});
+
 test('Readiness preview failure closes the Build gate and preserves optimistic answers', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });

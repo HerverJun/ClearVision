@@ -392,6 +392,65 @@ public sealed class AgentRunEndpointsTests
         root.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
     }
 
+    [Fact(DisplayName = "GET planning deadline returns the versioned backend budget contract")]
+    public async Task GetPlanningDeadline_ShouldReturnPublishedBudgetContract()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+
+        using var response = await host.Client.GetAsync("/api/ai/vision-agent/planning-deadline");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("contractVersion").GetString().Should().Be("v1");
+        root.GetProperty("totalBudgetMs").GetInt32().Should().Be(120_000);
+        root.GetProperty("clientNetworkMarginMs").GetInt32().Should().Be(15_000);
+        root.GetProperty("minimumRepairBudgetMs").GetInt32().Should().Be(5_000);
+    }
+
+    [Fact(DisplayName = "POST Agent intent router maps total budget exhaustion to explicit 504")]
+    public async Task CreateIntentRouter_DeadlineExceeded_ShouldReturnGatewayTimeout()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(intentRouterHandler: (_, _) =>
+            Task.FromException<VisionAgentIntentRouterResult>(
+                new VisionAgentPlanningDeadlineExceededException("intent_router")));
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-intent-router-runs", new
+        {
+            description = "detect scratches",
+            metadataOnly = true
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.GatewayTimeout);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("errorCode").GetString().Should().Be("planning_deadline_exceeded");
+        root.GetProperty("timeoutKind").GetString().Should().Be("total_budget_exceeded");
+        root.GetProperty("stage").GetString().Should().Be("intent_router");
+    }
+
+    [Fact(DisplayName = "POST Agent plan maps total budget exhaustion to explicit 504")]
+    public async Task CreatePlan_DeadlineExceeded_ShouldReturnGatewayTimeout()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, _, _) =>
+            Task.FromException<VisionAgentPlanModeResult>(
+                new VisionAgentPlanningDeadlineExceededException("plan_orchestration")));
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan", new VisionAgentPlanModeRequest
+        {
+            Description = "detect scratches",
+            OriginalUserPrompt = "detect scratches",
+            SessionId = "session-plan-deadline"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.GatewayTimeout);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("errorCode").GetString().Should().Be("planning_deadline_exceeded");
+        root.GetProperty("timeoutKind").GetString().Should().Be("total_budget_exceeded");
+        root.GetProperty("stage").GetString().Should().Be("plan_orchestration");
+    }
+
     [Fact(DisplayName = "POST Agent plan run streams public Plan events before completed")]
     public async Task CreatePlanRun_ShouldStreamPublicEventsBeforeCompleted()
     {

@@ -42,6 +42,8 @@ public static class AiGenerationServiceExtensions
             configuration.GetSection(VisionAgentIntentRouterOptions.SectionName));
         services.Configure<VisionAgentSemanticExtractorOptions>(
             configuration.GetSection(VisionAgentSemanticExtractorOptions.SectionName));
+        services.Configure<VisionAgentPlanningDeadlineOptions>(
+            configuration.GetSection(VisionAgentPlanningDeadlineOptions.SectionName));
 
         // 注册运行时配置管理器（单例：启动时从 ai_models.json 加载，必要时从 ai_config.json 迁移）
         services.AddSingleton<AiConfigStore>();

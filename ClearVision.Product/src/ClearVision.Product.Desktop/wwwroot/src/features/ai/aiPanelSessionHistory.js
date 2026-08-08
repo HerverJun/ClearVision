@@ -592,6 +592,9 @@ export const aiPanelSessionHistoryMixin = {
         const lifecycle = snapshot.lifecycleState.toLowerCase();
         const workspaceMode = lifecycle.includes('build') || snapshot.buildRunId
             ? AgentWorkspaceModes.BUILD : AgentWorkspaceModes.PLAN;
+        const restoredReadinessPreview = snapshot.appliedDowngraded || snapshot.readinessStale
+            ? null
+            : snapshot.readinessPreview;
         this._dispatchAgentWorkspaceEvent?.({
             type: 'workspace/session-restored',
             payload: {
@@ -607,11 +610,11 @@ export const aiPanelSessionHistoryMixin = {
                 optimisticAnswers: snapshot.optimisticPlanAnswers,
                 answerRevision: snapshot.answerRevision,
                 selections: snapshot.planQuestionSelections,
-                readiness: snapshot.appliedDowngraded ? null : (snapshot.readinessPreview?.buildReadiness || normalizedPlan?.buildReadiness),
-                readinessPreview: snapshot.appliedDowngraded ? null : (snapshot.readinessPreview || normalizedPlan?.effectiveReadiness),
-                readinessStatus: snapshot.appliedDowngraded ? 'idle' : (snapshot.readinessPreview
-                    ? (snapshot.readinessPreview.buildReadiness?.canBuild === true ? 'ready' : 'blocked')
-                    : 'idle'),
+                readiness: restoredReadinessPreview?.buildReadiness || null,
+                readinessPreview: restoredReadinessPreview,
+                readinessStatus: restoredReadinessPreview
+                    ? (restoredReadinessPreview.buildReadiness?.canBuild === true ? 'ready' : 'blocked')
+                    : 'idle',
                 missingResources: snapshot.missingResources,
                 resourceDecisions: snapshot.resourceDecisions,
                 resourceRevision: snapshot.resourceRevision,
@@ -642,6 +645,10 @@ export const aiPanelSessionHistoryMixin = {
         this._renderPlanWorkspace?.(this.pendingVisionPlan);
         this._renderBuildWorkspaceFromAgentRun?.();
         this._updatePlanBuildActionState?.();
+
+        if (snapshot.readinessStale && this.pendingVisionPlan) {
+            this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'session_restore_stale' });
+        }
 
         const identity = this._captureSessionNavigationIdentity?.();
         this._restoreWorkspaceRunReplays(snapshot, sessionId, identity);
