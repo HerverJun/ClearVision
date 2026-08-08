@@ -8,10 +8,10 @@
 F10_STATE=ACTIVE
 F10_START_HEAD=38b80b0dfcb66db67a9eab5ff84f80b994104606
 F10_START_REMOTE_HEAD=38b80b0dfcb66db67a9eab5ff84f80b994104606
-IMPLEMENTATION_HEAD=026768cf41552f8b7da11cfad496820901edfe22
+IMPLEMENTATION_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 DOCUMENTATION_HEAD=SELF
 BRANCH_HEAD_AT_REVIEW=SELF
-REMOTE_IMPLEMENTATION_HEAD=026768cf41552f8b7da11cfad496820901edfe22
+REMOTE_IMPLEMENTATION_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 BRANCH=studio-ui-next
 PROJECT_IMPORT_EXPORT=DONE
 AI_ATTACHMENT_RESOURCE=BLOCKED_BY_CONTRACT
@@ -33,11 +33,78 @@ FINAL_GATE=PARTIAL
 PRODUCTION_ACCEPTANCE=NOT_GRANTED
 ```
 
+## G0 候选冻结与稳定线语义同步
+
+```text
+G0_STATE=DONE
+G0_REVIEW_DATE=2026-08-08
+G0_PREVIOUS_CANDIDATE_HEAD=66ff270df251ca3b9106c9c89f3ed1ba308aa6f7
+G0_IMPLEMENTATION_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
+G0_DOCUMENTATION_COMMIT=SELF
+G0_REMOTE_STUDIO_UI_NEXT_BEFORE_PUSH=f8569fa85244d19a18ba7308051e4d2b2ed4060a
+G0_STABLE_REF=origin/codex初稿@e76c74e392bb14ffe02ef9ea9c7a614cb8987f04
+G0_MERGE_BASE=e1bad492fecb6dff2c0a8f848db9ebfa18acf093
+G0_DIVERGENCE=HEAD_ONLY_309_STABLE_ONLY_81
+G0_STABLE_COMMITS_AUDITED=81
+G0_STABLE_COMMITS_LEFT_ONLY=77
+G0_STABLE_COMMITS_PATCH_EQUIVALENT=4
+G0_GENERATED_CATALOGS=NOT_APPLICABLE_HISTORICAL_SNAPSHOT
+G0_REMOTE_REFRESH=PASS_NO_REMOTE_ADVANCE_OR_FORK
+G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
+```
+
+远端刷新于 2026-08-08 执行：`git fetch origin --prune` 成功；`origin/studio-ui-next` 仍为
+`f8569fa85244d19a18ba7308051e4d2b2ed4060a`，未前进、未分叉。候选实现先提交为
+`21105d57de7e5b4ce41365c7827ed14e64ca7ba5`，本节文档随后单独提交；因此实现 SHA、文档来源和
+最终远端 SHA 可以分别追溯。
+
+### Stable-only 语义矩阵
+
+下表覆盖稳定线 merge-base 之后的 81 个提交：77 个没有在 Next 历史中找到 patch-equivalent 的提交，
+以及 4 个已由 Next 等价提交覆盖的提交。`MERGE` 表示已将源码、合同、权限、测试或 CI 语义以当前
+架构落入 `21105d57d`；`SUPERSEDED` 表示无需再次合入；`NOT_APPLICABLE` 只适用于当前 G0 明确
+排除的生成快照或历史远端证据，不代表对应源码合同被跳过；没有发现需要阻断的 `BLOCKED` 提交。
+
+| 范围与稳定线提交 | disposition | 当前代码锚点 | 冲突/风险处理 | 验证与边界 |
+| --- | --- | --- | --- | --- |
+| `ac7701ffd`, `fe4b42f13`, `0ebbb6ecc`, `58545fab1`, `924e3afaf`, `2d941da14`, `dca452867`, `01e88c5e8`, `fe39d379c`, `988681cf6`, `59a6aede4`, `d5ef2232a` | `MERGE` | `OperatorMetadataScanner`、`OperatorFactory`、`OperatorService`、operator display-name/parameter contract tests | 以当前 metadata source 和 `OperatorCategoryId` 为准，保留 Next 现有 UI 投影；未使用整文件 ours/theirs | Product metadata/operator 定向 `49/49`；Product solution build `0 errors` |
+| `4485c1d07`, `6976c7bcc` | `NOT_APPLICABLE`（生成快照） | 运行时继续使用当前 source metadata；未把 `docs/ai/operator-knowledge/*`、`docs/operators/catalog.json`、card/version-history 快照当作 authority | 这些提交主要重生成 catalog/card/knowledge snapshot；当前分支保留历史快照，避免未审计的大批生成物混入 G0 | 旧 `OperatorKnowledgeGraphTests` 因历史 graph 的 DeepLearning 输出为 14、当前 source 为 31 而失败；记录为 `NOT_APPLICABLE_HISTORICAL_SNAPSHOT`，未静默改 fixture |
+| `08125e8a7`, `82e34837a`, `6c0fa1f02`, `5667bfbe7`, `ce266626e`, `0a827d78c`, `97d25440b` | `MERGE` | `OperatorImageContracts`、depth/domain evaluators、operator quality contracts、classification/precision tests | Image depth 约束保持后端/operator contract 权威；quality lane 与 functional lane 分开，不改变 Runtime authority | Product image-contract/quality 定向测试通过；OperatorLibrary smoke `41/41` |
+| `f1efcfc11`, `6e4906656` | `MERGE`（源码/门禁）+ `NOT_APPLICABLE`（生成 evidence） | `quality/test-gates.json`、`TestGovernanceRunner`、`OperatorQualityState`、CI quality jobs | 合并可执行的 governance runner 和 source contract；历史 generated quality/catalog report 不作为当前 SHA 证据 | Product/OperatorLibrary 本地门禁通过；生成报告不冒充当前 clean-checkout/Remote CI 证据 |
+| `505a33a5f`, `f7fcd2fac`, `9df0fa73d`, `ef103c899`, `727414e2c`, `f7e9eea40`, `dcd16e005`, `549f56af1`, `5b9324d02`, `5306a570d`, `e7b34f591`, `afcbfd686`, `dfa5ea1ef` | `MERGE`（脚本/测试/质量规则）+ `NOT_APPLICABLE`（历史 benchmark 输出） | `scripts/run-test-quality-lane.ps1`、measurement/benchmark runners、`.gitattributes`、package smoke | 保留 evidence identity、顺序执行和 fixture byte identity；benchmark 数字必须由当前命令重现，不能复制历史结果 | OperatorLibrary pack + smoke `41/41`；性能/质量报告未宣称为 Remote CI 当前通过 |
+| `b7667b01e`, `07ff5ede5`, `2eacc62d1`, `4403fee02`, `4386d8f35`, `bea404394`, `47d749468` | `MERGE` | planar calibration/1080P layout、operator search、single-frame preview/ROI、Unicode image paths、相关 Desktop/UI tests | 保留 canonical Canvas/ImageCanvas、Preview/ROI 和既有 camera/acquisition authority；只解决语义与布局差异 | Desktop synchronized group `106/106`；Unicode/acquisition、Preview/ROI 和 1080P 代码测试随 Product build 验证 |
+| `5887387c0`, `d1abc87fc`, `3c83e48d9`, `8008ab435`, `7a8110bbc`, `6c8d8a81d`, `bdc26abc4`, `132b2d543`, `99e2a538a`, `f8adf5221`, `e609f47bf`, `753b1b188`, `c6bb5302e`, `fc8ba0e81`, `674d26930`, `1dad6ced6`, `809d220bf`, `e8efbb904`, `402cf4856`, `432d6e302`, `ce98ae9bd`, `684de59a3`, `ed8af7a04`, `3a5076b54`, `64ff3c73a`, `ef4d1872a` | `MERGE` | `.github/workflows/*`、serial test runners、Desktop/TCP/SSE/photoelectric tests、agent fixture contracts、quality boundary | 共享 CI、测试配置和 `.csproj` 逐项语义合并；同一 `.csproj` 串行运行，未引入第二 runner 或第二 gate | Desktop extension `113/114`；唯一失败为 Windows Event Log 写权限，标记 `BLOCKED_BY_ENVIRONMENT`；其余 OperatorLibrary/Product gates 通过 |
+| `0ffa3b98b` | `MERGE`（测试/源闭包）+ `NOT_APPLICABLE`（generated metadata snapshot） | generated metadata governance test 与当前 source metadata contracts | 不把 generated catalog 变成前端或 AI authority；snapshot drift 显式保留 | 同上；历史 knowledge graph mismatch 单独记录，不作为源码合同失败 |
+| `3725d7e97`, `c5bc80454`, `9a40c1bed` | `NOT_APPLICABLE`（历史远端 evidence） | 无运行时 authority 变更；F10 仅保留当前候选的本地证据 | 这些提交绑定旧的 G01B-R2 remote report SHA，不能冒充 `21105d57d` 的 Remote CI | Remote CI 当前候选 `NOT PERFORMED/BLOCKED_BY_ENVIRONMENT`；未创建 run |
+| `8d72ba392`, `7dadc8535`, `eb199a8fa`, `2f44a8c13` | `MERGE` | Vision Agent planning readiness、artifact admission/fingerprint/recovery、active model、enum compatibility | 退役旧 Planner/Loop authority，保留 AgentRun/endpoint 后端权威；blob template route 和 failed artifact summary 只作为既有合同投影 | Product AI/Preview/runtime/operator group `84/85`；唯一失败为上表历史 knowledge snapshot，未改变 workflow authority |
+| `c17a30ff2`, `80ef45cd8`, `f79582f61`, `e76c74e39` | `SUPERSEDED` | `c5d6c1c23`、`521fb7e70`、`effb42642`、`5c239db5b` 已提供 patch-equivalent 语义 | `git log --cherry-pick` 证明等价；不重复合入，不创建第二 AI/acquisition owner | 由当前 branch history 和本轮相关 Product/Desktop tests 覆盖 |
+
+矩阵结论：所有 stable-only authority/security/contract、operator metadata、acquisition/Preview、质量和 CI
+语义均有 `MERGE` 或 `SUPERSEDED` disposition；生成 catalog/card/version-history、AI knowledge snapshot
+和旧远端报告均已明确 `NOT_APPLICABLE`。没有 `BLOCKED` 的稳定线提交，也没有通过前端私有模型替代后端
+authority 的改动。`DeepLearning` 当前 source metadata 仍有 31 个输出，旧 knowledge graph 14 个输出
+是已知文档漂移，后续如需重生成必须作为受控 artifact 变更单独审计。
+
+### G0 当前候选验证
+
+以下结果绑定实现 SHA `21105d57de7e5b4ce41365c7827ed14e64ca7ba5`；同一测试项目按仓库规则串行运行。
+
+| 证据 | 状态 | 当前结果与边界 |
+| --- | --- | --- |
+| Product solution build | `PASS` | 0 errors；保留既有 `NU1900` vulnerability-feed warning 与一个 `System.Collections.Immutable` version-conflict warning |
+| Product metadata/image-contract 定向 | `PASS` | `49/49` |
+| Product Preview/AI/runtime/operator 定向 | `PARTIAL_NOT_APPLICABLE` | `84/85`；唯一失败是旧 `docs/ai/operator-knowledge/operator_knowledge_graph.json` 与当前 source metadata 不一致，按矩阵记为历史快照 `NOT_APPLICABLE` |
+| Desktop 同步定向组 | `PASS` | `106/106` |
+| Desktop 扩展定向组 | `BLOCKED_BY_ENVIRONMENT` | `113/114`；唯一失败为无权限写 Windows Event Log，未改产品代码或 ACL |
+| OperatorLibrary pack + smoke | `PASS` | `41/41`；smoke restore/test 固定 `RuntimeIdentifier=win-x64`，避免无关 native asset 失败 |
+| `git diff --check` | `PASS` | 实现提交前通过；文档提交前及 push 前再次复核 |
+| 真实 WebView2、Windows 100%/125%、独立 no-Node、Remote CI、Camera/PLC/Station、生产 soak | `NOT_PERFORMED` / `BLOCKED_BY_ENVIRONMENT` | 不以 Chromium、DPR、本机 build 或历史 report 替代 |
+
 ## Gate 状态
 
 | Gate | 状态 | 当前证据 / blocker |
 | --- | --- | --- |
-| G0_REMOTE_CI | BLOCKED_BY_ENVIRONMENT | `026768cf4` 已推送至 `origin/studio-ui-next`。`ci.yml` 支持 `workflow_dispatch`，但本机 `gh` token 失效、内置浏览器未登录 GitHub、Chrome 会话不可用；未创建 run，未改 trigger。 |
+| G0_REMOTE_CI | BLOCKED_BY_ENVIRONMENT | 当前冻结实现为 `21105d57d`；`ci.yml` 支持 `workflow_dispatch`，但本机 `gh` token 失效、内置浏览器未登录 GitHub、Chrome 会话不可用；未创建当前候选 run，未改 trigger。 |
 | G1_PROJECT_CONTRACT | DONE | 复用 `ProjectLifecycleCoordinator`、`ProjectSaveCoordinator` 和现有 Project Service；JSON schema/version、CREATE/OVERWRITE、权限、revision、clientOperationId、validation、partial-save 防护和 replay/reconcile 已由现有 endpoint/lifecycle tests 覆盖。 |
 | G1_AI_RESOURCE_CONTRACT | BLOCKED_BY_CONTRACT | Camera resource identity/revision/decision 已有 authority；attachment、CV model artifact、TemplateMatching artifact 与 calibration asset-to-scale 投影仍缺正式后端合同，详见本轮 AI 结论。 |
 | G1_CALIBRATION_CONTRACT | DONE | N 点 draft/solve 继续要求 Engineer/Admin、非空且存在的 Project 上下文；`ScaleOffset` 复用同一 solver、candidate bundle 和 Project asset save 链。本轮新增 Chromium/fixture solve + formal asset save/reconcile journey，未新增 calibration authority。 |
@@ -84,15 +151,15 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 - Chromium/fixture 定向组 `7/7` 通过：Project canonical JSON import/export、Results server-side full-batch export/download、Station lost-response + duplicate lock + request identity reconcile、Template apply-to-draft、N Point solve + Project asset save/reconcile、Line Sequence Analyze/Recommendation/Apply，以及 draft stale/backend safety rejection。
 - 该证据只代表 Playwright Chromium + fixture contract，不代表真实 WebView2、DPI、Desktop endpoint 联调或现场设备。
 
-### Remote CI / Final Gate
+### Remote CI / Final Gate（当前 G0 候选）
 
-- `026768cf4` 已安全推送，push 前 fetch 确认远程未前进且 merge-base 与起始 SHA 一致。
+- `21105d57d` 是本轮冻结实现；实现提交与本次文档提交分离，push 前已 fetch 并确认远程未前进、未分叉。
 - `ci.yml` 存在 `workflow_dispatch`，但 `gh auth status` 显示 token 失效，内置浏览器 GitHub 未登录，Chrome 会话不可用。本轮未创建 remote run，未修改 trigger，未跳过 required job。
 - `FINAL_GATE=PARTIAL`：当前 implementation SHA 本地 gates 通过；clean-checkout CI、WebView2、no-Node 与现场硬件仍缺失。
 
 ## 前序工作记录（历史 checkpoint）
 
-### G0 Remote CI
+### G0 Remote CI（前序 checkpoint）
 
 - 已执行 `git fetch origin --prune`，远端 `studio-ui-next` 与本地基线一致。
 - 已审计 workflow 触发条件；普通 `studio-ui-next` push 不触发完整 CI。
@@ -128,7 +195,9 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 - AI attachment、CV model artifact、TemplateMatching artifact、calibration asset-to-scale projection 与 Advanced Settings 仍按合同缺口记录，不新增第二套 authority。
 - Line Sequence 软件闭环已完成，但未包含设备写入；Remote CI、WebView2 100%/125%、独立 no-Node、现场硬件与生产 soak 仍未取得证据。
 
-## 测试与真实环境
+## 测试与真实环境（前序 F10 checkpoint；当前 G0 证据见上节）
+
+> 本节保留前序 F10 的历史证据，不把旧 checkpoint 的数量或通过结论外推到当前实现 SHA。
 
 | 证据 | 状态 |
 | --- | --- |
@@ -157,4 +226,4 @@ PRODUCTION_ACCEPTANCE=NOT_GRANTED
 
 ## 提交
 
-本轮 implementation checkpoint：`026768cf4` （Line Sequence authority/Next 闭环、AutoTune 权限与 preview admission、核心 Browser journeys），已安全推送至 `origin/studio-ui-next`。前序 checkpoint：`1af7b2ec6`、`8846c52e4`、`d469a4740`。提交和软件测试不会自动授予生产验收。
+本轮 implementation checkpoint：`21105d57d`（稳定线 authority/contract、operator metadata、acquisition/Preview、质量与 CI/测试稳定性语义同步）；文档提交单独记录并随本分支推送。前序 checkpoint：`026768cf4`、`1af7b2ec6`、`8846c52e4`、`d469a4740`。提交和软件测试不会自动授予生产验收。

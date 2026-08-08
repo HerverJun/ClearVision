@@ -1,5 +1,14 @@
 # Studio UI Next
 
+```text
+CURRENT_STATUS_DISPOSITION=SUPERSEDED_FOR_CURRENT_STATUS_BY_F10
+CURRENT_STATUS_SOURCE=F10_ContractAndProductionPlan.md
+SUPERSEDED_BY_IMPLEMENTATION_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
+```
+
+本 README 及其阶段历史只保留背景、边界和可追溯证据；当前 Gate、SHA、同步 disposition、测试结果和
+未执行项统一以 `F10_ContractAndProductionPlan.md` 为准，不在本文件维护第二套状态。
+
 `studio-ui-next` 是 ClearVision Studio 的独立前端重构线。本目录只保存使命、边界、阶段门禁和少量长期上下文，不扩展成旧式 G00—G16 巨型流水账。
 
 ## 分支使命

@@ -2,16 +2,23 @@
 
 ```text
 DOCUMENT_ROLE=EXECUTION_PLAN
-DOCUMENT_STATE=READY_FOR_G0
+DOCUMENT_STATE=G0_DONE_G1_READY
 CURRENT_BRANCH=studio-ui-next
 PLANNING_BASELINE_HEAD=f8569fa85244d19a18ba7308051e4d2b2ed4060a
-IMPLEMENTATION_BASELINE_HEAD=026768cf41552f8b7da11cfad496820901edfe22
+IMPLEMENTATION_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 REFERENCE_STABLE_REF=origin/codex初稿@e76c74e392bb14ffe02ef9ea9c7a614cb8987f04
 PLANNING_MERGE_BASE=e1bad492fecb6dff2c0a8f848db9ebfa18acf093
 PLANNING_DIVERGENCE=STABLE_ONLY_81_NEXT_ONLY_294
-REFS_REFRESHED_FOR_THIS_PLAN=NO
+REFS_REFRESHED_FOR_THIS_PLAN=YES
 CURRENT_STATUS_SOURCE=docs/进行中/StudioUINext/F10_ContractAndProductionPlan.md
 EXECUTION_POLICY=ONE_GATE_AT_A_TIME
+G0_STATE=DONE
+G0_IMPLEMENTATION_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
+G0_STABLE_COMMITS_AUDITED=81
+G0_STABLE_COMMITS_LEFT_ONLY=77
+G0_STABLE_COMMITS_PATCH_EQUIVALENT=4
+G0_GENERATED_ARTIFACTS=NOT_APPLICABLE_HISTORICAL_SNAPSHOT
+G0_REMOTE_REFRESH=PASS_NO_REMOTE_ADVANCE_OR_FORK
 PRODUCTION_ACCEPTANCE=NOT_GRANTED
 LEGACY_RETIREMENT=NOT_APPROVED
 ```
@@ -53,8 +60,8 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 
 | Gate | 优先级 | 工作包 | 当前状态 | 唯一 Owner | 解锁条件 |
 | --- | --- | --- | --- | --- | --- |
-| G0 | P0 | 候选冻结、稳定线语义同步、文档收敛 | READY | 主协调 Owner | 无 |
-| G1 | P0 | 请求/写入生命周期与跨工程状态安全 | LOCKED | Workspace lifecycle Owner | G0 DONE |
+| G0 | P0 | 候选冻结、稳定线语义同步、文档收敛 | DONE | 主协调 Owner | 无 |
+| G1 | P0 | 请求/写入生命周期与跨工程状态安全 | READY | Workspace lifecycle Owner | G0 DONE |
 | G2 | P0/P1 | 后端合同解阻与功能差距决策 | LOCKED | 主协调 Owner + 对应后端 Owner | G0 DONE 可只读取证；G1 DONE 才实现 |
 | G3 | P1/P2 | 产品体验、视觉、中文与 Vue 可维护性收口 | LOCKED | UI Owner；共享面由主协调 Owner | G0 DONE 可只读审计；G2 合同冻结才实现 |
 | G4 | P0 | Legacy profile 隔离、rollback 与退役准备 | LOCKED | Host/Release Owner | G0-G3 DONE |
@@ -69,28 +76,28 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 **文件边界**：可能触及 Host、contracts、endpoints、AI、Preview、operator metadata、CI、配置和共享文档，
 因此仅由主协调 Owner 集成；不并行修改共享文件。
 
-- [ ] G0.1 记录 `git status --short --branch`、当前 HEAD、upstream、merge-base 和分叉计数。
-- [ ] G0.2 执行 `git fetch origin --prune`；若远端 `studio-ui-next` 前进或历史分叉，停止并报告。
-- [ ] G0.3 冻结 clean 候选 SHA；审计期间禁止继续向候选混入无关功能。
-- [ ] G0.4 对 stable-only commits 建立语义矩阵：`MERGE` / `SUPERSEDED` / `NOT_APPLICABLE` /
+- [x] G0.1 记录 `git status --short --branch`、当前 HEAD、upstream、merge-base 和分叉计数。
+- [x] G0.2 执行 `git fetch origin --prune`；若远端 `studio-ui-next` 前进或历史分叉，停止并报告。
+- [x] G0.3 冻结 clean 候选 SHA；审计期间禁止继续向候选混入无关功能。
+- [x] G0.4 对 stable-only commits 建立语义矩阵：`MERGE` / `SUPERSEDED` / `NOT_APPLICABLE` /
   `BLOCKED`，每项记录代码锚点、风险、冲突和验证。
-- [ ] G0.5 第一批同步 AI workflow artifact authority：旧 Planner 退役、artifact admission、route registry、
+- [x] G0.5 第一批同步 AI workflow artifact authority：旧 Planner 退役、artifact admission、route registry、
   fingerprint、readiness/recovery、failed artifact summary、active model 和 enum compatibility。
-- [ ] G0.6 第二批同步 acquisition、Unicode 图像路径、Camera 厂商探测、Preview/ROI 和 1080P 修复。
-- [ ] G0.7 第三批同步 operator metadata/contracts、性能报告与 CI/测试稳定性修复。
-- [ ] G0.8 共享 `appsettings.json`、API contracts、Host、CI 和测试配置逐项语义合并，禁止整文件选择
+- [x] G0.6 第二批同步 acquisition、Unicode 图像路径、Camera 厂商探测、Preview/ROI 和 1080P 修复。
+- [x] G0.7 第三批同步 operator metadata/contracts、性能报告与 CI/测试稳定性修复。
+- [x] G0.8 共享 `appsettings.json`、API contracts、Host、CI 和测试配置逐项语义合并，禁止整文件选择
   `ours` / `theirs`。
-- [ ] G0.9 每批完成后串行运行受影响项目的定向测试；同一 `.csproj` 不并发测试。
-- [ ] G0.10 更新 F10 当前 SHA、stable 同步 disposition 和证据；README、F09、M00、M09 标记
+- [x] G0.9 每批完成后串行运行受影响项目的定向测试；同一 `.csproj` 不并发测试。
+- [x] G0.10 更新 F10 当前 SHA、stable 同步 disposition 和证据；README、F09、M00、M09 标记
   `SUPERSEDED_FOR_CURRENT_STATUS_BY_F10`，不再维护第二套状态。
 
 **G0 退出条件**：
 
-- [ ] 所有 stable-only authority/security/contract 提交都有明确 disposition。
-- [ ] 当前代码不再无说明地保留稳定线已退役的旧 Planner/Loop 权威。
-- [ ] F10 的 `IMPLEMENTATION_HEAD` 指向冻结实现 SHA，文档提交来源可追溯；当前 HEAD/upstream 包含该实现与
+- [x] 所有 stable-only authority/security/contract 提交都有明确 disposition。
+- [x] 当前代码不再无说明地保留稳定线已退役的旧 Planner/Loop 权威。
+- [x] F10 的 `IMPLEMENTATION_HEAD` 指向冻结实现 SHA，文档提交来源可追溯；当前 HEAD/upstream 包含该实现与
   对应文档提交，工作树 clean 且无无关修改。
-- [ ] 受影响定向测试有当前 SHA 结果，未运行项明确记录。
+- [x] 受影响定向测试有当前 SHA 结果，未运行项明确记录。
 
 ## 5. G1：生命周期与状态安全
 
@@ -285,6 +292,6 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 
 ## 14. 下一步唯一动作
 
-- [ ] 只执行 **G0.1-G0.4**：刷新远端、冻结 clean 候选、生成 stable-only commit 语义矩阵。
-- [ ] G0.4 复审通过前，不开始 G1 生命周期修改、G2 capability 实现、G3 视觉精修或 G4 Legacy 隔离。
-- [ ] 第一份交付只包含：基线、语义矩阵、拟合批次、共享文件冲突、测试计划和 blocker；不混入实现。
+- [x] **G0.1-G0.4** 已完成：远端刷新、候选冻结和 stable-only commit 语义矩阵见 F10。
+- [ ] 开始 G1 生命周期与状态安全收口；G2/G3 只进行只读合同/体验审计，遵守唯一 Owner 和前置 Gate。
+- [ ] G1 实现不得改变后端 authority、保存链、Runtime/Station、AgentRun 或引入第二套基础设施。
