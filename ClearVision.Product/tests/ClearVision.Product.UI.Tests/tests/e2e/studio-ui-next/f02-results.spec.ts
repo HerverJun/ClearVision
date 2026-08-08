@@ -25,6 +25,7 @@ const defectId = '33333333-3333-4333-8333-333333333333';
 const referenceResultId = '44444444-4444-4444-8444-444444444444';
 const executionSnapshotId = '55555555-5555-4555-8555-555555555555';
 const imageId = '66666666-6666-4666-8666-666666666666';
+const exportId = '77777777-7777-4777-8777-777777777777';
 const canonicalCases = Object.freeze([
   ['Ok', 'Succeeded', 'Ok'],
   ['Ng', 'Succeeded', 'Ng'],
@@ -240,6 +241,38 @@ async function bootResults(page: Page, initialHash = '/results'): Promise<F02Met
     }
     if (url.pathname === `/api/inspection/statistics/${projectId}` || url.pathname === '/api/stations/statistics') {
       await fulfillJson(route, 200, statistics());
+      return;
+    }
+    if (url.pathname === '/api/results/exports' && request.method() === 'POST') {
+      const body = request.postDataJSON() as Readonly<Record<string, unknown>>;
+      await fulfillJson(route, 200, {
+        job: {
+          exportId,
+          projectId,
+          source: 'local',
+          format: body.format,
+          clientOperationId: body.clientOperationId,
+          state: 'completed',
+          createdAtUtc: '2026-07-15T02:00:00Z',
+          updatedAtUtc: '2026-07-15T02:00:01Z',
+          snapshotUpperBoundUtc: '2026-07-15T02:00:00Z',
+          completedAtUtc: '2026-07-15T02:00:01Z',
+          artifactExpiresAtUtc: '2026-07-16T02:00:01Z',
+          fileName: 'inspection-results.csv',
+          errorCode: null,
+          errorMessage: null,
+          downloadAvailable: true
+        }
+      });
+      return;
+    }
+    if (url.pathname === `/api/results/exports/${exportId}/download` && request.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/csv; charset=utf-8',
+        headers: { 'Content-Disposition': 'attachment; filename="inspection-results.csv"' },
+        body: 'resultId,outcome\n22222222-2222-4222-8222-222222222222,Ng\n'
+      });
       return;
     }
     if (url.pathname === `/api/inspection/history/${projectId}/${localResultId}/evidence/manifest`) {
@@ -472,6 +505,31 @@ test('Results Station view paginates the frozen 500-result fixture and marks leg
   )).toBe(true);
   expect(stationFixtures).toHaveLength(f02ResultsPerformanceFixtureCount);
   expect(expectGetOnly(audit)).toBe(true);
+});
+
+test('F10 exports the complete server-side local Results scope and downloads the generated file', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const audit = await bootResults(
+    page,
+    `/results?source=local&projectId=${projectId}&outcome=Ng&diagnosticCode=WIRE_SWAP`
+  );
+
+  await page.getByTestId('results-open-export').click();
+  const dialog = page.getByRole('dialog', { name: '导出完整结果' });
+  await expect(dialog).toContainText('当前工程全部历史结果');
+  await expect(dialog).toContainText('Ng');
+  await expect(dialog).toContainText('WIRE_SWAP');
+  await dialog.getByRole('button', { name: '开始导出' }).click();
+  await expect(dialog.locator('[data-capability="results-export"]')).toHaveAttribute('data-phase', 'completed');
+  await expect(dialog).toContainText('结果文件包含服务端当前工程历史查询能读取的全部匹配记录');
+
+  const downloadPromise = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: '下载文件' }).click();
+  const download = await downloadPromise;
+
+  expect(download.suggestedFilename()).toBe('inspection-results.csv');
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/results/exports')).toHaveLength(1);
+  expect(audit.filter(entry => entry.method === 'GET' && entry.path.endsWith('/download'))).toHaveLength(1);
 });
 
 for (const visual of [

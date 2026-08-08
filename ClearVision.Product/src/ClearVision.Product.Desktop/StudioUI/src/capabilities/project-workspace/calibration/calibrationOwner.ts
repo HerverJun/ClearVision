@@ -118,7 +118,8 @@ function parameterValue(node: Readonly<Record<string, unknown>>, name: string): 
 }
 
 function isNPointNode(node: Readonly<Record<string, unknown>> | null): boolean {
-  return text(node?.type ?? node?.Type).toLocaleLowerCase() === 'npointcalibration';
+  const identity = text(node?.type ?? node?.Type).toLocaleLowerCase();
+  return identity === 'npointcalibration' || identity === '150';
 }
 
 function newSample(order: number, input: CalibrationSampleInput): CalibrationSample {

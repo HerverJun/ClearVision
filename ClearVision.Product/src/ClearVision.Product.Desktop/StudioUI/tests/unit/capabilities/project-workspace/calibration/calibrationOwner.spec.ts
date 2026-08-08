@@ -12,7 +12,11 @@ function point(sampleId: string, x: number, y: number, worldX: number, worldY: n
   return { sampleId, ImageX: x, ImageY: y, WorldX: worldX, WorldY: worldY, Enabled: true };
 }
 
-function createHarness(post: ApiTransport['post'] = async () => undefined, calibrationMode = 'Affine') {
+function createHarness(
+  post: ApiTransport['post'] = async () => undefined,
+  calibrationMode = 'Affine',
+  calibrationType: string | number = 'NPointCalibration'
+) {
   const flowProjection = reactive({
     mutationGate: 'editable' as const,
     runtime: {
@@ -23,7 +27,7 @@ function createHarness(post: ApiTransport['post'] = async () => undefined, calib
     draft: {
       operators: [{
         id: nodeId,
-        type: 'NPointCalibration',
+        type: calibrationType,
         parameters: [
           { name: 'CalibrationMode', value: calibrationMode },
           { name: 'CalibrationUnit', value: 'mm' },
@@ -91,6 +95,14 @@ function solveResponse(sessionId = 'calibration-draft-session') {
 }
 
 describe('CalibrationOwner', () => {
+  it('recognizes the persisted numeric NPointCalibration identity', () => {
+    const harness = createHarness(async () => undefined, 'Affine', 150);
+
+    expect(harness.owner.projection.phase).toBe('ready');
+    expect(harness.owner.projection.samples).toHaveLength(3);
+    harness.owner.dispose();
+  });
+
   it('reads direct legacy PointPairs, edits incomplete World coordinates, and keeps a stable draft session', () => {
     const harness = createHarness();
     expect(harness.owner.projection.samples).toHaveLength(3);

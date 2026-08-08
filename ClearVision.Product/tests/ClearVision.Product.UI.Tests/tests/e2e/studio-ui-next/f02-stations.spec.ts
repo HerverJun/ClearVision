@@ -240,7 +240,8 @@ async function bootStations(
   role: 'Admin' | 'Engineer' = 'Engineer',
   initialCommands: Record<string, unknown>[] = [command({
     status: 'Succeeded', progressPercent: 100, completedAtUtc: '2026-07-15T02:01:00Z'
-  })]
+  })],
+  options: Readonly<{ commandPostUnknown?: boolean }> = {}
 ): Promise<F02MethodAuditEntry[]> {
   const audit: F02MethodAuditEntry[] = [];
   const commands = [...initialCommands];
@@ -331,6 +332,10 @@ async function bootStations(
           clientRequestId: body.clientRequestId, payloadJson: body.payloadJson
         });
         commands.unshift(created);
+        if (options.commandPostUnknown) {
+          await route.abort('failed');
+          return;
+        }
         await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? created : { error: 'StationAdminRequired' });
       } else {
         await fulfill(route, role === 'Admin' ? 200 : 403, role === 'Admin' ? commands : { error: 'StationAdminRequired' });
@@ -482,6 +487,25 @@ test('Admin Station journey mounts controls and creates command, identity and pa
   expect(identityErrors).toEqual({ consoleErrors: [], pageErrors: [] });
   expect(deployErrors).toEqual({ consoleErrors: [], pageErrors: [] });
   await deployPage.close();
+});
+
+test('F10 Station preserves unknown outcome, blocks duplicate submit and reconciles by request identity', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const audit = await bootStations(page, [station()], summary(), 'Admin', [], { commandPostUnknown: true });
+  await page.goto('/studio/index.html#/stations/station-a');
+
+  const admin = page.locator('[data-capability="station-admin-control"]');
+  const submit = admin.getByTestId('station-issue-command');
+  await submit.click();
+  await expect(admin.getByText('操作结果未知')).toBeVisible();
+  await expect(submit).toBeDisabled();
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/stations/station-a/commands')).toHaveLength(1);
+
+  await admin.getByRole('button', { name: '读取后端状态' }).click();
+  await expect(admin.getByText('已按请求标识确认命令记录；执行终态仍以后端命令状态为准。')).toBeVisible();
+  await expect(submit).toBeDisabled();
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/stations/station-a/commands')).toHaveLength(1);
+  expect(audit.filter(entry => entry.method === 'GET' && entry.path.includes('/commands/by-client-request/'))).toHaveLength(1);
 });
 
 test('Station list surfaces frozen-contract malformed and empty responses', async ({ page }) => {

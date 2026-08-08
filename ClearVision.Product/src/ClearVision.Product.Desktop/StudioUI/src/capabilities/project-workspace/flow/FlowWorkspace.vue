@@ -20,6 +20,7 @@ import OperatorRail from './OperatorRail.vue';
 import InspectorPanel from '../inspector/InspectorPanel.vue';
 import PreviewPanel from '../preview/PreviewPanel.vue';
 import { createCalibrationOwner, type CalibrationOwner } from '../calibration';
+import { createLineSequenceOwner, type LineSequenceOwner } from '../line-sequence';
 import {
   createWorkspaceLayoutOwner,
   workspaceInspectorDefaultWidth,
@@ -51,6 +52,13 @@ const calibrationOwner: CalibrationOwner | null = previewWorkbenchOwner && persi
     getPersistenceRevision: () => persistedWorkspaceOwner.projection.persistence?.persistenceRevision ?? null,
     reconcileAfterSave: () => persistedWorkspaceOwner.reconcileExternalProject()
   })
+  : null;
+const lineSequenceOwner: LineSequenceOwner | null = props.project.id
+  ? createLineSequenceOwner({
+      projectId: props.project.id,
+      flowOwner,
+      api: platform.api
+    })
   : null;
 const projection = flowOwner.projection;
 const layoutOwner = createWorkspaceLayoutOwner();
@@ -176,6 +184,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  lineSequenceOwner?.dispose('flow-workspace-unmounted');
   calibrationOwner?.dispose('flow-workspace-unmounted');
   layoutOwner.dispose();
 });
@@ -238,6 +247,7 @@ onBeforeUnmount(() => {
         :owner="inspectorOwner"
         :camera-owner="cameraBindingEditorOwner"
         :calibration-owner="calibrationOwner"
+        :line-sequence-owner="lineSequenceOwner"
       />
     </div>
 

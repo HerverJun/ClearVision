@@ -91,12 +91,14 @@ public static class AutoTuneEndpoints
             }
         })
         .WithName("AutoTuneOperator")
-        .WithDescription("对单个算子进行自动调参");
+        .WithDescription("对单个算子进行自动调参")
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
 
         // POST /api/autotune/flow-node - 流程内节点自动调参
         group.MapPost("/flow-node", async (
             FlowNodeAutoTuneRequest request,
             IAutoTuneService autoTuneService,
+            IExecutionAdmissionService executionAdmissionService,
             ILogger<AutoTuneService> logger,
             CancellationToken ct) =>
         {
@@ -108,6 +110,18 @@ public static class AutoTuneEndpoints
 
                 // 转换流程数据
                 var flow = FlowEntityMapper.ToPreviewEntity(request.FlowData, request.TargetNodeId);
+                var admission = executionAdmissionService.ValidateFlowSideEffects(
+                    flow,
+                    ExecutionAdmissionSurface.AutoTunePreview);
+                if (!admission.IsAllowed)
+                {
+                    return Results.BadRequest(new
+                    {
+                        Code = admission.Code,
+                        Error = admission.Message,
+                        Violations = admission.Violations
+                    });
+                }
 
                 var result = await autoTuneService.AutoTuneInFlowAsync(
                     flow,
@@ -153,7 +167,8 @@ public static class AutoTuneEndpoints
             }
         })
         .WithName("AutoTuneFlowNode")
-        .WithDescription("对流程中的特定节点进行自动调参");
+        .WithDescription("对流程中的特定节点进行自动调参")
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
 
         // POST /api/autotune/flow-node/preview - 线序场景专用预览与分析
         group.MapPost("/flow-node/preview", async (
@@ -210,38 +225,56 @@ public static class AutoTuneEndpoints
             }
         })
         .WithName("PreviewFlowNodeWithMetrics")
-        .WithDescription("返回线序节点预览图、结构化指标、诊断码、建议和缺失资源");
+        .WithDescription("返回线序节点预览图、结构化指标、诊断码、建议和缺失资源")
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
 
         // POST /api/autotune/scenario - 线序场景级自动调参
         group.MapPost("/scenario", async (
             ScenarioAutoTuneRequest request,
             IAutoTuneService autoTuneService,
+            IExecutionAdmissionService executionAdmissionService,
             ILogger<AutoTuneService> logger,
             CancellationToken ct) =>
         {
             try
             {
+                var scenarioKey = request.ScenarioKey?.Trim() ?? string.Empty;
                 logger.LogInformation(
                     "[AutoTuneAPI] 请求场景级自动调参: ScenarioKey={ScenarioKey}",
-                    request.ScenarioKey);
+                    scenarioKey);
 
-                var flow = FlowEntityMapper.ToEntity(request.FlowData);
-                if (string.IsNullOrWhiteSpace(request.InputImageBase64))
+                if (!string.Equals(scenarioKey, "wire-sequence-terminal", StringComparison.OrdinalIgnoreCase))
                 {
                     return Results.BadRequest(new ScenarioAutoTuneResponse
                     {
                         Success = false,
-                        ScenarioKey = request.ScenarioKey,
-                        ErrorMessage = "缺少输入图像，无法执行线序场景自动调参。"
+                        ScenarioKey = scenarioKey,
+                        ErrorMessage = "当前只支持 wire-sequence-terminal 线序场景。"
                     });
                 }
 
-                if (!ImagePayloadDecoder.TryDecodeBytes(request.InputImageBase64, "InputImageBase64", out var inputImage, out var decodeError, out var statusCode))
+                var flow = FlowEntityMapper.ToEntity(request.FlowData);
+                var admission = executionAdmissionService.ValidateFlowSideEffects(
+                    flow,
+                    ExecutionAdmissionSurface.AutoTunePreview);
+                if (!admission.IsAllowed)
+                {
+                    return Results.BadRequest(new
+                    {
+                        Code = admission.Code,
+                        Error = admission.Message,
+                        Violations = admission.Violations
+                    });
+                }
+
+                byte[]? inputImage = null;
+                if (!string.IsNullOrWhiteSpace(request.InputImageBase64) &&
+                    !ImagePayloadDecoder.TryDecodeBytes(request.InputImageBase64, "InputImageBase64", out inputImage, out var decodeError, out var statusCode))
                 {
                     var errorResponse = new ScenarioAutoTuneResponse
                     {
                         Success = false,
-                        ScenarioKey = request.ScenarioKey,
+                        ScenarioKey = scenarioKey,
                         ErrorMessage = decodeError
                     };
                     return statusCode == StatusCodes.Status413PayloadTooLarge
@@ -250,7 +283,7 @@ public static class AutoTuneEndpoints
                 }
 
                 var result = await autoTuneService.AutoTuneScenarioAsync(
-                    request.ScenarioKey,
+                    scenarioKey,
                     flow,
                     inputImage,
                     request.Goal ?? new AutoTuneGoal(),
@@ -258,7 +291,7 @@ public static class AutoTuneEndpoints
                     ct);
 
                 var response = MapScenarioAutoTuneResponse(result);
-                return result.Success || result.MissingResources.Count > 0
+                return result.Success || result.MissingResources.Count > 0 || result.Iterations.Count > 0
                     ? Results.Ok(response)
                     : Results.BadRequest(response);
             }
@@ -273,7 +306,8 @@ public static class AutoTuneEndpoints
             }
         })
         .WithName("AutoTuneScenario")
-        .WithDescription("仅对 wire-sequence-terminal 场景执行白名单参数自动调参");
+        .WithDescription("仅对 wire-sequence-terminal 场景执行白名单参数自动调参")
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
 
         // POST /api/autotune/suggest - 获取参数建议（快速建议，不调参）
         group.MapPost("/suggest", (
@@ -326,7 +360,8 @@ public static class AutoTuneEndpoints
             }
         })
         .WithName("GetParameterSuggestions")
-        .WithDescription("基于当前执行结果获取参数调整建议");
+        .WithDescription("基于当前执行结果获取参数调整建议")
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireEngineerOrAdmin);
 
         // GET /api/autotune/strategies - 获取支持的调参策略
         group.MapGet("/strategies", () =>
@@ -366,7 +401,8 @@ public static class AutoTuneEndpoints
             return Results.Ok(strategies);
         })
         .WithName("GetTuningStrategies")
-        .WithDescription("获取支持的自动调参策略");
+        .WithDescription("获取支持的自动调参策略")
+        .RequireClearVisionPermission(ClearVisionPermissionPolicies.RequireAuthenticated);
 
         return app;
     }

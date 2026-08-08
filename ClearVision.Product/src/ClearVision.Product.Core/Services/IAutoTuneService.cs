@@ -65,7 +65,7 @@ public interface IAutoTuneService
     Task<ScenarioAutoTuneResult> AutoTuneScenarioAsync(
         string scenarioKey,
         OperatorFlow flow,
-        byte[] inputImage,
+        byte[]? inputImage,
         AutoTuneGoal goal,
         int maxIterations = 5,
         CancellationToken ct = default);

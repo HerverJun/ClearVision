@@ -57,6 +57,46 @@ public class AutoTuneEndpointsTests
     }
 
     [Fact]
+    public async Task ScenarioAutoTune_ShouldRequireEngineerOrAdmin()
+    {
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        var authService = Substitute.For<IAuthService>();
+        authService.GetSessionAsync("operator-token").Returns(Task.FromResult<ClearVision.Product.Application.Services.UserSession?>(new ClearVision.Product.Application.Services.UserSession
+        {
+            UserId = Guid.NewGuid().ToString(),
+            Username = "operator",
+            Role = "Operator",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+        }));
+
+        await using var host = await AutoTuneEndpointTestHost.CreateWithDesktopAuthAsync(
+            previewService,
+            autoTuneService,
+            authService);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/autotune/scenario")
+        {
+            Content = JsonContent.Create(new ScenarioAutoTuneRequest
+            {
+                ScenarioKey = "wire-sequence-terminal",
+                FlowData = CreateFlowData(Guid.NewGuid(), OperatorType.DetectionSequenceJudge)
+            })
+        };
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "operator-token");
+
+        using var response = await host.Client.SendAsync(request);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
+        await autoTuneService.DidNotReceiveWithAnyArgs().AutoTuneScenarioAsync(
+            Arg.Any<string>(),
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<byte[]?>(),
+            Arg.Any<AutoTuneGoal>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task FlowNodePreview_ShouldReturnMetricsDiagnosticCodesAndSuggestions()
     {
         var targetNodeId = Guid.NewGuid();
@@ -450,6 +490,83 @@ public class AutoTuneEndpointsTests
         document.RootElement.GetProperty("finalPreview").GetProperty("success").GetBoolean().Should().BeTrue();
     }
 
+    [Fact]
+    public async Task ScenarioAutoTune_ShouldAllowFlowOwnedInputWhenInlineImageIsAbsent()
+    {
+        var targetNodeId = Guid.NewGuid();
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        byte[]? capturedInput = new byte[] { 1 };
+        autoTuneService.AutoTuneScenarioAsync(
+                Arg.Any<string>(),
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<byte[]?>(),
+                Arg.Any<AutoTuneGoal>(),
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                capturedInput = callInfo.ArgAt<byte[]?>(2);
+                return Task.FromResult(new ScenarioAutoTuneResult
+                {
+                    Success = false,
+                    ScenarioKey = "wire-sequence-terminal",
+                    FinalParameters = new Dictionary<string, object>
+                    {
+                        ["BoxNms.ScoreThreshold"] = 0.2d
+                    },
+                    Iterations =
+                    [
+                        new AutoTuneIteration
+                        {
+                            Iteration = 1,
+                            Parameters = new Dictionary<string, object>
+                            {
+                                ["BoxNms.ScoreThreshold"] = 0.2d
+                            }
+                        }
+                    ],
+                    TotalIterations = 1,
+                    ErrorMessage = "未能在限定轮次内收敛到线序目标。"
+                });
+            });
+
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
+        using var response = await host.Client.PostAsJsonAsync("/api/autotune/scenario", new ScenarioAutoTuneRequest
+        {
+            ScenarioKey = "wire-sequence-terminal",
+            FlowData = CreateFlowData(targetNodeId, OperatorType.DetectionSequenceJudge)
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        capturedInput.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ScenarioAutoTune_ShouldRejectSideEffectsBeforeRecommendationService()
+    {
+        var previewService = Substitute.For<IFlowNodePreviewService>();
+        var autoTuneService = Substitute.For<IAutoTuneService>();
+        await using var host = await AutoTuneEndpointTestHost.CreateAsync(previewService, autoTuneService);
+
+        using var response = await host.Client.PostAsJsonAsync("/api/autotune/scenario", new ScenarioAutoTuneRequest
+        {
+            ScenarioKey = "wire-sequence-terminal",
+            FlowData = CreateFlowData(Guid.NewGuid(), OperatorType.HttpRequest)
+        });
+
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest, payload);
+        payload.Should().Contain("ADMISSION_AUTOTUNE_PREVIEW_SIDE_EFFECT_BLOCKED");
+        await autoTuneService.DidNotReceiveWithAnyArgs().AutoTuneScenarioAsync(
+            Arg.Any<string>(),
+            Arg.Any<OperatorFlow>(),
+            Arg.Any<byte[]?>(),
+            Arg.Any<AutoTuneGoal>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
     private static FlowDataDto CreateFlowData(Guid nodeId, OperatorType type)
     {
         return new FlowDataDto
@@ -563,7 +680,8 @@ public class AutoTuneEndpointsTests
             var identity = new ClaimsIdentity(
             [
                 new Claim(ClaimTypes.NameIdentifier, "test-user"),
-                new Claim(ClaimTypes.Name, "test-user")
+                new Claim(ClaimTypes.Name, "test-user"),
+                new Claim(ClaimTypes.Role, UserRole.Engineer.ToString())
             ], SchemeName);
             var principal = new ClaimsPrincipal(identity);
             var ticket = new AuthenticationTicket(principal, SchemeName);

@@ -31,6 +31,8 @@ interface FixtureState {
   deletePosts: number;
   openPosts: number;
   updatePuts: number;
+  importPosts: number;
+  exportGets: number;
   operationGets: number;
   conflictOnFirstUpdate: boolean;
   audit: Array<{ method: string; path: string }>;
@@ -69,7 +71,7 @@ function blankProject(name = '新建工程', description: string | null = '空�
 }
 
 function operation(
-  kind: 'create' | 'delete',
+  kind: 'create' | 'delete' | 'import',
   clientOperationId: string,
   project: FixtureProject
 ): Record<string, unknown> {
@@ -78,7 +80,7 @@ function operation(
     kind,
     status: 'completed',
     projectId: project.id,
-    result: kind === 'create'
+    result: kind === 'create' || kind === 'import'
       ? {
           project,
           projectDeleted: false,
@@ -143,6 +145,8 @@ async function boot(page: Page, options: { initialProject?: FixtureProject; conf
     deletePosts: 0,
     openPosts: 0,
     updatePuts: 0,
+    importPosts: 0,
+    exportGets: 0,
     operationGets: 0,
     conflictOnFirstUpdate: options.conflictOnFirstUpdate ?? false,
     audit: []
@@ -193,6 +197,31 @@ async function boot(page: Page, options: { initialProject?: FixtureProject; conf
       state.deleted = false;
       state.operations.set(body.clientOperationId, operation('create', body.clientOperationId, created));
       await route.abort('failed');
+      return;
+    }
+    if (path === '/api/projects/import' && request.method() === 'POST') {
+      state.importPosts += 1;
+      const body = request.postDataJSON() as {
+        clientOperationId: string;
+        mode: string;
+        document: { project: { name: string; description?: string | null }; flow: Record<string, unknown> };
+      };
+      if (body.mode !== 'CREATE_NEW') {
+        await json(route, 400, { code: 'PROJECT_IMPORT_MODE_INVALID' });
+        return;
+      }
+      const imported = blankProject('导入产线工程', 'F10 canonical transfer');
+      imported.flow = { ...body.document.flow, id: flowId };
+      state.project = imported;
+      state.deleted = false;
+      const importedOperation = operation('import', body.clientOperationId, imported);
+      state.operations.set(body.clientOperationId, importedOperation);
+      await json(route, 200, {
+        projectId: imported.id,
+        project: imported,
+        operationReplayed: false,
+        operation: importedOperation
+      });
       return;
     }
     const operationMatch = path.match(/^\/api\/project-operations\/([0-9a-f-]{36})$/i);
@@ -356,6 +385,28 @@ async function boot(page: Page, options: { initialProject?: FixtureProject; conf
       await json(route, 200, state.project);
       return;
     }
+    const exportMatch = path.match(/^\/api\/projects\/([0-9a-f-]{36})\/export$/i);
+    if (exportMatch && request.method() === 'GET' && state.project && !state.deleted) {
+      state.exportGets += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: {
+          'Content-Disposition': 'attachment; filename="clearvision-imported-project.json"',
+          'x-clearvision-fixture-schema': 'f10-project-transfer.v1'
+        },
+        body: JSON.stringify({
+          documentType: 'clearvision-project',
+          schemaVersion: 1,
+          identity: { sourceProjectId: state.project.id, persistenceRevision: state.project.persistenceRevision },
+          project: { name: state.project.name, description: state.project.description },
+          flow: state.project.flow,
+          globalVariables: state.project.globalVariables,
+          assets: state.project.assets
+        })
+      });
+      return;
+    }
     await json(route, 404, { code: 'UNEXPECTED_F04_G3C_ROUTE' });
   });
   return state;
@@ -475,4 +526,42 @@ test('F04 G3C exposes revision conflict and reloads server authority without aut
   await expect(page.getByRole('heading', { name: '服务端并发版本' })).toBeVisible();
   await expect(page.getByLabel('工程名称')).toHaveValue('服务端并发版本');
   expect(state.updatePuts).toBe(1);
+});
+
+test('F10 imports a canonical Project document through lifecycle authority and exports the server document', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const state = await boot(page);
+  await page.goto('/studio/index.html#/projects');
+
+  await page.getByLabel('选择工程 JSON 文件').setInputFiles({
+    name: 'incoming-project.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({
+      documentType: 'clearvision-project',
+      schemaVersion: 1,
+      identity: { sourceProjectId: '99999999-9999-4999-8999-999999999999', persistenceRevision: 41 },
+      project: { name: '导入产线工程', description: 'F10 canonical transfer' },
+      flow: { id: null, name: '导入流程', operators: [], connections: [], decisionConfiguration: null },
+      globalVariables: { schemaVersion: '1.0', variables: [], sourceBindings: [], targetBindings: [] },
+      assets: { schemaVersion: 1, calibrationAssets: [], spatialAssets: [] }
+    }), 'utf8')
+  });
+  const importDialog = page.getByRole('dialog', { name: '导入工程 JSON' });
+  await expect(importDialog).toContainText('流程 0 个算子，0 条连接');
+  await importDialog.getByTestId('project-import-submit').click();
+
+  await expect(page).toHaveURL(new RegExp(`#\/projects\/${projectId}$`));
+  await expect(page.getByRole('heading', { name: '导入产线工程' })).toBeVisible();
+  expect(state.importPosts).toBe(1);
+  expect(state.project?.id).toBe(projectId);
+
+  await page.goto('/studio/index.html#/projects');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByTestId(`project-export-${projectId}`).click();
+  const download = await downloadPromise;
+
+  expect(download.suggestedFilename()).toBe('clearvision-imported-project.json');
+  expect(state.exportGets).toBe(1);
+  expect(state.audit.filter(entry => entry.method === 'POST' && entry.path === '/api/projects/import')).toHaveLength(1);
+  expect(state.audit.filter(entry => entry.method === 'GET' && entry.path.endsWith('/export'))).toHaveLength(1);
 });

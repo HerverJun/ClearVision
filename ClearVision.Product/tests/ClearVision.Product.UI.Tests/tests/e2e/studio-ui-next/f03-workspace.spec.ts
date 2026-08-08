@@ -322,6 +322,11 @@ interface BootOptions {
     call: number
   ) => Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }> |
     Promise<Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }>>;
+  readonly apiScenario?: (
+    request: Request,
+    call: number
+  ) => Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }> | null |
+    Promise<Readonly<{ status?: number; body?: unknown; delayMs?: number; abort?: boolean }> | null>;
 }
 
 async function bootWorkspace(page: Page, options: BootOptions = {}) {
@@ -330,6 +335,7 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
   let projectGetCall = 0;
   let projectPutCall = 0;
   let runCall = 0;
+  let customApiCall = 0;
   let lastExecutionSnapshotId: string | null = null;
   const projects = new Map<string, Readonly<Record<string, unknown>>>();
   await installF03BrowserStartup(page, options.workspaceEnabled ?? true);
@@ -352,6 +358,16 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
       await fulfillF03Json(route, status, status === 200
         ? { userId: 'f03-user', username: 'f03-engineer', role: options.authRole ?? 'Engineer' }
         : { code: 'AUTH_REQUIRED' }, fixtureSchema);
+      return;
+    }
+    const customScenario = await options.apiScenario?.(request, ++customApiCall);
+    if (customScenario) {
+      if (customScenario.delayMs) await new Promise(resolve => setTimeout(resolve, customScenario.delayMs));
+      if (customScenario.abort) {
+        await route.abort('failed');
+        return;
+      }
+      await fulfillF03Json(route, customScenario.status ?? 200, customScenario.body ?? {}, fixtureSchema);
       return;
     }
     if (url.pathname === '/api/cameras/bindings' && request.method() === 'GET') {
@@ -1541,6 +1557,160 @@ function prompt3PreviewFlow() {
       : parameter;
   });
   return flow;
+}
+
+function f10Parameter(
+  seed: number,
+  name: string,
+  displayName: string,
+  dataType: string,
+  value: unknown,
+  overrides: Record<string, unknown> = {}
+) {
+  return {
+    id: fixtureUuid(seed),
+    name,
+    displayName,
+    description: `${displayName} fixture parameter`,
+    dataType,
+    value,
+    defaultValue: value,
+    minValue: null,
+    maxValue: null,
+    isRequired: false,
+    options: null,
+    ...overrides
+  };
+}
+
+function f10LineSequenceCatalog() {
+  return [
+    operatorMetadata({
+      type: 140,
+      displayName: '候选框抑制',
+      description: '线序分析的白名单上游参数节点。',
+      categoryId: 10,
+      category: 'AI推理',
+      inputPorts: [],
+      outputPorts: [{ name: 'Boxes', displayName: '候选框', dataType: 11, isRequired: false, description: null }],
+      parameters: [
+        { name: 'ScoreThreshold', displayName: '候选框分数阈值', description: '候选框分数下限', dataType: 'double', defaultValue: 0.4, minValue: 0, maxValue: 1, isRequired: true, options: null },
+        { name: 'IouThreshold', displayName: '候选框重叠阈值', description: 'NMS 重叠阈值', dataType: 'double', defaultValue: 0.5, minValue: 0, maxValue: 1, isRequired: true, options: null }
+      ]
+    }),
+    operatorMetadata({
+      type: 61,
+      displayName: '线序判定',
+      description: '比较检测结果与预期线序。',
+      categoryId: 11,
+      category: '流程控制',
+      inputPorts: [{ name: 'Boxes', displayName: '候选框', dataType: 11, isRequired: true, description: null }],
+      outputPorts: [],
+      parameters: [{ name: 'ExpectedCount', displayName: '预期端子数量', description: '用于使当前 recommendation 失效的普通草稿参数', dataType: 'int', defaultValue: 4, minValue: 1, maxValue: 64, isRequired: true, options: null }]
+    })
+  ];
+}
+
+function f10LineSequenceFlow() {
+  const boxNodeId = fixtureUuid(81_001);
+  const judgeNodeId = fixtureUuid(81_002);
+  const boxOutputId = fixtureUuid(81_101);
+  const judgeInputId = fixtureUuid(81_102);
+  return {
+    id: flowId,
+    name: 'F10 线序分析流程',
+    operators: [{
+      id: boxNodeId,
+      name: '候选框抑制',
+      type: 140,
+      metadata: null,
+      x: 360,
+      y: 100,
+      inputPorts: [],
+      outputPorts: [{ id: boxOutputId, name: 'Boxes', direction: 1, dataType: 11, isRequired: false }],
+      parameters: [
+        f10Parameter(81_201, 'ScoreThreshold', '候选框分数阈值', 'double', 0.4, { minValue: 0, maxValue: 1, isRequired: true }),
+        f10Parameter(81_202, 'IouThreshold', '候选框重叠阈值', 'double', 0.5, { minValue: 0, maxValue: 1, isRequired: true })
+      ],
+      isEnabled: true,
+      executionStatus: 0,
+      executionTimeMs: null,
+      errorMessage: null
+    }, {
+      id: judgeNodeId,
+      name: '端子线序判定',
+      type: 61,
+      metadata: null,
+      x: 80,
+      y: 100,
+      inputPorts: [{ id: judgeInputId, name: 'Boxes', direction: 0, dataType: 11, isRequired: true }],
+      outputPorts: [],
+      parameters: [f10Parameter(81_203, 'ExpectedCount', '预期端子数量', 'int', 4, { minValue: 1, maxValue: 64, isRequired: true })],
+      isEnabled: true,
+      executionStatus: 0,
+      executionTimeMs: null,
+      errorMessage: null
+    }],
+    connections: [{
+      id: fixtureUuid(81_301),
+      sourceOperatorId: boxNodeId,
+      sourcePortId: boxOutputId,
+      targetOperatorId: judgeNodeId,
+      targetPortId: judgeInputId
+    }],
+    decisionConfiguration: null
+  };
+}
+
+function f10CalibrationCatalog() {
+  return [operatorMetadata({
+    type: 150,
+    displayName: 'N 点标定',
+    description: '通过服务端拟合生成正式工程标定资产。',
+    categoryId: 9,
+    category: '标定与坐标',
+    inputPorts: [],
+    outputPorts: [],
+    parameters: [
+      { name: 'CalibrationMode', displayName: '标定模式', description: '', dataType: 'string', defaultValue: 'Affine', minValue: null, maxValue: null, isRequired: true, options: null },
+      { name: 'CalibrationUnit', displayName: '标定单位', description: '', dataType: 'string', defaultValue: 'mm', minValue: null, maxValue: null, isRequired: true, options: null },
+      { name: 'PointPairs', displayName: '标定点对', description: '', dataType: 'string', defaultValue: '[]', minValue: null, maxValue: null, isRequired: true, options: null }
+    ]
+  })];
+}
+
+function f10CalibrationFlow() {
+  const nodeId = fixtureUuid(82_001);
+  const points = [
+    { sampleId: 'sample-1', ImageX: 10, ImageY: 20, WorldX: 1, WorldY: 2, Enabled: true },
+    { sampleId: 'sample-2', ImageX: 30, ImageY: 40, WorldX: 3, WorldY: 4, Enabled: true },
+    { sampleId: 'sample-3', ImageX: 50, ImageY: 60, WorldX: 5, WorldY: 6, Enabled: true }
+  ];
+  return {
+    id: flowId,
+    name: 'F10 N 点标定流程',
+    operators: [{
+      id: nodeId,
+      name: '平面 N 点标定',
+      type: 150,
+      metadata: null,
+      x: 80,
+      y: 100,
+      inputPorts: [],
+      outputPorts: [],
+      parameters: [
+        f10Parameter(82_101, 'CalibrationMode', '标定模式', 'string', 'Affine', { isRequired: true }),
+        f10Parameter(82_102, 'CalibrationUnit', '标定单位', 'string', 'mm', { isRequired: true }),
+        f10Parameter(82_103, 'PointPairs', '标定点对', 'string', JSON.stringify(points), { isRequired: true })
+      ],
+      isEnabled: true,
+      executionStatus: 0,
+      executionTimeMs: null,
+      errorMessage: null
+    }],
+    connections: [],
+    decisionConfiguration: null
+  };
 }
 
 async function selectInspectorNode(page: Page, x: number, y: number) {
@@ -3607,6 +3777,295 @@ for (const scenario of [
     expect(isF03G4RequestAllowlist(audit)).toBe(true);
   });
 }
+
+test('F10 Template journey loads and applies one server template to the canonical draft only', async ({ page }) => {
+  const templateId = fixtureUuid(83_001);
+  const template = {
+    id: templateId,
+    name: '相机采集模板',
+    description: 'F10 服务端流程模板',
+    industry: '电子制造',
+    tags: ['采集', '线序'],
+    flowJson: JSON.stringify({
+      operators: [{ tempId: 'source', operatorType: 0, displayName: '模板图像采集' }],
+      connections: []
+    }),
+    templateVersion: '1.0.0',
+    scenarioKey: 'wire-sequence-terminal',
+    createdAt: '2026-08-08T00:00:00Z'
+  };
+  const audit = await bootWorkspace(page, {
+    apiScenario: request => {
+      const path = new URL(request.url()).pathname;
+      if (path === '/api/templates' && request.method() === 'GET') return { body: [template] };
+      if (path === `/api/templates/${templateId}` && request.method() === 'GET') return { body: template };
+      return null;
+    }
+  });
+
+  const flow = page.locator('[data-capability="flow-workspace"]');
+  await page.getByTestId('workspace-templates').click();
+  const dialog = page.getByRole('dialog', { name: '流程模板' });
+  await dialog.getByRole('button', { name: /相机采集模板/ }).click();
+  await expect(dialog.getByRole('region', { name: '模板详情' })).toContainText('wire-sequence-terminal');
+  await dialog.getByTestId('template-apply').click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(flow.locator('[data-node-count]')).toHaveAttribute('data-node-count', '1');
+  await expect(page.locator('[data-evidence-surface="f03-workspace-shell"]')).toHaveAttribute('data-workspace-dirty', 'true');
+  await selectInspectorNode(page, 160, 125);
+  await expect(page.locator('[data-evidence-surface="f03-g3-inspector"]')).toContainText('模板图像采集');
+  expect(audit.filter(entry => entry.method === 'GET' && entry.path === '/api/templates')).toHaveLength(1);
+  expect(audit.some(entry => entry.method === 'PUT' && /^\/api\/projects\//.test(entry.path))).toBe(false);
+});
+
+test('F10 N Point Calibration solves a candidate and saves through Project asset authority', async ({ page }) => {
+  const calibrationNodeId = fixtureUuid(82_001);
+  const formalAssetId = 'calibration-f10-asset';
+  const initialProject = projectPayload(projectA, { flow: f10CalibrationFlow() });
+  let assetSaved = false;
+  const audit = await bootWorkspace(page, {
+    projectBody: initialProject,
+    operatorCatalogBody: f10CalibrationCatalog(),
+    previewScenario: (request, call) => ({
+      body: previewPayload(request, call, {
+        outputData: { calibrationPreview: true },
+        artifacts: [previewArtifactReference(call)]
+      })
+    }),
+    projectGetScenario: (_id, current) => ({
+      body: assetSaved
+        ? {
+            ...initialProject,
+            persistenceRevision: 8,
+            assets: {
+              schemaVersion: 1,
+              calibrationAssets: [{
+                assetId: formalAssetId,
+                kind: 'NPointCalibration',
+                version: '1.0',
+                producer: 'ClearVision.Calibration',
+                sourceDraftSessionId: 'fixture-session',
+                targetNodeId: calibrationNodeId,
+                imageIdentity: 'fixture-preview',
+                contentHash: 'sha256:f10-calibration',
+                projectRevision: 8,
+                createdAtUtc: '2026-08-08T00:00:00Z',
+                updatedAtUtc: '2026-08-08T00:00:00Z',
+                status: 'Active',
+                payload: { schemaVersion: 'npoint-calibration.v1' }
+              }],
+              spatialAssets: []
+            }
+          }
+        : current
+    }),
+    apiScenario: request => {
+      const path = new URL(request.url()).pathname;
+      if (path === '/api/calibration/npoint-draft/solve' && request.method() === 'POST') {
+        const body = request.postDataJSON() as {
+          sessionId: string;
+          projectId: string;
+          targetNodeId: string;
+          imageIdentity: string;
+          mode: string;
+          unit: string;
+          samples: Array<Record<string, unknown>>;
+        };
+        const samples = body.samples.map((sample, index) => ({
+          ...sample,
+          order: index + 1,
+          source: sample.source ?? 'Imported',
+          enabled: true,
+          valid: true,
+          inlier: true,
+          reprojectionX: sample.pixelX,
+          reprojectionY: sample.pixelY,
+          error: 0,
+          note: '',
+          createdAtUtc: '2026-08-08T00:00:00Z'
+        }));
+        const candidateBundle = { schemaVersion: 'npoint-calibration.v1', mode: body.mode, unit: body.unit };
+        return {
+          body: {
+            schemaVersion: 'calibration-draft-session.v1',
+            sessionId: body.sessionId,
+            projectId: body.projectId,
+            targetNodeId: body.targetNodeId,
+            imageIdentity: body.imageIdentity,
+            mode: body.mode,
+            unit: body.unit,
+            status: 'Solved',
+            success: true,
+            errorMessage: null,
+            samples,
+            lastSolveResult: {
+              success: true,
+              transformModel: 'Affine',
+              matrix: [[1, 0, 0], [0, 1, 0]],
+              meanError: 0,
+              maxError: 0,
+              inlierMeanError: 0,
+              inlierMaxError: 0,
+              allSampleMeanError: 0,
+              allSampleMaxError: 0,
+              inlierCount: 3,
+              totalSampleCount: 3,
+              inlierRatio: 1,
+              accepted: true,
+              diagnostics: []
+            },
+            candidateBundle,
+            candidateBundleJson: JSON.stringify(candidateBundle),
+            diagnostics: []
+          }
+        };
+      }
+      if (path === `/api/projects/${projectA}/calibration-assets/from-draft` && request.method() === 'POST') {
+        assetSaved = true;
+        return {
+          body: {
+            schemaVersion: 'project-calibration-asset-save.v1',
+            projectId: projectA,
+            persistenceRevision: 8,
+            assetsHash: 'sha256:f10-assets',
+            asset: { assetId: formalAssetId, contentHash: 'sha256:f10-calibration', projectRevision: 8 }
+          }
+        };
+      }
+      return null;
+    }
+  });
+
+  await selectInspectorNode(page, 120, 125);
+  const workbench = page.getByTestId('next-npoint-calibration-workbench');
+  await expect(workbench).toHaveAttribute('data-calibration-phase', 'ready');
+  await workbench.getByTestId('next-calibration-solve').click();
+  await expect(workbench).toHaveAttribute('data-calibration-phase', 'solved');
+  await expect(workbench.getByTestId('next-calibration-result')).toContainText('质量门禁 通过');
+  await workbench.getByTestId('next-calibration-save').click();
+  await expect(page.locator('[data-evidence-surface="f03-workspace-shell"]')).toHaveAttribute(
+    'data-workspace-persistence-revision',
+    '8'
+  );
+  await expect(workbench).toHaveAttribute('data-calibration-phase', 'ready');
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/calibration/npoint-draft/solve')).toHaveLength(1);
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path.endsWith('/calibration-assets/from-draft'))).toHaveLength(1);
+});
+
+test('F10 Line Sequence runs backend Analyze and Recommendation then applies one draft-only patch', async ({ page }) => {
+  const judgeNodeId = fixtureUuid(81_002);
+  const audit = await bootWorkspace(page, {
+    projectBody: projectPayload(projectA, { flow: f10LineSequenceFlow() }),
+    operatorCatalogBody: f10LineSequenceCatalog(),
+    apiScenario: request => {
+      const path = new URL(request.url()).pathname;
+      if (path === '/api/autotune/flow-node/preview' && request.method() === 'POST') {
+        return { body: {
+          success: true,
+          targetNodeId: judgeNodeId,
+          metrics: { overallScore: 0.72 },
+          diagnosticCodes: ['sequence_mismatch'],
+          suggestions: [{
+            parameterName: 'BoxNms.ScoreThreshold',
+            currentValue: 0.4,
+            suggestedValue: 0.64,
+            reason: '降低漏检',
+            expectedImprovement: '提高线序覆盖率'
+          }],
+          missingResources: [],
+          errorMessage: null
+        } };
+      }
+      if (path === '/api/autotune/scenario' && request.method() === 'POST') {
+        return { body: {
+          success: false,
+          scenarioKey: 'wire-sequence-terminal',
+          finalParameters: { 'BoxNms.ScoreThreshold': 0.64, 'BoxNms.IouThreshold': 0.38 },
+          totalIterations: 5,
+          totalExecutionTimeMs: 31,
+          isGoalAchieved: false,
+          diagnosticCodes: ['sequence_mismatch'],
+          missingResources: [],
+          errorMessage: null
+        } };
+      }
+      return null;
+    }
+  });
+
+  await selectInspectorNode(page, 120, 125);
+  const flow = page.locator('[data-capability="flow-workspace"]');
+  const workbench = page.locator('[data-line-sequence-workbench]');
+  const initialRevision = Number(await flow.getAttribute('data-flow-revision'));
+  await workbench.getByRole('button', { name: '分析线序' }).click();
+  await expect(workbench).toHaveAttribute('data-line-sequence-phase', 'analyzed');
+  await workbench.getByRole('button', { name: '计算建议' }).click();
+  await expect(workbench).toHaveAttribute('data-line-sequence-phase', 'recommended');
+  await expect(workbench).toContainText('候选框分数阈值');
+  await workbench.getByRole('button', { name: '应用到草稿' }).click();
+
+  await expect(workbench).toHaveAttribute('data-line-sequence-phase', 'applied');
+  await expect.poll(async () => Number(await flow.getAttribute('data-flow-revision'))).toBeGreaterThan(initialRevision);
+  await selectInspectorNode(page, 400, 125);
+  await expect(page.getByLabel('候选框分数阈值')).toHaveValue('0.64');
+  await expect(page.getByLabel('候选框重叠阈值')).toHaveValue('0.38');
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/autotune/flow-node/preview')).toHaveLength(1);
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/autotune/scenario')).toHaveLength(1);
+  expect(audit.some(entry => entry.method === 'PUT' && /^\/api\/projects\//.test(entry.path))).toBe(false);
+});
+
+test('F10 Line Sequence invalidates a recommendation after draft change and projects backend safety rejection', async ({ page }) => {
+  const judgeNodeId = fixtureUuid(81_002);
+  let rejectAnalysis = false;
+  const audit = await bootWorkspace(page, {
+    projectBody: projectPayload(projectA, { flow: f10LineSequenceFlow() }),
+    operatorCatalogBody: f10LineSequenceCatalog(),
+    apiScenario: request => {
+      const path = new URL(request.url()).pathname;
+      if (path === '/api/autotune/flow-node/preview') {
+        if (rejectAnalysis) return { status: 400, body: { code: 'FLOW_SIDE_EFFECT_BLOCKED', error: 'Preview side effect blocked.' } };
+        return { body: {
+          success: true,
+          targetNodeId: judgeNodeId,
+          metrics: { overallScore: 0.7 },
+          diagnosticCodes: [],
+          suggestions: [],
+          missingResources: [],
+          errorMessage: null
+        } };
+      }
+      if (path === '/api/autotune/scenario') return { body: {
+        success: true,
+        scenarioKey: 'wire-sequence-terminal',
+        finalParameters: { 'BoxNms.ScoreThreshold': 0.6 },
+        totalIterations: 2,
+        totalExecutionTimeMs: 14,
+        isGoalAchieved: true,
+        diagnosticCodes: [],
+        missingResources: [],
+        errorMessage: null
+      } };
+      return null;
+    }
+  });
+
+  await selectInspectorNode(page, 120, 125);
+  const workbench = page.locator('[data-line-sequence-workbench]');
+  await workbench.getByRole('button', { name: '分析线序' }).click();
+  await workbench.getByRole('button', { name: '计算建议' }).click();
+  await expect(workbench).toHaveAttribute('data-line-sequence-phase', 'recommended');
+  await page.getByLabel('预期端子数量').fill('5');
+  await page.getByLabel('预期端子数量').press('Enter');
+  await expect(workbench).toHaveAttribute('data-line-sequence-phase', 'stale');
+  await expect(workbench.getByRole('button', { name: '应用到草稿' })).toBeDisabled();
+
+  rejectAnalysis = true;
+  await workbench.getByRole('button', { name: '分析线序' }).click();
+  await expect(workbench).toHaveAttribute('data-line-sequence-phase', 'error');
+  await expect(workbench).toContainText('当前流程不满足线序分析条件');
+  expect(audit.filter(entry => entry.method === 'POST' && entry.path === '/api/autotune/scenario')).toHaveLength(1);
+});
 
 test('rejects a 401 before mounting ProductRuntime or Workspace owners', async ({ page }) => {
   const audit = await bootWorkspace(page, { authStatus: 401, expectAuthShell: true });

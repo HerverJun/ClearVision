@@ -9,11 +9,13 @@ import ParameterEditor from './ParameterEditor.vue';
 import { CameraBindingEditor, type CameraBindingEditorOwner } from '../camera';
 import CalibrationWorkbench from '../calibration/CalibrationWorkbench.vue';
 import type { CalibrationOwner } from '../calibration';
+import { LineSequenceWorkbench, type LineSequenceOwner } from '../line-sequence';
 
 const props = defineProps<{
   owner: InspectorOwner;
   cameraOwner: CameraBindingEditorOwner | null;
   calibrationOwner?: CalibrationOwner | null;
+  lineSequenceOwner?: LineSequenceOwner | null;
 }>();
 
 const platform = useStudioPlatform();
@@ -386,8 +388,12 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
       </details>
 
       <CalibrationWorkbench
-        v-if="props.calibrationOwner && projection.node?.type.toLocaleLowerCase() === 'npointcalibration'"
+        v-if="props.calibrationOwner && ['npointcalibration', '150'].includes(projection.node?.type.toLocaleLowerCase() ?? '')"
         :owner="props.calibrationOwner"
+      />
+      <LineSequenceWorkbench
+        v-if="props.lineSequenceOwner && ['detectionsequencejudge', '61'].includes(projection.node?.type.toLocaleLowerCase() ?? '')"
+        :owner="props.lineSequenceOwner"
       />
     </div>
 
