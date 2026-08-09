@@ -155,7 +155,9 @@ public class RuntimeMvpTests
         var root = CreateTempDirectory();
         try
         {
-            var project = CreatePackageConfiguredImageProject("package-configured");
+            var imagePath = Path.Combine(root, "package-configured-source.png");
+            await File.WriteAllBytesAsync(imagePath, [1, 2, 3, 4]);
+            var project = CreatePackageConfiguredImageProject("package-configured", imagePath);
             var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
             var export = await exporter.ExportAsync(new RuntimePackageExportRequest
             {
@@ -196,7 +198,9 @@ public class RuntimeMvpTests
         var root = CreateTempDirectory();
         try
         {
-            var project = CreatePackageConfiguredImageProject("isolated-runtime-events");
+            var imagePath = Path.Combine(root, "isolated-runtime-events-source.png");
+            await File.WriteAllBytesAsync(imagePath, [1, 2, 3, 4]);
+            var project = CreatePackageConfiguredImageProject("isolated-runtime-events", imagePath);
             var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
             var export = await exporter.ExportAsync(new RuntimePackageExportRequest
             {
@@ -1498,7 +1502,7 @@ public class RuntimeMvpTests
         };
     }
 
-    private static ProjectDto CreatePackageConfiguredImageProject(string name)
+    private static ProjectDto CreatePackageConfiguredImageProject(string name, string imagePath)
     {
         var acquisitionId = Guid.NewGuid();
         var acquisitionOutputPortId = Guid.NewGuid();
@@ -1521,6 +1525,12 @@ public class RuntimeMvpTests
                         Id = acquisitionId,
                         Name = "PackageConfiguredImage",
                         Type = OperatorType.ImageAcquisition,
+                        Parameters =
+                        [
+                            CreateParameterDto("SourceType", "enum", "File"),
+                            CreateParameterDto("FilePath", "file", imagePath),
+                            CreateParameterDto("CameraId", "cameraBinding", string.Empty)
+                        ],
                         OutputPorts =
                         [
                             new PortDto
