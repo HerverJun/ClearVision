@@ -708,8 +708,9 @@ async function readFlowSurface(page) {
 
 async function resetOperatorRailFilters(page) {
   await ensureOperatorFlyout(page);
-  await page.locator('[data-testid="operator-search"]').fill('');
-  await page.locator('.operator-rail__categories button').first().click();
+  const flyout = page.locator('[data-capability="operator-flyout"]');
+  await flyout.locator('[data-testid="operator-search"]').fill('');
+  await flyout.locator('[data-testid="operator-category"]').selectOption('');
 }
 
 async function ensureOperatorFlyout(page) {
