@@ -33,7 +33,7 @@ describe('F04 G4 product shell and leave protection architecture guards', () => 
     expect(files.filter(path => path.endsWith('productLeaveGuardOwner.ts'))).toHaveLength(1);
     expect(files.filter(path => path.endsWith('productLeaveGuardBridge.ts'))).toHaveLength(1);
 
-    const runtime = read(join(sourceRoot, 'app/productRuntime.ts'));
+    const runtime = read(join(sourceRoot, 'app/productRuntimeFactory.ts'));
     const compositionRoot = read(join(sourceRoot, 'app/createStudioApp.ts'));
     expect(runtime.match(/createProductLeaveGuardOwner\(/g)).toHaveLength(1);
     expect(compositionRoot.match(/installProductLeaveGuardBridge\(/g)).toHaveLength(1);

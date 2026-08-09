@@ -57,10 +57,10 @@ export async function mountStudioApp(
     removeAuthRouteGuard = installAuthRouteGuard(router, authRoot.auth, options.platform.startup);
     removeLeaveGuardBridge = installProductLeaveGuardBridge(router, authRoot);
     app.use(createPinia());
-    app.use(router);
     app.provide(studioPlatformKey, options.platform);
     app.provide(authLifecycleRootKey, authRoot);
     await authRoot.start();
+    app.use(router);
     await router.isReady();
     app.mount(mountTarget);
   } catch (error) {

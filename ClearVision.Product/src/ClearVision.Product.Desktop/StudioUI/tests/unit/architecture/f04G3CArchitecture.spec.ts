@@ -29,10 +29,11 @@ describe('F04 G3C Project lifecycle architecture guards', () => {
 
   it('has exactly one Project command owner and mounts it once in ProductRuntime', () => {
     expect(files.filter(path => path.endsWith('projectLifecycleCommandOwner.ts'))).toHaveLength(1);
-    const runtime = read(join(sourceRoot, 'app/productRuntime.ts'));
+    const contract = read(join(sourceRoot, 'app/productRuntime.ts'));
+    const runtime = read(join(sourceRoot, 'app/productRuntimeFactory.ts'));
     expect(runtime.match(/createProjectLifecycleCommandOwner\(/g)).toHaveLength(1);
     expect(runtime).toContain("authenticatedUser.role === 'Admin' || authenticatedUser.role === 'Engineer'");
-    expect(runtime).toContain('readonly projectLifecycle?: ProjectLifecycleCommandOwner;');
+    expect(contract).toContain('readonly projectLifecycle?: ProjectLifecycleCommandOwner;');
     expect(runtime).toContain('projectLifecycle.dispose');
     expect(runtime).toContain('leaveGuard.request(reason)');
     expect(runtime).toContain('projectLifecycle.reconcileAfterReauthentication');

@@ -2,6 +2,7 @@ import { inject, readonly, shallowRef, type DeepReadonly, type InjectionKey, typ
 import type { Router } from 'vue-router';
 import type { ProductLeaveGuardOwner } from '@/app/leave';
 import { createProductRuntime, type ProductRuntime } from '@/app/productRuntime';
+import { sessionIdentityOf, type SessionUserProjection } from '@/app/session';
 import type { StudioPlatform } from '@/app/studioPlatform';
 import {
   createAuthLifecycleOwner,
@@ -40,7 +41,10 @@ export function createAuthLifecycleRoot(platform: StudioPlatform): AuthLifecycle
     prepareForProtectedTransition(reason: 'logout' | 'change-password'): Promise<boolean> {
       return productRuntime.value?.prepareForProtectedTransition(reason) ?? Promise.resolve(true);
     },
-    async activateAuthenticatedSession(): Promise<boolean> {
+    async activateAuthenticatedSession(
+      user: SessionUserProjection,
+      generation: number
+    ): Promise<boolean> {
       if (disposed) return false;
       if (quarantinedRuntime) {
         const reconciled = await quarantinedRuntime.reconcileAfterReauthentication();
@@ -52,7 +56,15 @@ export function createAuthLifecycleRoot(platform: StudioPlatform): AuthLifecycle
       if (productRuntime.value) return true;
       const currentAuth = authHolder.current;
       if (!currentAuth) return false;
-      productRuntime.value = createProductRuntime(platform, currentAuth.session);
+      const nextRuntime = await createProductRuntime(platform, currentAuth.session);
+      const currentSession = currentAuth.session.projection;
+      const activationIsCurrent = currentSession.sessionGeneration === generation &&
+        currentSession.user !== null && sessionIdentityOf(currentSession.user) === sessionIdentityOf(user);
+      if (disposed || !activationIsCurrent || productRuntime.value !== null) {
+        nextRuntime.dispose();
+        return !disposed && activationIsCurrent && productRuntime.value !== null;
+      }
+      productRuntime.value = nextRuntime;
       return true;
     },
     endAuthenticatedSession(reason: 'logout' | 'change-password'): void {

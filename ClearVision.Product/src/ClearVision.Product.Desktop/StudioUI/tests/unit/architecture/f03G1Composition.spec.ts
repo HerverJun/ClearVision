@@ -15,7 +15,7 @@ describe('F03 G1 composition and startup flag guards', () => {
   it('mounts the formal Workspace route inside the one ProductLayout and ProductRuntime', () => {
     const router = read(join(sourceRoot, 'app/router.ts'));
     const layout = read(join(sourceRoot, 'app/layouts/ProductLayout.vue'));
-    const runtime = read(join(sourceRoot, 'app/productRuntime.ts'));
+    const runtime = read(join(sourceRoot, 'app/productRuntimeFactory.ts'));
 
     expect(router.match(/path:\s*'projects\/:id\/workspace'/g)).toHaveLength(1);
     expect(router).toContain("name: 'project-workspace'");

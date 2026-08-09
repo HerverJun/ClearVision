@@ -135,4 +135,42 @@ describe('AuthLifecycleRoot ProductRuntime ledger', () => {
     expect(mocks.createProductRuntime).toHaveBeenCalledTimes(2);
     root.dispose();
   });
+
+  it('disposes a runtime whose lazy factory completes after the auth root is disposed', async () => {
+    const runtime = fakeRuntime(false);
+    const h = platform(runtime);
+    let resolveRuntime: ((value: ProductRuntime) => void) | undefined;
+    mocks.createProductRuntime.mockReturnValue(new Promise<ProductRuntime>(resolve => {
+      resolveRuntime = resolve;
+    }));
+    const root = createAuthLifecycleRoot(h.value);
+
+    const started = root.start();
+    await vi.waitFor(() => expect(mocks.createProductRuntime).toHaveBeenCalledTimes(1));
+    root.dispose();
+    resolveRuntime?.(runtime);
+    await started;
+
+    expect(root.productRuntime.value).toBeNull();
+    expect(runtime.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('disposes a superseded lazy runtime instead of mounting it for a newer session generation', async () => {
+    const staleRuntime = fakeRuntime(false);
+    const h = platform(staleRuntime);
+    let resolveRuntime: ((value: ProductRuntime) => void) | undefined;
+    mocks.createProductRuntime.mockReturnValue(new Promise<ProductRuntime>(resolve => {
+      resolveRuntime = resolve;
+    }));
+    const root = createAuthLifecycleRoot(h.value);
+
+    const started = root.start();
+    await vi.waitFor(() => expect(mocks.createProductRuntime).toHaveBeenCalledTimes(1));
+    await h.expire();
+    resolveRuntime?.(staleRuntime);
+    await started;
+
+    expect(root.productRuntime.value).toBeNull();
+    expect(staleRuntime.dispose).toHaveBeenCalledTimes(1);
+  });
 });
