@@ -2749,6 +2749,7 @@ async function verifyProductPage(
         !(item.method === 'GET' && url.pathname === '/api/auth/setup-status') &&
         url.pathname !== '/api/auth/me' &&
         !(item.method === 'GET' && url.pathname === '/api/cameras/bindings') &&
+        !(item.method === 'GET' && url.pathname === '/api/templates') &&
         !(item.method === 'GET' && url.pathname === '/api/projects') &&
         !(item.method === 'GET' && url.pathname === '/api/projects/recent' && url.search === '?count=5') &&
         !(url.pathname === '/api/operators/library' && url.search === '?includeCompatibility=true') &&
@@ -2770,6 +2771,8 @@ async function verifyProductPage(
           /^\/api\/inspection\/history\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/evidence\/manifest$/i.test(url.pathname)) &&
         !(formalRun && item.method === 'GET' &&
           /^\/api\/inspection\/statistics\/[0-9a-f-]{36}$/i.test(url.pathname)) &&
+        !(formalRun && item.method === 'GET' &&
+          /^\/api\/analysis\/(?:defect-distribution|trend|report)\/[0-9a-f-]{36}$/i.test(url.pathname)) &&
         !(formalRun && item.method === 'GET' &&
           /^\/api\/images\/[0-9a-f-]{36}$/i.test(url.pathname)) &&
         !(goldenJourney && item.method === 'GET' &&
