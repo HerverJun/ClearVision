@@ -2,7 +2,7 @@
 
 ```text
 DOCUMENT_ROLE=EXECUTION_PLAN
-DOCUMENT_STATE=G3_READY
+DOCUMENT_STATE=G4_READY
 CURRENT_BRANCH=studio-ui-next
 PLANNING_BASELINE_HEAD=f8569fa85244d19a18ba7308051e4d2b2ed4060a
 IMPLEMENTATION_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
@@ -29,6 +29,12 @@ G2_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 G2_IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
 G2_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
 G2_VERIFICATION_DATE=2026-08-09
+G3_STATE=DONE
+G3_BASELINE_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
+G3_PRODUCT_IMPLEMENTATION_HEAD=a3c043e77ff9bcbc80fbf638f8f9f52a217fa8a8
+G3_EVIDENCE_HEAD=1c6e61e5a53d59ac3a7f78054af5eab3e86ec667
+G3_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G3_VERIFICATION_DATE=2026-08-09
 PRODUCTION_ACCEPTANCE=NOT_GRANTED
 LEGACY_RETIREMENT=NOT_APPROVED
 ```
@@ -75,8 +81,8 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 | G0 | P0 | 候选冻结、稳定线语义同步、文档收敛 | DONE | 主协调 Owner | 无 |
 | G1 | P0 | 请求/写入生命周期与跨工程状态安全 | DONE | Workspace lifecycle Owner | G0 DONE |
 | G2 | P0/P1 | 后端合同解阻与功能差距决策 | DONE | 主协调 Owner + 对应后端 Owner | G0-G1 DONE |
-| G3 | P1/P2 | 产品体验、视觉、中文与 Vue 可维护性收口 | READY | UI Owner；共享面由主协调 Owner | G2 DONE |
-| G4 | P0 | Legacy profile 隔离、rollback 与退役准备 | LOCKED | Host/Release Owner | G0-G3 DONE |
+| G3 | P1/P2 | 产品体验、视觉、中文与 Vue 可维护性收口 | DONE | UI Owner；共享面由主协调 Owner | G2 DONE |
+| G4 | P0 | Legacy profile 隔离、rollback 与退役准备 | READY | Host/Release Owner | G0-G3 DONE |
 | G5 | P0 | 同一 clean SHA 的本地软件证据 | LOCKED | Final Evidence Owner | G4 DONE |
 | G6 | P0 | 真实宿主、目标机、远程与现场验收 | LOCKED | Release/Field Owner | G5 DONE |
 
@@ -190,26 +196,31 @@ G2.1-G2.5、G2.7/G2.9、G2.10 AI follow-up 等延期边界；延期能力未来�
 
 **目标**：在不减少能力、不改变 authority 的前提下完成 Quiet Precision、工业高信息密度和简体中文体验。
 
-- [ ] G3.1 Results 建立“态势总览 / 调查详情”两层视图；保留执行状态与判定结果双轴，不恢复虚假的空 KPI。
-- [ ] G3.2 Stations 建立全站概览、异常优先排序和详情调查层，兼顾鸟瞰扫描与命令真实性。
-- [ ] G3.3 Projects 改善 1920 宽屏利用率、空数据布局和最近工程密度，不增加营销式卡片或大标题。
-- [ ] G3.4 清理页面整圈 Panel、卡片套卡片和无效留白；每个轴只保留一个明确滚动 Owner。
-- [ ] G3.5 解决 Results 短屏 `overflow:hidden`、Workspace 9/10/11px 文本、26px 命中区和长中文截断。
-- [ ] G3.6 外观/更多菜单支持点击外部关闭、Escape、焦点返回和 viewport 边界约束。
-- [ ] G3.7 统一简体中文词表，移除面向用户的 `authority`、`Profile`、`Admin only`、`safe read`、
+- [x] G3.1 Results 建立“态势总览 / 调查详情”两层视图；保留执行状态与判定结果双轴，不恢复虚假的空 KPI。
+- [x] G3.2 Stations 建立全站概览、异常优先排序和详情调查层，兼顾鸟瞰扫描与命令真实性。
+- [x] G3.3 Projects 改善 1920 宽屏利用率、空数据布局和最近工程密度，不增加营销式卡片或大标题。
+- [x] G3.4 清理页面整圈 Panel、卡片套卡片和无效留白；每个轴只保留一个明确滚动 Owner。
+- [x] G3.5 解决 Results 短屏 `overflow:hidden`、Workspace 9/10/11px 文本、26px 命中区和长中文截断。
+- [x] G3.6 外观/更多菜单支持点击外部关闭、Escape、焦点返回和 viewport 边界约束。
+- [x] G3.7 统一简体中文词表，移除面向用户的 `authority`、`Profile`、`Admin only`、`safe read`、
   `G3`、`下一阶段` 等研发语言。
-- [ ] G3.8 修正 Diagnostics/About 的默认入口、产品版本、宿主/后端版本、许可证和支持信息。
-- [ ] G3.9 拆分超大 SFC 的渲染/组合责任：Results、AI Settings、WorkspaceShell、TCP Settings、Projects；
+- [x] G3.8 修正 Diagnostics/About 的默认入口、产品版本、宿主/后端版本、许可证和支持信息。
+- [x] G3.9 拆分超大 SFC 的渲染/组合责任：Results、AI Settings、WorkspaceShell、TCP Settings、Projects；
   capability lifecycle owner 和写入口保持唯一，不因拆组件复制状态树。
-- [ ] G3.10 覆盖 loading、empty、error、401、403、offline、stale、conflict、unknown-outcome、长中文、
+- [x] G3.10 覆盖 loading、empty、error、401、403、offline、stale、conflict、unknown-outcome、长中文、
   reduced motion 和键盘路径。
 
 **G3 退出条件**：
 
-- [ ] 1920x1080、1536x864、1366x768 在 light/dark、compact/comfortable 下无非预期水平滚动、
+- [x] 1920x1080、1536x864、1366x768 在 light/dark、compact/comfortable 下无非预期水平滚动、
   双层滚动、越界浮层或文本遮挡。
-- [ ] Canvas、Inspector、Preview、保存、正式运行和核心状态在 125% 等效短屏首屏可达。
-- [ ] Browser 截图完成方向性复审；真实 WebView2/DPI 仍留到 G6，不提前写 PASS。
+- [x] Canvas、Inspector、Preview、保存、正式运行和核心状态在 125% 等效短屏首屏可达。
+- [x] Browser 截图完成方向性复审；真实 WebView2/DPI 仍留到 G6，不提前写 PASS。
+
+G3 冻结在 `1c6e61e5a53d59ac3a7f78054af5eab3e86ec667`。F02 方向性证据位于
+`.tmp/studio-ui-next/f02-1/g3-1c6e61e5a/`（73 组 PNG/JSON），F03 Workspace 证据位于
+`.tmp/studio-ui-next/f03/g3-1c6e61e5a/`（12 组 PNG/JSON）；两组均为 `BROWSER_FIXTURE` +
+`HARNESS_SEEDED_SESSION`，不能替代真实 WebView2 或 Windows DPI。
 
 ## 8. G4：Legacy 隔离与退役准备
 
@@ -314,5 +325,6 @@ G2.1-G2.5、G2.7/G2.9、G2.10 AI follow-up 等延期边界；延期能力未来�
 - [x] 开始 G2 合同解阻与功能差距决策；GlobalVariables 与 Line Sequence 可实施投影已落地，合同缺口与
   旧版能力处置见 G2 ADR。
 - [x] 完成 G2.1-G2.5 处置冻结、延期项重新进入条件和 `98cb8c7f5` 验证；G3 已解锁。
-- [ ] 开始 G3 产品体验、视觉、中文与 Vue 工程收口；先完成旧版能力对照和当前 UI 审计，再修改实现。
+- [x] 完成 G3 产品体验、视觉、中文与 Vue 工程收口；实现与浏览器方向性证据冻结在 `1c6e61e5a`。
+- [ ] 开始 G4 Legacy profile 隔离、rollback 与退役准备；保留 Legacy 源码，不提前授予退役批准。
 - [x] G1 实现未改变后端 authority、保存链、Runtime/Station、AgentRun，也未引入第二套基础设施。

@@ -8,7 +8,7 @@
 F10_STATE=ACTIVE
 F10_START_HEAD=38b80b0dfcb66db67a9eab5ff84f80b994104606
 F10_START_REMOTE_HEAD=38b80b0dfcb66db67a9eab5ff84f80b994104606
-IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
+IMPLEMENTATION_HEAD=1c6e61e5a53d59ac3a7f78054af5eab3e86ec667
 DOCUMENTATION_HEAD=SELF
 BRANCH_HEAD_AT_REVIEW=SELF
 REMOTE_IMPLEMENTATION_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
@@ -41,6 +41,13 @@ G2_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 G2_IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
 G2_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
 G2_VERIFICATION_DATE=2026-08-09
+G3_STATE=DONE
+G3_BASELINE_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
+G3_PRODUCT_IMPLEMENTATION_HEAD=a3c043e77ff9bcbc80fbf638f8f9f52a217fa8a8
+G3_EVIDENCE_HEAD=1c6e61e5a53d59ac3a7f78054af5eab3e86ec667
+G3_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G3_VERIFICATION_DATE=2026-08-09
+G4_STATE=READY
 ```
 
 ## G0 候选冻结与稳定线语义同步
@@ -127,7 +134,7 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 | G3_DEVICE_COMMANDS | PARTIAL | Station unknown/reconcile 已有 Chromium/fixture journey。Line Sequence 本轮不执行设备写入，Apply 仅修改 canonical flow draft；未引入新 command authority。现场 Station/PLC 仍未验证。 |
 | G4_NEXT_UI_CONSUMPTION | DONE | Line Sequence 唯一 owner 挂载于 FlowWorkspace，只使用 shared `ApiTransport` 和 `FlowCanvasOwner.commands.patchNodeParameters`；Project/Results/Station/Template/Calibration 用户路径已有本轮 Chromium/fixture 证据。 |
 | G5_PARTIAL_EVIDENCE | PARTIAL | F10 Chromium/fixture 定向 journey `7/7`；仍不等同于真实 WebView2、DPI、no-Node 或现场硬件证据。 |
-| G6_UX_HARDENING | NOT_PERFORMED | 尚未开始本轮集中 UI 收口。 |
+| G6_UX_HARDENING | DONE | G3 产品体验实现在 `a3c043e77`，evidence fixture 修正在 `1c6e61e5a`；F02 `73/73`、F03 `12/12` 方向性截图与 manifest 通过。 |
 | G7_WEBVIEW2 | NOT_PERFORMED | 当前未取得真实 WebView2 100%/125% 证据。 |
 | G8_NO_NODE | NOT_PERFORMED | 当前未进行独立 no-Node 发布启动验证。 |
 | G9_FIELD_HARDWARE | NOT_PERFORMED | 当前环境没有现场 Camera、PLC、Station 验证条件。 |
@@ -143,6 +150,38 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 - Production acceptance 不由本台账自动授予；软件门禁与真实 WebView2、DPI、no-Node、现场硬件、生产 soak 和产品 owner 签收分别记录。
 
 ## 本轮工作记录（2026-08-09）
+
+### G3 产品体验、视觉、中文与 Vue 工程收口
+
+- G3 产品实现提交为 `a3c043e77ff9bcbc80fbf638f8f9f52a217fa8a8`；Station 健康态 evidence fixture
+  修正提交为 `1c6e61e5a53d59ac3a7f78054af5eab3e86ec667`。后者只把健康 Station 的待回放计数归零，
+  未放宽产品异常排序或测试断言。
+- Results 和 Stations 均建立“态势总览 / 调查详情”两层视图；Projects 宽屏与最近工程密度完成收口；
+  Workspace、Results 短屏、长中文、命中区、菜单 Escape/点击外部/焦点返回与 viewport 约束已覆盖。
+- Diagnostics/About 改为投影真实产品、宿主和后端版本；用户可见研发语言已清理。Results、AI Settings、
+  WorkspaceShell、TCP Settings 与 Projects 的展示责任已拆分，未复制 capability owner、状态树或写入口。
+- 新增组件均为展示或窄交互边界：`WorkspaceCommandBar`、`ProjectsRecentPanel`、
+  `ResultsSituationSummary`、`SettingsAiModelCatalog`、`SettingsTcpProfileList`、`CvViewTabs`。
+- 架构审计未发现第二 API transport、EventBus、ServiceRegistry、Canvas kernel、HostBridge 执行通道、
+  Project 保存链、query owner 或 write owner；Project/Flow/Runtime/Station/Results authority 未改变。
+
+#### G3 当前验证
+
+| 证据 | 状态 | 当前结果与边界 |
+| --- | --- | --- |
+| Impeccable detector | `PASS` | 当前 StudioUI `src` 扫描结果 `[]`。 |
+| Studio UI lint / typecheck | `PASS` | `npm run lint` 与 `npm run typecheck` 通过。 |
+| Studio UI full unit | `PASS` | `139` 个文件、`900/900` 个测试通过。 |
+| F02 affected without formal evidence | `PASS_WITH_GATED_SKIP` | `18` 个通过，`49` 个按 evidence gate 跳过；随后在同一 SHA 运行正式 evidence。 |
+| F02 Browser evidence | `PASS_BROWSER_FIXTURE` | `.tmp/studio-ui-next/f02-1/g3-1c6e61e5a/`；`73` PNG + `73` JSON，全部绑定 `1c6e61e5a`；最大水平 overflow `0`、runtime error `0`、截图哈希错误 `0`、适用页面 viewport/theme/density drift `0`。 |
+| F03 Workspace evidence | `PASS_BROWSER_FIXTURE` | `.tmp/studio-ui-next/f03/g3-1c6e61e5a/`；`12` PNG + `12` JSON，绑定当前 SHA 与 stable audit SHA `e76c74e3`；水平/垂直 overflow、runtime error、allowlist failure、owner conflict、viewport drift、截图哈希错误均为 `0`。 |
+| WebView2 host targeted | `PASS` | `WebView2HostTests -NoBuild -NoRestore`：`66/66`。这是宿主代码测试，不是手工真实 WebView2/DPI 验收。 |
+| 视觉复审 | `PASS_BROWSER_DIRECTIONAL` | 已复审 Projects、Results、Stations、Diagnostics、About、Station Admin 与 Workspace 的 light/dark、compact/comfortable、1920x1080/1536x864/1366x768 代表截图；未发现遮挡、截断、非预期滚动或卡片套卡片。 |
+| Windows DPI / native WebView2 | `NOT_PERFORMED` | F02/F03 均明确记录 `BROWSER_FIXTURE`、`HARNESS_SEEDED_SESSION` 与 `windowsDpi/nativeDpi=NOT_PERFORMED`；不冒充真实宿主证据。 |
+
+G3 退出条件已满足并解锁 G4。浏览器 fixture 只承担方向性视觉、交互和 owner 投影证据；真实 WebView2、
+Windows 100%/125%、独立 no-Node、现场硬件、Remote CI、生产 soak 与产品 Owner 签收继续留在 G6，
+`PRODUCTION_ACCEPTANCE=NOT_GRANTED`、`LEGACY_RETIREMENT=NOT_APPROVED` 保持不变。
 
 ### G1 请求/写入生命周期与跨工程状态安全
 
