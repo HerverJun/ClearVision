@@ -678,6 +678,25 @@ foreach ($logFile in Get-ChildItem -LiteralPath $hostLogs -Recurse -File -Filter
         }
     }
 }
+$messageOwnerRecords = [System.Collections.Generic.List[object]]::new()
+foreach ($logFile in Get-ChildItem -LiteralPath $hostLogs -Recurse -File -Filter "$RunName-desktop*.log" -ErrorAction SilentlyContinue) {
+    foreach ($line in Get-Content -LiteralPath $logFile.FullName -Encoding UTF8) {
+        $marker = "[StudioWebMessageOwner] "
+        $markerIndex = $line.IndexOf($marker, [System.StringComparison]::Ordinal)
+        if ($markerIndex -lt 0) {
+            continue
+        }
+        $json = $line.Substring($markerIndex + $marker.Length)
+        try {
+            $messageOwnerRecords.Add(($json | ConvertFrom-Json))
+        } catch {
+            $messageOwnerRecords.Add([pscustomobject]@{
+                parseError = $_.Exception.Message
+                raw = $json
+            })
+        }
+    }
+}
 $shutdownRecords = [System.Collections.Generic.List[object]]::new()
 $shutdownParseErrors = [System.Collections.Generic.List[string]]::new()
 if (Test-Path -LiteralPath $shutdownDiagnosticsPath -PathType Leaf) {
@@ -765,6 +784,27 @@ $startupRecordPassed = $startupRecord -and
     [bool]$startupRecord.flags.'Studio:StudioUiEnabled' -eq $studioUiEnabled -and
     [bool]$startupRecord.flags.'Studio:WorkspaceCapabilityEnabled' -eq $workspaceCapabilityEnabled -and
     [bool]$startupRecord.flags.'Studio2.Workspace' -eq $workspaceCapabilityEnabled
+$expectedMessageOwnerSurface = if ($Expectation -eq "legacy") {
+    "legacy-compatibility"
+} else {
+    "studio-host-capabilities"
+}
+$expectedMountedSubscriptionCount = if ($Expectation -eq "legacy") { 4 } else { 1 }
+$mountedMessageOwnerRecords = @($messageOwnerRecords | Where-Object {
+    [string]$_.phase -eq "mounted"
+})
+$disposedMessageOwnerRecords = @($messageOwnerRecords | Where-Object {
+    [string]$_.phase -eq "disposed"
+})
+$messageOwnerLogPassed = $messageOwnerRecords.Count -eq 2 -and
+    $mountedMessageOwnerRecords.Count -eq 1 -and
+    $disposedMessageOwnerRecords.Count -eq 1 -and
+    [string]$mountedMessageOwnerRecords[0].profile -eq $expectedProfile -and
+    [string]$disposedMessageOwnerRecords[0].profile -eq $expectedProfile -and
+    [string]$mountedMessageOwnerRecords[0].surface -eq $expectedMessageOwnerSurface -and
+    [string]$disposedMessageOwnerRecords[0].surface -eq $expectedMessageOwnerSurface -and
+    [int]$mountedMessageOwnerRecords[0].activeSubscriptionCount -eq $expectedMountedSubscriptionCount -and
+    [int]$disposedMessageOwnerRecords[0].activeSubscriptionCount -eq 0
 $cleanup = [pscustomobject]@{
     schemaVersion = 1
     runName = $RunName
@@ -833,6 +873,14 @@ $cleanup = [pscustomobject]@{
         record = $startupRecord
         passed = [bool]$startupRecordPassed
     }
+    messageOwnerLog = [pscustomobject]@{
+        recordCount = $messageOwnerRecords.Count
+        mounted = if ($mountedMessageOwnerRecords.Count -eq 1) { $mountedMessageOwnerRecords[0] } else { $null }
+        disposed = if ($disposedMessageOwnerRecords.Count -eq 1) { $disposedMessageOwnerRecords[0] } else { $null }
+        expectedSurface = $expectedMessageOwnerSurface
+        expectedMountedSubscriptionCount = $expectedMountedSubscriptionCount
+        passed = [bool]$messageOwnerLogPassed
+    }
     shutdownDiagnostics = [pscustomobject]@{
         path = $shutdownDiagnosticsPath
         recordCount = $shutdownRecords.Count
@@ -854,6 +902,7 @@ $cleanupPassed = $cleanup.processCleanup.passed -and
     $cleanup.runtimeCleanup.databaseStatePassed -and
     $cleanup.runtimeCleanup.runtimeRootRemoved -and
     $cleanup.startupLog.passed -and
+    $cleanup.messageOwnerLog.passed -and
     $cleanup.shutdownDiagnostics.passed -and
     $cleanup.environmentRestored
 $cleanup | Add-Member -NotePropertyName passed -NotePropertyValue $cleanupPassed

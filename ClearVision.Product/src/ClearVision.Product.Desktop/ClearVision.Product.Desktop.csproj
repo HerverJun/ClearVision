@@ -105,7 +105,7 @@
     <StudioUiBuildInput Include="$(StudioUiRoot)tsconfig*.json" />
     <StudioUiBuildInput Include="$(StudioUiRoot)vite.config.ts" />
     <StudioUiBuildInput Include="$(StudioUiRoot)src\**\*" />
-    <!-- Vite's canonical aliases currently resolve into this shared source closure. -->
+    <!-- Dependency-scoped canonical modules shared by both profiles. This inventory must not include the Legacy index.html or src/app.js composition root. -->
     <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\core\canvas\flowCanvasAdapter.js" />
     <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\core\canvas\flowCanvas.js" />
     <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\core\canvas\portTypeCompatibility.mjs" />

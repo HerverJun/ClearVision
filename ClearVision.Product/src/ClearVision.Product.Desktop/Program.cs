@@ -296,6 +296,7 @@ static class Program
         builder.Services.AddSingleton<RuntimeResultNormalizer>();
         builder.Services.AddPreviewArtifactServices();
         builder.Services.AddSingleton<WebMessageHandler>();
+        builder.Services.AddSingleton<StudioHostCapabilityMessageHandler>();
         builder.Services.AddSingleton<StationIngressAuthService>();
         builder.Services.AddSingleton<StationCommunicationSettingsStore>();
         builder.Services.AddSingleton<StationRegistryService>();
@@ -334,7 +335,7 @@ static class Program
 
         var app = builder.Build();
         // Validate the configured profile before recovery can mutate durable state.
-        _ = RequireValidStudioOptions(app.Services);
+        var studioOptions = RequireValidStudioOptions(app.Services);
         app.UseMiddleware<StationIngressIsolationMiddleware>();
 
         using (var scope = app.Services.CreateScope())
@@ -354,7 +355,7 @@ static class Program
                 .ConfigureBindings(config.Cameras);
         }
 
-        UseDesktopStaticAssets(app);
+        UseDesktopStaticAssets(app, studioOptions);
 
         app.UseCors();
         app.UseMiddleware<AuthMiddleware>();
@@ -404,29 +405,41 @@ static class Program
 
     internal static void UseDesktopStaticAssets(
         IApplicationBuilder app,
+        StudioOptions studioOptions,
         string? legacyWebRootPath = null,
         string? studioUiWebRootPath = null)
     {
         ArgumentNullException.ThrowIfNull(app);
+        ArgumentNullException.ThrowIfNull(studioOptions);
+
+        var profile = StudioStartupProfileCatalog.Resolve(studioOptions);
+        var effectiveOptions = StudioStartupProfileCatalog.CreateEffectiveOptions(
+            studioOptions,
+            profile);
+
+        if (effectiveOptions.StudioUiEnabled)
+        {
+            var resolvedStudioUiWebRootPath = Path.GetFullPath(
+                studioUiWebRootPath ?? DesktopWebRootResolver.ResolveStudioUi());
+            if (Directory.Exists(resolvedStudioUiWebRootPath))
+            {
+                var studioUiProvider = new PhysicalFileProvider(resolvedStudioUiWebRootPath);
+                app.UseDefaultFiles(new DefaultFilesOptions
+                {
+                    FileProvider = studioUiProvider,
+                    RequestPath = "/studio",
+                    DefaultFileNames = new List<string> { "index.html" }
+                });
+                app.UseStaticFiles(CreateStudioUiStaticFileOptions(studioUiProvider));
+                Debug.WriteLine(
+                    $"StudioUI 静态资源目录: {resolvedStudioUiWebRootPath}; Profile={profile}");
+            }
+
+            return;
+        }
 
         var resolvedLegacyWebRootPath = Path.GetFullPath(
             legacyWebRootPath ?? DesktopWebRootResolver.Resolve());
-        var resolvedStudioUiWebRootPath = Path.GetFullPath(
-            studioUiWebRootPath ?? DesktopWebRootResolver.ResolveStudioUi());
-
-        if (Directory.Exists(resolvedStudioUiWebRootPath))
-        {
-            var studioUiProvider = new PhysicalFileProvider(resolvedStudioUiWebRootPath);
-            app.UseDefaultFiles(new DefaultFilesOptions
-            {
-                FileProvider = studioUiProvider,
-                RequestPath = "/studio",
-                DefaultFileNames = new List<string> { "index.html" }
-            });
-            app.UseStaticFiles(CreateStudioUiStaticFileOptions(studioUiProvider));
-            Debug.WriteLine($"StudioUI 静态资源目录: {resolvedStudioUiWebRootPath}");
-        }
-
         if (Directory.Exists(resolvedLegacyWebRootPath))
         {
             var legacyProvider = new PhysicalFileProvider(resolvedLegacyWebRootPath);
@@ -442,7 +455,8 @@ static class Program
 
                     legacyApp.UseStaticFiles(CreateDesktopStaticFileOptions(legacyProvider));
                 });
-            Debug.WriteLine($"Legacy 静态资源目录: {resolvedLegacyWebRootPath}");
+            Debug.WriteLine(
+                $"Legacy 静态资源目录: {resolvedLegacyWebRootPath}; Profile={profile}");
         }
     }
 

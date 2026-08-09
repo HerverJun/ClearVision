@@ -34,7 +34,7 @@ namespace ClearVision.Product.Desktop.Handlers;
 /// <summary>
 /// WebView2 消息处理器
 /// </summary>
-public class WebMessageHandler : IWebMessageClient, IDisposable
+public class WebMessageHandler : IWebMessageClient, IDesktopWebMessageOwner
 {
     private const int MaxPendingWebMessages = 512;
 
@@ -61,6 +61,11 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     // 事件订阅句柄
     private readonly List<IDisposable> _subscriptions = new();
     private bool _isSubscribed = false;
+
+    public string Surface => "legacy-compatibility";
+
+    public int ActiveSubscriptionCount =>
+        (_webView is null ? 0 : 1) + _subscriptions.Count;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -161,8 +166,11 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     /// </summary>
     public void Initialize(WebView2 webViewControl)
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeState) != 0, this);
         if (webViewControl?.CoreWebView2 == null)
             throw new InvalidOperationException("WebView2 content is not initialized.");
+        if (_webView is not null)
+            throw new InvalidOperationException("Legacy WebMessage compatibility channel is already initialized.");
 
         _webViewControl = webViewControl;
         _webView = webViewControl.CoreWebView2;

@@ -375,6 +375,7 @@ function Invoke-RollbackRun {
         profile = $StartupProfile
         rootKind = $summary.rootKind
         ownerLedger = $summary.owners
+        hostMessageOwner = $cleanup.messageOwnerLog
         authority = if ($summary.rollback) { $summary.rollback.authority } else { $null }
         databaseKept = [bool]$cleanup.runtimeCleanup.databaseKept
         databaseReused = [bool]$cleanup.runtimeCleanup.databaseReused
@@ -564,6 +565,8 @@ $manifest = [pscustomobject]@{
         oneMountedRootPerRestart = $phaseCountPassed
         legacyNextOwnerCount = 0
         nextWorkspaceOwnerCount = 1
+        oneProfileSpecificHostMessageOwnerPerRestart = $phaseCountPassed -and
+            @($runRecords | Where-Object { -not [bool]$_.hostMessageOwner.passed }).Count -eq 0
     }
     rollbackStatePath = $rollbackStatePath
     runs = @($runRecords)

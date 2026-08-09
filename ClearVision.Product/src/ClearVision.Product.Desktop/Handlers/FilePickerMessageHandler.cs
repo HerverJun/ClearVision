@@ -9,11 +9,11 @@ namespace ClearVision.Product.Desktop.Handlers;
 
 internal sealed class FilePickerMessageHandler
 {
-    private readonly IWebMessageClient _client;
+    private readonly IHostMessageClient _client;
     private readonly ILogger<FilePickerMessageHandler> _logger;
 
     public FilePickerMessageHandler(
-        IWebMessageClient client,
+        IHostMessageClient client,
         ILogger<FilePickerMessageHandler> logger)
     {
         _client = client;

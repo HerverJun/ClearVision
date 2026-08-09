@@ -1,3 +1,4 @@
+using ClearVision.Product.Desktop.Configuration;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -34,6 +35,7 @@ public sealed class ProgramStaticAssetsTests : IDisposable
         var app = builder.Build();
         Program.UseDesktopStaticAssets(
             app,
+            Profile(StudioStartupProfileCatalog.LegacyFallback),
             legacyRoot,
             Path.Combine(_tempRoot, "missing-studio-root"));
         await app.StartAsync();
@@ -61,10 +63,13 @@ public sealed class ProgramStaticAssetsTests : IDisposable
     public async Task UseDesktopStaticAssets_ShouldServeLegacyIndexAndNestedAssetsFromLegacyRoot()
     {
         var legacyRoot = Path.Combine(_tempRoot, "legacy-wwwroot");
+        var studioUiRoot = Path.Combine(_tempRoot, "studio-disabled-root");
         var nestedAsset = Path.Combine(legacyRoot, "src", "app.js");
         Directory.CreateDirectory(Path.GetDirectoryName(nestedAsset)!);
+        Directory.CreateDirectory(studioUiRoot);
         File.WriteAllText(Path.Combine(legacyRoot, "index.html"), "legacy-index");
         File.WriteAllText(nestedAsset, "legacy-app");
+        File.WriteAllText(Path.Combine(studioUiRoot, "index.html"), "studio-index");
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -74,8 +79,9 @@ public sealed class ProgramStaticAssetsTests : IDisposable
         var app = builder.Build();
         Program.UseDesktopStaticAssets(
             app,
+            Profile(StudioStartupProfileCatalog.LegacyFallback),
             legacyRoot,
-            Path.Combine(_tempRoot, "missing-studio-root"));
+            studioUiRoot);
         await app.StartAsync();
         try
         {
@@ -83,9 +89,11 @@ public sealed class ProgramStaticAssetsTests : IDisposable
 
             var legacyIndex = await client.GetStringAsync("/index.html");
             var legacyApp = await client.GetStringAsync("/src/app.js");
+            using var studioIndex = await client.GetAsync("/studio/index.html");
 
             legacyIndex.Should().Be("legacy-index");
             legacyApp.Should().Be("legacy-app");
+            studioIndex.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
         }
         finally
         {
@@ -115,7 +123,11 @@ public sealed class ProgramStaticAssetsTests : IDisposable
         });
         builder.WebHost.UseTestServer();
         var app = builder.Build();
-        Program.UseDesktopStaticAssets(app, legacyRoot, studioUiRoot);
+        Program.UseDesktopStaticAssets(
+            app,
+            Profile(StudioStartupProfileCatalog.NextDefault),
+            legacyRoot,
+            studioUiRoot);
         await app.StartAsync();
         try
         {
@@ -152,7 +164,11 @@ public sealed class ProgramStaticAssetsTests : IDisposable
         });
         builder.WebHost.UseTestServer();
         var app = builder.Build();
-        Program.UseDesktopStaticAssets(app, legacyRoot, studioUiRoot);
+        Program.UseDesktopStaticAssets(
+            app,
+            Profile(StudioStartupProfileCatalog.NextDefault),
+            legacyRoot,
+            studioUiRoot);
         await app.StartAsync();
         try
         {
@@ -173,13 +189,15 @@ public sealed class ProgramStaticAssetsTests : IDisposable
     }
 
     [Fact]
-    public async Task UseDesktopStaticAssets_ShouldKeepStudioProviderScopedFromLegacyRoot()
+    public async Task UseDesktopStaticAssets_NextProfile_ShouldMountOnlyStudioProvider()
     {
         var legacyRoot = Path.Combine(_tempRoot, "legacy-scope-root");
         var studioUiRoot = Path.Combine(_tempRoot, "studio-scope-root");
         Directory.CreateDirectory(Path.Combine(legacyRoot, "studio"));
+        Directory.CreateDirectory(Path.Combine(legacyRoot, "src"));
         Directory.CreateDirectory(Path.Combine(studioUiRoot, "assets"));
         File.WriteAllText(Path.Combine(legacyRoot, "index.html"), "legacy-index");
+        File.WriteAllText(Path.Combine(legacyRoot, "src", "app.js"), "legacy-app");
         File.WriteAllText(Path.Combine(legacyRoot, "studio", "index.html"), "legacy-shadow");
         File.WriteAllText(Path.Combine(studioUiRoot, "index.html"), "studio-index");
         File.WriteAllText(Path.Combine(studioUiRoot, "assets", "app-Clear1234.js"), "studio-asset");
@@ -190,15 +208,22 @@ public sealed class ProgramStaticAssetsTests : IDisposable
         });
         builder.WebHost.UseTestServer();
         var app = builder.Build();
-        Program.UseDesktopStaticAssets(app, legacyRoot, studioUiRoot);
+        Program.UseDesktopStaticAssets(
+            app,
+            Profile(StudioStartupProfileCatalog.NextDefault),
+            legacyRoot,
+            studioUiRoot);
         await app.StartAsync();
         try
         {
             using var client = app.GetTestClient();
 
-            (await client.GetStringAsync("/index.html")).Should().Be("legacy-index");
             (await client.GetStringAsync("/studio/index.html")).Should().Be("studio-index");
+            using var legacyIndex = await client.GetAsync("/index.html");
+            using var legacyApp = await client.GetAsync("/src/app.js");
             using var unscopedStudioAsset = await client.GetAsync("/assets/app-Clear1234.js");
+            legacyIndex.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+            legacyApp.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
             unscopedStudioAsset.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
         }
         finally
@@ -207,6 +232,44 @@ public sealed class ProgramStaticAssetsTests : IDisposable
             await app.DisposeAsync();
         }
     }
+
+    [Fact]
+    public async Task UseDesktopStaticAssets_NextProfileWithMissingAssets_ShouldNotFallBackToLegacy()
+    {
+        var legacyRoot = Path.Combine(_tempRoot, "legacy-fail-closed-root");
+        Directory.CreateDirectory(legacyRoot);
+        File.WriteAllText(Path.Combine(legacyRoot, "index.html"), "legacy-index");
+
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Production
+        });
+        builder.WebHost.UseTestServer();
+        var app = builder.Build();
+        Program.UseDesktopStaticAssets(
+            app,
+            Profile(StudioStartupProfileCatalog.NextDefault),
+            legacyRoot,
+            Path.Combine(_tempRoot, "missing-next-root"));
+        await app.StartAsync();
+        try
+        {
+            using var client = app.GetTestClient();
+            using var legacyIndex = await client.GetAsync("/index.html");
+
+            legacyIndex.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+        }
+        finally
+        {
+            await app.StopAsync();
+            await app.DisposeAsync();
+        }
+    }
+
+    private static StudioOptions Profile(string startupProfile) => new()
+    {
+        StartupProfile = startupProfile
+    };
 
     private static string GetHeader(HttpResponseMessage response, string headerName)
     {

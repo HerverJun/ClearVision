@@ -6,9 +6,7 @@ using System.Net;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Desktop.Configuration;
-using ClearVision.Product.Desktop.Handlers;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -51,7 +49,6 @@ public sealed class WebView2Host : IAsyncDisposable
     private WebView2StartupPlan? _startupPlan;
     private bool _isInitialized;
     private bool _isDisposed;
-    private readonly WebMessageHandler? _messageHandler;
 
     internal static Uri CreateInitialPageUri(int webPort)
     {
@@ -383,11 +380,6 @@ public sealed class WebView2Host : IAsyncDisposable
     public event EventHandler? Initialized;
 
     /// <summary>
-    /// 收到 Web 消息事件。
-    /// </summary>
-    public event EventHandler<WebMessage>? MessageReceived;
-
-    /// <summary>
     /// 获取是否已初始化。
     /// </summary>
     public bool IsInitialized => _isInitialized;
@@ -401,14 +393,11 @@ public sealed class WebView2Host : IAsyncDisposable
     /// 创建 WebView2 宿主实例。
     /// </summary>
     /// <param name="webView">WebView2 控件实例</param>
-    /// <param name="messageHandler">Web 消息处理器</param>
     public WebView2Host(
         WebView2 webView,
-        WebMessageHandler? messageHandler = null,
         StudioOptions? studioOptions = null)
     {
         _webView = webView ?? throw new ArgumentNullException(nameof(webView));
-        _messageHandler = messageHandler;
         _studioOptions = studioOptions ?? new StudioOptions();
     }
 
@@ -465,9 +454,6 @@ public sealed class WebView2Host : IAsyncDisposable
 
             // 配置 WebView2
             await ConfigureWebView2Async(startupPlan);
-
-            // 注册消息处理器
-            RegisterMessageHandlers();
 
             // 加载初始页面
             LoadInitialPage(startupPlan);
@@ -557,121 +543,6 @@ public sealed class WebView2Host : IAsyncDisposable
                     $"导航完成: {core.Source}");
             }
         };
-    }
-
-    /// <summary>
-    /// 注册消息处理器。
-    /// </summary>
-    private void RegisterMessageHandlers()
-    {
-        // 【修复】移除重复的 WebMessageReceived 订阅
-        // WebMessageHandler.Initialize() 已注册此事件，并能灵活匹配
-        // 前端发送的 messageType/type/Type 等不同字段名。
-        // WebView2Host 的 OnWebMessageReceived 将 JSON 反序列化为 WebMessage（期望 Type 属性），
-        // 但前端实际使用 messageType 字段名，导致 Type 为空、消息匹配失败。
-        // 保留此方法以便未来需要时重新启用。
-        // _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
-    }
-
-    /// <summary>
-    /// 处理收到的 Web 消息。
-    /// </summary>
-    private void OnWebMessageReceived(
-        object? sender,
-        CoreWebView2WebMessageReceivedEventArgs e)
-    {
-        try
-        {
-            var message = JsonSerializer.Deserialize<WebMessage>(
-                e.WebMessageAsJson,
-                new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-            if (message is not null)
-            {
-                // 触发消息接收事件
-                MessageReceived?.Invoke(this, message);
-
-                // 处理消息并发送响应
-                _ = HandleMessageAsync(message);
-            }
-        }
-        catch (JsonException ex)
-        {
-            System.Diagnostics.Debug.WriteLine(
-                $"无法解析 Web 消息: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// 异步处理消息。
-    /// </summary>
-    private async Task HandleMessageAsync(WebMessage message)
-    {
-        try
-        {
-            if (_messageHandler != null)
-            {
-                // 委托给 WebMessageHandler 处理
-                var result = await _messageHandler.HandleAsync(message);
-                await SendMessageAsync(result);
-            }
-            else
-            {
-                // 如果没有处理器，返回错误
-                await SendMessageAsync(new WebMessageResponse
-                {
-                    RequestId = message.Id,
-                    Success = false,
-                    Error = "消息处理器未初始化"
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            var errorResponse = new WebMessageResponse
-            {
-                RequestId = message.Id,
-                Success = false,
-                Error = ex.Message
-            };
-
-            await SendMessageAsync(errorResponse);
-        }
-    }
-
-    /// <summary>
-    /// 执行 JavaScript 脚本。
-    /// </summary>
-    /// <typeparam name="T">消息类型</typeparam>
-    /// <param name="message">消息对象</param>
-    public Task SendMessageAsync<T>(T message) where T : class
-    {
-        ObjectDisposedException.ThrowIf(_isDisposed, this);
-
-        if (!_isInitialized || _webView.CoreWebView2 is null)
-        {
-            throw new InvalidOperationException("WebView2 尚未初始化");
-        }
-
-        var json = JsonSerializer.Serialize(message, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
-
-        // 在 UI 线程上执行
-        if (_webView.InvokeRequired)
-        {
-            _webView.Invoke(() => _webView.CoreWebView2.PostWebMessageAsJson(json));
-        }
-        else
-        {
-            _webView.CoreWebView2.PostWebMessageAsJson(json);
-        }
-
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -888,12 +759,6 @@ public sealed class WebView2Host : IAsyncDisposable
         }
 
         _isDisposed = true;
-
-        // 取消事件订阅
-        if (_webView.CoreWebView2 is not null)
-        {
-            _webView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
-        }
 
         // 释放 WebView2 控件
         _webView.Dispose();

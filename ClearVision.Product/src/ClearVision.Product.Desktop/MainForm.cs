@@ -22,7 +22,8 @@ public partial class MainForm : Form
         "Formal Run may still be executing or its outcome may be unknown. Force-closing only releases local resources; it is not a successful Stop and may leave the server run active or lose the Results handoff. Force close anyway?";
     private readonly WebView2 _webView;
     private readonly WebView2Host _webView2Host;
-    private readonly Handlers.WebMessageHandler? _messageHandler;
+    private readonly Handlers.IDesktopWebMessageOwner? _messageOwner;
+    private readonly string _startupProfile;
     private readonly EnterPhotoelectricTriggerInputService? _triggerInputService;
     private readonly DesktopShutdownDiagnostics _shutdownDiagnostics;
     private DesktopShutdownCloseState _closeState;
@@ -40,12 +41,17 @@ public partial class MainForm : Form
         Controls.Add(_webView);
 
         // 创建 WebView2 宿主
-        _messageHandler = Program.ServiceProvider?.GetService<Handlers.WebMessageHandler>();
-        _triggerInputService = Program.ServiceProvider?.GetService<EnterPhotoelectricTriggerInputService>();
+        var serviceProvider = Program.ServiceProvider;
+        _triggerInputService = serviceProvider?.GetService<EnterPhotoelectricTriggerInputService>();
         _shutdownDiagnostics = Program.ShutdownDiagnostics;
-        var studioOptions = Program.ServiceProvider?.GetService<IOptions<StudioOptions>>()?.Value
+        var studioOptions = serviceProvider?.GetService<IOptions<StudioOptions>>()?.Value
             ?? new StudioOptions();
-        _webView2Host = new WebView2Host(_webView, _messageHandler, studioOptions);
+        _startupProfile = StudioStartupProfileCatalog.Resolve(studioOptions);
+        _messageOwner = serviceProvider is null
+            ? null
+            : (Handlers.IDesktopWebMessageOwner)serviceProvider.GetRequiredService(
+                ResolveWebMessageOwnerType(studioOptions));
+        _webView2Host = new WebView2Host(_webView, studioOptions);
 
         // 窗体加载时初始化 WebView2
         Load += MainForm_Load;
@@ -63,10 +69,11 @@ public partial class MainForm : Form
                 "CV_WEBVIEW2_USER_DATA_FOLDER");
             await _webView2Host.InitializeAsync(userDataFolder);
 
-            // S4-006: 初始化 WebMessage 处理器，挂载到 WebView2
+            // Mount exactly one profile-specific WebMessage owner.
             if (_webView.CoreWebView2 != null)
             {
-                _messageHandler?.Initialize(_webView);
+                _messageOwner?.Initialize(_webView);
+                LogWebMessageOwnerState("mounted", _messageOwner, _startupProfile);
             }
         }
         catch (Exception ex)
@@ -167,6 +174,40 @@ public partial class MainForm : Form
         }
 
         _ = PrepareCloseAsync(e.CloseReason);
+    }
+
+    internal static Type ResolveWebMessageOwnerType(StudioOptions studioOptions)
+    {
+        ArgumentNullException.ThrowIfNull(studioOptions);
+        var profile = StudioStartupProfileCatalog.Resolve(studioOptions);
+        var effectiveOptions = StudioStartupProfileCatalog.CreateEffectiveOptions(
+            studioOptions,
+            profile);
+        return effectiveOptions.StudioUiEnabled
+            ? typeof(Handlers.StudioHostCapabilityMessageHandler)
+            : typeof(Handlers.WebMessageHandler);
+    }
+
+    private static void LogWebMessageOwnerState(
+        string phase,
+        Handlers.IDesktopWebMessageOwner? owner,
+        string startupProfile)
+    {
+        if (owner is null)
+        {
+            return;
+        }
+
+        var diagnostics = JsonSerializer.Serialize(new
+        {
+            phase,
+            profile = startupProfile,
+            surface = owner.Surface,
+            activeSubscriptionCount = owner.ActiveSubscriptionCount
+        });
+        Serilog.Log.Information(
+            "[StudioWebMessageOwner] {OwnerDiagnostics:l}",
+            diagnostics);
     }
 
     private async Task PrepareCloseAsync(CloseReason closeReason)
@@ -652,7 +693,8 @@ public partial class MainForm : Form
         _disposedWebViewHost = true;
         try
         {
-            _messageHandler?.Dispose();
+            _messageOwner?.Dispose();
+            LogWebMessageOwnerState("disposed", _messageOwner, _startupProfile);
             await _webView2Host.DisposeAsync().AsTask().WaitAsync(
                 DesktopShutdownContract.WebViewDisposeDeadline);
             stage.Complete(DesktopShutdownStageStatus.Succeeded);
