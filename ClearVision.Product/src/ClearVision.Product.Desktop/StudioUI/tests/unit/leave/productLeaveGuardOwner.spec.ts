@@ -175,11 +175,11 @@ describe('productLeaveGuardOwner', () => {
     });
   });
 
-  it('prepares continuous inspection before leaving without treating owner disposal as stop', async () => {
+  it('lets a stable continuous inspection persist across ordinary route leave', async () => {
     const h = harness();
     const runtime = reactive({ isBusy: true, sessionType: 'ContinuousInspection' as const });
     const inspection = {
-      projection: reactive({ runtime }),
+      projection: reactive({ phase: 'running', runtime }),
       prepareForLeave: vi.fn(async () => { runtime.isBusy = false; return true; }),
       stop: vi.fn(async () => { runtime.isBusy = false; return true; }),
       reconcile: vi.fn(async () => undefined)
@@ -188,10 +188,29 @@ describe('productLeaveGuardOwner', () => {
 
     await expect(h.owner.request('route-leave')).resolves.toBe(true);
 
-    expect(inspection.prepareForLeave).toHaveBeenCalledOnce();
+    expect(inspection.prepareForLeave).not.toHaveBeenCalled();
     expect(inspection.stop).not.toHaveBeenCalled();
     expect(inspection.reconcile).not.toHaveBeenCalled();
+    expect(runtime.isBusy).toBe(true);
     expect(h.owner.projection.phase).toBe('allowed');
+  });
+
+  it('settles continuous inspection before protected session leave', async () => {
+    const h = harness();
+    const runtime = reactive({ isBusy: true, sessionType: 'ContinuousInspection' as const });
+    const inspection = {
+      projection: reactive({ phase: 'running', runtime }),
+      prepareForLeave: vi.fn(async () => { runtime.isBusy = false; return true; }),
+      stop: vi.fn(async () => { runtime.isBusy = false; return true; }),
+      reconcile: vi.fn(async () => undefined)
+    } as unknown as InspectionRunOwner;
+    h.owner.attachInspectionRun(inspection);
+
+    await expect(h.owner.request('logout')).resolves.toBe(true);
+
+    expect(inspection.prepareForLeave).toHaveBeenCalledOnce();
+    expect(inspection.stop).not.toHaveBeenCalled();
+    expect(runtime.isBusy).toBe(false);
   });
 
   it('blocks route leave when continuous inspection cannot settle', async () => {

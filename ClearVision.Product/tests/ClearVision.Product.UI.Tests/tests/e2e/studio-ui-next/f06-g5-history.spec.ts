@@ -151,7 +151,7 @@ test('G5 restores project-bound and unbound canonical Sessions through one dispo
     `#\/projects\/${f06ProjectId}\/ai\\?sessionId=${f06ProjectSessionId}$`
   ));
   await expect(page.locator('[data-ai-owner-phase]')).toHaveCount(1);
-  await expect(page.getByText('会话 revision 29')).toBeVisible();
+  await expect(page.getByText('会话修订 29')).toBeVisible();
   await expect(page.getByRole('dialog', { name: '历史与恢复' })).toHaveCount(0);
   await expect(page.locator('[data-ai-owner-phase]')).toHaveAttribute('data-ai-owner-stream-count', '0');
   await captureF06Evidence(page, audit, 'g5-session-restored-project', viewport, 'compact');
@@ -160,7 +160,7 @@ test('G5 restores project-bound and unbound canonical Sessions through one dispo
   const unboundSession = history.locator('li.ai-history__item').filter({ hasText: '会话版本 28' });
   await unboundSession.getByRole('button', { name: '前往独立工作台' }).click();
   await expect(page).toHaveURL(new RegExp(`#\/ai\\?sessionId=${f06UnboundHistorySessionId}$`));
-  await expect(page.getByText('会话 revision 28')).toBeVisible();
+  await expect(page.getByText('会话修订 28')).toBeVisible();
   await expect(page.locator('[data-ai-owner-phase]')).toHaveCount(1);
   await expect(page.locator('[data-ai-owner-phase]')).toHaveAttribute('data-ai-owner-subscription-count', '0');
   await captureF06Evidence(page, audit, 'g5-session-switched-unbound', viewport, 'compact');
@@ -180,10 +180,10 @@ test('G5 rejects late history responses after a Session route switch', async ({ 
     window.location.hash = `#/ai?sessionId=${sessionId}`;
   }, f06UnboundHistorySessionId);
   await expect(page).toHaveURL(new RegExp(`#\/ai\\?sessionId=${f06UnboundHistorySessionId}$`));
-  await expect(page.getByText('会话 revision 28')).toBeVisible();
+  await expect(page.getByText('会话修订 28')).toBeVisible();
   audit.releaseHistory();
   await expect(page.getByRole('dialog', { name: '历史与恢复' })).toHaveCount(0);
-  await expect(page.getByText('会话 revision 28')).toBeVisible();
+  await expect(page.getByText('会话修订 28')).toBeVisible();
   await expect(page.locator('[data-ai-owner-phase]')).toHaveAttribute('data-ai-owner-request-count', '0');
   expectNoRuntimeErrors(audit);
 });
@@ -334,6 +334,7 @@ test('G5 logout and protected 401 dispose the AI owner before returning to login
 
 test('G5 route chunk failure never mounts an AI owner and lands on the public recovery state', async ({ page }) => {
   const audit = await boot(page, { width: 1366, height: 768 }, 'compact', '/about');
+  await expect(page.locator('[data-studio-page="about"]')).toBeVisible();
   let abortedChunk = '';
   let abortNextScript = true;
   await page.route('**/assets/*.js', route => {

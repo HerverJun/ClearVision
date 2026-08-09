@@ -322,7 +322,7 @@ test('Settings shell reads Engineer safe projection, exposes groups, and stays G
   await expect(page.locator('[data-capability="settings"]')).toBeVisible();
   await expect(page.locator('[data-settings-phase="ready"]')).toBeVisible();
   await expect(page.locator('[data-capability="settings"][data-settings-safe-subset="true"]')).toBeVisible();
-  await expect(page.locator('[data-capability="settings"]')).toContainText('safe subset');
+  await expect(page.locator('[data-capability="settings"]')).toContainText('安全子集');
   await expect(page.locator('[data-product-nav="/settings"]')).toBeVisible();
   await expect(page.locator('[data-settings-group="camera"]')).toBeVisible();
 
@@ -338,7 +338,7 @@ test('Settings shell renders loading then Admin full projection without a save r
 
   await expect(page.locator('[data-settings-phase="loading"]')).toBeVisible();
   await expect(page.locator('[data-settings-phase="ready"]')).toBeVisible();
-  await expect(page.getByText('完整管理员投影', { exact: true })).toBeVisible();
+  await expect(page.getByText('完整管理员视图', { exact: true })).toBeVisible();
   await page.locator('[data-settings-group="storage"]').click();
   await expect(page.locator('input[name="imageSavePath"]')).toHaveValue('D:/VisionData');
   expect(audit.filter(entry => entry.method !== 'GET')).toEqual([]);

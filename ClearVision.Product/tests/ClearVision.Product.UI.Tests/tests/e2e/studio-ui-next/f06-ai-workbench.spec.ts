@@ -196,7 +196,7 @@ test('project-bound compact deep link shows canonical project revision and handl
     longContent: true
   });
   await expect(page.getByText('新能源托盘超长中文名称外观检测工程', { exact: true })).toBeVisible();
-  await expect(page.getByText('保存 revision 18')).toBeVisible();
+  await expect(page.getByText('保存修订 18')).toBeVisible();
   await page.getByRole('textbox', { name: '任务描述' }).fill('检测新能源电池托盘冲压件高反光表面的划伤、压痕与脏污，并输出缺陷类型、位置、尺寸和最终 OK/NG 判定。');
   await page.getByRole('button', { name: '理解并规划任务' }).click();
   await expect(page.locator('[data-ai-plan-workspace]')).toContainText('复杂环境光变化');

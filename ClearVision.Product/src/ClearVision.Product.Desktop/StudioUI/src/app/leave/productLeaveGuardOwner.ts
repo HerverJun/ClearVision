@@ -100,6 +100,7 @@ interface PromptSettlement {
 const activeRunPhases = new Set(['admitting', 'executing', 'cancel-requested']);
 const unknownRunPhases = new Set(['unknown-outcome']);
 const activeProjectCommandPhases = new Set(['creating', 'updating', 'deleting', 'reconciling']);
+const detachableInspectionPhases = new Set(['running', 'reconnecting', 'disconnected']);
 let activeOwnerCount = 0;
 
 function promptSettlement(): PromptSettlement {
@@ -254,6 +255,13 @@ export function createProductLeaveGuardOwner(
     return null;
   }
 
+  function preservesInspectionAcrossRouteLeave(reason: ProductLeaveReason): boolean {
+    const projection = inspectionRunOwner?.projection;
+    return reason === 'route-leave' && projection?.runtime?.isBusy === true &&
+      projection.runtime.sessionType === 'ContinuousInspection' &&
+      detachableInspectionPhases.has(projection.phase);
+  }
+
   function isCurrent(generation: number): boolean {
     return !disposed && generation === lifecycleGeneration;
   }
@@ -316,19 +324,21 @@ export function createProductLeaveGuardOwner(
     if (projectAfter === 'project-update-conflict') return await prompt(projectAfter, reason, generation);
     if (projectAfter) return block(projectAfter, generation);
 
-    const inspectionBefore = currentInspectionProtection();
-    if (inspectionBefore && inspectionRunOwner) {
-      let settled: boolean;
-      try {
-        settled = await inspectionRunOwner.prepareForLeave();
-      } catch {
-        settled = false;
+    if (!preservesInspectionAcrossRouteLeave(reason)) {
+      const inspectionBefore = currentInspectionProtection();
+      if (inspectionBefore && inspectionRunOwner) {
+        let settled: boolean;
+        try {
+          settled = await inspectionRunOwner.prepareForLeave();
+        } catch {
+          settled = false;
+        }
+        if (!isCurrent(generation)) return false;
+        if (!settled) return block(currentInspectionProtection() ?? inspectionBefore, generation);
       }
-      if (!isCurrent(generation)) return false;
-      if (!settled) return block(currentInspectionProtection() ?? inspectionBefore, generation);
+      const inspectionAfter = currentInspectionProtection();
+      if (inspectionAfter) return block(inspectionAfter, generation);
     }
-    const inspectionAfter = currentInspectionProtection();
-    if (inspectionAfter) return block(inspectionAfter, generation);
 
     const settingsProtection = currentSettingsProtection();
     if (settingsProtection) {

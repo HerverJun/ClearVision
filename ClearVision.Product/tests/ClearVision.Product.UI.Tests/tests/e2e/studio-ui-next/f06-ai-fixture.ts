@@ -633,6 +633,7 @@ export async function installF06Fixture(page: Page, options: F06BrowserFixtureOp
     if (url.pathname === '/api/auth/me') return json(200, { userId: 'f06-user', username: 'f06-engineer', role });
     if (url.pathname === '/api/auth/logout' && request.method() === 'POST') return json(200, {});
     if (url.pathname === '/api/operators/library') return json(200, []);
+    if (url.pathname === '/api/templates' && request.method() === 'GET') return json(200, []);
     if (url.pathname === '/api/cameras/bindings') {
       return json(200, []);
     }

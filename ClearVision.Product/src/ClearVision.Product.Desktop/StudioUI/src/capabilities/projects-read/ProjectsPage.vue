@@ -392,6 +392,7 @@ onBeforeUnmount(() => {
       ref="importPicker"
       class="projects-page__file-input"
       type="file"
+      tabindex="-1"
       accept="application/json,.json"
       aria-label="选择工程 JSON 文件"
       @change="handleImportFileChange"
@@ -835,7 +836,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .projects-page { display: grid; max-width: 1720px; gap: var(--cv-density-page-gap); min-width: 0; }
 .projects-page__meta { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-variant-numeric: tabular-nums lining-nums; }
-.projects-page__file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.projects-page__file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); pointer-events: none; white-space: nowrap; }
 .projects-page__meta + .projects-page__meta::before { margin-right: var(--cv-space-2); color: var(--cv-border-strong); content: '·'; }
 .projects-page__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(244px, 288px); gap: var(--cv-space-4); align-items: start; }
 .projects-page__layout--empty { grid-template-columns: minmax(0, 1fr); }

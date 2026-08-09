@@ -510,7 +510,7 @@ test('F04 G3C exposes revision conflict and reloads server authority without aut
 
   await page.getByLabel('工程名称').fill('本地覆盖请求');
   await page.getByRole('button', { name: '保存工程信息' }).click();
-  await expect(page.getByText('工程 revision 或 mutation 冲突')).toBeVisible();
+  await expect(page.getByText('工程修订或写入冲突')).toBeVisible();
   await expect(page.getByRole('heading', { name: '本地基线' })).toBeVisible();
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
