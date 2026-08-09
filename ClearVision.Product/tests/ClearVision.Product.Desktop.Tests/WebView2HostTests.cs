@@ -62,6 +62,10 @@ public class WebView2HostTests
             plan.StartupInjectionScript.Should().Contain("\"startupProfile\":\"NEXT_PILOT\"");
             plan.StartupInjectionScript.Should().Contain("\"profileAllowedRoles\":[\"Admin\"]");
             plan.StartupInjectionScript.Should().Contain("\"featureFlags\":");
+            plan.StartupInjectionScript.Should().Contain("\"productVersion\":");
+            plan.StartupInjectionScript.Should().Contain("\"hostVersion\":");
+            plan.StartupInjectionScript.Should().NotContain("\"productVersion\":\"unknown\"");
+            plan.StartupInjectionScript.Should().NotContain("\"hostVersion\":\"unknown\"");
             plan.StartupInjectionScript.Should().Contain("\"Studio2.Workspace\":true");
             plan.StartupInjectionScript.Should().Contain("Object.freeze(startup)");
             plan.StartupInjectionScript.Should().Contain("writable: false");

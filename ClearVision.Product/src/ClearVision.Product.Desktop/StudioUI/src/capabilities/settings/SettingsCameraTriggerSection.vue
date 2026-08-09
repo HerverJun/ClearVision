@@ -121,7 +121,7 @@ watch(() => props.serialPorts, ports => {
     <header class="camera-section__header">
       <div>
         <h3>Trigger 输入与诊断</h3>
-        <p>Enter、串口光电和诊断只调用现有 trigger-input endpoint。测试等待的是输入信号，不会写入正式检测结果。</p>
+        <p>Enter、串口光电和诊断只调用现有触发输入接口。测试等待的是输入信号，不会写入正式检测结果。</p>
       </div>
       <CvStatusBadge
         :tone="diagnosticsTone"

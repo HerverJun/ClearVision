@@ -9,7 +9,6 @@ import {
   CvStatusBadge,
   type CvStatusTone
 } from '@/design-system';
-import { CvIcon } from '@/design-system/icons';
 import { createLocalResultsDeepLink } from '@/shared/productionTraceLinks';
 import type { WorkspaceProjectV1 } from './workspaceContracts';
 import type { WorkspaceOwner } from './workspaceOwner';
@@ -24,6 +23,7 @@ import { RuntimePackageExportDialog, type RuntimePackageExportOwner } from './ru
 import { TemplateWorkbench, type TemplateOwner } from './templates';
 import WorkspaceHandoffBanner from './handoff/WorkspaceHandoffBanner.vue';
 import type { WorkspaceHandoffReceiveProjection } from './handoff/handoffContracts';
+import WorkspaceCommandBar from './WorkspaceCommandBar.vue';
 import RunConsole from '@/capabilities/inspection-run/RunConsole.vue';
 import RunStatusBar from '@/capabilities/inspection-run/RunStatusBar.vue';
 import {
@@ -234,6 +234,29 @@ const persistenceLabel = computed(() => {
     disposed: '已释放'
   }[projection.phase];
 });
+const commandBarProjectName = computed(() => currentProject.value?.name ?? newDraft.value?.project.name ?? '工程工作区');
+const commandBarProjectSubtitle = computed(() => {
+  if (currentProject.value) return `流程编辑 · 版本 ${currentProject.value.version}`;
+  if (newDraft.value) return '新工程草稿 · 尚未创建工程';
+  return null;
+});
+const commandBarProjectTitle = computed(() => {
+  if (props.newDraftOwner) return '未落库的新工程草稿';
+  const project = currentProject.value;
+  return `工程 ID：${effectiveProjectId.value}${project ? `；版本：${project.version}；保存修订：${persistence.value?.persistenceRevision ?? project.persistenceRevision}` : ''}`;
+});
+const commandBarSaveTone = computed<CvStatusTone>(() => persistence.value?.dirty ? 'warning' : persistence.value ? 'ok' : 'warning');
+const commandBarSaveLabel = computed(() => {
+  if (persistence.value) return persistenceLabel.value;
+  if (newDraft.value?.savePhase === 'workspace-project-creating') return '正在创建工程';
+  if (newDraft.value?.savePhase === 'workspace-save-unknown-outcome') return '创建结果未知';
+  return '未保存';
+});
+const commandBarActionLabel = computed(() => {
+  if (persistence.value?.phase === 'saving' || newDraft.value?.savePhase === 'workspace-project-creating') return '保存中…';
+  if (newDraft.value?.savePhase === 'workspace-save-unknown-outcome') return '核对创建结果';
+  return '保存';
+});
 const runTone = computed(() => {
   const phase = run.value?.phase;
   if (phase === 'succeeded') return 'ok';
@@ -297,7 +320,7 @@ const runAdmissionChecks = computed<readonly RunConsoleAdmissionCheck[]>(() => [
       ? 'pass' : persistence.value?.dirty ? 'blocked' : run.value?.phase === 'admitting' ? 'pending' : 'unknown',
     detail: persistence.value?.dirty
       ? '本地参数尚未保存'
-      : 'revision ' + (run.value?.admission?.persistenceRevision ?? persistence.value?.persistenceRevision ?? '--')
+      : '保存修订 ' + (run.value?.admission?.persistenceRevision ?? persistence.value?.persistenceRevision ?? '--')
   },
   {
     key: 'flow',
@@ -358,7 +381,7 @@ const runResults = computed<readonly RunConsoleResultItem[]>(() => {
     errorMessage: result.errorMessage,
     diagnostics: Object.freeze([
       { key: 'snapshot', label: 'executionSnapshotId', value: result.executionSnapshotId },
-      { key: 'revision', label: 'persistenceRevision', value: String(result.persistenceRevision) },
+      { key: 'revision', label: '保存修订', value: String(result.persistenceRevision) },
       { key: 'flow', label: 'flowHash', value: result.flowHash ?? '--' },
       { key: 'decision', label: 'decisionConfigurationHash', value: result.decisionConfigurationHash ?? '--' }
     ])
@@ -431,180 +454,39 @@ function workspaceResultsLink(resultId?: string): string {
     :data-workspace-persistence-revision="persistence?.persistenceRevision ?? currentProject?.persistenceRevision ?? -1"
     :data-workspace-save-compatibility="currentProject?.saveCompatibility.status ?? 'unavailable'"
   >
-    <header class="workspace-shell__toolbar">
-      <div class="workspace-shell__identity">
-        <nav
-          class="workspace-shell__back-nav"
-          aria-label="工程导航"
-        >
-          <RouterLink
-            class="workspace-shell__back"
-            to="/projects"
-          >
-            工程列表
-          </RouterLink>
-          <RouterLink
-            v-if="!newDraftOwner"
-            class="workspace-shell__back"
-            :to="`/projects/${effectiveProjectId}`"
-          >
-            工程详情
-          </RouterLink>
-        </nav>
-        <span
-          class="workspace-shell__divider"
-          aria-hidden="true"
-        />
-        <div
-          class="workspace-shell__project"
-          :title="newDraftOwner ? '未落库的新工程草稿' : `工程 ID：${effectiveProjectId}${currentProject ? `；版本：${currentProject.version}；保存修订：${persistence?.persistenceRevision ?? currentProject.persistenceRevision}` : ''}`"
-        >
-          <strong>{{ currentProject?.name ?? newDraft?.project.name ?? '工程工作区' }}</strong>
-          <small v-if="currentProject">流程编辑 · 版本 {{ currentProject.version }}</small>
-          <small v-else-if="newDraft">新工程草稿 · 尚未创建 Project</small>
-        </div>
-        <CvStatusBadge
-          v-if="persistence"
-          class="workspace-shell__save-state"
-          :tone="persistence.dirty ? 'warning' : 'ok'"
-          :label="persistenceLabel"
-        />
-        <CvStatusBadge
-          v-else-if="newDraft"
-          class="workspace-shell__save-state"
-          tone="warning"
-          :label="newDraft.savePhase === 'workspace-project-creating' ? '正在创建工程' : newDraft.savePhase === 'workspace-save-unknown-outcome' ? '创建结果未知' : '未保存'"
-        />
-      </div>
-
-      <div class="workspace-shell__commands">
-        <div class="workspace-shell__command-group workspace-shell__command-group--primary">
-          <CvButton
-            data-capability="final-decision"
-            data-testid="final-decision"
-            size="sm"
-            variant="secondary"
-            :disabled="!persistence || isReadonly"
-            title="配置正式运行使用的最终判定"
-            @click="openDecision"
-          >
-            <template #leading>
-              <CvIcon
-                name="decision"
-                size="sm"
-              />
-            </template>
-            最终判定
-          </CvButton>
-          <CvButton
-            v-if="persistence || newDraft"
-            data-testid="workspace-save"
-            size="sm"
-            variant="secondary"
-            :disabled="persistence ? !persistence.canSave : !newDraft?.canSave"
-            @click="emit('requestSave')"
-          >
-            <template #leading>
-              <CvIcon
-                name="save"
-                size="sm"
-              />
-            </template>
-            {{ persistence?.phase === 'saving' || newDraft?.savePhase === 'workspace-project-creating' ? '保存中…' : newDraft?.savePhase === 'workspace-save-unknown-outcome' ? '核对创建结果' : '保存' }}
-          </CvButton>
-        </div>
-        <span
-          class="workspace-shell__command-divider"
-          aria-hidden="true"
-        />
-        <div class="workspace-shell__command-group workspace-shell__command-group--tools">
-          <CvButton
-            data-capability="global-variables"
-            data-testid="global-variables"
-            size="sm"
-            variant="quiet"
-            :disabled="!persistence || isReadonly"
-            title="管理本工程的变量定义与绑定"
-            @click="openVariables"
-          >
-            <template #leading>
-              <CvIcon
-                name="variables"
-                size="sm"
-              />
-            </template>
-            全局变量
-          </CvButton>
-          <CvButton
-            v-if="userRole === 'Admin'"
-            data-testid="runtime-package-export"
-            size="sm"
-            variant="quiet"
-            :disabled="!persistence || run?.phase === 'executing'"
-            title="从已正式保存的工程导出运行包"
-            @click="openRuntimePackage"
-          >
-            运行包
-          </CvButton>
-          <CvButton
-            data-testid="workspace-templates"
-            size="sm"
-            variant="quiet"
-            :disabled="!persistence || !currentProject || isReadonly"
-            title="搜索、应用和维护流程模板"
-            @click="openTemplates"
-          >
-            <template #leading>
-              <CvIcon
-                name="copy"
-                size="sm"
-              />
-            </template>
-            模板
-          </CvButton>
-          <RouterLink
-            v-if="!newDraftOwner"
-            class="workspace-shell__results-link"
-            :to="workspaceResultsLink()"
-            data-testid="workspace-results"
-          >
-            本次结果
-          </RouterLink>
-        </div>
-        <CvButton
-          v-if="persistence?.canRetry"
-          data-testid="workspace-save-retry"
-          size="sm"
-          @click="workspaceOwner?.retrySave()"
-        >
-          重试
-        </CvButton>
-        <CvButton
-          v-if="persistence?.canReconcile"
-          data-testid="workspace-save-reconcile"
-          size="sm"
-          @click="workspaceOwner?.reconcileSave()"
-        >
-          核对保存结果
-        </CvButton>
-        <CvButton
-          v-if="persistence?.canReapplyConflict"
-          data-testid="workspace-conflict-reapply"
-          size="sm"
-          @click="workspaceOwner?.reapplyConflict()"
-        >
-          重新应用本地草稿
-        </CvButton>
-        <CvButton
-          v-if="persistence?.canDiscardConflict"
-          data-testid="workspace-conflict-discard"
-          size="sm"
-          @click="workspaceOwner?.discardConflict()"
-        >
-          放弃本地草稿
-        </CvButton>
-      </div>
-    </header>
+    <WorkspaceCommandBar
+      :project-id="effectiveProjectId"
+      :project-name="commandBarProjectName"
+      :project-subtitle="commandBarProjectSubtitle"
+      :project-title="commandBarProjectTitle"
+      :show-project-details="!newDraftOwner"
+      :show-save-state="Boolean(persistence || newDraft)"
+      :save-state-tone="commandBarSaveTone"
+      :save-state-label="commandBarSaveLabel"
+      :can-open-decision="Boolean(persistence) && !isReadonly"
+      :show-save="Boolean(persistence || newDraft)"
+      :can-save="persistence ? persistence.canSave : Boolean(newDraft?.canSave)"
+      :save-label="commandBarActionLabel"
+      :can-open-variables="Boolean(persistence) && !isReadonly"
+      :show-runtime-package="userRole === 'Admin'"
+      :can-open-runtime-package="Boolean(persistence) && run?.phase !== 'executing'"
+      :can-open-templates="Boolean(persistence && currentProject) && !isReadonly"
+      :show-results="!newDraftOwner"
+      :results-link="workspaceResultsLink()"
+      :can-retry-save="persistence?.canRetry === true"
+      :can-reconcile-save="persistence?.canReconcile === true"
+      :can-reapply-conflict="persistence?.canReapplyConflict === true"
+      :can-discard-conflict="persistence?.canDiscardConflict === true"
+      @open-decision="openDecision"
+      @request-save="emit('requestSave')"
+      @open-variables="openVariables"
+      @open-runtime-package="openRuntimePackage"
+      @open-templates="openTemplates"
+      @retry-save="workspaceOwner?.retrySave()"
+      @reconcile-save="workspaceOwner?.reconcileSave()"
+      @reapply-conflict="workspaceOwner?.reapplyConflict()"
+      @discard-conflict="workspaceOwner?.discardConflict()"
+    />
 
     <RunStatusBar
       v-if="run && currentProject"
@@ -928,6 +810,7 @@ function workspaceResultsLink(resultId?: string): string {
 
 <style scoped>
 .workspace-shell {
+  --cv-font-size-2xs: 12px;
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -945,71 +828,12 @@ function workspaceResultsLink(resultId?: string): string {
   grid-template-rows: auto auto auto minmax(0, 1fr) var(--cv-workspace-status-height, 24px);
 }
 
-.workspace-shell__toolbar,
 .workspace-shell__statusbar {
   display: flex;
   align-items: center;
   border-color: var(--cv-border-subtle);
   background: var(--cv-surface-page);
 }
-
-.workspace-shell__toolbar {
-  min-width: 0;
-  min-height: var(--cv-workspace-toolbar-height, 44px);
-  display: grid;
-  grid-template-columns: minmax(260px, auto) minmax(0, 1fr);
-  gap: var(--cv-space-2);
-  padding: 4px 10px;
-  border-bottom: 1px solid var(--cv-border-subtle);
-}
-
-.workspace-shell__identity,
-.workspace-shell__commands {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--cv-space-1);
-}
-.workspace-shell__commands :deep(.cv-button) { flex: 0 0 auto; }
-.workspace-shell__commands :deep(.cv-button:not(.cv-button--primary)) { background: var(--cv-surface-raised); }
-.workspace-shell__commands :deep(.cv-button--primary) { background: var(--cv-color-industrial-blue); border-color: var(--cv-color-industrial-blue); }
-.workspace-shell__commands :deep(.cv-button--primary:hover:not(:disabled)) { background: var(--cv-color-industrial-blue-hover); border-color: var(--cv-color-industrial-blue-hover); }
-
-.workspace-shell__identity > div { min-width: 0; }
-.workspace-shell__identity strong,
-.workspace-shell__identity small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workspace-shell__identity strong { font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); letter-spacing: 0; }
-.workspace-shell__identity small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
-.workspace-shell__project { display: flex; align-items: baseline; gap: var(--cv-space-2); }
-.workspace-shell__save-state { flex: 0 0 auto; }
-.workspace-shell__back-nav { display: flex; align-items: center; gap: var(--cv-space-2); }
-.workspace-shell__back { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); text-decoration: none; white-space: nowrap; }
-.workspace-shell__back:hover { color: var(--cv-color-link); }
-.workspace-shell__commands {
-  justify-content: flex-end;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.workspace-shell__command-group { display: flex; align-items: center; gap: 3px; }
-.workspace-shell__command-divider { width: 1px; height: 24px; flex: 0 0 auto; background: var(--cv-border-subtle); }
-.workspace-shell__commands::-webkit-scrollbar { display: none; }
-.workspace-shell__results-link {
-  display: inline-flex;
-  align-items: center;
-  height: var(--cv-density-control-height-sm);
-  padding: 0 var(--cv-space-2);
-  border: 1px solid transparent;
-  border-radius: var(--cv-radius-sm);
-  background: transparent;
-  color: var(--cv-text-secondary);
-  font-size: var(--cv-font-size-xs);
-  font-weight: var(--cv-font-weight-medium);
-  text-decoration: none;
-  white-space: nowrap;
-}
-.workspace-shell__results-link:hover { border-color: var(--cv-control-border-hover); background: var(--cv-interactive-hover); color: var(--cv-color-link); }
-.workspace-shell__results-link:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
-.workspace-shell__divider { width: 1px; height: 18px; background: var(--cv-border-subtle); }
 
 .workspace-shell__work-area {
   min-width: 0;
@@ -1145,7 +969,10 @@ function workspaceResultsLink(resultId?: string): string {
 
 .workspace-shell__diagnostics { position: relative; flex: 0 0 auto; }
 .workspace-shell__diagnostics summary {
+  min-height: 32px;
   padding: 2px var(--cv-space-1);
+  display: inline-flex;
+  align-items: center;
   color: var(--cv-text-muted);
   cursor: pointer;
   list-style: none;
@@ -1173,21 +1000,12 @@ function workspaceResultsLink(resultId?: string): string {
 
 @media (max-width: 1220px) {
   .workspace-shell__work-area--state { grid-template-columns: 176px minmax(520px, 1fr) 248px; }
-  .workspace-shell__project small { display: none; }
-}
-
-@media (max-width: 1420px) {
-  .workspace-shell__toolbar { grid-template-columns: minmax(210px, auto) minmax(0, 1fr); }
-  .workspace-shell__back-nav .workspace-shell__back:first-child,
-  .workspace-shell__project small,
-  .workspace-shell__save-state { display: none; }
 }
 
 @media (max-width: 920px) {
   .workspace-shell__work-area--state { grid-template-columns: minmax(0, 1fr); }
   .workspace-shell__work-area--state .workspace-shell__rail,
   .workspace-shell__work-area--state .workspace-shell__inspector { display: none; }
-  .workspace-shell__back-nav .workspace-shell__back:first-child { display: none; }
 }
 
 @media (max-height: 650px) {

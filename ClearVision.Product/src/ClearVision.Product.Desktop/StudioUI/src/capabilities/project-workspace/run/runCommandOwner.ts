@@ -97,18 +97,18 @@ function errorCode(error: unknown): string | null {
 function messageFor(error: unknown): string {
   return error instanceof Error && error.message.trim()
     ? error.message
-    : 'Formal Run request failed.';
+    : '正式运行请求失败。';
 }
 
 function terminalMessage(result: WorkspaceRunResultV1): string {
-  if (result.outcome.execution === 'Cancelled') return 'Formal Run was cancelled by the runtime.';
-  if (result.outcome.execution !== 'Succeeded') return result.errorMessage || 'Formal Run failed.';
+  if (result.outcome.execution === 'Cancelled') return '正式运行已由运行时取消。';
+  if (result.outcome.execution !== 'Succeeded') return result.errorMessage || '正式运行失败。';
   switch (result.outcome.decision) {
-    case 'Ok': return 'Formal Run completed: OK.';
-    case 'Ng': return 'Formal Run completed: NG.';
-    case 'Undetermined': return 'Formal Run completed: decision undetermined.';
-    case 'Invalid': return 'Formal Run completed: decision invalid.';
-    default: return 'Formal Run completed.';
+    case 'Ok': return '正式运行完成：判定 OK。';
+    case 'Ng': return '正式运行完成：判定 NG。';
+    case 'Undetermined': return '正式运行完成：判定未确定。';
+    case 'Invalid': return '正式运行完成：判定无效。';
+    default: return '正式运行完成。';
   }
 }
 
@@ -128,13 +128,13 @@ export function createWorkspaceRunCommandOwner(options: {
   }
   const runtimeApi: Pick<InspectionRunApiPort, 'hydrate'> = options.runtimeApi ?? Object.freeze({
     async hydrate(): Promise<InspectionRunState> {
-      throw new Error('Formal Run realtime state adapter is not configured.');
+      throw new Error('正式运行的实时状态适配器尚未配置。');
     }
   });
   const sse: InspectionSsePort = options.sse ?? Object.freeze({
     async connect(_options: Parameters<InspectionSsePort['connect']>[0]): Promise<void> {
       void _options;
-      throw new Error('Formal Run SSE adapter is not configured.');
+      throw new Error('正式运行的事件流适配器尚未配置。');
     }
   });
   const lease: WorkspaceCapabilityDiagnosticsLease = options.diagnostics.reserveRun(options.projectId);
@@ -145,7 +145,7 @@ export function createWorkspaceRunCommandOwner(options: {
     admission: null,
     runtime: null,
     result: null,
-    message: 'Formal Run is ready when the persisted Project is clean.',
+    message: '正式保存的工程无未处理修改时可以开始正式运行。',
     errorCode: null,
     canRun: false,
     canStop: false,
@@ -604,7 +604,8 @@ export function createWorkspaceRunCommandOwner(options: {
     state.admission = null;
     state.result = null;
     state.errorCode = 'RUN_ADMISSION_CANCELLED';
-    state.message = `Formal Run admission was cancelled locally (${reason}); no runtime session was created.`;
+    void reason;
+    state.message = '已在本机取消正式运行准入；后端未创建运行会话。';
     controller.abort();
     options.persistenceOwner.clearRunning(state.message);
     state.phase = options.persistenceOwner.projection.canRun ? 'idle' : 'blocked';
@@ -635,14 +636,14 @@ export function createWorkspaceRunCommandOwner(options: {
     if (!reconciliationMatchesIdentity(reconciliation, identity)) {
       state.phase = 'unknown-outcome';
       state.errorCode = 'RUN_RECONCILE_IDENTITY_MISMATCH';
-      state.message = 'The reconcile response did not match the formal run identity. Workspace remains locked.';
+      state.message = '核对响应与本次正式运行身份不一致；工作区保持锁定。';
       syncAvailability();
       return;
     }
     if (reconciliation.result && !resultMatchesIdentity(reconciliation.result, identity)) {
       state.phase = 'unknown-outcome';
       state.errorCode = 'RUN_RECONCILE_RESULT_IDENTITY_MISMATCH';
-      state.message = 'The reconciled result did not match the formal run identity. Workspace remains locked.';
+      state.message = '核对结果与本次正式运行身份不一致；工作区保持锁定。';
       syncAvailability();
       return;
     }
@@ -670,7 +671,7 @@ export function createWorkspaceRunCommandOwner(options: {
         if (!reconciliation.result) {
           state.phase = 'unknown-outcome';
           state.errorCode = 'RUN_RECONCILE_RESULT_MISSING';
-          state.message = 'The authoritative run succeeded but no formal result was returned. Workspace remains locked.';
+          state.message = '后端确认运行成功，但未返回正式结果；工作区保持锁定。';
           break;
         }
         state.result = reconciliation.result;
@@ -692,7 +693,7 @@ export function createWorkspaceRunCommandOwner(options: {
       case 'identity-mismatch':
         state.phase = 'unknown-outcome';
         state.errorCode = reconciliation.code ?? `RUN_${reconciliation.status.toUpperCase().replace('-', '_')}`;
-        state.message = `${reconciliation.message} Workspace remains locked.`;
+        state.message = `${reconciliation.message} 工作区保持锁定。`;
         break;
     }
     syncAvailability();
@@ -740,14 +741,14 @@ export function createWorkspaceRunCommandOwner(options: {
     if (!options.persistenceOwner.projection.canRun) {
       state.phase = 'blocked';
       state.errorCode = 'RUN_PERSISTENCE_GATE';
-      state.message = 'Save, reconcile, or resolve the current Project state before Formal Run.';
+      state.message = '请先保存、核对或解决当前工程状态，再开始正式运行。';
       syncAvailability();
       return null;
     }
-    if (!options.persistenceOwner.setRunning('Formal Run admission is in progress.')) {
+    if (!options.persistenceOwner.setRunning('正在校验正式运行准入条件。')) {
       state.phase = 'blocked';
       state.errorCode = 'RUN_MUTATION_GATE';
-      state.message = 'Workspace mutations are not eligible for Formal Run.';
+      state.message = '当前工作区修改状态不允许开始正式运行。';
       syncAvailability();
       return null;
     }
@@ -761,7 +762,7 @@ export function createWorkspaceRunCommandOwner(options: {
     state.result = null;
     state.phase = 'admitting';
     state.errorCode = null;
-    state.message = 'Validating the persisted Project snapshot for Formal Run.';
+    state.message = '正在校验用于正式运行的已保存工程快照。';
     syncDiagnostics(true);
     syncAvailability();
 
@@ -777,7 +778,7 @@ export function createWorkspaceRunCommandOwner(options: {
         state.phase = 'blocked';
         state.errorCode = admission.code;
         state.message = admission.message;
-        options.persistenceOwner.clearRunning('Formal Run admission was rejected.');
+        options.persistenceOwner.clearRunning('正式运行准入被拒绝。');
         return null;
       }
       if (admission.projectId !== options.projectId || admission.clientSnapshotId !== clientSnapshotId ||
@@ -785,13 +786,13 @@ export function createWorkspaceRunCommandOwner(options: {
         !admission.canonicalFlowHash || !admission.decisionConfigurationHash) {
         state.phase = 'blocked';
         state.errorCode = 'ADMISSION_IDENTITY_INVALID';
-        state.message = 'Admission did not echo the current persisted Project identity.';
-        options.persistenceOwner.clearRunning('Formal Run admission identity was rejected.');
+        state.message = '准入响应未返回当前已保存工程的完整身份。';
+        options.persistenceOwner.clearRunning('正式运行准入身份校验未通过。');
         return null;
       }
 
       state.phase = 'executing';
-      state.message = 'Formal Run is executing the admitted persisted Project snapshot.';
+      state.message = '正在执行已通过准入校验的正式工程快照。';
       syncAvailability();
       const result = await options.port.execute({
         projectId: options.projectId,
@@ -806,7 +807,7 @@ export function createWorkspaceRunCommandOwner(options: {
         result.decisionConfigurationHash !== admission.decisionConfigurationHash) {
         state.phase = 'unknown-outcome';
         state.errorCode = 'RUN_RESULT_IDENTITY_MISMATCH';
-        state.message = 'The execute response did not match the admitted persisted Project snapshot.';
+        state.message = '执行响应与已通过准入校验的工程快照不一致。';
         return null;
       }
       state.result = result;
@@ -833,10 +834,10 @@ export function createWorkspaceRunCommandOwner(options: {
       state.errorCode = errorCode(error) ?? (error instanceof ApiAbortError ? 'RUN_CANCELLED' : 'RUN_NETWORK_FAILURE');
       if (error instanceof ApiAbortError) {
         state.phase = 'unknown-outcome';
-        state.message = 'Formal Run cancellation was requested. The server outcome is unknown, so Workspace remains locked.';
+        state.message = '已请求取消正式运行，但服务端结果未知；工作区保持锁定。';
       } else if (error instanceof ApiNetworkError) {
         state.phase = 'unknown-outcome';
-        state.message = 'Formal Run network outcome is unknown, so Workspace remains locked.';
+        state.message = '正式运行的网络结果未知；工作区保持锁定。';
       } else if (error instanceof ApiHttpError) {
         if (error.status === 401 || error.status === 403) {
           state.phase = 'blocked';
@@ -877,14 +878,14 @@ export function createWorkspaceRunCommandOwner(options: {
     if (!identity) {
       state.phase = 'unknown-outcome';
       state.errorCode = 'RUN_IDENTITY_UNAVAILABLE';
-      state.message = 'Formal Run identity is incomplete. Workspace remains locked.';
+      state.message = '正式运行身份不完整；工作区保持锁定。';
       activeController?.abort();
       syncAvailability();
       return true;
     }
 
     state.phase = 'cancel-requested';
-    state.message = 'Stopping Formal Run through the authoritative runtime coordinator.';
+    state.message = '正在通过后端运行协调器停止正式运行。';
     syncAvailability();
     const controller = new AbortController();
     stopController = controller;
@@ -904,7 +905,7 @@ export function createWorkspaceRunCommandOwner(options: {
         if (isCurrent(generation, clientSnapshotId)) {
           state.phase = 'unknown-outcome';
           state.errorCode = errorCode(error) ?? 'RUN_STOP_NETWORK_FAILURE';
-          state.message = 'The stop request outcome is unknown. Reconcile the authoritative run before leaving.';
+          state.message = '停止请求的结果未知；离开前请核对后端正式运行状态。';
           // The server-side run is no longer tied to this HTTP request. Abort
           // only the local response wait so dispose cannot be mistaken for stop.
           activeController?.abort();
@@ -932,7 +933,7 @@ export function createWorkspaceRunCommandOwner(options: {
     const clientSnapshotId = state.clientSnapshotId;
     if (!identity || !clientSnapshotId) return null;
     const generation = operationGeneration;
-    state.message = 'Reconciling Formal Run against the authoritative runtime and result repository.';
+    state.message = '正在根据后端运行状态与结果库核对正式运行。';
     syncAvailability();
     const controller = new AbortController();
     reconcileController = controller;
@@ -947,7 +948,7 @@ export function createWorkspaceRunCommandOwner(options: {
         if (isCurrent(generation, clientSnapshotId)) {
           state.phase = 'unknown-outcome';
           state.errorCode = errorCode(error) ?? 'RUN_RECONCILE_NETWORK_FAILURE';
-          state.message = 'Formal Run reconcile failed before an authoritative answer was received. Workspace remains locked.';
+          state.message = '尚未获得后端确认时核对失败；工作区保持锁定。';
           syncAvailability();
         }
         return null;

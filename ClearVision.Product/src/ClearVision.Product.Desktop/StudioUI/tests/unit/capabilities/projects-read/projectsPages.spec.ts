@@ -6,6 +6,8 @@ import {
   type ProjectLifecycleCommandOwner
 } from '@/capabilities/project-lifecycle';
 import { ProjectDetailPage, ProjectsPage } from '@/capabilities/projects-read';
+import ProjectsRecentPanel from '@/capabilities/projects-read/ProjectsRecentPanel.vue';
+import type { ProjectSummary } from '@/capabilities/projects-read/projectContracts';
 import {
   ApiNotFoundError,
   type ApiBlobResponse,
@@ -26,7 +28,7 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-function summary(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function summary(overrides: Record<string, unknown> = {}): ProjectSummary & Record<string, unknown> {
   return {
     id: projectId,
     name: '瓶盖检测',
@@ -37,7 +39,7 @@ function summary(overrides: Record<string, unknown> = {}): Record<string, unknow
     modifiedAt: '2026-07-15T02:00:00Z',
     lastOpenedAt: '2026-07-15T03:00:00Z',
     ...overrides
-  };
+  } as ProjectSummary & Record<string, unknown>;
 }
 
 function details(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -140,6 +142,31 @@ function commandApi(options: {
 }
 
 describe('Projects read pages', () => {
+  it('keeps recent Projects visible while refresh is in progress or stale', async () => {
+    const router = createTestRouter();
+    await router.push('/projects');
+    await router.isReady();
+    const wrapper = mount(ProjectsRecentPanel, {
+      props: {
+        phase: 'success',
+        projects: [summary()],
+        isRefreshing: true,
+        canOpen: false,
+        busy: false
+      },
+      global: { plugins: [router] }
+    });
+
+    expect(wrapper.text()).toContain('正在刷新，暂时显示上次读取的最近工程');
+    expect(wrapper.text()).toContain('瓶盖检测');
+
+    await wrapper.setProps({ phase: 'partial-failure', isRefreshing: false });
+    expect(wrapper.text()).toContain('最近工程刷新未完成');
+    expect(wrapper.text()).toContain('瓶盖检测');
+
+    wrapper.unmount();
+  });
+
   it('renders only stable list fields even when the list payload contains misleading Flow counts', async () => {
     const api = apiWith(async path => path.startsWith('projects/recent')
       ? []

@@ -88,6 +88,20 @@ describe('readDesktopStudioStartupConfig', () => {
     expect(startup.profileAllowedRoles).toEqual(['Admin', 'Engineer', 'Operator']);
   });
 
+  it('accepts optional product metadata while preserving legacy payload compatibility', () => {
+    const legacyStartup = readDesktopStudioStartupConfig(createDesktopWindow());
+    expect(legacyStartup.productVersion).toBeUndefined();
+    expect(legacyStartup.hostVersion).toBeUndefined();
+
+    const startup = readDesktopStudioStartupConfig(createDesktopWindow(createStartupFixture({
+      productVersion: ' 3.2.1+candidate ',
+      hostVersion: '3.2.1.0'
+    })));
+
+    expect(startup.productVersion).toBe('3.2.1+candidate');
+    expect(startup.hostVersion).toBe('3.2.1.0');
+  });
+
   it('fails fast when Desktop did not inject startup configuration', () => {
     const runtimeWindow = Object.freeze({
       location: Object.freeze({ origin: localhostOrigin })
@@ -113,7 +127,9 @@ describe('readDesktopStudioStartupConfig', () => {
     ['profile role mapping', createStartupFixture({ profileAllowedRoles: ['Admin'] }), 'invalid-profile-allowed-roles'],
     ['null featureFlags', createStartupFixture({ featureFlags: null }), 'invalid-feature-flags'],
     ['array featureFlags', createStartupFixture({ featureFlags: [] }), 'invalid-feature-flags'],
-    ['non-boolean feature flag', createStartupFixture({ featureFlags: { enabled: 1 } }), 'invalid-feature-flags']
+    ['non-boolean feature flag', createStartupFixture({ featureFlags: { enabled: 1 } }), 'invalid-feature-flags'],
+    ['blank product version', createStartupFixture({ productVersion: '  ' }), 'invalid-product-metadata'],
+    ['non-string host version', createStartupFixture({ hostVersion: 321 }), 'invalid-product-metadata']
   ] as const)('rejects invalid %s', (_label, fixture, errorCode) => {
     expectStartupError(
       () => readDesktopStudioStartupConfig(createDesktopWindow(fixture)),

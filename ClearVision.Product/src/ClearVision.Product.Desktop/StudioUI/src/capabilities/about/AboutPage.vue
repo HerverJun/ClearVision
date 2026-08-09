@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useProductRuntime } from '@/app/productRuntime';
 import { useStudioPlatform } from '@/app/studioPlatform';
 import {
   CvDescriptionList,
+  CvInlineAlert,
   CvPageHeader,
   CvPanel,
   type CvDescriptionItem
@@ -10,14 +12,32 @@ import {
 import { studioUiBuildMetadata } from '@/platform/diagnostics/buildMetadata';
 
 const platform = useStudioPlatform();
+const runtime = useProductRuntime();
+const systemStatus = runtime.systemStatus.projection;
 const buildItems = computed<readonly CvDescriptionItem[]>(() => [
-  { key: 'frontend', label: '前端', value: `${studioUiBuildMetadata.name} ${studioUiBuildMetadata.version}` },
-  { key: 'schema', label: '启动协议', value: `版本 ${platform.startup.schemaVersion}` },
-  { key: 'profile', label: '启动 Profile', value: platform.startup.startupProfile },
-  { key: 'host', label: '宿主类型', value: platform.startup.hostKind },
-  { key: 'entry', label: '入口状态', value: 'Studio UI Next 已按当前 Profile 启动' },
-  { key: 'auth', label: '认证范围', value: '预置会话 authenticated preview', span: 2 }
+  { key: 'product', label: '产品版本', value: platform.startup.productVersion ?? '宿主未提供' },
+  { key: 'frontend', label: '界面版本', value: `${studioUiBuildMetadata.name} ${studioUiBuildMetadata.version}` },
+  { key: 'host-version', label: '桌面宿主版本', value: platform.startup.hostVersion ?? '浏览器环境不可用' },
+  { key: 'backend-version', label: '本地服务版本', value: systemStatus.health?.version ?? '尚未读取' },
+  { key: 'mode', label: '启动模式', value: formatStartupMode(platform.startup.startupProfile) },
+  { key: 'host', label: '运行环境', value: platform.startup.hostKind === 'desktop-webview2' ? 'Windows 桌面宿主' : '浏览器测试环境' },
+  { key: 'entry', label: '默认入口', value: '工程库（/projects）' },
+  { key: 'auth', label: '当前会话', value: '由本地服务认证与授权', span: 2 }
 ]);
+
+const supportItems: readonly CvDescriptionItem[] = Object.freeze([
+  { key: 'license', label: '产品许可证', value: '当前构建未嵌入产品许可证' },
+  { key: 'third-party', label: '第三方许可', value: '以发布包随附清单为准' },
+  { key: 'support', label: '技术支持', value: '请联系系统管理员或项目交付方', span: 2 }
+]);
+
+function formatStartupMode(value: string): string {
+  if (value === 'LEGACY_FALLBACK') return '兼容回退';
+  if (value === 'NEXT_DEFAULT') return '标准模式';
+  if (value.includes('PILOT')) return '受控试用';
+  if (value.includes('CANDIDATE')) return '候选模式';
+  return '受控启动';
+}
 </script>
 
 <template>
@@ -32,8 +52,8 @@ const buildItems = computed<readonly CvDescriptionItem[]>(() => [
     />
 
     <CvPanel
-      title="当前构建"
-      description="当前前端构建与宿主启动范围。"
+      title="版本与运行环境"
+      description="当前进程实际提供的产品、界面、宿主与本地服务版本。"
     >
       <CvDescriptionList
         :items="buildItems"
@@ -42,20 +62,24 @@ const buildItems = computed<readonly CvDescriptionItem[]>(() => [
     </CvPanel>
 
     <CvPanel
-      title="权威边界"
-      description="界面只呈现既有后端权威，不建立第二套业务状态。"
+      title="许可与支持"
+      description="发布和现场支持信息。"
     >
-      <ul>
-        <li>工程、流程、全局变量与正式资源仍由现有应用服务和保存协调器负责。</li>
-        <li>执行、检测结果、运行包与 Station 仍由既有后端和现场链路负责。</li>
-        <li>页面写操作只通过既有应用服务与已认证 HTTP 合同执行。</li>
-      </ul>
+      <CvDescriptionList
+        :items="supportItems"
+        label="许可与支持信息"
+      />
     </CvPanel>
+
+    <CvInlineAlert
+      tone="info"
+      title="产品组成"
+    >
+      Studio 用于工程配置与调试；正式执行由 Runtime 与现场工作站承载。
+    </CvInlineAlert>
   </section>
 </template>
 
 <style scoped>
 .about-page { max-width: 960px; display: grid; min-width: 0; gap: var(--cv-space-5); }
-.about-page ul { margin: 0; padding-left: var(--cv-space-5); }
-.about-page li { margin-block: var(--cv-space-2); color: var(--cv-text-secondary); line-height: var(--cv-line-height-relaxed); }
 </style>

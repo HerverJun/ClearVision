@@ -302,8 +302,8 @@ const toggleDisabledLabel = computed(() => {
 .flow-canvas-surface__tool-group + .flow-canvas-surface__tool-group { margin-left: var(--cv-space-1); padding-left: var(--cv-space-1); border-left: 1px solid var(--cv-border-subtle); }
 .flow-canvas-surface__tool-group--view { margin-left: auto !important; }
 .flow-canvas-surface__tool-button {
-  min-width: 28px;
-  height: 28px;
+  min-width: 32px;
+  height: 32px;
   padding: 0 6px;
   display: inline-flex;
   align-items: center;
@@ -323,7 +323,7 @@ const toggleDisabledLabel = computed(() => {
     border-color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard),
     color var(--cv-motion-duration-fast) var(--cv-motion-ease-standard);
 }
-.flow-canvas-surface__tool-button.is-icon-only { width: 28px; padding: 0; }
+.flow-canvas-surface__tool-button.is-icon-only { width: 32px; padding: 0; }
 .flow-canvas-surface__tool-button.is-scale { min-width: 46px; font-variant-numeric: tabular-nums; }
 .flow-canvas-surface__tool-button:hover:not(:disabled) { border-color: var(--cv-border-subtle); background: var(--cv-interactive-hover); color: var(--cv-color-industrial-blue); }
 .flow-canvas-surface__tool-button:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 0; }
@@ -336,7 +336,7 @@ const toggleDisabledLabel = computed(() => {
 .flow-canvas-surface__loading { position: absolute; inset: 0; display: grid; place-content: center; gap: var(--cv-space-1); text-align: center; background: color-mix(in srgb, var(--flow-canvas-background) 86%, transparent); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); pointer-events: none; }
 .flow-canvas-surface__loading strong { color: var(--cv-color-status-ng-strong); font-size: var(--cv-font-size-sm); }
 .flow-canvas-surface__loading.is-error { color: var(--cv-color-status-ng-strong); }
-.flow-canvas-surface__status { grid-row: 2; min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); padding: 0 var(--cv-space-2); overflow: hidden; border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); color: var(--cv-text-muted); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.flow-canvas-surface__status { grid-row: 2; min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); padding: 0 var(--cv-space-2); overflow: hidden; border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .flow-canvas-surface__counts,
 .flow-canvas-surface__revision,
 .flow-canvas-surface__feedback,
@@ -353,7 +353,7 @@ const toggleDisabledLabel = computed(() => {
 
 @media (max-width: 1360px) {
   .flow-canvas-surface__tool-button:not(.is-icon-only):not(.is-scale) span { display: none; }
-  .flow-canvas-surface__tool-button:not(.is-icon-only):not(.is-scale) { width: 28px; padding: 0; }
+  .flow-canvas-surface__tool-button:not(.is-icon-only):not(.is-scale) { width: 32px; padding: 0; }
 }
 
 @media (max-height: 760px) {

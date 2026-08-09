@@ -4,6 +4,7 @@ import {
   captureF02VisualEvidence,
   createF02RuntimeErrorAudit,
   expectGetOnly,
+  f02G3VisualMatrix,
   f02ResultsPerformanceFixtureCount,
   fulfillF02Json,
   hasF02VisualEvidenceTarget,
@@ -416,11 +417,16 @@ test('Results local view keeps query filters, dual axes, detail 404 and GET-only
   await page.setViewportSize(viewport);
   const runtimeErrors = createF04RuntimeErrorAudit(page);
   const audit = await bootResults(page, '/results?source=local');
-  await expect(page.getByText('请选择本机工程')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '请选择本机工程', exact: true })).toBeVisible();
+  const viewTabs = page.getByRole('tablist', { name: '结果视图' });
+  await expect(viewTabs.getByRole('tab', { name: '态势总览' })).toHaveAttribute('aria-selected', 'true');
   expect(audit.some(entry => entry.path.includes('/inspection/history/'))).toBe(false);
 
   await page.getByLabel('本机工程').selectOption(projectId);
   await expect(page.getByRole('link', { name: '返回工作区' })).toBeVisible();
+  await expect(page.getByText('83.3%', { exact: true })).toBeVisible();
+  await viewTabs.getByRole('tab', { name: '调查详情' }).click();
+  await expect(viewTabs.getByRole('tab', { name: '调查详情' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('cell', { name: '不适用', exact: true }).first()).toBeVisible();
   await expect(page.getByRole('cell', { name: '执行成功', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: '不适用', exact: true }).nth(1)).toBeVisible();
@@ -438,7 +444,6 @@ test('Results local view keeps query filters, dual axes, detail 404 and GET-only
   await expect(page.getByText('判定依据', { exact: true })).toBeVisible();
   await expect(page.getByText('FinalDecision', { exact: true })).toBeVisible();
   await expect(page.getByRole('img', { name: '本机检测结果图像' })).toBeVisible();
-  await expect(page.getByText('83.3%', { exact: true })).toBeVisible();
   await page.getByText('技术追溯', { exact: true }).click();
   await expect(page.getByText('流程版本哈希')).toBeVisible();
   await expect(page.getByText(executionSnapshotId, { exact: true })).toBeVisible();
@@ -532,35 +537,44 @@ test('F10 exports the complete server-side local Results scope and downloads the
   expect(audit.filter(entry => entry.method === 'GET' && entry.path.endsWith('/download'))).toHaveLength(1);
 });
 
-for (const visual of [
-  { id: 'results-wide-light-compact', width: 1920, height: 1080 },
-  { id: 'results-light-compact', width: 1366, height: 768 },
-  { id: 'results-short-light-compact', width: 1366, height: 600 }
-] as const) {
-  test(`captures ${visual.id} Browser fixture evidence`, async ({ page }) => {
+for (const visual of f02G3VisualMatrix) {
+  const scenario = `results-${visual.viewport.width}x${visual.viewport.height}-${visual.theme}-${visual.density}`;
+  test(`captures ${scenario} Browser fixture evidence`, async ({ page }) => {
     test.skip(
       !hasF02VisualEvidenceTarget() && !hasF04VisualEvidenceTarget(),
       'Visual evidence output was not requested.'
     );
-    await page.setViewportSize({ width: visual.width, height: visual.height });
-    await installF02VisualPreferences(page, 'light', 'compact');
+    await page.setViewportSize(visual.viewport);
+    await installF02VisualPreferences(page, visual.theme, visual.density);
     const runtimeErrors = createF02RuntimeErrorAudit(page);
     const audit = await bootResults(page, '/results?source=station&pageSize=200&resultId=fixture-result-0001');
     await expect(page.getByText('第 1–200 项，共 500 项')).toBeVisible();
+    const viewTabs = page.getByRole('tablist', { name: '结果视图' });
+    await expect(viewTabs.getByRole('tab', { name: '调查详情' })).toHaveAttribute('aria-selected', 'true');
     if (hasF02VisualEvidenceTarget()) {
       await captureF02VisualEvidence(page, {
-        scenario: visual.id,
-        viewport: { width: visual.width, height: visual.height },
-        theme: 'light',
-        density: 'compact',
+        scenario: `${scenario}-investigation`,
+        viewport: visual.viewport,
+        theme: visual.theme,
+        density: visual.density,
+        requests: audit,
+        runtimeErrors
+      });
+      await viewTabs.getByRole('tab', { name: '态势总览' }).click();
+      await expect(viewTabs.getByRole('tab', { name: '态势总览' })).toHaveAttribute('aria-selected', 'true');
+      await captureF02VisualEvidence(page, {
+        scenario: `${scenario}-overview`,
+        viewport: visual.viewport,
+        theme: visual.theme,
+        density: visual.density,
         requests: audit,
         runtimeErrors
       });
     }
     if (hasF04VisualEvidenceTarget()) {
       await captureF04VisualEvidence(page, {
-        scenario: visual.id,
-        viewport: { width: visual.width, height: visual.height },
+        scenario,
+        viewport: visual.viewport,
         runtimeErrors,
         requestAudit: audit,
         notes: ['F04.1 core page short-screen evidence.']

@@ -7,6 +7,8 @@ export interface StudioStartupConfigV1 {
   readonly startupProfile: StudioStartupProfile;
   readonly profileAllowedRoles: readonly StudioProfileRole[];
   readonly featureFlags: Readonly<Record<string, boolean>>;
+  readonly productVersion?: string;
+  readonly hostVersion?: string;
 }
 
 export type StudioProfileRole = 'Admin' | 'Engineer' | 'Operator';
@@ -55,6 +57,7 @@ export type StudioStartupConfigErrorCode =
   | 'invalid-studio-ui-base-path'
   | 'invalid-startup-profile'
   | 'invalid-profile-allowed-roles'
+  | 'invalid-product-metadata'
   | 'invalid-feature-flags';
 
 export class StudioStartupConfigError extends Error {
@@ -75,8 +78,20 @@ const startupFieldNames = new Set<string>([
   'studioUiBasePath',
   'startupProfile',
   'profileAllowedRoles',
-  'featureFlags'
+  'featureFlags',
+  'productVersion',
+  'hostVersion'
 ]);
+const requiredStartupFieldNames = Object.freeze([
+  'schemaVersion',
+  'uiKind',
+  'hostKind',
+  'apiBaseUrl',
+  'studioUiBasePath',
+  'startupProfile',
+  'profileAllowedRoles',
+  'featureFlags'
+] as const);
 
 const knownProfileRoles = new Set<StudioProfileRole>(['Admin', 'Engineer', 'Operator']);
 
@@ -137,7 +152,7 @@ function assertExactStartupFields(startup: UnknownRecord): void {
     }
   }
 
-  for (const fieldName of startupFieldNames) {
+  for (const fieldName of requiredStartupFieldNames) {
     if (!Object.prototype.hasOwnProperty.call(startup, fieldName)) {
       fail(
         'missing-startup-field',
@@ -236,7 +251,7 @@ function parseStartupProfile(value: unknown): StudioStartupProfile {
       !Object.prototype.hasOwnProperty.call(profileAllowedRolesByProfile, value)) {
     return fail(
       'invalid-startup-profile',
-      'StudioUI startupProfile must be a supported profile identifier.'
+      'StudioUI 启动模式必须使用受支持的标识。'
     );
   }
 
@@ -250,7 +265,7 @@ function parseProfileAllowedRoles(
   if (!Array.isArray(value) || value.length === 0) {
     return fail(
       'invalid-profile-allowed-roles',
-      'StudioUI profileAllowedRoles must be a non-empty array of supported roles.'
+      'StudioUI 启动模式角色列表必须包含至少一个受支持角色。'
     );
   }
 
@@ -260,7 +275,7 @@ function parseProfileAllowedRoles(
       roles.includes(role as StudioProfileRole)) {
       return fail(
         'invalid-profile-allowed-roles',
-        'StudioUI profileAllowedRoles must contain each supported role at most once.'
+        'StudioUI 启动模式角色列表不能包含重复或未知角色。'
       );
     }
 
@@ -272,7 +287,7 @@ function parseProfileAllowedRoles(
       roles.some((role, index) => role !== expectedRoles[index])) {
     return fail(
       'invalid-profile-allowed-roles',
-      'StudioUI profileAllowedRoles must exactly match the injected startupProfile.'
+      'StudioUI 启动模式角色列表必须与当前启动模式完全匹配。'
     );
   }
 
@@ -325,6 +340,14 @@ function validateStudioStartupConfig(
     const startupProfile = parseStartupProfile(candidate.startupProfile);
     const profileAllowedRoles = parseProfileAllowedRoles(candidate.profileAllowedRoles, startupProfile);
     const featureFlags = parseFeatureFlags(candidate.featureFlags);
+    const optionalMetadata = Object.fromEntries(['productVersion', 'hostVersion'].flatMap(key => {
+      const value = candidate[key];
+      if (value === undefined) return [];
+      if (typeof value !== 'string' || !value.trim() || value.length > 128) {
+        return fail('invalid-product-metadata', `StudioUI startup ${key} must be a non-empty version string.`);
+      }
+      return [[key, value.trim()]];
+    })) as Readonly<{ productVersion?: string; hostVersion?: string }>;
 
     return Object.freeze({
       schemaVersion: 1,
@@ -334,7 +357,8 @@ function validateStudioStartupConfig(
       studioUiBasePath: '/studio/',
       startupProfile,
       profileAllowedRoles,
-      featureFlags
+      featureFlags,
+      ...optionalMetadata
     });
   } catch (error) {
     if (error instanceof StudioStartupConfigError) {

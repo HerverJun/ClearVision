@@ -18,14 +18,14 @@ const emit = defineEmits<{
 }>();
 
 function stateLabel(target: SettingsNavigationTarget, role: string | null, projection: SettingsProjectionV1): string {
-  if (target === 'overview') return '服务端投影';
+  if (target === 'overview') return '服务端状态';
   if (isGenericSettingsSection(target)) {
-    const accessLabel = role === 'Admin' ? 'Admin 可编辑' : role === 'Engineer' ? 'Engineer 只读' : '只读';
+    const accessLabel = role === 'Admin' ? '管理员可编辑' : role === 'Engineer' ? '工程师只读' : '只读';
     return projection.sections[target] ? accessLabel : `${accessLabel}（安全子集未返回）`;
   }
   if (target === 'plc' || target === 'tcp' || target === 'camera' || target === 'database') return '已接入';
-  if (target === 'station') return role === 'Admin' ? 'Admin 可管理' : 'Admin only';
-  if (target === 'ai-model') return role === 'Admin' ? 'Admin 可管理' : role === 'Engineer' ? 'safe read' : 'Admin only';
+  if (target === 'station') return role === 'Admin' ? '管理员可管理' : '仅管理员';
+  if (target === 'ai-model') return role === 'Admin' ? '管理员可管理' : role === 'Engineer' ? '工程师安全只读' : '仅管理员';
   return '后续';
 }
 </script>
@@ -33,7 +33,7 @@ function stateLabel(target: SettingsNavigationTarget, role: string | null, proje
 <template>
   <nav
     class="settings-group-navigation"
-    aria-label="Settings 分组导航"
+    aria-label="设置分组导航"
     data-settings-navigation
   >
     <div class="settings-group-navigation__heading">

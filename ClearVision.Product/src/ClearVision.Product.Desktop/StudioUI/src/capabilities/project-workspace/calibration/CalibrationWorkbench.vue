@@ -192,14 +192,14 @@ function updateNumber(sampleId: string, key: 'worldX' | 'worldY', value: string)
 .calibration-workbench h3 { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); }
 .calibration-workbench small, .calibration-workbench__message { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .calibration-workbench__message { margin: 0; line-height: 1.45; }
-.calibration-workbench__summary, .calibration-workbench__result { color: var(--cv-text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.calibration-workbench__summary, .calibration-workbench__result { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); font-variant-numeric: tabular-nums; }
 .calibration-workbench__summary strong, .calibration-workbench__result strong { color: var(--cv-text-primary); }
 .calibration-workbench__table-wrap { overflow-x: auto; border: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
-.calibration-workbench__table { width: 100%; min-width: 430px; border-collapse: collapse; font-size: 10px; }
+.calibration-workbench__table { width: 100%; min-width: 430px; border-collapse: collapse; font-size: var(--cv-font-size-2xs); }
 .calibration-workbench__table th, .calibration-workbench__table td { padding: 4px 5px; border-bottom: 1px solid var(--cv-border-subtle); text-align: left; white-space: nowrap; }
-.calibration-workbench__table th { color: var(--cv-text-muted); font-size: 9px; font-weight: var(--cv-font-weight-semibold); }
+.calibration-workbench__table th { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-semibold); }
 .calibration-workbench__table td { color: var(--cv-text-secondary); }
-.calibration-workbench__table input { width: 62px; min-width: 0; height: 24px; padding: 0 4px; border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-sm); background: var(--cv-surface-raised); color: var(--cv-text-primary); font: inherit; }
+.calibration-workbench__table input { width: 68px; min-width: 0; height: 32px; padding: 0 6px; border: 1px solid var(--cv-control-border); border-radius: var(--cv-radius-sm); background: var(--cv-surface-raised); color: var(--cv-text-primary); font: inherit; }
 .calibration-workbench__table button { border: 0; background: transparent; color: var(--cv-color-status-ng-strong); cursor: pointer; font: inherit; }
 .calibration-workbench__table button:disabled { color: var(--cv-text-muted); cursor: not-allowed; }
 .calibration-workbench__table [data-inlier="false"] { color: var(--cv-color-status-ng-strong); }

@@ -70,11 +70,14 @@ function field(source: Readonly<Record<string, unknown>>, camel: string): unknow
 }
 function text(value: unknown): string { return typeof value === 'string' ? value : ''; }
 
-function dataType(value: unknown): string {
-  if (typeof value === 'string') return value;
+function dataType(value: unknown): string | number {
+  if (typeof value === 'string' || typeof value === 'number') return value;
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     const source = value as Readonly<Record<string, unknown>>;
-    return text(source.value) || text(source.persistenceValue);
+    const semanticValue = source.value;
+    if (typeof semanticValue === 'string' || typeof semanticValue === 'number') return semanticValue;
+    const persistenceValue = source.persistenceValue;
+    if (typeof persistenceValue === 'string' || typeof persistenceValue === 'number') return persistenceValue;
   }
   return '';
 }
@@ -726,6 +729,6 @@ watch(() => props.owner.projection.runtimeValues, values => {
 .variables-workbench__technical-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-3); padding-top: var(--cv-space-2); }.variables-workbench__technical-grid > label { display: grid; gap: var(--cv-space-1); color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }.variables-workbench__technical-grid small,.variables-workbench__technical-grid > div > span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .variables-workbench__bindings { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--cv-space-4); }.variables-workbench__bindings h3 { margin: 0 0 var(--cv-space-2); font-size: var(--cv-font-size-sm); }.variables-workbench__binding-form { display: grid; gap: var(--cv-space-2); }.variables-workbench__bindings ul { margin: var(--cv-space-3) 0 0; padding: 0; list-style: none; }.variables-workbench__bindings li { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); font-size: var(--cv-font-size-xs); }.variables-workbench__bindings li button { border: 0; background: transparent; color: var(--cv-color-status-ng-strong); cursor: pointer; }
 .variables-workbench__runtime table { width: 100%; border-collapse: collapse; font-size: var(--cv-font-size-xs); }.variables-workbench__runtime th,.variables-workbench__runtime td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--cv-border-subtle); }.variables-workbench__runtime p { margin: 0; flex: 1; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
-.variables-workbench__errors ul { margin: 4px 0 0; padding-left: 18px; }.variables-workbench__errors li { margin-top: var(--cv-space-1); }.variables-workbench__error-detail summary { cursor: pointer; color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }.variables-workbench__error-detail code { overflow-wrap: anywhere; font-size: 10px; }.variables-workbench__status > span { min-width: 0; overflow-wrap: anywhere; }
+.variables-workbench__errors ul { margin: 4px 0 0; padding-left: 18px; }.variables-workbench__errors li { margin-top: var(--cv-space-1); }.variables-workbench__error-detail summary { cursor: pointer; color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }.variables-workbench__error-detail code { overflow-wrap: anywhere; font-size: var(--cv-font-size-2xs); }.variables-workbench__status > span { min-width: 0; overflow-wrap: anywhere; }
 @media(max-width:720px){.variables-workbench__split,.variables-workbench__bindings,.variables-workbench__technical-grid{grid-template-columns:1fr}.variables-workbench__list{max-height:160px;border-right:0;border-bottom:1px solid var(--cv-border-subtle)}}
 </style>

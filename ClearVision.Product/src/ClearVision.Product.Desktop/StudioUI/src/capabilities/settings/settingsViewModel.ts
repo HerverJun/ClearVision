@@ -16,7 +16,7 @@ export interface SettingsNavigationItem {
 }
 
 export const SETTINGS_NAVIGATION_ITEMS: readonly SettingsNavigationItem[] = Object.freeze([
-  { id: 'overview', label: '总览', description: '服务端投影与读取范围' },
+  { id: 'overview', label: '总览', description: '服务端状态与读取范围' },
   { id: 'general', label: '常规', description: '产品标题与主题' },
   { id: 'storage', label: '存储', description: '图像保存与保留策略' },
   { id: 'runtime', label: '运行保护', description: '自动运行与保护规则' },
@@ -38,11 +38,11 @@ const sectionLabels: Readonly<Record<SettingsSection, string>> = Object.freeze(
 );
 
 const ignoredAuthorityLabels: Readonly<Record<string, string>> = Object.freeze({
-  communication: 'PLC 配置 authority',
-  tcpCommunication: 'TCP 配置 authority',
-  features: '产品能力开关 authority',
-  cameras: '相机系统 authority',
-  activeCameraId: '活动相机 authority'
+  communication: 'PLC 配置服务',
+  tcpCommunication: 'TCP 配置服务',
+  features: '产品能力开关服务',
+  cameras: '相机系统服务',
+  activeCameraId: '活动相机服务'
 });
 
 export function settingsNavigationItem(target: SettingsNavigationTarget): SettingsNavigationItem {
@@ -96,16 +96,16 @@ export function settingsFeedbackForResult<T>(result: SettingsWriteResult<T>): Se
     if (operationKind === 'read') {
       return Object.freeze({
         kind: 'completed',
-        message: '已重新读取服务端投影。',
+        message: '已重新读取服务端状态。',
         savedLabel: '不适用（读取）',
-        effectiveLabel: '服务端投影已读取',
+        effectiveLabel: '服务端状态已读取',
         restartLabel: '不适用'
       });
     }
     if (operationKind === 'runtime-operation') {
       return Object.freeze({
         kind: 'completed',
-        message: '运行操作已完成；运行时响应是当前权威结果。',
+        message: '运行操作已完成；运行时响应是当前结果。',
         savedLabel: '不适用（运行操作）',
         effectiveLabel: '运行状态已返回',
         restartLabel: '不适用'
@@ -123,7 +123,7 @@ export function settingsFeedbackForResult<T>(result: SettingsWriteResult<T>): Se
     if (operationKind === 'database-operation') {
       return Object.freeze({
         kind: 'completed',
-        message: '数据库操作已完成；返回响应是当前权威结果。',
+        message: '数据库操作已完成；返回响应是当前结果。',
         savedLabel: '不适用（数据库操作）',
         effectiveLabel: '服务端状态为准',
         restartLabel: '不适用'
@@ -131,9 +131,9 @@ export function settingsFeedbackForResult<T>(result: SettingsWriteResult<T>): Se
     }
     return Object.freeze({
       kind: 'saved',
-      message: '操作已完成；服务端返回值已作为新的权威投影。',
+      message: '操作已完成；服务端返回值已成为当前状态。',
       savedLabel: '已保存',
-      effectiveLabel: '投影已更新',
+      effectiveLabel: '状态已更新',
       restartLabel: '重载要求：后端未声明'
     });
   }
@@ -141,7 +141,7 @@ export function settingsFeedbackForResult<T>(result: SettingsWriteResult<T>): Se
   if (result.status === 'forbidden') {
     return Object.freeze({
       kind: 'forbidden',
-      message: '当前角色没有执行该 Settings endpoint 的权限。',
+      message: '当前角色没有执行该设置操作的权限。',
       savedLabel: '未保存',
       effectiveLabel: '未生效',
       restartLabel: '不适用'
@@ -206,7 +206,7 @@ export function settingsRoleCanUseOwnerEndpoint(role: string | null | undefined)
 }
 
 export function settingsOwnerForPanel(owner: SettingsOwner | null): SettingsOwner {
-  if (!owner) throw new Error('Settings panel requires the mounted Settings owner.');
+  if (!owner) throw new Error('设置面板缺少已挂载的生命周期管理器。');
   return owner;
 }
 

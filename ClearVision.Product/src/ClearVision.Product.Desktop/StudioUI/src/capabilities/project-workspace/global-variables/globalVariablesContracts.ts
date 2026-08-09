@@ -3,8 +3,8 @@ import type { WorkspaceGlobalVariableValueType, WorkspaceVariableConversionMode 
 export type GlobalVariableBindableDataType = WorkspaceGlobalVariableValueType | 'Unknown';
 
 function compact(value: unknown): string {
-  return typeof value === 'string'
-    ? value.trim().toLocaleLowerCase().replace(/[\s_-]/g, '')
+  return typeof value === 'string' || typeof value === 'number'
+    ? String(value).trim().toLocaleLowerCase().replace(/[\s_-]/g, '')
     : '';
 }
 
@@ -14,12 +14,15 @@ function compact(value: unknown): string {
  */
 export function normalizeGlobalVariableDataType(value: unknown): GlobalVariableBindableDataType {
   switch (compact(value)) {
+    case '4':
     case 'string':
     case 'text':
       return 'String';
+    case '3':
     case 'bool':
     case 'boolean':
       return 'Boolean';
+    case '1':
     case 'int':
     case 'integer':
     case 'int32':
@@ -28,6 +31,7 @@ export function normalizeGlobalVariableDataType(value: unknown): GlobalVariableB
     case 'uint64':
     case 'long':
       return 'Int64';
+    case '2':
     case 'float':
     case 'single':
     case 'double':

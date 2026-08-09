@@ -5,6 +5,7 @@ import {
   createF02RuntimeErrorAudit,
   expectGetOnly,
   f02BrowserFixture,
+  f02G3VisualMatrix,
   fulfillF02Json,
   hasF02VisualEvidenceTarget,
   installF02BrowserStartup,
@@ -391,7 +392,10 @@ test('Station list uses URL filters, preserves nine outcomes and stays GET-only'
   await page.goto('/studio/index.html#/stations?q=一号&online=Online&range=week&outcome=Ng&diagnosticCode=WIRE_SWAP');
 
   await expect(page.locator('[data-capability="stations-read"]')).toBeVisible();
+  const viewTabs = page.getByRole('tablist', { name: '工作站监控视图' });
+  await expect(viewTabs.getByRole('tab', { name: '异常调查' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('cell', { name: /一号检测站/ })).toBeVisible();
+  await viewTabs.getByRole('tab', { name: '全站概览' }).click();
   const outcomeCounters = page.locator('.stations-page__outcomes');
   await expect(outcomeCounters.getByText('未判定', { exact: true })).toBeVisible();
   await expect(outcomeCounters.getByText('不适用', { exact: true })).toBeVisible();
@@ -511,27 +515,23 @@ test('F10 Station preserves unknown outcome, blocks duplicate submit and reconci
 test('Station list surfaces frozen-contract malformed and empty responses', async ({ page }) => {
   await bootStations(page, { items: [] });
   await page.goto('/studio/index.html#/stations');
-  await expect(page.getByText('工作站列表读取失败')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '工作站列表读取失败', exact: true })).toBeVisible();
 
   await page.unrouteAll({ behavior: 'wait' });
   await bootStations(page, []);
   await page.reload();
-  await expect(page.getByText('暂无工作站')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '暂无工作站', exact: true })).toBeVisible();
 });
 
-for (const visual of [
-  { id: 'stations-wide-light-compact', width: 1920, height: 1080 },
-  { id: 'stations-mixed-light-compact', width: 1600, height: 1000 },
-  { id: 'stations-light-compact', width: 1366, height: 768 },
-  { id: 'stations-short-light-compact', width: 1366, height: 600 }
-] as const) {
-  test(`captures ${visual.id} Browser fixture evidence`, async ({ page }) => {
+for (const visual of f02G3VisualMatrix) {
+  const scenario = `stations-${visual.viewport.width}x${visual.viewport.height}-${visual.theme}-${visual.density}`;
+  test(`captures ${scenario} Browser fixture evidence`, async ({ page }) => {
     test.skip(
       !hasF02VisualEvidenceTarget() && !hasF04VisualEvidenceTarget(),
       'Visual evidence output was not requested.'
     );
-    await page.setViewportSize({ width: visual.width, height: visual.height });
-    await installF02VisualPreferences(page, 'light', 'compact');
+    await page.setViewportSize(visual.viewport);
+    await installF02VisualPreferences(page, visual.theme, visual.density);
     const runtimeErrors = createF02RuntimeErrorAudit(page);
     const mixedStations = [
       station({
@@ -581,20 +581,40 @@ for (const visual of [
     }));
     await page.goto('/studio/index.html#/stations');
     await expect(page.locator('[data-capability="stations-read"]')).toBeVisible();
+    const viewTabs = page.getByRole('tablist', { name: '工作站监控视图' });
+    await expect(viewTabs.getByRole('tab', { name: '全站概览' })).toHaveAttribute('aria-selected', 'true');
+    const priorityItems = page.locator('.stations-page__priority-list li');
+    await expect(priorityItems).toHaveCount(2);
+    await expect(priorityItems.nth(0)).toContainText('二号检测站');
+    await expect(priorityItems.nth(1)).toContainText('三号检测站');
     if (hasF02VisualEvidenceTarget()) {
       await captureF02VisualEvidence(page, {
-        scenario: visual.id,
-        viewport: { width: visual.width, height: visual.height },
-        theme: 'light',
-        density: 'compact',
+        scenario: `${scenario}-overview`,
+        viewport: visual.viewport,
+        theme: visual.theme,
+        density: visual.density,
+        requests: audit,
+        runtimeErrors
+      });
+      await viewTabs.getByRole('tab', { name: '异常调查' }).click();
+      await expect(viewTabs.getByRole('tab', { name: '异常调查' })).toHaveAttribute('aria-selected', 'true');
+      const rows = page.locator('.stations-page__list-panel tbody tr');
+      await expect(rows.nth(0)).toContainText('二号检测站');
+      await expect(rows.nth(1)).toContainText('三号检测站');
+      await expect(rows.nth(2)).toContainText('一号检测站');
+      await captureF02VisualEvidence(page, {
+        scenario: `${scenario}-investigation`,
+        viewport: visual.viewport,
+        theme: visual.theme,
+        density: visual.density,
         requests: audit,
         runtimeErrors
       });
     }
     if (hasF04VisualEvidenceTarget()) {
       await captureF04VisualEvidence(page, {
-        scenario: visual.id,
-        viewport: { width: visual.width, height: visual.height },
+        scenario,
+        viewport: visual.viewport,
         runtimeErrors,
         requestAudit: audit,
         notes: ['F04.1 product baseline short-screen evidence.']

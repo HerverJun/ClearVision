@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiAbortError, type ApiTransport } from '@/platform/api';
 import { decodeWorkspaceProjectV1 } from '@/capabilities/project-workspace';
-import { createWorkspaceGlobalVariablesOwner } from '@/capabilities/project-workspace/global-variables';
+import {
+  createWorkspaceGlobalVariablesOwner,
+  normalizeGlobalVariableDataType
+} from '@/capabilities/project-workspace/global-variables';
 import { createWorkspaceLifecycleDiagnosticsOwner } from '@/capabilities/project-workspace/workspaceLifecycleDiagnostics';
 
 const projectId = '11111111-1111-4111-8111-111111111111';
@@ -16,6 +19,14 @@ function baseline(id = projectId) {
 }
 
 describe('workspaceGlobalVariablesOwner', () => {
+  it('normalizes persisted numeric scalar port types without admitting image or unknown types', () => {
+    expect([1, 2, 3, 4].map(normalizeGlobalVariableDataType))
+      .toEqual(['Int64', 'Double', 'Boolean', 'String']);
+    expect(normalizeGlobalVariableDataType('2')).toBe('Double');
+    expect(normalizeGlobalVariableDataType(0)).toBe('Unknown');
+    expect(normalizeGlobalVariableDataType(99)).toBe('Unknown');
+  });
+
   it('supports definition and binding drafts, apply/cancel, and read-only runtime values', async () => {
     const api = { apiBaseUrl: 'http://localhost/api', get: vi.fn(async () => [{
       variableId: '22222222-2222-4222-8222-222222222222', name: 'Count', displayName: '计数', valueType: 'Int64', value: '12', version: 3,
@@ -47,7 +58,7 @@ describe('workspaceGlobalVariablesOwner', () => {
       name: 'Flow',
       operators: [{
         id: 'op-1',
-        outputPorts: [{ id: 'out-1', dataType: 'Float' }],
+        outputPorts: [{ id: 'out-1', dataType: 2 }],
         parameters: [{ id: 'param-1', dataType: 'bool' }]
       }],
       connections: [],

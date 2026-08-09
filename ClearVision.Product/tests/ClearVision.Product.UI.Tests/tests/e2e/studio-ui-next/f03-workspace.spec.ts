@@ -2504,11 +2504,11 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 76
     await variables.getByRole('button', { name: '绑定', exact: true }).click();
     const sourceBinding = variables.locator('.variables-workbench__bindings > div').nth(0);
     await sourceBinding.locator('select').nth(0).selectOption({ label: '密封宽度' });
-    await sourceBinding.locator('select').nth(1).selectOption({ label: '密封宽度判定 / Width' });
+    await sourceBinding.locator('select').nth(1).selectOption(`${goldenJudgeNodeId}:${goldenJudgeOutputId}`);
     await sourceBinding.getByRole('button', { name: '添加来源' }).click();
     const targetBinding = variables.locator('.variables-workbench__bindings > div').nth(1);
     await targetBinding.locator('select').nth(0).selectOption({ label: '密封宽度' });
-    await targetBinding.locator('select').nth(1).selectOption({ label: '密封宽度判定 / Tolerance' });
+    await targetBinding.locator('select').nth(1).selectOption(`${goldenJudgeNodeId}:${fixtureUuid(53_001)}`);
     await targetBinding.getByRole('button', { name: '添加绑定' }).click();
     if (hasF04VisualEvidenceTarget()) {
       await captureF04VisualEvidence(page, {
@@ -4565,25 +4565,32 @@ test('Prompt 3 Preview preserves image, result, ROI, empty and error hierarchy o
   expect(isF03G4RequestAllowlist(audit)).toBe(true);
 });
 
-for (const scenario of [
-  { viewport: { width: 1920, height: 1080 }, density: 'compact' },
-  { viewport: { width: 1366, height: 768 }, density: 'compact' },
-  { viewport: { width: 1350, height: 704 }, density: 'compact' },
-  { viewport: { width: 1920, height: 1080 }, density: 'comfortable' },
-  { viewport: { width: 1350, height: 704 }, density: 'comfortable' }
-] as const) {
-  test(`Workspace Shell fits ${scenario.viewport.width}x${scenario.viewport.height} at ${scenario.density} density`, async ({ page }) => {
-    const { viewport, density } = scenario;
+const workspaceG3VisualMatrix = [
+  { width: 1920, height: 1080 },
+  { width: 1536, height: 864 },
+  { width: 1366, height: 768 }
+].flatMap(viewport =>
+  (['light', 'dark'] as const).flatMap(theme =>
+    (['compact', 'comfortable'] as const).map(density => ({ viewport, theme, density }))
+  )
+);
+
+for (const scenario of workspaceG3VisualMatrix) {
+  test(`Workspace Shell fits ${scenario.viewport.width}x${scenario.viewport.height} in ${scenario.theme}/${scenario.density}`, async ({ page }) => {
+    const { viewport, theme, density } = scenario;
     await page.setViewportSize(viewport);
     const runtimeErrors = createF03RuntimeErrorAudit(page);
     const audit = await bootWorkspace(page);
     const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
     await expect(shell).toHaveAttribute('data-workspace-state', 'empty');
-    if (density === 'comfortable') {
-      await page.locator('[data-product-appearance] summary').click();
-      await page.getByRole('button', { name: '舒适' }).click();
-      await page.locator('[data-product-appearance] summary').click();
+    if (theme === 'dark' || density === 'comfortable') {
+      const appearance = page.locator('[data-product-appearance] summary');
+      await appearance.click();
+      if (theme === 'dark') await page.getByRole('button', { name: '深色', exact: true }).click();
+      if (density === 'comfortable') await page.getByRole('button', { name: '舒适', exact: true }).click();
+      await page.keyboard.press('Escape');
     }
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await expect(page.locator('html')).toHaveAttribute('data-density', density);
 
     const layout = await page.evaluate(() => {
@@ -4596,9 +4603,11 @@ for (const scenario of [
       const workspace = document.querySelector('.flow-workspace')?.getBoundingClientRect();
       const save = document.querySelector('[data-testid="workspace-save"]')?.getBoundingClientRect();
       const run = document.querySelector('[data-testid="workspace-run"]')?.getBoundingClientRect();
+      const commands = document.querySelector('.workspace-shell__commands');
       return {
         horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         verticalOverflow: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+        commandsHorizontalOverflow: commands ? commands.scrollWidth - commands.clientWidth : null,
         topbar: topbar ? { height: topbar.height } : null,
         toolbar: toolbar ? { top: toolbar.top, bottom: toolbar.bottom } : null,
         status: status ? { top: status.top, bottom: status.bottom } : null,
@@ -4615,6 +4624,7 @@ for (const scenario of [
     expect(layout).toMatchObject({
       horizontalOverflow: 0,
       verticalOverflow: 0,
+      commandsHorizontalOverflow: 0,
       viewport
     });
     expect(layout.toolbar?.top).toBeGreaterThanOrEqual(0);
@@ -4633,7 +4643,7 @@ for (const scenario of [
 
     if (hasF03VisualEvidenceTarget()) {
       await captureF03WorkspaceEvidence(page, {
-        scenario: `workspace-shell-${viewport.width}x${viewport.height}-${density}`,
+        scenario: `workspace-shell-${viewport.width}x${viewport.height}-${theme}-${density}`,
         viewport,
         requests: audit,
         runtimeErrors
@@ -4641,7 +4651,7 @@ for (const scenario of [
     }
     if (hasF04VisualEvidenceTarget()) {
       await captureF04VisualEvidence(page, {
-        scenario: `workspace-prompt3-layout-default-${density}`,
+        scenario: `workspace-prompt3-layout-default-${theme}-${density}`,
         viewport,
         runtimeErrors,
         requestAudit: audit,

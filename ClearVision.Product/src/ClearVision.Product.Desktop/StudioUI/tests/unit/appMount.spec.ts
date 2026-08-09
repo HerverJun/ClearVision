@@ -113,6 +113,50 @@ describe('mountStudioApp', () => {
     expect(document.querySelector('[data-studio-page="canvas-placeholder"]')).not.toBeNull();
   });
 
+  it('closes top-bar menus mutually, on outside pointer input, and returns focus on Escape', async () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const router = createTestRouter();
+    mountedApp = await mountStudioApp('#app', {
+      router,
+      platform: createTestPlatform()
+    });
+    await nextTick();
+
+    const appearance = document.querySelector<HTMLDetailsElement>('[data-product-appearance]')!;
+    const more = document.querySelector<HTMLDetailsElement>('[data-product-more]')!;
+    const appearanceTrigger = appearance.querySelector<HTMLElement>('summary')!;
+
+    appearance.open = true;
+    appearance.dispatchEvent(new Event('toggle'));
+    await nextTick();
+    expect(appearanceTrigger.getAttribute('aria-expanded')).toBe('true');
+
+    more.open = true;
+    more.dispatchEvent(new Event('toggle'));
+    await nextTick();
+    expect(appearance.open).toBe(false);
+    expect(more.open).toBe(true);
+
+    document.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    await nextTick();
+    expect(more.open).toBe(false);
+
+    appearance.open = true;
+    appearance.dispatchEvent(new Event('toggle'));
+    await nextTick();
+    const appearanceControl = appearance.querySelector<HTMLElement>('button')!;
+    appearanceControl.focus();
+    appearanceControl.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true
+    }));
+    await nextTick();
+
+    expect(appearance.open).toBe(false);
+    expect(document.activeElement).toBe(appearanceTrigger);
+  });
+
   it('renders formal diagnostics, about and 404 inside the single product shell', async () => {
     document.body.innerHTML = '<div id="app"></div>';
     const router = createTestRouter();
@@ -132,7 +176,7 @@ describe('mountStudioApp', () => {
     await router.push('/about');
     await nextTick();
     expect(document.querySelector('[data-studio-page="about"]')).not.toBeNull();
-    expect(document.body.textContent).toContain('authenticated');
+    expect(document.body.textContent).toContain('当前会话由本地服务认证与授权');
 
     await router.push('/missing-page');
     await nextTick();

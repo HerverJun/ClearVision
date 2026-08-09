@@ -524,14 +524,14 @@ export function createWorkspacePersistenceOwner(options: {
       if (error instanceof ApiNetworkError || error instanceof ApiAbortError) {
         state.phase = 'unknown-outcome';
         state.errorCode = error.code.toUpperCase();
-        state.message = '保存响应未知；本地 draft 已保留，必须先 GET reconcile，禁止盲重试。';
+        state.message = '保存响应未知；本地草稿已保留，必须先重新读取并核对服务端状态，禁止盲目重试。';
         syncAvailability();
         return Object.freeze({ status: 'unknown-outcome', project: null });
       }
       if (error instanceof ApiHttpError && error.status === 401) {
         state.phase = 'unknown-outcome';
         state.errorCode = 'SESSION_UNAUTHORIZED';
-        state.message = '会话已失效；保存结果未知，重新认证后必须先 GET reconcile。';
+        state.message = '会话已失效；保存结果未知，重新认证后必须先重新读取并核对服务端状态。';
         syncAvailability();
         return Object.freeze({ status: 'unknown-outcome', project: null });
       }
@@ -571,7 +571,7 @@ export function createWorkspacePersistenceOwner(options: {
         state.conflictServerRevision = null;
         state.phase = 'error';
         state.errorCode = 'SAVE_NOT_COMMITTED';
-        state.message = 'GET reconcile 确认服务器 revision 未变化，可以人工重试。';
+        state.message = '重新读取已确认服务端保存修订未变化，可以人工重试。';
         syncAvailability();
         return Object.freeze({ status: 'failed', project: server });
       }
@@ -664,7 +664,7 @@ export function createWorkspacePersistenceOwner(options: {
     },
     acceptExternalProject,
     reconcileExternalProject,
-    setRunning(reason = 'Formal Run is active.'): boolean {
+    setRunning(reason = '正式运行已启动。'): boolean {
       if (disposed || !state.canRun) return false;
       state.phase = 'running';
       state.message = reason;
@@ -673,7 +673,7 @@ export function createWorkspacePersistenceOwner(options: {
       syncAvailability();
       return true;
     },
-    clearRunning(reason = 'Formal Run completed.'): void {
+    clearRunning(reason = '正式运行已完成。'): void {
       if (disposed || state.phase !== 'running') return;
       state.phase = state.dirty ? 'dirty' : 'clean';
       state.message = reason;

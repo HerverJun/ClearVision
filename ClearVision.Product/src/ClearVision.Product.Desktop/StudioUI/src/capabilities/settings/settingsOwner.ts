@@ -250,7 +250,7 @@ export interface CreateSettingsOwnerOptions {
 
 export class SettingsOwnerConflictError extends Error {
   constructor() {
-    super('Only one mounted Settings owner is allowed at a time.');
+    super('同一时刻只能挂载一个设置生命周期管理器。');
     this.name = 'SettingsOwnerConflictError';
   }
 }
@@ -273,19 +273,19 @@ function safeRole(role: SettingsRole): string | null {
 
 function fallbackMessage(code: SettingsErrorCode): string {
   switch (code) {
-    case 'unauthorized': return '登录状态已失效，Settings owner 已停止请求。';
-    case 'forbidden': return '当前账户没有 Settings 访问权限。';
-    case 'not-found': return 'Settings 服务端对象不存在或当前用户不可见。';
-    case 'conflict': return '服务端 Settings 状态已变化，请重新读取后继续。';
-    case 'validation': return 'Settings 请求未通过服务端校验。';
-    case 'abort': return 'Settings 请求已取消。';
-    case 'decode': return 'Settings 服务端响应不符合已冻结合同。';
-    case 'network': return '本地 Settings 服务暂时不可用。';
-    case 'server': return '本地 Settings 服务发生服务端错误。';
-    case 'sensitive-field': return 'Settings 响应包含禁止暴露的敏感字段。';
-    case 'unsupported': return '当前 Settings 操作尚未获得合同授权。';
-    case 'unknown-outcome': return 'Settings 操作结果未知，请重新读取后再决定下一步。';
-    case 'unexpected-http-status': return 'Settings 请求返回了未分类的 HTTP 状态。';
+    case 'unauthorized': return '登录状态已失效，设置页已停止请求。';
+    case 'forbidden': return '当前账户没有设置访问权限。';
+    case 'not-found': return '服务端设置不存在或当前用户不可见。';
+    case 'conflict': return '服务端设置已变化，请重新读取后继续。';
+    case 'validation': return '设置请求未通过服务端校验。';
+    case 'abort': return '设置请求已取消。';
+    case 'decode': return '设置服务响应不符合已冻结合同。';
+    case 'network': return '本地设置服务暂时不可用。';
+    case 'server': return '本地设置服务发生错误。';
+    case 'sensitive-field': return '设置响应包含禁止暴露的敏感字段。';
+    case 'unsupported': return '当前设置操作尚未获得合同授权。';
+    case 'unknown-outcome': return '设置操作结果未知，请重新读取后再决定下一步。';
+    case 'unexpected-http-status': return '设置请求返回了未分类的 HTTP 状态。';
   }
 }
 
@@ -293,7 +293,7 @@ function errorProjection(error: unknown): SettingsErrorProjectionV1 {
   if (error instanceof SettingsUnknownOutcomeError) {
     return Object.freeze({
       code: 'unknown-outcome',
-      publicMessage: 'Operation outcome is unknown; re-read the server projection before deciding whether to retry.',
+      publicMessage: '操作结果未知；请重新读取服务端状态后再决定是否重试。',
       policy: null,
       issues: Object.freeze([])
     });
@@ -378,14 +378,14 @@ function isAbort(error: unknown): boolean {
     (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError');
 }
 
-function endpointAccessMessage(endpointId: string, reason: SettingsEndpointAccessReason): string {
+function endpointAccessMessage(reason: SettingsEndpointAccessReason): string {
   switch (reason) {
-    case 'unknown-endpoint': return `Unknown Settings endpoint is forbidden: ${endpointId}.`;
-    case 'excluded-endpoint': return `Excluded Settings endpoint is forbidden: ${endpointId}.`;
-    case 'section-mismatch': return `Settings endpoint ${endpointId} does not belong to the requested section.`;
-    case 'route-only': return `Settings endpoint ${endpointId} is route-only and cannot be executed.`;
-    case 'engineer-or-admin-required': return `Settings endpoint ${endpointId} requires Engineer or Admin permission.`;
-    case 'admin-required': return `Settings endpoint ${endpointId} requires Admin permission.`;
+    case 'unknown-endpoint': return '请求的设置操作未在允许列表中。';
+    case 'excluded-endpoint': return '请求的设置操作已被明确排除。';
+    case 'section-mismatch': return '请求的设置操作不属于当前配置分组。';
+    case 'route-only': return '该设置入口仅用于导航，不能直接执行。';
+    case 'engineer-or-admin-required': return '当前操作需要工程师或管理员权限。';
+    case 'admin-required': return '当前操作需要管理员权限。';
     case 'allowed': return '';
   }
 }
@@ -538,7 +538,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     role,
     settings: null,
     error: null,
-    message: 'Settings owner 尚未启动。',
+    message: '设置页尚未启动。',
     generation: 0,
     started: false,
     device: emptyDeviceProjection(),
@@ -758,7 +758,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         result.operationKind ?? 'write',
         result.generation,
         reread as SettingsWriteResult<unknown>,
-        'AI model connection test completed, but the model authority reread failed; the outcome is unknown.',
+        'AI 模型连接测试已完成，但模型状态重新读取失败，操作结果未知。',
         `ai-model-test:${modelId}`
       );
     }
@@ -796,7 +796,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     markUnknownOutcome(reconcileKey);
     const originalError = result.status === 'failed'
       ? result.error
-      : new Error('Authority reread did not complete.');
+      : new Error('服务端状态重新读取未完成。');
     const error = new SettingsUnknownOutcomeError(originalError, operationKind);
     return Object.freeze({
       status: 'failed',
@@ -820,7 +820,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         result.operationKind ?? 'write',
         result.generation,
         reread as SettingsWriteResult<unknown>,
-        'AI 模型 mutation 已提交，但服务端模型 projection 重新读取失败；结果未知。'
+        'AI 模型操作已提交，但重新读取服务端模型状态失败；结果未知。'
       );
     }
     return Object.freeze({
@@ -855,7 +855,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
           section: 'general',
           generation: writes.diagnostics().generation,
           operationKind: 'read',
-          message: 'Settings owner has been disposed.'
+          message: '设置页已卸载，无法继续核对。'
         });
       }
 
@@ -873,7 +873,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
           state.settings = result.value;
           state.phase = 'ready';
           state.error = null;
-          state.message = '已重新读取服务端 Settings 投影；Generic unknown 已完成核对。';
+          state.message = '已重新读取服务端设置状态；通用设置未知结果已完成核对。';
           reconcileUnknownOutcome(key);
         }
         return reconcileResult(result);
@@ -893,25 +893,25 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       if (key === 'change-password') {
         return unsupportedReconcile(
           'security',
-          'Change password 只能由现有 auth lifecycle 的 session 失效结果确认。'
+          '修改密码只能由现有身份验证流程的会话失效结果确认。'
         );
       }
       if (key === 'database-backup') {
         return unsupportedReconcile(
           'database',
-          'Database backup 没有可确认备份结果的读取合同；普通数据库状态读取不会清除 unknown。'
+          '数据库备份没有可确认结果的读取合同；普通数据库状态读取不会清除结果未知状态。'
         );
       }
       if (key.startsWith('tcp-runtime:')) {
         const profileId = key.slice('tcp-runtime:'.length).trim();
-        if (!profileId) return unsupportedReconcile('tcp', 'TCP runtime profile identity is missing.');
+        if (!profileId) return unsupportedReconcile('tcp', 'TCP 配置缺少可核对的连接身份。');
         const statusResult = await owner.readTcpStatus(profileId);
         if (statusResult.status === 'completed') return reconcileResult(statusResult);
         const framesResult = await owner.readTcpFrames(profileId);
         return reconcileResult(framesResult);
       }
 
-      return unsupportedReconcile('general', `Unsupported Settings authority reconcile key: ${key}.`);
+      return unsupportedReconcile('general', '当前设置操作没有可用的服务端核对方式。');
     },
     recordChangePasswordSessionResult(sessionInvalidated: boolean, outcomeUnknown = false): void {
       if (sessionInvalidated) {
@@ -925,10 +925,10 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       syncPanelState();
       if (unknownOutcomeKeys.size > 0 || state.pendingSectionCount > 0 || state.dirtySectionCount > 0) {
         state.message = unknownOutcomeKeys.size > 0
-          ? 'Settings 操作结果未知；请先完成对应 authority reconcile。'
+          ? '设置操作结果未知；请先读取对应服务端状态。'
           : state.pendingSectionCount > 0
-            ? 'Settings 操作仍在执行；完成前不能覆盖当前投影。'
-            : 'Settings 存在未保存草稿；请先保存或放弃草稿。';
+            ? '设置操作仍在执行；完成前不能覆盖当前状态。'
+            : '设置存在未保存草稿；请先保存或放弃草稿。';
         return false;
       }
       const access = evaluateSettingsRouteAccess(role);
@@ -955,7 +955,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       readController = controller;
       state.phase = 'loading';
       state.error = null;
-      state.message = '正在读取 Settings 权威投影。';
+      state.message = '正在读取服务端设置状态。';
       state.generation = operationGeneration;
       state.started = true;
       try {
@@ -964,8 +964,8 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         state.settings = projection;
         state.phase = 'ready';
         state.message = projection.safeSubset
-          ? '已读取服务端 safe subset；受限 section 由后端权限决定。'
-          : '已读取服务端 Settings 投影；未授权的 authority section 已隔离。';
+          ? '已读取服务端安全子集；受限配置分组由后端权限决定。'
+          : '已读取服务端设置状态；无权访问的配置区域已隔离。';
         state.error = null;
         reconcileUnknownOutcome('generic-settings');
         return true;
@@ -979,13 +979,13 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
     invalidate(reason = 'settings-owner-invalidated'): void {
       if (disposed) return;
       generation += 1;
-      void stopPreviewInternal('Settings 投影已失效，预览已停止。');
+      void stopPreviewInternal('设置状态已失效，预览已停止。');
       readController?.abort(reason);
       readController = undefined;
       writes.invalidate(reason);
       state.phase = 'stale';
       state.generation = generation;
-      state.message = 'Settings 投影已过期，请重新读取服务端状态。';
+      state.message = '设置状态已过期，请重新读取服务端状态。';
       state.error = Object.freeze({
         code: 'unknown-outcome', publicMessage: `${reason}；请重新读取服务端状态。`, policy: null, issues: Object.freeze([])
       });
@@ -1002,7 +1002,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         return Promise.resolve(Object.freeze({
           status: 'disposed', section, generation: writes.diagnostics().generation,
           operationKind,
-          message: 'Settings owner has been disposed.'
+          message: '设置页已卸载。'
         }));
       }
       const access = evaluateSettingsEndpointAccess(endpointId, section, role);
@@ -1010,7 +1010,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         return Promise.resolve(Object.freeze({
           status: 'forbidden', section, generation: writes.diagnostics().generation,
           operationKind,
-          message: endpointAccessMessage(endpointId, access.reason)
+          message: endpointAccessMessage(access.reason)
         }));
       }
       return writes.enqueue(
@@ -1065,7 +1065,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
         state.settings = result.value.config;
         state.phase = 'ready';
         state.error = null;
-        state.message = 'Settings section 已保存；服务端投影已更新，运行时重载要求由后端决定。';
+        state.message = '设置分组已保存；服务端状态已更新，运行时重载要求由后端决定。';
       }
       return result;
     },
@@ -1712,7 +1712,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       if (disposed) return;
       disposed = true;
       generation += 1;
-      void stopPreviewInternal('Settings owner 已释放，预览已停止。');
+      void stopPreviewInternal('设置页已释放，预览已停止。');
       readController?.abort(reason);
       readController = undefined;
       writes.dispose(reason);
@@ -1725,7 +1725,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       state.pendingSectionCount = 0;
       state.phase = 'disposed';
       state.generation = generation;
-      state.message = 'Settings owner 已释放。';
+      state.message = '设置页已释放。';
       state.error = null;
       if (activeSettingsOwnerToken === ownerToken) {
         activeSettingsOwnerToken = undefined;

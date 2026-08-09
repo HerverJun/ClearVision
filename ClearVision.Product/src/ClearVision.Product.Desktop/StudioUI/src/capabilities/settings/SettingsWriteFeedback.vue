@@ -43,7 +43,7 @@ const statusLabel = computed(() => {
         <dd>{{ feedback.savedLabel }}</dd>
       </div>
       <div>
-        <dt>投影</dt>
+        <dt>生效状态</dt>
         <dd>{{ feedback.effectiveLabel }}</dd>
       </div>
       <div>

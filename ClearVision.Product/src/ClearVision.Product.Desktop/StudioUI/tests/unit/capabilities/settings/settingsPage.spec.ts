@@ -151,7 +151,7 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
 
     expect(requestedPaths).toEqual(['settings']);
     expect(wrapper.attributes('data-settings-phase')).toBe('ready');
-    expect(wrapper.text()).toContain('完整投影');
+    expect(wrapper.text()).toContain('完整配置');
     expect(wrapper.text()).toContain('ClearVision');
     expect(wrapper.find('[data-settings-navigation]').exists()).toBe(true);
     await wrapper.get('[data-settings-group="storage"]').trigger('click');
@@ -169,7 +169,7 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
     await flushPromises();
 
     expect(wrapper.attributes('data-settings-safe-subset')).toBe('true');
-    expect(wrapper.text()).toContain('safe subset');
+    expect(wrapper.text()).toContain('安全子集');
     expect(wrapper.text()).toContain('安全子集未返回');
     expect(wrapper.text()).not.toContain('D:/VisionData');
 
@@ -211,7 +211,7 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
     await flushPromises();
 
     expect(wrapper.find('[data-page-state="error"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain('设置投影无法解析');
+    expect(wrapper.text()).toContain('设置响应无法解析');
     expect(wrapper.text()).not.toContain('must-not-render');
 
     wrapper.unmount();
@@ -377,7 +377,7 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
     await wrapper.get('[data-settings-group="security"]').trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('历史只读');
-    expect(wrapper.text()).toContain('不控制当前 session expiry');
+    expect(wrapper.text()).toContain('不控制当前会话过期时间');
     wrapper.unmount();
   });
 

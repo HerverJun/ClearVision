@@ -241,7 +241,7 @@ async function saveSettings(): Promise<void> {
     }
     const reread = await props.owner.readPlcSettings();
     if (reread.status !== 'completed' || !reread.value.settings) {
-      showFeedback('warning', 'PLC 设置已提交', '协议保存响应已返回，但重新读取服务端投影失败；请刷新后确认。');
+      showFeedback('warning', 'PLC 设置已提交', '协议保存响应已返回，但重新读取服务端状态失败；请刷新后确认。');
       return;
     }
     copySettings(reread.value.settings);
@@ -385,7 +385,7 @@ onBeforeUnmount(() => detachPanelState());
         <div class="plc-toolbar__scope">
           <span>当前工作协议</span>
           <strong>{{ activeProtocolLabel }}</strong>
-          <small>{{ settingsDirty ? '有配置草稿修改' : '与服务端投影一致' }}</small>
+          <small>{{ settingsDirty ? '有配置草稿修改' : '与服务端配置一致' }}</small>
         </div>
       </div>
 
@@ -437,7 +437,7 @@ onBeforeUnmount(() => detachPanelState());
         v-if="!canWrite"
         class="settings-panel__notice"
         tone="info"
-        title="Engineer 诊断权限"
+        title="工程师诊断权限"
       >
         当前角色可以读取和测试 PLC，但不能保存协议设置或映射。
       </CvInlineAlert>

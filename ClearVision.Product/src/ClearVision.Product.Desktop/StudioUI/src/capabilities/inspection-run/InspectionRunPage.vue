@@ -109,7 +109,7 @@ const admissionChecks = computed<readonly RunConsoleAdmissionCheck[]>(() => [
       projection.phase === 'admitting' ? 'pending' : 'unknown',
     detail: projection.admission?.persistenceRevision == null
       ? '等待后端确认'
-      : 'revision ' + projection.admission.persistenceRevision
+      : '保存修订 ' + projection.admission.persistenceRevision
   },
   {
     key: 'flow',

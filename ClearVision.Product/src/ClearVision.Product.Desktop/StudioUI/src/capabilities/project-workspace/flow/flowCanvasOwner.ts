@@ -511,7 +511,7 @@ export function createFlowCanvasOwner(options: {
     openCameraBindingEditor(): CameraBindingEditorOwner {
       assertActive();
       if (!options.project.id) {
-        throw new Error('Camera binding requires a persisted Project authority.');
+        throw new Error('相机绑定需要已正式保存的工程。');
       }
       if (cameraBindingEditorOwner) {
         throw new Error(`Camera binding editor owner already exists for project ${options.project.id}.`);
@@ -527,7 +527,7 @@ export function createFlowCanvasOwner(options: {
     openPreviewWorkbench(openedInspector: InspectorOwner): PreviewWorkbenchOwner {
       assertActive();
       if (!options.project.id) {
-        throw new Error('Preview execution requires a persisted Project authority.');
+        throw new Error('预览执行需要已正式保存的工程。');
       }
       if (openedInspector !== inspectorOwner) {
         throw new Error('Preview workbench requires the Flow owner\'s active Inspector owner.');

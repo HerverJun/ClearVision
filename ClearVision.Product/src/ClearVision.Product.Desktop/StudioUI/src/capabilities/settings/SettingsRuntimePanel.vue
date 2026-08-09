@@ -110,7 +110,7 @@ onBeforeUnmount(() => detachPanelState());
         >
         <span>
           <strong>启用保护规则</strong>
-          <small>保存成功不等于所有运行中的 consumer 已重载。</small>
+          <small>保存成功不等于所有运行中的使用方已重新加载。</small>
         </span>
       </label>
       <CvField
@@ -143,14 +143,14 @@ onBeforeUnmount(() => detachPanelState());
       v-if="!canWrite"
       class="settings-panel__notice"
       tone="info"
-      title="当前为安全投影"
+      title="当前为安全视图"
     >
-      当前角色可以核对已返回字段，但不能执行 Runtime mutation。
+      当前角色可以核对已返回字段，但不能修改运行保护配置。
     </CvInlineAlert>
 
     <template #footer>
       <div class="settings-panel__footer">
-        <span class="settings-panel__dirty">{{ dirty ? '有未保存修改' : '与服务端投影一致' }}</span>
+        <span class="settings-panel__dirty">{{ dirty ? '有未保存修改' : '与服务端配置一致' }}</span>
         <div class="settings-panel__actions">
           <CvButton
             v-if="canWrite"

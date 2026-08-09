@@ -68,11 +68,11 @@ const canRegenerateToken = computed(() =>
   draft.localStationSyncEnabled
 );
 const regenerateDisabledReason = computed(() => {
-  if (draft.mode === 'LanController') return 'LanController 没有获批的安全 token handoff，请使用手动 replace。';
-  if (hasStationUnknown.value) return 'Station token outcome is unknown; refresh Station authority before retrying.';
-  if (dirty.value) return 'Station communication has unsaved changes; save or discard the draft before regenerating.';
+  if (draft.mode === 'LanController') return '局域网控制模式没有获批的安全令牌交接，请手动替换令牌。';
+  if (hasStationUnknown.value) return '工作站令牌操作结果未知，请先刷新服务端状态再重试。';
+  if (dirty.value) return '工作站通信配置存在未保存修改，请先保存或放弃草稿。';
   if (draft.mode !== 'LocalLoopback' || !draft.localStationSyncEnabled) {
-    return 'Regenerate is available only for enabled LocalLoopback synchronization.';
+    return '仅启用本机同步时可以重新生成令牌。';
   }
   return '';
 });
@@ -138,7 +138,7 @@ async function loadStation(): Promise<void> {
   feedback.value = null;
   if (!canManage.value) {
     phase.value = 'forbidden';
-    readMessage.value = 'Station 通信设置 endpoint 仅允许 Admin 读取。';
+    readMessage.value = '工作站通信设置仅允许管理员读取。';
     return;
   }
 
@@ -167,10 +167,10 @@ async function refreshAuthority(): Promise<void> {
   if (dirty.value) {
     feedback.value = {
       kind: 'error',
-      message: 'Station communication has unsaved changes. Save or discard the draft before refreshing its authority.',
-      savedLabel: 'not saved',
-      effectiveLabel: 'not effective',
-      restartLabel: 'not applicable'
+      message: '工作站通信配置存在未保存修改，请先保存或放弃草稿再刷新。',
+      savedLabel: '未保存',
+      effectiveLabel: '未生效',
+      restartLabel: '不适用'
     };
     return;
   }
@@ -193,10 +193,10 @@ async function save(): Promise<void> {
   if (hasStationUnknown.value) {
     feedback.value = {
       kind: 'unknown',
-      message: 'Station communication outcome is unknown; refresh Station authority before retrying the mutation.',
-      savedLabel: 'unknown',
-      effectiveLabel: 'unknown',
-      restartLabel: 'unknown'
+      message: '工作站通信操作结果未知，请先刷新服务端状态再重试。',
+      savedLabel: '未知',
+      effectiveLabel: '未知',
+      restartLabel: '未知'
     };
     return;
   }
@@ -301,9 +301,9 @@ onDeactivated(() => {
     <CvInlineAlert
       v-if="!canManage"
       tone="info"
-      title="Station 通信设置仅 Admin 可用"
+      title="工作站通信设置仅管理员可用"
     >
-      当前角色不能读取或修改 Station 系统级通信配置。Station 管理页的运行包、部署和启停能力不在此处提供。
+      当前角色不能读取或修改工作站系统级通信配置。工作站管理页的运行包、部署和启停能力不在此处提供。
     </CvInlineAlert>
 
     <template v-else>
@@ -317,7 +317,7 @@ onDeactivated(() => {
 
       <CvPanel
         title="Station 通信"
-        description="配置 Studio 与本机/局域网 Station 的通信参数；保存只写入专用 Station endpoint，不会自动重启进程。"
+        description="配置 Studio 与本机或局域网工作站的通信参数；保存只写入专用工作站接口，不会自动重启进程。"
         data-settings-station-communication
       >
         <template #actions>
@@ -326,11 +326,11 @@ onDeactivated(() => {
             variant="quiet"
             :loading="loadBusy"
             :disabled="loadBusy || mutationBusy || dirty"
-            loading-label="Refreshing Station authority"
+            loading-label="正在刷新工作站配置"
             data-settings-station-authority-refresh
             @click="refreshAuthority"
           >
-            Refresh Station authority
+            刷新工作站配置
           </CvButton>
         </template>
         <form
@@ -367,17 +367,17 @@ onDeactivated(() => {
               :disabled="phase === 'loading' || mutationBusy"
             >
             <span>
-              <strong>启用本机 Station 同步</strong>
-              <small>保存后由 Station 自身按 restart-required 结果重新加载。</small>
+              <strong>启用本机工作站同步</strong>
+              <small>保存后由工作站根据“需要重启”状态重新加载。</small>
             </span>
           </label>
         </form>
 
         <div class="settings-station__token-row">
           <div class="settings-station__token-copy">
-            <span class="settings-station__eyebrow">Token</span>
+            <span class="settings-station__eyebrow">访问令牌</span>
             <strong>{{ projection?.token.hasToken ? (projection.token.mask || '已配置（已掩码）') : '未配置' }}</strong>
-            <small>真实 token 不会回显、持久化到前端或进入日志。</small>
+            <small>真实访问令牌不会回显、持久化到前端或进入日志。</small>
           </div>
           <CvSelect
             :model-value="tokenMode"
@@ -468,7 +468,7 @@ onDeactivated(() => {
             <strong>{{ projection?.requiresRestart.studio ? '需要重启' : '无需重启' }}</strong>
           </div>
           <div class="settings-station__state-item">
-            <span>本机 Station 重启</span>
+            <span>本机工作站重启</span>
             <strong>{{ projection?.requiresRestart.localStation ? '需要重启' : '无需重启' }}</strong>
           </div>
         </div>
@@ -485,13 +485,13 @@ onDeactivated(() => {
           tone="success"
           title="当前运行配置与已保存配置一致"
         >
-          当前没有后端声明的 restart-required 项。
+          当前没有后端声明的需要重启项。
         </CvInlineAlert>
       </CvPanel>
 
       <CvPanel
         title="通信诊断"
-        description="只展示 Station endpoint 返回的服务可用性提示，不把诊断结果当成配置 mutation 的 authority。"
+        description="只展示工作站接口返回的服务可用性提示，诊断结果不会覆盖正式配置。"
         data-settings-station-diagnostics
       >
         <ul
@@ -513,7 +513,7 @@ onDeactivated(() => {
         </p>
         <div class="settings-station__endpoints">
           <span>Studio 本地地址：{{ projection?.localStationBaseUrl || '未启用' }}</span>
-          <span>Station Hub：{{ projection?.remoteStationHubUrl || '未启用' }}</span>
+          <span>工作站中心：{{ projection?.remoteStationHubUrl || '未启用' }}</span>
         </div>
       </CvPanel>
     </template>

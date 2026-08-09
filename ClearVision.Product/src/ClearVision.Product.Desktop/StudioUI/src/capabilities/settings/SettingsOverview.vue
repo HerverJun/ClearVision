@@ -57,9 +57,9 @@ const projectionSummary = computed<readonly CvDescriptionItem[]>(() => [
   { key: 'softwareTitle', label: '软件标题', value: props.projection.sections.general.softwareTitle },
   { key: 'productTheme', label: '产品主题', value: props.projection.sections.general.theme === 'dark' ? '深色' : '浅色' },
   { key: 'revision', label: '服务端观察版本', value: props.projection.revision },
-  { key: 'scope', label: '读取范围', value: props.projection.safeSubset ? 'safe subset' : '完整管理员投影' },
-  { key: 'authority', label: '保存 authority', value: '后端配置服务' },
-  { key: 'revision-policy', label: '并发语义', value: '现有无条件 revision；不新增 conditional revision' }
+  { key: 'scope', label: '读取范围', value: props.projection.safeSubset ? '安全字段集' : '完整管理员视图' },
+  { key: 'authority', label: '保存服务', value: '后端配置服务' },
+  { key: 'revision-policy', label: '并发语义', value: '沿用现有修订规则' }
 ]);
 
 const genericSectionRows = computed(() => SETTINGS_NAVIGATION_ITEMS
@@ -107,7 +107,7 @@ const activeProjectionItems = computed<readonly CvDescriptionItem[]>(() => {
       if (!props.projection.sections.security) return [];
       return [
         { key: 'passwordMinLength', label: '密码最小长度', value: `${props.projection.sections.security.passwordMinLength} 位` },
-         { key: 'sessionTimeoutMinutes', label: '会话超时（历史只读，不控制当前 session expiry）', value: `${props.projection.sections.security.sessionTimeoutMinutes} 分钟` },
+         { key: 'sessionTimeoutMinutes', label: '会话超时（历史只读，不控制当前会话过期时间）', value: `${props.projection.sections.security.sessionTimeoutMinutes} 分钟` },
         { key: 'loginFailureLockoutCount', label: '失败锁定次数', value: `${props.projection.sections.security.loginFailureLockoutCount} 次` }
       ];
   }
@@ -145,17 +145,17 @@ function sectionStateLabel(
   state: SettingsSectionReadState
 ): string {
   if (isGenericSettingsSection(target)) {
-    const accessLabel = props.role === 'Admin' ? 'Admin 可编辑' : props.role === 'Engineer' ? 'Engineer 只读' : '只读';
+    const accessLabel = props.role === 'Admin' ? '管理员可编辑' : props.role === 'Engineer' ? '工程师只读' : '只读';
     return state === 'restricted' ? `${accessLabel}（安全子集未返回）` : accessLabel;
   }
   if (target === 'database') return '已接入';
   if (target === 'station') {
-    if (props.role !== 'Admin') return 'Admin only';
+    if (props.role !== 'Admin') return '仅管理员';
     return props.owner.projection.station ? '已接入' : '读取中';
   }
   if (target === 'ai-model') {
-    if (!props.owner.projection.aiModels) return props.role === 'Engineer' ? 'safe read' : '读取中';
-    return props.owner.projection.aiModels.safeSubset ? 'Engineer safe read' : 'Admin 可管理';
+    if (!props.owner.projection.aiModels) return props.role === 'Engineer' ? '工程师安全只读' : '读取中';
+    return props.owner.projection.aiModels.safeSubset ? '工程师安全只读' : '管理员可管理';
   }
   const device = props.owner.projection.device;
   if (target === 'plc') return device.plcSettings ? `已接入（${device.plcSettings.activeProtocol}）` : '未读取';
@@ -205,19 +205,19 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
   >
     <template v-if="activeGroup === 'overview'">
       <CvPanel
-        title="服务端投影"
-        description="只显示本次从现有 Settings endpoint 读取并通过 decoder 校验的字段。"
+        title="服务端状态"
+        description="只显示本次从现有设置接口读取并通过结构校验的字段。"
       >
         <CvDescriptionList
           :items="projectionSummary"
           :columns="2"
-          label="Settings 服务端投影摘要"
+          label="服务端设置摘要"
         />
       </CvPanel>
 
       <CvPanel
         title="分组读取状态"
-        description="设备、工作站、AI 与数据库分组使用各自服务端状态；此处只显示已读取的权威投影。"
+        description="设备、工作站、AI 与数据库分组使用各自服务端状态；此处只显示已经读取的数据。"
       >
         <ul class="settings-overview__section-list">
           <li
@@ -235,7 +235,7 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
           </li>
         </ul>
         <div class="settings-overview__authority-list">
-          <span class="settings-overview__authority-label">独立 authority</span>
+          <span class="settings-overview__authority-label">独立后端服务</span>
           <span
             v-for="item in authorityRows"
             :key="item.id"
@@ -248,9 +248,9 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
           v-if="isolatedAuthorityRows.length"
           class="settings-overview__notice"
           tone="info"
-          title="后端 authority 已隔离"
+          title="后端数据源已隔离"
         >
-          {{ isolatedAuthorityRows.map(item => item.label).join('、') }} 未进入 generic Settings 投影。
+          {{ isolatedAuthorityRows.map(item => item.label).join('、') }} 未进入通用设置视图。
         </CvInlineAlert>
       </CvPanel>
     </template>
@@ -330,7 +330,7 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
           <CvStatusBadge
             v-if="activeGenericProjection"
             tone="ok"
-            label="只读投影"
+            label="只读状态"
           />
           <CvStatusBadge
             v-else
@@ -343,13 +343,13 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
           tone="warning"
           title="当前响应未包含此分组"
         >
-          当前账户只收到 safe subset。后端未返回该分组时，界面不会用本地默认值补齐，也不会发起保存请求。
+          当前账户只收到安全字段集。后端未返回该分组时，界面不会用本地默认值补齐，也不会发起保存请求。
         </CvInlineAlert>
         <CvDescriptionList
           v-else
           :items="activeProjectionItems"
           :columns="2"
-          :label="`${settingsSectionLabel(activeGroup)}只读投影`"
+          :label="`${settingsSectionLabel(activeGroup)}只读状态`"
         />
       </CvPanel>
     </template>
@@ -366,9 +366,9 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
         />
       </template>
       <div class="settings-overview__deferred">
-        <strong>{{ activeItem.label }}保持独立 authority</strong>
+        <strong>{{ activeItem.label }}由独立后端服务管理</strong>
         <p>
-          该分组仍保持独立 authority，待对应 endpoint contract 接入后再挂载工作台。
+          该分组仍由独立后端服务管理，待对应接口合同就绪后再开放工作台。
         </p>
         <p>该分组当前没有可用的编辑或运行操作。</p>
       </div>

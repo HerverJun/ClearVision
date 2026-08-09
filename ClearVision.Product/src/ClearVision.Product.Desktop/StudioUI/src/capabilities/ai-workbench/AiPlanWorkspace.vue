@@ -164,7 +164,7 @@ const publicEvents = computed(() => props.events.filter(event =>
             compact
             :title="resource.resourceName || resource.resourceType || '资源尚未绑定'"
           >
-            {{ resource.description || '资源缺口将在 G3 中处理，本阶段不提供绑定入口。' }}
+            {{ resource.description || '资源合同尚未开放，当前不提供绑定入口。' }}
           </CvInlineAlert>
         </div>
       </section>
@@ -175,7 +175,7 @@ const publicEvents = computed(() => props.events.filter(event =>
           <dl>
             <div><dt>Plan 标识</dt><dd>{{ plan.planId }}</dd></div>
             <div><dt>Plan Hash</dt><dd>{{ plan.planHash }}</dd></div>
-            <div><dt>会话 revision</dt><dd>{{ session.snapshot.revision }}</dd></div>
+            <div><dt>会话修订</dt><dd>{{ session.snapshot.revision }}</dd></div>
             <div><dt>Planner 来源</dt><dd>{{ plan.planSource || '未标记' }}</dd></div>
             <div><dt>Fallback 原因</dt><dd>{{ plan.fallbackReason || '无' }}</dd></div>
             <div><dt>合同版本</dt><dd>{{ plan.planContractVersion }}</dd></div>

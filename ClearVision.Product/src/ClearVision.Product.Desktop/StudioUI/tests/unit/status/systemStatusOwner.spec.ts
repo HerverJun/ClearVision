@@ -19,6 +19,18 @@ describe('systemStatusOwner', () => {
     expect(decodeSystemHealth({ status: 'Healthy', port: 5000 })).toEqual({
       status: 'Healthy', port: 5000, healthy: true
     });
+    expect(decodeSystemHealth({
+      status: 'Healthy',
+      port: 5000,
+      service: ' ClearVision.Product.Desktop ',
+      version: ' 3.2.1+candidate '
+    })).toEqual({
+      status: 'Healthy',
+      port: 5000,
+      healthy: true,
+      service: 'ClearVision.Product.Desktop',
+      version: '3.2.1+candidate'
+    });
     expect(decodeSystemHealth({ status: 'Degraded', port: 5000 }).healthy).toBe(false);
     expect(() => decodeSystemHealth({ status: 'Healthy', port: 70_000 })).toThrow();
   });

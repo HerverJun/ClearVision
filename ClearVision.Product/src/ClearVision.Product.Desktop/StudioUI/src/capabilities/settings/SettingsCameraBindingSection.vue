@@ -225,7 +225,7 @@ watch(() => props.activeCameraId, value => {
     <header class="camera-section__header">
       <div>
         <h3>相机绑定与采集参数</h3>
-        <p>系统级绑定、活动相机和采集参数保存到相机配置 authority。修改活动流中的参数会由后端以 409 拒绝。</p>
+        <p>系统级绑定、活动相机和采集参数保存到相机配置服务。修改活动流中的参数会由后端拒绝并提示冲突。</p>
       </div>
       <div class="camera-section__actions">
         <CvStatusBadge
@@ -422,7 +422,7 @@ watch(() => props.activeCameraId, value => {
 
         <div class="camera-trigger-config">
           <div class="camera-subheading">
-            <strong>串口光电</strong><span>实际端口由 trigger-input endpoint 发现和测试</span>
+            <strong>串口光电</strong><span>实际端口由触发输入接口发现和测试</span>
           </div>
           <div class="camera-form-grid">
             <CvSelect

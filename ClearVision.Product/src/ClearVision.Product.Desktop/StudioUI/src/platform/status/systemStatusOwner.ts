@@ -5,6 +5,8 @@ export interface SystemHealthProjection {
   readonly status: string;
   readonly port: number;
   readonly healthy: boolean;
+  readonly service?: string;
+  readonly version?: string;
 }
 
 export type SystemStatusPhase = 'loading' | 'online' | 'offline' | 'stale';
@@ -47,7 +49,13 @@ export function decodeSystemHealth(payload: unknown): SystemHealthProjection {
   return Object.freeze({
     status: payload.status,
     port: payload.port,
-    healthy: payload.status.toLowerCase() === 'healthy'
+    healthy: payload.status.toLowerCase() === 'healthy',
+    ...(typeof payload.service === 'string' && payload.service.trim()
+      ? { service: payload.service.trim() }
+      : {}),
+    ...(typeof payload.version === 'string' && payload.version.trim()
+      ? { version: payload.version.trim() }
+      : {})
   });
 }
 

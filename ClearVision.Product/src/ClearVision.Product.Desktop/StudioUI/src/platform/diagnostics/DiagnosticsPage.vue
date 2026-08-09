@@ -25,16 +25,20 @@ const sessionProbeState = computed(() =>
   session.phase === 'authenticated' || session.phase === 'stale' ? 'ok' : 'error'
 );
 const startupItems = computed<readonly CvDescriptionItem[]>(() => [
-  { key: 'build', label: '构建', value: `${studioUiBuildMetadata.name} ${studioUiBuildMetadata.version}` },
+  { key: 'product-version', label: '产品版本', value: platform.startup.productVersion ?? '宿主未提供' },
+  { key: 'build', label: '界面版本', value: `${studioUiBuildMetadata.name} ${studioUiBuildMetadata.version}` },
+  { key: 'host-version', label: '桌面宿主版本', value: platform.startup.hostVersion ?? '浏览器环境不可用' },
+  { key: 'backend-version', label: '本地服务版本', value: systemStatus.health?.version ?? '尚未读取' },
   { key: 'schema', label: '启动协议版本', value: platform.startup.schemaVersion },
-  { key: 'profile', label: '启动 Profile', value: platform.startup.startupProfile },
+  { key: 'profile', label: '启动模式', value: formatStartupMode(platform.startup.startupProfile) },
   {
     key: 'profile-roles',
-    label: 'Profile 可用角色',
+    label: '可用角色',
     value: platform.startup.profileAllowedRoles.map(formatRole).join('、')
   },
-  { key: 'ui-kind', label: '界面类型', value: platform.startup.uiKind },
-  { key: 'host-kind', label: '宿主类型', value: platform.startup.hostKind },
+  { key: 'ui-kind', label: '界面类型', value: 'Studio 工程界面' },
+  { key: 'host-kind', label: '运行环境', value: platform.startup.hostKind === 'desktop-webview2' ? 'Windows 桌面宿主' : '浏览器测试环境' },
+  { key: 'default-entry', label: '默认入口', value: '工程库（/projects）' },
   { key: 'base', label: '界面基础路径', value: platform.startup.studioUiBasePath },
   { key: 'api-origin', label: '接口来源', value: apiOrigin },
   { key: 'host-channel', label: '宿主通道', value: hostDiagnostics.channel },
@@ -42,7 +46,7 @@ const startupItems = computed<readonly CvDescriptionItem[]>(() => [
 ]);
 const ownerItems = computed<readonly CvDescriptionItem[]>(() => [
   { key: 'generation', label: '会话代次', value: queryDiagnostics.value.sessionGeneration },
-  { key: 'owners', label: '活动查询所有者', value: queryDiagnostics.value.activeOwnerCount },
+  { key: 'owners', label: '活动查询组', value: queryDiagnostics.value.activeOwnerCount },
   { key: 'requests', label: '活动请求', value: queryDiagnostics.value.activeRequestCount },
   { key: 'cache', label: '缓存条目', value: queryDiagnostics.value.cacheEntryCount },
   { key: 'protected-cache', label: '受保护缓存', value: queryDiagnostics.value.protectedCacheEntryCount },
@@ -62,6 +66,14 @@ function formatRole(value: string | undefined): string {
   return labels[value.toLocaleLowerCase()] ?? value;
 }
 
+function formatStartupMode(value: string): string {
+  if (value === 'LEGACY_FALLBACK') return '兼容回退';
+  if (value === 'NEXT_DEFAULT') return '标准模式';
+  if (value.includes('PILOT')) return '受控试用';
+  if (value.includes('CANDIDATE')) return '候选模式';
+  return '受控启动';
+}
+
 async function refreshSharedOwners(): Promise<void> {
   await Promise.all([
     runtime.systemStatus.refresh(),
@@ -76,9 +88,8 @@ async function refreshSharedOwners(): Promise<void> {
     data-studio-page="diagnostics"
   >
     <CvPageHeader
-      eyebrow="运行诊断"
-      title="StudioUI 诊断"
-      description="查看统一会话、系统状态与只读查询服务的共享状态。"
+      title="运行诊断"
+      description="查看本地服务、当前会话、版本与查询资源状态。"
     >
       <template #actions>
         <CvButton
@@ -92,7 +103,7 @@ async function refreshSharedOwners(): Promise<void> {
 
     <CvPanel
       title="共享状态"
-      description="系统状态与会话状态由全应用唯一所有者提供。"
+      description="本地服务与当前会话的最近一次确认结果。"
     >
       <div class="diagnostics-page__summary">
         <div>
@@ -126,21 +137,21 @@ async function refreshSharedOwners(): Promise<void> {
       </CvPanel>
 
       <CvPanel
-        title="统一查询状态"
-        description="用于确认活动请求、缓存与会话代次没有出现第二套所有者。"
+        title="查询资源"
+        description="用于排查活动请求、缓存与会话刷新状态。"
       >
         <CvDescriptionList
           :items="ownerItems"
-          label="统一查询状态"
+          label="查询资源状态"
         />
       </CvPanel>
     </div>
 
     <CvInlineAlert
       tone="info"
-      title="证据范围"
+      title="诊断范围"
     >
-      当前阶段使用预置会话进行认证预览，不代表真实登录交接、默认入口切换或现场执行链路已经迁移。
+      浏览器测试环境不能替代真实桌面宿主、Windows 缩放或现场设备验证。
     </CvInlineAlert>
   </section>
 </template>

@@ -94,9 +94,9 @@ onBeforeUnmount(() => {
     <CvInlineAlert
       v-if="!isAdmin"
       tone="info"
-      title="仅 Admin 可用"
+      title="仅管理员可用"
     >
-      数据库维护 endpoint 保持现有 Admin policy，Engineer 不会发起请求。
+      数据库维护接口仅供管理员使用，工程师不会发起请求。
     </CvInlineAlert>
     <template v-else>
       <CvInlineAlert
@@ -104,7 +104,7 @@ onBeforeUnmount(() => {
         tone="info"
         title="正在读取数据库状态"
       >
-        正在读取服务端维护投影。
+        正在读取服务端维护状态。
       </CvInlineAlert>
       <CvInlineAlert
         v-else-if="phase === 'error'"
@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
         <div class="settings-database__heading">
           <div>
             <strong>当前状态</strong>
-            <p>路径字段由 decoder 丢弃，不进入设置投影或截图。</p>
+            <p>路径字段未通过公开接口返回，不进入设置视图或截图。</p>
           </div>
           <CvStatusBadge
             :tone="statusTone(status.state)"

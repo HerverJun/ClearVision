@@ -147,6 +147,14 @@ public sealed class WebView2Host : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(studioOptions);
         ArgumentException.ThrowIfNullOrWhiteSpace(startupProfile);
 
+        var assembly = typeof(WebView2Host).Assembly;
+        var productVersion = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion
+            ?? assembly.GetName().Version?.ToString()
+            ?? "unknown";
+        var hostVersion = assembly.GetName().Version?.ToString() ?? productVersion;
+
         var startup = new
         {
             schemaVersion = 1,
@@ -156,7 +164,9 @@ public sealed class WebView2Host : IAsyncDisposable
             studioUiBasePath = "/studio/",
             startupProfile,
             profileAllowedRoles = StudioStartupProfileCatalog.AllowedRolesFor(startupProfile),
-            featureFlags = BuildStudioUiFeatureFlags(studioOptions)
+            featureFlags = BuildStudioUiFeatureFlags(studioOptions),
+            productVersion,
+            hostVersion
         };
         var startupJson = JsonSerializer.Serialize(startup, StartupScriptJsonOptions);
 

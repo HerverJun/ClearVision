@@ -403,7 +403,7 @@ onBeforeUnmount(() => {
   z-index: calc(var(--cv-z-sticky) + 1);
   top: var(--cv-space-1);
   display: none;
-  height: 26px;
+  height: 32px;
   padding: 0 var(--cv-space-2);
   border: 1px solid var(--cv-border-default);
   border-radius: var(--cv-radius-sm);

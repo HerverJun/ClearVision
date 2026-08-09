@@ -113,7 +113,7 @@ onBeforeUnmount(() => detachPanelState());
 <template>
   <CvPanel
     title="存储"
-    description="保存路径与保留策略走 scoped AppConfig；路径选择器和立即清理当前没有可用合同。"
+    description="保存路径与保留策略由对应范围的应用配置管理；路径选择器和立即清理当前没有可用合同。"
     data-settings-section="storage"
   >
     <div class="settings-form-grid">
@@ -188,14 +188,14 @@ onBeforeUnmount(() => detachPanelState());
       v-if="!canWrite"
       class="settings-panel__notice"
       tone="info"
-      title="当前为安全投影"
+      title="当前为安全视图"
     >
-      当前角色不能读取 Admin-only 磁盘诊断，也不能保存 Storage。
+      当前角色不能读取仅管理员可见的磁盘诊断，也不能保存存储设置。
     </CvInlineAlert>
 
     <template #footer>
       <div class="settings-panel__footer">
-        <span class="settings-panel__dirty">{{ dirty ? '有未保存修改' : '与服务端投影一致' }}</span>
+        <span class="settings-panel__dirty">{{ dirty ? '有未保存修改' : '与服务端配置一致' }}</span>
         <div class="settings-panel__actions">
           <CvButton
             v-if="canWrite"

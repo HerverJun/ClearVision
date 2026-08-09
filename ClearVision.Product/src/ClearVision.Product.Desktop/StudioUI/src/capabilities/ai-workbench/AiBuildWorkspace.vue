@@ -148,13 +148,13 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
           <template v-else>
             {{ build.validation.firstFixRecommendation }}
             <template v-if="candidateReviewReady">
-              下一阶段将交接到工作区审核。
+              构建通过后可交接到工作区审核。
             </template>
           </template>
         </CvInlineAlert>
         <ul class="ai-build-workspace__boundaries">
           <li>
-            <div><strong>工作区候选</strong><p>仅表示候选具备下一阶段审核条件。</p></div>
+            <div><strong>工作区候选</strong><p>仅表示候选具备工作区审核条件。</p></div>
             <CvStatusBadge
               :tone="canvasCandidateReady ? 'ok' : 'warning'"
               :label="stale ? '结论已失效' : canvasCandidateReady ? '候选就绪' : '阻断'"

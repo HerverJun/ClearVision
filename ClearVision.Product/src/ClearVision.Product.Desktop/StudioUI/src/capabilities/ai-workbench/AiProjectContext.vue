@@ -23,7 +23,7 @@ const revision = computed(() => props.project?.persistenceRevision ?? null);
     />
     <div class="ai-project-context__identity">
       <strong>{{ project?.name ?? '尚未绑定工程' }}</strong>
-      <span v-if="project">版本 {{ project.version }} · 保存 revision {{ revision }}</span>
+      <span v-if="project">版本 {{ project.version }} · 保存修订 {{ revision }}</span>
       <span v-else>可先完成任务理解与方案规划，当前不会创建或写入工程。</span>
     </div>
     <CvStatusBadge
@@ -33,7 +33,7 @@ const revision = computed(() => props.project?.persistenceRevision ?? null);
     <span
       v-if="session"
       class="ai-project-context__session"
-    >会话 revision {{ session.snapshot.revision }}</span>
+    >会话修订 {{ session.snapshot.revision }}</span>
   </div>
 </template>
 

@@ -35,6 +35,12 @@ const runtime = props.runtime ?? useProductRuntime();
 const authRoot = inject(authLifecycleRootKey, null);
 const sessionProjection = computed(() => runtime.session.projection);
 const role = computed(() => sessionProjection.value.user?.role ?? null);
+const roleLabel = computed(() => {
+  if (role.value === 'Admin') return '管理员';
+  if (role.value === 'Engineer') return '工程师';
+  if (role.value === 'Operator') return '操作员';
+  return '未认证';
+});
 const sessionPhase = computed(() => sessionProjection.value.phase);
 const activeGroup = shallowRef<SettingsNavigationTarget>('overview');
 const navigationMessage = shallowRef<string | null>(null);
@@ -45,7 +51,7 @@ const unknownOutcomeKeys = computed<readonly SettingsAuthorityReconcileKey[]>(()
 );
 const reconcileBusyKeys = reactive(new Set<SettingsAuthorityReconcileKey>());
 const mountedOwner = computed<SettingsOwner>(() => {
-  if (!owner.value) throw new Error('Settings content cannot render without a mounted owner.');
+  if (!owner.value) throw new Error('设置内容缺少已挂载的生命周期管理器。');
   return owner.value;
 });
 const phase = computed<SettingsOwnerPhase>(() => ownerProjection.value?.phase ?? 'loading');
@@ -66,8 +72,8 @@ const statusTone = computed<CvStatusTone>(() => {
   return 'error';
 });
 const statusLabel = computed(() => {
-  if (phase.value === 'ready') return settings.value?.safeSubset ? '安全子集' : '完整投影';
-  if (phase.value === 'stale') return '投影已过期';
+  if (phase.value === 'ready') return settings.value?.safeSubset ? '安全子集' : '完整配置';
+  if (phase.value === 'stale') return '配置状态已过期';
   if (phase.value === 'loading') return '读取中';
   if (phase.value === 'forbidden') return '禁止访问';
   if (error.value?.code === 'unauthorized') return '会话失效';
@@ -76,14 +82,14 @@ const statusLabel = computed(() => {
 const stateTitle = computed(() => {
   if (pageStateKind.value === 'unauthorized') return '会话不可用';
   if (pageStateKind.value === 'forbidden') return '无权访问设置';
-  if (error.value?.code === 'decode') return '设置投影无法解析';
+  if (error.value?.code === 'decode') return '设置响应无法解析';
   return '设置读取失败';
 });
 const stateDescription = computed(() => {
   if (pageStateKind.value === 'unauthorized') return '当前会话已失效，请重新登录后再读取设置。';
   if (pageStateKind.value === 'forbidden') return '当前账户没有进入设置的权限；前端不会通过隐藏逻辑绕过后端授权。';
-  if (error.value?.code === 'decode') return '服务端响应未通过已冻结 decoder 校验，未验证字段不会显示。';
-  return error.value?.publicMessage ?? '本地设置服务未返回可用投影。';
+  if (error.value?.code === 'decode') return '服务端响应未通过已冻结的接口合同校验，未验证字段不会显示。';
+  return error.value?.publicMessage ?? '本地设置服务未返回可用状态。';
 });
 const showReadOnlyContent = computed(() =>
   (phase.value === 'ready' || phase.value === 'stale') && settings.value !== null
@@ -108,9 +114,9 @@ function reconcileLabel(key: SettingsAuthorityReconcileKey): string {
 }
 
 function reconcileDescription(key: SettingsAuthorityReconcileKey): string {
-  if (key === 'change-password') return '等待现有 auth lifecycle 确认 session 失效结果。';
-  if (key === 'database-backup') return '当前没有能够确认备份结果的读取合同，普通 database status 不会替代核对。';
-  return '在对应 authority reread 成功前，不会重试或覆盖当前投影。';
+  if (key === 'change-password') return '等待现有身份验证流程确认会话失效结果。';
+  if (key === 'database-backup') return '当前没有能够确认备份结果的读取合同，普通数据库状态不会替代核对。';
+  return '重新读取对应服务端状态前，不会重试或覆盖当前视图。';
 }
 
 async function reconcile(key: SettingsAuthorityReconcileKey): Promise<void> {
@@ -121,9 +127,9 @@ async function reconcile(key: SettingsAuthorityReconcileKey): Promise<void> {
   try {
     const result = await currentOwner.reconcileAuthority(key);
     if (result.status === 'completed') {
-      navigationMessage.value = `${reconcileLabel(key)} 已完成 authority reconcile。`;
+      navigationMessage.value = `${reconcileLabel(key)} 已完成服务端结果核对。`;
     } else {
-      navigationMessage.value = result.message ?? `${reconcileLabel(key)} reconcile 未完成，unknown 保持可见。`;
+      navigationMessage.value = result.message ?? `${reconcileLabel(key)}尚未完成服务端核对，结果未知状态将继续显示。`;
     }
   } finally {
     reconcileBusyKeys.delete(key);
@@ -131,7 +137,7 @@ async function reconcile(key: SettingsAuthorityReconcileKey): Promise<void> {
 }
 
 function readOnlyProjection(): SettingsProjectionV1 {
-  if (!settings.value) throw new Error('Settings read-only content requires a decoded projection.');
+  if (!settings.value) throw new Error('设置只读内容缺少已解码的服务端状态。');
   return settings.value;
 }
 
@@ -164,15 +170,15 @@ function disposeOwner(reason: string): void {
 async function refresh(): Promise<void> {
   const protection = owner.value?.leaveProtection();
   if (protection === 'settings-draft') {
-    navigationMessage.value = '当前 Settings 存在未保存草稿；请先保存或放弃草稿后再刷新。';
+    navigationMessage.value = '当前设置存在未保存草稿；请先保存或放弃草稿后再刷新。';
     return;
   }
   if (protection === 'settings-pending') {
-    navigationMessage.value = '当前 Settings 操作仍在执行；完成后再刷新，避免覆盖当前投影。';
+    navigationMessage.value = '当前设置操作仍在执行；完成后再刷新，避免覆盖当前状态。';
     return;
   }
   if (protection === 'settings-unknown') {
-    navigationMessage.value = '当前 Settings 操作结果未知；请先完成对应 authority reconcile 后再刷新。';
+    navigationMessage.value = '当前设置操作结果未知；请先核对对应服务端结果后再刷新。';
     return;
   }
   navigationMessage.value = null;
@@ -183,11 +189,11 @@ function selectGroup(target: SettingsNavigationTarget): void {
   if (target === activeGroup.value) return;
   const protection = owner.value?.leaveProtection();
   if (protection === 'settings-pending') {
-    navigationMessage.value = '当前 Settings 操作仍在执行，请等待完成或失败后再切换分组。';
+    navigationMessage.value = '当前设置操作仍在执行，请等待完成或失败后再切换分组。';
     return;
   }
   if (protection === 'settings-unknown') {
-    navigationMessage.value = '当前 Settings 操作结果未知，请先重新读取服务端状态后再切换分组。';
+    navigationMessage.value = '当前设置操作结果未知，请先重新读取服务端状态后再切换分组。';
     return;
   }
   navigationMessage.value = null;
@@ -219,25 +225,25 @@ onBeforeUnmount(() => {
     <CvPageHeader
       eyebrow="系统配置"
       title="设置"
-      description="读取现有服务端设置投影，核对权威范围与当前生效观察值。"
+      description="读取现有服务端设置，核对可访问范围与当前生效状态。"
     >
       <template #meta>
         <CvStatusBadge
           :tone="statusTone"
           :label="statusLabel"
         />
-        <span class="settings-page__role">{{ role ?? '未认证' }}</span>
+        <span class="settings-page__role">{{ roleLabel }}</span>
       </template>
       <template #actions>
         <CvButton
           v-if="phase !== 'forbidden'"
           size="sm"
           :loading="phase === 'loading'"
-          loading-label="正在刷新通用设置投影"
+          loading-label="正在刷新通用设置"
           data-settings-generic-refresh
           @click="refresh"
         >
-          刷新通用设置投影
+          刷新通用设置
         </CvButton>
       </template>
     </CvPageHeader>
@@ -246,7 +252,7 @@ onBeforeUnmount(() => {
       v-if="unknownOutcomeKeys.length"
       class="settings-page__unknown-alert"
       tone="warning"
-      title="存在待核对的 Settings 操作结果"
+      title="存在待核对的设置操作结果"
       data-settings-unknown-outcomes
     >
       <ul class="settings-page__unknown-list">
@@ -288,9 +294,9 @@ onBeforeUnmount(() => {
           v-if="phase === 'stale'"
           class="settings-page__stale-alert"
           tone="warning"
-          title="投影已过期"
+          title="配置状态已过期"
         >
-          当前内容仅供核对；请刷新服务端投影后再继续任何后续操作。
+          当前内容仅供核对；请刷新服务端状态后再继续任何后续操作。
         </CvInlineAlert>
         <CvInlineAlert
           v-if="navigationMessage"
@@ -313,8 +319,8 @@ onBeforeUnmount(() => {
     <CvPageState
       v-else
       :kind="pageStateKind ?? 'loading'"
-      :title="pageStateKind === 'loading' ? '正在读取 Settings' : stateTitle"
-      :description="pageStateKind === 'loading' ? '正在从现有服务端 endpoint 读取投影。' : stateDescription"
+      :title="pageStateKind === 'loading' ? '正在读取设置' : stateTitle"
+      :description="pageStateKind === 'loading' ? '正在从现有服务端接口读取设置。' : stateDescription"
     >
       <template
         v-if="pageStateKind === 'error' || pageStateKind === 'unauthorized'"

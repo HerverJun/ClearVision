@@ -593,7 +593,7 @@ export function createCalibrationOwner(options: {
         if (saveRequestSequence !== saveSequence || !isCurrent(identity)) return;
         if (!reconciled) {
           state.phase = 'error';
-          state.message = '标定资产已返回保存结果，但工程 revision reconcile 未完成；请先核对保存结果。';
+          state.message = '标定资产已返回保存结果，但工程保存修订尚未完成核对；请先确认保存结果。';
           return;
         }
         state.phase = 'saved';

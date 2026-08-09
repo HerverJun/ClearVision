@@ -271,7 +271,7 @@ describe('F07 G7 Station communication panel', () => {
     await wrapper.get('select[name="stationMode"]').setValue('LanController');
     const regenerate = wrapper.get('[data-settings-station-regenerate]');
     expect(regenerate.attributes('disabled')).toBeDefined();
-    expect(wrapper.get('[data-settings-station-token-hint]').text()).toContain('LanController');
+    expect(wrapper.get('[data-settings-station-token-hint]').text()).toContain('局域网控制模式');
     await regenerate.trigger('click');
     expect(fixture.stationToken).not.toHaveBeenCalled();
 
@@ -291,7 +291,7 @@ describe('F07 G7 Station communication panel', () => {
     await wrapper.get('input[name="stationPort"]').setValue('5033');
     const regenerate = wrapper.get('[data-settings-station-regenerate]');
     expect(regenerate.attributes('disabled')).toBeDefined();
-    expect(wrapper.get('[data-settings-station-token-hint]').text()).toContain('unsaved');
+    expect(wrapper.get('[data-settings-station-token-hint]').text()).toContain('未保存修改');
     await regenerate.trigger('click');
 
     expect(fixture.stationToken).not.toHaveBeenCalled();
@@ -515,7 +515,7 @@ describe('F07 G8 AI model administration panel', () => {
     await wrapper.get('[data-settings-ai-model-save]').trigger('click');
 
     expect(fixture.aiUpdate).not.toHaveBeenCalled();
-    expect(wrapper.get('[data-settings-ai-model-feedback]').text()).toContain('refresh AI authority');
+    expect(wrapper.get('[data-settings-ai-model-feedback]').text()).toContain('刷新服务端状态');
   });
 
   it('shows safe projection to Engineer and allows reasoning support diagnosis only', async () => {
@@ -566,7 +566,7 @@ describe('F07 G8 AI model administration panel', () => {
     await flushPromises();
 
     await wrapper.get('[data-settings-ai-reasoning-support]').trigger('click');
-    await wrapper.findAll('button.settings-ai-model__select')[1]!.trigger('click');
+    await wrapper.findAll('[data-settings-ai-model-select]')[1]!.trigger('click');
     resolveReasoning(completed({ ...reasoningSupport(), familyName: 'Stale model support' }));
     await flushPromises();
 

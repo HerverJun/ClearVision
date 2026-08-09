@@ -14,6 +14,7 @@ export { default as CvStatusBadge } from './CvStatusBadge.vue';
 export { default as CvSurface } from './CvSurface.vue';
 export { default as CvToastRegion } from './CvToastRegion.vue';
 export { default as CvTypography } from './CvTypography.vue';
+export { default as CvViewTabs } from './CvViewTabs.vue';
 export type {
   CvButtonVariant,
   CvDataTableColumn,

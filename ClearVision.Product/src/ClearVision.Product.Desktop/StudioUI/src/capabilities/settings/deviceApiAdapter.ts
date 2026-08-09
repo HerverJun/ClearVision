@@ -112,7 +112,7 @@ function requiredMethod<T>(method: T | undefined, name: string): T {
 
 function profilePath(profileId: string, suffix: string): string {
   const normalized = profileId.trim();
-  if (!normalized || normalized.includes('/')) throw new TypeError('TCP Profile id must be a path-safe value.');
+  if (!normalized || normalized.includes('/')) throw new TypeError('TCP 连接配置标识必须是安全的路径值。');
   return `tcp/profiles/${encodeURIComponent(normalized)}${suffix}`;
 }
 

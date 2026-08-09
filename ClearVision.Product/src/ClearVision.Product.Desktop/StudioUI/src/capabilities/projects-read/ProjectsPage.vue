@@ -38,6 +38,7 @@ import {
   useProjectsReadRuntime,
   type ProjectsReadRuntime
 } from './projectsReadRuntime';
+import ProjectsRecentPanel from './ProjectsRecentPanel.vue';
 
 const props = defineProps<{
   runtime?: ProjectsReadRuntime;
@@ -115,7 +116,7 @@ const importTargetOptions = computed<readonly CvSelectOption[]>(() => [
   { value: '', label: '选择目标工程', disabled: true },
   ...(listState.value.data ?? []).map(project => ({
     value: project.id,
-    label: `${project.name}（revision ${project.persistenceRevision}）`
+    label: `${project.name}（保存修订 ${project.persistenceRevision}）`
   }))
 ]);
 const importOperatorCount = computed(() => {
@@ -439,7 +440,10 @@ onBeforeUnmount(() => {
       {{ commandState.message }}
     </CvInlineAlert>
 
-    <div class="projects-page__layout">
+    <div
+      class="projects-page__layout"
+      :class="{ 'projects-page__layout--empty': listState.phase === 'empty' && !isSearching }"
+    >
       <CvPanel
         class="projects-page__library"
         title="全部工程"
@@ -636,56 +640,15 @@ onBeforeUnmount(() => {
         />
       </CvPanel>
 
-      <CvPanel
+      <ProjectsRecentPanel
         class="projects-page__recent"
-        title="最近工程"
-        :level="2"
-        :padded="false"
-      >
-        <CvPageState
-          v-if="recentState.phase === 'loading' && !recentState.data"
-          compact
-          kind="loading"
-          title="正在读取最近工程"
-        />
-        <CvPageState
-          v-else-if="recentState.phase === 'empty'"
-          compact
-          kind="empty"
-          title="暂无最近工程"
-        />
-        <CvPageState
-          v-else-if="recentState.phase === 'unauthorized' || recentState.phase === 'forbidden' || recentState.phase === 'error'"
-          compact
-          kind="error"
-          title="最近工程不可用"
-        />
-        <ol
-          v-if="recentState.data?.length"
-          class="projects-page__recent-list"
-        >
-          <li
-            v-for="project in recentState.data"
-            :key="project.id"
-          >
-            <div class="projects-page__recent-copy">
-              <RouterLink :to="`/projects/${project.id}`">
-                {{ project.name }}
-              </RouterLink>
-              <span>{{ formatProjectDateTime(project.lastOpenedAt) }}</span>
-            </div>
-            <CvButton
-              v-if="commands"
-              size="sm"
-              variant="quiet"
-              :disabled="commandBusy"
-              @click="openWorkspace(project)"
-            >
-              打开工作区
-            </CvButton>
-          </li>
-        </ol>
-      </CvPanel>
+        :phase="recentState.phase"
+        :projects="recentState.data ?? null"
+        :is-refreshing="recentState.isRefreshing"
+        :can-open="Boolean(commands)"
+        :busy="commandBusy"
+        @open="openWorkspace"
+      />
     </div>
 
     <CvModal
@@ -770,7 +733,7 @@ onBeforeUnmount(() => {
           v-model="importTargetModel"
           name="projectImportTarget"
           label="目标工程"
-          hint="revision 来自当前服务端工程列表；提交时服务端仍会再次校验。"
+          hint="保存修订来自当前服务端工程列表；提交时服务端仍会再次校验。"
           :options="importTargetOptions"
           :disabled="commandBusy"
           required
@@ -789,11 +752,11 @@ onBeforeUnmount(() => {
           title="覆盖会替换目标工程内容"
         >
           <template v-if="importTarget">
-            将覆盖“{{ importTarget.name }}”的流程、全局变量和正式资源。当前服务端 revision 为
-            <strong>{{ importTarget.persistenceRevision }}</strong>；revision 变化时请求会被拒绝，不会部分写入。
+            将覆盖“{{ importTarget.name }}”的流程、全局变量和正式资源。当前服务端保存修订为
+            <strong>{{ importTarget.persistenceRevision }}</strong>；保存修订变化时请求会被拒绝，不会部分写入。
           </template>
           <template v-else>
-            请选择目标工程后查看当前 revision 与覆盖影响。
+            请选择目标工程后查看当前保存修订与覆盖影响。
           </template>
         </CvInlineAlert>
 
@@ -806,7 +769,7 @@ onBeforeUnmount(() => {
             type="checkbox"
             :disabled="commandBusy || !importTarget"
           >
-          <span>我已确认按当前服务端 revision 覆盖目标工程。</span>
+          <span>我已确认按当前服务端保存修订覆盖目标工程。</span>
         </label>
       </div>
       <template #footer>
@@ -870,11 +833,13 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.projects-page { display: grid; max-width: 1580px; gap: var(--cv-density-page-gap); min-width: 0; }
+.projects-page { display: grid; max-width: 1720px; gap: var(--cv-density-page-gap); min-width: 0; }
 .projects-page__meta { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-variant-numeric: tabular-nums lining-nums; }
 .projects-page__file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 .projects-page__meta + .projects-page__meta::before { margin-right: var(--cv-space-2); color: var(--cv-border-strong); content: '·'; }
 .projects-page__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(244px, 288px); gap: var(--cv-space-4); align-items: start; }
+.projects-page__layout--empty { grid-template-columns: minmax(0, 1fr); }
+.projects-page__layout--empty .projects-page__recent { display: none; }
 .projects-page__library { background: var(--cv-surface-raised); }
 .projects-page__library-toolbar { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
 .projects-page__library-toolbar :deep(.cv-toolbar__primary) { flex: 1 1 620px; }
@@ -892,15 +857,8 @@ onBeforeUnmount(() => {
 .projects-page__file-label { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
 .projects-page__acknowledge { display: flex; align-items: flex-start; gap: var(--cv-space-2); color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); line-height: var(--cv-line-height-normal); }
 .projects-page__acknowledge input { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; accent-color: var(--cv-color-brand-500); }
-.projects-page__recent-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
-.projects-page__recent-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-2); padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
-.projects-page__recent-list li:last-child { border-bottom: 0; }
-.projects-page__recent-copy { display: grid; min-width: 0; gap: 2px; }
-.projects-page__recent-copy a { overflow: hidden; color: var(--cv-text-primary); font-weight: var(--cv-font-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
-.projects-page__recent-copy span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .projects-page :deep(.projects-page__library > .cv-panel__header),
 .projects-page :deep(.projects-page__recent > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
-.projects-page :deep(.projects-page__recent .cv-page-state) { margin: 0 var(--cv-density-panel-padding) var(--cv-density-panel-padding); }
-@media (max-width: 1040px) { .projects-page__layout { grid-template-columns: 1fr; } .projects-page__recent-list { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } .projects-page__recent-list li { border-right: 1px solid var(--cv-border-subtle); } }
+@media (max-width: 1040px) { .projects-page__layout { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .projects-page__actions { flex-wrap: wrap; justify-content: flex-start; } }
 </style>

@@ -149,8 +149,8 @@ function messageForCode(code: string | null): string {
     case 'PROJECT_MUTATION_CONFLICT': return '工程当前存在运行、保存或其他写入，暂时不能执行此操作。';
     case 'OPERATION_PAYLOAD_MISMATCH': return '该 operation identity 已绑定不同请求，不能复用。';
     case 'PROJECT_NOT_FOUND': return '工程不存在或已删除。';
-    case 'PROJECT_OPERATION_NOT_FOUND': return '服务端没有找到当前用户的 operation authority。';
-    case 'PROJECT_OPERATION_RETRYABLE': return '操作结果尚未确定，必须先查询 operation authority。';
+    case 'PROJECT_OPERATION_NOT_FOUND': return '服务端没有找到当前用户的操作记录。';
+    case 'PROJECT_OPERATION_RETRYABLE': return '操作结果尚未确定，必须先查询服务端操作记录。';
     case 'PROJECT_UPDATE_UNKNOWN_OUTCOME': return '更新响应不可确定。请重新读取工程，不要自动覆盖或盲目重试。';
     case 'PROJECT_OPERATION_FAILED': return '服务端 operation 已进入失败终态。';
     case 'PROJECT_CLEANUP_RETRYABLE': return '工程已删除，后台资源清理仍在重试。';
@@ -333,7 +333,7 @@ export function createProjectLifecycleCommandOwner(
     state.phase = command === 'create' ? 'creating' : command === 'update' ? 'updating' :
       command === 'delete' ? 'deleting' : command === 'import' ? 'importing' :
         command === 'export' ? 'exporting' : 'updating';
-    state.message = command === 'open' ? '正在确认工程打开 authority。' :
+    state.message = command === 'open' ? '正在确认工程打开结果。' :
       command === 'export' ? '正在读取服务端工程导出文件。' :
         command === 'import' ? '正在提交工程导入请求。' : '正在提交工程命令。';
     const controller = new AbortController();
@@ -425,7 +425,7 @@ export function createProjectLifecycleCommandOwner(
     }
     state.message = operation.result?.cleanupStatus === 'cleanup-failed-retryable'
       ? '工程 tombstone 已生效；后台资源清理仍在重试。'
-      : '工程已由服务端 tombstone authority 删除。';
+      : '工程已由服务端删除记录确认移除。';
     return Object.freeze({
       projectId,
       operationReplayed: true,
@@ -441,7 +441,7 @@ export function createProjectLifecycleCommandOwner(
     state.phase = 'reconciling';
     state.clientOperationId = pending.clientOperationId;
     state.canReconcile = false;
-    state.message = '正在查询服务端 operation authority。';
+    state.message = '正在查询服务端操作记录。';
     totalReconcileCount += 1;
     try {
       const payload = await options.api.get(
@@ -554,7 +554,7 @@ export function createProjectLifecycleCommandOwner(
           state.operation = result.operation;
           state.errorCode = null;
           state.message = result.operationReplayed
-            ? '空白工程已从既有 operation authority 恢复。'
+            ? '空白工程已从既有服务端操作记录恢复。'
             : '空白工程已创建。';
           return result;
         } catch (error) {
@@ -650,7 +650,7 @@ export function createProjectLifecycleCommandOwner(
             result.operation.clientOperationId !== clientOperationId ||
             (targetProjectId !== null && result.projectId !== targetProjectId)
           ) {
-            throw new TypeError('Import response authority identity changed.');
+            throw new TypeError('工程导入响应的操作身份已变化。');
           }
           pendingOperation = null;
           state.phase = 'succeeded';
@@ -660,7 +660,7 @@ export function createProjectLifecycleCommandOwner(
           state.errorCode = null;
           state.canReconcile = false;
           state.message = result.operationReplayed
-            ? '工程导入已从既有 operation authority 恢复。'
+            ? '工程导入已从既有服务端操作记录恢复。'
             : '工程已导入。';
           return result;
         } catch (error) {
@@ -774,7 +774,7 @@ export function createProjectLifecycleCommandOwner(
           state.phase = 'succeeded';
           state.openedAtUtc = result.lastOpenedAtUtc;
           state.errorCode = null;
-          state.message = '工程打开 authority 已确认。';
+          state.message = '工程打开结果已确认。';
           return result;
         } catch (error) {
           if (!isCurrent(started.generation, projectId)) return null;
@@ -816,7 +816,7 @@ export function createProjectLifecycleCommandOwner(
           if (!isCurrent(started.generation, input.projectId)) return null;
           const result = decodeProjectDeleteAuthorityResult(payload);
           if (result.projectId !== input.projectId || result.operation.clientOperationId !== clientOperationId) {
-            throw new TypeError('Delete response authority identity changed.');
+            throw new TypeError('工程删除响应的操作身份已变化。');
           }
           pendingOperation = null;
           state.phase = 'succeeded';

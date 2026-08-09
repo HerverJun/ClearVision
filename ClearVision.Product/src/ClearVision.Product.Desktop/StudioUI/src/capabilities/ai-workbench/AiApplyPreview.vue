@@ -28,7 +28,7 @@ const targetLabel = computed(() => props.build.projectBaseline.targetKind === 'n
   ? '未保存的新工程'
   : props.project?.name ?? '当前既有工程');
 const baselineLabel = computed(() => props.build.projectBaseline.targetKind === 'new'
-  ? '无正式 Project id、revision 或流程基线'
+  ? '缺少正式工程标识、保存修订或流程基线'
   : `工程版本 ${props.build.projectBaseline.persistenceRevision ?? 0}`);
 const eligible = computed(() => !props.stale && props.build.validation.handoffEligible &&
   !props.build.validation.applyGate.blocked && props.build.validation.applyGate.canvasApplyReady &&

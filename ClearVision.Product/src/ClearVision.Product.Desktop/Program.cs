@@ -359,7 +359,17 @@ static class Program
         app.UseCors();
         app.UseMiddleware<AuthMiddleware>();
 
-        app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Port = _webPort }));
+        app.MapGet("/health", () => Results.Ok(new
+        {
+            Status = "Healthy",
+            Port = _webPort,
+            Service = "ClearVision.Product.Desktop",
+            Version = typeof(Program).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion
+                ?? typeof(Program).Assembly.GetName().Version?.ToString()
+                ?? "unknown"
+        }));
         app.MapHub<StationHub>(StationSyncContractDefaults.HubPath);
         app.MapAuthEndpoints();
         app.MapUserEndpoints();

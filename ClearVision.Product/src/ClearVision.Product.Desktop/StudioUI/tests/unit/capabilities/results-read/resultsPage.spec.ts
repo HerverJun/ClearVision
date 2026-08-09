@@ -255,6 +255,11 @@ describe('Results page', () => {
 
     expect(requested).toEqual(['projects']);
     expect(mounted.wrapper.text()).toContain('请选择本机工程');
+    const tabs = mounted.wrapper.get('[data-testid="results-view-tabs"]').findAll('[role="tab"]');
+    expect(tabs.map(tab => tab.text())).toEqual(['态势总览', '调查详情']);
+    expect(tabs[0]!.attributes('aria-selected')).toBe('true');
+    expect(tabs[0]!.attributes('aria-controls')).toBe('results-overview-panel');
+    expect(mounted.wrapper.get('#results-overview-panel').attributes('aria-labelledby')).toBe('results-overview-tab');
 
     mounted.wrapper.unmount();
     mounted.queries.dispose();
@@ -335,6 +340,15 @@ describe('Results page', () => {
       })
     );
 
+    const tabs = mounted.wrapper.get('[data-testid="results-view-tabs"]').findAll('[role="tab"]');
+    expect(tabs[1]!.attributes('aria-selected')).toBe('true');
+    expect(mounted.wrapper.get('[aria-label="本机结果调查详情"]').isVisible()).toBe(true);
+    await tabs[0]!.trigger('click');
+    expect(tabs[0]!.attributes('aria-selected')).toBe('true');
+    expect(mounted.wrapper.get('[aria-label="本机结果调查详情"]').attributes('style')).toContain('display: none');
+    expect(mounted.wrapper.text()).toContain('83.3%');
+    await tabs[1]!.trigger('click');
+
     expect(mounted.wrapper.text()).toContain('不适用');
     expect(mounted.wrapper.text()).toContain('执行成功');
     expect(mounted.wrapper.text()).toContain('判定结果不适用');
@@ -345,7 +359,6 @@ describe('Results page', () => {
     expect(mounted.wrapper.text()).toContain(sessionId);
     expect(mounted.wrapper.text()).toContain('Run ID 未记录，旧结果身份不完整');
     expect(mounted.wrapper.text()).toContain('判定配置哈希');
-    expect(mounted.wrapper.text()).toContain('83.3%');
     expect(mounted.wrapper.text()).toContain('manifest-deep-link');
     expect(requested).toContain(`inspection/history/${projectId}/${resultId}/evidence/manifest`);
     expect(mounted.wrapper.text()).toContain('本次检测未产生可访问图像');
@@ -589,5 +602,28 @@ describe('Results page', () => {
     expect(aborted.wrapper.text()).toContain('工作站结果请求已取消');
     aborted.wrapper.unmount();
     aborted.queries.dispose();
+  });
+
+  it('keeps the last statistics visible while reporting a failed refresh', async () => {
+    let statisticsReads = 0;
+    const mounted = await mountResults('/results?source=station', apiWith(async path => {
+      if (path.startsWith('stations/results?')) return legacyStationPage();
+      if (path.startsWith('stations/statistics')) {
+        statisticsReads += 1;
+        if (statisticsReads > 1) throw new ApiServerError(httpDetails(503));
+        return statistics();
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    }));
+
+    expect(mounted.wrapper.text()).toContain('执行成功率');
+    await mounted.wrapper.get('[data-testid="results-refresh"]').trigger('click');
+    await flushPromises();
+
+    expect(mounted.wrapper.text()).toContain('统计刷新失败');
+    expect(mounted.wrapper.text()).toContain('当前显示上次成功读取的双分母统计摘要');
+    expect(mounted.wrapper.text()).toContain('执行成功率');
+    mounted.wrapper.unmount();
+    mounted.queries.dispose();
   });
 });

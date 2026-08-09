@@ -58,9 +58,9 @@ const detachPanelState = props.owner.registerPanelState('security', () => ({
 watch([userDraftDirty, userMutationPending, editingId], () => props.owner.refreshPanelState());
 
 const roleOptions: readonly CvSelectOption[] = Object.freeze([
-  { value: '0', label: 'Admin' },
-  { value: '1', label: 'Engineer' },
-  { value: '2', label: 'Operator' }
+  { value: '0', label: '管理员' },
+  { value: '1', label: '工程师' },
+  { value: '2', label: '操作员' }
 ]);
 const columns: readonly CvDataTableColumn<SettingsUserProjectionV1>[] = Object.freeze([
   { key: 'username', label: '用户名', width: '18%' },
@@ -250,15 +250,15 @@ onDeactivated(() => {
 <template>
   <CvPanel
     title="用户管理"
-    description="用户记录和密码走各自的后端 authority，不进入 AppConfig 草稿。"
+    description="用户记录和密码由各自的后端服务管理，不进入应用配置草稿。"
     data-settings-users
   >
     <CvInlineAlert
       v-if="!canManage"
       tone="info"
-      title="仅 Admin 可用"
+      title="仅管理员可用"
     >
-      Engineer 可以修改本人密码，但不能读取或管理用户列表。
+      工程师可以修改本人密码，但不能读取或管理用户列表。
     </CvInlineAlert>
 
     <template v-if="canManage">
@@ -324,7 +324,7 @@ onDeactivated(() => {
         :rows="users"
         :columns="columns"
         row-key="id"
-        caption="Admin 用户列表"
+        caption="管理员用户列表"
       >
         <template #cell-role="{ row }">
           {{ row.role }}
@@ -426,7 +426,7 @@ onDeactivated(() => {
   <CvModal
     :open="resetUser !== null"
     title="重置用户密码"
-    description="新密码仅提交给既有 Admin endpoint，不会写入用户列表或页面投影。"
+    description="新密码仅提交给既有管理员接口，不会写入用户列表或页面状态。"
     size="sm"
     @close="closeReset"
   >

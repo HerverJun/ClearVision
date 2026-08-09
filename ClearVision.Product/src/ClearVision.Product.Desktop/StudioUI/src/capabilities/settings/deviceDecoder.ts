@@ -208,7 +208,7 @@ function decodeTcpProfile(value: unknown, path: string): TcpProfileV1 {
   const source = record(value, path);
   return Object.freeze({
     id: text(field(source, 'id'), `${path}.id`),
-    name: text(field(source, 'name'), `${path}.name`, 'TCP Profile'),
+    name: text(field(source, 'name'), `${path}.name`, 'TCP 连接配置'),
     enabled: booleanValue(field(source, 'enabled'), `${path}.enabled`),
     mode: enumValue(field(source, 'mode'), `${path}.mode`, TCP_MODES, 'Client'),
     remoteHost: text(field(source, 'remoteHost'), `${path}.remoteHost`, '127.0.0.1'),

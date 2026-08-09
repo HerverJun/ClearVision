@@ -508,7 +508,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 .preview-panel__roi-actions { max-width: 100%; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--cv-space-1); }
 .preview-panel__summary dl { margin: var(--cv-space-2) 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-1); }
 .preview-panel__summary dl div { min-width: 0; padding: 7px 8px; border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); }
-.preview-panel__summary dt { color: var(--cv-text-muted); font-size: 9px; }
+.preview-panel__summary dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .preview-panel__summary dd { margin: 2px 0 0; overflow: hidden; color: var(--cv-text-primary); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
 .preview-panel__summary dd[data-tone="ok"] { color: var(--cv-color-status-ok-strong); }
 .preview-panel__summary dd[data-tone="ng"] { color: var(--cv-color-status-ng-strong); }
@@ -534,10 +534,10 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 .preview-panel__artifacts li strong,
 .preview-panel__artifacts li small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .preview-panel__artifacts li strong { font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-medium); }
-.preview-panel__artifacts li small { color: var(--cv-text-muted); font-size: 9px; }
+.preview-panel__artifacts li small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .preview-panel__artifacts > p { margin: var(--cv-space-2) 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); line-height: 1.45; overflow-wrap: anywhere; }
 .preview-panel__diagnostics li { min-width: 0; padding: var(--cv-space-1) 0; display: grid; grid-template-columns: minmax(72px, auto) minmax(0, 1fr); gap: var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); font-size: var(--cv-font-size-2xs); line-height: 1.45; }
-.preview-panel__diagnostics code { color: var(--cv-color-status-warning-strong); font-family: var(--cv-font-mono); font-size: 9px; overflow-wrap: anywhere; }
+.preview-panel__diagnostics code { color: var(--cv-color-status-warning-strong); font-family: var(--cv-font-mono); font-size: var(--cv-font-size-2xs); overflow-wrap: anywhere; }
 .preview-panel__diagnostics span { color: var(--cv-text-secondary); overflow-wrap: anywhere; }
 
 .preview-panel--image-expanded .preview-panel__body { grid-template-rows: minmax(0, 1fr); }

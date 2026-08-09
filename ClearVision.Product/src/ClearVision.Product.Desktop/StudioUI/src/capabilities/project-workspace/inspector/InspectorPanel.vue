@@ -475,12 +475,12 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
   overflow: hidden;
   color: var(--cv-text-muted);
   font-family: var(--cv-font-mono);
-  font-size: 9px;
+  font-size: var(--cv-font-size-2xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .inspector-panel__technical-identity { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--cv-space-2); }
-.inspector-panel__technical-identity small { color: var(--cv-text-muted); font-size: 9px; }
+.inspector-panel__technical-identity small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .inspector-panel__identity > p[title] {
   display: -webkit-box;
   overflow: hidden;
@@ -512,7 +512,7 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
 }
 .inspector-panel__field input:hover:not(:disabled) { border-color: var(--cv-control-border-hover); }
 .inspector-panel__field input:focus-visible { border-color: var(--cv-color-industrial-blue); outline: 2px solid color-mix(in srgb, var(--cv-color-industrial-blue) 20%, transparent); outline-offset: 1px; }
-.inspector-panel__check { min-height: 24px; display: flex; align-items: center; gap: var(--cv-space-2); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); cursor: pointer; }
+.inspector-panel__check { min-height: 32px; display: flex; align-items: center; gap: var(--cv-space-2); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); cursor: pointer; }
 .inspector-panel__ports { display: grid; }
 .inspector-panel__ports div {
   min-width: 0;
@@ -526,7 +526,7 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
 .inspector-panel__ports div:last-child { border-bottom: 0; }
 .inspector-panel__ports div[data-available="false"] { opacity: 0.55; }
 .inspector-panel__ports span,
-.inspector-panel__ports small { color: var(--cv-text-muted); font-size: 9px; }
+.inspector-panel__ports small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .inspector-panel__ports small { padding: 1px 5px; border-radius: var(--cv-radius-pill); background: var(--cv-color-status-info-soft); color: var(--cv-color-status-info-strong); }
 .inspector-panel__ports strong { overflow: hidden; font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .inspector-panel__parameters { gap: var(--cv-space-1); }
@@ -536,7 +536,7 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
 .inspector-panel__advanced summary { min-height: 36px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-2); color: var(--cv-text-primary); cursor: pointer; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); list-style-position: inside; }
 .inspector-panel__advanced summary:hover { background: var(--cv-interactive-hover); }
 .inspector-panel__advanced summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
-.inspector-panel__advanced summary small { color: var(--cv-text-muted); font-size: 9px; font-weight: var(--cv-font-weight-normal); }
+.inspector-panel__advanced summary small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-normal); }
 .inspector-panel__advanced > .inspector-panel__parameter-list { padding: 0 14px var(--cv-space-2); }
 .inspector-panel__metadata-message { padding: var(--cv-space-2); border-radius: var(--cv-radius-sm); background: var(--cv-color-status-warning-soft); color: var(--cv-color-status-warning-strong) !important; }
 .inspector-panel__summary-node {
@@ -566,7 +566,7 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
 .inspector-panel__connection button:hover { border-color: var(--cv-border-default); background: var(--cv-interactive-hover); }
 .inspector-panel__connection button:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
 .inspector-panel__connection small,
-.inspector-panel__connection span { overflow: hidden; color: var(--cv-text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.inspector-panel__connection span { overflow: hidden; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .inspector-panel__connection strong { overflow: hidden; font-size: var(--cv-font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
 .inspector-panel__danger { margin: 0 var(--cv-space-3) var(--cv-space-3); height: var(--cv-density-control-height); border: 1px solid var(--cv-color-status-ng-border); border-radius: var(--cv-radius-sm); background: transparent; color: var(--cv-color-status-ng-strong); cursor: pointer; }
 .inspector-panel__danger:hover:not(:disabled) { background: var(--cv-color-status-ng-soft); }
@@ -574,7 +574,7 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
 .inspector-panel__danger:disabled { opacity: 0.45; cursor: not-allowed; }
 .inspector-panel__validation { margin: 0 var(--cv-space-3) var(--cv-space-2); padding: 9px 10px; border: 1px solid var(--cv-color-status-ng-border); border-radius: var(--cv-radius-sm); background: var(--cv-color-status-ng-soft); color: var(--cv-color-status-ng-strong); font-size: var(--cv-font-size-2xs); overflow-wrap: anywhere; }
 .inspector-panel__validation ul { margin: var(--cv-space-1) 0 0; padding-left: 16px; }
-.inspector-panel__footer { min-width: 0; min-height: 22px; padding: 0 var(--cv-space-3); display: flex; align-items: center; gap: var(--cv-space-2); overflow: hidden; border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); color: var(--cv-text-muted); font-size: 9px; white-space: nowrap; }
+.inspector-panel__footer { min-width: 0; min-height: 24px; padding: 0 var(--cv-space-3); display: flex; align-items: center; gap: var(--cv-space-2); overflow: hidden; border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); white-space: nowrap; }
 .inspector-panel__footer span { overflow: hidden; text-overflow: ellipsis; }
 .inspector-panel__footer span:last-child { color: var(--cv-text-secondary); }
 

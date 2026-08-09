@@ -419,10 +419,10 @@ onBeforeUnmount(() => emit('draftActive', false));
 .parameter-editor__label > label { min-width: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); line-height: 1.4; overflow-wrap: anywhere; }
 .parameter-editor__label > label span { color: var(--cv-color-status-ng-strong); }
 .parameter-editor__states { min-width: 0; display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--cv-space-1); }
-.parameter-editor__states small { color: var(--cv-text-muted); font-size: 9px; line-height: 1.3; }
+.parameter-editor__states small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); line-height: 1.3; }
 .parameter-editor__states small + small::before { content: "·"; margin-right: var(--cv-space-1); color: var(--cv-border-strong); }
 .parameter-editor__states small[data-tone="warning"] { color: var(--cv-color-status-warning-strong); }
-.parameter-editor__technical-label { color: var(--cv-text-muted); font-family: ui-monospace, "Cascadia Mono", monospace; font-size: 9px; line-height: 1.25; overflow-wrap: anywhere; }
+.parameter-editor__technical-label { color: var(--cv-text-muted); font-family: ui-monospace, "Cascadia Mono", monospace; font-size: var(--cv-font-size-2xs); line-height: 1.25; overflow-wrap: anywhere; }
 .parameter-editor__sr-only {
   position: absolute;
   width: 1px;
@@ -464,7 +464,7 @@ onBeforeUnmount(() => emit('draftActive', false));
 .parameter-editor input:disabled,
 .parameter-editor select:disabled { color: var(--cv-text-muted); cursor: not-allowed; opacity: 0.62; }
 .parameter-editor__nullable,
-.parameter-editor__boolean { min-height: 24px; display: inline-flex; align-items: center; gap: var(--cv-space-2); color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); cursor: pointer; }
+.parameter-editor__boolean { min-height: 32px; display: inline-flex; align-items: center; gap: var(--cv-space-2); color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); cursor: pointer; }
 .parameter-editor__nullable input,
 .parameter-editor__boolean input { margin: 0; }
 .parameter-editor__slider { display: grid; grid-template-columns: minmax(0, 1fr) 72px; align-items: center; gap: var(--cv-space-2); }

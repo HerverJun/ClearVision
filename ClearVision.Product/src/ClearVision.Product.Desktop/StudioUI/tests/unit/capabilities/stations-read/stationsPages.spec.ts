@@ -102,6 +102,60 @@ describe('Station read pages', () => {
     expect(wrapper.text()).toContain('执行超时');
     expect(wrapper.text()).toContain('已跳过');
     expect(paths).toContain('stations/statistics?range=week&status=Ng&diagnosticCode=WIRE_SWAP');
+    const tabs = wrapper.get('[data-testid="stations-view-tabs"]').findAll('[role="tab"]');
+    expect(tabs.map(tab => tab.text())).toEqual(['全站概览', '异常调查']);
+    expect(tabs[1]!.attributes('aria-selected')).toBe('true');
+
+    wrapper.unmount();
+    queries.dispose();
+  });
+
+  it('prioritizes abnormal Stations in overview and enters the investigation layer', async () => {
+    const queries = createReadQueryClient(apiWith(async path => {
+      if (path === 'stations') return [
+        stationStatus({ stationId: 'station-warning', stationName: '待核对工作站' }),
+        stationStatus({
+          stationId: 'station-critical',
+          stationName: '离线故障工作站',
+          onlineState: 'Offline',
+          runtimeState: 'Faulted',
+          state: 'Faulted',
+          isOnline: false,
+          offlineReason: 'HeartbeatExpired',
+          spoolPendingCount: 12
+        })
+      ];
+      if (path === 'stations/summary') return stationSummary();
+      if (path.startsWith('stations/statistics')) return stationStatistics();
+      throw new Error(`Unexpected path ${path}`);
+    }));
+    const router = createTestRouter();
+    await router.push('/stations');
+    await router.isReady();
+    const wrapper = mount(StationsPage, {
+      props: { runtime: { queries } },
+      global: { plugins: [router] },
+      attachTo: document.body
+    });
+    await flushPromises();
+
+    const tabs = wrapper.get('[data-testid="stations-view-tabs"]').findAll('[role="tab"]');
+    expect(tabs[0]!.attributes('aria-selected')).toBe('true');
+    expect(wrapper.findAll('#stations-overview-panel')).toHaveLength(1);
+    expect(wrapper.findAll('#stations-investigation-panel')).toHaveLength(1);
+    expect(wrapper.get('#stations-overview-panel').isVisible()).toBe(true);
+    expect(wrapper.get('#stations-investigation-panel').isVisible()).toBe(false);
+    const priorityRows = wrapper.get('.stations-page__priority-list').findAll('li');
+    expect(priorityRows.map(row => row.text())).toEqual([
+      expect.stringContaining('离线故障工作站'),
+      expect.stringContaining('待核对工作站')
+    ]);
+
+    await wrapper.get('.stations-page__priority-footer button').trigger('click');
+    await flushPromises();
+    expect(tabs[1]!.attributes('aria-selected')).toBe('true');
+    expect(wrapper.get('.stations-page__list-panel').isVisible()).toBe(true);
+    expect(document.activeElement).toBe(tabs[1]!.element);
 
     wrapper.unmount();
     queries.dispose();

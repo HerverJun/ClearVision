@@ -233,7 +233,7 @@ function updateSelected(): void {
                 :disabled="!canWrite"
               />
             </div>
-            <small v-if="!canWrite">当前账号只能读取模板；创建和更新需要 Engineer/Admin 权限。</small>
+            <small v-if="!canWrite">当前账号只能读取模板；创建和更新需要工程师或管理员权限。</small>
             <CvButton
               size="sm"
               :disabled="!canWrite || owner.projection.phase === 'saving'"
@@ -287,7 +287,7 @@ function updateSelected(): void {
 .template-workbench__detail p { margin: var(--cv-space-1) 0 0; line-height: 1.5; }
 .template-workbench__detail dl { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-block: 1px solid var(--cv-border-subtle); }
 .template-workbench__detail dl div { min-width: 0; padding: var(--cv-space-2); }
-.template-workbench__detail dt { color: var(--cv-text-muted); font-size: 9px; }
+.template-workbench__detail dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .template-workbench__detail dd { margin: var(--cv-space-1) 0 0; overflow: hidden; color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .template-workbench__diagnostics { padding: var(--cv-space-3); border: 1px solid var(--cv-color-status-warning-border); background: var(--cv-color-status-warning-soft); color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-2xs); }
 .template-workbench__diagnostics ul { margin: var(--cv-space-1) 0 0; padding-left: 18px; }
@@ -296,7 +296,7 @@ function updateSelected(): void {
 .template-workbench__write { display: grid; gap: var(--cv-space-2); padding-top: var(--cv-space-3); border-top: 1px solid var(--cv-border-subtle); }
 .template-workbench__write h3 { font-size: var(--cv-font-size-sm); }
 .template-workbench__write-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-2); }
-.template-workbench__message { margin: 0; padding: var(--cv-space-2) var(--cv-space-3); border-left: 3px solid var(--cv-color-status-info-strong); background: var(--cv-color-status-info-soft); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
-.template-workbench__message[data-tone='error'] { border-left-color: var(--cv-color-status-ng-strong); background: var(--cv-color-status-ng-soft); color: var(--cv-color-status-ng-strong); }
+.template-workbench__message { margin: 0; padding: var(--cv-space-2) var(--cv-space-3); border: 1px solid var(--cv-color-status-info-border); background: var(--cv-color-status-info-soft); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
+.template-workbench__message[data-tone='error'] { border-color: var(--cv-color-status-ng-border); background: var(--cv-color-status-ng-soft); color: var(--cv-color-status-ng-strong); }
 @media (max-width: 720px) { .template-workbench__filters,.template-workbench__body,.template-workbench__write-grid { grid-template-columns: 1fr; } .template-workbench__body { min-height: 0; } .template-workbench__list { max-height: 220px; } .template-workbench__detail dl { grid-template-columns: 1fr; } }
 </style>

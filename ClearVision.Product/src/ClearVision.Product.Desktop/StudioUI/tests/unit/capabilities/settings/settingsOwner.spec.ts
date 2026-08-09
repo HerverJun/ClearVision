@@ -12,6 +12,7 @@ import {
   createSettingsWriteCoordinator,
   getSettingsOwnerActiveCount,
   SettingsContractDecodeError,
+  SettingsOwnerConflictError,
   SettingsUnknownOutcomeError,
   settingsOperationResultMessage,
   type SettingsEndpointTask,
@@ -504,7 +505,8 @@ describe('F07 G1 Settings owner lifecycle', () => {
   it('enforces one mounted Settings owner at a time', () => {
     const first = createSettingsOwner({ runtime: runtime(vi.fn()), role: 'Admin' });
     expect(getSettingsOwnerActiveCount()).toBe(1);
-    expect(() => createSettingsOwner({ runtime: runtime(vi.fn()), role: 'Engineer' })).toThrow('Only one mounted');
+    expect(() => createSettingsOwner({ runtime: runtime(vi.fn()), role: 'Engineer' }))
+      .toThrow(SettingsOwnerConflictError);
     first.dispose();
     expect(getSettingsOwnerActiveCount()).toBe(0);
   });

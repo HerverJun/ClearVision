@@ -209,7 +209,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
     markProjectCreating(): void {
       assertWritable();
       state.savePhase = 'workspace-project-creating';
-      state.message = '正在通过既有工程创建 authority 创建空白工程。';
+      state.message = '正在通过既有工程服务创建空白工程。';
       state.canSave = false;
       state.metadataLocked = true;
       flowOwner?.setMutationGate('readonly');

@@ -114,7 +114,7 @@ describe('F07 G5 TCP Profile lifecycle', () => {
     expect(wrapper.get('[data-tcp-action="connect"]').attributes('disabled')).toBeDefined();
     expect(wrapper.get('[data-tcp-action="send"]').attributes('disabled')).toBeDefined();
 
-    await wrapper.get('button[aria-label="添加 Client Profile"]').trigger('click');
+    await wrapper.get('button[aria-label="添加客户端配置"]').trigger('click');
     await flushPromises();
     expect(wrapper.get('input[name="tcpProfileId"]').attributes('readonly')).toBeDefined();
     expect(wrapper.get('[data-tcp-action="connect"]').attributes('disabled')).toBeDefined();

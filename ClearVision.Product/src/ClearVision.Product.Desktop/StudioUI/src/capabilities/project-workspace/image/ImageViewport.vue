@@ -226,6 +226,6 @@ onMounted(async () => {
 @container (max-width: 390px) {
   .image-viewport__status strong { display: none; }
   .image-viewport__actions :deep(.cv-button__visual-label) { display: none; }
-  .image-viewport__actions :deep(.cv-button--sm) { width: 28px; padding-inline: 0; }
+  .image-viewport__actions :deep(.cv-button--sm) { width: 32px; padding-inline: 0; }
 }
 </style>

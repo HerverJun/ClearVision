@@ -398,7 +398,7 @@ export function createTemplateOwner(options: {
           state.message = state.writeStatus === 'unknown-outcome'
             ? '模板更新结果未知；请刷新列表核对服务器状态。'
             : error instanceof ApiForbiddenError
-              ? '后端拒绝模板更新；请确认 Engineer/Admin 权限。'
+              ? '后端拒绝模板更新；请确认工程师或管理员权限。'
               : error instanceof ApiConflictError
                 ? '模板更新发生冲突；请重新读取模板后再操作。'
                 : `模板更新失败：${errorMessage(error)}`;

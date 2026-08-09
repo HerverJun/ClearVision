@@ -398,7 +398,7 @@ export function createRoiInteractionOwner(options: {
       }
       options.inspectorOwner.setDraftActive(draftKey, true);
       state.phase = 'editing';
-      state.message = 'ROI 草稿仅保存在当前编辑会话；确认后才写入 Flow。';
+      state.message = 'ROI 草稿仅保存在当前编辑会话；确认后才写入流程草稿。';
       state.canStart = false;
       state.canConfirm = false;
       state.canCancel = true;
@@ -440,11 +440,11 @@ export function createRoiInteractionOwner(options: {
       state.canCancel = false;
       state.canUndo = false;
       state.canRedo = false;
-      state.message = 'ROI 已通过单个 typed command 写入 Flow draft。';
+      state.message = 'ROI 已通过唯一编辑命令写入流程草稿。';
       syncAvailability();
       return result;
     },
-    cancel(reason = '已取消 ROI 编辑，Flow draft 未变化。'): void {
+    cancel(reason = '已取消 ROI 编辑，流程草稿未变化。'): void {
       if (disposed || !state.sessionIdentity) return;
       if (initialGeometry) options.imageOwner.roi.replace(initialGeometry, true);
       resetSession(reason, 'ready');

@@ -180,7 +180,9 @@
   z-index: var(--cv-z-dropdown);
   top: calc(100% + var(--cv-space-2));
   right: 0;
-  width: 248px;
+  width: min(248px, calc(100vw - 24px));
+  max-height: calc(100dvh - var(--cv-product-topbar-height) - 16px);
+  overflow-y: auto;
   padding: var(--cv-space-3);
   display: grid;
   gap: var(--cv-space-3);
@@ -212,7 +214,9 @@
   z-index: var(--cv-z-dropdown);
   top: calc(100% + var(--cv-space-2));
   right: 0;
-  width: 168px;
+  width: min(168px, calc(100vw - 24px));
+  max-height: calc(100dvh - var(--cv-product-topbar-height) - 16px);
+  overflow-y: auto;
   padding: var(--cv-space-1);
   display: grid;
   border: 1px solid var(--cv-border-subtle);

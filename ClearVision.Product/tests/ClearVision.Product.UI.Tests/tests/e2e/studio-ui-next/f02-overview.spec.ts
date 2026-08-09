@@ -111,7 +111,7 @@ test('Product shell persists theme/density preferences and keeps Labs out of nav
   await expect(page.getByRole('navigation', { name: '产品主导航' })).not.toContainText('实验室');
 });
 
-test('Product shell exposes one main landmark, skip navigation and disclosure focus recovery', async ({ page }) => {
+test('Product shell exposes one main landmark and keeps disclosure menus mutually exclusive', async ({ page }) => {
   await bootOverview(page);
 
   await expect(page.getByRole('main')).toHaveCount(1);
@@ -130,6 +130,22 @@ test('Product shell exposes one main landmark, skip navigation and disclosure fo
   await page.keyboard.press('Escape');
   await expect(appearance).not.toHaveAttribute('open', '');
   await expect(trigger).toBeFocused();
+
+  const more = page.locator('[data-product-more]');
+  const moreTrigger = more.locator('summary');
+  await trigger.click();
+  await expect(appearance).toHaveAttribute('open', '');
+  await moreTrigger.click();
+  await expect(appearance).not.toHaveAttribute('open', '');
+  await expect(more).toHaveAttribute('open', '');
+  await page.keyboard.press('Escape');
+  await expect(more).not.toHaveAttribute('open', '');
+  await expect(moreTrigger).toBeFocused();
+
+  await trigger.click();
+  await expect(appearance).toHaveAttribute('open', '');
+  await page.getByRole('main').click({ position: { x: 12, y: 12 } });
+  await expect(appearance).not.toHaveAttribute('open', '');
 
   await page.locator('[data-product-nav="/projects"]').click();
   await expect(page.locator('[data-capability="projects-read"]')).toBeVisible();
@@ -159,6 +175,22 @@ test('Product shell keeps reduced motion and short-viewport keyboard targets vis
   expect(appearanceBox).not.toBeNull();
   expect(appearanceBox!.y).toBeGreaterThanOrEqual(0);
   expect(appearanceBox!.y + appearanceBox!.height).toBeLessThanOrEqual(600);
+  await appearance.click();
+  const appearancePopover = await page.locator('.product-layout__appearance-popover').boundingBox();
+  expect(appearancePopover).not.toBeNull();
+  expect(appearancePopover!.x).toBeGreaterThanOrEqual(0);
+  expect(appearancePopover!.y).toBeGreaterThanOrEqual(0);
+  expect(appearancePopover!.x + appearancePopover!.width).toBeLessThanOrEqual(1366);
+  expect(appearancePopover!.y + appearancePopover!.height).toBeLessThanOrEqual(600);
+
+  const more = page.locator('[data-product-more] > summary');
+  await more.click();
+  const morePopover = await page.locator('[data-product-more] > nav').boundingBox();
+  expect(morePopover).not.toBeNull();
+  expect(morePopover!.x).toBeGreaterThanOrEqual(0);
+  expect(morePopover!.y).toBeGreaterThanOrEqual(0);
+  expect(morePopover!.x + morePopover!.width).toBeLessThanOrEqual(1366);
+  expect(morePopover!.y + morePopover!.height).toBeLessThanOrEqual(600);
   const overflow = await page.locator('html').evaluate(element => element.scrollWidth - element.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
@@ -172,7 +204,11 @@ test('Diagnostics, About and 404 remain inside the single product shell', async 
 
   await page.goto('/studio/index.html#/about');
   await expect(page.locator('[data-studio-page="about"]')).toBeVisible();
-  await expect(page.getByText('预置会话 authenticated preview', { exact: true })).toBeVisible();
+  await expect(page.getByText('产品版本', { exact: true })).toBeVisible();
+  await expect(page.getByText('桌面宿主版本', { exact: true })).toBeVisible();
+  await expect(page.getByText('本地服务版本', { exact: true })).toBeVisible();
+  await expect(page.getByText('工程库（/projects）', { exact: true })).toBeVisible();
+  await expect(page.getByText('请联系系统管理员或项目交付方', { exact: true })).toBeVisible();
 
   await page.goto('/studio/index.html#/not-a-product-route');
   await expect(page.locator('[data-studio-page="not-found"]')).toBeVisible();

@@ -222,7 +222,7 @@ onBeforeUnmount(() => {
     <CvInlineAlert
       v-if="commandState?.phase === 'conflict'"
       tone="warning"
-      title="工程 revision 或 mutation 冲突"
+      title="工程修订或写入冲突"
     >
       {{ commandState.message }}
       <template #actions>
@@ -330,7 +330,7 @@ onBeforeUnmount(() => {
     >
       <CvPanel
         title="工程摘要"
-        description="服务端工程数据与当前 persistence revision。"
+        description="服务端工程数据与当前保存修订。"
       >
         <CvDescriptionList
           :items="summaryItems"
@@ -411,7 +411,7 @@ onBeforeUnmount(() => {
       @close="closeDelete"
     >
       <CvInlineAlert tone="error">
-        删除使用当前服务端 revision；发生 revision 或运行冲突时不会自动覆盖。
+        删除使用当前服务端保存修订；保存修订或运行状态发生冲突时不会自动覆盖。
       </CvInlineAlert>
       <template #footer>
         <CvButton

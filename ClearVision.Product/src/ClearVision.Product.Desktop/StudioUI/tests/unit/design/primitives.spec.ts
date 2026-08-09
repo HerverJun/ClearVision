@@ -8,7 +8,8 @@ import {
   CvSelect,
   CvStatusBadge,
   CvSurface,
-  CvTypography
+  CvTypography,
+  CvViewTabs
 } from '@/design-system/primitives';
 
 describe('Design Foundation primitives', () => {
@@ -98,4 +99,41 @@ describe('Design Foundation primitives', () => {
       expect(wrapper.text()).toContain(tone.toUpperCase());
     }
   );
+
+  it('supports roving keyboard focus for view tabs', async () => {
+    const wrapper = mount(CvViewTabs, {
+      attachTo: document.body,
+      props: {
+        modelValue: 'overview',
+        label: '结果视图',
+        options: [
+          { value: 'overview', label: '态势总览', id: 'overview-tab', controls: 'overview-panel' },
+          { value: 'investigation', label: '调查详情', id: 'investigation-tab', controls: 'investigation-panel' },
+          { value: 'evidence', label: '证据核对', id: 'evidence-tab', controls: 'evidence-panel' }
+        ]
+      }
+    });
+    const tabs = wrapper.findAll('[role="tab"]');
+
+    expect(tabs.map(tab => tab.attributes('tabindex'))).toEqual(['0', '-1', '-1']);
+    expect(tabs.map(tab => tab.attributes('id'))).toEqual(['overview-tab', 'investigation-tab', 'evidence-tab']);
+    expect(tabs.map(tab => tab.attributes('aria-controls'))).toEqual([
+      'overview-panel', 'investigation-panel', 'evidence-panel'
+    ]);
+    await tabs[0]!.trigger('keydown', { key: 'ArrowRight' });
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['investigation']);
+    expect(document.activeElement).toBe(tabs[1]!.element);
+
+    await wrapper.setProps({ modelValue: 'investigation' });
+    await tabs[1]!.trigger('keydown', { key: 'End' });
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['evidence']);
+    expect(document.activeElement).toBe(tabs[2]!.element);
+
+    await wrapper.setProps({ modelValue: 'evidence' });
+    await tabs[2]!.trigger('keydown', { key: 'Home' });
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['overview']);
+    expect(document.activeElement).toBe(tabs[0]!.element);
+
+    wrapper.unmount();
+  });
 });

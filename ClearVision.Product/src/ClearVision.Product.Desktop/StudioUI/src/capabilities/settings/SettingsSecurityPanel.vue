@@ -154,7 +154,7 @@ async function changePassword(): Promise<void> {
     if (!props.auth) {
       passwordFeedback.value = {
         kind: 'error',
-        message: 'Auth lifecycle is unavailable; the password change was rejected.',
+        message: '身份验证流程不可用，密码修改已被拒绝。',
         savedLabel: '未完成',
         effectiveLabel: '未生效',
         restartLabel: '不适用'
@@ -174,11 +174,11 @@ async function changePassword(): Promise<void> {
       : {
           kind: outcomeUnknown ? 'unknown' : 'error',
           message: outcomeUnknown
-            ? '密码请求结果未知；请等待 auth lifecycle 确认 session 状态后再决定是否重试。'
+            ? '密码请求结果未知；请等待身份验证流程确认会话状态后再决定是否重试。'
             : props.auth.projection.message,
           savedLabel: outcomeUnknown ? '结果未知' : '未完成',
           effectiveLabel: outcomeUnknown ? '结果未知' : '未生效',
-          restartLabel: outcomeUnknown ? '等待 session 核对' : '不适用'
+          restartLabel: outcomeUnknown ? '等待会话核对' : '不适用'
         };
   } finally {
     oldPassword.value = '';
@@ -207,7 +207,7 @@ onDeactivated(() => {
   >
     <CvPanel
       title="安全策略"
-      description="密码策略属于 AppConfig Security；用户记录和密码操作属于独立 authority。"
+      description="密码策略属于应用安全配置；用户记录和密码操作由独立后端服务管理。"
       data-settings-security-policy
     >
       <div v-if="projection">
@@ -221,7 +221,7 @@ onDeactivated(() => {
           />
           <CvField
             v-model="policyDraft.sessionTimeoutMinutes"
-            label="会话超时（历史只读，不控制当前 session expiry，分钟）"
+            label="会话超时（历史只读，不控制当前会话过期时间，分钟）"
             type="number"
             readonly
           />
@@ -237,9 +237,9 @@ onDeactivated(() => {
           v-if="!canWritePolicy"
           class="settings-panel__notice"
           tone="info"
-          title="当前为安全投影"
+          title="当前为安全视图"
         >
-          当前角色可以核对已返回策略，但不能执行 Security policy mutation。
+          当前角色可以核对已返回策略，但不能修改安全策略。
         </CvInlineAlert>
       </div>
       <CvInlineAlert
@@ -247,14 +247,14 @@ onDeactivated(() => {
         tone="info"
         title="当前响应未包含安全策略"
       >
-        服务端返回的是 safe subset；不会用本地默认值补齐策略，也不会发起越权写入。
+        服务端只返回当前权限允许的安全子集；不会用本地默认值补齐策略，也不会发起越权写入。
       </CvInlineAlert>
       <template
         v-if="projection"
         #footer
       >
         <div class="settings-panel__footer">
-          <span class="settings-panel__dirty">{{ policyDirty ? '有未保存修改' : '与服务端投影一致' }}</span>
+          <span class="settings-panel__dirty">{{ policyDirty ? '有未保存修改' : '与服务端安全策略一致' }}</span>
           <div class="settings-panel__actions">
             <CvButton
               v-if="canWritePolicy"
@@ -285,7 +285,7 @@ onDeactivated(() => {
 
     <CvPanel
       title="修改本人密码"
-      description="密码只提交给既有 authenticated session endpoint，完成或离开分区后立即清空。"
+      description="密码只提交给既有认证会话接口，完成或离开分区后立即清空。"
       data-settings-change-password
     >
       <form

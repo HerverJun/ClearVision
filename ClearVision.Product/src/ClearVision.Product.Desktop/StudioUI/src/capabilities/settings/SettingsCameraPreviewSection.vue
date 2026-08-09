@@ -110,7 +110,7 @@ async function togglePreview(): Promise<void> {
     <header class="camera-section__header">
       <div>
         <h3>调试 Preview</h3>
-        <p>Soft capture 和 continuous preview 仅用于调试输入，不写入正式检测结果；离开 Settings 或切换面板时会停止 session。</p>
+        <p>软触发采集和连续预览仅用于调试输入，不写入正式检测结果；离开设置或切换面板时会停止预览会话。</p>
       </div>
       <CvStatusBadge
         :tone="previewTone"

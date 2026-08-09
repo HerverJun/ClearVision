@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, shallowRef, watch } from 'vue';
-import { CvButton, CvField, CvInlineAlert, CvPanel, CvSelect, CvStatusBadge } from '@/design-system';
+import { CvButton, CvField, CvInlineAlert, CvPageState, CvPanel, CvSelect, CvStatusBadge } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 import {
   TCP_ENCODINGS,
@@ -16,6 +16,7 @@ import {
 import type { TcpSendRequestV1 } from './deviceApiAdapter';
 import { settingsOperationResultMessage, type SettingsOwner } from './settingsOwner';
 import type { SettingsOperationKind } from './contracts';
+import SettingsTcpProfileList from './SettingsTcpProfileList.vue';
 
 const props = defineProps<{
   owner: SettingsOwner;
@@ -178,10 +179,10 @@ function profilePayload(value: TcpDraft): TcpProfileV1 {
 }
 
 function validateProfile(value: TcpDraft | null): string[] {
-  if (!value) return ['请先选择一个 TCP Profile。'];
+  if (!value) return ['请先选择一个 TCP 连接配置。'];
   const errors: string[] = [];
-  if (!value.id.trim()) errors.push('Profile Id 不能为空。');
-  if (!value.name.trim()) errors.push('Profile 名称不能为空。');
+  if (!value.id.trim()) errors.push('配置标识不能为空。');
+  if (!value.name.trim()) errors.push('配置名称不能为空。');
   const host = value.mode === 'Client' ? value.remoteHost : value.localHost;
   const port = value.mode === 'Client' ? Number(value.remotePort) : Number(value.localPort);
   if (!isValidHost(host)) errors.push(value.mode === 'Client' ? '远端 IP 必须是有效 IP 地址。' : '本地监听 IP 必须是有效 IP 地址。');
@@ -242,7 +243,7 @@ async function load(): Promise<void> {
   try {
     const result = await props.owner.readTcpProfiles();
     if (result.status !== 'completed') {
-      showFeedback('error', 'TCP Profile 读取失败', resultMessage(result));
+      showFeedback('error', 'TCP 连接配置读取失败', resultMessage(result));
       phase.value = 'error';
       return;
     }
@@ -262,16 +263,16 @@ async function saveProfiles(): Promise<void> {
   try {
     const result = await props.owner.saveTcpProfiles(drafts.map(profilePayload));
     if (result.status !== 'completed') {
-      showFeedback('error', 'TCP Profile 未保存', resultMessage(result));
+      showFeedback('error', 'TCP 连接配置未保存', resultMessage(result));
       return;
     }
     validationIssues.value = result.value.errors;
     if (!result.value.success) {
-      showFeedback('error', 'TCP Profile 校验失败', result.value.message || '请修正当前 Profile 后重试。');
+      showFeedback('error', 'TCP 连接配置校验失败', result.value.message || '请修正当前配置后重试。');
       return;
     }
     copyProfiles(result.value.profiles);
-    showFeedback('success', 'TCP Profile 已保存', 'Profile 已持久化；不会自动连接或启动 Server。');
+    showFeedback('success', 'TCP 连接配置已保存', '配置已保存；不会自动连接或启动服务端监听。');
   } finally {
     pendingAction.value = null;
   }
@@ -391,7 +392,7 @@ onBeforeUnmount(() => detachPanelState());
   >
     <CvPanel
       title="TCP 连接工作台"
-      description="Profile 持久化与 Client/Server 运行操作分离；状态和收发日志只来自运行时 endpoint。"
+      description="连接配置保存与客户端/服务端运行操作分离；状态和收发日志只来自运行时接口。"
     >
       <template #actions>
         <CvStatusBadge
@@ -415,72 +416,22 @@ onBeforeUnmount(() => detachPanelState());
       </template>
 
       <div class="tcp-workbench">
-        <aside
-          class="tcp-profile-list"
-          aria-label="TCP Profile 列表"
-        >
-          <div class="tcp-profile-list__header">
-            <div><strong>Profiles</strong><small>{{ drafts.length }} 个配置</small></div>
-            <div class="tcp-profile-list__actions">
-              <button
-                class="icon-action"
-                type="button"
-                aria-label="添加 Client Profile"
-                title="添加 Client Profile"
-                :disabled="!canWrite || isBusy"
-                @click="addProfile('Client')"
-              >
-                <CvIcon
-                  name="plus"
-                  size="sm"
-                />
-              </button>
-              <button
-                class="icon-action"
-                type="button"
-                aria-label="添加 Server Profile"
-                title="添加 Server Profile"
-                :disabled="!canWrite || isBusy"
-                @click="addProfile('Server')"
-              >
-                <CvIcon
-                  name="server"
-                  size="sm"
-                />
-              </button>
-            </div>
-          </div>
-          <div class="tcp-profile-list__items">
-            <button
-              v-for="profile in drafts"
-              :key="profile.id"
-              class="tcp-profile-row"
-              :class="{ 'is-active': profile.id === selectedId }"
-              type="button"
-              @click="selectedId = profile.id"
-            >
-              <span class="tcp-profile-row__main"><strong>{{ profile.name || '未命名 Profile' }}</strong><small>{{ profile.mode }} · {{ profile.id }}</small></span>
-              <CvStatusBadge
-                v-if="props.owner.projection.device.tcpStatuses[profile.id]?.isConnected || props.owner.projection.device.tcpStatuses[profile.id]?.isListening"
-                tone="ok"
-                label="运行"
-              />
-            </button>
-            <p
-              v-if="drafts.length === 0"
-              class="tcp-profile-list__empty"
-            >
-              暂无 Profile；Admin 可添加 Client 或 Server。
-            </p>
-          </div>
-        </aside>
+        <SettingsTcpProfileList
+          :profiles="drafts"
+          :statuses="props.owner.projection.device.tcpStatuses"
+          :selected-id="selectedId"
+          :can-write="canWrite"
+          :busy="isBusy"
+          @select="selectedId = $event"
+          @add="addProfile"
+        />
 
         <div
           v-if="selectedDraft"
           class="tcp-profile-editor"
         >
           <div class="tcp-profile-editor__header">
-            <div><h3>Profile 配置</h3><p>当前保存仅更新 Profile，不会建立 socket 或启动监听。</p></div>
+            <div><h3>连接配置</h3><p>当前保存仅更新配置，不会建立网络连接或启动监听。</p></div>
             <CvStatusBadge
               :tone="runtimeTone"
               :label="runtimeLabel"
@@ -489,14 +440,14 @@ onBeforeUnmount(() => detachPanelState());
           <div class="settings-form-grid">
             <CvField
               v-model="selectedDraft.name"
-              label="Profile 名称"
+              label="配置名称"
               name="tcpProfileName"
               :readonly="!canWrite"
               required
             />
             <CvField
               v-model="selectedDraft.id"
-              label="Profile Id"
+              label="配置标识"
               name="tcpProfileId"
               :readonly="true"
               required
@@ -582,7 +533,7 @@ onBeforeUnmount(() => detachPanelState());
               v-model="selectedDraft.enabled"
               type="checkbox"
               :disabled="!canWrite"
-            ><span>启用 Profile</span></label>
+            ><span>启用配置</span></label>
             <label class="check-field"><input
               v-model="selectedDraft.keepAlive"
               type="checkbox"
@@ -609,12 +560,12 @@ onBeforeUnmount(() => detachPanelState());
             v-if="localErrors.length"
             class="settings-panel__notice"
             tone="warning"
-            title="Profile 参数需要修正"
+            title="连接配置参数需要修正"
           >
             {{ localErrors.join(' ') }}
           </CvInlineAlert>
           <div class="settings-panel__footer">
-            <span class="settings-panel__dirty">{{ dirty ? '有 Profile 草稿修改' : 'Profile 与服务端一致' }}</span>
+            <span class="settings-panel__dirty">{{ dirty ? '有连接配置草稿修改' : '连接配置与服务端一致' }}</span>
             <div class="settings-panel__actions">
               <CvButton
                 v-if="canWrite"
@@ -628,7 +579,7 @@ onBeforeUnmount(() => detachPanelState());
                     name="trash"
                     size="sm"
                   />
-                </template>删除本地 Profile
+                </template>删除本地配置
               </CvButton>
               <CvButton
                 v-if="canWrite"
@@ -644,7 +595,7 @@ onBeforeUnmount(() => detachPanelState());
                     name="save"
                     size="sm"
                   />
-                </template>保存 Profiles
+                </template>保存连接配置
               </CvButton>
             </div>
           </div>
@@ -652,8 +603,8 @@ onBeforeUnmount(() => detachPanelState());
         <CvPageState
           v-else
           kind="empty"
-          title="未选择 TCP Profile"
-          description="Admin 可从左侧添加 Client 或 Server Profile。"
+          title="未选择 TCP 连接配置"
+          description="管理员可从左侧添加客户端或服务端配置。"
         />
       </div>
     </CvPanel>
@@ -663,7 +614,7 @@ onBeforeUnmount(() => detachPanelState());
       class="settings-subsection"
     >
       <header class="settings-subsection__header">
-        <div><h3>运行控制与收发调试</h3><p>运行状态由后端实时投影；发送不会修改 Profile 配置。</p></div>
+        <div><h3>运行控制与收发调试</h3><p>运行状态由后端实时提供；发送不会修改连接配置。</p></div>
         <CvButton
           variant="quiet"
           size="sm"
@@ -882,20 +833,9 @@ onBeforeUnmount(() => detachPanelState());
 <style scoped>
 .settings-device-workbench { display: grid; min-width: 0; gap: var(--cv-density-page-gap); }
 .tcp-workbench { display: grid; min-width: 0; grid-template-columns: minmax(210px, 0.28fr) minmax(0, 1fr); gap: var(--cv-space-5); }
-.tcp-profile-list { min-width: 0; border-right: 1px solid var(--cv-border-subtle); padding-right: var(--cv-space-4); }
-.tcp-profile-list__header, .tcp-frame-header { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
-.tcp-profile-list__header strong, .tcp-frame-header strong { display: block; color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
-.tcp-profile-list__header small, .tcp-frame-header small { display: block; margin-top: 2px; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
-.tcp-profile-list__actions { display: flex; gap: var(--cv-space-1); }
-.tcp-profile-list__items { display: grid; gap: 2px; margin-top: var(--cv-space-3); }
-.tcp-profile-row { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-2); padding: var(--cv-space-2); border: 0; border-radius: var(--cv-radius-sm); background: transparent; color: var(--cv-text-secondary); text-align: left; cursor: pointer; }
-.tcp-profile-row:hover { background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
-.tcp-profile-row.is-active { background: var(--cv-color-brand-soft); color: var(--cv-color-brand-text); }
-.tcp-profile-row__main { display: grid; min-width: 0; gap: 2px; }
-.tcp-profile-row__main strong, .tcp-profile-row__main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tcp-profile-row__main strong { font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
-.tcp-profile-row__main small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
-.tcp-profile-list__empty { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
+.tcp-frame-header { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
+.tcp-frame-header strong { display: block; color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
+.tcp-frame-header small { display: block; margin-top: 2px; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .tcp-profile-editor { min-width: 0; }
 .tcp-profile-editor__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--cv-space-3); margin-bottom: var(--cv-space-4); }
 .tcp-profile-editor__header h3, .settings-subsection__header h3 { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-type-section-title-size); }
@@ -932,9 +872,6 @@ onBeforeUnmount(() => detachPanelState());
 .break-cell { max-width: 220px; overflow-wrap: anywhere; }
 .mono-cell { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .validation-list { display: grid; gap: var(--cv-space-1); margin: var(--cv-space-3) 0 0; padding-left: var(--cv-space-4); color: var(--cv-color-status-ng-strong); font-size: var(--cv-font-size-xs); }
-.icon-action { display: inline-grid; width: var(--cv-density-control-height-sm); height: var(--cv-density-control-height-sm); place-items: center; border: 0; border-radius: var(--cv-radius-xs); background: transparent; color: var(--cv-text-secondary); cursor: pointer; }
-.icon-action:hover:not(:disabled) { background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
-.icon-action:disabled { opacity: 0.48; cursor: not-allowed; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 
 @media (max-width: 1100px) {
@@ -944,7 +881,6 @@ onBeforeUnmount(() => detachPanelState());
 
 @media (max-width: 780px) {
   .tcp-workbench { grid-template-columns: 1fr; }
-  .tcp-profile-list { padding-right: 0; padding-bottom: var(--cv-space-3); border-right: 0; border-bottom: 1px solid var(--cv-border-subtle); }
   .tcp-runtime-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 

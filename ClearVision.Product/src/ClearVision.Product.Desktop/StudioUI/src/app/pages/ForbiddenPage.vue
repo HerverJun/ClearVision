@@ -10,7 +10,7 @@ import { CvPageState } from '@/design-system/patterns';
     <CvPageState
       kind="forbidden"
       title="无权访问"
-      description="当前角色或产品 profile 不允许访问此页面。后端权限仍是最终安全边界。"
+      description="当前角色或启动模式不允许访问此页面。后端权限仍是最终安全边界。"
       :heading-level="1"
     >
       <template #actions>

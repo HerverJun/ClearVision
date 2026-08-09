@@ -16,6 +16,30 @@ export const f02BrowserFixture = Object.freeze({
 export const f02OperatorPerformanceFixtureCount = 200;
 export const f02ResultsPerformanceFixtureCount = 500;
 
+export interface F02G3VisualScenario {
+  readonly viewport: Readonly<{ width: number; height: number }>;
+  readonly theme: 'light' | 'dark';
+  readonly density: 'compact' | 'comfortable';
+}
+
+const f02G3Viewports = Object.freeze([
+  { width: 1920, height: 1080 },
+  { width: 1536, height: 864 },
+  { width: 1366, height: 768 }
+] as const);
+
+export const f02G3VisualMatrix: readonly F02G3VisualScenario[] = Object.freeze(
+  f02G3Viewports.flatMap(viewport =>
+    (['light', 'dark'] as const).flatMap(theme =>
+      (['compact', 'comfortable'] as const).map(density => Object.freeze({
+        viewport,
+        theme,
+        density
+      }))
+    )
+  )
+);
+
 export interface F02MethodAuditEntry {
   readonly method: string;
   readonly path: string;

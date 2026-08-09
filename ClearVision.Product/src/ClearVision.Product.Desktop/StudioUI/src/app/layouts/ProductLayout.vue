@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
 import { useAuthLifecycleRoot } from '@/app/auth';
 import { visibleProductNavigation } from '@/app/navigation';
@@ -18,6 +18,9 @@ const systemStatus = runtime.systemStatus.projection;
 const preferences = runtime.preferences.projection;
 const contentRoot = ref<HTMLElement>();
 const appearanceDetails = ref<HTMLDetailsElement>();
+const moreDetails = ref<HTMLDetailsElement>();
+const appearanceOpen = ref(false);
+const moreOpen = ref(false);
 const workspaceMode = computed(() => route.meta.workspaceMode === true);
 const routeViewKey = computed(() => route.name === 'project-workspace'
   ? 'project-workspace'
@@ -134,11 +137,37 @@ const leavePromptTitle = computed(() => leaveGuard.projection.protectionKind ===
   ? '放弃未解决的工程编辑？'
   : '放弃本地工作区修改？');
 
-function closeAppearance(): void {
-  const details = appearanceDetails.value;
+function closeDetails(details: HTMLDetailsElement | undefined, returnFocus: boolean): void {
   if (!details?.open) return;
   details.open = false;
-  details.querySelector<HTMLElement>('summary')?.focus();
+  if (returnFocus) details.querySelector<HTMLElement>('summary')?.focus();
+}
+
+function closeAppearance(returnFocus = true): void {
+  closeDetails(appearanceDetails.value, returnFocus);
+  appearanceOpen.value = false;
+}
+
+function closeMore(returnFocus = true): void {
+  closeDetails(moreDetails.value, returnFocus);
+  moreOpen.value = false;
+}
+
+function onAppearanceToggle(event: Event): void {
+  appearanceOpen.value = (event.currentTarget as HTMLDetailsElement).open;
+  if (appearanceOpen.value) closeMore(false);
+}
+
+function onMoreToggle(event: Event): void {
+  moreOpen.value = (event.currentTarget as HTMLDetailsElement).open;
+  if (moreOpen.value) closeAppearance(false);
+}
+
+function handleDocumentPointerDown(event: PointerEvent): void {
+  const target = event.target;
+  if (!(target instanceof Node)) return;
+  if (appearanceDetails.value?.open && !appearanceDetails.value.contains(target)) closeAppearance(false);
+  if (moreDetails.value?.open && !moreDetails.value.contains(target)) closeMore(false);
 }
 
 function focusContent(): void {
@@ -147,11 +176,18 @@ function focusContent(): void {
 
 watch(() => route.path, async (current, previous) => {
   if (!previous || current === previous) return;
+  closeAppearance(false);
+  closeMore(false);
   await nextTick();
   contentRoot.value?.focus({ preventScroll: true });
 });
 
-onMounted(() => runtime.preferences.apply());
+onMounted(() => {
+  runtime.preferences.apply();
+  document.addEventListener('pointerdown', handleDocumentPointerDown, true);
+});
+
+onBeforeUnmount(() => document.removeEventListener('pointerdown', handleDocumentPointerDown, true));
 </script>
 
 <template>
@@ -238,11 +274,13 @@ onMounted(() => runtime.preferences.apply());
             ref="appearanceDetails"
             class="product-layout__appearance"
             data-product-appearance
-            @keydown.esc.stop.prevent="closeAppearance"
+            @toggle="onAppearanceToggle"
+            @keydown.esc.stop.prevent="closeAppearance()"
           >
             <summary
               class="product-layout__appearance-trigger"
               :aria-label="`外观设置，当前${themeLabel}主题，${densityLabel}密度`"
+              :aria-expanded="appearanceOpen"
             >
               <CvIcon
                 name="theme"
@@ -314,10 +352,16 @@ onMounted(() => runtime.preferences.apply());
 
           <details
             v-if="productMoreNavigation.length"
+            ref="moreDetails"
             class="product-layout__more"
             data-product-more
+            @toggle="onMoreToggle"
+            @keydown.esc.stop.prevent="closeMore()"
           >
-            <summary title="更多产品入口">
+            <summary
+              title="更多产品入口"
+              :aria-expanded="moreOpen"
+            >
               更多
               <CvIcon
                 name="chevron-right"
@@ -380,7 +424,7 @@ onMounted(() => runtime.preferences.apply());
           class="product-layout__session-alert"
           tone="warning"
           compact
-          title="当前操作已被 Leave Guard 阻止"
+          title="离开操作已被保护"
           data-product-state="leave-blocked"
         >
           {{ leaveGuard.projection.message }}

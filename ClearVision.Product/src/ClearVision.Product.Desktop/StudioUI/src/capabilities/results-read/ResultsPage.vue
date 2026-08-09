@@ -19,6 +19,7 @@ import {
   CvSelect,
   CvStatusBadge,
   CvToolbar,
+  CvViewTabs,
   type CvDataTableColumn,
   type CvDescriptionItem,
   type CvSelectOption
@@ -66,6 +67,7 @@ import {
   type ResultEvidenceOwner
 } from './resultEvidenceOwner';
 import ResultsAnalysisWorkbench from './ResultsAnalysisWorkbench.vue';
+import ResultsSituationSummary from './ResultsSituationSummary.vue';
 import ResultsExportDialog from './ResultsExportDialog.vue';
 import {
   createResultsExportOwner,
@@ -106,6 +108,26 @@ const advancedFiltersOpen = shallowRef(
   Boolean(firstQueryValue(route.query.diagnosticCode) || firstQueryValue(route.query.from) || firstQueryValue(route.query.to))
 );
 const copiedTechnicalField = shallowRef<string | null>(null);
+type ResultsView = 'overview' | 'investigation';
+const activeView = shallowRef<ResultsView>(
+  firstQueryValue(route.query.resultId) ? 'investigation' : 'overview'
+);
+const viewOptions = Object.freeze([
+  {
+    value: 'overview',
+    label: '态势总览',
+    description: '查看执行与判定双轴统计及趋势',
+    id: 'results-overview-tab',
+    controls: 'results-overview-panel'
+  },
+  {
+    value: 'investigation',
+    label: '调查详情',
+    description: '筛选结果并核对单次检测证据',
+    id: 'results-investigation-tab',
+    controls: 'results-investigation-panel'
+  }
+] as const);
 
 function evidencePhaseLabel(phase: string): string {
   return ({
@@ -634,10 +656,12 @@ async function investigatePreviousSuccess(): Promise<void> {
 }
 
 function selectLocalResult(id: string): void {
+  activeView.value = 'investigation';
   void updateQuery({ resultId: id });
 }
 
 function selectStationResult(id: string): void {
+  activeView.value = 'investigation';
   void updateQuery({ resultId: id });
 }
 
@@ -658,20 +682,6 @@ function formatDateTime(value: string | null): string {
 
 function formatDuration(value: number): string {
   return `${value.toLocaleString('zh-CN')} ms`;
-}
-
-function formatPercent(value: number): string {
-  return new Intl.NumberFormat('zh-CN', {
-    style: 'percent',
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1
-  }).format(value);
-}
-
-function executionSuccessRate(statistics: ResultsOutcomeStatistics): number {
-  return statistics.totalAttemptCount > 0
-    ? statistics.executionSucceededCount / statistics.totalAttemptCount
-    : 0;
 }
 
 function judgmentItems(detail: Pick<LocalInspectionResultDetail | StationInspectionResultSummary,
@@ -775,6 +785,7 @@ const visibleComparisonDiffs = computed(() => {
 
 watch(source, next => {
   if (!mounted.value) return;
+  activeView.value = 'overview';
   disposeResultsExport();
   if (next === 'local') {
     disposeStationList();
@@ -829,6 +840,10 @@ watch(
     void refreshLocalDetail(true);
   }
 );
+
+watch(resultId, value => {
+  if (value) activeView.value = 'investigation';
+});
 
 onMounted(() => {
   mounted.value = true;
@@ -908,12 +923,20 @@ onBeforeUnmount(() => {
           size="sm"
           :loading="localListState.isRefreshing || stationListState.isRefreshing"
           loading-label="正在刷新结果"
+          data-testid="results-refresh"
           @click="refreshActive(true)"
         >
           刷新
         </CvButton>
       </div>
     </header>
+
+    <CvViewTabs
+      v-model="activeView"
+      :options="viewOptions"
+      label="检测结果视图"
+      data-testid="results-view-tabs"
+    />
 
     <section
       class="results-page__filters"
@@ -1025,7 +1048,7 @@ onBeforeUnmount(() => {
       tone="info"
       title="已按工作站身份读取"
     >
-      当前列表与统计由后端按工作站 {{ stationId }} 重新查询；URL 未携带结果或工作站 payload。
+      当前列表与统计由后端按工作站 {{ stationId }} 重新查询；链接中不携带结果正文或工作站数据内容。
     </CvInlineAlert>
 
     <CvInlineAlert
@@ -1037,33 +1060,66 @@ onBeforeUnmount(() => {
     </CvInlineAlert>
 
     <section
-      v-if="activeStatistics"
-      class="results-page__metrics"
-      aria-label="结果双分母统计"
+      v-show="activeView === 'overview'"
+      id="results-overview-panel"
+      class="results-page__tab-panel"
+      role="tabpanel"
+      aria-labelledby="results-overview-tab"
+      tabindex="0"
     >
-      <div><span>检测次数</span><strong>{{ activeStatistics.totalAttemptCount.toLocaleString('zh-CN') }}</strong></div>
-      <div><span>执行成功率</span><strong>{{ formatPercent(executionSuccessRate(activeStatistics)) }}</strong><small>{{ activeStatistics.executionSucceededCount }} / {{ activeStatistics.totalAttemptCount }}</small></div>
-      <div><span>判定覆盖率</span><strong>{{ formatPercent(activeStatistics.decisionCoverageRate) }}</strong><small>{{ activeStatistics.validDecisionCount }} / {{ activeStatistics.executionSucceededCount }}</small></div>
-      <div><span>有效判定良率</span><strong>{{ formatPercent(activeStatistics.yieldRate) }}</strong><small>{{ activeStatistics.okCount }} OK / {{ activeStatistics.ngCount }} NG</small></div>
-      <div><span>执行异常</span><strong>{{ activeStatistics.executionFailureCount.toLocaleString('zh-CN') }}</strong></div>
-      <div><span>平均耗时</span><strong>{{ formatDuration(Math.round(activeStatistics.averageExecutionTimeMs)) }}</strong></div>
+      <CvPageState
+        v-if="source === 'local' && !projectId"
+        kind="empty"
+        title="请选择本机工程"
+        description="选择工程后查看执行与判定双轴统计。"
+      />
+      <CvPageState
+        v-else-if="activeStatisticsState.phase === 'loading' && !activeStatistics"
+        kind="loading"
+        title="正在读取结果态势"
+      />
+      <CvPageState
+        v-else-if="activeStatisticsState.phase === 'unauthorized'"
+        kind="unauthorized"
+        title="当前会话不可用"
+      />
+      <CvPageState
+        v-else-if="activeStatisticsState.phase === 'forbidden'"
+        kind="forbidden"
+        title="无权读取结果态势"
+      />
+      <CvPageState
+        v-else-if="activeStatisticsState.phase === 'error' || activeStatisticsState.phase === 'not-found'"
+        kind="error"
+        title="结果态势读取失败"
+        :description="activeStatisticsState.failure?.message"
+      />
+      <CvInlineAlert
+        v-if="activeStatisticsState.phase === 'stale' || activeStatisticsState.phase === 'partial-failure'"
+        tone="warning"
+        title="统计刷新失败"
+      >
+        {{ activeStatistics ? '当前显示上次成功读取的双分母统计摘要。' : '当前没有可用的双分母统计摘要。' }}
+      </CvInlineAlert>
+      <ResultsSituationSummary
+        v-if="activeStatistics"
+        :statistics="activeStatistics"
+      />
+      <ResultsAnalysisWorkbench
+        v-if="source === 'local' && analysisOwner && !hasInvalidDate"
+        :owner="analysisOwner"
+      />
     </section>
-    <CvInlineAlert
-      v-else-if="activeStatisticsState.phase === 'stale' || activeStatisticsState.phase === 'partial-failure'"
-      tone="warning"
-      title="统计刷新失败"
-    >
-      当前没有可用的双分母统计摘要。
-    </CvInlineAlert>
-
-    <ResultsAnalysisWorkbench
-      v-if="source === 'local' && analysisOwner && !hasInvalidDate"
-      :owner="analysisOwner"
-    />
 
     <section
       v-if="source === 'local'"
+      v-show="activeView === 'investigation'"
+      id="results-investigation-panel"
       class="results-page__layout"
+      role="tabpanel"
+      aria-labelledby="results-investigation-tab"
+      aria-label="本机结果调查详情"
+      tabindex="0"
     >
       <CvPanel
         class="results-page__list-panel"
@@ -1490,7 +1546,13 @@ onBeforeUnmount(() => {
 
     <section
       v-else
+      v-show="activeView === 'investigation'"
+      id="results-investigation-panel"
       class="results-page__layout"
+      role="tabpanel"
+      aria-labelledby="results-investigation-tab"
+      aria-label="工作站结果调查详情"
+      tabindex="0"
     >
       <CvPanel
         class="results-page__list-panel"
@@ -1699,7 +1761,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.results-page { height: 100%; min-height: 0; display: flex; flex-direction: column; max-width: 1720px; min-width: 0; gap: var(--cv-space-2); overflow: hidden; }
+.results-page { min-height: 100%; display: flex; flex-direction: column; max-width: 1720px; min-width: 0; gap: var(--cv-space-2); }
 .results-page__commandbar { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); border-bottom: 1px solid var(--cv-border-subtle); }
 .results-page__title,.results-page__commands { min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); }
 .results-page__nav-link { min-height: var(--cv-density-control-height-sm); padding: 0 var(--cv-space-2); display: inline-flex; align-items: center; border-radius: var(--cv-radius-sm); color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; touch-action: manipulation; }
@@ -1723,14 +1785,10 @@ onBeforeUnmount(() => {
 .results-page__advanced-trigger:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
 .results-page__filter-count { padding: 1px var(--cv-space-1); border-radius: var(--cv-radius-pill); background: var(--cv-color-status-info-soft); color: var(--cv-color-status-info-strong); font-size: var(--cv-font-size-2xs); }
 .results-page__advanced { display: flex; flex-wrap: wrap; align-items: start; gap: var(--cv-space-3); padding: var(--cv-space-2); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
-.results-page__metrics { min-width: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-block: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
-.results-page__metrics > div { min-width: 0; min-height: 48px; padding: 6px var(--cv-space-3); display: grid; align-content: center; gap: 1px; border-right: 1px solid var(--cv-border-subtle); }
-.results-page__metrics > div:last-child { border-right: 0; }
-.results-page__metrics span,.results-page__metrics small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
-.results-page__metrics strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); font-variant-numeric: tabular-nums; }
-.results-page__layout { min-height: 0; flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(390px, 0.85fr); gap: var(--cv-space-2); align-items: stretch; overflow: hidden; }
-.results-page__list-panel,.results-page__detail-panel { height: 100%; min-height: 0; border-radius: var(--cv-radius-sm); }
-.results-page :deep(.results-page__list-panel > .cv-panel__content),.results-page :deep(.results-page__detail-panel > .cv-panel__content) { max-height: 100%; overflow: auto; overscroll-behavior: contain; }
+.results-page__tab-panel { min-width: 0; display: grid; gap: var(--cv-space-2); }
+.results-page__tab-panel:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
+.results-page__layout { min-height: 0; display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(390px, 0.85fr); gap: var(--cv-space-2); align-items: start; }
+.results-page__list-panel,.results-page__detail-panel { min-height: 0; border-radius: var(--cv-radius-sm); }
 .results-page__notice { margin-bottom: var(--cv-space-3); }
 .results-page__outcome-cell { display: grid; justify-items: start; gap: var(--cv-space-1); }
 .results-page__outcome-cell small { color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-2xs); }
@@ -1753,7 +1811,7 @@ onBeforeUnmount(() => {
 .results-page__replay-summary { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--cv-border-subtle); }
 .results-page__replay-summary div { min-width: 0; padding: var(--cv-space-2); }
 .results-page__replay-summary div + div { border-left: 1px solid var(--cv-border-subtle); }
-.results-page__replay-summary dt { color: var(--cv-text-muted); font-size: 9px; }
+.results-page__replay-summary dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .results-page__replay-summary dd { margin: 2px 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); overflow-wrap: anywhere; }
 .results-page__comparison-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--cv-font-size-2xs); }
 .results-page__comparison-table th,.results-page__comparison-table td { padding: 5px 6px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--cv-border-subtle); overflow-wrap: anywhere; }
@@ -1763,7 +1821,7 @@ onBeforeUnmount(() => {
 .results-page__evidence-heading p { margin: 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .results-page__evidence-summary { margin: var(--cv-space-3) 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-block: 1px solid var(--cv-border-subtle); }
 .results-page__evidence-summary div { min-width: 0; padding: 6px 8px; border-bottom: 1px solid var(--cv-border-subtle); }
-.results-page__evidence-summary dt { color: var(--cv-text-muted); font-size: 9px; }
+.results-page__evidence-summary dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .results-page__evidence-summary dd { margin: 2px 0 0; font-size: var(--cv-font-size-2xs); overflow-wrap: anywhere; }
 .results-page__evidence-items { width: 100%; margin-top: var(--cv-space-2); border-collapse: collapse; font-size: var(--cv-font-size-2xs); }
 .results-page__evidence-items th,.results-page__evidence-items td { padding: 5px 6px; text-align: left; border-bottom: 1px solid var(--cv-border-subtle); }
@@ -1777,10 +1835,10 @@ onBeforeUnmount(() => {
 .results-page__technical-details summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
 .results-page__technical-details dl { margin: 0; display: grid; gap: var(--cv-space-2); }
 .results-page__technical-details dl > div { min-width: 0; padding: var(--cv-space-2); background: var(--cv-surface-page); }
-.results-page__technical-details dt { color: var(--cv-text-secondary); font-size: 9px; }
+.results-page__technical-details dt { color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }
 .results-page__technical-details dt span { margin-left: var(--cv-space-1); color: var(--cv-text-muted); }
 .results-page__technical-details dd { margin: 2px 0 0; display: flex; align-items: flex-start; gap: var(--cv-space-2); }
-.results-page__technical-details code { min-width: 0; flex: 1; color: var(--cv-text-primary); font-size: 10px; overflow-wrap: anywhere; user-select: all; }
+.results-page__technical-details code { min-width: 0; flex: 1; color: var(--cv-text-primary); font-size: var(--cv-font-size-2xs); overflow-wrap: anywhere; user-select: all; }
 .results-page :deep(.results-page__list-panel > .cv-panel__header),
 .results-page :deep(.results-page__detail-panel > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
 .results-page :deep(.results-page__list-panel .cv-inline-alert),
@@ -1788,7 +1846,7 @@ onBeforeUnmount(() => {
 .results-page :deep(.results-page__detail-panel > .cv-panel__content > .cv-inline-alert),
 .results-page :deep(.results-page__detail-panel > .cv-panel__content > .cv-page-state) { margin: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
 .results-page :deep(.results-page__list-panel .cv-pagination) { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
-@media (max-width: 1240px) { .results-page__metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } .results-page__metrics > div:nth-child(3) { border-right: 0; } .results-page__metrics > div:nth-child(-n+3) { border-bottom: 1px solid var(--cv-border-subtle); } .results-page__layout { grid-template-columns: minmax(0, 1fr) minmax(340px, 0.72fr); } }
+@media (max-width: 1240px) { .results-page__layout { grid-template-columns: minmax(0, 1fr) minmax(340px, 0.72fr); } }
 @media (max-width: 980px) { .results-page__layout { grid-template-columns: 1fr; } .results-page__detail-panel { position: static; } }
-@media (max-width: 640px) { .results-page__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .results-page__metrics > div:nth-child(3) { border-right: 1px solid var(--cv-border-subtle); } .results-page__metrics > div:nth-child(2n) { border-right: 0; } .results-page__metrics > div:nth-child(-n+4) { border-bottom: 1px solid var(--cv-border-subtle); } .results-page__defects li,.results-page__replay-summary { grid-template-columns: 1fr; } .results-page__replay-summary div + div { border-left: 0; border-top: 1px solid var(--cv-border-subtle); } .results-page__investigation-heading { align-items: stretch; flex-direction: column; } }
+@media (max-width: 640px) { .results-page__defects li,.results-page__replay-summary { grid-template-columns: 1fr; } .results-page__replay-summary div + div { border-left: 0; border-top: 1px solid var(--cv-border-subtle); } .results-page__investigation-heading { align-items: stretch; flex-direction: column; } }
 </style>

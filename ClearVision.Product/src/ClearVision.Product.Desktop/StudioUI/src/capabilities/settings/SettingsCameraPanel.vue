@@ -161,7 +161,7 @@ onBeforeUnmount(() => {
         <header class="camera-section__header">
           <div>
             <h3>相机发现</h3>
-            <p>按供应商调用现有发现 endpoint。发现结果是诊断投影，不会自动写入绑定或切换活动相机。</p>
+            <p>按供应商调用现有发现接口。发现结果仅用于诊断，不会自动写入绑定或切换活动相机。</p>
           </div>
           <div class="camera-section__actions">
             <CvButton

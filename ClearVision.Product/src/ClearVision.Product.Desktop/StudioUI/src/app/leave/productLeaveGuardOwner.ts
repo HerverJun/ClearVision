@@ -135,7 +135,7 @@ function messageFor(kind: ProductLeaveProtectionKind): string {
     case 'workspace-save-conflict':
       return '当前工程存在保存冲突。继续离开会放弃尚未解决的本地 draft。';
     case 'workspace-save-unknown':
-      return '保存结果仍未知，必须先重新读取服务端 authority；当前禁止离开。';
+      return '保存结果仍未知，必须先重新读取服务端状态；当前禁止离开。';
     case 'workspace-run-active':
       return 'Formal Run 仍在 admission、执行或取消协调中；当前禁止强制离开。';
     case 'workspace-run-unknown':
@@ -147,7 +147,7 @@ function messageFor(kind: ProductLeaveProtectionKind): string {
     case 'project-command-active':
       return '工程创建、更新、删除或 reconcile 尚未完成；当前禁止离开。';
     case 'project-command-unknown':
-      return '工程操作结果未知，必须先查询服务端 operation authority；当前禁止离开。';
+      return '工程操作结果未知，必须先查询服务端操作记录；当前禁止离开。';
     case 'project-update-conflict':
       return '工程信息更新存在 revision 冲突。继续离开会放弃当前页面中的未解决编辑。';
     case 'continuous-inspection-active':
@@ -301,7 +301,7 @@ export function createProductLeaveGuardOwner(
     state.reason = reason;
     state.targetProjectId = targetProjectId ?? null;
     state.protectionKind = null;
-    state.message = '正在等待后端 authority settle。';
+    state.message = '正在等待后端确认操作结果。';
     state.forceCloseAllowed = false;
     state.requestCount += 1;
 
@@ -357,7 +357,7 @@ export function createProductLeaveGuardOwner(
     }
     state.phase = 'allowed';
     state.protectionKind = null;
-    state.message = '后端 authority 已 settle，可以安全离开。';
+    state.message = '后端操作结果已确认，可以安全离开。';
     state.forceCloseAllowed = true;
     return true;
   }
@@ -398,7 +398,7 @@ export function createProductLeaveGuardOwner(
       state.phase = 'idle';
       state.reason = null;
       state.protectionKind = null;
-      state.message = '会话失效；leave prompt 已取消，保留 reconcile authority。';
+      state.message = '会话失效；离开提示已取消，保留结果核对状态。';
       state.forceCloseAllowed = false;
     },
     attachInspectionRun(owner: InspectionRunOwner): () => void {
