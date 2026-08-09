@@ -622,6 +622,8 @@ async function verifyStudioFoundation(page, webPort, route) {
       'apiBaseUrl',
       'featureFlags',
       'hostKind',
+      'hostVersion',
+      'productVersion',
       'profileAllowedRoles',
       'schemaVersion',
       'startupProfile',
@@ -633,6 +635,14 @@ async function verifyStudioFoundation(page, webPort, route) {
   assert(startup.value.schemaVersion === 1, 'StudioUI startup schemaVersion is not 1.');
   assert(startup.value.uiKind === 'studio-ui', 'StudioUI startup uiKind is invalid.');
   assert(startup.value.hostKind === 'desktop-webview2', 'StudioUI is not running in Desktop WebView2.');
+  assert(
+    typeof startup.value.productVersion === 'string' && startup.value.productVersion.length > 0,
+    'StudioUI productVersion is missing.'
+  );
+  assert(
+    typeof startup.value.hostVersion === 'string' && startup.value.hostVersion.length > 0,
+    'StudioUI hostVersion is missing.'
+  );
   assert(startup.value.apiBaseUrl === `http://localhost:${webPort}/api`, 'StudioUI API base URL is unexpected.');
   assert(startup.value.studioUiBasePath === '/studio/', 'StudioUI base path is unexpected.');
   assert(typeof startup.value.startupProfile === 'string', 'StudioUI startup profile is missing.');
