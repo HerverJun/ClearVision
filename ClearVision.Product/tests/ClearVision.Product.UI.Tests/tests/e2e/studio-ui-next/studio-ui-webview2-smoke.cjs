@@ -1864,11 +1864,11 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
     'Real WebView2 Formal Run snapshot identity did not match admission.');
   assert(!executeResponseCompleted,
     'Real WebView2 Stop was attempted after the execute response had already completed.');
-  const preStopReconcileRequestCount = formalRunRequestRecords.filter(item =>
+  const preStopReconcileRequestCountAtRunningSignal = formalRunRequestRecords.filter(item =>
     item.clientSnapshotId === admitted.clientSnapshotId &&
     item.path === '/api/inspection/reconcile'
   ).length;
-  assert(preStopReconcileRequestCount <= 1,
+  assert(preStopReconcileRequestCountAtRunningSignal <= 1,
     `Formal Run issued more than one pre-stop reconcile: ${JSON.stringify(formalRunRequestRecords)}`);
 
   const stopResponsePromise = page.waitForResponse(response =>
@@ -1964,6 +1964,20 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
   page.off('request', captureFormalRunRequest);
   const formalRunRequests = formalRunRequestRecords.filter(item =>
     formalRunSnapshotIds.has(item.clientSnapshotId));
+  const stoppedRunRequests = formalRunRequests.filter(item =>
+    item.clientSnapshotId === admitted.clientSnapshotId);
+  const stopRequestIndex = stoppedRunRequests.findIndex(item =>
+    item.path === '/api/inspection/stop');
+  assert(stopRequestIndex >= 0,
+    `Formal Run did not record the authoritative Stop request: ${JSON.stringify(stoppedRunRequests)}`);
+  const preStopReconcileRequestCount = stoppedRunRequests
+    .slice(0, stopRequestIndex)
+    .filter(item => item.path === '/api/inspection/reconcile').length;
+  const postStopReconcileRequestCount = stoppedRunRequests
+    .slice(stopRequestIndex + 1)
+    .filter(item => item.path === '/api/inspection/reconcile').length;
+  assert(preStopReconcileRequestCount <= 1 && postStopReconcileRequestCount <= 1,
+    `Formal Run issued an invalid Stop reconciliation sequence: ${JSON.stringify(stoppedRunRequests)}`);
   const runPaths = formalRunRequests.map(item => item.path);
   return {
     projectId,
@@ -1974,7 +1988,9 @@ async function verifyWorkspaceG6(page, runtimeErrors, formalRunSeed, webPort, to
       fixture: 'DETERMINISTIC_DELAY_OPERATOR_60000MS',
       slowFixtureEnabled,
       runtimeRunningSignal: runningSignal,
+      preStopReconcileRequestCountAtRunningSignal,
       preStopReconcileRequestCount,
+      postStopReconcileRequestCount,
       executeResponseCompletedBeforeStop: false,
       stopReconciliation,
       cancelledSignal,
@@ -2668,7 +2684,8 @@ async function verifyProductPage(
         ...Array(workspaceG6?.genuineRunningStop?.preStopReconcileRequestCount ?? 0)
           .fill('/api/inspection/reconcile'),
         '/api/inspection/stop',
-        ...(workspaceG6?.genuineRunningStop?.uiReconciliation ? ['/api/inspection/reconcile'] : [])
+        ...Array(workspaceG6?.genuineRunningStop?.postStopReconcileRequestCount ?? 0)
+          .fill('/api/inspection/reconcile')
       ]
     : [];
   const unexpectedWriteRequests = writeRequests.filter(item => {

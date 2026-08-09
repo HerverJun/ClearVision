@@ -115,6 +115,7 @@
     <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\core\logging\debugLogger.js" />
     <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\features\flow-editor\previewCoordinator.js" />
     <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\features\flow-editor\previewOutputFormatter.mjs" />
+    <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\features\flow-editor\previewValueSemantics.mjs" />
     <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\shared\parameterDependencyRules.js" />
     <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\core\canvas\imageCanvas.js" />
     <StudioUiBuildInput Include="$(MSBuildThisFileDirectory)wwwroot\src\features\flow-editor\roiGeometry.mjs" />
