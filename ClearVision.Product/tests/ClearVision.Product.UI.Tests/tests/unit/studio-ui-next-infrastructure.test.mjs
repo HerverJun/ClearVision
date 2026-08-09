@@ -35,6 +35,16 @@ const webView2SmokePath = join(
   'studio-ui-next',
   'studio-ui-webview2-smoke.cjs'
 );
+const productPerformancePath = join(
+  repositoryRoot,
+  'ClearVision.Product',
+  'tests',
+  'ClearVision.Product.UI.Tests',
+  'tests',
+  'e2e',
+  'studio-ui-next',
+  'studio-ui-product-performance.cjs'
+);
 const dpiEvidencePath = join(
   repositoryRoot,
   'scripts',
@@ -120,8 +130,9 @@ test('StudioUI browser fixture exits when its launcher closes stdin', async () =
 });
 
 test('M08 f09 current-candidate evidence includes formal Workspace DPI and pointer coverage', async () => {
-  const [smoke, dpiAudit] = await Promise.all([
+  const [smoke, productPerformance, dpiAudit] = await Promise.all([
     readText(webView2SmokePath),
+    readText(productPerformancePath),
     readText(dpiEvidencePath)
   ]);
 
@@ -137,6 +148,11 @@ test('M08 f09 current-candidate evidence includes formal Workspace DPI and point
   assert.match(smoke, /resultsFilterLayout\.controls\.length === 6/);
   assert.match(smoke, /resultsFilterLayout\.maximumBottomDelta <= 1/);
   assert.doesNotMatch(smoke, /1350px WebView2 client/);
+  assert.match(productPerformance, /async function waitForFunctionWithoutHandle/);
+  assert.match(productPerformance, /await handle\.dispose\(\)/);
+  assert.doesNotMatch(productPerformance, /await page\.waitForSelector\(/);
+  assert.equal([...productPerformance.matchAll(/await page\.waitForFunction\(/g)].length, 1);
+  assert.match(productPerformance, /required\('CV_NODE_COMPLETION_SIGNAL'\)/);
   assert.match(dpiAudit, /\$\_\.phase -in @\("f04", "f09"\)/);
 });
 

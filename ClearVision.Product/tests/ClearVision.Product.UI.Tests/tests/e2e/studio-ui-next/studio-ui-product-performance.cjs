@@ -139,10 +139,15 @@ async function installInstrumentation(page) {
   });
 }
 
+async function waitForFunctionWithoutHandle(page, pageFunction, arg, options) {
+  const handle = await page.waitForFunction(pageFunction, arg, options);
+  await handle.dispose();
+}
+
 async function waitInteractive(page, route) {
   if (route === '/diagnostics') {
-    await page.waitForSelector('[data-studio-page="diagnostics"]', { state: 'visible' });
-    await page.waitForFunction(() => {
+    await page.locator('[data-studio-page="diagnostics"]').waitFor({ state: 'visible' });
+    await waitForFunctionWithoutHandle(page, () => {
       const states = [...document.querySelectorAll('[data-probe-state]')]
         .map(node => node.getAttribute('data-probe-state'));
       return states.length === 2 && states.every(state => state === 'ok');
@@ -150,14 +155,14 @@ async function waitInteractive(page, route) {
     return;
   }
   if (route === '/labs/design') {
-    await page.waitForSelector('[data-design-lab="ready"]', { state: 'visible' });
+    await page.locator('[data-design-lab="ready"]').waitFor({ state: 'visible' });
     return;
   }
   const selector = route === '/projects'
     ? '[data-capability="projects-read"]'
     : '[data-capability="overview"]';
-  await page.waitForSelector(selector, { state: 'visible' });
-  await page.waitForFunction(() => {
+  await page.locator(selector).waitFor({ state: 'visible' });
+  await waitForFunctionWithoutHandle(page, () => {
     const user = document.querySelector('.product-layout__user strong')?.textContent?.trim();
     const loading = document.querySelector('[data-page-state="loading"]');
     return Boolean(user && user !== '未认证' && !loading);
@@ -777,7 +782,7 @@ async function installFrozenBrowserFixture(page, authority, operators, results, 
 
 async function waitForBrowserRoute(page, route) {
   if (route === 'operators') {
-    await page.waitForFunction(() => {
+    await waitForFunctionWithoutHandle(page, () => {
       const capability = document.querySelector('[data-capability="operators-read"]');
       const rows = document.querySelectorAll('[data-capability="operators-read"] tbody tr');
       const loading = document.querySelector('[data-page-state="loading"]');
@@ -785,7 +790,7 @@ async function waitForBrowserRoute(page, route) {
     }, null, { timeout: 30_000 });
     return;
   }
-  await page.waitForFunction(() => {
+  await waitForFunctionWithoutHandle(page, () => {
     const capability = document.querySelector('[data-capability="results-read"][data-results-source="station"]');
     const rows = document.querySelectorAll('[data-capability="results-read"] tbody tr');
     const summary = [...document.querySelectorAll('.cv-pagination__summary')]
@@ -1635,6 +1640,11 @@ async function runWebView2Profile() {
     };
     fs.writeFileSync(outputPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
     if (runtimeErrors.length) throw new Error(runtimeErrors.join('\n'));
+    fs.writeFileSync(
+      required('CV_NODE_COMPLETION_SIGNAL'),
+      `${JSON.stringify({ status: 'PASS', completedAtUtc: new Date().toISOString() })}\n`,
+      'utf8'
+    );
     process.stdout.write(`${JSON.stringify({ ok: true, outputPath, summaries: payload.summaries, deltas: payload.deltas })}\n`);
   } finally {
     await browser.close();
