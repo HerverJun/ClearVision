@@ -538,7 +538,9 @@ for (const visual of f02G3VisualMatrix) {
         lastExecutionOutcome: 'Succeeded',
         lastDecisionOutcome: 'Ok',
         lastDiagnosticCode: null,
-        lastDiagnosticMessage: null
+        lastDiagnosticMessage: null,
+        spoolPendingCount: 0,
+        spoolBytes: 0
       }),
       station({
         stationId: 'station-b',
