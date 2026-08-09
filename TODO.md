@@ -2,7 +2,7 @@
 
 ```text
 DOCUMENT_ROLE=EXECUTION_PLAN
-DOCUMENT_STATE=G0_DONE_G1_READY
+DOCUMENT_STATE=G3_READY
 CURRENT_BRANCH=studio-ui-next
 PLANNING_BASELINE_HEAD=f8569fa85244d19a18ba7308051e4d2b2ed4060a
 IMPLEMENTATION_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
@@ -19,6 +19,16 @@ G0_STABLE_COMMITS_LEFT_ONLY=77
 G0_STABLE_COMMITS_PATCH_EQUIVALENT=4
 G0_GENERATED_ARTIFACTS=CONTROLLED_SOURCE_DERIVED_OUTPUTS_PLUS_NOT_APPLICABLE_HISTORICAL_SNAPSHOTS
 G0_REMOTE_REFRESH=PASS_NO_REMOTE_ADVANCE_OR_FORK
+G1_STATE=DONE
+G1_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
+G1_IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
+G1_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G1_VERIFICATION_DATE=2026-08-09
+G2_STATE=DONE
+G2_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
+G2_IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
+G2_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G2_VERIFICATION_DATE=2026-08-09
 PRODUCTION_ACCEPTANCE=NOT_GRANTED
 LEGACY_RETIREMENT=NOT_APPROVED
 ```
@@ -37,7 +47,9 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
   软件闭环已在 F10 标记为 `DONE`，不得按旧 TODO 重复实现。
 - Station 测试包/设备命令与整体证据仍为 `PARTIAL`。
 - AI attachment、CV model artifact、TemplateMatching artifact、calibration asset projection、数据库高级维护
-  仍为 `BLOCKED_BY_CONTRACT`。
+  仍为 `BLOCKED_BY_CONTRACT`；G2 ADR 已冻结延期边界，未由前端私有实现替代。
+- GlobalVariables 类型过滤/Flow identity 校验和 Line Sequence 最近图像输入/返回预览投影已在
+  `98cb8c7f5` 实现 checkpoint 完成；尚未推送远端。
 - F10 已记录 implementation SHA 的 Chromium/fixture 定向 journey `7/7`；该结果不代表真实宿主通过。
 - Remote CI 当前为 `BLOCKED_BY_ENVIRONMENT`，Final Gate 为 `PARTIAL`，生产验收仍为 `NOT_GRANTED`。
 - 真实 WebView2 100%/125%、独立 no-Node、现场 Camera/PLC/Station、生产 soak 尚未完成。
@@ -61,9 +73,9 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 | Gate | 优先级 | 工作包 | 当前状态 | 唯一 Owner | 解锁条件 |
 | --- | --- | --- | --- | --- | --- |
 | G0 | P0 | 候选冻结、稳定线语义同步、文档收敛 | DONE | 主协调 Owner | 无 |
-| G1 | P0 | 请求/写入生命周期与跨工程状态安全 | READY | Workspace lifecycle Owner | G0 DONE |
-| G2 | P0/P1 | 后端合同解阻与功能差距决策 | LOCKED | 主协调 Owner + 对应后端 Owner | G0 DONE 可只读取证；G1 DONE 才实现 |
-| G3 | P1/P2 | 产品体验、视觉、中文与 Vue 可维护性收口 | LOCKED | UI Owner；共享面由主协调 Owner | G0 DONE 可只读审计；G2 合同冻结才实现 |
+| G1 | P0 | 请求/写入生命周期与跨工程状态安全 | DONE | Workspace lifecycle Owner | G0 DONE |
+| G2 | P0/P1 | 后端合同解阻与功能差距决策 | DONE | 主协调 Owner + 对应后端 Owner | G0-G1 DONE |
+| G3 | P1/P2 | 产品体验、视觉、中文与 Vue 可维护性收口 | READY | UI Owner；共享面由主协调 Owner | G2 DONE |
 | G4 | P0 | Legacy profile 隔离、rollback 与退役准备 | LOCKED | Host/Release Owner | G0-G3 DONE |
 | G5 | P0 | 同一 clean SHA 的本地软件证据 | LOCKED | Final Evidence Owner | G4 DONE |
 | G6 | P0 | 真实宿主、目标机、远程与现场验收 | LOCKED | Release/Field Owner | G5 DONE |
@@ -106,30 +118,34 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 **Owner 约束**：Project save + GlobalVariables 由一个纵向 Owner 处理；FlowCanvas + Inspector + Preview
 不得拆成多个并行实现 owner。
 
-- [ ] G1.1 盘点所有 capability 的 request、timer、SSE、subscription、AbortController 和写入口，生成
+- [x] G1.1 盘点所有 capability 的 request、timer、SSE、subscription、AbortController 和写入口，生成
   `mount -> active -> dispose` 资源账本。
-- [ ] G1.2 所有可取消 GET/read 查询在 selection、project、route、session、flag 变化和 dispose 时 abort。
-- [ ] G1.3 为 PUT/POST 写入冻结统一语义：写操作由能跨组件卸载存活的唯一 Owner 持有，或阻止离开直到
+- [x] G1.2 所有可取消 GET/read 查询在 selection、project、route、session、flag 变化和 dispose 时 abort。
+- [x] G1.3 为 PUT/POST 写入冻结统一语义：写操作由能跨组件卸载存活的唯一 Owner 持有，或阻止离开直到
   settle；网络结果未知必须按 `clientOperationId` reconcile。不得用“abort 后当作未提交”伪造确定性。
-- [ ] G1.4 修复 workspace save GET/PUT、Template GET/POST/PUT、GlobalVariables runtime GET/PUT/POST、
+- [x] G1.4 修复 workspace save GET/PUT、Template GET/POST/PUT、GlobalVariables runtime GET/PUT/POST、
   Camera binding read 的生命周期缺口。
-- [ ] G1.5 修复跨工程切换时 variables/decision/package/template 弹窗继续持有旧 disposed owner；切换前
+- [x] G1.5 修复跨工程切换时 variables/decision/package/template 弹窗继续持有旧 disposed owner；切换前
   关闭旧弹窗或以工程 identity 强制 remount。
-- [ ] G1.6 为 AI handoff 的 `stage -> acknowledge` 增加可恢复协议：acknowledge 失败时能够回滚 staging，
+- [x] G1.6 为 AI handoff 的 `stage -> acknowledge` 增加可恢复协议：acknowledge 失败时能够回滚 staging，
   或按 operation identity reconcile，不能留下来源不明的本地 Flow 草稿。
-- [ ] G1.7 连续检测工程选择页显式投影 `unauthorized`、`forbidden`、`stale`、`partial-failure` 和
+- [x] G1.7 连续检测工程选择页显式投影 `unauthorized`、`forbidden`、`stale`、`partial-failure` 和
   `aborted`，不得把 401/403 显示为“暂无工程”。
-- [ ] G1.8 为 artifact DELETE、Camera stop 等 dispose 后 cleanup 请求建立 ADR：明确唯一 Owner、幂等、
+- [x] G1.8 为 artifact DELETE、Camera stop 等 dispose 后 cleanup 请求建立 ADR：明确唯一 Owner、幂等、
   超时、失败和允许的 cleanup 豁免范围。
-- [ ] G1.9 增加 route param 切换、Feature Flag on/off、session 失效、运行中离开和晚到响应测试。
-- [ ] G1.10 diagnostics 证明 unmount 后旧 owner、subscription、timer、SSE 和可取消 request 数量归零。
+- [x] G1.9 增加 route param 切换、Feature Flag on/off、session 失效、运行中离开和晚到响应测试。
+- [x] G1.10 diagnostics 证明 unmount 后旧 owner、subscription、timer、SSE 和可取消 request 数量归零。
 
 **G1 退出条件**：
 
-- [ ] 任何 capability 切换后只有一个 mounted owner、一个订阅集合和一个写入口。
-- [ ] 不存在跨工程旧 owner 与新 Project 投影混用。
-- [ ] 每类写请求都有 committed / rejected / unknown-outcome / reconciled 的可证明终态。
-- [ ] cleanup ADR 获得批准，未批准的 dispose 后请求保持阻断。
+- [x] 任何 capability 切换后只有一个 mounted owner、一个订阅集合和一个写入口。
+- [x] 不存在跨工程旧 owner 与新 Project 投影混用。
+- [x] 每类写请求都有 committed / rejected / unknown-outcome / reconciled 的可证明终态。
+- [x] cleanup ADR 获得批准，未批准的 dispose 后请求保持阻断。
+
+G1 实现已在 `98cb8c7f5` checkpoint 提交但尚未推送；当前验证与边界见
+`docs/进行中/StudioUINext/F10_ContractAndProductionPlan.md` 的 G1 工作记录。该 SHA 是本地候选，
+不冒充远端候选或生产验收。
 
 ## 6. G2：合同解阻与功能差距
 
@@ -137,37 +153,38 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 
 以下任务在合同批准前只能取证和提出方案，不得由 Vue、localStorage 或第二 endpoint 替代：
 
-- [ ] G2.1 AI attachment：冻结上传、resource reference、版本、权限、TTL 和 AgentRun 恢复合同。
-- [ ] G2.2 CV model artifact：区分视觉模型资产与 `/api/ai/models` 的 LLM 配置，指定唯一资产 Owner。
-- [ ] G2.3 TemplateMatching artifact：冻结图像模板产物 identity、版本、权限和 Project 关联。
-- [ ] G2.4 Calibration projection：冻结正式 calibration asset 到算子 numeric scale/offset 的权威投影。
-- [ ] G2.5 Database advanced：逐项冻结 repair、restore、cleanup、global reset 的权限、备份前置、互斥、
-  审计与 unknown-outcome/reconcile。
-- [ ] G2.6 Station test package/device command：冻结 package identity、target Station、幂等操作身份、过期、
+- [x] G2.1 AI attachment：冻结为 `DEFER`；重新进入合同覆盖上传、resource reference、版本、权限、TTL 和 AgentRun 恢复。
+- [x] G2.2 CV model artifact：冻结为 `DEFER`；视觉模型资产与 `/api/ai/models` 的 LLM 配置保持分离。
+- [x] G2.3 TemplateMatching artifact：冻结为 `DEFER`；图像模板产物不得借用 Flow template authority。
+- [x] G2.4 Calibration projection：冻结为 `DEFER`；正式 calibration asset 不静默投影为算子 numeric scale/offset。
+- [x] G2.5 Database advanced：冻结为 `DEFER`；repair、restore、cleanup、global reset 在完整 Admin 合同前不暴露写入口。
+- [x] G2.6 Station test package/device command：冻结 package identity、target Station、幂等操作身份、过期、
   查询、取消和终态 reconcile。
 
 ### 6.2 旧版能力逐项决策
 
 每项必须得到 `MIGRATE`、`RELOCATE`、`DEFER` 或 `RETIRE_WITH_APPROVAL` 之一；不得因页面更简洁而静默删除。
 
-- [ ] G2.7 N 点标定高级工作流：9 点模板、候选提取、粘贴导入、复制/JSON 导出、备注、排序、像素编辑、
-  启用状态和重投影误差 overlay。
-- [ ] G2.8 GlobalVariables：按端口/参数 data type 过滤候选，并校验变量、端口、参数存在性与兼容性。
-- [ ] G2.9 通用 AutoTune：核对 Thresholding、Filtering、GaussianBlur、BlobAnalysis、
-  SharpnessEvaluation 等旧入口，决定迁移范围。
-- [ ] G2.10 Line Sequence：核对当前 Preview/最近检测图输入、返回预览图和 AI parameter-only follow-up。
-- [ ] G2.11 连续检测：核对缺料超时、连续 NG 保护和现场恢复策略；保护规则保持在既有 Runtime/Inspection authority。
-- [ ] G2.12 Demo/示例工程：决定迁移到受控 Project lifecycle，或正式保留为 Legacy-only/deferred；不得复制
-  demo Flow JSON 到前端。
-- [ ] G2.13 Camera 标定入口与 Settings 高风险操作分别决定重定位或退役，不以隐藏入口代替产品决策。
+- [x] G2.7 N 点标定高级工作流：冻结为 `DEFER`；保留当前采集、求解和正式 asset 保存，完整高级工作流按 ADR 重新进入。
+- [x] G2.8 GlobalVariables：按端口/参数 data type 过滤候选，并校验变量、端口、参数存在性与兼容性；
+  已在 `WorkspaceGlobalVariablesOwner` 与工作台实现，证据见 G2 ADR。
+- [x] G2.9 通用 AutoTune：冻结为 `DEFER`；逐算子合同未齐前不恢复泛化入口。
+- [x] G2.10 Line Sequence：Preview/最近检测图输入和返回预览图已迁移；AI parameter-only follow-up 按 ADR 延期。
+- [x] G2.11 连续检测：冻结为 `RELOCATE`；缺料超时、连续 NG 保护和现场恢复策略保持在既有 Runtime/Inspection authority。
+- [x] G2.12 Demo/示例工程：冻结为 `RELOCATE`；继续使用受控后端 Project lifecycle，不复制 demo Flow JSON 到前端。
+- [x] G2.13 Camera 标定入口与 Settings 高风险操作：标定 `MIGRATE` 到 Workspace，高风险维护 `RELOCATE/DEFER` 到 Admin 合同。
+
+G2 当前处置与合同矩阵见 `docs/进行中/StudioUINext/ADR-G2-合同解阻与能力处置.md`。主协调 Owner 已冻结
+G2.1-G2.5、G2.7/G2.9、G2.10 AI follow-up 等延期边界；延期能力未来重新进入仍需产品/后端 owner 批准，
+但不再阻塞本轮 G2 合同决策 Gate。延期不表示能力迁移、生产验收或 Legacy 退役。
 
 **G2 退出条件**：
 
-- [ ] 每个合同项都有明确结论：已冻结可实施的后端 contract，或由产品/后端 Owner 批准 `DEFER` / `RETIRE`。
-- [ ] 对可实施项，contract 已覆盖 Owner、权限、并发身份、错误和 reconcile；对延期项，影响、fallback 和
+- [x] 每个合同项都有明确结论：已冻结可实施的后端 contract，或由主协调 Owner 冻结 `DEFER` / `RELOCATE`。
+- [x] 对可实施项，contract 已覆盖 Owner、权限、并发身份、错误和 reconcile；对延期项，影响、fallback 和
   重新进入条件已记录。
-- [ ] 每个旧版用户任务都有明确 disposition、入口、测试和中文状态语义。
-- [ ] 未获批准的能力保持 `BLOCKED_BY_CONTRACT`，没有前端私有替代实现；存在此类未决项时 G2 不得标记 DONE。
+- [x] 每个旧版用户任务都有明确 disposition、入口、测试和中文状态语义。
+- [x] 延期能力保持不可用且没有前端私有替代实现；重新进入不作为本轮 G2 退出条件。
 
 ## 7. G3：产品体验、视觉与 Vue 工程收口
 
@@ -293,5 +310,9 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 ## 14. 下一步唯一动作
 
 - [x] **G0.1-G0.4** 已完成：远端刷新、候选冻结和 stable-only commit 语义矩阵见 F10。
-- [ ] 开始 G1 生命周期与状态安全收口；G2/G3 只进行只读合同/体验审计，遵守唯一 Owner 和前置 Gate。
-- [ ] G1 实现不得改变后端 authority、保存链、Runtime/Station、AgentRun 或引入第二套基础设施。
+- [x] **G1.1-G1.10** 已完成：请求/写入生命周期、跨工程状态安全、handoff 恢复和 diagnostics 账本已在 `98cb8c7f5` 提交。
+- [x] 开始 G2 合同解阻与功能差距决策；GlobalVariables 与 Line Sequence 可实施投影已落地，合同缺口与
+  旧版能力处置见 G2 ADR。
+- [x] 完成 G2.1-G2.5 处置冻结、延期项重新进入条件和 `98cb8c7f5` 验证；G3 已解锁。
+- [ ] 开始 G3 产品体验、视觉、中文与 Vue 工程收口；先完成旧版能力对照和当前 UI 审计，再修改实现。
+- [x] G1 实现未改变后端 authority、保存链、Runtime/Station、AgentRun，也未引入第二套基础设施。

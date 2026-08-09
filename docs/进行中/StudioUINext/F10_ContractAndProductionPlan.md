@@ -8,29 +8,39 @@
 F10_STATE=ACTIVE
 F10_START_HEAD=38b80b0dfcb66db67a9eab5ff84f80b994104606
 F10_START_REMOTE_HEAD=38b80b0dfcb66db67a9eab5ff84f80b994104606
-IMPLEMENTATION_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
+IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
 DOCUMENTATION_HEAD=SELF
 BRANCH_HEAD_AT_REVIEW=SELF
 REMOTE_IMPLEMENTATION_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 BRANCH=studio-ui-next
 PROJECT_IMPORT_EXPORT=DONE
-AI_ATTACHMENT_RESOURCE=BLOCKED_BY_CONTRACT
-AI_MODEL_RESOURCE=BLOCKED_BY_CONTRACT
-AI_TEMPLATE_ARTIFACT=BLOCKED_BY_CONTRACT
-AI_CALIBRATION_PROJECTION=BLOCKED_BY_CONTRACT
+AI_ATTACHMENT_RESOURCE=DEFERRED
+AI_MODEL_RESOURCE=DEFERRED
+AI_TEMPLATE_ARTIFACT=DEFERRED
+AI_CALIBRATION_PROJECTION=DEFERRED
 NPOINT_AUTHORIZATION=DONE
 PLANAR_CALIBRATION=DONE
 RESULTS_BULK_EXPORT=DONE
 LINE_SEQUENCE=DONE
 F10_BROWSER_JOURNEYS=DONE
 STATION_TEST_PACKAGE=PARTIAL
-DATABASE_ADVANCED=BLOCKED_BY_CONTRACT
+DATABASE_ADVANCED=DEFERRED
 PARTIAL_EVIDENCE=PARTIAL
 WEBVIEW2_125=NOT_PERFORMED
 INDEPENDENT_NO_NODE=NOT_PERFORMED
 REMOTE_CI=BLOCKED_BY_ENVIRONMENT
 FINAL_GATE=PARTIAL
 PRODUCTION_ACCEPTANCE=NOT_GRANTED
+G1_STATE=DONE
+G1_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
+G1_IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
+G1_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G1_VERIFICATION_DATE=2026-08-09
+G2_STATE=DONE
+G2_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
+G2_IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
+G2_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G2_VERIFICATION_DATE=2026-08-09
 ```
 
 ## G0 候选冻结与稳定线语义同步
@@ -108,9 +118,11 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 | Gate | 状态 | 当前证据 / blocker |
 | --- | --- | --- |
 | G0_REMOTE_CI | BLOCKED_BY_ENVIRONMENT | 当前冻结实现为 `21105d57d`；`ci.yml` 支持 `workflow_dispatch`，但本机 `gh` token 失效、内置浏览器未登录 GitHub、Chrome 会话不可用；未创建当前候选 run，未改 trigger。 |
+| G1_WORKSPACE_LIFECYCLE | DONE | `98cb8c7f5` 已完成请求/写入生命周期、跨工程状态隔离与 leave guard；13 个 G1 定向测试文件共 `103/103`，Studio UI 全量 139 个文件、`891/891` 测试通过。当前实现已本地提交、尚未推送。 |
 | G1_PROJECT_CONTRACT | DONE | 复用 `ProjectLifecycleCoordinator`、`ProjectSaveCoordinator` 和现有 Project Service；JSON schema/version、CREATE/OVERWRITE、权限、revision、clientOperationId、validation、partial-save 防护和 replay/reconcile 已由现有 endpoint/lifecycle tests 覆盖。 |
-| G1_AI_RESOURCE_CONTRACT | BLOCKED_BY_CONTRACT | Camera resource identity/revision/decision 已有 authority；attachment、CV model artifact、TemplateMatching artifact 与 calibration asset-to-scale 投影仍缺正式后端合同，详见本轮 AI 结论。 |
+| G1_AI_RESOURCE_CONTRACT | DEFERRED | Camera resource identity/revision/decision 已有 authority；attachment、CV model artifact、TemplateMatching artifact 与 calibration asset-to-scale 投影缺正式后端合同，已按 G2 ADR 冻结延期且未新增私有 authority。 |
 | G1_CALIBRATION_CONTRACT | DONE | N 点 draft/solve 继续要求 Engineer/Admin、非空且存在的 Project 上下文；`ScaleOffset` 复用同一 solver、candidate bundle 和 Project asset save 链。本轮新增 Chromium/fixture solve + formal asset save/reconcile journey，未新增 calibration authority。 |
+| G2_CONTRACT_AND_GAP | DONE | GlobalVariables 类型/identity 校验与 Line Sequence 最近图像输入/返回预览已落地；AI resource、calibration projection、Database advanced 与旧版高级能力均已冻结 `DEFER/RELOCATE` 边界，完整矩阵见 ADR-G2。 |
 | G2_RESULTS_EXPORT | DONE | 已补齐服务端 CSV/JSON export job、clientOperationId 幂等与对账、快照上界、取消、TTL、SHA-256 产物校验和权限错误映射；Results 页面仅对本机结果开放，Station 来源明确不支持。Studio UI 全量 `138/138` 文件、`869/869` 测试通过。 |
 | G3_DEVICE_COMMANDS | PARTIAL | Station unknown/reconcile 已有 Chromium/fixture journey。Line Sequence 本轮不执行设备写入，Apply 仅修改 canonical flow draft；未引入新 command authority。现场 Station/PLC 仍未验证。 |
 | G4_NEXT_UI_CONSUMPTION | DONE | Line Sequence 唯一 owner 挂载于 FlowWorkspace，只使用 shared `ApiTransport` 和 `FlowCanvasOwner.commands.patchNodeParameters`；Project/Results/Station/Template/Calibration 用户路径已有本轮 Chromium/fixture 证据。 |
@@ -130,15 +142,70 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 - 本轮不新增第二 API transport、HostBridge、EventBus、Project repository、Calibration asset authority、Station command authority 或前端私有持久化链。
 - Production acceptance 不由本台账自动授予；软件门禁与真实 WebView2、DPI、no-Node、现场硬件、生产 soak 和产品 owner 签收分别记录。
 
-## 本轮工作记录（2026-08-08）
+## 本轮工作记录（2026-08-09）
+
+### G1 请求/写入生命周期与跨工程状态安全
+
+- 当前实现 checkpoint 为 `98cb8c7f54d2d51ea5b59ca534aafd51544b773f`，已本地提交、尚未推送；新增 ADR 与台账在后续文档提交记录，不授予生产验收。
+- Workspace diagnostics capability 账本已覆盖最终判定、运行包、线序、标定和 handoff；GET/read 在 route、工程、session、flag 变化及 dispose 时 abort，晚到响应按 owner/workspace identity 丢弃，request/controller/timer/subscription 资源在释放后归零。
+- Project save、Global Variables、Template、Camera binding、runtime package、final decision、line sequence、calibration、AI handoff、新工程 draft 与 handoff receiver 均接入唯一 owner 的 pending/committed/rejected/unknown-outcome/reconciled 语义；服务端无 operation identity 的未知写入不自动重放，并由 leave guard 阻断离开直到可协调。
+- WorkspaceRuntime 统一纳入正式 workspace owner、新工程 draft、handoff receiver 和 FlowCanvas lifecycle participant；跨工程切换会关闭旧 popup、释放旧 owner，并防止旧工程响应投影到新工程。Inspection 页面显式区分 `unauthorized`、`forbidden`、`aborted`、`stale` 与 `partial-failure`。
+- Cleanup 与写入边界见 [ADR-G1：Cleanup 与写入生命周期](./ADR-G1-Cleanup与写入生命周期.md)。本轮未新增 Project save endpoint、HTTP transport、EventBus、Canvas kernel、HostBridge 或前端持久化 authority。
+- Camera continuous-preview 的 stop 只由 camera owner 发起一次；dispose 后 diagnostics lease 保持非零直到有界 cleanup settle，失败不自动重试并阻断 leave。
+
+#### G1 当前验证
+
+| 证据 | 状态 | 当前结果与边界 |
+| --- | --- | --- |
+| `npm run lint` | `PASS` | 当前 G1 工作树通过。 |
+| `npm run typecheck` | `PASS` | 当前 G1 工作树通过。 |
+| `npm run test:unit` | `PASS` | Studio UI 全量 `139` 个文件、`891/891` 个测试通过。 |
+| G1 生命周期定向测试 | `PASS` | `13` 个文件、`103/103`；覆盖 runtime、handoff/new-draft、leave guard、read/query、camera cleanup 与 diagnostics 生命周期语义。 |
+| `npm run build` | `PASS` | Vite 转换 `511` modules；仅保留既有 chunk size warning。 |
+| `git diff --check` | `PASS` | 文档回写完成后重新复核。 |
+| Remote CI | `NOT_PERFORMED` / `BLOCKED_BY_ENVIRONMENT` | 当前无有效 GitHub 认证入口，未创建 remote run，未修改 trigger，未跳过 required job。 |
+| WebView2 100% / 125% | `NOT_PERFORMED` | 未以 Chromium/fixture 证据替代真实 WebView2 与 Windows DPI。 |
+| Independent no-Node | `NOT_PERFORMED` | 未执行独立目标机发布启动验证。 |
+| Camera / PLC / Station | `NOT_PERFORMED` | 当前未取得现场硬件与 Station 联调证据。 |
+| Production soak | `NOT_PERFORMED` | 未执行生产环境 soak；`PRODUCTION_ACCEPTANCE` 仍为 `NOT_GRANTED`。 |
+
+### G2 合同解阻与功能差距（2026-08-09）
+
+- 当前 G2 实现与 G1 生命周期收口共同冻结在 `98cb8c7f54d2d51ea5b59ca534aafd51544b773f`；
+  该 checkpoint 已本地提交但尚未推送，不把它写成远端或生产候选。
+- GlobalVariables 由同一 `WorkspaceGlobalVariablesOwner` 读取当前 Flow draft，工作台只展示可映射到四种标量
+  类型的端口/参数；应用前重新校验算子、端口、参数 identity 和兼容性，错误码为 `GV009/GV010/GV011/GV014/GV015`。
+  正式定义/绑定仍进入既有 Project save chain，运行值仍使用后端 version 和 G1 unknown/reconcile 语义。
+- Line Sequence 继续使用现有 AutoTune preview/scenario endpoint。输入优先取同一 Preview owner 的当前输入图，
+  其次取当前输出图，预览 stale/未完成时不发送旧图；owner 解码并投影输入图、返回预览图、Outputs 和 scenario
+  `FinalPreview`。Apply 仍只修改 canonical Flow draft，不写设备、不保存工程。
+- Line Sequence 的 AI parameter-only follow-up 因缺少已批准的跨 capability composer/queue 合同而 `DEFER`；
+  不新增 AI session、第二 endpoint 或 localStorage 队列。
+- 其余 G2.1-G2.5、G2.7、G2.9 及高级能力的 owner、权限、并发身份、错误和 reconcile 处置见
+  [ADR-G2：合同解阻与能力处置](./ADR-G2-合同解阻与能力处置.md)。主协调 Owner 已冻结
+  `DEFER/RELOCATE` 边界，G2 合同决策 Gate 为 `DONE`；延期能力未迁移，未来重新进入仍需审批。
+
+#### G2 当前验证
+
+| 证据 | 状态 | 当前结果与边界 |
+| --- | --- | --- |
+| Studio UI typecheck | `PASS` | 当前 G2 工作树 `npm run typecheck` 通过。 |
+| GlobalVariables owner targeted | `PASS` | `7/7`；覆盖类型兼容、Flow identity、运行值和 dispose 生命周期。 |
+| Line Sequence owner/contract targeted | `PASS` | `11/11`；覆盖 InputImageBase64、返回预览图、FinalPreview、stale 和晚到响应。 |
+| Studio UI lint | `PASS` | 当前 G2 工作树 `npm run lint` 通过，`--max-warnings=0`。 |
+| Studio UI full unit | `PASS` | `139` 个文件、`891/891` 个测试通过。 |
+| Studio UI build | `PASS` | Vite 转换 `511` modules；保留既有 chunk size warning。 |
+| Product/Desktop/.NET endpoint tests | `NOT RUN` | 本轮未修改后端 endpoint；沿用既有证据，不外推到新工作树。 |
+| Browser / Playwright | `NOT RUN` | 尚未为 G2 新增 journey；不以 unit 结果替代 Chromium 或真实宿主。 |
+| WebView2 / DPI / no-Node / Remote CI / 现场硬件 | `NOT_PERFORMED` | 环境不具备或尚未执行，仍不授予生产验收。 |
 
 ### AI Resource Contract
 
 - 可复用：Camera resource 已有 identity、revision、binding decision 与工程关联合同，不需要新建前端资源库。
-- `model_resource=BLOCKED_BY_CONTRACT`：CV 算子消费 `ModelPath/ModelId`；`/api/ai/models` 是 LLM provider/model 配置，不是视觉模型 asset authority。
-- `template_artifact=BLOCKED_BY_CONTRACT`：`/api/templates` 拥有 flow template，不拥有 TemplateMatching 图像模板产物。
-- `calibration_resource=BLOCKED_BY_CONTRACT`：Project assets 拥有正式 calibration bundle，但 AI/UnitConvert 当前消费 numeric `Scale`，尚无权威 asset-to-scale projection。
-- `attachment_resource=BLOCKED_BY_CONTRACT`：Legacy 本地路径只是主机路径；AgentRun 会剥离路径，当前没有上传、版本、权限和 resource reference store。
+- `model_resource=DEFERRED`：CV 算子消费 `ModelPath/ModelId`；`/api/ai/models` 是 LLM provider/model 配置，不是视觉模型 asset authority。
+- `template_artifact=DEFERRED`：`/api/templates` 拥有 flow template，不拥有 TemplateMatching 图像模板产物。
+- `calibration_resource=DEFERRED`：Project assets 拥有正式 calibration bundle，但 AI/UnitConvert 当前消费 numeric `Scale`，尚无权威 asset-to-scale projection。
+- `attachment_resource=DEFERRED`：Legacy 本地路径只是主机路径；AgentRun 会剥离路径，当前没有上传、版本、权限和 resource reference store。
 - 因此本轮不把本地路径冒充正式资源，不为 model/template/calibration 创建前端私有绑定。
 
 ### Line Sequence authority 与闭环
@@ -156,7 +223,7 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 
 ### Remote CI / Final Gate（当前 G0 候选）
 
-- `21105d57d` 是本轮冻结实现；实现提交与本次文档提交分离，push 前已 fetch 并确认远程未前进、未分叉。
+- `98cb8c7f5` 是当前本地冻结实现；实现提交与本次文档提交分离，提交前已 fetch 并确认远程未前进、未分叉。
 - `ci.yml` 存在 `workflow_dispatch`，但 `gh auth status` 显示 token 失效，内置浏览器 GitHub 未登录，Chrome 会话不可用。本轮未创建 remote run，未修改 trigger，未跳过 required job。
 - `FINAL_GATE=PARTIAL`：当前 implementation SHA 本地 gates 通过；clean-checkout CI、WebView2、no-Node 与现场硬件仍缺失。
 
@@ -195,8 +262,9 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 
 ### Contract blockers retained
 
-- AI attachment、CV model artifact、TemplateMatching artifact、calibration asset-to-scale projection 与 Advanced Settings 仍按合同缺口记录，不新增第二套 authority。
-- Line Sequence 软件闭环已完成，但未包含设备写入；Remote CI、WebView2 100%/125%、独立 no-Node、现场硬件与生产 soak 仍未取得证据。
+- AI attachment、CV model artifact、TemplateMatching artifact、calibration asset-to-scale projection 与 Advanced Settings 仍按合同缺口记录；G2 ADR 已补齐 owner、权限、并发身份、错误/reconcile、fallback 和重新进入条件，不新增第二套 authority。
+- GlobalVariables 类型/identity 校验与 Line Sequence Preview 输入/返回图已进入 `98cb8c7f5`；Line Sequence AI parameter-only follow-up、通用 AutoTune 入口和 N 点高级工作流仍按 ADR 延期。
+- Line Sequence 软件闭环仍不包含设备写入；Remote CI、WebView2 100%/125%、独立 no-Node、现场硬件与生产 soak 仍未取得证据。
 
 ## 测试与真实环境（前序 F10 checkpoint；当前 G0 证据见上节）
 
@@ -229,4 +297,4 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 
 ## 提交
 
-本轮 implementation checkpoint：`21105d57d`（稳定线 authority/contract、operator metadata、acquisition/Preview、质量与 CI/测试稳定性语义同步）；文档提交单独记录并随本分支推送。前序 checkpoint：`026768cf4`、`1af7b2ec6`、`8846c52e4`、`d469a4740`。提交和软件测试不会自动授予生产验收。
+当前 implementation checkpoint：`98cb8c7f5`（G1 生命周期/状态安全与 G2 GlobalVariables、Line Sequence 投影）；前序 G0 checkpoint：`21105d57d`。文档提交单独记录并最终随本分支推送。更早 checkpoint：`026768cf4`、`1af7b2ec6`、`8846c52e4`、`d469a4740`。提交和软件测试不会自动授予生产验收。
