@@ -2,10 +2,10 @@
 
 ```text
 DOCUMENT_ROLE=EXECUTION_PLAN
-DOCUMENT_STATE=G5_READY
+DOCUMENT_STATE=G6_BLOCKED_BY_ENVIRONMENT
 CURRENT_BRANCH=studio-ui-next
 PLANNING_BASELINE_HEAD=f8569fa85244d19a18ba7308051e4d2b2ed4060a
-IMPLEMENTATION_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
+IMPLEMENTATION_BASELINE_HEAD=93cc880619b51d68828bcbc3336b77c83ad60dcc
 REFERENCE_STABLE_REF=origin/codex初稿@e76c74e392bb14ffe02ef9ea9c7a614cb8987f04
 PLANNING_MERGE_BASE=e1bad492fecb6dff2c0a8f848db9ebfa18acf093
 PLANNING_DIVERGENCE=STABLE_ONLY_81_NEXT_ONLY_294
@@ -22,25 +22,38 @@ G0_REMOTE_REFRESH=PASS_NO_REMOTE_ADVANCE_OR_FORK
 G1_STATE=DONE
 G1_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 G1_IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
-G1_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G1_WORKTREE_STATE=COMMITTED_IN_BRANCH_HISTORY
 G1_VERIFICATION_DATE=2026-08-09
 G2_STATE=DONE
 G2_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 G2_IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
-G2_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G2_WORKTREE_STATE=COMMITTED_IN_BRANCH_HISTORY
 G2_VERIFICATION_DATE=2026-08-09
 G3_STATE=DONE
 G3_BASELINE_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
 G3_PRODUCT_IMPLEMENTATION_HEAD=a3c043e77ff9bcbc80fbf638f8f9f52a217fa8a8
 G3_EVIDENCE_HEAD=1c6e61e5a53d59ac3a7f78054af5eab3e86ec667
-G3_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G3_WORKTREE_STATE=COMMITTED_IN_BRANCH_HISTORY
 G3_VERIFICATION_DATE=2026-08-09
 G4_STATE=DONE
 G4_BASELINE_HEAD=1c6e61e5a53d59ac3a7f78054af5eab3e86ec667
 G4_HOST_IMPLEMENTATION_HEAD=245e9cec9398cbcc2bc42d3d3cc79176634a76bb
 G4_EVIDENCE_HEAD=1c8ad67f3a890ed0a8cd72702cef82ed9623f367
-G4_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G4_WORKTREE_STATE=COMMITTED_IN_BRANCH_HISTORY
 G4_VERIFICATION_DATE=2026-08-09
+G5_STATE=DONE
+G5_BASELINE_HEAD=1c8ad67f3a890ed0a8cd72702cef82ed9623f367
+G5_PRODUCT_IMPLEMENTATION_HEAD=1ed799231bcc003c074d6787e9448433bed32956
+G5_EVIDENCE_HEAD=93cc880619b51d68828bcbc3336b77c83ad60dcc
+G5_VERIFICATION_DATE=2026-08-09
+G5_LOCAL_SOFTWARE_GATE=PASS
+G6_STATE=BLOCKED_BY_ENVIRONMENT
+WEBVIEW2_100_LOCAL_AUTOMATED=PASS_DEBUG_AND_RELEASE
+WEBVIEW2_125=NOT_PERFORMED
+INDEPENDENT_NO_NODE=NOT_PERFORMED
+REMOTE_CI=BLOCKED_BY_ENVIRONMENT
+FIELD_CAMERA_PLC_STATION_AI=NOT_PERFORMED
+PRODUCTION_SOAK=NOT_PERFORMED
 PRODUCTION_ACCEPTANCE=NOT_GRANTED
 LEGACY_RETIREMENT=NOT_APPROVED
 ```
@@ -61,10 +74,12 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 - AI attachment、CV model artifact、TemplateMatching artifact、calibration asset projection、数据库高级维护
   仍为 `BLOCKED_BY_CONTRACT`；G2 ADR 已冻结延期边界，未由前端私有实现替代。
 - GlobalVariables 类型过滤/Flow identity 校验和 Line Sequence 最近图像输入/返回预览投影已在
-  `98cb8c7f5` 实现 checkpoint 完成；尚未推送远端。
-- F10 已记录 implementation SHA 的 Chromium/fixture 定向 journey `7/7`；该结果不代表真实宿主通过。
+  `98cb8c7f5` 完成，并已进入当前分支历史；G5 最终候选为 `93cc88061`。
+- G5 当前 SHA 已取得 StudioUI、Studio UI Next Playwright、受影响 .NET、真实 WinForms/WebView2 Debug/Release
+  scale 1.0、rollback、20-cycle soak、性能、Release publish 和本机 no-Node 静态/进程树证据。
 - Remote CI 当前为 `BLOCKED_BY_ENVIRONMENT`，Final Gate 为 `PARTIAL`，生产验收仍为 `NOT_GRANTED`。
-- 真实 WebView2 100%/125%、独立 no-Node、现场 Camera/PLC/Station、生产 soak 尚未完成。
+- 本机真实 WebView2 100% 自动证据已完成；Windows 125%、独立无 Node 目标机、现场 Camera/PLC/Station/AI、
+  生产 soak 与产品 Owner 签收仍未完成，不能由本机证据替代。
 - `NEXT_DEFAULT` 不等于 Legacy 已退役；Legacy 页面、静态文件和 compatibility chain 仍需受控隔离。
 
 规划基线只是进入点。开始任何实现前必须执行 G0，刷新远端并重新冻结 clean SHA。
@@ -89,8 +104,8 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 | G2 | P0/P1 | 后端合同解阻与功能差距决策 | DONE | 主协调 Owner + 对应后端 Owner | G0-G1 DONE |
 | G3 | P1/P2 | 产品体验、视觉、中文与 Vue 可维护性收口 | DONE | UI Owner；共享面由主协调 Owner | G2 DONE |
 | G4 | P0 | Legacy profile 隔离、rollback 与退役准备 | DONE | Host/Release Owner | G0-G3 DONE |
-| G5 | P0 | 同一 clean SHA 的本地软件证据 | READY | Final Evidence Owner | G4 DONE |
-| G6 | P0 | 真实宿主、目标机、远程与现场验收 | LOCKED | Release/Field Owner | G5 DONE |
+| G5 | P0 | 同一 clean SHA 的本地软件证据 | DONE | Final Evidence Owner | G4 DONE |
+| G6 | P0 | 真实宿主、目标机、远程与现场验收 | BLOCKED_BY_ENVIRONMENT | Release/Field Owner | G5 DONE |
 
 ## 4. G0：候选冻结与稳定线语义同步
 
@@ -155,9 +170,9 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 - [x] 每类写请求都有 committed / rejected / unknown-outcome / reconciled 的可证明终态。
 - [x] cleanup ADR 获得批准，未批准的 dispose 后请求保持阻断。
 
-G1 实现已在 `98cb8c7f5` checkpoint 提交但尚未推送；当前验证与边界见
-`docs/进行中/StudioUINext/F10_ContractAndProductionPlan.md` 的 G1 工作记录。该 SHA 是本地候选，
-不冒充远端候选或生产验收。
+G1 实现已在 `98cb8c7f5` checkpoint 提交并进入当前分支历史；当前验证与边界见
+`docs/进行中/StudioUINext/F10_ContractAndProductionPlan.md` 的 G1 工作记录。最终 G5 证据另绑定
+`93cc88061`；提交或推送均不冒充生产验收。
 
 ## 6. G2：合同解阻与功能差距
 
@@ -257,35 +272,64 @@ WinForms/WebView2 Debug 100% 自动证据；它证明 profile 隔离、fail-clos
 
 所有命令绑定同一个 clean source SHA；任一实现修改都会使本 Gate 重新开始。
 
-- [ ] G5.1 StudioUI：`npm run lint`。
-- [ ] G5.2 StudioUI：`npm run typecheck`。
-- [ ] G5.3 StudioUI：`npm run test:unit`。
-- [ ] G5.4 StudioUI：`npm run build`、production build 和既有 bundle gate。
-- [ ] G5.5 Studio UI Next Playwright：Project、Workspace、Results、Stations、Settings、AI、Inspection、
+- [x] G5.1 StudioUI：`npm run lint`。
+- [x] G5.2 StudioUI：`npm run typecheck`。
+- [x] G5.3 StudioUI：`npm run test:unit`。
+- [x] G5.4 StudioUI：`npm run build`、production build 和既有 bundle gate。
+- [x] G5.5 Studio UI Next Playwright：Project、Workspace、Results、Stations、Settings、AI、Inspection、
   lifecycle/flag/session、responsive/accessibility 全部受影响 journey。
-- [ ] G5.6 .NET：按仓库固定脚本串行运行受影响的 Product、Desktop endpoints、Services、Runtime、Station 测试；
+- [x] G5.6 .NET：按仓库固定脚本串行运行受影响的 Product、Desktop endpoints、Services、Runtime、Station 测试；
   同一 `.csproj` 合并过滤条件，不并发启动。
-- [ ] G5.7 Release publish 只写 `./.tmp/publish-check/`，验证 hashed assets、manifest、Next/Legacy profile 和 stale chunk。
-- [ ] G5.8 静态 no-Node 扫描、启动配置、rollback runner、性能/内存基线分别记录；不把扫描冒充目标机启动。
-- [ ] G5.9 运行 `git diff --check`，确认无未忽略 publish、截图、日志和测试结果产物。
-- [ ] G5.10 更新 F10 evidence manifest：source SHA、命令、环境、结果、产物、失败分类和未执行项完整。
+- [x] G5.7 Release publish 只写 `./.tmp/publish-check/`，验证 hashed assets、manifest、Next/Legacy profile 和 stale chunk。
+- [x] G5.8 静态 no-Node 扫描、启动配置、rollback runner、性能/内存基线分别记录；不把扫描冒充目标机启动。
+- [x] G5.9 运行 `git diff --check`，确认无未忽略 publish、截图、日志和测试结果产物。
+- [x] G5.10 更新 F10 evidence manifest：source SHA、命令、环境、结果、产物、失败分类和未执行项完整。
+
+G5 最终证据全部绑定 `93cc880619b51d68828bcbc3336b77c83ad60dcc`：
+
+| 证据域 | 结果 |
+| --- | --- |
+| StudioUI | lint、typecheck、Debug/production build、bundle budget、bundle reproducibility PASS；`139` files / `903` unit tests；Vite `530` modules；bundle `2,110,258` bytes |
+| Studio UI Next Playwright | `164 passed / 52 evidence-only skipped / 0 failed`；命令显式使用 `CV_UI_SCENARIO=studio-ui-next` |
+| .NET 串行门禁 | Services `523/523`、Stage12 `119/119`、PLC 软件回归 `56/56`、Desktop endpoints `430/430`、Runtime/Station `108/108`、Inspection/Station `53/53`、AgentRun `78/78`、AI revalidation `114/114` |
+| Startup profiles | 真实 WebView2 Debug 8/8 PASS：Legacy、pilot、candidate、`NEXT_DEFAULT` 与 missing-assets fail-closed |
+| Final journey / soak | 2 次重启、create/run/logout/reopen/delete、20/20 cycles、20 unique Results、GC/WeakRef/owner/resource/数据库清理 PASS |
+| Rollback | `NEXT_DEFAULT -> missing assets -> LEGACY_FALLBACK -> NEXT_DEFAULT`；同库 authority identity、唯一 root/Host owner 与清理 PASS |
+| Release publish / no-Node | 7/7 PASS；hashed assets/manifest、Legacy/Next/missing-assets、进程树无 Node child、清理 PASS；独立无 Node 机器 `NOT_PERFORMED` |
+| 性能 | primary median `35.17 ms`、secondary median `40.62 ms`、route switch p95 `40.93 ms`；heap `+298,560 B`，CDP nodes/listeners delta `0/0` |
+
+证据索引位于 `.tmp/studio-ui-next/g5-93cc88061/`。该目录被 Git 忽略；Release publish 内容和当前 run 的
+空包装目录已清理。详细命令、环境、失败分类、manifest 与 G6 未执行项见 F10。
 
 **G5 退出条件**：当前 clean SHA 的所有软件 Gate 为 PASS 或有经批准的明确 blocker；历史 F09/M00/M09 PASS
-不得充当当前证据。
+不得充当当前证据。当前候选已满足 G5 退出条件；G6 仅由外部环境与人工验收解锁，不自动授予生产验收。
 
 ## 10. G6：真实环境与生产验收
 
+G6 当前为 `BLOCKED_BY_ENVIRONMENT`，下列未勾选项是外部目标机、远程服务、现场设备或产品 Owner 的真实
+验收责任，不允许用本地自动化补写 PASS：
+
 - [ ] G6.1 真实 WinForms + WebView2：Windows 100% 和 125%，Debug/Release，启动、登录、会话失效、关闭。
+  当前仅本机 Windows 100%/96 DPI、Debug/Release 自动证据 PASS；`WEBVIEW2_125=NOT_PERFORMED`。
 - [ ] G6.2 1920x1080、1536x864、1366x768/等效 client size；light/dark、compact/comfortable。
+  Chromium 方向性矩阵已通过；真实 WebView2 只测 1600x1000 window、1584x936 viewport、scale 1.0。
 - [ ] G6.3 独立无 Node 目标机安装、启动、升级、资源加载和卸载验证。
+  本机静态/进程树证据为 PASS；`INDEPENDENT_NO_NODE=NOT_PERFORMED`。
 - [ ] G6.4 Remote CI clean checkout；required jobs 和 Final Gate 全部通过，不放宽性能/质量阈值。
-- [ ] G6.5 真实 Camera：发现、绑定、单帧、连续预览、触发、断连恢复、标定。
-- [ ] G6.6 真实 PLC/TCP：连接、收发、超时、断连、重连和高风险命令状态。
+  `REMOTE_CI=BLOCKED_BY_ENVIRONMENT`；普通分支 push 不等于完整 CI。
+- [ ] G6.5 真实 Camera：发现、绑定、单帧、连续预览、触发、断连恢复、标定。`NOT_PERFORMED`。
+- [ ] G6.6 真实 PLC/TCP：连接、收发、超时、断连、重连和高风险命令状态。`NOT_PERFORMED`。
 - [ ] G6.7 真实 Station：运行包、测试包、部署、命令 unknown-outcome/reconcile、结果/日志/健康回流。
+  `NOT_PERFORMED`。
 - [ ] G6.8 真实 AI 模型与资源：澄清、Build、attachment/resource、handoff、恢复、取消和正式保存。
+  `NOT_PERFORMED`；延期合同项仍按 G2 ADR 管理。
 - [ ] G6.9 rollback drill、长时间运行、生产 soak、内存/SSE/request 资源稳定性。
+  本机 rollback 与 20-cycle bounded soak PASS；长时间生产 soak `NOT_PERFORMED`。
 - [ ] G6.10 产品 Owner 签收；只有签收后才能设置 `PRODUCTION_ACCEPTANCE=GRANTED`，另行批准
   `LEGACY_RETIREMENT`。
+
+G6 不因 G5 完成而自动通过。当前必须保持：`PRODUCTION_ACCEPTANCE=NOT_GRANTED`、
+`LEGACY_RETIREMENT=NOT_APPROVED`。
 
 ## 11. Owner 与并行规则
 
@@ -305,18 +349,20 @@ WinForms/WebView2 Debug 100% 自动证据；它证明 profile 隔离、fail-clos
 
 ## 12. 通用 Definition of Done
 
-- [ ] 完整用户路径可完成，不只证明路由、按钮或 DOM 存在。
-- [ ] 旧版能力已标记为保留、优化、重定位、只读、隐藏、延后或经批准退役。
-- [ ] 后端 authority、`ProjectSaveCoordinator`、Runtime/Station、AgentRun 和正式结果权威未改变。
-- [ ] 没有第二 API transport、HostBridge、EventBus、ServiceRegistry、Canvas 或保存链。
-- [ ] 唯一 owner、subscription、request、timer、SSE 和写入口具有 mount/dispose 证据。
-- [ ] 权限、readonly、running、loading、empty、error、offline、stale、conflict、unknown outcome 已覆盖。
-- [ ] 简体中文术语一致；错误说明发生原因、影响和下一步，不用诊断码代替解释。
-- [ ] 1920x1080 和 125% 等效短屏下核心操作可达，无水平滚动、双层滚动或越界浮层。
+- [x] 完整用户路径可完成，不只证明路由、按钮或 DOM 存在。
+- [x] 旧版能力已标记为保留、优化、重定位、只读、隐藏、延后或经批准退役。
+- [x] 后端 authority、`ProjectSaveCoordinator`、Runtime/Station、AgentRun 和正式结果权威未改变。
+- [x] 没有第二 API transport、HostBridge、EventBus、ServiceRegistry、Canvas 或保存链。
+- [x] 唯一 owner、subscription、request、timer、SSE 和写入口具有 mount/dispose 证据。
+- [x] 权限、readonly、running、loading、empty、error、offline、stale、conflict、unknown outcome 已覆盖。
+- [x] 简体中文术语一致；错误说明发生原因、影响和下一步，不用诊断码代替解释。
+- [x] 1920x1080 和 125% 等效短屏下核心操作可达，无水平滚动、双层滚动或越界浮层。
 - [ ] unit/component、Playwright、相关 .NET 测试和真实环境证据按风险完成。
-- [ ] 所有证据绑定当前 clean SHA；未运行项诚实记录。
-- [ ] 文件白名单、`git diff --stat`、`git diff --check` 和临时产物检查通过。
-- [ ] F10 已更新并经过复审；未由自动测试自行授予生产验收。
+- [x] 所有 G5 证据绑定当前 clean SHA；G6 未运行项诚实记录。
+- [x] 文件白名单、`git diff --stat`、`git diff --check` 和临时产物检查通过。
+- [x] F10 已更新并经过复审；未由自动测试自行授予生产验收。
+
+唯一未满足的通用 DoD 是 G6 真实环境组合证据及产品 Owner 签收；该项保持未勾选，不能由本地软件门禁代替。
 
 ## 13. 停止条件
 
@@ -338,5 +384,8 @@ WinForms/WebView2 Debug 100% 自动证据；它证明 profile 隔离、fail-clos
 - [x] 完成 G2.1-G2.5 处置冻结、延期项重新进入条件和 `98cb8c7f5` 验证；G3 已解锁。
 - [x] 完成 G3 产品体验、视觉、中文与 Vue 工程收口；实现与浏览器方向性证据冻结在 `1c6e61e5a`。
 - [x] 完成 G4 Legacy profile 隔离、rollback 与退役准备；Legacy 源码保留，退役未获批准。
-- [ ] 在 `1c8ad67f3` 之后的文档冻结提交上开始 G5，并将全部本地软件证据绑定同一个新的 clean SHA。
+- [x] 在 `1c8ad67f3` 之后完成 G5；全部最终本地软件证据绑定
+  `93cc880619b51d68828bcbc3336b77c83ad60dcc`。
+- [ ] 由 Release/Field Owner 在具备目标环境后完成 G6：Windows 125%、独立无 Node 机器、Remote CI、
+  现场 Camera/PLC/Station/AI、生产 soak 与产品 Owner 签收。
 - [x] G1 实现未改变后端 authority、保存链、Runtime/Station、AgentRun，也未引入第二套基础设施。

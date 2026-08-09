@@ -8,10 +8,10 @@
 F10_STATE=ACTIVE
 F10_START_HEAD=38b80b0dfcb66db67a9eab5ff84f80b994104606
 F10_START_REMOTE_HEAD=38b80b0dfcb66db67a9eab5ff84f80b994104606
-IMPLEMENTATION_HEAD=1c8ad67f3a890ed0a8cd72702cef82ed9623f367
+IMPLEMENTATION_HEAD=93cc880619b51d68828bcbc3336b77c83ad60dcc
 DOCUMENTATION_HEAD=SELF
 BRANCH_HEAD_AT_REVIEW=SELF
-REMOTE_IMPLEMENTATION_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
+REMOTE_IMPLEMENTATION_HEAD=cd83db2bcc3117dbcd3039764ce8aa57206e5396
 BRANCH=studio-ui-next
 PROJECT_IMPORT_EXPORT=DONE
 AI_ATTACHMENT_RESOURCE=DEFERRED
@@ -25,36 +25,47 @@ LINE_SEQUENCE=DONE
 F10_BROWSER_JOURNEYS=DONE
 STATION_TEST_PACKAGE=PARTIAL
 DATABASE_ADVANCED=DEFERRED
-PARTIAL_EVIDENCE=PARTIAL
+LOCAL_SOFTWARE_EVIDENCE=DONE
+PARTIAL_EVIDENCE=PARTIAL_EXTERNAL
 WEBVIEW2_125=NOT_PERFORMED
 INDEPENDENT_NO_NODE=NOT_PERFORMED
 REMOTE_CI=BLOCKED_BY_ENVIRONMENT
 FINAL_GATE=PARTIAL
 PRODUCTION_ACCEPTANCE=NOT_GRANTED
+LEGACY_RETIREMENT=NOT_APPROVED
 G1_STATE=DONE
 G1_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 G1_IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
-G1_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G1_WORKTREE_STATE=COMMITTED_IN_BRANCH_HISTORY
 G1_VERIFICATION_DATE=2026-08-09
 G2_STATE=DONE
 G2_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
 G2_IMPLEMENTATION_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
-G2_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G2_WORKTREE_STATE=COMMITTED_IN_BRANCH_HISTORY
 G2_VERIFICATION_DATE=2026-08-09
 G3_STATE=DONE
 G3_BASELINE_HEAD=98cb8c7f54d2d51ea5b59ca534aafd51544b773f
 G3_PRODUCT_IMPLEMENTATION_HEAD=a3c043e77ff9bcbc80fbf638f8f9f52a217fa8a8
 G3_EVIDENCE_HEAD=1c6e61e5a53d59ac3a7f78054af5eab3e86ec667
-G3_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G3_WORKTREE_STATE=COMMITTED_IN_BRANCH_HISTORY
 G3_VERIFICATION_DATE=2026-08-09
 G4_STATE=DONE
 G4_BASELINE_HEAD=1c6e61e5a53d59ac3a7f78054af5eab3e86ec667
 G4_HOST_IMPLEMENTATION_HEAD=245e9cec9398cbcc2bc42d3d3cc79176634a76bb
 G4_EVIDENCE_HEAD=1c8ad67f3a890ed0a8cd72702cef82ed9623f367
-G4_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G4_WORKTREE_STATE=COMMITTED_IN_BRANCH_HISTORY
 G4_VERIFICATION_DATE=2026-08-09
 G4_WEBVIEW2_ROLLBACK_100_DEBUG=PASS_AUTOMATED
-G5_STATE=READY
+G5_STATE=DONE
+G5_BASELINE_HEAD=1c8ad67f3a890ed0a8cd72702cef82ed9623f367
+G5_PRODUCT_IMPLEMENTATION_HEAD=1ed799231bcc003c074d6787e9448433bed32956
+G5_EVIDENCE_HEAD=93cc880619b51d68828bcbc3336b77c83ad60dcc
+G5_VERIFICATION_DATE=2026-08-09
+G5_LOCAL_SOFTWARE_GATE=PASS
+G6_STATE=BLOCKED_BY_ENVIRONMENT
+WEBVIEW2_100_LOCAL_AUTOMATED=PASS_DEBUG_AND_RELEASE
+FIELD_CAMERA_PLC_STATION_AI=NOT_PERFORMED
+PRODUCTION_SOAK=NOT_PERFORMED
 ```
 
 ## G0 候选冻结与稳定线语义同步
@@ -131,8 +142,8 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 
 | Gate | 状态 | 当前证据 / blocker |
 | --- | --- | --- |
-| G0_REMOTE_CI | BLOCKED_BY_ENVIRONMENT | 当前冻结实现为 `21105d57d`；`ci.yml` 支持 `workflow_dispatch`，但本机 `gh` token 失效、内置浏览器未登录 GitHub、Chrome 会话不可用；未创建当前候选 run，未改 trigger。 |
-| G1_WORKSPACE_LIFECYCLE | DONE | `98cb8c7f5` 已完成请求/写入生命周期、跨工程状态隔离与 leave guard；13 个 G1 定向测试文件共 `103/103`，Studio UI 全量 139 个文件、`891/891` 测试通过。当前实现已本地提交、尚未推送。 |
+| G0_REMOTE_CI | BLOCKED_BY_ENVIRONMENT | 当前 G5 候选为 `93cc88061`；`ci.yml` 支持 `workflow_dispatch`，但本机无有效 GitHub 认证入口，未创建当前候选 run，未改 trigger。普通分支 push 不等于完整 CI。 |
+| G1_WORKSPACE_LIFECYCLE | DONE | `98cb8c7f5` 已完成请求/写入生命周期、跨工程状态隔离与 leave guard；13 个 G1 定向测试文件共 `103/103`，当前 G5 Studio UI 全量为 139 个文件、`903/903` 测试通过。实现已进入当前分支历史。 |
 | G1_PROJECT_CONTRACT | DONE | 复用 `ProjectLifecycleCoordinator`、`ProjectSaveCoordinator` 和现有 Project Service；JSON schema/version、CREATE/OVERWRITE、权限、revision、clientOperationId、validation、partial-save 防护和 replay/reconcile 已由现有 endpoint/lifecycle tests 覆盖。 |
 | G1_AI_RESOURCE_CONTRACT | DEFERRED | Camera resource identity/revision/decision 已有 authority；attachment、CV model artifact、TemplateMatching artifact 与 calibration asset-to-scale 投影缺正式后端合同，已按 G2 ADR 冻结延期且未新增私有 authority。 |
 | G1_CALIBRATION_CONTRACT | DONE | N 点 draft/solve 继续要求 Engineer/Admin、非空且存在的 Project 上下文；`ScaleOffset` 复用同一 solver、candidate bundle 和 Project asset save 链。本轮新增 Chromium/fixture solve + formal asset save/reconcile journey，未新增 calibration authority。 |
@@ -140,13 +151,13 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 | G2_RESULTS_EXPORT | DONE | 已补齐服务端 CSV/JSON export job、clientOperationId 幂等与对账、快照上界、取消、TTL、SHA-256 产物校验和权限错误映射；Results 页面仅对本机结果开放，Station 来源明确不支持。Studio UI 全量 `138/138` 文件、`869/869` 测试通过。 |
 | G3_DEVICE_COMMANDS | PARTIAL | Station unknown/reconcile 已有 Chromium/fixture journey。Line Sequence 本轮不执行设备写入，Apply 仅修改 canonical flow draft；未引入新 command authority。现场 Station/PLC 仍未验证。 |
 | G4_NEXT_UI_CONSUMPTION | DONE | Line Sequence 唯一 owner 挂载于 FlowWorkspace，只使用 shared `ApiTransport` 和 `FlowCanvasOwner.commands.patchNodeParameters`；Project/Results/Station/Template/Calibration 用户路径已有本轮 Chromium/fixture 证据。 |
-| G5_PARTIAL_EVIDENCE | PARTIAL | F10 Chromium/fixture 定向 journey `7/7`；仍不等同于真实 WebView2、DPI、no-Node 或现场硬件证据。 |
+| G5_LOCAL_SOFTWARE_EVIDENCE | DONE | `93cc88061` 的 StudioUI、Studio UI Next Playwright、受影响 .NET、真实 WebView2 Debug/Release scale 1.0、profiles、rollback、20-cycle soak、性能、publish 和本机 no-Node 证据均通过。 |
 | G6_UX_HARDENING | DONE | G3 产品体验实现在 `a3c043e77`，evidence fixture 修正在 `1c6e61e5a`；F02 `73/73`、F03 `12/12` 方向性截图与 manifest 通过。 |
 | G4_LEGACY_PROFILE_ISOLATION | DONE | `1c8ad67f3` 的真实 WinForms/WebView2 Debug 100% rollback manifest 为 PASS；Next/诊断/Legacy/Next 每次只有一个 root 和一个 profile 专属 Host message owner，dispose 后订阅归零，同一 Project/PersistenceRevision/Result authority identity 保持一致。 |
-| G7_WEBVIEW2 | PARTIAL | 已取得本机真实 WebView2 Debug 100% 自动 rollback 证据；Release 与 Windows 125% 仍为 `NOT_PERFORMED`。 |
-| G8_NO_NODE | NOT_PERFORMED | 当前未进行独立 no-Node 发布启动验证。 |
+| G7_WEBVIEW2 | PARTIAL | 已取得当前 SHA 的本机真实 WebView2 Debug/Release 100% 自动证据；Windows 125% 仍为 `NOT_PERFORMED`。 |
+| G8_NO_NODE | PARTIAL | 本机 publish 静态扫描、Desktop 进程树无 Node child、sanitized-path 启动均 PASS；独立无 Node 目标机仍为 `NOT_PERFORMED`。 |
 | G9_FIELD_HARDWARE | NOT_PERFORMED | 当前环境没有现场 Camera、PLC、Station 验证条件。 |
-| G10_FINAL_CI | PARTIAL | 当前 implementation SHA 本地 gates 通过；clean-checkout Remote CI 未运行，不授予 final/production acceptance。 |
+| G10_FINAL_CI | PARTIAL | 当前 implementation SHA 本地软件 gates 通过；clean-checkout Remote CI、125% DPI、独立目标机、现场硬件、生产 soak 和产品签收未完成，不授予 production acceptance。 |
 
 状态枚举：`DONE`、`PARTIAL`、`BLOCKED_BY_CONTRACT`、`BLOCKED_BY_ENVIRONMENT`、`NOT_PERFORMED`、`FAILED_RELATED`、`FAILED_UNRELATED`、`DEFERRED`。
 
@@ -158,6 +169,127 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 - Production acceptance 不由本台账自动授予；软件门禁与真实 WebView2、DPI、no-Node、现场硬件、生产 soak 和产品 owner 签收分别记录。
 
 ## 本轮工作记录（2026-08-09）
+
+### G5 同一 clean SHA 的本地软件证据
+
+G5 最终候选为 `93cc880619b51d68828bcbc3336b77c83ad60dcc`。G4 文档冻结后，产品与门禁收口按以下
+checkpoint 进入当前历史：`8017f1f0e` 延迟加载 authenticated runtime，`66677079f` 修复最终 Browser
+回归，`81ec82f9d` 对齐 Runtime package fixture，`1ed799231` 固化 AI revalidated candidate identity，
+`1c466edb3` 补齐 final evidence canonical input。随后四个提交只修改 WebView2 evidence runner/tests：
+`4dc7c7e86`、`82538e515`、`3824fa0b5`、`93cc88061`。由于 source SHA 已变化，前端、Playwright、
+.NET 和真实 WebView2 最终门禁均在 `93cc88061` 重新执行，不把 `1c466edb3` 的历史 PASS 外推到新候选。
+
+#### G5 执行环境
+
+| 维度 | 当前事实 |
+| --- | --- |
+| OS / CPU / memory | Windows `10.0.22000` x64；Intel i7-12700F，20 logical CPUs，约 68.5 GB memory |
+| WebView2 | Edge WebView2 `151.0.4129.72`；CDP protocol `1.3` |
+| 本机显示证据 | 1920x1080 screen；native window 1600x1000、client 1584x961、Browser viewport 1584x936；native DPI 96、scale/DPR 1.0 |
+| Node 角色 | 绝对路径 Node 仅作为 Desktop 进程树外的 CDP driver；所有发布 Desktop 进程树 `nodeDescendantCount=0` |
+| 证据根 | `.tmp/studio-ui-next/g5-93cc88061/`；被 Git 忽略，未作为源码提交 |
+
+本机 scale 1.0 证据不等于真实 Windows 125%。外置 Node driver 证明 Desktop 发布产物本身不派生 Node，
+但不等于独立无 Node 目标机；两项边界分别保持 `WEBVIEW2_125=NOT_PERFORMED` 与
+`INDEPENDENT_NO_NODE=NOT_PERFORMED`。
+
+#### StudioUI 与 Browser 门禁
+
+| 命令 / 证据 | 结果 |
+| --- | --- |
+| `npm run lint` | PASS；`--max-warnings=0` |
+| `npm run typecheck` | PASS；app、Vitest 与 Node 三组 TypeScript 配置 |
+| `npm run test:unit` | PASS；`139` files、`903/903` tests |
+| `npm run build` | PASS；Vite `530` modules |
+| `npm run build:production` + `npm run bundle:gate` | PASS；JS `1,765,384 B`、CSS `328,876 B`、other `15,998 B`、total `2,110,258 B` |
+| `npm run bundle:verify` | PASS；两次 production build 的规范化报告一致，全部 budget PASS |
+| `CV_UI_SCENARIO=studio-ui-next npx playwright test --reporter=list` | PASS；`164 passed / 52 evidence-only skipped / 0 failed`，216 total |
+| `soak-metric-analysis.test.cjs` | PASS；`4/4`，覆盖有界预热、持续泄漏、总量阈值和跨度缩放 |
+| `studio-ui-next-infrastructure.test.mjs` | PASS；`3/3`，锁定性能 handle dispose 与 completion signal 协议 |
+| 相关 `.cjs` `node --check` | PASS |
+
+52 个 evidence-only skip 需要正式 SHA/环境变量和独立 evidence directory；本轮没有用占位 SHA 强行执行。
+正式方向性截图证据仍以既有 F02/F03 manifest 为准，当前 G5 的功能 Playwright 不冒充 Windows DPI。
+
+#### .NET 串行门禁
+
+所有调用均通过 `run-dotnet-test-serial.ps1` 项目锁；同一 `.csproj` 没有并发。Services、Runtime/Station、
+Desktop endpoint 与 Station fixture 的最终 PASS 在沙箱外正常 Windows 路径执行，未修改 ACL、产品代码或
+测试断言。
+
+| 命令 / 过滤范围 | 结果 |
+| --- | --- |
+| `run-tests-services-regression.ps1 -NoBuild -NoRestore` | PASS；`523/523` |
+| `run-tests-phase42-regression.ps1 -NoBuild -NoRestore` | PASS；`119/119` |
+| `run-tests-plc-regression.ps1 -NoBuild -NoRestore` | PASS；软件回归 `56/56`，不等于真实 PLC |
+| `run-tests-desktop-endpoints.ps1 -NoBuild -NoRestore` | PASS；`430/430` |
+| Product Runtime/Station 13 类单次合并过滤 | PASS；`108/108` |
+| Desktop Inspection/Station 6 类单次合并过滤 | PASS；`53/53` |
+| `AgentRunEndpointsTests` | PASS；`78/78` |
+| AI revalidation 5 类单次合并过滤 | PASS；`114/114` |
+
+TRX 与 classified-gate JSON 位于 `.tmp/studio-ui-next/g5-93cc88061/dotnet/`，每组均校验 total、executed、
+passed、failed/error/timeout/aborted 计数；不存在零测试或仅 discovery 成功的伪 PASS。
+
+#### 真实 WinForms / WebView2 与发布证据
+
+| 入口与 manifest | 结果 |
+| --- | --- |
+| `Invoke-StudioUiProfileEvidence.ps1`；`webview2/profiles-final2/studio-ui-profile-evidence.json` | PASS；8/8：Legacy default/fallback、三个 pilot、candidate、`NEXT_DEFAULT`、missing-assets |
+| `Invoke-StudioUiRollbackEvidence.ps1`；`webview2/rollback/studio-ui-rollback-evidence.json` | PASS；Next → missing-assets → Legacy → Next，同库 authority identity、唯一 root/Host owner、订阅 dispose 与数据库清理通过 |
+| `Invoke-StudioUiFinalEvidence.ps1 -SoakCycles 20`；`webview2/final-final/studio-ui-final-evidence.json` | PASS；create/run/logout、reopen/delete、soak 三阶段全部 PASS；2 次重启、20/20 cycles、20 unique Results |
+| `Invoke-StudioUiWebView2Matrix.ps1 -RunScope publish-only`；`webview2/publish-final/studio-ui-webview2-matrix.json` | PASS；Release 7/7：Legacy、Overview、Projects、Operators、Stations、Results、missing-assets |
+| `studio-ui-no-node-evidence.json` | 本机 PASS；publish static scan、published runtime、Desktop child-process audit、sanitized-path startup 均 PASS；独立无 Node 机器未执行 |
+| `studio-ui-product-performance.json` + cleanup manifest | PASS；source SHA、runtime errors、exit completion、ports、database、runtime root 与 shutdown stages 均通过 |
+
+Final soak 在两次 warmup 后观测 18 个样本：heap 总增长 `2,141,012 B`，低于 `8 MiB` 总阈值；tail
+增长 `190,688 B`，低于按跨度缩放的 `986,895 B` 持续增长阈值。DOM nodes、JS event listeners 与 document
+count delta 均为 0；working set、private memory、handle count 不呈持续单调增长。GC、WeakRef、logout 后
+owner/resource 释放和两个数据库删除均 PASS。
+
+产品性能采样结果为 primary median `35.17 ms`、secondary median `40.62 ms`、route switch p95
+`40.93 ms`；heap delta `+298,560 B`，CDP nodes delta `0`，CDP JS event listeners delta `0`，runtime
+errors `0`。instrumentation listener `+200` 与 completed-request AbortController `+30` 是采样器/已完成请求
+观测，不单独作为泄漏判据；真正的 CDP DOM/listener、timer/interval、owner ledger 与 cleanup gate 均通过。
+
+Release publish 只进入 `.tmp/publish-check/studio-ui-next-f09/g5-93cc88061-publish-final/`。manifest 记录
+publish、missing-assets、build artifacts 与 runtime directory 全部删除；复核后又删除了 harness 遗留的空 run
+包装目录。发布 evidence 本身保留在 `.tmp/studio-ui-next/g5-93cc88061/webview2/publish-final/`。
+
+#### 失败与非通过样本分类
+
+| 样本 | 分类与处理 |
+| --- | --- |
+| Services 首次沙箱运行 | `BLOCKED_BY_ENVIRONMENT`；真实 AppData 写入被拒，沙箱外同组 `523/523` PASS |
+| Product Runtime/Station 首次沙箱运行 | `BLOCKED_BY_ENVIRONMENT`；AppData/result-record 写入被拒，沙箱外同组 `108/108` PASS |
+| Desktop endpoint 首次沙箱运行 | `BLOCKED_BY_ENVIRONMENT`；Windows Event Log 写权限被拒，沙箱外 `430/430` PASS |
+| Station/Inspection 历史首次运行 | `BLOCKED_BY_ENVIRONMENT`；Station fixture/AppData 权限，最终沙箱外 6 类 `53/53` PASS |
+| 旧 SHA rollback 样本 | `FAILED_THEN_FIXED_NOT_COUNTED_AS_PASS`；reconcile 采样竞态，最终 `93cc88061` manifest 使用全新目录并 PASS |
+| MSBuild canonical input 漏项 | `FAILED_THEN_FIXED_NOT_COUNTED_AS_PASS`；`1c466edb3` 将输入纳入 `.csproj`，当前 build/publish PASS |
+| Final runner 算子 Flyout | `FAILED_THEN_FIXED_NOT_COUNTED_AS_PASS`；旧 runner 重复点击 active trigger 导致关闭；`4dc7c7e86` 保持 Flyout，`82538e515` 验证加入后真实 detached |
+| 旧 heap 门禁 | `FAILED_THEN_FIXED_NOT_COUNTED_AS_PASS`；未区分有界收敛与持续泄漏；`3824fa0b5` 增加总量与 tail span 门禁及 4 个分析测试 |
+| 旧性能 runner | `FAILED_THEN_FIXED_NOT_COUNTED_AS_PASS`；未 dispose CDP handles 产生假泄漏且缺 completion signal；`93cc88061` 使用 locator/显式 handle dispose 并写 `CV_NODE_COMPLETION_SIGNAL` |
+| 性能入口两次前置失败 | `PREFLIGHT_REJECTED_NOT_RUNTIME_FAILURE`；参数/环境校验阶段即退出，未启动 Desktop，不计产品性能失败 |
+| Profile 沙箱入口 | `BLOCKED_BY_ENVIRONMENT`；`Win32_Process` 查询被拒，只完成前置 build；新目录沙箱外 8/8 PASS |
+| 未设置 `CV_UI_SCENARIO` 的 `npm test` | `WRONG_LANE_NOT_G5_EVIDENCE`；进入 Legacy 199-test lane，外层 20 分钟超时且含 Legacy 失败标记；未计入 G5，随后正确 Next lane 164/52/0 PASS，残留 Node 进程为 0 |
+
+任何失败目录、旧 SHA 或前置失败都没有被复用为最终 PASS manifest。
+
+#### G5 退出与 G6 保留项
+
+G5 的同一 SHA 本地软件门禁为 `DONE`。下列证据超出当前机器、认证和现场资源，继续保持真实状态：
+
+| G6 项 | 当前状态 |
+| --- | --- |
+| Windows WebView2 125% | `NOT_PERFORMED`；本轮只观察 native 96 DPI / scale 1.0 |
+| 独立无 Node 目标机 | `NOT_PERFORMED`；本机静态/进程树 PASS 不替代目标机安装、升级、卸载 |
+| Remote CI clean checkout | `BLOCKED_BY_ENVIRONMENT`；无有效 GitHub 认证入口，未创建当前候选 run，普通 push 不等于完整 CI |
+| 真实 Camera / PLC / TCP / Station / AI | `NOT_PERFORMED`；软件 fixture 与 endpoint 回归不替代现场设备/模型 |
+| 长时间生产 soak | `NOT_PERFORMED`；本机 20-cycle bounded soak 仅为软件门禁 |
+| 产品 Owner 签收 | `NOT_PERFORMED` |
+
+因此 `FINAL_GATE=PARTIAL`、`PRODUCTION_ACCEPTANCE=NOT_GRANTED`、`LEGACY_RETIREMENT=NOT_APPROVED` 保持不变。
+G6 当前为 `BLOCKED_BY_ENVIRONMENT`，需要 Release/Field/Product Owner 在目标环境继续执行。
 
 ### G3 产品体验、视觉、中文与 Vue 工程收口
 
@@ -173,7 +305,7 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 - 架构审计未发现第二 API transport、EventBus、ServiceRegistry、Canvas kernel、HostBridge 执行通道、
   Project 保存链、query owner 或 write owner；Project/Flow/Runtime/Station/Results authority 未改变。
 
-#### G3 当前验证
+#### G3 checkpoint 验证
 
 | 证据 | 状态 | 当前结果与边界 |
 | --- | --- | --- |
@@ -185,11 +317,12 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 | F03 Workspace evidence | `PASS_BROWSER_FIXTURE` | `.tmp/studio-ui-next/f03/g3-1c6e61e5a/`；`12` PNG + `12` JSON，绑定当前 SHA 与 stable audit SHA `e76c74e3`；水平/垂直 overflow、runtime error、allowlist failure、owner conflict、viewport drift、截图哈希错误均为 `0`。 |
 | WebView2 host targeted | `PASS` | `WebView2HostTests -NoBuild -NoRestore`：`66/66`。这是宿主代码测试，不是手工真实 WebView2/DPI 验收。 |
 | 视觉复审 | `PASS_BROWSER_DIRECTIONAL` | 已复审 Projects、Results、Stations、Diagnostics、About、Station Admin 与 Workspace 的 light/dark、compact/comfortable、1920x1080/1536x864/1366x768 代表截图；未发现遮挡、截断、非预期滚动或卡片套卡片。 |
-| Windows DPI / native WebView2 | `NOT_PERFORMED` | F02/F03 均明确记录 `BROWSER_FIXTURE`、`HARNESS_SEEDED_SESSION` 与 `windowsDpi/nativeDpi=NOT_PERFORMED`；不冒充真实宿主证据。 |
+| Windows DPI / native WebView2 | `NOT_PERFORMED`（G3 当时） | F02/F03 均明确记录 `BROWSER_FIXTURE`、`HARNESS_SEEDED_SESSION` 与 `windowsDpi/nativeDpi=NOT_PERFORMED`；当前 G5 已取得本机 Debug/Release 100% 自动证据，仍不把方向性 fixture 冒充 Windows 125%。 |
 
-G3 退出条件已满足并解锁 G4。浏览器 fixture 只承担方向性视觉、交互和 owner 投影证据；真实 WebView2、
-Windows 100%/125%、独立 no-Node、现场硬件、Remote CI、生产 soak 与产品 Owner 签收继续留在 G6，
-`PRODUCTION_ACCEPTANCE=NOT_GRANTED`、`LEGACY_RETIREMENT=NOT_APPROVED` 保持不变。
+G3 退出条件已满足并解锁 G4。浏览器 fixture 只承担方向性视觉、交互和 owner 投影证据。当前 G5 已补齐
+本机真实 WebView2 Debug/Release 100%；Windows 125%、独立 no-Node 目标机、现场硬件、Remote CI、生产 soak
+与产品 Owner 签收继续留在 G6，`PRODUCTION_ACCEPTANCE=NOT_GRANTED`、`LEGACY_RETIREMENT=NOT_APPROVED`
+保持不变。
 
 ### G4 Legacy profile 隔离、rollback 与退役准备
 
@@ -216,7 +349,7 @@ Windows 100%/125%、独立 no-Node、现场硬件、Remote CI、生产 soak 与�
   数据/客户支持迁移方案、独立 ADR、回退窗口、备份策略和发布审批；当前
   `LEGACY_RETIREMENT=NOT_APPROVED`。
 
-#### G4 当前验证
+#### G4 checkpoint 验证
 
 | 证据 | 状态 | 当前结果与边界 |
 | --- | --- | --- |
@@ -226,40 +359,40 @@ Windows 100%/125%、独立 no-Node、现场硬件、Remote CI、生产 soak 与�
 | Authority identity | `PASS` | 同一 Project、`PersistenceRevision=4`、Flow、正式 Result、ExecutionSnapshot、flow/decision hash、image reference 与 history identity 跨重启一致；无 migration、无 dual-write，隔离数据库最终删除。 |
 | Host owner lifecycle | `PASS` | Next/诊断挂载 `studio-host-capabilities`，active subscription `1 -> 0`；Legacy 挂载 `legacy-compatibility`，active subscription `4 -> 0`；每次进程退出、端口、WebView2 user-data 与请求资源清理通过。 |
 | 失败样本 | `FAILED_THEN_FIXED_NOT_COUNTED_AS_PASS` | `g4-245e9cec9` 因 G3 新增 product/host version 后 smoke 旧字段集失败；`g4-893159d88` 因 Template/Results 正式只读请求未进入旧 allowlist 失败。两者均在首阶段停止并完成清理，最终 manifest 未复用其数据。 |
-| G6 外部环境 | `NOT_PERFORMED` | 本次只覆盖本机 Debug、scale 1.0 自动化；Release、Windows 125%、独立 no-Node 目标机、Remote CI、现场硬件、长时间生产 soak 与产品 Owner 签收仍未执行。 |
+| G6 外部环境 | `PARTIAL` | G4 当时只覆盖本机 Debug、scale 1.0 自动化；当前 G5 已补齐本机 Debug/Release scale 1.0。Windows 125%、独立 no-Node 目标机、Remote CI、现场硬件、长时间生产 soak 与产品 Owner 签收仍未执行。 |
 
 G4 退出条件已满足并解锁 G5。该结论只批准继续收集同一 clean SHA 的本地软件证据，不授予生产接受，
 也不批准 Legacy 物理退役。
 
 ### G1 请求/写入生命周期与跨工程状态安全
 
-- 当前实现 checkpoint 为 `98cb8c7f54d2d51ea5b59ca534aafd51544b773f`，已本地提交、尚未推送；新增 ADR 与台账在后续文档提交记录，不授予生产验收。
+- G1 实现 checkpoint 为 `98cb8c7f54d2d51ea5b59ca534aafd51544b773f`，已进入当前分支历史；本节保留该 checkpoint 当时的验证与边界，不把历史结果冒充当前 G5 或生产验收。
 - Workspace diagnostics capability 账本已覆盖最终判定、运行包、线序、标定和 handoff；GET/read 在 route、工程、session、flag 变化及 dispose 时 abort，晚到响应按 owner/workspace identity 丢弃，request/controller/timer/subscription 资源在释放后归零。
 - Project save、Global Variables、Template、Camera binding、runtime package、final decision、line sequence、calibration、AI handoff、新工程 draft 与 handoff receiver 均接入唯一 owner 的 pending/committed/rejected/unknown-outcome/reconciled 语义；服务端无 operation identity 的未知写入不自动重放，并由 leave guard 阻断离开直到可协调。
 - WorkspaceRuntime 统一纳入正式 workspace owner、新工程 draft、handoff receiver 和 FlowCanvas lifecycle participant；跨工程切换会关闭旧 popup、释放旧 owner，并防止旧工程响应投影到新工程。Inspection 页面显式区分 `unauthorized`、`forbidden`、`aborted`、`stale` 与 `partial-failure`。
 - Cleanup 与写入边界见 [ADR-G1：Cleanup 与写入生命周期](./ADR-G1-Cleanup与写入生命周期.md)。本轮未新增 Project save endpoint、HTTP transport、EventBus、Canvas kernel、HostBridge 或前端持久化 authority。
 - Camera continuous-preview 的 stop 只由 camera owner 发起一次；dispose 后 diagnostics lease 保持非零直到有界 cleanup settle，失败不自动重试并阻断 leave。
 
-#### G1 当前验证
+#### G1 checkpoint 验证
 
 | 证据 | 状态 | 当前结果与边界 |
 | --- | --- | --- |
-| `npm run lint` | `PASS` | 当前 G1 工作树通过。 |
-| `npm run typecheck` | `PASS` | 当前 G1 工作树通过。 |
+| `npm run lint` | `PASS` | G1 checkpoint 工作树通过。 |
+| `npm run typecheck` | `PASS` | G1 checkpoint 工作树通过。 |
 | `npm run test:unit` | `PASS` | Studio UI 全量 `139` 个文件、`891/891` 个测试通过。 |
 | G1 生命周期定向测试 | `PASS` | `13` 个文件、`103/103`；覆盖 runtime、handoff/new-draft、leave guard、read/query、camera cleanup 与 diagnostics 生命周期语义。 |
 | `npm run build` | `PASS` | Vite 转换 `511` modules；仅保留既有 chunk size warning。 |
 | `git diff --check` | `PASS` | 文档回写完成后重新复核。 |
 | Remote CI | `NOT_PERFORMED` / `BLOCKED_BY_ENVIRONMENT` | 当前无有效 GitHub 认证入口，未创建 remote run，未修改 trigger，未跳过 required job。 |
-| WebView2 100% / 125% | `NOT_PERFORMED` | 未以 Chromium/fixture 证据替代真实 WebView2 与 Windows DPI。 |
+| WebView2 100% / 125% | `NOT_PERFORMED`（G1 当时） | G1 checkpoint 未以 Chromium/fixture 证据替代真实 WebView2 与 Windows DPI；当前 G5 已取得本机 Debug/Release 100% 自动证据，125% 仍未执行。 |
 | Independent no-Node | `NOT_PERFORMED` | 未执行独立目标机发布启动验证。 |
 | Camera / PLC / Station | `NOT_PERFORMED` | 当前未取得现场硬件与 Station 联调证据。 |
 | Production soak | `NOT_PERFORMED` | 未执行生产环境 soak；`PRODUCTION_ACCEPTANCE` 仍为 `NOT_GRANTED`。 |
 
 ### G2 合同解阻与功能差距（2026-08-09）
 
-- 当前 G2 实现与 G1 生命周期收口共同冻结在 `98cb8c7f54d2d51ea5b59ca534aafd51544b773f`；
-  该 checkpoint 已本地提交但尚未推送，不把它写成远端或生产候选。
+- G2 实现与 G1 生命周期收口共同冻结在 `98cb8c7f54d2d51ea5b59ca534aafd51544b773f`；
+  该 checkpoint 已进入当前分支历史。本节保留 G2 当时的验证，不把它写成当前 G5 或生产候选。
 - GlobalVariables 由同一 `WorkspaceGlobalVariablesOwner` 读取当前 Flow draft，工作台只展示可映射到四种标量
   类型的端口/参数；应用前重新校验算子、端口、参数 identity 和兼容性，错误码为 `GV009/GV010/GV011/GV014/GV015`。
   正式定义/绑定仍进入既有 Project save chain，运行值仍使用后端 version 和 G1 unknown/reconcile 语义。
@@ -272,14 +405,14 @@ G4 退出条件已满足并解锁 G5。该结论只批准继续收集同一 clea
   [ADR-G2：合同解阻与能力处置](./ADR-G2-合同解阻与能力处置.md)。主协调 Owner 已冻结
   `DEFER/RELOCATE` 边界，G2 合同决策 Gate 为 `DONE`；延期能力未迁移，未来重新进入仍需审批。
 
-#### G2 当前验证
+#### G2 checkpoint 验证
 
 | 证据 | 状态 | 当前结果与边界 |
 | --- | --- | --- |
-| Studio UI typecheck | `PASS` | 当前 G2 工作树 `npm run typecheck` 通过。 |
+| Studio UI typecheck | `PASS` | G2 checkpoint 工作树 `npm run typecheck` 通过。 |
 | GlobalVariables owner targeted | `PASS` | `7/7`；覆盖类型兼容、Flow identity、运行值和 dispose 生命周期。 |
 | Line Sequence owner/contract targeted | `PASS` | `11/11`；覆盖 InputImageBase64、返回预览图、FinalPreview、stale 和晚到响应。 |
-| Studio UI lint | `PASS` | 当前 G2 工作树 `npm run lint` 通过，`--max-warnings=0`。 |
+| Studio UI lint | `PASS` | G2 checkpoint 工作树 `npm run lint` 通过，`--max-warnings=0`。 |
 | Studio UI full unit | `PASS` | `139` 个文件、`891/891` 个测试通过。 |
 | Studio UI build | `PASS` | Vite 转换 `511` modules；保留既有 chunk size warning。 |
 | Product/Desktop/.NET endpoint tests | `NOT RUN` | 本轮未修改后端 endpoint；沿用既有证据，不外推到新工作树。 |
@@ -308,11 +441,11 @@ G4 退出条件已满足并解锁 G5。该结论只批准继续收集同一 clea
 - Chromium/fixture 定向组 `7/7` 通过：Project canonical JSON import/export、Results server-side full-batch export/download、Station lost-response + duplicate lock + request identity reconcile、Template apply-to-draft、N Point solve + Project asset save/reconcile、Line Sequence Analyze/Recommendation/Apply，以及 draft stale/backend safety rejection。
 - 该证据只代表 Playwright Chromium + fixture contract，不代表真实 WebView2、DPI、Desktop endpoint 联调或现场设备。
 
-### Remote CI / Final Gate（当前 G0 候选）
+### Remote CI / Final Gate（当前 G5 候选）
 
-- `98cb8c7f5` 是当前本地冻结实现；实现提交与本次文档提交分离，提交前已 fetch 并确认远程未前进、未分叉。
+- `93cc88061` 是当前 G5 实现与证据候选；实现/evidence commit 与本次文档提交分离，最终 fetch 审计与普通 push 另行记录。
 - `ci.yml` 存在 `workflow_dispatch`，但 `gh auth status` 显示 token 失效，内置浏览器 GitHub 未登录，Chrome 会话不可用。本轮未创建 remote run，未修改 trigger，未跳过 required job。
-- `FINAL_GATE=PARTIAL`：当前 implementation SHA 本地 gates 通过；clean-checkout CI、WebView2、no-Node 与现场硬件仍缺失。
+- `FINAL_GATE=PARTIAL`：当前 implementation SHA 的 G5 本地软件 gates 已通过；clean-checkout Remote CI、真实 Windows 125%、独立无 Node 目标机、现场硬件、长时间生产 soak 与产品 Owner 签收仍缺失。本机真实 WebView2 Debug/Release 100% 不再列为缺失项。
 
 ## 前序工作记录（历史 checkpoint）
 
@@ -351,11 +484,11 @@ G4 退出条件已满足并解锁 G5。该结论只批准继续收集同一 clea
 
 - AI attachment、CV model artifact、TemplateMatching artifact、calibration asset-to-scale projection 与 Advanced Settings 仍按合同缺口记录；G2 ADR 已补齐 owner、权限、并发身份、错误/reconcile、fallback 和重新进入条件，不新增第二套 authority。
 - GlobalVariables 类型/identity 校验与 Line Sequence Preview 输入/返回图已进入 `98cb8c7f5`；Line Sequence AI parameter-only follow-up、通用 AutoTune 入口和 N 点高级工作流仍按 ADR 延期。
-- Line Sequence 软件闭环仍不包含设备写入；Remote CI、WebView2 100%/125%、独立 no-Node、现场硬件与生产 soak 仍未取得证据。
+- Line Sequence 软件闭环仍不包含设备写入；当前 G5 已取得本机真实 WebView2 Debug/Release 100% 自动证据。Remote CI、Windows 125%、独立 no-Node 目标机、现场硬件与生产 soak 仍未取得证据。
 
-## 测试与真实环境（前序 F10 checkpoint；当前 G0 证据见上节）
+## 测试与真实环境（前序 F10 checkpoint；当前 G5 证据见上节）
 
-> 本节保留前序 F10 的历史证据，不把旧 checkpoint 的数量或通过结论外推到当前实现 SHA。
+> 本节保留前序 F10 的历史证据，不把旧 checkpoint 的数量或通过结论外推到当前实现 SHA。下表 WebView2 100% 的 `NOT_PERFORMED` 是前序状态；当前 G5 状态以本页上方 G5 证据为准。
 
 | 证据 | 状态 |
 | --- | --- |
@@ -384,4 +517,4 @@ G4 退出条件已满足并解锁 G5。该结论只批准继续收集同一 clea
 
 ## 提交
 
-当前 implementation checkpoint：`98cb8c7f5`（G1 生命周期/状态安全与 G2 GlobalVariables、Line Sequence 投影）；前序 G0 checkpoint：`21105d57d`。文档提交单独记录并最终随本分支推送。更早 checkpoint：`026768cf4`、`1af7b2ec6`、`8846c52e4`、`d469a4740`。提交和软件测试不会自动授予生产验收。
+当前 G5 implementation/evidence checkpoint：`93cc88061`。历史 checkpoint：G4 `1c8ad67f3`，G1/G2 `98cb8c7f5`，G0 `21105d57d`；更早 checkpoint 为 `026768cf4`、`1af7b2ec6`、`8846c52e4`、`d469a4740`。文档提交单独记录并随本分支普通推送；提交、推送和软件测试都不会自动授予生产验收。
