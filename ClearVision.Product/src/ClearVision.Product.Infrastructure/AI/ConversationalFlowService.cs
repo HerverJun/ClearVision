@@ -145,6 +145,7 @@ public sealed class VisionAgentWorkspaceSnapshotUpdate
     public string? SubmittedBuildFingerprint { get; set; }
     public string? BuildClientOperationId { get; set; }
     public VisionAgentPublicBuildResultV1? PublicBuildResult { get; set; }
+    public string? LatestCanvasFlowJson { get; set; }
     public AiProjectBaselineIdentity? ProjectBaseline { get; set; }
     public string? UserTurnId { get; set; }
     public string? UserMessage { get; set; }
@@ -1418,7 +1419,8 @@ public class ConversationalFlowService : IConversationalFlowService
             update.ResourceDecisions != null ||
             update.ResourceRevision.HasValue ||
             update.WorkspaceViewMode != null ||
-            update.PublicBuildResult != null;
+            update.PublicBuildResult != null ||
+            update.LatestCanvasFlowJson != null;
 
         if (!hasV2WorkspaceFields)
         {
@@ -1480,6 +1482,7 @@ public class ConversationalFlowService : IConversationalFlowService
             update.SubmittedBuildFingerprint,
             update.BuildClientOperationId,
             update.PublicBuildResult,
+            update.LatestCanvasFlowJson,
             update.ProjectBaseline,
             update.UserTurnId,
             update.UserMessage
@@ -2054,6 +2057,11 @@ public class ConversationalFlowService : IConversationalFlowService
         ConversationSession session,
         VisionAgentWorkspaceSnapshotUpdate update)
     {
+        if (!string.IsNullOrWhiteSpace(update.LatestCanvasFlowJson))
+        {
+            session.CurrentCanvasFlowJson = update.LatestCanvasFlowJson;
+        }
+
         var snapshot = session.WorkspaceSnapshot ?? new VisionAgentWorkspaceSnapshot();
         ApplyWorkspaceUpdate(snapshot, update);
         session.WorkspaceSnapshot = snapshot;

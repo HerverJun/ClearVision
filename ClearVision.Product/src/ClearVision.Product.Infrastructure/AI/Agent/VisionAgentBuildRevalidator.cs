@@ -16,7 +16,7 @@ internal sealed class VisionAgentBuildRevalidator
         PropertyNameCaseInsensitive = true
     };
 
-    public async Task<VisionAgentPublicBuildResultV1> RevalidateAsync(
+    public async Task<VisionAgentBuildRevalidationResult> RevalidateAsync(
         VisionAgentBuildRevalidationRequest request,
         CancellationToken cancellationToken)
     {
@@ -30,6 +30,7 @@ internal sealed class VisionAgentBuildRevalidator
             throw new InvalidOperationException("Candidate flow fingerprint no longer matches the submitted Build.");
         }
 
+        var artifactIdentity = ReadArtifactIdentity(flow, request.Build.PlanHash);
         var parameterIssues = new List<string>();
         var mappings = request.Build.ParameterMapping
             .Select(mapping => ApplyParameterValue(flow, mapping, request.ParameterValues, parameterIssues))
@@ -74,7 +75,33 @@ internal sealed class VisionAgentBuildRevalidator
             AgentRunId = request.Build.RunId,
             ExistingFlowJson = JsonSerializer.Serialize(flow, JsonOptions)
         };
-        var arguments = BuildValidationArguments(flow);
+        var arguments = BuildValidationArguments(flow, artifactIdentity, string.Empty);
+        var normalized = VisionAgentFlowDraftNormalizer.Normalize(arguments, context);
+        var artifactFingerprint = string.Empty;
+        var returnedFlowFingerprint = string.Empty;
+        VisionTaskRouteAssessment? routeAssessment = null;
+        if (artifactIdentity != null && normalized.Success)
+        {
+            var contractCatalog = new VisionAgentOperatorContractCatalog();
+            var graph = WorkflowArtifactFingerprint.ToGraph(normalized.Flow, contractCatalog);
+            artifactFingerprint = WorkflowArtifactFingerprint.Compute(
+                artifactIdentity.PlanHash,
+                artifactIdentity.CatalogVersion,
+                artifactIdentity.BuildIntent,
+                graph);
+            routeAssessment = new VisionTaskRouteContractRegistry().Assess(artifactIdentity.TaskType, graph);
+            StampArtifactEvidence(flow, artifactIdentity, artifactFingerprint, routeAssessment);
+            returnedFlowFingerprint = WorkflowArtifactFingerprint.ComputeCanvasProjection(
+                flow,
+                artifactIdentity.PlanHash,
+                artifactIdentity.CatalogVersion,
+                artifactIdentity.BuildIntent,
+                graph,
+                contractCatalog);
+            context = context with { ExistingFlowJson = JsonSerializer.Serialize(flow, JsonOptions) };
+            arguments = BuildValidationArguments(flow, artifactIdentity, artifactFingerprint);
+        }
+
         var validationTool = new FlowValidationTool();
         var dryRunTool = new DryRunFlowTool();
         var validation = await validationTool.ExecuteAsync(context, arguments, cancellationToken);
@@ -83,17 +110,10 @@ internal sealed class VisionAgentBuildRevalidator
             .Where(resource => !appliedDecisionIds.Contains(resource.CanonicalId))
             .ToList();
         var pendingParameters = mappings.Count(item => item.Pending && !item.ResourceDependent);
-        var validationBlockers = VisionAgentBuildSupport.ReadCount(validation.Data, "blockingIssues") + parameterIssues.Count;
-        var dryRunSucceeded = VisionAgentBuildSupport.ReadBool(dryRun.Data, "dryRunSucceeded") == true;
-        var packageReady = validationBlockers == 0 && dryRunSucceeded && pendingParameters == 0 && missingResources.Count == 0;
-        var packageReadiness = VisionAgentToolResult.Ok(new
-        {
-            readyForDeployment = packageReady,
-            pendingParameters = mappings.Where(item => item.Pending).Select(item => item.CanonicalKey).ToList(),
-            missingResources,
-            parameterIssues,
-            metadataOnly = true
-        });
+        var packageReadiness = await new RuntimePackagePrecheckTool().ExecuteAsync(
+            context,
+            BuildPrecheckArguments(arguments, validation, dryRun, decisions, appliedDecisionIds),
+            cancellationToken);
         var deploymentBlockers = mappings.Where(item => item.Pending).Select(item => $"parameter:{item.CanonicalKey}")
             .Concat(missingResources.Select(item => $"resource:{item.CanonicalId}"))
             .Concat(parameterIssues.Select(issue => $"parameter_validation:{issue}"))
@@ -106,7 +126,14 @@ internal sealed class VisionAgentBuildRevalidator
             ValidationFailures = parameterIssues.ToList(),
             DeploymentBlockers = deploymentBlockers
         };
-        var gate = new ApplyGateResolver().Build(validation, dryRun, packageReadiness, diff).Payload;
+        var gate = new ApplyGateResolver().Build(
+            validation,
+            dryRun,
+            packageReadiness,
+            diff,
+            artifactFingerprint,
+            routeAssessment,
+            returnedFlowFingerprint).Payload;
         if (parameterIssues.Count > 0)
         {
             gate = gate with
@@ -126,7 +153,9 @@ internal sealed class VisionAgentBuildRevalidator
                 ? "请确认所有普通待处理参数后重新校验。"
                 : missingResources.Count > 0
                     ? "请处理仍缺失的 canonical 资源后重新校验。"
-                    : request.Build.Validation.FirstFixRecommendation;
+                    : gate.Blocked
+                        ? "候选缺少可验证的流程身份或任务路由证据，请重新构建。"
+                        : request.Build.Validation.FirstFixRecommendation;
         var projectedValidation = VisionAgentPublicBuildProjector.ProjectValidation(
             validation.Data,
             dryRun.Data,
@@ -136,14 +165,25 @@ internal sealed class VisionAgentBuildRevalidator
             missingResources.Count,
             firstFix);
 
-        return request.Build with
+        var candidateFlowJson = JsonSerializer.Serialize(flow, JsonOptions);
+        var persistedCandidateFlow = JsonSerializer.Deserialize<OperatorFlowDto>(candidateFlowJson, JsonOptions)
+            ?? throw new InvalidOperationException("Revalidated candidate flow could not be restored.");
+        var candidateFlowFingerprint = ExecutionFlowIdentity.ComputeFlowHash(persistedCandidateFlow.ToEntity());
+        var build = request.Build with
         {
             AnswerRevision = Math.Max(0, request.AnswerRevision),
             ResourceRevision = Math.Max(0, request.ResourceRevision),
+            CandidateFlowFingerprint = candidateFlowFingerprint,
             ParameterMapping = mappings,
             MissingResources = missingResources,
             WorkflowDiff = diff,
             Validation = projectedValidation
+        };
+
+        return new VisionAgentBuildRevalidationResult
+        {
+            Build = build,
+            CandidateFlowJson = candidateFlowJson
         };
     }
 
@@ -288,7 +328,10 @@ internal sealed class VisionAgentBuildRevalidator
         return true;
     }
 
-    private static JsonElement BuildValidationArguments(OperatorFlowDto flow)
+    private static JsonElement BuildValidationArguments(
+        OperatorFlowDto flow,
+        RevalidationArtifactIdentity? identity,
+        string artifactFingerprint)
     {
         var tempIds = flow.Operators.ToDictionary(
             op => op.Id,
@@ -301,9 +344,7 @@ internal sealed class VisionAgentBuildRevalidator
                 .GroupBy(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
                     group => group.Key,
-                    group => group.Last().HasExplicitValue
-                        ? group.Last().Value
-                        : group.Last().DefaultValue,
+                    group => group.Last().Value ?? group.Last().DefaultValue,
                     StringComparer.OrdinalIgnoreCase)
         }).ToList();
         var connections = flow.Connections.Select(connection =>
@@ -330,8 +371,120 @@ internal sealed class VisionAgentBuildRevalidator
                 connections,
                 entryOperatorTempId
             },
-            entryOperatorTempId
+            entryOperatorTempId,
+            planHash = identity?.PlanHash ?? string.Empty,
+            catalogVersion = identity?.CatalogVersion ?? string.Empty,
+            buildIntent = identity?.BuildIntent ?? string.Empty,
+            artifactFingerprint
         }, JsonOptions);
+    }
+
+    private static JsonElement BuildPrecheckArguments(
+        JsonElement validationArguments,
+        VisionAgentToolResult validation,
+        VisionAgentToolResult dryRun,
+        IReadOnlyDictionary<string, VisionAgentResourceDecision> decisions,
+        IReadOnlySet<string> appliedDecisionIds)
+    {
+        var confirmations = appliedDecisionIds
+            .Where(decisions.ContainsKey)
+            .Select(id => decisions[id])
+            .Select(decision => new
+            {
+                resourceType = decision.ResourceType,
+                operatorId = decision.OperatorId,
+                parameterName = decision.ParameterName,
+                resourceKey = decision.ResourceKey,
+                metadataOnly = true
+            })
+            .ToList();
+
+        return JsonSerializer.SerializeToElement(new
+        {
+            flow = validationArguments.GetProperty("flow"),
+            entryOperatorTempId = validationArguments.GetProperty("entryOperatorTempId"),
+            planHash = validationArguments.GetProperty("planHash"),
+            catalogVersion = validationArguments.GetProperty("catalogVersion"),
+            buildIntent = validationArguments.GetProperty("buildIntent"),
+            artifactFingerprint = validationArguments.GetProperty("artifactFingerprint"),
+            validationSummary = validation.Data,
+            dryRunSummary = dryRun.Data,
+            manualResourceConfirmations = confirmations,
+            requireReplay = false
+        }, JsonOptions);
+    }
+
+    private static RevalidationArtifactIdentity? ReadArtifactIdentity(
+        OperatorFlowDto flow,
+        string expectedPlanHash)
+    {
+        var planHash = ReadConsistentMetadata(flow, "agentPlanHash");
+        var catalogVersion = ReadConsistentMetadata(flow, "agentCatalogVersion");
+        var buildIntent = ReadConsistentMetadata(flow, "agentBuildIntent");
+        var taskType = VisionTaskRouteContractRegistry.NormalizeTaskType(
+            ReadConsistentMetadata(flow, "agentTaskType"));
+        if (string.IsNullOrWhiteSpace(planHash) ||
+            !planHash.Equals(expectedPlanHash?.Trim(), StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(catalogVersion) ||
+            string.IsNullOrWhiteSpace(buildIntent) ||
+            string.IsNullOrWhiteSpace(taskType))
+        {
+            return null;
+        }
+
+        return new RevalidationArtifactIdentity(planHash, catalogVersion, buildIntent, taskType);
+    }
+
+    private static string ReadConsistentMetadata(OperatorFlowDto flow, string key)
+    {
+        if (flow.Operators.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var values = flow.Operators
+            .Select(op => ReadMetadataString(op.Metadata, key))
+            .ToList();
+        if (values.Any(string.IsNullOrWhiteSpace))
+        {
+            return string.Empty;
+        }
+
+        var distinct = values.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return distinct.Count == 1 ? distinct[0] : string.Empty;
+    }
+
+    private static string ReadMetadataString(
+        IReadOnlyDictionary<string, object?>? metadata,
+        string key)
+    {
+        if (metadata == null || !metadata.TryGetValue(key, out var value) || value == null)
+        {
+            return string.Empty;
+        }
+
+        return value is JsonElement element && element.ValueKind == JsonValueKind.String
+            ? element.GetString()?.Trim() ?? string.Empty
+            : Convert.ToString(value, CultureInfo.InvariantCulture)?.Trim() ?? string.Empty;
+    }
+
+    private static void StampArtifactEvidence(
+        OperatorFlowDto flow,
+        RevalidationArtifactIdentity identity,
+        string artifactFingerprint,
+        VisionTaskRouteAssessment routeAssessment)
+    {
+        foreach (var op in flow.Operators)
+        {
+            op.Metadata ??= new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            op.Metadata["agentPlanHash"] = identity.PlanHash;
+            op.Metadata["agentCatalogVersion"] = identity.CatalogVersion;
+            op.Metadata["agentBuildIntent"] = identity.BuildIntent;
+            op.Metadata["agentTaskType"] = routeAssessment.TaskType;
+            op.Metadata["agentArtifactFingerprint"] = artifactFingerprint;
+            op.Metadata["agentRouteSemanticsSatisfied"] = routeAssessment.Satisfied;
+            op.Metadata["agentRouteContractVersion"] = routeAssessment.ContractVersion;
+        }
     }
 
     private static string ReadValidationTempId(OperatorDto op)
@@ -350,4 +503,10 @@ internal sealed class VisionAgentBuildRevalidator
             ? element.GetString() ?? string.Empty
             : Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
     }
+
+    private sealed record RevalidationArtifactIdentity(
+        string PlanHash,
+        string CatalogVersion,
+        string BuildIntent,
+        string TaskType);
 }

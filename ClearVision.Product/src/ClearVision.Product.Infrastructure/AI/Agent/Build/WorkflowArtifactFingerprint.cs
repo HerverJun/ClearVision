@@ -187,7 +187,7 @@ internal static class WorkflowArtifactFingerprint
         return Compute(planHash, catalogVersion, buildIntent, graph);
     }
 
-    private static CanonicalWorkflowGraph ToGraph(
+    internal static CanonicalWorkflowGraph ToGraph(
         VisionAgentFlowDraft flow,
         IVisionAgentOperatorContractCatalog contractCatalog)
     {

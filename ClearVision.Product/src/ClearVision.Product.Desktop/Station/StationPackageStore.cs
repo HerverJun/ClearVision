@@ -49,14 +49,28 @@ public sealed class StationPackageStore
         IServiceScopeFactory scopeFactory,
         ILogger<StationPackageStore> logger,
         IWorkflowArtifactAdmissionGate? workflowArtifactAdmissionGate = null)
+        : this(
+            scopeFactory,
+            logger,
+            workflowArtifactAdmissionGate,
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "ClearVisionStudio",
+                "packages"))
+    {
+    }
+
+    internal StationPackageStore(
+        IServiceScopeFactory scopeFactory,
+        ILogger<StationPackageStore> logger,
+        IWorkflowArtifactAdmissionGate? workflowArtifactAdmissionGate,
+        string rootDirectory)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _workflowArtifactAdmissionGate = workflowArtifactAdmissionGate;
-        _rootDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ClearVisionStudio",
-            "packages");
+        ArgumentException.ThrowIfNullOrWhiteSpace(rootDirectory);
+        _rootDirectory = Path.GetFullPath(rootDirectory);
         Directory.CreateDirectory(FilesDirectory);
     }
 

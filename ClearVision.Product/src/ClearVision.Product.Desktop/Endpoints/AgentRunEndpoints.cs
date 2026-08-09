@@ -207,10 +207,10 @@ public static class AgentRunEndpoints
         }
 
         var decisions = ReadTrustedResourceDecisions(snapshot);
-        VisionAgentPublicBuildResultV1 revalidated;
+        VisionAgentBuildRevalidationResult revalidation;
         try
         {
-            revalidated = await buildApplication.RevalidateAsync(new VisionAgentBuildRevalidationRequest
+            revalidation = await buildApplication.RevalidateAsync(new VisionAgentBuildRevalidationRequest
             {
                 CandidateFlowJson = session.CurrentCanvasFlowJson,
                 Build = build,
@@ -229,6 +229,8 @@ public static class AgentRunEndpoints
             }, statusCode: StatusCodes.Status409Conflict);
         }
 
+        var revalidated = revalidation.Build;
+
         var persisted = conversationService.TryUpdateOwnedWorkspaceSnapshot(ownerHash, request.SessionId,
             new VisionAgentWorkspaceSnapshotUpdate
             {
@@ -238,6 +240,7 @@ public static class AgentRunEndpoints
                     revalidated.ParameterMapping.Any(item => item.Pending && !item.ResourceDependent) ? "parameters_pending" :
                     revalidated.MissingResources.Count > 0 ? "resources_pending" : "build_blocked",
                 PublicBuildResult = revalidated,
+                LatestCanvasFlowJson = revalidation.CandidateFlowJson,
                 MissingResources = revalidated.MissingResources.Select(resource => new VisionAgentResourceRequirement
                 {
                     CanonicalId = resource.CanonicalId,

@@ -13,6 +13,7 @@ using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Desktop.Middleware;
 using ClearVision.Product.Infrastructure.AI;
@@ -36,6 +37,11 @@ namespace ClearVision.Product.Desktop.Tests;
 
 public sealed class AgentRunEndpointsTests
 {
+    private static readonly JsonSerializerOptions CaseInsensitiveWebJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     [Fact(DisplayName = "POST AgentRun creates run and returns started plus brief events")]
     public async Task CreateRun_ShouldReturnInitialEvents()
     {
@@ -2888,8 +2894,8 @@ public sealed class AgentRunEndpointsTests
         (await structured.Content.ReadAsStringAsync()).Should().Contain("build_parameter_value_invalid");
     }
 
-    [Fact(DisplayName = "Build revalidation enforces scalar type range enum null and empty-string contracts")]
-    public async Task BuildRevalidator_ShouldEnforceParameterContractsWithoutChangingCandidateIdentity()
+    [Fact(DisplayName = "Build revalidation enforces parameter contracts and fails closed without artifact evidence")]
+    public async Task BuildRevalidator_ShouldEnforceParameterContractsAndFailClosedWithoutArtifactEvidence()
     {
         var flow = new OperatorFlowDto
         {
@@ -2980,7 +2986,7 @@ public sealed class AgentRunEndpointsTests
             WorkflowDiff = new VisionAgentWorkflowDiff()
         };
 
-        async Task<VisionAgentPublicBuildResultV1> Revalidate(
+        async Task<VisionAgentBuildRevalidationResult> Revalidate(
             VisionAgentParameterMapping mapping,
             object? value)
         {
@@ -2999,24 +3005,34 @@ public sealed class AgentRunEndpointsTests
 
         var threshold = Mapping("Threshold", "number", true, 0d, 255d);
         var valid = await Revalidate(threshold, 200d);
-        valid.CandidateFlowFingerprint.Should().Be(candidateFingerprint);
-        valid.ParameterMapping.Single().Pending.Should().BeFalse();
-        valid.ParameterMapping.Single().Value.Should().Be(200d);
+        valid.CandidateFlowFingerprint.Should().NotBe(candidateFingerprint);
+        valid.Build.CandidateFlowFingerprint.Should().Be(valid.CandidateFlowFingerprint);
+        ExecutionFlowIdentity.ComputeFlowHash(
+                JsonSerializer.Deserialize<OperatorFlowDto>(
+                    valid.CandidateFlowJson,
+                    CaseInsensitiveWebJsonOptions)!.ToEntity())
+            .Should().Be(valid.CandidateFlowFingerprint);
+        valid.Build.ParameterMapping.Single().Pending.Should().BeFalse();
+        valid.Build.ParameterMapping.Single().Value.Should().Be(200d);
+        valid.Build.Validation.HandoffEligible.Should().BeFalse();
+        valid.Build.Validation.ApplyGate.Blocked.Should().BeTrue();
+        valid.Build.Validation.ApplyGate.ApplyBlockers.Should().Contain("route_semantics_evidence_missing");
+        valid.Build.Validation.ApplyGate.ApplyBlockers.Should().Contain("artifact_fingerprint_inconsistent");
 
         var nullRequired = await Revalidate(threshold, null);
-        nullRequired.ParameterMapping.Single().Pending.Should().BeTrue();
-        nullRequired.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("required_value_missing"));
+        nullRequired.Build.ParameterMapping.Single().Pending.Should().BeTrue();
+        nullRequired.Build.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("required_value_missing"));
 
         var wrongType = await Revalidate(threshold, "200");
-        wrongType.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("number_required"));
+        wrongType.Build.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("number_required"));
 
         var outOfRange = await Revalidate(threshold, 300d);
-        outOfRange.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("above_maximum"));
+        outOfRange.Build.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("above_maximum"));
 
         var label = Mapping("Label", "string", false);
         var emptyString = await Revalidate(label, string.Empty);
-        emptyString.ParameterMapping.Single().Pending.Should().BeFalse();
-        emptyString.ParameterMapping.Single().Value.Should().Be(string.Empty);
+        emptyString.Build.ParameterMapping.Single().Pending.Should().BeFalse();
+        emptyString.Build.ParameterMapping.Single().Value.Should().Be(string.Empty);
 
         var mode = Mapping("Mode", "string", true, options:
         [
@@ -3024,16 +3040,106 @@ public sealed class AgentRunEndpointsTests
             new VisionAgentParameterOption { Label = "精确", Value = "accurate" }
         ]);
         var invalidEnum = await Revalidate(mode, "unsupported");
-        invalidEnum.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("enum_value_invalid"));
+        invalidEnum.Build.WorkflowDiff.ValidationFailures.Should().Contain(item => item.Contains("enum_value_invalid"));
     }
 
     [Fact(DisplayName = "Build revalidation projects canonical topology and clears trusted camera mapping blockers")]
     public async Task BuildRevalidator_ShouldProjectCanonicalTopologyAndApplyTrustedCameraAuthority()
     {
+        var planHash = new string('b', 64);
+        const string catalogVersion = "catalog.revalidation.v1";
+        const string buildIntent = "new";
+        const string taskType = "presence_detection";
+        Dictionary<string, object?> ArtifactMetadata(string tempId) => new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["agentTempId"] = tempId,
+            ["agentPlanHash"] = planHash,
+            ["agentCatalogVersion"] = catalogVersion,
+            ["agentBuildIntent"] = buildIntent,
+            ["agentTaskType"] = taskType
+        };
+        var contractCatalog = new VisionAgentOperatorContractCatalog();
+        void CompleteContractProjection(OperatorDto op)
+        {
+            contractCatalog.TryGet(op.Type.ToString(), out var contract).Should().BeTrue();
+            foreach (var input in contract.InputPorts)
+            {
+                var port = op.InputPorts.FirstOrDefault(item =>
+                    item.Name.Equals(input.Name, StringComparison.OrdinalIgnoreCase));
+                if (port == null)
+                {
+                    op.InputPorts.Add(new PortDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = input.Name,
+                        Direction = PortDirection.Input,
+                        DataType = input.DataType,
+                        IsRequired = input.IsRequired
+                    });
+                }
+                else
+                {
+                    port.DataType = input.DataType;
+                    port.IsRequired = input.IsRequired;
+                }
+            }
+
+            foreach (var output in contract.OutputPorts)
+            {
+                var port = op.OutputPorts.FirstOrDefault(item =>
+                    item.Name.Equals(output.Name, StringComparison.OrdinalIgnoreCase));
+                if (port == null)
+                {
+                    op.OutputPorts.Add(new PortDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = output.Name,
+                        Direction = PortDirection.Output,
+                        DataType = output.DataType
+                    });
+                }
+                else
+                {
+                    port.DataType = output.DataType;
+                }
+            }
+
+            foreach (var parameterContract in contract.Parameters)
+            {
+                var parameter = op.Parameters.FirstOrDefault(item =>
+                    item.Name.Equals(parameterContract.Name, StringComparison.OrdinalIgnoreCase));
+                if (parameter == null)
+                {
+                    parameter = new ParameterDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = parameterContract.Name
+                    };
+                    op.Parameters.Add(parameter);
+                }
+
+                parameter.DisplayName = parameterContract.DisplayName;
+                parameter.Description = parameterContract.Description;
+                parameter.DataType = parameterContract.DataType;
+                parameter.DefaultValue = parameterContract.DefaultValue;
+                parameter.MinValue = parameterContract.MinValue;
+                parameter.MaxValue = parameterContract.MaxValue;
+                parameter.IsRequired = parameterContract.IsRequired;
+                parameter.Options = parameterContract.Options?.Select(option => new ParameterOption
+                {
+                    Label = option.Label,
+                    Value = option.Value
+                }).ToList();
+            }
+        }
+
         var cameraId = Guid.NewGuid();
         var cameraOutputId = Guid.NewGuid();
         var thresholdId = Guid.NewGuid();
         var thresholdInputId = Guid.NewGuid();
+        var thresholdOutputId = Guid.NewGuid();
+        var resultOutputId = Guid.NewGuid();
+        var resultInputId = Guid.NewGuid();
         var flow = new OperatorFlowDto
         {
             Id = Guid.NewGuid(),
@@ -3045,7 +3151,7 @@ public sealed class AgentRunEndpointsTests
                     Id = cameraId,
                     Name = "Image acquisition",
                     Type = OperatorType.ImageAcquisition,
-                    Metadata = new Dictionary<string, object?> { ["agentTempId"] = "op_cam" },
+                    Metadata = ArtifactMetadata("op_cam"),
                     OutputPorts =
                     [
                         new PortDto
@@ -3083,7 +3189,7 @@ public sealed class AgentRunEndpointsTests
                     Id = thresholdId,
                     Name = "Thresholding",
                     Type = OperatorType.Thresholding,
-                    Metadata = new Dictionary<string, object?> { ["agentTempId"] = "op_threshold" },
+                    Metadata = ArtifactMetadata("op_threshold"),
                     InputPorts =
                     [
                         new PortDto
@@ -3093,6 +3199,16 @@ public sealed class AgentRunEndpointsTests
                             Direction = PortDirection.Input,
                             DataType = PortDataType.Image,
                             IsRequired = true
+                        }
+                    ],
+                    OutputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = thresholdOutputId,
+                            Name = "Image",
+                            Direction = PortDirection.Output,
+                            DataType = PortDataType.Image
                         }
                     ],
                     Parameters =
@@ -3109,6 +3225,24 @@ public sealed class AgentRunEndpointsTests
                             IsRequired = true
                         }
                     ]
+                },
+                new OperatorDto
+                {
+                    Id = resultOutputId,
+                    Name = "Result output",
+                    Type = OperatorType.ResultOutput,
+                    Metadata = ArtifactMetadata("op_result"),
+                    InputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = resultInputId,
+                            Name = "Image",
+                            Direction = PortDirection.Input,
+                            DataType = PortDataType.Image,
+                            IsRequired = false
+                        }
+                    ]
                 }
             ],
             Connections =
@@ -3120,10 +3254,26 @@ public sealed class AgentRunEndpointsTests
                     SourcePortId = cameraOutputId,
                     TargetOperatorId = thresholdId,
                     TargetPortId = thresholdInputId
+                },
+                new OperatorConnectionDto
+                {
+                    Id = Guid.NewGuid(),
+                    SourceOperatorId = thresholdId,
+                    SourcePortId = thresholdOutputId,
+                    TargetOperatorId = resultOutputId,
+                    TargetPortId = resultInputId
                 }
             ]
         };
-        var candidateFingerprint = ExecutionFlowIdentity.ComputeFlowHash(flow.ToEntity());
+        foreach (var op in flow.Operators)
+        {
+            CompleteContractProjection(op);
+        }
+        var candidateFlowJson = JsonSerializer.Serialize(flow);
+        var candidateFingerprint = ExecutionFlowIdentity.ComputeFlowHash(
+            JsonSerializer.Deserialize<OperatorFlowDto>(
+                candidateFlowJson,
+                CaseInsensitiveWebJsonOptions)!.ToEntity());
         const string cameraResourceKey = "f06-evidence-camera-01";
         var canonicalId = VisionAgentResourceIdentity.CreateCanonicalId(
             "camera_binding", "imageacquisition#1", "CameraId", cameraResourceKey);
@@ -3160,21 +3310,21 @@ public sealed class AgentRunEndpointsTests
             Status = VisionAgentResourceStatuses.Pending,
             Source = "operator_contract"
         };
-        var result = await new VisionAgentBuildRevalidator().RevalidateAsync(
+        var revalidation = await new VisionAgentBuildRevalidator().RevalidateAsync(
             new VisionAgentBuildRevalidationRequest
             {
-                CandidateFlowJson = JsonSerializer.Serialize(flow),
+                CandidateFlowJson = candidateFlowJson,
                 Build = new VisionAgentPublicBuildResultV1
                 {
                     RunId = "ar_camera_authority_revalidation",
                     BuildId = "build_camera_authority_revalidation",
                     BuildIdentity = "build-identity",
                     PlanId = "plan_camera_authority_revalidation",
-                    PlanHash = new string('b', 64),
+                    PlanHash = planHash,
                     AnswerSetFingerprint = new string('c', 64),
                     CandidateFlowFingerprint = candidateFingerprint,
-                    OperatorCount = 2,
-                    ConnectionCount = 1,
+                    OperatorCount = 3,
+                    ConnectionCount = 2,
                     ParameterMapping = [mapping],
                     MissingResources = [missingResource],
                     WorkflowDiff = new VisionAgentWorkflowDiff
@@ -3206,6 +3356,7 @@ public sealed class AgentRunEndpointsTests
             },
             CancellationToken.None);
 
+        var result = revalidation.Build;
         var applied = result.ParameterMapping.Should().ContainSingle().Subject;
         applied.Pending.Should().BeFalse();
         applied.Value.Should().Be(cameraResourceKey);
@@ -3216,9 +3367,38 @@ public sealed class AgentRunEndpointsTests
         result.WorkflowDiff.DeploymentBlockers.Should().BeEmpty();
         result.Validation.Structural.BlockerCount.Should().Be(0);
         result.Validation.DryRun.BlockerCount.Should().Be(0);
+        result.Validation.ApplyGate.CompiledFingerprint.Should().NotBeNullOrWhiteSpace();
+        result.Validation.ApplyGate.ValidationFingerprint.Should().Be(result.Validation.ApplyGate.CompiledFingerprint);
+        result.Validation.ApplyGate.DryRunFingerprint.Should().Be(result.Validation.ApplyGate.CompiledFingerprint);
+        result.Validation.ApplyGate.PrecheckFingerprint.Should().Be(result.Validation.ApplyGate.CompiledFingerprint);
+        result.Validation.ApplyGate.ReturnedFlowSemanticFingerprint.Should().Be(result.Validation.ApplyGate.CompiledFingerprint);
+        result.Validation.ApplyGate.ApplyBlockers.Should().BeEmpty();
+        result.Validation.ApplyGate.DeploymentBlockers.Should().BeEmpty();
         result.Validation.Manifest.Status.Should().Be("passed");
         result.Validation.HandoffEligible.Should().BeTrue();
         result.Validation.ApplyGate.Blocked.Should().BeFalse();
+        result.Validation.ApplyGate.ArtifactFingerprintConsistent.Should().BeTrue();
+        result.Validation.ApplyGate.RouteSemanticsSatisfied.Should().BeTrue();
+
+        revalidation.CandidateFlowFingerprint.Should().Be(result.CandidateFlowFingerprint);
+        revalidation.CandidateFlowFingerprint.Should().NotBe(candidateFingerprint);
+        var candidateFlow = JsonSerializer.Deserialize<OperatorFlowDto>(
+            revalidation.CandidateFlowJson,
+            CaseInsensitiveWebJsonOptions)!;
+        ExecutionFlowIdentity.ComputeFlowHash(candidateFlow.ToEntity())
+            .Should().Be(revalidation.CandidateFlowFingerprint);
+        var candidateCamera = candidateFlow.Operators.Single(op => op.Id == cameraId);
+        candidateCamera.Parameters.Single(parameter => parameter.Name == "CameraId")
+            .Value.Should().BeOfType<JsonElement>().Which.GetString().Should().Be(cameraResourceKey);
+        candidateFlow.Operators.Should().OnlyContain(op =>
+            JsonSerializer.SerializeToElement(
+                op.Metadata!["agentArtifactFingerprint"],
+                (JsonSerializerOptions?)null).GetString() ==
+            result.Validation.ApplyGate.CompiledFingerprint);
+        candidateFlow.Operators.Should().OnlyContain(op =>
+            JsonSerializer.SerializeToElement(
+                op.Metadata!["agentRouteSemanticsSatisfied"],
+                (JsonSerializerOptions?)null).GetBoolean());
     }
 
     [Fact(DisplayName = "AI operation identity replays matching requests rejects conflicts and supports lookup")]
@@ -3452,29 +3632,50 @@ public sealed class AgentRunEndpointsTests
     [Fact(DisplayName = "Build revalidation binds run session candidate revisions and persists the latest ApplyGate")]
     public async Task BuildRevalidation_ShouldEnforceIdentityAndPersistReadiness()
     {
+        string? emittedCanvasFlowJson = null;
+        string? emittedCandidateFingerprint = null;
         await using var host = await AgentRunEndpointTestHost.CreateAsync(
             useAuth: true,
-            revalidateHandler: (request, _) => Task.FromResult(request.Build with
+            revalidateHandler: (request, _) =>
             {
-                AnswerRevision = request.AnswerRevision,
-                ResourceRevision = request.ResourceRevision,
-                Validation = request.Build.Validation with
+                var flow = JsonSerializer.Deserialize<OperatorFlowDto>(request.CandidateFlowJson)!;
+                flow.DecisionConfiguration = new ClearVision.Product.Core.Decisions.DecisionConfiguration
                 {
-                    HandoffEligible = true,
-                    ReadinessStatus = "ready",
-                    FirstFixRecommendation = string.Empty,
-                    ApplyGate = request.Build.Validation.ApplyGate with
+                    MissingDecisionPolicy = ClearVision.Product.Core.Decisions.MissingDecisionPolicy.Invalid
+                };
+                emittedCanvasFlowJson = JsonSerializer.Serialize(flow);
+                emittedCandidateFingerprint = ExecutionFlowIdentity.ComputeFlowHash(flow.ToEntity());
+                var build = request.Build with
+                {
+                    AnswerRevision = request.AnswerRevision,
+                    ResourceRevision = request.ResourceRevision,
+                    CandidateFlowFingerprint = emittedCandidateFingerprint,
+                    Validation = request.Build.Validation with
                     {
-                        CanvasApplyReady = true,
-                        RuntimeDraftReady = true,
-                        Blocked = false,
-                        Status = "ready_for_handoff",
-                        ApplyBlockers = []
+                        HandoffEligible = true,
+                        ReadinessStatus = "ready",
+                        FirstFixRecommendation = string.Empty,
+                        ApplyGate = request.Build.Validation.ApplyGate with
+                        {
+                            CanvasApplyReady = true,
+                            RuntimeDraftReady = true,
+                            Blocked = false,
+                            Status = "ready_for_handoff",
+                            ApplyBlockers = []
+                        }
                     }
-                }
-            }));
+                };
+                return Task.FromResult(new VisionAgentBuildRevalidationResult
+                {
+                    Build = build,
+                    CandidateFlowJson = emittedCanvasFlowJson
+                });
+            });
         host.AuthorizeAs("owner-a-token");
         var candidate = await CreateG3BuildCandidateAsync(host);
+        var initialSession = host.ConversationService.GetSession(candidate.SessionId)!;
+        var initialCanvasFlowJson = initialSession.CurrentCanvasFlowJson;
+        initialCanvasFlowJson.Should().NotBeNullOrWhiteSpace();
         object Command(
             string? sessionId = null,
             string? buildId = null,
@@ -3517,22 +3718,45 @@ public sealed class AgentRunEndpointsTests
             $"/api/ai/agent-runs/{otherRunId}/revalidate", Command());
         wrongRun.StatusCode.Should().Be(HttpStatusCode.Conflict);
 
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () =>
+            throw new IOException("revalidation primary failed");
+        using var persistenceFailure = await host.Client.PostAsJsonAsync(
+            $"/api/ai/agent-runs/{candidate.RunId}/revalidate", Command());
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = null;
+        persistenceFailure.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await persistenceFailure.Content.ReadAsStringAsync()).Should().Contain("session_persistence_failed");
+        var sessionAfterFailure = host.ConversationService.GetSession(candidate.SessionId)!;
+        sessionAfterFailure.WorkspaceSnapshot!.Revision.Should().Be(candidate.Revision);
+        sessionAfterFailure.WorkspaceSnapshot.PublicBuildResult!.CandidateFlowFingerprint
+            .Should().Be(candidate.Build.CandidateFlowFingerprint);
+        sessionAfterFailure.CurrentCanvasFlowJson.Should().Be(initialCanvasFlowJson);
+
         using var accepted = await host.Client.PostAsJsonAsync(
             $"/api/ai/agent-runs/{candidate.RunId}/revalidate", Command());
         accepted.StatusCode.Should().Be(HttpStatusCode.OK);
         using var acceptedDocument = JsonDocument.Parse(await accepted.Content.ReadAsStringAsync());
         var root = acceptedDocument.RootElement;
         root.GetProperty("build").GetProperty("candidateFlowFingerprint").GetString()
-            .Should().Be(candidate.Build.CandidateFlowFingerprint);
+            .Should().Be(emittedCandidateFingerprint)
+            .And.NotBe(candidate.Build.CandidateFlowFingerprint);
         root.GetProperty("build").GetProperty("validation").GetProperty("handoffEligible").GetBoolean().Should().BeTrue();
         root.GetProperty("build").GetProperty("validation").GetProperty("applyGate")
             .GetProperty("status").GetString().Should().Be("ready_for_handoff");
         root.GetProperty("snapshot").GetProperty("revision").GetInt64().Should().Be(candidate.Revision + 1);
         root.GetProperty("snapshot").GetProperty("lifecycleState").GetString().Should().Be("build_ready");
+        var committedSession = host.ConversationService.GetSession(candidate.SessionId)!;
+        committedSession.CurrentCanvasFlowJson.Should().Be(emittedCanvasFlowJson);
+        committedSession.WorkspaceSnapshot!.PublicBuildResult!.CandidateFlowFingerprint
+            .Should().Be(emittedCandidateFingerprint);
+        ExecutionFlowIdentity.ComputeFlowHash(
+                JsonSerializer.Deserialize<OperatorFlowDto>(committedSession.CurrentCanvasFlowJson!)!.ToEntity())
+            .Should().Be(emittedCandidateFingerprint);
 
         using var staleRetry = await host.Client.PostAsJsonAsync(
             $"/api/ai/agent-runs/{candidate.RunId}/revalidate", Command());
         staleRetry.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        host.ConversationService.GetSession(candidate.SessionId)!.CurrentCanvasFlowJson
+            .Should().Be(emittedCanvasFlowJson);
 
         host.AuthorizeAs("owner-b-token");
         using var nonOwner = await host.Client.PostAsJsonAsync(
@@ -4270,7 +4494,7 @@ public sealed class AgentRunEndpointsTests
             Func<DateTimeOffset>? utcNowProvider = null,
             Func<VisionAgentPlanModeRequest, VisionAgentPlanModeResult, CancellationToken, Task<VisionAgentPlanModeResult>>? planHandler = null,
             Func<VisionAgentIntentRouterRequest, CancellationToken, Task<VisionAgentIntentRouterResult>>? intentRouterHandler = null,
-            Func<VisionAgentBuildRevalidationRequest, CancellationToken, Task<VisionAgentPublicBuildResultV1>>? revalidateHandler = null)
+            Func<VisionAgentBuildRevalidationRequest, CancellationToken, Task<VisionAgentBuildRevalidationResult>>? revalidateHandler = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -4543,13 +4767,13 @@ public sealed class AgentRunEndpointsTests
     {
         private readonly Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>> _handler;
         private readonly IAgentRunEventStreamService _streamService;
-        private readonly Func<VisionAgentBuildRevalidationRequest, CancellationToken, Task<VisionAgentPublicBuildResultV1>>? _revalidateHandler;
+        private readonly Func<VisionAgentBuildRevalidationRequest, CancellationToken, Task<VisionAgentBuildRevalidationResult>>? _revalidateHandler;
         private readonly TaskCompletionSource _called = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public FakeAiFlowGenerationService(
             Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>> handler,
             IAgentRunEventStreamService streamService,
-            Func<VisionAgentBuildRevalidationRequest, CancellationToken, Task<VisionAgentPublicBuildResultV1>>? revalidateHandler = null)
+            Func<VisionAgentBuildRevalidationRequest, CancellationToken, Task<VisionAgentBuildRevalidationResult>>? revalidateHandler = null)
         {
             _handler = handler;
             _streamService = streamService;
@@ -4642,17 +4866,26 @@ public sealed class AgentRunEndpointsTests
             });
         }
 
-        public Task<VisionAgentPublicBuildResultV1> RevalidateAsync(
+        public async Task<VisionAgentBuildRevalidationResult> RevalidateAsync(
             VisionAgentBuildRevalidationRequest request,
             CancellationToken cancellationToken)
         {
             LastCancellationToken = cancellationToken;
-            if (_revalidateHandler != null) return _revalidateHandler(request, cancellationToken);
-            return Task.FromResult(request.Build with
+            if (_revalidateHandler != null)
+            {
+                return await _revalidateHandler(request, cancellationToken);
+            }
+
+            var build = request.Build with
             {
                 AnswerRevision = request.AnswerRevision,
                 ResourceRevision = request.ResourceRevision
-            });
+            };
+            return new VisionAgentBuildRevalidationResult
+            {
+                Build = build,
+                CandidateFlowJson = request.CandidateFlowJson
+            };
         }
 
         public async Task WaitForCallAsync()

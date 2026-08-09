@@ -267,7 +267,11 @@ public sealed class StationPackageDeploymentServiceTests
             await using var provider = new ServiceCollection()
                 .AddLogging()
                 .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
-                .AddSingleton<StationPackageStore>()
+                .AddSingleton(sp => new StationPackageStore(
+                    sp.GetRequiredService<IServiceScopeFactory>(),
+                    NullLogger<StationPackageStore>.Instance,
+                    WorkflowArtifactAdmissionTestSupport.CreateGate(),
+                    Path.Combine(root, "studio-packages")))
                 .BuildServiceProvider();
             await using (var scope = provider.CreateAsyncScope())
             {
@@ -627,8 +631,8 @@ public sealed class StationPackageDeploymentServiceTests
     {
         var revision = 3;
         var payload = CreateCalibrationPayload(bundleId);
-        var decisionOperatorId = Guid.NewGuid();
-        var decisionPortId = Guid.NewGuid();
+        var decisionOperator = WorkflowArtifactAdmissionTestSupport
+            .CreateCanonicalResultJudgmentOperator("Decision");
         return new ProjectDto
         {
             Id = Guid.NewGuid(),
@@ -638,37 +642,7 @@ public sealed class StationPackageDeploymentServiceTests
             {
                 Id = Guid.NewGuid(),
                 Name = "asset-load-flow",
-                DecisionConfiguration = new DecisionConfiguration
-                {
-                    FinalDecisionBinding = new FinalDecisionBinding
-                    {
-                        SourceOperatorId = decisionOperatorId,
-                        SourceOutputPortId = decisionPortId,
-                        SourceOutputName = "IsOk",
-                        DataType = DecisionValueType.Boolean,
-                        Rule = DecisionInterpretationRule.Boolean,
-                        TrueMeansOk = true
-                    }
-                },
-                Operators =
-                [
-                    new OperatorDto
-                    {
-                        Id = decisionOperatorId,
-                        Name = "Decision",
-                        Type = OperatorType.ResultJudgment,
-                        OutputPorts =
-                        [
-                            new PortDto
-                            {
-                                Id = decisionPortId,
-                                Name = "IsOk",
-                                Direction = PortDirection.Output,
-                                DataType = PortDataType.Boolean
-                            }
-                        ]
-                    }
-                ]
+                Operators = [decisionOperator]
             },
             Assets = new ProjectAssetsDto
             {

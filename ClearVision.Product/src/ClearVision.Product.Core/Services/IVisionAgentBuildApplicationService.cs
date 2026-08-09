@@ -12,7 +12,7 @@ public interface IVisionAgentBuildApplicationService
         BuildCommand command,
         CancellationToken cancellationToken);
 
-    Task<VisionAgentPublicBuildResultV1> RevalidateAsync(
+    Task<VisionAgentBuildRevalidationResult> RevalidateAsync(
         VisionAgentBuildRevalidationRequest request,
         CancellationToken cancellationToken);
 }

@@ -83,7 +83,7 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         return Task.FromResult(BuildPreviewResult(previewRequest, contract, readinessContext));
     }
 
-    public Task<VisionAgentPublicBuildResultV1> RevalidateAsync(
+    public Task<VisionAgentBuildRevalidationResult> RevalidateAsync(
         VisionAgentBuildRevalidationRequest request,
         CancellationToken cancellationToken)
     {

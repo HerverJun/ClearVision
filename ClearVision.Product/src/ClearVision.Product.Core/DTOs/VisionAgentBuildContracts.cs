@@ -293,3 +293,10 @@ public sealed record VisionAgentBuildRevalidationRequest
     public int AnswerRevision { get; init; }
     public int ResourceRevision { get; init; }
 }
+
+public sealed record VisionAgentBuildRevalidationResult
+{
+    public VisionAgentPublicBuildResultV1 Build { get; init; } = new();
+    public string CandidateFlowJson { get; init; } = string.Empty;
+    public string CandidateFlowFingerprint => Build.CandidateFlowFingerprint;
+}

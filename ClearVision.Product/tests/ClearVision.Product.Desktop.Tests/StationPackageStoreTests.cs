@@ -44,7 +44,7 @@ public sealed class StationPackageStoreTests
             await using (var provider = new ServiceCollection()
                 .AddLogging()
                 .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
-                .AddSingleton<StationPackageStore>()
+                .AddSingleton(sp => CreateStore(sp, root))
                 .AddSingleton<RuntimePackageValidator>()
                 .AddSingleton<RuntimePackageLoader>()
                 .BuildServiceProvider())
@@ -106,7 +106,7 @@ public sealed class StationPackageStoreTests
             await using (var provider = new ServiceCollection()
                 .AddLogging()
                 .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
-                .AddSingleton<StationPackageStore>()
+                .AddSingleton(sp => CreateStore(sp, root))
                 .AddSingleton<RuntimePackageValidator>()
                 .AddSingleton<RuntimePackageLoader>()
                 .BuildServiceProvider())
@@ -162,11 +162,11 @@ public sealed class StationPackageStoreTests
                     CancellationToken.None);
                 legacyManifest.SourceProjectId.Should().BeNull();
                 legacyManifest.SourceProjectRevision.Should().BeNull();
-                legacyManifest.DecisionConfigurationHash.Should().BeNull();
+                legacyManifest.DecisionConfigurationHash.Should().NotBeNullOrWhiteSpace();
                 var reloadedLegacyManifest = store.GetPackage(legacyManifest.PackageId);
                 reloadedLegacyManifest!.SourceProjectId.Should().BeNull();
                 reloadedLegacyManifest.SourceProjectRevision.Should().BeNull();
-                reloadedLegacyManifest.DecisionConfigurationHash.Should().BeNull();
+                reloadedLegacyManifest.DecisionConfigurationHash.Should().Be(legacyManifest.DecisionConfigurationHash);
                 reloadedLegacyManifest.MinStationVersion.Should().Be("0.1.0");
             }
         }
@@ -193,7 +193,7 @@ public sealed class StationPackageStoreTests
             await using (var provider = new ServiceCollection()
                 .AddLogging()
                 .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
-                .AddSingleton<StationPackageStore>()
+                .AddSingleton(sp => CreateStore(sp, root))
                 .BuildServiceProvider())
             {
                 await using (var scope = provider.CreateAsyncScope())
@@ -235,8 +235,9 @@ public sealed class StationPackageStoreTests
         Directory.CreateDirectory(Path.Combine(runtimeRoot, "quality"));
         Directory.CreateDirectory(Path.Combine(runtimeRoot, "field"));
 
-        var decisionOperatorId = Guid.NewGuid();
-        var decisionPortId = Guid.NewGuid();
+        var decisionOperator = WorkflowArtifactAdmissionTestSupport
+            .CreateCanonicalResultJudgmentOperator("Decision");
+        var decisionPort = decisionOperator.OutputPorts.Single(port => port.Name == "JudgmentResult");
         var flow = new OperatorFlowDto
         {
             Id = Guid.NewGuid(),
@@ -245,39 +246,18 @@ public sealed class StationPackageStoreTests
             {
                 FinalDecisionBinding = new FinalDecisionBinding
                 {
-                    SourceOperatorId = decisionOperatorId,
-                    SourceOutputPortId = decisionPortId,
-                    SourceOutputName = "IsOk",
-                    DataType = DecisionValueType.Boolean,
-                    Rule = DecisionInterpretationRule.Boolean,
-                    TrueMeansOk = true
+                    SourceOperatorId = decisionOperator.Id,
+                    SourceOutputPortId = decisionPort.Id,
+                    SourceOutputName = decisionPort.Name,
+                    DataType = DecisionValueType.String,
+                    Rule = DecisionInterpretationRule.StringMap,
+                    OkValue = "OK",
+                    NgValue = "NG"
                 }
             },
-            Operators =
-            [
-                new OperatorDto
-                {
-                    Id = decisionOperatorId,
-                    Name = "Decision",
-                    Type = OperatorType.ResultJudgment,
-                    X = 0,
-                    Y = 0,
-                    InputPorts = [],
-                    OutputPorts =
-                    [
-                        new PortDto
-                        {
-                            Id = decisionPortId,
-                            Name = "IsOk",
-                            Direction = PortDirection.Output,
-                            DataType = PortDataType.Boolean
-                        }
-                    ],
-                    Parameters = []
-                }
-            ],
+            Operators = [decisionOperator],
             Connections = []
-        }.WithStringDecisionBinding();
+        };
         var flowBytes = JsonSerializer.SerializeToUtf8Bytes(flow, JsonOptions);
         var flowEntity = flow.ToEntity();
         var flowHash = ExecutionFlowIdentity.ComputeFlowHash(flowEntity);
@@ -327,6 +307,13 @@ public sealed class StationPackageStoreTests
             Path.Combine(runtimeRoot, "quality", "validation-report.json"),
             JsonSerializer.Serialize(validationReport, JsonOptions));
     }
+
+    private static StationPackageStore CreateStore(IServiceProvider provider, string root) =>
+        new(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            NullLogger<StationPackageStore>.Instance,
+            WorkflowArtifactAdmissionTestSupport.CreateGate(),
+            Path.Combine(root, "packages"));
 
     private static async Task CreateLegacyPackageRecordDatabaseAsync(string dbPath)
     {
