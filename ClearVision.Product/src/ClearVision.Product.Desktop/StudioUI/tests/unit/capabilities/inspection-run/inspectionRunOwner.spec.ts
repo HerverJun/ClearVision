@@ -101,6 +101,51 @@ describe('inspectionRunOwner', () => {
     owner.dispose();
   });
 
+  it('stops an active continuous inspection before leave and confirms the backend is idle', async () => {
+    const h = harness(running);
+    const owner = createInspectionRunOwner({ projectId, api: h.api, sse: h.sse });
+
+    await owner.hydrate();
+    await expect(owner.prepareForLeave()).resolves.toBe(true);
+
+    expect(h.api.stop).toHaveBeenCalledWith(identity, expect.anything());
+    expect(owner.projection.runtime).toMatchObject({ status: 'Idle', isBusy: false });
+    expect(owner.resources()).toEqual({ streams: 0, timers: 0, abortControllers: 0, subscriptions: 0 });
+
+    owner.dispose();
+    expect(h.api.stop).toHaveBeenCalledOnce();
+  });
+
+  it('blocks leave when the stop outcome is unknown and the backend remains busy', async () => {
+    const h = harness(running);
+    const owner = createInspectionRunOwner({ projectId, api: h.api, sse: h.sse });
+    await owner.hydrate();
+    vi.mocked(h.api.stop).mockRejectedValueOnce(new ApiNetworkError(
+      'http://localhost/api/inspection/realtime/stop',
+      new Error('offline')
+    ));
+
+    await expect(owner.prepareForLeave()).resolves.toBe(false);
+
+    expect(owner.projection.runtime).toMatchObject({ status: 'Running', isBusy: true });
+    expect(owner.projection.errorCode).toBe('INSPECTION_STOP_FAILED');
+    expect(owner.resources()).toEqual({ streams: 0, timers: 0, abortControllers: 0, subscriptions: 0 });
+    owner.dispose();
+  });
+
+  it('blocks leave when a busy continuous session has no complete stop identity', async () => {
+    const incomplete: InspectionRunState = { ...running, clientSnapshotId: null };
+    const h = harness(incomplete);
+    const owner = createInspectionRunOwner({ projectId, api: h.api, sse: h.sse });
+    await owner.hydrate();
+
+    await expect(owner.prepareForLeave()).resolves.toBe(false);
+
+    expect(h.api.stop).not.toHaveBeenCalled();
+    expect(owner.projection.errorCode).toBe('INSPECTION_LEAVE_IDENTITY_MISSING');
+    owner.dispose();
+  });
+
   it('ignores replay events from an older session and resets the cursor for an explicit new start', async () => {
     const h = harness();
     const connections: Array<Parameters<InspectionSsePort['connect']>[0]> = [];

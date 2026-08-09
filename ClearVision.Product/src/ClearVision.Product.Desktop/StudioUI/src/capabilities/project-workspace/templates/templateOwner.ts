@@ -4,6 +4,10 @@ import { ApiConflictError, ApiForbiddenError, ApiNetworkError, ApiAbortError, Ap
 import type { ReadQueryClient } from '@/platform/query';
 import type { FlowCanvasOwner } from '../flow';
 import type { OperatorCatalogItem } from '@/capabilities/operators-read/operatorContracts';
+import type {
+  WorkspaceCapabilityDiagnosticsLease,
+  WorkspaceLifecycleDiagnosticsOwner
+} from '../workspaceLifecycleDiagnostics';
 import {
   convertTemplateFlow,
   decodeFlowTemplate,
@@ -53,6 +57,10 @@ export interface TemplateOwner {
   applySelected(options?: Readonly<{ confirmReplace?: boolean }>): Promise<boolean>;
   saveAs(input: TemplateWriteInput): Promise<boolean>;
   updateSelected(input: TemplateWriteInput): Promise<boolean>;
+  setReadonly(reason: string): void;
+  clearReadonly(): void;
+  prepareForLeave(): Promise<boolean>;
+  settle(): Promise<void>;
   dispose(reason?: string): void;
 }
 
@@ -75,6 +83,11 @@ function errorMessage(error: unknown): string {
   return error instanceof Error && error.message.trim() ? error.message : '模板操作失败。';
 }
 
+function isUnknownWriteOutcome(error: unknown): boolean {
+  return error instanceof ApiNetworkError || error instanceof ApiAbortError ||
+    error instanceof ApiHttpError && error.status === 401;
+}
+
 function normalizeWriteInput(input: TemplateWriteInput): TemplateWriteInput | null {
   const name = input.name.trim();
   if (!name) return null;
@@ -94,6 +107,7 @@ export function createTemplateOwner(options: {
   readonly api: ApiTransport;
   readonly canWrite: boolean;
   readonly isDirty: () => boolean;
+  readonly diagnostics?: WorkspaceLifecycleDiagnosticsOwner;
 }): TemplateOwner {
   const industryRef = { value: '' };
   const query = createTemplateListQuery(options.queries, () => industryRef.value);
@@ -115,8 +129,41 @@ export function createTemplateOwner(options: {
     errorCode: null
   });
   let disposed = false;
+  const initialCanWrite = options.canWrite;
+  let readonlyReason: string | null = null;
   let detailGeneration = 0;
   let writeGeneration = 0;
+  const lease: WorkspaceCapabilityDiagnosticsLease | undefined = options.diagnostics?.reserveCapability(
+    options.projectId,
+    'template'
+  );
+  const detailControllers = new Set<AbortController>();
+  const writeControllers = new Set<AbortController>();
+  const pending = new Set<Promise<unknown>>();
+
+  function syncDiagnostics(): void {
+    lease?.update(Object.freeze({
+      activeSubscriptions: 0,
+      activeTimers: 0,
+      activeAnimationFrames: 0,
+      activeObservers: 0,
+      activeAbortControllers: detailControllers.size + writeControllers.size +
+        Number(query.state.value.isRefreshing),
+      activeBlobUrls: 0,
+      activePreviewArtifactIds: 0,
+      activeHostSubscriptions: 0,
+      inFlightReads: detailControllers.size + Number(query.state.value.isRefreshing),
+      inFlightWrites: writeControllers.size,
+      inFlightPreview: 0,
+      inFlightExecute: 0
+    }));
+  }
+
+  function track<T>(promise: Promise<T>): Promise<T> {
+    pending.add(promise);
+    promise.finally(() => pending.delete(promise)).catch(() => {});
+    return promise;
+  }
 
   function assertActive(): void {
     if (disposed) throw new Error('模板工作台已关闭。');
@@ -137,6 +184,7 @@ export function createTemplateOwner(options: {
     if (value.phase === 'loading') state.phase = 'loading';
     else if (value.phase === 'success' || value.phase === 'empty' || value.phase === 'stale') state.phase = 'ready';
     else if (value.phase !== 'idle') state.phase = 'error';
+    syncDiagnostics();
   }
 
   function currentCatalog(): readonly OperatorCatalogItem[] {
@@ -157,43 +205,60 @@ export function createTemplateOwner(options: {
       state.industry = value;
       industryRef.value = value;
       state.filteredTemplates = Object.freeze(state.templates.filter(template => templateMatches(template, state.search, value)));
-      void query.refresh({ force: true });
+      if (!readonlyReason) void query.refresh({ force: true });
     },
-    async select(id: string | null): Promise<void> {
+    select(id: string | null): Promise<void> {
       assertActive();
+      if (readonlyReason) return Promise.resolve();
       const generation = ++detailGeneration;
+      for (const controller of detailControllers) controller.abort('template-selection-changed');
       state.selectedTemplateId = id;
       state.selectedTemplate = null;
       state.conversion = null;
       state.diagnostics = Object.freeze([]);
       if (!id) {
         state.message = '选择模板后可查看内容并装载到流程草稿。';
-        return;
+        return Promise.resolve();
       }
       const listed = state.templates.find(template => template.id === id);
-      try {
+      const task = (async () => {
+        const controller = new AbortController();
+        detailControllers.add(controller);
         state.phase = 'loading';
-        const payload = typeof options.api.get === 'function'
-          ? await options.api.get<unknown>(createTemplateDetailPath(id))
-          : listed;
-        if (disposed || generation !== detailGeneration) return;
-        const template = decodeFlowTemplate(payload ?? listed);
-        state.selectedTemplate = template;
-        state.message = `已选择模板：${template.name}`;
-        state.phase = 'ready';
-      } catch (error) {
-        if (disposed || generation !== detailGeneration) return;
-        state.phase = 'error';
-        state.errorCode = errorCode(error);
-        state.message = `模板详情读取失败：${errorMessage(error)}`;
-      }
+        syncDiagnostics();
+        try {
+          const payload = typeof options.api.get === 'function'
+            ? await options.api.get<unknown>(createTemplateDetailPath(id), { signal: controller.signal })
+            : listed;
+          if (disposed || generation !== detailGeneration) return;
+          const template = decodeFlowTemplate(payload ?? listed);
+          state.selectedTemplate = template;
+          state.errorCode = null;
+          state.message = `已选择模板：${template.name}`;
+          state.phase = 'ready';
+        } catch (error) {
+          if (disposed || generation !== detailGeneration || error instanceof ApiAbortError) return;
+          state.phase = 'error';
+          state.errorCode = errorCode(error);
+          state.message = `模板详情读取失败：${errorMessage(error)}`;
+        } finally {
+          detailControllers.delete(controller);
+          syncDiagnostics();
+        }
+      })();
+      return track(task);
     },
     async refresh(): Promise<void> {
       assertActive();
+      if (readonlyReason) return;
       await query.refresh({ force: true });
     },
     async applySelected(applyOptions: Readonly<{ confirmReplace?: boolean }> = {}): Promise<boolean> {
       assertActive();
+      if (readonlyReason) {
+        state.message = readonlyReason;
+        return false;
+      }
       const template = state.selectedTemplate;
       if (!template) {
         state.message = '请先选择一个模板。';
@@ -231,99 +296,150 @@ export function createTemplateOwner(options: {
         return false;
       }
     },
-    async saveAs(input: TemplateWriteInput): Promise<boolean> {
+    saveAs(input: TemplateWriteInput): Promise<boolean> {
       assertActive();
+      if (readonlyReason) {
+        state.message = readonlyReason;
+        return Promise.resolve(false);
+      }
       if (!state.canWrite) {
         state.message = '当前账号没有创建模板的权限。';
-        return false;
+        return Promise.resolve(false);
       }
       if (typeof options.api.post !== 'function') {
         state.message = '当前 API 不支持创建模板。';
-        return false;
+        return Promise.resolve(false);
       }
       const normalizedInput = normalizeWriteInput(input);
       if (!normalizedInput) {
         state.message = '模板名称不能为空。';
-        return false;
+        return Promise.resolve(false);
       }
       const generation = ++writeGeneration;
-      state.phase = 'saving';
-      state.writeStatus = 'saving';
-      state.errorCode = null;
-      try {
-        const flowData = options.flowOwner.projection.draft as unknown as Readonly<Record<string, unknown>>;
-        const response = await options.api.post<unknown>('templates', { ...normalizedInput, flowData });
-        if (disposed || generation !== writeGeneration) return false;
-        const created = decodeFlowTemplate(response);
-        state.selectedTemplateId = created.id;
-        state.selectedTemplate = created;
-        state.writeStatus = 'saved';
-        state.phase = 'ready';
-        state.message = `模板已保存：${created.name}。工程草稿未自动保存。`;
-        await query.refresh({ force: true });
-        return true;
-      } catch (error) {
-        if (disposed || generation !== writeGeneration) return false;
-        state.writeStatus = error instanceof ApiNetworkError || error instanceof ApiAbortError ? 'unknown-outcome' : 'failed';
-        state.phase = state.writeStatus === 'unknown-outcome' ? 'unknown-outcome' : 'error';
-        state.errorCode = errorCode(error);
-        state.message = state.writeStatus === 'unknown-outcome'
-          ? '模板保存结果未知；后端没有提供可安全重放的 operation identity，请先刷新模板列表核对。'
-          : `模板保存失败：${errorMessage(error)}`;
-        return false;
-      }
+      const task = (async () => {
+        const controller = new AbortController();
+        writeControllers.add(controller);
+        state.phase = 'saving';
+        state.writeStatus = 'saving';
+        state.errorCode = null;
+        syncDiagnostics();
+        try {
+          const flowData = options.flowOwner.projection.draft as unknown as Readonly<Record<string, unknown>>;
+          const response = await options.api.post!<unknown>('templates', { ...normalizedInput, flowData }, { signal: controller.signal });
+          if (disposed || generation !== writeGeneration) return false;
+          const created = decodeFlowTemplate(response);
+          state.selectedTemplateId = created.id;
+          state.selectedTemplate = created;
+          state.writeStatus = 'saved';
+          state.phase = 'ready';
+          state.message = `模板已保存：${created.name}。工程草稿未自动保存。`;
+          await query.refresh({ force: true });
+          return true;
+        } catch (error) {
+          if (disposed || generation !== writeGeneration) return false;
+          state.writeStatus = isUnknownWriteOutcome(error) ? 'unknown-outcome' : 'failed';
+          state.phase = state.writeStatus === 'unknown-outcome' ? 'unknown-outcome' : 'error';
+          state.errorCode = errorCode(error);
+          state.message = state.writeStatus === 'unknown-outcome'
+            ? '模板保存结果未知；后端没有提供可安全重放的 operation identity，请先刷新模板列表核对。'
+            : `模板保存失败：${errorMessage(error)}`;
+          return false;
+        } finally {
+          writeControllers.delete(controller);
+          syncDiagnostics();
+        }
+      })();
+      return track(task);
     },
-    async updateSelected(input: TemplateWriteInput): Promise<boolean> {
+    updateSelected(input: TemplateWriteInput): Promise<boolean> {
       assertActive();
+      if (readonlyReason) {
+        state.message = readonlyReason;
+        return Promise.resolve(false);
+      }
       if (!state.canWrite) {
         state.message = '当前账号没有更新模板的权限。';
-        return false;
+        return Promise.resolve(false);
       }
       const id = state.selectedTemplateId;
       if (!id || typeof options.api.put !== 'function') {
         state.message = '请先选择可更新的模板。';
-        return false;
+        return Promise.resolve(false);
       }
       const normalizedInput = normalizeWriteInput(input);
       if (!normalizedInput) {
         state.message = '模板名称不能为空。';
-        return false;
+        return Promise.resolve(false);
       }
       const generation = ++writeGeneration;
-      state.phase = 'saving';
-      state.writeStatus = 'saving';
-      state.errorCode = null;
-      try {
-        const flowData = options.flowOwner.projection.draft as unknown as Readonly<Record<string, unknown>>;
-        const response = await options.api.put<unknown>(createTemplateDetailPath(id), { ...normalizedInput, flowData });
-        if (disposed || generation !== writeGeneration) return false;
-        const updated = decodeFlowTemplate(response);
-        state.selectedTemplate = updated;
-        state.writeStatus = 'saved';
-        state.phase = 'ready';
-        state.message = `模板已更新：${updated.name}。工程草稿未自动保存。`;
-        await query.refresh({ force: true });
-        return true;
-      } catch (error) {
-        if (disposed || generation !== writeGeneration) return false;
-        state.writeStatus = error instanceof ApiNetworkError || error instanceof ApiAbortError ? 'unknown-outcome' : 'failed';
-        state.phase = state.writeStatus === 'unknown-outcome' ? 'unknown-outcome' : 'error';
-        state.errorCode = errorCode(error);
-        state.message = state.writeStatus === 'unknown-outcome'
-          ? '模板更新结果未知；请刷新列表核对服务器状态。'
-          : error instanceof ApiForbiddenError
-            ? '后端拒绝模板更新；请确认 Engineer/Admin 权限。'
-            : error instanceof ApiConflictError
-              ? '模板更新发生冲突；请重新读取模板后再操作。'
-              : `模板更新失败：${errorMessage(error)}`;
-        return false;
-      }
+      const task = (async () => {
+        const controller = new AbortController();
+        writeControllers.add(controller);
+        state.phase = 'saving';
+        state.writeStatus = 'saving';
+        state.errorCode = null;
+        syncDiagnostics();
+        try {
+          const flowData = options.flowOwner.projection.draft as unknown as Readonly<Record<string, unknown>>;
+          const response = await options.api.put!<unknown>(createTemplateDetailPath(id), { ...normalizedInput, flowData }, { signal: controller.signal });
+          if (disposed || generation !== writeGeneration) return false;
+          const updated = decodeFlowTemplate(response);
+          state.selectedTemplate = updated;
+          state.writeStatus = 'saved';
+          state.phase = 'ready';
+          state.message = `模板已更新：${updated.name}。工程草稿未自动保存。`;
+          await query.refresh({ force: true });
+          return true;
+        } catch (error) {
+          if (disposed || generation !== writeGeneration) return false;
+          state.writeStatus = isUnknownWriteOutcome(error) ? 'unknown-outcome' : 'failed';
+          state.phase = state.writeStatus === 'unknown-outcome' ? 'unknown-outcome' : 'error';
+          state.errorCode = errorCode(error);
+          state.message = state.writeStatus === 'unknown-outcome'
+            ? '模板更新结果未知；请刷新列表核对服务器状态。'
+            : error instanceof ApiForbiddenError
+              ? '后端拒绝模板更新；请确认 Engineer/Admin 权限。'
+              : error instanceof ApiConflictError
+                ? '模板更新发生冲突；请重新读取模板后再操作。'
+                : `模板更新失败：${errorMessage(error)}`;
+          return false;
+        } finally {
+          writeControllers.delete(controller);
+          syncDiagnostics();
+        }
+      })();
+      return track(task);
+    },
+    setReadonly(reason: string): void {
+      if (disposed) return;
+      readonlyReason = reason.trim() || '会话已失效；模板保持只读。';
+      query.abort('session-expired');
+      for (const controller of detailControllers) controller.abort('session-expired');
+      state.canWrite = false;
+      state.message = readonlyReason;
+    },
+    clearReadonly(): void {
+      if (disposed) return;
+      readonlyReason = null;
+      state.canWrite = initialCanWrite;
+      if (state.phase !== 'unknown-outcome') state.message = '会话已恢复；模板操作可按权限继续。';
+    },
+    async prepareForLeave(): Promise<boolean> {
+      query.abort('leave');
+      for (const controller of detailControllers) controller.abort('leave');
+      await Promise.allSettled([...pending]);
+      return writeControllers.size === 0 && state.writeStatus !== 'unknown-outcome';
+    },
+    async settle(): Promise<void> {
+      await Promise.allSettled([...pending]);
     },
     dispose(): void {
       if (disposed) return;
       disposed = true;
       detailGeneration += 1;
       writeGeneration += 1;
+      for (const controller of detailControllers) controller.abort('template-owner-disposed');
+      for (const controller of writeControllers) controller.abort('template-owner-disposed');
       stopQueryWatch();
       query.dispose();
       state.phase = 'disposed';
@@ -332,8 +448,24 @@ export function createTemplateOwner(options: {
       state.filteredTemplates = Object.freeze([]);
       state.selectedTemplate = null;
       state.conversion = null;
+      lease?.update(Object.freeze({
+        activeSubscriptions: 0,
+        activeTimers: 0,
+        activeAnimationFrames: 0,
+        activeObservers: 0,
+        activeAbortControllers: 0,
+        activeBlobUrls: 0,
+        activePreviewArtifactIds: 0,
+        activeHostSubscriptions: 0,
+        inFlightReads: 0,
+        inFlightWrites: 0,
+        inFlightPreview: 0,
+        inFlightExecute: 0
+      }));
+      lease?.dispose('template-owner-disposed');
     }
   });
+  syncDiagnostics();
   void query.refresh();
   return owner;
 }

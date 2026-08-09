@@ -15,6 +15,10 @@ import {
   type RunConsoleResultItem,
   type RunConsoleStatistics
 } from './runConsoleProjection';
+import type {
+  WorkspaceCapabilityDiagnosticsLease,
+  WorkspaceLifecycleDiagnosticsOwner
+} from '@/capabilities/project-workspace/workspaceLifecycleDiagnostics';
 
 export type InspectionRunPhase =
   | 'idle'
@@ -59,6 +63,7 @@ export interface InspectionRunOwner {
   hydrate(): Promise<void>;
   start(identity: InspectionRunIdentity, cameraId?: string | null): Promise<boolean>;
   stop(): Promise<boolean>;
+  prepareForLeave(): Promise<boolean>;
   reconcile(): Promise<void>;
   resources(): InspectionRunResources;
   settle(): Promise<void>;
@@ -87,6 +92,7 @@ export function createInspectionRunOwner(options: {
   readonly retryDelaysMs?: readonly number[];
   readonly setTimer?: typeof globalThis.setTimeout;
   readonly clearTimer?: typeof globalThis.clearTimeout;
+  readonly diagnostics?: WorkspaceLifecycleDiagnosticsOwner;
 }): InspectionRunOwner {
   const retryDelays = options.retryDelaysMs ?? [250, 500, 1000, 2000, 5000];
   const setTimer = options.setTimer ?? globalThis.setTimeout.bind(globalThis);
@@ -114,7 +120,36 @@ export function createInspectionRunOwner(options: {
   let hydratePromise: Promise<void> | null = null;
   let startPromise: Promise<boolean> | null = null;
   let stopPromise: Promise<boolean> | null = null;
+  let prepareForLeavePromise: Promise<boolean> | null = null;
+  let preparingForLeave = false;
   const pending = new Set<Promise<unknown>>();
+  const lease: WorkspaceCapabilityDiagnosticsLease | undefined = options.diagnostics?.reserveCapability(
+    options.projectId,
+    'inspection-run'
+  );
+
+  function syncDiagnostics(): void {
+    const resources = {
+      streams: streamController ? 1 : 0,
+      timers: reconnectTimer == null ? 0 : 1,
+      abortControllers: (requestController ? 1 : 0) + (streamController ? 1 : 0),
+      subscriptions: streamController ? 1 : 0
+    };
+    lease?.update(Object.freeze({
+      activeSubscriptions: resources.subscriptions,
+      activeTimers: resources.timers,
+      activeAnimationFrames: 0,
+      activeObservers: 0,
+      activeAbortControllers: resources.abortControllers,
+      activeBlobUrls: 0,
+      activePreviewArtifactIds: 0,
+      activeHostSubscriptions: 0,
+      inFlightReads: requestController ? 1 : 0,
+      inFlightWrites: state.phase === 'starting' || state.phase === 'stopping' ? 1 : 0,
+      inFlightPreview: 0,
+      inFlightExecute: state.phase === 'running' || state.phase === 'reconnecting' ? 1 : 0
+    }));
+  }
 
   function track<T>(promise: Promise<T>): Promise<T> {
     pending.add(promise);
@@ -132,6 +167,7 @@ export function createInspectionRunOwner(options: {
     streamController = null;
     state.connected = false;
     clearReconnect();
+    syncDiagnostics();
   }
 
   function terminal(status: string): boolean {
@@ -263,6 +299,7 @@ export function createInspectionRunOwner(options: {
     if (disposed || ownerGeneration !== generation || requestController) return;
     const controller = new AbortController();
     requestController = controller;
+    syncDiagnostics();
     try {
       const runtime = await options.api.hydrate(options.projectId, { signal: controller.signal });
       if (disposed || ownerGeneration !== generation) return;
@@ -280,11 +317,12 @@ export function createInspectionRunOwner(options: {
       }
     } finally {
       if (requestController === controller) requestController = null;
+      syncDiagnostics();
     }
   }
 
   function scheduleReconnect(ownerGeneration: number): void {
-    if (disposed || ownerGeneration !== generation || reconnectTimer != null ||
+    if (disposed || preparingForLeave || ownerGeneration !== generation || reconnectTimer != null ||
       state.phase === 'idle' || state.phase === 'faulted' || state.phase === 'occupied') return;
     if (state.reconnectAttempt >= retryDelays.length) {
       state.connected = false;
@@ -299,12 +337,14 @@ export function createInspectionRunOwner(options: {
       reconnectTimer = null;
       connect(ownerGeneration);
     }, delay);
+    syncDiagnostics();
   }
 
   function connect(ownerGeneration: number): void {
-    if (disposed || ownerGeneration !== generation || streamController) return;
+    if (disposed || preparingForLeave || ownerGeneration !== generation || streamController) return;
     const controller = new AbortController();
     streamController = controller;
+    syncDiagnostics();
     const flight = options.sse.connect({
       projectId: options.projectId,
       lastEventId: lastEventSequence == null ? null : String(lastEventSequence),
@@ -326,6 +366,7 @@ export function createInspectionRunOwner(options: {
     }).finally(() => {
       if (streamController === controller) streamController = null;
       state.connected = false;
+      syncDiagnostics();
       if (!controller.signal.aborted) scheduleReconnect(ownerGeneration);
     });
   }
@@ -354,6 +395,7 @@ export function createInspectionRunOwner(options: {
       }
     } finally {
       if (requestController === controller) requestController = null;
+      syncDiagnostics();
     }
   }
 
@@ -434,6 +476,7 @@ export function createInspectionRunOwner(options: {
       return false;
     } finally {
       if (requestController === controller) requestController = null;
+      syncDiagnostics();
     }
   }
 
@@ -475,6 +518,7 @@ export function createInspectionRunOwner(options: {
       return false;
     } finally {
       if (requestController === controller) requestController = null;
+      syncDiagnostics();
     }
   }
 
@@ -488,12 +532,64 @@ export function createInspectionRunOwner(options: {
     return flight;
   }
 
+  async function settlePending(): Promise<void> {
+    while (pending.size > 0) {
+      await Promise.allSettled([...pending]);
+    }
+  }
+
+  async function performPrepareForLeave(): Promise<boolean> {
+    if (disposed) return false;
+    preparingForLeave = true;
+    closeStream();
+    try {
+      await settlePending();
+      if (disposed) return false;
+
+      const runtime = state.runtime;
+      if (!runtime) {
+        state.errorCode = 'INSPECTION_LEAVE_AUTHORITY_MISSING';
+        state.message = '离开前未取得连续检测权威状态，当前禁止卸载。';
+        return false;
+      }
+      if (!runtime.isBusy || runtime.sessionType !== 'ContinuousInspection') return true;
+      if (!activeIdentity) {
+        state.errorCode = 'INSPECTION_LEAVE_IDENTITY_MISSING';
+        state.message = '连续检测仍在运行，但缺少完整执行身份；当前禁止卸载。';
+        return false;
+      }
+
+      const stopped = await stop();
+      if (!stopped || disposed) return false;
+      await settlePending();
+      const settledRuntime = state.runtime;
+      if (!settledRuntime || settledRuntime.isBusy) {
+        state.errorCode = 'INSPECTION_LEAVE_STILL_BUSY';
+        state.message = '停止请求后后端仍确认连续检测运行，当前禁止卸载。';
+        return false;
+      }
+      return true;
+    } finally {
+      preparingForLeave = false;
+    }
+  }
+
+  function prepareForLeave(): Promise<boolean> {
+    if (prepareForLeavePromise) return prepareForLeavePromise;
+    const flight = performPrepareForLeave().finally(() => {
+      if (prepareForLeavePromise === flight) prepareForLeavePromise = null;
+    });
+    prepareForLeavePromise = flight;
+    return flight;
+  }
+
   const owner: InspectionRunOwner = Object.freeze({
     projectId: options.projectId,
     projection: readonly(state),
     hydrate,
     start,
     stop,
+    prepareForLeave,
     reconcile: hydrate,
     resources: () => Object.freeze({
       streams: streamController ? 1 : 0,
@@ -501,9 +597,7 @@ export function createInspectionRunOwner(options: {
       abortControllers: (requestController ? 1 : 0) + (streamController ? 1 : 0),
       subscriptions: streamController ? 1 : 0
     }),
-    settle: async () => {
-      await Promise.allSettled([...pending]);
-    },
+    settle: settlePending,
     dispose: () => {
       if (disposed) return;
       disposed = true;
@@ -515,9 +609,27 @@ export function createInspectionRunOwner(options: {
       hydratePromise = null;
       startPromise = null;
       stopPromise = null;
+      prepareForLeavePromise = null;
+      preparingForLeave = false;
       state.phase = 'disposed';
       state.message = '连续检测 Owner 已释放；未向后端发送停止命令。';
+      lease?.update(Object.freeze({
+        activeSubscriptions: 0,
+        activeTimers: 0,
+        activeAnimationFrames: 0,
+        activeObservers: 0,
+        activeAbortControllers: 0,
+        activeBlobUrls: 0,
+        activePreviewArtifactIds: 0,
+        activeHostSubscriptions: 0,
+        inFlightReads: 0,
+        inFlightWrites: 0,
+        inFlightPreview: 0,
+        inFlightExecute: 0
+      }));
+      lease?.dispose('inspection-run-owner-disposed');
     }
   });
+  syncDiagnostics();
   return owner;
 }

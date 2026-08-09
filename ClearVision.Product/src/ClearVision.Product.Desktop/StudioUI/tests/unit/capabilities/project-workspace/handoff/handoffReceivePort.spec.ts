@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ApiTransport } from '@/platform/api';
+import { ApiAbortError, ApiNetworkError, type ApiTransport } from '@/platform/api';
 import {
   createWorkspaceHandoffReceivePort,
   decodeWorkspaceHandoffArtifactV1
@@ -126,6 +126,8 @@ describe('F06 G4 Workspace handoff receive port', () => {
       `ai/handoffs/${artifactId}/consume`
     ]);
     expect(port.projection.phase).toBe('error');
+    expect(port.hasUnknownOutcome()).toBe(true);
+    await expect(port.prepareForLeave()).resolves.toBe(false);
     port.dispose();
   });
 
@@ -184,6 +186,101 @@ describe('F06 G4 Workspace handoff receive port', () => {
 
     expect(port.projection.phase).toBe('artifact-baseline-conflict');
     expect(transport.post).not.toHaveBeenCalled();
+    port.dispose();
+  });
+
+  it('reconciles acknowledge by identity and rolls back the staged Flow when consumption is not confirmed', async () => {
+    const current = { value: handoffArtifactPayload() };
+    const get = vi.fn(async () => current.value);
+    const post = vi.fn(async (path: string, body?: Record<string, unknown>) => {
+      if (path.endsWith('/consume')) {
+        current.value = handoffArtifactPayload({
+          ...current.value,
+          status: 'consuming',
+          consumeClientOperationId: body?.clientOperationId
+        });
+        return current.value;
+      }
+      throw new ApiNetworkError(path, new Error('acknowledge response lost'));
+    });
+    const rollback = vi.fn(async () => undefined);
+    const port = createWorkspaceHandoffReceivePort({
+      api: { apiBaseUrl: 'http://localhost/api', get, post } as unknown as ApiTransport,
+      operationIdFactory: () => consumeOperationId
+    });
+
+    await expect(port.receive({
+      artifactId,
+      targetProjectId: null,
+      isDirty: () => false,
+      baselineMatches: () => true,
+      stage: async () => undefined,
+      rollback
+    })).resolves.toBeNull();
+
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(post.mock.calls.map(([path]) => path)).toEqual([
+      `ai/handoffs/${artifactId}/consume`,
+      `ai/handoffs/${artifactId}/acknowledge`
+    ]);
+    expect(rollback).toHaveBeenCalledOnce();
+    expect(port.hasUnknownOutcome()).toBe(true);
+    await expect(port.prepareForLeave()).resolves.toBe(false);
+    expect(port.projection.phase).toBe('error');
+    expect(port.projection.message).toContain('本地候选已回滚');
+    port.dispose();
+  });
+
+  it('aborts an in-flight handoff read on leave and ignores its late response', async () => {
+    let signal: AbortSignal | undefined;
+    let resolveRead: ((value: unknown) => void) | undefined;
+    const get = vi.fn(async (_path: string, options?: { signal?: AbortSignal }) => await new Promise<unknown>((resolve, reject) => {
+      signal = options?.signal;
+      resolveRead = resolve;
+      signal?.addEventListener('abort', () => reject(new ApiAbortError('handoff-read')), { once: true });
+    }));
+    const port = createWorkspaceHandoffReceivePort({
+      api: { apiBaseUrl: 'http://localhost/api', get } as unknown as ApiTransport
+    });
+    const pending = port.receive({
+      artifactId,
+      targetProjectId: null,
+      isDirty: () => false,
+      baselineMatches: () => true,
+      stage: vi.fn()
+    });
+
+    await vi.waitFor(() => expect(signal).toBeDefined());
+    expect(port.hasPendingOperation()).toBe(true);
+    await expect(port.prepareForLeave()).resolves.toBe(true);
+    resolveRead?.(handoffArtifactPayload());
+    await expect(pending).resolves.toBeNull();
+    expect(port.hasPendingOperation()).toBe(false);
+    expect(port.hasUnknownOutcome()).toBe(false);
+    port.dispose();
+  });
+
+  it('keeps a consume response loss as unknown and blocks leave', async () => {
+    const get = vi.fn(async () => handoffArtifactPayload());
+    const post = vi.fn(async (path: string) => {
+      if (path.endsWith('/consume')) throw new ApiNetworkError(path, new Error('consume response lost'));
+      return handoffArtifactPayload();
+    });
+    const port = createWorkspaceHandoffReceivePort({
+      api: { apiBaseUrl: 'http://localhost/api', get, post } as unknown as ApiTransport,
+      operationIdFactory: () => consumeOperationId
+    });
+
+    await expect(port.receive({
+      artifactId,
+      targetProjectId: null,
+      isDirty: () => false,
+      baselineMatches: () => true,
+      stage: vi.fn()
+    })).resolves.toBeNull();
+
+    expect(port.hasUnknownOutcome()).toBe(true);
+    await expect(port.prepareForLeave()).resolves.toBe(false);
     port.dispose();
   });
 });

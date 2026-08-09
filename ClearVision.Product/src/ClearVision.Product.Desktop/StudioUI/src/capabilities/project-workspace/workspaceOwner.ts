@@ -99,6 +99,8 @@ export interface WorkspaceOwner {
   retrySave(): Promise<WorkspaceSaveAttemptResult>;
   reconcileSave(): Promise<WorkspaceSaveAttemptResult>;
   reconcileExternalProject(): Promise<boolean>;
+  hasPendingChildOperation(): boolean;
+  hasUnknownChildOperation(): boolean;
   reapplyConflict(): void;
   discardConflict(): void;
   hydrateFormalRun(): Promise<void>;
@@ -153,6 +155,7 @@ export function createWorkspaceOwner(
   let finalDecisionOwner: FinalDecisionOwner | undefined;
   let runtimePackageExportOwner: RuntimePackageExportOwner | undefined;
   let templateOwner: TemplateOwner | undefined;
+  let sessionQuarantined = false;
 
   function projectHandoffSave(result: WorkspaceSaveAttemptResult): WorkspaceSaveAttemptResult {
     if (!state.handoff) return result;
@@ -196,12 +199,15 @@ export function createWorkspaceOwner(
       globalVariablesOwner = createWorkspaceGlobalVariablesOwner({
         projectId: project.id,
         baseline: state.project.globalVariables,
-        api
+        api,
+        getFlowDraft: () => flowOwner?.projection.draft ?? null,
+        diagnostics
       });
       finalDecisionOwner = createFinalDecisionOwner({
         flowOwner,
         api,
-        initial: state.project.flow?.decisionConfiguration ?? null
+        initial: state.project.flow?.decisionConfiguration ?? null,
+        diagnostics
       });
       persistenceOwner = createWorkspacePersistenceOwner({
         baseline: state.project,
@@ -222,7 +228,8 @@ export function createWorkspaceOwner(
       runtimePackageExportOwner = createRuntimePackageExportOwner({
         projectId: project.id,
         persistenceOwner,
-        api
+        api,
+        diagnostics
       });
       templateOwner = createTemplateOwner({
         projectId: project.id,
@@ -231,7 +238,8 @@ export function createWorkspaceOwner(
         queries,
         api,
         canWrite: canWriteTemplates,
-        isDirty: () => persistenceOwner?.projection.dirty === true
+        isDirty: () => persistenceOwner?.projection.dirty === true,
+        diagnostics
       });
       runOwner = createWorkspaceRunCommandOwner({
         projectId: project.id,
@@ -278,13 +286,7 @@ export function createWorkspaceOwner(
       return projectHandoffSave(await persistenceOwner.reconcile());
     },
     async reconcileExternalProject(): Promise<boolean> {
-      if (!persistenceOwner || !api) return false;
-      try {
-        const externalProject = await createWorkspaceProjectPersistencePort(api, project.id).getProject();
-        return persistenceOwner.acceptExternalProject(externalProject);
-      } catch {
-        return false;
-      }
+      return await persistenceOwner?.reconcileExternalProject() ?? false;
     },
     reapplyConflict(): void {
       persistenceOwner?.reapplyConflict();
@@ -322,14 +324,45 @@ export function createWorkspaceOwner(
           return false;
         }
       }
+      if (globalVariablesOwner && !(await globalVariablesOwner.prepareForLeave())) {
+        return false;
+      }
+      if (templateOwner && !(await templateOwner.prepareForLeave())) {
+        return false;
+      }
+      if (flowOwner && !(await flowOwner.prepareForLeave())) {
+        return false;
+      }
       return await persistenceOwner?.prepareForLeave(reason) ?? true;
+    },
+    hasPendingChildOperation(): boolean {
+      const runtimeOperation = globalVariablesOwner?.projection.runtimeOperation;
+      return Boolean(
+        runtimeOperation === 'loading' ||
+        runtimeOperation === 'writing' ||
+        runtimeOperation === 'resetting' ||
+        globalVariablesOwner?.projection.runtimeHasPendingWrite ||
+        templateOwner?.projection.writeStatus === 'saving' ||
+        runtimePackageExportOwner?.projection.phase === 'saving' ||
+        runtimePackageExportOwner?.projection.phase === 'exporting' ||
+        flowOwner?.hasPendingLifecycleOperation() === true
+      );
+    },
+    hasUnknownChildOperation(): boolean {
+      return globalVariablesOwner?.projection.runtimeOutcome === 'unknown-outcome' ||
+        templateOwner?.projection.writeStatus === 'unknown-outcome' ||
+        runtimePackageExportOwner?.projection.phase === 'unknown-outcome' ||
+        flowOwner?.hasUnknownLifecycleOutcome() === true;
     },
     quarantineForSessionExpiration(): WorkspaceSessionReconcileIdentity | null {
       if (disposed) return null;
+      sessionQuarantined = true;
       state.phase = 'readonly';
       state.readonlyReason = '会话已失效；本地 draft 与运行身份已隔离，重新认证并完成 reconcile 前禁止写入。';
       flowOwner?.setMutationGate('readonly');
       persistenceOwner?.setReadonly(state.readonlyReason);
+      globalVariablesOwner?.setReadonly(state.readonlyReason);
+      templateOwner?.setReadonly(state.readonlyReason);
       const identity = runOwner?.reconciliationIdentity();
       if (!identity) return null;
       return Object.freeze({
@@ -341,6 +374,7 @@ export function createWorkspaceOwner(
     },
     async reconcileAfterReauthentication(): Promise<boolean> {
       if (disposed) return true;
+      if (persistenceOwner) await persistenceOwner.settle();
       if (persistenceOwner?.projection.phase === 'unknown-outcome') {
         const save = await persistenceOwner.reconcile();
         if (save.status === 'unknown-outcome' || save.status === 'failed') return false;
@@ -348,13 +382,25 @@ export function createWorkspaceOwner(
       const runPhase = runOwner?.projection.phase;
       if (runPhase === 'executing' || runPhase === 'cancel-requested' || runPhase === 'unknown-outcome') {
         const reconciliation = await runOwner?.reconcile();
-        return Boolean(reconciliation && (
+        if (!reconciliation || !(
           reconciliation.status === 'cancelled' ||
           reconciliation.status === 'succeeded' ||
           reconciliation.status === 'failed'
-        ));
+        )) return false;
       }
-      return runPhase !== 'admitting';
+      if (runPhase === 'admitting') return false;
+      if (sessionQuarantined) {
+        persistenceOwner?.clearReadonly();
+        globalVariablesOwner?.clearReadonly();
+        templateOwner?.clearReadonly();
+        flowOwner?.setMutationGate('editable');
+        state.phase = state.project.flow === null || state.project.flow.operators.length === 0
+          ? 'empty'
+          : 'ready';
+        state.readonlyReason = null;
+        sessionQuarantined = false;
+      }
+      return true;
     },
     setReadonly(reason: string): void {
       if (disposed) return;
@@ -362,6 +408,8 @@ export function createWorkspaceOwner(
       state.readonlyReason = reason.trim() || '后端拒绝当前读取刷新；保留已解码的只读投影。';
       flowOwner?.setMutationGate('readonly');
       persistenceOwner?.setReadonly(state.readonlyReason);
+      globalVariablesOwner?.setReadonly(state.readonlyReason);
+      templateOwner?.setReadonly(state.readonlyReason);
     },
     async stageHandoffDraft(artifact: WorkspaceHandoffArtifactV1): Promise<void> {
       if (disposed) throw new Error('Workspace owner has been disposed.');

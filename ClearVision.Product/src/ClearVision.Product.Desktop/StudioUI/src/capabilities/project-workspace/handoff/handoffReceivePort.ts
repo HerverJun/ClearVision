@@ -14,6 +14,10 @@ import {
   type WorkspaceHandoffReceiveProjection,
   type WorkspaceHandoffSourceV1
 } from './handoffContracts';
+import type {
+  WorkspaceCapabilityDiagnosticsLease,
+  WorkspaceLifecycleDiagnosticsOwner
+} from '../workspaceLifecycleDiagnostics';
 
 type MutableProjection = {
   -readonly [Key in keyof WorkspaceHandoffReceiveProjection]: WorkspaceHandoffReceiveProjection[Key]
@@ -26,12 +30,19 @@ export interface WorkspaceHandoffReceiveResult {
 
 export interface WorkspaceHandoffReceivePort {
   readonly projection: DeepReadonly<WorkspaceHandoffReceiveProjection>;
+  hasPendingOperation(): boolean;
+  hasUnknownOutcome(): boolean;
+  quarantineForSessionExpiration(): boolean;
+  reconcileAfterReauthentication(): boolean;
+  prepareForLeave(): Promise<boolean>;
+  settle(): Promise<void>;
   receive(options: Readonly<{
     artifactId: string;
     targetProjectId: string | null;
     isDirty: () => boolean;
     baselineMatches: (artifact: WorkspaceHandoffArtifactV1) => boolean;
     stage: (artifact: WorkspaceHandoffArtifactV1) => Promise<void>;
+    rollback?: (artifact: WorkspaceHandoffArtifactV1) => Promise<void>;
   }>): Promise<WorkspaceHandoffReceiveResult | null>;
   reject(reason?: string): Promise<boolean>;
   dispose(reason?: string): void;
@@ -70,6 +81,7 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
   api: ApiTransport;
   operationIdFactory?: () => string;
   now?: () => Date;
+  diagnostics?: WorkspaceLifecycleDiagnosticsOwner;
 }>): WorkspaceHandoffReceivePort {
   const operationIdFactory = options.operationIdFactory ?? (() => globalThis.crypto.randomUUID());
   const now = options.now ?? (() => new Date());
@@ -85,6 +97,33 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
   let controller: AbortController | null = null;
   let activeArtifactId: string | null = null;
   let consumeOperationId: string | null = null;
+  let unknownOutcome = false;
+  let writeInFlight = false;
+  let sessionQuarantined = false;
+  const idleWaiters = new Set<() => void>();
+  const lease: WorkspaceCapabilityDiagnosticsLease | undefined = options.diagnostics?.reserveCapability(
+    'workspace-handoff',
+    'handoff'
+  );
+
+  function syncDiagnostics(): void {
+    const active = state.inFlightCount > 0;
+    const loading = active && state.phase === 'workspace-loading-artifact';
+    lease?.update(Object.freeze({
+      activeSubscriptions: 0,
+      activeTimers: 0,
+      activeAnimationFrames: 0,
+      activeObservers: 0,
+      activeAbortControllers: Number(Boolean(controller)),
+      activeBlobUrls: 0,
+      activePreviewArtifactIds: 0,
+      activeHostSubscriptions: 0,
+      inFlightReads: loading ? 1 : 0,
+      inFlightWrites: active && !loading ? 1 : 0,
+      inFlightPreview: 0,
+      inFlightExecute: 0
+    }));
+  }
 
   function setPhase(
     phase: WorkspaceHandoffReceivePhase,
@@ -97,6 +136,19 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
     state.message = message;
     state.blocker = blocker;
     state.nextStep = nextStep;
+    syncDiagnostics();
+  }
+
+  function waitForIdle(): Promise<void> {
+    if (state.inFlightCount === 0) return Promise.resolve();
+    return new Promise(resolve => idleWaiters.add(resolve));
+  }
+
+  function notifyIdle(): void {
+    if (state.inFlightCount !== 0) return;
+    const waiters = [...idleWaiters];
+    idleWaiters.clear();
+    for (const resolve of waiters) resolve();
   }
 
   function assertTarget(artifact: WorkspaceHandoffArtifactV1, projectId: string | null): void {
@@ -142,10 +194,53 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
 
   return Object.freeze({
     projection: readonly(state),
+    hasPendingOperation(): boolean {
+      return state.inFlightCount > 0;
+    },
+    hasUnknownOutcome(): boolean {
+      return unknownOutcome;
+    },
+    async prepareForLeave(): Promise<boolean> {
+      if (disposed || unknownOutcome) return !unknownOutcome;
+      if (sessionQuarantined) return false;
+      if (state.inFlightCount === 0) return true;
+      if (state.phase !== 'workspace-loading-artifact') return false;
+      controller?.abort('handoff-read-leave');
+      await waitForIdle();
+      return !unknownOutcome && state.inFlightCount === 0;
+    },
+    quarantineForSessionExpiration(): boolean {
+      if (disposed) return false;
+      sessionQuarantined = true;
+      generation += 1;
+      const preserveUnknown = writeInFlight;
+      controller?.abort('session-expired');
+      controller = null;
+      state.inFlightCount = 0;
+      if (preserveUnknown) {
+        unknownOutcome = true;
+        setPhase('error', '会话已失效；交接写入结果未知，重新认证后必须先协调。',
+          'SESSION_UNAUTHORIZED', '重新认证后查询当前 artifact 状态；禁止重复接收。');
+      } else {
+        setPhase('idle', '会话已失效；交接读取已停止，候选状态未改变。', null, '重新认证后可重新读取候选。');
+      }
+      syncDiagnostics();
+      notifyIdle();
+      return true;
+    },
+    reconcileAfterReauthentication(): boolean {
+      if (disposed) return false;
+      if (unknownOutcome) return false;
+      sessionQuarantined = false;
+      return true;
+    },
+    async settle(): Promise<void> {
+      await waitForIdle();
+    },
     async receive(
       receiveOptions: Parameters<WorkspaceHandoffReceivePort['receive']>[0]
     ): Promise<WorkspaceHandoffReceiveResult | null> {
-      if (disposed) return null;
+      if (disposed || sessionQuarantined) return null;
       if (!artifactPattern.test(receiveOptions.artifactId) ||
           receiveOptions.targetProjectId !== null && !guidPattern.test(receiveOptions.targetProjectId)) {
         setPhase('error', '交接链接无效。', 'artifact identity invalid', '返回 AI 工作台重新发起交接。');
@@ -158,12 +253,30 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
       state.inFlightCount = 1;
       activeArtifactId = receiveOptions.artifactId;
       setPhase('workspace-loading-artifact', '正在读取并预检 AI 候选。', null, '完成预检后进入工作区本地草稿。');
+      let rollbackAttempted = false;
+      let rollbackFailed = false;
+      let stagingAttempted = false;
+      let stagingConfirmed = false;
+      let writeAttempted = false;
+      let writeOutcomeReconciled = false;
+      let stagedArtifact: WorkspaceHandoffArtifactV1 | null = null;
+
+      const rollbackStage = async (artifact: WorkspaceHandoffArtifactV1): Promise<void> => {
+        if (!receiveOptions.rollback || rollbackAttempted) return;
+        rollbackAttempted = true;
+        try {
+          await receiveOptions.rollback(artifact);
+        } catch {
+          rollbackFailed = true;
+        }
+      };
+
       try {
         const loaded = decodeWorkspaceHandoffArtifactV1(await options.api.get(
           `ai/handoffs/${encodeURIComponent(receiveOptions.artifactId)}`,
           { signal: controller.signal }
         ));
-        if (disposed || requestGeneration !== generation) return null;
+        if (disposed || requestGeneration !== generation || controller.signal.aborted) return null;
         assertTarget(loaded, receiveOptions.targetProjectId);
         if (!receiveOptions.baselineMatches(loaded)) {
           setPhase(
@@ -175,14 +288,17 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
           return null;
         }
         if (loaded.status === 'expired') {
+          unknownOutcome = false;
           setPhase('artifact-expired', 'AI 候选已过期。', 'artifact expired', '返回 AI 基于当前条件重新 Build。');
           return null;
         }
         if (loaded.status === 'consumed') {
+          unknownOutcome = false;
           setPhase('artifact-consumed', 'AI 候选已由工作区接收。', 'artifact consumed', '返回 AI 创建新的候选交接。');
           return null;
         }
         if (loaded.status === 'rejected') {
+          unknownOutcome = false;
           setPhase('error', 'AI 候选已放弃。', 'artifact rejected', '返回 AI 重新 Build。');
           return null;
         }
@@ -196,6 +312,8 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
           return null;
         }
         consumeOperationId = loaded.consumeClientOperationId ?? operationIdFactory();
+        writeAttempted = true;
+        writeInFlight = true;
         const reserved = await postArtifact(
           loaded.artifactId,
           'consume',
@@ -203,12 +321,13 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
           receiveOptions.targetProjectId,
           loaded.candidateFlowFingerprint,
           controller.signal
-        );
-        if (disposed || requestGeneration !== generation) return null;
+        ).finally(() => { writeInFlight = false; });
+        if (disposed || requestGeneration !== generation || controller.signal.aborted) return null;
         if (reserved.status !== 'consuming' || reserved.consumeClientOperationId !== consumeOperationId) {
           throw new WorkspaceHandoffContractError('$.status', 'consuming for the current operation');
         }
         if (receiveOptions.isDirty()) {
+          unknownOutcome = true;
           setPhase(
             'workspace-dirty-conflict',
             '接收期间工作区产生了未保存修改，候选未装载。',
@@ -218,18 +337,53 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
           return null;
         }
         setPhase('workspace-staging', '正在把候选装载到唯一 Workspace owner。', null, '装载成功后确认一次性接收。');
+        stagingAttempted = true;
+        stagedArtifact = reserved;
         await receiveOptions.stage(reserved);
-        if (disposed || requestGeneration !== generation) return null;
-        const acknowledged = await postArtifact(
-          reserved.artifactId,
-          'acknowledge',
-          consumeOperationId,
-          receiveOptions.targetProjectId,
-          reserved.candidateFlowFingerprint,
-          controller.signal
-        );
-        if (acknowledged.status !== 'consumed') {
-          throw new WorkspaceHandoffContractError('$.status', 'consumed after Workspace staging');
+        if (disposed || requestGeneration !== generation) {
+          await rollbackStage(reserved);
+          return null;
+        }
+        let acknowledged: WorkspaceHandoffArtifactV1;
+        try {
+          writeAttempted = true;
+          writeInFlight = true;
+          acknowledged = await postArtifact(
+            reserved.artifactId,
+            'acknowledge',
+            consumeOperationId,
+            receiveOptions.targetProjectId,
+            reserved.candidateFlowFingerprint,
+            controller.signal
+          ).finally(() => { writeInFlight = false; });
+          if (acknowledged.status !== 'consumed') {
+            throw new WorkspaceHandoffContractError('$.status', 'consumed after Workspace staging');
+          }
+          stagingConfirmed = true;
+          writeOutcomeReconciled = true;
+          unknownOutcome = false;
+        } catch (acknowledgeError) {
+          let reconciled: WorkspaceHandoffArtifactV1 | null = null;
+          if (!(acknowledgeError instanceof ApiAbortError) && !controller.signal.aborted) {
+            try {
+              reconciled = decodeWorkspaceHandoffArtifactV1(await options.api.get(
+                `ai/handoffs/${encodeURIComponent(reserved.artifactId)}`,
+                { signal: controller.signal }
+              ));
+            } catch {
+              reconciled = null;
+            }
+          }
+          if (reconciled?.status === 'consumed' &&
+              reconciled.consumeClientOperationId === consumeOperationId) {
+            acknowledged = reconciled;
+            writeOutcomeReconciled = true;
+            unknownOutcome = false;
+          } else {
+            unknownOutcome = true;
+            await rollbackStage(reserved);
+            throw acknowledgeError;
+          }
         }
         const source = Object.freeze({
           artifactId: acknowledged.artifactId,
@@ -248,30 +402,45 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
         );
         return Object.freeze({ artifact: acknowledged, source });
       } catch (error) {
+        if (writeAttempted && !writeOutcomeReconciled) unknownOutcome = true;
+        if (stagingAttempted && !stagingConfirmed && stagedArtifact) {
+          await rollbackStage(stagedArtifact);
+        }
         if (disposed || requestGeneration !== generation || error instanceof ApiAbortError) return null;
         const phase = phaseFor(error);
-        setPhase(phase, failureMessage(error), failureCode(error) || 'handoff receive failed',
+        const message = rollbackAttempted
+          ? rollbackFailed
+            ? `${failureMessage(error)} 本地草稿回滚失败，请保持页面并由 Workspace owner 继续协调。`
+            : `${failureMessage(error)} 本地候选已回滚，未留下未确认的 Flow 草稿。`
+          : failureMessage(error);
+        setPhase(phase, message, failureCode(error) || 'handoff receive failed',
           phase === 'artifact-baseline-conflict'
             ? '返回 AI 基于最新工程重新 Build。'
             : '协调当前 artifact 状态后重试；不要重新创建候选。');
         return null;
       } finally {
         if (requestGeneration === generation) {
+          writeInFlight = false;
           controller = null;
           state.inFlightCount = 0;
+          syncDiagnostics();
+          notifyIdle();
         }
       }
     },
     async reject(reason = 'workspace_staging_failed'): Promise<boolean> {
-      if (disposed || !activeArtifactId || !consumeOperationId || !options.api.post) return false;
+      if (disposed || sessionQuarantined || !activeArtifactId || !consumeOperationId || !options.api.post) return false;
       const rejectController = new AbortController();
       controller = rejectController;
       state.inFlightCount = 1;
+      unknownOutcome = true;
+      syncDiagnostics();
       try {
         await options.api.post(`ai/handoffs/${encodeURIComponent(activeArtifactId)}/reject`, {
           clientOperationId: consumeOperationId,
           rejectionCode: reason
         }, { signal: rejectController.signal });
+        unknownOutcome = false;
         return true;
       } catch (error) {
         if (!(error instanceof ApiAbortError)) {
@@ -282,6 +451,8 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
       } finally {
         if (controller === rejectController) controller = null;
         state.inFlightCount = 0;
+        syncDiagnostics();
+        notifyIdle();
       }
     },
     dispose(reason = 'handoff-receive-disposed'): void {
@@ -292,11 +463,17 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
       controller = null;
       activeArtifactId = null;
       consumeOperationId = null;
+      writeInFlight = false;
+      sessionQuarantined = false;
       state.inFlightCount = 0;
       state.phase = 'disposed';
       state.message = '';
       state.blocker = null;
       state.nextStep = '';
+      unknownOutcome = false;
+      syncDiagnostics();
+      notifyIdle();
+      lease?.dispose(reason);
     }
   });
 }

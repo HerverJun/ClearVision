@@ -23,6 +23,70 @@ const zeroResources = {
 } as const;
 
 describe('F03 G1-G4 Workspace lifecycle diagnostics', () => {
+  it('tracks auxiliary capability owners and their request resources independently', () => {
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const variables = diagnostics.reserveCapability(projectA, 'global-variables');
+    const template = diagnostics.reserveCapability(projectA, 'template');
+    const camera = diagnostics.reserveCapability(projectA, 'camera-binding');
+    const inspection = diagnostics.reserveCapability(projectA, 'inspection-run');
+
+    expect(diagnostics.diagnostics.capabilityOwnerCounts).toEqual({
+      'global-variables': 1,
+      template: 1,
+      'camera-binding': 1,
+      'inspection-run': 1,
+      'final-decision': 0,
+      'runtime-package': 0,
+      'line-sequence': 0,
+      calibration: 0,
+      handoff: 0
+    });
+    expect(() => diagnostics.reserveCapability(projectB, 'template')).toThrow(WorkspaceOwnerConflictError);
+
+    variables.update({ ...zeroResources, inFlightReads: 1, activeAbortControllers: 1 });
+    camera.update({ ...zeroResources, activeTimers: 1, inFlightWrites: 1, activeAbortControllers: 1 });
+    expect(diagnostics.diagnostics).toMatchObject({
+      capabilityOwnerCounts: {
+        'global-variables': 1,
+        template: 1,
+        'camera-binding': 1,
+        'inspection-run': 1,
+        'final-decision': 0,
+        'runtime-package': 0,
+        'line-sequence': 0,
+        calibration: 0,
+        handoff: 0
+      },
+      activeTimers: 1,
+      activeAbortControllers: 2,
+      inFlightReads: 1,
+      inFlightWrites: 1
+    });
+
+    inspection.dispose('inspection-leave');
+    camera.dispose('camera-leave');
+    template.dispose('template-leave');
+    variables.dispose('variables-leave');
+    expect(diagnostics.diagnostics).toMatchObject({
+      capabilityOwnerCounts: {
+        'global-variables': 0,
+        template: 0,
+        'camera-binding': 0,
+        'inspection-run': 0,
+        'final-decision': 0,
+        'runtime-package': 0,
+        'line-sequence': 0,
+        calibration: 0,
+        handoff: 0
+      },
+      activeTimers: 0,
+      activeAbortControllers: 0,
+      inFlightReads: 0,
+      inFlightWrites: 0
+    });
+    diagnostics.dispose();
+  });
+
   it('keeps every owner count at 0 or 1 and fails immediately on conflicts', () => {
     const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
     const read = diagnostics.reserveRead(projectA);

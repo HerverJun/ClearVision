@@ -7,6 +7,10 @@ import {
   type ApiTransport
 } from '@/platform/api';
 import type { FlowCanvasOwner } from '../flow';
+import type {
+  WorkspaceCapabilityDiagnosticsLease,
+  WorkspaceLifecycleDiagnosticsOwner
+} from '../workspaceLifecycleDiagnostics';
 
 export interface CameraBindingV1 {
   readonly id: string;
@@ -53,6 +57,8 @@ export interface CameraBindingEditorOwner {
   capture(): Promise<CapturedCameraFrameV1 | null>;
   cancelCapture(): void;
   getPreviewInputContext(targetNode: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> | null;
+  prepareForLeave(): Promise<boolean>;
+  settle(): Promise<void>;
   dispose(reason?: string): void;
 }
 
@@ -179,6 +185,7 @@ export function createCameraBindingEditorOwner(options: {
   readonly projectId: string;
   readonly flowOwner: FlowCanvasOwner;
   readonly api: ApiTransport;
+  readonly diagnostics?: WorkspaceLifecycleDiagnosticsOwner;
 }): CameraBindingEditorOwner {
   if (!options.api.get || !options.api.post || !options.api.getBlob || !options.api.postBlob) {
     throw new TypeError('相机编辑器需要 shared ApiTransport 的 GET、POST、GET blob 与 POST blob。');
@@ -200,7 +207,39 @@ export function createCameraBindingEditorOwner(options: {
   let disposed = false;
   let generation = 0;
   let captureController: AbortController | null = null;
+  let bindingController: AbortController | null = null;
   let activePreviewSessionId: string | null = null;
+  const cleanupControllers = new Set<AbortController>();
+  const cleanupTimers = new Set<ReturnType<typeof globalThis.setTimeout>>();
+  const pending = new Set<Promise<unknown>>();
+  let cleanupFailed = false;
+  const lease: WorkspaceCapabilityDiagnosticsLease | undefined = options.diagnostics?.reserveCapability(
+    options.projectId,
+    'camera-binding'
+  );
+
+  function syncDiagnostics(): void {
+    lease?.update(Object.freeze({
+      activeSubscriptions: 0,
+      activeTimers: cleanupTimers.size,
+      activeAnimationFrames: 0,
+      activeObservers: 0,
+      activeAbortControllers: Number(Boolean(captureController)) + Number(Boolean(bindingController)) + cleanupControllers.size,
+      activeBlobUrls: 0,
+      activePreviewArtifactIds: 0,
+      activeHostSubscriptions: 0,
+      inFlightReads: Number(Boolean(bindingController)),
+      inFlightWrites: cleanupControllers.size,
+      inFlightPreview: Number(Boolean(captureController)),
+      inFlightExecute: 0
+    }));
+  }
+
+  function track<T>(promise: Promise<T>): Promise<T> {
+    pending.add(promise);
+    promise.finally(() => pending.delete(promise)).catch(() => {});
+    return promise;
+  }
 
   function selectedNode(): Readonly<Record<string, unknown>> | null {
     const selectedId = options.flowOwner.projection.runtime?.selectedNodeId ?? null;
@@ -236,11 +275,29 @@ export function createCameraBindingEditorOwner(options: {
     { immediate: true, flush: 'sync' }
   );
 
-  async function stopPreviewSession(): Promise<void> {
+  function stopPreviewSession(): Promise<void> {
     const sessionId = activePreviewSessionId;
     activePreviewSessionId = null;
-    if (!sessionId) return;
-    await post('cameras/continuous-preview/stop', { sessionId }).catch(() => undefined);
+    if (!sessionId) return Promise.resolve();
+    const controller = new AbortController();
+    cleanupControllers.add(controller);
+    const timeout = globalThis.setTimeout(() => controller.abort('camera-preview-stop-timeout'), 3000);
+    cleanupTimers.add(timeout);
+    syncDiagnostics();
+    const task = (async () => {
+      try {
+        await post('cameras/continuous-preview/stop', { sessionId }, { signal: controller.signal });
+      } catch {
+        cleanupFailed = true;
+      } finally {
+        globalThis.clearTimeout(timeout);
+        cleanupTimers.delete(timeout);
+        cleanupControllers.delete(controller);
+        syncDiagnostics();
+      }
+    })();
+    syncDiagnostics();
+    return track(task);
   }
 
   async function captureBlob(binding: CameraBindingV1, signal: AbortSignal): Promise<ApiBlobResponse> {
@@ -260,26 +317,35 @@ export function createCameraBindingEditorOwner(options: {
 
   const owner: CameraBindingEditorOwner = Object.freeze({
     projection: readonly(state),
-    async refreshBindings(): Promise<void> {
-      if (disposed) return;
+    refreshBindings(): Promise<void> {
+      if (disposed) return Promise.resolve();
       const operation = ++generation;
-      state.phase = 'loading';
-      state.message = '正在读取相机绑定。';
-      try {
-        const bindings = decodeBindings(await get('cameras/bindings'));
-        if (disposed || operation !== generation) return;
-        state.bindings = bindings;
-        state.phase = 'ready';
-        state.message = bindings.length > 0 ? `已读取 ${bindings.length} 个相机绑定。` : '尚未配置相机绑定。';
-      } catch (error) {
-        if (disposed || operation !== generation || error instanceof ApiAbortError) return;
-        state.phase = 'error';
-        state.message = error instanceof ApiForbiddenError
-          ? '当前账户没有相机操作权限。'
-          : '相机绑定读取失败，请检查设备服务后重试。';
-      } finally {
-        syncSelection();
-      }
+      bindingController?.abort('camera-bindings-replaced');
+      const controller = new AbortController();
+      bindingController = controller;
+      const task = (async () => {
+        state.phase = 'loading';
+        state.message = '正在读取相机绑定。';
+        syncDiagnostics();
+        try {
+          const bindings = decodeBindings(await get('cameras/bindings', { signal: controller.signal }));
+          if (disposed || operation !== generation) return;
+          state.bindings = bindings;
+          state.phase = 'ready';
+          state.message = bindings.length > 0 ? `已读取 ${bindings.length} 个相机绑定。` : '尚未配置相机绑定。';
+        } catch (error) {
+          if (disposed || operation !== generation || error instanceof ApiAbortError) return;
+          state.phase = 'error';
+          state.message = error instanceof ApiForbiddenError
+            ? '当前账户没有相机操作权限。'
+            : '相机绑定读取失败，请检查设备服务后重试。';
+        } finally {
+          if (bindingController === controller) bindingController = null;
+          syncSelection();
+          syncDiagnostics();
+        }
+      })();
+      return track(task);
     },
     selectBinding(parameterName: string, bindingId: string): boolean {
       if (disposed || options.flowOwner.projection.mutationGate !== 'editable') return false;
@@ -291,6 +357,7 @@ export function createCameraBindingEditorOwner(options: {
         return false;
       }
       captureController?.abort('camera-binding-changed');
+      void stopPreviewSession();
       state.frame = null;
       const result = options.flowOwner.commands.patchNodeParameter({
         nodeId: nodeId(node),
@@ -301,81 +368,86 @@ export function createCameraBindingEditorOwner(options: {
       syncSelection();
       return result.ok;
     },
-    async capture(): Promise<CapturedCameraFrameV1 | null> {
-      if (disposed || state.capturePhase === 'capturing') return null;
+    capture(): Promise<CapturedCameraFrameV1 | null> {
+      if (disposed || state.capturePhase === 'capturing') return Promise.resolve(null);
       const source = selectedNode();
       const binding = state.bindings.find(item => item.id === state.currentBindingId);
       if (!source || !state.canCapture || !binding) {
         state.capturePhase = 'error';
         state.message = '请先选择启用的相机绑定，并将采集源设为相机。';
-        return null;
+        return Promise.resolve(null);
       }
       const operation = ++generation;
       const controller = new AbortController();
       captureController = controller;
-      state.capturePhase = 'capturing';
-      state.canCapture = false;
-      state.message = `正在从 ${binding.displayName} 获取单帧。`;
-      try {
-        const response = await captureBlob(binding, controller.signal);
-        if (response.blob.size === 0) throw new Error('相机未返回图像数据。');
-        const imageBase64 = await blobToBase64(response.blob);
-        if (disposed || operation !== generation || controller.signal.aborted) return null;
-        const currentSource = options.flowOwner.projection.draft.operators.find(item => nodeId(item) === nodeId(source));
-        if (!currentSource || sourceSignature(currentSource) !== sourceSignature(source)) {
-          state.capturePhase = 'cancelled';
-          state.message = '捕获期间采集配置已变化，返回帧已丢弃。';
-          return null;
-        }
-        const frame = Object.freeze({
-          projectId: options.projectId,
-          sourceNodeId: nodeId(source),
-          frameId: globalThis.crypto.randomUUID(),
-          sourceSignature: sourceSignature(source),
-          imageBase64,
-          cameraBindingId: response.headers.get('X-Camera-Id') || binding.id,
-          triggerMode: response.headers.get('X-Trigger-Mode') || binding.triggerMode,
-          width: positiveHeader(response.headers, 'X-Image-Width'),
-          height: positiveHeader(response.headers, 'X-Image-Height'),
-          contentType: response.contentType,
-          capturedAtUtc: new Date().toISOString()
-        } satisfies CapturedCameraFrameV1);
-        state.frame = frame;
-        state.capturePhase = 'captured';
-        state.message = frame.width && frame.height
-          ? `单帧已捕获：${frame.width} x ${frame.height}。`
-          : '单帧已捕获，可用于下游预览与 ROI。';
-        return frame;
-      } catch (error) {
-        if (disposed || operation !== generation || error instanceof ApiAbortError || controller.signal.aborted) {
-          if (!disposed) {
+      const task = (async () => {
+        state.capturePhase = 'capturing';
+        state.canCapture = false;
+        state.message = `正在从 ${binding.displayName} 获取单帧。`;
+        syncDiagnostics();
+        try {
+          const response = await captureBlob(binding, controller.signal);
+          if (response.blob.size === 0) throw new Error('相机未返回图像数据。');
+          const imageBase64 = await blobToBase64(response.blob);
+          if (disposed || operation !== generation || controller.signal.aborted) return null;
+          const currentSource = options.flowOwner.projection.draft.operators.find(item => nodeId(item) === nodeId(source));
+          if (!currentSource || sourceSignature(currentSource) !== sourceSignature(source)) {
             state.capturePhase = 'cancelled';
-            state.message = '单帧捕获已取消。';
+            state.message = '捕获期间采集配置已变化，返回帧已丢弃。';
+            return null;
           }
+          const frame = Object.freeze({
+            projectId: options.projectId,
+            sourceNodeId: nodeId(source),
+            frameId: globalThis.crypto.randomUUID(),
+            sourceSignature: sourceSignature(source),
+            imageBase64,
+            cameraBindingId: response.headers.get('X-Camera-Id') || binding.id,
+            triggerMode: response.headers.get('X-Trigger-Mode') || binding.triggerMode,
+            width: positiveHeader(response.headers, 'X-Image-Width'),
+            height: positiveHeader(response.headers, 'X-Image-Height'),
+            contentType: response.contentType,
+            capturedAtUtc: new Date().toISOString()
+          } satisfies CapturedCameraFrameV1);
+          state.frame = frame;
+          state.capturePhase = 'captured';
+          state.message = frame.width && frame.height
+            ? `单帧已捕获：${frame.width} x ${frame.height}。`
+            : '单帧已捕获，可用于下游预览与 ROI。';
+          return frame;
+        } catch (error) {
+          if (disposed || operation !== generation || error instanceof ApiAbortError || controller.signal.aborted) {
+            if (!disposed) {
+              state.capturePhase = 'cancelled';
+              state.message = '单帧捕获已取消。';
+            }
+            return null;
+          }
+          state.frame = null;
+          state.capturePhase = 'error';
+          state.message = error instanceof ApiForbiddenError
+            ? '当前账户没有相机操作权限。'
+            : error instanceof ApiNotFoundError
+              ? '相机绑定已不存在，请刷新绑定后重试。'
+              : `单帧捕获失败：${error instanceof Error ? error.message : '设备未返回可用图像。'}`;
           return null;
+        } finally {
+          if (captureController === controller) captureController = null;
+          syncSelection();
+          syncDiagnostics();
         }
-        state.frame = null;
-        state.capturePhase = 'error';
-        state.message = error instanceof ApiForbiddenError
-          ? '当前账户没有相机操作权限。'
-          : error instanceof ApiNotFoundError
-            ? '相机绑定已不存在，请刷新绑定后重试。'
-            : `单帧捕获失败：${error instanceof Error ? error.message : '设备未返回可用图像。'}`;
-        return null;
-      } finally {
-        if (captureController === controller) captureController = null;
-        syncSelection();
-      }
+      })();
+      return track(task);
     },
     cancelCapture(): void {
       if (disposed || state.capturePhase !== 'capturing') return;
       generation += 1;
       captureController?.abort('camera-capture-cancelled');
-      captureController = null;
       void stopPreviewSession();
       state.capturePhase = 'cancelled';
       state.message = '单帧捕获已取消。';
       syncSelection();
+      syncDiagnostics();
     },
     getPreviewInputContext(
       targetNode: Readonly<Record<string, unknown>>
@@ -398,13 +470,26 @@ export function createCameraBindingEditorOwner(options: {
         frameId: frame.frameId
       });
     },
-    dispose(): void {
+    async prepareForLeave(): Promise<boolean> {
+      if (state.capturePhase === 'capturing') {
+        generation += 1;
+        captureController?.abort('leave');
+        void stopPreviewSession();
+      }
+      bindingController?.abort('leave');
+      await Promise.allSettled([...pending]);
+      return captureController === null && bindingController === null && cleanupControllers.size === 0 && !cleanupFailed;
+    },
+    async settle(): Promise<void> {
+      await Promise.allSettled([...pending]);
+    },
+    dispose(reason = 'camera-owner-disposed'): void {
       if (disposed) return;
       disposed = true;
       generation += 1;
       stopWatch();
       captureController?.abort('camera-owner-disposed');
-      captureController = null;
+      bindingController?.abort('camera-owner-disposed');
       void stopPreviewSession();
       state.frame = null;
       state.bindings = Object.freeze([]);
@@ -412,9 +497,28 @@ export function createCameraBindingEditorOwner(options: {
       state.capturePhase = 'idle';
       state.canCapture = false;
       state.message = '相机编辑器已释放。';
+      syncDiagnostics();
+      void Promise.allSettled([...pending]).finally(() => {
+        lease?.update(Object.freeze({
+          activeSubscriptions: 0,
+          activeTimers: 0,
+          activeAnimationFrames: 0,
+          activeObservers: 0,
+          activeAbortControllers: 0,
+          activeBlobUrls: 0,
+          activePreviewArtifactIds: 0,
+          activeHostSubscriptions: 0,
+          inFlightReads: 0,
+          inFlightWrites: 0,
+          inFlightPreview: 0,
+          inFlightExecute: 0
+        }));
+        lease?.dispose(reason);
+      });
     }
   });
 
+  syncDiagnostics();
   void owner.refreshBindings();
   return owner;
 }

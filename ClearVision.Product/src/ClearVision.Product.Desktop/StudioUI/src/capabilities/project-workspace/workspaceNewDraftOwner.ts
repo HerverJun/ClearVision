@@ -64,6 +64,9 @@ export interface WorkspaceNewDraftOwner {
   markSaveUnknown(message: string): void;
   markSaveFailed(message: string, allowEdit?: boolean): void;
   discardHandoffDraft(): Promise<void>;
+  setReadonly(reason: string): void;
+  clearReadonly(): boolean;
+  prepareForLeave(): Promise<boolean>;
   dispose(reason?: string): void;
 }
 
@@ -99,11 +102,17 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
     metadataLocked: false
   });
   let disposed = false;
+  let readonlyReason: string | null = null;
   let flowOwner: FlowCanvasOwner | undefined;
   let stagedArtifact: WorkspaceHandoffArtifactV1 | null = null;
 
   function assertActive(): void {
     if (disposed) throw new Error('New Workspace draft owner has been disposed.');
+  }
+
+  function assertWritable(): void {
+    assertActive();
+    if (readonlyReason) throw new Error(readonlyReason);
   }
 
   return Object.freeze({
@@ -129,7 +138,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
       return state.handoff !== null;
     },
     setMetadata(input: Readonly<{ name?: string; description?: string | null }>): void {
-      assertActive();
+      assertWritable();
       if (state.metadataLocked) return;
       const name = input.name === undefined ? state.project.name : input.name;
       const description = input.description === undefined ? state.project.description : input.description;
@@ -141,7 +150,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
       state.canSave = Boolean(state.handoff && name.trim());
     },
     async stageHandoffDraft(artifact: WorkspaceHandoffArtifactV1): Promise<void> {
-      assertActive();
+      assertWritable();
       if (artifact.targetKind !== 'new' || artifact.projectBaseline.projectId !== null ||
           artifact.projectBaseline.persistenceRevision !== null) {
         throw new Error('Only a baseline-free new-project artifact can enter this Workspace draft.');
@@ -163,7 +172,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
       await nextTick();
     },
     confirmHandoff(source: WorkspaceHandoffSourceV1): void {
-      assertActive();
+      assertWritable();
       if (!stagedArtifact || !state.handoff || state.handoff.phase !== 'workspace-staging') {
         throw new Error('The new Workspace draft has no staged handoff awaiting confirmation.');
       }
@@ -178,7 +187,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
       state.canSave = state.project.name.trim().length > 0;
     },
     createSaveIntent(): WorkspaceNewDraftSaveIntent {
-      assertActive();
+      assertWritable();
       const source = state.handoff?.source;
       if (!stagedArtifact || !source || !flowOwner || !state.canSave) {
         throw new Error('The new Workspace draft is not ready for an explicit save.');
@@ -198,7 +207,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
       });
     },
     markProjectCreating(): void {
-      assertActive();
+      assertWritable();
       state.savePhase = 'workspace-project-creating';
       state.message = '正在通过既有工程创建 authority 创建空白工程。';
       state.canSave = false;
@@ -206,7 +215,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
       flowOwner?.setMutationGate('readonly');
     },
     markSaveUnknown(message: string): void {
-      assertActive();
+      assertWritable();
       state.savePhase = 'workspace-save-unknown-outcome';
       state.message = message;
       state.canSave = true;
@@ -214,7 +223,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
       flowOwner?.setMutationGate('readonly');
     },
     markSaveFailed(message: string, allowEdit = true): void {
-      assertActive();
+      assertWritable();
       state.savePhase = 'workspace-save-failed';
       state.message = message;
       state.canSave = true;
@@ -222,7 +231,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
       flowOwner?.setMutationGate(allowEdit ? 'editable' : 'readonly');
     },
     async discardHandoffDraft(): Promise<void> {
-      if (disposed || !state.handoff) return;
+      if (disposed || readonlyReason || !state.handoff) return;
       if (!flowOwner || flowOwner.projection.phase !== 'mounted') {
         throw new Error('Canonical FlowCanvas is unavailable for discarding the new-project candidate.');
       }
@@ -234,6 +243,30 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
       state.message = 'AI 候选已从本地草稿放弃；未创建正式工程。';
       state.canSave = false;
       state.metadataLocked = false;
+    },
+    setReadonly(reason: string): void {
+      if (disposed) return;
+      readonlyReason = reason.trim() || '会话已失效；新工程草稿保持只读。';
+      state.canSave = false;
+      state.metadataLocked = true;
+      flowOwner?.setMutationGate('readonly');
+      state.message = readonlyReason;
+    },
+    clearReadonly(): boolean {
+      if (disposed || state.savePhase === 'workspace-project-creating' ||
+          state.savePhase === 'workspace-save-unknown-outcome') return false;
+      readonlyReason = null;
+      state.metadataLocked = false;
+      state.canSave = Boolean(state.handoff && state.project.name.trim());
+      flowOwner?.setMutationGate('editable');
+      state.message = '会话已恢复；新工程草稿仍未保存。';
+      return true;
+    },
+    async prepareForLeave(): Promise<boolean> {
+      if (flowOwner && !(await flowOwner.prepareForLeave())) return false;
+      return state.savePhase !== 'workspace-project-creating' &&
+        state.savePhase !== 'workspace-save-unknown-outcome' &&
+        !state.handoff;
     },
     dispose(reason = 'workspace-new-draft-disposed'): void {
       if (disposed) return;

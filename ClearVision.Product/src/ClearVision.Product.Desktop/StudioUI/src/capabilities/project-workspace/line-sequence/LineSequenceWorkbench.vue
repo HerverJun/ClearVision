@@ -28,6 +28,12 @@ const status = computed<Readonly<{ label: string; tone: CvStatusTone }>>(() => {
   }
 });
 const recommendationEntries = computed(() => Object.entries(projection.recommendation?.finalParameters ?? {}));
+const previewImageSrc = computed(() => {
+  const value = projection.preview?.previewImageBase64;
+  if (!value) return null;
+  return value.startsWith('data:') ? value : `data:image/png;base64,${value}`;
+});
+const inputImageAvailable = computed(() => Boolean(projection.preview?.inputImageBase64));
 
 function diagnosticLabel(code: string): string {
   const labels: Readonly<Record<string, string>> = {
@@ -83,6 +89,22 @@ function formatValue(value: unknown): string {
     >
       {{ projection.message }}
     </p>
+
+    <section
+      v-if="previewImageSrc"
+      class="line-sequence__preview"
+      data-line-sequence-preview
+    >
+      <div class="line-sequence__preview-heading">
+        <strong>线序预览</strong>
+        <small>{{ inputImageAvailable ? '已使用最近检测图' : '后端返回的预览结果' }}</small>
+      </div>
+      <img
+        :src="previewImageSrc"
+        alt="线序分析预览结果"
+        loading="lazy"
+      >
+    </section>
 
     <dl
       v-if="projection.analysis"
@@ -208,6 +230,11 @@ function formatValue(value: unknown): string {
 .line-sequence__header h3 { margin: 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .line-sequence__header small { display: block; margin-block-start: 2px; color: var(--cv-text-muted); font-size: 9px; }
 .line-sequence__message { margin: 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); line-height: var(--cv-line-height-normal); overflow-wrap: anywhere; }
+.line-sequence__preview { min-width: 0; display: grid; gap: var(--cv-space-2); padding-block-end: var(--cv-space-2); border-block-end: 1px solid var(--cv-border-subtle); }
+.line-sequence__preview-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--cv-space-2); }
+.line-sequence__preview-heading strong { color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }
+.line-sequence__preview-heading small { color: var(--cv-text-muted); font-size: 9px; }
+.line-sequence__preview img { display: block; width: 100%; max-height: 180px; object-fit: contain; background: var(--cv-surface-page); border: 1px solid var(--cv-border-subtle); }
 .line-sequence__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
 .line-sequence__summary div { min-width: 0; padding-inline: var(--cv-space-2); border-inline-start: 1px solid var(--cv-border-subtle); }
 .line-sequence__summary dt { color: var(--cv-text-muted); font-size: 9px; }

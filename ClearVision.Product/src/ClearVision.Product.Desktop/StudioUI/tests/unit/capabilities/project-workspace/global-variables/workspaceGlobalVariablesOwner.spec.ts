@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ApiTransport } from '@/platform/api';
+import { ApiAbortError, type ApiTransport } from '@/platform/api';
 import { decodeWorkspaceProjectV1 } from '@/capabilities/project-workspace';
 import { createWorkspaceGlobalVariablesOwner } from '@/capabilities/project-workspace/global-variables';
+import { createWorkspaceLifecycleDiagnosticsOwner } from '@/capabilities/project-workspace/workspaceLifecycleDiagnostics';
 
 const projectId = '11111111-1111-4111-8111-111111111111';
 const nextProjectId = '33333333-3333-4333-8333-333333333333';
@@ -38,10 +39,68 @@ describe('workspaceGlobalVariablesOwner', () => {
     owner.dispose();
   });
 
+  it('validates binding identity and scalar compatibility against the current flow draft', () => {
+    const variableId = '22222222-2222-4222-8222-222222222222';
+    const api = { apiBaseUrl: 'http://localhost/api' } as unknown as ApiTransport;
+    const flow = {
+      id: 'flow-1',
+      name: 'Flow',
+      operators: [{
+        id: 'op-1',
+        outputPorts: [{ id: 'out-1', dataType: 'Float' }],
+        parameters: [{ id: 'param-1', dataType: 'bool' }]
+      }],
+      connections: [],
+      decisionConfiguration: null,
+      opaquePassthrough: {}
+    };
+    const owner = createWorkspaceGlobalVariablesOwner({
+      projectId,
+      baseline: baseline(),
+      api,
+      getFlowDraft: () => flow
+    });
+    owner.upsertDefinition({ id: variableId, name: 'Score', displayName: '得分', valueType: 'Double', initialValue: 0 });
+    owner.upsertSourceBinding({
+      variableId, operatorId: 'op-1', outputPortId: 'out-1', operatorName: '算子', outputPortName: '输出'
+    });
+    owner.upsertTargetBinding({
+      variableId, operatorId: 'op-1', parameterId: 'param-1', operatorName: '算子', parameterName: '布尔参数'
+    });
+
+    expect(owner.apply()).toBe(false);
+    expect(owner.projection.fieldErrors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'GV015', parameterId: 'param-1' })
+    ]));
+    expect(owner.projection.fieldErrors).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'GV014', portId: 'out-1' })
+    ]));
+    owner.dispose();
+  });
+
   it('uses structured server diagnostics without parsing messages', () => {
     const owner = createWorkspaceGlobalVariablesOwner({ projectId, baseline: baseline(), api: { apiBaseUrl: 'http://localhost/api', get: vi.fn() } as unknown as ApiTransport });
     owner.setServerDiagnostics({ diagnostics: [{ code: 'GV011', message: 'missing', field: 'globalVariables.targetBindings[0].parameterId', variableId: null, operatorId: 'op', portId: null, parameterId: 'parameter', severity: 'Error' }] });
     expect(owner.projection.fieldErrors[0]).toMatchObject({ code: 'GV011', field: 'globalVariables.targetBindings[0].parameterId', parameterId: 'parameter' });
+  });
+
+  it('blocks local and runtime writes while the session is quarantined, then restores the owner after reauthentication', async () => {
+    const put = vi.fn();
+    const owner = createWorkspaceGlobalVariablesOwner({
+      projectId,
+      baseline: baseline(),
+      api: { apiBaseUrl: 'http://localhost/api', put } as unknown as ApiTransport
+    });
+
+    owner.setReadonly('会话已失效');
+    expect(owner.upsertDefinition({ name: 'Blocked', displayName: 'Blocked', valueType: 'Int64', initialValue: 0 })).toBeNull();
+    expect(owner.apply()).toBe(false);
+    expect(await owner.writeRuntimeValue('missing', 1)).toBe(false);
+    expect(put).not.toHaveBeenCalled();
+
+    owner.clearReadonly();
+    expect(owner.upsertDefinition({ name: 'Restored', displayName: 'Restored', valueType: 'Int64', initialValue: 0 })).not.toBeNull();
+    owner.dispose();
   });
 
   it('keeps runtime writes and resets separate from the definition draft', async () => {
@@ -62,11 +121,23 @@ describe('workspaceGlobalVariablesOwner', () => {
     await owner.refreshRuntimeValues();
     expect(await owner.writeRuntimeValue(variableId, 8, 0)).toBe(true);
     expect(owner.projection.dirty).toBe(false);
-    expect(api.put).toHaveBeenCalledWith(`projects/${projectId}/global-variable-values/${variableId}`, { value: 8, expectedVersion: 0 });
+    expect(api.put).toHaveBeenCalledWith(
+      `projects/${projectId}/global-variable-values/${variableId}`,
+      { value: 8, expectedVersion: 0 },
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
     expect(await owner.resetRuntimeValue(variableId, 1)).toBe(true);
-    expect(api.post).toHaveBeenCalledWith(`projects/${projectId}/global-variable-values/${variableId}/reset`, { expectedVersion: 1 });
+    expect(api.post).toHaveBeenCalledWith(
+      `projects/${projectId}/global-variable-values/${variableId}/reset`,
+      { expectedVersion: 1 },
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
     expect(await owner.resetAllRuntimeValues({ [variableId]: 2 })).toBe(true);
-    expect(api.post).toHaveBeenCalledWith(`projects/${projectId}/global-variable-values/reset`, { expectedVersions: { [variableId]: 2 } });
+    expect(api.post).toHaveBeenCalledWith(
+      `projects/${projectId}/global-variable-values/reset`,
+      { expectedVersions: { [variableId]: 2 } },
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
   });
 
   it('rejects runtime mutation for variables that do not allow manual writes', async () => {
@@ -127,5 +198,41 @@ describe('workspaceGlobalVariablesOwner', () => {
     expect(oldOwner.projection.runtimeValues).toHaveLength(0);
     expect(nextOwner.projection.runtimeValues[0]).toMatchObject({ value: 'new-project', version: 4 });
     nextOwner.dispose();
+  });
+
+  it('aborts runtime reads during leave and releases request resources before disposal', async () => {
+    let signal: AbortSignal | undefined;
+    const api = {
+      apiBaseUrl: 'http://localhost/api',
+      get: vi.fn(async (_path: string, options?: { signal?: AbortSignal }) => await new Promise<never>((_resolve, reject) => {
+        signal = options?.signal;
+        signal?.addEventListener('abort', () => reject(new ApiAbortError('global-variable-values')), { once: true });
+      }))
+    } as unknown as ApiTransport;
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const owner = createWorkspaceGlobalVariablesOwner({ projectId, baseline: baseline(), api, diagnostics });
+    const refresh = owner.refreshRuntimeValues();
+
+    expect(signal).toBeDefined();
+    expect(diagnostics.diagnostics).toMatchObject({
+      capabilityOwnerCounts: { 'global-variables': 1 },
+      activeAbortControllers: 1,
+      inFlightReads: 1
+    });
+
+    const leaving = owner.prepareForLeave();
+    expect(signal?.aborted).toBe(true);
+    await expect(leaving).resolves.toBe(true);
+    await refresh;
+    expect(diagnostics.diagnostics).toMatchObject({
+      capabilityOwnerCounts: { 'global-variables': 1 },
+      activeAbortControllers: 0,
+      inFlightReads: 0,
+      inFlightWrites: 0
+    });
+
+    owner.dispose();
+    expect(diagnostics.diagnostics.capabilityOwnerCounts['global-variables']).toBe(0);
+    diagnostics.dispose();
   });
 });

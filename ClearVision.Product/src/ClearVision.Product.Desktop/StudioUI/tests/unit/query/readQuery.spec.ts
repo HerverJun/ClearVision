@@ -155,6 +155,36 @@ describe('readQuery', () => {
     client.dispose();
   });
 
+  it('projects session invalidation as aborted and ignores a late protected response', async () => {
+    let resolveRead: ((value: unknown) => void) | undefined;
+    let signal: AbortSignal | undefined;
+    const client = createReadQueryClient(createApi((_, options) => {
+      signal = options?.signal;
+      return new Promise(resolve => { resolveRead = resolve; });
+    }));
+    client.setSessionIdentity('user-a');
+    const query = client.createQuery({
+      key: 'session-abort',
+      path: 'projects',
+      decode: decodeValue,
+      protected: true
+    });
+
+    const pending = query.refresh({ force: true });
+    await Promise.resolve();
+    client.setSessionIdentity(null);
+
+    expect(signal?.aborted).toBe(true);
+    resolveRead?.({ value: 'old-session' });
+    const result = await pending;
+    expect(result.phase).toBe('aborted');
+    expect(result.data).toBeUndefined();
+    expect(result.sessionGeneration).toBe(2);
+    expect(client.getDiagnostics().activeRequestCount).toBe(0);
+    query.dispose();
+    client.dispose();
+  });
+
   it('aborts active work and releases owner diagnostics on dispose', () => {
     let signal: AbortSignal | undefined;
     const client = createReadQueryClient(createApi((_, options) => {

@@ -422,6 +422,49 @@ describe('F03 G1 WorkspacePage', () => {
     harness.queries.dispose();
   });
 
+  it('aborts the old Project read and ignores its late response during a project switch', async () => {
+    let resolveA: ((value: unknown) => void) | undefined;
+    let resolveB: ((value: unknown) => void) | undefined;
+    let signalA: AbortSignal | undefined;
+    const harness = await createHarness({
+      get: async (path, options) => {
+        if (path === `projects/${projectA}`) {
+          signalA = options?.signal;
+          return await new Promise<unknown>(resolve => { resolveA = resolve; });
+        }
+        if (path === `projects/${projectB}`) {
+          return await new Promise<unknown>(resolve => { resolveB = resolve; });
+        }
+        throw new Error(`Unexpected GET ${path}`);
+      }
+    });
+    const wrapper = mount(WorkspacePage, {
+      props: { projectId: projectA, runtime: harness.runtime },
+      global: { plugins: [harness.router], stubs: { FlowWorkspace: flowWorkspaceStub } }
+    });
+
+    await vi.waitFor(() => expect(resolveA).toBeDefined());
+    await wrapper.setProps({ projectId: projectB });
+    await vi.waitFor(() => expect(resolveB).toBeDefined());
+    expect(signalA?.aborted).toBe(true);
+
+    resolveA?.(projectPayload(projectA, { name: '旧工程晚到响应' }));
+    await flushPromises();
+    resolveB?.(projectPayload(projectB, { name: '工程 B' }));
+    await vi.waitFor(() => expect(harness.diagnostics.diagnostics.activeProjectId).toBe(projectB));
+
+    expect(harness.diagnostics.diagnostics).toMatchObject({
+      workspaceOwnerCount: 1,
+      activeProjectId: projectB,
+      activeReadProjectId: projectB
+    });
+    expect(wrapper.text()).toContain('工程 B');
+
+    wrapper.unmount();
+    harness.runtime.dispose();
+    harness.queries.dispose();
+  });
+
   it.each([
     ['unauthorized', new ApiUnauthorizedError(httpDetails(401)), 'unauthorized'],
     ['forbidden/readonly', new ApiForbiddenError(httpDetails(403)), 'forbidden'],

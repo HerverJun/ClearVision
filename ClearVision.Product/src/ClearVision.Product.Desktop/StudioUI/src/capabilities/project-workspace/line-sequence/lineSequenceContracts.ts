@@ -16,6 +16,12 @@ export interface LineSequenceMissingResourceV1 {
   readonly diagnosticCode: string;
 }
 
+export interface LineSequencePreviewV1 {
+  readonly inputImageBase64: string | null;
+  readonly previewImageBase64: string | null;
+  readonly outputs: Readonly<Record<string, unknown>> | null;
+}
+
 export interface LineSequenceAnalysisV1 {
   readonly success: boolean;
   readonly targetNodeId: string;
@@ -24,6 +30,7 @@ export interface LineSequenceAnalysisV1 {
   readonly suggestions: readonly LineSequenceSuggestionV1[];
   readonly missingResources: readonly LineSequenceMissingResourceV1[];
   readonly errorMessage: string | null;
+  readonly preview: LineSequencePreviewV1 | null;
 }
 
 export interface LineSequenceRecommendationV1 {
@@ -36,6 +43,7 @@ export interface LineSequenceRecommendationV1 {
   readonly diagnosticCodes: readonly string[];
   readonly missingResources: readonly LineSequenceMissingResourceV1[];
   readonly errorMessage: string | null;
+  readonly finalPreview: LineSequencePreviewV1 | null;
 }
 
 export interface LineSequenceParameterPatchV1 {
@@ -68,6 +76,15 @@ function text(value: unknown, path: string, allowEmpty = false): string {
 function optionalText(value: unknown, path: string): string | null {
   if (value === null || value === undefined || value === '') return null;
   return text(value, path, true);
+}
+
+function optionalImage(value: unknown, path: string): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string') {
+    throw new LineSequenceContractDecodeError(path, 'expected a base64 image string or null');
+  }
+  const separator = value.indexOf(',');
+  return value.startsWith('data:') && separator >= 0 ? value.slice(separator + 1) : value;
 }
 
 function booleanValue(value: unknown, path: string): boolean {
@@ -113,11 +130,28 @@ function decodeMissingResources(value: unknown, path: string): readonly LineSequ
   return Object.freeze(value.map((item, index) => decodeMissingResource(item, `${path}[${index}]`)));
 }
 
+function decodePreview(value: unknown, path: string): LineSequencePreviewV1 | null {
+  if (value === null || value === undefined) return null;
+  const source = record(value, path);
+  const input = source.inputImageBase64 ?? source.InputImageBase64;
+  const output = source.previewImageBase64 ?? source.PreviewImageBase64;
+  const outputs = source.outputs ?? source.Outputs;
+  if (input === undefined && output === undefined && outputs === undefined) return null;
+  let normalizedOutputs: Readonly<Record<string, unknown>> | null = null;
+  if (outputs !== null && outputs !== undefined) normalizedOutputs = record(outputs, `${path}.outputs`);
+  return Object.freeze({
+    inputImageBase64: optionalImage(input, `${path}.inputImageBase64`),
+    previewImageBase64: optionalImage(output, `${path}.previewImageBase64`),
+    outputs: normalizedOutputs
+  });
+}
+
 export function decodeLineSequenceAnalysisV1(value: unknown): LineSequenceAnalysisV1 {
   const source = record(value, '$');
   const suggestions = source.suggestions;
   if (!Array.isArray(suggestions)) throw new LineSequenceContractDecodeError('$.suggestions', 'expected an array');
   const metrics = source.metrics === null || source.metrics === undefined ? null : record(source.metrics, '$.metrics');
+  const preview = source.preview === undefined ? source : source.preview;
   return Object.freeze({
     success: booleanValue(source.success, '$.success'),
     targetNodeId: text(source.targetNodeId, '$.targetNodeId'),
@@ -127,7 +161,8 @@ export function decodeLineSequenceAnalysisV1(value: unknown): LineSequenceAnalys
     diagnosticCodes: stringArray(source.diagnosticCodes, '$.diagnosticCodes'),
     suggestions: Object.freeze(suggestions.map((item, index) => decodeSuggestion(item, `$.suggestions[${index}]`))),
     missingResources: decodeMissingResources(source.missingResources, '$.missingResources'),
-    errorMessage: optionalText(source.errorMessage, '$.errorMessage')
+    errorMessage: optionalText(source.errorMessage, '$.errorMessage'),
+    preview: decodePreview(preview, '$.preview')
   });
 }
 
@@ -151,7 +186,8 @@ export function decodeLineSequenceRecommendationV1(value: unknown): LineSequence
     isGoalAchieved: booleanValue(source.isGoalAchieved, '$.isGoalAchieved'),
     diagnosticCodes: stringArray(source.diagnosticCodes, '$.diagnosticCodes'),
     missingResources: decodeMissingResources(source.missingResources, '$.missingResources'),
-    errorMessage: optionalText(source.errorMessage, '$.errorMessage')
+    errorMessage: optionalText(source.errorMessage, '$.errorMessage'),
+    finalPreview: decodePreview(source.finalPreview ?? source.FinalPreview, '$.finalPreview')
   });
 }
 

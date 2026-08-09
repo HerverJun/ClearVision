@@ -113,7 +113,11 @@ async function receiveHandoff(generation: number): Promise<void> {
         artifact.projectBaseline.persistenceRevision === null,
     stage: artifact => owner
       ? owner.stageHandoffDraft(artifact)
-      : draftOwner!.stageHandoffDraft(artifact)
+      : draftOwner!.stageHandoffDraft(artifact),
+    rollback: async () => {
+      if (owner) await owner.discardHandoffDraft();
+      else await draftOwner?.discardHandoffDraft();
+    }
   });
   if (!result || generation !== lifecycleGeneration || workspaceOwner !== owner || newDraftOwner !== draftOwner) return;
   (owner ?? draftOwner)?.confirmHandoff(result.source);
@@ -438,6 +442,7 @@ onBeforeUnmount(() => {
     :handoff-receive="activeHandoffReceiver?.projection ?? null"
     :message="message"
     :diagnostics="runtime.diagnostics"
+    :lifecycle-diagnostics="runtime.lifecycleDiagnostics"
     :user-role="runtime.session.user?.role"
     @retry="retry"
     @refresh-session="refreshSession"

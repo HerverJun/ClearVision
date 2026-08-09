@@ -6,6 +6,10 @@ import {
   type ApiTransport
 } from '@/platform/api';
 import type { WorkspacePersistenceOwner } from '../persistence';
+import type {
+  WorkspaceCapabilityDiagnosticsLease,
+  WorkspaceLifecycleDiagnosticsOwner
+} from '../workspaceLifecycleDiagnostics';
 
 export interface RuntimePackageExportResultV1 {
   readonly packageRootPath: string;
@@ -73,11 +77,16 @@ export function createRuntimePackageExportOwner(options: {
   readonly projectId: string;
   readonly persistenceOwner: WorkspacePersistenceOwner;
   readonly api: ApiTransport;
+  readonly diagnostics?: WorkspaceLifecycleDiagnosticsOwner;
 }): RuntimePackageExportOwner {
   if (!options.api.post) throw new TypeError('Runtime Package 导出需要 shared ApiTransport POST。');
   let disposed = false;
   let generation = 0;
   let controller: AbortController | null = null;
+  const lease: WorkspaceCapabilityDiagnosticsLease | undefined = options.diagnostics?.reserveCapability(
+    options.projectId,
+    'runtime-package'
+  );
   const state = reactive<MutableProjection>({
     phase: 'idle',
     result: null,
@@ -91,6 +100,24 @@ export function createRuntimePackageExportOwner(options: {
     state.canExport = !disposed && !['saving', 'exporting', 'unknown-outcome'].includes(state.phase);
   }
 
+  function syncDiagnostics(): void {
+    const pending = state.phase === 'saving' || state.phase === 'exporting';
+    lease?.update(Object.freeze({
+      activeSubscriptions: 0,
+      activeTimers: 0,
+      activeAnimationFrames: 0,
+      activeObservers: 0,
+      activeAbortControllers: Number(Boolean(controller)),
+      activeBlobUrls: 0,
+      activePreviewArtifactIds: 0,
+      activeHostSubscriptions: 0,
+      inFlightReads: 0,
+      inFlightWrites: pending ? 1 : 0,
+      inFlightPreview: 0,
+      inFlightExecute: 0
+    }));
+  }
+
   const owner: RuntimePackageExportOwner = Object.freeze({
     projection: readonly(state),
     async exportPackage(): Promise<RuntimePackageExportResultV1 | null> {
@@ -101,12 +128,14 @@ export function createRuntimePackageExportOwner(options: {
         state.phase = 'saving';
         state.message = '工程存在修改，正在通过统一保存链正式保存。';
         syncAvailable();
+        syncDiagnostics();
         const saved = await options.persistenceOwner.save();
         if (disposed || operation !== generation) return null;
         if (saved.status !== 'saved' && saved.status !== 'no-op') {
           state.phase = 'error';
           state.message = '工程未能正式保存，未发起运行包导出。';
           syncAvailable();
+          syncDiagnostics();
           return null;
         }
       }
@@ -114,6 +143,7 @@ export function createRuntimePackageExportOwner(options: {
         state.phase = 'error';
         state.message = '工程仍有未保存修改或处于运行锁定状态，未发起导出。';
         syncAvailable();
+        syncDiagnostics();
         return null;
       }
       controller = new AbortController();
@@ -122,6 +152,7 @@ export function createRuntimePackageExportOwner(options: {
       state.requestedAtUtc = new Date().toISOString();
       state.message = `正在由服务端导出 revision ${state.requestedRevision} 的运行包。`;
       syncAvailable();
+      syncDiagnostics();
       try {
         // Deliberately no Flow override: the backend exports the persisted Project snapshot.
         const result = decodeResult(await options.api.post!(
@@ -150,6 +181,7 @@ export function createRuntimePackageExportOwner(options: {
       } finally {
         controller = null;
         syncAvailable();
+        syncDiagnostics();
       }
     },
     cancel(): void {
@@ -160,6 +192,7 @@ export function createRuntimePackageExportOwner(options: {
       state.phase = 'idle';
       state.message = '已取消本次运行包导出请求。';
       syncAvailable();
+      syncDiagnostics();
     },
     dispose(): void {
       if (disposed) return;
@@ -170,7 +203,10 @@ export function createRuntimePackageExportOwner(options: {
       state.phase = 'disposed';
       state.canExport = false;
       state.result = null;
+      syncDiagnostics();
+      lease?.dispose('runtime-package-owner-disposed');
     }
   });
+  syncDiagnostics();
   return owner;
 }

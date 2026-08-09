@@ -31,7 +31,10 @@ if (!isProjectId(projectId)) throw new TypeError('Inspection route requires a va
 const run = createInspectionRunOwner({
   projectId,
   api: createInspectionRunApiAdapter(runtime.api),
-  sse: createInspectionSseAdapter(runtime.api)
+  sse: createInspectionSseAdapter(runtime.api),
+  ...(runtime.workspace.lifecycleDiagnostics
+    ? { diagnostics: runtime.workspace.lifecycleDiagnostics }
+    : {})
 });
 const owner = createInspectionRunPageOwner({ projectId, api: runtime.api, run });
 const detachLeaveGuard = runtime.leaveGuard.attachInspectionRun(run);

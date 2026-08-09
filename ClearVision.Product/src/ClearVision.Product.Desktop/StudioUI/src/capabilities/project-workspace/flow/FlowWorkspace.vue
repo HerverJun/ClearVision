@@ -26,10 +26,12 @@ import {
   workspaceInspectorDefaultWidth,
   workspacePreviewDefaultWidth
 } from './workspaceLayoutOwner';
+import type { WorkspaceLifecycleDiagnosticsOwner } from '../workspaceLifecycleDiagnostics';
 
 const props = defineProps<{
   workspaceOwner: WorkspaceOwner | WorkspaceNewDraftOwner;
   project: WorkspaceCanvasProjectV1;
+  lifecycleDiagnostics?: WorkspaceLifecycleDiagnosticsOwner | undefined;
 }>();
 
 const platform = useStudioPlatform();
@@ -50,15 +52,25 @@ const calibrationOwner: CalibrationOwner | null = previewWorkbenchOwner && persi
     imageOwner: previewWorkbenchOwner.image,
     api: platform.api,
     getPersistenceRevision: () => persistedWorkspaceOwner.projection.persistence?.persistenceRevision ?? null,
-    reconcileAfterSave: () => persistedWorkspaceOwner.reconcileExternalProject()
+    reconcileAfterSave: () => persistedWorkspaceOwner.reconcileExternalProject(),
+    diagnostics: props.lifecycleDiagnostics
   })
   : null;
 const lineSequenceOwner: LineSequenceOwner | null = props.project.id
   ? createLineSequenceOwner({
       projectId: props.project.id,
       flowOwner,
-      api: platform.api
+      api: platform.api,
+      getRecentImageBase64: () => {
+        const preview = previewWorkbenchOwner?.preview.projection;
+        if (!preview || preview.isStale || !['success', 'empty'].includes(preview.phase)) return null;
+        return preview.inputImageBase64 ?? preview.outputImageBase64 ?? null;
+      },
+      diagnostics: props.lifecycleDiagnostics
     })
+  : null;
+const unregisterCalibration = calibrationOwner
+  ? flowOwner.registerLifecycleParticipant(calibrationOwner)
   : null;
 const projection = flowOwner.projection;
 const layoutOwner = createWorkspaceLayoutOwner();
@@ -186,6 +198,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   lineSequenceOwner?.dispose('flow-workspace-unmounted');
   calibrationOwner?.dispose('flow-workspace-unmounted');
+  unregisterCalibration?.();
   layoutOwner.dispose();
 });
 

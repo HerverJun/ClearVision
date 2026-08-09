@@ -13,8 +13,13 @@ import {
   decodeLineSequenceRecommendationV1,
   resolveLineSequenceParameterPatch,
   type LineSequenceAnalysisV1,
+  type LineSequencePreviewV1,
   type LineSequenceRecommendationV1
 } from './lineSequenceContracts';
+import type {
+  WorkspaceCapabilityDiagnosticsLease,
+  WorkspaceLifecycleDiagnosticsOwner
+} from '../workspaceLifecycleDiagnostics';
 
 export type LineSequencePhase =
   | 'idle'
@@ -35,6 +40,7 @@ export interface LineSequenceProjection {
   readonly sourceFlowRevision: number | null;
   readonly analysis: LineSequenceAnalysisV1 | null;
   readonly recommendation: LineSequenceRecommendationV1 | null;
+  readonly preview: LineSequencePreviewV1 | null;
   readonly message: string;
   readonly canAnalyze: boolean;
   readonly canRecommend: boolean;
@@ -105,6 +111,8 @@ export function createLineSequenceOwner(options: Readonly<{
   projectId: string;
   flowOwner: FlowCanvasOwner;
   api: ApiTransport;
+  getRecentImageBase64?: () => string | null;
+  diagnostics?: WorkspaceLifecycleDiagnosticsOwner | undefined;
 }>): LineSequenceOwner {
   if (typeof options.api.post !== 'function') {
     throw new TypeError('Line sequence owner requires POST on the shared ApiTransport.');
@@ -117,6 +125,7 @@ export function createLineSequenceOwner(options: Readonly<{
     sourceFlowRevision: null,
     analysis: null,
     recommendation: null,
+    preview: null,
     message: '等待线序节点。',
     canAnalyze: false,
     canRecommend: false,
@@ -125,6 +134,27 @@ export function createLineSequenceOwner(options: Readonly<{
   let disposed = false;
   let requestSequence = 0;
   let controller: AbortController | null = null;
+  const lease: WorkspaceCapabilityDiagnosticsLease | undefined = options.diagnostics?.reserveCapability(
+    options.projectId,
+    'line-sequence'
+  );
+
+  function syncDiagnostics(): void {
+    lease?.update(Object.freeze({
+      activeSubscriptions: disposed ? 0 : 1,
+      activeTimers: 0,
+      activeAnimationFrames: 0,
+      activeObservers: 0,
+      activeAbortControllers: Number(Boolean(controller)),
+      activeBlobUrls: 0,
+      activePreviewArtifactIds: 0,
+      activeHostSubscriptions: 0,
+      inFlightReads: Number(Boolean(controller)),
+      inFlightWrites: 0,
+      inFlightPreview: 0,
+      inFlightExecute: 0
+    }));
+  }
 
   function isCurrent(identity: LineSequenceRequestIdentity): boolean {
     const current = requestIdentity(options.flowOwner);
@@ -158,6 +188,7 @@ export function createLineSequenceOwner(options: Readonly<{
     requestSequence += 1;
     controller?.abort(reason);
     controller = null;
+    syncDiagnostics();
   }
 
   function clearResult(message: string): void {
@@ -165,15 +196,18 @@ export function createLineSequenceOwner(options: Readonly<{
     state.sourceFlowRevision = null;
     state.analysis = null;
     state.recommendation = null;
+    state.preview = null;
     state.message = message;
     syncActions();
   }
 
   function flowRequest(identity: LineSequenceRequestIdentity): Readonly<Record<string, unknown>> {
     const draft = options.flowOwner.projection.draft;
+    const inputImageBase64 = options.getRecentImageBase64?.() ?? null;
     return Object.freeze({
       flowId: draft.id ?? options.projectId,
       targetNodeId: identity.nodeId,
+      inputImageBase64: inputImageBase64 || null,
       flowData: Object.freeze({
         ...draft.opaquePassthrough,
         id: draft.id ?? options.projectId,
@@ -191,9 +225,11 @@ export function createLineSequenceOwner(options: Readonly<{
     const sequence = requestSequence;
     const requestController = new AbortController();
     controller = requestController;
+    syncDiagnostics();
     state.phase = 'analyzing';
     state.analysis = null;
     state.recommendation = null;
+    state.preview = null;
     state.sourceFlowRevision = identity.flowRevision;
     state.message = '正在分析当前线序。';
     syncActions();
@@ -207,6 +243,7 @@ export function createLineSequenceOwner(options: Readonly<{
         throw new Error('Line sequence analysis target identity mismatch.');
       }
       state.analysis = analysis;
+      state.preview = analysis.preview;
       state.phase = 'analyzed';
       state.message = analysis.missingResources.length > 0
         ? '分析完成，但必要资源尚未就绪。'
@@ -221,6 +258,7 @@ export function createLineSequenceOwner(options: Readonly<{
     } finally {
       if (controller === requestController) controller = null;
       syncActions();
+      syncDiagnostics();
     }
   }
 
@@ -231,6 +269,7 @@ export function createLineSequenceOwner(options: Readonly<{
     const sequence = requestSequence;
     const requestController = new AbortController();
     controller = requestController;
+    syncDiagnostics();
     state.phase = 'recommending';
     state.recommendation = null;
     state.sourceFlowRevision = identity.flowRevision;
@@ -248,6 +287,7 @@ export function createLineSequenceOwner(options: Readonly<{
         throw new Error('Line sequence recommendation scenario identity mismatch.');
       }
       state.recommendation = recommendation;
+      state.preview = recommendation.finalPreview ?? state.preview;
       state.phase = 'recommended';
       const patch = resolveLineSequenceParameterPatch(
         options.flowOwner.projection.draft,
@@ -268,6 +308,7 @@ export function createLineSequenceOwner(options: Readonly<{
     } finally {
       if (controller === requestController) controller = null;
       syncActions();
+      syncDiagnostics();
     }
   }
 
@@ -365,6 +406,9 @@ export function createLineSequenceOwner(options: Readonly<{
       state.canRecommend = false;
       state.canApply = false;
       state.message = '线序辅助已卸载。';
+      syncDiagnostics();
+      lease?.dispose(reason);
     }
   });
+  syncDiagnostics();
 }

@@ -3,6 +3,11 @@ import { computed, reactive, shallowRef, watch } from 'vue';
 import { CvButton, CvModal, CvStatusBadge, type CvStatusTone } from '@/design-system';
 import type { FlowCanvasOwner } from '../flow';
 import type { WorkspaceGlobalVariableValueType, WorkspaceJsonValue } from '../workspaceContracts';
+import {
+  globalVariableDataTypeLabel,
+  isGlobalVariableDataTypeCompatible,
+  normalizeGlobalVariableDataType
+} from './globalVariablesContracts';
 import type { WorkspaceGlobalVariablesOwner } from './workspaceGlobalVariablesOwner';
 
 const props = defineProps<{
@@ -65,6 +70,15 @@ function field(source: Readonly<Record<string, unknown>>, camel: string): unknow
 }
 function text(value: unknown): string { return typeof value === 'string' ? value : ''; }
 
+function dataType(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const source = value as Readonly<Record<string, unknown>>;
+    return text(source.value) || text(source.persistenceValue);
+  }
+  return '';
+}
+
 const outputCandidates = computed(() => props.flowOwner.projection.draft.operators.flatMap(operator => {
   const operatorId = text(field(operator, 'id'));
   const operatorName = text(field(operator, 'name')) || operatorId;
@@ -73,8 +87,17 @@ const outputCandidates = computed(() => props.flowOwner.projection.draft.operato
     const port = raw as Readonly<Record<string, unknown>>;
     const portId = text(field(port, 'id'));
     const portName = text(field(port, 'name')) || text(field(port, 'displayName')) || portId;
-    return { key: `${operatorId}:${portId}`, operatorId, operatorName, portId, portName };
-  }) : [];
+    const portDataType = dataType(field(port, 'dataType'));
+    return {
+      key: `${operatorId}:${portId}`,
+      operatorId,
+      operatorName,
+      portId,
+      portName,
+      dataType: portDataType,
+      bindableType: normalizeGlobalVariableDataType(portDataType)
+    };
+  }).filter(item => item.portId) : [];
 }));
 const parameterCandidates = computed(() => props.flowOwner.projection.draft.operators.flatMap(operator => {
   const operatorId = text(field(operator, 'id'));
@@ -84,9 +107,32 @@ const parameterCandidates = computed(() => props.flowOwner.projection.draft.oper
     const parameter = raw as Readonly<Record<string, unknown>>;
     const parameterId = text(field(parameter, 'id'));
     const parameterName = text(field(parameter, 'name')) || parameterId;
-    return { key: `${operatorId}:${parameterId}`, operatorId, operatorName, parameterId, parameterName };
+    const parameterDataType = dataType(field(parameter, 'dataType'));
+    return {
+      key: `${operatorId}:${parameterId}`,
+      operatorId,
+      operatorName,
+      parameterId,
+      parameterName,
+      dataType: parameterDataType,
+      bindableType: normalizeGlobalVariableDataType(parameterDataType)
+    };
   }).filter(item => item.parameterId) : [];
 }));
+const selectedSourceVariable = computed(() => props.owner.projection.draft.variables
+  .find(item => item.id === sourceDraft.variableId) ?? null);
+const selectedTargetVariable = computed(() => props.owner.projection.draft.variables
+  .find(item => item.id === targetDraft.variableId) ?? null);
+const compatibleOutputCandidates = computed(() => outputCandidates.value.filter(item =>
+  selectedSourceVariable.value && isGlobalVariableDataTypeCompatible(
+    selectedSourceVariable.value.valueType.value,
+    item.bindableType
+  )));
+const compatibleParameterCandidates = computed(() => parameterCandidates.value.filter(item =>
+  selectedTargetVariable.value && isGlobalVariableDataTypeCompatible(
+    selectedTargetVariable.value.valueType.value,
+    item.bindableType
+  )));
 const runtimeRows = computed(() => {
   const values = new Map(props.owner.projection.runtimeValues.map(value => [value.variableId, value]));
   return props.owner.projection.draft.variables.map(variable => ({
@@ -225,6 +271,12 @@ async function resetAllRuntime(): Promise<void> {
 }
 
 watch(() => props.open, open => { if (open && tab.value === 'runtime') void props.owner.refreshRuntimeValues(); });
+watch(() => sourceDraft.variableId, () => {
+  if (!compatibleOutputCandidates.value.some(item => item.key === sourceDraft.outputKey)) sourceDraft.outputKey = '';
+});
+watch(() => targetDraft.variableId, () => {
+  if (!compatibleParameterCandidates.value.some(item => item.key === targetDraft.parameterKey)) targetDraft.parameterKey = '';
+});
 watch(() => props.owner.projection.runtimeValues, values => {
   values.forEach(value => {
     if (runtimeDrafts[value.variableId] === undefined) runtimeDrafts[value.variableId] = formatRuntimeValue(value.value);
@@ -414,11 +466,17 @@ watch(() => props.owner.projection.runtimeValues, values => {
               <option value="">
                 选择结构化输出
               </option><option
-                v-for="item in outputCandidates"
+                v-for="item in compatibleOutputCandidates"
                 :key="item.key"
                 :value="item.key"
               >
-                {{ item.operatorName }} / {{ item.portName }}
+                {{ item.operatorName }} / {{ item.portName }} · {{ globalVariableDataTypeLabel(item.bindableType) }}
+              </option><option
+                v-if="sourceDraft.variableId && !compatibleOutputCandidates.length"
+                disabled
+                value=""
+              >
+                当前变量没有兼容的输出端口
               </option>
             </select><input
               v-model="sourceDraft.resultPath"
@@ -480,11 +538,17 @@ watch(() => props.owner.projection.runtimeValues, values => {
               <option value="">
                 选择算子参数
               </option><option
-                v-for="item in parameterCandidates"
+                v-for="item in compatibleParameterCandidates"
                 :key="item.key"
                 :value="item.key"
               >
-                {{ item.operatorName }} / {{ item.parameterName }}
+                {{ item.operatorName }} / {{ item.parameterName }} · {{ globalVariableDataTypeLabel(item.bindableType) }}
+              </option><option
+                v-if="targetDraft.variableId && !compatibleParameterCandidates.length"
+                disabled
+                value=""
+              >
+                当前变量没有兼容的参数
               </option>
             </select><input
               v-model="targetDraft.expression"

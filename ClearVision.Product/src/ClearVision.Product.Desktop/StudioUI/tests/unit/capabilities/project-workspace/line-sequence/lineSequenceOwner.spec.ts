@@ -5,6 +5,7 @@ import type { FlowCanvasOwner } from '@/capabilities/project-workspace/flow';
 import {
   createLineSequenceOwner,
   decodeLineSequenceAnalysisV1,
+  decodeLineSequenceRecommendationV1,
   LineSequenceContractDecodeError,
   resolveLineSequenceParameterPatch
 } from '@/capabilities/project-workspace/line-sequence';
@@ -93,7 +94,12 @@ function createHarness(post: ApiPost, judgeType: string | number = 'DetectionSeq
     get: vi.fn(async () => undefined),
     post
   };
-  const owner = createLineSequenceOwner({ projectId, flowOwner, api });
+  const owner = createLineSequenceOwner({
+    projectId,
+    flowOwner,
+    api,
+    getRecentImageBase64: () => 'AQID'
+  });
   return { owner, projection, patchNodeParameters };
 }
 
@@ -103,6 +109,24 @@ describe('Line sequence contracts', () => {
       ...analysisPayload(),
       diagnosticCodes: 'sequence_mismatch'
     })).toThrow(LineSequenceContractDecodeError);
+  });
+
+  it('decodes preview images and final scenario previews without making them authoritative', () => {
+    const analysis = decodeLineSequenceAnalysisV1({
+      ...analysisPayload(),
+      inputImageBase64: 'data:image/png;base64,AQID',
+      previewImageBase64: 'BAUG',
+      outputs: { sequence: ['red', 'black'] }
+    });
+    expect(analysis.preview).toEqual({
+      inputImageBase64: 'AQID',
+      previewImageBase64: 'BAUG',
+      outputs: { sequence: ['red', 'black'] }
+    });
+    expect(decodeLineSequenceRecommendationV1({
+      ...recommendationPayload(),
+      finalPreview: { inputImageBase64: 'AQID', previewImageBase64: 'BAUG', outputs: {} }
+    }).finalPreview).toMatchObject({ inputImageBase64: 'AQID', previewImageBase64: 'BAUG' });
   });
 
   it('selects the nearest upstream BoxNms node deterministically', () => {
@@ -239,6 +263,27 @@ describe('LineSequenceOwner', () => {
     });
     await nextTick();
     expect(harness.owner.projection.phase).toBe('applied');
+    harness.owner.dispose();
+  });
+
+  it('sends the recent preview image and projects the backend preview image', async () => {
+    let requestBody: Readonly<Record<string, unknown>> | null = null;
+    const post = vi.fn(async (path: string, body: unknown) => {
+      requestBody = body as Readonly<Record<string, unknown>>;
+      return path === 'autotune/flow-node/preview'
+        ? { ...analysisPayload(), inputImageBase64: 'AQID', previewImageBase64: 'BAUG', outputs: { count: 2 } }
+        : recommendationPayload();
+    });
+    const harness = createHarness(post as unknown as ApiPost);
+
+    await harness.owner.analyze();
+
+    expect(requestBody).toMatchObject({ inputImageBase64: 'AQID', targetNodeId: judgeNodeId });
+    expect(harness.owner.projection.preview).toEqual({
+      inputImageBase64: 'AQID',
+      previewImageBase64: 'BAUG',
+      outputs: { count: 2 }
+    });
     harness.owner.dispose();
   });
 

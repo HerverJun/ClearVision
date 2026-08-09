@@ -9,6 +9,10 @@ import {
 } from '@/platform/api';
 import type { FlowCanvasOwner } from '../flow';
 import type { ImageCanvasClick, ImageCanvasOwner } from '../image/imageCanvasOwner';
+import type {
+  WorkspaceCapabilityDiagnosticsLease,
+  WorkspaceLifecycleDiagnosticsOwner
+} from '../workspaceLifecycleDiagnostics';
 import type { InspectorOwner } from '../inspector/inspectorOwner';
 import {
   decodeCalibrationAssetSaveResponse,
@@ -31,6 +35,7 @@ export type CalibrationOwnerPhase =
   | 'saved'
   | 'stale'
   | 'readonly'
+  | 'unknown-outcome'
   | 'error'
   | 'disposed';
 
@@ -74,6 +79,10 @@ export interface CalibrationOwner {
   reset(): void;
   solve(): Promise<void>;
   save(): Promise<void>;
+  prepareForLeave(): Promise<boolean>;
+  settle(): Promise<void>;
+  hasPendingOperation(): boolean;
+  hasUnknownOutcome(): boolean;
   dispose(reason?: string): void;
 }
 
@@ -226,6 +235,7 @@ export function createCalibrationOwner(options: {
   readonly api: ApiTransport;
   readonly getPersistenceRevision: () => number | null;
   readonly reconcileAfterSave: () => Promise<boolean>;
+  readonly diagnostics?: WorkspaceLifecycleDiagnosticsOwner | undefined;
 }): CalibrationOwner {
   const post = options.api.post;
   if (typeof post !== 'function') throw new TypeError('Calibration owner requires POST on the shared ApiTransport.');
@@ -261,6 +271,27 @@ export function createCalibrationOwner(options: {
   let saveAbort: AbortController | undefined;
   let saving = false;
   let draftSessionId = '';
+  const lease: WorkspaceCapabilityDiagnosticsLease | undefined = options.diagnostics?.reserveCapability(
+    options.projectId,
+    'calibration'
+  );
+
+  function syncDiagnostics(): void {
+    lease?.update(Object.freeze({
+      activeSubscriptions: disposed ? 0 : 2,
+      activeTimers: 0,
+      activeAnimationFrames: 0,
+      activeObservers: 0,
+      activeAbortControllers: Number(Boolean(solveAbort)) + Number(Boolean(saveAbort)),
+      activeBlobUrls: 0,
+      activePreviewArtifactIds: 0,
+      activeHostSubscriptions: 0,
+      inFlightReads: Number(Boolean(solveAbort)),
+      inFlightWrites: Number(Boolean(saveAbort)),
+      inFlightPreview: 0,
+      inFlightExecute: 0
+    }));
+  }
 
   function currentNode(): Readonly<Record<string, unknown>> | null {
     return selectedNode(options.flowOwner);
@@ -286,6 +317,7 @@ export function createCalibrationOwner(options: {
     const imageReady = currentImage.phase === 'ready' && Boolean(state.imageIdentity) && imageMatches;
     const selected = Boolean(state.targetNodeId) && state.targetNodeId === nodeId(options.flowOwner);
     const usableDraft = state.phase !== 'stale' && state.phase !== 'unavailable' && state.phase !== 'readonly' &&
+      state.phase !== 'unknown-outcome' &&
       state.phase !== 'disposed' && !saving && state.phase !== 'solving' && state.phase !== 'saving';
     state.canCapture = !disposed && selected && imageReady && editable() && usableDraft;
     const requiredSampleCount = state.mode === 'Perspective' ? 4 : 3;
@@ -483,6 +515,7 @@ export function createCalibrationOwner(options: {
       solveAbort?.abort('superseded');
       const controller = new AbortController();
       solveAbort = controller;
+      syncDiagnostics();
       const sequence = ++solveSequence;
       state.phase = 'solving';
       state.message = '正在请求服务端拟合与残差分析…';
@@ -521,6 +554,7 @@ export function createCalibrationOwner(options: {
       } finally {
         if (solveAbort === controller) solveAbort = undefined;
         syncAvailability();
+        syncDiagnostics();
       }
     },
     async save(): Promise<void> {
@@ -536,6 +570,7 @@ export function createCalibrationOwner(options: {
       saveAbort?.abort('superseded');
       saveAbort = controller;
       const saveRequestSequence = ++saveSequence;
+      syncDiagnostics();
       try {
         const response = await post<unknown>(
           `projects/${encodeURIComponent(options.projectId)}/calibration-assets/from-draft`,
@@ -565,16 +600,37 @@ export function createCalibrationOwner(options: {
         state.message = `标定资产 ${decoded.assetId} 已保存，工程 revision ${decoded.persistenceRevision}。`;
       } catch (error) {
         if (saveRequestSequence !== saveSequence || disposed || error instanceof ApiAbortError) return;
-        state.phase = 'error';
-        state.message = errorMessage(error);
+        state.phase = error instanceof ApiNetworkError ? 'unknown-outcome' : 'error';
+        state.message = error instanceof ApiNetworkError
+          ? '标定资产保存结果未知；请先核对工程 revision，禁止重复提交。'
+          : errorMessage(error);
         state.diagnostics = Object.freeze([state.message]);
       } finally {
         if (saveAbort === controller) {
           saveAbort = undefined;
           saving = false;
           syncAvailability();
+          syncDiagnostics();
         }
       }
+    },
+    async prepareForLeave(): Promise<boolean> {
+      if (disposed) return true;
+      if (saveAbort || saving || state.phase === 'unknown-outcome') return false;
+      if (solveAbort) {
+        solveAbort.abort('leave');
+        return false;
+      }
+      return true;
+    },
+    async settle(): Promise<void> {
+      return Promise.resolve();
+    },
+    hasPendingOperation(): boolean {
+      return Boolean(solveAbort || saveAbort || saving);
+    },
+    hasUnknownOutcome(): boolean {
+      return state.phase === 'unknown-outcome';
     },
     dispose(reason = 'calibration-owner-disposed'): void {
       if (disposed) return;
@@ -594,8 +650,11 @@ export function createCalibrationOwner(options: {
       state.canSave = false;
       state.captureArmed = false;
       state.message = '标定工作台已关闭。';
+      syncDiagnostics();
+      lease?.dispose(reason);
     }
   });
 
+  syncDiagnostics();
   return owner;
 }

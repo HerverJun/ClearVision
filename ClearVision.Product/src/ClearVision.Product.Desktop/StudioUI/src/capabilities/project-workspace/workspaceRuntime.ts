@@ -42,6 +42,7 @@ export interface WorkspaceRuntime {
   readonly enabled: boolean;
   readonly session: DeepReadonly<SessionProjection>;
   readonly diagnostics: WorkspaceLifecycleDiagnostics;
+  readonly lifecycleDiagnostics?: WorkspaceLifecycleDiagnosticsOwner;
   refreshSession(): Promise<void>;
   openProject(projectId: string): WorkspaceProjectReadPort;
   mountProject(project: WorkspaceProjectV1): WorkspaceOwner;
@@ -57,14 +58,18 @@ export interface WorkspaceRuntime {
 }
 
 export interface WorkspaceLeaveProtectionSnapshot {
-  readonly projectId: string;
+  readonly projectId: string | null;
   readonly persistencePhase: string | null;
   readonly dirty: boolean;
   readonly runPhase: string | null;
+  readonly childPending?: boolean;
+  readonly childUnknown?: boolean;
 }
 
 export interface WorkspaceRuntimeQuarantine {
   readonly activeOwnerCount: number;
+  readonly activeNewDraftOwnerCount: number;
+  readonly activeHandoffReceiverCount: number;
   readonly runIdentities: readonly WorkspaceSessionReconcileIdentity[];
 }
 
@@ -89,6 +94,13 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
       if (projectId !== undefined && owner.projectId !== projectId) continue;
       if (!(await owner.prepareForLeave(reason))) return false;
     }
+    for (const owner of [...activeNewDraftOwners]) {
+      if (projectId !== undefined && projectId !== 'new') continue;
+      if (!(await owner.prepareForLeave())) return false;
+    }
+    for (const receiver of [...activeHandoffReceivers]) {
+      if (!(await receiver.prepareForLeave())) return false;
+    }
     return true;
   }
 
@@ -96,6 +108,7 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
     enabled,
     session: options.session.projection,
     diagnostics: diagnosticsOwner.diagnostics,
+    lifecycleDiagnostics: diagnosticsOwner,
     refreshSession(): Promise<void> {
       if (disposed) return Promise.resolve();
       return options.session.refresh();
@@ -144,6 +157,8 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
         retrySave: inner.retrySave,
         reconcileSave: inner.reconcileSave,
         reconcileExternalProject: inner.reconcileExternalProject,
+        hasPendingChildOperation: inner.hasPendingChildOperation,
+        hasUnknownChildOperation: inner.hasUnknownChildOperation,
         reapplyConflict: inner.reapplyConflict,
         discardConflict: inner.discardConflict,
         hydrateFormalRun: inner.hydrateFormalRun,
@@ -194,6 +209,9 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
         markSaveUnknown: inner.markSaveUnknown,
         markSaveFailed: inner.markSaveFailed,
         discardHandoffDraft: inner.discardHandoffDraft,
+        setReadonly: inner.setReadonly,
+        clearReadonly: inner.clearReadonly,
+        prepareForLeave: inner.prepareForLeave,
         dispose(reason = 'workspace-new-draft-disposed'): void {
           if (ownerDisposed) return;
           ownerDisposed = true;
@@ -207,10 +225,19 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
     openHandoffReceiver(): WorkspaceHandoffReceivePort {
       assertActive();
       if (!enabled || !options.api) throw new Error('Workspace handoff requires the shared ApiTransport.');
-      const inner = createWorkspaceHandoffReceivePort({ api: options.api });
+      const inner = createWorkspaceHandoffReceivePort({
+        api: options.api,
+        diagnostics: diagnosticsOwner
+      });
       let receiverDisposed = false;
       const receiver: WorkspaceHandoffReceivePort = Object.freeze({
         projection: inner.projection,
+        hasPendingOperation: inner.hasPendingOperation,
+        hasUnknownOutcome: inner.hasUnknownOutcome,
+        quarantineForSessionExpiration: inner.quarantineForSessionExpiration,
+        reconcileAfterReauthentication: inner.reconcileAfterReauthentication,
+        prepareForLeave: inner.prepareForLeave,
+        settle: inner.settle,
         receive: inner.receive,
         reject: inner.reject,
         dispose(reason = 'workspace-handoff-receiver-disposed'): void {
@@ -226,12 +253,40 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
     getLeaveProtectionSnapshot(projectId?: string): WorkspaceLeaveProtectionSnapshot | null {
       assertActive();
       const owner = [...activeOwners].find(candidate => projectId === undefined || candidate.projectId === projectId);
-      if (!owner) return null;
+      const receiverPending = [...activeHandoffReceivers].some(receiver => receiver.hasPendingOperation());
+      const receiverUnknown = [...activeHandoffReceivers].some(receiver => receiver.hasUnknownOutcome());
+      if (owner) {
+        return Object.freeze({
+          projectId: owner.projectId,
+          persistencePhase: owner.projection.persistence?.phase ?? null,
+          dirty: owner.projection.persistence?.dirty ?? false,
+          runPhase: owner.projection.run?.phase ?? null,
+          childPending: (typeof owner.hasPendingChildOperation === 'function' && owner.hasPendingChildOperation()) || receiverPending,
+          childUnknown: (typeof owner.hasUnknownChildOperation === 'function' && owner.hasUnknownChildOperation()) || receiverUnknown
+        });
+      }
+      const newDraft = [...activeNewDraftOwners].find(() => projectId === undefined || projectId === 'new');
+      if (newDraft) {
+        const flowOwner = newDraft.getFlowCanvasOwner();
+        return Object.freeze({
+          projectId: null,
+          persistencePhase: newDraft.projection.savePhase,
+          dirty: newDraft.isDirty(),
+          runPhase: null,
+          childPending: newDraft.projection.savePhase === 'workspace-project-creating' ||
+            flowOwner?.hasPendingLifecycleOperation() === true || receiverPending,
+          childUnknown: newDraft.projection.savePhase === 'workspace-save-unknown-outcome' ||
+            flowOwner?.hasUnknownLifecycleOutcome() === true || receiverUnknown
+        });
+      }
+      if (activeHandoffReceivers.size === 0) return null;
       return Object.freeze({
-        projectId: owner.projectId,
-        persistencePhase: owner.projection.persistence?.phase ?? null,
-        dirty: owner.projection.persistence?.dirty ?? false,
-        runPhase: owner.projection.run?.phase ?? null
+        projectId: null,
+        persistencePhase: null,
+        dirty: false,
+        runPhase: null,
+        childPending: receiverPending,
+        childUnknown: receiverUnknown
       });
     },
     prepareForLeave(reason: string, projectId?: string): Promise<boolean> {
@@ -245,11 +300,20 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
     },
     quarantineForSessionExpiration(): WorkspaceRuntimeQuarantine {
       assertActive();
+      for (const read of [...activeReads]) read.dispose('session-expired');
+      for (const owner of [...activeNewDraftOwners]) {
+        owner.setReadonly('会话已失效；新工程草稿与本地候选已隔离，重新认证前禁止写入。');
+      }
+      for (const receiver of [...activeHandoffReceivers]) {
+        receiver.quarantineForSessionExpiration();
+      }
       const runIdentities = [...activeOwners]
         .map(owner => owner.quarantineForSessionExpiration())
         .filter((identity): identity is WorkspaceSessionReconcileIdentity => identity !== null);
       return Object.freeze({
         activeOwnerCount: activeOwners.size,
+        activeNewDraftOwnerCount: activeNewDraftOwners.size,
+        activeHandoffReceiverCount: activeHandoffReceivers.size,
         runIdentities: Object.freeze(runIdentities)
       });
     },
@@ -257,6 +321,12 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
       assertActive();
       for (const owner of [...activeOwners]) {
         if (!(await owner.reconcileAfterReauthentication())) return false;
+      }
+      for (const owner of [...activeNewDraftOwners]) {
+        if (!owner.clearReadonly()) return false;
+      }
+      for (const receiver of [...activeHandoffReceivers]) {
+        if (!receiver.reconcileAfterReauthentication()) return false;
       }
       return true;
     },

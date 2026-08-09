@@ -101,7 +101,8 @@ export function createProductRuntime(
       const result = workspace.quarantineForSessionExpiration();
       systemStatus.dispose();
       return Object.freeze({
-        requiresPreservation: projectLifecycleRequiresPreservation || result.activeOwnerCount > 0,
+        requiresPreservation: projectLifecycleRequiresPreservation || result.activeOwnerCount > 0 ||
+          result.activeNewDraftOwnerCount > 0 || result.activeHandoffReceiverCount > 0,
         activeWorkspaceOwnerCount: result.activeOwnerCount,
         runIdentities: result.runIdentities
       });

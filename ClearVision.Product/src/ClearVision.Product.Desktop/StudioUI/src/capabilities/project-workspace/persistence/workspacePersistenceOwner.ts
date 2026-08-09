@@ -85,9 +85,11 @@ export interface WorkspacePersistenceOwner {
   reapplyConflict(): void;
   discardConflict(): void;
   acceptExternalProject(project: WorkspaceProjectV1): boolean;
+  reconcileExternalProject(): Promise<boolean>;
   setRunning(reason?: string): boolean;
   clearRunning(reason?: string): void;
   setReadonly(reason: string): void;
+  clearReadonly(): void;
   prepareForLeave(reason?: string): Promise<boolean>;
   settle(): Promise<void>;
   dispose(reason?: string): void;
@@ -163,12 +165,15 @@ export function createWorkspacePersistenceOwner(options: {
   let conflictServerProject: WorkspaceProjectV1 | null = null;
   let lastSubmitted: SubmittedSave | null = null;
   let disposed = false;
+  let sessionReadonly = false;
   let operationGeneration = 0;
   let suppressDraftObservation = false;
   let inFlightReads = 0;
   let inFlightWrites = 0;
   let savePromise: Promise<WorkspaceSaveAttemptResult> | null = null;
   const pending = new Set<Promise<unknown>>();
+  const readControllers = new Set<AbortController>();
+  const writeControllers = new Set<AbortController>();
   const initiallyReadonly = Boolean(options.readonlyReason) || !baseline.saveCompatibility.canEncode;
   const state = reactive<MutableWorkspacePersistenceProjection>({
     phase: initiallyReadonly ? 'readonly' : 'clean',
@@ -231,6 +236,7 @@ export function createWorkspacePersistenceOwner(options: {
     lease.update(Object.freeze({
       ...zeroResources(),
       activeSubscriptions: activeSubscription ? 1 : 0,
+      activeAbortControllers: readControllers.size + writeControllers.size,
       inFlightReads,
       inFlightWrites
     }));
@@ -401,14 +407,17 @@ export function createWorkspacePersistenceOwner(options: {
   }
 
   async function readServerProject(operation: number): Promise<WorkspaceProjectV1> {
+    const controller = new AbortController();
+    readControllers.add(controller);
     inFlightReads += 1;
     syncDiagnostics();
     syncAvailability();
     try {
-      const project = await options.port.getProject();
+      const project = await options.port.getProject({ signal: controller.signal });
       if (!isCurrentOperation(operation)) throw new ApiAbortError('workspace-reconcile', new Error('owner disposed'));
       return project;
     } finally {
+      readControllers.delete(controller);
       if (isCurrentOperation(operation)) {
         inFlightReads = Math.max(0, inFlightReads - 1);
         syncDiagnostics();
@@ -482,10 +491,12 @@ export function createWorkspacePersistenceOwner(options: {
     state.message = '正在保存工程…';
     state.errorCode = null;
     inFlightWrites += 1;
+    const controller = new AbortController();
+    writeControllers.add(controller);
     syncDiagnostics();
     syncAvailability();
     try {
-      const project = await options.port.putProject(payload);
+      const project = await options.port.putProject(payload, { signal: controller.signal });
       if (!isCurrentOperation(operation)) return Object.freeze({ status: 'disposed', project: null });
       return applySuccessfulProject(project, submitted);
     } catch (error) {
@@ -517,6 +528,13 @@ export function createWorkspacePersistenceOwner(options: {
         syncAvailability();
         return Object.freeze({ status: 'unknown-outcome', project: null });
       }
+      if (error instanceof ApiHttpError && error.status === 401) {
+        state.phase = 'unknown-outcome';
+        state.errorCode = 'SESSION_UNAUTHORIZED';
+        state.message = '会话已失效；保存结果未知，重新认证后必须先 GET reconcile。';
+        syncAvailability();
+        return Object.freeze({ status: 'unknown-outcome', project: null });
+      }
       state.phase = 'error';
       state.errorCode = code ?? 'SAVE_FAILED';
       state.message = `保存失败：${errorMessage(error)} 本地 draft 已保留。`;
@@ -524,6 +542,7 @@ export function createWorkspacePersistenceOwner(options: {
       syncAvailability();
       return Object.freeze({ status: 'failed', project: null });
     } finally {
+      writeControllers.delete(controller);
       if (isCurrentOperation(operation)) {
         inFlightWrites = Math.max(0, inFlightWrites - 1);
         state.submittedDirtyGeneration = null;
@@ -567,6 +586,18 @@ export function createWorkspacePersistenceOwner(options: {
       state.message = `Reconcile 失败：${errorMessage(error)}`;
       syncAvailability();
       return Object.freeze({ status: 'failed', project: null });
+    }
+  }
+
+  async function reconcileExternalProject(): Promise<boolean> {
+    if (disposed) return false;
+    const operation = operationGeneration;
+    try {
+      const server = await readServerProject(operation);
+      if (!isCurrentOperation(operation)) return false;
+      return acceptExternalProject(server);
+    } catch {
+      return false;
     }
   }
 
@@ -632,6 +663,7 @@ export function createWorkspacePersistenceOwner(options: {
       syncAvailability();
     },
     acceptExternalProject,
+    reconcileExternalProject,
     setRunning(reason = 'Formal Run is active.'): boolean {
       if (disposed || !state.canRun) return false;
       state.phase = 'running';
@@ -651,15 +683,29 @@ export function createWorkspacePersistenceOwner(options: {
     },
     setReadonly(reason: string): void {
       if (disposed) return;
-      state.phase = 'readonly';
+      sessionReadonly = true;
+      if (state.phase !== 'saving' && state.phase !== 'unknown-outcome') state.phase = 'readonly';
       state.message = reason.trim() || 'Workspace 已切换为只读。';
       options.flowOwner.setMutationGate('readonly');
       syncAvailability();
     },
+    clearReadonly(): void {
+      if (disposed || initiallyReadonly || !sessionReadonly) return;
+      sessionReadonly = false;
+      if (state.phase === 'readonly') {
+        state.phase = state.dirty ? 'dirty' : 'clean';
+        state.message = state.dirty ? '会话已恢复；本地 draft 仍未保存。' : '会话已恢复，所有修改已保存。';
+        state.errorCode = null;
+        options.flowOwner.setMutationGate('editable');
+      }
+      syncAvailability();
+    },
     async prepareForLeave(): Promise<boolean> {
+      for (const controller of readControllers) controller.abort('leave');
       if (savePromise) await savePromise;
+      await Promise.allSettled([...pending]);
       return !state.dirty && state.phase !== 'conflict' && state.phase !== 'unknown-outcome' &&
-        state.phase !== 'saving';
+        state.phase !== 'saving' && writeControllers.size === 0;
     },
     async settle(): Promise<void> {
       await Promise.allSettled([...pending]);
@@ -668,6 +714,8 @@ export function createWorkspacePersistenceOwner(options: {
       if (disposed) return;
       disposed = true;
       operationGeneration += 1;
+      for (const controller of readControllers) controller.abort(reason);
+      for (const controller of writeControllers) controller.abort(reason);
       stopDraftWatch();
       state.phase = 'disposed';
       state.canSave = false;

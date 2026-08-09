@@ -40,17 +40,61 @@ onBeforeUnmount(() => query.dispose());
         description="请稍候。"
       />
       <CvPageState
-        v-else-if="query.state.value.phase === 'error'"
+        v-else-if="query.state.value.phase === 'unauthorized'"
+        kind="unauthorized"
+        title="会话已失效"
+        description="当前会话已失效，不能读取可检测工程。请重新认证后再试。"
+      />
+      <CvPageState
+        v-else-if="query.state.value.phase === 'forbidden'"
+        kind="forbidden"
+        title="无权读取检测工程"
+        description="当前账号没有读取连续检测工程列表的权限。"
+      />
+      <CvPageState
+        v-else-if="query.state.value.phase === 'aborted'"
+        kind="error"
+        title="工程读取已取消"
+        description="当前读取请求已被新的页面生命周期取消，没有把取消结果当作空工程。"
+      />
+      <CvPageState
+        v-else-if="query.state.value.phase === 'stale' && projects.length === 0"
+        kind="error"
+        title="工程列表已过期"
+        description="服务暂时不可用，当前没有可安全展示的旧工程列表。请重试。"
+      />
+      <CvPageState
+        v-else-if="query.state.value.phase === 'partial-failure' && projects.length === 0"
+        kind="error"
+        title="工程列表读取不完整"
+        description="部分服务响应失败，未把不完整结果显示为暂无工程。请重试。"
+      />
+      <CvPageState
+        v-else-if="query.state.value.phase === 'error' || query.state.value.phase === 'not-found'"
         kind="error"
         title="工程读取失败"
         :description="query.state.value.failure?.message"
       />
       <CvPageState
-        v-else-if="projects.length === 0"
+        v-else-if="(query.state.value.phase === 'empty' || query.state.value.phase === 'success') && projects.length === 0"
         kind="empty"
         title="暂无可检测工程"
         description="请先创建并保存工程。"
       />
+      <CvInlineAlert
+        v-if="query.state.value.phase === 'stale' && projects.length > 0"
+        tone="warning"
+        compact
+      >
+        当前显示的是上一次成功读取的工程列表，最新刷新失败；不会把过期列表当作最新权限结果。
+      </CvInlineAlert>
+      <CvInlineAlert
+        v-if="query.state.value.phase === 'partial-failure' && projects.length > 0"
+        tone="warning"
+        compact
+      >
+        工程列表部分读取失败，当前内容可能不完整；请刷新后再进入连续检测。
+      </CvInlineAlert>
       <ul
         v-else
         class="inspection-projects__list"

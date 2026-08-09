@@ -55,6 +55,10 @@ vi.mock('@/capabilities/project-workspace/flow', () => ({
       openInspector: vi.fn(),
       openCameraBindingEditor: vi.fn(),
       openPreviewWorkbench: vi.fn(),
+      hasPendingLifecycleOperation: vi.fn(() => false),
+      hasUnknownLifecycleOutcome: vi.fn(() => false),
+      prepareForLeave: vi.fn(async () => true),
+      settle: vi.fn(async () => undefined),
       refreshOperators: vi.fn(),
       setMutationGate: vi.fn((gate: 'editable' | 'readonly' | 'running') => {
         projection.mutationGate = gate;
@@ -165,6 +169,35 @@ describe('F06 G4 new-project Workspace draft owner', () => {
       savePhase: 'workspace-save-unknown-outcome', metadataLocked: true, canSave: true
     });
     owner.dispose();
+    context.diagnostics.dispose();
+    context.queries.dispose();
+  });
+
+  it('blocks leave while a new-project draft is dirty, creating, or unknown', async () => {
+    const context = harness();
+    const artifact = decodeWorkspaceHandoffArtifactV1(handoffArtifactPayload());
+    const owner = createWorkspaceNewDraftOwner({
+      artifactId,
+      diagnostics: context.diagnostics,
+      queries: context.queries,
+      api: context.api,
+      featureFlags: {}
+    });
+    owner.openFlowCanvas();
+    await owner.stageHandoffDraft(artifact);
+    owner.confirmHandoff({
+      artifactId, sessionId: artifact.sessionId, planId: artifact.planId,
+      buildId: artifact.build.buildId, candidateFlowFingerprint: artifact.candidateFlowFingerprint,
+      targetKind: 'new', receivedAtUtc: '2026-07-29T08:05:00.000Z'
+    });
+
+    await expect(owner.prepareForLeave()).resolves.toBe(false);
+    owner.markProjectCreating();
+    await expect(owner.prepareForLeave()).resolves.toBe(false);
+    owner.markSaveUnknown('创建结果未知');
+    await expect(owner.prepareForLeave()).resolves.toBe(false);
+
+    owner.dispose('leave-test');
     context.diagnostics.dispose();
     context.queries.dispose();
   });

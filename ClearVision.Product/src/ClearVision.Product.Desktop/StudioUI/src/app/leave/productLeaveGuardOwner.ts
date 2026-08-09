@@ -28,6 +28,8 @@ export type ProductLeaveProtectionKind =
   | 'workspace-save-unknown'
   | 'workspace-run-active'
   | 'workspace-run-unknown'
+  | 'workspace-child-pending'
+  | 'workspace-child-unknown'
   | 'project-command-active'
   | 'project-command-unknown'
   | 'project-update-conflict'
@@ -118,6 +120,8 @@ function workspaceProtection(snapshot: WorkspaceLeaveProtectionSnapshot | null):
   if (!snapshot) return null;
   if (snapshot.runPhase && activeRunPhases.has(snapshot.runPhase)) return 'workspace-run-active';
   if (snapshot.runPhase && unknownRunPhases.has(snapshot.runPhase)) return 'workspace-run-unknown';
+  if (snapshot.childUnknown) return 'workspace-child-unknown';
+  if (snapshot.childPending) return 'workspace-child-pending';
   if (snapshot.persistencePhase === 'unknown-outcome') return 'workspace-save-unknown';
   if (snapshot.persistencePhase === 'conflict') return 'workspace-save-conflict';
   if (snapshot.dirty || snapshot.persistencePhase === 'saving') return 'workspace-draft';
@@ -136,6 +140,10 @@ function messageFor(kind: ProductLeaveProtectionKind): string {
       return 'Formal Run 仍在 admission、执行或取消协调中；当前禁止强制离开。';
     case 'workspace-run-unknown':
       return 'Formal Run 结果未知，必须先 reconcile；当前禁止强制离开。';
+    case 'workspace-child-pending':
+      return '工程子功能仍有请求或写入处理中；请等待其完成后再离开。';
+    case 'workspace-child-unknown':
+      return '工程子功能写入结果未知；当前后端合同不支持安全重放，必须先重新读取协调。';
     case 'project-command-active':
       return '工程创建、更新、删除或 reconcile 尚未完成；当前禁止离开。';
     case 'project-command-unknown':
@@ -232,6 +240,20 @@ export function createProductLeaveGuardOwner(
     return settingsParticipant?.inspect() ?? null;
   }
 
+  function currentInspectionProtection(): ProductLeaveProtectionKind {
+    const projection = inspectionRunOwner?.projection;
+    if (!projection) return null;
+    const runtime = projection.runtime;
+    if (runtime?.isBusy && runtime.sessionType === 'ContinuousInspection') {
+      return 'continuous-inspection-active';
+    }
+    if (projection.phase === 'starting' || projection.phase === 'stopping' ||
+        projection.phase === 'reconnecting' || projection.phase === 'disconnected') {
+      return 'continuous-inspection-active';
+    }
+    return null;
+  }
+
   function isCurrent(generation: number): boolean {
     return !disposed && generation === lifecycleGeneration;
   }
@@ -294,6 +316,20 @@ export function createProductLeaveGuardOwner(
     if (projectAfter === 'project-update-conflict') return await prompt(projectAfter, reason, generation);
     if (projectAfter) return block(projectAfter, generation);
 
+    const inspectionBefore = currentInspectionProtection();
+    if (inspectionBefore && inspectionRunOwner) {
+      let settled: boolean;
+      try {
+        settled = await inspectionRunOwner.prepareForLeave();
+      } catch {
+        settled = false;
+      }
+      if (!isCurrent(generation)) return false;
+      if (!settled) return block(currentInspectionProtection() ?? inspectionBefore, generation);
+    }
+    const inspectionAfter = currentInspectionProtection();
+    if (inspectionAfter) return block(inspectionAfter, generation);
+
     const settingsProtection = currentSettingsProtection();
     if (settingsProtection) {
       return isPromptable(settingsProtection)
@@ -345,7 +381,8 @@ export function createProductLeaveGuardOwner(
     hasProtection(targetProjectId?: string): boolean {
       if (disposed) return false;
       return currentProjectProtection() !== null ||
-        currentWorkspaceProtection(targetProjectId) !== null || currentSettingsProtection() !== null;
+        currentWorkspaceProtection(targetProjectId) !== null || currentSettingsProtection() !== null ||
+        currentInspectionProtection() !== null;
     },
     confirmPrompt(): void {
       pendingPrompt?.settle(true);

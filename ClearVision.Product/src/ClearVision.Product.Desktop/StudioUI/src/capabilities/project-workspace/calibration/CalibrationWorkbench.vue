@@ -10,19 +10,19 @@ const props = defineProps<{
 const projection = props.owner.projection;
 const phaseTone = computed(() => {
   if (projection.phase === 'saved' || projection.lastSolveResult?.accepted === true) return 'ok';
-  if (projection.phase === 'error' || projection.phase === 'stale') return 'warning';
+  if (projection.phase === 'error' || projection.phase === 'stale' || projection.phase === 'unknown-outcome') return 'warning';
   if (projection.phase === 'solving' || projection.phase === 'saving') return 'info';
   return 'idle';
 });
 const phaseLabel = computed(() => ({
   unavailable: '等待图像', ready: '可采集', dirty: '草稿', solving: '拟合中', solved: '候选就绪',
-  saving: '保存中', saved: '已保存', stale: '已过期', readonly: '只读', error: '需处理', disposed: '已关闭'
+  saving: '保存中', saved: '已保存', stale: '已过期', readonly: '只读', 'unknown-outcome': '结果待核对', error: '需处理', disposed: '已关闭'
 }[projection.phase] ?? '状态未知'));
 const accepted = computed(() => projection.lastSolveResult?.accepted === true);
 const activeCount = computed(() => projection.samples.filter(sample => sample.enabled).length);
 const completeCount = computed(() => projection.samples.filter(sample => sample.enabled && sample.valid).length);
 const worldEditingDisabled = computed(() => [
-  'unavailable', 'readonly', 'stale', 'disposed', 'solving', 'saving'
+  'unavailable', 'readonly', 'stale', 'unknown-outcome', 'disposed', 'solving', 'saving'
 ].includes(projection.phase));
 
 function numericValue(value: number | null): string {
@@ -53,7 +53,7 @@ function updateNumber(sampleId: string, key: 'worldX' | 'worldY', value: string)
     </div>
 
     <CvInlineAlert
-      v-if="projection.phase === 'error' || projection.phase === 'stale' || projection.phase === 'readonly'"
+      v-if="projection.phase === 'error' || projection.phase === 'stale' || projection.phase === 'readonly' || projection.phase === 'unknown-outcome'"
       tone="warning"
       title="标定状态"
     >

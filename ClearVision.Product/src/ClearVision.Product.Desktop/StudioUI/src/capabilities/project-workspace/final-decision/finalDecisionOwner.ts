@@ -10,6 +10,10 @@ import {
   type WorkspaceFinalDecisionBindingV1,
   type WorkspaceMissingDecisionPolicy
 } from '../workspaceContracts';
+import type {
+  WorkspaceCapabilityDiagnosticsLease,
+  WorkspaceLifecycleDiagnosticsOwner
+} from '../workspaceLifecycleDiagnostics';
 
 export interface FinalDecisionCandidateV1 {
   readonly operatorId: string;
@@ -155,6 +159,7 @@ export function createFinalDecisionOwner(options: {
   readonly flowOwner: FlowCanvasOwner;
   readonly api: ApiTransport;
   readonly initial: WorkspaceDecisionConfigurationV1 | null;
+  readonly diagnostics?: WorkspaceLifecycleDiagnosticsOwner;
 }): FinalDecisionOwner {
   if (!options.api.post) throw new TypeError('最终判定需要 shared ApiTransport POST。');
   let applied = cloneDecision(options.initial);
@@ -162,6 +167,10 @@ export function createFinalDecisionOwner(options: {
   let disposed = false;
   let generation = 0;
   let validationController: AbortController | null = null;
+  const lease: WorkspaceCapabilityDiagnosticsLease | undefined = options.diagnostics?.reserveCapability(
+    options.flowOwner.projectId ?? 'workspace-final-decision',
+    'final-decision'
+  );
   const state = reactive<MutableProjection>({
     phase: 'idle',
     draft,
@@ -173,6 +182,23 @@ export function createFinalDecisionOwner(options: {
     draftFingerprint: fingerprint(draft),
     message: '正在读取后端最终判定候选。'
   });
+
+  function syncDiagnostics(): void {
+    lease?.update(Object.freeze({
+      activeSubscriptions: disposed ? 0 : 1,
+      activeTimers: 0,
+      activeAnimationFrames: 0,
+      activeObservers: 0,
+      activeAbortControllers: Number(Boolean(validationController)),
+      activeBlobUrls: 0,
+      activePreviewArtifactIds: 0,
+      activeHostSubscriptions: 0,
+      inFlightReads: Number(Boolean(validationController)),
+      inFlightWrites: 0,
+      inFlightPreview: 0,
+      inFlightExecute: 0
+    }));
+  }
 
   function updateDraft(next: WorkspaceDecisionConfigurationV1 | null): void {
     draft = cloneDecision(next);
@@ -190,6 +216,7 @@ export function createFinalDecisionOwner(options: {
     validationController?.abort('decision-validation-superseded');
     const controller = new AbortController();
     validationController = controller;
+    syncDiagnostics();
     state.phase = 'validating';
     state.message = '正在由后端校验候选与规则。';
     try {
@@ -216,6 +243,7 @@ export function createFinalDecisionOwner(options: {
       return false;
     } finally {
       if (validationController === controller) validationController = null;
+      syncDiagnostics();
     }
   }
 
@@ -330,11 +358,14 @@ export function createFinalDecisionOwner(options: {
       stopWatch();
       validationController?.abort('final-decision-owner-disposed');
       validationController = null;
+      syncDiagnostics();
+      lease?.dispose('final-decision-owner-disposed');
       state.phase = 'disposed';
       state.candidates = Object.freeze([]);
       state.message = '最终判定 owner 已释放。';
     }
   });
+  syncDiagnostics();
   void validate();
   return owner;
 }

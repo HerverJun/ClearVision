@@ -56,6 +56,8 @@ export interface PreviewOwnerProjection {
   readonly canCancel: boolean;
   readonly autoPreviewAllowed: boolean;
   readonly manualReason: string | null;
+  readonly inputImageBase64: string | null;
+  readonly outputImageBase64: string | null;
   readonly inputImageSrc: string | null;
   readonly outputImageSrc: string | null;
   readonly outputData: Readonly<Record<string, unknown>> | null;
@@ -251,6 +253,8 @@ export function createPreviewOwner(options: {
     canCancel: false,
     autoPreviewAllowed: true,
     manualReason: null,
+    inputImageBase64: null,
+    outputImageBase64: null,
     inputImageSrc: null,
     outputImageSrc: null,
     outputData: null,
@@ -348,6 +352,8 @@ export function createPreviewOwner(options: {
     const previewCost = record(rawState.previewCost);
     state.autoPreviewAllowed = previewCost.autoPreviewAllowed !== false;
     state.manualReason = text(previewCost.reason) || null;
+    state.inputImageBase64 = text(rawState.inputImageBase64) || null;
+    state.outputImageBase64 = text(rawState.outputImageBase64) || null;
     state.inputImageSrc = text(presenter.inputImageSrc) || null;
     state.outputImageSrc = text(presenter.outputImageSrc) || null;
     state.outputData = outputData;
@@ -432,6 +438,8 @@ export function createPreviewOwner(options: {
       state.phase = 'disposed';
       state.canPreview = false;
       state.canCancel = false;
+      state.inputImageBase64 = null;
+      state.outputImageBase64 = null;
       state.inputImageSrc = null;
       state.outputImageSrc = null;
       state.outputData = null;

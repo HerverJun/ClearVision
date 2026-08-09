@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, type DeepReadonly } from 'vue';
+import { computed, ref, shallowRef, watch, type DeepReadonly } from 'vue';
 import { RouterLink } from 'vue-router';
 import {
   CvButton,
@@ -16,6 +16,7 @@ import type { WorkspaceOwner } from './workspaceOwner';
 import type { WorkspaceNewDraftOwner } from './workspaceNewDraftOwner';
 import FlowWorkspace from './flow/FlowWorkspace.vue';
 import type { WorkspaceLifecycleDiagnostics } from './workspaceLifecycleDiagnostics';
+import type { WorkspaceLifecycleDiagnosticsOwner } from './workspaceLifecycleDiagnostics';
 import { GlobalVariablesWorkbench, type WorkspaceGlobalVariablesOwner } from './global-variables';
 import { FinalDecisionWorkbench, type FinalDecisionOwner } from './final-decision';
 import type { FlowCanvasOwner } from './flow';
@@ -52,6 +53,7 @@ const props = defineProps<{
   newDraftOwner?: WorkspaceNewDraftOwner | null;
   message: string | null;
   diagnostics: WorkspaceLifecycleDiagnostics;
+  lifecycleDiagnostics?: WorkspaceLifecycleDiagnosticsOwner | undefined;
   handoffReceive?: DeepReadonly<WorkspaceHandoffReceiveProjection> | null;
   userRole?: string | null | undefined;
 }>();
@@ -71,6 +73,27 @@ const packageOpen = ref(false);
 const templateOwner = shallowRef<TemplateOwner | null>(null);
 const templateOpen = ref(false);
 const runDetailsOpen = ref(false);
+
+function closeCapabilityDialogs(): void {
+  variablesOpen.value = false;
+  decisionOpen.value = false;
+  packageOpen.value = false;
+  templateOpen.value = false;
+  variablesOwner.value = null;
+  modalFlowOwner.value = null;
+  decisionOwner.value = null;
+  packageOwner.value = null;
+  templateOwner.value = null;
+  runDetailsOpen.value = false;
+}
+
+watch(
+  () => [props.projectId, props.project?.id ?? null, props.workspaceOwner] as const,
+  ([projectId, projectIdentity, owner], previous) => {
+    if (!previous || projectId === previous[0] && projectIdentity === previous[1] && owner === previous[2]) return;
+    closeCapabilityDialogs();
+  }
+);
 
 function openVariables(): void {
   variablesOwner.value = props.workspaceOwner?.getGlobalVariablesOwner() ?? null;
@@ -732,6 +755,7 @@ function workspaceResultsLink(resultId?: string): string {
         :key="effectiveProjectId"
         :workspace-owner="canvasOwner"
         :project="canvasProject"
+        :lifecycle-diagnostics="lifecycleDiagnostics"
       />
     </div>
 

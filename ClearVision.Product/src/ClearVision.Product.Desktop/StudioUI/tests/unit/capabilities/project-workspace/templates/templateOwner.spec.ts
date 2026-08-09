@@ -3,6 +3,7 @@ import { reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ApiConflictError,
+  ApiAbortError,
   ApiForbiddenError,
   ApiNetworkError,
   type ApiTransport
@@ -15,6 +16,10 @@ import {
   type TemplateOwner,
   type TemplateWriteInput
 } from '@/capabilities/project-workspace/templates';
+import {
+  createWorkspaceLifecycleDiagnosticsOwner,
+  type WorkspaceLifecycleDiagnosticsOwner
+} from '@/capabilities/project-workspace/workspaceLifecycleDiagnostics';
 
 const projectId = '11111111-1111-4111-8111-111111111111';
 const templateId = '22222222-2222-4222-8222-222222222222';
@@ -98,6 +103,7 @@ function createHarness(options: {
   get?: ApiTransport['get'];
   post?: ApiTransport['post'];
   put?: ApiTransport['put'];
+  diagnostics?: WorkspaceLifecycleDiagnosticsOwner;
 } = {}) {
   const flow = createFlowOwner(options.mutationGate);
   const defaultGet: ApiTransport['get'] = async <T = unknown>(path: string) => {
@@ -119,7 +125,8 @@ function createHarness(options: {
     queries,
     api,
     canWrite: options.canWrite ?? true,
-    isDirty: () => options.dirty ?? false
+    isDirty: () => options.dirty ?? false,
+    ...(options.diagnostics ? { diagnostics: options.diagnostics } : {})
   });
   return { owner, flow, api, queries };
 }
@@ -185,7 +192,7 @@ describe('TemplateOwner', () => {
       description: 'Saved description',
       industry: 'Electronics',
       tags: ['inspection']
-    }));
+    }), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(postMock.mock.calls[0]?.[0]).toBe('templates');
     expect(postMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ flowData: harness.flow.projection.draft }));
 
@@ -195,7 +202,7 @@ describe('TemplateOwner', () => {
       name: 'Saved template',
       tags: ['inspection'],
       flowData: harness.flow.projection.draft
-    }));
+    }), expect.objectContaining({ signal: expect.any(AbortSignal) }));
 
     harness.owner.dispose();
     harness.queries.dispose();
@@ -254,5 +261,35 @@ describe('TemplateOwner', () => {
     expect(conflictHarness.owner.projection.errorCode).toBe('CONFLICT');
     conflictHarness.owner.dispose();
     conflictHarness.queries.dispose();
+  });
+
+  it('aborts the list read during leave without turning it into a template write outcome', async () => {
+    let signal: AbortSignal | undefined;
+    const get = vi.fn(async (path: string, options?: { signal?: AbortSignal }) => {
+      if (path !== 'templates') return templatePayload() as unknown;
+      return await new Promise<never>((_resolve, reject) => {
+        signal = options?.signal;
+        signal?.addEventListener('abort', () => reject(new ApiAbortError(path)), { once: true });
+      });
+    }) as unknown as ApiTransport['get'];
+    const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
+    const harness = createHarness({ get, diagnostics });
+
+    await vi.waitFor(() => expect(signal).toBeDefined());
+    const leaving = harness.owner.prepareForLeave();
+    expect(signal?.aborted).toBe(true);
+    await expect(leaving).resolves.toBe(true);
+    expect(harness.owner.projection.writeStatus).toBe('idle');
+    expect(diagnostics.diagnostics).toMatchObject({
+      capabilityOwnerCounts: { template: 1 },
+      activeAbortControllers: 0,
+      inFlightReads: 0,
+      inFlightWrites: 0
+    });
+
+    harness.owner.dispose('route-leave');
+    expect(diagnostics.diagnostics.capabilityOwnerCounts.template).toBe(0);
+    harness.queries.dispose();
+    diagnostics.dispose();
   });
 });

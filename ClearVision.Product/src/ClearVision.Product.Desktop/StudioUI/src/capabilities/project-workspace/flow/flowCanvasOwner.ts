@@ -125,6 +125,13 @@ export interface FlowCaliperSearchRegionPatch {
   readonly values: Readonly<Record<string, WorkspaceJsonValue>>;
 }
 
+export interface FlowLifecycleParticipant {
+  prepareForLeave(): Promise<boolean>;
+  settle(): Promise<void>;
+  hasPendingOperation?(): boolean;
+  hasUnknownOutcome?(): boolean;
+}
+
 export interface FlowCanvasOwner {
   readonly projectId: string | null;
   readonly projection: DeepReadonly<FlowCanvasOwnerProjection>;
@@ -134,8 +141,13 @@ export interface FlowCanvasOwner {
   openInspector(): InspectorOwner;
   openCameraBindingEditor(): CameraBindingEditorOwner;
   openPreviewWorkbench(inspectorOwner: InspectorOwner): PreviewWorkbenchOwner;
+  registerLifecycleParticipant(participant: FlowLifecycleParticipant): () => void;
+  hasPendingLifecycleOperation(): boolean;
+  hasUnknownLifecycleOutcome(): boolean;
   refreshOperators(force?: boolean): Promise<void>;
   setMutationGate(gate: FlowMutationGate): void;
+  prepareForLeave(): Promise<boolean>;
+  settle(): Promise<void>;
   dispose(reason?: string): void;
 }
 
@@ -333,6 +345,7 @@ export function createFlowCanvasOwner(options: {
   let inspectorOwner: InspectorOwner | undefined;
   let cameraBindingEditorOwner: CameraBindingEditorOwner | undefined;
   let previewWorkbenchOwner: PreviewWorkbenchOwner | undefined;
+  const lifecycleParticipants = new Set<FlowLifecycleParticipant>();
 
   function assertActive(): void {
     if (disposed) throw new Error('FlowCanvas owner has been disposed.');
@@ -506,7 +519,8 @@ export function createFlowCanvasOwner(options: {
       cameraBindingEditorOwner = createCameraBindingEditorOwner({
         projectId: options.project.id,
         flowOwner: owner,
-        api: options.api
+        api: options.api,
+        diagnostics: options.diagnostics
       });
       return cameraBindingEditorOwner;
     },
@@ -534,6 +548,17 @@ export function createFlowCanvasOwner(options: {
         getInputImageContext: node => cameraBindingEditorOwner?.getPreviewInputContext(node) ?? null
       });
       return previewWorkbenchOwner;
+    },
+    registerLifecycleParticipant(participant: FlowLifecycleParticipant): () => void {
+      assertActive();
+      lifecycleParticipants.add(participant);
+      return () => lifecycleParticipants.delete(participant);
+    },
+    hasPendingLifecycleOperation(): boolean {
+      return [...lifecycleParticipants].some(participant => participant.hasPendingOperation?.() === true);
+    },
+    hasUnknownLifecycleOutcome(): boolean {
+      return [...lifecycleParticipants].some(participant => participant.hasUnknownOutcome?.() === true);
     },
     mountCanvas(mountOptions: FlowCanvasMountOptions): void {
       assertActive();
@@ -590,6 +615,17 @@ export function createFlowCanvasOwner(options: {
         syncDiagnostics();
       }
     },
+    async prepareForLeave(): Promise<boolean> {
+      if (cameraBindingEditorOwner && !(await cameraBindingEditorOwner.prepareForLeave())) return false;
+      for (const participant of [...lifecycleParticipants]) {
+        if (!(await participant.prepareForLeave())) return false;
+      }
+      return true;
+    },
+    async settle(): Promise<void> {
+      await cameraBindingEditorOwner?.settle();
+      await Promise.all([...lifecycleParticipants].map(participant => participant.settle()));
+    },
     dispose(reason = 'flow-canvas-owner-disposed'): void {
       if (disposed) return;
       disposed = true;
@@ -629,6 +665,7 @@ export function createFlowCanvasOwner(options: {
         disposalError ??= error;
       }
       host = undefined;
+      lifecycleParticipants.clear();
       stopCatalogWatch();
       catalogQuery.dispose();
       state.phase = 'disposed';

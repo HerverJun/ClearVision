@@ -88,7 +88,7 @@ describe('F06 G4 handoff and save-authority architecture guards', () => {
     expect(port).toContain('const path = projectPath(projectId)');
     expect(port).toContain('const put = api.put.bind(api)');
     expect(port).toContain('await put<unknown>(path, payload, options)');
-    expect(persistence).toContain('options.port.putProject(payload)');
+    expect(persistence).toContain('options.port.putProject(payload, { signal: controller.signal })');
   });
 
   it('does not turn the durable artifact store into a Project store or save coordinator', () => {

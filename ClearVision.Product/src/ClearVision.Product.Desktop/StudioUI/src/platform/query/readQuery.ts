@@ -73,6 +73,7 @@ export interface ReadQueryRefreshOptions {
 export interface ReadQueryOwner<T> {
   readonly state: DeepReadonly<ShallowRef<ReadQueryState<T>>>;
   refresh(options?: ReadQueryRefreshOptions): Promise<ReadQueryState<T>>;
+  abort(reason?: string): void;
   dispose(): void;
 }
 
@@ -204,11 +205,34 @@ export function createReadQueryClient(api: ApiTransport): ReadQueryClient {
       let requestId = 0;
       let ownerDisposed = false;
 
+      function abortActiveRequest(reason: string): void {
+        const controller = activeController;
+        if (!controller) return;
+        activeController = undefined;
+        controller.abort(reason);
+        const current = state.value;
+        const previousData = current.data;
+        state.value = previousData === undefined
+          ? Object.freeze({
+              phase: 'aborted',
+              isRefreshing: false,
+              requestId: current.requestId,
+              sessionGeneration
+            })
+          : Object.freeze({
+              phase: current.phase,
+              data: previousData,
+              isRefreshing: false,
+              requestId: current.requestId,
+              ...(current.updatedAt === undefined ? {} : { updatedAt: current.updatedAt }),
+              sessionGeneration
+            });
+      }
+
       const managedOwner: ManagedOwner = {
         protected: definition.protected,
         abort(reason: string): void {
-          activeController?.abort(reason);
-          activeController = undefined;
+          abortActiveRequest(reason);
         },
         isActive(): boolean {
           return activeController !== undefined;
@@ -334,10 +358,14 @@ export function createReadQueryClient(api: ApiTransport): ReadQueryClient {
           }
           return state.value;
         },
+        abort(reason = 'aborted'): void {
+          if (ownerDisposed || disposed) return;
+          abortActiveRequest(reason);
+        },
         dispose(): void {
           if (ownerDisposed) return;
+          owner.abort('disposed');
           ownerDisposed = true;
-          managedOwner.abort('disposed');
           owners.delete(managedOwner);
         }
       });
