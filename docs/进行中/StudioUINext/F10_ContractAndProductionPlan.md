@@ -8,7 +8,7 @@
 F10_STATE=ACTIVE
 F10_START_HEAD=38b80b0dfcb66db67a9eab5ff84f80b994104606
 F10_START_REMOTE_HEAD=38b80b0dfcb66db67a9eab5ff84f80b994104606
-IMPLEMENTATION_HEAD=1c6e61e5a53d59ac3a7f78054af5eab3e86ec667
+IMPLEMENTATION_HEAD=1c8ad67f3a890ed0a8cd72702cef82ed9623f367
 DOCUMENTATION_HEAD=SELF
 BRANCH_HEAD_AT_REVIEW=SELF
 REMOTE_IMPLEMENTATION_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
@@ -47,7 +47,14 @@ G3_PRODUCT_IMPLEMENTATION_HEAD=a3c043e77ff9bcbc80fbf638f8f9f52a217fa8a8
 G3_EVIDENCE_HEAD=1c6e61e5a53d59ac3a7f78054af5eab3e86ec667
 G3_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
 G3_VERIFICATION_DATE=2026-08-09
-G4_STATE=READY
+G4_STATE=DONE
+G4_BASELINE_HEAD=1c6e61e5a53d59ac3a7f78054af5eab3e86ec667
+G4_HOST_IMPLEMENTATION_HEAD=245e9cec9398cbcc2bc42d3d3cc79176634a76bb
+G4_EVIDENCE_HEAD=1c8ad67f3a890ed0a8cd72702cef82ed9623f367
+G4_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G4_VERIFICATION_DATE=2026-08-09
+G4_WEBVIEW2_ROLLBACK_100_DEBUG=PASS_AUTOMATED
+G5_STATE=READY
 ```
 
 ## G0 候选冻结与稳定线语义同步
@@ -135,7 +142,8 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 | G4_NEXT_UI_CONSUMPTION | DONE | Line Sequence 唯一 owner 挂载于 FlowWorkspace，只使用 shared `ApiTransport` 和 `FlowCanvasOwner.commands.patchNodeParameters`；Project/Results/Station/Template/Calibration 用户路径已有本轮 Chromium/fixture 证据。 |
 | G5_PARTIAL_EVIDENCE | PARTIAL | F10 Chromium/fixture 定向 journey `7/7`；仍不等同于真实 WebView2、DPI、no-Node 或现场硬件证据。 |
 | G6_UX_HARDENING | DONE | G3 产品体验实现在 `a3c043e77`，evidence fixture 修正在 `1c6e61e5a`；F02 `73/73`、F03 `12/12` 方向性截图与 manifest 通过。 |
-| G7_WEBVIEW2 | NOT_PERFORMED | 当前未取得真实 WebView2 100%/125% 证据。 |
+| G4_LEGACY_PROFILE_ISOLATION | DONE | `1c8ad67f3` 的真实 WinForms/WebView2 Debug 100% rollback manifest 为 PASS；Next/诊断/Legacy/Next 每次只有一个 root 和一个 profile 专属 Host message owner，dispose 后订阅归零，同一 Project/PersistenceRevision/Result authority identity 保持一致。 |
+| G7_WEBVIEW2 | PARTIAL | 已取得本机真实 WebView2 Debug 100% 自动 rollback 证据；Release 与 Windows 125% 仍为 `NOT_PERFORMED`。 |
 | G8_NO_NODE | NOT_PERFORMED | 当前未进行独立 no-Node 发布启动验证。 |
 | G9_FIELD_HARDWARE | NOT_PERFORMED | 当前环境没有现场 Camera、PLC、Station 验证条件。 |
 | G10_FINAL_CI | PARTIAL | 当前 implementation SHA 本地 gates 通过；clean-checkout Remote CI 未运行，不授予 final/production acceptance。 |
@@ -182,6 +190,46 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 G3 退出条件已满足并解锁 G4。浏览器 fixture 只承担方向性视觉、交互和 owner 投影证据；真实 WebView2、
 Windows 100%/125%、独立 no-Node、现场硬件、Remote CI、生产 soak 与产品 Owner 签收继续留在 G6，
 `PRODUCTION_ACCEPTANCE=NOT_GRANTED`、`LEGACY_RETIREMENT=NOT_APPROVED` 保持不变。
+
+### G4 Legacy profile 隔离、rollback 与退役准备
+
+- Host/profile 隔离实现提交为 `245e9cec9398cbcc2bc42d3d3cc79176634a76bb`；真实 WebView2 harness 的
+  G3 启动字段与只读请求合同漂移分别在 `893159d88`、`1c8ad67f3` 修正。最终证据只绑定后者，
+  两个失败尝试不作为通过证据。
+- `Program.UseDesktopStaticAssets` 在进程启动时解析一次受验证的 Startup Profile。Next 只挂载 `/studio`
+  provider，Legacy `index.html`、`src/app.js` 返回 404；Legacy 只挂载根 provider 并明确排除 `/studio`。
+  Next 资源缺失时不挂载 Legacy provider，由现有 `StudioStartupPageResolver` fail-closed 到诊断页。
+- `MainForm` 每进程只解析一个 `IDesktopWebMessageOwner`：Next 为 `StudioHostCapabilityMessageHandler`，
+  精确白名单只有 `PickFileCommand`；Legacy 才解析完整 `WebMessageHandler` compatibility chain。
+  `WebView2Host` 中失效的第二消息分发器、事件与发送入口已删除；没有新增 HostBridge 或执行旁路。
+- StudioUI 的 canonical dependency inventory 固定为 Canvas/interaction、Preview formatter/coordinator、
+  ImageCanvas、ROI geometry/editor、pixel probe、parameter dependency、operator visual/feature registry 与其
+  UI/logging 支撑模块。`.csproj` 与 Vite alias guard 明确排除 Legacy `wwwroot/index.html` 和
+  `wwwroot/src/app.js` composition root；canonical FlowCanvas/ImageCanvas 仍各只有一个内核与 mounted owner。
+- 当前 fallback 入口为 `Studio:StartupProfile=LEGACY_FALLBACK` 或环境变量
+  `Studio__StartupProfile=LEGACY_FALLBACK`。适用范围仅为受控恢复与历史兼容：先停止当前 Host，保留数据库、
+  Project、运行包、Result 与 diagnostics，修改同一权威配置后重启，核对启动日志 profile、唯一 Legacy root、
+  `legacy-compatibility` owner 与同一 Project/PersistenceRevision；问题解决后以同样方式重启回
+  `NEXT_DEFAULT`。profile 切换不要求修改源码、重编译或新增数据迁移/双写。
+- Legacy 源码与打包资产继续保留。物理删除必须等 G6 的完整 WebView2/DPI、独立 no-Node、Remote CI、
+  现场 Camera/PLC/Station、生产 soak 与产品 Owner 签收全部取得证据，并另行完成 capability disposition、
+  数据/客户支持迁移方案、独立 ADR、回退窗口、备份策略和发布审批；当前
+  `LEGACY_RETIREMENT=NOT_APPROVED`。
+
+#### G4 当前验证
+
+| 证据 | 状态 | 当前结果与边界 |
+| --- | --- | --- |
+| Desktop profile/Host 定向 | `PASS` | 单次串行调用覆盖 `ProgramStaticAssetsTests`、profile isolation architecture、`WebView2HostTests`、`WebMessageHandlerTests`：`89/89`；NuGet vulnerability feed 在受限网络下产生 `NU1900`，锁定依赖构建与测试通过。 |
+| PowerShell / Node runner syntax | `PASS` | 两个 evidence PowerShell 脚本 parser error `0`；`studio-ui-webview2-smoke.cjs` 通过 `node --check`。 |
+| 最终 rollback manifest | `PASS_REAL_WEBVIEW2_DEBUG_100_AUTOMATED` | `.tmp/studio-ui-next/f09/rollback/g4-1c8ad67f3/studio-ui-rollback-evidence.json`；`sourceSha=1c8ad67f3a890ed0a8cd72702cef82ed9623f367`，顺序为 Next → 缺失资源诊断 → Legacy → Next，四阶段 runtime/cleanup 均 PASS。 |
+| Authority identity | `PASS` | 同一 Project、`PersistenceRevision=4`、Flow、正式 Result、ExecutionSnapshot、flow/decision hash、image reference 与 history identity 跨重启一致；无 migration、无 dual-write，隔离数据库最终删除。 |
+| Host owner lifecycle | `PASS` | Next/诊断挂载 `studio-host-capabilities`，active subscription `1 -> 0`；Legacy 挂载 `legacy-compatibility`，active subscription `4 -> 0`；每次进程退出、端口、WebView2 user-data 与请求资源清理通过。 |
+| 失败样本 | `FAILED_THEN_FIXED_NOT_COUNTED_AS_PASS` | `g4-245e9cec9` 因 G3 新增 product/host version 后 smoke 旧字段集失败；`g4-893159d88` 因 Template/Results 正式只读请求未进入旧 allowlist 失败。两者均在首阶段停止并完成清理，最终 manifest 未复用其数据。 |
+| G6 外部环境 | `NOT_PERFORMED` | 本次只覆盖本机 Debug、scale 1.0 自动化；Release、Windows 125%、独立 no-Node 目标机、Remote CI、现场硬件、长时间生产 soak 与产品 Owner 签收仍未执行。 |
+
+G4 退出条件已满足并解锁 G5。该结论只批准继续收集同一 clean SHA 的本地软件证据，不授予生产接受，
+也不批准 Legacy 物理退役。
 
 ### G1 请求/写入生命周期与跨工程状态安全
 

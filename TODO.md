@@ -2,7 +2,7 @@
 
 ```text
 DOCUMENT_ROLE=EXECUTION_PLAN
-DOCUMENT_STATE=G4_READY
+DOCUMENT_STATE=G5_READY
 CURRENT_BRANCH=studio-ui-next
 PLANNING_BASELINE_HEAD=f8569fa85244d19a18ba7308051e4d2b2ed4060a
 IMPLEMENTATION_BASELINE_HEAD=21105d57de7e5b4ce41365c7827ed14e64ca7ba5
@@ -35,6 +35,12 @@ G3_PRODUCT_IMPLEMENTATION_HEAD=a3c043e77ff9bcbc80fbf638f8f9f52a217fa8a8
 G3_EVIDENCE_HEAD=1c6e61e5a53d59ac3a7f78054af5eab3e86ec667
 G3_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
 G3_VERIFICATION_DATE=2026-08-09
+G4_STATE=DONE
+G4_BASELINE_HEAD=1c6e61e5a53d59ac3a7f78054af5eab3e86ec667
+G4_HOST_IMPLEMENTATION_HEAD=245e9cec9398cbcc2bc42d3d3cc79176634a76bb
+G4_EVIDENCE_HEAD=1c8ad67f3a890ed0a8cd72702cef82ed9623f367
+G4_WORKTREE_STATE=COMMITTED_LOCAL_NOT_PUSHED
+G4_VERIFICATION_DATE=2026-08-09
 PRODUCTION_ACCEPTANCE=NOT_GRANTED
 LEGACY_RETIREMENT=NOT_APPROVED
 ```
@@ -82,8 +88,8 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
 | G1 | P0 | 请求/写入生命周期与跨工程状态安全 | DONE | Workspace lifecycle Owner | G0 DONE |
 | G2 | P0/P1 | 后端合同解阻与功能差距决策 | DONE | 主协调 Owner + 对应后端 Owner | G0-G1 DONE |
 | G3 | P1/P2 | 产品体验、视觉、中文与 Vue 可维护性收口 | DONE | UI Owner；共享面由主协调 Owner | G2 DONE |
-| G4 | P0 | Legacy profile 隔离、rollback 与退役准备 | READY | Host/Release Owner | G0-G3 DONE |
-| G5 | P0 | 同一 clean SHA 的本地软件证据 | LOCKED | Final Evidence Owner | G4 DONE |
+| G4 | P0 | Legacy profile 隔离、rollback 与退役准备 | DONE | Host/Release Owner | G0-G3 DONE |
+| G5 | P0 | 同一 clean SHA 的本地软件证据 | READY | Final Evidence Owner | G4 DONE |
 | G6 | P0 | 真实宿主、目标机、远程与现场验收 | LOCKED | Release/Field Owner | G5 DONE |
 
 ## 4. G0：候选冻结与稳定线语义同步
@@ -226,21 +232,26 @@ G3 冻结在 `1c6e61e5a53d59ac3a7f78054af5eab3e86ec667`。F02 方向性证据位
 
 **目标**：让 `NEXT_DEFAULT` 只挂载 Next composition root，同时保留可审计、可演练的命名式 Legacy fallback。
 
-- [ ] G4.1 盘点 Next build 仍复用的 Legacy canonical Canvas、Preview、ROI、参数依赖和 visual metadata 模块；
+- [x] G4.1 盘点 Next build 仍复用的 Legacy canonical Canvas、Preview、ROI、参数依赖和 visual metadata 模块；
   标记为共享底层依赖，而不是第二业务 composition root。
-- [ ] G4.2 按 Startup Profile 隔离静态入口：Next profile 不挂载、订阅或执行 Legacy `app.js`；
+- [x] G4.2 按 Startup Profile 隔离静态入口：Next profile 不挂载、订阅或执行 Legacy `app.js`；
   `LEGACY_FALLBACK` 仅通过显式配置和重启启用。
-- [ ] G4.3 隔离 Legacy WebMessage compatibility chain；Next 只保留 Host capability adapter，不恢复执行旁路。
-- [ ] G4.4 Studio UI 资源缺失继续 fail-closed 到诊断页，不静默回退 Legacy。
-- [ ] G4.5 证明 profile 切换会 unmount/dispose 旧 owner，并停止 subscription、timer、SSE、request 和写入口。
-- [ ] G4.6 进行 Next -> Legacy -> Next rollback drill，验证同一 Project、PersistenceRevision、启动诊断和进程退出。
-- [ ] G4.7 在 G6 全部通过前不删除 Legacy 源码；物理删除必须是单独批准的最终工作包。
+- [x] G4.3 隔离 Legacy WebMessage compatibility chain；Next 只保留 Host capability adapter，不恢复执行旁路。
+- [x] G4.4 Studio UI 资源缺失继续 fail-closed 到诊断页，不静默回退 Legacy。
+- [x] G4.5 证明 profile 切换会 unmount/dispose 旧 owner，并停止 subscription、timer、SSE、request 和写入口。
+- [x] G4.6 进行 Next -> Legacy -> Next rollback drill，验证同一 Project、PersistenceRevision、启动诊断和进程退出。
+- [x] G4.7 在 G6 全部通过前不删除 Legacy 源码；物理删除必须是单独批准的最终工作包。
 
 **G4 退出条件**：
 
-- [ ] Next profile 不存在可运行的第二前端业务 root。
-- [ ] Legacy fallback 入口、适用范围、恢复步骤和删除条件均有文档与自动证据。
-- [ ] canonical Canvas/ImageCanvas 仍只有一个内核和一个 mounted owner。
+- [x] Next profile 不存在可运行的第二前端业务 root。
+- [x] Legacy fallback 入口、适用范围、恢复步骤和删除条件均有文档与自动证据。
+- [x] canonical Canvas/ImageCanvas 仍只有一个内核和一个 mounted owner。
+
+G4 冻结在 `1c8ad67f3a890ed0a8cd72702cef82ed9623f367`。最终 rollback manifest 位于
+`.tmp/studio-ui-next/f09/rollback/g4-1c8ad67f3/studio-ui-rollback-evidence.json`，四阶段均为真实
+WinForms/WebView2 Debug 100% 自动证据；它证明 profile 隔离、fail-closed、同库 authority identity 与进程清理，
+但不替代 Release、125%、独立 no-Node、现场硬件、Remote CI 或生产签收。
 
 ## 9. G5：同一 clean SHA 的本地软件证据
 
@@ -326,5 +337,6 @@ G3 冻结在 `1c6e61e5a53d59ac3a7f78054af5eab3e86ec667`。F02 方向性证据位
   旧版能力处置见 G2 ADR。
 - [x] 完成 G2.1-G2.5 处置冻结、延期项重新进入条件和 `98cb8c7f5` 验证；G3 已解锁。
 - [x] 完成 G3 产品体验、视觉、中文与 Vue 工程收口；实现与浏览器方向性证据冻结在 `1c6e61e5a`。
-- [ ] 开始 G4 Legacy profile 隔离、rollback 与退役准备；保留 Legacy 源码，不提前授予退役批准。
+- [x] 完成 G4 Legacy profile 隔离、rollback 与退役准备；Legacy 源码保留，退役未获批准。
+- [ ] 在 `1c8ad67f3` 之后的文档冻结提交上开始 G5，并将全部本地软件证据绑定同一个新的 clean SHA。
 - [x] G1 实现未改变后端 authority、保存链、Runtime/Station、AgentRun，也未引入第二套基础设施。
