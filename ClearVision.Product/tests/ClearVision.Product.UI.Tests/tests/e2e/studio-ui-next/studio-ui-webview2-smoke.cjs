@@ -23,6 +23,7 @@ const {
 const {
   resolveProductNavigationContract
 } = require('./product-navigation-contract.cjs');
+const { analyzeSoakMetric } = require('./soak-metric-analysis.cjs');
 
 const expectations = new Set([
   'legacy',
@@ -3960,35 +3961,6 @@ async function captureSoakMetricSample(
       nodeDescendantCount: nativeRuntime.nodeDescendantCount
     } : null,
     dom
-  };
-}
-
-function analyzeSoakMetric(samples, selector, policy) {
-  const values = samples
-    .slice(Math.min(2, samples.length - 1))
-    .map(selector)
-    .map(Number)
-    .filter(Number.isFinite);
-  assert(values.length > 1, `Soak metric ${policy.name} did not provide enough finite samples.`);
-  const first = values[0];
-  const last = values[values.length - 1];
-  const delta = last - first;
-  const monotonicIncrease = values.length > 1 && values.every((value, index) =>
-    index === 0 || value >= values[index - 1]);
-  const unexplainedMonotonicGrowth = monotonicIncrease && delta > policy.monotonicGrowthLimit;
-  return {
-    name: policy.name,
-    sampleCount: values.length,
-    first,
-    last,
-    minimum: Math.min(...values),
-    maximum: Math.max(...values),
-    delta,
-    growthLimit: policy.growthLimit,
-    monotonicGrowthLimit: policy.monotonicGrowthLimit,
-    monotonicIncrease,
-    unexplainedMonotonicGrowth,
-    passed: delta <= policy.growthLimit && !unexplainedMonotonicGrowth
   };
 }
 
