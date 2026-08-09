@@ -48,10 +48,12 @@ G5_EVIDENCE_HEAD=93cc880619b51d68828bcbc3336b77c83ad60dcc
 G5_VERIFICATION_DATE=2026-08-09
 G5_LOCAL_SOFTWARE_GATE=PASS
 G6_STATE=BLOCKED_BY_ENVIRONMENT
-G6_LOCAL_EXTENSION_HEAD=35631f5309231899f25e656f952c79c877cc20e7
+G6_LOCAL_EXTENSION_HEAD=f97009fabca7567598fab59e29ccc1037c472a09
+G6_LOCAL_DEBUG_SIZE_HEAD=35631f5309231899f25e656f952c79c877cc20e7
+G6_LOCAL_RELEASE_SIZE_HEAD=f97009fabca7567598fab59e29ccc1037c472a09
 G6_LOCAL_UI_AUDIT=PASS
 WEBVIEW2_100_LOCAL_AUTOMATED=PASS_DEBUG_AND_RELEASE
-WEBVIEW2_100_SIZE_MATRIX=PASS_DEBUG_1920_1536_1366
+WEBVIEW2_100_SIZE_MATRIX=PASS_DEBUG_AND_RELEASE_1920_1536_1366
 WEBVIEW2_125=NOT_PERFORMED
 INDEPENDENT_NO_NODE=NOT_PERFORMED
 REMOTE_CI=BLOCKED_BY_ENVIRONMENT
@@ -80,9 +82,10 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
   `98cb8c7f5` 完成，并已进入当前分支历史；G5 最终候选为 `93cc88061`。
 - G5 当前 SHA 已取得 StudioUI、Studio UI Next Playwright、受影响 .NET、真实 WinForms/WebView2 Debug/Release
   scale 1.0、rollback、20-cycle soak、性能、Release publish 和本机 no-Node 静态/进程树证据。
-- G6 本机扩展证据绑定 `35631f530`：当前 HEAD 的 lint、typecheck、`903/903` unit/component 与 production
-  bundle gate 通过；真实 WebView2 Debug 在 1920x1080、1536x864、1366x768 window 下完成主题/密度循环，
-  三组原生 DPI 均为 96，不能外推为 Windows 125%。
+- G6 本机 UI 审计与 Debug 尺寸证据绑定 `35631f530`：lint、typecheck、`903/903` unit/component 与
+  production bundle gate 通过；仅文档前进后的 `f97009fab` 又以 self-contained Release publish 重跑
+  1920x1080、1536x864、1366x768。Debug/Release 每组均完成主题/密度循环，六组原生 DPI 均为 96，
+  不能外推为 Windows 125%。
 - Remote CI 当前为 `BLOCKED_BY_ENVIRONMENT`，Final Gate 为 `PARTIAL`，生产验收仍为 `NOT_GRANTED`。
 - 本机真实 WebView2 100% 自动证据已完成；Windows 125%、独立无 Node 目标机、现场 Camera/PLC/Station/AI、
   生产 soak 与产品 Owner 签收仍未完成，不能由本机证据替代。
@@ -316,11 +319,14 @@ G6 当前为 `BLOCKED_BY_ENVIRONMENT`，下列未勾选项是外部目标机、�
 验收责任，不允许用本地自动化补写 PASS：
 
 - [ ] G6.1 真实 WinForms + WebView2：Windows 100% 和 125%，Debug/Release，启动、登录、会话失效、关闭。
-  当前仅本机 Windows 100%/96 DPI、Debug/Release 自动证据 PASS；`WEBVIEW2_125=NOT_PERFORMED`。
+  当前本机 Windows 100%/96 DPI 的 Debug/Release 自动证据与三尺寸矩阵均 PASS；
+  `WEBVIEW2_125=NOT_PERFORMED`。
 - [ ] G6.2 1920x1080、1536x864、1366x768/等效 client size；light/dark、compact/comfortable。
-  Chromium 方向性矩阵已通过；`35631f530` 的真实 WebView2 Debug 100% 已补测 1920x1080、1536x864、
-  1366x768 window，对应 1904x1016、1520x800、1350x704 viewport。每组均实际切换并断言 light/dark、
-  compact/comfortable，水平/垂直 overflow 为 0；Windows 125% 组合仍为 `NOT_PERFORMED`。
+  Chromium 方向性矩阵已通过；`35631f530` 的 Debug 与 `f97009fab` 的 self-contained Release 均完成
+  1920x1080、1536x864、1366x768 window，对应 1904x1016、1520x800、1350x704 viewport。每组均实际切换
+  并断言 light/dark、compact/comfortable，水平/垂直 overflow 为 0；Release 的 PerMonitorV2、Canvas
+  backing store/hit-test、截图像素、唯一 owner 与 cleanup 审计均 PASS。Windows 125% 组合仍为
+  `NOT_PERFORMED`。
 - [ ] G6.3 独立无 Node 目标机安装、启动、升级、资源加载和卸载验证。
   本机静态/进程树证据为 PASS；`INDEPENDENT_NO_NODE=NOT_PERFORMED`。
 - [ ] G6.4 Remote CI clean checkout；required jobs 和 Final Gate 全部通过，不放宽性能/质量阈值。

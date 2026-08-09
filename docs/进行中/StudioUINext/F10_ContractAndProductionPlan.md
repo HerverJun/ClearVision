@@ -63,10 +63,12 @@ G5_EVIDENCE_HEAD=93cc880619b51d68828bcbc3336b77c83ad60dcc
 G5_VERIFICATION_DATE=2026-08-09
 G5_LOCAL_SOFTWARE_GATE=PASS
 G6_STATE=BLOCKED_BY_ENVIRONMENT
-G6_LOCAL_EXTENSION_HEAD=35631f5309231899f25e656f952c79c877cc20e7
+G6_LOCAL_EXTENSION_HEAD=f97009fabca7567598fab59e29ccc1037c472a09
+G6_LOCAL_DEBUG_SIZE_HEAD=35631f5309231899f25e656f952c79c877cc20e7
+G6_LOCAL_RELEASE_SIZE_HEAD=f97009fabca7567598fab59e29ccc1037c472a09
 G6_LOCAL_UI_AUDIT=PASS
 WEBVIEW2_100_LOCAL_AUTOMATED=PASS_DEBUG_AND_RELEASE
-WEBVIEW2_100_SIZE_MATRIX=PASS_DEBUG_1920_1536_1366
+WEBVIEW2_100_SIZE_MATRIX=PASS_DEBUG_AND_RELEASE_1920_1536_1366
 FIELD_CAMERA_PLC_STATION_AI=NOT_PERFORMED
 PRODUCTION_SOAK=NOT_PERFORMED
 ```
@@ -157,7 +159,7 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 | G5_LOCAL_SOFTWARE_EVIDENCE | DONE | `93cc88061` 的 StudioUI、Studio UI Next Playwright、受影响 .NET、真实 WebView2 Debug/Release scale 1.0、profiles、rollback、20-cycle soak、性能、publish 和本机 no-Node 证据均通过。 |
 | G6_UX_HARDENING | DONE | G3 产品体验实现在 `a3c043e77`，evidence fixture 修正在 `1c6e61e5a`；F02 `73/73`、F03 `12/12` 方向性截图与 manifest 通过。 |
 | G4_LEGACY_PROFILE_ISOLATION | DONE | `1c8ad67f3` 的真实 WinForms/WebView2 Debug 100% rollback manifest 为 PASS；Next/诊断/Legacy/Next 每次只有一个 root 和一个 profile 专属 Host message owner，dispose 后订阅归零，同一 Project/PersistenceRevision/Result authority identity 保持一致。 |
-| G7_WEBVIEW2 | PARTIAL | G5 已取得真实 WebView2 Debug/Release 100% 自动证据；`35631f530` 又补齐 Debug 下 1920x1080、1536x864、1366x768 window 与 light/dark、compact/comfortable 投影循环。三组 native DPI 都是 96；Windows 125% 仍为 `NOT_PERFORMED`。 |
+| G7_WEBVIEW2 | PARTIAL | G5 已取得真实 WebView2 Debug/Release 100% 自动证据；`35631f530` 补齐 Debug 三尺寸，`f97009fab` 又以 self-contained Release publish 补齐同一三尺寸与 light/dark、compact/comfortable 投影循环。六组 native DPI 都是 96；Windows 125% 仍为 `NOT_PERFORMED`。 |
 | G8_NO_NODE | PARTIAL | 本机 publish 静态扫描、Desktop 进程树无 Node child、sanitized-path 启动均 PASS；独立无 Node 目标机仍为 `NOT_PERFORMED`。 |
 | G9_FIELD_HARDWARE | NOT_PERFORMED | 当前环境没有现场 Camera、PLC、Station 验证条件。 |
 | G10_FINAL_CI | PARTIAL | 当前 implementation SHA 本地软件 gates 通过；clean-checkout Remote CI、125% DPI、独立目标机、现场硬件、生产 soak 和产品签收未完成，不授予 production acceptance。 |
@@ -198,8 +200,10 @@ checkpoint 进入当前历史：`8017f1f0e` 延迟加载 authenticated runtime�
 
 ### G6 本机可完成项扩展（2026-08-09）
 
-本节只记录绑定 source SHA `35631f5309231899f25e656f952c79c877cc20e7` 的本机扩展审计，不改变
-G6 的外部环境与人工验收边界。
+本节记录两组本机扩展证据：UI 审计与 Debug 三尺寸绑定
+`35631f5309231899f25e656f952c79c877cc20e7`，self-contained Release 三尺寸绑定
+`f97009fabca7567598fab59e29ccc1037c472a09`。两者之间只修改本执行台账与根 TODO，没有产品代码差异；这些
+证据不改变 G6 的外部环境与人工验收边界。
 
 | 命令 / 证据 | 结果 |
 | --- | --- |
@@ -212,17 +216,24 @@ G6 的外部环境与人工验收边界。
 | WebView2 Debug 1920x1080 window | PASS；client 1904x1041、viewport 1904x1016、native DPI 96、DPR 1、overflow 0、Desktop Node descendant 0 |
 | WebView2 Debug 1536x864 window | PASS；client 1520x825、viewport 1520x800、native DPI 96、DPR 1、overflow 0、Desktop Node descendant 0 |
 | WebView2 Debug 1366x768 window | PASS；client 1350x729、viewport 1350x704、native DPI 96、DPR 1、overflow 0、Desktop Node descendant 0 |
-| 三组主题 / 密度投影 | PASS；每组均由真实 WebView2 UI 从 light/compact 切到 dark、comfortable，再恢复 light/compact；未产生 HTTP 写请求 |
-| 截图与像素复审 | PASS；3 张真实 WebView2 PNG 尺寸分别为 1904x1016、1520x800、1350x704，抽样颜色分别为 179、183、223，非空且未见遮挡、截断、越界浮层或异常滚动 |
-| shutdown / cleanup | PASS；每组 10 个 shutdown stage records，forced exit、uncertain、parse error、deadline violation 均为 0；Desktop 进程与端口清理完成 |
-| 证据根 | `.tmp/studio-ui-next/g6-35631f530/100dpi/`；Git ignored，不作为源码 authority |
+| Debug 三组主题 / 密度投影 | PASS；每组均由真实 WebView2 UI 从 light/compact 切到 dark、comfortable，再恢复 light/compact；未产生 HTTP 写请求 |
+| Debug 截图与像素复审 | PASS；3 张真实 WebView2 PNG 尺寸分别为 1904x1016、1520x800、1350x704，抽样颜色分别为 179、183、223，非空且未见遮挡、截断、越界浮层或异常滚动 |
+| Debug shutdown / cleanup | PASS；每组 10 个 shutdown stage records，forced exit、uncertain、parse error、deadline violation 均为 0；Desktop 进程与端口清理完成 |
+| Debug 证据根 | `.tmp/studio-ui-next/g6-35631f530/100dpi/`；Git ignored，不作为源码 authority |
+| Release self-contained publish | PASS；通过仓库 `scripts/dotnet.ps1` 生成，StudioUI Vite 530 modules；受限网络下仅有 NuGet vulnerability feed `NU1900`，publish 返回 0，product version/source SHA 均为 `f97009fab` |
+| WebView2 Release 三尺寸 | PASS；1920x1080、1536x864、1366x768 window 的 client/viewport 分别为 1904x1041/1904x1016、1520x825/1520x800、1350x729/1350x704；native DPI 96、DPR 1、PerMonitorV2、overflow 0、Desktop Node descendant 0 |
+| Release 主题 / 密度、owner 与 Canvas | PASS；三组均实际完成 light/compact → dark → comfortable → light → compact，Workspace/FlowCanvas/Inspector/ImageCanvas/ROI/Preview owner 均为 1、冲突 0；Canvas backing store 与 pointer hit-test 均通过 |
+| `Test-StudioUiDpiEvidence.ps1 -ExpectedScales 1.0` | PASS；3/3 Release manifests 通过 project DPI authority、runtime awareness、WebView2 force scale、CDP/JS/screenshot scale 与 Canvas backing/hit-test 全部层级 |
+| Release 截图与像素复审 | PASS；PNG 尺寸与 viewport 一致，8px 网格抽样颜色数为 587、556、534，非白像素占比 69.21%、62.61%、60.16%，亮度跨度 18-255；目视未见遮挡、文本截断、越界浮层或异常滚动 |
+| Release shutdown / cleanup | PASS；三组均无 forced exit、uncertain、console error、request failure 或 deadline violation；Host message owner dispose 后订阅为 0，Desktop、端口、数据库、runtime root 与 WebView2 user-data 全部清理 |
+| Release 证据根与临时发布 | `.tmp/studio-ui-next/g6-f97009fab/100dpi-release/` 保留为 Git ignored evidence；`.tmp/publish-check/g6-f97009fab-100dpi*` 已验证路径后删除 |
 
 失败样本没有计入 PASS：第一次调用在宿主启动前被当前 PowerShell execution policy 拒绝；第二次因外层工具等待仅
 5 秒而中断，遗留的单个 Desktop 进程已按精确 PID 停止。最终 1920x1080 使用新 run `r3` 完整通过，后续两组
 均使用独立端口、WebView2 user-data、数据库与 isolation root。
 
-本轮观测的真实桌面仍为 1920x1080、native 96 DPI。上述尺寸与主题/密度证据补齐 G6.2 的 100% 本机侧，不能
-将 DPR、window resize 或 Chromium fixture 冒充 Windows 125%；因此 G6.1/G6.2 仍不勾选。
+本轮观测的真实桌面仍为 1920x1080、native 96 DPI。上述 Debug/Release 尺寸与主题/密度证据补齐 G6.2 的
+100% 本机侧；不能将 DPR、window resize 或 Chromium fixture 冒充 Windows 125%，因此 G6.1/G6.2 仍不勾选。
 
 #### StudioUI 与 Browser 门禁
 
@@ -312,7 +323,7 @@ G5 的同一 SHA 本地软件门禁为 `DONE`。下列证据超出当前机器�
 
 | G6 项 | 当前状态 |
 | --- | --- |
-| Windows WebView2 125% | `NOT_PERFORMED`；本轮新增 3 组真实 WebView2 100% size/theme/density 证据，但全部只观察 native 96 DPI / scale 1.0 |
+| Windows WebView2 125% | `NOT_PERFORMED`；本轮新增 Debug/Release 各 3 组真实 WebView2 100% size/theme/density 证据，但六组全部只观察 native 96 DPI / scale 1.0 |
 | 独立无 Node 目标机 | `NOT_PERFORMED`；本机静态/进程树 PASS 不替代目标机安装、升级、卸载 |
 | Remote CI clean checkout | `BLOCKED_BY_ENVIRONMENT`；无有效 GitHub 认证入口，未创建当前候选 run，普通 push 不等于完整 CI |
 | 真实 Camera / PLC / TCP / Station / AI | `NOT_PERFORMED`；软件 fixture 与 endpoint 回归不替代现场设备/模型 |
