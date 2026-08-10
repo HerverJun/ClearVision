@@ -2308,6 +2308,7 @@ async function verifyProductPage(
           };
         }, selectors);
 
+        const sourceValue = await page.locator('.results-page__source select').inputValue();
         const primary = await collectVisibleControls([
           '.results-page__source',
           '.results-page__project, .results-page__station',
@@ -2320,7 +2321,7 @@ async function verifyProductPage(
         if (!advancedWasOpen) {
           await advancedTrigger.click();
         }
-        await page.locator('#results-advanced-filters .results-page__diagnostic')
+        await page.locator('#results-advanced-filters .results-page__date').first()
           .waitFor({ state: 'visible' });
         const advanced = await collectVisibleControls([
           '.results-page__diagnostic',
@@ -2334,6 +2335,7 @@ async function verifyProductPage(
           await page.locator('#results-advanced-filters').waitFor({ state: 'hidden' });
         }
         return {
+          source: sourceValue,
           primary,
           advanced: {
             ...advanced,
@@ -2855,11 +2857,15 @@ async function verifyProductPage(
       `Results filter rail did not expose five visible primary controls: ${JSON.stringify(resultsFilterLayout)}`);
     assert(resultsFilterLayout.primary.maximumBottomDelta <= 1,
       `Results filter rail wrapped in the current WebView2 client: ${JSON.stringify(resultsFilterLayout)}`);
-    assert(resultsFilterLayout.advanced.diagnosticWithinDisclosure === 1,
-      `Results diagnostic filter is not owned by the advanced disclosure: ${JSON.stringify(resultsFilterLayout)}`);
+    const expectedDiagnosticCount = resultsFilterLayout.source === 'station' ? 1 : 0;
+    assert(resultsFilterLayout.advanced.diagnosticWithinDisclosure === expectedDiagnosticCount,
+      `Results diagnostic filter ownership did not match the selected source: ${JSON.stringify(resultsFilterLayout)}`);
+    assert(resultsFilterLayout.advanced.controls.filter(
+      control => control.selector === '.results-page__date').length === 2,
+    `Results advanced disclosure did not expose both date filters: ${JSON.stringify(resultsFilterLayout)}`);
     assert(resultsFilterLayout.advanced.controls.some(
-      control => control.selector === '.results-page__diagnostic'),
-    `Results advanced disclosure did not expose the diagnostic filter: ${JSON.stringify(resultsFilterLayout)}`);
+      control => control.selector === '.results-page__diagnostic') === (expectedDiagnosticCount === 1),
+    `Results advanced disclosure exposed the wrong diagnostic filter for its source: ${JSON.stringify(resultsFilterLayout)}`);
     assert(resultsFilterLayout.advanced.restoredExpanded === String(resultsFilterLayout.advanced.wasOpen),
       `Results advanced disclosure did not restore its initial state: ${JSON.stringify(resultsFilterLayout)}`);
   }
