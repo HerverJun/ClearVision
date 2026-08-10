@@ -1,10 +1,12 @@
 export class ProjectContractDecodeError extends Error {
   readonly path: string;
+  readonly expectation: string;
 
   constructor(path: string, expectation: string) {
-    super(`Project response field ${path} must be ${expectation}.`);
+    super('工程服务返回的数据格式不符合要求，请刷新后重试。');
     this.name = 'ProjectContractDecodeError';
     this.path = path;
+    this.expectation = expectation;
   }
 }
 

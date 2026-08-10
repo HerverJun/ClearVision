@@ -82,11 +82,13 @@ describe('mountStudioApp', () => {
     expect(document.querySelector('[data-product-nav="/results"]')).not.toBeNull();
     expect(document.querySelector('[data-product-nav="/settings"]')).not.toBeNull();
     expect(document.querySelector('[data-product-more]')).not.toBeNull();
-    expect(document.querySelector('[data-product-more] [data-product-nav="/overview"]')).not.toBeNull();
-    expect(document.querySelector('[data-product-more] [data-product-nav="/operators"]')).not.toBeNull();
-    expect(document.querySelector('[data-product-more] [data-product-nav="/diagnostics"]')).not.toBeNull();
-    expect(document.querySelector('[data-product-more] [data-product-nav="/about"]')).not.toBeNull();
-    expect(document.querySelector('[data-product-more] [data-product-nav="/stations"]')).toBeNull();
+    document.querySelector<HTMLButtonElement>('[data-product-more] button[aria-haspopup="menu"]')?.click();
+    await nextTick();
+    expect(document.querySelector('[data-product-nav="/overview"]')).not.toBeNull();
+    expect(document.querySelector('[data-product-nav="/operators"]')).not.toBeNull();
+    expect(document.querySelector('[data-product-nav="/diagnostics"]')).not.toBeNull();
+    expect(document.querySelector('[data-product-nav="/about"]')).not.toBeNull();
+    expect(document.querySelector('[data-product-nav="/stations"]')).toBeNull();
 
     mountedApp.unmount();
     mountedApp.unmount();
@@ -113,7 +115,7 @@ describe('mountStudioApp', () => {
     expect(document.querySelector('[data-studio-page="canvas-placeholder"]')).not.toBeNull();
   });
 
-  it('closes top-bar menus mutually, on outside pointer input, and returns focus on Escape', async () => {
+  it('closes lifecycle-owned top-bar menus mutually, on outside pointer input, and returns focus on Escape', async () => {
     document.body.innerHTML = '<div id="app"></div>';
     const router = createTestRouter();
     mountedApp = await mountStudioApp('#app', {
@@ -122,29 +124,25 @@ describe('mountStudioApp', () => {
     });
     await nextTick();
 
-    const appearance = document.querySelector<HTMLDetailsElement>('[data-product-appearance]')!;
-    const more = document.querySelector<HTMLDetailsElement>('[data-product-more]')!;
-    const appearanceTrigger = appearance.querySelector<HTMLElement>('summary')!;
+    const appearanceTrigger = document.querySelector<HTMLButtonElement>('[data-product-appearance] button[aria-haspopup="menu"]')!;
+    const moreTrigger = document.querySelector<HTMLButtonElement>('[data-product-more] button[aria-haspopup="menu"]')!;
 
-    appearance.open = true;
-    appearance.dispatchEvent(new Event('toggle'));
+    appearanceTrigger.click();
     await nextTick();
     expect(appearanceTrigger.getAttribute('aria-expanded')).toBe('true');
 
-    more.open = true;
-    more.dispatchEvent(new Event('toggle'));
+    moreTrigger.click();
     await nextTick();
-    expect(appearance.open).toBe(false);
-    expect(more.open).toBe(true);
+    expect(appearanceTrigger.getAttribute('aria-expanded')).toBe('false');
+    expect(moreTrigger.getAttribute('aria-expanded')).toBe('true');
 
     document.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     await nextTick();
-    expect(more.open).toBe(false);
+    expect(moreTrigger.getAttribute('aria-expanded')).toBe('false');
 
-    appearance.open = true;
-    appearance.dispatchEvent(new Event('toggle'));
+    appearanceTrigger.click();
     await nextTick();
-    const appearanceControl = appearance.querySelector<HTMLElement>('button')!;
+    const appearanceControl = document.querySelector<HTMLElement>('[role="menu"][aria-label="外观设置"] [role="menuitemcheckbox"]')!;
     appearanceControl.focus();
     appearanceControl.dispatchEvent(new KeyboardEvent('keydown', {
       key: 'Escape',
@@ -153,8 +151,8 @@ describe('mountStudioApp', () => {
     }));
     await nextTick();
 
-    expect(appearance.open).toBe(false);
-    expect(document.activeElement).toBe(appearanceTrigger);
+    expect(appearanceTrigger.getAttribute('aria-expanded')).toBe('false');
+    await vi.waitFor(() => expect(document.activeElement).toBe(appearanceTrigger));
   });
 
   it('renders formal diagnostics, about and 404 inside the single product shell', async () => {
@@ -176,7 +174,7 @@ describe('mountStudioApp', () => {
     await router.push('/about');
     await nextTick();
     expect(document.querySelector('[data-studio-page="about"]')).not.toBeNull();
-    expect(document.body.textContent).toContain('当前会话由本地服务认证与授权');
+    expect(document.body.textContent).toContain('账号验证由本地服务统一管理');
 
     await router.push('/missing-page');
     await nextTick();

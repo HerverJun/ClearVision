@@ -1,9 +1,13 @@
 import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { isAbsolute, relative, resolve } from 'node:path';
 import { expect, type Page } from '@playwright/test';
 import {
   auditF02Request,
   fulfillF02Json,
   installF02BrowserStartup,
+  type F02RuntimeErrorAudit,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
 
@@ -22,6 +26,104 @@ export interface F07DeviceAudit {
     readonly previewStopCount: number;
     readonly previewFrameCount: number;
   };
+}
+
+export interface F07VisualEvidenceOptions {
+  readonly scenario: string;
+  readonly viewport: Readonly<{ width: number; height: number }>;
+  readonly theme: 'light' | 'dark';
+  readonly density: 'compact' | 'comfortable';
+  readonly requests: readonly F02MethodAuditEntry[];
+  readonly runtimeErrors: F02RuntimeErrorAudit;
+}
+
+function f07EvidenceRoot(): string | null {
+  const configured = process.env.CV_F07_EVIDENCE_DIR?.trim();
+  if (!configured) return null;
+  const repositoryRoot = resolve(process.cwd(), '..', '..', '..');
+  const allowedRoot = resolve(repositoryRoot, '.tmp', 'studio-ui-next', 'f07');
+  const outputRoot = isAbsolute(configured) ? resolve(configured) : resolve(repositoryRoot, configured);
+  const relativeOutput = relative(allowedRoot, outputRoot);
+  if (relativeOutput.startsWith('..') || isAbsolute(relativeOutput)) {
+    throw new Error('CV_F07_EVIDENCE_DIR must remain under .tmp/studio-ui-next/f07.');
+  }
+  return outputRoot;
+}
+
+function f07CandidateSha(): string {
+  const candidate = process.env.CV_F07_SOURCE_SHA?.trim() ?? '';
+  if (!/^[0-9a-f]{40}$/i.test(candidate)) {
+    throw new Error('CV_F07_SOURCE_SHA must contain the 40-character candidate SHA.');
+  }
+  return candidate.toLowerCase();
+}
+
+function safeEvidenceName(value: string): string {
+  const safe = value.trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '');
+  if (!safe) throw new Error('F07 evidence scenario must contain a safe filename character.');
+  return safe;
+}
+
+export function hasF07EvidenceTarget(): boolean {
+  return Boolean(process.env.CV_F07_EVIDENCE_DIR?.trim());
+}
+
+export async function captureF07Evidence(page: Page, options: F07VisualEvidenceOptions): Promise<void> {
+  const outputRoot = f07EvidenceRoot();
+  if (!outputRoot) throw new Error('CV_F07_EVIDENCE_DIR is required for visual capture.');
+  if (options.runtimeErrors.consoleErrors.length || options.runtimeErrors.pageErrors.length) {
+    throw new Error(`F07 runtime errors detected: ${JSON.stringify(options.runtimeErrors)}.`);
+  }
+  const projection = await page.evaluate(() => ({
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    theme: document.documentElement.dataset.theme ?? null,
+    density: document.documentElement.dataset.density ?? null,
+    dpr: window.devicePixelRatio,
+    horizontalOverflow: Math.max(
+      document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      document.body.scrollWidth - document.body.clientWidth
+    )
+  }));
+  if (projection.viewport.width !== options.viewport.width || projection.viewport.height !== options.viewport.height) {
+    throw new Error(`F07 viewport drifted: ${JSON.stringify(projection.viewport)}.`);
+  }
+  if (projection.theme !== options.theme || projection.density !== options.density) {
+    throw new Error(`F07 preference projection drifted: ${JSON.stringify(projection)}.`);
+  }
+  if (projection.horizontalOverflow > 1) {
+    throw new Error(`F07 scenario has ${projection.horizontalOverflow}px global horizontal overflow.`);
+  }
+  const stem = [safeEvidenceName(options.scenario), `${options.viewport.width}x${options.viewport.height}`, options.theme, options.density].join('-');
+  await mkdir(outputRoot, { recursive: true });
+  const screenshot = await page.screenshot({ animations: 'disabled', fullPage: false });
+  if (screenshot.byteLength < 10_000) throw new Error(`F07 screenshot ${stem} is unexpectedly small.`);
+  const screenshotPath = resolve(outputRoot, `${stem}.png`);
+  await writeFile(screenshotPath, screenshot);
+  await writeFile(resolve(outputRoot, `${stem}.json`), JSON.stringify({
+    schemaVersion: 'f07-visual-evidence.v1',
+    capturedAtUtc: new Date().toISOString(),
+    sourceSha: f07CandidateSha(),
+    DATA_SOURCE: 'BROWSER_FIXTURE',
+    AUTH_SOURCE: 'HARNESS_SEEDED_SESSION',
+    scenario: safeEvidenceName(options.scenario),
+    url: page.url(),
+    viewport: options.viewport,
+    observedViewport: projection.viewport,
+    theme: options.theme,
+    observedTheme: projection.theme,
+    density: options.density,
+    observedDensity: projection.density,
+    dpr: { type: 'BROWSER_EMULATED_DPR', value: projection.dpr, windowsDpi: 'NOT_PERFORMED' },
+    horizontalOverflow: projection.horizontalOverflow,
+    requestMethods: options.requests,
+    consoleErrors: options.runtimeErrors.consoleErrors,
+    pageErrors: options.runtimeErrors.pageErrors,
+    screenshot: {
+      fileName: `${stem}.png`,
+      sha256: createHash('sha256').update(screenshot).digest('hex').toUpperCase(),
+      bytes: screenshot.byteLength
+    }
+  }, null, 2), 'utf8');
 }
 
 function fullSettingsPayload(): Record<string, unknown> {
@@ -43,7 +145,7 @@ function plcProfile(port: number, ipAddress = '127.0.0.1'): Record<string, unkno
   return {
     ipAddress,
     port,
-    mappings: [{ name: 'Ready', address: 'M0', dataType: 'Bool', description: 'Fixture', canWrite: false }],
+    mappings: [{ name: 'Ready', address: 'M0', dataType: 'Bool', description: '测试映射', canWrite: false }],
     cpuType: 'S7-1200',
     rack: 0,
     slot: 1
@@ -63,7 +165,7 @@ function plcSettings(): Record<string, unknown> {
 function tcpProfile(): Record<string, unknown> {
   return {
     id: 'tcp-fixture',
-    name: 'Fixture Loopback',
+    name: '测试回环连接',
     enabled: true,
     mode: 'Client',
     remoteHost: '127.0.0.1',
@@ -78,14 +180,14 @@ function tcpProfile(): Record<string, unknown> {
     keepAlive: false,
     reconnect: true,
     connectOnStartup: false,
-    description: 'Deterministic TCP fixture'
+    description: '用于界面验证的确定性 TCP 测试连接'
   };
 }
 
 function cameraBinding(active = true): Record<string, unknown> {
   return {
     id: 'cam-fixture',
-    displayName: 'Fixture Camera',
+    displayName: '测试相机',
     deviceId: 'fixture-camera-1',
     serialNumber: 'fixture-camera-1',
     ipAddress: '192.168.0.10',
@@ -115,13 +217,14 @@ function cameraBinding(active = true): Record<string, unknown> {
 }
 
 function discoveryDevice(manufacturer: string, cameraId: string): Record<string, unknown> {
+  const displayName = `${manufacturer} 测试相机`;
   return {
     cameraId,
-    name: `${manufacturer} Fixture`,
+    name: displayName,
     serialNumber: `${cameraId}-serial`,
     manufacturer,
     model: `${manufacturer}-Mock-1`,
-    userDefinedName: `${manufacturer} Fixture`,
+    userDefinedName: displayName,
     ipAddress: '192.168.0.10',
     connectionType: 'GigE',
     interfaceType: 'GigE',
@@ -281,7 +384,10 @@ export async function installF07DeviceFixture(page: Page, role: 'Admin' | 'Engin
       return;
     }
     if (url.pathname === '/api/cameras/discover/hikvision') {
-      await fulfillF07Json(route, 200, [discoveryDevice('Hikvision', 'hikvision-1')]);
+      await fulfillF07Json(route, 200, {
+        devices: [discoveryDevice('Hikvision', 'hikvision-1')],
+        diagnostics: { provider: 'hikvision', fixture: true }
+      });
       return;
     }
     if (url.pathname === '/api/cameras/bindings') {

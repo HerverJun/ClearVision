@@ -88,7 +88,8 @@ const isDisabled = computed(() => props.disabled || props.loading);
     box-shadow var(--cv-motion-duration-fast) var(--cv-motion-ease-standard);
 }
 
-.cv-button:disabled { cursor: not-allowed; opacity: 0.48; }
+.cv-button:focus-visible { outline: none; box-shadow: var(--cv-focus-ring); }
+.cv-button:disabled { cursor: not-allowed; opacity: 0.52; }
 .cv-button--sm { height: var(--cv-density-control-height-sm); padding-inline: var(--cv-space-3); }
 .cv-button--block { width: 100%; }
 
@@ -119,13 +120,17 @@ const isDisabled = computed(() => props.disabled || props.loading);
 .cv-button--quiet:hover:not(:disabled) { background: var(--cv-interactive-hover); color: var(--cv-color-link); }
 .cv-button--quiet:active:not(:disabled) { background: var(--cv-interactive-active); }
 
-.cv-button--danger {
+.cv-button--danger,
+.cv-button--destructive {
   border-color: var(--cv-color-destructive-border);
   background: var(--cv-color-destructive-soft);
   color: var(--cv-color-destructive-strong);
 }
 
-.cv-button--danger:hover:not(:disabled) { border-color: var(--cv-color-destructive); background: color-mix(in srgb, var(--cv-color-destructive-soft) 78%, var(--cv-color-destructive) 22%); }
+.cv-button--danger:hover:not(:disabled),
+.cv-button--destructive:hover:not(:disabled) { border-color: var(--cv-color-destructive); background: color-mix(in srgb, var(--cv-color-destructive-soft) 78%, var(--cv-color-destructive) 22%); }
+.cv-button--danger:active:not(:disabled),
+.cv-button--destructive:active:not(:disabled) { background: color-mix(in srgb, var(--cv-color-destructive-soft) 62%, var(--cv-color-destructive) 38%); }
 
 .cv-button__spinner {
   width: 14px;
@@ -133,7 +138,7 @@ const isDisabled = computed(() => props.disabled || props.loading);
   border: 2px solid currentColor;
   border-right-color: transparent;
   border-radius: 50%;
-  animation: cv-button-spin var(--cv-motion-duration-slow) linear infinite;
+  animation: cv-button-spin var(--cv-motion-duration-progress) linear infinite;
 }
 
 .cv-button__icon { display: inline-flex; }

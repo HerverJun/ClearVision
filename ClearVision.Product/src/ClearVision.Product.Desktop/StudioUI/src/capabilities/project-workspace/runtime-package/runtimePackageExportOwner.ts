@@ -150,7 +150,7 @@ export function createRuntimePackageExportOwner(options: {
       state.phase = 'exporting';
       state.requestedRevision = options.persistenceOwner.projection.persistenceRevision;
       state.requestedAtUtc = new Date().toISOString();
-      state.message = `正在由服务端导出 revision ${state.requestedRevision} 的运行包。`;
+      state.message = `正在由服务端导出保存修订 ${state.requestedRevision} 的运行包。`;
       syncAvailable();
       syncDiagnostics();
       try {
@@ -172,7 +172,7 @@ export function createRuntimePackageExportOwner(options: {
           state.message = '导出运行包需要管理员权限。';
         } else if (error instanceof ApiNetworkError) {
           state.phase = 'unknown-outcome';
-          state.message = '导出响应未知，禁止自动重试；请按工程、revision 与请求时间核对已注册运行包。';
+          state.message = '导出响应未知，禁止自动重试；请按工程、保存修订与请求时间核对已注册运行包。';
         } else {
           state.phase = 'error';
           state.message = `运行包导出失败：${error instanceof Error ? error.message : '服务端校验未通过。'}`;

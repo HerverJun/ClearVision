@@ -697,10 +697,12 @@ export interface AiCameraBindingOptionV1 {
 
 export class AiContractDecodeError extends Error {
   readonly path: string;
+  readonly expected: string;
 
   constructor(path: string, expected: string) {
-    super(`${path} must be ${expected}.`);
+    super('AI 服务返回的数据格式不符合要求，请刷新后重试。');
     this.name = 'AiContractDecodeError';
     this.path = path;
+    this.expected = expected;
   }
 }

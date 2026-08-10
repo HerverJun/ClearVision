@@ -56,13 +56,16 @@ const waitResponse = shallowRef(true);
 const responseTimeoutMs = shallowRef('5000');
 const lastResponse = shallowRef<string | null>(null);
 
-const modeOptions = Object.freeze(TCP_MODES.map(value => ({ value, label: value === 'Client' ? 'Client 客户端' : 'Server 服务端' })));
+const modeOptions = Object.freeze(TCP_MODES.map(value => ({ value, label: value === 'Client' ? '客户端' : '服务端' })));
 const encodingOptions = Object.freeze(TCP_ENCODINGS.map(value => ({ value, label: value })));
 const frameModeOptions = Object.freeze(TCP_FRAME_MODES.map(value => ({
   value,
-  label: value === 'FixedLength' ? 'FixedLength 定长' : value === 'Line' ? 'Line 行' : value === 'Hex' ? 'Hex' : 'Raw 原始'
+  label: value === 'FixedLength' ? '定长报文' : value === 'Line' ? '按行分隔' : value === 'Hex' ? '十六进制' : '原始字节流'
 })));
-const lineEndingOptions = Object.freeze(TCP_LINE_ENDINGS.map(value => ({ value, label: value })));
+const lineEndingOptions = Object.freeze(TCP_LINE_ENDINGS.map(value => ({
+  value,
+  label: value === 'None' ? '无' : value
+})));
 const sendModeOptions = Object.freeze([
   { value: 'text', label: '文本' },
   { value: 'hex', label: 'HEX' }
@@ -187,8 +190,8 @@ function validateProfile(value: TcpDraft | null): string[] {
   const port = value.mode === 'Client' ? Number(value.remotePort) : Number(value.localPort);
   if (!isValidHost(host)) errors.push(value.mode === 'Client' ? '远端 IP 必须是有效 IP 地址。' : '本地监听 IP 必须是有效 IP 地址。');
   if (!Number.isInteger(port) || port < 1 || port > 65535) errors.push(value.mode === 'Client' ? '远端端口必须在 1-65535 之间。' : '本地监听端口必须在 1-65535 之间。');
-  if (!Number.isInteger(Number(value.timeoutMs)) || Number(value.timeoutMs) < 100 || Number(value.timeoutMs) > 600000) errors.push('超时时间必须在 100-600000 ms 之间。');
-  if (value.frameMode === 'FixedLength' && (!Number.isInteger(Number(value.fixedLength)) || Number(value.fixedLength) <= 0)) errors.push('FixedLength 报文模式需要配置正整数长度。');
+  if (!Number.isInteger(Number(value.timeoutMs)) || Number(value.timeoutMs) < 100 || Number(value.timeoutMs) > 600000) errors.push('超时时间必须在 100-600000 毫秒之间。');
+  if (value.frameMode === 'FixedLength' && (!Number.isInteger(Number(value.fixedLength)) || Number(value.fixedLength) <= 0)) errors.push('定长报文需要配置正整数长度。');
   return errors;
 }
 
@@ -228,7 +231,7 @@ function applyRuntimeResponse(
   }
   validationIssues.value = result.value.errors ?? Object.freeze([]);
   if (!result.value.success) {
-    showFeedback('warning', title, result.value.message || '服务端未完成该操作。');
+    showFeedback('warning', title, result.value.message || '通信服务未完成该操作。');
     return false;
   }
   showFeedback('success', title, result.value.message || '操作已完成。');
@@ -310,7 +313,7 @@ async function runtimeAction(action: 'connect' | 'disconnect' | 'start-server' |
         ? props.owner.disconnectTcp
         : action === 'start-server' ? props.owner.startTcpServer : props.owner.stopTcpServer;
     const result = await ownerAction.call(props.owner, selectedDraft.value.id);
-    if (applyRuntimeResponse(result, action === 'connect' ? 'TCP 客户端连接' : action === 'disconnect' ? 'TCP 客户端断开' : action === 'start-server' ? 'TCP Server 启动' : 'TCP Server 停止')) {
+    if (applyRuntimeResponse(result, action === 'connect' ? 'TCP 客户端连接' : action === 'disconnect' ? 'TCP 客户端断开' : action === 'start-server' ? 'TCP 服务端启动' : 'TCP 服务端停止')) {
       await props.owner.readTcpFrames(selectedDraft.value.id);
     }
   } finally {
@@ -373,6 +376,18 @@ function frameTime(value: string): string {
   return Number.isNaN(date.valueOf()) ? value : date.toLocaleTimeString();
 }
 
+function isReceivedFrame(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'in' || normalized.includes('receive') || normalized.includes('inbound');
+}
+
+function frameDirectionLabel(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (isReceivedFrame(value)) return '接收';
+  if (normalized === 'out' || normalized.includes('send') || normalized.includes('outbound')) return '发送';
+  return value || '未知';
+}
+
 watch(() => props.owner.projection.device.tcpProfiles, value => {
   if (!dirty.value) copyProfiles(value);
 });
@@ -392,7 +407,7 @@ onBeforeUnmount(() => detachPanelState());
   >
     <CvPanel
       title="TCP 连接工作台"
-      description="连接配置保存与客户端/服务端运行操作分离；状态和收发日志只来自运行时接口。"
+      description="连接配置与运行控制分开处理；保存配置不会连接远端或启动本地监听。"
     >
       <template #actions>
         <CvStatusBadge
@@ -447,7 +462,7 @@ onBeforeUnmount(() => detachPanelState());
             />
             <CvField
               v-model="selectedDraft.id"
-              label="配置标识"
+              label="配置 ID"
               name="tcpProfileId"
               :readonly="true"
               required
@@ -548,7 +563,7 @@ onBeforeUnmount(() => detachPanelState());
               v-model="selectedDraft.connectOnStartup"
               type="checkbox"
               :disabled="!canWrite"
-            ><span>启动时连接（由运行时读取）</span></label>
+            ><span>应用启动时连接</span></label>
             <CvField
               v-model="selectedDraft.description"
               label="说明"
@@ -565,11 +580,11 @@ onBeforeUnmount(() => detachPanelState());
             {{ localErrors.join(' ') }}
           </CvInlineAlert>
           <div class="settings-panel__footer">
-            <span class="settings-panel__dirty">{{ dirty ? '有连接配置草稿修改' : '连接配置与服务端一致' }}</span>
+            <span class="settings-panel__dirty">{{ dirty ? '有未保存修改' : '连接配置已保存' }}</span>
             <div class="settings-panel__actions">
               <CvButton
                 v-if="canWrite"
-                variant="danger"
+                variant="quiet"
                 size="sm"
                 :disabled="isBusy"
                 @click="removeSelectedProfile"
@@ -579,7 +594,7 @@ onBeforeUnmount(() => detachPanelState());
                     name="trash"
                     size="sm"
                   />
-                </template>删除本地配置
+                </template>移除配置
               </CvButton>
               <CvButton
                 v-if="canWrite"
@@ -614,7 +629,7 @@ onBeforeUnmount(() => detachPanelState());
       class="settings-subsection"
     >
       <header class="settings-subsection__header">
-        <div><h3>运行控制与收发调试</h3><p>运行状态由后端实时提供；发送不会修改连接配置。</p></div>
+        <div><h3>运行控制与收发调试</h3><p>运行状态由通信服务实时提供；发送报文不会修改连接配置。</p></div>
         <CvButton
           variant="quiet"
           size="sm"
@@ -627,7 +642,7 @@ onBeforeUnmount(() => detachPanelState());
               name="refresh"
               size="sm"
             />
-          </template>刷新运行态
+          </template>刷新运行状态
         </CvButton>
       </header>
       <div class="tcp-runtime-summary">
@@ -691,7 +706,7 @@ onBeforeUnmount(() => detachPanelState());
               name="play"
               size="sm"
             />
-          </template>启动 Server
+          </template>启动监听
         </CvButton>
         <CvButton
           v-if="selectedDraft.mode === 'Server'"
@@ -707,7 +722,7 @@ onBeforeUnmount(() => detachPanelState());
               name="square"
               size="sm"
             />
-          </template>停止 Server
+          </template>停止监听
         </CvButton>
       </div>
       <div class="tcp-send-form">
@@ -762,7 +777,7 @@ onBeforeUnmount(() => detachPanelState());
         <code>{{ lastResponse || '未返回响应' }}</code>
       </div>
       <div class="tcp-frame-header">
-        <div><strong>有界收发日志</strong><small>仅显示后端运行时返回的最近 {{ selectedFrames.length }} 条记录</small></div><CvButton
+        <div><strong>最近收发记录</strong><small>通信服务返回 {{ selectedFrames.length }} 条记录</small></div><CvButton
           variant="quiet"
           size="sm"
           :disabled="!canOperate || isBusy || !selectedProfileSaved"
@@ -787,8 +802,8 @@ onBeforeUnmount(() => detachPanelState());
             >
               <td>{{ frameTime(frame.timestampUtc) }}</td><td>
                 <CvStatusBadge
-                  :tone="frame.direction.toLowerCase().includes('receive') || frame.direction.toLowerCase().includes('in') ? 'info' : 'ok'"
-                  :label="frame.direction"
+                  :tone="isReceivedFrame(frame.direction) ? 'info' : 'ok'"
+                  :label="frameDirectionLabel(frame.direction)"
                 />
               </td><td>{{ frame.byteCount }}</td><td class="break-cell">
                 {{ frame.text || '—' }}
@@ -800,7 +815,7 @@ onBeforeUnmount(() => detachPanelState());
                 colspan="6"
                 class="mapping-table__empty"
               >
-                暂无运行时帧。
+                暂无收发记录。
               </td>
             </tr>
           </tbody>

@@ -5,6 +5,7 @@ import { CvModal } from '@/design-system/primitives';
 
 afterEach(() => {
   document.body.innerHTML = '';
+  document.body.removeAttribute('style');
 });
 
 describe('CvModal', () => {
@@ -24,6 +25,7 @@ describe('CvModal', () => {
     });
 
     await nextTick();
+    expect(document.body.style.overflow).toBe('hidden');
     const first = document.querySelector<HTMLElement>('#first');
     const last = document.querySelector<HTMLElement>('#last');
     const close = document.querySelector<HTMLElement>('[aria-label="关闭对话框"]');
@@ -42,6 +44,7 @@ describe('CvModal', () => {
 
     await wrapper.setProps({ open: false });
     await nextTick();
+    expect(document.body.style.overflow).toBe('');
     expect(document.activeElement).toBe(trigger);
     wrapper.unmount();
   });

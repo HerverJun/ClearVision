@@ -58,8 +58,7 @@ describe('F02 architecture guards', () => {
       .map(path => relative(studioRoot, path).replaceAll('\\', '/'));
     expect(formalMainFiles).toEqual(expect.arrayContaining([
       'src/app/layouts/ProductLayout.vue',
-      'src/app/pages/auth/AuthShell.vue',
-      'src/app/pages/ForbiddenPage.vue'
+      'src/app/pages/auth/AuthShell.vue'
     ]));
     expect(existsSync(join(sourceRoot, 'design-system/tokens/tokens.css'))).toBe(true);
     expect(files.filter(path => /data-product-shell="ready"/.test(read(path))))

@@ -74,11 +74,13 @@ export interface CalibrationAssetSaveResponse {
 
 export class CalibrationContractDecodeError extends Error {
   readonly path: string;
+  readonly detail: string;
 
-  constructor(path: string, message: string) {
-    super(`${path}: ${message}`);
+  constructor(path: string, detail: string) {
+    super('标定服务返回的数据格式不符合要求，请刷新后重试。');
     this.name = 'CalibrationContractDecodeError';
     this.path = path;
+    this.detail = detail;
   }
 }
 

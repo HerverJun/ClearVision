@@ -171,8 +171,8 @@ function stageStatusLabel(status: PublicStage['status']): string {
           <dd>{{ state.session?.snapshot.revision ?? '未建立' }}</dd>
         </div>
         <div>
-          <dt>工程基线</dt>
-          <dd>{{ state.projectBaseline?.targetKind === 'existing' ? `已绑定 · 保存版本 ${state.projectBaseline.persistenceRevision}` : '新工程空基线' }}</dd>
+          <dt>工程保存基线</dt>
+          <dd>{{ state.projectBaseline?.targetKind === 'existing' ? `已绑定 · 保存修订 ${state.projectBaseline.persistenceRevision}` : '新工程尚无工程保存基线' }}</dd>
         </div>
         <div>
           <dt>方案</dt>
@@ -183,7 +183,7 @@ function stageStatusLabel(status: PublicStage['status']): string {
           <dd>{{ state.build ? `${state.build.operatorCount} 个算子 · ${state.build.connectionCount} 条连接` : state.run.kind === 'build' ? '正在构建' : '尚未构建' }}</dd>
         </div>
         <div>
-          <dt>交接工件</dt>
+          <dt>交接候选</dt>
           <dd>{{ state.handoff ? `已创建 · ${state.handoff.status === 'available' ? '待工作区接收' : state.handoff.status}` : '尚未创建' }}</dd>
         </div>
       </dl>

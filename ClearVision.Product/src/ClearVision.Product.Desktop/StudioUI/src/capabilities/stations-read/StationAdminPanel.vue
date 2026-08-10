@@ -59,8 +59,8 @@ watch(() => props.detailsState.data, details => {
 
 const commandOptions: readonly CvSelectOption[] = Object.freeze([
   { value: 'Ping', label: '连通性检查' },
-  { value: 'StartRuntime', label: '启动 Runtime' },
-  { value: 'StopRuntime', label: '停止 Runtime' },
+  { value: 'StartRuntime', label: '启动运行服务' },
+  { value: 'StopRuntime', label: '停止运行服务' },
   { value: 'ReloadPackage', label: '重新加载运行包' },
   { value: 'ApplySiteProfile', label: '应用现场配置' },
   { value: 'CollectLogs', label: '采集日志' }
@@ -96,6 +96,12 @@ const deployment = computed(() => projectStationDeployment({
   pendingPackageId: selectedCommand.packageId
 }));
 const identityPackage = computed(() => deployment.value.expectedIdentity ?? selectedPackage.value);
+const versionRequirement = computed(() => {
+  const details = props.detailsState.data;
+  const target = deployment.value.expectedPackage ?? selectedPackage.value;
+  if (!details || !target) return null;
+  return `工作站版本 ${details.clientVersion || '未上报'} · 运行包最低要求 ${target.minStationVersion || '未声明'}`;
+});
 const busy = computed(() => ['pending', 'reconciling'].includes(props.owner.projection.phase));
 const commandInFlight = computed(() => projectedCommands.value.some(command =>
   !['Succeeded', 'Failed', 'TimedOut', 'Cancelled', 'Rejected'].includes(command.status)
@@ -110,6 +116,7 @@ const operationTone = computed(() => {
   if (phase === 'failed') return 'error';
   return 'info';
 });
+const commandVariant = computed(() => selectedCommand.type === 'StopRuntime' ? 'danger' : 'primary');
 
 const commandColumns: readonly CvDataTableColumn<StationCommand>[] = Object.freeze([
   { key: 'createdAtUtc', label: '创建时间', width: '19%' },
@@ -134,6 +141,7 @@ const auditColumns: readonly CvDataTableColumn<StationAudit>[] = Object.freeze([
 ]);
 
 function commandLabel(type: StationCommandType): string {
+  if (type === 'DeployPackage') return '部署运行包';
   return commandOptions.find(item => item.value === type)?.label ?? type;
 }
 
@@ -151,6 +159,29 @@ function commandStatusLabel(status: StationCommand['status']): string {
     Succeeded: '成功', Failed: '失败', TimedOut: '已过期', Cancelled: '已取消'
   };
   return labels[status];
+}
+
+function logLevelLabel(level: string): string {
+  const labels: Readonly<Record<string, string>> = {
+    TRACE: '追踪', DEBUG: '调试', INFO: '信息', WARN: '警告', WARNING: '警告', ERROR: '错误', FATAL: '严重错误'
+  };
+  return labels[level.toUpperCase()] ?? level;
+}
+
+function auditActionLabel(action: string): string {
+  return ({
+    StationCommandCreated: '已创建工作站命令',
+    StationIdentityUpdated: '已修订工作站身份',
+    StationPackageDeployed: '已创建运行包部署'
+  } as Readonly<Record<string, string>>)[action] ?? action;
+}
+
+function auditResultLabel(result: string | null): string {
+  if (!result) return '未记录';
+  return ({
+    Created: '已创建', Delivered: '已送达', Accepted: '已接受', Rejected: '已拒绝', Running: '执行中',
+    Succeeded: '成功', Failed: '失败', TimedOut: '已过期', Cancelled: '已取消'
+  } as Readonly<Record<string, string>>)[result] ?? result;
 }
 
 async function issueCommand(): Promise<void> {
@@ -196,7 +227,7 @@ async function recover(): Promise<void> {
       :title="owner.projection.phase === 'unknown-outcome' ? '操作结果未知' : owner.projection.phase === 'reconciling' ? '正在核对操作结果' : owner.projection.phase === 'conflict' ? '操作冲突' : undefined"
     >
       {{ owner.projection.message }}
-      <span v-if="owner.projection.errorCode">（{{ owner.projection.errorCode }}）</span>
+      <code v-if="owner.projection.errorCode">{{ owner.projection.errorCode }}</code>
       <template
         v-if="owner.projection.canRecover"
         #actions
@@ -215,7 +246,7 @@ async function recover(): Promise<void> {
     <div class="station-admin__control-grid">
       <CvPanel
         title="运行控制"
-        description="命令只通过现有工作站管理 HTTP 合同创建；创建成功不代表执行成功。"
+        description="创建工作站命令并跟踪后端执行状态；命令已创建不代表现场执行成功。"
       >
         <div class="station-admin__command-row">
           <CvSelect
@@ -226,13 +257,13 @@ async function recover(): Promise<void> {
             :disabled="submissionLocked"
           />
           <CvButton
-            variant="primary"
+            :variant="commandVariant"
             :loading="busy && owner.projection.operation === 'command'"
             :disabled="submissionLocked"
             data-testid="station-issue-command"
             @click="issueCommand"
           >
-            下发命令
+            创建命令
           </CvButton>
         </div>
         <div class="station-admin__command-row">
@@ -249,7 +280,7 @@ async function recover(): Promise<void> {
             data-testid="station-deploy-package"
             @click="deployPackage"
           >
-            下发运行包
+            创建部署命令
           </CvButton>
         </div>
         <section
@@ -267,6 +298,12 @@ async function recover(): Promise<void> {
             </CvStatusBadge>
           </div>
           <p>{{ deployment.message }}</p>
+          <p
+            v-if="versionRequirement"
+            class="station-admin__version-requirement"
+          >
+            {{ versionRequirement }}。兼容性仍由后端在创建部署命令时校验。
+          </p>
           <dl
             v-if="identityPackage"
             class="station-admin__identity-grid"
@@ -290,7 +327,7 @@ async function recover(): Promise<void> {
 
       <CvPanel
         title="身份修订"
-        description="修订工作站业务身份；连接与运行状态仍由后端权威维护。"
+        description="修订工作站业务身份；连接与运行状态仍由服务端维护。"
       >
         <CvPageState
           v-if="detailsState.phase === 'loading' && !detailsState.data"
@@ -392,7 +429,7 @@ async function recover(): Promise<void> {
               :disabled="submissionLocked"
               data-testid="station-save-identity"
             >
-              保存身份修订
+              保存工作站身份
             </CvButton>
           </div>
         </form>
@@ -475,7 +512,7 @@ async function recover(): Promise<void> {
           </template>
           <template #cell-level="{ row }">
             <CvStatusBadge :tone="row.level === 'ERROR' || row.level === 'FATAL' ? 'error' : 'warning'">
-              {{ row.level || '—' }}
+              {{ logLevelLabel(row.level) || '—' }}
             </CvStatusBadge>
           </template>
         </CvDataTable>
@@ -512,8 +549,11 @@ async function recover(): Promise<void> {
           <template #cell-userName="{ row }">
             {{ row.userName || '系统' }}
           </template>
+          <template #cell-action="{ row }">
+            {{ auditActionLabel(row.action) }}
+          </template>
           <template #cell-result="{ row }">
-            {{ row.result || '—' }}
+            {{ auditResultLabel(row.result) }}
           </template>
           <template #cell-payloadSummary="{ row }">
             <span class="station-admin__wrap">{{ row.payloadSummary || '—' }}</span>
@@ -531,6 +571,7 @@ async function recover(): Promise<void> {
 
 <style scoped>
 .station-admin { display: grid; min-width: 0; gap: var(--cv-density-page-gap); }
+.station-admin > :deep(.cv-inline-alert) code { margin-left: var(--cv-space-1); color: inherit; font-size: var(--cv-font-size-xs); }
 .station-admin__control-grid,
 .station-admin__records-grid { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-density-page-gap); align-items: start; }
 .station-admin__command-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--cv-space-3); align-items: end; }
@@ -539,6 +580,7 @@ async function recover(): Promise<void> {
 .station-admin__deployment-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
 .station-admin__deployment-heading h3 { margin: 0; font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); letter-spacing: 0; }
 .station-admin__deployment p { margin: var(--cv-space-2) 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }
+.station-admin__deployment .station-admin__version-requirement { font-size: var(--cv-font-size-xs); }
 .station-admin__identity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-2) var(--cv-space-4); margin: var(--cv-space-3) 0 0; }
 .station-admin__identity-grid div { min-width: 0; }
 .station-admin__identity-grid dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }

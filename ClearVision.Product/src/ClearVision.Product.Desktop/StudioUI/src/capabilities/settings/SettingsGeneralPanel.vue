@@ -82,8 +82,8 @@ onBeforeUnmount(() => detachPanelState());
 
 <template>
   <CvPanel
-    title="常规"
-    description="产品标题与产品主题由应用配置管理；Studio 外观偏好保持独立。"
+    title="常规设置"
+    description="设置软件标题和默认主题。顶栏中的个人外观偏好不会被此处覆盖。"
     data-settings-section="general"
   >
     <div class="settings-form-grid">
@@ -92,7 +92,7 @@ onBeforeUnmount(() => detachPanelState());
         label="软件标题"
         name="softwareTitle"
         :readonly="!canWrite"
-        hint="这是产品配置标题，不会改变 Studio 外观偏好。"
+        hint="显示在软件窗口和产品标识附近。"
       />
       <CvSelect
         v-model="draft.theme"
@@ -100,14 +100,14 @@ onBeforeUnmount(() => detachPanelState());
         name="productTheme"
         :options="themeOptions"
         :disabled="!canWrite"
-        hint="只写入应用常规配置中的主题设置。"
+        hint="作为未设置个人外观偏好时的默认主题。"
       />
       <CvField
         :model-value="draft.autoStart === null ? '未返回' : draft.autoStart ? '已启用' : '未启用'"
-        label="历史自动启动"
+        label="自动启动（兼容字段）"
         readonly
         disabled
-        hint="该历史字段当前不作为可用能力，也不会被保存请求回写。"
+        hint="当前版本不使用此项，保持只读。"
       />
     </div>
 
@@ -115,14 +115,14 @@ onBeforeUnmount(() => detachPanelState());
       v-if="!canWrite"
       class="settings-panel__notice"
       tone="info"
-      title="当前为安全视图"
+      title="当前账户为只读"
     >
-      当前角色可以核对已返回字段，但不能修改应用配置。
+      你可以查看当前设置；修改需要管理员权限。
     </CvInlineAlert>
 
     <template #footer>
       <div class="settings-panel__footer">
-        <span class="settings-panel__dirty">{{ dirty ? '有未保存修改' : '与服务端配置一致' }}</span>
+        <span class="settings-panel__dirty">{{ dirty ? '有未保存修改' : '当前分组已保存' }}</span>
         <div class="settings-panel__actions">
           <CvButton
             v-if="canWrite"

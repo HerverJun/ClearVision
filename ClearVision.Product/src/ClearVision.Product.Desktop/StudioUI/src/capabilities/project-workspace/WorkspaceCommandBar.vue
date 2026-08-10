@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router';
-import { CvButton, CvStatusBadge, type CvStatusTone } from '@/design-system';
+import { CvButton, CvIconButton, CvStatusBadge, type CvStatusTone } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 
 defineProps<{
@@ -104,7 +104,7 @@ const emit = defineEmits<{
           v-if="showSave"
           data-testid="workspace-save"
           size="sm"
-          variant="secondary"
+          variant="primary"
           :disabled="!canSave"
           @click="emit('requestSave')"
         >
@@ -122,63 +122,67 @@ const emit = defineEmits<{
         aria-hidden="true"
       />
       <div class="workspace-shell__command-group workspace-shell__command-group--tools">
-        <CvButton
+        <CvIconButton
           data-capability="global-variables"
           data-testid="global-variables"
           size="sm"
-          variant="quiet"
+          label="全局变量"
           :disabled="!canOpenVariables"
           title="管理本工程的变量定义与绑定"
           @click="emit('openVariables')"
         >
-          <template #leading>
-            <CvIcon
-              name="variables"
-              size="sm"
-            />
-          </template>
-          全局变量
-        </CvButton>
-        <CvButton
+          <CvIcon
+            name="variables"
+            size="sm"
+          />
+        </CvIconButton>
+        <CvIconButton
           v-if="showRuntimePackage"
           data-testid="runtime-package-export"
           size="sm"
-          variant="quiet"
+          label="运行包"
           :disabled="!canOpenRuntimePackage"
           title="从已正式保存的工程导出运行包"
           @click="emit('openRuntimePackage')"
         >
-          运行包
-        </CvButton>
-        <CvButton
+          <CvIcon
+            name="projects"
+            size="sm"
+          />
+        </CvIconButton>
+        <CvIconButton
           data-testid="workspace-templates"
           size="sm"
-          variant="quiet"
+          label="流程模板"
           :disabled="!canOpenTemplates"
           title="搜索、应用和维护流程模板"
           @click="emit('openTemplates')"
         >
-          <template #leading>
-            <CvIcon
-              name="copy"
-              size="sm"
-            />
-          </template>
-          模板
-        </CvButton>
+          <CvIcon
+            name="copy"
+            size="sm"
+          />
+        </CvIconButton>
         <RouterLink
           v-if="showResults"
           class="workspace-shell__results-link"
           :to="resultsLink"
           data-testid="workspace-results"
+          aria-label="本次结果"
+          title="查看本工程的检测结果"
         >
-          本次结果
+          <CvIcon
+            name="results"
+            size="sm"
+          />
+          <span>结果</span>
         </RouterLink>
       </div>
       <CvButton
         v-if="canRetrySave"
         data-testid="workspace-save-retry"
         size="sm"
+        variant="primary"
         @click="emit('retrySave')"
       >
         重试
@@ -187,6 +191,7 @@ const emit = defineEmits<{
         v-if="canReconcileSave"
         data-testid="workspace-save-reconcile"
         size="sm"
+        variant="secondary"
         @click="emit('reconcileSave')"
       >
         核对保存结果
@@ -195,6 +200,7 @@ const emit = defineEmits<{
         v-if="canReapplyConflict"
         data-testid="workspace-conflict-reapply"
         size="sm"
+        variant="secondary"
         @click="emit('reapplyConflict')"
       >
         重新应用本地草稿
@@ -203,6 +209,7 @@ const emit = defineEmits<{
         v-if="canDiscardConflict"
         data-testid="workspace-conflict-discard"
         size="sm"
+        variant="destructive"
         @click="emit('discardConflict')"
       >
         放弃本地草稿
@@ -216,7 +223,7 @@ const emit = defineEmits<{
   min-width: 0;
   min-height: var(--cv-workspace-toolbar-height, 44px);
   display: grid;
-  grid-template-columns: minmax(260px, auto) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 1fr) auto;
   align-items: center;
   gap: var(--cv-space-2);
   padding: 4px 10px;
@@ -231,9 +238,7 @@ const emit = defineEmits<{
   gap: var(--cv-space-1);
 }
 .workspace-shell__commands :deep(.cv-button) { flex: 0 0 auto; }
-.workspace-shell__commands :deep(.cv-button:not(.cv-button--primary)) { background: var(--cv-surface-raised); }
-.workspace-shell__commands :deep(.cv-button--primary) { background: var(--cv-color-industrial-blue); border-color: var(--cv-color-industrial-blue); }
-.workspace-shell__commands :deep(.cv-button--primary:hover:not(:disabled)) { background: var(--cv-color-industrial-blue-hover); border-color: var(--cv-color-industrial-blue-hover); }
+.workspace-shell__commands :deep(.cv-icon-button) { flex: 0 0 auto; }
 .workspace-shell__identity > div { min-width: 0; }
 .workspace-shell__identity strong,
 .workspace-shell__identity small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -249,12 +254,13 @@ const emit = defineEmits<{
   overflow-x: auto;
   scrollbar-width: none;
 }
-.workspace-shell__command-group { display: flex; align-items: center; gap: 3px; }
+.workspace-shell__command-group { display: flex; align-items: center; gap: 2px; }
 .workspace-shell__command-divider { width: 1px; height: 24px; flex: 0 0 auto; background: var(--cv-border-subtle); }
 .workspace-shell__commands::-webkit-scrollbar { display: none; }
 .workspace-shell__results-link {
   display: inline-flex;
   align-items: center;
+  gap: var(--cv-space-1);
   height: var(--cv-density-control-height-sm);
   padding: 0 var(--cv-space-2);
   border: 1px solid transparent;
@@ -271,7 +277,7 @@ const emit = defineEmits<{
 .workspace-shell__divider { width: 1px; height: 18px; background: var(--cv-border-subtle); }
 
 @media (max-width: 1420px) {
-  .workspace-shell__toolbar { grid-template-columns: minmax(210px, auto) minmax(0, 1fr); }
+  .workspace-shell__toolbar { grid-template-columns: minmax(220px, 1fr) auto; }
   .workspace-shell__back-nav .workspace-shell__back:first-child,
   .workspace-shell__project small,
   .workspace-shell__save-state { display: none; }

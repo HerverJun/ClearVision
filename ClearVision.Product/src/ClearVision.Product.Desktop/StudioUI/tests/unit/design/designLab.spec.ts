@@ -47,7 +47,7 @@ describe('Design Foundation Lab', () => {
     expect(document.documentElement.dataset.reducedMotion).toBe('prior-motion');
   });
 
-  it('renders all fifteen representative primitive families', async () => {
+  it('renders all eighteen representative primitive families', async () => {
     const wrapper = mount(DesignLab, {
       global: {
         stubs: {
@@ -57,6 +57,7 @@ describe('Design Foundation Lab', () => {
       }
     });
     await wrapper.get('[data-modal-trigger]').trigger('click');
+    await wrapper.get('[aria-label="打开样本操作菜单"]').trigger('click');
     const names = new Set(
       wrapper.findAll('[data-design-primitive]').map(node => node.attributes('data-design-primitive'))
     );
@@ -68,6 +69,8 @@ describe('Design Foundation Lab', () => {
       'icon-button',
       'field',
       'inline-alert',
+      'menu',
+      'menu-item',
       'pagination',
       'search-field',
       'select',
@@ -75,7 +78,8 @@ describe('Design Foundation Lab', () => {
       'status-badge',
       'modal',
       'toast',
-      'splitter'
+      'splitter',
+      'tooltip'
     ]));
     expect(wrapper.text()).toContain('Cinnabar brand intent');
     expect(wrapper.text()).not.toContain('Brand blue');

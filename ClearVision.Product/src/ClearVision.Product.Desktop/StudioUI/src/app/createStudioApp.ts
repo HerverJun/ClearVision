@@ -4,6 +4,7 @@ import type { Router } from 'vue-router';
 import App from '@/app/App.vue';
 import { authLifecycleRootKey, createAuthLifecycleRoot, type AuthLifecycleRoot } from '@/app/auth';
 import { installProductLeaveGuardBridge } from '@/app/leave';
+import { createUiPreferencesOwner, type UiPreferencesOwner } from '@/app/preferences';
 import type { ProductRuntime } from '@/app/productRuntime';
 import { createStudioRouter, installAuthRouteGuard } from '@/app/router';
 import {
@@ -16,12 +17,14 @@ import {
 
 export interface MountStudioAppOptions {
   readonly platform: StudioPlatform;
+  readonly preferences?: UiPreferencesOwner;
   router?: Router;
 }
 
 export interface MountDesktopStudioAppOptions {
   readonly router?: Router;
   readonly runtimeWindow?: DesktopStudioRuntimeWindow;
+  readonly preferences?: UiPreferencesOwner;
 }
 
 export interface MountedStudioApp {
@@ -42,13 +45,15 @@ export async function mountStudioApp(
     : target;
 
   if (!(mountTarget instanceof Element)) {
+    options.preferences?.dispose();
     options.platform.dispose();
     throw new Error('StudioUI mount target was not found.');
   }
 
   const app = createApp(App);
   const router = options.router ?? createStudioRouter();
-  const authRoot = createAuthLifecycleRoot(options.platform);
+  const preferences = options.preferences ?? createUiPreferencesOwner();
+  const authRoot = createAuthLifecycleRoot(options.platform, preferences);
   let removeAuthRouteGuard: (() => void) | undefined;
   let removeLeaveGuardBridge: (() => void) | undefined;
 
@@ -111,6 +116,7 @@ export async function mountDesktopStudioApp(
   const platform = createDesktopStudioPlatform(options.runtimeWindow);
   return mountStudioApp(target, {
     platform,
+    ...(options.preferences ? { preferences: options.preferences } : {}),
     ...(options.router ? { router: options.router } : {})
   });
 }
@@ -122,6 +128,7 @@ export async function mountRuntimeStudioApp(
   const platform = createRuntimeStudioPlatform(options.runtimeWindow);
   return mountStudioApp(target, {
     platform,
+    ...(options.preferences ? { preferences: options.preferences } : {}),
     ...(options.router ? { router: options.router } : {})
   });
 }

@@ -463,7 +463,7 @@ export function createImageCanvasOwner(options: {
       } catch (error) {
         if (disposed || generation !== state.imageGeneration) return;
         state.phase = 'error';
-        state.errorMessage = error instanceof Error ? error.message : 'Artifact 图像加载失败。';
+        state.errorMessage = error instanceof Error ? error.message : '附加图像加载失败。';
         syncDiagnostics();
       }
     },

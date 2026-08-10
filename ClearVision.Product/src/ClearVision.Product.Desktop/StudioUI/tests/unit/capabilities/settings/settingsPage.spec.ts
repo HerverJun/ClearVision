@@ -151,7 +151,8 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
 
     expect(requestedPaths).toEqual(['settings']);
     expect(wrapper.attributes('data-settings-phase')).toBe('ready');
-    expect(wrapper.text()).toContain('完整配置');
+    expect(wrapper.text()).toContain('设置已加载');
+    expect(wrapper.text()).toContain('管理员完整范围');
     expect(wrapper.text()).toContain('ClearVision');
     expect(wrapper.find('[data-settings-navigation]').exists()).toBe(true);
     await wrapper.get('[data-settings-group="storage"]').trigger('click');
@@ -169,8 +170,9 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
     await flushPromises();
 
     expect(wrapper.attributes('data-settings-safe-subset')).toBe('true');
-    expect(wrapper.text()).toContain('安全子集');
-    expect(wrapper.text()).toContain('安全子集未返回');
+    expect(wrapper.text()).toContain('可用范围受限');
+    expect(wrapper.text()).toContain('工程师安全范围');
+    expect(wrapper.text()).toContain('当前账户不可用');
     expect(wrapper.text()).not.toContain('D:/VisionData');
 
     wrapper.unmount();
@@ -280,14 +282,14 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
 
     await wrapper.get('[data-settings-group="database"]').trigger('click');
     await flushPromises();
-    expect(wrapper.text()).toContain('Healthy');
+    expect(wrapper.text()).toContain('正常');
     expect(requestedPaths.filter(path => path === 'settings/database/status')).toHaveLength(1);
 
     session.user.role = 'Engineer';
     await nextTick();
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain('Healthy');
+    expect(wrapper.text()).not.toContain('正常');
     expect(requestedPaths.filter(path => path === 'settings/database/status')).toHaveLength(1);
     wrapper.unmount();
   });
@@ -365,7 +367,7 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
     wrapper.unmount();
   });
 
-  it('labels Database as connected and marks the historical session timeout as read-only', async () => {
+  it('labels Database as on-demand and marks the compatibility session duration as read-only', async () => {
     const { runtime } = createRuntime(async path => {
       if (path === 'users') return [];
       return settingsPayload();
@@ -373,11 +375,11 @@ describe('F07 G2/G3 Settings shell and scoped sections', () => {
     const wrapper = mountSettingsPage(runtime);
     await flushPromises();
 
-    expect(wrapper.get('[data-settings-group="database"]').text()).toContain('已接入');
+    expect(wrapper.get('[data-settings-group="database"]').text()).toBe('数据库维护');
     await wrapper.get('[data-settings-group="security"]').trigger('click');
     await flushPromises();
-    expect(wrapper.text()).toContain('历史只读');
-    expect(wrapper.text()).toContain('不控制当前会话过期时间');
+    expect(wrapper.text()).toContain('会话时长（分钟）');
+    expect(wrapper.text()).toContain('当前桌面会话不会按此数值自动退出');
     wrapper.unmount();
   });
 

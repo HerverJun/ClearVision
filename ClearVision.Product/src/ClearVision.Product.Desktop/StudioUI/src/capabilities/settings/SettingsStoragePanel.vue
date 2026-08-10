@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, shallowRef, watch } from 'vue';
-import { CvButton, CvField, CvInlineAlert, CvPanel } from '@/design-system';
+import {
+  CvButton,
+  CvField,
+  CvInlineAlert,
+  CvPanel,
+  CvSelect,
+  type CvSelectOption
+} from '@/design-system';
 import type { SettingsOwner } from './settingsOwner';
 import type { SettingsDiskUsageProjectionV1, SettingsStorageProjectionV1 } from './decoder';
 import {
@@ -40,6 +47,19 @@ const feedback = shallowRef<SettingsFeedback | null>(null);
 const diskUsage = shallowRef<SettingsDiskUsageProjectionV1 | null>(null);
 const diskError = shallowRef<string | null>(null);
 const dirty = computed(() => JSON.stringify(draft) !== JSON.stringify(baseline.value));
+const knownSavePolicyOptions: readonly CvSelectOption[] = Object.freeze([
+  { value: 'All', label: '保存所有图像' },
+  { value: 'NgOnly', label: '仅保存 NG 图像' },
+  { value: 'None', label: '不保存图像' }
+]);
+const savePolicyOptions = computed<readonly CvSelectOption[]>(() =>
+  knownSavePolicyOptions.some(option => option.value === draft.savePolicy)
+    ? knownSavePolicyOptions
+    : Object.freeze([
+        ...knownSavePolicyOptions,
+        { value: draft.savePolicy, label: `保留当前值（${draft.savePolicy}）` }
+      ])
+);
 const detachPanelState = props.owner.registerPanelState('storage', () => ({
   dirty: dirty.value,
   pending: busy.value || diskBusy.value
@@ -112,8 +132,8 @@ onBeforeUnmount(() => detachPanelState());
 
 <template>
   <CvPanel
-    title="存储"
-    description="保存路径与保留策略由对应范围的应用配置管理；路径选择器和立即清理当前没有可用合同。"
+    title="图像存储"
+    description="设置检测图像的保存位置、保存范围和保留时间。"
     data-settings-section="storage"
   >
     <div class="settings-form-grid">
@@ -122,14 +142,15 @@ onBeforeUnmount(() => detachPanelState());
         label="图像保存路径"
         name="imageSavePath"
         :readonly="!canWrite"
-        hint="当前没有可用的宿主路径选择器，请手工输入并让服务端校验。"
+        hint="输入本机路径，保存时由本机服务校验。"
       />
-      <CvField
+      <CvSelect
         v-model="draft.savePolicy"
         label="保存策略"
         name="savePolicy"
-        :readonly="!canWrite"
-        hint="保持后端既有策略值，不在前端猜测枚举。"
+        :options="savePolicyOptions"
+        :disabled="!canWrite"
+        hint="选择需要长期保留的检测图像。"
       />
       <CvField
         v-model="draft.retentionDays"
@@ -150,17 +171,17 @@ onBeforeUnmount(() => detachPanelState());
 
     <div class="settings-storage__tools">
       <div>
-        <strong>磁盘占用</strong>
-        <p>仅在点击检查时读取服务端结果，不把路径检查伪装成保存或清理。</p>
+        <strong>磁盘空间</strong>
+        <p>按当前保存路径检查可访问性、可写状态和剩余容量。</p>
       </div>
       <CvButton
         v-if="canWrite"
         size="sm"
         :loading="diskBusy"
-        loading-label="正在读取磁盘占用"
+        loading-label="正在检查磁盘空间"
         @click="inspectDiskUsage"
       >
-        读取磁盘占用
+        检查空间
       </CvButton>
     </div>
 
@@ -188,14 +209,14 @@ onBeforeUnmount(() => detachPanelState());
       v-if="!canWrite"
       class="settings-panel__notice"
       tone="info"
-      title="当前为安全视图"
+      title="当前账户为只读"
     >
-      当前角色不能读取仅管理员可见的磁盘诊断，也不能保存存储设置。
+      你可以查看存储设置；检查磁盘空间和修改配置需要管理员权限。
     </CvInlineAlert>
 
     <template #footer>
       <div class="settings-panel__footer">
-        <span class="settings-panel__dirty">{{ dirty ? '有未保存修改' : '与服务端配置一致' }}</span>
+        <span class="settings-panel__dirty">{{ dirty ? '有未保存修改' : '当前分组已保存' }}</span>
         <div class="settings-panel__actions">
           <CvButton
             v-if="canWrite"

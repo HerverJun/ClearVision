@@ -11,6 +11,7 @@ import {
   CvStatusBadge,
   type CvDescriptionItem
 } from '@/design-system';
+import { CvIcon } from '@/design-system/icons';
 import {
   createRecentProjectsQuery,
   formatProjectDateTime
@@ -28,14 +29,28 @@ const session = computed(() => runtime.session.projection);
 const systemStatus = computed(() => runtime.systemStatus.projection);
 const canViewDiagnostics = computed(() => session.value.user?.role === 'Admin' ||
   session.value.user?.role === 'Engineer');
+const canRunInspection = computed(() => canViewDiagnostics.value);
 const systemItems = computed<readonly CvDescriptionItem[]>(() => [
-  { key: 'port', label: '服务端口', value: systemStatus.value.health?.port ?? null },
-  { key: 'message', label: '状态说明', value: systemStatus.value.message, span: 2 }
+  { key: 'message', label: '状态说明', value: systemStatus.value.message },
+  { key: 'updated', label: '最近确认', value: formatUpdatedAt(systemStatus.value.updatedAt) }
 ]);
 const sessionItems = computed<readonly CvDescriptionItem[]>(() => [
   { key: 'role', label: '角色', value: formatRole(session.value.user?.role) },
-  { key: 'message', label: '状态说明', value: session.value.message, span: 2 }
+  { key: 'message', label: '会话状态', value: session.value.message }
 ]);
+
+const dateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false
+});
+
+function formatUpdatedAt(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? dateTimeFormatter.format(new Date(value))
+    : '尚未确认';
+}
 
 function formatHealthStatus(value: string | undefined): string {
   if (!value) return '状态不可用';
@@ -81,13 +96,19 @@ onBeforeUnmount(() => {
     <CvPageHeader
       eyebrow="工作台"
       title="概览"
-      description="查看本地服务、当前会话和最近工程的只读状态。"
+      description="掌握服务可用性，继续最近工程，并进入检测与结果调查。"
     >
       <template #actions>
         <CvButton
           size="sm"
           @click="refreshSharedProjections"
         >
+          <template #leading>
+            <CvIcon
+              name="refresh"
+              size="sm"
+            />
+          </template>
           刷新概览
         </CvButton>
       </template>
@@ -99,8 +120,9 @@ onBeforeUnmount(() => {
     >
       <CvPanel
         title="本地服务"
-        description="由全应用统一的系统状态服务提供。"
+        description="Studio 与本地服务的可用状态。"
         :level="2"
+        variant="section"
       >
         <div class="overview-page__status-row">
           <CvStatusBadge
@@ -118,8 +140,9 @@ onBeforeUnmount(() => {
 
       <CvPanel
         title="当前会话"
-        description="由全应用统一的会话状态服务提供。"
+        description="当前账号及其可用工作范围。"
         :level="2"
+        variant="section"
       >
         <div class="overview-page__status-row">
           <CvStatusBadge
@@ -139,7 +162,8 @@ onBeforeUnmount(() => {
     <section class="overview-page__content-grid">
       <CvPanel
         title="最近工程"
-        description="显示服务端记录的最近打开工程。"
+        description="从最近打开的工程继续配置或查看详情。"
+        variant="section"
       >
         <template #actions>
           <RouterLink to="/projects">
@@ -220,31 +244,54 @@ onBeforeUnmount(() => {
               </RouterLink>
               <p>{{ project.description || '无描述' }}</p>
             </div>
-            <time :datetime="project.lastOpenedAt ?? undefined">{{ formatProjectDateTime(project.lastOpenedAt) }}</time>
+            <div class="overview-page__project-meta">
+              <time :datetime="project.lastOpenedAt ?? undefined">{{ formatProjectDateTime(project.lastOpenedAt) }}</time>
+              <RouterLink
+                class="overview-page__continue"
+                :to="`/projects/${encodeURIComponent(project.id)}/workspace`"
+              >
+                继续配置
+              </RouterLink>
+            </div>
           </li>
         </ul>
       </CvPanel>
 
       <CvPanel
         title="快速入口"
-        description="前往当前可用的只读产品页面。"
+        description="按当前角色进入常用工作区。"
         :level="2"
+        variant="section"
       >
         <nav
           class="overview-page__quick-links"
           aria-label="产品快速入口"
         >
           <RouterLink to="/projects">
-            <strong>工程</strong><span>查看工程列表和正式详情摘要</span>
+            <CvIcon name="projects" />
+            <span><strong>工程</strong><small>配置流程与工程资产</small></span>
+          </RouterLink>
+          <RouterLink
+            v-if="canRunInspection"
+            to="/inspection"
+          >
+            <CvIcon name="play" />
+            <span><strong>连续检测</strong><small>选择已保存工程并进入运行页</small></span>
+          </RouterLink>
+          <RouterLink to="/results">
+            <CvIcon name="results" />
+            <span><strong>检测结果</strong><small>调查本机与工作站结果</small></span>
           </RouterLink>
           <RouterLink
             v-if="canViewDiagnostics"
             to="/diagnostics"
           >
-            <strong>诊断</strong><span>查看 StudioUI 与宿主诊断投影</span>
+            <CvIcon name="diagnostics" />
+            <span><strong>诊断</strong><small>核对应用、宿主与服务状态</small></span>
           </RouterLink>
           <RouterLink to="/about">
-            <strong>关于</strong><span>查看产品版本和环境信息</span>
+            <CvIcon name="about" />
+            <span><strong>关于</strong><small>查看版本与支持信息</small></span>
           </RouterLink>
         </nav>
       </CvPanel>
@@ -253,9 +300,11 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.overview-page { display: grid; max-width: 1440px; gap: var(--cv-density-page-gap); min-width: 0; }
-.overview-page__status-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-3); }
-.overview-page__content-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(240px, .65fr); gap: var(--cv-space-3); align-items: start; }
+.overview-page { display: grid; width: 100%; max-width: 1600px; gap: var(--cv-density-page-gap); min-width: 0; }
+.overview-page__status-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-block: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
+.overview-page__status-grid :deep(.cv-panel) { border-block-start: 0; }
+.overview-page__status-grid :deep(.cv-panel + .cv-panel) { border-inline-start: 1px solid var(--cv-border-subtle); }
+.overview-page__content-grid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(280px, .7fr); gap: var(--cv-space-5); align-items: start; }
 .overview-page__status-row { display: flex; align-items: center; gap: var(--cv-space-3); margin-bottom: var(--cv-space-3); }
 .overview-page__notice { margin-bottom: var(--cv-space-3); }
 .overview-page__project-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
@@ -263,11 +312,19 @@ onBeforeUnmount(() => {
 .overview-page__project-list li:first-child { padding-top: 0; }
 .overview-page__project-list p { margin: var(--cv-space-1) 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .overview-page__project-list time { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); white-space: nowrap; }
+.overview-page__project-meta { display: flex; flex: 0 0 auto; align-items: center; gap: var(--cv-space-4); }
+.overview-page__continue { font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); white-space: nowrap; }
 .overview-page__quick-links { display: grid; gap: 0; }
-.overview-page__quick-links a { display: grid; gap: var(--cv-space-1); padding: var(--cv-space-3) var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); color: var(--cv-text-primary); text-decoration: none; }
+.overview-page__quick-links a { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: var(--cv-space-3); padding: var(--cv-space-3) var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); color: var(--cv-text-primary); text-decoration: none; }
 .overview-page__quick-links a:last-child { border-bottom: 0; }
 .overview-page__quick-links a:hover { background: var(--cv-interactive-hover); }
-.overview-page__quick-links span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.overview-page__quick-links a > span { display: grid; gap: 2px; }
+.overview-page__quick-links small { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 @media (max-width: 900px) { .overview-page__content-grid { grid-template-columns: 1fr; } }
-@media (max-width: 680px) { .overview-page__status-grid { grid-template-columns: 1fr; } }
+@media (max-width: 680px) {
+  .overview-page__status-grid { grid-template-columns: 1fr; }
+  .overview-page__status-grid :deep(.cv-panel + .cv-panel) { border-block-start: 1px solid var(--cv-border-subtle); border-inline-start: 0; }
+  .overview-page__project-list li { display: grid; }
+  .overview-page__project-meta { justify-content: space-between; }
+}
 </style>

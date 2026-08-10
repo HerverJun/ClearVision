@@ -38,17 +38,17 @@ const statusTone = computed<CvStatusTone>(() => ({
   'unknown-outcome': 'warning', disposed: 'idle'
 }[props.owner.projection.phase] as CvStatusTone));
 const statusLabel = computed(() => ({
-  idle: '等待导出', creating: '正在创建任务', reconciling: '正在对账', queued: '已排队',
+  idle: '等待导出', creating: '正在创建任务', reconciling: '正在核对任务', queued: '已排队',
   running: '正在生成', cancelling: '正在取消', downloading: '正在下载', completed: '已完成',
   cancelled: '已取消', failed: '生成失败', expired: '文件已过期', forbidden: '权限不足',
-  error: '导出异常', 'unknown-outcome': '结果未知', disposed: '已关闭'
+  error: '导出异常', 'unknown-outcome': '任务状态待确认', disposed: '已关闭'
 }[props.owner.projection.phase] ?? '状态未知'));
 const scopeTimeLabel = computed(() => {
   const scope = props.owner.projection.scope;
   if (!scope.startTime && !scope.endTime) return '当前工程全部历史结果';
   return `${scope.startTime || '最早'} 至 ${scope.endTime || '现在'}`;
 });
-const scopeStatusLabel = computed(() => props.owner.projection.scope.status || '全部标准结果');
+const scopeStatusLabel = computed(() => props.owner.projection.scope.status || '全部结果类型');
 const scopeDefectLabel = computed(() => props.owner.projection.scope.defectType || '全部缺陷类型');
 const scopeDiagnosticLabel = computed(() => props.owner.projection.scope.diagnosticCode || '全部诊断码');
 
@@ -92,7 +92,7 @@ function start(): void {
         <dl>
           <div><dt>工程</dt><dd>{{ projectName }}</dd></div>
           <div><dt>时间范围</dt><dd>{{ scopeTimeLabel }}</dd></div>
-          <div><dt>标准结果</dt><dd>{{ scopeStatusLabel }}</dd></div>
+          <div><dt>结果类型</dt><dd>{{ scopeStatusLabel }}</dd></div>
           <div><dt>缺陷类型</dt><dd>{{ scopeDefectLabel }}</dd></div>
           <div><dt>诊断码</dt><dd>{{ scopeDiagnosticLabel }}</dd></div>
         </dl>
@@ -127,17 +127,17 @@ function start(): void {
       <CvInlineAlert
         v-if="owner.projection.phase === 'unknown-outcome'"
         tone="warning"
-        title="创建结果尚未确认"
+        title="导出任务状态待确认"
       >
-        当前不会自动重发创建请求。请按操作身份查询已有任务；确认任务状态前不要重复导出。
+        系统不会重复创建导出任务。请先查询已有任务；确认状态前不要再次导出。
       </CvInlineAlert>
 
       <CvInlineAlert
         v-else-if="owner.projection.phase === 'forbidden'"
         tone="warning"
-        title="当前会话无权导出"
+        title="当前账号无权导出"
       >
-        服务端权限策略拒绝了结果导出请求；仅在界面隐藏按钮不能替代该检查。
+        当前账号没有导出检测结果的权限。如需导出，请联系管理员调整权限。
       </CvInlineAlert>
 
       <section
@@ -147,14 +147,14 @@ function start(): void {
       >
         <div class="results-export-dialog__section-heading">
           <h3 id="results-export-job-title">
-            任务身份
+            导出任务
           </h3>
           <span>{{ owner.projection.job.format.toUpperCase() }}</span>
         </div>
         <dl>
           <div><dt>导出任务</dt><dd><code translate="no">{{ owner.projection.job.exportId }}</code></dd></div>
           <div><dt>结果文件</dt><dd>{{ owner.projection.job.fileName }}</dd></div>
-          <div><dt>快照上界</dt><dd>{{ owner.projection.job.snapshotUpperBoundUtc || '创建时记录' }}</dd></div>
+          <div><dt>结果截止时间</dt><dd>{{ owner.projection.job.snapshotUpperBoundUtc || '创建任务时' }}</dd></div>
           <div><dt>文件状态</dt><dd>{{ owner.projection.job.downloadAvailable ? '可下载' : '不可下载或已过期' }}</dd></div>
         </dl>
       </section>
@@ -163,7 +163,7 @@ function start(): void {
         <summary>技术追溯</summary>
         <dl>
           <div><dt>工程标识</dt><dd><code translate="no">{{ owner.projection.scope.projectId }}</code></dd></div>
-          <div><dt>clientOperationId</dt><dd><code translate="no">{{ owner.projection.clientOperationId || '尚未创建' }}</code></dd></div>
+          <div><dt>操作标识</dt><dd><code translate="no">{{ owner.projection.clientOperationId || '尚未创建' }}</code></dd></div>
           <div v-if="owner.projection.downloadedSha256">
             <dt>下载校验和</dt><dd><code translate="no">{{ owner.projection.downloadedSha256 }}</code></dd>
           </div>
@@ -220,12 +220,12 @@ function start(): void {
 .results-export-dialog { display: grid; gap: var(--cv-space-4); }
 .results-export-dialog h3 { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); }
 .results-export-dialog__section-heading { min-height: 28px; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
-.results-export-dialog__section-heading > span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.results-export-dialog__section-heading > span { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .results-export-dialog dl { margin: var(--cv-space-2) 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-block: 1px solid var(--cv-border-subtle); }
 .results-export-dialog dl div { min-width: 0; padding: var(--cv-space-2) var(--cv-space-3); border-bottom: 1px solid var(--cv-border-subtle); }
-.results-export-dialog dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.results-export-dialog dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .results-export-dialog dd { margin: 2px 0 0; overflow-wrap: anywhere; color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); }
-.results-export-dialog code { overflow-wrap: anywhere; color: var(--cv-text-primary); font-size: var(--cv-font-size-2xs); user-select: all; }
+.results-export-dialog code { overflow-wrap: anywhere; color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); user-select: all; }
 .results-export-dialog__scope-note { margin: var(--cv-space-2) 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
 .results-export-dialog__status { display: flex; align-items: flex-start; gap: var(--cv-space-2); }
 .results-export-dialog__status p { min-width: 0; margin: 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); overflow-wrap: anywhere; }

@@ -84,7 +84,15 @@ export interface InspectionRunStateEvent {
   readonly sessionType: InspectionRuntimeSessionType | null;
 }
 
-export class InspectionRunDecodeError extends Error {}
+export class InspectionRunDecodeError extends Error {
+  readonly detail: string;
+
+  constructor(detail: string) {
+    super('检测运行服务返回的数据格式不符合要求，请刷新后重试。');
+    this.name = 'InspectionRunDecodeError';
+    this.detail = detail;
+  }
+}
 
 function record(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {

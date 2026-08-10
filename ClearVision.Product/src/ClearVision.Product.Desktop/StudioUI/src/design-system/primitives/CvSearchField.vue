@@ -99,6 +99,7 @@ function handleEscape(event: KeyboardEvent): void {
         type="button"
         :disabled="disabled"
         :aria-label="clearLabel"
+        :title="clearLabel"
         @mousedown.prevent
         @click="clearSearch"
       >

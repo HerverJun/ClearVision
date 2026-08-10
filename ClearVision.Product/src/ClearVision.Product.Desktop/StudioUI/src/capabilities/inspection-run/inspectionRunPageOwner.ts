@@ -141,7 +141,7 @@ export function createInspectionRunPageOwner(options: {
     admissionController = controller;
     state.phase = 'admitting';
     state.errorCode = null;
-    state.message = '正在读取已保存工程的权威准入。';
+    state.message = '正在读取已保存工程的服务端运行准入。';
     try {
       const admitted = await admissionPort.admit({
         projectId: options.projectId,

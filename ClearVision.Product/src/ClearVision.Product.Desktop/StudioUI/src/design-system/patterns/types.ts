@@ -8,6 +8,11 @@ export type CvPageStateKind =
   | 'loading'
   | 'empty'
   | 'error'
+  | 'offline'
+  | 'stale'
+  | 'partial'
+  | 'conflict'
+  | 'unknown'
   | 'unauthorized'
   | 'forbidden'
   | 'not-found';

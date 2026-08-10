@@ -268,7 +268,7 @@ export function createAiWorkbenchApi(api: ApiTransport): AiWorkbenchApi {
         mutation,
         signalOptions(signal)
       );
-      if (!payload || !('snapshot' in payload)) throw new Error('Workspace snapshot response is malformed.');
+      if (!payload || !('snapshot' in payload)) throw new Error('AI 工作区快照响应格式不符合要求，请刷新后重试。');
       return decodeAiSessionSnapshotV1(payload.snapshot, '$.snapshot');
     },
     async createHandoff(command: AiHandoffCreateCommandV1, signal?: AbortSignal) {

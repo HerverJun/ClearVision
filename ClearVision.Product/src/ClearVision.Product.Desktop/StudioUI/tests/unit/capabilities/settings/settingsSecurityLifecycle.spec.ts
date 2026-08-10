@@ -301,7 +301,7 @@ describe('F07 G4 database backup pending leave protection', () => {
     await flushPromises();
 
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    await wrapper.get('button').trigger('click');
+    await wrapper.get('[data-settings-database-backup]').trigger('click');
     await nextTick();
 
     expect(fixture.backupDatabase).toHaveBeenCalledTimes(1);

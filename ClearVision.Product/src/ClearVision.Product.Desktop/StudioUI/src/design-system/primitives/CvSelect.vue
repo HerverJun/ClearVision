@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue';
+import CvIcon from '../icons/CvIcon.vue';
 import type { CvSelectOption } from './types';
 
 const props = withDefaults(defineProps<{
@@ -76,20 +77,11 @@ function updateValue(event: Event): void {
           :disabled="option.disabled"
         >{{ option.label }}</option>
       </select>
-      <svg
+      <CvIcon
         class="cv-select__chevron"
-        viewBox="0 0 16 16"
-        aria-hidden="true"
-      >
-        <path
-          d="m4 6 4 4 4-4"
-          fill="none"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="1.5"
-        />
-      </svg>
+        name="chevron-right"
+        size="sm"
+      />
     </span>
     <span
       v-if="hint"
@@ -126,7 +118,7 @@ function updateValue(event: Event): void {
 .cv-select__control:focus-visible { border-color: var(--cv-focus-ring-color); outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; box-shadow: none; }
 .cv-select--error .cv-select__control { border-color: var(--cv-color-status-ng); }
 .cv-select--disabled { opacity: 0.54; }
-.cv-select__chevron { position: absolute; right: var(--cv-space-3); top: 50%; width: 16px; height: 16px; transform: translateY(-50%); color: var(--cv-text-muted); pointer-events: none; }
+.cv-select__chevron { position: absolute; right: var(--cv-space-3); top: 50%; transform: translateY(-50%) rotate(90deg); color: var(--cv-text-muted); pointer-events: none; }
 .cv-select__hint, .cv-select__error { font-size: var(--cv-font-size-2xs); line-height: var(--cv-line-height-normal); }
 .cv-select__hint { color: var(--cv-text-muted); }
 .cv-select__error { color: var(--cv-color-status-ng-strong); }

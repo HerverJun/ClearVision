@@ -99,10 +99,12 @@ export interface WorkspaceHandoffReceiveProjection {
 
 export class WorkspaceHandoffContractError extends Error {
   readonly path: string;
+  readonly expected: string;
 
   constructor(path: string, expected: string) {
-    super(`${path} must be ${expected}.`);
+    super('AI 候选交接数据格式不符合要求，请返回 AI 工作台重新确认候选。');
     this.name = 'WorkspaceHandoffContractError';
     this.path = path;
+    this.expected = expected;
   }
 }

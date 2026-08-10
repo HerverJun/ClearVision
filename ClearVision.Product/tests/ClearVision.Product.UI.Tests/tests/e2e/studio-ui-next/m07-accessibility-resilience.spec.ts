@@ -218,8 +218,8 @@ test('M07 equivalent 200 percent text scale keeps product surfaces named and hor
   }
 
   const appearance = page.locator('[data-product-appearance]');
-  await appearance.locator('summary').click();
-  const popover = page.locator('.product-layout__appearance-popover');
+  await appearance.locator('button[aria-haspopup="menu"]').click();
+  const popover = page.locator('[role="menu"][aria-label="外观设置"]');
   const bounds = await popover.boundingBox();
   expect(bounds).not.toBeNull();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
@@ -288,8 +288,8 @@ test('M07 light and dark semantic tokens meet the AA audit baseline', async ({ p
   expect(light.minRatio).toBeGreaterThanOrEqual(4.5);
 
   const appearance = page.locator('[data-product-appearance]');
-  await appearance.locator('summary').click();
-  await page.locator('[data-product-appearance] button').nth(1).click();
+  await appearance.locator('button[aria-haspopup="menu"]').click();
+  await page.getByRole('menuitemcheckbox', { name: '深色' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   const dark = await inspectContrast(page);
   expect(dark.minRatio).toBeGreaterThanOrEqual(4.5);

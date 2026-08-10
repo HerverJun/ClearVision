@@ -21,6 +21,11 @@ const defaultCopy: Readonly<Record<CvPageStateKind, { title: string; description
   loading: { title: '正在加载', description: '请稍候，正在读取最新数据。', icon: 'refresh' },
   empty: { title: '暂无数据', description: '当前没有可显示的内容。', icon: 'empty' },
   error: { title: '加载失败', description: '暂时无法读取数据，请稍后重试。', icon: 'error' },
+  offline: { title: '当前离线', description: '无法连接服务，恢复连接后可重新获取最新数据。', icon: 'unlink' },
+  stale: { title: '数据可能已过期', description: '当前显示的是上次成功读取的数据，请刷新核对。', icon: 'clock' },
+  partial: { title: '部分数据不可用', description: '已显示可读取的内容，其余内容可稍后重试。', icon: 'warning' },
+  conflict: { title: '内容已在其他位置更新', description: '请重新读取最新内容，再决定如何继续。', icon: 'warning' },
+  unknown: { title: '结果尚未确认', description: '当前状态无法确认，请核对后再继续操作。', icon: 'info' },
   unauthorized: { title: '需要登录', description: '当前没有可用的预置会话，无法访问此页面。', icon: 'lock' },
   forbidden: { title: '无权访问', description: '当前用户没有访问此内容的权限。', icon: 'lock' },
   'not-found': { title: '页面不存在', description: '请求的页面不存在或已被移除。', icon: 'not-found' }
@@ -112,9 +117,14 @@ const liveMode = computed(() => props.kind === 'error'
 }
 
 .cv-page-state--error .cv-page-state__icon { background: var(--cv-color-status-error-soft); color: var(--cv-color-status-error-strong); }
+.cv-page-state--offline .cv-page-state__icon { background: var(--cv-color-status-offline-soft); color: var(--cv-color-status-offline-strong); }
+.cv-page-state--stale .cv-page-state__icon,
+.cv-page-state--partial .cv-page-state__icon,
+.cv-page-state--conflict .cv-page-state__icon { background: var(--cv-color-status-warning-soft); color: var(--cv-color-status-warning-strong); }
+.cv-page-state--unknown .cv-page-state__icon { background: var(--cv-color-status-unknown-soft); color: var(--cv-color-status-unknown-strong); }
 .cv-page-state--unauthorized .cv-page-state__icon,
 .cv-page-state--forbidden .cv-page-state__icon { background: var(--cv-color-status-warning-soft); color: var(--cv-color-status-warning-strong); }
-.cv-page-state__icon--loading { animation: cv-page-state-spin var(--cv-motion-duration-slow) linear infinite; }
+.cv-page-state__icon--loading { animation: cv-page-state-spin var(--cv-motion-duration-progress) linear infinite; }
 .cv-page-state__copy { min-width: 0; }
 
 .cv-page-state__title {

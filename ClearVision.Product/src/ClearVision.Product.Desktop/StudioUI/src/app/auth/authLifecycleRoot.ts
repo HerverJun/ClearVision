@@ -1,6 +1,7 @@
 import { inject, readonly, shallowRef, type DeepReadonly, type InjectionKey, type ShallowRef } from 'vue';
 import type { Router } from 'vue-router';
 import type { ProductLeaveGuardOwner } from '@/app/leave';
+import { createUiPreferencesOwner, type UiPreferencesOwner } from '@/app/preferences';
 import { createProductRuntime, type ProductRuntime } from '@/app/productRuntime';
 import { sessionIdentityOf, type SessionUserProjection } from '@/app/session';
 import type { StudioPlatform } from '@/app/studioPlatform';
@@ -21,7 +22,10 @@ export interface AuthLifecycleRoot {
 
 export const authLifecycleRootKey: InjectionKey<AuthLifecycleRoot> = Symbol('AuthLifecycleRoot');
 
-export function createAuthLifecycleRoot(platform: StudioPlatform): AuthLifecycleRoot {
+export function createAuthLifecycleRoot(
+  platform: StudioPlatform,
+  preferences: UiPreferencesOwner = createUiPreferencesOwner()
+): AuthLifecycleRoot {
   const productRuntime = shallowRef<ProductRuntime | null>(null);
   let quarantinedRuntime: ProductRuntime | null = null;
   let router: Router | undefined;
@@ -56,7 +60,7 @@ export function createAuthLifecycleRoot(platform: StudioPlatform): AuthLifecycle
       if (productRuntime.value) return true;
       const currentAuth = authHolder.current;
       if (!currentAuth) return false;
-      const nextRuntime = await createProductRuntime(platform, currentAuth.session);
+      const nextRuntime = await createProductRuntime(platform, currentAuth.session, preferences);
       const currentSession = currentAuth.session.projection;
       const activationIsCurrent = currentSession.sessionGeneration === generation &&
         currentSession.user !== null && sessionIdentityOf(currentSession.user) === sessionIdentityOf(user);
@@ -114,6 +118,7 @@ export function createAuthLifecycleRoot(platform: StudioPlatform): AuthLifecycle
       auth.dispose();
       delete authHolder.current;
       disposeRuntime('auth-root-disposed');
+      preferences.dispose();
       router = undefined;
     }
   });

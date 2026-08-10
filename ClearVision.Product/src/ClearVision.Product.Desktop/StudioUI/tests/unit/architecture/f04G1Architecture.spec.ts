@@ -62,7 +62,7 @@ describe('F04 G2 auth, owner, route and transport boundary guards', () => {
   it('gates ProductRuntime behind authenticated composition and preserves one Workspace authority', () => {
     const root = read(join(sourceRoot, 'app/auth/authLifecycleRoot.ts'));
     const productRuntime = read(join(sourceRoot, 'app/productRuntime.ts'));
-    expect(root).toContain('createProductRuntime(platform, currentAuth.session)');
+    expect(root).toContain('createProductRuntime(platform, currentAuth.session, preferences)');
     expect(root).toContain('const nextRuntime = await createProductRuntime');
     expect(root).toContain('productRuntime.value = null');
     expect(root).toContain('quarantineForSessionExpiration');

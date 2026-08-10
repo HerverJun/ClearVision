@@ -159,7 +159,10 @@ describe('G4 Preview transport', () => {
       delete: deleteRequest
     };
     const port = createPreviewTransportPort(api);
-    await expect(port.previewNode(command())).rejects.toThrow(/active preview request identity/i);
+    await expect(port.previewNode(command())).rejects.toMatchObject({
+      path: '$.observation.identity.flowRevision',
+      expectation: 'to match the active preview request identity'
+    });
     await port.settle();
     expect(deleteRequest).toHaveBeenCalledWith(
       `preview-artifacts/${artifactId}`,

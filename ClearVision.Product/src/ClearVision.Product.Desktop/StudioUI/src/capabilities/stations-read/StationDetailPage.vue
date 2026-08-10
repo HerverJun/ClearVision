@@ -2,9 +2,10 @@
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import {
-  CvButton,
   CvDataTable,
   CvDescriptionList,
+  CvIcon,
+  CvIconButton,
   CvInlineAlert,
   CvPageHeader,
   CvPageState,
@@ -17,6 +18,7 @@ import {
 } from '@/design-system';
 import { formatInspectionOutcome } from '@/shared/inspectionOutcome';
 import {
+  createStationDetailDeepLink,
   createStationResultsDeepLink,
   resolveProductionReturnTo
 } from '@/shared/productionTraceLinks';
@@ -48,10 +50,12 @@ import {
   formatStationBytes,
   formatStationDateTime,
   formatStationDuration,
+  formatStationReportedStatus,
   stationDisplayName,
   stationOfflineReasonLabel,
   stationOnlineLabel,
   stationOnlineTone,
+  stationPackageHealthLabel,
   stationRuntimeLabel,
   stationRuntimeTone
 } from './stationViewModel';
@@ -236,43 +240,55 @@ const resultColumns: readonly CvDataTableColumn<StationResult>[] = Object.freeze
   { key: 'outcome', label: '结果', width: '13%' },
   { key: 'axes', label: '执行状态 / 判定结果', width: '18%' },
   { key: 'packageName', label: '运行包', width: '15%' },
-  { key: 'diagnosticCode', label: '诊断码', width: '14%' },
+  { key: 'diagnosticCode', label: '诊断', width: '14%' },
   { key: 'executionTimeMs', label: '耗时', align: 'end', width: '10%' },
   { key: 'actions', label: '操作', align: 'end', width: '12%' }
 ]);
 
 const healthColumns: readonly CvDataTableColumn<StationHealthSnapshot>[] = Object.freeze([
-  { key: 'createdAtUtc', label: '采集时间', width: '21%' },
-  { key: 'runtimeState', label: '运行状态', width: '14%' },
-  { key: 'processUptimeSeconds', label: '进程运行时长', width: '16%' },
-  { key: 'cpuUsagePercent', label: 'CPU', align: 'end', width: '10%' },
-  { key: 'workingSetMb', label: '内存', align: 'end', width: '10%' },
-  { key: 'diskFreeMb', label: '磁盘可用', align: 'end', width: '12%' },
-  { key: 'spoolPendingCount', label: '待上报', align: 'end', width: '10%' }
+  { key: 'createdAtUtc', label: '采集时间', width: '18%' },
+  { key: 'runtimeState', label: '运行状态', width: '12%' },
+  { key: 'processUptimeSeconds', label: '进程运行时长', width: '15%' },
+  { key: 'resources', label: '资源', width: '20%' },
+  { key: 'fieldStatus', label: '设备 / 运行包', width: '23%' },
+  { key: 'spoolPendingCount', label: '待同步', align: 'end', width: '12%' }
 ]);
 
-const ordinaryItems = computed<readonly CvDescriptionItem[]>(() => {
+const operationalItems = computed<readonly CvDescriptionItem[]>(() => {
   const value = station.value;
   if (!value) return [];
   return [
-    { key: 'station-id', label: '工作站标识', value: value.stationId, span: 2 },
-    { key: 'connection', label: '服务端连接判定', value: value.isOnline ? '在线' : (stationOfflineReasonLabel(value.offlineReason) ?? '离线') },
+    { key: 'connection', label: '连接状态', value: value.isOnline ? '在线' : (stationOfflineReasonLabel(value.offlineReason) ?? '离线') },
+    { key: 'enabled', label: '启用状态', value: value.isEnabled ? '已启用' : '已停用' },
     { key: 'machine', label: '机器名', value: value.machineName || '—' },
     { key: 'line', label: '产线', value: value.lineName || '—' },
     { key: 'last-seen', label: '最后心跳', value: formatStationDateTime(value.lastSeenAtUtc), span: 2 },
     { key: 'package', label: '当前运行包', value: value.packageName ? `${value.packageName}${value.packageVersion ? ` · ${value.packageVersion}` : ''}` : '未激活运行包' },
-    { key: 'package-id', label: '运行包标识', value: value.packageId || '未上报' },
-    { key: 'source-revision', label: '来源工程修订', value: value.sourceProjectRevision === null ? '未上报' : `r${value.sourceProjectRevision}` },
-    { key: 'flow', label: '执行 Flow Hash', value: value.executionFlowHash || value.packageFlowHash || '未上报' },
-    { key: 'decision', label: '判定配置 Hash', value: value.decisionConfigurationHash || '未上报' },
-    { key: 'run', label: '当前运行标识', value: value.currentRunId || '无活动运行' },
+    { key: 'package-health', label: '运行包状态', value: stationPackageHealthLabel(value.currentPackageHealth, value.packageId) },
     { key: 'average', label: '平均执行耗时', value: `${value.averageExecutionTimeMs.toFixed(1)} ms` },
-    { key: 'spool', label: 'Spool', value: value.spoolPendingCount > 0 ? `待回放 ${value.spoolPendingCount} · ${formatStationBytes(value.spoolBytes)}` : '无待回放' },
-    { key: 'camera', label: '相机', value: value.cameraStatusSummary || '未上报/不可确认' },
-    { key: 'plc', label: 'PLC', value: value.plcStatusSummary || '未上报/不可确认' },
+    { key: 'sync', label: '结果同步', value: value.spoolPendingCount > 0 ? `等待同步 ${value.spoolPendingCount} 条 · ${formatStationBytes(value.spoolBytes)}` : '同步正常' },
+    { key: 'camera', label: '相机', value: formatStationReportedStatus(value.cameraStatusSummary) },
+    { key: 'plc', label: 'PLC', value: formatStationReportedStatus(value.plcStatusSummary) },
     { key: 'tcp', label: 'TCP', value: '未上报/不可确认' },
-    { key: 'package-health', label: '运行包一致性', value: value.currentPackageHealth || '未上报/不可确认' },
-    { key: 'diagnostic', label: '最近诊断', value: value.lastDiagnosticCode || '无已上报诊断' }
+    { key: 'diagnostic', label: '最近诊断', value: value.lastDiagnosticMessage || value.lastDiagnosticCode || '无已上报诊断', span: 2 }
+  ];
+});
+
+const technicalItems = computed<readonly CvDescriptionItem[]>(() => {
+  const value = station.value;
+  if (!value) return [];
+  return [
+    { key: 'station-id', label: '工作站标识', value: value.stationId, span: 2 },
+    { key: 'package-id', label: '运行包标识', value: value.packageId || '未上报' },
+    { key: 'source-project', label: '来源工程标识', value: value.sourceProjectId || '未上报' },
+    { key: 'source-revision', label: '来源工程修订', value: value.sourceProjectRevision === null ? '未上报' : `r${value.sourceProjectRevision}` },
+    { key: 'project-revision', label: '执行工程修订', value: value.projectRevision === null ? '未上报' : `r${value.projectRevision}` },
+    { key: 'package-flow', label: '运行包流程哈希', value: value.packageFlowHash || '未上报', span: 2 },
+    { key: 'execution-flow', label: '执行流程哈希', value: value.executionFlowHash || '未上报', span: 2 },
+    { key: 'decision', label: '判定配置哈希', value: value.decisionConfigurationHash || '未上报', span: 2 },
+    { key: 'snapshot', label: '执行快照标识', value: value.executionSnapshotId || '未上报', span: 2 },
+    { key: 'run', label: '当前运行标识', value: value.currentRunId || '无活动运行' },
+    { key: 'mode', label: '运行模式', value: value.executionRunMode || '未上报' }
   ];
 });
 
@@ -281,7 +297,10 @@ function resultPresentation(result: StationResult) {
 }
 
 function stationReturnPath(): string {
-  return `/stations/${encodeURIComponent(activeStationId.value)}`;
+  const fleetReturnTo = returnTarget.value === '/stations' || returnTarget.value?.startsWith('/stations?')
+    ? returnTarget.value
+    : null;
+  return createStationDetailDeepLink(activeStationId.value, fleetReturnTo);
 }
 
 function stationResultLink(result: StationResult): string {
@@ -335,14 +354,18 @@ onBeforeUnmount(() => {
   >
     <CvPageHeader
       :title="station ? stationDisplayName(station) : '工作站详情'"
-      description="核对当前状态、最近结果与健康快照。各区域保持独立权限和失败边界。"
+      description="核对连接、运行包、最近结果与现场健康；管理操作仅对工作站管理员开放。"
     >
       <template #breadcrumbs>
         <RouterLink
           class="station-detail__back"
           :to="returnTarget ?? '/stations'"
         >
-          ← {{ returnLabel }}
+          <CvIcon
+            name="chevron-left"
+            size="sm"
+          />
+          {{ returnLabel }}
         </RouterLink>
       </template>
       <template #actions>
@@ -361,14 +384,18 @@ onBeforeUnmount(() => {
           :options="takeOptions"
           @update:model-value="changeTake"
         />
-        <CvButton
+        <CvIconButton
           size="sm"
+          variant="secondary"
+          label="刷新工作站详情"
           :loading="Boolean(listState.isRefreshing || resultsState.isRefreshing || healthState.isRefreshing || adminState?.isRefreshing || logsState?.isRefreshing || commandsState?.isRefreshing)"
-          loading-label="正在刷新工作站详情"
           @click="monitoring.refreshNow()"
         >
-          刷新
-        </CvButton>
+          <CvIcon
+            name="refresh"
+            size="sm"
+          />
+        </CvIconButton>
       </template>
       <template
         v-if="station"
@@ -397,7 +424,7 @@ onBeforeUnmount(() => {
       tone="warning"
       title="实时连接正在恢复"
     >
-      当前保留上次权威读取；恢复期间按服务端状态重新同步。
+      当前保留上次成功读取；恢复期间按服务端状态重新同步。
     </CvInlineAlert>
 
     <CvInlineAlert
@@ -445,10 +472,18 @@ onBeforeUnmount(() => {
         :padded="false"
       >
         <CvDescriptionList
-          :items="ordinaryItems"
+          :items="operationalItems"
           :columns="1"
-          label="工作站普通详情"
+          label="工作站运行概览"
         />
+        <details class="station-detail__technical-details">
+          <summary>技术身份</summary>
+          <CvDescriptionList
+            :items="technicalItems"
+            :columns="1"
+            label="工作站技术身份"
+          />
+        </details>
       </CvPanel>
     </div>
 
@@ -517,7 +552,7 @@ onBeforeUnmount(() => {
             <CvStatusBadge :tone="resultPresentation(row).tone">
               {{ resultPresentation(row).label }}
             </CvStatusBadge>
-            <span v-if="row.legacyOutcomeProjection">兼容投影</span>
+            <span v-if="row.legacyOutcomeProjection">旧版结果映射</span>
           </div>
         </template>
         <template #cell-axes="{ row }">
@@ -527,7 +562,10 @@ onBeforeUnmount(() => {
           {{ row.packageName || '—' }}
         </template>
         <template #cell-diagnosticCode="{ row }">
-          {{ row.diagnosticCode || '—' }}
+          <div class="station-detail__diagnostic">
+            <span>{{ row.diagnosticMessage || '无诊断说明' }}</span>
+            <code v-if="row.diagnosticCode">{{ row.diagnosticCode }}</code>
+          </div>
         </template>
         <template #cell-executionTimeMs="{ row }">
           {{ row.executionTimeMs }} ms
@@ -624,18 +662,27 @@ onBeforeUnmount(() => {
         <template #cell-processUptimeSeconds="{ row }">
           {{ formatStationDuration(row.processUptimeSeconds) }}
         </template>
-        <template #cell-cpuUsagePercent="{ row }">
-          {{ row.cpuUsagePercent === null ? '—' : `${row.cpuUsagePercent.toFixed(1)}%` }}
+        <template #cell-resources="{ row }">
+          <div class="station-detail__health-stack">
+            <span>CPU {{ row.cpuUsagePercent === null ? '未上报' : `${row.cpuUsagePercent.toFixed(1)}%` }}</span>
+            <small>内存 {{ row.workingSetMb }} MB · 磁盘可用 {{ row.diskFreeMb }} MB</small>
+          </div>
         </template>
-        <template #cell-workingSetMb="{ row }">
-          {{ row.workingSetMb }} MB
-        </template>
-        <template #cell-diskFreeMb="{ row }">
-          {{ row.diskFreeMb }} MB
+        <template #cell-fieldStatus="{ row }">
+          <div class="station-detail__health-stack">
+            <span>相机 {{ formatStationReportedStatus(row.cameraStatusSummary) }} · PLC {{ formatStationReportedStatus(row.plcStatusSummary) }}</span>
+            <small>{{ stationPackageHealthLabel(row.currentPackageHealth, row.currentPackageId) }}</small>
+            <small
+              v-if="row.lastErrorMessage || row.lastErrorCode"
+              class="station-detail__health-error"
+            >
+              {{ row.lastErrorMessage || row.lastErrorCode }}
+            </small>
+          </div>
         </template>
         <template #cell-spoolPendingCount="{ row }">
-          <span :title="`Spool 大小 ${formatStationBytes(row.spoolBytes)}`">
-            {{ row.spoolPendingCount }}
+          <span :title="`待同步数据 ${formatStationBytes(row.spoolBytes)}`">
+            {{ row.spoolPendingCount }} 条
           </span>
         </template>
       </CvDataTable>
@@ -660,7 +707,7 @@ onBeforeUnmount(() => {
 .station-detail :deep(.cv-page-header),
 .station-detail > :deep(.cv-inline-alert),
 .station-detail > :deep(.cv-page-state) { grid-column: 1 / -1; }
-.station-detail__back { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); text-decoration: none; }
+.station-detail__back { display: inline-flex; align-items: center; gap: var(--cv-space-1); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); text-decoration: none; }
 .station-detail__back:hover { color: var(--cv-color-link); text-decoration: underline; }
 .station-detail__nav-link { min-height: var(--cv-density-control-height-sm); padding: 0 var(--cv-space-2); display: inline-flex; align-items: center; justify-content: center; border-radius: var(--cv-radius-sm); color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; touch-action: manipulation; }
 .station-detail__nav-link:hover { background: var(--cv-interactive-hover); color: var(--cv-color-link-hover); }
@@ -673,11 +720,22 @@ onBeforeUnmount(() => {
 .station-detail__production-trace { grid-column: 1 / -1; }
 .station-detail__admin-control { grid-column: 1 / -1; }
 .station-detail__outcome { display: grid; justify-items: start; gap: var(--cv-space-1); }
-.station-detail__outcome span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.station-detail__outcome span { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
+.station-detail__diagnostic,
+.station-detail__health-stack { min-width: 0; display: grid; gap: 2px; }
+.station-detail__diagnostic span,
+.station-detail__health-stack span { color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
+.station-detail__diagnostic code,
+.station-detail__health-stack small { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
+.station-detail__health-stack .station-detail__health-error { color: var(--cv-color-status-error-strong); }
+.station-detail__technical-details { border-top: 1px solid var(--cv-border-subtle); }
+.station-detail__technical-details summary { min-height: 36px; padding: 0 var(--cv-density-panel-padding); display: flex; align-items: center; color: var(--cv-text-secondary); cursor: pointer; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
+.station-detail__technical-details summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
 .station-detail :deep(.station-detail__overview-panel > .cv-panel__header),
 .station-detail :deep(.station-detail__results-panel > .cv-panel__header),
 .station-detail :deep(.station-detail__health-panel > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
-.station-detail :deep(.station-detail__overview-panel .cv-description-list) { padding: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
+.station-detail :deep(.station-detail__overview-panel > .cv-description-list) { padding: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
+.station-detail__technical-details :deep(.cv-description-list) { padding: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
 .station-detail :deep(.station-detail__results-panel .cv-inline-alert),
 .station-detail :deep(.station-detail__results-panel .cv-page-state),
 .station-detail :deep(.station-detail__health-panel .cv-inline-alert),

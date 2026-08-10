@@ -223,6 +223,11 @@ describe('F07 G7 Station communication panel', () => {
     mountedWrappers.push(wrapper);
     await flushPromises();
 
+    expect(wrapper.text()).toContain('工作站通信');
+    expect(wrapper.text()).toContain('Studio 通信入口已配置');
+    expect(wrapper.text()).not.toContain('saved projection');
+    expect(wrapper.text()).not.toContain('Studio ingress is configured.');
+
     await wrapper.get('input[type="number"]').setValue('5033');
     await wrapper.get('[data-settings-station-save]').trigger('click');
     expect(fixture.stationSave).toHaveBeenLastCalledWith(expect.objectContaining({ port: 5033 }));
@@ -443,7 +448,8 @@ describe('F07 G8 AI model administration panel', () => {
     mountedWrappers.push(wrapper);
     await flushPromises();
 
-    expect(wrapper.get('[data-settings-ai-last-test]').text()).toContain('最近测试状态：ok');
+    expect(wrapper.get('[data-settings-ai-last-test]').text()).toContain('最近连接测试成功');
+    expect(wrapper.get('[data-settings-ai-advanced]').attributes('open')).toBeUndefined();
     await wrapper.get('[data-settings-ai-provider-preset] select').setValue('anthropic');
     expect((wrapper.get('[name="aiProvider"]').element as HTMLInputElement).value).toBe('Anthropic');
     await wrapper.get('[data-settings-ai-model-save]').trigger('click');
@@ -527,6 +533,8 @@ describe('F07 G8 AI model administration panel', () => {
     expect(wrapper.find('[data-settings-ai-model-safe]').exists()).toBe(true);
     expect(wrapper.find('[data-settings-ai-model-editor]').exists()).toBe(false);
     expect(wrapper.find('input[type="password"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('支持图像输入');
+    expect(wrapper.text()).not.toContain('supportsVisionInput=true');
     await wrapper.find('[data-settings-ai-model-safe] button').trigger('click');
     await flushPromises();
     expect(fixture.aiReasoning).toHaveBeenCalledWith(expect.objectContaining({ model: 'gpt-5.1-mini' }));

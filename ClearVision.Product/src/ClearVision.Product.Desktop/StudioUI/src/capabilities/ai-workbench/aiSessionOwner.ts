@@ -177,7 +177,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
   }
 
   async function request<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
-    if (authorizationFrozen) throw new Error('AI owner is frozen after authentication failure.');
+    if (authorizationFrozen) throw new Error('认证失败后，当前 AI 会话已冻结。');
     const controller = new AbortController();
     const release = ledger.trackRequest(controller);
     try {
@@ -248,7 +248,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
         snapshot.buildClientOperationId !== build.clientOperationId ||
         snapshot.submittedBuildFingerprint !== build.submittedBuildFingerprint ||
         snapshot.buildTerminalSequence === null) {
-      throw new Error('Build Snapshot identity mismatch.');
+      throw new Error('构建快照身份不一致。');
     }
   }
 
@@ -277,7 +277,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
         url: '',
         payload: {
           errorCode: 'handoff_artifact_identity_conflict',
-          publicMessage: '交接工件与当前 terminal Build 或工程基线不一致。'
+          publicMessage: '交接候选与当前最终构建结果或工程保存基线不一致。'
         },
         responseBody: ''
       });
@@ -359,7 +359,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
       if (!session.snapshot.buildResult || session.snapshot.buildRunId !== replay.summary.runId ||
           session.snapshot.buildTerminalSequence !== replay.summary.lastSequence ||
           session.snapshot.buildRunStatus !== replay.summary.status) {
-        throw new Error('Terminal Build replay is not confirmed by the canonical Session Snapshot.');
+        throw new Error('最终构建的回放结果未得到服务端会话快照确认。');
       }
       dispatch({ type: 'snapshot-ready', snapshot: session.snapshot, at: now() });
       await loadCameraBindings();
@@ -375,7 +375,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     initialEvents: readonly AiAgentRunEventV1[] = [],
     kind: 'plan' | 'build' = 'plan'
   ): Promise<void> {
-    if (!currentSessionId) throw new Error('A confirmed Session is required before attaching a run.');
+    if (!currentSessionId) throw new Error('必须先确认 AI 会话，才能接入运行记录。');
     dispatch(kind === 'build'
       ? { type: 'build-attached', runId, operation, snapshot, at: now() }
       : { type: 'plan-attached', runId, operation, snapshot, at: now() });
@@ -399,7 +399,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     const operation = await request(signal => api.getOperation(planOperationId!, 'plan_run', signal));
     if (operation.status === 'pending') return false;
     if (operation.status !== 'created' || !operation.runId || operation.sessionId !== currentSessionId) {
-      throw new Error(operation.publicMessage || 'Plan operation was not created.');
+      throw new Error(operation.publicMessage || '方案规划操作未创建。');
     }
     await attachRun(operation.runId, operation, null);
     return true;
@@ -414,7 +414,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
       return false;
     }
     if (operation.status !== 'created' || !operation.runId || operation.sessionId !== currentSessionId) {
-      throw new Error(operation.publicMessage || 'Build operation was not created.');
+      throw new Error(operation.publicMessage || '候选构建操作未创建。');
     }
     await attachRun(operation.runId, operation, null, [], 'build');
     return true;
@@ -455,7 +455,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
     try {
       const project = projectId ? await request(signal => api.getProject(projectId, signal)) : null;
       if (disposed || runGeneration !== ownerGeneration) return;
-      if (projectId && project?.id !== projectId) throw new Error('Canonical Project identity mismatch.');
+      if (projectId && project?.id !== projectId) throw new Error('服务端工程身份与当前入口不一致。');
       await loadProjectBaseline();
       if (disposed || runGeneration !== ownerGeneration) return;
 
@@ -480,7 +480,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
         return;
       }
       if (await reconcileCreate(createOperationId)) return;
-      throw new Error('Session operation is still pending.');
+      throw new Error('AI 会话创建操作仍在处理中。');
     } catch (error) {
       if (disposed || runGeneration !== ownerGeneration || error instanceof ApiAbortError) return;
       if (!currentSessionId && createOperationId && !(error instanceof ApiUnauthorizedError)) {
@@ -513,7 +513,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
       }, signal));
       if (disposed || generation !== planGeneration) return;
       if (!response.runId || response.sessionId !== currentSessionId || response.operation.kind !== 'plan_run') {
-        throw new Error('Plan Run response identity mismatch.');
+        throw new Error('方案规划响应的运行身份不一致。');
       }
       await attachRun(response.runId, response.operation, response.workspaceSnapshot, response.events);
     } catch (error) {
@@ -569,7 +569,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
       }, signal));
       if (disposed || generation !== planGeneration) return;
       if (!response.runId || response.sessionId !== currentSessionId || response.operation.kind !== 'build_run') {
-        throw new Error('Build Run response identity mismatch.');
+        throw new Error('候选构建响应的运行身份不一致。');
       }
       await attachRun(response.runId, response.operation, response.workspaceSnapshot, response.events, 'build');
       await refreshSessionSnapshot();
@@ -589,7 +589,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
       } else {
         dispatch({
           type: 'build-unknown',
-          message: '构建创建响应未能确认；请先查询 operation 状态，系统不会盲目重复创建。',
+          message: '候选构建请求的结果尚未确认；请先核对操作状态，系统不会盲目重复创建。',
           at: now()
         });
       }
@@ -762,7 +762,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
       }, signal));
       if (response.build.runId !== build.runId || response.build.buildId !== build.buildId ||
           response.build.candidateFlowFingerprint !== build.candidateFlowFingerprint) {
-        throw new Error('Build revalidation response identity mismatch.');
+        throw new Error('候选重新校验响应的身份不一致。');
       }
       dispatch({ type: 'revalidation-ready', build: response.build, snapshot: response.snapshot, at: now() });
     } catch (error) {
@@ -911,7 +911,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
       if (readiness.planId !== plan.planId || readiness.planHash !== plan.planHash ||
           readiness.answerRevision !== session.snapshot.answerRevision ||
           readiness.resourceRevision !== session.snapshot.resourceRevision) {
-        throw new Error('Readiness response identity mismatch.');
+        throw new Error('就绪检查响应的身份不一致。');
       }
       const latestSession = state.value.session;
       if (!latestSession || latestSession.sessionId !== session.sessionId ||
@@ -971,7 +971,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
         type: 'failed',
         phase: 'session-conflict',
         errorCode: 'handoff_not_eligible',
-        message: '当前 terminal Build 未满足服务端交接身份与 ApplyGate 条件。',
+        message: '当前最终构建结果未满足服务端交接身份与应用准入条件。',
         at: now()
       });
       return null;
@@ -1006,7 +1006,7 @@ export function createAiSessionOwner(options: CreateAiSessionOwnerOptions): AiSe
           payload?.errorCode === 'handoff_create_unknown_outcome') {
         dispatch({
           type: 'handoff-unknown',
-          message: '交接响应未能确认；请查询当前 Build 的既有工件，禁止重复创建。',
+          message: '交接响应未能确认；请查询当前构建已有的交接候选，禁止重复创建。',
           at: now()
         });
         return null;

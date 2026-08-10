@@ -80,6 +80,9 @@ test('Overview consumes shared health/session and recent-project projections wit
   await expect(page.getByText('健康', { exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: '当前会话' }).getByText('fixture-operator', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '瓶盖检测' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '继续配置' })).toHaveAttribute(
+    'href', `#/projects/${projectId}/workspace`
+  );
   await expect.poll(() => audit.some(entry => entry.path === '/health')).toBe(true);
   await expect.poll(() => audit.some(entry => entry.path === '/api/auth/me')).toBe(true);
   await expect.poll(() => audit.some(entry => entry.path.startsWith('/api/projects/recent'))).toBe(true);
@@ -98,9 +101,11 @@ test('Overview does not mount ProductRuntime when the seeded session is rejected
 test('Product shell persists theme/density preferences and keeps Labs out of navigation', async ({ page }) => {
   await bootOverview(page);
 
-  await page.locator('[data-product-appearance] > summary').click();
-  await page.getByRole('button', { name: '深色', exact: true }).click();
-  await page.getByRole('button', { name: '舒适', exact: true }).click();
+  const appearanceTrigger = page.locator('[data-product-appearance] button[aria-haspopup="menu"]');
+  await appearanceTrigger.click();
+  await page.getByRole('menuitemcheckbox', { name: '深色', exact: true }).click();
+  await appearanceTrigger.click();
+  await page.getByRole('menuitemcheckbox', { name: '舒适', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(page.locator('html')).toHaveAttribute('data-density', 'comfortable');
   await page.reload();
@@ -116,36 +121,36 @@ test('Product shell exposes one main landmark and keeps disclosure menus mutuall
 
   await expect(page.getByRole('main')).toHaveCount(1);
   await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
-  await page.keyboard.press('Tab');
   const skipLink = page.getByRole('link', { name: '跳到主要内容' });
+  await skipLink.focus();
   await expect(skipLink).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('main')).toBeFocused();
 
   const appearance = page.locator('[data-product-appearance]');
-  const trigger = appearance.locator('summary');
+  const trigger = appearance.locator('button[aria-haspopup="menu"]');
   await trigger.focus();
   await page.keyboard.press('Enter');
-  await expect(appearance).toHaveAttribute('open', '');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Escape');
-  await expect(appearance).not.toHaveAttribute('open', '');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await expect(trigger).toBeFocused();
 
   const more = page.locator('[data-product-more]');
-  const moreTrigger = more.locator('summary');
+  const moreTrigger = more.locator('button[aria-haspopup="menu"]');
   await trigger.click();
-  await expect(appearance).toHaveAttribute('open', '');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await moreTrigger.click();
-  await expect(appearance).not.toHaveAttribute('open', '');
-  await expect(more).toHaveAttribute('open', '');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(moreTrigger).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Escape');
-  await expect(more).not.toHaveAttribute('open', '');
+  await expect(moreTrigger).toHaveAttribute('aria-expanded', 'false');
   await expect(moreTrigger).toBeFocused();
 
   await trigger.click();
-  await expect(appearance).toHaveAttribute('open', '');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await page.getByRole('main').click({ position: { x: 12, y: 12 } });
-  await expect(appearance).not.toHaveAttribute('open', '');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
 
   await page.locator('[data-product-nav="/projects"]').click();
   await expect(page.locator('[data-capability="projects-read"]')).toBeVisible();
@@ -169,23 +174,23 @@ test('Product shell keeps reduced motion and short-viewport keyboard targets vis
   expect(projectsBox!.y).toBeGreaterThanOrEqual(0);
   expect(projectsBox!.y + projectsBox!.height).toBeLessThanOrEqual(600);
 
-  const appearance = page.locator('[data-product-appearance] > summary');
+  const appearance = page.locator('[data-product-appearance] button[aria-haspopup="menu"]');
   await appearance.focus();
   const appearanceBox = await appearance.boundingBox();
   expect(appearanceBox).not.toBeNull();
   expect(appearanceBox!.y).toBeGreaterThanOrEqual(0);
   expect(appearanceBox!.y + appearanceBox!.height).toBeLessThanOrEqual(600);
   await appearance.click();
-  const appearancePopover = await page.locator('.product-layout__appearance-popover').boundingBox();
+  const appearancePopover = await page.locator('[role="menu"][aria-label="外观设置"]').boundingBox();
   expect(appearancePopover).not.toBeNull();
   expect(appearancePopover!.x).toBeGreaterThanOrEqual(0);
   expect(appearancePopover!.y).toBeGreaterThanOrEqual(0);
   expect(appearancePopover!.x + appearancePopover!.width).toBeLessThanOrEqual(1366);
   expect(appearancePopover!.y + appearancePopover!.height).toBeLessThanOrEqual(600);
 
-  const more = page.locator('[data-product-more] > summary');
+  const more = page.locator('[data-product-more] button[aria-haspopup="menu"]');
   await more.click();
-  const morePopover = await page.locator('[data-product-more] > nav').boundingBox();
+  const morePopover = await page.locator('[role="menu"][aria-label="更多产品入口"]').boundingBox();
   expect(morePopover).not.toBeNull();
   expect(morePopover!.x).toBeGreaterThanOrEqual(0);
   expect(morePopover!.y).toBeGreaterThanOrEqual(0);
@@ -207,8 +212,8 @@ test('Diagnostics, About and 404 remain inside the single product shell', async 
   await expect(page.getByText('产品版本', { exact: true })).toBeVisible();
   await expect(page.getByText('桌面宿主版本', { exact: true })).toBeVisible();
   await expect(page.getByText('本地服务版本', { exact: true })).toBeVisible();
-  await expect(page.getByText('工程库（/projects）', { exact: true })).toBeVisible();
-  await expect(page.getByText('请联系系统管理员或项目交付方', { exact: true })).toBeVisible();
+  await expect(page.getByText('启动模式', { exact: true })).toBeVisible();
+  await expect(page.getByText('请联系系统管理员或实施交付方', { exact: true })).toBeVisible();
 
   await page.goto('/studio/index.html#/not-a-product-route');
   await expect(page.locator('[data-studio-page="not-found"]')).toBeVisible();

@@ -680,7 +680,7 @@ export function createWorkspaceGlobalVariablesOwner(options: {
           state.runtimeTargetVariableId = variableId;
           if (isUnknownWriteOutcome(error)) {
             state.runtimeOutcome = 'unknown-outcome';
-            state.message = '运行值写入响应未知；后端没有 operation identity，请先重新读取协调，禁止自动重试。';
+            state.message = '运行值写入响应未知；服务端没有提供可核对的操作标识，请先重新读取状态，禁止自动重试。';
           } else {
             pendingWrite = null;
             state.runtimeHasPendingWrite = false;
@@ -925,7 +925,7 @@ export function createWorkspaceGlobalVariablesOwner(options: {
       state.runtimeTargetVariableId = null;
       state.runtimeValues = Object.freeze([]);
       state.runtimeHasPendingWrite = false;
-      state.message = '全局变量 owner 已释放。';
+      state.message = '全局变量编辑已关闭。';
       lease?.update(Object.freeze({
         activeSubscriptions: 0,
         activeTimers: 0,

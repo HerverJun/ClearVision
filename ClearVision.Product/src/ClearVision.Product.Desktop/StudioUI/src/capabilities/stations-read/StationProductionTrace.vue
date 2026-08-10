@@ -75,7 +75,7 @@ async function copyIdentity(key: string, value: string | null): Promise<void> {
   <CvPanel
     class="production-trace"
     title="生产追溯链"
-    description="由当前页面已读取的工程、运行包、命令、审计、当前运行身份与结果权威组合，不建立新的持久化投影。"
+    description="串联来源工程、正式运行包、部署记录、当前运行身份和最近结果。"
     data-testid="station-production-trace"
   >
     <div class="production-trace__heading">
@@ -110,13 +110,13 @@ async function copyIdentity(key: string, value: string | null): Promise<void> {
         <div>
           <small>部署命令与审计</small>
           <strong>{{ projection.deploymentCommand ? `${projection.deploymentCommand.issuedBy || '系统'} · ${formatStationDateTime(projection.deploymentCommand.createdAtUtc)}` : '当前窗口无可关联命令' }}</strong>
-          <em>{{ projection.deploymentCommand ? `${projection.deploymentCommand.commandId} · ${projection.deploymentCommand.status}` : adminEvidence === 'restricted' ? '管理员详情未向当前角色开放' : '未猜测命令关联' }}</em>
+          <em>{{ projection.deploymentCommand ? `${projection.deploymentCommand.commandId} · ${projection.deploymentCommand.status}` : adminEvidence === 'restricted' ? '当前账号无权查看命令详情' : '未找到可确认的命令关联' }}</em>
           <em v-if="projection.deploymentAudit">审计 {{ projection.deploymentAudit.auditId }} · {{ projection.deploymentAudit.userName || '系统' }} · {{ projection.deploymentAudit.result || '结果未记录' }} · {{ formatStationDateTime(projection.deploymentAudit.createdAtUtc) }}</em>
         </div>
       </li>
       <li>
         <span>4</span>
-        <div><small>工作站当前身份 / 运行</small><strong>{{ station.isOnline ? '在线权威已读取' : '工作站离线，显示最后上报事实' }}</strong><em>{{ station.executionSnapshotId || '执行快照未上报' }} · {{ station.currentRunId || '无活动运行' }}</em></div>
+        <div><small>工作站当前身份 / 运行</small><strong>{{ station.isOnline ? '服务端状态已读取' : '工作站离线，显示最后上报事实' }}</strong><em>{{ station.executionSnapshotId || '执行快照未上报' }} · {{ station.currentRunId || '无活动运行' }}</em></div>
       </li>
       <li>
         <span>5</span>
@@ -178,7 +178,7 @@ async function copyIdentity(key: string, value: string | null): Promise<void> {
       title="远程图像未上传"
       data-remote-image-status="not-uploaded"
     >
-      工作站仅同步结果摘要；本页不会请求现场图像。图像上传、隐私、带宽、留存与加密需另行评审。
+      工作站当前只同步结果摘要，现场图像不可查看。图像上传范围、留存和加密策略尚未配置。
     </CvInlineAlert>
   </CvPanel>
 </template>
@@ -190,17 +190,17 @@ async function copyIdentity(key: string, value: string | null): Promise<void> {
 .production-trace__steps { margin: 0; padding: 0; display: grid; list-style: none; border-block: 1px solid var(--cv-border-subtle); }
 .production-trace__steps li { min-width: 0; min-height: 54px; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: var(--cv-space-3); border-bottom: 1px solid var(--cv-border-subtle); }
 .production-trace__steps li:last-child { border-bottom: 0; }
-.production-trace__steps li > span:first-child { width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid var(--cv-control-border); border-radius: 50%; color: var(--cv-text-muted); font-family: var(--cv-font-mono); font-size: var(--cv-font-size-2xs); }
+.production-trace__steps li > span:first-child { width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid var(--cv-control-border); border-radius: 50%; color: var(--cv-text-muted); font-family: var(--cv-font-mono); font-size: var(--cv-font-size-xs); }
 .production-trace__steps li > div { min-width: 0; display: grid; gap: 1px; }
-.production-trace__steps small,.production-trace__steps em { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); font-style: normal; overflow-wrap: anywhere; }
+.production-trace__steps small,.production-trace__steps em { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); font-style: normal; overflow-wrap: anywhere; }
 .production-trace__steps strong { font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); overflow-wrap: anywhere; }
-.production-trace__restricted { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.production-trace__restricted { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .production-trace__nav-link { min-height: var(--cv-density-control-height-sm); padding: 0 var(--cv-space-2); display: inline-flex; align-items: center; justify-content: center; border-radius: var(--cv-radius-sm); color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; touch-action: manipulation; }
 .production-trace__nav-link:hover { background: var(--cv-interactive-hover); color: var(--cv-color-link-hover); }
 .production-trace__nav-link:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
 .production-trace__hashes { margin: var(--cv-space-3) 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--cv-space-2); }
 .production-trace__hashes > div { min-width: 0; padding: var(--cv-space-2); background: var(--cv-surface-page); }
-.production-trace__hashes dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.production-trace__hashes dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .production-trace__hashes dd { min-width: 0; margin: 2px 0 0; display: flex; align-items: center; gap: var(--cv-space-1); }
 .production-trace__hashes code { min-width: 0; flex: 1; overflow: hidden; color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
 .production-trace :deep(.cv-inline-alert) { margin-top: var(--cv-space-2); }

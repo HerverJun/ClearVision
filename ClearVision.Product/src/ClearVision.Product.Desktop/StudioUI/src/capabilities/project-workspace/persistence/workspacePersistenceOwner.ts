@@ -191,7 +191,7 @@ export function createWorkspacePersistenceOwner(options: {
     message: options.readonlyReason ?? (
       baseline.saveCompatibility.canEncode
         ? '所有修改已保存。'
-        : `保存合同阻断：${baseline.saveCompatibility.blockedPaths.join(', ')}`
+        : '保存合同阻断：当前流程包含服务端暂不支持保存的字段。'
     ),
     errorCode: null,
     conflictServerRevision: null,
@@ -339,7 +339,7 @@ export function createWorkspacePersistenceOwner(options: {
     if (contentChangedOnServer && hadLocalDraft) {
       state.phase = 'conflict';
       state.errorCode = 'PSV011';
-      state.message = `服务器 revision ${project.persistenceRevision} 同时包含工程修改；本地 draft 已保留，请使用现有保存冲突处理。`;
+      state.message = `服务端保存修订 ${project.persistenceRevision} 同时包含工程修改；本地草稿已保留，请使用现有保存冲突处理。`;
       options.flowOwner.setMutationGate('readonly');
       syncAvailability();
       return false;
@@ -361,7 +361,7 @@ export function createWorkspacePersistenceOwner(options: {
     state.persistenceRevision = project.persistenceRevision;
     state.errorCode = null;
     state.conflictServerRevision = null;
-    state.message = `外部资产提交已协调到工程 revision ${project.persistenceRevision}。`;
+    state.message = `外部资产提交已核对到工程保存修订 ${project.persistenceRevision}。`;
     syncAvailability();
     return true;
   }
@@ -385,7 +385,7 @@ export function createWorkspacePersistenceOwner(options: {
       replaceFlow(canonicalFlow, project.name);
       state.dirty = false;
       state.phase = 'saved';
-      state.message = `已保存 revision ${project.persistenceRevision}。`;
+      state.message = `已保存修订 ${project.persistenceRevision}。`;
     } else {
       const replayed = encodeWorkspaceFlowDraftUpdateV1(project, currentDraft, {
         materializedFlowId,
@@ -399,8 +399,8 @@ export function createWorkspacePersistenceOwner(options: {
       }) !== baselineContentFingerprint;
       state.phase = state.dirty ? 'dirty' : 'saved';
       state.message = state.dirty
-        ? `revision ${project.persistenceRevision} 已更新；保存期间的新修改仍未保存。`
-        : `已保存 revision ${project.persistenceRevision}。`;
+        ? `保存修订 ${project.persistenceRevision} 已更新；保存期间的新修改仍未保存。`
+        : `已保存修订 ${project.persistenceRevision}。`;
     }
     syncAvailability();
     return Object.freeze({ status: 'saved', project });
@@ -430,7 +430,7 @@ export function createWorkspacePersistenceOwner(options: {
     const operation = operationGeneration;
     state.phase = 'conflict';
     state.errorCode = code;
-    state.message = '保存冲突：本地 draft 已保留，正在读取服务器版本。';
+    state.message = '保存冲突：本地草稿已保留，正在读取服务端版本。';
     options.flowOwner.setMutationGate('readonly');
     syncAvailability();
     try {
@@ -438,10 +438,10 @@ export function createWorkspacePersistenceOwner(options: {
       if (!isCurrentOperation(operation)) return Object.freeze({ status: 'disposed', project: null });
       conflictServerProject = server;
       state.conflictServerRevision = conflictServerProject.persistenceRevision;
-      state.message = `保存冲突：服务器 revision ${conflictServerProject.persistenceRevision}；请选择重放或放弃本地 draft。`;
+      state.message = `保存冲突：服务端保存修订 ${conflictServerProject.persistenceRevision}；请选择重新应用或放弃本地草稿。`;
     } catch (error) {
       if (!isCurrentOperation(operation)) return Object.freeze({ status: 'disposed', project: null });
-      state.message = `保存冲突：本地 draft 已保留；服务器版本读取失败。${errorMessage(error)}`;
+      state.message = `保存冲突：本地草稿已保留；服务端版本读取失败。${errorMessage(error)}`;
     }
     syncAvailability();
     return Object.freeze({ status: 'conflict', project: conflictServerProject });
@@ -505,7 +505,7 @@ export function createWorkspacePersistenceOwner(options: {
       if (error instanceof ApiForbiddenError) {
         state.phase = 'readonly';
         state.errorCode = code ?? 'HTTP_403';
-        state.message = '后端拒绝保存；Workspace 已切换为只读，本地 draft 保留。';
+        state.message = '服务端拒绝保存；工程工作区已切换为只读，本地草稿保留。';
         options.flowOwner.setMutationGate('readonly');
         syncAvailability();
         return Object.freeze({ status: 'readonly', project: null });
@@ -513,7 +513,7 @@ export function createWorkspacePersistenceOwner(options: {
       if (error instanceof ApiConflictError && code === 'GV031') {
         state.phase = 'running';
         state.errorCode = code;
-        state.message = '工程正在运行，保存被后端锁定；本地 draft 保留。';
+        state.message = '工程正在正式运行，保存被服务端锁定；本地草稿保留。';
         options.flowOwner.setMutationGate('running');
         syncAvailability();
         return Object.freeze({ status: 'running', project: null });
@@ -537,7 +537,7 @@ export function createWorkspacePersistenceOwner(options: {
       }
       state.phase = 'error';
       state.errorCode = code ?? 'SAVE_FAILED';
-      state.message = `保存失败：${errorMessage(error)} 本地 draft 已保留。`;
+      state.message = `保存失败：${errorMessage(error)} 本地草稿已保留。`;
       if (error instanceof ApiHttpError) options.globalVariablesOwner.setServerDiagnostics(error.payload);
       syncAvailability();
       return Object.freeze({ status: 'failed', project: null });
@@ -577,13 +577,13 @@ export function createWorkspacePersistenceOwner(options: {
       }
       state.phase = 'conflict';
       state.errorCode = 'PSV011';
-      state.message = `服务器 revision ${server.persistenceRevision} 与本地 baseline 不一致；请选择重放或放弃 draft。`;
+      state.message = `服务端保存修订 ${server.persistenceRevision} 与本地保存基线不一致；请选择重新应用或放弃草稿。`;
       options.flowOwner.setMutationGate('readonly');
       syncAvailability();
       return Object.freeze({ status: 'conflict', project: server });
     } catch (error) {
       if (!isCurrentOperation(operation)) return Object.freeze({ status: 'disposed', project: null });
-      state.message = `Reconcile 失败：${errorMessage(error)}`;
+      state.message = `状态核对失败：${errorMessage(error)}`;
       syncAvailability();
       return Object.freeze({ status: 'failed', project: null });
     }
@@ -641,8 +641,8 @@ export function createWorkspacePersistenceOwner(options: {
       state.errorCode = null;
       state.conflictServerRevision = null;
       state.message = state.dirty
-        ? `本地 draft 已重放到 revision ${server.persistenceRevision}；请再次手动保存。`
-        : '服务器版本与本地 draft 等价。';
+        ? `本地草稿已重新应用到保存修订 ${server.persistenceRevision}；请再次手动保存。`
+        : '服务端版本与本地草稿等价。';
       conflictServerProject = null;
       options.flowOwner.setMutationGate('editable');
       syncAvailability();
@@ -657,7 +657,7 @@ export function createWorkspacePersistenceOwner(options: {
       state.phase = 'clean';
       state.errorCode = null;
       state.conflictServerRevision = null;
-      state.message = `已放弃本地 draft，加载服务器 revision ${server.persistenceRevision}。`;
+      state.message = `已放弃本地草稿，加载服务端保存修订 ${server.persistenceRevision}。`;
       conflictServerProject = null;
       options.flowOwner.setMutationGate('editable');
       syncAvailability();
@@ -685,7 +685,7 @@ export function createWorkspacePersistenceOwner(options: {
       if (disposed) return;
       sessionReadonly = true;
       if (state.phase !== 'saving' && state.phase !== 'unknown-outcome') state.phase = 'readonly';
-      state.message = reason.trim() || 'Workspace 已切换为只读。';
+      state.message = reason.trim() || '工程工作区已切换为只读。';
       options.flowOwner.setMutationGate('readonly');
       syncAvailability();
     },
@@ -694,7 +694,7 @@ export function createWorkspacePersistenceOwner(options: {
       sessionReadonly = false;
       if (state.phase === 'readonly') {
         state.phase = state.dirty ? 'dirty' : 'clean';
-        state.message = state.dirty ? '会话已恢复；本地 draft 仍未保存。' : '会话已恢复，所有修改已保存。';
+        state.message = state.dirty ? '会话已恢复；本地草稿仍未保存。' : '会话已恢复，所有修改已保存。';
         state.errorCode = null;
         options.flowOwner.setMutationGate('editable');
       }

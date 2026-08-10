@@ -1,26 +1,33 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { RouterLink, RouterView, useRoute } from 'vue-router';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import { useAuthLifecycleRoot } from '@/app/auth';
 import { visibleProductNavigation } from '@/app/navigation';
 import { useProductRuntime } from '@/app/productRuntime';
 import { CvBrand } from '@/design-system/patterns';
-import { CvButton, CvInlineAlert, CvModal, CvStatusBadge } from '@/design-system/primitives';
+import {
+  CvButton,
+  CvInlineAlert,
+  CvMenu,
+  CvMenuItem,
+  CvModal,
+  CvStatusBadge
+} from '@/design-system/primitives';
 import { CvIcon } from '@/design-system/icons';
 import type { CvIconName } from '@/design-system/icons';
 import './product-layout.css';
 
 const route = useRoute();
+const router = useRouter();
 const runtime = useProductRuntime();
 const authRoot = useAuthLifecycleRoot();
 const session = runtime.session.projection;
 const systemStatus = runtime.systemStatus.projection;
 const preferences = runtime.preferences.projection;
 const contentRoot = ref<HTMLElement>();
-const appearanceDetails = ref<HTMLDetailsElement>();
-const moreDetails = ref<HTMLDetailsElement>();
 const appearanceOpen = ref(false);
 const moreOpen = ref(false);
+const userOpen = ref(false);
 const workspaceMode = computed(() => route.meta.workspaceMode === true);
 const routeViewKey = computed(() => route.name === 'project-workspace'
   ? 'project-workspace'
@@ -137,37 +144,51 @@ const leavePromptTitle = computed(() => leaveGuard.projection.protectionKind ===
   ? '放弃未解决的工程编辑？'
   : '放弃本地工作区修改？');
 
-function closeDetails(details: HTMLDetailsElement | undefined, returnFocus: boolean): void {
-  if (!details?.open) return;
-  details.open = false;
-  if (returnFocus) details.querySelector<HTMLElement>('summary')?.focus();
-}
-
-function closeAppearance(returnFocus = true): void {
-  closeDetails(appearanceDetails.value, returnFocus);
+function closeAppearance(): void {
   appearanceOpen.value = false;
 }
 
-function closeMore(returnFocus = true): void {
-  closeDetails(moreDetails.value, returnFocus);
+function closeMore(): void {
   moreOpen.value = false;
 }
 
-function onAppearanceToggle(event: Event): void {
-  appearanceOpen.value = (event.currentTarget as HTMLDetailsElement).open;
-  if (appearanceOpen.value) closeMore(false);
+function closeUser(): void {
+  userOpen.value = false;
 }
 
-function onMoreToggle(event: Event): void {
-  moreOpen.value = (event.currentTarget as HTMLDetailsElement).open;
-  if (moreOpen.value) closeAppearance(false);
+function openAppearance(): void {
+  closeMore();
+  closeUser();
 }
 
-function handleDocumentPointerDown(event: PointerEvent): void {
-  const target = event.target;
-  if (!(target instanceof Node)) return;
-  if (appearanceDetails.value?.open && !appearanceDetails.value.contains(target)) closeAppearance(false);
-  if (moreDetails.value?.open && !moreDetails.value.contains(target)) closeMore(false);
+function openMore(): void {
+  closeAppearance();
+  closeUser();
+}
+
+function openUser(): void {
+  closeAppearance();
+  closeMore();
+}
+
+function selectAppearance(value: string): void {
+  if (value === 'theme-light' || value === 'theme-dark') {
+    runtime.preferences.setTheme(value === 'theme-dark' ? 'dark' : 'light');
+  } else if (value === 'density-compact' || value === 'density-comfortable') {
+    runtime.preferences.setDensity(value === 'density-comfortable' ? 'comfortable' : 'compact');
+  }
+}
+
+function selectMore(value: string): void {
+  if (productMoreNavigation.value.some(item => item.to === value)) void router.push(value);
+}
+
+function selectUser(value: string): void {
+  if (value === 'change-password') {
+    void router.push('/change-password');
+  } else if (value === 'logout') {
+    void authRoot.auth.logout();
+  }
 }
 
 function focusContent(): void {
@@ -176,18 +197,16 @@ function focusContent(): void {
 
 watch(() => route.path, async (current, previous) => {
   if (!previous || current === previous) return;
-  closeAppearance(false);
-  closeMore(false);
+  closeAppearance();
+  closeMore();
+  closeUser();
   await nextTick();
   contentRoot.value?.focus({ preventScroll: true });
 });
 
 onMounted(() => {
   runtime.preferences.apply();
-  document.addEventListener('pointerdown', handleDocumentPointerDown, true);
 });
-
-onBeforeUnmount(() => document.removeEventListener('pointerdown', handleDocumentPointerDown, true));
 </script>
 
 <template>
@@ -270,145 +289,141 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', handleDocument
             />
           </div>
 
-          <details
-            ref="appearanceDetails"
+          <span
             class="product-layout__appearance"
             data-product-appearance
-            @toggle="onAppearanceToggle"
-            @keydown.esc.stop.prevent="closeAppearance()"
           >
-            <summary
-              class="product-layout__appearance-trigger"
-              :aria-label="`外观设置，当前${themeLabel}主题，${densityLabel}密度`"
-              :aria-expanded="appearanceOpen"
+            <CvMenu
+              v-model="appearanceOpen"
+              label="外观设置"
+              :trigger-label="`外观设置，当前${themeLabel}主题，${densityLabel}密度`"
+              align="end"
+              @open="openAppearance"
+              @select="selectAppearance"
             >
-              <CvIcon
-                name="theme"
-                size="sm"
-              />
-              <span>外观</span>
-              <small>{{ themeLabel }} · {{ densityLabel }}</small>
-              <CvIcon
-                name="chevron-right"
-                size="sm"
-              />
-            </summary>
-            <div
-              class="product-layout__appearance-popover"
-              aria-label="外观设置"
-            >
-              <div class="product-layout__appearance-section">
-                <span>主题</span>
-                <div
-                  class="product-layout__preference-group"
-                  role="group"
-                  aria-label="主题"
-                >
-                  <CvButton
-                    size="sm"
-                    :variant="preferences.theme === 'light' ? 'secondary' : 'quiet'"
-                    :aria-pressed="preferences.theme === 'light'"
-                    @click="runtime.preferences.setTheme('light')"
-                  >
-                    浅色
-                  </CvButton>
-                  <CvButton
-                    size="sm"
-                    :variant="preferences.theme === 'dark' ? 'secondary' : 'quiet'"
-                    :aria-pressed="preferences.theme === 'dark'"
-                    @click="runtime.preferences.setTheme('dark')"
-                  >
-                    深色
-                  </CvButton>
-                </div>
-              </div>
-              <div class="product-layout__appearance-section">
-                <span>界面密度</span>
-                <div
-                  class="product-layout__preference-group"
-                  role="group"
-                  aria-label="界面密度"
-                >
-                  <CvButton
-                    size="sm"
-                    :variant="preferences.density === 'compact' ? 'secondary' : 'quiet'"
-                    :aria-pressed="preferences.density === 'compact'"
-                    @click="runtime.preferences.setDensity('compact')"
-                  >
-                    紧凑
-                  </CvButton>
-                  <CvButton
-                    size="sm"
-                    :variant="preferences.density === 'comfortable' ? 'secondary' : 'quiet'"
-                    :aria-pressed="preferences.density === 'comfortable'"
-                    @click="runtime.preferences.setDensity('comfortable')"
-                  >
-                    舒适
-                  </CvButton>
-                </div>
-              </div>
-            </div>
-          </details>
-
-          <details
-            v-if="productMoreNavigation.length"
-            ref="moreDetails"
-            class="product-layout__more"
-            data-product-more
-            @toggle="onMoreToggle"
-            @keydown.esc.stop.prevent="closeMore()"
-          >
-            <summary
-              title="更多产品入口"
-              :aria-expanded="moreOpen"
-            >
-              更多
-              <CvIcon
-                name="chevron-right"
-                size="sm"
-              />
-            </summary>
-            <nav aria-label="更多产品入口">
-              <RouterLink
-                v-for="item in productMoreNavigation"
-                :key="item.to"
-                :to="item.to"
-                :data-product-nav="item.to"
-              >
+              <template #trigger>
                 <CvIcon
-                  :name="navigationIcons[item.to] ?? 'overview'"
+                  name="theme"
                   size="sm"
                 />
-                <span>{{ item.label }}</span>
-              </RouterLink>
-            </nav>
-          </details>
+                <span class="product-layout__menu-trigger-label">外观</span>
+                <small>{{ themeLabel }} · {{ densityLabel }}</small>
+              </template>
+              <span class="product-layout__menu-label">主题</span>
+              <CvMenuItem
+                value="theme-light"
+                label="浅色"
+                :checked="preferences.theme === 'light'"
+              />
+              <CvMenuItem
+                value="theme-dark"
+                label="深色"
+                :checked="preferences.theme === 'dark'"
+              />
+              <span class="product-layout__menu-label">界面密度</span>
+              <CvMenuItem
+                value="density-compact"
+                label="紧凑"
+                :checked="preferences.density === 'compact'"
+              />
+              <CvMenuItem
+                value="density-comfortable"
+                label="舒适"
+                :checked="preferences.density === 'comfortable'"
+              />
+            </CvMenu>
+          </span>
 
-          <div class="product-layout__user">
-            <span
-              class="product-layout__user-avatar"
-              aria-hidden="true"
-            >{{ userInitial }}</span>
-            <span class="product-layout__user-copy">
-              <strong>{{ session.user?.username ?? '未认证' }}</strong>
-              <small>{{ roleLabel }}</small>
-            </span>
-          </div>
-          <RouterLink
-            class="product-layout__session-command"
-            to="/change-password"
+          <span
+            v-if="productMoreNavigation.length"
+            class="product-layout__more"
+            data-product-more
           >
-            修改密码
-          </RouterLink>
-          <CvButton
-            v-if="!workspaceMode"
-            size="sm"
-            variant="quiet"
-            data-auth-command="logout"
-            @click="authRoot.auth.logout()"
+            <CvMenu
+              v-model="moreOpen"
+              label="更多产品入口"
+              trigger-label="更多产品入口"
+              align="end"
+              @open="openMore"
+              @select="selectMore"
+            >
+              <template #trigger>
+                <span class="product-layout__menu-trigger-label">更多</span>
+                <CvIcon
+                  name="chevron-right"
+                  size="sm"
+                />
+              </template>
+              <CvMenuItem
+                v-for="item in productMoreNavigation"
+                :key="item.to"
+                :value="item.to"
+                :label="item.label"
+                :data-product-nav="item.to"
+              >
+                <template #leading>
+                  <CvIcon
+                    :name="navigationIcons[item.to] ?? 'overview'"
+                    size="sm"
+                  />
+                </template>
+              </CvMenuItem>
+            </CvMenu>
+          </span>
+
+          <span
+            class="product-layout__user-menu"
+            data-product-user-menu
           >
-            退出
-          </CvButton>
+            <CvMenu
+              v-model="userOpen"
+              label="会话菜单"
+              :trigger-label="`会话菜单，${session.user?.username ?? '未认证'}，${roleLabel}`"
+              align="end"
+              @open="openUser"
+              @select="selectUser"
+            >
+              <template #trigger>
+                <span
+                  class="product-layout__user-avatar"
+                  aria-hidden="true"
+                >{{ userInitial }}</span>
+                <span class="product-layout__user-copy">
+                  <strong>{{ session.user?.username ?? '未认证' }}</strong>
+                  <small>{{ roleLabel }}</small>
+                </span>
+                <CvIcon
+                  name="chevron-right"
+                  size="sm"
+                />
+              </template>
+              <CvMenuItem
+                value="change-password"
+                label="修改密码"
+                data-session-command="change-password"
+              >
+                <template #leading>
+                  <CvIcon
+                    name="lock"
+                    size="sm"
+                  />
+                </template>
+              </CvMenuItem>
+              <CvMenuItem
+                value="logout"
+                label="退出"
+                tone="destructive"
+                data-auth-command="logout"
+              >
+                <template #leading>
+                  <CvIcon
+                    name="power"
+                    size="sm"
+                  />
+                </template>
+              </CvMenuItem>
+            </CvMenu>
+          </span>
         </div>
       </header>
 

@@ -129,6 +129,51 @@ textarea {
   white-space: pre-wrap;
 }
 
+.foundation-page.bootstrap-diagnostic {
+  margin-block: clamp(32px, 12vh, 120px);
+}
+
+.bootstrap-diagnostic__product {
+  margin: 0 0 8px;
+  color: var(--cv-color-link);
+  font-size: var(--cv-font-size-xs);
+  font-weight: var(--cv-font-weight-semibold);
+}
+
+.bootstrap-diagnostic__technical {
+  margin-top: 16px;
+  border-top: 1px solid var(--cv-border-subtle);
+}
+
+.bootstrap-diagnostic__technical summary {
+  padding: 12px 0;
+  color: var(--cv-color-link);
+  cursor: pointer;
+  font-size: var(--cv-font-size-sm);
+  font-weight: var(--cv-font-weight-medium);
+}
+
+.bootstrap-diagnostic__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.bootstrap-diagnostic__copy-status {
+  display: block;
+  min-height: 20px;
+  margin-top: 8px;
+  color: var(--cv-text-secondary);
+  font-size: var(--cv-font-size-xs);
+}
+
+.bootstrap-diagnostic__guidance {
+  margin: 16px 0 0;
+  color: var(--cv-text-secondary);
+  font-size: var(--cv-font-size-sm);
+}
+
 .bootstrap-diagnostic button {
   min-height: var(--cv-density-control-height);
   padding: 0 var(--cv-space-4);

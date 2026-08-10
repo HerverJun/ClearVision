@@ -12,10 +12,10 @@ import {
   CvSearchField,
   CvSelect,
   CvStatusBadge,
-  CvToolbar,
   type CvDataTableColumn,
   type CvSelectOption
 } from '@/design-system';
+import { CvIcon } from '@/design-system/icons';
 import type { OperatorCatalogItem, OperatorCategoryId, OperatorLifecycle } from './operatorContracts';
 import { createOperatorCatalogQuery } from './operatorQueries';
 import { useOperatorsReadRuntime, type OperatorsReadRuntime } from './operatorsReadRuntime';
@@ -97,6 +97,14 @@ const filters = computed<OperatorFilters>(() => ({
 }));
 const filtered = computed(() => filterOperators(state.value.data ?? [], filters.value));
 const pageSlice = computed(() => paginateOperators(filtered.value, pageModel.value, pageSize));
+const activeFilterCount = computed(() => [
+  filters.value.q,
+  filters.value.category,
+  filters.value.port,
+  filters.value.parameter,
+  filters.value.lifecycle,
+  filters.value.visibility === 'default' ? '' : filters.value.visibility
+].filter(Boolean).length);
 
 watch(() => pageSlice.value.page, page => {
   if (page !== pageModel.value) pageModel.value = page;
@@ -129,6 +137,10 @@ function detailHref(operator: OperatorCatalogItem): string {
   return `/operators/${encodeURIComponent(operator.operatorType)}`;
 }
 
+function clearFilters(): void {
+  void router.replace({ query: {} });
+}
+
 onMounted(() => { void catalogQuery.refresh(); });
 onBeforeUnmount(() => { catalogQuery.dispose(); });
 </script>
@@ -141,53 +153,47 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
     <CvPageHeader
       eyebrow="资源目录"
       title="算子库"
-      description="只读浏览算子标识与当前分支运行时元数据；不提供拖拽、预览、执行或参数生成。"
+      description="按名称、分类、端口和参数查找可用算子，查看当前版本的接口定义。"
     >
       <template #actions>
+        <CvStatusBadge
+          tone="idle"
+          :dot="false"
+        >
+          只读目录
+        </CvStatusBadge>
         <CvButton
           size="sm"
           :loading="state.isRefreshing"
           loading-label="正在刷新算子库"
           @click="catalogQuery.refresh({ force: true })"
         >
+          <template #leading>
+            <CvIcon name="refresh" />
+          </template>
           刷新
         </CvButton>
       </template>
     </CvPageHeader>
 
     <CvPanel
-      title="算子目录"
-      description="筛选在当前只读目录内执行，全部条件保存在地址栏参数中。"
+      title="目录与筛选"
+      description="筛选条件会随当前链接保留，返回目录时可继续上次查找。"
     >
-      <CvToolbar
-        interaction="group"
-        label="算子目录筛选"
+      <div
+        class="operators-page__filters"
+        role="search"
+        aria-label="算子目录筛选"
       >
-        <CvSearchField
-          v-model="searchModel"
-          class="operators-page__search"
-          label="搜索算子"
-          placeholder="名称、类型、关键词或标签"
-          clear-label="清除算子搜索"
-          :hide-label="false"
-        />
-        <CvSearchField
-          v-model="portModel"
-          class="operators-page__compact-search"
-          label="端口过滤"
-          placeholder="端口名称或类型"
-          clear-label="清除端口过滤"
-          :hide-label="false"
-        />
-        <CvSearchField
-          v-model="parameterModel"
-          class="operators-page__compact-search"
-          label="参数过滤"
-          placeholder="参数名称或类型"
-          clear-label="清除参数过滤"
-          :hide-label="false"
-        />
-        <template #secondary>
+        <div class="operators-page__primary-filters">
+          <CvSearchField
+            v-model="searchModel"
+            class="operators-page__search"
+            label="搜索算子"
+            placeholder="名称、标识、关键词或标签"
+            clear-label="清除算子搜索"
+            :hide-label="false"
+          />
           <CvSelect
             v-model="categoryModel"
             label="分类"
@@ -200,11 +206,50 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
           />
           <CvSelect
             v-model="visibilityModel"
-            label="可见性"
+            label="可见范围"
             :options="visibilityOptions"
           />
-        </template>
-      </CvToolbar>
+        </div>
+        <div class="operators-page__metadata-filters">
+          <span class="operators-page__metadata-label">接口条件</span>
+          <CvSearchField
+            v-model="portModel"
+            class="operators-page__compact-search"
+            label="端口"
+            placeholder="名称或数据类型"
+            clear-label="清除端口过滤"
+            :hide-label="false"
+          />
+          <CvSearchField
+            v-model="parameterModel"
+            class="operators-page__compact-search"
+            label="参数"
+            placeholder="名称或数据类型"
+            clear-label="清除参数过滤"
+            :hide-label="false"
+          />
+        </div>
+      </div>
+
+      <div
+        v-if="state.data"
+        class="operators-page__result-bar"
+        aria-live="polite"
+      >
+        <p>
+          <strong>{{ pageSlice.totalCount }}</strong>
+          个匹配项
+          <span v-if="pageSlice.totalCount !== state.data.length">/ 目录共 {{ state.data.length }} 项</span>
+        </p>
+        <CvButton
+          v-if="activeFilterCount > 0"
+          variant="quiet"
+          size="sm"
+          @click="clearFilters"
+        >
+          清除 {{ activeFilterCount }} 项筛选
+        </CvButton>
+      </div>
 
       <CvInlineAlert
         v-if="state.isRefreshing && state.data"
@@ -276,7 +321,10 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
         <template #cell-displayName="{ row }">
           <div class="operators-page__identity">
             <strong>{{ row.displayName }}</strong>
-            <code>{{ row.operatorType }}</code>
+            <div class="operators-page__identity-meta">
+              <span>{{ row.description || '暂无说明' }}</span>
+              <code>标识 {{ row.operatorType }}</code>
+            </div>
           </div>
         </template>
         <template #cell-category="{ row }">
@@ -288,14 +336,19 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
           </CvStatusBadge>
         </template>
         <template #cell-ports="{ row }">
-          输入 {{ row.inputPorts.length }} / 输出 {{ row.outputPorts.length }}
+          输入 {{ row.inputPorts.length }} · 输出 {{ row.outputPorts.length }}
         </template>
         <template #cell-parameters="{ row }">
-          {{ row.parameters.length }}
+          {{ row.parameters.length }} 项
         </template>
         <template #cell-actions="{ row }">
-          <RouterLink :to="detailHref(row)">
-            查看详情
+          <RouterLink
+            class="operators-page__detail-link"
+            :to="detailHref(row)"
+            :aria-label="`查看${row.displayName}详情`"
+          >
+            查看
+            <CvIcon name="chevron-right" />
           </RouterLink>
         </template>
       </CvDataTable>
@@ -315,8 +368,29 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
 
 <style scoped>
 .operators-page { display: grid; max-width: 1620px; gap: var(--cv-density-page-gap); min-width: 0; }
-.operators-page__search { flex: 1 1 280px; }
-.operators-page__compact-search { flex: 1 1 180px; }
-.operators-page__identity { display: grid; gap: var(--cv-space-1); }
-.operators-page__identity code { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.operators-page__filters { display: grid; gap: var(--cv-space-3); padding-bottom: var(--cv-space-3); }
+.operators-page__primary-filters { display: grid; grid-template-columns: minmax(260px, 1fr) repeat(3, minmax(148px, 0.42fr)); gap: var(--cv-space-2); align-items: end; }
+.operators-page__metadata-filters { display: grid; grid-template-columns: max-content repeat(2, minmax(180px, 280px)) 1fr; gap: var(--cv-space-2); align-items: end; }
+.operators-page__metadata-label { align-self: center; padding: var(--cv-space-5) var(--cv-space-2) var(--cv-space-2) 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); }
+.operators-page__result-bar { display: flex; min-height: var(--cv-density-control-height-sm); align-items: center; justify-content: space-between; gap: var(--cv-space-3); padding: var(--cv-space-2) 0; border-top: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.operators-page__result-bar p { margin: 0; }
+.operators-page__result-bar strong { color: var(--cv-text-primary); font-variant-numeric: tabular-nums; }
+.operators-page__identity { display: grid; gap: 2px; min-width: 0; }
+.operators-page__identity-meta { display: flex; min-width: 0; align-items: baseline; gap: var(--cv-space-2); }
+.operators-page__identity-meta > span { min-width: 0; overflow: hidden; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
+.operators-page__identity code { flex: 0 0 auto; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.operators-page__detail-link { display: inline-flex; align-items: center; gap: var(--cv-space-1); white-space: nowrap; }
+.operators-page__detail-link :deep(svg) { width: 14px; height: 14px; }
+
+@media (max-width: 1080px) {
+  .operators-page__primary-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .operators-page__search { grid-column: 1 / -1; }
+}
+
+@media (max-width: 720px) {
+  .operators-page__primary-filters,
+  .operators-page__metadata-filters { grid-template-columns: 1fr; }
+  .operators-page__metadata-label { padding: 0; }
+  .operators-page__result-bar { align-items: flex-start; flex-direction: column; }
+}
 </style>

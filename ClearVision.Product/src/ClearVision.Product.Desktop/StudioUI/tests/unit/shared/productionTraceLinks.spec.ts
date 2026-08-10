@@ -36,8 +36,15 @@ describe('production trace deep links', () => {
     expect(resolveProductionReturnTo('/stations?packageId=package-a&projectId=project-a')).toBe(
       '/stations?packageId=package-a&projectId=project-a'
     );
+    expect(resolveProductionReturnTo(
+      '/stations/station-a?returnTo=%2Fstations%3FpackageId%3Dpackage-a%26projectId%3Dproject-a'
+    )).toBe(
+      '/stations/station-a?returnTo=%2Fstations%3FpackageId%3Dpackage-a%26projectId%3Dproject-a'
+    );
     expect(resolveProductionReturnTo('/projects/project-a/inspection')).toBe('/projects/project-a/inspection');
     expect(resolveProductionReturnTo('/results?source=station&token=secret')).toBeNull();
+    expect(resolveProductionReturnTo('/stations/station-a?returnTo=%2Fstations%3Ftoken%3Dsecret')).toBeNull();
+    expect(resolveProductionReturnTo('/stations/station-a?returnTo=%2Fresults%3Fsource%3Dstation')).toBeNull();
     expect(resolveProductionReturnTo('https://example.com/results?source=station')).toBeNull();
     expect(resolveProductionReturnTo('//example.com/results?source=station')).toBeNull();
   });

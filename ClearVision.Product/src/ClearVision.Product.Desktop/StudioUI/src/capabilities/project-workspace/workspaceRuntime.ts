@@ -85,7 +85,7 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
   let disposed = false;
 
   function assertActive(): void {
-    if (disposed) throw new Error('WorkspaceRuntime has been disposed.');
+    if (disposed) throw new Error('工程工作区运行环境已关闭。');
   }
 
   async function prepareOwnersForLeave(reason: string, projectId?: string): Promise<boolean> {
@@ -115,7 +115,7 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
     },
     openProject(projectId: string): WorkspaceProjectReadPort {
       assertActive();
-      if (!enabled) throw new Error('Workspace capability is disabled by startup configuration.');
+      if (!enabled) throw new Error('工程工作区功能未启用。');
       const inner = createWorkspaceProjectReadPort(options.queries, diagnosticsOwner, projectId);
       let portDisposed = false;
       const port: WorkspaceProjectReadPort = Object.freeze({
@@ -134,7 +134,7 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
     },
     mountProject(project: WorkspaceProjectV1): WorkspaceOwner {
       assertActive();
-      if (!enabled) throw new Error('Workspace capability is disabled by startup configuration.');
+      if (!enabled) throw new Error('工程工作区功能未启用。');
       const inner = createWorkspaceOwner(
         project,
         diagnosticsOwner,
@@ -186,7 +186,7 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
     },
     mountNewHandoffDraft(artifactId: string): WorkspaceNewDraftOwner {
       assertActive();
-      if (!enabled || !options.api) throw new Error('Workspace handoff requires the shared ApiTransport.');
+      if (!enabled || !options.api) throw new Error('工程工作区候选交接通道不可用。');
       const inner = createWorkspaceNewDraftOwner({
         artifactId,
         diagnostics: diagnosticsOwner,
@@ -224,7 +224,7 @@ export function createWorkspaceRuntime(options: CreateWorkspaceRuntimeOptions): 
     },
     openHandoffReceiver(): WorkspaceHandoffReceivePort {
       assertActive();
-      if (!enabled || !options.api) throw new Error('Workspace handoff requires the shared ApiTransport.');
+      if (!enabled || !options.api) throw new Error('工程工作区候选交接通道不可用。');
       const inner = createWorkspaceHandoffReceivePort({
         api: options.api,
         diagnostics: diagnosticsOwner

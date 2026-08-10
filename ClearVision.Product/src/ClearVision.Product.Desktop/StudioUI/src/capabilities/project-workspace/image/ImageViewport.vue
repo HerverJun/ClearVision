@@ -78,40 +78,32 @@ onMounted(async () => {
             size="sm"
           />
         </CvIconButton>
-        <CvButton
+        <CvIconButton
           data-testid="image-fit"
           size="sm"
-          variant="quiet"
-          aria-label="适应预览区"
+          label="适应预览区"
           title="适应预览区"
           :disabled="projection.phase !== 'ready'"
           @click="owner.fit()"
         >
-          <template #leading>
-            <CvIcon
-              name="fit"
-              size="sm"
-            />
-          </template>
-          适应
-        </CvButton>
-        <CvButton
+          <CvIcon
+            name="fit"
+            size="sm"
+          />
+        </CvIconButton>
+        <CvIconButton
           data-testid="image-actual-size"
           size="sm"
-          variant="quiet"
-          aria-label="按图像实际像素显示"
+          label="按图像实际像素显示"
           title="按图像实际像素显示"
           :disabled="projection.phase !== 'ready'"
           @click="owner.actualSize()"
         >
-          <template #leading>
-            <CvIcon
-              name="actual-size"
-              size="sm"
-            />
-          </template>
-          1:1
-        </CvButton>
+          <CvIcon
+            name="actual-size"
+            size="sm"
+          />
+        </CvIconButton>
         <CvIconButton
           data-testid="image-expand"
           size="sm"

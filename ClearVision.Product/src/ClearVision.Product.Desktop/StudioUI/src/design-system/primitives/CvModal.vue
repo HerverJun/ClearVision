@@ -8,11 +8,13 @@ const props = withDefaults(defineProps<{
   description?: string | undefined;
   closeLabel?: string;
   closeOnBackdrop?: boolean;
+  closeOnEscape?: boolean;
   size?: 'sm' | 'md' | 'lg';
 }>(), {
   description: undefined,
   closeLabel: '关闭对话框',
   closeOnBackdrop: true,
+  closeOnEscape: true,
   size: 'md'
 });
 
@@ -26,6 +28,9 @@ const titleId = `cv-modal-${generatedId}-title`;
 const descriptionId = `cv-modal-${generatedId}-description`;
 let previousFocus: HTMLElement | null = null;
 let listening = false;
+let ownsBodyScrollLock = false;
+let previousBodyOverflow = '';
+let previousBodyPaddingRight = '';
 
 const focusableSelector = [
   'a[href]',
@@ -51,7 +56,7 @@ function focusInitialElement(): void {
 function handleKeydown(event: KeyboardEvent): void {
   if (!props.open) return;
 
-  if (event.key === 'Escape') {
+  if (event.key === 'Escape' && props.closeOnEscape) {
     event.preventDefault();
     emit('close');
     return;
@@ -76,6 +81,23 @@ function handleKeydown(event: KeyboardEvent): void {
     event.preventDefault();
     first.focus();
   }
+}
+
+function lockBodyScroll(): void {
+  if (ownsBodyScrollLock) return;
+  ownsBodyScrollLock = true;
+  previousBodyOverflow = document.body.style.overflow;
+  previousBodyPaddingRight = document.body.style.paddingRight;
+  const scrollbarWidth = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+  document.body.style.overflow = 'hidden';
+  if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
+}
+
+function unlockBodyScroll(): void {
+  if (!ownsBodyScrollLock) return;
+  ownsBodyScrollLock = false;
+  document.body.style.overflow = previousBodyOverflow;
+  document.body.style.paddingRight = previousBodyPaddingRight;
 }
 
 function startListening(): void {
@@ -105,16 +127,19 @@ watch(() => props.open, open => {
   if (open) {
     previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     startListening();
+    lockBodyScroll();
     void nextTick(focusInitialElement);
     return;
   }
 
   stopListening();
+  unlockBodyScroll();
   restoreFocus();
 }, { immediate: true, flush: 'post' });
 
 onUnmounted(() => {
   stopListening();
+  unlockBodyScroll();
   restoreFocus();
 });
 </script>

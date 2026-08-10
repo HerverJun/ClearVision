@@ -4,6 +4,7 @@ import type {
   SettingsSection,
   SettingsWriteResult
 } from './contracts';
+import type { CvIconName } from '@/design-system/icons';
 import type { SettingsProjectionV1 } from './decoder';
 import { projectSettingsOperationFailure, type SettingsOwner } from './settingsOwner';
 
@@ -13,20 +14,22 @@ export interface SettingsNavigationItem {
   readonly id: SettingsNavigationTarget;
   readonly label: string;
   readonly description: string;
+  readonly group: 'overview' | 'basic' | 'device' | 'system';
+  readonly icon: CvIconName;
 }
 
 export const SETTINGS_NAVIGATION_ITEMS: readonly SettingsNavigationItem[] = Object.freeze([
-  { id: 'overview', label: '总览', description: '服务端状态与读取范围' },
-  { id: 'general', label: '常规', description: '产品标题与主题' },
-  { id: 'storage', label: '存储', description: '图像保存与保留策略' },
-  { id: 'runtime', label: '运行保护', description: '自动运行与保护规则' },
-  { id: 'security', label: '安全策略', description: '密码与会话策略' },
-  { id: 'plc', label: 'PLC', description: '协议与连接诊断' },
-  { id: 'tcp', label: 'TCP', description: '配置文件与运行状态' },
-  { id: 'camera', label: '相机系统', description: '系统绑定与触发诊断' },
-  { id: 'station', label: '工作站通信', description: 'Studio 与 Station 同步' },
-  { id: 'ai-model', label: 'AI 模型', description: '模型配置与测试' },
-  { id: 'database', label: '数据库维护', description: '状态与备份操作' }
+  { id: 'overview', label: '总览', description: '配置状态与可用范围', group: 'overview', icon: 'overview' },
+  { id: 'general', label: '常规', description: '软件标题与默认主题', group: 'basic', icon: 'theme' },
+  { id: 'storage', label: '存储', description: '图像保存与保留规则', group: 'basic', icon: 'server' },
+  { id: 'runtime', label: '运行保护', description: '自动运行与停止条件', group: 'basic', icon: 'power' },
+  { id: 'security', label: '安全与用户', description: '密码策略、本人密码与用户', group: 'basic', icon: 'lock' },
+  { id: 'plc', label: 'PLC', description: '协议、映射与连接测试', group: 'device', icon: 'sliders' },
+  { id: 'tcp', label: 'TCP', description: '连接配置与收发调试', group: 'device', icon: 'link' },
+  { id: 'camera', label: '相机', description: '发现、绑定、触发与预览', group: 'device', icon: 'camera' },
+  { id: 'station', label: '工作站通信', description: 'Studio 与工作站同步', group: 'device', icon: 'stations' },
+  { id: 'ai-model', label: 'AI 模型', description: '模型配置与连接测试', group: 'system', icon: 'spark' },
+  { id: 'database', label: '数据库维护', description: '健康状态与备份', group: 'system', icon: 'diagnostics' }
 ]);
 
 const sectionLabels: Readonly<Record<SettingsSection, string>> = Object.freeze(
@@ -61,22 +64,22 @@ export function isGenericSettingsSection(value: SettingsNavigationTarget): value
   return value === 'general' || value === 'storage' || value === 'runtime' || value === 'security';
 }
 
-export type SettingsSectionReadState = 'available' | 'restricted' | 'shell-only';
+export type SettingsSectionReadState = 'available' | 'restricted' | 'on-demand';
 
 export function settingsSectionReadState(
   target: SettingsNavigationTarget,
   projection: SettingsProjectionV1
 ): SettingsSectionReadState {
   if (target === 'overview') return 'available';
-  if (!isGenericSettingsSection(target)) return 'shell-only';
+  if (!isGenericSettingsSection(target)) return 'on-demand';
   return projection.sections[target] ? 'available' : 'restricted';
 }
 
 export function settingsSectionStateLabel(state: SettingsSectionReadState): string {
   switch (state) {
     case 'available': return '已读取';
-    case 'restricted': return '安全子集未返回';
-    case 'shell-only': return '后续接入';
+    case 'restricted': return '当前账户不可用';
+    case 'on-demand': return '进入后读取';
   }
 }
 
@@ -96,16 +99,16 @@ export function settingsFeedbackForResult<T>(result: SettingsWriteResult<T>): Se
     if (operationKind === 'read') {
       return Object.freeze({
         kind: 'completed',
-        message: '已重新读取服务端状态。',
+        message: '已重新读取当前状态。',
         savedLabel: '不适用（读取）',
-        effectiveLabel: '服务端状态已读取',
+        effectiveLabel: '当前状态已更新',
         restartLabel: '不适用'
       });
     }
     if (operationKind === 'runtime-operation') {
       return Object.freeze({
         kind: 'completed',
-        message: '运行操作已完成；运行时响应是当前结果。',
+        message: '运行操作已完成，当前状态已更新。',
         savedLabel: '不适用（运行操作）',
         effectiveLabel: '运行状态已返回',
         restartLabel: '不适用'
@@ -114,7 +117,7 @@ export function settingsFeedbackForResult<T>(result: SettingsWriteResult<T>): Se
     if (operationKind === 'account-operation') {
       return Object.freeze({
         kind: 'completed',
-        message: '账户操作已完成；用户与会话状态仍以服务端为准。',
+        message: '账户操作已完成，用户或会话状态已更新。',
         savedLabel: '不适用（账户操作）',
         effectiveLabel: '服务端状态为准',
         restartLabel: '不适用'
@@ -123,7 +126,7 @@ export function settingsFeedbackForResult<T>(result: SettingsWriteResult<T>): Se
     if (operationKind === 'database-operation') {
       return Object.freeze({
         kind: 'completed',
-        message: '数据库操作已完成；返回响应是当前结果。',
+        message: '数据库操作已完成。',
         savedLabel: '不适用（数据库操作）',
         effectiveLabel: '服务端状态为准',
         restartLabel: '不适用'
@@ -131,10 +134,10 @@ export function settingsFeedbackForResult<T>(result: SettingsWriteResult<T>): Se
     }
     return Object.freeze({
       kind: 'saved',
-      message: '操作已完成；服务端返回值已成为当前状态。',
+      message: '设置已保存，当前页面已更新。',
       savedLabel: '已保存',
       effectiveLabel: '状态已更新',
-      restartLabel: '重载要求：后端未声明'
+      restartLabel: '未说明'
     });
   }
 

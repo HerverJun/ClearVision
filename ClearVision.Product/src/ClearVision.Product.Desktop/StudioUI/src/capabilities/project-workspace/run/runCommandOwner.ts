@@ -124,7 +124,7 @@ export function createWorkspaceRunCommandOwner(options: {
   readonly clearTimer?: typeof globalThis.clearTimeout;
 }): WorkspaceRunCommandOwner {
   if (options.port.projectId !== options.projectId || options.persistenceOwner.projectId !== options.projectId) {
-    throw new TypeError('Workspace Run owner requires one Project identity.');
+    throw new TypeError('正式运行需要唯一的工程标识。');
   }
   const runtimeApi: Pick<InspectionRunApiPort, 'hydrate'> = options.runtimeApi ?? Object.freeze({
     async hydrate(): Promise<InspectionRunState> {
@@ -339,13 +339,13 @@ export function createWorkspaceRunCommandOwner(options: {
       } else if (runtime.isBusy) {
         state.phase = 'unknown-outcome';
         state.errorCode = 'RUN_RUNTIME_IDENTITY_MISMATCH';
-        state.message = '权威运行状态与当前正式运行身份不一致，工作区保持锁定。';
+        state.message = '服务端运行状态与当前正式运行身份不一致，工作区保持锁定。';
       }
     } catch (error) {
       if (!disposed && ownerGeneration === operationGeneration && !(error instanceof ApiAbortError)) {
         state.phase = 'disconnected';
         state.errorCode = errorCode(error) ?? 'RUN_AUTHORITY_REREAD_FAILED';
-        state.message = '实时重连已达上限，且权威状态重读失败。';
+        state.message = '实时重连已达上限，且服务端运行状态重新读取失败。';
       }
     } finally {
       if (hydrateController === controller) hydrateController = undefined;
@@ -471,7 +471,7 @@ export function createWorkspaceRunCommandOwner(options: {
     hydrateController = controller;
     state.phase = 'hydrating';
     state.errorCode = null;
-    state.message = '正在读取后端运行权威状态。';
+    state.message = '正在读取服务端运行状态。';
     syncDiagnostics();
     syncAvailability();
     try {
@@ -483,12 +483,12 @@ export function createWorkspaceRunCommandOwner(options: {
       if (identity && expectedIdentity && !identitiesMatch(identity, expectedIdentity)) {
         if (options.persistenceOwner.projection.canRun) {
           runtimeLockedPersistence = options.persistenceOwner.setRunning(
-            '权威运行身份与当前正式运行身份不一致。'
+            '服务端运行身份与当前正式运行身份不一致。'
           );
         }
         state.phase = 'unknown-outcome';
         state.errorCode = 'RUN_RUNTIME_IDENTITY_MISMATCH';
-        state.message = '权威运行状态与当前正式运行身份不一致，工作区保持锁定。';
+        state.message = '服务端运行状态与当前正式运行身份不一致，工作区保持锁定。';
         return;
       }
       if (runtime.isBusy && identity) {
@@ -513,7 +513,7 @@ export function createWorkspaceRunCommandOwner(options: {
         }
         state.phase = 'occupied';
         state.errorCode = 'ADMISSION_RUNTIME_ALREADY_ACTIVE';
-        state.message = '工程由' + (runtime.sessionType ?? '其他运行会话') + '占用；未挂载第二个运行 owner。';
+        state.message = '工程由' + (runtime.sessionType ?? '其他运行会话') + '占用；当前页面不会启动第二个正式运行。';
         return;
       }
       if (identity) {
@@ -539,7 +539,7 @@ export function createWorkspaceRunCommandOwner(options: {
         state.errorCode = errorCode(error) ?? 'RUN_HYDRATE_FAILED';
         state.message = error instanceof ApiHttpError && (error.status === 401 || error.status === 403)
           ? '当前会话无权读取工程运行状态。'
-          : '无法读取工程运行权威状态。';
+          : '无法读取工程的服务端运行状态。';
       }
     } finally {
       if (hydrateController === controller) hydrateController = undefined;
@@ -845,7 +845,7 @@ export function createWorkspaceRunCommandOwner(options: {
           options.persistenceOwner.clearRunning(state.message);
         } else {
           state.phase = 'unknown-outcome';
-          state.message = '正式运行响应不确定，正在读取后端权威状态。';
+          state.message = '正式运行响应不确定，正在读取服务端状态。';
         }
       } else {
         state.phase = 'failed';

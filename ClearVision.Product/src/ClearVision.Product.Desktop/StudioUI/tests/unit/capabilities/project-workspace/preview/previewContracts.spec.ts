@@ -108,12 +108,22 @@ describe('G4 Preview response contracts', () => {
     const wrongNodeObservation = observationFixture({
       identity: { ...identity, targetNodeId: failedOperatorId }
     });
-    expect(() => decodePreviewNodeResponseV1(responseFixture({ observation: wrongNodeObservation })))
-      .toThrowError(/\$\.observation\.identity\.targetNodeId/);
+    let nodeFailure: unknown;
+    try {
+      decodePreviewNodeResponseV1(responseFixture({ observation: wrongNodeObservation }));
+    } catch (error) {
+      nodeFailure = error;
+    }
+    expect(nodeFailure).toMatchObject({ path: '$.observation.identity.targetNodeId' });
 
     const newerIdentity = buildPreviewIdentityV1({ ...identity, clientRequestSequence: 8 });
-    expect(() => decodePreviewNodeResponseV1(responseFixture(), newerIdentity))
-      .toThrowError(/\$\.observation\.identity\.clientRequestSequence/);
+    let sequenceFailure: unknown;
+    try {
+      decodePreviewNodeResponseV1(responseFixture(), newerIdentity);
+    } catch (error) {
+      sequenceFailure = error;
+    }
+    expect(sequenceFailure).toMatchObject({ path: '$.observation.identity.clientRequestSequence' });
   });
 
   it.each([

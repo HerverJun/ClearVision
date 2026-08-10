@@ -6,11 +6,13 @@ import type {
 
 export class TemplateContractDecodeError extends Error {
   readonly path: string;
+  readonly expectation: string;
 
   constructor(path: string, expectation: string) {
-    super(`模板响应字段 ${path} 必须是${expectation}。`);
+    super('模板服务返回的数据格式不符合要求，请刷新后重试。');
     this.name = 'TemplateContractDecodeError';
     this.path = path;
+    this.expectation = expectation;
   }
 }
 

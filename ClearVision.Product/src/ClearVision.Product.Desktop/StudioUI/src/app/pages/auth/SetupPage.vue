@@ -14,7 +14,15 @@ const showPassword = ref(false);
 const messageRoot = ref<HTMLElement>();
 const busy = computed(() => root.auth.projection.phase === 'authenticating' ||
   root.auth.projection.phase === 'protected-transition');
-const passwordHint = computed(() => `密码至少 ${root.auth.projection.setupPolicy?.passwordMinLength ?? 6} 位。`);
+const passwordHint = computed(() => {
+  const policy = root.auth.projection.setupPolicy;
+  const requirements = [`至少 ${policy?.passwordMinLength ?? 6} 位`];
+  if (policy?.requiresUppercase) requirements.push('包含大写字母');
+  if (policy?.requiresLowercase) requirements.push('包含小写字母');
+  if (policy?.requiresDigit) requirements.push('包含数字');
+  return `密码要求：${requirements.join('，')}。`;
+});
+const messageTone = computed(() => root.auth.projection.errorCode ? 'error' : 'info');
 
 async function submit(): Promise<void> {
   const accepted = await root.auth.setupAdmin({
@@ -34,7 +42,7 @@ async function submit(): Promise<void> {
 <template>
   <AuthShell
     title="创建首位管理员"
-    description="初始化只允许执行一次；成功返回的 token 仍须经过 /api/auth/me 权威复核。"
+    description="为这台工作站创建首位管理员。完成后将直接进入工程库，此入口不再出现。"
   >
     <form
       class="auth-form"
@@ -48,6 +56,7 @@ async function submit(): Promise<void> {
         aria-live="polite"
         tabindex="-1"
         data-auth-message
+        :data-tone="messageTone"
       >
         {{ root.auth.projection.message }}
       </p>
@@ -109,7 +118,7 @@ async function submit(): Promise<void> {
           :loading="busy"
           loading-label="正在初始化"
         >
-          创建并进入 Studio
+          创建管理员并进入工程库
         </CvButton>
       </div>
     </form>

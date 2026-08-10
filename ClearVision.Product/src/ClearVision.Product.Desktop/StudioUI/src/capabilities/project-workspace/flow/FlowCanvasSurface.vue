@@ -260,7 +260,7 @@ const toggleDisabledLabel = computed(() => {
         连线 {{ runtime?.connectionCount ?? projection.draft.connections.length }} ·
         已选 {{ selectedCount }}
       </span>
-      <span class="flow-canvas-surface__revision">本地流程 r{{ runtime?.flowRevision ?? 0 }}</span>
+      <span class="flow-canvas-surface__revision">本地流程修订 {{ runtime?.flowRevision ?? 0 }}</span>
       <span class="flow-canvas-surface__spacer" />
       <span
         v-if="projection.feedback"
@@ -280,7 +280,7 @@ const toggleDisabledLabel = computed(() => {
 </template>
 
 <style scoped>
-.flow-canvas-surface { position: relative; min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 22px; overflow: hidden; background: var(--flow-canvas-background); }
+.flow-canvas-surface { position: relative; min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 22px; overflow: hidden; background: var(--flow-canvas-background); container-name: flow-canvas; container-type: inline-size; }
 .flow-canvas-surface__toolbar {
   position: absolute;
   z-index: calc(var(--cv-z-sticky) - 1);
@@ -354,6 +354,12 @@ const toggleDisabledLabel = computed(() => {
 @media (max-width: 1360px) {
   .flow-canvas-surface__tool-button:not(.is-icon-only):not(.is-scale) span { display: none; }
   .flow-canvas-surface__tool-button:not(.is-icon-only):not(.is-scale) { width: 32px; padding: 0; }
+}
+
+@container flow-canvas (max-width: 760px) {
+  .flow-canvas-surface__tool-button:not(.is-icon-only):not(.is-scale) span { display: none; }
+  .flow-canvas-surface__tool-button:not(.is-icon-only):not(.is-scale) { width: 32px; padding: 0; }
+  .flow-canvas-surface__tool-group + .flow-canvas-surface__tool-group { margin-left: 2px; padding-left: 2px; }
 }
 
 @media (max-height: 760px) {

@@ -267,11 +267,11 @@ export function createAuthLifecycleOwner(options: CreateAuthLifecycleOwnerOption
         sessionIdentityOf(previousUser) === sessionIdentityOf(user);
       state.user = user;
       if (!sameSessionIdentity) state.sessionGeneration += 1;
-      project('protected-transition', '认证已确认，正在创建受保护产品运行时…');
+      project('protected-transition', '登录已确认，正在载入受保护工作区…');
       const activated = await options.runtime.activateAuthenticatedSession(user, state.sessionGeneration);
       if (!current(operation)) return false;
       if (!activated) {
-        project('protected-transition', '已重新认证，正在按原运行身份完成权威 reconcile。');
+        project('protected-transition', '已重新认证，正在恢复未完成的工作。');
         return false;
       }
       project('authenticated', '会话有效。');
@@ -279,12 +279,12 @@ export function createAuthLifecycleOwner(options: CreateAuthLifecycleOwnerOption
     } catch (error) {
       if (!current(operation) || error instanceof ApiAbortError) return false;
       if (error instanceof ApiUnauthorizedError) {
-        await rejectVerifiedSession('登录凭据未通过 /api/auth/me 权威复核。', previousUser);
+        await rejectVerifiedSession('登录凭据未通过会话确认。', previousUser);
         return false;
       }
       const details = errorDetails(error);
       state.user = previousUser;
-      project('stale', '已收到 token，但 /api/auth/me 暂时无法完成权威复核。可重试会话恢复。', details.code);
+      project('stale', '登录凭据已收到，但会话暂时无法确认。请检查本地服务后重试。', details.code);
       return false;
     }
   }
@@ -393,13 +393,13 @@ export function createAuthLifecycleOwner(options: CreateAuthLifecycleOwnerOption
               project(
                 status.requiresInitialAdminSetup ? 'setup-required' : 'unauthenticated',
                 status.requiresInitialAdminSetup
-                  ? '管理员初始化响应丢失，权威状态仍要求初始化；可以安全重新提交。'
-                  : '管理员初始化响应丢失，但权威状态表明初始化已完成。请使用刚设置的账号登录。',
+                  ? '未收到管理员创建结果；系统确认尚未创建，可以重新提交。'
+                  : '未收到管理员创建结果，但系统确认初始化已完成。请使用刚设置的账号登录。',
                 details.code
               );
             } catch (statusError) {
               if (!current(operation) || statusError instanceof ApiAbortError) return false;
-              project('error', '管理员初始化结果未知，且无法重新读取初始化状态；不要重复猜测提交结果。', details.code);
+              project('error', '无法确认管理员是否已创建。请先检查本地服务并刷新页面，暂不要重复提交。', details.code);
             }
           } else if (error instanceof ApiConflictError) {
             project('unauthenticated', '系统已完成初始化，请直接登录。', details.code);
@@ -440,9 +440,9 @@ export function createAuthLifecycleOwner(options: CreateAuthLifecycleOwnerOption
     },
     async prepareChangePasswordRoute(): Promise<boolean> {
       if (disposed || !state.user || state.phase !== 'authenticated') return false;
-      project('protected-transition', '正在确认保存与运行状态允许进入修改密码流程…');
+      project('protected-transition', '正在确认当前工作可以安全离开…');
       if (!(await options.runtime.prepareForProtectedTransition('change-password'))) {
-        project('authenticated', '修改密码已阻止：存在未安全收口的保存、运行或未知结果。', 'CHANGE_PASSWORD_BLOCKED');
+        project('authenticated', '暂时无法修改密码：有工程正在保存，或运行状态尚未确认。请先返回并完成处理。', 'CHANGE_PASSWORD_BLOCKED');
         return false;
       }
       project('authenticated', '可以安全进入修改密码流程。');
@@ -452,9 +452,9 @@ export function createAuthLifecycleOwner(options: CreateAuthLifecycleOwnerOption
       if (disposed || !state.user || state.phase !== 'authenticated') return Promise.resolve(false);
       if (passwordPromise) return passwordPromise;
       passwordPromise = (async () => {
-        project('protected-transition', '正在确认保存与运行状态允许修改密码…');
+        project('protected-transition', '正在确认当前工作可以安全离开…');
         if (!(await options.runtime.prepareForProtectedTransition('change-password'))) {
-          project('authenticated', '修改密码已阻止：存在未安全收口的保存、运行或未知结果。', 'CHANGE_PASSWORD_BLOCKED');
+          project('authenticated', '暂时无法修改密码：有工程正在保存，或运行状态尚未确认。请先返回并完成处理。', 'CHANGE_PASSWORD_BLOCKED');
           return false;
         }
         const operation = begin('changing-password', '正在修改密码…');
@@ -527,7 +527,7 @@ export function createAuthLifecycleOwner(options: CreateAuthLifecycleOwnerOption
       if (existing) return existing;
       const generation = context.sessionGeneration;
       const flight = (async () => {
-        project('expired', '当前会话已失效。正在隔离产品运行时并保留必要 reconcile 身份。', 'SESSION_EXPIRED');
+        project('expired', '当前会话已失效。正在安全结束本次工作并保留可恢复信息。', 'SESSION_EXPIRED');
         options.tokenPort.removeToken();
         state.sessionGeneration += 1;
         await options.runtime.expireAuthenticatedSession(context);

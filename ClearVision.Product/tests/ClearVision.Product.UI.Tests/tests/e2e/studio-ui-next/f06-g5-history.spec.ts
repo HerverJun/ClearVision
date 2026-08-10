@@ -151,7 +151,7 @@ test('G5 restores project-bound and unbound canonical Sessions through one dispo
     `#\/projects\/${f06ProjectId}\/ai\\?sessionId=${f06ProjectSessionId}$`
   ));
   await expect(page.locator('[data-ai-owner-phase]')).toHaveCount(1);
-  await expect(page.getByText('会话修订 29')).toBeVisible();
+  await expect(page.getByText('会话版本 29')).toBeVisible();
   await expect(page.getByRole('dialog', { name: '历史与恢复' })).toHaveCount(0);
   await expect(page.locator('[data-ai-owner-phase]')).toHaveAttribute('data-ai-owner-stream-count', '0');
   await captureF06Evidence(page, audit, 'g5-session-restored-project', viewport, 'compact');
@@ -160,7 +160,7 @@ test('G5 restores project-bound and unbound canonical Sessions through one dispo
   const unboundSession = history.locator('li.ai-history__item').filter({ hasText: '会话版本 28' });
   await unboundSession.getByRole('button', { name: '前往独立工作台' }).click();
   await expect(page).toHaveURL(new RegExp(`#\/ai\\?sessionId=${f06UnboundHistorySessionId}$`));
-  await expect(page.getByText('会话修订 28')).toBeVisible();
+  await expect(page.getByText('会话版本 28')).toBeVisible();
   await expect(page.locator('[data-ai-owner-phase]')).toHaveCount(1);
   await expect(page.locator('[data-ai-owner-phase]')).toHaveAttribute('data-ai-owner-subscription-count', '0');
   await captureF06Evidence(page, audit, 'g5-session-switched-unbound', viewport, 'compact');
@@ -180,10 +180,10 @@ test('G5 rejects late history responses after a Session route switch', async ({ 
     window.location.hash = `#/ai?sessionId=${sessionId}`;
   }, f06UnboundHistorySessionId);
   await expect(page).toHaveURL(new RegExp(`#\/ai\\?sessionId=${f06UnboundHistorySessionId}$`));
-  await expect(page.getByText('会话修订 28')).toBeVisible();
+  await expect(page.getByText('会话版本 28')).toBeVisible();
   audit.releaseHistory();
   await expect(page.getByRole('dialog', { name: '历史与恢复' })).toHaveCount(0);
-  await expect(page.getByText('会话修订 28')).toBeVisible();
+  await expect(page.getByText('会话版本 28')).toBeVisible();
   await expect(page.locator('[data-ai-owner-phase]')).toHaveAttribute('data-ai-owner-request-count', '0');
   expectNoRuntimeErrors(audit);
 });
@@ -310,7 +310,8 @@ test('G5 logout and protected 401 dispose the AI owner before returning to login
   });
   await openDiagnostics(logoutPage);
   await logoutPage.keyboard.press('Escape');
-  await logoutPage.getByRole('button', { name: '退出' }).click();
+  await logoutPage.locator('[data-product-user-menu] button[aria-haspopup="menu"]').click();
+  await logoutPage.getByRole('menuitem', { name: '退出' }).click();
   await expect(logoutPage.locator('[data-auth-page="login"]')).toBeVisible();
   await expect(logoutPage.locator('[data-ai-owner-phase]')).toHaveCount(0);
   expect(logoutAudit.requests.some(item => item.path === '/api/auth/logout')).toBe(true);

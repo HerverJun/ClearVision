@@ -54,6 +54,10 @@
 .design-lab__status-card--error .design-lab__swatch { background: var(--cv-color-status-error); }
 .design-lab__status-card--warning .design-lab__swatch { background: var(--cv-color-status-warning); }
 .design-lab__status-card--info .design-lab__swatch { background: var(--cv-color-status-info); }
+.design-lab__status-card--idle .design-lab__swatch { background: var(--cv-color-status-idle); }
+.design-lab__status-card--offline .design-lab__swatch { background: var(--cv-color-status-offline); }
+.design-lab__status-card--unknown .design-lab__swatch { background: var(--cv-color-status-unknown); }
+.design-lab__status-card--disabled .design-lab__swatch { border: 1px solid var(--cv-color-status-disabled); background: transparent; }
 
 .design-lab__wide-panel { max-width: 1600px; margin: 0 auto var(--cv-density-content-gap); }
 .design-lab__pattern-alert { margin-block: var(--cv-space-2) var(--cv-space-3); }

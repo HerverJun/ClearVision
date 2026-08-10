@@ -56,4 +56,10 @@ withDefaults(defineProps<{
 .cv-status-badge--warning .cv-status-badge__dot { background: var(--cv-color-status-warning); }
 .cv-status-badge--info { border-color: var(--cv-color-status-info-border); background: var(--cv-color-status-info-soft); color: var(--cv-color-status-info-strong); }
 .cv-status-badge--info .cv-status-badge__dot { background: var(--cv-color-status-info); }
+.cv-status-badge--offline { border-color: var(--cv-color-status-offline-border); background: var(--cv-color-status-offline-soft); color: var(--cv-color-status-offline-strong); }
+.cv-status-badge--offline .cv-status-badge__dot { background: var(--cv-color-status-offline); }
+.cv-status-badge--unknown { border-color: var(--cv-color-status-unknown-border); background: var(--cv-color-status-unknown-soft); color: var(--cv-color-status-unknown-strong); }
+.cv-status-badge--unknown .cv-status-badge__dot { background: var(--cv-color-status-unknown); }
+.cv-status-badge--disabled { border-color: var(--cv-border-default); background: var(--cv-color-status-disabled-soft); color: var(--cv-text-muted); }
+.cv-status-badge--disabled .cv-status-badge__dot { border: 1px solid currentColor; background: transparent; }
 </style>

@@ -397,10 +397,10 @@ test('Station list uses URL filters, preserves nine outcomes and stays GET-only'
   await expect(page.getByRole('cell', { name: /一号检测站/ })).toBeVisible();
   await viewTabs.getByRole('tab', { name: '全站概览' }).click();
   const outcomeCounters = page.locator('.stations-page__outcomes');
-  await expect(outcomeCounters.getByText('未判定', { exact: true })).toBeVisible();
-  await expect(outcomeCounters.getByText('不适用', { exact: true })).toBeVisible();
-  await expect(outcomeCounters.getByText('判定无效', { exact: true })).toBeVisible();
-  await expect(outcomeCounters.getByText('执行失败', { exact: true })).toBeVisible();
+  await expect(outcomeCounters).toContainText('未判定 1');
+  await expect(outcomeCounters).toContainText('不适用 1');
+  await expect(outcomeCounters).toContainText('判定无效 1');
+  await expect(outcomeCounters).toContainText('执行失败 1');
   await expect.poll(() => audit.some(entry => entry.path.includes(
     '/api/stations/statistics?range=week&status=Ng&diagnosticCode=WIRE_SWAP'
   ))).toBe(true);
@@ -425,7 +425,10 @@ test('Engineer Station journey remains read-only and never mounts the Admin cont
   await expect(page.getByText('进程运行时长')).toBeVisible();
   await expect(page.getByText('工作站详情读取失败')).toHaveCount(0);
   await expect(page.getByText('TCP', { exact: true })).toBeVisible();
-  await expect(page.getByText('未上报/不可确认', { exact: true })).toBeVisible();
+  await expect(page.getByText('未上报/不可确认', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('运行包状态正常', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('已就绪', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('已连接', { exact: true }).first()).toBeVisible();
   await expect(page.getByTestId('station-production-trace')).toContainText('当前角色仅能查看监控摘要');
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
@@ -448,6 +451,23 @@ test('Engineer Station journey remains read-only and never mounts the Admin cont
   await page.getByTestId('results-open-station').click();
   await expect(page).toHaveURL(/#\/stations\/station-a\?returnTo=/);
   await expect(page.getByText('返回检测结果')).toBeVisible();
+});
+
+test('Station investigation preserves fleet filters through detail and Results return', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await bootStations(page);
+  const fleetPath = '/stations?q=一号&online=Online&runtime=Running&range=week&outcome=Ng&diagnosticCode=WIRE_SWAP';
+  await page.goto(`/studio/index.html#${fleetPath}`);
+
+  await page.getByRole('link', { name: '一号检测站', exact: true }).first().click();
+  await expect(page).toHaveURL(/#\/stations\/station-a\?returnTo=/);
+  await page.getByTestId('station-result-link').click();
+  await expect(page).toHaveURL(/#\/results\?source=station&stationId=station-a&resultId=message-9&returnTo=/);
+
+  await page.getByTestId('results-return-workspace').click();
+  await expect(page).toHaveURL(/#\/stations\/station-a\?returnTo=/);
+  await page.getByRole('link', { name: '返回工作站列表' }).click();
+  await expect.poll(() => decodeURIComponent(new URL(page.url()).hash.slice(1))).toBe(fleetPath);
 });
 
 test('Admin Station journey mounts controls and creates command, identity and package operations', async ({ page, context }) => {
@@ -564,7 +584,10 @@ for (const visual of f02G3VisualMatrix) {
         machineName: 'CV-STATION-C',
         onlineState: 'Degraded',
         runtimeState: 'Paused',
-        packageName: '外观复检包',
+        packageId: null,
+        packageName: null,
+        packageVersion: null,
+        currentPackageHealth: 'NoPackage',
         lastExecutionOutcome: 'Succeeded',
         lastDecisionOutcome: 'Ng',
         lastDiagnosticCode: 'QUALITY_GATE',
@@ -603,9 +626,21 @@ for (const visual of f02G3VisualMatrix) {
       const rows = page.locator('.stations-page__list-panel tbody tr');
       await expect(rows.nth(0)).toContainText('二号检测站');
       await expect(rows.nth(1)).toContainText('三号检测站');
+      await expect(rows.nth(1)).toContainText('未激活运行包');
       await expect(rows.nth(2)).toContainText('一号检测站');
       await captureF02VisualEvidence(page, {
         scenario: `${scenario}-investigation`,
+        viewport: visual.viewport,
+        theme: visual.theme,
+        density: visual.density,
+        requests: audit,
+        runtimeErrors
+      });
+      await page.goto('/studio/index.html#/stations/station-a');
+      await expect(page.locator('[data-capability="stations-read-detail"]')).toBeVisible();
+      await expect(page.locator('[data-capability="station-admin-control"]')).toHaveCount(0);
+      await captureF02VisualEvidence(page, {
+        scenario: `${scenario}-detail`,
         viewport: visual.viewport,
         theme: visual.theme,
         density: visual.density,

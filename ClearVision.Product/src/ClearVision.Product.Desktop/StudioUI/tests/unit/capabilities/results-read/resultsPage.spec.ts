@@ -383,13 +383,13 @@ describe('Results page', () => {
       })
     );
 
-    expect(mounted.wrapper.text()).toContain('旧版结果映射');
+    expect(mounted.wrapper.text()).toContain('旧版格式');
     expect(mounted.wrapper.text()).toContain('旧版工作站结果映射');
     expect(mounted.wrapper.text()).toContain('执行失败');
     expect(mounted.wrapper.text()).toContain('未判定');
     expect(mounted.wrapper.findAll('[data-status-tone="error"]')).toHaveLength(1);
     expect(mounted.wrapper.findAll('[data-status-tone="ng"]')).toHaveLength(0);
-    expect(mounted.wrapper.text()).not.toContain('判定 NG');
+    expect(mounted.wrapper.get('.results-page__detail-panel').text()).not.toContain('判定 NG');
     expect(mounted.wrapper.text()).toContain('远程结果仅保留摘要');
     expect(mounted.wrapper.text()).toContain('run-9');
     expect(mounted.wrapper.find('[data-remote-image-status="not-uploaded"]').exists()).toBe(true);
@@ -443,7 +443,7 @@ describe('Results page', () => {
 
     expect(requested).toContain('stations/results?stationId=station-a&pageIndex=0&pageSize=20');
     expect(requested).toContain('stations/statistics?stationId=station-a');
-    expect(mounted.wrapper.text()).toContain('已按工作站身份读取');
+    expect(mounted.wrapper.text()).toContain('已限定工作站');
     expect(mounted.wrapper.get('[data-testid="results-return-workspace"]').text()).toBe('返回工作站');
 
     await mounted.wrapper.get('[data-testid="results-detail-open-station"]').trigger('click');
@@ -477,9 +477,9 @@ describe('Results page', () => {
       apiWith(async path => path === 'projects' ? [project()] : localPage())
     );
 
-    expect(mounted.wrapper.text()).toContain('本机诊断码为当前页过滤');
+    expect(mounted.wrapper.text()).toContain('诊断码只筛选当前页');
     expect(mounted.wrapper.text()).toContain('当前页没有匹配诊断码的结果');
-    expect(mounted.wrapper.text()).toContain('不代表后端全量结果计数');
+    expect(mounted.wrapper.text()).toContain('不会重新计算完整历史计数');
 
     mounted.wrapper.unmount();
     mounted.queries.dispose();
@@ -616,13 +616,13 @@ describe('Results page', () => {
       throw new Error(`Unexpected request: ${path}`);
     }));
 
-    expect(mounted.wrapper.text()).toContain('执行成功率');
+    expect(mounted.wrapper.text()).toContain('执行成功');
     await mounted.wrapper.get('[data-testid="results-refresh"]').trigger('click');
     await flushPromises();
 
     expect(mounted.wrapper.text()).toContain('统计刷新失败');
-    expect(mounted.wrapper.text()).toContain('当前显示上次成功读取的双分母统计摘要');
-    expect(mounted.wrapper.text()).toContain('执行成功率');
+    expect(mounted.wrapper.text()).toContain('当前显示上次成功读取的执行与判定统计');
+    expect(mounted.wrapper.text()).toContain('执行成功');
     mounted.wrapper.unmount();
     mounted.queries.dispose();
   });

@@ -16,6 +16,7 @@ import {
   type RunConsoleViolation
 } from './runConsoleProjection';
 import {
+  CvButton,
   CvInlineAlert,
   CvPageHeader,
   CvPageState,
@@ -50,10 +51,23 @@ const canStop = computed(() => isContinuous.value && runState.runtime?.isBusy ==
   projection.phase !== 'stopping');
 const canReconcile = computed(() => runState.phase === 'disconnected' ||
   runState.runtime?.isBusy === true || projection.phase === 'error');
+const runMessage = computed(() => occupiedByOther.value
+  ? '工程正由其他运行模式占用；当前页面保持只读。请在对应工作区停止运行后重试。'
+  : projection.message || runState.message);
+const cameraConnectionLabels: Readonly<Record<string, string>> = Object.freeze({
+  Connected: '已连接',
+  Disconnected: '未连接',
+  Connecting: '连接中',
+  Offline: '离线',
+  Unknown: '状态未知'
+});
+function cameraConnectionLabel(value: string | null): string {
+  return value ? cameraConnectionLabels[value] ?? '状态未知' : '状态未知';
+}
 const cameraOptions = computed<readonly CvSelectOption[]>(() => projection.cameras.map(camera => ({
   value: camera.id,
   label: camera.connectionStatus
-    ? camera.label + ' · ' + (camera.connectionStatus === 'Connected' ? '已连接' : camera.connectionStatus)
+    ? camera.label + ' · ' + cameraConnectionLabel(camera.connectionStatus)
     : camera.label,
   disabled: !camera.enabled
 })));
@@ -113,28 +127,28 @@ const admissionChecks = computed<readonly RunConsoleAdmissionCheck[]>(() => [
   },
   {
     key: 'flow',
-    label: '流程与判定身份',
+    label: '流程与判定版本',
     state: projection.admission?.canonicalFlowHash && projection.admission.decisionConfigurationHash
       ? 'pass' : checkState(hasCode('FLOW', 'DECISION')),
-    detail: projection.admission?.canonicalFlowHash ? '已取得 canonical identity' : '等待权威身份'
+    detail: projection.admission?.canonicalFlowHash ? '已确认保存版本' : '等待后端确认'
   },
   {
     key: 'parameters',
     label: '必要参数',
     state: checkState(hasCode('PARAMETER', 'REQUIRED')),
-    detail: hasCode('PARAMETER', 'REQUIRED') ? '存在未满足的必要参数' : '由 admission 校验'
+    detail: hasCode('PARAMETER', 'REQUIRED') ? '存在未满足的必要参数' : '未返回参数阻断'
   },
   {
     key: 'resources',
     label: '工程资源',
     state: checkState(hasCode('RESOURCE', 'ASSET', 'MISSING')),
-    detail: hasCode('RESOURCE', 'ASSET', 'MISSING') ? '存在缺失资源' : '由 admission 校验'
+    detail: hasCode('RESOURCE', 'ASSET', 'MISSING') ? '存在缺失资源' : '未返回资源阻断'
   },
   {
     key: 'decision',
     label: '最终判定',
     state: checkState(hasCode('DECISION')),
-    detail: hasCode('DECISION') ? '最终判定配置阻断运行' : '由 admission 校验'
+    detail: hasCode('DECISION') ? '最终判定配置阻断运行' : '未返回判定阻断'
   },
   {
     key: 'device',
@@ -142,7 +156,7 @@ const admissionChecks = computed<readonly RunConsoleAdmissionCheck[]>(() => [
     state: selectedCamera.value?.enabled && selectedCamera.value.connectionStatus === 'Connected'
       ? 'pass' : selectedCamera.value?.enabled ? 'unknown' : 'blocked',
     detail: selectedCamera.value
-      ? selectedCamera.value.label + ' · ' + (selectedCamera.value.connectionStatus ?? '状态未知')
+      ? selectedCamera.value.label + ' · ' + cameraConnectionLabel(selectedCamera.value.connectionStatus)
       : '未选择可用相机'
   },
   {
@@ -208,28 +222,37 @@ onBeforeUnmount(() => {
       v-if="projection.phase === 'loading'"
       kind="loading"
       title="正在准备连续检测"
-      description="正在读取工程、相机与运行权威状态。"
+      description="正在读取工程、相机与服务端运行状态。"
     />
     <CvPageState
       v-else-if="projection.phase === 'error' && !projection.project"
       kind="error"
       title="连续检测不可用"
       :description="projection.message"
-    />
+    >
+      <template #actions>
+        <CvButton
+          size="sm"
+          @click="owner.load"
+        >
+          重新读取
+        </CvButton>
+      </template>
+    </CvPageState>
     <template v-else>
       <CvInlineAlert
         v-if="occupiedByOther"
         tone="warning"
         title="工程已被其他运行会话占用"
       >
-        {{ runState.message }}
+        {{ runMessage }}
       </CvInlineAlert>
       <RunConsole
         mode="continuous"
         :project-name="projection.project?.name ?? projectId"
         :phase-label="phaseLabel"
         :tone="tone"
-        :message="projection.message || runState.message"
+        :message="runMessage"
         :error-code="projection.errorCode || runState.errorCode"
         :connected="runState.connected"
         :reconnect-attempt="runState.reconnectAttempt"
@@ -265,6 +288,14 @@ onBeforeUnmount(() => {
             data-testid="inspection-run-result-link"
           >
             查看结果
+          </RouterLink>
+        </template>
+        <template #recovery-action>
+          <RouterLink
+            :to="`/projects/${projectId}/workspace`"
+            data-testid="inspection-run-workspace-link"
+          >
+            返回工作区修正并保存
           </RouterLink>
         </template>
       </RunConsole>

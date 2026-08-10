@@ -15,9 +15,12 @@ describe('bootstrap diagnostic', () => {
     );
 
     expect(diagnostic.getAttribute('data-studio-page')).toBe('bootstrap-diagnostic');
-    expect(diagnostic.textContent).toContain('StudioUI stopped before mounting');
+    expect(diagnostic.textContent).toContain('Studio 已停止载入');
     expect(diagnostic.textContent).toContain('<img src=x onerror=alert(1)>');
     expect(diagnostic.querySelector('img')).toBeNull();
+    expect(diagnostic.querySelector('details')?.hasAttribute('open')).toBe(false);
+    expect([...diagnostic.querySelectorAll('button')].map(button => button.textContent))
+      .toEqual(['重新加载 Studio', '复制技术信息']);
   });
 
   it('renders a recoverable route resource failure for cold deep-link chunk errors', () => {

@@ -102,8 +102,8 @@ const localErrors = computed(() => {
   }
   if (protocol.value === 'S7') {
     if (!draft.cpuType.trim()) errors.push('S7 CPU 类型不能为空。');
-    if (!Number.isInteger(Number(draft.rack)) || Number(draft.rack) < 0 || Number(draft.rack) > 15) errors.push('Rack 必须在 0-15 之间。');
-    if (!Number.isInteger(Number(draft.slot)) || Number(draft.slot) < 0 || Number(draft.slot) > 15) errors.push('Slot 必须在 0-15 之间。');
+    if (!Number.isInteger(Number(draft.rack)) || Number(draft.rack) < 0 || Number(draft.rack) > 15) errors.push('机架号（Rack）必须在 0-15 之间。');
+    if (!Number.isInteger(Number(draft.slot)) || Number(draft.slot) < 0 || Number(draft.slot) > 15) errors.push('槽位号（Slot）必须在 0-15 之间。');
   }
   return errors;
 });
@@ -342,8 +342,8 @@ onBeforeUnmount(() => detachPanelState());
     data-settings-section="plc"
   >
     <CvPanel
-      title="PLC 通讯"
-      description="协议草稿彼此隔离；保存配置、保存映射和连接测试是三个独立操作。"
+      title="PLC 通信"
+      description="连接参数、地址映射和连接测试彼此独立；保存配置不会自动连接 PLC。"
     >
       <template #actions>
         <CvStatusBadge
@@ -369,7 +369,7 @@ onBeforeUnmount(() => detachPanelState());
       <div class="plc-toolbar">
         <CvSelect
           v-model="protocol"
-          label="当前协议草稿"
+          label="编辑协议"
           name="plcProtocol"
           :options="protocolOptions"
           :disabled="isBusy"
@@ -383,9 +383,9 @@ onBeforeUnmount(() => detachPanelState());
           :readonly="!canWrite"
         />
         <div class="plc-toolbar__scope">
-          <span>当前工作协议</span>
+          <span>已保存协议</span>
           <strong>{{ activeProtocolLabel }}</strong>
-          <small>{{ settingsDirty ? '有配置草稿修改' : '与服务端配置一致' }}</small>
+          <small>{{ settingsDirty ? '有未保存修改' : '配置已保存' }}</small>
         </div>
       </div>
 
@@ -418,7 +418,7 @@ onBeforeUnmount(() => detachPanelState());
         <CvField
           v-if="protocol === 'S7'"
           v-model="activeDraft.rack"
-          label="Rack"
+          label="机架号（Rack）"
           name="plcRack"
           type="number"
           :readonly="!canWrite"
@@ -426,7 +426,7 @@ onBeforeUnmount(() => detachPanelState());
         <CvField
           v-if="protocol === 'S7'"
           v-model="activeDraft.slot"
-          label="Slot"
+          label="槽位号（Slot）"
           name="plcSlot"
           type="number"
           :readonly="!canWrite"
@@ -437,7 +437,7 @@ onBeforeUnmount(() => detachPanelState());
         v-if="!canWrite"
         class="settings-panel__notice"
         tone="info"
-        title="工程师诊断权限"
+        title="当前为只读模式"
       >
         当前角色可以读取和测试 PLC，但不能保存协议设置或映射。
       </CvInlineAlert>
@@ -457,7 +457,7 @@ onBeforeUnmount(() => detachPanelState());
         tone="warning"
         title="当前协议尚未保存"
       >
-        当前本地协议为 {{ activeProtocolLabel }}，服务端 ActiveProtocol 仍为 {{ baseline?.activeProtocol }}；请先保存协议设置，再保存映射。
+        正在编辑 {{ activeProtocolLabel }}，已保存协议仍为 {{ baseline?.activeProtocol }}；请先保存协议设置，再保存映射。
       </CvInlineAlert>
 
       <template #footer>
@@ -617,7 +617,7 @@ onBeforeUnmount(() => detachPanelState());
         </li>
       </ul>
       <div class="settings-panel__footer mapping-footer">
-        <span class="settings-panel__dirty">{{ mappingDirty ? '映射草稿未保存' : '映射与服务端一致' }}</span>
+        <span class="settings-panel__dirty">{{ mappingDirty ? '映射有未保存修改' : '映射已保存' }}</span>
         <CvButton
           v-if="canWrite"
           variant="primary"

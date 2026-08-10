@@ -46,7 +46,7 @@ watch([policyDirty, policyBusy, passwordBusy, oldPassword, newPassword], () => {
 });
 const policyValidation = computed(() => {
   const passwordMinLength = Number(policyDraft.passwordMinLength);
-  if (!Number.isInteger(passwordMinLength) || passwordMinLength < 6) return 'PasswordMinLength must be at least 6.';
+  if (!Number.isInteger(passwordMinLength) || passwordMinLength < 6) return '密码最小长度不能少于 6 位。';
   for (const [label, raw] of [
     ['失败锁定次数', policyDraft.loginFailureLockoutCount]
   ] as const) {
@@ -207,7 +207,8 @@ onDeactivated(() => {
   >
     <CvPanel
       title="安全策略"
-      description="密码策略属于应用安全配置；用户记录和密码操作由独立后端服务管理。"
+      description="设置密码长度和登录失败锁定次数。"
+      variant="section"
       data-settings-security-policy
     >
       <div v-if="projection">
@@ -221,9 +222,11 @@ onDeactivated(() => {
           />
           <CvField
             v-model="policyDraft.sessionTimeoutMinutes"
-            label="会话超时（历史只读，不控制当前会话过期时间，分钟）"
+            label="会话时长（分钟）"
             type="number"
             readonly
+            disabled
+            hint="兼容字段，只读；当前桌面会话不会按此数值自动退出。"
           />
           <CvField
             v-model="policyDraft.loginFailureLockoutCount"
@@ -237,9 +240,9 @@ onDeactivated(() => {
           v-if="!canWritePolicy"
           class="settings-panel__notice"
           tone="info"
-          title="当前为安全视图"
+          title="当前账户为只读"
         >
-          当前角色可以核对已返回策略，但不能修改安全策略。
+          你可以查看当前策略；修改需要管理员权限。
         </CvInlineAlert>
       </div>
       <CvInlineAlert
@@ -247,14 +250,14 @@ onDeactivated(() => {
         tone="info"
         title="当前响应未包含安全策略"
       >
-        服务端只返回当前权限允许的安全子集；不会用本地默认值补齐策略，也不会发起越权写入。
+        当前账户不能查看安全策略，页面不会显示默认值或提交修改。
       </CvInlineAlert>
       <template
         v-if="projection"
         #footer
       >
         <div class="settings-panel__footer">
-          <span class="settings-panel__dirty">{{ policyDirty ? '有未保存修改' : '与服务端安全策略一致' }}</span>
+          <span class="settings-panel__dirty">{{ policyDirty ? '有未保存修改' : '当前策略已保存' }}</span>
           <div class="settings-panel__actions">
             <CvButton
               v-if="canWritePolicy"
@@ -285,7 +288,8 @@ onDeactivated(() => {
 
     <CvPanel
       title="修改本人密码"
-      description="密码只提交给既有认证会话接口，完成或离开分区后立即清空。"
+      description="修改成功后当前会话会退出，需要使用新密码重新登录。"
+      variant="section"
       data-settings-change-password
     >
       <form
@@ -311,7 +315,7 @@ onDeactivated(() => {
         <CvButton
           type="submit"
           size="sm"
-          variant="danger"
+          variant="primary"
           :loading="passwordBusy"
           :disabled="!oldPassword || !newPassword"
           loading-label="正在修改密码"
@@ -341,6 +345,7 @@ onDeactivated(() => {
 .settings-security { display: grid; min-width: 0; gap: var(--cv-density-page-gap); }
 .settings-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--cv-space-4); }
 .settings-password-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: var(--cv-space-4); }
+.settings-password-form > :deep(.cv-button) { justify-self: start; }
 .settings-panel__notice { margin-top: var(--cv-space-4); }
 .settings-panel__footer { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
 .settings-panel__dirty { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }

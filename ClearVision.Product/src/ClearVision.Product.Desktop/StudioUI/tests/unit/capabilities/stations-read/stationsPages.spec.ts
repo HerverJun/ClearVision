@@ -101,6 +101,8 @@ describe('Station read pages', () => {
     expect(wrapper.text()).toContain('已取消');
     expect(wrapper.text()).toContain('执行超时');
     expect(wrapper.text()).toContain('已跳过');
+    expect(wrapper.text()).toContain('执行轴');
+    expect(wrapper.text()).toContain('判定轴');
     expect(paths).toContain('stations/statistics?range=week&status=Ng&diagnosticCode=WIRE_SWAP');
     const tabs = wrapper.get('[data-testid="stations-view-tabs"]').findAll('[role="tab"]');
     expect(tabs.map(tab => tab.text())).toEqual(['全站概览', '异常调查']);
@@ -182,9 +184,8 @@ describe('Station read pages', () => {
     });
     await flushPromises();
 
-    const refresh = wrapper.findAll('button').find(button => button.text() === '刷新');
-    expect(refresh).toBeDefined();
-    await refresh?.trigger('click');
+    const refresh = wrapper.get('button[aria-label="刷新工作站监控"]');
+    await refresh.trigger('click');
     await flushPromises();
 
     expect(wrapper.text()).toContain('列表刷新未完成');
@@ -245,6 +246,10 @@ describe('Station read pages', () => {
     expect(wrapper.text()).toContain('执行成功');
     expect(wrapper.text()).toContain('判定 NG');
     expect(wrapper.text()).toContain('进程运行时长');
+    expect(wrapper.text()).toContain('运行包状态正常');
+    expect(wrapper.text()).toContain('已就绪');
+    expect(wrapper.text()).toContain('已连接');
+    expect(wrapper.text()).not.toContain('Spool');
     expect(wrapper.text()).toContain('生产追溯链');
     expect(wrapper.text()).toContain('当前角色仅能查看监控摘要');
     expect(wrapper.text()).not.toContain('工作站详情读取失败');
@@ -300,7 +305,7 @@ describe('Station read pages', () => {
     expect(wrapper.text()).toContain('运行控制');
     expect(wrapper.text()).toContain('身份修订');
     expect(wrapper.text()).toContain('运行包健康状态降级');
-    expect(wrapper.text()).toContain('StationCommandCreated');
+    expect(wrapper.text()).toContain('已创建工作站命令');
     expect(wrapper.get('[data-testid="station-production-trace"]').text()).toContain('身份闭合');
     expect(wrapper.get('[data-testid="station-production-trace"]').text()).toContain('command-a · Succeeded');
     expect(wrapper.get('[data-testid="station-production-trace"]').text()).toContain('run-9 · message-9');

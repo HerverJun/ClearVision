@@ -60,7 +60,7 @@ function cancellationResult<T>(
 function failureMessage(error: unknown): string {
   return error instanceof Error && error.message.trim()
     ? error.message
-    : 'Settings section write failed.';
+    : '设置保存失败。';
 }
 
 export function createSettingsWriteCoordinator(): SettingsWriteCoordinator {
@@ -134,11 +134,11 @@ export function createSettingsWriteCoordinator(): SettingsWriteCoordinator {
         const value = await entry.task(context);
         const current = active.get(section);
         if (disposed) {
-          settle(entry, cancellationResult(entry, 'disposed', 'Settings write coordinator has been disposed.'));
+          settle(entry, cancellationResult(entry, 'disposed', '设置保存通道已关闭。'));
         } else if (current?.entry.id === entry.id && current.cancellationStatus) {
-          settle(entry, cancellationResult(entry, current.cancellationStatus, 'Settings write was cancelled before completion.'));
+          settle(entry, cancellationResult(entry, current.cancellationStatus, '设置保存完成前已取消。'));
         } else if (controller.signal.aborted || !isCurrent(entry as QueueEntry<unknown>)) {
-          settle(entry, cancellationResult(entry, 'stale', 'Settings write result was invalidated before completion.'));
+          settle(entry, cancellationResult(entry, 'stale', '设置保存结果完成前已失效。'));
         } else {
           settle(entry, Object.freeze({
             status: 'completed', section: entry.section, generation: entry.generation,
@@ -148,13 +148,13 @@ export function createSettingsWriteCoordinator(): SettingsWriteCoordinator {
       } catch (error) {
         const current = active.get(section);
         if (disposed) {
-          settle(entry, cancellationResult(entry, 'disposed', 'Settings write coordinator has been disposed.'));
+          settle(entry, cancellationResult(entry, 'disposed', '设置保存通道已关闭。'));
         } else if (current?.entry.id === entry.id && current.cancellationStatus) {
-          settle(entry, cancellationResult(entry, current.cancellationStatus, 'Settings write was cancelled before completion.'));
+          settle(entry, cancellationResult(entry, current.cancellationStatus, '设置保存完成前已取消。'));
         } else if (!isCurrent(entry as QueueEntry<unknown>)) {
-          settle(entry, cancellationResult(entry, 'stale', 'Settings write result was invalidated before completion.'));
+          settle(entry, cancellationResult(entry, 'stale', '设置保存结果完成前已失效。'));
         } else if (controller.signal.aborted) {
-          settle(entry, cancellationResult(entry, 'cancelled', 'Settings write was cancelled before completion.'));
+          settle(entry, cancellationResult(entry, 'cancelled', '设置保存完成前已取消。'));
         } else if (hasUnknownMutationOutcome(entry as QueueEntry<unknown>, error)) {
           const unknown = new SettingsUnknownOutcomeError(error, entry.operationKind);
           settle(entry, Object.freeze({
@@ -197,10 +197,10 @@ export function createSettingsWriteCoordinator(): SettingsWriteCoordinator {
       if (disposed) {
         return Promise.resolve(Object.freeze({
           status: 'disposed', section, generation: currentSectionGeneration(section), operationKind,
-          message: 'Settings write coordinator has been disposed.'
+          message: '设置保存通道已关闭。'
         }));
       }
-      if (typeof task !== 'function') throw new TypeError('Settings write task must be a function.');
+      if (typeof task !== 'function') throw new TypeError('设置保存任务无效。');
       const entryGeneration = currentSectionGeneration(section);
       return new Promise<SettingsWriteResult<T>>(resolve => {
         const entry: QueueEntry<T> = {
@@ -223,19 +223,19 @@ export function createSettingsWriteCoordinator(): SettingsWriteCoordinator {
       if (disposed) return;
       globalGeneration += 1;
       for (const section of active.keys()) abortActive(section, reason, 'stale');
-      for (const section of queues.keys()) cancelQueue(section, 'stale', `Settings writes invalidated: ${reason}.`);
+      for (const section of queues.keys()) cancelQueue(section, 'stale', `设置保存结果已失效：${reason}。`);
     },
     cancel(section?: SettingsSection, reason = 'settings-write-cancelled'): void {
       if (disposed) return;
       if (section) {
         bumpSectionGeneration(section);
         abortActive(section, reason, 'cancelled');
-        cancelQueue(section, 'cancelled', `Settings write cancelled: ${reason}.`);
+        cancelQueue(section, 'cancelled', `设置保存已取消：${reason}。`);
         return;
       }
       globalGeneration += 1;
       for (const currentSection of active.keys()) abortActive(currentSection, reason, 'cancelled');
-      for (const currentSection of queues.keys()) cancelQueue(currentSection, 'cancelled', `Settings writes cancelled: ${reason}.`);
+      for (const currentSection of queues.keys()) cancelQueue(currentSection, 'cancelled', `设置保存已取消：${reason}。`);
     },
     diagnostics(): SettingsWriteCoordinatorDiagnostics {
       const queuedTaskCount = [...queues.values()].reduce((total, queue) => total + queue.length, 0);
@@ -260,7 +260,7 @@ export function createSettingsWriteCoordinator(): SettingsWriteCoordinator {
         current.cancellationStatus = 'disposed';
         current.controller.abort(reason);
       }
-      for (const section of queues.keys()) cancelQueue(section, 'disposed', `Settings write coordinator has been disposed: ${reason}.`);
+      for (const section of queues.keys()) cancelQueue(section, 'disposed', `设置保存通道已关闭：${reason}。`);
     }
   });
 

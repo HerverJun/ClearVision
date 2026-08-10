@@ -51,7 +51,7 @@ const summaryItems = computed<readonly CvDescriptionItem[]>(() => state.value.da
       { key: 'name', label: '名称', value: state.value.data.name, span: 2 },
       { key: 'description', label: '描述', value: state.value.data.description, span: 2 },
       { key: 'version', label: '工程版本', value: state.value.data.version },
-      { key: 'revision', label: '持久化修订', value: state.value.data.persistenceRevision },
+      { key: 'revision', label: '保存修订', value: state.value.data.persistenceRevision },
       { key: 'created', label: '创建时间', value: formatProjectDateTime(state.value.data.createdAt) },
       { key: 'modified', label: '修改时间', value: formatProjectDateTime(state.value.data.modifiedAt) },
       { key: 'opened', label: '最近打开', value: formatProjectDateTime(state.value.data.lastOpenedAt), span: 2 }
@@ -177,7 +177,7 @@ onBeforeUnmount(() => {
   >
     <CvPageHeader
       :title="state.data?.name ?? '工程详情'"
-      description="详情统计只来自当前工程的只读详情接口，不复用列表中的流程信息。"
+      description="查看工程状态、流程规模、资源与保存版本。"
     >
       <template #breadcrumbs>
         <RouterLink
@@ -201,7 +201,7 @@ onBeforeUnmount(() => {
         <CvButton
           v-if="state.data && commands"
           size="sm"
-          variant="danger"
+          variant="destructive"
           :disabled="commandBusy"
           data-testid="project-detail-delete"
           @click="requestDelete"
@@ -246,7 +246,7 @@ onBeforeUnmount(() => {
           size="sm"
           @click="reconcileUnknownOutcome"
         >
-          查询权威结果
+          核对服务端结果
         </CvButton>
         <CvButton
           v-else
@@ -288,13 +288,13 @@ onBeforeUnmount(() => {
       v-else-if="state.phase === 'unauthorized'"
       kind="unauthorized"
       title="当前会话不可用"
-      description="请由宿主或测试环境预置有效会话。"
+      description="会话已失效，请重新登录后再试。"
     />
     <CvPageState
       v-else-if="state.phase === 'forbidden'"
       kind="forbidden"
       title="无权读取此工程"
-      description="后端权限是唯一安全边界。"
+      description="当前账号没有此工程的读取权限。"
     />
     <CvPageState
       v-else-if="state.phase === 'not-found'"
@@ -330,7 +330,8 @@ onBeforeUnmount(() => {
     >
       <CvPanel
         title="工程摘要"
-        description="服务端工程数据与当前保存修订。"
+        description="工程信息与当前保存版本。"
+        variant="section"
       >
         <CvDescriptionList
           :items="summaryItems"
@@ -341,7 +342,8 @@ onBeforeUnmount(() => {
       <CvPanel
         v-if="commands"
         title="编辑工程信息"
-        description="名称与描述更新复用现有工程保存链，不复制流程保存逻辑。"
+        description="更新工程名称和说明。"
+        variant="section"
       >
         <form
           class="project-details__form"
@@ -376,7 +378,8 @@ onBeforeUnmount(() => {
 
       <CvPanel
         title="流程摘要"
-        description="算子与连接数量仅由详情响应计算。"
+        description="当前流程规模。"
+        variant="section"
       >
         <CvDescriptionList
           v-if="state.data.flow"
@@ -393,7 +396,8 @@ onBeforeUnmount(() => {
 
       <CvPanel
         title="正式资源摘要"
-        description="仅统计详情响应中的正式工程资源。"
+        description="当前工程的正式资源。"
+        variant="section"
       >
         <CvDescriptionList
           :items="assetItems"
@@ -405,13 +409,13 @@ onBeforeUnmount(() => {
     <CvModal
       :open="deleteOpen"
       title="删除工程"
-      :description="state.data ? `将删除“${state.data.name}”。只有服务端 tombstone 成功后才会返回工程列表。` : undefined"
+      :description="state.data ? `将删除“${state.data.name}”。操作确认后才会返回工程列表。` : undefined"
       size="sm"
       :close-on-backdrop="!commandBusy"
       @close="closeDelete"
     >
       <CvInlineAlert tone="error">
-        删除使用当前服务端保存修订；保存修订或运行状态发生冲突时不会自动覆盖。
+        删除使用当前保存版本；保存版本或运行状态发生冲突时不会自动覆盖。
       </CvInlineAlert>
       <template #footer>
         <CvButton
@@ -425,7 +429,7 @@ onBeforeUnmount(() => {
         </CvButton>
         <CvButton
           size="sm"
-          variant="danger"
+          variant="destructive"
           :loading="commandState?.phase === 'deleting' || commandState?.phase === 'reconciling'"
           loading-label="正在确认删除"
           data-testid="project-detail-delete-confirm"

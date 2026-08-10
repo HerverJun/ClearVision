@@ -14,6 +14,7 @@ import {
 import type { SettingsOwner } from './settingsOwner';
 import type { SettingsUserProjectionV1 } from './decoder';
 import { settingsFeedbackForResult, type SettingsFeedback } from './settingsViewModel';
+import SettingsWriteFeedback from './SettingsWriteFeedback.vue';
 
 const props = defineProps<{
   owner: SettingsOwner;
@@ -249,8 +250,9 @@ onDeactivated(() => {
 
 <template>
   <CvPanel
-    title="用户管理"
-    description="用户记录和密码由各自的后端服务管理，不进入应用配置草稿。"
+    title="用户与权限"
+    description="管理可登录 Studio 的账户、角色和启用状态。"
+    variant="section"
     data-settings-users
   >
     <CvInlineAlert
@@ -258,7 +260,7 @@ onDeactivated(() => {
       tone="info"
       title="仅管理员可用"
     >
-      工程师可以修改本人密码，但不能读取或管理用户列表。
+      查看和管理用户需要管理员权限。工程师仍可在上方修改本人密码。
     </CvInlineAlert>
 
     <template v-if="canManage">
@@ -268,7 +270,7 @@ onDeactivated(() => {
       >
         <div class="settings-users__create-heading">
           <strong>创建用户</strong>
-          <span>密码只在本次请求期间存在于内存。</span>
+          <span>初始密码提交后立即清空，页面不会回显。</span>
         </div>
         <CvField
           v-model="createDraft.username"
@@ -411,22 +413,12 @@ onDeactivated(() => {
     </template>
   </CvPanel>
 
-  <div
-    v-if="operationFeedback"
-    class="settings-users__feedback"
-  >
-    <CvInlineAlert
-      :tone="operationFeedback.kind === 'saved' ? 'success' : operationFeedback.kind === 'unknown' ? 'warning' : 'error'"
-      :title="operationFeedback.kind === 'saved' ? '用户操作已完成' : '用户操作未完成'"
-    >
-      {{ operationFeedback.message }}
-    </CvInlineAlert>
-  </div>
+  <SettingsWriteFeedback :feedback="operationFeedback" />
 
   <CvModal
     :open="resetUser !== null"
     title="重置用户密码"
-    description="新密码仅提交给既有管理员接口，不会写入用户列表或页面状态。"
+    description="重置后旧密码立即失效。新密码提交后不会保留在页面中。"
     size="sm"
     @close="closeReset"
   >
@@ -472,6 +464,7 @@ onDeactivated(() => {
 }
 
 .settings-users__create-heading { display: grid; gap: var(--cv-space-1); }
+.settings-users__create-heading { grid-column: 1 / -1; }
 .settings-users__create-heading strong, .settings-users__edit > strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .settings-users__create-heading span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .settings-users__row-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px; }
@@ -482,7 +475,6 @@ onDeactivated(() => {
 .settings-toggle span { display: grid; gap: var(--cv-space-1); }
 .settings-toggle strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); }
 .settings-toggle small { color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }
-.settings-users__feedback { margin-top: var(--cv-space-4); }
 @media (max-width: 1020px) {
   .settings-users__create, .settings-users__edit { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -94,8 +94,16 @@ describe('operator contracts', () => {
       .toThrow(OperatorContractDecodeError);
     expect(() => decodeOperatorCatalogItem(operator({ parameters: [{ name: '' }] })))
       .toThrow(OperatorContractDecodeError);
-    expect(() => decodeOperatorCatalog([operator(), operator()]))
-      .toThrow(/unique operator identities/);
+    let duplicateFailure: unknown;
+    try {
+      decodeOperatorCatalog([operator(), operator()]);
+    } catch (error) {
+      duplicateFailure = error;
+    }
+    expect(duplicateFailure).toMatchObject({
+      path: '$.type',
+      expectation: 'unique operator identities'
+    });
   });
 
   it('freezes stable conditional, output and image contract metadata without interpreting G3 editors', () => {

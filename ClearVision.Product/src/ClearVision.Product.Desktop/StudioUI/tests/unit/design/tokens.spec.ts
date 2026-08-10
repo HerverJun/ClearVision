@@ -101,7 +101,7 @@ describe('Design Foundation color tokens', () => {
     }
   });
 
-  it('defines the V1.1 surface, typography and motion semantics once', () => {
+  it('defines the 2.0 surface, typography and motion semantics once', () => {
     for (const token of [
       '--cv-surface-app',
       '--cv-surface-page',
@@ -113,12 +113,28 @@ describe('Design Foundation color tokens', () => {
       '--cv-type-body-size',
       '--cv-type-secondary-size',
       '--cv-type-caption-size',
-      '--cv-type-numeric-size'
+      '--cv-type-numeric-size',
+      '--cv-type-metadata-size',
+      '--cv-surface-section',
+      '--cv-surface-card',
+      '--cv-surface-tool'
     ]) {
       expect(light.has(token)).toBe(true);
     }
     expect(light.get('--cv-motion-duration-fast')).toBe('140ms');
     expect(light.get('--cv-motion-duration-normal')).toBe('180ms');
     expect(light.get('--cv-motion-duration-slow')).toBe('200ms');
+    expect(light.get('--cv-motion-duration-progress')).toBe('800ms');
+    expect(Number.parseFloat(light.get('--cv-font-size-2xs')!)).toBeGreaterThanOrEqual(12);
+  });
+
+  it.each([
+    ['light', light],
+    ['dark', dark]
+  ] as const)('defines explicit %s offline and unknown state colors', (_theme, tokens) => {
+    expect(tokens.get('--cv-color-status-offline')).not.toBe(tokens.get('--cv-color-status-idle'));
+    expect(tokens.get('--cv-color-status-unknown')).not.toBe(tokens.get('--cv-color-status-warning'));
+    expect(tokens.get('--cv-color-status-offline-border')).toBeDefined();
+    expect(tokens.get('--cv-color-status-unknown-border')).toBeDefined();
   });
 });

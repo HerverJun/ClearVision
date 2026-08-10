@@ -173,7 +173,7 @@ function requiredMethod<T>(method: T | undefined, name: string): T {
 function userPath(id: string, suffix = ''): string {
   const normalized = id.trim();
   if (!normalized || normalized.includes('/')) {
-    throw new ApiConfigurationError('Settings user id must be a non-empty path-safe value.');
+    throw new ApiConfigurationError('设置用户标识无效。');
   }
   return `users/${encodeURIComponent(normalized)}${suffix}`;
 }

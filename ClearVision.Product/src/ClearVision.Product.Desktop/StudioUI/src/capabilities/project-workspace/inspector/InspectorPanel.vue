@@ -414,7 +414,7 @@ onBeforeUnmount(() => props.owner.setDraftActive('node:name', false));
     </section>
 
     <footer class="inspector-panel__footer">
-      <span>本地流程 r{{ projection.flowRevision }}</span>
+      <span>本地流程修订 {{ projection.flowRevision }}</span>
       <span v-if="projection.activeDraftCount > 0">未提交字段 {{ projection.activeDraftCount }}</span>
       <span
         v-if="lastMessage"

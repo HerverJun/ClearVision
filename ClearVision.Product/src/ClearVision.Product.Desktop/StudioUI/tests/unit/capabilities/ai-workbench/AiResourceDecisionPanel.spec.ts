@@ -41,7 +41,8 @@ describe('AiResourceDecisionPanel', () => {
 
     expect(wrapper.find('select').exists()).toBe(false);
     expect(wrapper.find('input').exists()).toBe(false);
-    expect(wrapper.text()).toContain('当前没有获批的安全选择合同');
+    expect(wrapper.text()).toContain('当前没有可用的资源选择项');
+    expect(wrapper.text()).not.toContain('安全选择合同');
     expect(wrapper.get('button').attributes('disabled')).toBeDefined();
     wrapper.unmount();
   });

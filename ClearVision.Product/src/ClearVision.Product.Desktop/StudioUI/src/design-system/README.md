@@ -1,4 +1,4 @@
-# ClearVision Design System V1.1
+# ClearVision Design System 2.0
 
 Design System V1 服务正式 Studio 产品页面与隔离 Labs。它不导入 legacy CSS，不创建第二产品 Shell，
 也不承载 Project、Flow、Session、Inspection 或 Station authority。
@@ -13,7 +13,8 @@ Design System V1 服务正式 Studio 产品页面与隔离 Labs。它不导入 l
 - 常规页面优先排版、间距、背景差和单向分割线，避免 Panel、Table 与内部卡片重复整圈描边；
 - 阴影保持克制，只用于 raised、floating、modal 与显式 elevated 场景。
 - 所有正式产品路由复用唯一 Product Shell：丹红雪花品牌、顶部产品导航、会话/外观区和统一页面容器；不再维护普通页面侧栏壳层。
-- 默认 Panel 使用低对比描边与 tonal layer，不同时叠加宽软阴影；Modal/Toast 通过真实 elevation 表达浮层。
+- `CvPanel` 的 `section` 用于连续页面区，`card` 只用于真实独立对象，`tool` 用于有明确工作边界的工具面；默认 `card` 保持现有调用兼容，页面迁移必须显式选择语义。
+- Panel 不同时叠加完整描边与宽软阴影；Menu、Tooltip、Modal、Toast 通过真实 elevation 表达浮层。
 - 页面滚动区、表格、弹窗 body 与工作区滚动 owner 使用同一套窄滚动条 token。
 
 ## 排版层级
@@ -21,7 +22,7 @@ Design System V1 服务正式 Studio 产品页面与隔离 Labs。它不导入 l
 - Display：内部视觉样本和特殊产品身份；
 - Page Title：正式路由唯一 `h1`；
 - Section Title：Panel 和工作区分区；
-- Body / Secondary / Caption：按信息权重递减，不依靠大量粗体制造层级；
+- Body / Secondary / Caption：按信息权重递减，不依靠大量粗体制造层级；正式产品可见文字不低于 12px；
 - Numeric：使用 tabular lining numbers，稳定呈现计数、时间、耗时、版本与状态值。
 
 字体栈只使用 Windows/系统可用字体，不下载外部字体或在线资源。普通交互动效为 140–200ms，
@@ -32,13 +33,13 @@ Design System V1 服务正式 Studio 产品页面与隔离 Labs。它不导入 l
 正式页面统一从 `@/design-system` 导入。根出口转发：
 
 - `primitives`：Button、Field、Select、DataTable、SearchField、Pagination、DescriptionList、
-  InlineAlert、Modal、Toast、Splitter 等；
+  InlineAlert、Menu、Tooltip、Modal、Toast、Splitter 等；
 - `patterns`：PageHeader、Breadcrumbs、Toolbar、PageState；
 - `icons`：仅包含当前产品与 patterns 实际使用的无依赖 SVG 图标。
 
 patterns 只负责呈现和交互语义，不识别 HTTP、query、permission 或业务 DTO。Loading、Empty、Error、
-Unauthorized、Forbidden 与 Not Found 由 `CvPageState` 统一呈现；Stale 与 Partial Failure 使用
-`CvInlineAlert`，并由 capability 保留 previous data。
+Offline、Stale、Partial、Conflict、Unknown、Unauthorized、Forbidden 与 Not Found 由 `CvPageState`
+统一呈现；页面内局部 Stale 与 Partial Failure 可使用 `CvInlineAlert`，并由 capability 保留 previous data。
 
 ## 中文产品文案规范
 
@@ -48,7 +49,7 @@ Unauthorized、Forbidden 与 Not Found 由 `CvPageState` 统一呈现；Stale �
 - Forbidden 与网络故障分开表述，403 不写成“服务不可用”；
 - Stale/Partial Failure 明确说明正在显示上次数据；
 - 危险、NG、品牌丹红和技术 info 不互相借用语义；
-- API path、schemaVersion、hostKind、PersistenceRevision 等协议名可保留英文；
+- API path、schemaVersion、hostKind、PersistenceRevision 等协议名只在确有诊断价值的次级技术详情中保留，不进入登录、恢复或主任务指导文案；
 - Labs 可保留必要的技术英文，但必须标明内部实验室，不进入正式导航。
 
 ## 可访问性与生命周期
@@ -59,7 +60,7 @@ Unauthorized、Forbidden 与 Not Found 由 `CvPageState` 统一呈现；Stale �
 - Product Shell 提供 skip link、唯一 `main`，正式路由切换后把焦点恢复到主要内容；
 - 混合筛选控件使用 group 与自然 Tab，纯按钮 toolbar 才使用方向键模型；
 - 静态 Empty、Unauthorized、Forbidden 与 404 不创建多余 live region；
-- Modal、Toast、Splitter、Toolbar 等 transient listener/timer 由 mounted owner 清理；
+- Menu、Tooltip、Modal、Toast、Splitter、Toolbar 等 transient listener/timer 由 mounted owner 清理；
 - reduced-motion 由系统偏好和根 projection 共同控制；
 - 1366×768 不允许全局横向滚动，表格需要时只在局部容器滚动。
 

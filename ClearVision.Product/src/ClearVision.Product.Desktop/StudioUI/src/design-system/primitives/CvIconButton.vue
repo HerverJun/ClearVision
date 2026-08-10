@@ -74,6 +74,7 @@ const isDisabled = computed(() => props.disabled || props.loading);
 .cv-icon-button--secondary { border-color: var(--cv-control-border); background: var(--cv-surface-raised); }
 .cv-icon-button:hover:not(:disabled) { border-color: var(--cv-control-border-hover); background: var(--cv-interactive-hover); color: var(--cv-color-link); }
 .cv-icon-button:active:not(:disabled) { background: var(--cv-interactive-active); }
+.cv-icon-button:focus-visible { outline: none; box-shadow: var(--cv-focus-ring); }
 .cv-icon-button:disabled { cursor: not-allowed; opacity: 0.48; }
 .cv-icon-button__icon { display: inline-flex; }
 .cv-icon-button__icon :deep(svg) { width: var(--cv-density-icon-size); height: var(--cv-density-icon-size); }
@@ -83,7 +84,7 @@ const isDisabled = computed(() => props.disabled || props.loading);
   border: 2px solid currentColor;
   border-right-color: transparent;
   border-radius: 50%;
-  animation: cv-icon-button-spin var(--cv-motion-duration-slow) linear infinite;
+  animation: cv-icon-button-spin var(--cv-motion-duration-progress) linear infinite;
 }
 
 @keyframes cv-icon-button-spin { to { transform: rotate(360deg); } }

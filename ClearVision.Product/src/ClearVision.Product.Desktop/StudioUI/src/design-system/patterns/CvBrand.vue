@@ -83,9 +83,9 @@ withDefaults(defineProps<{
 
 .cv-brand__wordmark small {
   color: var(--cv-text-muted);
-  font-size: 9px;
+  font-size: var(--cv-font-size-xs);
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: 0;
 }
 
 .cv-brand--compact { gap: 0; }

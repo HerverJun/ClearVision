@@ -20,8 +20,9 @@ const emit = defineEmits<{
 <template>
   <CvPanel
     class="projects-recent"
-    title="最近工程"
+    title="最近打开"
     :level="2"
+    variant="section"
     :padded="false"
   >
     <CvInlineAlert
@@ -93,7 +94,7 @@ const emit = defineEmits<{
           :disabled="busy"
           @click="emit('open', project)"
         >
-          打开工作区
+          打开
         </CvButton>
       </li>
     </ol>

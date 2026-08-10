@@ -185,9 +185,9 @@ export function createWorkspaceOwner(
     projectId: project.id,
     projection: readonly(state),
     openFlowCanvas(): FlowCanvasOwner {
-      if (disposed) throw new Error('Workspace owner has been disposed.');
-      if (flowOwner) throw new Error(`FlowCanvas owner already exists for project ${project.id}.`);
-      if (!api) throw new Error('Workspace Flow/Preview composition requires the shared ApiTransport.');
+      if (disposed) throw new Error('工程工作区已关闭。');
+      if (flowOwner) throw new Error(`工程 ${project.id} 的流程画布已挂载。`);
+      if (!api) throw new Error('工程工作区缺少共享服务连接，无法加载流程与预览。');
       flowOwner = createFlowCanvasOwner({
         project,
         queries,
@@ -358,7 +358,7 @@ export function createWorkspaceOwner(
       if (disposed) return null;
       sessionQuarantined = true;
       state.phase = 'readonly';
-      state.readonlyReason = '会话已失效；本地 draft 与运行身份已隔离，重新认证并完成 reconcile 前禁止写入。';
+      state.readonlyReason = '会话已失效；本地草稿与正式运行身份已隔离，重新认证并完成状态核对前禁止写入。';
       flowOwner?.setMutationGate('readonly');
       persistenceOwner?.setReadonly(state.readonlyReason);
       globalVariablesOwner?.setReadonly(state.readonlyReason);
@@ -412,22 +412,22 @@ export function createWorkspaceOwner(
       templateOwner?.setReadonly(state.readonlyReason);
     },
     async stageHandoffDraft(artifact: WorkspaceHandoffArtifactV1): Promise<void> {
-      if (disposed) throw new Error('Workspace owner has been disposed.');
+      if (disposed) throw new Error('工程工作区已关闭。');
       if (artifact.targetKind !== 'existing' || artifact.projectBaseline.projectId !== project.id ||
           artifact.projectBaseline.persistenceRevision !== state.project.persistenceRevision) {
-        throw new Error('Artifact baseline does not match the mounted Workspace project.');
+        throw new Error('交接候选的工程保存基线与当前工作区不一致。');
       }
       if (persistenceOwner?.projection.dirty) {
-        throw new Error('Workspace has an unsaved draft and cannot stage an AI candidate.');
+        throw new Error('当前工程存在未保存的本地草稿，不能装载 AI 候选。');
       }
       if (!flowOwner || flowOwner.projection.phase !== 'mounted') {
-        throw new Error('Canonical FlowCanvas must be mounted before staging a handoff candidate.');
+        throw new Error('流程画布尚未就绪，不能装载 AI 候选。');
       }
       state.handoff = Object.freeze({
         phase: 'workspace-staging',
         source: null,
         build: artifact.build,
-        message: '正在把 AI 候选装载到唯一 Workspace owner。'
+        message: '正在把 AI 候选装载到当前工程工作区。'
       });
       flowOwner.replaceFlow(encodeWorkspaceHandoffFlowV1(artifact.candidateFlow), state.project.name);
       await nextTick();
@@ -437,21 +437,21 @@ export function createWorkspaceOwner(
       source: WorkspaceHandoffSourceV1;
       build: WorkspaceHandoffBuildSummaryV1;
     }>): Promise<void> {
-      if (disposed) throw new Error('Workspace owner has been disposed.');
+      if (disposed) throw new Error('工程工作区已关闭。');
       if (input.source.targetKind !== 'new') {
-        throw new Error('Only a new-project handoff draft can be adopted after Project creation.');
+        throw new Error('只有新工程交接草稿可在创建工程后接管。');
       }
       if (persistenceOwner?.projection.dirty) {
-        throw new Error('The created Project Workspace is no longer at its blank baseline.');
+        throw new Error('新建工程已不再是空白保存基线，不能接管该候选。');
       }
       if (!flowOwner || flowOwner.projection.phase !== 'mounted') {
-        throw new Error('Canonical FlowCanvas must be mounted before adopting a new-project draft.');
+        throw new Error('流程画布尚未就绪，不能接管新工程草稿。');
       }
       state.handoff = Object.freeze({
         phase: 'workspace-staging',
         source: input.source,
         build: input.build,
-        message: '正在把未落库候选接管到正式 Project Workspace。'
+        message: '正在把未落库候选接管到正式工程工作区。'
       });
       flowOwner.replaceFlow(input.flow, state.project.name);
       await nextTick();
@@ -464,7 +464,7 @@ export function createWorkspaceOwner(
     },
     confirmHandoff(source: WorkspaceHandoffSourceV1): void {
       if (disposed || !state.handoff || state.handoff.phase !== 'workspace-staging') {
-        throw new Error('Workspace has no staged handoff awaiting confirmation.');
+        throw new Error('当前工作区没有等待确认的交接候选。');
       }
       state.handoff = Object.freeze({
         ...state.handoff,
@@ -476,7 +476,7 @@ export function createWorkspaceOwner(
     async discardHandoffDraft(): Promise<void> {
       if (disposed || !state.handoff) return;
       if (!flowOwner || flowOwner.projection.phase !== 'mounted') {
-        throw new Error('Canonical FlowCanvas is not available.');
+        throw new Error('流程画布不可用。');
       }
       if (persistenceOwner?.projection.phase === 'saving' ||
           persistenceOwner?.projection.phase === 'unknown-outcome') {

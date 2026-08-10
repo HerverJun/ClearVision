@@ -28,8 +28,8 @@ const targetLabel = computed(() => props.build.projectBaseline.targetKind === 'n
   ? '未保存的新工程'
   : props.project?.name ?? '当前既有工程');
 const baselineLabel = computed(() => props.build.projectBaseline.targetKind === 'new'
-  ? '缺少正式工程标识、保存修订或流程基线'
-  : `工程版本 ${props.build.projectBaseline.persistenceRevision ?? 0}`);
+  ? '尚无工程保存基线'
+  : `工程保存基线 · 修订 ${props.build.projectBaseline.persistenceRevision ?? 0}`);
 const eligible = computed(() => !props.stale && props.build.validation.handoffEligible &&
   !props.build.validation.applyGate.blocked && props.build.validation.applyGate.canvasApplyReady &&
   props.build.validation.applyGate.runtimeDraftReady);
@@ -124,7 +124,7 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
                 v-for="item in resourceBindings"
                 :key="item.canonicalKey"
               >
-                {{ item.operatorDisplayName || item.operatorType }} · {{ item.parameterDisplayName || item.parameterName }}：{{ item.valueSummary || '已绑定 canonical identity' }}
+                {{ item.operatorDisplayName || item.operatorType }} · {{ item.parameterDisplayName || item.parameterName }}：{{ item.valueSummary || '已绑定资源' }}
               </li>
             </ul>
             <p v-else>
@@ -179,8 +179,8 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
       <details class="ai-apply-preview__technical">
         <summary>查看技术身份</summary>
         <dl>
-          <div><dt>Plan Hash</dt><dd>{{ build.planHash }}</dd></div>
-          <div><dt>Candidate fingerprint</dt><dd>{{ build.candidateFlowFingerprint }}</dd></div>
+          <div><dt>方案摘要</dt><dd>{{ build.planHash }}</dd></div>
+          <div><dt>候选摘要</dt><dd>{{ build.candidateFlowFingerprint }}</dd></div>
         </dl>
       </details>
     </div>

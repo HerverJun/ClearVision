@@ -52,7 +52,7 @@ function save(): void {
       <div>
         <h2 id="ai-resources-title">
           资源决策
-        </h2><p>不接受自由文本路径或前端猜测。</p>
+        </h2><p>仅可选择系统已确认的资源；无法安全匹配的资源项继续保持阻断。</p>
       </div>
       <span>{{ resources.length }} 项</span>
     </header>
@@ -95,7 +95,7 @@ function save(): void {
           v-else
           class="ai-resources__blocked"
         >
-          当前没有获批的安全选择合同。本项保持阻断；解决位置：{{ resource.resolutionTarget || '对应设置' }}。
+          当前没有可用的资源选择项。本项保持阻断；请前往{{ resource.resolutionTarget || '对应设置' }}处理。
         </p>
         <p
           v-if="resource.resourceType === 'camera_binding' && cameraBindings.length === 0"
@@ -106,7 +106,7 @@ function save(): void {
       </li>
     </ul>
     <footer>
-      <span v-if="selectableCount < resources.length">{{ resources.length - selectableCount }} 项因缺少安全选择合同继续阻断</span>
+      <span v-if="selectableCount < resources.length">{{ resources.length - selectableCount }} 项暂时没有可用选择，继续阻断</span>
       <CvButton
         size="sm"
         variant="primary"

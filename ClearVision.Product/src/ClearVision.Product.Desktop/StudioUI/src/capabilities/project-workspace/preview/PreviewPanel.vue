@@ -132,7 +132,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
         <small
           v-if="preview.requestIdentity"
           class="preview-panel__revision"
-        >流程 r{{ preview.requestIdentity.flowRevision }}</small>
+        >流程修订 {{ preview.requestIdentity.flowRevision }}</small>
         <CvStatusBadge
           :tone="preview.autoPreviewAllowed ? 'info' : 'idle'"
           :label="preview.autoPreviewAllowed ? '自动预览' : '仅手动'"
@@ -163,6 +163,12 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
         :disabled="!preview.canPreview || preview.canCancel"
         @click="owner.preview.previewNow()"
       >
+        <template #leading>
+          <CvIcon
+            name="play"
+            size="sm"
+          />
+        </template>
         手动预览
       </CvButton>
       <CvIconButton
@@ -283,27 +289,39 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
                 :disabled="!roi.canStart"
                 @click="owner.roi.start()"
               >
+                <template #leading>
+                  <CvIcon
+                    name="region"
+                    size="sm"
+                  />
+                </template>
                 编辑 ROI
               </CvButton>
               <template v-else>
-                <CvButton
+                <CvIconButton
                   data-testid="roi-undo"
                   size="sm"
-                  variant="quiet"
+                  label="撤销 ROI 编辑"
                   :disabled="!roi.canUndo"
                   @click="owner.roi.undo()"
                 >
-                  撤销
-                </CvButton>
-                <CvButton
+                  <CvIcon
+                    name="undo"
+                    size="sm"
+                  />
+                </CvIconButton>
+                <CvIconButton
                   data-testid="roi-redo"
                   size="sm"
-                  variant="quiet"
+                  label="重做 ROI 编辑"
                   :disabled="!roi.canRedo"
                   @click="owner.roi.redo()"
                 >
-                  重做
-                </CvButton>
+                  <CvIcon
+                    name="redo"
+                    size="sm"
+                  />
+                </CvIconButton>
                 <CvButton
                   data-testid="roi-cancel"
                   size="sm"
@@ -315,6 +333,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
                 <CvButton
                   data-testid="roi-confirm"
                   size="sm"
+                  variant="primary"
                   :disabled="!roi.canConfirm"
                   @click="owner.roi.confirm()"
                 >
@@ -491,10 +510,12 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 .preview-panel__manual-reason { max-width: 180px; }
 .preview-panel__collapse-icon { transform: rotate(180deg); transition: transform var(--cv-motion-duration-fast) var(--cv-motion-ease-standard); }
 .preview-panel__collapse-icon.is-collapsed { transform: rotate(0); }
-.preview-panel__body { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 43%) minmax(0, 1fr); overflow: hidden; }
+.preview-panel__body { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 50%) minmax(0, 1fr); overflow: hidden; }
 .preview-panel__body > :deep(.image-viewport) { min-height: 0; }
 .preview-panel__details { min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; border-top: 1px solid var(--cv-border-subtle); scrollbar-gutter: stable; }
 .preview-panel__alerts { padding: var(--cv-space-2) var(--cv-space-3) 0; display: grid; gap: var(--cv-space-2); }
+.preview-panel__alerts :deep(.cv-inline-alert) { align-items: start; grid-template-columns: auto minmax(0, 1fr); }
+.preview-panel__alerts :deep(.cv-inline-alert__actions) { grid-column: 2 / -1; justify-content: flex-start; }
 .preview-panel__summary,
 .preview-panel__roi,
 .preview-panel__key-outputs,
@@ -505,9 +526,10 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 .preview-panel__section-heading > div { min-width: 0; display: grid; gap: 2px; }
 .preview-panel__section-heading strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
 .preview-panel__section-heading small { overflow: hidden; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }
-.preview-panel__roi-actions { max-width: 100%; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--cv-space-1); }
-.preview-panel__summary dl { margin: var(--cv-space-2) 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-1); }
-.preview-panel__summary dl div { min-width: 0; padding: 7px 8px; border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); }
+.preview-panel__roi .preview-panel__section-heading { display: grid; grid-template-columns: minmax(0, 1fr); }
+.preview-panel__section-heading > .preview-panel__roi-actions { width: 100%; max-width: 100%; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--cv-space-1); }
+.preview-panel__summary dl { margin: var(--cv-space-2) 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--cv-space-3); }
+.preview-panel__summary dl div { min-width: 0; padding: 6px 0; border-bottom: 1px solid var(--cv-border-subtle); }
 .preview-panel__summary dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .preview-panel__summary dd { margin: 2px 0 0; overflow: hidden; color: var(--cv-text-primary); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
 .preview-panel__summary dd[data-tone="ok"] { color: var(--cv-color-status-ok-strong); }
@@ -555,7 +577,7 @@ async function openArtifact(artifactId: string, isImage: boolean): Promise<void>
 }
 
 @media (max-height: 760px) {
-  .preview-panel__body { grid-template-rows: minmax(0, 48%) minmax(0, 1fr); }
+  .preview-panel__body { grid-template-rows: minmax(0, 52%) minmax(0, 1fr); }
   .preview-panel__summary,
   .preview-panel__roi,
   .preview-panel__key-outputs,

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { CvButton, CvInlineAlert, CvStatusBadge } from '@/design-system';
+import { CvIconButton, CvInlineAlert, CvStatusBadge } from '@/design-system';
+import { CvIcon } from '@/design-system/icons';
 import type { ResultAnalysisOwner } from './resultAnalysisOwner';
 
 const props = defineProps<{ owner: ResultAnalysisOwner }>();
@@ -55,6 +56,14 @@ function phaseLabel(phase: string): string {
   } as Readonly<Record<string, string>>)[phase] ?? '状态未知';
 }
 
+function intervalLabel(interval: string): string {
+  return ({
+    minute: '每分钟',
+    hour: '每小时',
+    day: '每天'
+  } as Readonly<Record<string, string>>)[interval] ?? '自定义间隔';
+}
+
 function refresh(): void {
   void props.owner.refresh({ force: true });
 }
@@ -69,30 +78,32 @@ function refresh(): void {
     <header class="results-analysis__header">
       <div>
         <h2>结果分析</h2>
-        <p>趋势与缺陷分布来自当前工程的服务端分析投影。</p>
+        <p>按当前工程与筛选条件汇总趋势、缺陷分布和处理节拍。</p>
       </div>
       <div class="results-analysis__actions">
         <CvStatusBadge
           :tone="phaseTone(projection.phase)"
           :label="phaseLabel(projection.phase)"
         />
-        <CvButton
+        <CvIconButton
           size="sm"
-          variant="quiet"
+          label="刷新结果分析"
           :loading="projection.phase === 'loading'"
-          loading-label="正在刷新"
           data-testid="results-analysis-refresh"
           @click="refresh"
         >
-          刷新分析
-        </CvButton>
+          <CvIcon
+            name="refresh"
+            size="sm"
+          />
+        </CvIconButton>
       </div>
     </header>
 
     <CvInlineAlert
       v-if="projection.phase === 'error' || projection.phase === 'partial-failure'"
       :tone="projection.phase === 'error' ? 'error' : 'warning'"
-      title="分析投影状态"
+      title="分析数据未完全更新"
     >
       {{ projection.message }}
     </CvInlineAlert>
@@ -140,7 +151,7 @@ function refresh(): void {
       >
         <div class="results-analysis__section-heading">
           <h3>检测趋势</h3>
-          <span>{{ trend?.interval ?? projection.interval }} · {{ trend?.dataPoints.length ?? 0 }} 个时间点</span>
+          <span>{{ intervalLabel(trend?.interval ?? projection.interval) }} · {{ trend?.dataPoints.length ?? 0 }} 个时间点</span>
         </div>
         <p
           v-if="!trend || trend.dataPoints.length === 0"
@@ -205,29 +216,29 @@ function refresh(): void {
 .results-analysis { min-width: 0; border-block: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
 .results-analysis__header { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); padding: var(--cv-space-3) var(--cv-space-4); border-bottom: 1px solid var(--cv-border-subtle); }
 .results-analysis__header h2 { margin: 0; font-size: var(--cv-font-size-sm); }
-.results-analysis__header p { margin: 2px 0 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.results-analysis__header p { margin: 2px 0 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .results-analysis__actions { display: flex; align-items: center; gap: var(--cv-space-2); }
 .results-analysis__grid { min-width: 0; display: grid; grid-template-columns: minmax(220px, .85fr) minmax(360px, 1.35fr) minmax(240px, .8fr); }
 .results-analysis__section { min-width: 0; min-height: 176px; padding: var(--cv-space-3) var(--cv-space-4); border-right: 1px solid var(--cv-border-subtle); }
 .results-analysis__section:last-child { border-right: 0; }
 .results-analysis__section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--cv-space-2); margin-bottom: var(--cv-space-2); }
 .results-analysis__section-heading h3 { margin: 0; font-size: var(--cv-font-size-xs); }
-.results-analysis__section-heading span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); white-space: nowrap; }
+.results-analysis__section-heading span { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); white-space: nowrap; }
 .results-analysis__empty { margin: var(--cv-space-4) 0 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .results-analysis__distribution { display: grid; gap: var(--cv-space-2); margin: 0; padding: 0; list-style: none; }
-.results-analysis__distribution-label { display: flex; justify-content: space-between; gap: var(--cv-space-2); color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }
+.results-analysis__distribution-label { display: flex; justify-content: space-between; gap: var(--cv-space-2); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .results-analysis__distribution-label strong { min-width: 0; overflow: hidden; color: var(--cv-text-primary); text-overflow: ellipsis; white-space: nowrap; }
 .results-analysis__bar { height: 5px; margin-top: 3px; overflow: hidden; background: var(--cv-surface-sunken); }
 .results-analysis__bar span { display: block; height: 100%; background: var(--cv-color-industrial-blue); }
-.results-analysis__trend { width: 100%; border-collapse: collapse; font-size: var(--cv-font-size-2xs); }
+.results-analysis__trend { width: 100%; border-collapse: collapse; font-size: var(--cv-font-size-xs); }
 .results-analysis__trend th,.results-analysis__trend td { padding: 4px 5px; text-align: right; border-bottom: 1px solid var(--cv-border-subtle); font-variant-numeric: tabular-nums; }
 .results-analysis__trend th:first-child,.results-analysis__trend td:first-child { text-align: left; }
 .results-analysis__trend th { color: var(--cv-text-muted); font-weight: var(--cv-font-weight-medium); }
 .results-analysis__summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-block: 1px solid var(--cv-border-subtle); }
 .results-analysis__summary div { min-width: 0; padding: var(--cv-space-2); }
-.results-analysis__summary dt { color: var(--cv-text-muted); font-size: 9px; }
+.results-analysis__summary dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .results-analysis__summary dd { margin: 2px 0 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); font-variant-numeric: tabular-nums; }
-.results-analysis__recommendations { margin: var(--cv-space-2) 0 0; padding-left: var(--cv-space-4); color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); line-height: 1.45; }
+.results-analysis__recommendations { margin: var(--cv-space-2) 0 0; padding-left: var(--cv-space-4); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
 .results-analysis > :deep(.cv-inline-alert) { margin: var(--cv-space-3) var(--cv-space-4) 0; }
 @media (max-width: 1180px) { .results-analysis__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .results-analysis__section:nth-child(2) { border-right: 0; } .results-analysis__section:last-child { grid-column: 1 / -1; border-top: 1px solid var(--cv-border-subtle); } }
 @media (max-width: 700px) { .results-analysis__header { align-items: flex-start; flex-direction: column; } .results-analysis__grid { grid-template-columns: 1fr; } .results-analysis__section { border-right: 0; border-bottom: 1px solid var(--cv-border-subtle); } .results-analysis__section:last-child { grid-column: auto; border-top: 0; border-bottom: 0; } }

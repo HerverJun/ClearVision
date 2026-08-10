@@ -201,7 +201,7 @@ function identityKey(flowOwner: FlowCanvasOwner, imageOwner: ImageCanvasOwner): 
 }
 
 function errorMessage(error: unknown, action: 'solve' | 'save' = 'save'): string {
-  if (error instanceof ApiConflictError) return '工程 revision 已变化；请先重新读取工程后再保存标定资产。';
+  if (error instanceof ApiConflictError) return '工程保存修订已变化；请先重新读取工程后再保存标定资产。';
   if (error instanceof ApiForbiddenError) {
     return action === 'solve'
       ? '当前账户没有执行标定计算的权限。'
@@ -597,12 +597,12 @@ export function createCalibrationOwner(options: {
           return;
         }
         state.phase = 'saved';
-        state.message = `标定资产 ${decoded.assetId} 已保存，工程 revision ${decoded.persistenceRevision}。`;
+        state.message = `标定资产 ${decoded.assetId} 已保存，工程保存修订 ${decoded.persistenceRevision}。`;
       } catch (error) {
         if (saveRequestSequence !== saveSequence || disposed || error instanceof ApiAbortError) return;
         state.phase = error instanceof ApiNetworkError ? 'unknown-outcome' : 'error';
         state.message = error instanceof ApiNetworkError
-          ? '标定资产保存结果未知；请先核对工程 revision，禁止重复提交。'
+          ? '标定资产保存结果未知；请先核对工程保存修订，禁止重复提交。'
           : errorMessage(error);
         state.diagnostics = Object.freeze([state.message]);
       } finally {

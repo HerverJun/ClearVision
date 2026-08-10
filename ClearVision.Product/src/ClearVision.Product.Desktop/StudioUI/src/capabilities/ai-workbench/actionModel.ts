@@ -48,11 +48,11 @@ export function aiWorkbenchActionModel(state: AiWorkbenchState): AiWorkbenchActi
   switch (state.phase) {
     case 'idle':
       return Object.freeze({ primary: action('submitTask', '理解并规划任务', true), secondary: Object.freeze([]),
-        statusHint: '任务描述将先经过 Intent Router，再创建可恢复的 Plan Run。', nextStagePlaceholder: null });
+        statusHint: '服务端会先理解任务，再创建可恢复的方案规划记录。', nextStagePlaceholder: null });
     case 'planning':
       return Object.freeze({ primary: action('cancelPlan', '取消规划', false, state.run.runId !== null,
-        state.run.runId ? '' : 'Plan Run 尚未由服务端确认。'), secondary: Object.freeze([]),
-        statusHint: '公开进度通过 replay 与 SSE 恢复。', nextStagePlaceholder: null });
+        state.run.runId ? '' : '规划任务尚未由服务端确认。'), secondary: Object.freeze([]),
+        statusHint: '规划进度可从服务端事件记录恢复。', nextStagePlaceholder: null });
     case 'clarifying':
       return Object.freeze({ primary: action('answerClarification', '确认回答并重新检查', true),
         secondary: Object.freeze([action('acceptRecommendedAnswers', '采用推荐答案', false)]),
@@ -78,9 +78,9 @@ export function aiWorkbenchActionModel(state: AiWorkbenchState): AiWorkbenchActi
     case 'validating':
       return Object.freeze({
         primary: action('cancelBuild', '取消构建', false, state.run.runId !== null,
-          state.run.runId ? '' : 'Build Run 尚未由服务端确认。'),
+          state.run.runId ? '' : '构建任务尚未由服务端确认。'),
         secondary: Object.freeze([]),
-        statusHint: '公开阶段通过 replay 与 SSE 恢复。',
+        statusHint: '构建进度可从服务端事件记录恢复。',
         nextStagePlaceholder: null
       });
     case 'parameters-pending':
@@ -88,7 +88,7 @@ export function aiWorkbenchActionModel(state: AiWorkbenchState): AiWorkbenchActi
         statusHint: '建议值不会自动视为已确认；确认后必须重新校验。', nextStagePlaceholder: null });
     case 'resources-pending':
       return Object.freeze({ primary: action('updateResourceDecision', '保存资源决策', true), secondary: Object.freeze([]),
-        statusHint: '只接受当前 Build 返回的 canonical 资源身份。', nextStagePlaceholder: null });
+        statusHint: '只接受当前构建返回的已确认资源身份。', nextStagePlaceholder: null });
     case 'build-blocked':
       return Object.freeze({ primary: action('recheckReadiness', '重新校验', true),
         secondary: Object.freeze([action('rebuild', '重新构建', false)]),
@@ -96,22 +96,22 @@ export function aiWorkbenchActionModel(state: AiWorkbenchState): AiWorkbenchActi
         nextStagePlaceholder: null });
     case 'revalidating':
       return Object.freeze({ primary: null, secondary: Object.freeze([]),
-        statusHint: '候选结构保持不变，服务端正在重新计算 Validation 与 ApplyGate。', nextStagePlaceholder: null });
+        statusHint: '候选结构保持不变，服务端正在重新计算校验与交接条件。', nextStagePlaceholder: null });
     case 'build-ready':
       return Object.freeze({ primary: action('prepareHandoff', '交接到工作区审核', true),
         secondary: Object.freeze([action('recheckReadiness', '重新校验', false)]),
-        statusHint: '交接只会创建短期候选工件，不会自动保存或运行。',
+        statusHint: '交接只会创建短期候选，不会自动保存或运行。',
         nextStagePlaceholder: null });
     case 'handoff-creating':
       return Object.freeze({ primary: null, secondary: Object.freeze([]),
-        statusHint: '服务端正在重新证明 Build、revision、baseline 与 candidate fingerprint。',
+        statusHint: '服务端正在重新核对构建记录、会话修订、工程保存基线与候选摘要。',
         nextStagePlaceholder: null });
     case 'handoff-unknown-outcome':
       return Object.freeze({ primary: action('reconcileHandoff', '查询交接结果', true),
         secondary: Object.freeze([]), statusHint: state.message, nextStagePlaceholder: null });
     case 'handoff-created':
       return Object.freeze({ primary: null, secondary: Object.freeze([]),
-        statusHint: 'AI owner 即将释放；Workspace owner 挂载后才会读取候选。', nextStagePlaceholder: null });
+        statusHint: '当前工作台资源即将释放；进入工程工作区后才会读取候选。', nextStagePlaceholder: null });
     case 'build-failed':
     case 'build-cancelled':
       return Object.freeze({ primary: action('rebuild', '重新构建', true),
@@ -123,7 +123,7 @@ export function aiWorkbenchActionModel(state: AiWorkbenchState): AiWorkbenchActi
         statusHint: state.message, nextStagePlaceholder: null });
     case 'build-cancelling':
       return Object.freeze({ primary: null, secondary: Object.freeze([]),
-        statusHint: '正在等待后端终态 reservation。', nextStagePlaceholder: null });
+        statusHint: '正在等待服务端确认最终状态。', nextStagePlaceholder: null });
     case 'cancelled':
       return Object.freeze({ primary: action('startNewTask', '开始新任务', true), secondary: Object.freeze([]),
         statusHint: '规划终态已由服务端确认。', nextStagePlaceholder: null });

@@ -46,7 +46,7 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
         tone="warning"
         title="当前结果已过期"
       >
-        参数、资源、方案或工程基线已变化；以下候选仅供查看，旧校验与候选就绪结论不再有效。
+        参数、资源、方案或工程保存基线已变化；以下候选仅供查看，旧校验与候选就绪结论不再有效。
       </CvInlineAlert>
 
       <section
@@ -143,7 +143,7 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
           :title="stale ? '候选结论已失效' : candidateReviewReady ? '候选已具备交接条件' : '候选尚未具备交接条件'"
         >
           <template v-if="stale">
-            请基于最新参数、资源、方案和工程基线重新构建并校验候选。
+            请基于最新参数、资源、方案和工程保存基线重新构建并校验候选。
           </template>
           <template v-else>
             {{ build.validation.firstFixRecommendation }}
@@ -192,9 +192,9 @@ function checkBadge(check: AiBuildCheckV1): Readonly<{ label: string; tone: CvSt
         <summary>查看完整映射与公开诊断</summary>
         <div class="ai-build-workspace__detail-grid">
           <dl>
-            <div><dt>Build</dt><dd>{{ build.buildId }}</dd></div>
-            <div><dt>Plan</dt><dd>{{ build.planId }}</dd></div>
-            <div><dt>Plan Hash</dt><dd>{{ build.planHash }}</dd></div>
+            <div><dt>构建编号</dt><dd>{{ build.buildId }}</dd></div>
+            <div><dt>方案编号</dt><dd>{{ build.planId }}</dd></div>
+            <div><dt>方案摘要</dt><dd>{{ build.planHash }}</dd></div>
             <div><dt>候选指纹</dt><dd>{{ build.candidateFlowFingerprint }}</dd></div>
             <div><dt>输入指纹</dt><dd>{{ build.submittedBuildFingerprint }}</dd></div>
             <div><dt>参数 / 资源版本</dt><dd>{{ build.answerRevision }} / {{ build.resourceRevision }}</dd></div>

@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { CvButton, CvStatusBadge, type CvStatusTone } from '@/design-system';
 import { CvIcon } from '@/design-system/icons';
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   phaseLabel: string;
   tone: CvStatusTone;
   message?: string | null;
@@ -36,6 +37,12 @@ const emit = defineEmits<{
   reconcile: [];
   details: [];
 }>();
+
+const inspectionLabel = computed(() => props.admissionLabel
+  .replace('准入阻断', '运行检查阻断')
+  .replace('准入通过', '运行检查通过')
+  .replace('准入检查中', '正在检查运行条件')
+  .replace('待检查准入', '待检查运行条件'));
 </script>
 
 <template>
@@ -61,7 +68,7 @@ const emit = defineEmits<{
     <div class="run-status-bar__admission">
       <CvStatusBadge
         :tone="admissionTone"
-        :label="admissionLabel"
+        :label="inspectionLabel"
       />
       <span
         v-if="blockerCount > 0"
@@ -83,8 +90,8 @@ const emit = defineEmits<{
         variant="quiet"
         :disabled="pending || canStop"
         data-testid="run-console-admission-refresh"
-        aria-label="检查正式运行准入"
-        title="重新请求后端准入检查"
+        aria-label="检查正式运行条件"
+        title="重新检查已保存工程与运行条件"
         @click="emit('checkAdmission')"
       >
         <template #leading>
@@ -93,7 +100,7 @@ const emit = defineEmits<{
             size="sm"
           />
         </template>
-        检查准入
+        检查条件
       </CvButton>
       <CvButton
         size="sm"

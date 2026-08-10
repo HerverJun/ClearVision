@@ -17,7 +17,7 @@ export interface WorkspaceProjectPersistencePort {
 
 function projectPath(projectId: string): string {
   if (!isWorkspaceProjectId(projectId)) {
-    throw new TypeError('Workspace persistence project id must be a non-empty UUID.');
+    throw new TypeError('工程保存标识必须是有效的非空 UUID。');
   }
   return `projects/${projectId}`;
 }
@@ -27,7 +27,7 @@ export function createWorkspaceProjectPersistencePort(
   projectId: string
 ): WorkspaceProjectPersistencePort {
   if (typeof api.put !== 'function') {
-    throw new TypeError('Workspace persistence requires PUT on the shared ApiTransport.');
+    throw new TypeError('工程保存通道不可用。');
   }
   const path = projectPath(projectId);
   const put = api.put.bind(api);

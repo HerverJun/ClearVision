@@ -132,33 +132,33 @@ function workspaceProtection(snapshot: WorkspaceLeaveProtectionSnapshot | null):
 function messageFor(kind: ProductLeaveProtectionKind): string {
   switch (kind) {
     case 'workspace-draft':
-      return '当前工程仍有未保存修改。继续离开会放弃本地 draft。';
+      return '当前工程仍有未保存修改。继续离开会放弃本地草稿。';
     case 'workspace-save-conflict':
-      return '当前工程存在保存冲突。继续离开会放弃尚未解决的本地 draft。';
+      return '当前工程存在保存冲突。继续离开会放弃尚未解决的本地草稿。';
     case 'workspace-save-unknown':
       return '保存结果仍未知，必须先重新读取服务端状态；当前禁止离开。';
     case 'workspace-run-active':
-      return 'Formal Run 仍在 admission、执行或取消协调中；当前禁止强制离开。';
+      return '正式运行仍在准入校验、执行或取消协调中；当前禁止强制离开。';
     case 'workspace-run-unknown':
-      return 'Formal Run 结果未知，必须先 reconcile；当前禁止强制离开。';
+      return '正式运行结果未知，必须先核对服务端状态；当前禁止强制离开。';
     case 'workspace-child-pending':
       return '工程子功能仍有请求或写入处理中；请等待其完成后再离开。';
     case 'workspace-child-unknown':
       return '工程子功能写入结果未知；当前后端合同不支持安全重放，必须先重新读取协调。';
     case 'project-command-active':
-      return '工程创建、更新、删除或 reconcile 尚未完成；当前禁止离开。';
+      return '工程创建、更新、删除或结果核对尚未完成；当前禁止离开。';
     case 'project-command-unknown':
       return '工程操作结果未知，必须先查询服务端操作记录；当前禁止离开。';
     case 'project-update-conflict':
-      return '工程信息更新存在 revision 冲突。继续离开会放弃当前页面中的未解决编辑。';
+      return '工程信息更新存在保存修订冲突。继续离开会放弃当前页面中的未解决编辑。';
     case 'continuous-inspection-active':
       return '连续检测仍由当前页面持有，停止后端会话并确认释放前不能离开。';
     case 'settings-draft':
-      return 'Settings 仍有未保存草稿，继续离开会放弃当前页面草稿。';
+      return '设置中仍有未保存草稿，继续离开会放弃当前页面草稿。';
     case 'settings-pending':
-      return 'Settings 操作仍在执行中，请等待操作完成或失败后再离开。';
+      return '设置操作仍在执行中，请等待操作完成或失败后再离开。';
     case 'settings-unknown':
-      return 'Settings 操作结果未知，请先重新读取服务端状态。';
+      return '设置操作结果未知，请先重新读取服务端状态。';
     default:
       return '当前可以安全离开。';
   }
@@ -181,7 +181,7 @@ export function createProductLeaveGuardOwner(
     reason: null,
     targetProjectId: null,
     protectionKind: null,
-    message: 'Leave guard 已就绪。',
+    message: '页面离开保护已就绪。',
     forceCloseAllowed: false,
     requestCount: 0
   });
@@ -444,7 +444,7 @@ export function createProductLeaveGuardOwner(
       state.phase = 'disposed';
       state.reason = null;
       state.protectionKind = null;
-      state.message = 'Leave guard 已释放。';
+      state.message = '页面离开保护已释放。';
       state.forceCloseAllowed = false;
       activeOwnerCount = Math.max(0, activeOwnerCount - 1);
       if (publishedWindow) {

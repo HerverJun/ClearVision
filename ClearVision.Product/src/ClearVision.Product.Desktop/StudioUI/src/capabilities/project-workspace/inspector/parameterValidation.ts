@@ -206,7 +206,7 @@ function validateBasic(
     }
   }
   if (parameter.options && !parameter.options.some(option => option.value === value)) {
-    return [Object.freeze({ code: 'enum', parameterNames: [parameter.name], message: `${parameter.label}必须使用 metadata 枚举值。`, reasonCode: null })];
+    return [Object.freeze({ code: 'enum', parameterNames: [parameter.name], message: `${parameter.label}必须使用参数定义中的可选值。`, reasonCode: null })];
   }
   if (['string', 'text', 'guid'].includes(type) && typeof value !== 'string') {
     return [Object.freeze({ code: 'type', parameterNames: [parameter.name], message: `${parameter.label}必须是字符串。`, reasonCode: null })];
@@ -230,7 +230,7 @@ export function validateInspectorParameterPatch(
     return [Object.freeze({
       code: 'disabled',
       parameterNames: [parameter.name],
-      message: `${parameter.label}当前由 metadata constraints 禁用。`,
+      message: `${parameter.label}当前由参数约束禁用。`,
       reasonCode: state.constraint?.reasonCode ?? null
     })];
   }

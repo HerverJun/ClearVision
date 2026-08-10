@@ -87,7 +87,7 @@ const selectedErrors = computed(() => {
   }
   if (draft.softwareTriggerSource === 'EnterPhotoelectric') {
     if (!Number.isInteger(Number(draft.enterPhotoelectricTimeoutMs)) || Number(draft.enterPhotoelectricTimeoutMs) < 1000) {
-      errors.push('Enter 光电超时必须至少为 1000 ms。');
+      errors.push('Enter 键光电输入的等待超时必须至少为 1000 毫秒。');
     }
   }
   if (draft.softwareTriggerSource === 'SerialPhotoelectric') {
@@ -100,13 +100,13 @@ const selectedErrors = computed(() => {
 });
 
 const triggerModeOptions = Object.freeze([
-  { value: 'Software', label: 'Software 软件触发' },
-  { value: 'External', label: 'External 外部触发' },
-  { value: 'Continuous', label: 'Continuous 连续' }
+  { value: 'Software', label: '软件触发' },
+  { value: 'External', label: '外部触发' },
+  { value: 'Continuous', label: '连续采集' }
 ]);
 const softwareSourceOptions = Object.freeze([
-  { value: 'Manual', label: 'Manual 手动' },
-  { value: 'EnterPhotoelectric', label: 'Enter 光电' },
+  { value: 'Manual', label: '手动触发' },
+  { value: 'EnterPhotoelectric', label: 'Enter 键光电输入' },
   { value: 'SerialPhotoelectric', label: '串口光电' }
 ]);
 const pixelFormatOptions = Object.freeze([
@@ -118,6 +118,16 @@ const pixelFormatOptions = Object.freeze([
   { value: 'BayerGR8', label: 'BayerGR8' },
   { value: 'BayerBG8', label: 'BayerBG8' }
 ]);
+
+function cameraConnectionLabel(value: string): string {
+  switch (value.trim().toLowerCase()) {
+    case 'connected': return '已连接';
+    case 'disconnected': return '未连接';
+    case 'connecting': return '连接中';
+    case 'error': return '连接异常';
+    default: return value.trim() || '状态未知';
+  }
+}
 
 function copyBinding(value: CameraBindingV1): CameraBindingDraft {
   return {
@@ -225,12 +235,12 @@ watch(() => props.activeCameraId, value => {
     <header class="camera-section__header">
       <div>
         <h3>相机绑定与采集参数</h3>
-        <p>系统级绑定、活动相机和采集参数保存到相机配置服务。修改活动流中的参数会由后端拒绝并提示冲突。</p>
+        <p>配置本机相机绑定、当前使用的相机和采集参数。相机正在采集时，相关参数不可修改。</p>
       </div>
       <div class="camera-section__actions">
         <CvStatusBadge
           :tone="dirty ? 'warning' : 'idle'"
-          :label="dirty ? '有草稿修改' : '与服务端一致'"
+          :label="dirty ? '有未保存修改' : '已保存'"
         />
         <CvButton
           v-if="canWrite"
@@ -290,7 +300,7 @@ watch(() => props.activeCameraId, value => {
           </div>
           <CvStatusBadge
             :tone="isCameraConnected(selectedDraft.connectionStatus) ? 'ok' : 'warning'"
-            :label="selectedDraft.connectionStatus || 'Unknown'"
+            :label="cameraConnectionLabel(selectedDraft.connectionStatus)"
           />
         </div>
 
@@ -334,7 +344,7 @@ watch(() => props.activeCameraId, value => {
           ><span>启用绑定</span></label>
           <CvField
             v-model="selectedDraft.exposureTimeUs"
-            label="曝光（μs）"
+            label="曝光时间（微秒）"
             name="cameraExposure"
             type="number"
             :readonly="!canWrite || disabled"
@@ -359,7 +369,7 @@ watch(() => props.activeCameraId, value => {
           />
           <CvField
             v-model="selectedDraft.targetFrameRateFps"
-            label="目标帧率（FPS）"
+            label="目标帧率（帧/秒）"
             name="cameraTargetFrameRate"
             type="number"
             :readonly="!canWrite || disabled"
@@ -389,7 +399,7 @@ watch(() => props.activeCameraId, value => {
 
         <div class="camera-trigger-config">
           <div class="camera-subheading">
-            <strong>Enter 光电</strong><span>仅在软件触发源为 Enter 光电时生效</span>
+            <strong>Enter 键光电输入</strong><span>仅在选择该软件触发源时生效</span>
           </div>
           <div class="camera-form-grid">
             <CvField
@@ -400,14 +410,14 @@ watch(() => props.activeCameraId, value => {
             />
             <CvField
               v-model="selectedDraft.enterPhotoelectricDebounceMs"
-              label="去抖（ms）"
+              label="去抖时间（毫秒）"
               name="enterDebounce"
               type="number"
               :readonly="!canWrite || disabled"
             />
             <CvField
               v-model="selectedDraft.enterPhotoelectricTimeoutMs"
-              label="等待超时（ms）"
+              label="等待超时（毫秒）"
               name="enterTimeout"
               type="number"
               :readonly="!canWrite || disabled"
@@ -441,14 +451,14 @@ watch(() => props.activeCameraId, value => {
             />
             <CvField
               v-model="selectedDraft.serialPhotoelectricDebounceMs"
-              label="去抖（ms）"
+              label="去抖时间（毫秒）"
               name="serialDebounce"
               type="number"
               :readonly="!canWrite || disabled"
             />
             <CvField
               v-model="selectedDraft.serialPhotoelectricTimeoutMs"
-              label="等待超时（ms）"
+              label="等待超时（毫秒）"
               name="serialTimeout"
               type="number"
               :readonly="!canWrite || disabled"
@@ -479,7 +489,7 @@ watch(() => props.activeCameraId, value => {
       v-else
       class="camera-empty"
     >
-      当前没有可编辑的系统级 CameraBinding，请先完成 discovery 或检查后端相机配置。
+      当前没有可编辑的相机绑定。请先扫描设备，或检查本机相机服务。
     </div>
   </section>
 </template>

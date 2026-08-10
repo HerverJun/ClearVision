@@ -42,6 +42,8 @@ interface BootOptions {
   readonly admissionAllowed?: boolean;
   readonly density?: 'compact' | 'comfortable';
   readonly projectName?: string;
+  readonly projectListStatus?: number;
+  readonly projectListFailureAfter?: number;
 }
 
 async function boot(
@@ -54,6 +56,7 @@ async function boot(
   let busy = options.initialSessionType != null;
   let activeSessionType = options.initialSessionType ?? null;
   let stopCount = 0;
+  let projectListCount = 0;
   const projectFixture = { ...project, name: options.projectName ?? project.name };
   await page.route('**/health', route => fulfill(route, 200, { status: 'Healthy' }));
   await page.route('**/api/**', async route => {
@@ -63,7 +66,17 @@ async function boot(
     requests.push({ path: url.pathname, method: request.method(), body });
     if (url.pathname === '/api/auth/setup-status') return fulfill(route, 200, { requiresInitialAdminSetup: false, usernameMinLength: 3, passwordMinLength: 6, requiresUppercase: false, requiresLowercase: false, requiresDigit: false });
     if (url.pathname === '/api/auth/me') return fulfill(route, 200, { userId: 'fixture-user', username: 'fixture-engineer', role: 'Engineer' });
-    if (url.pathname === '/api/projects') return fulfill(route, 200, [projectFixture]);
+    if (url.pathname === '/api/projects' || url.pathname === '/api/projects/search') {
+      projectListCount += 1;
+      const status = options.projectListStatus ?? (
+        options.projectListFailureAfter != null && projectListCount > options.projectListFailureAfter ? 503 : 200
+      );
+      if (status !== 200) return fulfill(route, status, { error: status === 403 ? 'Forbidden' : 'Unavailable' });
+      const keyword = url.searchParams.get('keyword')?.trim().toLowerCase() ?? '';
+      const matches = !keyword || projectFixture.name.toLowerCase().includes(keyword) ||
+        projectFixture.description.toLowerCase().includes(keyword);
+      return fulfill(route, 200, matches ? [projectFixture] : []);
+    }
     if (url.pathname === `/api/projects/${projectId}`) return fulfill(route, 200, projectFixture);
     if (url.pathname === '/api/cameras/bindings') return fulfill(route, 200, [{ id: 'camera-a', displayName: '顶视相机', isEnabled: true, connectionStatus: 'Connected' }]);
     if (url.pathname === '/api/inspection/admission') {
@@ -133,6 +146,13 @@ test('continuous inspection persists across route leave and restores from author
   await page.goto('/studio/index.html#/inspection');
 
   await expect(page.getByTestId('inspection-projects-page')).toBeVisible();
+  await captureScenario(page, 'inspection-projects-1920x1080-compact');
+  await page.getByTestId('inspection-project-search').fill('瓶盖');
+  await page.getByRole('button', { name: '搜索', exact: true }).click();
+  await expect(page.getByText('1 个匹配工程')).toBeVisible();
+  await page.getByRole('button', { name: '清除工程搜索' }).click();
+  await expect(page.getByText('1 个工程可供选择')).toBeVisible();
+  expect(audit.requests.some(entry => entry.path === '/api/projects/search')).toBe(true);
   await page.getByTestId('inspection-project-open').click();
   await expect(page.getByTestId('inspection-run-page')).toBeVisible();
   await page.getByTestId('inspection-start').click();
@@ -158,6 +178,28 @@ test('continuous inspection persists across route leave and restores from author
   await expect(page.getByTestId('inspection-run-page')).toBeVisible();
   await expect(page.getByTestId('run-console')).toContainText(/连续检测中|实时恢复中/);
   expect(audit.requests.filter(entry => entry.path === '/api/inspection/realtime/start')).toHaveLength(1);
+});
+
+test('inspection project picker keeps cached rows visible when refresh becomes stale', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await boot(page, { projectListFailureAfter: 1 });
+  await page.goto('/studio/index.html#/inspection');
+
+  await expect(page.getByTestId('inspection-project-open')).toBeVisible();
+  await page.getByRole('button', { name: '刷新可检测工程' }).click();
+  await expect(page.getByText('列表可能已过期')).toBeVisible();
+  await expect(page.getByTestId('inspection-project-open')).toBeVisible();
+  await captureScenario(page, 'inspection-projects-stale-1366x768-compact');
+});
+
+test('inspection project picker presents forbidden access instead of an empty list', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await boot(page, { projectListStatus: 403 });
+  await page.goto('/studio/index.html#/inspection');
+
+  await expect(page.getByText('无权读取检测工程')).toBeVisible();
+  await expect(page.getByText('暂无可检测工程')).toHaveCount(0);
+  await captureScenario(page, 'inspection-projects-forbidden-1366x768-compact');
 });
 
 test('formal run occupancy is read-only on the continuous route and mounts no continuous stream', async ({ page }) => {

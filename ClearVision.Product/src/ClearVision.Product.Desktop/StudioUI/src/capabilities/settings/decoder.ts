@@ -628,7 +628,7 @@ export function decodeSettingsErrorPayloadV1(
     code,
     publicMessage: typeof publicMessage === 'string' && publicMessage.trim()
       ? publicMessage.trim()
-      : 'Settings 请求未能完成。',
+      : '设置请求未能完成。',
     policy: nullableString(optionalValueOf(source, 'policy'), `${path}.policy`),
     issues
   });

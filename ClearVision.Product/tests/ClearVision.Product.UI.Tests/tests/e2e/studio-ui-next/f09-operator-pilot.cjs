@@ -414,7 +414,9 @@ async function main() {
           ? [...window.__CLEARVISION_STARTUP__.profileAllowedRoles] : null,
         featureFlags: { ...(window.__CLEARVISION_STARTUP__?.featureFlags || {}) }
       },
-      headerUser: document.querySelector('.product-layout__user strong')?.textContent?.trim() || null,
+      headerUser: document.querySelector(
+        '[data-product-user-menu] button[aria-haspopup="menu"]'
+      )?.getAttribute('aria-label')?.trim() || null,
       ownerLedger: {
         studio: window.__STUDIO_UI_DIAGNOSTICS__ ? { ...window.__STUDIO_UI_DIAGNOSTICS__ } : null,
         projectLifecycle: window.__STUDIO_UI_PROJECT_LIFECYCLE_DIAGNOSTICS__

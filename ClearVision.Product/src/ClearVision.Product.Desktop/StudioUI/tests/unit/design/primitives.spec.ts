@@ -28,11 +28,12 @@ describe('Design Foundation primitives', () => {
     expect(surface.attributes('data-surface-level')).toBe('2');
 
     const panel = mount(CvPanel, {
-      props: { title: 'Inspection state', description: 'Read-only projection' },
+      props: { title: 'Inspection state', description: 'Read-only projection', variant: 'section' },
       slots: { default: 'Panel content' }
     });
     const heading = panel.get('h2');
     expect(panel.attributes('aria-labelledby')).toBe(heading.attributes('id'));
+    expect(panel.attributes('data-panel-variant')).toBe('section');
     expect(panel.text()).toContain('Read-only projection');
   });
 
@@ -59,14 +60,15 @@ describe('Design Foundation primitives', () => {
         label: 'Camera address',
         modelValue: '192.168.0.999',
         hint: 'IPv4 only',
-        error: 'Enter a valid address.'
+        error: 'Enter a valid address.',
+        unit: 'ms'
       }
     });
 
     const input = wrapper.get('input');
     const describedBy = input.attributes('aria-describedby')?.split(' ') ?? [];
     expect(input.attributes('aria-invalid')).toBe('true');
-    expect(describedBy).toHaveLength(2);
+    expect(describedBy).toHaveLength(3);
     expect(describedBy.every(id => document.getElementById(id) !== null || wrapper.find(`#${id}`).exists())).toBe(true);
 
     await input.setValue('192.168.0.10');
@@ -91,7 +93,7 @@ describe('Design Foundation primitives', () => {
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['decision']);
   });
 
-  it.each(['ok', 'ng', 'warning', 'info', 'idle'] as const)(
+  it.each(['ok', 'ng', 'error', 'warning', 'info', 'idle', 'offline', 'unknown', 'disabled'] as const)(
     'keeps the %s status tone explicit',
     tone => {
       const wrapper = mount(CvStatusBadge, { props: { tone, label: tone.toUpperCase() } });

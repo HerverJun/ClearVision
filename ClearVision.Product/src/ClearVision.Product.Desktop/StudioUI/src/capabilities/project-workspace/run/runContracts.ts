@@ -3,11 +3,13 @@ import { decodeInspectionOutcome, type InspectionOutcome } from '@/shared/inspec
 
 export class WorkspaceRunContractDecodeError extends Error {
   readonly path: string;
+  readonly expectation: string;
 
   constructor(path: string, expectation: string) {
-    super(`Workspace Run response ${path} must be ${expectation}.`);
+    super('正式运行响应格式不符合要求，请核对运行状态后重试。');
     this.name = 'WorkspaceRunContractDecodeError';
     this.path = path;
+    this.expectation = expectation;
   }
 }
 
@@ -235,28 +237,28 @@ function assertProjectId(projectId: string): void {
 export function createWorkspaceRunPort(api: ApiTransport, projectId: string): WorkspaceRunPort {
   assertProjectId(projectId);
   if (typeof api.post !== 'function') {
-    throw new TypeError('Workspace Run requires POST on the shared ApiTransport.');
+    throw new TypeError('正式运行需要可用的共享写入通道。');
   }
   const post = api.post.bind(api);
   return Object.freeze({
     projectId,
     async admit(payload: WorkspaceRunAdmissionRequestV1, options: ApiWriteOptions = {}): Promise<WorkspaceRunAdmissionV1> {
-      if (payload.projectId !== projectId) throw new TypeError('Workspace Run admission project identity changed.');
+      if (payload.projectId !== projectId) throw new TypeError('正式运行准入检查的工程标识已变化。');
       const response = await post<unknown>('inspection/admission', payload, options);
       return decodeWorkspaceRunAdmissionV1(response);
     },
     async execute(payload: WorkspaceRunExecuteRequestV1, options: ApiWriteOptions = {}): Promise<WorkspaceRunResultV1> {
-      if (payload.projectId !== projectId) throw new TypeError('Workspace Run execute project identity changed.');
+      if (payload.projectId !== projectId) throw new TypeError('正式运行请求的工程标识已变化。');
       const response = await post<unknown>('inspection/execute', payload, options);
       return decodeWorkspaceRunResultV1(response);
     },
     async stop(payload: WorkspaceRunIdentityV1, options: ApiWriteOptions = {}): Promise<WorkspaceRunReconciliationV1> {
-      if (payload.projectId !== projectId) throw new TypeError('Workspace Run stop project identity changed.');
+      if (payload.projectId !== projectId) throw new TypeError('停止运行请求的工程标识已变化。');
       const response = await post<unknown>('inspection/stop', payload, options);
       return decodeWorkspaceRunReconciliationV1(response);
     },
     async reconcile(payload: WorkspaceRunIdentityV1, options: ApiWriteOptions = {}): Promise<WorkspaceRunReconciliationV1> {
-      if (payload.projectId !== projectId) throw new TypeError('Workspace Run reconcile project identity changed.');
+      if (payload.projectId !== projectId) throw new TypeError('运行状态核对请求的工程标识已变化。');
       const response = await post<unknown>('inspection/reconcile', payload, options);
       return decodeWorkspaceRunReconciliationV1(response);
     }

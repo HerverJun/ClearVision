@@ -146,7 +146,7 @@ function messageFor(code: string): string {
     case 'STATION_ADMIN_CONFLICT': return '工作站状态已发生冲突；请刷新后重新确认。';
     case 'STATION_ADMIN_ABORTED_UNKNOWN': return '页面已停止等待响应，但后端操作可能已经受理；必须读取命令或工作站状态确认。';
     case 'STATION_ADMIN_UNKNOWN_OUTCOME': return '网络响应结果未知；禁止重复提交，必须先读取后端命令或工作站状态确认。';
-    case 'STATION_ADMIN_CONTRACT_UNKNOWN': return '后端响应无法按合同确认；操作可能已受理，必须先读取权威记录。';
+    case 'STATION_ADMIN_CONTRACT_UNKNOWN': return '服务端响应无法按合同确认；操作可能已受理，必须先读取服务端记录。';
     default: return '工作站管理员操作失败。';
   }
 }
@@ -239,7 +239,7 @@ export function createStationAdminCommandOwner(options: {
     if (!target) return false;
     state.phase = 'reconciling';
     state.canRecover = false;
-    state.message = '正在读取后端权威状态，确认上一次操作结果。';
+    state.message = '正在读取服务端状态，确认上一次操作结果。';
     controller = new AbortController();
     try {
       if (target.operation === 'identity' && target.identity) {
@@ -266,7 +266,7 @@ export function createStationAdminCommandOwner(options: {
       state.canRecover = false;
       state.errorCode = null;
       state.message = target.operation === 'identity'
-        ? '已从后端权威记录确认操作结果。'
+        ? '已从服务端记录确认操作结果。'
         : '已按请求标识确认命令记录；执行终态仍以后端命令状态为准。';
       return true;
     } catch (error) {

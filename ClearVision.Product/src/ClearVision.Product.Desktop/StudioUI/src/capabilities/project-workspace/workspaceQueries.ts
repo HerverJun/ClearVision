@@ -23,7 +23,7 @@ export interface WorkspaceProjectReadPort {
 
 export function createWorkspaceProjectPath(projectId: string): string {
   if (!isWorkspaceProjectId(projectId)) {
-    throw new TypeError('Workspace project id must be a non-empty UUID.');
+    throw new TypeError('工程标识必须是有效的非空 UUID。');
   }
   return `projects/${projectId}`;
 }
@@ -56,7 +56,7 @@ export function createWorkspaceProjectReadPort(
     projectId,
     state: query.state,
     async refresh(options: ReadQueryRefreshOptions = {}): Promise<ReadQueryState<WorkspaceProjectV1>> {
-      if (disposed) throw new Error('The Workspace project read port has been disposed.');
+      if (disposed) throw new Error('工程读取通道已关闭。');
       const requestToken = lease.startRequest();
       try {
         return await query.refresh(options);

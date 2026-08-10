@@ -73,7 +73,8 @@ describe('operator read pages', () => {
 
     expect(wrapper.text()).toContain('颜色分析');
     expect(wrapper.text()).not.toContain('图像采集');
-    expect(wrapper.text()).toContain('输入 1 / 输出 1');
+    expect(wrapper.text()).toContain('输入 1 · 输出 1');
+    expect(wrapper.text()).toContain('1 个匹配项');
     expect(appRouter.currentRoute.value.query).toMatchObject({
       q: '颜色', category: 'AiInference', port: 'Image', parameter: 'Threshold', visibility: 'all'
     });
@@ -98,6 +99,8 @@ describe('operator read pages', () => {
     expect(wrapper.text()).toContain('输入端口');
     expect(wrapper.text()).toContain('输出端口');
     expect(wrapper.text()).toContain('Threshold');
+    expect(wrapper.text()).toContain('浮点数');
+    expect(wrapper.find('details').attributes('open')).toBeUndefined();
     expect(wrapper.text()).not.toContain('readiness');
     expect(wrapper.text()).not.toContain('side-effect');
 
@@ -124,8 +127,8 @@ describe('operator read pages', () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).toContain('算子不存在');
-    expect(wrapper.text()).toContain('404');
+    expect(wrapper.text()).toContain('未找到算子');
+    expect(wrapper.text()).not.toContain('OperatorType');
 
     wrapper.unmount();
     queries.dispose();

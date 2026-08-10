@@ -289,6 +289,8 @@ const operatorCatalog = Object.freeze([
 
 interface BootOptions {
   readonly workspaceEnabled?: boolean;
+  readonly authenticated?: boolean;
+  readonly initialRoute?: string;
   readonly authStatus?: number;
   readonly authRole?: 'Admin' | 'Engineer';
   readonly expectAuthShell?: boolean;
@@ -338,7 +340,11 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
   let customApiCall = 0;
   let lastExecutionSnapshotId: string | null = null;
   const projects = new Map<string, Readonly<Record<string, unknown>>>();
-  await installF03BrowserStartup(page, options.workspaceEnabled ?? true);
+  await installF03BrowserStartup(
+    page,
+    options.workspaceEnabled ?? true,
+    options.authenticated ?? true
+  );
   await page.route('**/health', route => fulfillF03Json(
     route,
     200,
@@ -358,6 +364,17 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
       await fulfillF03Json(route, status, status === 200
         ? { userId: 'f03-user', username: 'f03-engineer', role: options.authRole ?? 'Engineer' }
         : { code: 'AUTH_REQUIRED' }, fixtureSchema);
+      return;
+    }
+    if (url.pathname === '/api/auth/login' && request.method() === 'POST') {
+      const body = request.postDataJSON() as Readonly<{ username?: unknown }>;
+      await fulfillF03Json(route, 200, {
+        token: 'f03-golden-journey-token',
+        user: {
+          username: typeof body.username === 'string' ? body.username : 'f03-engineer',
+          role: options.authRole ?? 'Engineer'
+        }
+      }, fixtureSchema);
       return;
     }
     const customScenario = await options.apiScenario?.(request, ++customApiCall);
@@ -596,6 +613,14 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
       await fulfillF03Json(route, 200, [projectPayload(projectA)], fixtureSchema);
       return;
     }
+    if (url.pathname === '/api/projects/recent' && request.method() === 'GET') {
+      await fulfillF03Json(route, 200, [projectPayload(projectA)], fixtureSchema);
+      return;
+    }
+    if (url.pathname === '/api/projects/search' && request.method() === 'GET') {
+      await fulfillF03Json(route, 200, [projectPayload(projectA)], fixtureSchema);
+      return;
+    }
     if (url.pathname === `/api/inspection/statistics/${projectA}` && request.method() === 'GET') {
       await fulfillF03Json(route, 200, {
         totalAttemptCount: 1,
@@ -810,10 +835,10 @@ async function bootWorkspace(page: Page, options: BootOptions = {}) {
     }
     await fulfillF03Json(route, 404, { code: 'UNEXPECTED_F03_ROUTE' }, fixtureSchema);
   });
-  await page.goto(`/studio/index.html#/projects/${projectA}/workspace`);
+  await page.goto(`/studio/index.html#${options.initialRoute ?? `/projects/${projectA}/workspace`}`);
   if (options.expectAuthShell) {
     await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
-  } else {
+  } else if (!options.initialRoute) {
     await expect(page.locator('[data-evidence-surface="f03-workspace-shell"]')).toBeVisible();
   }
   return audit;
@@ -2265,6 +2290,17 @@ test('G4 Preview and ImageCanvas render artifacts, probe pixels and commit ROI o
   await expect(roi).toHaveAttribute('data-roi-phase', 'ready');
   await page.locator('[data-testid="roi-start"]').click();
   await expect(roi).toHaveAttribute('data-roi-phase', 'editing');
+  const roiActionLayout = await page.locator('.preview-panel__roi-actions button').evaluateAll(buttons => ({
+    viewportHeight: window.innerHeight,
+    boxes: buttons.map(button => {
+      const rect = button.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right };
+    })
+  }));
+  expect(roiActionLayout.boxes).toHaveLength(4);
+  expect(Math.max(...roiActionLayout.boxes.map(box => box.top)) - Math.min(...roiActionLayout.boxes.map(box => box.top)))
+    .toBeLessThanOrEqual(1);
+  expect(roiActionLayout.boxes.every(box => box.bottom <= roiActionLayout.viewportHeight)).toBe(true);
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'workspace-roi-editing', viewport, runtimeErrors, requestAudit: audit
@@ -2615,6 +2651,137 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 76
   });
 }
 
+test('V2.10 walks login, Projects, node and ROI editing, Preview, Save, Formal Run and Results as one journey', async ({ page }) => {
+  test.setTimeout(60_000);
+  const viewport = { width: 1920, height: 1080 } as const;
+  await page.setViewportSize(viewport);
+  await page.addInitScript(() => {
+    const trackedWindow = window as typeof window & {
+      __CV_V2_GOLDEN_CLICK_COUNT__?: Readonly<{ value: number }>;
+    };
+    const tracker = { value: 0 };
+    trackedWindow.__CV_V2_GOLDEN_CLICK_COUNT__ = tracker;
+    document.addEventListener('click', () => { tracker.value += 1; }, true);
+  });
+  const runtimeErrors = createF04RuntimeErrorAudit(page);
+  const audit = await bootWorkspace(page, {
+    authenticated: false,
+    initialRoute: '/login',
+    authRole: 'Engineer',
+    projectBody: projectId => projectPayload(projectId, { flow: goldenJourneyFlow() }),
+    previewScenario: (request, call) => ({
+      body: previewPayload(request, call, {
+        outputData: { width: 12.8, tolerance: 12.5, outcome: 'OK' },
+        artifacts: [previewArtifactReference(call)]
+      })
+    })
+  });
+
+  const clickCount = () => page.evaluate(() => (
+    window as typeof window & { __CV_V2_GOLDEN_CLICK_COUNT__?: Readonly<{ value: number }> }
+  ).__CV_V2_GOLDEN_CLICK_COUNT__?.value ?? -1);
+  const captureJourney = async (scenario: string, note: string): Promise<void> => {
+    if (!hasF04VisualEvidenceTarget()) return;
+    await captureF04VisualEvidence(page, {
+      scenario,
+      viewport,
+      runtimeErrors,
+      requestAudit: audit,
+      notes: [`V2.10 ${note}`, `visible-click-count=${await clickCount()}`]
+    });
+  };
+
+  await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
+  await page.getByLabel('用户名').focus();
+  await captureJourney('v2-golden-00-login-ready', 'journey entry before authentication');
+  await page.getByLabel('用户名').fill('f03-engineer');
+  await page.getByLabel('密码').fill('fixture-password');
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+
+  await expect(page.locator('[data-capability="projects-read"]')).toBeVisible();
+  await expect(page.getByText('瓶盖检测 A').first()).toBeVisible();
+  await captureJourney('v2-golden-01-projects', 'authenticated Projects selection');
+  await page.getByTestId(`project-open-${projectA}`).click();
+
+  const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
+  const canvas = page.locator('[data-evidence-surface="f03-g2-flow-canvas"]');
+  const preview = page.locator('[data-capability="preview-workbench"]');
+  await expect(shell).toHaveAttribute('data-workspace-state', 'ready');
+  await expect(canvas).toHaveAttribute('data-node-count', '3');
+  await captureJourney('v2-golden-02-workspace', 'Workspace loaded from the selected Project');
+
+  const addedOperator = await searchOperator(page, '二值图转区域');
+  await expect(addedOperator).toHaveCount(1);
+  await addedOperator.click();
+  await expect(canvas).toHaveAttribute('data-node-count', '4');
+  await expect(canvas).toHaveAttribute('data-selected-count', '1');
+  await captureJourney('v2-golden-03-node-added', 'operator added and selected through the visible catalog');
+
+  await selectInspectorNode(page, 340, 125);
+  const xInput = page.locator('[data-evidence-surface="f03-g3-inspector"] [data-parameter-name="X"] input');
+  await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+  await xInput.fill('14');
+  await xInput.press('Tab');
+  await expect(preview).toHaveAttribute('data-preview-stale', 'true');
+  await page.getByTestId('preview-run').click();
+  await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+
+  const roi = page.locator('.preview-panel__roi');
+  await page.getByTestId('roi-start').click();
+  await expect(roi).toHaveAttribute('data-roi-phase', 'editing');
+  await page.getByTestId('image-canvas').focus();
+  await page.keyboard.press('ArrowRight');
+  await page.getByTestId('roi-confirm').click();
+  await expect(roi).toHaveAttribute('data-roi-phase', 'ready');
+  await expect(preview).toHaveAttribute('data-preview-phase', 'success');
+  await captureJourney('v2-golden-04-preview-roi', 'parameter and ROI edits re-previewed successfully');
+
+  await page.getByTestId('final-decision').click();
+  const decision = page.locator('[data-capability="final-decision-workbench"]');
+  await decision.locator('select').first().selectOption(`${goldenJudgeNodeId}:${goldenJudgeOutputId}`);
+  await decision.locator('input[type="number"]').fill('12.5');
+  await page.getByRole('button', { name: '校验并应用' }).click();
+  await expect(decision).toHaveCount(0);
+
+  await page.getByTestId('workspace-save').click();
+  await expect(shell).toHaveAttribute('data-workspace-persistence-phase', 'saved');
+  await captureJourney('v2-golden-05-saved', 'canonical Project save settled');
+
+  await page.getByTestId('workspace-run').click();
+  await expect(shell).toHaveAttribute('data-workspace-run-phase', 'succeeded');
+  await expect(page.getByTestId('workspace-current-result')).toHaveText('查看本次结果');
+  await captureJourney('v2-golden-06-run-complete', 'Formal Run reached an authoritative OK result');
+
+  await page.getByTestId('workspace-current-result').click();
+  await expect(page.locator('[data-capability="results-read"]')).toBeVisible();
+  await expect(page.locator('[data-capability="result-evidence"]')).toHaveAttribute('data-evidence-phase', 'available');
+  await captureJourney('v2-golden-07-results', 'current result and evidence opened from Workspace');
+
+  expect(await clickCount()).toBe(12);
+  await expect(shell).toHaveCount(0);
+  await expect.poll(() => workspaceDiagnostics(page)).toMatchObject({
+    workspaceOwnerCount: 0,
+    flowCanvasOwnerCount: 0,
+    inspectorOwnerCount: 0,
+    imageCanvasOwnerCount: 0,
+    previewOwnerCount: 0,
+    roiOwnerCount: 0,
+    persistenceOwnerCount: 0,
+    runOwnerCount: 0,
+    activeSubscriptions: 0,
+    activeTimers: 0,
+    activeAbortControllers: 0,
+    activeBlobUrls: 0,
+    ownerConflictCount: 0
+  });
+  expect(audit.some(entry => entry.method === 'POST' && entry.path === '/api/auth/login')).toBe(true);
+  expect(audit.some(entry => entry.method === 'POST' && entry.path.endsWith('/open'))).toBe(true);
+  expect(audit.some(entry => entry.method === 'PUT' && entry.path === `/api/projects/${projectA}`)).toBe(true);
+  expect(audit.some(entry => entry.path === '/api/inspection/execute')).toBe(true);
+  expect(audit.some(entry => entry.path.endsWith(`/inspection/history/${projectA}/${goldenResultId}`))).toBe(true);
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [] });
+});
+
 test('G4 visual evidence holds Formal Run executing until the authoritative result settles', async ({ page }) => {
   const viewport = { width: 1600, height: 1000 } as const;
   await page.setViewportSize(viewport);
@@ -2863,7 +3030,7 @@ test('G6 protects route leave while Formal Run is still executing', async ({ pag
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'executing');
 
   await requestStudioHashNavigation(page, '#/about');
-  await expect(page.locator('[data-product-state="leave-blocked"]')).toContainText('Formal Run');
+  await expect(page.locator('[data-product-state="leave-blocked"]')).toContainText('正式运行');
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
   expect(audit.some(entry => entry.path === '/api/inspection/stop')).toBe(false);
   expect(audit.some(entry => entry.path === '/api/inspection/reconcile')).toBe(false);
@@ -2901,7 +3068,7 @@ test('G6 protects project switch while Formal Run is still executing', async ({ 
   await expect(shell).toHaveAttribute('data-workspace-run-phase', 'executing');
 
   await requestStudioHashNavigation(page, `#/projects/${projectB}/workspace`);
-  await expect(page.locator('[data-product-state="leave-blocked"]')).toContainText('Formal Run');
+  await expect(page.locator('[data-product-state="leave-blocked"]')).toContainText('正式运行');
   await expect(shell).toHaveAttribute('data-workspace-project-id', projectA);
   expect(audit.some(entry => entry.path === '/api/inspection/stop')).toBe(false);
   expect(audit.some(entry => entry.path === '/api/inspection/reconcile')).toBe(false);
@@ -4487,9 +4654,8 @@ test('Prompt 3 Preview preserves image, result, ROI, empty and error hierarchy o
       };
     }
   });
-  await page.locator('[data-product-appearance] summary').click();
-  await page.getByRole('button', { name: '舒适' }).click();
-  await page.locator('[data-product-appearance] summary').click();
+  await page.locator('[data-product-appearance] button[aria-haspopup="menu"]').click();
+  await page.getByRole('menuitemcheckbox', { name: '舒适' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-density', 'comfortable');
   await selectInspectorNode(page, 120, 125);
 
@@ -4584,11 +4750,15 @@ for (const scenario of workspaceG3VisualMatrix) {
     const shell = page.locator('[data-evidence-surface="f03-workspace-shell"]');
     await expect(shell).toHaveAttribute('data-workspace-state', 'empty');
     if (theme === 'dark' || density === 'comfortable') {
-      const appearance = page.locator('[data-product-appearance] summary');
-      await appearance.click();
-      if (theme === 'dark') await page.getByRole('button', { name: '深色', exact: true }).click();
-      if (density === 'comfortable') await page.getByRole('button', { name: '舒适', exact: true }).click();
-      await page.keyboard.press('Escape');
+      const appearance = page.locator('[data-product-appearance] button[aria-haspopup="menu"]');
+      if (theme === 'dark') {
+        await appearance.click();
+        await page.getByRole('menuitemcheckbox', { name: '深色', exact: true }).click();
+      }
+      if (density === 'comfortable') {
+        await appearance.click();
+        await page.getByRole('menuitemcheckbox', { name: '舒适', exact: true }).click();
+      }
     }
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await expect(page.locator('html')).toHaveAttribute('data-density', density);

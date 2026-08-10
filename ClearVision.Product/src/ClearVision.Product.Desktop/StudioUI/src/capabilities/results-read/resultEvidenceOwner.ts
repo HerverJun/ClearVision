@@ -191,7 +191,7 @@ function evidenceMessage(
   serverMessage: string,
   errorCode: string | null
 ): string {
-  if (phase === 'retained-summary-only') return '证据文件不可用，仅保留权威结果摘要。';
+  if (phase === 'retained-summary-only') return '证据文件不可用，仅保留正式检测结果摘要。';
   if (phase === 'not-produced') return '本次结果未产生可保留证据。';
   if (phase === 'expired') return '证据已过保留期，结果摘要仍可调查。';
   if (phase === 'partial') return '部分证据可用；缺失项按清单原因显示。';
@@ -379,7 +379,7 @@ export function createResultEvidenceOwner(options: {
       state.phase = 'disposed';
       state.manifest = null;
       state.canExport = false;
-      setImage('disposed', null, '图像 owner 已关闭。');
+      setImage('disposed', null, '图像查看已关闭。');
     }
   });
   return owner;

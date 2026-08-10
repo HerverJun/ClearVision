@@ -145,14 +145,14 @@ function phaseForCode(code: string | null): ProjectLifecycleCommandPhase {
 
 function messageForCode(code: string | null): string {
   switch (code) {
-    case 'PROJECT_REVISION_CONFLICT': return '工程已由其他保存更新。请重新读取服务端 revision 后再决定如何处理。';
+    case 'PROJECT_REVISION_CONFLICT': return '工程已由其他保存更新。请重新读取服务端保存修订后再决定如何处理。';
     case 'PROJECT_MUTATION_CONFLICT': return '工程当前存在运行、保存或其他写入，暂时不能执行此操作。';
-    case 'OPERATION_PAYLOAD_MISMATCH': return '该 operation identity 已绑定不同请求，不能复用。';
+    case 'OPERATION_PAYLOAD_MISMATCH': return '该操作标识已绑定不同请求，不能复用。';
     case 'PROJECT_NOT_FOUND': return '工程不存在或已删除。';
     case 'PROJECT_OPERATION_NOT_FOUND': return '服务端没有找到当前用户的操作记录。';
     case 'PROJECT_OPERATION_RETRYABLE': return '操作结果尚未确定，必须先查询服务端操作记录。';
     case 'PROJECT_UPDATE_UNKNOWN_OUTCOME': return '更新响应不可确定。请重新读取工程，不要自动覆盖或盲目重试。';
-    case 'PROJECT_OPERATION_FAILED': return '服务端 operation 已进入失败终态。';
+    case 'PROJECT_OPERATION_FAILED': return '服务端操作记录已进入失败终态。';
     case 'PROJECT_CLEANUP_RETRYABLE': return '工程已删除，后台资源清理仍在重试。';
     case 'PROJECT_VALIDATION_NAME_REQUIRED': return '请输入工程名称。';
     case 'PROJECT_VALIDATION_NAME_TOO_LONG': return '工程名称超出允许长度。';
@@ -160,9 +160,9 @@ function messageForCode(code: string | null): string {
     case 'PROJECT_IMPORT_DOCUMENT_REQUIRED': return '请选择有效的工程 JSON 文件。';
     case 'PROJECT_IMPORT_DOCUMENT_INVALID': return '工程 JSON 结构不完整或无法解析。';
     case 'PROJECT_IMPORT_DOCUMENT_TYPE_UNSUPPORTED': return '该文件不是 ClearVision 工程导出文件。';
-    case 'PROJECT_IMPORT_SCHEMA_UNSUPPORTED': return '工程 JSON schema 版本不受当前 Studio 支持。';
+    case 'PROJECT_IMPORT_SCHEMA_UNSUPPORTED': return '工程 JSON 文件版本不受当前 Studio 支持。';
     case 'PROJECT_IMPORT_MODE_INVALID': return '工程导入模式无效，请重新选择导入方式。';
-    case 'PROJECT_IMPORT_REVISION_INVALID': return '目标工程 revision 无效，请重新读取工程列表。';
+    case 'PROJECT_IMPORT_REVISION_INVALID': return '目标工程保存修订无效，请重新读取工程列表。';
     case 'PROJECT_IMPORT_METADATA_REQUIRED': return '工程 JSON 缺少工程元数据。';
     case 'PROJECT_IMPORT_FLOW_REQUIRED': return '工程 JSON 缺少流程数据。';
     case 'PROJECT_IMPORT_FLOW_NAME_REQUIRED': return '工程 JSON 缺少流程名称。';
@@ -170,17 +170,17 @@ function messageForCode(code: string | null): string {
     case 'PROJECT_IMPORT_UNKNOWN_PARAMETER': return '工程包含当前服务端不认识的算子参数，未执行导入。';
     case 'PROJECT_IMPORT_PARAMETER_INVALID': return '工程包含不兼容的算子参数，未执行导入。';
     case 'PROJECT_IMPORT_GLOBAL_VARIABLES_INVALID': return '工程全局变量校验失败，未执行导入。';
-    case 'PROJECT_IMPORT_ASSET_SCHEMA_UNSUPPORTED': return '工程资源 schema 版本不受当前 Studio 支持。';
+    case 'PROJECT_IMPORT_ASSET_SCHEMA_UNSUPPORTED': return '工程资源格式版本不受当前 Studio 支持。';
     case 'PROJECT_IMPORT_ASSET_STORAGE_UNAVAILABLE': return '当前服务端没有可用的正式资源存储，未执行导入。';
     case 'PROJECT_IMPORT_TARGET_REQUIRED': return '覆盖导入必须选择目标工程。';
-    case 'PROJECT_IMPORT_REVISION_REQUIRED': return '覆盖导入缺少目标工程的服务端 revision。';
+    case 'PROJECT_IMPORT_REVISION_REQUIRED': return '覆盖导入缺少目标工程的服务端保存修订。';
     case 'PROJECT_IMPORT_PROJECT_ID_CONFLICT': return '导入目标工程身份已被占用或已删除，未执行导入。';
-    case 'PROJECT_IMPORT_CREATE_REVISION_FORBIDDEN': return '新建导入不能携带目标工程 revision。';
+    case 'PROJECT_IMPORT_CREATE_REVISION_FORBIDDEN': return '新建导入不能携带目标工程保存修订。';
     case 'PROJECT_LEAVE_BLOCKED': return '当前工程仍有未完成的保存或运行协调，删除已被阻止。';
-    case 'SESSION_UNAUTHORIZED': return '当前会话已失效，认证 owner 正在处理重新登录。';
+    case 'SESSION_UNAUTHORIZED': return '当前会话已失效，正在转入重新登录。';
     case 'PROJECT_FORBIDDEN': return '当前账号无权修改此工程。';
     case 'PROJECT_COMMAND_ABORTED': return '工程操作已取消。';
-    case 'PROJECT_CONTRACT_INVALID': return '服务响应不符合冻结的 Project 生命周期合同。';
+    case 'PROJECT_CONTRACT_INVALID': return '服务响应不符合既有工程生命周期合同。';
     case 'PROJECT_NETWORK_FAILURE': return '本地服务响应不可确定；不要盲目重试写请求。';
     default: return '工程操作未完成。';
   }
@@ -214,7 +214,7 @@ function normalizedDescription(value: string | null | undefined): string | null 
 
 function assertRevision(value: number): void {
   if (!Number.isInteger(value) || value < 0) {
-    throw new TypeError('Expected persistence revision must be a non-negative integer.');
+    throw new TypeError('预期保存修订必须是非负整数。');
   }
 }
 
@@ -255,7 +255,7 @@ export function createProjectLifecycleCommandOwner(
     operation: null,
     openedAtUtc: null,
     errorCode: null,
-    message: '工程命令 owner 已就绪。',
+    message: '工程操作已就绪。',
     canReconcile: false,
     generation: 0
   });
@@ -424,7 +424,7 @@ export function createProjectLifecycleCommandOwner(
       });
     }
     state.message = operation.result?.cleanupStatus === 'cleanup-failed-retryable'
-      ? '工程 tombstone 已生效；后台资源清理仍在重试。'
+      ? '工程删除记录已生效；后台资源清理仍在重试。'
       : '工程已由服务端删除记录确认移除。';
     return Object.freeze({
       projectId,
@@ -451,7 +451,7 @@ export function createProjectLifecycleCommandOwner(
       if (!isCurrent(started.generation, pending.projectId)) return null;
       const operation = decodeProjectLifecycleOperation(payload);
       if (operation.clientOperationId !== pending.clientOperationId || operation.kind !== pending.kind) {
-        throw new TypeError('Operation reconcile identity changed.');
+        throw new TypeError('工程操作核对标识已变化。');
       }
       return applyCompletedOperation(operation, started.generation);
     } catch (error) {
@@ -459,7 +459,7 @@ export function createProjectLifecycleCommandOwner(
       if (error instanceof ApiUnauthorizedError) {
         state.phase = 'unknown-outcome';
         state.errorCode = 'SESSION_UNAUTHORIZED';
-        state.message = '会话已失效；保留 operation identity，重新认证后继续 reconcile。';
+        state.message = '会话已失效；操作标识已保留，重新登录后继续核对结果。';
         state.canReconcile = true;
       } else if (error instanceof ApiAbortError) {
         state.phase = 'unknown-outcome';
@@ -511,7 +511,7 @@ export function createProjectLifecycleCommandOwner(
       state.command = null;
       state.projectId = projectId;
       state.clientOperationId = null;
-      state.message = '工程命令 scope 已切换。';
+      state.message = '工程操作上下文已切换。';
     },
     createBlank(input: Readonly<{ name: string; description?: string | null }>): Promise<ProjectCreateAuthorityResult | null> {
       return track('create', async () => {
@@ -545,7 +545,7 @@ export function createProjectLifecycleCommandOwner(
           if (!isCurrent(started.generation, null)) return null;
           const result = decodeProjectCreateAuthorityResult(payload);
           if (result.operation.clientOperationId !== clientOperationId) {
-            throw new TypeError('Create response operation identity changed.');
+            throw new TypeError('工程创建响应的操作标识已变化。');
           }
           pendingOperation = null;
           state.phase = 'succeeded';
@@ -742,7 +742,7 @@ export function createProjectLifecycleCommandOwner(
           state.phase = 'succeeded';
           state.project = project;
           state.errorCode = null;
-          state.message = '工程名称与描述已按服务端 revision 保存。';
+          state.message = '工程名称与描述已按服务端保存修订写入。';
           return project;
         } catch (error) {
           if (!isCurrent(started.generation, input.projectId)) return null;
@@ -862,7 +862,7 @@ export function createProjectLifecycleCommandOwner(
       if (pendingOperation) {
         state.phase = 'unknown-outcome';
         state.errorCode = 'SESSION_UNAUTHORIZED';
-        state.message = '会话已失效；operation identity 已隔离，重新认证后继续 reconcile。';
+        state.message = '会话已失效；操作标识已隔离，重新登录后继续核对结果。';
         state.canReconcile = true;
         return true;
       }
@@ -885,7 +885,7 @@ export function createProjectLifecycleCommandOwner(
       state.phase = 'idle';
       state.command = null;
       state.clientOperationId = null;
-      state.message = '工程命令 owner 已重置。';
+      state.message = '工程操作已重置。';
     },
     dispose(reason = 'project-lifecycle-owner-disposed'): void {
       void reason;
@@ -897,7 +897,7 @@ export function createProjectLifecycleCommandOwner(
       state.phase = 'disposed';
       state.command = null;
       state.canReconcile = false;
-      state.message = '工程命令 owner 已释放。';
+      state.message = '工程操作已关闭。';
       activeOwnerCount = Math.max(0, activeOwnerCount - 1);
       if (publishedWindow) {
         delete (publishedWindow as { __STUDIO_UI_PROJECT_LIFECYCLE_DIAGNOSTICS__?: ProjectLifecycleCommandDiagnostics })

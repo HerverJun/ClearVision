@@ -16,8 +16,8 @@ export const operatorCategoryLabels: Readonly<Record<OperatorCategoryId, string>
   DefectDetection: '缺陷检测',
   Measurement: '测量',
   CalibrationAndCoordinates: '标定与坐标',
-  AiInference: 'AI推理',
-  PointCloud3D: '3D点云',
+  AiInference: 'AI 推理',
+  PointCloud3D: '3D 点云',
   DataProcessing: '数据处理',
   FlowControl: '流程控制',
   Communication: '通信',
@@ -30,6 +30,47 @@ export const operatorLifecycleLabels: Readonly<Record<OperatorLifecycle, string>
   Reference: '参考',
   Legacy: '兼容旧版',
   Deprecated: '已弃用'
+});
+
+const operatorDataTypeLabels: Readonly<Record<string, string>> = Object.freeze({
+  Image: '图像',
+  Integer: '整数',
+  Float: '浮点数',
+  Boolean: '是 / 否',
+  String: '文本',
+  Point: '点',
+  Rectangle: '矩形',
+  Contour: '轮廓',
+  PointList: '点集',
+  DetectionResult: '检测结果',
+  DetectionList: '检测结果集',
+  CircleData: '圆',
+  LineData: '直线',
+  Region: '区域',
+  BlobList: '连通区域集',
+  BlobFeatureList: '连通区域特征集',
+  Any: '任意类型'
+});
+
+const parameterDataTypeLabels: Readonly<Record<string, string>> = Object.freeze({
+  bool: '是 / 否',
+  boolean: '是 / 否',
+  byte: '整数',
+  short: '整数',
+  int: '整数',
+  integer: '整数',
+  long: '整数',
+  float: '浮点数',
+  single: '浮点数',
+  double: '浮点数',
+  decimal: '小数',
+  string: '文本',
+  text: '文本',
+  enum: '选项',
+  image: '图像',
+  point: '点',
+  rectangle: '矩形',
+  region: '区域'
 });
 
 export type OperatorVisibility = 'default' | 'all' | 'hidden';
@@ -121,10 +162,19 @@ export function lifecycleTone(lifecycle: OperatorLifecycle): CvStatusTone {
   return 'warning';
 }
 
+export function formatOperatorDataType(value: string): string {
+  return operatorDataTypeLabels[value] ?? value;
+}
+
+export function formatParameterDataType(value: string): string {
+  return parameterDataTypeLabels[value.trim().toLocaleLowerCase('en-US')] ?? value;
+}
+
 export function formatMetadataValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'boolean') return value ? '是' : '否';
+  if (typeof value === 'number') return String(value);
   try {
     return JSON.stringify(value);
   } catch {

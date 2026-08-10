@@ -39,13 +39,13 @@ const draft = reactive({
 const baseline = shallowRef(copyProjection(null));
 
 const modeOptions: readonly CvSelectOption[] = Object.freeze([
-  { value: 'Disabled', label: 'Disabled（关闭）' },
-  { value: 'LocalLoopback', label: 'LocalLoopback（本机）' },
-  { value: 'LanController', label: 'LanController（局域网）' }
+  { value: 'Disabled', label: '关闭' },
+  { value: 'LocalLoopback', label: '本机通信' },
+  { value: 'LanController', label: '局域网控制' }
 ]);
 const tokenModeOptions: readonly CvSelectOption[] = Object.freeze([
-  { value: 'preserve', label: '保留当前 token（默认）' },
-  { value: 'replace', label: '替换 token' }
+  { value: 'preserve', label: '保留当前访问令牌' },
+  { value: 'replace', label: '替换访问令牌' }
 ]);
 
 const dirty = computed(() =>
@@ -203,7 +203,7 @@ async function save(): Promise<void> {
   if (tokenMode.value === 'replace' && !tokenDraft.value.trim()) {
     feedback.value = {
       kind: 'error',
-      message: '选择替换 token 后必须输入新 token。',
+      message: '选择替换访问令牌后，必须输入新的访问令牌。',
       savedLabel: '未保存',
       effectiveLabel: '未生效',
       restartLabel: '不适用'
@@ -241,13 +241,13 @@ async function regenerateToken(): Promise<void> {
     feedback.value = {
       kind: 'error',
       message: regenerateDisabledReason.value,
-      savedLabel: 'not saved',
-      effectiveLabel: 'not effective',
-      restartLabel: 'not applicable'
+      savedLabel: '未保存',
+      effectiveLabel: '未生效',
+      restartLabel: '不适用'
     };
     return;
   }
-  if (!window.confirm('确认重新生成 Station token？现有 Station 将需要使用新配置。')) return;
+  if (!window.confirm('确认重新生成工作站访问令牌？现有工作站需要更新通信配置。')) return;
   const owner = props.owner;
   mutationBusy.value = true;
   feedback.value = null;
@@ -268,6 +268,22 @@ async function regenerateToken(): Promise<void> {
 
 function modeLabel(value: string): string {
   return modeOptions.find(item => item.value === value)?.label ?? value;
+}
+
+function runningModeLabel(value: string): string {
+  if (value === 'Loopback' || value === 'LocalLoopback') return '本机回环';
+  if (value === 'Lan' || value === 'LanController') return '局域网';
+  return value || '未提供';
+}
+
+const stationDiagnosticLabels: Readonly<Record<string, string>> = Object.freeze({
+  'Station communication fixture is available.': '测试环境中的工作站通信服务可用。',
+  'Studio ingress is configured.': 'Studio 通信入口已配置。',
+  'Restart is required to apply the saved ingress.': '需要重启后应用已保存的通信入口。'
+});
+
+function stationDiagnosticLabel(value: string): string {
+  return stationDiagnosticLabels[value] ?? value;
 }
 
 watch(projection, value => {
@@ -303,21 +319,21 @@ onDeactivated(() => {
       tone="info"
       title="工作站通信设置仅管理员可用"
     >
-      当前角色不能读取或修改工作站系统级通信配置。工作站管理页的运行包、部署和启停能力不在此处提供。
+      当前角色不能读取或修改工作站通信配置。运行包、部署和启停仍在工作站管理页中操作。
     </CvInlineAlert>
 
     <template v-else>
       <CvInlineAlert
         v-if="phase === 'error'"
         tone="error"
-        title="Station 通信配置读取失败"
+        title="工作站通信配置读取失败"
       >
         {{ readMessage }}
       </CvInlineAlert>
 
       <CvPanel
-        title="Station 通信"
-        description="配置 Studio 与本机或局域网工作站的通信参数；保存只写入专用工作站接口，不会自动重启进程。"
+        title="工作站通信"
+        description="配置 Studio 与本机或局域网工作站的连接方式。保存后不会自动重启 Studio 或工作站。"
         data-settings-station-communication
       >
         <template #actions>
@@ -357,7 +373,7 @@ onDeactivated(() => {
             v-model="draft.lanHost"
             label="局域网地址"
             name="stationLanHost"
-            placeholder="LanController 模式使用"
+            placeholder="仅在“局域网控制”模式使用"
             :readonly="phase === 'loading' || mutationBusy"
           />
           <label class="settings-station__toggle">
@@ -377,11 +393,11 @@ onDeactivated(() => {
           <div class="settings-station__token-copy">
             <span class="settings-station__eyebrow">访问令牌</span>
             <strong>{{ projection?.token.hasToken ? (projection.token.mask || '已配置（已掩码）') : '未配置' }}</strong>
-            <small>真实访问令牌不会回显、持久化到前端或进入日志。</small>
+            <small>完整令牌不会回显，也不会保存在浏览器或写入日志。</small>
           </div>
           <CvSelect
             :model-value="tokenMode"
-            label="Token 操作"
+            label="访问令牌操作"
             name="stationTokenOperation"
             :options="tokenModeOptions"
             :disabled="mutationBusy"
@@ -391,7 +407,7 @@ onDeactivated(() => {
           <CvField
             v-if="tokenMode === 'replace'"
             v-model="tokenDraft"
-            label="新 token"
+            label="新访问令牌"
             name="stationToken"
             type="password"
             autocomplete="new-password"
@@ -407,7 +423,7 @@ onDeactivated(() => {
             data-settings-station-regenerate
             @click="regenerateToken"
           >
-            重新生成 token
+            重新生成令牌
           </CvButton>
           <small
             v-if="regenerateDisabledReason"
@@ -438,7 +454,7 @@ onDeactivated(() => {
                 variant="primary"
                 :loading="mutationBusy"
                 :disabled="!dirty || mutationBusy || phase === 'loading'"
-                loading-label="正在保存 Station 配置"
+                loading-label="正在保存工作站配置"
                 data-settings-station-save
                 @click="save"
               >
@@ -449,11 +465,14 @@ onDeactivated(() => {
         </template>
       </CvPanel>
 
-      <CvPanel
-        title="已保存 / 生效状态"
-        description="服务端返回的 saved projection 与当前运行配置分开显示。需要重启时不会由 Studio 自动执行。"
+      <section
+        class="settings-station__section"
         data-settings-station-effective
       >
+        <header class="settings-station__section-header">
+          <h3>保存与生效状态</h3>
+          <p>分别核对已保存配置和当前运行状态；需要重启时，Studio 不会自动执行。</p>
+        </header>
         <div class="settings-station__state-grid">
           <div class="settings-station__state-item">
             <span>已保存模式</span>
@@ -461,7 +480,7 @@ onDeactivated(() => {
           </div>
           <div class="settings-station__state-item">
             <span>Studio 当前运行</span>
-            <strong>{{ projection?.currentRunning.studioEnabled ? `${projection.currentRunning.studioListenMode} : ${projection.currentRunning.studioPort}` : '未启用' }}</strong>
+            <strong>{{ projection?.currentRunning.studioEnabled ? `${runningModeLabel(projection.currentRunning.studioListenMode)} · ${projection.currentRunning.studioPort}` : '未启用' }}</strong>
           </div>
           <div class="settings-station__state-item">
             <span>Studio 重启</span>
@@ -478,22 +497,25 @@ onDeactivated(() => {
           data-settings-station-restart-required
           title="配置已保存，尚未生效"
         >
-          请按后端提示重启对应 Studio 或本机 Station；本页面不会自动重启任何进程或服务。
+          请根据提示重启 Studio 或本机工作站。本页面不会自动重启任何进程或服务。
         </CvInlineAlert>
         <CvInlineAlert
           v-else-if="projection"
           tone="success"
           title="当前运行配置与已保存配置一致"
         >
-          当前没有后端声明的需要重启项。
+          当前没有需要重启的配置项。
         </CvInlineAlert>
-      </CvPanel>
+      </section>
 
-      <CvPanel
-        title="通信诊断"
-        description="只展示工作站接口返回的服务可用性提示，诊断结果不会覆盖正式配置。"
+      <section
+        class="settings-station__section"
         data-settings-station-diagnostics
       >
+        <header class="settings-station__section-header">
+          <h3>通信诊断</h3>
+          <p>通信服务返回的可用性信息仅用于排查问题，不会覆盖已保存配置。</p>
+        </header>
         <ul
           v-if="projection?.diagnostics.length"
           class="settings-station__diagnostics"
@@ -502,7 +524,7 @@ onDeactivated(() => {
             v-for="item in projection.diagnostics"
             :key="item"
           >
-            {{ item }}
+            {{ stationDiagnosticLabel(item) }}
           </li>
         </ul>
         <p
@@ -512,16 +534,16 @@ onDeactivated(() => {
           尚未返回诊断信息。
         </p>
         <div class="settings-station__endpoints">
-          <span>Studio 本地地址：{{ projection?.localStationBaseUrl || '未启用' }}</span>
-          <span>工作站中心：{{ projection?.remoteStationHubUrl || '未启用' }}</span>
+          <span>本机工作站地址：{{ projection?.localStationBaseUrl || '未启用' }}</span>
+          <span>远程工作站中心：{{ projection?.remoteStationHubUrl || '未启用' }}</span>
         </div>
-      </CvPanel>
+      </section>
     </template>
 
     <CvInlineAlert
       v-if="feedback"
-      :tone="feedback.kind === 'saved' ? 'success' : feedback.kind === 'unknown' ? 'warning' : 'error'"
-      :title="feedback.kind === 'saved' ? 'Station 操作已完成' : feedback.kind === 'unknown' ? 'Station 操作结果未知' : 'Station 操作未完成'"
+      :tone="feedback.kind === 'saved' || feedback.kind === 'completed' ? 'success' : feedback.kind === 'unknown' ? 'warning' : 'error'"
+      :title="feedback.kind === 'saved' || feedback.kind === 'completed' ? '工作站操作已完成' : feedback.kind === 'unknown' ? '工作站操作结果未知' : '工作站操作未完成'"
       data-settings-station-feedback
     >
       {{ feedback.message }}
@@ -544,12 +566,15 @@ onDeactivated(() => {
 .settings-station__eyebrow { color: var(--cv-color-brand-text); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-semibold); }
 .settings-station__footer { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
 .settings-station__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--cv-space-2); }
-.settings-station__state-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--cv-space-3); margin-bottom: var(--cv-space-4); }
-.settings-station__state-item { display: grid; min-width: 0; gap: var(--cv-space-1); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); background: var(--cv-surface-raised); }
+.settings-station__section { min-width: 0; padding: var(--cv-space-5) 0 0; border-top: 1px solid var(--cv-border-subtle); }
+.settings-station__section-header h3 { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-type-section-title-size); }
+.settings-station__section-header p { max-width: 760px; margin: var(--cv-space-1) 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
+.settings-station__state-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--cv-space-4); margin: var(--cv-space-4) 0; padding: var(--cv-space-3) 0; border-block: 1px solid var(--cv-border-subtle); }
+.settings-station__state-item { display: grid; min-width: 0; gap: var(--cv-space-1); }
 .settings-station__state-item span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .settings-station__state-item strong { overflow: hidden; color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); text-overflow: ellipsis; white-space: nowrap; }
-.settings-station__diagnostics { display: grid; gap: var(--cv-space-2); margin: 0; padding-left: 18px; color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }
-.settings-station__empty { margin: 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-sm); }
+.settings-station__diagnostics { display: grid; gap: var(--cv-space-2); margin: var(--cv-space-4) 0 0; padding-left: 18px; color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }
+.settings-station__empty { margin: var(--cv-space-4) 0 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-sm); }
 .settings-station__endpoints { display: grid; gap: var(--cv-space-1); margin-top: var(--cv-space-4); color: var(--cv-text-muted); font-family: var(--cv-font-family-mono); font-size: var(--cv-font-size-2xs); overflow-wrap: anywhere; }
 @media (max-width: 900px) {
   .settings-station__form, .settings-station__token-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }

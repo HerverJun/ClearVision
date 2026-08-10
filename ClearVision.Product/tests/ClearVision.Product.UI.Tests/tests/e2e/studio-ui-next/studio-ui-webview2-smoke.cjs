@@ -399,7 +399,8 @@ async function verifyStudioAuthLifecycle(page, userJson, password) {
   assert(authenticated.authShellCount === 0, 'WebView2 login left the Auth shell mounted.');
   assert(authenticated.tokenPresent, 'WebView2 login did not persist the token through the token port.');
 
-  await page.getByRole('button', { name: '退出', exact: true }).click();
+  await page.locator('[data-product-user-menu] button[aria-haspopup="menu"]').click();
+  await page.getByRole('menuitem', { name: '退出', exact: true }).click();
   await page.waitForSelector('[data-auth-page="login"]', { state: 'visible', timeout: 45_000 });
   await page.goBack();
   await page.waitForSelector('[data-auth-page="login"]', { state: 'visible', timeout: 45_000 });
@@ -2188,16 +2189,33 @@ async function verifyProductPage(
   }
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => {
-    const user = document.querySelector('.product-layout__user strong')?.textContent?.trim();
-    return Boolean(user && user !== '未认证');
+    const sessionLabel = document.querySelector(
+      '[data-product-user-menu] button[aria-haspopup="menu"]'
+    )?.getAttribute('aria-label')?.trim();
+    return Boolean(sessionLabel && !sessionLabel.includes('未认证'));
   }, null, { timeout: 30_000 });
 
-  const projection = await page.evaluate(() => ({
+  let overflowNavigation = [];
+  const moreTrigger = page.locator('[data-product-more] button[aria-haspopup="menu"]');
+  if (await moreTrigger.count()) {
+    await moreTrigger.click();
+    const moreMenu = page.getByRole('menu', { name: '更多产品入口' });
+    await moreMenu.waitFor({ state: 'visible' });
+    overflowNavigation = await moreMenu.locator('[data-product-nav]').evaluateAll(nodes =>
+      nodes.map(node => node.getAttribute('data-product-nav')).filter(Boolean));
+    await page.keyboard.press('Escape');
+    await moreMenu.waitFor({ state: 'detached' });
+  }
+
+  const projection = await page.evaluate(additionalNavigation => ({
     shellCount: document.querySelectorAll('[data-product-shell]').length,
     internalLabCount: document.querySelectorAll('[data-internal-lab-layout]').length,
     capability: document.querySelector('[data-capability]')?.getAttribute('data-capability') || null,
-    formalNavigation: [...document.querySelectorAll('[data-product-nav]')]
-      .map(node => node.getAttribute('data-product-nav')),
+    formalNavigation: [...new Set([
+      ...[...document.querySelectorAll('[data-product-nav]')]
+        .map(node => node.getAttribute('data-product-nav')),
+      ...additionalNavigation
+    ])],
     startupFeatureFlags: { ...(window.__CLEARVISION_STARTUP__?.featureFlags || {}) },
     labNavigationCount: document.querySelectorAll('[data-product-nav^="/labs"]').length,
     theme: document.documentElement.dataset.theme || null,
@@ -2225,7 +2243,7 @@ async function verifyProductPage(
       ? 'REAL_WEBVIEW2_PROJECT_AUTHORITY'
       : 'REAL_WEBVIEW2_EMPTY_AUTHORITY',
     authSource: 'HARNESS_SEEDED_SESSION'
-  }));
+  }), overflowNavigation);
   const navigationContract = resolveProductNavigationContract(phase, projection.startupFeatureFlags);
   const isFormalWorkspaceEvidence = ['f04', 'f09'].includes(navigationContract.phase);
   const origin = new URL(page.url()).origin;
@@ -2235,21 +2253,17 @@ async function verifyProductPage(
   };
 
   const preferenceRequestStart = runtimeErrors.requests.length;
-  await page.locator('[data-product-appearance] > summary').click();
   const setPreference = async (groupName, buttonName, attribute, expectedValue) => {
-    const group = page.getByRole('group', { name: groupName });
-    const button = group.getByRole('button', { name: buttonName, exact: true });
-    await button.click();
+    const trigger = page.locator('[data-product-appearance] button[aria-haspopup="menu"]');
+    await trigger.click();
+    await page.getByRole('menuitemcheckbox', { name: buttonName, exact: true }).click();
     await page.waitForFunction(
       ({ attributeName, value }) => document.documentElement.getAttribute(attributeName) === value,
       { attributeName: attribute, value: expectedValue }
     );
-    return page.evaluate(({ attributeName, groupLabel }) => ({
-      attributeValue: document.documentElement.getAttribute(attributeName),
-      pressed: document.querySelector(
-        `[role="group"][aria-label="${groupLabel}"] button[aria-pressed="true"]`
-      )?.textContent?.trim() || null
-    }), { attributeName: attribute, groupLabel: groupName });
+    return page.evaluate(attributeName => ({
+      attributeValue: document.documentElement.getAttribute(attributeName)
+    }), attribute);
   };
   const preferenceCycle = {
     initial: { theme: projection.theme, density: projection.density },
@@ -2263,39 +2277,72 @@ async function verifyProductPage(
       stored: JSON.parse(localStorage.getItem('clearvision.studio-ui.preferences.v1') || 'null')
     }))
   };
-  await page.locator('[data-product-appearance] > summary').click();
-  assert(await page.locator('[data-product-appearance]').getAttribute('open') === null,
-    'Appearance disclosure did not close after the preference audit.');
+  assert(await page.locator('[data-product-appearance] button[aria-haspopup="menu"]')
+    .getAttribute('aria-expanded') === 'false',
+  'Appearance menu did not close after the preference audit.');
   const resultsFilterLayout = route.startsWith('/results')
-    ? await page.evaluate(() => {
-        const selectors = [
+    ? await (async () => {
+        const collectVisibleControls = selectors => page.evaluate(items => {
+          const controls = items.flatMap(selector =>
+            [...document.querySelectorAll(selector)]
+              .filter(element => element.getClientRects().length > 0)
+              .map(element => {
+                const bounds = element.getBoundingClientRect();
+                return {
+                  selector: element.matches('.results-page__project')
+                    ? '.results-page__project'
+                    : element.matches('.results-page__station')
+                      ? '.results-page__station'
+                      : selector,
+                  top: Math.round(bounds.top * 100) / 100,
+                  bottom: Math.round(bounds.bottom * 100) / 100
+                };
+              })
+          );
+          const tops = controls.map(item => item.top);
+          const bottoms = controls.map(item => item.bottom);
+          return {
+            controls,
+            maximumTopDelta: tops.length ? Math.max(...tops) - Math.min(...tops) : null,
+            maximumBottomDelta: bottoms.length ? Math.max(...bottoms) - Math.min(...bottoms) : null
+          };
+        }, selectors);
+
+        const primary = await collectVisibleControls([
           '.results-page__source',
-          '.results-page__project',
+          '.results-page__project, .results-page__station',
           '.results-page__outcome',
-          '.results-page__diagnostic',
           '.results-page__page-size',
           '.results-page__advanced-trigger'
-        ];
-        const controls = selectors.flatMap(selector =>
-          [...document.querySelectorAll(selector)]
-            .filter(element => element.getClientRects().length > 0)
-            .map(element => {
-              const bounds = element.getBoundingClientRect();
-              return {
-                selector,
-                top: Math.round(bounds.top * 100) / 100,
-                bottom: Math.round(bounds.bottom * 100) / 100
-              };
-            })
-        );
-        const tops = controls.map(item => item.top);
-        const bottoms = controls.map(item => item.bottom);
+        ]);
+        const advancedTrigger = page.locator('.results-page__advanced-trigger');
+        const advancedWasOpen = await advancedTrigger.getAttribute('aria-expanded') === 'true';
+        if (!advancedWasOpen) {
+          await advancedTrigger.click();
+        }
+        await page.locator('#results-advanced-filters .results-page__diagnostic')
+          .waitFor({ state: 'visible' });
+        const advanced = await collectVisibleControls([
+          '.results-page__diagnostic',
+          '.results-page__date'
+        ]);
+        const diagnosticWithinDisclosure = await page.locator(
+          '#results-advanced-filters .results-page__diagnostic'
+        ).count();
+        if (!advancedWasOpen) {
+          await advancedTrigger.click();
+          await page.locator('#results-advanced-filters').waitFor({ state: 'hidden' });
+        }
         return {
-          controls,
-          maximumTopDelta: tops.length ? Math.max(...tops) - Math.min(...tops) : null,
-          maximumBottomDelta: bottoms.length ? Math.max(...bottoms) - Math.min(...bottoms) : null
+          primary,
+          advanced: {
+            ...advanced,
+            wasOpen: advancedWasOpen,
+            diagnosticWithinDisclosure,
+            restoredExpanded: await advancedTrigger.getAttribute('aria-expanded')
+          }
         };
-      })
+      })()
     : null;
   const preferenceRequests = runtimeErrors.requests.slice(preferenceRequestStart).filter(item => {
     const url = new URL(item.url);
@@ -2804,10 +2851,17 @@ async function verifyProductPage(
       `ProductLayout did not enter workspaceMode: ${JSON.stringify(projection)}`);
   }
   if (resultsFilterLayout) {
-    assert(resultsFilterLayout.controls.length === 6,
-      `Results filter rail did not expose six visible primary controls: ${JSON.stringify(resultsFilterLayout)}`);
-    assert(resultsFilterLayout.maximumBottomDelta <= 1,
+    assert(resultsFilterLayout.primary.controls.length === 5,
+      `Results filter rail did not expose five visible primary controls: ${JSON.stringify(resultsFilterLayout)}`);
+    assert(resultsFilterLayout.primary.maximumBottomDelta <= 1,
       `Results filter rail wrapped in the current WebView2 client: ${JSON.stringify(resultsFilterLayout)}`);
+    assert(resultsFilterLayout.advanced.diagnosticWithinDisclosure === 1,
+      `Results diagnostic filter is not owned by the advanced disclosure: ${JSON.stringify(resultsFilterLayout)}`);
+    assert(resultsFilterLayout.advanced.controls.some(
+      control => control.selector === '.results-page__diagnostic'),
+    `Results advanced disclosure did not expose the diagnostic filter: ${JSON.stringify(resultsFilterLayout)}`);
+    assert(resultsFilterLayout.advanced.restoredExpanded === String(resultsFilterLayout.advanced.wasOpen),
+      `Results advanced disclosure did not restore its initial state: ${JSON.stringify(resultsFilterLayout)}`);
   }
   return {
     ...projection,
@@ -3161,7 +3215,8 @@ async function logoutThroughUi(page) {
       state: 'visible', timeout: 45_000
     });
   }
-  await page.getByRole('button', { name: '退出', exact: true }).click();
+  await page.locator('[data-product-user-menu] button[aria-haspopup="menu"]').click();
+  await page.getByRole('menuitem', { name: '退出', exact: true }).click();
   await waitForSelectorWithoutHandle(
     page,
     '[data-auth-page="login"]',

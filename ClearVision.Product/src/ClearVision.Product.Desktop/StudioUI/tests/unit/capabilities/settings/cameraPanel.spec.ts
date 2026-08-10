@@ -82,11 +82,12 @@ describe('F07 G6 Camera/Trigger/Preview panel', () => {
     await flushPromises();
 
     expect(wrapper.find('[data-camera-section="discovery"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain('Huaray');
-    expect(wrapper.text()).toContain('Hikvision');
+    expect(wrapper.text()).toContain('华睿');
+    expect(wrapper.text()).toContain('海康威视');
     expect(wrapper.text()).toContain('曝光');
-    expect(wrapper.text()).toContain('Trigger 输入与诊断');
-    expect(wrapper.text()).toContain('调试 Preview');
+    expect(wrapper.text()).toContain('触发输入与诊断');
+    expect(wrapper.text()).toContain('采集预览');
+    expect(wrapper.text()).toContain('N 点标定');
 
     await wrapper.get('input[name="cameraExposure"]').setValue('7000');
     await wrapper.findAll('button').find(button => button.text().includes('保存绑定'))?.trigger('click');
@@ -95,7 +96,7 @@ describe('F07 G6 Camera/Trigger/Preview panel', () => {
       'cam-1'
     );
 
-    await wrapper.findAll('button').find(button => button.text().includes('Soft capture'))?.trigger('click');
+    await wrapper.findAll('button').find(button => button.text().includes('采集单帧'))?.trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('captured');
     expect(fixture.owner.captureSoftTrigger).toHaveBeenCalledWith('cam-1');
@@ -108,7 +109,7 @@ describe('F07 G6 Camera/Trigger/Preview panel', () => {
     await flushPromises();
 
     const saveButton = wrapper.findAll('button').find(button => button.text().includes('保存绑定'));
-    const captureButton = wrapper.findAll('button').find(button => button.text().includes('Soft capture'));
+    const captureButton = wrapper.findAll('button').find(button => button.text().includes('采集单帧'));
     const previewButton = wrapper.findAll('button').find(button => button.text().includes('停止连续预览'));
     expect(saveButton).toBeUndefined();
     expect(captureButton?.attributes('disabled')).toBeDefined();
@@ -166,7 +167,7 @@ describe('F07 G6 Camera/Trigger/Preview panel', () => {
 
     const status = wrapper.find('[data-camera-section="bindings"] [data-status-tone="warning"]');
     expect(status.exists()).toBe(true);
-    expect(status.text()).toContain('Disconnected');
+    expect(status.text()).toContain('未连接');
     wrapper.unmount();
   });
 });

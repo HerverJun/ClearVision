@@ -13,11 +13,13 @@ export type WorkspaceJsonValue =
 
 export class WorkspaceContractDecodeError extends Error {
   readonly path: string;
+  readonly expectation: string;
 
   constructor(path: string, expectation: string) {
-    super(`Workspace project field ${path} must be ${expectation}.`);
+    super('工程数据格式不符合要求，请刷新或检查服务状态。');
     this.name = 'WorkspaceContractDecodeError';
     this.path = path;
+    this.expectation = expectation;
   }
 }
 
@@ -25,7 +27,7 @@ export class WorkspaceSaveCompatibilityError extends Error {
   readonly blockedPaths: readonly string[];
 
   constructor(blockedPaths: readonly string[]) {
-    super(`Workspace persistence cannot be encoded safely: ${blockedPaths.join(', ')}.`);
+    super('工程包含当前版本无法安全保存的数据，请保留草稿并检查兼容性。');
     this.name = 'WorkspaceSaveCompatibilityError';
     this.blockedPaths = blockedPaths;
   }

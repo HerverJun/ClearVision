@@ -9,6 +9,7 @@ import {
   type CvPageStateKind,
   type CvStatusTone
 } from '@/design-system';
+import { CvIcon } from '@/design-system/icons';
 import { useProductRuntime, type ProductRuntime } from '@/app/productRuntime';
 import { authLifecycleRootKey } from '@/app/auth';
 import {
@@ -72,9 +73,9 @@ const statusTone = computed<CvStatusTone>(() => {
   return 'error';
 });
 const statusLabel = computed(() => {
-  if (phase.value === 'ready') return settings.value?.safeSubset ? '安全子集' : '完整配置';
-  if (phase.value === 'stale') return '配置状态已过期';
-  if (phase.value === 'loading') return '读取中';
+  if (phase.value === 'ready') return settings.value?.safeSubset ? '可用范围受限' : '设置已加载';
+  if (phase.value === 'stale') return '内容待刷新';
+  if (phase.value === 'loading') return '正在加载';
   if (phase.value === 'forbidden') return '禁止访问';
   if (error.value?.code === 'unauthorized') return '会话失效';
   return '读取失败';
@@ -87,9 +88,9 @@ const stateTitle = computed(() => {
 });
 const stateDescription = computed(() => {
   if (pageStateKind.value === 'unauthorized') return '当前会话已失效，请重新登录后再读取设置。';
-  if (pageStateKind.value === 'forbidden') return '当前账户没有进入设置的权限；前端不会通过隐藏逻辑绕过后端授权。';
-  if (error.value?.code === 'decode') return '服务端响应未通过已冻结的接口合同校验，未验证字段不会显示。';
-  return error.value?.publicMessage ?? '本地设置服务未返回可用状态。';
+  if (pageStateKind.value === 'forbidden') return '当前账户没有设置权限，请联系管理员调整角色后重试。';
+  if (error.value?.code === 'decode') return '本机服务返回了当前版本无法识别的数据，请检查 Studio 与服务版本。';
+  return error.value?.publicMessage ?? '本机设置服务暂时不可用。';
 });
 const showReadOnlyContent = computed(() =>
   (phase.value === 'ready' || phase.value === 'stale') && settings.value !== null
@@ -114,9 +115,9 @@ function reconcileLabel(key: SettingsAuthorityReconcileKey): string {
 }
 
 function reconcileDescription(key: SettingsAuthorityReconcileKey): string {
-  if (key === 'change-password') return '等待现有身份验证流程确认会话失效结果。';
-  if (key === 'database-backup') return '当前没有能够确认备份结果的读取合同，普通数据库状态不会替代核对。';
-  return '重新读取对应服务端状态前，不会重试或覆盖当前视图。';
+  if (key === 'change-password') return '等待身份验证流程确认当前会话状态。';
+  if (key === 'database-backup') return '无法自动确认本次备份结果，请先检查备份记录。';
+  return '重新读取对应状态，确认结果后再决定是否重试。';
 }
 
 async function reconcile(key: SettingsAuthorityReconcileKey): Promise<void> {
@@ -127,9 +128,9 @@ async function reconcile(key: SettingsAuthorityReconcileKey): Promise<void> {
   try {
     const result = await currentOwner.reconcileAuthority(key);
     if (result.status === 'completed') {
-      navigationMessage.value = `${reconcileLabel(key)} 已完成服务端结果核对。`;
+      navigationMessage.value = `${reconcileLabel(key)}已完成结果核对。`;
     } else {
-      navigationMessage.value = result.message ?? `${reconcileLabel(key)}尚未完成服务端核对，结果未知状态将继续显示。`;
+      navigationMessage.value = result.message ?? `${reconcileLabel(key)}仍无法确认结果，请稍后再次核对。`;
     }
   } finally {
     reconcileBusyKeys.delete(key);
@@ -223,16 +224,15 @@ onBeforeUnmount(() => {
     :aria-busy="phase === 'loading' ? 'true' : undefined"
   >
     <CvPageHeader
-      eyebrow="系统配置"
       title="设置"
-      description="读取现有服务端设置，核对可访问范围与当前生效状态。"
+      description="管理基础配置、设备连接和系统维护。每个分组独立保存，未保存内容会在离开前提醒。"
     >
       <template #meta>
         <CvStatusBadge
           :tone="statusTone"
           :label="statusLabel"
         />
-        <span class="settings-page__role">{{ roleLabel }}</span>
+        <span class="settings-page__role">当前账户：{{ roleLabel }}</span>
       </template>
       <template #actions>
         <CvButton
@@ -243,7 +243,13 @@ onBeforeUnmount(() => {
           data-settings-generic-refresh
           @click="refresh"
         >
-          刷新通用设置
+          <template #leading>
+            <CvIcon
+              name="refresh"
+              size="sm"
+            />
+          </template>
+          刷新基础设置
         </CvButton>
       </template>
     </CvPageHeader>
@@ -252,7 +258,7 @@ onBeforeUnmount(() => {
       v-if="unknownOutcomeKeys.length"
       class="settings-page__unknown-alert"
       tone="warning"
-      title="存在待核对的设置操作结果"
+      title="部分操作结果尚未确认"
       data-settings-unknown-outcomes
     >
       <ul class="settings-page__unknown-list">
@@ -294,15 +300,15 @@ onBeforeUnmount(() => {
           v-if="phase === 'stale'"
           class="settings-page__stale-alert"
           tone="warning"
-          title="配置状态已过期"
+          title="当前内容可能已经变化"
         >
-          当前内容仅供核对；请刷新服务端状态后再继续任何后续操作。
+          请刷新基础设置后再继续编辑，避免覆盖较新的配置。
         </CvInlineAlert>
         <CvInlineAlert
           v-if="navigationMessage"
           class="settings-page__navigation-alert"
           tone="warning"
-          title="暂不能切换分组"
+          title="操作暂不可用"
         >
           {{ navigationMessage }}
         </CvInlineAlert>
@@ -312,6 +318,7 @@ onBeforeUnmount(() => {
           :owner="mountedOwner"
           :role="role"
           :auth="authRoot?.auth ?? null"
+          @select="selectGroup"
         />
       </div>
     </div>
@@ -319,8 +326,8 @@ onBeforeUnmount(() => {
     <CvPageState
       v-else
       :kind="pageStateKind ?? 'loading'"
-      :title="pageStateKind === 'loading' ? '正在读取设置' : stateTitle"
-      :description="pageStateKind === 'loading' ? '正在从现有服务端接口读取设置。' : stateDescription"
+      :title="pageStateKind === 'loading' ? '正在加载设置' : stateTitle"
+      :description="pageStateKind === 'loading' ? '正在读取当前可用配置。' : stateDescription"
     >
       <template
         v-if="pageStateKind === 'error' || pageStateKind === 'unauthorized'"
@@ -353,7 +360,7 @@ onBeforeUnmount(() => {
 .settings-page__workspace {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(196px, 232px) minmax(0, 1fr);
+  grid-template-columns: minmax(176px, 208px) minmax(0, 1fr);
   align-items: start;
   gap: var(--cv-density-page-gap);
 }

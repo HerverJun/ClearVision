@@ -47,6 +47,32 @@ const previewLabel = computed(() => {
   return '未运行';
 });
 
+function previewMessage(value: string): string {
+  switch (value.trim().toLowerCase()) {
+    case 'idle': return '尚未开始采集';
+    case 'running': return '正在接收连续预览';
+    case 'starting': return '正在启动预览';
+    case 'stopped': return '连续预览已停止';
+    default: return value || '尚未接收预览帧';
+  }
+}
+
+function previewTriggerMode(value: string | null): string {
+  if (!value) return '触发方式未提供';
+  if (value === 'Software') return '软件触发';
+  if (value === 'External') return '外部触发';
+  if (value === 'Continuous') return '连续采集';
+  return value;
+}
+
+function diagnosticState(value: string | undefined, emptyLabel: string): string {
+  if (!value) return emptyLabel;
+  if (value === 'idle') return '空闲';
+  if (value === 'running') return '运行中';
+  if (value === 'none') return emptyLabel;
+  return value;
+}
+
 function operationMessage(result: { status: string; message?: string; error?: unknown; operationKind?: SettingsOperationKind }): string {
   return settingsOperationResultMessage(result);
 }
@@ -109,8 +135,8 @@ async function togglePreview(): Promise<void> {
   >
     <header class="camera-section__header">
       <div>
-        <h3>调试 Preview</h3>
-        <p>软触发采集和连续预览仅用于调试输入，不写入正式检测结果；离开设置或切换面板时会停止预览会话。</p>
+        <h3>采集预览</h3>
+        <p>单帧采集和连续预览仅用于设备调试，不会生成正式检测结果；离开本页时连续预览会自动停止。</p>
       </div>
       <CvStatusBadge
         :tone="previewTone"
@@ -144,7 +170,7 @@ async function togglePreview(): Promise<void> {
               size="sm"
             />
           </template>
-          Soft capture
+          采集单帧
         </CvButton>
         <CvButton
           :variant="isRunning ? 'quiet' : 'primary'"
@@ -168,7 +194,7 @@ async function togglePreview(): Promise<void> {
       v-else
       class="camera-empty"
     >
-      没有活动 CameraBinding，无法开始调试预览。
+      当前没有可用的相机绑定，无法开始采集预览。
     </div>
 
     <div
@@ -190,8 +216,8 @@ async function togglePreview(): Promise<void> {
           name="camera"
           size="lg"
         />
-        <strong>{{ preview.message || '尚未接收预览帧' }}</strong>
-        <span>当前面板只显示可丢弃调试输入。</span>
+        <strong>{{ previewMessage(preview.message) }}</strong>
+        <span>设备调试画面不会保存为检测结果。</span>
       </div>
       <div
         v-if="preview.imageUrl"
@@ -199,20 +225,23 @@ async function togglePreview(): Promise<void> {
       >
         <span>{{ preview.width ?? '—' }} × {{ preview.height ?? '—' }}</span>
         <span>序号 {{ preview.frameSequence ?? '—' }}</span>
-        <span>{{ preview.triggerMode || '—' }}</span>
+        <span>{{ previewTriggerMode(preview.triggerMode) }}</span>
       </div>
     </div>
 
-    <dl
+    <details
       class="preview-diagnostics"
       data-camera-preview-diagnostics
     >
-      <div><dt>Controller</dt><dd>{{ preview.diagnostics?.controller ?? 'idle' }}</dd></div>
-      <div><dt>Session</dt><dd>{{ preview.diagnostics?.session ?? 'none' }}</dd></div>
-      <div><dt>Frame loop</dt><dd>{{ preview.diagnostics?.frameLoop ?? 'idle' }}</dd></div>
-      <div><dt>Blob URL</dt><dd>{{ preview.diagnostics?.blobUrl ?? 'none' }}</dd></div>
-      <div><dt>资源计数</dt><dd>{{ preview.diagnostics?.controllerCount ?? 0 }}/{{ preview.diagnostics?.sessionCount ?? 0 }}/{{ preview.diagnostics?.frameLoopCount ?? 0 }}/{{ preview.diagnostics?.blobUrlCount ?? 0 }}</dd></div>
-    </dl>
+      <summary>查看预览资源诊断</summary>
+      <dl>
+        <div><dt>采集控制器</dt><dd>{{ diagnosticState(preview.diagnostics?.controller, '空闲') }}</dd></div>
+        <div><dt>预览会话</dt><dd>{{ diagnosticState(preview.diagnostics?.session, '无') }}</dd></div>
+        <div><dt>取帧循环</dt><dd>{{ diagnosticState(preview.diagnostics?.frameLoop, '空闲') }}</dd></div>
+        <div><dt>图像资源</dt><dd>{{ diagnosticState(preview.diagnostics?.blobUrl, '无') }}</dd></div>
+        <div><dt>资源计数</dt><dd>{{ preview.diagnostics?.controllerCount ?? 0 }}/{{ preview.diagnostics?.sessionCount ?? 0 }}/{{ preview.diagnostics?.frameLoopCount ?? 0 }}/{{ preview.diagnostics?.blobUrlCount ?? 0 }}</dd></div>
+      </dl>
+    </details>
 
     <CvInlineAlert
       v-if="feedback"
@@ -240,12 +269,14 @@ async function togglePreview(): Promise<void> {
 .preview-frame__empty strong { color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }
 .preview-frame__empty span { font-size: var(--cv-font-size-xs); }
 .preview-frame__meta { position: absolute; right: var(--cv-space-3); bottom: var(--cv-space-3); display: flex; flex-wrap: wrap; gap: var(--cv-space-2); padding: var(--cv-space-1) var(--cv-space-2); background: color-mix(in srgb, var(--cv-surface-overlay) 90%, transparent); color: var(--cv-text-primary); font-size: var(--cv-font-size-2xs); }
-.preview-diagnostics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--cv-space-2); margin: var(--cv-space-3) 0 0; }
-.preview-diagnostics > div { min-width: 0; padding: var(--cv-space-2); border: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
+.preview-diagnostics { margin-top: var(--cv-space-3); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.preview-diagnostics summary { width: fit-content; cursor: pointer; }
+.preview-diagnostics dl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--cv-space-2); margin: var(--cv-space-2) 0 0; }
+.preview-diagnostics dl > div { min-width: 0; padding: var(--cv-space-2); border: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
 .preview-diagnostics dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .preview-diagnostics dd { margin: var(--cv-space-1) 0 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
 .camera-empty { margin-top: var(--cv-space-4); color: var(--cv-text-muted); font-size: var(--cv-font-size-sm); }
 .camera-preview__alert { margin-top: var(--cv-space-4); }
-@media (max-width: 900px) { .preview-diagnostics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 700px) { .preview-toolbar { grid-template-columns: 1fr; } .preview-actions { justify-content: flex-start; } .preview-frame { min-height: 220px; } .preview-diagnostics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .preview-diagnostics dl { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .preview-toolbar { grid-template-columns: 1fr; } .preview-actions { justify-content: flex-start; } .preview-frame { min-height: 220px; } .preview-diagnostics dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>

@@ -13,10 +13,11 @@ async function boot(
   viewport: Readonly<{ width: number; height: number }>,
   density: 'compact' | 'comfortable',
   route: string,
-  options: F06BrowserFixtureOptions = {}
+  options: F06BrowserFixtureOptions = {},
+  theme: 'light' | 'dark' = 'light'
 ): Promise<F06BrowserAudit> {
   await page.setViewportSize(viewport);
-  await installF02VisualPreferences(page, 'light', density);
+  await installF02VisualPreferences(page, theme, density);
   const audit = await installF06Fixture(page, options);
   await page.goto(`/studio/index.html#${route}`);
   return audit;
@@ -140,6 +141,7 @@ test('terminal replay projects failed and cancelled Build outcomes without reviv
     });
     const phase = state === 'failed' ? 'build-failed' : 'build-cancelled';
     await expect(page.locator(`[data-ai-owner-phase="${phase}"]`)).toBeVisible();
+    await expect(page.locator('[data-ai-terminal-state]')).toBeVisible();
     await captureF06Evidence(page, audit, `ai-build-${state}`, viewport, 'compact');
     expectNoRuntimeErrors(audit);
     await expectNoHorizontalOverflow(page);
@@ -235,6 +237,52 @@ test('Admin role mounts the same single AI owner through the unbound route', asy
   await expect(page.locator('[data-ai-owner-phase]')).toHaveCount(1);
   expect(audit.requests.filter(item => item.method === 'POST' && item.path === '/api/ai/sessions')).toHaveLength(1);
   expectNoRuntimeErrors(audit);
+});
+
+test('dark comfortable workbench keeps the idle task and recovery entry legible', async ({ page }) => {
+  const viewport = { width: 1536, height: 864 } as const;
+  const audit = await boot(page, viewport, 'comfortable', '/ai', { role: 'Engineer' }, 'dark');
+  await expect(page.locator('[data-ai-owner-phase="idle"]')).toBeVisible();
+  await expect(page.locator('[data-ai-task-composer]')).toBeVisible();
+  await expect(page.getByRole('button', { name: '打开历史与恢复' })).toBeVisible();
+  await captureF06Evidence(page, audit, 'ai-idle-dark', viewport, 'comfortable');
+  expectNoRuntimeErrors(audit);
+  await expectNoHorizontalOverflow(page);
+});
+
+test('V4 stage matrix keeps the AI entry stable across B0-B4', async ({ browser }) => {
+  for (const visual of [
+    { id: 'b0', width: 1920, height: 1080, theme: 'light', density: 'compact' },
+    { id: 'b1', width: 1536, height: 864, theme: 'light', density: 'compact' },
+    { id: 'b2', width: 1366, height: 768, theme: 'light', density: 'compact' },
+    { id: 'b3', width: 1920, height: 1080, theme: 'dark', density: 'compact' },
+    { id: 'b4-light', width: 1920, height: 1080, theme: 'light', density: 'comfortable' },
+    { id: 'b4-dark', width: 1920, height: 1080, theme: 'dark', density: 'comfortable' }
+  ] as const) {
+    const viewport = { width: visual.width, height: visual.height } as const;
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    try {
+      await installF02VisualPreferences(page, visual.theme, visual.density);
+      const audit = await installF06Fixture(page, { role: 'Engineer', historyMode: 'empty' });
+      await page.goto('/studio/index.html#/ai');
+      await expect(page.locator('[data-ai-owner-phase="idle"]')).toBeVisible();
+      await expect(page.locator('[data-ai-task-composer]')).toBeVisible();
+      const projection = await page.evaluate(() => ({
+        theme: document.documentElement.dataset.theme,
+        density: document.documentElement.dataset.density,
+        overflow: Math.max(
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          document.body.scrollWidth - document.body.clientWidth
+        )
+      }));
+      expect(projection).toEqual({ theme: visual.theme, density: visual.density, overflow: 0 });
+      await captureF06Evidence(page, audit, `ai-stage-${visual.id}`, viewport, visual.density);
+      expectNoRuntimeErrors(audit);
+    } finally {
+      await context.close();
+    }
+  }
 });
 
 test('service unavailable state explains impact and next action without layout overflow', async ({ page }) => {

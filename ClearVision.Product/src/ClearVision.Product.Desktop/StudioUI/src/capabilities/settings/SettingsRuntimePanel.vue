@@ -87,7 +87,7 @@ onBeforeUnmount(() => detachPanelState());
 <template>
   <CvPanel
     title="运行保护"
-    description="只编辑运行保护的四个范围字段；RuntimePreview Pilot 继续保持仅开发者可用。"
+    description="设置自动运行，以及连续 NG 和缺料时的停止条件。"
     data-settings-section="runtime"
   >
     <div class="settings-form-grid">
@@ -99,7 +99,7 @@ onBeforeUnmount(() => detachPanelState());
         >
         <span>
           <strong>自动运行</strong>
-          <small>由服务端运行时使用方决定具体生效时机。</small>
+          <small>保存后由正式运行流程在下一次读取配置时使用。</small>
         </span>
       </label>
       <label class="settings-toggle">
@@ -110,7 +110,7 @@ onBeforeUnmount(() => detachPanelState());
         >
         <span>
           <strong>启用保护规则</strong>
-          <small>保存成功不等于所有运行中的使用方已重新加载。</small>
+          <small>关闭后，连续 NG 和缺料超时不会触发自动停止。</small>
         </span>
       </label>
       <CvField
@@ -120,6 +120,7 @@ onBeforeUnmount(() => detachPanelState());
         type="number"
         :readonly="!canWrite"
         :error="canWrite ? validationMessage ?? undefined : undefined"
+        hint="设为 0 可关闭连续 NG 自动停止。"
       />
       <CvField
         v-model="draft.missingMaterialTimeoutSeconds"
@@ -128,29 +129,22 @@ onBeforeUnmount(() => detachPanelState());
         type="number"
         :readonly="!canWrite"
         :error="canWrite ? validationMessage ?? undefined : undefined"
+        hint="在此时间内没有新结果时停止连续运行。"
       />
     </div>
-
-    <CvInlineAlert
-      class="settings-runtime__developer-note"
-      tone="info"
-      title="RuntimePreview Pilot 未进入普通设置"
-    >
-      仅元数据的 Pilot 仍由仅开发者可用的界面管理，本分区不会显示、保存或扩展它。
-    </CvInlineAlert>
 
     <CvInlineAlert
       v-if="!canWrite"
       class="settings-panel__notice"
       tone="info"
-      title="当前为安全视图"
+      title="当前账户为只读"
     >
-      当前角色可以核对已返回字段，但不能修改运行保护配置。
+      你可以查看运行保护；修改需要管理员权限。
     </CvInlineAlert>
 
     <template #footer>
       <div class="settings-panel__footer">
-        <span class="settings-panel__dirty">{{ dirty ? '有未保存修改' : '与服务端配置一致' }}</span>
+        <span class="settings-panel__dirty">{{ dirty ? '有未保存修改' : '当前分组已保存' }}</span>
         <div class="settings-panel__actions">
           <CvButton
             v-if="canWrite"
@@ -187,7 +181,6 @@ onBeforeUnmount(() => detachPanelState());
 .settings-toggle span { display: grid; min-width: 0; gap: var(--cv-space-1); }
 .settings-toggle strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .settings-toggle small { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
-.settings-runtime__developer-note { margin-top: var(--cv-space-4); }
 .settings-panel__notice { margin-top: var(--cv-space-4); }
 .settings-panel__footer { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
 .settings-panel__dirty { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }

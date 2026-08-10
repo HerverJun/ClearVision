@@ -313,7 +313,7 @@ export function createInspectionRunOwner(options: {
       if (!disposed && ownerGeneration === generation && !(error instanceof ApiAbortError)) {
         state.phase = 'disconnected';
         state.errorCode = responseCode(error) ?? 'INSPECTION_AUTHORITY_REREAD_FAILED';
-        state.message = '实时重连已达上限，且权威状态重读失败。';
+        state.message = '实时重连已达上限，且服务端运行状态重新读取失败。';
       }
     } finally {
       if (requestController === controller) requestController = null;
@@ -549,7 +549,7 @@ export function createInspectionRunOwner(options: {
       const runtime = state.runtime;
       if (!runtime) {
         state.errorCode = 'INSPECTION_LEAVE_AUTHORITY_MISSING';
-        state.message = '离开前未取得连续检测权威状态，当前禁止卸载。';
+        state.message = '离开前未取得连续检测的服务端状态，当前禁止关闭页面。';
         return false;
       }
       if (!runtime.isBusy || runtime.sessionType !== 'ContinuousInspection') return true;
@@ -612,7 +612,7 @@ export function createInspectionRunOwner(options: {
       prepareForLeavePromise = null;
       preparingForLeave = false;
       state.phase = 'disposed';
-      state.message = '连续检测 Owner 已释放；未向后端发送停止命令。';
+      state.message = '连续检测页面已关闭；未向服务端发送停止命令。';
       lease?.update(Object.freeze({
         activeSubscriptions: 0,
         activeTimers: 0,

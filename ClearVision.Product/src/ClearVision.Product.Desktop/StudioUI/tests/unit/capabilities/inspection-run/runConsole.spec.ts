@@ -36,6 +36,26 @@ describe('RunConsole', () => {
     expect(wrapper.emitted('stop')).toHaveLength(1);
     expect(wrapper.emitted('reconcile')).toHaveLength(1);
   });
+
+  it('keeps diagnostic codes in secondary technical details', () => {
+    const wrapper = mount(RunConsole, {
+      props: {
+        ...baseProps,
+        errorCode: 'RUN_ADMISSION_BLOCKED',
+        violations: [{
+          key: 'parameter',
+          code: 'PENDING_PARAMETER',
+          message: '请先配置模型文件路径。',
+          target: '模型文件路径'
+        }]
+      }
+    });
+
+    expect(wrapper.get('.run-console__control > p').text()).not.toContain('RUN_ADMISSION_BLOCKED');
+    expect(wrapper.get('.run-console__technical').text()).toContain('RUN_ADMISSION_BLOCKED');
+    expect(wrapper.get('.run-console__violations').text()).toContain('PENDING_PARAMETER');
+    expect(wrapper.text()).toContain('运行前检查');
+  });
 });
 
 describe('RunStatusBar', () => {
@@ -57,6 +77,8 @@ describe('RunStatusBar', () => {
     });
 
     expect(wrapper.get('[data-testid="run-status-bar"]').text()).toContain('阻断 1 项');
+    expect(wrapper.get('[data-testid="run-status-bar"]').text()).toContain('运行检查阻断 1 项');
+    expect(wrapper.get('[data-testid="run-status-bar"]').text()).not.toContain('准入');
     expect(wrapper.get('[data-testid="run-console-reconcile"]').text()).toContain('核对结果');
     expect(wrapper.find('[data-testid="run-console-start"]').attributes('disabled')).toBeDefined();
 

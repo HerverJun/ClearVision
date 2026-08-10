@@ -1,11 +1,14 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import {
   auditF02Request,
+  createF02RuntimeErrorAudit,
   expectGetOnly,
   fulfillF02Json,
   installF02BrowserStartup,
+  installF02VisualPreferences,
   type F02MethodAuditEntry
 } from './f02-browser-fixture';
+import { captureF07Evidence, hasF07EvidenceTarget } from './f07-device-fixture';
 
 const fixtureSchema = 'f07-settings-shell.v1';
 
@@ -104,7 +107,7 @@ function aiReasoningSupportPayload(): Record<string, unknown> {
     familyName: 'OpenAI GPT-5',
     allowedModes: ['auto', 'off', 'on'],
     allowedEfforts: ['low', 'medium', 'high'],
-    helpText: 'Fixture reasoning support only describes the endpoint contract.',
+    helpText: '测试环境仅描述此服务端点支持的推理能力。',
     supportsExplicitMode: true,
     supportsEffort: true,
     isModelLockedOn: false,
@@ -116,7 +119,7 @@ function aiFullModelPayload(hasApiKey = true): Record<string, unknown> {
   return {
     id: 'model-1',
     name: 'fixture-primary',
-    displayName: 'Fixture AI model',
+    displayName: '测试语言模型',
     provider: 'OpenAI Compatible',
     model: 'gpt-5.1-mini',
     hasApiKey,
@@ -150,7 +153,7 @@ function aiFullModelPayload(hasApiKey = true): Record<string, unknown> {
 function aiSafeModelPayload(): Record<string, unknown> {
   return {
     id: 'model-1',
-    displayName: 'Fixture AI model',
+    displayName: '测试语言模型',
     provider: 'OpenAI Compatible',
     model: 'gpt-5.1-mini',
     modelRole: 'generation',
@@ -298,6 +301,17 @@ async function bootSettings(
       await fulfillF02Json(route, 200, response === 'full' ? currentSettings : safeSettingsPayload(), fixtureSchema);
       return;
     }
+    if (url.pathname === '/api/users' && request.method() === 'GET') {
+      await fulfillF02Json(route, 200, [{
+        id: 'fixture-operator',
+        username: 'operator-a',
+        displayName: '产线操作员',
+        role: 2,
+        isActive: true,
+        lastLoginAt: '2026-08-01T00:00:00Z'
+      }], fixtureSchema);
+      return;
+    }
     if (url.pathname === '/api/auth/change-password' && request.method() === 'POST') {
       await fulfillF02Json(route, 200, { message: '密码修改成功' }, fixtureSchema);
       return;
@@ -322,7 +336,7 @@ test('Settings shell reads Engineer safe projection, exposes groups, and stays G
   await expect(page.locator('[data-capability="settings"]')).toBeVisible();
   await expect(page.locator('[data-settings-phase="ready"]')).toBeVisible();
   await expect(page.locator('[data-capability="settings"][data-settings-safe-subset="true"]')).toBeVisible();
-  await expect(page.locator('[data-capability="settings"]')).toContainText('安全子集');
+  await expect(page.locator('[data-capability="settings"]')).toContainText('工程师安全范围');
   await expect(page.locator('[data-product-nav="/settings"]')).toBeVisible();
   await expect(page.locator('[data-settings-group="camera"]')).toBeVisible();
 
@@ -338,7 +352,7 @@ test('Settings shell renders loading then Admin full projection without a save r
 
   await expect(page.locator('[data-settings-phase="loading"]')).toBeVisible();
   await expect(page.locator('[data-settings-phase="ready"]')).toBeVisible();
-  await expect(page.getByText('完整管理员视图', { exact: true })).toBeVisible();
+  await expect(page.getByText('管理员完整范围', { exact: true })).toBeVisible();
   await page.locator('[data-settings-group="storage"]').click();
   await expect(page.locator('input[name="imageSavePath"]')).toHaveValue('D:/VisionData');
   expect(audit.filter(entry => entry.method !== 'GET')).toEqual([]);
@@ -506,7 +520,7 @@ test('Admin Database exposes only status and backup metadata', async ({ page }) 
   await expect(databaseGroup).toHaveCount(1);
   await databaseGroup.click();
   const database = page.locator('[data-settings-section="database"]');
-  await expect(database).toContainText('Healthy');
+  await expect(database).toContainText('正常');
   const backupButton = database.locator('.settings-database__backup button');
   await expect(backupButton).toHaveCount(1);
   page.once('dialog', dialog => dialog.accept());
@@ -537,7 +551,7 @@ test('Admin password change invalidates the session and clears secrets', async (
   if (await page.locator('[data-settings-group="database"]').count() === 0) return;
 
   await page.locator('[data-settings-group="database"]').click();
-  await expect(page.locator('[data-settings-section="database"]')).toContainText('Healthy');
+  await expect(page.locator('[data-settings-section="database"]')).toContainText('正常');
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: '创建备份', exact: true }).click();
   await expect(page.locator('[data-settings-backup-result]')).toBeVisible();
@@ -572,4 +586,56 @@ test('Settings shell keeps the page width bounded at desktop and narrow viewport
     expect(overflow, `horizontal overflow at ${viewport.width}x${viewport.height}`).toBeLessThanOrEqual(1);
   }
   expect(expectGetOnly(audit)).toBe(true);
+});
+
+for (const visual of [
+  { id: 'settings-overview', group: 'overview', selector: '[data-settings-overview]', width: 1920, height: 1080, theme: 'light', density: 'compact' },
+  { id: 'settings-overview-b1', group: 'overview', selector: '[data-settings-overview]', width: 1536, height: 864, theme: 'light', density: 'compact' },
+  { id: 'settings-overview-b2', group: 'overview', selector: '[data-settings-overview]', width: 1366, height: 768, theme: 'light', density: 'compact' },
+  { id: 'settings-overview-b3', group: 'overview', selector: '[data-settings-overview]', width: 1920, height: 1080, theme: 'dark', density: 'compact' },
+  { id: 'settings-overview-b4-light', group: 'overview', selector: '[data-settings-overview]', width: 1920, height: 1080, theme: 'light', density: 'comfortable' },
+  { id: 'settings-overview-b4-dark', group: 'overview', selector: '[data-settings-overview]', width: 1920, height: 1080, theme: 'dark', density: 'comfortable' },
+  { id: 'settings-general', group: 'general', selector: '[data-settings-section="general"]', width: 1536, height: 864, theme: 'dark', density: 'comfortable' },
+  { id: 'settings-storage', group: 'storage', selector: '[data-settings-section="storage"]', width: 1366, height: 768, theme: 'light', density: 'compact' },
+  { id: 'settings-runtime', group: 'runtime', selector: '[data-settings-section="runtime"]', width: 1366, height: 768, theme: 'dark', density: 'compact' },
+  { id: 'settings-security', group: 'security', selector: '[data-settings-section="security"]', width: 1536, height: 864, theme: 'light', density: 'comfortable' },
+  { id: 'settings-station', group: 'station', selector: '[data-settings-station]', width: 1920, height: 1080, theme: 'dark', density: 'compact' },
+  { id: 'settings-ai-model', group: 'ai-model', selector: '[data-settings-ai-model]', width: 1920, height: 1080, theme: 'light', density: 'compact' },
+  { id: 'settings-database', group: 'database', selector: '[data-settings-section="database"]', width: 1366, height: 768, theme: 'dark', density: 'comfortable' }
+] as const) {
+  test(`captures ${visual.id} F07 baseline evidence`, async ({ page }) => {
+    test.skip(!hasF07EvidenceTarget(), 'F07 visual evidence output was not requested.');
+    const viewport = { width: visual.width, height: visual.height } as const;
+    await page.setViewportSize(viewport);
+    await installF02VisualPreferences(page, visual.theme, visual.density);
+    const runtimeErrors = createF02RuntimeErrorAudit(page);
+    const audit = await bootSettings(page, 'Admin', 'full');
+    await page.goto('/studio/index.html#/settings');
+    await expect(page.locator('[data-settings-phase="ready"]')).toBeVisible();
+    if (visual.group !== 'overview') await page.locator(`[data-settings-group="${visual.group}"]`).click();
+    await expect(page.locator(visual.selector)).toBeVisible();
+    await captureF07Evidence(page, {
+      scenario: visual.id,
+      viewport,
+      theme: visual.theme,
+      density: visual.density,
+      requests: audit,
+      runtimeErrors
+    });
+  });
+}
+
+test('captures Settings Engineer safe-subset evidence', async ({ page }) => {
+  test.skip(!hasF07EvidenceTarget(), 'F07 visual evidence output was not requested.');
+  const viewport = { width: 1366, height: 768 } as const;
+  await page.setViewportSize(viewport);
+  await installF02VisualPreferences(page, 'light', 'compact');
+  const runtimeErrors = createF02RuntimeErrorAudit(page, [403]);
+  const audit = await bootSettings(page, 'Engineer', 'safe');
+  await page.goto('/studio/index.html#/settings');
+  await page.locator('[data-settings-group="ai-model"]').click();
+  await expect(page.locator('[data-settings-ai-model-safe]')).toBeVisible();
+  await captureF07Evidence(page, {
+    scenario: 'settings-engineer-ai-safe', viewport, theme: 'light', density: 'compact', requests: audit, runtimeErrors
+  });
 });

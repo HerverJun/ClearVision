@@ -5,6 +5,7 @@ import {
   CvButton,
   CvDataTable,
   CvField,
+  CvIconButton,
   CvInlineAlert,
   CvModal,
   CvPageHeader,
@@ -345,7 +346,7 @@ onBeforeUnmount(() => {
   >
     <CvPageHeader
       title="工程"
-      description="管理工程库，快速返回最近工作，并进入流程工作区。"
+      description="管理工程库与最近工作。"
     >
       <template #meta>
         <span class="projects-page__meta">{{ projectCountLabel }}</span>
@@ -366,7 +367,7 @@ onBeforeUnmount(() => {
               size="sm"
             />
           </template>
-          导入工程 JSON
+          导入
         </CvButton>
         <CvButton
           v-if="commands"
@@ -375,16 +376,25 @@ onBeforeUnmount(() => {
           data-testid="project-create-open"
           @click="showCreate"
         >
-          新建空白工程
+          <template #leading>
+            <CvIcon
+              name="plus"
+              size="sm"
+            />
+          </template>
+          新建工程
         </CvButton>
-        <CvButton
+        <CvIconButton
           size="sm"
+          label="刷新工程列表"
           :loading="listState.isRefreshing"
-          loading-label="正在刷新工程"
           @click="listQuery.refresh({ force: true })"
         >
-          刷新
-        </CvButton>
+          <CvIcon
+            name="refresh"
+            size="sm"
+          />
+        </CvIconButton>
       </template>
     </CvPageHeader>
 
@@ -420,7 +430,7 @@ onBeforeUnmount(() => {
           data-testid="project-command-reconcile"
           @click="reconcileUnknownOutcome"
         >
-          查询权威结果
+          核对服务端结果
         </CvButton>
       </template>
     </CvInlineAlert>
@@ -448,6 +458,7 @@ onBeforeUnmount(() => {
       <CvPanel
         class="projects-page__library"
         title="全部工程"
+        variant="section"
         :padded="false"
       >
         <CvToolbar
@@ -505,28 +516,28 @@ onBeforeUnmount(() => {
           class="projects-page__state"
           kind="loading"
           title="正在读取工程列表"
-          description="请稍候，正在读取后端工程摘要。"
+          description="正在同步工程库，请稍候。"
         />
         <CvPageState
           v-else-if="listState.phase === 'unauthorized'"
           class="projects-page__state"
           kind="unauthorized"
           title="当前会话不可用"
-          description="请由宿主或测试环境预置有效会话后重试。"
+          description="会话已失效，请重新登录后再试。"
         />
         <CvPageState
           v-else-if="listState.phase === 'forbidden'"
           class="projects-page__state"
           kind="forbidden"
           title="无权读取工程"
-          description="导航可见性不代表后端授权，请联系管理员核对权限。"
+          description="当前账号没有工程读取权限，请联系管理员。"
         />
         <CvPageState
           v-else-if="listState.phase === 'error' || listState.phase === 'not-found'"
           class="projects-page__state"
           kind="error"
           title="工程列表读取失败"
-          :description="listState.failure?.message ?? '本地服务未返回可用的工程列表。'"
+          :description="listState.failure?.message ?? '工程列表暂时不可用。'"
         >
           <template #actions>
             <CvButton
@@ -542,7 +553,7 @@ onBeforeUnmount(() => {
           class="projects-page__state"
           kind="empty"
           :title="isSearching ? '没有匹配的工程' : '暂无工程'"
-          :description="isSearching ? '调整关键词，或清除搜索返回完整工程库。' : '创建空白工程后，可从这里进入流程工作区。'"
+          :description="isSearching ? '调整关键词，或清除搜索返回完整工程库。' : '创建工程后即可进入流程工作区。'"
         >
           <template #actions>
             <CvButton
@@ -558,7 +569,7 @@ onBeforeUnmount(() => {
               variant="primary"
               @click="showCreate"
             >
-              创建第一个工程
+              创建工程
             </CvButton>
           </template>
         </CvPageState>
@@ -585,13 +596,16 @@ onBeforeUnmount(() => {
           </template>
           <template #cell-actions="{ row }">
             <span class="projects-page__actions">
-              <RouterLink :to="`/projects/${row.id}`">
-                查看详情
+              <RouterLink
+                :to="`/projects/${row.id}`"
+                :aria-label="`查看详情：${row.name}`"
+              >
+                详情
               </RouterLink>
               <CvButton
                 v-if="commands"
                 size="sm"
-                variant="quiet"
+                variant="secondary"
                 :disabled="commandBusy"
                 :data-testid="`project-open-${row.id}`"
                 @click="openWorkspace(row)"
@@ -619,7 +633,7 @@ onBeforeUnmount(() => {
               <CvButton
                 v-if="commands"
                 size="sm"
-                variant="danger"
+                variant="destructive"
                 :disabled="commandBusy"
                 :data-testid="`project-delete-${row.id}`"
                 @click="requestDelete(row)"
@@ -655,7 +669,7 @@ onBeforeUnmount(() => {
     <CvModal
       :open="createOpen"
       title="新建空白工程"
-      description="创建空白工程记录，不添加模板、流程或导入资源。"
+      description="创建一个不含模板、流程或导入资源的新工程。"
       :close-on-backdrop="!commandBusy"
       @close="closeCreate"
     >
@@ -706,7 +720,7 @@ onBeforeUnmount(() => {
     <CvModal
       :open="importOpen"
       title="导入工程 JSON"
-      description="先读取正式导出文件，再由服务端校验并进入现有工程保存链。"
+      description="选择正式导出的 JSON 文件，系统会先校验内容再导入。"
       size="md"
       :close-on-backdrop="!commandBusy"
       @close="closeImport"
@@ -734,7 +748,7 @@ onBeforeUnmount(() => {
           v-model="importTargetModel"
           name="projectImportTarget"
           label="目标工程"
-          hint="保存修订来自当前服务端工程列表；提交时服务端仍会再次校验。"
+          hint="保存版本来自当前工程列表；提交时会再次校验。"
           :options="importTargetOptions"
           :disabled="commandBusy"
           required
@@ -745,7 +759,7 @@ onBeforeUnmount(() => {
           tone="info"
           title="新建工程"
         >
-          服务端会生成新的工程身份与持久化 lineage，不会沿用 JSON 中的源工程 ID。
+          系统会创建新的工程身份，不会沿用导出文件中的源工程标识。
         </CvInlineAlert>
         <CvInlineAlert
           v-else
@@ -753,7 +767,7 @@ onBeforeUnmount(() => {
           title="覆盖会替换目标工程内容"
         >
           <template v-if="importTarget">
-            将覆盖“{{ importTarget.name }}”的流程、全局变量和正式资源。当前服务端保存修订为
+            将覆盖“{{ importTarget.name }}”的流程、全局变量和正式资源。当前保存版本为
             <strong>{{ importTarget.persistenceRevision }}</strong>；保存修订变化时请求会被拒绝，不会部分写入。
           </template>
           <template v-else>
@@ -770,7 +784,7 @@ onBeforeUnmount(() => {
             type="checkbox"
             :disabled="commandBusy || !importTarget"
           >
-          <span>我已确认按当前服务端保存修订覆盖目标工程。</span>
+          <span>我已确认按当前保存版本覆盖目标工程。</span>
         </label>
       </div>
       <template #footer>
@@ -800,13 +814,13 @@ onBeforeUnmount(() => {
     <CvModal
       :open="deleteTarget !== null"
       title="删除工程"
-      :description="deleteTarget ? `将删除“${deleteTarget.name}”。服务端确认后才会从工程库移除。` : undefined"
+      :description="deleteTarget ? `将删除“${deleteTarget.name}”。操作确认后才会从工程库移除。` : undefined"
       size="sm"
       :close-on-backdrop="!commandBusy"
       @close="closeDelete"
     >
       <CvInlineAlert tone="error">
-        将按当前服务端修订号删除；如果工程已被修改，系统会提示冲突且不会覆盖。
+        将按当前保存版本删除；如果工程已被修改，系统会提示冲突且不会覆盖。
       </CvInlineAlert>
       <template #footer>
         <CvButton
@@ -820,7 +834,7 @@ onBeforeUnmount(() => {
         </CvButton>
         <CvButton
           size="sm"
-          variant="danger"
+          variant="destructive"
           :loading="commandState?.phase === 'deleting' || commandState?.phase === 'reconciling'"
           loading-label="正在确认删除"
           data-testid="project-delete-confirm"
@@ -850,7 +864,8 @@ onBeforeUnmount(() => {
 .projects-page__inset { margin-inline: var(--cv-density-panel-padding); }
 .projects-page__state { margin: 0 var(--cv-density-panel-padding) var(--cv-density-panel-padding); }
 .projects-page__name { color: var(--cv-text-primary); font-weight: var(--cv-font-weight-semibold); }
-.projects-page__actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--cv-space-1); }
+.projects-page__actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--cv-space-1); white-space: nowrap; }
+.projects-page__actions > a { flex: 0 0 auto; }
 .projects-page__form { display: grid; gap: var(--cv-space-4); }
 .projects-page__import-form { display: grid; gap: var(--cv-space-4); }
 .projects-page__file-summary { display: grid; gap: var(--cv-space-1); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }

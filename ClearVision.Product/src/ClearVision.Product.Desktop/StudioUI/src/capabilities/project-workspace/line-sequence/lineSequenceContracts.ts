@@ -53,8 +53,8 @@ export interface LineSequenceParameterPatchV1 {
 }
 
 export class LineSequenceContractDecodeError extends Error {
-  constructor(readonly path: string, message: string) {
-    super(`${path}: ${message}`);
+  constructor(readonly path: string, readonly detail: string) {
+    super('线序分析服务返回的数据格式不符合要求，请重新分析。');
     this.name = 'LineSequenceContractDecodeError';
   }
 }

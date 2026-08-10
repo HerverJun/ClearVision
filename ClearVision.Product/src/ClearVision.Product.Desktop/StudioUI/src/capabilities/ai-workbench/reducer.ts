@@ -266,7 +266,7 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
         operation: event.operation ?? state.operation,
         errorCode: baselineConflict ? 'project_baseline_changed' : null,
         message: baselineConflict
-          ? '工程保存版本或流程内容已更新；当前候选基于旧工程基线，仅供查看。'
+          ? '工程保存版本或流程内容已更新；当前候选基于旧工程保存基线，仅供查看。'
           : event.project ? '工程上下文与会话已由服务端确认。' : '会话已就绪，当前尚未绑定工程。',
         updatedAt: event.at
       });
@@ -289,7 +289,7 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
           ? 'project_baseline_changed'
           : state.errorCode === 'project_baseline_changed' ? null : state.errorCode,
         message: baselineConflict
-          ? '工程保存版本或流程内容已更新；当前候选基于旧工程基线，仅供查看。'
+          ? '工程保存版本或流程内容已更新；当前候选基于旧工程保存基线，仅供查看。'
           : state.message,
         updatedAt: event.at
       });
@@ -428,7 +428,7 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
         phase: 'handoff-creating',
         handoff: null,
         errorCode: null,
-        message: '正在由服务端重新核对 Build、工程基线与候选指纹。',
+        message: '正在由服务端重新核对构建结果、工程保存基线与候选指纹。',
         updatedAt: event.at
       });
     case 'handoff-created':
@@ -437,7 +437,7 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
         phase: 'handoff-created',
         handoff: event.artifact,
         errorCode: null,
-        message: '交接工件已创建，正在安全释放 AI 工作台。',
+        message: '交接候选已创建，正在安全释放 AI 工作台。',
         updatedAt: event.at
       });
     case 'handoff-unknown':
@@ -586,7 +586,7 @@ export function reduceAiWorkbench(state: AiWorkbenchState, event: AiWorkbenchEve
           ? buildPhase(event.snapshot.buildResult)
           : next.plan ? planPhase(next.plan, event.snapshot.readinessPreview) : next.phase,
         message: baselineConflict
-          ? '工程保存版本或流程内容已更新；当前候选基于旧工程基线，仅供查看。'
+          ? '工程保存版本或流程内容已更新；当前候选基于旧工程保存基线，仅供查看。'
           : terminalPhase === 'build-cancelled'
           ? '本次构建已取消，上一版候选仅供查看。'
           : terminalPhase === 'build-failed'

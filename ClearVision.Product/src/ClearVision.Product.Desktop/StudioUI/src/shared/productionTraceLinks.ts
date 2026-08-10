@@ -159,7 +159,16 @@ export function resolveProductionReturnTo(value: string | null | undefined): str
       ? route(parsed.pathname, parsed.searchParams)
       : null;
   }
-  if (/^\/stations\/[^/]+$/.test(parsed.pathname) && !parsed.search) return parsed.pathname;
+  if (/^\/stations\/[^/]+$/.test(parsed.pathname)) {
+    if (!parsed.search) return parsed.pathname;
+    if ([...parsed.searchParams.keys()].some(key => key !== 'returnTo')) return null;
+    const fleet = parseInternalRoute(parsed.searchParams.get('returnTo'));
+    if (!fleet || fleet.pathname !== '/stations' || !hasOnlyKeys(fleet.searchParams, stationListQueryKeys)) {
+      return null;
+    }
+    const query = new URLSearchParams({ returnTo: route(fleet.pathname, fleet.searchParams) });
+    return route(parsed.pathname, query);
+  }
   if (/^\/projects\/[^/]+\/(?:workspace|inspection)$/.test(parsed.pathname) && !parsed.search) {
     return parsed.pathname;
   }

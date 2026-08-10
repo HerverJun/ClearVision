@@ -212,7 +212,7 @@ function updateCompatibility(event: Event): void {
 
 <style scoped>
 .operator-flyout {
-  width: 272px;
+  width: min(304px, calc(100vw - var(--cv-workspace-operator-rail-width) - 16px));
   min-width: 0;
   min-height: 0;
   display: grid;
@@ -250,7 +250,7 @@ function updateCompatibility(event: Event): void {
 .operator-flyout__empty { margin: 0; padding: var(--cv-space-2) var(--cv-space-3); color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); line-height: 1.45; overflow-wrap: anywhere; }
 .operator-flyout__list { min-height: 0; padding: 0 var(--cv-space-2) var(--cv-space-2); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .operator-flyout__item-shell { position: relative; min-width: 0; border-bottom: 1px solid var(--cv-border-subtle); }
-.operator-flyout__item { width: 100%; min-width: 0; min-height: 62px; padding: var(--cv-space-2) 28px var(--cv-space-2) 2px; display: grid; grid-template-columns: 14px minmax(0, 1fr); align-items: start; gap: var(--cv-space-1); text-align: left; border: 0; background: transparent; color: var(--cv-text-primary); cursor: grab; content-visibility: auto; contain-intrinsic-size: 62px; }
+.operator-flyout__item { width: 100%; min-width: 0; min-height: 64px; padding: var(--cv-space-2) 28px var(--cv-space-2) 2px; display: grid; grid-template-columns: 14px minmax(0, 1fr); align-items: start; gap: var(--cv-space-1); text-align: left; border: 0; background: transparent; color: var(--cv-text-primary); cursor: grab; content-visibility: auto; contain-intrinsic-size: 64px; }
 .operator-flyout__item:hover:not(:disabled) { background: var(--cv-interactive-hover); }
 .operator-flyout__item:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
 .operator-flyout__item:active:not(:disabled) { background: var(--cv-interactive-active); cursor: grabbing; }
@@ -284,6 +284,6 @@ function updateCompatibility(event: Event): void {
 @media (max-height: 760px) {
   .operator-flyout { grid-template-rows: 38px auto auto auto minmax(0, 1fr); }
   .operator-flyout__controls { gap: var(--cv-space-1); padding-block: var(--cv-space-1); }
-  .operator-flyout__item { min-height: 56px; contain-intrinsic-size: 56px; }
+  .operator-flyout__item { min-height: 58px; contain-intrinsic-size: 58px; }
 }
 </style>

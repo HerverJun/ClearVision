@@ -144,6 +144,77 @@ function statistics() {
   };
 }
 
+function analysisDistribution() {
+  return {
+    projectId,
+    startTime: null,
+    endTime: null,
+    totalDefects: 6,
+    items: [
+      { defectType: '划痕', count: 3, percentage: 50 },
+      { defectType: '脏污', count: 2, percentage: 33.3 },
+      { defectType: '缺口', count: 1, percentage: 16.7 }
+    ]
+  };
+}
+
+function analysisTrend() {
+  return {
+    projectId,
+    interval: 'hour',
+    startTime: '2026-07-15T00:00:00Z',
+    endTime: '2026-07-15T03:00:00Z',
+    dataPoints: [0, 1, 2, 3].map(hour => ({
+      timestamp: `2026-07-15T0${hour}:00:00Z`,
+      totalCount: 24 + hour,
+      okCount: 20 + hour,
+      ngCount: 2,
+      errorCount: 1,
+      okRate: (20 + hour) / (24 + hour),
+      yieldRate: (20 + hour) / (22 + hour),
+      validDecisionCount: 22 + hour,
+      executionFailureCount: 1,
+      undeterminedCount: 1,
+      invalidCount: 0,
+      defectCount: 3 + hour,
+      averageProcessingTime: 17 + hour
+    }))
+  };
+}
+
+function analysisReport() {
+  return {
+    projectId,
+    generatedAt: '2026-07-15T03:05:00Z',
+    period: { startTime: null, endTime: null },
+    summary: {
+      projectId,
+      totalCount: 102,
+      okCount: 86,
+      ngCount: 8,
+      errorCount: 4,
+      okRate: 86 / 102,
+      yieldRate: 86 / 94,
+      totalDefects: 6,
+      averageProcessingTimeMs: 18.5
+    },
+    defectDistribution: analysisDistribution(),
+    confidenceDistribution: {
+      projectId,
+      startTime: null,
+      endTime: null,
+      totalDefects: 6,
+      buckets: [
+        { range: '0.90-1.00', count: 4, percentage: 66.7 },
+        { range: '0.80-0.89', count: 2, percentage: 33.3 }
+      ],
+      averageConfidence: 0.91
+    },
+    hourlyTrend: analysisTrend(),
+    recommendations: ['优先复核划痕工位的光源与定位稳定性。']
+  };
+}
+
 function comparisonSummary(id: string, decision: 'Ok' | 'Ng') {
   return {
     resultId: id,
@@ -242,6 +313,18 @@ async function bootResults(page: Page, initialHash = '/results'): Promise<F02Met
     }
     if (url.pathname === `/api/inspection/statistics/${projectId}` || url.pathname === '/api/stations/statistics') {
       await fulfillJson(route, 200, statistics());
+      return;
+    }
+    if (url.pathname === `/api/analysis/defect-distribution/${projectId}`) {
+      await fulfillJson(route, 200, analysisDistribution());
+      return;
+    }
+    if (url.pathname === `/api/analysis/trend/${projectId}`) {
+      await fulfillJson(route, 200, analysisTrend());
+      return;
+    }
+    if (url.pathname === `/api/analysis/report/${projectId}`) {
+      await fulfillJson(route, 200, analysisReport());
       return;
     }
     if (url.pathname === '/api/results/exports' && request.method() === 'POST') {
@@ -430,10 +513,11 @@ test('Results local view keeps query filters, dual axes, detail 404 and GET-only
   await expect(page.getByRole('cell', { name: '不适用', exact: true }).first()).toBeVisible();
   await expect(page.getByRole('cell', { name: '执行成功', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: '不适用', exact: true }).nth(1)).toBeVisible();
-  await page.getByLabel('标准结果').selectOption('Invalid');
+  await page.getByLabel('执行 / 判定结果').selectOption('Invalid');
+  await page.getByRole('button', { name: '更多筛选' }).click();
   await expect.poll(() => audit.some(entry => entry.path.includes('status=Invalid'))).toBe(true);
   await page.getByLabel('诊断码').fill('FIXTURE_INVALID');
-  await expect(page.getByText('本机诊断码为当前页过滤')).toBeVisible();
+  await expect(page.getByText('诊断码只筛选当前页')).toBeVisible();
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'results-filter-list', viewport, runtimeErrors, requestAudit: audit
@@ -442,9 +526,10 @@ test('Results local view keeps query filters, dual axes, detail 404 and GET-only
   await page.getByRole('button', { name: '查看详情' }).first().click();
   await expect(page.getByText('轻微划痕')).toBeVisible();
   await expect(page.getByText('判定依据', { exact: true })).toBeVisible();
-  await expect(page.getByText('FinalDecision', { exact: true })).toBeVisible();
+  await expect(page.getByText('最终判定配置', { exact: true })).toBeVisible();
   await expect(page.getByRole('img', { name: '本机检测结果图像' })).toBeVisible();
   await page.getByText('技术追溯', { exact: true }).click();
+  await expect(page.getByText('FinalDecision', { exact: true })).toBeVisible();
   await expect(page.getByText('流程版本哈希')).toBeVisible();
   await expect(page.getByText(executionSnapshotId, { exact: true })).toBeVisible();
   await expect(page.getByText('decision-hash', { exact: true })).toBeVisible();
@@ -481,7 +566,7 @@ test('Results renders NG and non-NG exception axes without inference and disting
     ['Undetermined', '执行成功', '未判定'],
     ['Cancelled', '已取消', '不适用']
   ] as const) {
-    await page.getByLabel('标准结果').selectOption(kind);
+    await page.getByLabel('执行 / 判定结果').selectOption(kind);
     await page.getByRole('button', { name: '查看详情' }).first().click();
     await expect(detail.getByText(executionLabel, { exact: true }).first()).toBeVisible();
     await expect(detail.getByText(decisionLabel, { exact: true }).first()).toBeVisible();
@@ -503,7 +588,8 @@ test('Results Station view paginates the frozen 500-result fixture and marks leg
   await expect(page.getByText('第 401–500 项，共 500 项')).toBeVisible();
   await expect.poll(() => audit.some(entry => entry.path.includes('pageIndex=2&pageSize=200'))).toBe(true);
 
-  await page.getByLabel('标准结果').selectOption('TimedOut');
+  await page.getByLabel('执行 / 判定结果').selectOption('TimedOut');
+  await page.getByRole('button', { name: '更多筛选' }).click();
   await page.getByLabel('诊断码').fill('FIXTURE_TIMEDOUT');
   await expect.poll(() => audit.some(entry =>
     entry.path.includes('status=TimedOut') && entry.path.includes('diagnosticCode=FIXTURE_TIMEDOUT')
@@ -564,6 +650,31 @@ for (const visual of f02G3VisualMatrix) {
       await expect(viewTabs.getByRole('tab', { name: '态势总览' })).toHaveAttribute('aria-selected', 'true');
       await captureF02VisualEvidence(page, {
         scenario: `${scenario}-overview`,
+        viewport: visual.viewport,
+        theme: visual.theme,
+        density: visual.density,
+        requests: audit,
+        runtimeErrors
+      });
+
+      await page.goto(
+        `/studio/index.html#/results?source=local&projectId=${projectId}&resultId=${localResultId}`
+      );
+      await expect(page.getByRole('heading', { name: '本机结果', exact: true })).toBeVisible();
+      const localViewTabs = page.getByRole('tablist', { name: '结果视图' });
+      await expect(localViewTabs.getByRole('tab', { name: '调查详情' })).toHaveAttribute('aria-selected', 'true');
+      await captureF02VisualEvidence(page, {
+        scenario: `${scenario}-local-investigation`,
+        viewport: visual.viewport,
+        theme: visual.theme,
+        density: visual.density,
+        requests: audit,
+        runtimeErrors
+      });
+      await localViewTabs.getByRole('tab', { name: '态势总览' }).click();
+      await expect(localViewTabs.getByRole('tab', { name: '态势总览' })).toHaveAttribute('aria-selected', 'true');
+      await captureF02VisualEvidence(page, {
+        scenario: `${scenario}-local-overview`,
         viewport: visual.viewport,
         theme: visual.theme,
         density: visual.density,

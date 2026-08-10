@@ -178,7 +178,7 @@ const handoffReceiveLabel = computed(() => {
     'workspace-dirty-conflict': '本地草稿冲突',
     'artifact-expired': '候选已过期',
     'artifact-consumed': '候选已接收',
-    'artifact-baseline-conflict': '工程基线冲突',
+    'artifact-baseline-conflict': '工程保存基线冲突',
     'workspace-staging': '正在装载候选',
     error: '候选接收失败'
   };
@@ -307,6 +307,38 @@ const runIdentity = computed(() => {
 const runAdmissionCodes = computed(() => run.value?.admission?.violations
   .map(item => item.code ?? '')
   .filter(Boolean) ?? []);
+const runMessageByCode: Readonly<Record<string, string>> = Object.freeze({
+  DECISION_FLOW_REQUIRED: '请先创建并保存流程，再配置最终判定。',
+  DECISION_BINDING_REQUIRED: '请先配置最终判定，再开始正式运行。',
+  DECISION_SOURCE_OPERATOR_NOT_FOUND: '最终判定引用的算子不存在，请重新选择。',
+  DECISION_SOURCE_OPERATOR_DISABLED: '最终判定引用的算子已禁用，请启用或重新选择。',
+  DECISION_SOURCE_OUTPUT_NOT_FOUND: '最终判定引用的输出不存在，请重新选择。',
+  DECISION_SOURCE_OUTPUT_MISMATCH: '最终判定引用的输出信息不一致，请重新配置。',
+  DECISION_SOURCE_TYPE_MISMATCH: '最终判定的数据类型与算子输出不匹配。',
+  DECISION_SOURCE_OUTPUT_INELIGIBLE: '所选输出不能作为最终判定来源。',
+  DECISION_RULE_CONTRACT_MISMATCH: '最终判定规则与算子输出约束不一致。',
+  DECISION_RULE_TYPE_MISMATCH: '最终判定规则与所选数据类型不匹配。',
+  DECISION_STRING_MAP_VALUES_REQUIRED: '请填写最终判定的 OK 与 NG 映射值。',
+  DECISION_STRING_MAP_VALUES_CONFLICT: '最终判定的 OK 与 NG 映射值不能相同。',
+  DECISION_STRING_MAP_CONSTRAINT_MISMATCH: '最终判定映射不符合算子输出约束。',
+  DECISION_NUMERIC_COMPARISON_REQUIRED: '请为数值判定设置有效的比较条件和阈值。',
+  ADMISSION_DECISION_IDENTITY_MISMATCH: '最终判定配置在运行检查后已变更，请重新检查运行条件。'
+});
+function presentRunMessage(message: string | null | undefined, code: string | null | undefined): string | null {
+  const normalizedCode = code?.trim().toUpperCase();
+  if (normalizedCode && runMessageByCode[normalizedCode]) return runMessageByCode[normalizedCode];
+  if (normalizedCode?.includes('DECISION')) return '最终判定配置未通过，请检查最终判定设置。';
+  if (normalizedCode && ['PARAMETER', 'REQUIRED'].some(segment => normalizedCode.includes(segment))) {
+    return '必要参数尚未完整配置，请检查标记为必填的参数。';
+  }
+  if (normalizedCode && ['RESOURCE', 'ASSET', 'MISSING'].some(segment => normalizedCode.includes(segment))) {
+    return '工程所需资源不完整，请补齐资源后重新检查。';
+  }
+  if (normalizedCode && ['DEVICE', 'CAMERA', 'SITE_PROFILE'].some(segment => normalizedCode.includes(segment))) {
+    return '设备或现场配置未满足运行条件，请检查设备连接与现场配置。';
+  }
+  return message?.trim() || null;
+}
 const runHasCode = (...segments: readonly string[]): boolean => runAdmissionCodes.value.some(
   code => segments.some(segment => code.includes(segment)));
 const runCheckState = (blocked: boolean): RunConsoleAdmissionCheck['state'] =>
@@ -327,25 +359,25 @@ const runAdmissionChecks = computed<readonly RunConsoleAdmissionCheck[]>(() => [
     label: '流程与判定身份',
     state: run.value?.admission?.canonicalFlowHash && run.value.admission.decisionConfigurationHash
       ? 'pass' : runCheckState(runHasCode('FLOW', 'DECISION')),
-    detail: run.value?.admission?.canonicalFlowHash ? '已取得 canonical identity' : '等待权威身份'
+    detail: run.value?.admission?.canonicalFlowHash ? '已取得正式流程与判定身份' : '等待正式流程身份'
   },
   {
     key: 'parameters',
     label: '必要参数',
     state: persistence.value?.dirty ? 'blocked' : runCheckState(runHasCode('PARAMETER', 'REQUIRED')),
-    detail: persistence.value?.dirty ? '保存当前参数后重新准入' : '由 admission 校验'
+    detail: persistence.value?.dirty ? '保存当前参数后重新检查' : '由运行前检查验证'
   },
   {
     key: 'resources',
     label: '工程资源',
     state: runCheckState(runHasCode('RESOURCE', 'ASSET', 'MISSING')),
-    detail: runHasCode('RESOURCE', 'ASSET', 'MISSING') ? '存在缺失资源' : '由 admission 校验'
+    detail: runHasCode('RESOURCE', 'ASSET', 'MISSING') ? '存在缺失资源' : '由运行前检查验证'
   },
   {
     key: 'decision',
     label: '最终判定',
     state: runCheckState(runHasCode('DECISION')),
-    detail: runHasCode('DECISION') ? '最终判定配置阻断运行' : '由 admission 校验'
+    detail: runHasCode('DECISION') ? '最终判定配置阻断运行' : '由运行前检查验证'
   },
   {
     key: 'device',
@@ -357,14 +389,14 @@ const runAdmissionChecks = computed<readonly RunConsoleAdmissionCheck[]>(() => [
     key: 'package',
     label: '运行包',
     state: 'not-applicable',
-    detail: 'Workspace 正式运行直接使用已保存工程快照'
+    detail: '工作区正式运行直接使用已保存工程快照'
   }
 ]);
 const runViolations = computed<readonly RunConsoleViolation[]>(() => (run.value?.admission?.violations ?? []).map(
   (item, index) => ({
     key: (item.code ?? 'ADMISSION') + '-' + index,
     code: item.code ?? run.value?.admission?.code ?? 'ADMISSION_REJECTED',
-    message: item.reason,
+    message: presentRunMessage(item.reason, item.code ?? run.value?.admission?.code) ?? '运行条件未通过。',
     target: item.operatorName || item.parameterName
       ? [item.operatorName, item.parameterName].filter(Boolean).join(' · ')
       : null
@@ -380,10 +412,10 @@ const runResults = computed<readonly RunConsoleResultItem[]>(() => {
     processingTimeMs: null,
     errorMessage: result.errorMessage,
     diagnostics: Object.freeze([
-      { key: 'snapshot', label: 'executionSnapshotId', value: result.executionSnapshotId },
+      { key: 'snapshot', label: '执行快照', value: result.executionSnapshotId },
       { key: 'revision', label: '保存修订', value: String(result.persistenceRevision) },
-      { key: 'flow', label: 'flowHash', value: result.flowHash ?? '--' },
-      { key: 'decision', label: 'decisionConfigurationHash', value: result.decisionConfigurationHash ?? '--' }
+      { key: 'flow', label: '流程身份', value: result.flowHash ?? '--' },
+      { key: 'decision', label: '判定身份', value: result.decisionConfigurationHash ?? '--' }
     ])
   })];
 });
@@ -391,6 +423,10 @@ const runStatistics = computed(() => calculateRunConsoleStatistics(runResults.va
 const showTopStateStack = computed(() => Boolean(newDraft.value || showHandoffReceive.value || handoff.value));
 const blockedAdmissionChecks = computed(() => runAdmissionChecks.value.filter(item => item.state === 'blocked'));
 const runBlockerCount = computed(() => Math.max(blockedAdmissionChecks.value.length, runViolations.value.length));
+const runProjectionMessage = computed(() => presentRunMessage(
+  run.value?.message,
+  run.value?.errorCode ?? run.value?.admission?.code
+));
 const runAdmissionTone = computed<CvStatusTone>(() => {
   if (runBlockerCount.value > 0) return 'ng';
   if (run.value?.admission?.allowed === true || run.value?.canRun === true) return 'ok';
@@ -408,9 +444,17 @@ const runBlockerMessage = computed(() => {
   const violation = runViolations.value[0]?.message;
   if (violation) return violation;
   if (run.value && ['blocked', 'failed', 'unknown-outcome'].includes(run.value.phase)) {
-    return run.value.message || null;
+    return runProjectionMessage.value;
   }
   return null;
+});
+const runStatusMessage = computed(() => {
+  if (runBlockerMessage.value) return runBlockerMessage.value;
+  if (!run.value || ![
+    'occupied', 'reconnecting', 'disconnected', 'failed', 'cancelled',
+    'cancel-requested', 'unknown-outcome'
+  ].includes(run.value.phase)) return null;
+  return runProjectionMessage.value;
 });
 function workspaceResultsLink(resultId?: string): string {
   const projectId = effectiveProjectId.value;
@@ -492,7 +536,7 @@ function workspaceResultsLink(resultId?: string): string {
       v-if="run && currentProject"
       :phase-label="runLabel"
       :tone="runTone"
-      :message="runBlockerMessage || run.message"
+      :message="runStatusMessage"
       :connected="run.connected === true"
       :reconnect-attempt="run.reconnectAttempt ?? 0"
       :pending="runPending"
@@ -541,7 +585,7 @@ function workspaceResultsLink(resultId?: string): string {
           :project-name="currentProject.name"
           :phase-label="runLabel"
           :tone="runTone"
-          :message="run.message"
+          :message="runProjectionMessage ?? ''"
           :error-code="run.errorCode"
           :connected="run.connected === true"
           :reconnect-attempt="run.reconnectAttempt ?? 0"
@@ -617,7 +661,9 @@ function workspaceResultsLink(resultId?: string): string {
         />
         <div>
           <strong>{{ handoffReceive.message }}</strong>
-          <span v-if="handoffReceive.blocker">阻断：{{ handoffReceive.blocker }}</span>
+          <small v-if="handoffReceive.blocker">
+            技术信息：<code>{{ handoffReceive.blocker }}</code>
+          </small>
           <span>{{ handoffReceive.nextStep }}</span>
         </div>
       </section>
@@ -956,6 +1002,8 @@ function workspaceResultsLink(resultId?: string): string {
 .workspace-shell__handoff-receive > div { display: grid; min-width: 0; gap: 2px; }
 .workspace-shell__handoff-receive strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); }
 .workspace-shell__handoff-receive span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); line-height: var(--cv-line-height-normal); }
+.workspace-shell__handoff-receive small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); line-height: var(--cv-line-height-normal); }
+.workspace-shell__handoff-receive code { font-family: var(--cv-font-family-mono); font-size: inherit; }
 @media (max-width: 980px) { .workspace-shell__new-project { grid-template-columns: 1fr 1fr; } .workspace-shell__new-project > div { grid-column: 1 / -1; } }
 .workspace-shell__status-divider { width: 1px; height: 12px; flex: 0 0 auto; background: var(--cv-border-subtle); }
 .workspace-shell__statusbar :deep(.cv-status-badge) {
@@ -969,7 +1017,7 @@ function workspaceResultsLink(resultId?: string): string {
 
 .workspace-shell__diagnostics { position: relative; flex: 0 0 auto; }
 .workspace-shell__diagnostics summary {
-  min-height: 32px;
+  min-height: 20px;
   padding: 2px var(--cv-space-1);
   display: inline-flex;
   align-items: center;
@@ -997,6 +1045,19 @@ function workspaceResultsLink(resultId?: string): string {
 .workspace-shell__diagnostics dl div { display: flex; justify-content: space-between; gap: var(--cv-space-3); }
 .workspace-shell__diagnostics dt { color: var(--cv-text-secondary); }
 .workspace-shell__diagnostics dd { margin: 0; color: var(--cv-text-primary); font-variant-numeric: tabular-nums; }
+
+.workspace-shell[data-workspace-persistence-phase="conflict"] .workspace-shell__statusbar,
+.workspace-shell[data-workspace-persistence-phase="error"] .workspace-shell__statusbar,
+.workspace-shell[data-workspace-persistence-phase="unknown-outcome"] .workspace-shell__statusbar {
+  border-top-color: var(--cv-color-status-ng-border);
+  background: color-mix(in srgb, var(--cv-color-status-ng-soft) 32%, var(--cv-surface-page));
+}
+
+.workspace-shell[data-workspace-run-phase="executing"] .workspace-shell__statusbar,
+.workspace-shell[data-workspace-run-phase="reconnecting"] .workspace-shell__statusbar,
+.workspace-shell[data-workspace-run-phase="disconnected"] .workspace-shell__statusbar {
+  border-top-color: var(--cv-color-status-warning-border);
+}
 
 @media (max-width: 1220px) {
   .workspace-shell__work-area--state { grid-template-columns: 176px minmax(520px, 1fr) 248px; }

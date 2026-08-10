@@ -3,9 +3,9 @@ import { computed, onMounted, onUnmounted, shallowRef, watch, type WatchStopHand
 import { useRoute, useRouter } from 'vue-router';
 import { useProductRuntime } from '@/app/productRuntime';
 import { useStudioPlatform } from '@/app/studioPlatform';
-import { CvPageHeader, CvPageState } from '@/design-system/patterns';
+import { CvPageHeader, CvPageState, type CvPageStateKind } from '@/design-system/patterns';
 import { CvIcon } from '@/design-system/icons';
-import { CvIconButton, CvInlineAlert, CvStatusBadge } from '@/design-system/primitives';
+import { CvIconButton, CvInlineAlert } from '@/design-system/primitives';
 import AiDiagnosticsDrawer from './AiDiagnosticsDrawer.vue';
 import AiHistoryDrawer from './AiHistoryDrawer.vue';
 import AiClarificationPanel from './AiClarificationPanel.vue';
@@ -54,6 +54,16 @@ const buildReadonly = computed(() => state.value.buildStale || ['build-failed', 
 const showApplyPreview = computed(() => state.value.build !== null && [
   'build-ready', 'handoff-creating', 'handoff-unknown-outcome', 'handoff-created'
 ].includes(state.value.phase));
+const terminalPageState = computed<CvPageStateKind | null>(() => {
+  if (state.value.plan || state.value.build) return null;
+  if (['build-failed', 'plan-failed'].includes(state.value.phase)) return 'error';
+  if (['baseline-conflict', 'session-conflict'].includes(state.value.phase)) return 'conflict';
+  if (['unknown-outcome', 'handoff-unknown-outcome'].includes(state.value.phase)) return 'unknown';
+  if (state.value.phase === 'offline-or-service-unavailable') return 'offline';
+  if (['build-cancelled', 'cancelled'].includes(state.value.phase)) return 'empty';
+  return null;
+});
+const terminalDescription = computed(() => `${projection.value.stageDescription} ${projection.value.nextHint}`.trim());
 
 function replaceOwner(): void {
   owner.value?.dispose();
@@ -73,7 +83,7 @@ function releaseOwner(current: AiSessionOwner): void {
   if (owner.value === current) owner.value = null;
   const released = current.diagnostics();
   if (released.requestCount || released.streamCount || released.timerCount || released.subscriptionCount) {
-    throw new Error('AI owner resources were not released before Session navigation.');
+    throw new Error('切换 AI 会话前未能释放全部运行资源。');
   }
 }
 
@@ -181,10 +191,6 @@ onUnmounted(() => {
   >
     <CvPageHeader title="AI 工程工作台">
       <template #meta>
-        <CvStatusBadge
-          :tone="projection.statusTone"
-          :label="projection.statusLabel"
-        />
         <span class="ai-workbench-page__scope">{{ projectId ? '工程方案' : '独立方案' }}</span>
       </template>
       <template #actions>
@@ -250,7 +256,7 @@ onUnmounted(() => {
         />
 
         <CvInlineAlert
-          v-if="state.intent && !state.plan && !showProgress"
+          v-if="state.intent && !state.plan && !showProgress && !terminalPageState"
           :tone="state.phase === 'plan-failed' ? 'error' : 'warning'"
           title="任务理解结果"
         >
@@ -265,6 +271,15 @@ onUnmounted(() => {
         <AiBuildProgress
           v-if="showBuildProgress"
           :events="state.run.events"
+        />
+
+        <CvPageState
+          v-if="terminalPageState"
+          class="ai-workbench-page__terminal"
+          :kind="terminalPageState"
+          :title="projection.currentStage"
+          :description="terminalDescription"
+          data-ai-terminal-state
         />
 
         <div
@@ -347,6 +362,7 @@ onUnmounted(() => {
 .ai-workbench-page__scope { display: inline-flex; min-height: 22px; align-items: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .ai-workbench-page__context { padding: 0 var(--cv-density-page-padding) var(--cv-space-3); }
 .ai-workbench-page__main { display: grid; min-width: 0; gap: var(--cv-density-page-gap); padding: var(--cv-density-page-gap) var(--cv-density-page-padding) var(--cv-density-page-padding); }
+.ai-workbench-page__terminal { max-width: 980px; border-block: 1px solid var(--cv-border-subtle); background: transparent; }
 .ai-workbench-page__workspace { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(340px, 0.85fr); min-width: 0; align-items: start; gap: var(--cv-density-page-gap); }
 
 @media (max-width: 1180px) {

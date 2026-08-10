@@ -235,6 +235,10 @@ async function boot(page: Page, options: { initialProject?: FixtureProject; conf
       await json(route, 200, []);
       return;
     }
+    if (path === '/api/templates' && request.method() === 'GET') {
+      await json(route, 200, []);
+      return;
+    }
     if (path === '/api/cameras/bindings' && request.method() === 'GET') {
       await json(route, 200, [{
         id: 'camera-a',
@@ -425,7 +429,7 @@ test('F04 G3C completes create reconcile, open, rename, delete reconcile and tom
     });
   }
 
-  await page.getByRole('button', { name: '新建空白工程' }).click();
+  await page.getByRole('button', { name: '新建工程', exact: true }).click();
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, {
       scenario: 'create-project', viewport, runtimeErrors: initialRuntimeErrors, requestAudit: state.audit

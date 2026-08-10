@@ -76,6 +76,49 @@ export function stationRuntimeTone(state: StationRuntimeState): CvStatusTone {
   }
 }
 
+const reportedStatusLabels: Readonly<Record<string, string>> = Object.freeze({
+  Ready: '已就绪',
+  Connected: '已连接',
+  Disconnected: '连接已断开',
+  Online: '在线',
+  Offline: '离线',
+  Faulted: '故障',
+  Error: '异常',
+  Unknown: '状态未知'
+});
+
+export function formatStationReportedStatus(value: string | null): string {
+  if (!value?.trim()) return '未上报/不可确认';
+  return reportedStatusLabels[value.trim()] ?? value.trim();
+}
+
+export function stationPackageHealthLabel(
+  health: string | null,
+  packageId: string | null
+): string {
+  if (!packageId) return '未激活运行包';
+  if (!health?.trim()) return '运行包状态未上报';
+  const normalized = health.trim();
+  return ({
+    Loaded: '运行包已加载',
+    Healthy: '运行包状态正常',
+    NoPackage: '未加载运行包'
+  } as Readonly<Record<string, string>>)[normalized] ?? `运行包状态待确认（${normalized}）`;
+}
+
+export function stationPackageHealthTone(
+  health: string | null,
+  packageId: string | null
+): CvStatusTone {
+  if (!packageId || health?.trim() === 'NoPackage') return 'warning';
+  if (!health?.trim()) return 'idle';
+  return ['Loaded', 'Healthy'].includes(health.trim()) ? 'ok' : 'warning';
+}
+
+export function stationHasPackageWarning(station: Pick<StationStatus, 'packageId' | 'currentPackageHealth'>): boolean {
+  return stationPackageHealthTone(station.currentPackageHealth, station.packageId) === 'warning';
+}
+
 export function stationDisplayName(station: StationStatus): string {
   return station.stationName.trim() || station.machineName.trim() || station.stationId;
 }

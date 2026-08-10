@@ -88,6 +88,7 @@ function goTo(page: number): void {
             type="button"
             :disabled="currentPage <= 1"
             :aria-label="previousLabel"
+            :title="previousLabel"
             @click="goTo(currentPage - 1)"
           >
             <CvIcon
@@ -123,6 +124,7 @@ function goTo(page: number): void {
             type="button"
             :disabled="currentPage >= totalPages"
             :aria-label="nextLabel"
+            :title="nextLabel"
             @click="goTo(currentPage + 1)"
           >
             <CvIcon

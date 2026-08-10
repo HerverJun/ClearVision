@@ -107,7 +107,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
   let stagedArtifact: WorkspaceHandoffArtifactV1 | null = null;
 
   function assertActive(): void {
-    if (disposed) throw new Error('New Workspace draft owner has been disposed.');
+    if (disposed) throw new Error('新工程草稿工作区已关闭。');
   }
 
   function assertWritable(): void {
@@ -120,7 +120,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
     projection: readonly(state),
     openFlowCanvas(): FlowCanvasOwner {
       assertActive();
-      if (flowOwner) throw new Error('The new Workspace draft already has a FlowCanvas owner.');
+      if (flowOwner) throw new Error('新工程草稿的流程画布已挂载。');
       flowOwner = createFlowCanvasOwner({
         project: state.project,
         diagnosticsKey,
@@ -153,20 +153,20 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
       assertWritable();
       if (artifact.targetKind !== 'new' || artifact.projectBaseline.projectId !== null ||
           artifact.projectBaseline.persistenceRevision !== null) {
-        throw new Error('Only a baseline-free new-project artifact can enter this Workspace draft.');
+        throw new Error('只有尚无保存基线的新工程候选可进入此草稿。');
       }
       if (state.handoff || stagedArtifact) {
-        throw new Error('The new Workspace draft already contains an AI candidate.');
+        throw new Error('新工程草稿已包含一个 AI 候选。');
       }
       if (!flowOwner || flowOwner.projection.phase !== 'mounted') {
-        throw new Error('Canonical FlowCanvas must be mounted before staging a new-project candidate.');
+        throw new Error('流程画布尚未就绪，不能装载新工程候选。');
       }
       stagedArtifact = artifact;
       state.handoff = Object.freeze({
         phase: 'workspace-staging',
         source: null,
         build: artifact.build,
-        message: '正在把 AI 候选装载到唯一 Workspace owner。'
+        message: '正在把 AI 候选装载到新工程草稿。'
       });
       flowOwner.replaceFlow(encodeWorkspaceHandoffFlowV1(artifact.candidateFlow), state.project.name);
       await nextTick();
@@ -174,7 +174,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
     confirmHandoff(source: WorkspaceHandoffSourceV1): void {
       assertWritable();
       if (!stagedArtifact || !state.handoff || state.handoff.phase !== 'workspace-staging') {
-        throw new Error('The new Workspace draft has no staged handoff awaiting confirmation.');
+        throw new Error('新工程草稿没有等待确认的交接候选。');
       }
       state.handoff = Object.freeze({
         ...state.handoff,
@@ -190,14 +190,14 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
       assertWritable();
       const source = state.handoff?.source;
       if (!stagedArtifact || !source || !flowOwner || !state.canSave) {
-        throw new Error('The new Workspace draft is not ready for an explicit save.');
+        throw new Error('新工程草稿尚未具备保存条件。');
       }
       const flow = encodeWorkspaceFlowDraftUpdateV1(
         { flow: stagedArtifact.candidateFlow, saveCompatibility: compatibleFlow },
         flowOwner.projection.draft,
         { materializedFlowId: stagedArtifact.candidateFlow.id }
       );
-      if (!flow) throw new Error('A handoff candidate must contain a canonical Flow.');
+      if (!flow) throw new Error('交接候选必须包含可保存的流程。');
       return Object.freeze({
         name: state.project.name.trim(),
         description: state.project.description?.trim() || null,
@@ -233,7 +233,7 @@ export function createWorkspaceNewDraftOwner(options: Readonly<{
     async discardHandoffDraft(): Promise<void> {
       if (disposed || readonlyReason || !state.handoff) return;
       if (!flowOwner || flowOwner.projection.phase !== 'mounted') {
-        throw new Error('Canonical FlowCanvas is unavailable for discarding the new-project candidate.');
+        throw new Error('流程画布不可用，无法放弃新工程候选。');
       }
       flowOwner.replaceFlow(null, state.project.name);
       await nextTick();

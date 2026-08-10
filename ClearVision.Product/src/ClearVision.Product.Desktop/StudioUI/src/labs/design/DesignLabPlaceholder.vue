@@ -6,6 +6,8 @@ import {
   CvField,
   CvIconButton,
   CvInlineAlert,
+  CvMenu,
+  CvMenuItem,
   CvModal,
   CvPagination,
   CvPanel,
@@ -15,12 +17,14 @@ import {
   CvStatusBadge,
   CvSurface,
   CvToastRegion,
+  CvTooltip,
   CvTypography,
   type CvDataTableColumn,
   type CvSelectOption,
   type CvStatusTone,
   type CvToastItem
 } from '@/design-system/primitives';
+import { CvIcon } from '@/design-system/icons';
 import {
   CvPageHeader,
   CvPageState,
@@ -41,6 +45,7 @@ const theme = ref<Theme>('light');
 const density = ref<Density>('comfortable');
 const reducedMotion = ref(false);
 const modalOpen = ref(false);
+const menuOpen = ref(false);
 const showGuidance = ref(false);
 const fieldValue = ref('CV-Station-01');
 const searchValue = ref('edge');
@@ -53,19 +58,22 @@ let rootSnapshot: RootAttributeSnapshot | undefined;
 let ownsRootProjection = false;
 
 const selectOptions: readonly CvSelectOption[] = [
-  { value: 'camera', label: 'Camera acquisition' },
-  { value: 'preprocess', label: 'Image preprocessing' },
-  { value: 'measurement', label: 'Precision measurement' },
-  { value: 'decision', label: 'Final decision', disabled: true }
+  { value: 'camera', label: '相机采集' },
+  { value: 'preprocess', label: '图像预处理' },
+  { value: 'measurement', label: '精密测量' },
+  { value: 'decision', label: '最终判定', disabled: true }
 ];
 
 const statusSamples: readonly { tone: CvStatusTone; label: string; detail: string }[] = [
-  { tone: 'ok', label: 'OK', detail: 'Inspection accepted' },
-  { tone: 'ng', label: 'NG', detail: 'Inspection rejected' },
-  { tone: 'error', label: 'Execution error', detail: 'Execution did not complete' },
-  { tone: 'warning', label: 'Warning', detail: 'Operator attention' },
-  { tone: 'info', label: 'Info', detail: 'Neutral process fact' },
-  { tone: 'idle', label: 'Idle', detail: 'No active execution' }
+  { tone: 'ok', label: 'OK', detail: '检测通过' },
+  { tone: 'ng', label: 'NG', detail: '检测未通过' },
+  { tone: 'error', label: '执行错误', detail: '执行未完成' },
+  { tone: 'warning', label: '警告', detail: '需要操作员处理' },
+  { tone: 'info', label: '信息', detail: '一般过程信息' },
+  { tone: 'idle', label: '空闲', detail: '当前没有执行任务' },
+  { tone: 'offline', label: '离线', detail: '连接不可用' },
+  { tone: 'unknown', label: '未判定', detail: '需要核对结果' },
+  { tone: 'disabled', label: '已禁用', detail: '操作当前不可用' }
 ];
 
 interface DesignLabTableRow {
@@ -134,6 +142,10 @@ function dismissToast(id: string): void {
   toasts.value = toasts.value.filter(toast => toast.id !== id);
 }
 
+function handleSampleMenu(value: string): void {
+  showToast(value === 'remove' ? 'warning' : 'info');
+}
+
 onMounted(() => {
   const root = document.documentElement;
   rootSnapshot = {
@@ -198,7 +210,7 @@ onUnmounted(() => {
           variant="page-title"
           weight="semibold"
         >
-          Design System V1.1 / Product Shell Calibration
+          Design System 2.0 / Product Shell Calibration
         </CvTypography>
         <CvTypography
           as="p"
@@ -304,24 +316,20 @@ onUnmounted(() => {
         description="Default, hover, active, focus-visible, disabled, loading and error semantics."
       >
         <template #actions>
-          <CvIconButton
-            label="Toggle state guidance"
-            @click="showGuidance = !showGuidance"
+          <CvTooltip
+            text="显示或隐藏键盘状态说明"
+            placement="bottom"
           >
-            <svg viewBox="0 0 20 20"><circle
-              cx="10"
-              cy="10"
-              r="7.5"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-            /><path
-              d="M10 9v5M10 6.3v.2"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-width="1.7"
-            /></svg>
-          </CvIconButton>
+            <template #default="{ tooltipId }">
+              <CvIconButton
+                label="Toggle state guidance"
+                :aria-describedby="tooltipId"
+                @click="showGuidance = !showGuidance"
+              >
+                <CvIcon name="info" />
+              </CvIconButton>
+            </template>
+          </CvTooltip>
         </template>
 
         <div
@@ -337,7 +345,7 @@ onUnmounted(() => {
           <CvButton variant="quiet">
             Quiet action
           </CvButton>
-          <CvButton variant="danger">
+          <CvButton variant="destructive">
             Reject
           </CvButton>
           <CvButton loading>
@@ -366,7 +374,7 @@ onUnmounted(() => {
           <CvField
             v-model="fieldValue"
             label="Station identifier"
-            hint="Local UI draft only"
+            hint="仅保留本地界面草稿"
             autocomplete="off"
           />
           <CvSelect
@@ -382,7 +390,7 @@ onUnmounted(() => {
           />
           <CvField
             model-value="Runtime-owned"
-            label="Execution authority"
+            label="正式运行状态来源"
             disabled
           />
         </div>
@@ -424,7 +432,7 @@ onUnmounted(() => {
 
       <CvPanel
         title="Layered feedback"
-        description="Modal focus ownership and local Toast timers dispose with their mounted owner."
+        description="菜单、提示、弹窗与通知的监听、焦点和计时器会随组件卸载释放。"
       >
         <div class="design-lab__feedback-actions">
           <CvButton
@@ -446,14 +454,50 @@ onUnmounted(() => {
           >
             Ready toast
           </CvButton>
+          <CvMenu
+            v-model="menuOpen"
+            label="Design Lab 操作"
+            trigger-label="打开样本操作菜单"
+            @select="handleSampleMenu"
+          >
+            <template #trigger>
+              <CvIcon name="sliders" />
+              <span>More actions</span>
+            </template>
+            <CvMenuItem value="refresh">
+              刷新样本
+              <template #trailing>
+                Ctrl+R
+              </template>
+            </CvMenuItem>
+            <CvMenuItem
+              value="readonly"
+              :checked="true"
+            >
+              只读投影
+            </CvMenuItem>
+            <CvMenuItem
+              value="disabled"
+              disabled
+            >
+              不可用操作
+            </CvMenuItem>
+            <CvMenuItem
+              value="remove"
+              tone="destructive"
+            >
+              移除样本
+            </CvMenuItem>
+          </CvMenu>
         </div>
       </CvPanel>
     </div>
 
     <CvPanel
       title="Product patterns"
-      description="Page header、筛选、提示、表格与分页共享同一套 V1.1 表面和密度语义。"
+      description="Page header、筛选、提示、表格与分页共享同一套 2.0 表面和密度语义。"
       class="design-lab__wide-panel"
+      variant="section"
     >
       <CvPageHeader
         eyebrow="只读样本"
@@ -494,7 +538,7 @@ onUnmounted(() => {
         :rows="tableRows"
         :columns="tableColumns"
         row-key="id"
-        caption="Design System V1.1 表格样本"
+        caption="Design System 2.0 表格样本"
       />
       <CvPagination
         v-model:page="samplePage"
@@ -506,14 +550,40 @@ onUnmounted(() => {
 
     <CvPanel
       title="Product states"
-      description="Loading、Empty、Error、Unauthorized、Forbidden 与 404 使用统一而克制的状态轴线。"
+      description="加载、空数据、错误、离线、状态过期、部分可用、冲突、状态未知、权限与 404 使用统一状态轴线。"
       class="design-lab__wide-panel"
+      variant="section"
     >
       <div class="design-lab__state-grid">
         <CvPageState
           compact
           kind="loading"
           title="正在读取"
+          :heading-level="3"
+        />
+        <CvPageState
+          compact
+          kind="offline"
+          :heading-level="3"
+        />
+        <CvPageState
+          compact
+          kind="stale"
+          :heading-level="3"
+        />
+        <CvPageState
+          compact
+          kind="partial"
+          :heading-level="3"
+        />
+        <CvPageState
+          compact
+          kind="conflict"
+          :heading-level="3"
+        />
+        <CvPageState
+          compact
+          kind="unknown"
           :heading-level="3"
         />
         <CvPageState
@@ -554,6 +624,7 @@ onUnmounted(() => {
       description="Pointer and keyboard listeners exist only while the mounted separator owns an active resize."
       class="design-lab__splitter-panel"
       :padded="false"
+      variant="tool"
     >
       <div
         class="design-lab__split-layout"

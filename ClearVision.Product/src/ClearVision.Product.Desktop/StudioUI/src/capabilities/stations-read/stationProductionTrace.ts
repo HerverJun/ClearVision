@@ -103,9 +103,9 @@ export function projectStationProductionTrace(input: {
   if (input.adminEvidence === 'restricted') {
     gaps.push('当前角色仅能查看监控摘要，命令与审计详情未扩权。');
   } else if (input.adminEvidence === 'loading') {
-    gaps.push('命令、审计与运行包权威仍在读取。');
+    gaps.push('命令、审计与运行包服务端状态仍在读取。');
   } else if (input.adminEvidence === 'unavailable') {
-    gaps.push('命令、审计或运行包权威读取失败。');
+    gaps.push('命令、审计或运行包服务端状态读取失败。');
   } else {
     if (input.station.packageId && !activePackage) gaps.push('当前激活运行包不在可用包窗口中，可能已归档。');
     if (!deploymentCommand) gaps.push('当前读取窗口没有可关联的部署命令。');

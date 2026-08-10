@@ -13,10 +13,13 @@ import {
   type CvDataTableColumn,
   type CvDescriptionItem
 } from '@/design-system';
+import { CvIcon } from '@/design-system/icons';
 import type { OperatorParameter, OperatorPort } from './operatorContracts';
 import { createOperatorDetailQuery } from './operatorQueries';
 import { useOperatorsReadRuntime, type OperatorsReadRuntime } from './operatorsReadRuntime';
 import {
+  formatOperatorDataType,
+  formatParameterDataType,
   formatMetadataValue,
   lifecycleTone,
   operatorCategoryLabels,
@@ -30,30 +33,34 @@ const activeOperatorType = computed(() => props.operatorType ?? String(route.par
 const detailQuery = createOperatorDetailQuery(runtime.queries, () => activeOperatorType.value);
 const state = computed(() => detailQuery.state.value);
 const summary = computed<readonly CvDescriptionItem[]>(() => state.value.data ? [
-  { key: 'type', label: '算子类型标识', value: state.value.data.operatorType },
   { key: 'category', label: '分类', value: operatorCategoryLabels[state.value.data.categoryId] },
   { key: 'version', label: '当前版本', value: state.value.data.version },
-  { key: 'hidden', label: '默认隐藏', value: state.value.data.defaultHidden ? '是' : '否' },
-  { key: 'icon', label: '图标标识', value: state.value.data.iconName },
-  { key: 'lifecycle-note', label: '生命周期说明', value: state.value.data.lifecycleNote, span: 2 },
+  { key: 'visibility', label: '目录可见性', value: state.value.data.defaultHidden ? '默认隐藏' : '默认可见' },
+  { key: 'ports', label: '接口规模', value: `输入 ${state.value.data.inputPorts.length} · 输出 ${state.value.data.outputPorts.length}` },
+  { key: 'parameters', label: '参数数量', value: `${state.value.data.parameters.length} 项` },
+  ...(state.value.data.lifecycleNote
+    ? [{ key: 'lifecycle-note', label: '使用说明', value: state.value.data.lifecycleNote, span: 2 as const }]
+    : [])
+] : []);
+const technicalSummary = computed<readonly CvDescriptionItem[]>(() => state.value.data ? [
+  { key: 'type', label: '算子类型标识', value: state.value.data.operatorType },
+  { key: 'icon', label: '图标标识', value: state.value.data.iconName ?? '未提供' },
   { key: 'keywords', label: '关键词', value: state.value.data.keywords.join('、'), span: 2 },
   { key: 'tags', label: '标签', value: state.value.data.tags.join('、'), span: 2 }
 ] : []);
 
 const portColumns: readonly CvDataTableColumn<OperatorPort>[] = Object.freeze([
-  { key: 'name', label: '名称', width: '24%' },
-  { key: 'displayName', label: '显示名', width: '24%' },
+  { key: 'identity', label: '端口', width: '30%' },
   { key: 'dataType', label: '数据类型', width: '20%' },
-  { key: 'isRequired', label: '必需', width: '12%' },
-  { key: 'description', label: '说明', width: '20%' }
+  { key: 'isRequired', label: '要求', width: '14%' },
+  { key: 'description', label: '说明', width: '36%' }
 ]);
 const parameterColumns: readonly CvDataTableColumn<OperatorParameter>[] = Object.freeze([
-  { key: 'name', label: '名称', width: '18%' },
-  { key: 'displayName', label: '显示名', width: '18%' },
-  { key: 'dataType', label: '类型', width: '12%' },
-  { key: 'isRequired', label: '必需', width: '10%' },
-  { key: 'defaultValue', label: '元数据默认值', width: '16%' },
-  { key: 'range', label: '范围 / 选项', width: '26%' }
+  { key: 'identity', label: '参数', width: '30%' },
+  { key: 'dataType', label: '类型', width: '14%' },
+  { key: 'isRequired', label: '要求', width: '12%' },
+  { key: 'defaultValue', label: '默认值', width: '16%' },
+  { key: 'range', label: '范围 / 选项', width: '28%' }
 ]);
 
 function parameterRange(parameter: OperatorParameter): string {
@@ -81,20 +88,33 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
   >
     <CvPageHeader
       :title="state.data?.displayName ?? '算子详情'"
-      description="详情只读取当前分支的算子元数据，不调用预览、执行或参数推荐。"
+      :description="state.data?.description || '查看算子的版本、端口和参数定义。'"
     >
       <template #breadcrumbs>
-        <RouterLink to="/operators">
-          ← 返回算子库
+        <RouterLink
+          class="operator-detail__back-link"
+          to="/operators"
+        >
+          <CvIcon name="chevron-left" />
+          返回算子库
         </RouterLink>
       </template>
       <template #actions>
+        <CvStatusBadge
+          tone="idle"
+          :dot="false"
+        >
+          只读
+        </CvStatusBadge>
         <CvButton
           size="sm"
           :loading="state.isRefreshing"
           loading-label="正在刷新算子详情"
           @click="detailQuery.refresh({ force: true })"
         >
+          <template #leading>
+            <CvIcon name="refresh" />
+          </template>
           刷新
         </CvButton>
       </template>
@@ -132,8 +152,8 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
     <CvPageState
       v-else-if="state.phase === 'not-found'"
       kind="not-found"
-      title="算子不存在（404）"
-      description="该 OperatorType 不存在，或当前链接无效。"
+      title="未找到算子"
+      description="该算子可能已被移除，或当前链接无效。"
     >
       <template #actions>
         <RouterLink to="/operators">
@@ -162,23 +182,31 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
       class="operator-detail__grid"
     >
       <CvPanel
-        title="身份与生命周期"
-        :description="state.data.description"
+        title="算子概况"
+        description="当前目录发布的版本与使用状态。"
       >
-        <div class="operator-detail__lifecycle">
+        <div class="operator-detail__status-row">
           <CvStatusBadge :tone="lifecycleTone(state.data.lifecycle)">
             {{ operatorLifecycleLabels[state.data.lifecycle] }}
           </CvStatusBadge>
+          <span>此页面仅供查阅，不会更改工程或运行配置。</span>
         </div>
         <CvDescriptionList
           :items="summary"
           label="算子身份"
         />
+        <details class="operator-detail__technical">
+          <summary>技术标识</summary>
+          <CvDescriptionList
+            :items="technicalSummary"
+            label="算子技术标识"
+          />
+        </details>
       </CvPanel>
 
       <CvPanel
         title="输入端口"
-        description="当前分支运行时元数据。"
+        description="算子接收的数据及其必需条件。"
       >
         <CvPageState
           v-if="state.data.inputPorts.length === 0"
@@ -193,8 +221,20 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
           row-key="name"
           caption="算子输入端口"
         >
+          <template #cell-identity="{ row }">
+            <div class="operator-detail__identity-cell">
+              <strong>{{ row.displayName || row.name }}</strong>
+              <code>{{ row.name }}</code>
+            </div>
+          </template>
+          <template #cell-dataType="{ row }">
+            <div class="operator-detail__type-cell">
+              <span>{{ formatOperatorDataType(row.dataType) }}</span>
+              <code>{{ row.dataType }}</code>
+            </div>
+          </template>
           <template #cell-isRequired="{ row }">
-            {{ row.isRequired ? '是' : '否' }}
+            {{ row.isRequired ? '必需' : '可选' }}
           </template>
           <template #cell-description="{ row }">
             {{ row.description || '—' }}
@@ -204,7 +244,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
 
       <CvPanel
         title="输出端口"
-        description="只展示当前接口返回的正式输出端口，不推断条件输出。"
+        description="算子当前声明的输出数据。"
       >
         <CvPageState
           v-if="state.data.outputPorts.length === 0"
@@ -219,8 +259,20 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
           row-key="name"
           caption="算子输出端口"
         >
+          <template #cell-identity="{ row }">
+            <div class="operator-detail__identity-cell">
+              <strong>{{ row.displayName || row.name }}</strong>
+              <code>{{ row.name }}</code>
+            </div>
+          </template>
+          <template #cell-dataType="{ row }">
+            <div class="operator-detail__type-cell">
+              <span>{{ formatOperatorDataType(row.dataType) }}</span>
+              <code>{{ row.dataType }}</code>
+            </div>
+          </template>
           <template #cell-isRequired="{ row }">
-            {{ row.isRequired ? '是' : '否' }}
+            {{ row.isRequired ? '必需' : '可选' }}
           </template>
           <template #cell-description="{ row }">
             {{ row.description || '—' }}
@@ -230,7 +282,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
 
       <CvPanel
         title="参数"
-        description="展示当前分支元数据；页面不会生成、写入或推荐参数。"
+        description="默认值与约束来自当前算子目录，仅用于查阅。"
       >
         <CvPageState
           v-if="state.data.parameters.length === 0"
@@ -245,8 +297,21 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
           row-key="name"
           caption="算子参数元数据"
         >
+          <template #cell-identity="{ row }">
+            <div class="operator-detail__identity-cell">
+              <strong>{{ row.displayName || row.name }}</strong>
+              <code>{{ row.name }}</code>
+              <span v-if="row.description">{{ row.description }}</span>
+            </div>
+          </template>
+          <template #cell-dataType="{ row }">
+            <div class="operator-detail__type-cell">
+              <span>{{ formatParameterDataType(row.dataType) }}</span>
+              <code>{{ row.dataType }}</code>
+            </div>
+          </template>
           <template #cell-isRequired="{ row }">
-            {{ row.isRequired ? '是' : '否' }}
+            {{ row.isRequired ? '必需' : '可选' }}
           </template>
           <template #cell-defaultValue="{ row }">
             {{ formatMetadataValue(row.defaultValue) }}
@@ -263,5 +328,19 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
 <style scoped>
 .operator-detail { display: grid; gap: var(--cv-space-5); min-width: 0; }
 .operator-detail__grid { display: grid; gap: var(--cv-space-4); min-width: 0; }
-.operator-detail__lifecycle { margin-bottom: var(--cv-space-3); }
+.operator-detail__back-link { display: inline-flex; align-items: center; gap: var(--cv-space-1); }
+.operator-detail__back-link :deep(svg) { width: 14px; height: 14px; }
+.operator-detail__status-row { display: flex; align-items: center; gap: var(--cv-space-3); margin-bottom: var(--cv-space-3); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+.operator-detail__technical { margin-top: var(--cv-space-3); border-top: 1px solid var(--cv-border-subtle); }
+.operator-detail__technical summary { padding: var(--cv-space-3) 0; color: var(--cv-color-link); cursor: pointer; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); }
+.operator-detail__technical summary:focus-visible { border-radius: var(--cv-radius-xs); outline: none; box-shadow: var(--cv-focus-ring); }
+.operator-detail__identity-cell,
+.operator-detail__type-cell { display: grid; gap: 2px; min-width: 0; }
+.operator-detail__identity-cell code,
+.operator-detail__type-cell code { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); overflow-wrap: anywhere; }
+.operator-detail__identity-cell > span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
+
+@media (max-width: 720px) {
+  .operator-detail__status-row { align-items: flex-start; flex-direction: column; }
+}
 </style>

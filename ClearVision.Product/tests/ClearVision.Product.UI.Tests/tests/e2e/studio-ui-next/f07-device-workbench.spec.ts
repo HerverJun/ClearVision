@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { installF07DeviceFixture, type F07DeviceAudit } from './f07-device-fixture';
+import { createF02RuntimeErrorAudit, installF02VisualPreferences } from './f02-browser-fixture';
+import {
+  captureF07Evidence,
+  hasF07EvidenceTarget,
+  installF07DeviceFixture,
+  type F07DeviceAudit
+} from './f07-device-fixture';
 
 async function openSettings(page: Parameters<typeof installF07DeviceFixture>[0], audit: F07DeviceAudit): Promise<void> {
   await page.goto('/studio/index.html#/settings');
@@ -13,6 +19,10 @@ function expectNoFormalInspection(audit: F07DeviceAudit): void {
 }
 
 test('G5 Admin PLC keeps protocol drafts isolated and separates save, mapping, and connection test', async ({ page }) => {
+  const viewport = { width: 1920, height: 1080 } as const;
+  await page.setViewportSize(viewport);
+  await installF02VisualPreferences(page, 'light', 'compact');
+  const runtimeErrors = createF02RuntimeErrorAudit(page);
   const fixture = await installF07DeviceFixture(page, 'Admin');
   await openSettings(page, fixture);
 
@@ -20,6 +30,12 @@ test('G5 Admin PLC keeps protocol drafts isolated and separates save, mapping, a
   const plc = page.locator('[data-settings-section="plc"]');
   await expect(plc).toHaveCount(1);
   await expect(plc.locator('input[name="plcIpAddress"]')).toHaveValue('127.0.0.1');
+  if (hasF07EvidenceTarget()) {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await captureF07Evidence(page, {
+      scenario: 'settings-plc-admin-top', viewport, theme: 'light', density: 'compact', requests: fixture.audit, runtimeErrors
+    });
+  }
 
   await plc.locator('select[name="plcProtocol"]').selectOption('MC');
   await plc.locator('input[name="plcIpAddress"]').fill('10.0.0.20');
@@ -52,18 +68,33 @@ test('G5 Admin PLC keeps protocol drafts isolated and separates save, mapping, a
   await expect(plc.locator('[data-settings-device-feedback="plc"]')).toBeVisible();
   expect(fixture.audit.filter(entry => entry.method === 'POST' && entry.path === '/api/plc/test-connection')).toHaveLength(1);
   expect(fixture.audit.some(entry => entry.method === 'POST' && entry.path.includes('/api/tcp'))).toBe(false);
+  if (hasF07EvidenceTarget()) {
+    await captureF07Evidence(page, {
+      scenario: 'settings-plc-admin', viewport, theme: 'light', density: 'compact', requests: fixture.audit, runtimeErrors
+    });
+  }
 });
 
 test('G5 TCP Admin saves profiles without auto-connect, then operates the runtime and bounded log', async ({ page }) => {
+  const viewport = { width: 1536, height: 864 } as const;
+  await page.setViewportSize(viewport);
+  await installF02VisualPreferences(page, 'dark', 'comfortable');
+  const runtimeErrors = createF02RuntimeErrorAudit(page);
   const fixture = await installF07DeviceFixture(page, 'Admin');
   await openSettings(page, fixture);
 
   await page.locator('[data-settings-group="tcp"]').click();
   const tcp = page.locator('[data-settings-section="tcp"]');
   await expect(tcp).toHaveCount(1);
-  await expect(tcp.locator('input[name="tcpProfileName"]')).toHaveValue('Fixture Loopback');
+  await expect(tcp.locator('input[name="tcpProfileName"]')).toHaveValue('测试回环连接');
+  if (hasF07EvidenceTarget()) {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await captureF07Evidence(page, {
+      scenario: 'settings-tcp-admin-top', viewport, theme: 'dark', density: 'comfortable', requests: fixture.audit, runtimeErrors
+    });
+  }
 
-  await tcp.locator('input[name="tcpProfileName"]').fill('Fixture Loopback Saved');
+  await tcp.locator('input[name="tcpProfileName"]').fill('已保存的测试回环连接');
   await tcp.locator('[data-tcp-action="save-profiles"]').click();
   expect(fixture.audit.filter(entry => entry.method === 'PUT' && entry.path === '/api/tcp/profiles')).toHaveLength(1);
   expect(fixture.audit.filter(entry => entry.method === 'POST' && entry.path.includes('/connect'))).toHaveLength(0);
@@ -77,12 +108,22 @@ test('G5 TCP Admin saves profiles without auto-connect, then operates the runtim
   await expect(tcp).toContainText('fixture-response');
   expect(fixture.audit.some(entry => entry.method === 'POST' && entry.path.endsWith('/send'))).toBe(true);
 
+  if (hasF07EvidenceTarget()) {
+    await captureF07Evidence(page, {
+      scenario: 'settings-tcp-admin-connected', viewport, theme: 'dark', density: 'comfortable', requests: fixture.audit, runtimeErrors
+    });
+  }
+
   await tcp.locator('[data-tcp-action="disconnect"]').click();
   expect(fixture.audit.some(entry => entry.method === 'POST' && entry.path.endsWith('/disconnect'))).toBe(true);
   expect(fixture.audit.some(entry => entry.path.includes('/api/settings'))).toBe(true);
 });
 
 test('G6 Camera discovery, trigger inputs, soft capture, preview, 409 fail-closed, and leave cleanup', async ({ page }) => {
+  const viewport = { width: 1366, height: 768 } as const;
+  await page.setViewportSize(viewport);
+  await installF02VisualPreferences(page, 'light', 'compact');
+  const runtimeErrors = createF02RuntimeErrorAudit(page, [409]);
   const fixture = await installF07DeviceFixture(page, 'Admin');
   await openSettings(page, fixture);
 
@@ -90,12 +131,18 @@ test('G6 Camera discovery, trigger inputs, soft capture, preview, 409 fail-close
   const camera = page.locator('[data-settings-section="camera"]');
   await expect(camera).toHaveCount(1);
   await camera.locator('[data-camera-discovery="huaray"]').click();
-  await expect(camera.locator('[data-camera-section="discovery"]')).toContainText('Huaray Fixture');
+  await expect(camera.locator('[data-camera-section="discovery"]')).toContainText('Huaray 测试相机');
   await camera.locator('[data-camera-discovery="hikvision"]').click();
-  await expect(camera.locator('[data-camera-section="discovery"]')).toContainText('Hikvision Fixture');
+  await expect(camera.locator('[data-camera-section="discovery"]')).toContainText('Hikvision 测试相机');
   await expect(camera.locator('input[name="cameraExposure"]')).toHaveValue('5000');
   await expect(camera.locator('select[name="cameraTriggerMode"]')).toHaveValue('Software');
   await expect(camera.locator('select[name="cameraSoftwareTriggerSource"]')).toHaveValue('Manual');
+  if (hasF07EvidenceTarget()) {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await captureF07Evidence(page, {
+      scenario: 'settings-camera-admin-top', viewport, theme: 'light', density: 'compact', requests: fixture.audit, runtimeErrors
+    });
+  }
 
   await camera.locator('[data-camera-action="soft-capture"]').click();
   await expect(camera.locator('[data-camera-section="preview"] img')).toHaveCount(1);
@@ -112,6 +159,12 @@ test('G6 Camera discovery, trigger inputs, soft capture, preview, 409 fail-close
   await expect(camera.locator('[data-settings-device-feedback="camera"]')).toBeVisible();
   await expect(camera.locator('[data-camera-action="toggle-preview"]')).toContainText('停止');
   expect(fixture.state.previewStopCount).toBe(0);
+
+  if (hasF07EvidenceTarget()) {
+    await captureF07Evidence(page, {
+      scenario: 'settings-camera-admin-preview', viewport, theme: 'light', density: 'compact', requests: fixture.audit, runtimeErrors
+    });
+  }
 
   await camera.locator('[data-camera-action="toggle-preview"]').click();
   await expect.poll(() => fixture.state.previewStopCount).toBe(1);

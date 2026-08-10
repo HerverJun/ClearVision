@@ -1,10 +1,12 @@
 export class PreviewContractDecodeError extends Error {
   readonly path: string;
+  readonly expectation: string;
 
   constructor(path: string, expectation: string) {
-    super(`Preview response field ${path} must be ${expectation}.`);
+    super('预览服务返回的数据格式不符合要求，请重新预览。');
     this.name = 'PreviewContractDecodeError';
     this.path = path;
+    this.expectation = expectation;
   }
 }
 

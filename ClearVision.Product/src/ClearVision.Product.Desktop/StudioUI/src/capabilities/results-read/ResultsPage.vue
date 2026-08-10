@@ -12,6 +12,7 @@ import {
   CvDataTable,
   CvDescriptionList,
   CvField,
+  CvIconButton,
   CvInlineAlert,
   CvPageState,
   CvPagination,
@@ -24,6 +25,7 @@ import {
   type CvDescriptionItem,
   type CvSelectOption
 } from '@/design-system';
+import { CvIcon } from '@/design-system/icons';
 import type { ReadQueryOwner, ReadQueryState } from '@/platform/query';
 import {
   canonicalInspectionOutcomeKinds,
@@ -688,15 +690,29 @@ function judgmentItems(detail: Pick<LocalInspectionResultDetail | StationInspect
   'hasJudgmentSignal' | 'decisionSource' | 'reasonCode'>): readonly CvDescriptionItem[] {
   return Object.freeze([
     { key: 'hasJudgmentSignal', label: '有效判定信号', value: detail.hasJudgmentSignal ? '有' : '无' },
-    { key: 'decisionSource', label: '判定来源', value: detail.decisionSource },
-    { key: 'reasonCode', label: '原因码', value: detail.reasonCode, span: 2 }
+    { key: 'decisionSource', label: '判定来源', value: decisionSourceLabel(detail.decisionSource) }
   ]);
+}
+
+function decisionSourceLabel(value: string | null): string {
+  if (!value) return '未记录';
+  if (value === 'FinalDecision') return '最终判定配置';
+  if (value === 'LegacyStationResult') return '旧版工作站结果映射';
+  return '其他来源（详见技术追溯）';
+}
+
+function retentionClassLabel(value: string): string {
+  return ({
+    standard: '标准保留',
+    extended: '延长保留',
+    'legal-hold': '合规保留'
+  } as Readonly<Record<string, string>>)[value] ?? '按服务策略保留';
 }
 
 function localOverviewItems(detail: LocalInspectionResultDetail): readonly CvDescriptionItem[] {
   const formatted = formatInspectionOutcome(detail.outcome);
   return Object.freeze([
-    { key: 'result', label: '标准结果', value: formatted.label },
+    { key: 'result', label: '结果类型', value: formatted.label },
     { key: 'execution', label: '执行状态', value: formatted.executionLabel },
     { key: 'decision', label: '判定结果', value: formatted.decisionLabel },
     { key: 'inspectionTime', label: '完成时间', value: formatDateTime(detail.inspectionTime) },
@@ -707,8 +723,8 @@ function localOverviewItems(detail: LocalInspectionResultDetail): readonly CvDes
 
 function localDiagnosticItems(detail: LocalInspectionResultDetail): readonly CvDescriptionItem[] {
   return Object.freeze([
-    { key: 'diagnosticCode', label: '诊断码', value: detail.diagnosticCode },
-    { key: 'diagnosticMessage', label: '诊断说明', value: detail.diagnosticMessage, span: 2 }
+    { key: 'diagnosticMessage', label: '诊断说明', value: detail.diagnosticMessage, span: 2 },
+    { key: 'diagnosticCode', label: '诊断码', value: detail.diagnosticCode }
   ]);
 }
 
@@ -725,6 +741,8 @@ function localTraceabilityItems(detail: LocalInspectionResultDetail): readonly C
     },
     { key: 'projectPersistenceRevision', label: '工程保存修订', value: detail.traceability.projectPersistenceRevision },
     { key: 'decisionConfigurationHash', label: '判定配置哈希', value: detail.traceability.decisionConfigurationHash },
+    { key: 'decisionSource', label: '判定来源代码', value: detail.decisionSource },
+    { key: 'reasonCode', label: '判定原因码', value: detail.reasonCode },
     { key: 'packageId', label: '运行包标识', value: detail.traceability.runtimePackageId ?? detail.traceability.packageId },
     { key: 'executionSource', label: '执行来源', value: detail.traceability.executionSource },
     { key: 'executionRunMode', label: '运行模式', value: detail.traceability.executionRunMode },
@@ -736,7 +754,7 @@ function localTraceabilityItems(detail: LocalInspectionResultDetail): readonly C
 function stationOverviewItems(detail: StationInspectionResultSummary): readonly CvDescriptionItem[] {
   const formatted = formatInspectionOutcome(detail.outcome);
   return Object.freeze([
-    { key: 'result', label: '标准结果', value: formatted.label },
+    { key: 'result', label: '结果类型', value: formatted.label },
     { key: 'execution', label: '执行状态', value: formatted.executionLabel },
     { key: 'decision', label: '判定结果', value: formatted.decisionLabel },
     { key: 'stationId', label: '工作站', value: detail.stationId },
@@ -748,8 +766,8 @@ function stationOverviewItems(detail: StationInspectionResultSummary): readonly 
 
 function stationDiagnosticItems(detail: StationInspectionResultSummary): readonly CvDescriptionItem[] {
   return Object.freeze([
-    { key: 'diagnosticCode', label: '诊断码', value: detail.diagnosticCode },
-    { key: 'diagnosticMessage', label: '诊断说明', value: detail.diagnosticMessage, span: 2 }
+    { key: 'diagnosticMessage', label: '诊断说明', value: detail.diagnosticMessage, span: 2 },
+    { key: 'diagnosticCode', label: '诊断码', value: detail.diagnosticCode }
   ]);
 }
 
@@ -763,6 +781,8 @@ function stationTraceabilityItems(detail: StationInspectionResultSummary): reado
     { key: 'executionSnapshotId', label: '执行快照', value: detail.executionSnapshotId },
     { key: 'projectRevision', label: '工程修订', value: detail.projectRevision },
     { key: 'decisionConfigurationHash', label: '判定配置哈希', value: detail.decisionConfigurationHash },
+    { key: 'decisionSource', label: '判定来源代码', value: detail.decisionSource },
+    { key: 'reasonCode', label: '判定原因码', value: detail.reasonCode },
     { key: 'executionRunMode', label: '运行模式', value: detail.executionRunMode },
     { key: 'runId', label: '运行标识', value: detail.runId },
     { key: 'messageId', label: '消息标识', value: detail.messageId }
@@ -910,6 +930,12 @@ onBeforeUnmount(() => {
           data-testid="results-open-export"
           @click="openResultsExport"
         >
+          <template #leading>
+            <CvIcon
+              name="save"
+              size="sm"
+            />
+          </template>
           导出完整结果
         </CvButton>
         <span
@@ -917,17 +943,20 @@ onBeforeUnmount(() => {
           class="results-page__export-boundary"
           role="status"
         >
-          工作站上报暂不支持完整导出
+          工作站上报暂无完整导出
         </span>
-        <CvButton
+        <CvIconButton
           size="sm"
+          label="刷新检测结果"
           :loading="localListState.isRefreshing || stationListState.isRefreshing"
-          loading-label="正在刷新结果"
           data-testid="results-refresh"
           @click="refreshActive(true)"
         >
-          刷新
-        </CvButton>
+          <CvIcon
+            name="refresh"
+            size="sm"
+          />
+        </CvIconButton>
       </div>
     </header>
 
@@ -976,16 +1005,8 @@ onBeforeUnmount(() => {
           v-model="outcomeModel"
           class="results-page__outcome"
           name="resultsOutcome"
-          label="标准结果"
+          label="执行 / 判定结果"
           :options="outcomeOptions"
-        />
-        <CvField
-          v-model="diagnosticModel"
-          class="results-page__diagnostic"
-          name="diagnosticCode"
-          label="诊断码"
-          placeholder="例如 CAMERA_TIMEOUT…"
-          autocomplete="off"
         />
         <CvSelect
           v-model="pageSizeModel"
@@ -994,19 +1015,26 @@ onBeforeUnmount(() => {
           label="分页大小"
           :options="pageSizeOptions"
         />
-        <button
-          type="button"
+        <CvButton
+          size="sm"
+          variant="quiet"
           class="results-page__advanced-trigger"
           :aria-expanded="advancedFiltersOpen"
           aria-controls="results-advanced-filters"
           @click="advancedFiltersOpen = !advancedFiltersOpen"
         >
-          高级筛选
+          <template #leading>
+            <CvIcon
+              name="filter"
+              size="sm"
+            />
+          </template>
+          更多筛选
           <span
-            v-if="from || to"
+            v-if="diagnosticCode || from || to"
             class="results-page__filter-count"
           >已应用</span>
-        </button>
+        </CvButton>
       </CvToolbar>
 
       <div
@@ -1015,10 +1043,18 @@ onBeforeUnmount(() => {
         class="results-page__advanced"
       >
         <CvField
+          v-model="diagnosticModel"
+          class="results-page__diagnostic"
+          name="diagnosticCode"
+          label="诊断码"
+          placeholder="例如 CAMERA_TIMEOUT…"
+          autocomplete="off"
+        />
+        <CvField
           v-model="fromModel"
           class="results-page__date"
           name="resultsFrom"
-          label="开始时间（ISO）"
+          label="开始时间"
           placeholder="2026-07-15T00:00:00Z…"
           autocomplete="off"
           :error="invalidFrom ? '请输入有效的 ISO 时间。' : undefined"
@@ -1027,7 +1063,7 @@ onBeforeUnmount(() => {
           v-model="toModel"
           class="results-page__date"
           name="resultsTo"
-          label="结束时间（ISO）"
+          label="结束时间"
           placeholder="2026-07-15T23:59:59Z…"
           autocomplete="off"
           :error="invalidTo ? '请输入有效的 ISO 时间。' : undefined"
@@ -1038,17 +1074,17 @@ onBeforeUnmount(() => {
     <CvInlineAlert
       v-if="source === 'local' && diagnosticCode.trim()"
       tone="info"
-      title="本机诊断码为当前页过滤"
+      title="诊断码只筛选当前页"
     >
-      当前本机历史接口没有诊断码参数；此条件只过滤当前页已读取结果，不代表后端全量结果计数。
+      本机诊断码条件不会重新计算完整历史计数；切换分页后请再次核对筛选结果。
     </CvInlineAlert>
 
     <CvInlineAlert
       v-if="source === 'station' && stationId"
       tone="info"
-      title="已按工作站身份读取"
+      title="已限定工作站"
     >
-      当前列表与统计由后端按工作站 {{ stationId }} 重新查询；链接中不携带结果正文或工作站数据内容。
+      当前列表与统计只包含工作站 {{ stationId }} 的上报结果。
     </CvInlineAlert>
 
     <CvInlineAlert
@@ -1089,22 +1125,54 @@ onBeforeUnmount(() => {
         title="无权读取结果态势"
       />
       <CvPageState
+        v-else-if="(activeStatisticsState.phase === 'stale' || activeStatisticsState.phase === 'partial-failure') && !activeStatistics"
+        :kind="activeStatisticsState.phase === 'stale' ? 'stale' : 'partial'"
+        title="结果态势暂不可用"
+        description="当前没有可核对的历史统计，请重新读取。"
+      >
+        <template #actions>
+          <CvButton
+            size="sm"
+            @click="refreshActive(true)"
+          >
+            重试
+          </CvButton>
+        </template>
+      </CvPageState>
+      <CvPageState
         v-else-if="activeStatisticsState.phase === 'error' || activeStatisticsState.phase === 'not-found'"
         kind="error"
         title="结果态势读取失败"
         :description="activeStatisticsState.failure?.message"
-      />
+      >
+        <template #actions>
+          <CvButton
+            size="sm"
+            @click="refreshActive(true)"
+          >
+            重试
+          </CvButton>
+        </template>
+      </CvPageState>
       <CvInlineAlert
-        v-if="activeStatisticsState.phase === 'stale' || activeStatisticsState.phase === 'partial-failure'"
+        v-if="activeStatistics && (activeStatisticsState.phase === 'stale' || activeStatisticsState.phase === 'partial-failure')"
         tone="warning"
         title="统计刷新失败"
       >
-        {{ activeStatistics ? '当前显示上次成功读取的双分母统计摘要。' : '当前没有可用的双分母统计摘要。' }}
+        当前显示上次成功读取的执行与判定统计。
       </CvInlineAlert>
       <ResultsSituationSummary
         v-if="activeStatistics"
         :statistics="activeStatistics"
       />
+      <CvInlineAlert
+        v-if="source === 'station' && activeStatistics"
+        tone="info"
+        compact
+        title="工作站上报分析范围"
+      >
+        当前来源提供执行与判定汇总及分页结果；趋势和缺陷分布仅在选择本机工程后可用。
+      </CvInlineAlert>
       <ResultsAnalysisWorkbench
         v-if="source === 'local' && analysisOwner && !hasInvalidDate"
         :owner="analysisOwner"
@@ -1124,6 +1192,7 @@ onBeforeUnmount(() => {
       <CvPanel
         class="results-page__list-panel"
         title="本机结果"
+        variant="tool"
         :padded="false"
       >
         <CvInlineAlert
@@ -1261,6 +1330,7 @@ onBeforeUnmount(() => {
       <CvPanel
         class="results-page__detail-panel"
         title="结果详情"
+        variant="tool"
         :padded="false"
       >
         <CvInlineAlert
@@ -1452,7 +1522,7 @@ onBeforeUnmount(() => {
                 v-else
                 class="results-page__comparison-empty"
               >
-                权威对比未发现差异。
+                结果对比未发现差异。
               </p>
             </template>
           </section>
@@ -1482,7 +1552,7 @@ onBeforeUnmount(() => {
             >
               <div><dt>证据状态</dt><dd>{{ evidencePhaseLabel(evidence.phase) }}</dd></div>
               <div><dt>大小</dt><dd>{{ evidence.manifest.totalBytes.toLocaleString('zh-CN') }} B</dd></div>
-              <div><dt>保留</dt><dd>{{ evidence.manifest.retentionClass }} / {{ formatDateTime(evidence.manifest.retentionExpiresAtUtc) }}</dd></div>
+              <div><dt>保留</dt><dd>{{ retentionClassLabel(evidence.manifest.retentionClass) }} / {{ formatDateTime(evidence.manifest.retentionExpiresAtUtc) }}</dd></div>
               <div><dt>脱敏</dt><dd>{{ evidence.manifest.redactionApplied ? '已应用' : '未应用' }}</dd></div>
             </dl>
             <table
@@ -1557,6 +1627,7 @@ onBeforeUnmount(() => {
       <CvPanel
         class="results-page__list-panel"
         title="工作站上报结果"
+        variant="tool"
         :padded="false"
       >
         <CvInlineAlert
@@ -1630,7 +1701,7 @@ onBeforeUnmount(() => {
               <CvStatusBadge :tone="formatInspectionOutcome(row.outcome).tone">
                 {{ formatInspectionOutcome(row.outcome).label }}
               </CvStatusBadge>
-              <small v-if="row.legacyProjection">兼容投影（旧版结果映射）</small>
+              <small v-if="row.legacyProjection">旧版格式</small>
             </span>
           </template>
           <template #cell-execution="{ row }">
@@ -1668,6 +1739,7 @@ onBeforeUnmount(() => {
       <CvPanel
         class="results-page__detail-panel"
         title="工作站结果详情"
+        variant="tool"
         :padded="false"
       >
         <CvPageState
@@ -1688,9 +1760,9 @@ onBeforeUnmount(() => {
             v-if="selectedStationResult.legacyProjection"
             class="results-page__notice"
             tone="warning"
-            title="兼容投影（旧版工作站结果映射）"
+            title="旧版工作站结果"
           >
-            此旧格式数据缺少标准双轴；当前结果仅按后端固定映射展示，不从诊断文案推断。
+            此记录缺少独立的执行与判定字段；当前结论按服务端兼容规则展示，不从诊断文案推断。
           </CvInlineAlert>
           <section class="results-page__detail-section results-page__detail-section--summary">
             <div class="results-page__detail-heading">
@@ -1738,7 +1810,7 @@ onBeforeUnmount(() => {
             title="远程结果仅保留摘要"
             data-remote-image-status="not-uploaded"
           >
-            工作站结果合同未上传图像或 evidence；本页不会发起远程图片请求。需要现场图像时，应在工作站按独立的隐私与留存合同调查。
+            工作站上报未包含图像或证据文件，本页不会请求现场图片。需要图像时，请在对应工作站按现场留存策略调查。
           </CvInlineAlert>
           <details class="results-page__traceability">
             <summary>技术追溯</summary>
@@ -1769,7 +1841,7 @@ onBeforeUnmount(() => {
 .results-page__nav-link:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
 .results-page__title h1 { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-md); font-weight: var(--cv-font-weight-semibold); letter-spacing: 0; }
 .results-page__meta { align-self: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-.results-page__export-boundary { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); white-space: nowrap; }
+.results-page__export-boundary { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); white-space: nowrap; }
 .results-page__filters { overflow: hidden; border-block: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
 .results-page__filter-toolbar { padding: var(--cv-space-2); background: var(--cv-surface-raised); }
 .results-page__filter-toolbar :deep(.cv-toolbar__primary) { flex: 1 1 100%; align-items: end; }
@@ -1780,10 +1852,7 @@ onBeforeUnmount(() => {
 .results-page__diagnostic { min-width: 180px; flex: 1 1 220px; }
 .results-page__date { min-width: 206px; flex: 1 1 240px; }
 .results-page__page-size { min-width: 112px; flex: 0 1 112px; }
-.results-page__advanced-trigger { min-height: var(--cv-density-control-height); padding: 0 var(--cv-space-3); display: inline-flex; align-items: center; gap: var(--cv-space-2); border: 1px solid transparent; border-radius: var(--cv-radius-sm); background: transparent; color: var(--cv-color-link); cursor: pointer; font: inherit; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); touch-action: manipulation; }
-.results-page__advanced-trigger:hover { background: var(--cv-interactive-hover); }
-.results-page__advanced-trigger:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
-.results-page__filter-count { padding: 1px var(--cv-space-1); border-radius: var(--cv-radius-pill); background: var(--cv-color-status-info-soft); color: var(--cv-color-status-info-strong); font-size: var(--cv-font-size-2xs); }
+.results-page__filter-count { padding: 1px var(--cv-space-1); border-radius: var(--cv-radius-pill); background: var(--cv-color-status-info-soft); color: var(--cv-color-status-info-strong); font-size: var(--cv-font-size-xs); }
 .results-page__advanced { display: flex; flex-wrap: wrap; align-items: start; gap: var(--cv-space-3); padding: var(--cv-space-2); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
 .results-page__tab-panel { min-width: 0; display: grid; gap: var(--cv-space-2); }
 .results-page__tab-panel:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
@@ -1791,7 +1860,7 @@ onBeforeUnmount(() => {
 .results-page__list-panel,.results-page__detail-panel { min-height: 0; border-radius: var(--cv-radius-sm); }
 .results-page__notice { margin-bottom: var(--cv-space-3); }
 .results-page__outcome-cell { display: grid; justify-items: start; gap: var(--cv-space-1); }
-.results-page__outcome-cell small { color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-2xs); }
+.results-page__outcome-cell small { color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-xs); }
 .results-page__detail-panel { position: static; }
 .results-page__detail-section { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
 .results-page__detail-section--summary { background: var(--cv-surface-page); }
@@ -1803,7 +1872,7 @@ onBeforeUnmount(() => {
 .results-page__defects li:last-child { border-bottom: 0; }
 .results-page__defects strong { color: var(--cv-text-primary); }
 .results-page__image img { display: block; width: 100%; max-height: 280px; aspect-ratio: 4 / 3; object-fit: contain; border: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
-.results-page__image p,.results-page__investigation-heading p,.results-page__comparison-reference,.results-page__comparison-empty { margin: 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.results-page__image p,.results-page__investigation-heading p,.results-page__comparison-reference,.results-page__comparison-empty { margin: 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .results-page__investigation { display: grid; gap: var(--cv-space-2); }
 .results-page__investigation-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--cv-space-3); }
 .results-page__investigation-heading h3 { margin-bottom: 2px; }
@@ -1811,19 +1880,19 @@ onBeforeUnmount(() => {
 .results-page__replay-summary { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--cv-border-subtle); }
 .results-page__replay-summary div { min-width: 0; padding: var(--cv-space-2); }
 .results-page__replay-summary div + div { border-left: 1px solid var(--cv-border-subtle); }
-.results-page__replay-summary dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
-.results-page__replay-summary dd { margin: 2px 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); overflow-wrap: anywhere; }
-.results-page__comparison-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--cv-font-size-2xs); }
+.results-page__replay-summary dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
+.results-page__replay-summary dd { margin: 2px 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
+.results-page__comparison-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--cv-font-size-xs); }
 .results-page__comparison-table th,.results-page__comparison-table td { padding: 5px 6px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--cv-border-subtle); overflow-wrap: anywhere; }
 .results-page__comparison-table th { color: var(--cv-text-secondary); font-weight: var(--cv-font-weight-medium); }
 .results-page__evidence-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
 .results-page__evidence-heading h3 { margin-bottom: 2px; }
-.results-page__evidence-heading p { margin: 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.results-page__evidence-heading p { margin: 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .results-page__evidence-summary { margin: var(--cv-space-3) 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-block: 1px solid var(--cv-border-subtle); }
 .results-page__evidence-summary div { min-width: 0; padding: 6px 8px; border-bottom: 1px solid var(--cv-border-subtle); }
-.results-page__evidence-summary dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
-.results-page__evidence-summary dd { margin: 2px 0 0; font-size: var(--cv-font-size-2xs); overflow-wrap: anywhere; }
-.results-page__evidence-items { width: 100%; margin-top: var(--cv-space-2); border-collapse: collapse; font-size: var(--cv-font-size-2xs); }
+.results-page__evidence-summary dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
+.results-page__evidence-summary dd { margin: 2px 0 0; font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
+.results-page__evidence-items { width: 100%; margin-top: var(--cv-space-2); border-collapse: collapse; font-size: var(--cv-font-size-xs); }
 .results-page__evidence-items th,.results-page__evidence-items td { padding: 5px 6px; text-align: left; border-bottom: 1px solid var(--cv-border-subtle); }
 .results-page__traceability { border-top: 1px solid var(--cv-border-subtle); }
 .results-page__traceability summary { padding: var(--cv-space-3) var(--cv-density-panel-padding); color: var(--cv-text-secondary); cursor: pointer; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); list-style-position: inside; }
@@ -1831,14 +1900,14 @@ onBeforeUnmount(() => {
 .results-page__traceability summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
 .results-page__traceability :deep(.cv-description-list) { padding: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
 .results-page__technical-details { margin-top: var(--cv-space-2); border-top: 1px solid var(--cv-border-subtle); }
-.results-page__technical-details summary { min-height: 32px; display: flex; align-items: center; color: var(--cv-text-secondary); cursor: pointer; font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-semibold); }
+.results-page__technical-details summary { min-height: 32px; display: flex; align-items: center; color: var(--cv-text-secondary); cursor: pointer; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
 .results-page__technical-details summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
 .results-page__technical-details dl { margin: 0; display: grid; gap: var(--cv-space-2); }
 .results-page__technical-details dl > div { min-width: 0; padding: var(--cv-space-2); background: var(--cv-surface-page); }
-.results-page__technical-details dt { color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }
+.results-page__technical-details dt { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .results-page__technical-details dt span { margin-left: var(--cv-space-1); color: var(--cv-text-muted); }
 .results-page__technical-details dd { margin: 2px 0 0; display: flex; align-items: flex-start; gap: var(--cv-space-2); }
-.results-page__technical-details code { min-width: 0; flex: 1; color: var(--cv-text-primary); font-size: var(--cv-font-size-2xs); overflow-wrap: anywhere; user-select: all; }
+.results-page__technical-details code { min-width: 0; flex: 1; color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; user-select: all; }
 .results-page :deep(.results-page__list-panel > .cv-panel__header),
 .results-page :deep(.results-page__detail-panel > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
 .results-page :deep(.results-page__list-panel .cv-inline-alert),

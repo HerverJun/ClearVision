@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
 import { CvButton, CvInlineAlert, CvPanel, CvStatusBadge, type CvStatusTone } from '@/design-system';
+import { CvIcon } from '@/design-system/icons';
 import type { SettingsOwner } from './settingsOwner';
 import type { SettingsDatabaseBackupProjectionV1, SettingsDatabaseStatusProjectionV1 } from './decoder';
 import { formatSettingsBytes, settingsFeedbackForResult, type SettingsFeedback } from './settingsViewModel';
+import SettingsWriteFeedback from './SettingsWriteFeedback.vue';
 
 const props = defineProps<{ owner: SettingsOwner; role: string | null }>();
 const isAdmin = computed(() => props.role === 'Admin');
@@ -36,6 +38,22 @@ function statusTone(value: string): CvStatusTone {
   return 'idle';
 }
 
+function statusLabel(value: string): string {
+  if (value === 'Healthy') return '正常';
+  if (value === 'PendingMigration') return '等待升级';
+  if (value === 'NeedsRepair') return '需要维护';
+  if (value === 'Missing') return '未找到';
+  if (value === 'Corrupt') return '数据损坏';
+  if (value === 'Error') return '检查失败';
+  return '状态未知';
+}
+
+function integrityLabel(value: string): string {
+  if (!value || value === 'not-run') return '未检查';
+  if (value.toLowerCase() === 'ok') return '正常';
+  return value;
+}
+
 async function loadStatus(): Promise<void> {
   const owner = props.owner;
   const version = ++requestVersion;
@@ -57,7 +75,7 @@ async function loadStatus(): Promise<void> {
 
 async function createBackup(): Promise<void> {
   if (!isAdmin.value || backupBusy.value) return;
-  if (!window.confirm('确认创建当前数据库备份？本轮不会提供 restore、cleanup 或 repair。')) return;
+  if (!window.confirm('确认创建当前数据库备份？')) return;
   const owner = props.owner;
   const version = requestVersion;
   backupBusy.value = true;
@@ -87,16 +105,36 @@ onBeforeUnmount(() => {
 <template>
   <CvPanel
     title="数据库维护"
-    description="首轮只读取 status 与创建 backup；restore、cleanup、repair、全局 reset 延期。"
+    description="查看数据库健康状态，并创建可用于恢复的数据备份。"
     data-settings-section="database"
     data-settings-database-no-path="true"
   >
+    <template
+      v-if="isAdmin"
+      #actions
+    >
+      <CvButton
+        size="sm"
+        variant="quiet"
+        :loading="phase === 'loading'"
+        loading-label="正在刷新数据库状态"
+        @click="loadStatus"
+      >
+        <template #leading>
+          <CvIcon
+            name="refresh"
+            size="sm"
+          />
+        </template>
+        刷新状态
+      </CvButton>
+    </template>
     <CvInlineAlert
       v-if="!isAdmin"
       tone="info"
       title="仅管理员可用"
     >
-      数据库维护接口仅供管理员使用，工程师不会发起请求。
+      查看数据库状态和创建备份需要管理员权限。
     </CvInlineAlert>
     <template v-else>
       <CvInlineAlert
@@ -117,20 +155,20 @@ onBeforeUnmount(() => {
         <div class="settings-database__heading">
           <div>
             <strong>当前状态</strong>
-            <p>路径字段未通过公开接口返回，不进入设置视图或截图。</p>
+            <p>状态来自本机数据库检查，不显示数据库和备份目录。</p>
           </div>
           <CvStatusBadge
             :tone="statusTone(status.state)"
-            :label="status.state"
+            :label="statusLabel(status.state)"
           />
         </div>
         <dl class="settings-database__grid">
           <div><dt>数据库存在</dt><dd>{{ status.exists ? '是' : '否' }}</dd></div>
-          <div><dt>Schema</dt><dd>{{ status.schemaVersion }} / {{ status.currentSchemaVersion }}</dd></div>
-          <div><dt>完整性检查</dt><dd>{{ status.integrityCheck || '未运行' }}</dd></div>
+          <div><dt>结构版本</dt><dd>{{ status.schemaVersion }} / {{ status.currentSchemaVersion }}</dd></div>
+          <div><dt>完整性检查</dt><dd>{{ integrityLabel(status.integrityCheck) }}</dd></div>
           <div><dt>外键违规</dt><dd>{{ status.foreignKeyViolationCount }}</dd></div>
           <div><dt>数据库大小</dt><dd>{{ formatSettingsBytes(status.databaseSizeBytes) }}</dd></div>
-          <div><dt>WAL 大小</dt><dd>{{ formatSettingsBytes(status.walSizeBytes) }}</dd></div>
+          <div><dt>预写日志（WAL）</dt><dd>{{ formatSettingsBytes(status.walSizeBytes) }}</dd></div>
           <div><dt>运行包文件</dt><dd>{{ status.packageFileCount }}</dd></div>
           <div><dt>待处理迁移</dt><dd>{{ status.pendingMigrations.length }}</dd></div>
         </dl>
@@ -146,13 +184,14 @@ onBeforeUnmount(() => {
       <div class="settings-database__backup">
         <div>
           <strong>创建数据库备份</strong>
-          <p>结果只显示时间和大小，不显示或保存 backup path。</p>
+          <p>完成后显示创建时间和数据量；备份目录不会出现在页面中。</p>
         </div>
         <CvButton
           variant="primary"
           size="sm"
           :loading="backupBusy"
           loading-label="正在创建数据库备份"
+          data-settings-database-backup
           @click="createBackup"
         >
           创建备份
@@ -168,26 +207,9 @@ onBeforeUnmount(() => {
         <div><dt>数据库大小</dt><dd>{{ formatSettingsBytes(backup.databaseSizeBytes) }}</dd></div>
         <div><dt>运行包</dt><dd>{{ backup.packageFileCount }} 个文件 / {{ formatSettingsBytes(backup.packageBytes) }}</dd></div>
       </dl>
-      <CvInlineAlert
-        class="settings-database__deferred"
-        tone="info"
-        title="延期操作"
-      >
-        restore、cleanup、repair 和全局 reset 本轮没有入口，也不会由前端直接操作 SQLite。
-      </CvInlineAlert>
     </template>
   </CvPanel>
-  <div
-    v-if="feedback"
-    class="settings-database__feedback"
-  >
-    <CvInlineAlert
-      :tone="feedback.kind === 'saved' ? 'success' : feedback.kind === 'unknown' ? 'warning' : 'error'"
-      :title="feedback.kind === 'saved' ? '备份操作已完成' : '备份操作未完成'"
-    >
-      {{ feedback.message }}
-    </CvInlineAlert>
-  </div>
+  <SettingsWriteFeedback :feedback="feedback" />
 </template>
 
 <style scoped>
@@ -198,7 +220,7 @@ onBeforeUnmount(() => {
 .settings-database__grid > div, .settings-database__backup-result > div { min-width: 0; padding: var(--cv-space-2) var(--cv-space-3); border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); }
 .settings-database__grid dt, .settings-database__backup-result dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .settings-database__grid dd, .settings-database__backup-result dd { margin: var(--cv-space-1) 0 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
-.settings-database__issues, .settings-database__deferred, .settings-database__feedback { margin-top: var(--cv-space-4); }
+.settings-database__issues { margin-top: var(--cv-space-4); }
 .settings-database__backup { margin-top: var(--cv-space-5); padding-top: var(--cv-space-4); border-top: 1px solid var(--cv-border-subtle); }
 @media (max-width: 900px) { .settings-database__grid, .settings-database__backup-result { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .settings-database__heading, .settings-database__backup { align-items: stretch; flex-direction: column; } .settings-database__grid, .settings-database__backup-result { grid-template-columns: 1fr; } }

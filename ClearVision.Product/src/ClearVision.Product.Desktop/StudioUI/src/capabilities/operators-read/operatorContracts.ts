@@ -1,10 +1,12 @@
 export class OperatorContractDecodeError extends Error {
   readonly path: string;
+  readonly expectation: string;
 
   constructor(path: string, expectation: string) {
-    super(`Operator response field ${path} must be ${expectation}.`);
+    super('算子目录返回的数据格式不符合要求，请刷新后重试。');
     this.name = 'OperatorContractDecodeError';
     this.path = path;
+    this.expectation = expectation;
   }
 }
 

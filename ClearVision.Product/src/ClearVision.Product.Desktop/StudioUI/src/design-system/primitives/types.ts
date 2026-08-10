@@ -1,6 +1,15 @@
-export type CvButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
+export type CvButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger' | 'destructive';
 
-export type CvStatusTone = 'ok' | 'ng' | 'error' | 'warning' | 'info' | 'idle';
+export type CvStatusTone =
+  | 'ok'
+  | 'ng'
+  | 'error'
+  | 'warning'
+  | 'info'
+  | 'idle'
+  | 'offline'
+  | 'unknown'
+  | 'disabled';
 
 export type CvInlineAlertTone = 'info' | 'success' | 'warning' | 'error';
 

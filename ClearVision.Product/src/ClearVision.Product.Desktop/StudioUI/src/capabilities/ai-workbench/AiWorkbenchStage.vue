@@ -44,7 +44,7 @@ const visibleActions = computed(() => {
 
     <dl class="ai-workbench-stage__facts">
       <div>
-        <dt>当前阻断</dt>
+        <dt>待处理</dt>
         <dd>{{ projection.blockerCount }}</dd>
       </div>
       <div>

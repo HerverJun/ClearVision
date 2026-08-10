@@ -80,6 +80,11 @@ describe('Design System page patterns', () => {
     ['loading', '正在加载'],
     ['empty', '暂无数据'],
     ['error', '加载失败'],
+    ['offline', '当前离线'],
+    ['stale', '数据可能已过期'],
+    ['partial', '部分数据不可用'],
+    ['conflict', '内容已在其他位置更新'],
+    ['unknown', '结果尚未确认'],
     ['unauthorized', '需要登录'],
     ['forbidden', '无权访问'],
     ['not-found', '页面不存在']

@@ -103,9 +103,21 @@ async function chooseFile(parameter: AiBuildParameterV1): Promise<void> {
 }
 
 function suggested(parameter: AiBuildParameterV1): string {
-  if (parameter.valueSummary === 'null') return '建议使用 null';
+  if (parameter.valueSummary === 'null') return '建议使用空值';
   if (parameter.valueSummary === '') return '建议为空字符串';
   return `建议：${parameter.valueSummary}`;
+}
+
+function dataTypeLabel(value: string): string {
+  const type = value.trim().toLowerCase();
+  if (type === 'int' || type === 'integer') return '整数';
+  if (['double', 'number', 'float', 'decimal'].includes(type)) return '数值';
+  if (type === 'bool' || type === 'boolean') return '是 / 否';
+  if (type === 'string') return '文本';
+  if (type === 'enum') return '选项';
+  if (type === 'file' || type === 'path') return '文件';
+  if (type.includes('camera')) return '相机绑定';
+  return '参数';
 }
 
 function submit(): void {
@@ -147,7 +159,7 @@ function submit(): void {
             <label :for="`ai-param-${parameter.canonicalKey}`">{{ parameter.parameterDisplayName || parameter.parameterName }}</label>
             <CvStatusBadge
               tone="warning"
-              :label="parameter.dataType"
+              :label="dataTypeLabel(parameter.dataType)"
             />
           </div>
           <p>{{ parameter.purpose || parameter.impact }}</p>
@@ -229,7 +241,7 @@ function submit(): void {
               type="checkbox"
               :disabled="busy"
             >
-            使用 null（与空字符串不同）
+            使用空值（与空字符串不同）
           </label>
           <p class="ai-parameters__reason">
             {{ suggested(parameter) }}。{{ parameter.suggestedReason }}

@@ -934,13 +934,13 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       const access = evaluateSettingsRouteAccess(role);
       if (!access.allowed) {
         generation += 1;
-        void stopPreviewInternal('Settings 权限已变化，预览已停止。');
+        void stopPreviewInternal('设置访问权限已变化，预览已停止。');
         readController?.abort('settings-route-forbidden');
         readController = undefined;
         writes.cancel(undefined, 'settings-route-forbidden');
         state.phase = 'forbidden';
         state.error = Object.freeze({
-          code: 'forbidden', publicMessage: '当前账户禁止进入 Settings。', policy: 'settings-route', issues: Object.freeze([])
+          code: 'forbidden', publicMessage: '当前账户无权进入设置。', policy: 'settings-route', issues: Object.freeze([])
         });
         state.message = state.error.publicMessage;
         state.generation = generation;
@@ -1100,7 +1100,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
           result.operationKind ?? 'write',
           result.generation,
           reread as SettingsWriteResult<unknown>,
-          'Station 配置已提交，但服务端 Station projection 重新读取失败；结果未知。'
+          '工作站配置已提交，但服务端工作站状态重新读取失败；结果未知。'
         );
       }
       return Object.freeze({ ...result, value: reread.value });
@@ -1123,7 +1123,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
           result.operationKind ?? 'write',
           result.generation,
           reread as SettingsWriteResult<unknown>,
-          'Station token 操作已提交，但服务端 Station projection 重新读取失败；结果未知。'
+          '工作站访问令牌操作已提交，但服务端工作站状态重新读取失败；结果未知。'
         );
       }
       return Object.freeze({
@@ -1573,7 +1573,7 @@ export function createSettingsOwner(options: CreateSettingsOwnerOptions): Settin
       }));
       return Object.freeze({
         ...result,
-        value: operationResult(true, '相机绑定已保存，并已重新读取服务端 binding projection。')
+        value: operationResult(true, '相机绑定已保存，并已重新读取服务端绑定状态。')
       });
     },
     readTriggerDiagnostics(): Promise<SettingsWriteResult<TriggerDiagnosticsV1>> {

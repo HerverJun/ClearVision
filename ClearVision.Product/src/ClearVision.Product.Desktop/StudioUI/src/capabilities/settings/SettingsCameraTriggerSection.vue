@@ -54,6 +54,12 @@ const diagnosticsLabel = computed(() => {
   return props.diagnostics.isAvailable ? '可用' : '不可用';
 });
 
+function listenerTypeLabel(value: string | null | undefined): string {
+  if (!value) return '未提供';
+  if (value.toLowerCase() === 'fixture') return '测试环境';
+  return value;
+}
+
 function operationMessage(result: { status: string; message?: string; error?: unknown; operationKind?: SettingsOperationKind }): string {
   return settingsOperationResultMessage(result);
 }
@@ -120,8 +126,8 @@ watch(() => props.serialPorts, ports => {
   >
     <header class="camera-section__header">
       <div>
-        <h3>Trigger 输入与诊断</h3>
-        <p>Enter、串口光电和诊断只调用现有触发输入接口。测试等待的是输入信号，不会写入正式检测结果。</p>
+        <h3>触发输入与诊断</h3>
+        <p>检查 Enter 键和串口光电输入。测试只等待输入信号，不会启动正式检测。</p>
       </div>
       <CvStatusBadge
         :tone="diagnosticsTone"
@@ -130,10 +136,10 @@ watch(() => props.serialPorts, ports => {
     </header>
 
     <dl class="diagnostics-grid">
-      <div><dt>监听类型</dt><dd>{{ diagnostics?.listenerType || '—' }}</dd></div>
-      <div><dt>等待者</dt><dd>{{ diagnostics?.pendingWaiterCount ?? 0 }}</dd></div>
+      <div><dt>输入来源</dt><dd>{{ listenerTypeLabel(diagnostics?.listenerType) }}</dd></div>
+      <div><dt>等待中的测试</dt><dd>{{ diagnostics?.pendingWaiterCount ?? 0 }}</dd></div>
       <div>
-        <dt>窗口句柄</dt><dd class="mono-value">
+        <dt>关联窗口</dt><dd class="mono-value">
           {{ diagnostics?.attachedWindowHandle || '—' }}
         </dd>
       </div>
@@ -144,11 +150,11 @@ watch(() => props.serialPorts, ports => {
     <div class="trigger-test-grid">
       <div class="trigger-test-block">
         <div class="camera-subheading">
-          <strong>Enter 光电</strong><span>学习下一个可用设备</span>
+          <strong>Enter 键光电输入</strong><span>识别下一次有效输入</span>
         </div>
         <CvField
           v-model="timeoutMs"
-          label="等待超时（ms）"
+          label="等待超时（毫秒）"
           name="enterLearnTimeout"
           type="number"
           :readonly="!canOperate || disabled"
@@ -166,7 +172,7 @@ watch(() => props.serialPorts, ports => {
               size="sm"
             />
           </template>
-          识别 Enter 设备
+          识别输入设备
         </CvButton>
       </div>
       <div class="trigger-test-block">
@@ -190,7 +196,7 @@ watch(() => props.serialPorts, ports => {
           />
           <CvField
             v-model="debounceMs"
-            label="去抖（ms）"
+            label="去抖时间（毫秒）"
             name="serialTestDebounce"
             type="number"
             :readonly="!canOperate || disabled"
@@ -218,7 +224,7 @@ watch(() => props.serialPorts, ports => {
       v-if="diagnostics?.lastError"
       class="camera-trigger__alert"
       tone="error"
-      title="Trigger 输入异常"
+      title="触发输入异常"
     >
       {{ diagnostics.lastError }}
     </CvInlineAlert>

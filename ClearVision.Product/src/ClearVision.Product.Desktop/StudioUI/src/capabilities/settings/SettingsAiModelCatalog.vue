@@ -26,18 +26,22 @@ const emit = defineEmits<{
 function isFullModel(value: AiModelPublicProjectionV1): value is AiModelProjectionV1 {
   return 'hasApiKey' in value;
 }
+
+function providerDisplayLabel(value: string): string {
+  return value.trim().toLowerCase() === 'openai compatible' ? 'OpenAI 兼容服务' : value || '未声明';
+}
 </script>
 
 <template>
   <CvPanel
     title="AI 模型目录"
-    description="模型元数据由 AI 模型服务返回；管理员看到脱敏完整视图，工程师只看到安全视图。"
+    description="用于智能助手规划、推理和生成的语言模型连接配置；这里不管理视觉算法模型文件。"
     data-settings-ai-model-list
   >
     <template #actions>
       <CvStatusBadge
         :tone="safeSubset ? 'info' : 'ok'"
-        :label="safeSubset ? '安全视图' : '完整视图（已脱敏）'"
+        :label="safeSubset ? '工程师只读' : '管理员视图'"
       />
     </template>
 
@@ -53,7 +57,7 @@ function isFullModel(value: AiModelPublicProjectionV1): value is AiModelProjecti
       tone="info"
       title="正在读取模型配置"
     >
-      只接受服务端返回的安全或完整视图，不使用本地默认模型补齐列表。
+      正在从 AI 模型服务读取配置。
     </CvInlineAlert>
 
     <div class="ai-model-catalog__toolbar">
@@ -107,8 +111,8 @@ function isFullModel(value: AiModelPublicProjectionV1): value is AiModelProjecti
               label="当前激活"
             />
           </span>
-          <span class="ai-model-catalog__row-meta">{{ model.provider }} · {{ model.model || '未设置模型名' }}</span>
-          <span class="ai-model-catalog__row-meta">{{ model.isEnabled ? '已启用' : '已停用' }} · {{ isFullModel(model) && model.hasApiKey ? 'API 密钥已配置' : '安全视图' }}</span>
+          <span class="ai-model-catalog__row-meta">{{ providerDisplayLabel(model.provider) }} · {{ model.model || '未设置模型名' }}</span>
+          <span class="ai-model-catalog__row-meta">{{ model.isEnabled ? '已启用' : '已停用' }} · {{ isFullModel(model) ? (model.hasApiKey ? 'API 密钥已配置' : 'API 密钥未配置') : '敏感信息已隐藏' }}</span>
         </button>
         <div
           v-if="canManage && isFullModel(model)"
@@ -156,7 +160,7 @@ function isFullModel(value: AiModelPublicProjectionV1): value is AiModelProjecti
       v-else-if="phase === 'ready'"
       class="ai-model-catalog__empty"
     >
-      服务端没有返回模型配置。
+      当前没有模型配置。
     </p>
   </CvPanel>
 </template>

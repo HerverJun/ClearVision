@@ -113,7 +113,7 @@ export class SettingsUnknownOutcomeError extends Error {
   readonly operationKind: SettingsOperationKind;
 
   constructor(originalError: unknown, operationKind: SettingsOperationKind) {
-    super('Settings operation outcome is unknown; reread the server projection before retrying.');
+    super('设置操作结果未知；重试前请重新读取服务端状态。');
     this.name = 'SettingsUnknownOutcomeError';
     this.originalError = originalError;
     this.operationKind = operationKind;
@@ -696,7 +696,7 @@ export class SettingsContractDecodeError extends TypeError {
   readonly expected: string;
 
   constructor(path: string, expected: string) {
-    super(`Settings contract field ${path} must be ${expected}.`);
+    super('设置服务返回的数据格式不符合要求，请刷新后重试。');
     this.name = 'SettingsContractDecodeError';
     this.path = path;
     this.expected = expected;

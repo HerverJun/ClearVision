@@ -146,11 +146,14 @@ export function createF03RuntimeErrorAudit(page: Page): F03RuntimeErrorAudit {
 
 export async function installF03BrowserStartup(
   page: Page,
-  workspaceEnabled: boolean
+  workspaceEnabled: boolean,
+  authenticated = true
 ): Promise<void> {
-  await page.addInitScript(({ metadata, enabled, preferencesKey }) => {
-    sessionStorage.setItem('cv_auth_token', 'f03-browser-fixture-token');
-    sessionStorage.setItem('cv_current_user', 'f03-workspace-user');
+  await page.addInitScript(({ metadata, enabled, preferencesKey, seedAuthentication }) => {
+    if (seedAuthentication) {
+      sessionStorage.setItem('cv_auth_token', 'f03-browser-fixture-token');
+      sessionStorage.setItem('cv_current_user', 'f03-workspace-user');
+    }
     localStorage.setItem(preferencesKey, JSON.stringify({
       schemaVersion: 1,
       theme: 'light',
@@ -178,6 +181,7 @@ export async function installF03BrowserStartup(
   }, {
     metadata: f03BrowserFixture,
     enabled: workspaceEnabled,
+    seedAuthentication: authenticated,
     preferencesKey: preferencesStorageKey
   });
 }

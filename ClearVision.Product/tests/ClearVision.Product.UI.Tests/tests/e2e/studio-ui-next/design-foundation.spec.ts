@@ -91,7 +91,9 @@ test('Design Lab exposes themes, density and separated industrial status colors'
       color: getComputedStyle(card.querySelector('.design-lab__swatch') as Element).backgroundColor
     }))
   );
-  expect(palette.map(item => item.token)).toEqual(['brand', 'ok', 'ng', 'error', 'warning', 'info', 'idle']);
+  expect(palette.map(item => item.token)).toEqual([
+    'brand', 'ok', 'ng', 'error', 'warning', 'info', 'idle', 'offline', 'unknown', 'disabled'
+  ]);
   expect(new Set(palette.map(item => item.color)).size).toBe(palette.length);
   expect(runtimeErrors).toEqual([]);
 });
@@ -115,6 +117,41 @@ test('Modal traps keyboard focus, closes with Escape and restores its trigger', 
   await expect(initial).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('Menu and Tooltip keep keyboard focus and floating layers inside the viewport', async ({ page }) => {
+  const runtimeErrors = await bootDesignLab(page);
+  const guidance = page.getByRole('button', { name: 'Toggle state guidance' });
+  await guidance.focus();
+  await expect(page.getByRole('tooltip')).toHaveText('显示或隐藏键盘状态说明');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
+
+  const trigger = page.getByRole('button', { name: '打开样本操作菜单' });
+  await trigger.scrollIntoViewIfNeeded();
+  await trigger.click();
+  const menu = page.getByRole('menu', { name: 'Design Lab 操作' });
+  const menuItems = menu.getByRole('menuitem');
+  await expect(menu).toBeVisible();
+  await expect(menuItems.first()).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(menuItems.last()).toBeFocused();
+
+  const box = await menu.boundingBox();
+  const viewport = page.viewportSize();
+  expect(box).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  if (box && viewport) {
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  }
+
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
   await expect(trigger).toBeFocused();
   expect(runtimeErrors).toEqual([]);
 });

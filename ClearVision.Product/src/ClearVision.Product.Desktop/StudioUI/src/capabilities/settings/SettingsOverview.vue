@@ -8,15 +8,14 @@ import {
   type CvDescriptionItem,
   type CvStatusTone
 } from '@/design-system';
-import type { GenericSettingsSection, SettingsSection } from './contracts';
+import { CvIcon } from '@/design-system/icons';
+import type { GenericSettingsSection } from './contracts';
 import type { SettingsProjectionV1 } from './decoder';
 import type { SettingsOwner } from './settingsOwner';
 import type { AuthLifecycleOwner } from '@/app/auth';
 import {
   isGenericSettingsSection,
-  settingsAuthorityLabel,
   settingsNavigationItem,
-  settingsSectionLabel,
   settingsSectionReadState,
   settingsSectionStateLabel,
   SETTINGS_NAVIGATION_ITEMS,
@@ -42,12 +41,13 @@ const props = defineProps<{
   auth: AuthLifecycleOwner | null;
 }>();
 
+const emit = defineEmits<{
+  select: [target: SettingsNavigationTarget];
+}>();
+
 const activeItem = computed(() => settingsNavigationItem(props.activeGroup));
-const activeSection = computed<SettingsSection | null>(() =>
-  props.activeGroup === 'overview' ? null : props.activeGroup
-);
 const activeGenericSection = computed<GenericSettingsSection | null>(() =>
-  activeSection.value && isGenericSettingsSection(activeSection.value) ? activeSection.value : null
+  props.activeGroup !== 'overview' && isGenericSettingsSection(props.activeGroup) ? props.activeGroup : null
 );
 const activeGenericProjection = computed(() => activeGenericSection.value
   ? props.projection.sections[activeGenericSection.value]
@@ -55,11 +55,9 @@ const activeGenericProjection = computed(() => activeGenericSection.value
 
 const projectionSummary = computed<readonly CvDescriptionItem[]>(() => [
   { key: 'softwareTitle', label: '软件标题', value: props.projection.sections.general.softwareTitle },
-  { key: 'productTheme', label: '产品主题', value: props.projection.sections.general.theme === 'dark' ? '深色' : '浅色' },
-  { key: 'revision', label: '服务端观察版本', value: props.projection.revision },
-  { key: 'scope', label: '读取范围', value: props.projection.safeSubset ? '安全字段集' : '完整管理员视图' },
-  { key: 'authority', label: '保存服务', value: '后端配置服务' },
-  { key: 'revision-policy', label: '并发语义', value: '沿用现有修订规则' }
+  { key: 'productTheme', label: '默认主题', value: props.projection.sections.general.theme === 'dark' ? '深色' : '浅色' },
+  { key: 'revision', label: '配置版本', value: props.projection.revision },
+  { key: 'scope', label: '可用范围', value: props.projection.safeSubset ? '工程师安全范围' : '管理员完整范围' }
 ]);
 
 const genericSectionRows = computed(() => SETTINGS_NAVIGATION_ITEMS
@@ -68,56 +66,6 @@ const genericSectionRows = computed(() => SETTINGS_NAVIGATION_ITEMS
     ...item,
     state: settingsSectionReadState(item.id, props.projection)
   })));
-
-const authorityRows = computed(() => genericSectionRows.value
-  .filter(item => !isGenericSettingsSection(item.id)));
-
-const isolatedAuthorityRows = computed(() => props.projection.ignoredAuthoritySections
-  .map(key => Object.freeze({ key, label: settingsAuthorityLabel(key) })));
-
-const activeProjectionItems = computed<readonly CvDescriptionItem[]>(() => {
-  const section = activeGenericSection.value;
-  if (!section) return [];
-
-  switch (section) {
-    case 'general':
-      if (!props.projection.sections.general) return [];
-      return [
-        { key: 'softwareTitle', label: '软件标题', value: props.projection.sections.general.softwareTitle },
-        { key: 'theme', label: '产品主题', value: props.projection.sections.general.theme === 'dark' ? '深色' : '浅色' },
-        { key: 'autoStart', label: '自动启动', value: booleanLabel(props.projection.sections.general.autoStart) }
-      ];
-    case 'storage':
-      if (!props.projection.sections.storage) return [];
-      return [
-        { key: 'imageSavePath', label: '图像保存路径', value: props.projection.sections.storage.imageSavePath },
-        { key: 'savePolicy', label: '保存策略', value: props.projection.sections.storage.savePolicy },
-        { key: 'retentionDays', label: '保留天数', value: `${props.projection.sections.storage.retentionDays} 天` },
-        { key: 'minFreeSpaceGb', label: '最低可用空间', value: `${props.projection.sections.storage.minFreeSpaceGb} GB` }
-      ];
-    case 'runtime':
-      if (!props.projection.sections.runtime) return [];
-      return [
-        { key: 'autoRun', label: '自动运行', value: booleanLabel(props.projection.sections.runtime.autoRun) },
-        { key: 'stopOnConsecutiveNg', label: '连续 NG 停止', value: `${props.projection.sections.runtime.stopOnConsecutiveNg} 次` },
-        { key: 'missingMaterialTimeoutSeconds', label: '缺料超时', value: `${props.projection.sections.runtime.missingMaterialTimeoutSeconds} 秒` },
-        { key: 'applyProtectionRules', label: '启用保护规则', value: booleanLabel(props.projection.sections.runtime.applyProtectionRules) }
-      ];
-    case 'security':
-      if (!props.projection.sections.security) return [];
-      return [
-        { key: 'passwordMinLength', label: '密码最小长度', value: `${props.projection.sections.security.passwordMinLength} 位` },
-         { key: 'sessionTimeoutMinutes', label: '会话超时（历史只读，不控制当前会话过期时间）', value: `${props.projection.sections.security.sessionTimeoutMinutes} 分钟` },
-        { key: 'loginFailureLockoutCount', label: '失败锁定次数', value: `${props.projection.sections.security.loginFailureLockoutCount} 次` }
-      ];
-  }
-  return [];
-});
-
-function booleanLabel(value: boolean | null): string {
-  if (value === null) return '未返回';
-  return value ? '已启用' : '未启用';
-}
 
 function isCameraConnected(status: string): boolean {
   return status.trim().toLowerCase() === 'connected';
@@ -131,13 +79,8 @@ function stateTone(state: SettingsSectionReadState): CvStatusTone {
   switch (state) {
     case 'available': return 'ok';
     case 'restricted': return 'warning';
-    case 'shell-only': return 'idle';
+    case 'on-demand': return 'idle';
   }
-}
-
-function mountedSection(target: SettingsNavigationTarget): boolean {
-  return target === 'overview' || target === 'database' || target === 'plc' || target === 'tcp' ||
-    target === 'camera' || target === 'station' || target === 'ai-model';
 }
 
 function sectionStateLabel(
@@ -145,37 +88,37 @@ function sectionStateLabel(
   state: SettingsSectionReadState
 ): string {
   if (isGenericSettingsSection(target)) {
-    const accessLabel = props.role === 'Admin' ? '管理员可编辑' : props.role === 'Engineer' ? '工程师只读' : '只读';
-    return state === 'restricted' ? `${accessLabel}（安全子集未返回）` : accessLabel;
+    const accessLabel = props.role === 'Admin' ? '可编辑' : '只读';
+    return state === 'restricted' ? '当前账户不可用' : accessLabel;
   }
-  if (target === 'database') return '已接入';
+  if (target === 'database') return props.role === 'Admin' ? '进入后读取' : '仅管理员';
   if (target === 'station') {
     if (props.role !== 'Admin') return '仅管理员';
-    return props.owner.projection.station ? '已接入' : '读取中';
+    return props.owner.projection.station ? '已读取' : '进入后读取';
   }
   if (target === 'ai-model') {
-    if (!props.owner.projection.aiModels) return props.role === 'Engineer' ? '工程师安全只读' : '读取中';
-    return props.owner.projection.aiModels.safeSubset ? '工程师安全只读' : '管理员可管理';
+    if (!props.owner.projection.aiModels) return props.role === 'Engineer' ? '只读' : '进入后读取';
+    return props.owner.projection.aiModels.safeSubset ? '只读' : '可管理';
   }
   const device = props.owner.projection.device;
-  if (target === 'plc') return device.plcSettings ? `已接入（${device.plcSettings.activeProtocol}）` : '未读取';
+  if (target === 'plc') return device.plcSettings ? `已读取 · ${device.plcSettings.activeProtocol}` : '进入后读取';
   if (target === 'tcp') {
     const statuses = Object.values(device.tcpStatuses);
     if (statuses.some(status => status?.isConnected || status?.isListening)) return '运行中';
-    return device.tcpProfiles.length > 0 ? '已配置，未运行' : '未读取';
+    return device.tcpProfiles.length > 0 ? '已配置，未运行' : '进入后读取';
   }
   if (target === 'camera') {
     const bindings = device.cameraBindings;
     if (bindings.some(binding => isCameraConnected(binding.connectionStatus))) return '已连接';
     if (bindings.some(binding => isCameraOnline(binding.connectionStatus))) return '在线（已发现）';
-    return bindings.length > 0 ? '已读取，未连接' : '未读取';
+    return bindings.length > 0 ? '已读取，未连接' : '进入后读取';
   }
   return settingsSectionStateLabel(state);
 }
 
 function sectionTone(target: SettingsNavigationTarget, state: SettingsSectionReadState): CvStatusTone {
   const device = props.owner.projection.device;
-  if (target === 'database') return 'ok';
+  if (target === 'database') return props.role === 'Admin' ? 'idle' : 'warning';
   if (target === 'station') return props.owner.projection.station ? 'ok' : 'idle';
   if (target === 'ai-model') return props.owner.projection.aiModels ? 'ok' : 'idle';
   if (target === 'plc') return device.plcSettings ? 'ok' : 'idle';
@@ -205,19 +148,21 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
   >
     <template v-if="activeGroup === 'overview'">
       <CvPanel
-        title="服务端状态"
-        description="只显示本次从现有设置接口读取并通过结构校验的字段。"
+        title="当前配置"
+        description="基础设置已加载。设备和系统服务会在进入对应分组时读取。"
+        variant="section"
       >
         <CvDescriptionList
           :items="projectionSummary"
           :columns="2"
-          label="服务端设置摘要"
+          label="当前设置摘要"
         />
       </CvPanel>
 
       <CvPanel
-        title="分组读取状态"
-        description="设备、工作站、AI 与数据库分组使用各自服务端状态；此处只显示已经读取的数据。"
+        title="设置分组"
+        description="选择分组查看当前配置、可用操作和保存状态。"
+        variant="section"
       >
         <ul class="settings-overview__section-list">
           <li
@@ -225,33 +170,29 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
             :key="item.id"
             class="settings-overview__section-row"
           >
-            <div class="settings-overview__section-copy">
-              <strong>{{ item.label }}</strong>
-              <span>{{ item.description }}</span>
-            </div>
-            <CvStatusBadge :tone="sectionTone(item.id, item.state)">
-              {{ sectionStateLabel(item.id, item.state) }}
-            </CvStatusBadge>
+            <button
+              type="button"
+              :data-settings-overview-group="item.id"
+              @click="emit('select', item.id)"
+            >
+              <CvIcon
+                :name="item.icon"
+                size="sm"
+              />
+              <span class="settings-overview__section-copy">
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.description }}</span>
+              </span>
+              <CvStatusBadge :tone="sectionTone(item.id, item.state)">
+                {{ sectionStateLabel(item.id, item.state) }}
+              </CvStatusBadge>
+              <CvIcon
+                name="chevron-right"
+                size="sm"
+              />
+            </button>
           </li>
         </ul>
-        <div class="settings-overview__authority-list">
-          <span class="settings-overview__authority-label">独立后端服务</span>
-          <span
-            v-for="item in authorityRows"
-            :key="item.id"
-            class="settings-overview__authority-chip"
-          >
-            {{ item.label }}
-          </span>
-        </div>
-        <CvInlineAlert
-          v-if="isolatedAuthorityRows.length"
-          class="settings-overview__notice"
-          tone="info"
-          title="后端数据源已隔离"
-        >
-          {{ isolatedAuthorityRows.map(item => item.label).join('、') }} 未进入通用设置视图。
-        </CvInlineAlert>
       </CvPanel>
     </template>
 
@@ -324,55 +265,22 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
     <template v-if="isGenericSection(activeGroup) && !activeGenericProjection">
       <CvPanel
         :title="activeItem.label"
-        :description="activeItem.description"
+        description="此分组不在当前账户可查看的设置范围内。"
       >
         <template #actions>
           <CvStatusBadge
-            v-if="activeGenericProjection"
-            tone="ok"
-            label="只读状态"
-          />
-          <CvStatusBadge
-            v-else
             tone="warning"
-            label="安全子集"
+            label="不可用"
           />
         </template>
         <CvInlineAlert
-          v-if="!activeGenericProjection"
           tone="warning"
           title="当前响应未包含此分组"
         >
-          当前账户只收到安全字段集。后端未返回该分组时，界面不会用本地默认值补齐，也不会发起保存请求。
+          当前账户不能查看此分组。界面不会显示默认值，也不会提交修改。
         </CvInlineAlert>
-        <CvDescriptionList
-          v-else
-          :items="activeProjectionItems"
-          :columns="2"
-          :label="`${settingsSectionLabel(activeGroup)}只读状态`"
-        />
       </CvPanel>
     </template>
-
-    <CvPanel
-      v-if="!isGenericSection(activeGroup) && !mountedSection(activeGroup)"
-      :title="activeItem.label"
-      :description="activeItem.description"
-    >
-      <template #actions>
-        <CvStatusBadge
-          tone="idle"
-          label="待接入"
-        />
-      </template>
-      <div class="settings-overview__deferred">
-        <strong>{{ activeItem.label }}由独立后端服务管理</strong>
-        <p>
-          该分组仍由独立后端服务管理，待对应接口合同就绪后再开放工作台。
-        </p>
-        <p>该分组当前没有可用的编辑或运行操作。</p>
-      </div>
-    </CvPanel>
   </div>
 </template>
 
@@ -392,15 +300,29 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
 }
 
 .settings-overview__section-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--cv-space-3);
-  padding: var(--cv-space-3) 0;
   border-bottom: 1px solid var(--cv-border-subtle);
 }
 
 .settings-overview__section-row:last-child { border-bottom: 0; }
+
+.settings-overview__section-row > button {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--cv-space-3);
+  width: 100%;
+  padding: var(--cv-space-3) var(--cv-space-2);
+  border: 0;
+  border-radius: var(--cv-radius-sm);
+  background: transparent;
+  color: var(--cv-text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-overview__section-row > button:hover { background: var(--cv-interactive-hover); }
+.settings-overview__section-row > button:focus-visible { outline: none; box-shadow: var(--cv-focus-ring); }
 
 .settings-overview__section-copy {
   display: grid;
@@ -411,36 +333,11 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
 .settings-overview__section-copy strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .settings-overview__section-copy span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 
-.settings-overview__authority-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--cv-space-1) var(--cv-space-2);
-  padding-top: var(--cv-space-3);
-  border-top: 1px solid var(--cv-border-subtle);
-}
-
-.settings-overview__authority-label { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-
-.settings-overview__authority-chip {
-  padding: 2px var(--cv-space-2);
-  border: 1px solid var(--cv-border-subtle);
-  border-radius: var(--cv-radius-sm);
-  color: var(--cv-text-muted);
-  font-size: var(--cv-font-size-2xs);
-}
-
-.settings-overview__notice { margin-top: var(--cv-space-3); }
-
-.settings-overview__deferred {
-  display: grid;
-  gap: var(--cv-space-2);
-  color: var(--cv-text-secondary);
-}
-
-.settings-overview__deferred strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
-.settings-overview__deferred p { margin: 0; font-size: var(--cv-font-size-sm); line-height: var(--cv-line-height-normal); }
-
 @media (max-width: 560px) {
-  .settings-overview__section-row { align-items: start; grid-template-columns: minmax(0, 1fr); }
+  .settings-overview__section-row > button {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .settings-overview__section-row :deep([data-design-primitive="status-badge"]) { display: none; }
 }
 </style>

@@ -341,7 +341,7 @@ export function createTemplateOwner(options: {
           state.phase = state.writeStatus === 'unknown-outcome' ? 'unknown-outcome' : 'error';
           state.errorCode = errorCode(error);
           state.message = state.writeStatus === 'unknown-outcome'
-            ? '模板保存结果未知；后端没有提供可安全重放的 operation identity，请先刷新模板列表核对。'
+            ? '模板保存结果未知；服务端没有提供可安全核对的操作标识，请先刷新模板列表确认。'
             : `模板保存失败：${errorMessage(error)}`;
           return false;
         } finally {

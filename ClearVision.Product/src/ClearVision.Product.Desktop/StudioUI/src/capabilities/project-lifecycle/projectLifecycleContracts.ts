@@ -19,11 +19,13 @@ export type ProjectLifecycleCleanupStatus =
 
 export class ProjectLifecycleContractDecodeError extends Error {
   readonly path: string;
+  readonly expectation: string;
 
   constructor(path: string, expectation: string) {
-    super(`Project lifecycle response field ${path} must be ${expectation}.`);
+    super('工程操作响应格式不符合要求，请核对工程状态后重试。');
     this.name = 'ProjectLifecycleContractDecodeError';
     this.path = path;
+    this.expectation = expectation;
   }
 }
 

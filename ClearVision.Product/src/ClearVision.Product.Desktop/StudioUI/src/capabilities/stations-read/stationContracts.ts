@@ -5,11 +5,13 @@ import {
 
 export class StationContractDecodeError extends Error {
   readonly path: string;
+  readonly expectation: string;
 
   constructor(path: string, expectation: string) {
-    super(`Station response field ${path} must be ${expectation}.`);
+    super('工作站服务返回的数据格式不符合要求，请刷新后重试。');
     this.name = 'StationContractDecodeError';
     this.path = path;
+    this.expectation = expectation;
   }
 }
 

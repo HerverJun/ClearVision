@@ -34,10 +34,11 @@ export const productRuntimeKey: InjectionKey<ProductRuntime> = Symbol('ProductRu
 
 export async function createProductRuntime(
   platform: StudioPlatform,
-  session: SessionProjectionOwner
+  session: SessionProjectionOwner,
+  preferences: UiPreferencesOwner
 ): Promise<ProductRuntime> {
   const { buildProductRuntime } = await import('@/app/productRuntimeFactory');
-  return buildProductRuntime(platform, session);
+  return buildProductRuntime(platform, session, preferences);
 }
 
 export function useProductRuntime(): ProductRuntime {

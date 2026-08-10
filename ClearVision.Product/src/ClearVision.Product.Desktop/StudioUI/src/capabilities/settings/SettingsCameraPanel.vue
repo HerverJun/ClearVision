@@ -37,6 +37,31 @@ const detachPanelState = props.owner.registerPanelState('camera', () => ({
 watch([bindingDirty, triggerPending, previewPending, isBusy], () => props.owner.refreshPanelState());
 const cameraStatusTone = computed(() => phase.value === 'ready' ? 'ok' : phase.value === 'error' ? 'error' : 'info');
 const cameraStatusLabel = computed(() => phase.value === 'ready' ? '已读取' : phase.value === 'loading' ? '读取中' : phase.value === 'error' ? '读取失败' : '未读取');
+const discoverySourceLabel = computed(() => discovery.value?.diagnostics.fixture === true
+  ? '测试环境数据'
+  : '本机相机服务');
+
+const providerLabels: Readonly<Record<CameraDiscoveryProviderV1, string>> = Object.freeze({
+  all: '全部厂商',
+  huaray: '华睿',
+  hikvision: '海康威视'
+});
+
+const discoveryDiagnosticLabels: Readonly<Record<string, string>> = Object.freeze({
+  provider: '发现来源',
+  fixture: '数据环境'
+});
+
+function discoveryDiagnosticLabel(key: string): string {
+  return discoveryDiagnosticLabels[key] ?? key;
+}
+
+function discoveryDiagnosticValue(key: string, value: string | number | boolean | null): string | number {
+  if (key === 'provider') return providerLabels[value as CameraDiscoveryProviderV1] ?? String(value ?? '未提供');
+  if (key === 'fixture') return value === true ? '测试环境' : '实际服务';
+  if (typeof value === 'boolean') return value ? '是' : '否';
+  return value ?? '未提供';
+}
 
 function resultMessage(result: { status: string; message?: string; error?: unknown; operationKind?: SettingsOperationKind }): string {
   return settingsOperationResultMessage(result);
@@ -78,10 +103,10 @@ async function discover(provider: CameraDiscoveryProviderV1): Promise<void> {
   try {
     const result = await props.owner.discoverCameras(provider);
     if (result.status !== 'completed') {
-      showFeedback('error', '相机 discovery 失败', resultMessage(result));
+      showFeedback('error', '发现相机失败', resultMessage(result));
       return;
     }
-    showFeedback('success', '相机 discovery 完成', `已发现 ${result.value.devices.length} 台 ${provider === 'all' ? '相机' : provider} 设备。`);
+    showFeedback('success', '相机发现完成', `${providerLabels[provider]}共发现 ${result.value.devices.length} 台设备。`);
   } finally {
     pendingAction.value = null;
   }
@@ -131,7 +156,7 @@ onBeforeUnmount(() => {
   >
     <CvPanel
       title="相机、触发与预览"
-      description="系统级相机发现、绑定和诊断与工程内相机绑定分离；预览仅是可丢弃的调试输入。"
+      description="发现、绑定、触发与采集调试均由本机相机服务提供。相机标定在工程工作区的 N 点标定算子中完成。"
     >
       <template #actions>
         <CvStatusBadge
@@ -161,7 +186,7 @@ onBeforeUnmount(() => {
         <header class="camera-section__header">
           <div>
             <h3>相机发现</h3>
-            <p>按供应商调用现有发现接口。发现结果仅用于诊断，不会自动写入绑定或切换活动相机。</p>
+            <p>从本机相机服务扫描设备。扫描结果不会自动创建绑定，也不会切换当前使用的相机。</p>
           </div>
           <div class="camera-section__actions">
             <CvButton
@@ -178,7 +203,7 @@ onBeforeUnmount(() => {
                   size="sm"
                 />
               </template>
-              全部
+              全部厂商
             </CvButton>
             <CvButton
               variant="quiet"
@@ -188,7 +213,7 @@ onBeforeUnmount(() => {
               :loading="pendingAction === 'discover-huaray'"
               @click="discover('huaray')"
             >
-              Huaray
+              华睿
             </CvButton>
             <CvButton
               variant="quiet"
@@ -198,7 +223,7 @@ onBeforeUnmount(() => {
               :loading="pendingAction === 'discover-hikvision'"
               @click="discover('hikvision')"
             >
-              Hikvision
+              海康威视
             </CvButton>
           </div>
         </header>
@@ -207,6 +232,10 @@ onBeforeUnmount(() => {
           v-if="discovery"
           class="discovery-table-wrap"
         >
+          <div class="discovery-table__summary">
+            <span>{{ discoverySourceLabel }}</span>
+            <strong>{{ discovery.devices.length }} 台设备</strong>
+          </div>
           <table class="discovery-table">
             <caption class="sr-only">
               相机发现结果
@@ -243,21 +272,24 @@ onBeforeUnmount(() => {
               </tr>
             </tbody>
           </table>
-          <div
+          <details
             v-if="Object.keys(discovery.diagnostics).length"
             class="discovery-diagnostics"
           >
-            <span
-              v-for="(value, key) in discovery.diagnostics"
-              :key="key"
-            ><strong>{{ key }}</strong> {{ value ?? '—' }}</span>
-          </div>
+            <summary>查看发现诊断</summary>
+            <div>
+              <span
+                v-for="(value, key) in discovery.diagnostics"
+                :key="key"
+              ><strong>{{ discoveryDiagnosticLabel(key) }}</strong> {{ discoveryDiagnosticValue(key, value) }}</span>
+            </div>
+          </details>
         </div>
         <div
           v-else
           class="camera-empty"
         >
-          尚未执行 discovery。选择 provider 后只读取设备信息。
+          尚未扫描设备。可扫描全部厂商，也可只扫描指定厂商。
         </div>
       </section>
 
@@ -309,6 +341,8 @@ onBeforeUnmount(() => {
 .camera-section__header p { max-width: 760px; margin: var(--cv-space-1) 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
 .camera-section__actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--cv-space-2); }
 .discovery-table-wrap { max-width: 100%; margin-top: var(--cv-space-4); overflow: auto; border-bottom: 1px solid var(--cv-border-subtle); }
+.discovery-table__summary { position: sticky; left: 0; display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-3); padding: var(--cv-space-2) 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
+.discovery-table__summary strong { color: var(--cv-text-secondary); font-weight: var(--cv-font-weight-medium); }
 .discovery-table { width: 100%; min-width: 820px; border-collapse: collapse; table-layout: fixed; }
 .discovery-table th, .discovery-table td { padding: var(--cv-space-2); border-bottom: 1px solid var(--cv-border-subtle); vertical-align: middle; text-align: left; }
 .discovery-table th { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); }
@@ -316,7 +350,9 @@ onBeforeUnmount(() => {
 .discovery-table td:first-child { display: grid; gap: 2px; }
 .discovery-table td:first-child small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .discovery-table__empty { color: var(--cv-text-muted); text-align: center !important; }
-.discovery-diagnostics { display: flex; flex-wrap: wrap; gap: var(--cv-space-2) var(--cv-space-4); padding: var(--cv-space-2) 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.discovery-diagnostics { position: sticky; left: 0; padding: var(--cv-space-2) 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.discovery-diagnostics summary { width: fit-content; cursor: pointer; color: var(--cv-text-secondary); }
+.discovery-diagnostics > div { display: flex; flex-wrap: wrap; gap: var(--cv-space-2) var(--cv-space-4); margin-top: var(--cv-space-2); }
 .discovery-diagnostics strong { color: var(--cv-text-secondary); }
 .mono-cell { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .camera-empty { margin-top: var(--cv-space-4); color: var(--cv-text-muted); font-size: var(--cv-font-size-sm); }

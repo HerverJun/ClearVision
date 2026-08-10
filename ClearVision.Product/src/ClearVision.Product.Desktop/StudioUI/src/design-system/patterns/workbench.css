@@ -124,7 +124,7 @@
   flex: 1;
   overflow-wrap: anywhere;
   font-family: var(--cv-font-mono);
-  font-size: 10px;
+  font-size: var(--cv-type-metadata-size);
   user-select: all;
 }
 .cv-workbench-footer-spacer { flex: 1; }

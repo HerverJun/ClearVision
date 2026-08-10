@@ -178,7 +178,7 @@ onBeforeUnmount(() => {
           :class="{ 'canvas-lab__owner-badge--active': isMounted }"
           data-canvas-owner-count
         >
-          owner {{ diagnostics.ownerCount }}/1
+          控制实例 {{ diagnostics.ownerCount }}/1
         </span>
         <RouterLink to="/diagnostics">
           Diagnostics
@@ -269,7 +269,7 @@ onBeforeUnmount(() => {
             aria-live="polite"
           >
             <strong>{{ mountError ? 'Canvas runtime unavailable' : 'Mounting canonical Canvas…' }}</strong>
-            <span>{{ mountError ?? 'Waiting for the single capability owner.' }}</span>
+            <span>{{ mountError ?? '正在等待唯一画布实例。' }}</span>
           </div>
         </div>
 
@@ -286,12 +286,12 @@ onBeforeUnmount(() => {
         v-show="diagnosticsExpanded"
         class="canvas-lab__diagnostics"
         data-canvas-diagnostics
-        aria-label="Canvas runtime diagnostics"
+        aria-label="画布运行诊断"
       >
         <section class="canvas-lab__diagnostic-section">
           <div class="canvas-lab__section-heading">
             <div>
-              <span class="canvas-lab__eyebrow">Mounted projection</span>
+              <span class="canvas-lab__eyebrow">当前挂载状态</span>
               <h2>{{ diagnostics.fixtureName ?? 'No active fixture' }}</h2>
             </div>
             <span
@@ -357,7 +357,7 @@ onBeforeUnmount(() => {
         </section>
 
         <section class="canvas-lab__diagnostic-section">
-          <h2>Pixel and lifecycle authority</h2>
+          <h2>像素与生命周期状态</h2>
           <dl class="canvas-lab__resource-list">
             <div>
               <dt>DPR</dt><dd data-canvas-dpr>

@@ -44,7 +44,7 @@ describe('AiBuildWorkspace', () => {
     });
 
     expect(wrapper.text()).toContain('候选结论已失效');
-    expect(wrapper.text()).toContain('请基于最新参数、资源、方案和工程基线重新构建并校验候选。');
+    expect(wrapper.text()).toContain('请基于最新参数、资源、方案和工程保存基线重新构建并校验候选。');
     expect(wrapper.text()).not.toContain('候选已具备交接条件');
     const statusLabels = wrapper.findAllComponents(CvStatusBadge).map(badge => badge.props('label'));
     expect(statusLabels).not.toContain('候选就绪');

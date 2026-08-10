@@ -138,7 +138,7 @@ function state(value: unknown, path: string): ResultsExportJobSnapshotV1['state'
 function decodeJob(payload: unknown): ResultsExportJobSnapshotV1 {
   const source = record(payload);
   const sourceValue = text(field(source, 'source')).toLowerCase();
-  if (sourceValue !== 'local') throw new TypeError('服务端返回了不受支持的 Results source。');
+  if (sourceValue !== 'local') throw new TypeError('服务端返回了不受支持的检测结果来源。');
   const decoded = Object.freeze({
     exportId: uuid(field(source, 'exportId'), '$.exportId'),
     projectId: uuid(field(source, 'projectId'), '$.projectId'),
@@ -309,7 +309,7 @@ export function createResultsExportOwner(options: {
     const clientOperationId = state.clientOperationId;
     if (disposed || operation !== generation || !clientOperationId) return;
     state.phase = 'reconciling';
-    state.message = '创建响应未知，正在按 clientOperationId 查询已有导出任务。';
+    state.message = '创建响应未知，正在按本次操作标识查询已有导出任务。';
     syncControls();
     for (let attempt = 0; attempt < attempts; attempt++) {
       if (disposed || operation !== generation) return;
@@ -342,7 +342,7 @@ export function createResultsExportOwner(options: {
         await new Promise<void>(resolve => setTimeout(resolve, 200 * (attempt + 1)));
       }
     }
-    setUnknown('未能按 clientOperationId 找到导出任务；禁止自动重发创建请求，请稍后手动对账。');
+    setUnknown('未能按操作标识找到导出任务；禁止自动重发创建请求，请稍后手动核对。');
   }
 
   const owner: ResultsExportOwner = Object.freeze({
@@ -508,7 +508,7 @@ export function createResultsExportOwner(options: {
       controller?.abort('results-export-owner-disposed');
       controller = null;
       state.phase = 'disposed';
-      state.message = '结果导出 owner 已关闭。';
+      state.message = '结果导出已关闭。';
       state.canStart = false;
       state.canCancel = false;
       state.canReconcile = false;

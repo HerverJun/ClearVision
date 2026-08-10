@@ -2,7 +2,7 @@ import {
   createProductLeaveGuardOwner,
   type ProductLeaveGuardOwner
 } from '@/app/leave';
-import { createUiPreferencesOwner } from '@/app/preferences';
+import type { UiPreferencesOwner } from '@/app/preferences';
 import { sessionIdentityOf, type SessionProjectionOwner } from '@/app/session';
 import type { StudioPlatform } from '@/app/studioPlatform';
 import type { ProductRuntime, ProductRuntimeQuarantine } from '@/app/productRuntime';
@@ -13,13 +13,13 @@ import { createSystemStatusOwner } from '@/platform/status';
 
 export function buildProductRuntime(
   platform: StudioPlatform,
-  session: SessionProjectionOwner
+  session: SessionProjectionOwner,
+  preferences: UiPreferencesOwner
 ): ProductRuntime {
   const queries = createReadQueryClient(platform.api);
   const authenticatedUser = session.projection.user;
   if (!authenticatedUser) throw new Error('ProductRuntime requires an authenticated session projection.');
   queries.setSessionIdentity(sessionIdentityOf(authenticatedUser));
-  const preferences = createUiPreferencesOwner();
   const systemStatus = createSystemStatusOwner({ queries });
   const leaveGuardHolder: { current?: ProductLeaveGuardOwner } = {};
   const projectLifecycle = authenticatedUser.role === 'Admin' || authenticatedUser.role === 'Engineer'
@@ -97,7 +97,6 @@ export function buildProductRuntime(
       }
       systemStatus.dispose();
       queries.dispose();
-      preferences.dispose();
     }
   });
 }

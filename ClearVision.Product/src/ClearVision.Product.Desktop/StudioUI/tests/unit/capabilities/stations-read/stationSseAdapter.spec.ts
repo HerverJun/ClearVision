@@ -76,6 +76,9 @@ describe('Station SSE adapter', () => {
       signal: new AbortController().signal,
       onOpen: vi.fn(),
       onEvent: vi.fn()
-    })).rejects.toThrow('positive sequence');
+    })).rejects.toMatchObject({
+      path: 'event.id',
+      expectation: 'a positive sequence for a stored event'
+    });
   });
 });

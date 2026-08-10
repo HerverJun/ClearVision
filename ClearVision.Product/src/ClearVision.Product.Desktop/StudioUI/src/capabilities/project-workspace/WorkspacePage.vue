@@ -311,7 +311,7 @@ async function startLifecycle(reason: string): Promise<void> {
     const artifactId = activeHandoffId.value;
     if (!artifactId) {
       shellState.value = 'decode-error';
-      message.value = '新工程工作区只能接收经过验证的 AI handoff artifact。';
+      message.value = '新工程工作区只能接收经过验证的 AI 交接候选。';
       return;
     }
     try {

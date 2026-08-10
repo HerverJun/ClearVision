@@ -29,11 +29,17 @@ describe('results analysis contracts', () => {
   });
 
   it('rejects a distribution whose percentage is outside the backend contract', () => {
-    expect(() => decodeDefectDistributionResponse({
-      projectId,
-      totalDefects: 1,
-      items: [{ defectType: 'Scratch', count: 1, percentage: 101.5 }]
-    })).toThrow(/percentage/);
+    let failure: unknown;
+    try {
+      decodeDefectDistributionResponse({
+        projectId,
+        totalDefects: 1,
+        items: [{ defectType: 'Scratch', count: 1, percentage: 101.5 }]
+      });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({ path: '$.items[0].percentage' });
   });
 
   it('decodes report summary, confidence, trend and recommendations together', () => {
@@ -118,13 +124,19 @@ describe('results analysis contracts', () => {
   });
 
   it('decodes a sparse trend only when required server counters are present', () => {
-    expect(() => decodeResultsAnalysisTrend({
-      projectId,
-      interval: 'Hour',
-      startTime,
-      endTime,
-      dataPoints: [{ timestamp: startTime }]
-    })).toThrow(/totalCount/);
+    let failure: unknown;
+    try {
+      decodeResultsAnalysisTrend({
+        projectId,
+        interval: 'Hour',
+        startTime,
+        endTime,
+        dataPoints: [{ timestamp: startTime }]
+      });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({ path: '$.dataPoints[0].totalCount' });
   });
 
   it('normalizes a future-only start into an ordered zero-width trend window', () => {

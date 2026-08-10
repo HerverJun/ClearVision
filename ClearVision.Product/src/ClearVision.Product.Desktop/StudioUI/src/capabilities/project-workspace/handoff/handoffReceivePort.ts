@@ -158,7 +158,7 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
           status: 409,
           statusText: 'Conflict',
           url: '',
-          payload: { errorCode: 'handoff_new_target_project_forbidden', publicMessage: '新工程候选不能绑定伪造的 Project id。' },
+          payload: { errorCode: 'handoff_new_target_project_forbidden', publicMessage: '新工程候选不能绑定伪造的工程标识。' },
           responseBody: ''
         });
       }
@@ -169,7 +169,7 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
         status: 409,
         statusText: 'Conflict',
         url: '',
-        payload: { errorCode: 'handoff_target_project_conflict', publicMessage: '当前工作区工程与 artifact baseline 不一致。' },
+        payload: { errorCode: 'handoff_target_project_conflict', publicMessage: '当前工作区工程与交接候选的保存基线不一致。' },
         responseBody: ''
       });
     }
@@ -183,7 +183,7 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
     fingerprint: string,
     signal: AbortSignal
   ): Promise<WorkspaceHandoffArtifactV1> {
-    if (!options.api.post) throw new Error('Shared API transport does not support POST.');
+    if (!options.api.post) throw new Error('共享服务连接不支持提交交接操作。');
     const payload = await options.api.post(`ai/handoffs/${encodeURIComponent(artifactId)}/${action}`, {
       clientOperationId: operationId,
       targetProjectId: projectId,
@@ -220,7 +220,7 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
       if (preserveUnknown) {
         unknownOutcome = true;
         setPhase('error', '会话已失效；交接写入结果未知，重新认证后必须先协调。',
-          'SESSION_UNAUTHORIZED', '重新认证后查询当前 artifact 状态；禁止重复接收。');
+          'SESSION_UNAUTHORIZED', '重新认证后查询当前交接候选状态；禁止重复接收。');
       } else {
         setPhase('idle', '会话已失效；交接读取已停止，候选状态未改变。', null, '重新认证后可重新读取候选。');
       }
@@ -243,7 +243,7 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
       if (disposed || sessionQuarantined) return null;
       if (!artifactPattern.test(receiveOptions.artifactId) ||
           receiveOptions.targetProjectId !== null && !guidPattern.test(receiveOptions.targetProjectId)) {
-        setPhase('error', '交接链接无效。', 'artifact identity invalid', '返回 AI 工作台重新发起交接。');
+        setPhase('error', '交接链接无效。', 'AI_CANDIDATE_IDENTITY_INVALID', '返回 AI 工作台重新发起交接。');
         return null;
       }
       generation += 1;
@@ -282,31 +282,31 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
           setPhase(
             'artifact-baseline-conflict',
             '当前工程保存基线与 AI 候选不一致，未预留或装载候选。',
-            'artifact baseline changed',
-            '返回 AI 基于最新工程重新 Build。'
+            'AI_CANDIDATE_BASELINE_CHANGED',
+            '返回 AI，基于最新工程重新构建候选。'
           );
           return null;
         }
         if (loaded.status === 'expired') {
           unknownOutcome = false;
-          setPhase('artifact-expired', 'AI 候选已过期。', 'artifact expired', '返回 AI 基于当前条件重新 Build。');
+          setPhase('artifact-expired', 'AI 候选已过期。', 'AI_CANDIDATE_EXPIRED', '返回 AI，基于当前条件重新构建候选。');
           return null;
         }
         if (loaded.status === 'consumed') {
           unknownOutcome = false;
-          setPhase('artifact-consumed', 'AI 候选已由工作区接收。', 'artifact consumed', '返回 AI 创建新的候选交接。');
+          setPhase('artifact-consumed', 'AI 候选已由工作区接收。', 'AI_CANDIDATE_CONSUMED', '返回 AI 创建新的候选交接。');
           return null;
         }
         if (loaded.status === 'rejected') {
           unknownOutcome = false;
-          setPhase('error', 'AI 候选已放弃。', 'artifact rejected', '返回 AI 重新 Build。');
+          setPhase('error', 'AI 候选已放弃。', 'AI_CANDIDATE_REJECTED', '返回 AI 重新构建候选。');
           return null;
         }
         if (receiveOptions.isDirty()) {
           setPhase(
             'workspace-dirty-conflict',
             '当前工作区已有未保存修改，未覆盖本地草稿。',
-            'workspace dirty',
+            'WORKSPACE_HAS_LOCAL_DRAFT',
             '先保存或放弃当前草稿，再重新接收候选。'
           );
           return null;
@@ -331,12 +331,12 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
           setPhase(
             'workspace-dirty-conflict',
             '接收期间工作区产生了未保存修改，候选未装载。',
-            'workspace dirty',
+            'WORKSPACE_HAS_LOCAL_DRAFT',
             '保留当前草稿并协调交接状态。'
           );
           return null;
         }
-        setPhase('workspace-staging', '正在把候选装载到唯一 Workspace owner。', null, '装载成功后确认一次性接收。');
+        setPhase('workspace-staging', '正在把候选装载到当前工程工作区。', null, '装载成功后确认一次性接收。');
         stagingAttempted = true;
         stagedArtifact = reserved;
         await receiveOptions.stage(reserved);
@@ -410,13 +410,13 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
         const phase = phaseFor(error);
         const message = rollbackAttempted
           ? rollbackFailed
-            ? `${failureMessage(error)} 本地草稿回滚失败，请保持页面并由 Workspace owner 继续协调。`
-            : `${failureMessage(error)} 本地候选已回滚，未留下未确认的 Flow 草稿。`
+            ? `${failureMessage(error)} 本地草稿回滚失败，请保持页面并继续核对工作区状态。`
+            : `${failureMessage(error)} 本地候选已回滚，未留下未确认的流程草稿。`
           : failureMessage(error);
-        setPhase(phase, message, failureCode(error) || 'handoff receive failed',
+        setPhase(phase, message, failureCode(error) || 'AI_CANDIDATE_RECEIVE_FAILED',
           phase === 'artifact-baseline-conflict'
-            ? '返回 AI 基于最新工程重新 Build。'
-            : '协调当前 artifact 状态后重试；不要重新创建候选。');
+            ? '返回 AI，基于最新工程重新构建候选。'
+            : '核对当前交接候选状态后重试；不要重新创建候选。');
         return null;
       } finally {
         if (requestGeneration === generation) {
@@ -445,7 +445,7 @@ export function createWorkspaceHandoffReceivePort(options: Readonly<{
       } catch (error) {
         if (!(error instanceof ApiAbortError)) {
           setPhase('error', failureMessage(error), failureCode(error) || 'handoff reject failed',
-            '协调 artifact 状态后离开。');
+            '核对交接候选状态后离开。');
         }
         return false;
       } finally {

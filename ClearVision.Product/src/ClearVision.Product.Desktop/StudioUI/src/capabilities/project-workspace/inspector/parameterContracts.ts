@@ -38,11 +38,13 @@ export interface InspectorOutputAvailabilityRule {
 
 export class InspectorMetadataDecodeError extends Error {
   readonly path: string;
+  readonly expectation: string;
 
   constructor(path: string, expectation: string) {
-    super(`Inspector metadata field ${path} must be ${expectation}.`);
+    super('属性检查器参数定义格式不符合要求，请刷新后重试。');
     this.name = 'InspectorMetadataDecodeError';
     this.path = path;
+    this.expectation = expectation;
   }
 }
 

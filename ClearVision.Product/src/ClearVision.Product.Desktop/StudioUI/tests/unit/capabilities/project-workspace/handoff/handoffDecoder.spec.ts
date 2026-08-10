@@ -44,26 +44,44 @@ describe('F06 G4 Workspace handoff decoder', () => {
       ownerHash: 'private-owner'
     })).toThrow(WorkspaceHandoffContractError);
 
-    expect(() => decodeWorkspaceHandoffArtifactV1({
-      ...handoffArtifactPayload({ status: 'consumed' }),
-      consumeReceipt: {
-        clientOperationId: '55555555-5555-4555-8555-555555555555',
-        acknowledgedAtUtc: '2026-07-29T08:05:00.000Z',
-        projectSaved: true
-      }
-    })).toThrow('$.consumeReceipt.projectSaved');
+    let receiptFailure: unknown;
+    try {
+      decodeWorkspaceHandoffArtifactV1({
+        ...handoffArtifactPayload({ status: 'consumed' }),
+        consumeReceipt: {
+          clientOperationId: '55555555-5555-4555-8555-555555555555',
+          acknowledgedAtUtc: '2026-07-29T08:05:00.000Z',
+          projectSaved: true
+        }
+      });
+    } catch (error) {
+      receiptFailure = error;
+    }
+    expect(receiptFailure).toMatchObject({ path: '$.consumeReceipt.projectSaved' });
   });
 
   it('rejects a new target carrying a Project identity and a mismatched candidate fingerprint', () => {
-    expect(() => decodeWorkspaceHandoffArtifactV1(handoffArtifactPayload({
-      projectBaseline: {
-        targetKind: 'new', projectId: '22222222-2222-4222-8222-222222222222',
-        persistenceRevision: 0, canonicalFlowHash: ''
-      }
-    }))).toThrow('$.projectBaseline');
+    let baselineFailure: unknown;
+    try {
+      decodeWorkspaceHandoffArtifactV1(handoffArtifactPayload({
+        projectBaseline: {
+          targetKind: 'new', projectId: '22222222-2222-4222-8222-222222222222',
+          persistenceRevision: 0, canonicalFlowHash: ''
+        }
+      }));
+    } catch (error) {
+      baselineFailure = error;
+    }
+    expect(baselineFailure).toMatchObject({ path: '$.projectBaseline' });
 
-    expect(() => decodeWorkspaceHandoffArtifactV1(handoffArtifactPayload({
-      candidateFlowFingerprint: 'f'.repeat(64)
-    }))).toThrow('$.build');
+    let fingerprintFailure: unknown;
+    try {
+      decodeWorkspaceHandoffArtifactV1(handoffArtifactPayload({
+        candidateFlowFingerprint: 'f'.repeat(64)
+      }));
+    } catch (error) {
+      fingerprintFailure = error;
+    }
+    expect(fingerprintFailure).toMatchObject({ path: '$.build' });
   });
 });

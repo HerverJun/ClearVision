@@ -69,6 +69,7 @@ describe('Overview page', () => {
         { path: '/overview', component: { template: '<div />' } },
         { path: '/projects', component: { template: '<div />' } },
         { path: '/projects/:projectId', component: { template: '<div />' } },
+        { path: '/projects/:projectId/workspace', component: { template: '<div />' } },
         { path: '/diagnostics', component: { template: '<div />' } },
         { path: '/about', component: { template: '<div />' } }
       ]
@@ -86,6 +87,7 @@ describe('Overview page', () => {
     expect(wrapper.text()).toContain('operator-a');
     expect(wrapper.text()).toContain('操作员');
     expect(wrapper.text()).toContain('最近工程');
+    expect(wrapper.get('a[href="/projects/11111111-1111-4111-8111-111111111111/workspace"]').text()).toBe('继续配置');
     expect(wrapper.findAll('a').some(link => link.text().includes('诊断'))).toBe(false);
     expect(requestedPaths).toEqual(['projects/recent?count=5']);
     expect(requestedPaths).not.toContain('/health');

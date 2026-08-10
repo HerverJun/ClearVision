@@ -28,12 +28,12 @@ const revision = computed(() => props.project?.persistenceRevision ?? null);
     </div>
     <CvStatusBadge
       :tone="project ? 'info' : 'idle'"
-      :label="project ? '服务端工程上下文' : '未绑定工程'"
+      :label="project ? '已绑定工程' : '未绑定工程'"
     />
     <span
       v-if="session"
       class="ai-project-context__session"
-    >会话修订 {{ session.snapshot.revision }}</span>
+    >会话版本 {{ session.snapshot.revision }}</span>
   </div>
 </template>
 

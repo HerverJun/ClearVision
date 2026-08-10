@@ -163,9 +163,11 @@ async function waitInteractive(page, route) {
     : '[data-capability="overview"]';
   await page.locator(selector).waitFor({ state: 'visible' });
   await waitForFunctionWithoutHandle(page, () => {
-    const user = document.querySelector('.product-layout__user strong')?.textContent?.trim();
+    const sessionLabel = document.querySelector(
+      '[data-product-user-menu] button[aria-haspopup="menu"]'
+    )?.getAttribute('aria-label')?.trim();
     const loading = document.querySelector('[data-page-state="loading"]');
-    return Boolean(user && user !== '未认证' && !loading);
+    return Boolean(sessionLabel && !sessionLabel.includes('未认证') && !loading);
   }, null, { timeout: 30_000 });
 }
 

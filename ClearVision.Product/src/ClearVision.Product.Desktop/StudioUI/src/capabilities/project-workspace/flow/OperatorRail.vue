@@ -332,9 +332,9 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
 }
 .operator-rail__categories { width: 100%; height: 100%; padding: var(--cv-space-2) 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; }
 .operator-rail__categories::-webkit-scrollbar { display: none; }
-.operator-rail__category-button { position: relative; width: 100%; min-height: 44px; padding: 4px 2px; display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 0; background: transparent; color: var(--cv-shell-sidebar-muted); font: inherit; cursor: pointer; }
+.operator-rail__category-button { position: relative; width: 100%; min-height: 46px; padding: 4px 3px; display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 0; background: transparent; color: var(--cv-shell-sidebar-muted); font: inherit; cursor: pointer; }
 .operator-rail__category-button::before { position: absolute; inset: 8px auto 8px 0; width: 3px; border-radius: 0 var(--cv-radius-pill) var(--cv-radius-pill) 0; background: transparent; content: ''; }
-.operator-rail__category-button span { width: 100%; overflow: hidden; font-size: var(--cv-font-size-2xs); line-height: 1.2; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.operator-rail__category-button span { width: 100%; min-height: 1.2em; overflow: hidden; display: -webkit-box; font-size: var(--cv-font-size-2xs); line-height: 1.2; text-align: center; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .operator-rail__category-button:hover { background: var(--cv-shell-sidebar-hover); color: var(--cv-shell-sidebar-text); }
 .operator-rail__category-button.is-active { background: var(--cv-color-brand-soft); color: var(--cv-color-brand-text); }
 .operator-rail__category-button.is-active::before { background: var(--cv-color-brand-500); }
@@ -344,6 +344,6 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
 
 @media (max-height: 760px) {
   .operator-rail__categories { padding-block: var(--cv-space-1); }
-  .operator-rail__category-button { min-height: 39px; }
+  .operator-rail__category-button { min-height: 42px; }
 }
 </style>

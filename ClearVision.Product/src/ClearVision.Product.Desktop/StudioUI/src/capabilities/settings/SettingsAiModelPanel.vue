@@ -86,17 +86,17 @@ const presetOverrides = reactive({
 const draft = reactive<DraftState>(emptyDraft());
 
 const providerPresetOptions: readonly CvSelectOption[] = Object.freeze([
-  { value: 'custom', label: 'Custom provider' },
+  { value: 'custom', label: '自定义服务商' },
   { value: 'openai', label: 'OpenAI' },
-  { value: 'openai-compatible', label: 'OpenAI-compatible' },
+  { value: 'openai-compatible', label: 'OpenAI 兼容服务' },
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'azure-openai', label: 'Azure OpenAI' },
   { value: 'ollama', label: 'Ollama' }
 ]);
 const baseUrlOptions: readonly CvSelectOption[] = Object.freeze([
-  { value: 'preserve', label: 'Preserve current URL (default)' },
-  { value: 'replace', label: 'Replace URL' },
-  { value: 'clear', label: 'Clear URL' }
+  { value: 'preserve', label: '保留当前服务地址' },
+  { value: 'replace', label: '替换服务地址' },
+  { value: 'clear', label: '清除服务地址' }
 ]);
 const protocolOptions: readonly CvSelectOption[] = Object.freeze([
   { value: 'openai_compatible', label: 'OpenAI Compatible' },
@@ -109,42 +109,43 @@ const wireApiOptions: readonly CvSelectOption[] = Object.freeze([
   { value: 'responses', label: 'Responses' }
 ]);
 const authModeOptions: readonly CvSelectOption[] = Object.freeze([
-  { value: 'bearer', label: 'Bearer' },
-  { value: 'header_key', label: 'Header key' },
-  { value: 'none', label: 'None' }
+  { value: 'bearer', label: 'Bearer 令牌' },
+  { value: 'header_key', label: '请求头密钥' },
+  { value: 'none', label: '无需认证' }
 ]);
 const apiKeyOptions = computed<readonly CvSelectOption[]>(() => {
   if (draft.authMode === 'none') {
-    return Object.freeze([{ value: 'clear', label: '不使用 API key' }]);
+    return Object.freeze([{ value: 'clear', label: '不使用 API 密钥' }]);
   }
   if (isNewModel.value) {
     return Object.freeze([
-      { value: 'replace', label: '创建并写入 key' },
-      { value: 'clear', label: '暂不配置 key（稍后补充）' }
+      { value: 'replace', label: '写入 API 密钥' },
+      { value: 'clear', label: '暂不配置密钥' }
     ]);
   }
   return Object.freeze([
-    { value: 'keep', label: '保留当前 key（默认）' },
-    { value: 'replace', label: '替换 key' },
-    { value: 'clear', label: '清除 key' }
+    { value: 'keep', label: '保留当前 API 密钥' },
+    { value: 'replace', label: '替换 API 密钥' },
+    { value: 'clear', label: '清除 API 密钥' }
   ]);
 });
 const roleOptions: readonly CvSelectOption[] = Object.freeze([
-  { value: 'generation', label: 'generation' },
-  { value: 'planner', label: 'planner' },
-  { value: 'vision-agent-shadow-eval', label: 'shadow-eval' },
-  { value: 'reasoning', label: 'reasoning' },
-  { value: 'vision', label: 'vision' },
-  { value: 'fallback', label: 'fallback' },
-  { value: 'validation', label: 'validation' }
+  { value: 'generation', label: '内容生成' },
+  { value: 'planner', label: '流程规划' },
+  { value: 'vision-agent-shadow-eval', label: '影子评估' },
+  { value: 'reasoning', label: '推理' },
+  { value: 'vision', label: '图像理解' },
+  { value: 'fallback', label: '备用' },
+  { value: 'validation', label: '验证' }
 ]);
 const reasoningModeOptions = computed<readonly CvSelectOption[]>(() => {
   const allowed = displayReasoningSupport.value?.allowedModes ?? ['auto', 'off', 'on'];
-  return allowed.map(value => ({ value, label: value === 'auto' ? 'Auto' : value === 'off' ? 'Off' : 'On' }));
+  return allowed.map(value => ({ value, label: value === 'auto' ? '自动' : value === 'off' ? '关闭' : '开启' }));
 });
 const reasoningEffortOptions = computed<readonly CvSelectOption[]>(() => {
   const allowed = displayReasoningSupport.value?.allowedEfforts ?? ['low', 'medium', 'high', 'xhigh'];
-  return allowed.map(value => ({ value, label: value === 'xhigh' ? 'XHigh' : value[0]!.toUpperCase() + value.slice(1) }));
+  const labels: Readonly<Record<string, string>> = { low: '低', medium: '中', high: '高', xhigh: '极高' };
+  return allowed.map(value => ({ value, label: labels[value] ?? value }));
 });
 
 const selectedModel = computed(() => models.value.find(item => item.id === selectedId.value) ?? null);
@@ -168,9 +169,9 @@ const selectedSafeDetails = computed<readonly CvDescriptionItem[]>(() => {
   const model = selectedModel.value;
   if (!model) return [];
   return [
-    { key: 'provider', label: 'Provider', value: model.provider },
+    { key: 'provider', label: '服务商', value: providerDisplayLabel(model.provider) },
     { key: 'model', label: '模型名', value: model.model || '未设置' },
-    { key: 'role', label: '主角色', value: model.modelRole ?? '未声明' },
+    { key: 'role', label: '主要用途', value: roleDisplayLabel(model.modelRole) },
     { key: 'enabled', label: '状态', value: model.isEnabled ? '启用' : '停用' },
     { key: 'active', label: '激活', value: model.isActive ? '当前激活' : '未激活' },
     { key: 'capabilities', label: '能力元数据', value: capabilitySummary(model.capabilities) }
@@ -350,8 +351,34 @@ function supportFromRecord(value: JsonRecord | null | undefined): AiReasoningSup
 
 function capabilitySummary(value: JsonRecord | null): string {
   if (!value) return '未返回';
-  const entries = Object.entries(value).map(([key, item]) => `${key}=${String(item)}`);
+  const labels: Readonly<Record<string, string>> = {
+    supportsVisionInput: '图像输入',
+    supportsToolCall: '工具调用',
+    supportsReasoning: '推理',
+    supportsStreaming: '流式响应'
+  };
+  const entries = Object.entries(value).map(([key, item]) => {
+    const label = labels[key] ?? key;
+    if (typeof item === 'boolean') return item ? `支持${label}` : `不支持${label}`;
+    return `${label}：${String(item)}`;
+  });
   return entries.length > 0 ? entries.join(', ') : '未声明';
+}
+
+function providerDisplayLabel(value: string): string {
+  return value.trim().toLowerCase() === 'openai compatible' ? 'OpenAI 兼容服务' : value || '未声明';
+}
+
+function roleDisplayLabel(value: string | null | undefined): string {
+  return roleOptions.find(option => option.value === value)?.label ?? value ?? '未声明';
+}
+
+function lastTestStatusLabel(value: string | null | undefined): string {
+  if (!value) return '未测试';
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'ok' || normalized === 'success' || normalized === 'passed') return '成功';
+  if (normalized === 'failed' || normalized === 'error') return '失败';
+  return value;
 }
 
 function snapshotDraft(): Readonly<Record<string, unknown>> {
@@ -442,9 +469,9 @@ function reportUnknownMutation(message = 'AI 模型操作结果未知，请先�
   feedback.value = {
     kind: 'unknown',
     message,
-    savedLabel: 'unknown',
-    effectiveLabel: 'unknown',
-    restartLabel: 'unknown'
+    savedLabel: '结果未知',
+    effectiveLabel: '结果未知',
+    restartLabel: '重新读取后判断'
   };
 }
 
@@ -489,18 +516,18 @@ function setBaseUrlMode(value: string): void {
 
 function validateDraft(): string | null {
   if (!draft.displayName.trim() && !draft.name.trim()) return '请填写模型名称。';
-  if (!draft.provider.trim()) return '请填写 Provider。';
+  if (!draft.provider.trim()) return '请填写服务商。';
   if (!draft.model.trim()) return '请填写模型名。';
   const timeout = Number(draft.timeoutMs);
-  if (!Number.isInteger(timeout) || timeout <= 0) return 'Timeout 必须是正整数毫秒。';
+  if (!Number.isInteger(timeout) || timeout <= 0) return '超时时间必须是正整数毫秒。';
   const priority = Number(draft.priority);
-  if (!Number.isInteger(priority) || priority < 0) return 'Priority 必须是非负整数。';
-  if (draft.authMode === 'none' && apiKeyMode.value !== 'clear') return '不使用认证的模型必须明确清除 API key。';
-  if (isNewModel.value && apiKeyMode.value === 'keep') return '新模型没有可保留的 API key，请选择写入 key 或暂不配置。';
+  if (!Number.isInteger(priority) || priority < 0) return '优先级必须是非负整数。';
+  if (draft.authMode === 'none' && apiKeyMode.value !== 'clear') return '无需认证的模型不能保留 API 密钥。';
+  if (isNewModel.value && apiKeyMode.value === 'keep') return '新模型没有可保留的 API 密钥，请选择写入或暂不配置。';
   if (apiKeyMode.value === 'replace') {
-    if (!apiKeyDraft.value.trim()) return '选择替换 API key 后必须输入新 key。';
+    if (!apiKeyDraft.value.trim()) return '选择替换 API 密钥后，必须输入新密钥。';
     if (isRedactedPlaceholder(apiKeyDraft.value) || apiKeyDraft.value === selectedFullModel.value?.apiKeyMasked) {
-      return '不能把 masked API key 当作真实 key 回写。请重新输入真实 key，或选择保留。';
+      return '不能把已隐藏的 API 密钥当作真实密钥保存。请重新输入，或选择保留当前密钥。';
     }
   }
   if (baseUrlMode.value === 'replace') {
@@ -655,7 +682,7 @@ async function deleteModel(id: string): Promise<void> {
     return;
   }
   if (models.value.length <= 1) {
-    feedback.value = { kind: 'error', message: '后端要求至少保留一个 AI 模型配置。', savedLabel: '未删除', effectiveLabel: '未生效', restartLabel: '不适用' };
+    feedback.value = { kind: 'error', message: '至少需要保留一个 AI 模型配置。', savedLabel: '未删除', effectiveLabel: '未生效', restartLabel: '不适用' };
     return;
   }
   if (!window.confirm(`确认删除 AI 模型“${model.displayName}”？`)) return;
@@ -775,7 +802,7 @@ async function testSelectedModel(): Promise<void> {
     return;
   }
   if (dirty.value) {
-    feedback.value = { kind: 'error', message: '请先保存模型配置，再执行连接测试。连接测试只验证通信合同，不代表真实 LLM 产品质量。', savedLabel: '未保存', effectiveLabel: '未测试', restartLabel: '不适用' };
+    feedback.value = { kind: 'error', message: '请先保存模型配置，再执行连接测试。连接测试只验证通信配置，不代表语言模型生成质量。', savedLabel: '未保存', effectiveLabel: '未测试', restartLabel: '不适用' };
     return;
   }
   const owner = props.owner;
@@ -880,8 +907,8 @@ onDeactivated(() => {
 
       <CvPanel
         v-if="canEditSelected"
-        title="模型配置"
-        description="保存后会重新读取 AI 模型服务；API 密钥只在明确选择替换或清除时提交。"
+        title="模型连接配置"
+        description="配置智能助手使用的语言模型服务。API 密钥仅在明确选择替换或清除时提交。"
         data-settings-ai-model-editor
       >
         <form
@@ -889,129 +916,73 @@ onDeactivated(() => {
           autocomplete="off"
           @submit.prevent="save"
         >
-          <CvField
-            v-model="draft.name"
-            label="内部名称"
-            placeholder="Local alias"
-            :readonly="mutationBusy"
-          />
-          <CvField
-            v-model="draft.displayName"
-            label="显示名称"
-            required
-            :readonly="mutationBusy"
-          />
-          <CvSelect
-            :model-value="providerPreset"
-            label="服务商预设"
-            :options="providerPresetOptions"
-            :disabled="mutationBusy"
-            data-settings-ai-provider-preset
-            @update:model-value="setProviderPreset"
-          />
-          <CvField
-            :model-value="draft.provider"
-            label="服务商"
-            name="aiProvider"
-            :readonly="mutationBusy"
-            @update:model-value="onProviderInput"
-          />
-          <CvSelect
-            v-model="draft.protocol"
-            label="协议"
-            :options="protocolOptions"
-            :disabled="mutationBusy"
-            @update:model-value="markPresetOverride('protocol')"
-          />
-          <CvSelect
-            v-model="draft.wireApi"
-            label="接口协议"
-            :options="wireApiOptions"
-            :disabled="mutationBusy"
-            @update:model-value="markPresetOverride('wireApi')"
-          />
-          <CvSelect
-            v-model="draft.authMode"
-            label="认证方式"
-            :options="authModeOptions"
-            :disabled="mutationBusy"
-            @update:model-value="onAuthModeChanged"
-          />
-          <CvField
-            v-model="draft.authHeaderName"
-            label="认证请求头"
-            :readonly="mutationBusy || draft.authMode === 'none'"
-            @update:model-value="markPresetOverride('authHeaderName')"
-          />
-          <CvField
-            v-model="draft.model"
-            label="模型名"
-            name="aiModel"
-            required
-            placeholder="例如 gpt-4o-mini"
-            :readonly="mutationBusy"
-          />
-          <CvSelect
-            :model-value="baseUrlMode"
-            label="服务地址操作"
-            :options="baseUrlOptions"
-            :disabled="mutationBusy"
-            data-settings-ai-base-url-operation
-            @update:model-value="setBaseUrlMode"
-          />
-          <CvField
-            v-if="baseUrlMode === 'replace'"
-            v-model="draft.baseUrl"
-            label="服务地址替换"
-            name="aiBaseUrl"
-            placeholder="可选；服务端返回值可能已脱敏"
-            :readonly="mutationBusy"
-          />
-          <CvField
-            v-model="draft.timeoutMs"
-            label="超时（毫秒）"
-            type="number"
-            min="1"
-            :readonly="mutationBusy"
-          />
-          <CvField
-            v-model="draft.priority"
-            label="优先级"
-            type="number"
-            min="0"
-            :readonly="mutationBusy"
-          />
-          <label class="settings-ai-model__toggle">
-            <input
-              v-model="draft.isEnabled"
-              type="checkbox"
+          <div class="settings-ai-model__primary-grid">
+            <CvField
+              v-model="draft.displayName"
+              label="显示名称"
+              name="aiDisplayName"
+              required
+              :readonly="mutationBusy"
+            />
+            <CvSelect
+              :model-value="providerPreset"
+              label="服务商"
+              :options="providerPresetOptions"
               :disabled="mutationBusy"
-            >
-            <span><strong>启用模型</strong><small>停用只影响模型选择，不删除配置或已保存密钥。</small></span>
-          </label>
-          <CvSelect
-            :model-value="apiKeyMode"
-            label="API key 操作"
-            :options="apiKeyOptions"
-            :disabled="mutationBusy || draft.authMode === 'none'"
-            data-settings-ai-key-operation
-            @update:model-value="setApiKeyMode"
-          />
-          <CvField
-            v-if="apiKeyMode === 'replace'"
-            v-model="apiKeyDraft"
-            label="新 API key"
-            name="aiApiKey"
-            type="password"
-            autocomplete="new-password"
-            placeholder="不显示、不回填 masked 值"
-            :readonly="mutationBusy"
-          />
-          <CvField
-            v-model="draft.remark"
-            label="备注"
-            :readonly="mutationBusy"
-          />
+              data-settings-ai-provider-preset
+              @update:model-value="setProviderPreset"
+            />
+            <CvField
+              v-model="draft.model"
+              label="模型名"
+              name="aiModel"
+              required
+              placeholder="例如 gpt-4o-mini"
+              :readonly="mutationBusy"
+            />
+            <label class="settings-ai-model__toggle">
+              <input
+                v-model="draft.isEnabled"
+                type="checkbox"
+                :disabled="mutationBusy"
+              >
+              <span><strong>启用此配置</strong><small>停用不会删除配置或已保存密钥。</small></span>
+            </label>
+            <CvSelect
+              :model-value="baseUrlMode"
+              label="服务地址"
+              :options="baseUrlOptions"
+              :disabled="mutationBusy"
+              data-settings-ai-base-url-operation
+              @update:model-value="setBaseUrlMode"
+            />
+            <CvField
+              v-if="baseUrlMode === 'replace'"
+              v-model="draft.baseUrl"
+              label="新服务地址"
+              name="aiBaseUrl"
+              placeholder="例如 https://api.example.com/v1"
+              :readonly="mutationBusy"
+            />
+            <CvSelect
+              :model-value="apiKeyMode"
+              label="API 密钥"
+              :options="apiKeyOptions"
+              :disabled="mutationBusy || draft.authMode === 'none'"
+              data-settings-ai-key-operation
+              @update:model-value="setApiKeyMode"
+            />
+            <CvField
+              v-if="apiKeyMode === 'replace'"
+              v-model="apiKeyDraft"
+              label="新 API 密钥"
+              name="aiApiKey"
+              type="password"
+              autocomplete="new-password"
+              placeholder="仅本次保存使用"
+              :readonly="mutationBusy"
+            />
+          </div>
         </form>
 
         <div
@@ -1019,34 +990,128 @@ onDeactivated(() => {
           class="settings-ai-model__last-test"
           data-settings-ai-last-test
         >
-          <span>最近测试状态：{{ selectedFullModel.lastTestStatus || '未测试' }}</span>
-          <span>最近测试时间：{{ selectedFullModel.lastTestAt || '不可用' }}</span>
-          <span>最近测试延迟：{{ selectedFullModel.lastTestLatencyMs ?? '不可用' }} ms</span>
-        </div>
-        <div
-          v-if="selectedFullModel"
-          class="settings-ai-model__readonly-secrets"
-          data-settings-ai-readonly-extra
-        >
-          额外请求头、查询参数和请求体在设置中仅以脱敏视图只读展示，不支持编辑。
-        </div>
-
-        <div class="settings-ai-model__roles">
-          <span class="settings-ai-model__eyebrow">角色绑定</span>
-          <label
-            v-for="option in roleOptions"
-            :key="String(option.value)"
-            class="settings-ai-model__role"
+          <div>
+            <span>最近连接测试</span>
+            <strong>{{ lastTestStatusLabel(selectedFullModel.lastTestStatus) }}</strong>
+            <small>{{ selectedFullModel.lastTestAt || '尚无测试时间' }} · {{ selectedFullModel.lastTestLatencyMs === null ? '无延迟数据' : `${selectedFullModel.lastTestLatencyMs} 毫秒` }}</small>
+          </div>
+          <CvButton
+            size="sm"
+            variant="secondary"
+            :disabled="mutationBusy || dirty"
+            data-settings-ai-model-test
+            @click="testSelectedModel"
           >
-            <input
-              type="checkbox"
-              :checked="draft.roleBindings.includes(String(option.value))"
-              :disabled="mutationBusy"
-              @change="toggleRole(String(option.value), $event)"
-            >
-            <span>{{ option.label }}</span>
-          </label>
+            测试连接
+          </CvButton>
         </div>
+        <CvInlineAlert
+          v-if="connectionResult"
+          :tone="connectionResult.connectionOk ? 'success' : 'error'"
+          :title="connectionResult.connectionOk ? '通信测试成功' : '通信测试失败'"
+          data-settings-ai-model-test-result
+        >
+          {{ connectionResult.sanitizedMessage || connectionResult.message || connectionResult.errorCode }}
+          <span v-if="connectionResult.latencyMs > 0">（{{ connectionResult.latencyMs }} 毫秒）</span>
+        </CvInlineAlert>
+
+        <details
+          class="settings-ai-model__advanced"
+          data-settings-ai-advanced
+        >
+          <summary>
+            <span>高级连接与调度设置</span>
+            <small>自定义服务商、协议、认证、超时和角色绑定</small>
+          </summary>
+          <div class="settings-ai-model__advanced-content">
+            <div class="settings-ai-model__advanced-grid">
+              <CvField
+                v-model="draft.name"
+                label="内部名称"
+                placeholder="用于配置识别"
+                :readonly="mutationBusy"
+              />
+              <CvField
+                :model-value="draft.provider"
+                label="自定义服务商名称"
+                name="aiProvider"
+                :readonly="mutationBusy"
+                @update:model-value="onProviderInput"
+              />
+              <CvSelect
+                v-model="draft.protocol"
+                label="服务协议"
+                :options="protocolOptions"
+                :disabled="mutationBusy"
+                @update:model-value="markPresetOverride('protocol')"
+              />
+              <CvSelect
+                v-model="draft.wireApi"
+                label="接口类型"
+                :options="wireApiOptions"
+                :disabled="mutationBusy"
+                @update:model-value="markPresetOverride('wireApi')"
+              />
+              <CvSelect
+                v-model="draft.authMode"
+                label="认证方式"
+                :options="authModeOptions"
+                :disabled="mutationBusy"
+                @update:model-value="onAuthModeChanged"
+              />
+              <CvField
+                v-model="draft.authHeaderName"
+                label="认证请求头"
+                :readonly="mutationBusy || draft.authMode === 'none'"
+                @update:model-value="markPresetOverride('authHeaderName')"
+              />
+              <CvField
+                v-model="draft.timeoutMs"
+                label="超时时间（毫秒）"
+                type="number"
+                min="1"
+                :readonly="mutationBusy"
+              />
+              <CvField
+                v-model="draft.priority"
+                label="选择优先级"
+                type="number"
+                min="0"
+                :readonly="mutationBusy"
+              />
+              <CvField
+                v-model="draft.remark"
+                label="备注"
+                :readonly="mutationBusy"
+              />
+            </div>
+
+            <div
+              v-if="selectedFullModel"
+              class="settings-ai-model__readonly-secrets"
+              data-settings-ai-readonly-extra
+            >
+              附加请求头、查询参数和请求体仅显示已隐藏敏感值的只读摘要。
+            </div>
+
+            <div class="settings-ai-model__roles">
+              <span class="settings-ai-model__eyebrow">角色绑定</span>
+              <label
+                v-for="option in roleOptions"
+                :key="String(option.value)"
+                class="settings-ai-model__role"
+              >
+                <input
+                  type="checkbox"
+                  :checked="draft.roleBindings.includes(String(option.value))"
+                  :disabled="mutationBusy"
+                  @change="toggleRole(String(option.value), $event)"
+                >
+                <span>{{ option.label }}</span>
+              </label>
+            </div>
+          </div>
+        </details>
 
         <div class="settings-ai-model__reasoning">
           <div class="settings-ai-model__reasoning-heading">
@@ -1082,13 +1147,13 @@ onDeactivated(() => {
             />
           </div>
           <p class="settings-ai-model__help">
-            {{ displayReasoningSupport?.helpText ?? '推理支持只描述服务端能力，不评价真实 LLM 产品质量。' }}
+            {{ displayReasoningSupport?.helpText ?? '推理支持只描述服务端能力，不评价语言模型生成质量。' }}
           </p>
         </div>
 
         <template #footer>
           <div class="settings-ai-model__footer">
-            <span>{{ dirty ? '有未保存修改' : '与服务端模型状态一致' }}</span>
+            <span>{{ dirty ? '有未保存修改' : '模型配置已保存' }}</span>
             <div class="settings-ai-model__actions">
               <CvButton
                 size="sm"
@@ -1097,16 +1162,6 @@ onDeactivated(() => {
                 @click="resetDraft(selectedModel)"
               >
                 放弃修改
-              </CvButton>
-              <CvButton
-                v-if="selectedId"
-                size="sm"
-                variant="quiet"
-                :disabled="mutationBusy || dirty"
-                data-settings-ai-model-test
-                @click="testSelectedModel"
-              >
-                测试连接
               </CvButton>
               <CvButton
                 size="sm"
@@ -1126,8 +1181,8 @@ onDeactivated(() => {
 
       <CvPanel
         v-else-if="selectedModel"
-        title="安全模型视图"
-        description="工程师只读取后端脱敏信息；不会看到服务地址、认证请求头或 API key。"
+        title="模型只读信息"
+        description="工程师可查看用途、状态和能力；服务地址、认证请求头和 API 密钥均已隐藏。"
         data-settings-ai-model-safe
       >
         <CvDescriptionList
@@ -1155,31 +1210,16 @@ onDeactivated(() => {
             </CvButton>
           </div>
           <p class="settings-ai-model__help">
-            {{ displayReasoningSupport?.helpText ?? '该诊断只验证服务端能力合同，不评价真实 LLM 产品质量。' }}
+            {{ displayReasoningSupport?.helpText ?? '该诊断只读取服务端支持范围，不评价语言模型生成质量。' }}
           </p>
         </div>
-      </CvPanel>
-
-      <CvPanel
-        v-if="connectionResult"
-        title="连接测试结果"
-        description="此结果只说明通信接口可用，不代表模型生成质量已经通过产品验收。"
-        data-settings-ai-model-test-result
-      >
-        <CvInlineAlert
-          :tone="connectionResult.connectionOk ? 'success' : 'error'"
-          :title="connectionResult.connectionOk ? '通信测试成功' : '通信测试失败'"
-        >
-          {{ connectionResult.sanitizedMessage || connectionResult.message || connectionResult.errorCode }}
-          <span v-if="connectionResult.latencyMs > 0">（{{ connectionResult.latencyMs }} ms）</span>
-        </CvInlineAlert>
       </CvPanel>
     </template>
 
     <CvInlineAlert
       v-if="feedback"
-      :tone="feedback.kind === 'saved' ? 'success' : feedback.kind === 'unknown' ? 'warning' : 'error'"
-      :title="feedback.kind === 'saved' ? 'AI 模型操作已完成' : feedback.kind === 'unknown' ? 'AI 模型操作结果未知' : 'AI 模型操作未完成'"
+      :tone="feedback.kind === 'saved' || feedback.kind === 'completed' ? 'success' : feedback.kind === 'unknown' ? 'warning' : 'error'"
+      :title="feedback.kind === 'saved' || feedback.kind === 'completed' ? 'AI 模型操作已完成' : feedback.kind === 'unknown' ? 'AI 模型操作结果未知' : 'AI 模型操作未完成'"
       data-settings-ai-model-feedback
     >
       {{ feedback.message }}
@@ -1189,14 +1229,23 @@ onDeactivated(() => {
 
 <style scoped>
 .settings-ai-model { display: grid; min-width: 0; gap: var(--cv-density-page-gap); }
-.settings-ai-model__form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: var(--cv-space-4); }
+.settings-ai-model__form { min-width: 0; }
+.settings-ai-model__primary-grid, .settings-ai-model__advanced-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: var(--cv-space-4); }
 .settings-ai-model__toggle { display: flex; min-height: var(--cv-density-control-height); align-items: center; gap: var(--cv-space-2); }
 .settings-ai-model__toggle input, .settings-ai-model__role input { width: 16px; height: 16px; accent-color: var(--cv-color-brand-500); }
 .settings-ai-model__toggle span { display: grid; gap: 2px; }
 .settings-ai-model__toggle strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .settings-ai-model__toggle small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
-.settings-ai-model__last-test, .settings-ai-model__readonly-secrets { display: flex; flex-wrap: wrap; gap: var(--cv-space-3); margin-top: var(--cv-space-4); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }
-.settings-ai-model__readonly-secrets { color: var(--cv-text-muted); }
+.settings-ai-model__last-test { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-4); margin-top: var(--cv-space-4); padding: var(--cv-space-3) 0; border-block: 1px solid var(--cv-border-subtle); }
+.settings-ai-model__last-test > div { display: grid; min-width: 0; gap: 2px; }
+.settings-ai-model__last-test span, .settings-ai-model__last-test small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.settings-ai-model__last-test strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
+[data-settings-ai-model-test-result] { margin-top: var(--cv-space-3); }
+.settings-ai-model__advanced { margin-top: var(--cv-space-4); border-bottom: 1px solid var(--cv-border-subtle); }
+.settings-ai-model__advanced summary { min-height: var(--cv-density-control-height); padding: var(--cv-space-2) 0; border-top: 1px solid var(--cv-border-subtle); color: var(--cv-text-primary); cursor: pointer; font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); line-height: var(--cv-density-control-height-sm); }
+.settings-ai-model__advanced summary small { float: right; margin-left: var(--cv-space-4); color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-regular); }
+.settings-ai-model__advanced-content { padding: var(--cv-space-4) 0; }
+.settings-ai-model__readonly-secrets { margin-top: var(--cv-space-4); color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .settings-ai-model__roles { display: flex; flex-wrap: wrap; align-items: center; gap: var(--cv-space-2) var(--cv-space-3); margin-top: var(--cv-space-4); padding-top: var(--cv-space-4); border-top: 1px solid var(--cv-border-subtle); }
 .settings-ai-model__eyebrow { color: var(--cv-color-brand-text); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-semibold); }
 .settings-ai-model__role { display: inline-flex; align-items: center; gap: var(--cv-space-1); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
@@ -1211,11 +1260,12 @@ onDeactivated(() => {
 .settings-ai-model__footer { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-3); color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .settings-ai-model__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--cv-space-2); }
 @media (max-width: 900px) {
-  .settings-ai-model__form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .settings-ai-model__primary-grid, .settings-ai-model__advanced-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
-  .settings-ai-model__form, .settings-ai-model__reasoning-fields { grid-template-columns: 1fr; }
-  .settings-ai-model__reasoning-heading, .settings-ai-model__footer { align-items: stretch; flex-direction: column; }
+  .settings-ai-model__primary-grid, .settings-ai-model__advanced-grid, .settings-ai-model__reasoning-fields { grid-template-columns: 1fr; }
+  .settings-ai-model__advanced summary small { float: none; display: block; margin: 0; }
+  .settings-ai-model__last-test, .settings-ai-model__reasoning-heading, .settings-ai-model__footer { align-items: stretch; flex-direction: column; }
   .settings-ai-model__actions { justify-content: flex-start; }
 }
 </style>

@@ -1047,6 +1047,7 @@ export async function captureF06Evidence(
     ];
     return {
       viewport: { width: window.innerWidth, height: window.innerHeight },
+      theme: document.documentElement.dataset.theme ?? null,
       density: document.documentElement.dataset.density ?? null,
       overflow: Math.max(document.documentElement.scrollWidth - document.documentElement.clientWidth, document.body.scrollWidth - document.body.clientWidth),
       dpr: window.devicePixelRatio,

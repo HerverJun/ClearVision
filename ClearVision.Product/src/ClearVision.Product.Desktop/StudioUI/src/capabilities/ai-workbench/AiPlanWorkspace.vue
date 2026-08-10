@@ -173,9 +173,9 @@ const publicEvents = computed(() => props.events.filter(event =>
         <summary>工程诊断与公开规划详情</summary>
         <div class="ai-plan-workspace__diagnostic-grid">
           <dl>
-            <div><dt>Plan 标识</dt><dd>{{ plan.planId }}</dd></div>
-            <div><dt>Plan Hash</dt><dd>{{ plan.planHash }}</dd></div>
-            <div><dt>会话修订</dt><dd>{{ session.snapshot.revision }}</dd></div>
+            <div><dt>方案编号</dt><dd>{{ plan.planId }}</dd></div>
+            <div><dt>方案摘要</dt><dd>{{ plan.planHash }}</dd></div>
+            <div><dt>会话版本</dt><dd>{{ session.snapshot.revision }}</dd></div>
             <div><dt>Planner 来源</dt><dd>{{ plan.planSource || '未标记' }}</dd></div>
             <div><dt>Fallback 原因</dt><dd>{{ plan.fallbackReason || '无' }}</dd></div>
             <div><dt>合同版本</dt><dd>{{ plan.planContractVersion }}</dd></div>

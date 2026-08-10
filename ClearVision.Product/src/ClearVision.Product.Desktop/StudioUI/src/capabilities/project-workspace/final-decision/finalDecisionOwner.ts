@@ -362,7 +362,7 @@ export function createFinalDecisionOwner(options: {
       lease?.dispose('final-decision-owner-disposed');
       state.phase = 'disposed';
       state.candidates = Object.freeze([]);
-      state.message = '最终判定 owner 已释放。';
+      state.message = '最终判定编辑已关闭。';
     }
   });
   syncDiagnostics();

@@ -140,7 +140,9 @@ async function createHarness(options: {
   return { requests, queries, diagnostics, runtime, router };
 }
 
-function createProtectedRunHarness(runPhase: 'executing' | 'cancel-requested' | 'unknown-outcome' = 'executing') {
+function createProtectedRunHarness(
+  runPhase: 'executing' | 'cancel-requested' | 'unknown-outcome' | 'blocked' = 'executing'
+) {
   const diagnostics = createWorkspaceLifecycleDiagnosticsOwner({ publishToWindow: false });
   const project = {
     ...projectPayload(),
@@ -176,10 +178,29 @@ function createProtectedRunHarness(runPhase: 'executing' | 'cancel-requested' | 
     phase: runPhase,
     projectId: projectA,
     clientSnapshotId: '33333333-3333-4333-8333-333333333333',
-    admission: null,
+    admission: runPhase === 'blocked' ? {
+      allowed: false,
+      code: 'DECISION_BINDING_REQUIRED',
+      message: 'A final decision binding is required for official inspection.',
+      projectId: projectA,
+      clientSnapshotId: '33333333-3333-4333-8333-333333333333',
+      persistenceRevision: 3,
+      canonicalFlowHash: 'flow-hash',
+      decisionConfigurationHash: null,
+      violations: [{
+        operatorId: null,
+        operatorName: null,
+        operatorType: null,
+        reason: 'A final decision binding is required for official inspection.',
+        parameterName: null,
+        code: 'DECISION_BINDING_REQUIRED'
+      }]
+    } : null,
     result: null,
-    message: runPhase,
-    errorCode: null,
+    message: runPhase === 'blocked'
+      ? 'A final decision binding is required for official inspection.'
+      : runPhase,
+    errorCode: runPhase === 'blocked' ? 'DECISION_BINDING_REQUIRED' : null,
     canRun: false,
     canStop: runPhase === 'executing',
     canReconcile: runPhase !== 'executing'
@@ -329,6 +350,23 @@ describe('F03 G1 WorkspacePage', () => {
     expect(reconciling.get('[data-testid="workspace-run-reconcile"]').text()).toBe('查询运行结果');
     reconciling.unmount();
     reconcileHarness.runtime.dispose();
+  });
+
+  it('localizes backend admission messages without changing their diagnostic code', async () => {
+    const harness = createProtectedRunHarness('blocked');
+    const router = await createTestRouter();
+    const wrapper = mount(WorkspacePage, {
+      props: { projectId: projectA, runtime: harness.runtime },
+      global: { plugins: [router], stubs: { FlowWorkspace: flowWorkspaceStub } }
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('请先配置最终判定，再开始正式运行。');
+    expect(wrapper.text()).not.toContain('A final decision binding is required');
+    expect(harness.owner.projection.run?.errorCode).toBe('DECISION_BINDING_REQUIRED');
+
+    wrapper.unmount();
+    harness.runtime.dispose();
   });
 
   it('keeps flag-off at owner=0 and does not issue a Project GET', async () => {

@@ -21,7 +21,7 @@ function reloadApplication(): void {
       :title="isRouteLoadFailure ? '页面资源加载失败' : '未找到此页面'"
       :description="isRouteLoadFailure
         ? '页面代码未能从本机资源中加载。请刷新 Studio；若问题仍在，请重新启动应用。'
-        : '错误代码 404。该地址不属于当前 StudioUI 产品路由。'"
+        : '错误代码 404。该地址不属于当前 Studio 页面。'"
       :heading-level="1"
     >
       <template #actions>

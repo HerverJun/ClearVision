@@ -395,7 +395,7 @@ function confirmDelete(): void {
     <CvModal
       :open="deleteCandidate !== null"
       title="删除会话"
-      description="删除不会删除工程，但服务端会拒绝删除仍有关联运行、操作、交接工件或工作区暂存草稿的会话。"
+      description="删除不会删除工程，但服务端会拒绝删除仍有关联运行、操作、交接候选或工作区暂存草稿的会话。"
       size="sm"
       @close="deleteCandidate = null"
     >

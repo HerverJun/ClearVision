@@ -47,7 +47,7 @@ const statusLabel = computed(() => {
         <dd>{{ feedback.effectiveLabel }}</dd>
       </div>
       <div>
-        <dt>重载</dt>
+        <dt>后续</dt>
         <dd>{{ feedback.restartLabel }}</dd>
       </div>
     </dl>
@@ -62,18 +62,18 @@ const statusLabel = computed(() => {
 }
 
 .settings-write-feedback__semantics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--cv-space-2);
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--cv-space-2) var(--cv-space-4);
   margin: 0;
+  padding-inline: var(--cv-space-3);
 }
 
 .settings-write-feedback__semantics > div {
+  display: flex;
   min-width: 0;
-  padding: var(--cv-space-2) var(--cv-space-3);
-  border: 1px solid var(--cv-border-subtle);
-  border-radius: var(--cv-radius-sm);
-  background: var(--cv-surface-page);
+  gap: var(--cv-space-1);
 }
 
 .settings-write-feedback__semantics dt {
@@ -82,13 +82,10 @@ const statusLabel = computed(() => {
 }
 
 .settings-write-feedback__semantics dd {
-  margin: var(--cv-space-1) 0 0;
+  margin: 0;
   color: var(--cv-text-primary);
   font-size: var(--cv-font-size-xs);
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 620px) {
-  .settings-write-feedback__semantics { grid-template-columns: 1fr; }
-}
 </style>

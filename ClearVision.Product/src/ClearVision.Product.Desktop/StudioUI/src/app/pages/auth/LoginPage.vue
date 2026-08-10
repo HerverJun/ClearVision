@@ -15,6 +15,21 @@ const showPassword = ref(false);
 const messageRoot = ref<HTMLElement>();
 const busy = computed(() => root.auth.projection.phase === 'authenticating' ||
   root.auth.projection.phase === 'protected-transition');
+const pageTitle = computed(() => route.query.reason === 'expired' || route.query.reason === 'change-password'
+  ? '重新登录'
+  : '登录');
+const pageDescription = computed(() => {
+  if (route.query.reason === 'expired') return '会话已结束，请重新登录后继续原来的工作。';
+  if (route.query.reason === 'change-password') return '密码已更新，请使用新密码重新登录。';
+  if (route.query.reason === 'logout') return '你已安全退出，可再次登录进入工程配置与调试环境。';
+  return '使用工作站账号进入工程配置与调试环境。';
+});
+const messageTone = computed(() => {
+  if (root.auth.projection.phase === 'stale' || root.auth.projection.phase === 'expired') return 'warning';
+  if (root.auth.projection.errorCode) return 'error';
+  if (root.auth.projection.phase === 'authenticated') return 'success';
+  return 'info';
+});
 
 async function submit(): Promise<void> {
   const accepted = await root.auth.login({ username: username.value, password: password.value });
@@ -36,8 +51,8 @@ async function retryRecovery(): Promise<void> {
 
 <template>
   <AuthShell
-    title="登录"
-    description="认证成功并经 /api/auth/me 复核后，产品运行时才会挂载。"
+    :title="pageTitle"
+    :description="pageDescription"
   >
     <form
       class="auth-form"
@@ -51,6 +66,7 @@ async function retryRecovery(): Promise<void> {
         aria-live="polite"
         tabindex="-1"
         data-auth-message
+        :data-tone="messageTone"
       >
         {{ root.auth.projection.message }}
       </p>
@@ -103,7 +119,7 @@ async function retryRecovery(): Promise<void> {
           type="button"
           @click="retryRecovery"
         >
-          重试会话恢复
+          重新确认会话
         </CvButton>
       </div>
     </form>
