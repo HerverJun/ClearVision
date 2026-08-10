@@ -69,6 +69,15 @@ G6_LOCAL_RELEASE_SIZE_HEAD=f97009fabca7567598fab59e29ccc1037c472a09
 G6_LOCAL_UI_AUDIT=PASS
 WEBVIEW2_100_LOCAL_AUTOMATED=PASS_DEBUG_AND_RELEASE
 WEBVIEW2_100_SIZE_MATRIX=PASS_DEBUG_AND_RELEASE_1920_1536_1366
+VIEW_POLISH_BASE_HEAD=9c2ba21d0060ad8d70eb7e93f1228791e96ae6b8
+VIEW_POLISH_IMPLEMENTATION_HEAD=a3e59bd552d0e7dd73be9041487843daed87caea
+VIEW_POLISH_WORKTREE_STATE=IMPLEMENTATION_COMMITTED_EVIDENCE_BOUND
+VIEW_POLISH_V5_GATE=PASS_IMPLEMENTATION_COMMITTED
+VIEW_POLISH_V6_SOFTWARE=PASS_SHA_BOUND_AFTER_COMPLETE_SERIAL_RERUN
+VIEW_POLISH_PLAYWRIGHT=PASS_SHA_BOUND_175_OF_262_WITH_87_EVIDENCE_ONLY_SKIPS
+VIEW_POLISH_WEBVIEW2_100=PASS_SHA_BOUND_DEBUG_RELEASE_1920_1536_1366
+VIEW_POLISH_IN_APP_BROWSER=BLOCKED_BY_ENVIRONMENT
+VIEW_POLISH_OWNER_SIGNOFF=NOT_PERFORMED
 FIELD_CAMERA_PLC_STATION_AI=NOT_PERFORMED
 PRODUCTION_SOAK=NOT_PERFORMED
 ```
@@ -332,6 +341,33 @@ G5 的同一 SHA 本地软件门禁为 `DONE`。下列证据超出当前机器�
 
 因此 `FINAL_GATE=PARTIAL`、`PRODUCTION_ACCEPTANCE=NOT_GRANTED`、`LEGACY_RETIREMENT=NOT_APPROVED` 保持不变。
 G6 当前为 `BLOCKED_BY_ENVIRONMENT`，需要 Release/Field/Product Owner 在目标环境继续执行。
+
+### V5/V6 视觉精修已提交候选（2026-08-10）
+
+产品与测试实现已在基线 `9c2ba21d0060ad8d70eb7e93f1228791e96ae6b8` 上提交为
+`a3e59bd552d0e7dd73be9041487843daed87caea`，本节软件、Playwright 与真实 WebView2 100% 证据均绑定该
+implementation SHA。后续纯文档提交不改变此候选；任何产品代码变化仍要求重新冻结并重跑正式证据。
+该候选不自动改写既有 G5 生产证据，也不授予外部环境、人工或生产签收。详细 S00-S13 before/final 对比与
+交接边界见根 `TODOView.md`。
+
+| 证据域 | 当前结果与边界 |
+| --- | --- |
+| StudioUI 软件门禁 | `PASS_SHA_BOUND_AFTER_COMPLETE_SERIAL_RERUN`；lint、typecheck、production build、bundle gate、bundle reproducibility PASS；首次 full unit 的 `appMount.spec.ts` 首项 5 秒超时并引发 3 个 cleanup 级联失败，记为 `FAILED_THEN_PASSED_NOT_COUNTED_AS_INITIAL_PASS`；定向 5/5 PASS 后，完整串行重跑 140 files / `919/919` PASS |
+| 自动 UI 规则 | `PASS`；Impeccable detector `[]`；获取并按最新版 Web Interface Guidelines 定向扫描受影响 UI，未发现可复现 P0/P1/P2 |
+| 完整 Playwright | `PASS_SHA_BOUND`；`a3e59bd...` 上 262 total，`175 passed / 87 evidence-only skipped / 0 failed`；未使用占位 SHA 强制开启 evidence-only 用例 |
+| V5 方向性证据 | `PASS`；291 组 JSON/PNG 同名对和 12 张 screenshot-only PNG，JSON 解析、PNG 解码与配对错误均为 0；P0/P1/P2 为 0，P3 无系统性重复 |
+| WebView2 1920x1080 | `PASS_REAL_100_SHA_BOUND`；`.tmp/studio-ui-next/f09/view-polish-v6-a3e59bd/matrix-100-r1/`，17/17 子运行、DPI、local no-Node、publish/static/runtime 与 cleanup PASS；独立无 Node 目标机仍 `NOT_PERFORMED` |
+| WebView2 1536x864 / 1366x768 | `PASS_REAL_100_SHA_BOUND`；`.tmp/studio-ui-next/f09/view-polish-v6-a3e59bd/webview2-size-matrix-r1/`，Debug/Release 4/4；viewport 1520x800 / 1350x704，Canvas backing/pointer、theme/density、owner 与 cleanup PASS |
+| V6 完整性审计 | `PASS`；21 个 run manifest、21 个 cleanup JSON 与 16 张引用 PNG 通过审计，实际 SHA-256、byte length 和解码尺寸匹配；`studio-ui-webview2-candidate-audit.json`、`studio-ui-webview2-size-audit.json`、`studio-ui-dpi-evidence.json` 均 PASS |
+| 内置浏览器最终绑定 | `BLOCKED_BY_ENVIRONMENT`；端口 `42943` 最终重试超时；后续端口 `42944` 恢复复测确认 HTTP 200，但浏览器选择和规定的连接诊断先后超时并自动重置；两个 server/端口均已清理，Playwright/WebView2 不替代该项 |
+| 当前真实 DPI | native 96 DPI / 100%；Windows 125% `NOT_PERFORMED`，DPR/force scale 不外推 |
+| .NET / Remote CI / 现场 | 本视觉收口未运行新的 .NET 门禁，不外推既有 G5 PASS；Remote CI、独立 no-Node 目标机、现场硬件/AI、生产 soak 均保持既有状态 |
+| 人工与生产签收 | 产品 Owner `NOT_PERFORMED`；`VISUAL_ACCEPTANCE_GRANTED` 与 production acceptance 均 `NOT_GRANTED`；Legacy retirement `NOT_APPROVED` |
+| 临时产物清理 | `PASS`；服务、进程、端口及最终矩阵自有清理完成；用户授权的五个旧 publish/runtime 路径已永久删除（2,194 files / `1,454,810,170` bytes）；候选复验新建的 publish/runtime 根与一个空包装目录也在审计后删除（2,002 files / `1,440,353,363` bytes）；所有目标复核均已不存在，最终 JSON/PNG 证据保留 |
+
+本机可自主完成的 V5 实施、候选冻结、软件检查、Playwright、真实 WebView2 100% 与清理均已完成。V6 formal
+gate 仍因内置浏览器环境阻塞、Windows 125% 与人工签收缺失而保持 `PARTIAL`，不得写成
+`VISUAL_ENGINEERING_DONE` 或 `VISUAL_ACCEPTANCE_GRANTED`。
 
 ### G3 产品体验、视觉、中文与 Vue 工程收口
 

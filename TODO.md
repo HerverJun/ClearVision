@@ -54,6 +54,15 @@ G6_LOCAL_RELEASE_SIZE_HEAD=f97009fabca7567598fab59e29ccc1037c472a09
 G6_LOCAL_UI_AUDIT=PASS
 WEBVIEW2_100_LOCAL_AUTOMATED=PASS_DEBUG_AND_RELEASE
 WEBVIEW2_100_SIZE_MATRIX=PASS_DEBUG_AND_RELEASE_1920_1536_1366
+VIEW_POLISH_BASE_HEAD=9c2ba21d0060ad8d70eb7e93f1228791e96ae6b8
+VIEW_POLISH_IMPLEMENTATION_HEAD=a3e59bd552d0e7dd73be9041487843daed87caea
+VIEW_POLISH_WORKTREE_STATE=IMPLEMENTATION_COMMITTED_EVIDENCE_BOUND
+VIEW_POLISH_V5_GATE=PASS_IMPLEMENTATION_COMMITTED
+VIEW_POLISH_V6_SOFTWARE=PASS_SHA_BOUND_AFTER_COMPLETE_SERIAL_RERUN
+VIEW_POLISH_PLAYWRIGHT=PASS_SHA_BOUND_175_OF_262_WITH_87_EVIDENCE_ONLY_SKIPS
+VIEW_POLISH_WEBVIEW2_100=PASS_SHA_BOUND_DEBUG_RELEASE_1920_1536_1366
+VIEW_POLISH_IN_APP_BROWSER=BLOCKED_BY_ENVIRONMENT
+VIEW_POLISH_OWNER_SIGNOFF=NOT_PERFORMED
 WEBVIEW2_125=NOT_PERFORMED
 INDEPENDENT_NO_NODE=NOT_PERFORMED
 REMOTE_CI=BLOCKED_BY_ENVIRONMENT
@@ -86,6 +95,16 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
   production bundle gate 通过；仅文档前进后的 `f97009fab` 又以 self-contained Release publish 重跑
   1920x1080、1536x864、1366x768。Debug/Release 每组均完成主题/密度循环，六组原生 DPI 均为 96，
   不能外推为 Windows 125%。
+- `TODOView.md` 的视觉精修产品与测试实现已提交为 `a3e59bd...`。lint、typecheck、production build、bundle gates
+  全部绑定该 SHA；首次 full unit 因 `appMount.spec.ts` 首项 5 秒超时及 3 个 cleanup 级联失败而未计为初次通过，
+  定向 5/5 PASS 后的完整串行重跑为 140 files / `919/919` PASS。完整 Playwright 为
+  `175 passed / 87 evidence-only skipped / 0 failed`，真实 WebView2 100% Debug/Release 1920x1080、
+  1536x864、1366x768 复验也绑定同一 implementation SHA。内置浏览器最终绑定仍为
+  `BLOCKED_BY_ENVIRONMENT`；后续以 HTTP 200 的隔离端口 `42944` 复测时，浏览器选择和插件连接诊断仍先后
+  超时并自动重置，server/端口已清理。该阻塞不授予 `VISUAL_ENGINEERING_DONE` 或正式生产结论。
+- 视觉交接、临时服务/进程/端口及最终矩阵自有清理已完成；用户明确授权后永久删除五个保留的
+  publish/runtime 临时路径（2,194 files / `1,454,810,170` bytes）；候选复验新建的 publish/runtime 根与一个
+  空包装目录也在审计后删除（2,002 files / `1,440,353,363` bytes），逐项复核均已不存在，最终 JSON/PNG 证据保留。
 - Remote CI 当前为 `BLOCKED_BY_ENVIRONMENT`，Final Gate 为 `PARTIAL`，生产验收仍为 `NOT_GRANTED`。
 - 本机真实 WebView2 100% 自动证据已完成；Windows 125%、独立无 Node 目标机、现场 Camera/PLC/Station/AI、
   生产 soak 与产品 Owner 签收仍未完成，不能由本机证据替代。
