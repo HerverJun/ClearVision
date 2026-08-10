@@ -132,13 +132,15 @@ function submit(): void {
 
 <style scoped>
 .ai-task-composer {
+  justify-self: center;
+  width: min(1120px, 100%);
   display: grid;
   gap: var(--cv-space-4);
-  max-width: 920px;
-  padding: var(--cv-density-panel-padding);
+  padding: clamp(var(--cv-density-panel-padding), 2.2vw, var(--cv-space-6));
   border: 1px solid var(--cv-border-subtle);
   border-radius: var(--cv-radius-lg);
   background: var(--cv-surface-raised);
+  box-shadow: var(--cv-elevation-1);
 }
 .ai-task-composer__heading { display: flex; align-items: start; justify-content: space-between; gap: var(--cv-space-4); }
 .ai-task-composer__title { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-type-section-title-size); line-height: var(--cv-line-height-tight); }
@@ -148,7 +150,7 @@ function submit(): void {
 .ai-task-composer__label { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
 .ai-task-composer__textarea {
   width: 100%;
-  min-height: 156px;
+  min-height: 172px;
   resize: vertical;
   padding: var(--cv-space-3);
   border: 1px solid var(--cv-control-border);
@@ -169,7 +171,7 @@ function submit(): void {
 .ai-task-composer__mode { display: inline-flex; min-width: 0; margin: 0; padding: 3px; border: 1px solid var(--cv-border-default); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); }
 .ai-task-composer__mode legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
 .ai-task-composer__mode label { position: relative; display: inline-flex; min-height: var(--cv-density-control-height-sm); align-items: center; padding: 0 var(--cv-space-3); border-radius: calc(var(--cv-radius-sm) - 2px); color: var(--cv-text-secondary); cursor: pointer; font-size: var(--cv-font-size-xs); }
-.ai-task-composer__mode label.is-selected { background: var(--cv-surface-raised); color: var(--cv-text-primary); box-shadow: var(--cv-elevation-1); }
+.ai-task-composer__mode label.is-selected { background: var(--cv-color-action-soft); color: var(--cv-color-action-text); box-shadow: inset 0 0 0 1px var(--cv-color-action-border); }
 .ai-task-composer__mode input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .ai-task-composer__mode label:focus-within { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
 

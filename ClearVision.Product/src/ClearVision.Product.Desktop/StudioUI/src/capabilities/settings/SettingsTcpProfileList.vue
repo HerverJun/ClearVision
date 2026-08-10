@@ -98,7 +98,7 @@ const emit = defineEmits<{
 .tcp-profile-list__items { display: grid; gap: 2px; margin-top: var(--cv-space-3); }
 .tcp-profile-list__row { min-width: 0; min-height: 36px; padding: var(--cv-space-2); display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-2); border: 0; border-radius: var(--cv-radius-sm); background: transparent; color: var(--cv-text-secondary); text-align: left; cursor: pointer; }
 .tcp-profile-list__row:hover { background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
-.tcp-profile-list__row.is-active { background: var(--cv-color-brand-soft); color: var(--cv-color-brand-text); }
+.tcp-profile-list__row.is-active { background: var(--cv-color-action-soft); color: var(--cv-color-action-text); }
 .tcp-profile-list__main { display: grid; min-width: 0; gap: 2px; }
 .tcp-profile-list__main strong,.tcp-profile-list__main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tcp-profile-list__main strong { font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }

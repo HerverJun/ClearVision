@@ -107,7 +107,14 @@ const resultsExportOwner = shallowRef<ResultsExportOwner | null>(null);
 const resultsExportOpen = shallowRef(false);
 const comparisonLeftId = shallowRef('');
 const advancedFiltersOpen = shallowRef(
-  Boolean(firstQueryValue(route.query.diagnosticCode) || firstQueryValue(route.query.from) || firstQueryValue(route.query.to))
+  Boolean(
+    firstQueryValue(route.query.from) ||
+    firstQueryValue(route.query.to) ||
+    (
+      firstQueryValue(route.query.source) === 'station' &&
+      firstQueryValue(route.query.diagnosticCode)
+    )
+  )
 );
 const copiedTechnicalField = shallowRef<string | null>(null);
 type ResultsView = 'overview' | 'investigation';
@@ -196,6 +203,9 @@ const reversedDateRange = computed(() =>
   !invalidFrom.value && !invalidTo.value && Boolean(from.value && to.value) &&
   Date.parse(from.value) > Date.parse(to.value));
 const hasInvalidDate = computed(() => invalidFrom.value || invalidTo.value || reversedDateRange.value);
+const hasAdvancedFilters = computed(() => Boolean(
+  from.value || to.value || (source.value === 'station' && diagnosticCode.value)
+));
 const filters = computed<ResultsListFilters>(() => Object.freeze({
   stationId: stationId.value,
   outcome: outcome.value,
@@ -359,7 +369,14 @@ const outcomeModel = computed({
 });
 const diagnosticModel = computed({
   get: () => diagnosticCode.value,
-  set: value => { void updateQuery({ diagnosticCode: value || undefined, resultId: undefined, page: '1' }); }
+  set: value => {
+    const changes: LocationQueryRaw = {
+      diagnosticCode: value || undefined,
+      resultId: undefined
+    };
+    if (source.value === 'station') changes.page = '1';
+    void updateQuery(changes);
+  }
 });
 const fromModel = computed({
   get: () => from.value,
@@ -385,6 +402,10 @@ function updateQuery(changes: LocationQueryRaw): Promise<unknown> {
       ...changes
     }
   });
+}
+
+function clearCurrentPageDiagnostic(): void {
+  void updateQuery({ diagnosticCode: undefined, resultId: undefined });
 }
 
 function ensureProjectsOwner(): ReadQueryOwner<readonly ResultsProjectOption[]> {
@@ -826,15 +847,22 @@ watch(
   () => [projectId.value, outcome.value, from.value, to.value, diagnosticCode.value, page.value, pageSize.value],
   (next, previous) => {
     if (!mounted.value || source.value !== 'local') return;
+    const projectChanged = next[0] !== previous[0];
+    const queryScopeChanged = next.slice(0, 4).some((value, index) => value !== previous[index]);
+    const pageChanged = next[5] !== previous[5] || next[6] !== previous[6];
     if (next.slice(0, 5).some((value, index) => value !== previous[index])) {
       disposeResultsExport();
     }
-    if (next[0] !== previous[0]) {
+    if (projectChanged) {
       disposeLocalList();
       disposeLocalStatistics();
       disposeAnalysis();
     }
-    void Promise.all([refreshLocalList(true), refreshLocalStatistics(true), refreshAnalysis(true)]);
+    if (!queryScopeChanged && !pageChanged) return;
+    void Promise.all([
+      refreshLocalList(true),
+      ...(queryScopeChanged ? [refreshLocalStatistics(true), refreshAnalysis(true)] : [])
+    ]);
   }
 );
 
@@ -1031,7 +1059,7 @@ onBeforeUnmount(() => {
           </template>
           更多筛选
           <span
-            v-if="diagnosticCode || from || to"
+            v-if="hasAdvancedFilters"
             class="results-page__filter-count"
           >已应用</span>
         </CvButton>
@@ -1043,10 +1071,11 @@ onBeforeUnmount(() => {
         class="results-page__advanced"
       >
         <CvField
+          v-if="source === 'station'"
           v-model="diagnosticModel"
           class="results-page__diagnostic"
           name="diagnosticCode"
-          label="诊断码"
+          label="工作站诊断码"
           placeholder="例如 CAMERA_TIMEOUT…"
           autocomplete="off"
         />
@@ -1070,14 +1099,6 @@ onBeforeUnmount(() => {
         />
       </div>
     </section>
-
-    <CvInlineAlert
-      v-if="source === 'local' && diagnosticCode.trim()"
-      tone="info"
-      title="诊断码只筛选当前页"
-    >
-      本机诊断码条件不会重新计算完整历史计数；切换分页后请再次核对筛选结果。
-    </CvInlineAlert>
 
     <CvInlineAlert
       v-if="source === 'station' && stationId"
@@ -1192,9 +1213,40 @@ onBeforeUnmount(() => {
       <CvPanel
         class="results-page__list-panel"
         title="本机结果"
+        description="按完成时间查看当前查询页，并选择记录进入证据调查。"
         variant="tool"
         :padded="false"
       >
+        <CvToolbar
+          v-if="(localListState.data?.items.length ?? 0) > 0"
+          class="results-page__table-toolbar"
+          interaction="group"
+          label="本机结果当前页诊断筛选"
+        >
+          <div class="results-page__table-filter-copy">
+            <strong>当前页 {{ localItems.length }} / {{ localListState.data?.items.length ?? 0 }} 条</strong>
+            <span>诊断码只筛选当前页；不会重新计算完整历史计数、总体态势或结果分析。</span>
+          </div>
+          <CvField
+            v-model="diagnosticModel"
+            class="results-page__table-diagnostic"
+            name="currentPageDiagnosticCode"
+            label="筛选当前页诊断码"
+            placeholder="例如 CAMERA_TIMEOUT…"
+            autocomplete="off"
+          />
+          <template #secondary>
+            <CvButton
+              v-if="diagnosticCode.trim() && localItems.length > 0"
+              size="sm"
+              variant="quiet"
+              data-testid="results-clear-page-diagnostic"
+              @click="clearCurrentPageDiagnostic"
+            >
+              清除当前页筛选
+            </CvButton>
+          </template>
+        </CvToolbar>
         <CvInlineAlert
           v-if="projectsState.phase === 'stale' || projectsState.phase === 'partial-failure'"
           tone="warning"
@@ -1273,10 +1325,26 @@ onBeforeUnmount(() => {
           title="暂无本机结果"
         />
         <CvPageState
-          v-else-if="localListState.data && localItems.length === 0"
+          v-else-if="localListState.data && diagnosticCode.trim() && localItems.length === 0"
           kind="empty"
           title="当前页没有匹配诊断码的结果"
-          description="本机诊断码条件只作用于当前页投影。"
+          description="此条件只检查当前页已加载记录，不会改变总体态势或其他分页。"
+        >
+          <template #actions>
+            <CvButton
+              size="sm"
+              variant="secondary"
+              @click="clearCurrentPageDiagnostic"
+            >
+              清除当前页筛选
+            </CvButton>
+          </template>
+        </CvPageState>
+        <CvPageState
+          v-else-if="localListState.data && localItems.length === 0"
+          kind="empty"
+          title="当前页暂无结果"
+          description="当前分页没有可显示的记录，请切换分页或调整查询范围。"
         />
 
         <CvDataTable
@@ -1302,7 +1370,10 @@ onBeforeUnmount(() => {
             {{ formatInspectionOutcome(row.outcome).decisionLabel }}
           </template>
           <template #cell-diagnosticCode="{ row }">
-            {{ row.diagnosticCode || '—' }}
+            <code
+              class="results-page__technical-code"
+              translate="no"
+            >{{ row.diagnosticCode || '—' }}</code>
           </template>
           <template #cell-processingTimeMs="{ row }">
             {{ formatDuration(row.processingTimeMs) }}
@@ -1330,6 +1401,7 @@ onBeforeUnmount(() => {
       <CvPanel
         class="results-page__detail-panel"
         title="结果详情"
+        description="判定、缺陷、诊断、证据与技术追溯。"
         variant="tool"
         :padded="false"
       >
@@ -1627,6 +1699,7 @@ onBeforeUnmount(() => {
       <CvPanel
         class="results-page__list-panel"
         title="工作站上报结果"
+        description="服务端按当前范围筛选并分页返回现场结果摘要。"
         variant="tool"
         :padded="false"
       >
@@ -1696,6 +1769,12 @@ onBeforeUnmount(() => {
           <template #cell-completedAtUtc="{ row }">
             {{ formatDateTime(row.completedAtUtc) }}
           </template>
+          <template #cell-stationId="{ row }">
+            <code
+              class="results-page__technical-code"
+              translate="no"
+            >{{ row.stationId }}</code>
+          </template>
           <template #cell-outcome="{ row }">
             <span class="results-page__outcome-cell">
               <CvStatusBadge :tone="formatInspectionOutcome(row.outcome).tone">
@@ -1711,7 +1790,10 @@ onBeforeUnmount(() => {
             {{ formatInspectionOutcome(row.outcome).decisionLabel }}
           </template>
           <template #cell-diagnosticCode="{ row }">
-            {{ row.diagnosticCode || '—' }}
+            <code
+              class="results-page__technical-code"
+              translate="no"
+            >{{ row.diagnosticCode || '—' }}</code>
           </template>
           <template #cell-executionTimeMs="{ row }">
             {{ formatDuration(row.executionTimeMs) }}
@@ -1739,6 +1821,7 @@ onBeforeUnmount(() => {
       <CvPanel
         class="results-page__detail-panel"
         title="工作站结果详情"
+        description="现场上报摘要与可用追溯信息。"
         variant="tool"
         :padded="false"
       >
@@ -1833,89 +1916,514 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.results-page { min-height: 100%; display: flex; flex-direction: column; max-width: 1720px; min-width: 0; gap: var(--cv-space-2); }
-.results-page__commandbar { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); border-bottom: 1px solid var(--cv-border-subtle); }
-.results-page__title,.results-page__commands { min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); }
-.results-page__nav-link { min-height: var(--cv-density-control-height-sm); padding: 0 var(--cv-space-2); display: inline-flex; align-items: center; border-radius: var(--cv-radius-sm); color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; touch-action: manipulation; }
-.results-page__nav-link:hover { background: var(--cv-interactive-hover); color: var(--cv-color-link-hover); }
-.results-page__nav-link:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
-.results-page__title h1 { margin: 0; color: var(--cv-text-primary); font-size: var(--cv-font-size-md); font-weight: var(--cv-font-weight-semibold); letter-spacing: 0; }
-.results-page__meta { align-self: center; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-.results-page__export-boundary { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); white-space: nowrap; }
-.results-page__filters { overflow: hidden; border-block: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
-.results-page__filter-toolbar { padding: var(--cv-space-2); background: var(--cv-surface-raised); }
-.results-page__filter-toolbar :deep(.cv-toolbar__primary) { flex: 1 1 100%; align-items: end; }
-.results-page__source { min-width: 124px; flex: 0 1 124px; }
-.results-page__project { min-width: 220px; flex: 1 1 260px; }
-.results-page__station { min-width: 180px; flex: 1 1 220px; }
-.results-page__outcome { min-width: 132px; flex: 0 1 132px; }
-.results-page__diagnostic { min-width: 180px; flex: 1 1 220px; }
-.results-page__date { min-width: 206px; flex: 1 1 240px; }
-.results-page__page-size { min-width: 112px; flex: 0 1 112px; }
-.results-page__filter-count { padding: 1px var(--cv-space-1); border-radius: var(--cv-radius-pill); background: var(--cv-color-status-info-soft); color: var(--cv-color-status-info-strong); font-size: var(--cv-font-size-xs); }
-.results-page__advanced { display: flex; flex-wrap: wrap; align-items: start; gap: var(--cv-space-3); padding: var(--cv-space-2); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-raised); }
-.results-page__tab-panel { min-width: 0; display: grid; gap: var(--cv-space-2); }
-.results-page__tab-panel:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: 1px; }
-.results-page__layout { min-height: 0; display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(390px, 0.85fr); gap: var(--cv-space-2); align-items: start; }
-.results-page__list-panel,.results-page__detail-panel { min-height: 0; border-radius: var(--cv-radius-sm); }
+.results-page {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  max-width: 1720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cv-space-3);
+}
+
+.results-page__commandbar {
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cv-space-4);
+  padding-bottom: var(--cv-space-3);
+  border-bottom: 1px solid var(--cv-border-subtle);
+}
+
+.results-page__title,
+.results-page__commands {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--cv-space-2);
+}
+
+.results-page__title h1 {
+  margin: 0;
+  color: var(--cv-text-primary);
+  font-size: var(--cv-type-page-title-size);
+  font-weight: var(--cv-font-weight-semibold);
+  letter-spacing: var(--cv-letter-spacing-title);
+  line-height: var(--cv-line-height-tight);
+  text-wrap: balance;
+}
+
+.results-page__meta,
+.results-page__export-boundary {
+  color: var(--cv-text-secondary);
+  font-size: var(--cv-font-size-xs);
+}
+
+.results-page__export-boundary { white-space: nowrap; }
+
+.results-page__nav-link {
+  min-height: var(--cv-density-control-height-sm);
+  padding: 0 var(--cv-space-2);
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--cv-radius-sm);
+  color: var(--cv-color-link);
+  font-size: var(--cv-font-size-xs);
+  font-weight: var(--cv-font-weight-medium);
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.results-page__nav-link:hover {
+  background: var(--cv-interactive-hover);
+  color: var(--cv-color-link-hover);
+}
+
+.results-page__nav-link:focus-visible {
+  outline: 2px solid var(--cv-focus-ring-color);
+  outline-offset: 1px;
+}
+
+.results-page__filters {
+  overflow: hidden;
+  border: 1px solid var(--cv-border-subtle);
+  border-radius: var(--cv-radius-md);
+  background: var(--cv-surface-raised);
+}
+
+.results-page__filter-toolbar {
+  padding: var(--cv-space-3) var(--cv-space-4);
+  background: var(--cv-surface-raised);
+}
+
+.results-page__filter-toolbar :deep(.cv-toolbar__primary) {
+  flex: 1 1 100%;
+  align-items: end;
+}
+
+.results-page__source { min-width: 124px; flex: 0 1 132px; }
+.results-page__project { min-width: 220px; flex: 1 1 280px; }
+.results-page__station { min-width: 180px; flex: 1 1 240px; }
+.results-page__outcome { min-width: 144px; flex: 0 1 164px; }
+.results-page__diagnostic { min-width: 200px; flex: 1 1 240px; }
+.results-page__date { min-width: 212px; flex: 1 1 250px; }
+.results-page__page-size { min-width: 116px; flex: 0 1 124px; }
+
+.results-page__filter-count {
+  padding: 1px var(--cv-space-1);
+  border-radius: var(--cv-radius-pill);
+  background: var(--cv-color-status-info-soft);
+  color: var(--cv-color-status-info-strong);
+  font-size: var(--cv-font-size-xs);
+}
+
+.results-page__advanced {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: var(--cv-space-3);
+  padding: var(--cv-space-3) var(--cv-space-4);
+  border-top: 1px solid var(--cv-border-subtle);
+  background: var(--cv-surface-page);
+}
+
+.results-page__tab-panel {
+  min-width: 0;
+  display: grid;
+  gap: var(--cv-space-3);
+}
+
+.results-page__tab-panel:focus-visible,
+.results-page__layout:focus-visible {
+  outline: 2px solid var(--cv-focus-ring-color);
+  outline-offset: 2px;
+}
+
+.results-page__layout {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.72fr) minmax(370px, 0.78fr);
+  gap: var(--cv-space-3);
+  align-items: start;
+}
+
+.results-page__list-panel,
+.results-page__detail-panel {
+  min-height: 0;
+  border-radius: var(--cv-radius-md);
+  background: var(--cv-surface-raised);
+}
+
+.results-page__table-toolbar {
+  padding: var(--cv-space-3) var(--cv-density-panel-padding);
+  border-block: 1px solid var(--cv-border-subtle);
+  background: var(--cv-surface-page);
+}
+
+.results-page__table-toolbar :deep(.cv-toolbar__primary) {
+  flex: 1 1 auto;
+  align-items: end;
+}
+
+.results-page__table-toolbar :deep(.cv-toolbar__secondary) { align-items: end; }
+
+.results-page__table-filter-copy {
+  min-width: 230px;
+  flex: 1 1 260px;
+  display: grid;
+  align-self: center;
+  gap: 2px;
+}
+
+.results-page__table-filter-copy strong {
+  color: var(--cv-text-primary);
+  font-size: var(--cv-font-size-sm);
+  font-weight: var(--cv-font-weight-semibold);
+}
+
+.results-page__table-filter-copy span {
+  color: var(--cv-text-secondary);
+  font-size: var(--cv-font-size-xs);
+  line-height: var(--cv-line-height-normal);
+  text-wrap: pretty;
+}
+
+.results-page__table-diagnostic {
+  min-width: 210px;
+  flex: 0 1 260px;
+}
+
 .results-page__notice { margin-bottom: var(--cv-space-3); }
-.results-page__outcome-cell { display: grid; justify-items: start; gap: var(--cv-space-1); }
-.results-page__outcome-cell small { color: var(--cv-color-status-warning-strong); font-size: var(--cv-font-size-xs); }
+
+.results-page__outcome-cell {
+  display: grid;
+  justify-items: start;
+  gap: var(--cv-space-1);
+}
+
+.results-page__outcome-cell small {
+  color: var(--cv-color-status-warning-strong);
+  font-size: var(--cv-font-size-xs);
+}
+
+.results-page__technical-code {
+  color: var(--cv-text-secondary);
+  font-family: var(--cv-font-mono);
+  font-size: var(--cv-font-size-xs);
+  overflow-wrap: anywhere;
+}
+
 .results-page__detail-panel { position: static; }
-.results-page__detail-section { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
+
+.results-page__detail-section {
+  padding: var(--cv-space-4) var(--cv-density-panel-padding);
+}
+
+.results-page__detail-section + .results-page__detail-section {
+  border-top: 1px solid var(--cv-border-subtle);
+}
+
 .results-page__detail-section--summary { background: var(--cv-surface-page); }
-.results-page__detail-section h3 { margin: 0 0 var(--cv-space-2); color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); font-weight: var(--cv-font-weight-semibold); }
-.results-page__detail-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); margin-bottom: var(--cv-space-2); }
-.results-page__detail-heading h3 { margin: 0; }
-.results-page__defects { display: grid; gap: var(--cv-space-2); margin: 0; padding: 0; list-style: none; }
-.results-page__defects li { display: grid; grid-template-columns: minmax(96px, 0.62fr) minmax(116px, 0.72fr) minmax(0, 1fr); gap: var(--cv-space-3); padding: var(--cv-space-2) 0; border-bottom: 1px solid var(--cv-border-subtle); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
+
+.results-page__detail-section h3 {
+  margin: 0 0 var(--cv-space-2);
+  color: var(--cv-text-primary);
+  font-size: var(--cv-font-size-sm);
+  font-weight: var(--cv-font-weight-semibold);
+}
+
+.results-page__detail-heading,
+.results-page__evidence-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cv-space-3);
+  margin-bottom: var(--cv-space-2);
+}
+
+.results-page__detail-heading h3,
+.results-page__evidence-heading h3 { margin: 0; }
+
+.results-page__defects {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.results-page__defects li {
+  display: grid;
+  grid-template-columns: minmax(96px, 0.62fr) minmax(116px, 0.72fr) minmax(0, 1fr);
+  gap: var(--cv-space-3);
+  padding: var(--cv-space-2) 0;
+  border-bottom: 1px solid var(--cv-border-subtle);
+  color: var(--cv-text-secondary);
+  font-size: var(--cv-font-size-xs);
+}
+
 .results-page__defects li:last-child { border-bottom: 0; }
 .results-page__defects strong { color: var(--cv-text-primary); }
-.results-page__image img { display: block; width: 100%; max-height: 280px; aspect-ratio: 4 / 3; object-fit: contain; border: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
-.results-page__image p,.results-page__investigation-heading p,.results-page__comparison-reference,.results-page__comparison-empty { margin: 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
-.results-page__investigation { display: grid; gap: var(--cv-space-2); }
-.results-page__investigation-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--cv-space-3); }
+
+.results-page__image img {
+  display: block;
+  width: 100%;
+  max-height: 280px;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  border: 1px solid var(--cv-border-subtle);
+  border-radius: var(--cv-radius-xs);
+  background: var(--cv-surface-page);
+}
+
+.results-page__image p,
+.results-page__investigation-heading p,
+.results-page__comparison-reference,
+.results-page__comparison-empty,
+.results-page__evidence-heading p {
+  margin: 0;
+  color: var(--cv-text-secondary);
+  font-size: var(--cv-font-size-xs);
+  line-height: var(--cv-line-height-normal);
+}
+
+.results-page__investigation {
+  display: grid;
+  gap: var(--cv-space-3);
+}
+
+.results-page__investigation-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--cv-space-3);
+}
+
 .results-page__investigation-heading h3 { margin-bottom: 2px; }
-.results-page__comparison-reference { padding: var(--cv-space-2); overflow-wrap: anywhere; background: var(--cv-surface-page); }
-.results-page__replay-summary { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--cv-border-subtle); }
-.results-page__replay-summary div { min-width: 0; padding: var(--cv-space-2); }
-.results-page__replay-summary div + div { border-left: 1px solid var(--cv-border-subtle); }
-.results-page__replay-summary dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
-.results-page__replay-summary dd { margin: 2px 0 0; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
-.results-page__comparison-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--cv-font-size-xs); }
-.results-page__comparison-table th,.results-page__comparison-table td { padding: 5px 6px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--cv-border-subtle); overflow-wrap: anywhere; }
-.results-page__comparison-table th { color: var(--cv-text-secondary); font-weight: var(--cv-font-weight-medium); }
-.results-page__evidence-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
-.results-page__evidence-heading h3 { margin-bottom: 2px; }
-.results-page__evidence-heading p { margin: 0; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
-.results-page__evidence-summary { margin: var(--cv-space-3) 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-block: 1px solid var(--cv-border-subtle); }
-.results-page__evidence-summary div { min-width: 0; padding: 6px 8px; border-bottom: 1px solid var(--cv-border-subtle); }
-.results-page__evidence-summary dt { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
-.results-page__evidence-summary dd { margin: 2px 0 0; font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
-.results-page__evidence-items { width: 100%; margin-top: var(--cv-space-2); border-collapse: collapse; font-size: var(--cv-font-size-xs); }
-.results-page__evidence-items th,.results-page__evidence-items td { padding: 5px 6px; text-align: left; border-bottom: 1px solid var(--cv-border-subtle); }
+
+.results-page__comparison-reference {
+  padding: var(--cv-space-2) var(--cv-space-3);
+  overflow-wrap: anywhere;
+  border-radius: var(--cv-radius-xs);
+  background: var(--cv-surface-page);
+}
+
+.results-page__replay-summary,
+.results-page__evidence-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--cv-border-subtle);
+  border-radius: var(--cv-radius-xs);
+  background: var(--cv-border-subtle);
+}
+
+.results-page__replay-summary { margin: 0; }
+.results-page__evidence-summary { margin: var(--cv-space-3) 0 0; }
+
+.results-page__replay-summary div,
+.results-page__evidence-summary div {
+  min-width: 0;
+  padding: var(--cv-space-2) var(--cv-space-3);
+  background: var(--cv-surface-raised);
+}
+
+.results-page__replay-summary dt,
+.results-page__evidence-summary dt {
+  color: var(--cv-text-muted);
+  font-size: var(--cv-font-size-xs);
+}
+
+.results-page__replay-summary dd,
+.results-page__evidence-summary dd {
+  margin: 2px 0 0;
+  color: var(--cv-text-primary);
+  font-size: var(--cv-font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.results-page__comparison-table,
+.results-page__evidence-items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--cv-font-size-xs);
+}
+
+.results-page__comparison-table {
+  table-layout: fixed;
+}
+
+.results-page__evidence-items { margin-top: var(--cv-space-2); }
+
+.results-page__comparison-table th,
+.results-page__comparison-table td,
+.results-page__evidence-items th,
+.results-page__evidence-items td {
+  padding: 6px var(--cv-space-2);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--cv-border-subtle);
+  overflow-wrap: anywhere;
+}
+
+.results-page__comparison-table th,
+.results-page__evidence-items th {
+  background: var(--cv-surface-page);
+  color: var(--cv-text-secondary);
+  font-weight: var(--cv-font-weight-medium);
+}
+
 .results-page__traceability { border-top: 1px solid var(--cv-border-subtle); }
-.results-page__traceability summary { padding: var(--cv-space-3) var(--cv-density-panel-padding); color: var(--cv-text-secondary); cursor: pointer; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); list-style-position: inside; }
-.results-page__traceability summary:hover { background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
-.results-page__traceability summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
-.results-page__traceability :deep(.cv-description-list) { padding: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
-.results-page__technical-details { margin-top: var(--cv-space-2); border-top: 1px solid var(--cv-border-subtle); }
-.results-page__technical-details summary { min-height: 32px; display: flex; align-items: center; color: var(--cv-text-secondary); cursor: pointer; font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
-.results-page__technical-details summary:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
-.results-page__technical-details dl { margin: 0; display: grid; gap: var(--cv-space-2); }
-.results-page__technical-details dl > div { min-width: 0; padding: var(--cv-space-2); background: var(--cv-surface-page); }
-.results-page__technical-details dt { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-.results-page__technical-details dt span { margin-left: var(--cv-space-1); color: var(--cv-text-muted); }
-.results-page__technical-details dd { margin: 2px 0 0; display: flex; align-items: flex-start; gap: var(--cv-space-2); }
-.results-page__technical-details code { min-width: 0; flex: 1; color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; user-select: all; }
+
+.results-page__traceability summary {
+  min-height: 38px;
+  padding: 0 var(--cv-density-panel-padding);
+  display: flex;
+  align-items: center;
+  color: var(--cv-text-secondary);
+  cursor: pointer;
+  font-size: var(--cv-font-size-xs);
+  font-weight: var(--cv-font-weight-semibold);
+  list-style-position: inside;
+}
+
+.results-page__traceability summary:hover {
+  background: var(--cv-interactive-hover);
+  color: var(--cv-text-primary);
+}
+
+.results-page__traceability summary:focus-visible,
+.results-page__technical-details summary:focus-visible {
+  outline: 2px solid var(--cv-focus-ring-color);
+  outline-offset: -2px;
+}
+
+.results-page__traceability :deep(.cv-description-list) {
+  padding: 0 var(--cv-density-panel-padding) var(--cv-space-3);
+}
+
+.results-page__technical-details {
+  margin-top: var(--cv-space-2);
+  border-top: 1px solid var(--cv-border-subtle);
+}
+
+.results-page__technical-details summary {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  color: var(--cv-text-secondary);
+  cursor: pointer;
+  font-size: var(--cv-font-size-xs);
+  font-weight: var(--cv-font-weight-semibold);
+}
+
+.results-page__technical-details dl {
+  margin: 0;
+  display: grid;
+  gap: var(--cv-space-2);
+}
+
+.results-page__technical-details dl > div {
+  min-width: 0;
+  padding: var(--cv-space-2) var(--cv-space-3);
+  border-radius: var(--cv-radius-xs);
+  background: var(--cv-surface-page);
+}
+
+.results-page__technical-details dt {
+  color: var(--cv-text-secondary);
+  font-size: var(--cv-font-size-xs);
+}
+
+.results-page__technical-details dt span {
+  margin-left: var(--cv-space-1);
+  color: var(--cv-text-muted);
+}
+
+.results-page__technical-details dd {
+  margin: 2px 0 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--cv-space-2);
+}
+
+.results-page__technical-details code {
+  min-width: 0;
+  flex: 1;
+  color: var(--cv-text-primary);
+  font-size: var(--cv-font-size-xs);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .results-page :deep(.results-page__list-panel > .cv-panel__header),
-.results-page :deep(.results-page__detail-panel > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
+.results-page :deep(.results-page__detail-panel > .cv-panel__header) {
+  padding: var(--cv-space-4) var(--cv-density-panel-padding) var(--cv-space-3);
+}
+
 .results-page :deep(.results-page__list-panel .cv-inline-alert),
 .results-page :deep(.results-page__list-panel .cv-page-state),
 .results-page :deep(.results-page__detail-panel > .cv-panel__content > .cv-inline-alert),
-.results-page :deep(.results-page__detail-panel > .cv-panel__content > .cv-page-state) { margin: 0 var(--cv-density-panel-padding) var(--cv-space-3); }
-.results-page :deep(.results-page__list-panel .cv-pagination) { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
-@media (max-width: 1240px) { .results-page__layout { grid-template-columns: minmax(0, 1fr) minmax(340px, 0.72fr); } }
-@media (max-width: 980px) { .results-page__layout { grid-template-columns: 1fr; } .results-page__detail-panel { position: static; } }
-@media (max-width: 640px) { .results-page__defects li,.results-page__replay-summary { grid-template-columns: 1fr; } .results-page__replay-summary div + div { border-left: 0; border-top: 1px solid var(--cv-border-subtle); } .results-page__investigation-heading { align-items: stretch; flex-direction: column; } }
+.results-page :deep(.results-page__detail-panel > .cv-panel__content > .cv-page-state) {
+  margin: var(--cv-space-3) var(--cv-density-panel-padding);
+}
+
+.results-page :deep(.results-page__list-panel .cv-pagination) {
+  padding: var(--cv-space-3) var(--cv-density-panel-padding);
+  border-top: 1px solid var(--cv-border-subtle);
+}
+
+@media (max-width: 1240px) {
+  .results-page__layout { grid-template-columns: minmax(0, 1fr) minmax(340px, 0.72fr); }
+  .results-page__table-filter-copy { min-width: 190px; }
+}
+
+@media (max-width: 980px) {
+  .results-page__layout { grid-template-columns: 1fr; }
+  .results-page__detail-panel { position: static; }
+}
+
+@media (max-width: 760px) {
+  .results-page__commandbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .results-page__commands { width: 100%; flex-wrap: wrap; }
+
+  .results-page__filter-toolbar,
+  .results-page__advanced { padding-inline: var(--cv-space-3); }
+
+  .results-page__source,
+  .results-page__project,
+  .results-page__station,
+  .results-page__outcome,
+  .results-page__diagnostic,
+  .results-page__date,
+  .results-page__page-size { min-width: min(100%, 220px); flex: 1 1 220px; }
+}
+
+@media (max-width: 640px) {
+  .results-page__table-toolbar :deep(.cv-toolbar__primary),
+  .results-page__table-toolbar :deep(.cv-toolbar__secondary) {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .results-page__table-filter-copy,
+  .results-page__table-diagnostic { min-width: 100%; flex-basis: 100%; }
+
+  .results-page__defects li,
+  .results-page__replay-summary,
+  .results-page__evidence-summary { grid-template-columns: 1fr; }
+
+  .results-page__investigation-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
 </style>

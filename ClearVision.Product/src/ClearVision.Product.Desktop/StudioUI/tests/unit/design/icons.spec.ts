@@ -9,6 +9,7 @@ describe('CvIcon', () => {
     'close',
     'chevron-left',
     'chevron-right',
+    'more-horizontal',
     'info',
     'warning',
     'error',

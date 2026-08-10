@@ -2695,7 +2695,7 @@ test('V2.10 walks login, Projects, node and ROI editing, Preview, Save, Formal R
   await page.getByLabel('用户名').focus();
   await captureJourney('v2-golden-00-login-ready', 'journey entry before authentication');
   await page.getByLabel('用户名').fill('f03-engineer');
-  await page.getByLabel('密码').fill('fixture-password');
+  await page.getByLabel('密码', { exact: true }).fill('fixture-password');
   await page.getByRole('button', { name: '登录', exact: true }).click();
 
   await expect(page.locator('[data-capability="projects-read"]')).toBeVisible();

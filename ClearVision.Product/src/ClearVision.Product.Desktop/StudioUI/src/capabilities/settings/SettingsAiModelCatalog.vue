@@ -170,7 +170,7 @@ function providerDisplayLabel(value: string): string {
 .ai-model-catalog__count { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .ai-model-catalog__list { display: grid; gap: 2px; }
 .ai-model-catalog__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--cv-space-3); padding: var(--cv-space-2); border: 1px solid transparent; border-bottom-color: var(--cv-border-subtle); }
-.ai-model-catalog__row.is-selected { border-color: var(--cv-color-brand-300); background: var(--cv-color-brand-soft); }
+.ai-model-catalog__row.is-selected { border-color: var(--cv-color-action-border); background: var(--cv-color-action-soft); }
 .ai-model-catalog__select { min-width: 0; min-height: 36px; padding: 0; display: grid; gap: 3px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .ai-model-catalog__row-title { min-width: 0; display: flex; align-items: center; gap: var(--cv-space-2); }
 .ai-model-catalog__row-title strong { overflow: hidden; color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); text-overflow: ellipsis; white-space: nowrap; }

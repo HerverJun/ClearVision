@@ -504,7 +504,7 @@ watch(() => props.activeCameraId, value => {
 .camera-binding-list { display: grid; align-content: start; gap: 2px; min-width: 0; padding-right: var(--cv-space-4); border-right: 1px solid var(--cv-border-subtle); }
 .camera-binding-row { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-2); padding: var(--cv-space-2); border: 0; border-radius: var(--cv-radius-sm); background: transparent; color: var(--cv-text-secondary); text-align: left; cursor: pointer; }
 .camera-binding-row:hover:not(:disabled) { background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
-.camera-binding-row.is-active { background: var(--cv-color-brand-soft); color: var(--cv-color-brand-text); }
+.camera-binding-row.is-active { background: var(--cv-color-action-soft); color: var(--cv-color-action-text); }
 .camera-binding-row:disabled { cursor: not-allowed; opacity: 0.62; }
 .camera-binding-row__copy { display: grid; min-width: 0; gap: 2px; }
 .camera-binding-row__copy strong, .camera-binding-row__copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -521,7 +521,7 @@ watch(() => props.activeCameraId, value => {
 .camera-subheading strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .camera-subheading span { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .check-field { display: inline-flex; min-height: var(--cv-density-control-height); align-items: center; gap: var(--cv-space-2); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-.check-field input { accent-color: var(--cv-color-brand-500); }
+.check-field input { width: var(--cv-control-check-size); height: var(--cv-control-check-size); flex: 0 0 auto; margin: 0; accent-color: var(--cv-color-action); }
 .camera-validation { display: grid; gap: var(--cv-space-1); margin: var(--cv-space-3) 0 0; padding-left: var(--cv-space-4); color: var(--cv-color-status-ng-strong); font-size: var(--cv-font-size-xs); }
 .camera-empty { margin-top: var(--cv-space-4); color: var(--cv-text-muted); font-size: var(--cv-font-size-sm); }
 @media (max-width: 1080px) { .camera-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

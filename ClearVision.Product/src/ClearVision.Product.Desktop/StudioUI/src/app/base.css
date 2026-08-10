@@ -77,6 +77,14 @@ textarea {
   caret-color: var(--cv-color-industrial-blue);
 }
 
+input[type="checkbox"] {
+  width: var(--cv-control-check-size);
+  height: var(--cv-control-check-size);
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--cv-color-action);
+}
+
 :focus-visible {
   outline: 2px solid var(--cv-focus-ring-color);
   outline-offset: 2px;

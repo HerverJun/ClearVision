@@ -378,7 +378,7 @@ onBeforeUnmount(() => { catalogQuery.dispose(); });
 .operators-page__identity { display: grid; gap: 2px; min-width: 0; }
 .operators-page__identity-meta { display: flex; min-width: 0; align-items: baseline; gap: var(--cv-space-2); }
 .operators-page__identity-meta > span { min-width: 0; overflow: hidden; color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
-.operators-page__identity code { flex: 0 0 auto; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
+.operators-page__identity code { flex: 0 0 auto; color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .operators-page__detail-link { display: inline-flex; align-items: center; gap: var(--cv-space-1); white-space: nowrap; }
 .operators-page__detail-link :deep(svg) { width: 14px; height: 14px; }
 

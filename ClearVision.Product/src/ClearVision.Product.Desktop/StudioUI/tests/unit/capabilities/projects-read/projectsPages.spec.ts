@@ -193,6 +193,7 @@ describe('Projects read pages', () => {
     expect(wrapper.text()).not.toContain('连接数量');
     expect(wrapper.text()).not.toContain('40');
     expect(wrapper.text()).not.toContain('50');
+    expect(wrapper.get(`a.projects-page__detail[href="/projects/${projectId}"]`).text()).toBe('查看详情');
 
     wrapper.unmount();
     queries.dispose();

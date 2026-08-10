@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthLifecycleRoot } from '@/app/auth';
 import { resolveSafeReturnRoute } from '@/app/router';
-import { CvButton } from '@/design-system/primitives';
+import { CvButton, CvIconButton } from '@/design-system/primitives';
+import { CvIcon } from '@/design-system/icons';
 import AuthShell from './AuthShell.vue';
 
 const root = useAuthLifecycleRoot();
 const route = useRoute();
 const router = useRouter();
-const username = ref('');
-const password = ref('');
-const showPassword = ref(false);
-const messageRoot = ref<HTMLElement>();
+const username = shallowRef(root.preferences.projection.rememberedUsername ?? '');
+const password = shallowRef('');
+const showPassword = shallowRef(false);
+const rememberUsername = shallowRef(root.preferences.projection.rememberedUsername !== null);
+const messageRoot = shallowRef<HTMLElement>();
 const busy = computed(() => root.auth.projection.phase === 'authenticating' ||
   root.auth.projection.phase === 'protected-transition');
 const pageTitle = computed(() => route.query.reason === 'expired' || route.query.reason === 'change-password'
@@ -27,13 +29,21 @@ const pageDescription = computed(() => {
 const messageTone = computed(() => {
   if (root.auth.projection.phase === 'stale' || root.auth.projection.phase === 'expired') return 'warning';
   if (root.auth.projection.errorCode) return 'error';
+  if (route.query.reason === 'change-password' || route.query.reason === 'logout') return 'success';
   if (root.auth.projection.phase === 'authenticated') return 'success';
   return 'info';
 });
+const prominentMessage = computed(() => messageTone.value !== 'info' ||
+  root.auth.projection.phase === 'protected-transition');
+
+function persistRememberedUsername(): void {
+  root.preferences.setRememberedUsername(rememberUsername.value ? username.value : null);
+}
 
 async function submit(): Promise<void> {
   const accepted = await root.auth.login({ username: username.value, password: password.value });
   if (accepted) {
+    persistRememberedUsername();
     await router.replace(resolveSafeReturnRoute(route.query.returnTo) ?? '/projects');
     return;
   }
@@ -60,6 +70,7 @@ async function retryRecovery(): Promise<void> {
       @submit.prevent="submit"
     >
       <p
+        v-if="prominentMessage"
         ref="messageRoot"
         class="auth-form__message"
         role="status"
@@ -94,21 +105,36 @@ async function retryRecovery(): Promise<void> {
             autocomplete="current-password"
             required
           >
-          <CvButton
+          <CvIconButton
+            class="auth-form__password-toggle"
             type="button"
             size="sm"
-            variant="quiet"
+            :label="showPassword ? '隐藏登录密码' : '显示登录密码'"
             :aria-pressed="showPassword"
             @click="showPassword = !showPassword"
           >
-            {{ showPassword ? '隐藏密码' : '显示密码' }}
-          </CvButton>
+            <CvIcon
+              :name="showPassword ? 'eye-off' : 'eye'"
+              size="md"
+            />
+          </CvIconButton>
         </div>
+      </div>
+      <div class="auth-form__options">
+        <label class="auth-form__remember">
+          <input
+            v-model="rememberUsername"
+            type="checkbox"
+          >
+          <span>记住账号</span>
+        </label>
       </div>
       <div class="auth-form__actions">
         <CvButton
+          class="auth-form__submit"
           type="submit"
           variant="primary"
+          block
           :loading="busy"
           loading-label="正在登录"
         >

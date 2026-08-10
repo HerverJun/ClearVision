@@ -184,12 +184,12 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
       <CvPanel
         title="算子概况"
         description="当前目录发布的版本与使用状态。"
+        variant="section"
       >
         <div class="operator-detail__status-row">
           <CvStatusBadge :tone="lifecycleTone(state.data.lifecycle)">
             {{ operatorLifecycleLabels[state.data.lifecycle] }}
           </CvStatusBadge>
-          <span>此页面仅供查阅，不会更改工程或运行配置。</span>
         </div>
         <CvDescriptionList
           :items="summary"
@@ -207,6 +207,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
       <CvPanel
         title="输入端口"
         description="算子接收的数据及其必需条件。"
+        variant="section"
       >
         <CvPageState
           v-if="state.data.inputPorts.length === 0"
@@ -245,6 +246,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
       <CvPanel
         title="输出端口"
         description="算子当前声明的输出数据。"
+        variant="section"
       >
         <CvPageState
           v-if="state.data.outputPorts.length === 0"
@@ -283,6 +285,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
       <CvPanel
         title="参数"
         description="默认值与约束来自当前算子目录，仅用于查阅。"
+        variant="section"
       >
         <CvPageState
           v-if="state.data.parameters.length === 0"
@@ -327,7 +330,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
 
 <style scoped>
 .operator-detail { display: grid; gap: var(--cv-space-5); min-width: 0; }
-.operator-detail__grid { display: grid; gap: var(--cv-space-4); min-width: 0; }
+.operator-detail__grid { display: grid; gap: var(--cv-space-6); min-width: 0; }
 .operator-detail__back-link { display: inline-flex; align-items: center; gap: var(--cv-space-1); }
 .operator-detail__back-link :deep(svg) { width: 14px; height: 14px; }
 .operator-detail__status-row { display: flex; align-items: center; gap: var(--cv-space-3); margin-bottom: var(--cv-space-3); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
@@ -337,7 +340,7 @@ onBeforeUnmount(() => { detailQuery.dispose(); });
 .operator-detail__identity-cell,
 .operator-detail__type-cell { display: grid; gap: 2px; min-width: 0; }
 .operator-detail__identity-cell code,
-.operator-detail__type-cell code { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); overflow-wrap: anywhere; }
+.operator-detail__type-cell code { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); overflow-wrap: anywhere; }
 .operator-detail__identity-cell > span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
 
 @media (max-width: 720px) {

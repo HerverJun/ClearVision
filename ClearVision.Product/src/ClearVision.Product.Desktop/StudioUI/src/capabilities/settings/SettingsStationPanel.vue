@@ -555,7 +555,7 @@ onDeactivated(() => {
 .settings-station { display: grid; min-width: 0; gap: var(--cv-density-page-gap); }
 .settings-station__form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: var(--cv-space-4); }
 .settings-station__toggle { display: flex; min-height: var(--cv-density-control-height); align-items: center; gap: var(--cv-space-2); color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
-.settings-station__toggle input { width: 16px; height: 16px; accent-color: var(--cv-color-brand-500); }
+.settings-station__toggle input { width: 16px; height: 16px; accent-color: var(--cv-color-action); }
 .settings-station__toggle span { display: grid; gap: 2px; }
 .settings-station__toggle small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .settings-station__token-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(200px, 240px) minmax(220px, 1fr) auto; align-items: end; gap: var(--cv-space-3); margin-top: var(--cv-space-5); padding-top: var(--cv-space-4); border-top: 1px solid var(--cv-border-subtle); }
@@ -563,7 +563,7 @@ onDeactivated(() => {
 .settings-station__token-copy strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .settings-station__token-copy small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .settings-station__token-hint { grid-column: 1 / -1; color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
-.settings-station__eyebrow { color: var(--cv-color-brand-text); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-semibold); }
+.settings-station__eyebrow { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-semibold); }
 .settings-station__footer { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }
 .settings-station__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--cv-space-2); }
 .settings-station__section { min-width: 0; padding: var(--cv-space-5) 0 0; border-top: 1px solid var(--cv-border-subtle); }

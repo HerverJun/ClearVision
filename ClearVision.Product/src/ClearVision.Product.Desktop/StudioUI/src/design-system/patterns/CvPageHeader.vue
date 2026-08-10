@@ -64,8 +64,7 @@ withDefaults(defineProps<{
   display: grid;
   min-width: 0;
   gap: var(--cv-space-2);
-  padding-block: var(--cv-space-1) var(--cv-space-3);
-  border-bottom: 1px solid var(--cv-border-subtle);
+  padding-block: var(--cv-space-1) var(--cv-space-2);
 }
 
 .cv-page-header__row {
@@ -80,9 +79,9 @@ withDefaults(defineProps<{
 
 .cv-page-header__eyebrow {
   margin: 0 0 var(--cv-space-1);
-  color: var(--cv-color-brand-text);
-  font-size: var(--cv-font-size-2xs);
-  font-weight: var(--cv-font-weight-medium);
+  color: var(--cv-color-action-text);
+  font-size: var(--cv-font-size-xs);
+  font-weight: var(--cv-font-weight-semibold);
   letter-spacing: var(--cv-letter-spacing-caption);
 }
 
@@ -98,9 +97,9 @@ withDefaults(defineProps<{
 
 .cv-page-header__description {
   max-width: 76ch;
-  margin: var(--cv-space-1) 0 0;
+  margin: var(--cv-space-2) 0 0;
   color: var(--cv-text-secondary);
-  font-size: var(--cv-font-size-sm);
+  font-size: var(--cv-font-size-md);
   line-height: var(--cv-line-height-normal);
   text-wrap: pretty;
 }

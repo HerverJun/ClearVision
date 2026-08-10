@@ -347,7 +347,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .settings-page {
   display: grid;
-  max-width: 1480px;
+  max-width: var(--cv-page-max-width);
   min-width: 0;
   gap: var(--cv-density-page-gap);
 }

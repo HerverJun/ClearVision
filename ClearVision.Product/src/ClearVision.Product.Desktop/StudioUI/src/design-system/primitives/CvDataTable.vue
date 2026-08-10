@@ -213,7 +213,7 @@ caption {
   white-space: nowrap;
 }
 
-thead { background: var(--cv-surface-page); }
+thead { background: var(--cv-surface-tool); }
 
 th,
 td {
@@ -233,7 +233,7 @@ th {
 }
 
 tbody tr:last-child td { border-bottom: 0; }
-tbody tr:nth-child(even) { background: color-mix(in srgb, var(--cv-color-industrial-blue) 3%, transparent); }
+tbody tr:nth-child(even) { background: color-mix(in srgb, var(--cv-color-action) 2.5%, transparent); }
 tbody tr:hover { background: var(--cv-interactive-hover); }
 .cv-data-table__cell--center { text-align: center; }
 .cv-data-table__cell--end { text-align: right; }
@@ -254,7 +254,7 @@ tbody tr:hover { background: var(--cv-interactive-hover); }
 
 .cv-data-table__sort:hover { background: var(--cv-interactive-hover); color: var(--cv-text-primary); }
 .cv-data-table__sort-icon { opacity: 0.35; transform: rotate(90deg); }
-.cv-data-table__sort-icon--active { color: var(--cv-color-brand-text); opacity: 1; }
+.cv-data-table__sort-icon--active { color: var(--cv-color-action-text); opacity: 1; }
 .cv-data-table__sort-icon--descending { transform: rotate(-90deg); }
 
 .cv-data-table__message {
@@ -272,7 +272,7 @@ tbody tr:hover { background: var(--cv-interactive-hover); }
   width: 14px;
   height: 14px;
   border: 2px solid var(--cv-border-strong);
-  border-right-color: var(--cv-color-brand-500);
+  border-right-color: var(--cv-color-action);
   border-radius: 50%;
   animation: cv-data-table-spin var(--cv-motion-duration-slow) linear infinite;
 }

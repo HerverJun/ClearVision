@@ -999,7 +999,7 @@ onBeforeUnmount(() => {
 .stations-page__outcomes { border-top: 1px solid var(--cv-border-subtle); }
 .stations-page__outcomes > section + section { border-top: 1px solid var(--cv-border-subtle); }
 .stations-page__outcomes header { min-height: 42px; padding: var(--cv-space-2) var(--cv-space-3); display: flex; align-items: baseline; justify-content: space-between; gap: var(--cv-space-2); border-top: 2px solid var(--cv-color-industrial-blue); background: var(--cv-surface-raised); }
-.stations-page__outcomes > section + section header { border-top-color: var(--cv-color-brand-500); }
+.stations-page__outcomes > section + section header { border-top-color: var(--cv-color-industrial-blue); }
 .stations-page__outcomes header strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .stations-page__outcomes header span { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); }
 .stations-page__outcomes dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }

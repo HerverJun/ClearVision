@@ -86,9 +86,10 @@ const visibleActions = computed(() => {
   min-width: 0;
   align-items: center;
   gap: var(--cv-space-5);
-  padding: var(--cv-space-3) var(--cv-space-4);
-  border-block: 1px solid var(--cv-border-subtle);
-  background: var(--cv-surface-page);
+  margin-inline: var(--cv-density-page-padding);
+  padding: var(--cv-space-3) 0 var(--cv-space-4);
+  border-bottom: 1px solid var(--cv-border-subtle);
+  background: transparent;
 }
 .ai-workbench-stage__status { display: flex; min-width: 0; align-items: center; gap: var(--cv-space-3); }
 .ai-workbench-stage__copy { min-width: 0; }

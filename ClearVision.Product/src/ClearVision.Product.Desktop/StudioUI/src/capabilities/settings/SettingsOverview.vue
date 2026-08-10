@@ -296,6 +296,10 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
   gap: 0;
   margin: 0;
   padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--cv-border-subtle);
+  border-radius: var(--cv-radius-md);
+  background: var(--cv-surface-raised);
   list-style: none;
 }
 
@@ -312,16 +316,17 @@ function isGenericSection(target: SettingsNavigationTarget): target is GenericSe
   align-items: center;
   gap: var(--cv-space-3);
   width: 100%;
-  padding: var(--cv-space-3) var(--cv-space-2);
+  min-height: calc(var(--cv-density-row-height) + var(--cv-space-4));
+  padding: var(--cv-space-3) var(--cv-space-4);
   border: 0;
-  border-radius: var(--cv-radius-sm);
+  border-radius: 0;
   background: transparent;
   color: var(--cv-text-secondary);
   text-align: left;
   cursor: pointer;
 }
 
-.settings-overview__section-row > button:hover { background: var(--cv-interactive-hover); }
+.settings-overview__section-row > button:hover { background: var(--cv-color-action-soft); }
 .settings-overview__section-row > button:focus-visible { outline: none; box-shadow: var(--cv-focus-ring); }
 
 .settings-overview__section-copy {

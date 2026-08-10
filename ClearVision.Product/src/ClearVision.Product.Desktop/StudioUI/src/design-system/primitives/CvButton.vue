@@ -94,19 +94,19 @@ const isDisabled = computed(() => props.disabled || props.loading);
 .cv-button--block { width: 100%; }
 
 .cv-button--primary {
-  border-color: var(--cv-color-brand-600);
-  background: var(--cv-color-brand-500);
-  color: var(--cv-color-on-brand);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cv-color-on-brand) 12%, transparent);
+  border-color: var(--cv-color-action);
+  background: var(--cv-color-action);
+  color: var(--cv-color-on-action);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cv-color-on-action) 16%, transparent);
 }
 
-.cv-button--primary:hover:not(:disabled) { background: var(--cv-color-brand-600); }
-.cv-button--primary:active:not(:disabled) { background: var(--cv-color-brand-700); }
+.cv-button--primary:hover:not(:disabled) { border-color: var(--cv-color-action-hover); background: var(--cv-color-action-hover); }
+.cv-button--primary:active:not(:disabled) { border-color: var(--cv-color-action-active); background: var(--cv-color-action-active); }
 
 .cv-button--secondary {
-  border-color: color-mix(in srgb, var(--cv-color-industrial-blue) 62%, var(--cv-border-default));
+  border-color: var(--cv-border-default);
   background: var(--cv-surface-raised);
-  color: var(--cv-color-industrial-blue-hover);
+  color: var(--cv-color-action-text);
 }
 
 .cv-button--secondary:hover:not(:disabled) { border-color: var(--cv-control-border-hover); background: var(--cv-interactive-hover); }

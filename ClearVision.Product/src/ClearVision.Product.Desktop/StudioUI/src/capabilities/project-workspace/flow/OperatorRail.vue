@@ -332,12 +332,10 @@ function startDrag(event: DragEvent, operator: OperatorCatalogItem): void {
 }
 .operator-rail__categories { width: 100%; height: 100%; padding: var(--cv-space-2) 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; }
 .operator-rail__categories::-webkit-scrollbar { display: none; }
-.operator-rail__category-button { position: relative; width: 100%; min-height: 46px; padding: 4px 3px; display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 0; background: transparent; color: var(--cv-shell-sidebar-muted); font: inherit; cursor: pointer; }
-.operator-rail__category-button::before { position: absolute; inset: 8px auto 8px 0; width: 3px; border-radius: 0 var(--cv-radius-pill) var(--cv-radius-pill) 0; background: transparent; content: ''; }
-.operator-rail__category-button span { width: 100%; min-height: 1.2em; overflow: hidden; display: -webkit-box; font-size: var(--cv-font-size-2xs); line-height: 1.2; text-align: center; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.operator-rail__category-button { position: relative; width: 100%; min-height: 48px; padding: 5px 6px; display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 0; background: transparent; color: var(--cv-shell-sidebar-muted); font: inherit; cursor: pointer; }
+.operator-rail__category-button span { width: 100%; min-height: 1.25em; overflow: hidden; display: -webkit-box; font-size: var(--cv-font-size-2xs); line-height: 1.25; text-align: center; overflow-wrap: normal; word-break: keep-all; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .operator-rail__category-button:hover { background: var(--cv-shell-sidebar-hover); color: var(--cv-shell-sidebar-text); }
-.operator-rail__category-button.is-active { background: var(--cv-color-brand-soft); color: var(--cv-color-brand-text); }
-.operator-rail__category-button.is-active::before { background: var(--cv-color-brand-500); }
+.operator-rail__category-button.is-active { background: var(--cv-color-action-soft); box-shadow: inset 0 0 0 1px var(--cv-color-action-border); color: var(--cv-color-action-text); }
 .operator-rail__category-button:focus-visible { outline: 2px solid var(--cv-focus-ring-color); outline-offset: -2px; }
 .operator-rail__separator { height: 1px; margin: 5px var(--cv-space-2); flex: 0 0 auto; background: var(--cv-shell-sidebar-border); }
 .operator-rail__flyout { position: absolute; z-index: calc(var(--cv-z-dropdown) - 1); inset: 0 auto 0 100%; }

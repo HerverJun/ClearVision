@@ -18,11 +18,20 @@
   --cv-color-brand-soft: rgba(182, 69, 60, 0.1);
   --cv-color-brand-border: rgba(182, 69, 60, 0.3);
 
-  --cv-color-industrial-blue: #47738f;
-  --cv-color-industrial-blue-hover: #365d76;
-  --cv-color-canvas-line: #3f718e;
-  --cv-color-link: #3f718e;
-  --cv-color-link-hover: #315b74;
+  /* Operational blue owns commands and selection. Brand red remains an
+     identity color so NG, destructive actions and navigation do not blur. */
+  --cv-color-action: #2f6f95;
+  --cv-color-action-hover: #245b7b;
+  --cv-color-action-active: #1c4964;
+  --cv-color-on-action: #ffffff;
+  --cv-color-action-text: #285f81;
+  --cv-color-action-soft: rgba(47, 111, 149, 0.1);
+  --cv-color-action-border: rgba(47, 111, 149, 0.34);
+  --cv-color-industrial-blue: var(--cv-color-action);
+  --cv-color-industrial-blue-hover: var(--cv-color-action-hover);
+  --cv-color-canvas-line: #397799;
+  --cv-color-link: #2b668b;
+  --cv-color-link-hover: #1f506e;
 
   --cv-color-status-ok: #16866f;
   --cv-color-status-ok-strong: #0f6f5c;
@@ -69,12 +78,12 @@
   --cv-font-size-xs: 12px;
   --cv-font-size-sm: 13px;
   --cv-font-size-md: 14px;
-  --cv-font-size-lg: 16px;
-  --cv-font-size-xl: 22px;
-  --cv-font-size-2xl: 28px;
-  --cv-line-height-tight: 1.28;
-  --cv-line-height-normal: 1.55;
-  --cv-line-height-relaxed: 1.68;
+  --cv-font-size-lg: 17px;
+  --cv-font-size-xl: 24px;
+  --cv-font-size-2xl: 30px;
+  --cv-line-height-tight: 1.24;
+  --cv-line-height-normal: 1.5;
+  --cv-line-height-relaxed: 1.64;
   --cv-font-weight-regular: 400;
   --cv-font-weight-medium: 520;
   --cv-font-weight-semibold: 620;
@@ -113,10 +122,10 @@
 
   /* Elevation */
   --cv-elevation-0: none;
-  --cv-elevation-1: 0 1px 2px rgba(25, 29, 27, 0.06);
-  --cv-elevation-2: 0 6px 18px rgba(25, 29, 27, 0.1);
-  --cv-elevation-3: 0 14px 34px rgba(25, 29, 27, 0.15);
-  --cv-elevation-modal: 0 24px 64px rgba(15, 18, 16, 0.24);
+  --cv-elevation-1: 0 1px 3px rgba(20, 27, 35, 0.08), 0 4px 10px rgba(20, 27, 35, 0.035);
+  --cv-elevation-2: 0 8px 24px rgba(20, 27, 35, 0.12);
+  --cv-elevation-3: 0 16px 40px rgba(20, 27, 35, 0.16);
+  --cv-elevation-modal: 0 24px 64px rgba(12, 17, 23, 0.24);
   --cv-elevation-raised: var(--cv-elevation-1);
   --cv-elevation-floating: var(--cv-elevation-2);
 
@@ -140,17 +149,18 @@
   --cv-z-modal: 1000;
 
   /* Density: compact is the formal product default. */
-  --cv-density-control-height: 30px;
+  --cv-density-control-height: 32px;
   --cv-density-control-height-sm: 28px;
-  --cv-density-row-height: 32px;
-  --cv-density-panel-padding: 12px;
+  --cv-density-row-height: 36px;
+  --cv-density-panel-padding: 14px;
   --cv-density-field-gap: 6px;
   --cv-density-content-gap: 12px;
   --cv-density-icon-size: 16px;
-  --cv-density-page-padding: 20px;
-  --cv-density-page-gap: 16px;
-  --cv-density-pane-header-height: 34px;
-  --cv-density-toolbar-height: 36px;
+  --cv-control-check-size: 16px;
+  --cv-density-page-padding: 24px;
+  --cv-density-page-gap: 20px;
+  --cv-density-pane-header-height: 36px;
+  --cv-density-toolbar-height: 38px;
 
   /* Professional workbench alignment. These aliases keep capability-local
      editors on the shared density, spacing and surface vocabulary. */
@@ -164,41 +174,42 @@
   --cv-workspace-toolbar-height: 38px;
   --cv-workspace-status-height: 22px;
   --cv-workspace-product-rail-width: 56px;
-  --cv-workspace-operator-rail-width: 56px;
+  --cv-workspace-operator-rail-width: 68px;
   --cv-workspace-topbar-height: 52px;
   --cv-product-topbar-height: 52px;
+  --cv-page-max-width: 1640px;
 
   /* Light surfaces */
-  --cv-surface-app: #f0f2f4;
-  --cv-surface-page: #f7f8fa;
+  --cv-surface-app: #e9edf2;
+  --cv-surface-page: #f5f7f9;
   --cv-surface-raised: #ffffff;
   --cv-surface-floating: #ffffff;
-  --cv-surface-sunken: #f0f2f4;
+  --cv-surface-sunken: #e8edf2;
   --cv-surface-1: #ffffff;
-  --cv-surface-2: #f7f8fa;
-  --cv-surface-3: #eceff2;
+  --cv-surface-2: #f5f7f9;
+  --cv-surface-3: #e8edf2;
   --cv-surface-overlay: rgba(255, 255, 255, 0.98);
-  --cv-surface-canvas: #e8eef6;
+  --cv-surface-canvas: #e9f0f6;
   --cv-surface-image-canvas: #10151d;
   --cv-surface-section: transparent;
   --cv-surface-card: var(--cv-surface-raised);
-  --cv-surface-tool: var(--cv-surface-page);
-  --cv-text-primary: #191c1a;
-  --cv-text-secondary: #505753;
-  --cv-text-muted: #626a65;
-  --cv-text-inverse: #f6f7f4;
-  --cv-border-subtle: #d9e0e8;
-  --cv-border-default: #c3ccd5;
-  --cv-border-strong: #6f7c89;
-  --cv-control-border: #6f7c89;
-  --cv-control-border-hover: #47738f;
-  --cv-interactive-hover: rgba(71, 115, 143, 0.08);
-  --cv-interactive-active: rgba(71, 115, 143, 0.14);
-  --cv-backdrop: rgba(20, 24, 21, 0.52);
-  --cv-focus-ring-color: #315b74;
-  --cv-focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #315b74;
-  --cv-selection-background: #f0d6d2;
-  --cv-selection-text: #191c1a;
+  --cv-surface-tool: #f1f4f7;
+  --cv-text-primary: #171b20;
+  --cv-text-secondary: #4a535d;
+  --cv-text-muted: #626d78;
+  --cv-text-inverse: #f7f9fb;
+  --cv-border-subtle: #d8dfe7;
+  --cv-border-default: #b9c4cf;
+  --cv-border-strong: #667482;
+  --cv-control-border: #74818e;
+  --cv-control-border-hover: var(--cv-color-action);
+  --cv-interactive-hover: rgba(47, 111, 149, 0.075);
+  --cv-interactive-active: rgba(47, 111, 149, 0.14);
+  --cv-backdrop: rgba(18, 23, 29, 0.54);
+  --cv-focus-ring-color: #245b7b;
+  --cv-focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px rgba(36, 91, 123, 0.92);
+  --cv-selection-background: #d8e8f2;
+  --cv-selection-text: #171b20;
   --cv-scrollbar-track: transparent;
   --cv-scrollbar-thumb: #aeb8c1;
   --cv-scrollbar-thumb-hover: #8795a1;
@@ -211,17 +222,17 @@
   --cv-shell-sidebar-active: rgba(255, 255, 255, 0.09);
 
   /* Canvas tokens consumed by the canonical FlowCanvas. */
-  --flow-canvas-background: #f4f6f8;
-  --flow-canvas-grid: rgba(63, 113, 142, 0.105);
+  --flow-canvas-background: #f2f5f8;
+  --flow-canvas-grid: rgba(47, 111, 149, 0.12);
   --flow-canvas-border: #d3dce5;
   --flow-canvas-minimap-background: rgba(255, 255, 255, 0.97);
   --flow-canvas-minimap-border: rgba(63, 113, 142, 0.28);
-  --flow-canvas-minimap-viewport: rgba(182, 69, 60, 0.88);
+  --flow-canvas-minimap-viewport: var(--cv-color-action);
   --flow-canvas-minimap-selected: #26394a;
   --flow-canvas-minimap-disabled: #8b96a6;
-  --flow-canvas-selection-background: rgba(71, 115, 143, 0.13);
-  --flow-canvas-selection-border: #47738f;
-  --flow-canvas-guide: #47738f;
+  --flow-canvas-selection-background: var(--cv-color-action-soft);
+  --flow-canvas-selection-border: var(--cv-color-action);
+  --flow-canvas-guide: var(--cv-color-action);
   --flow-canvas-node-background-start: #ffffff;
   --flow-canvas-node-background-end: #f4f6f8;
   --flow-canvas-node-selected-start: #fbfdfe;
@@ -232,8 +243,8 @@
   --flow-canvas-node-shadow: rgba(37, 55, 72, 0.15);
   --flow-canvas-node-badge-background: rgba(255, 255, 255, 0.96);
   --flow-canvas-port-outline: #ffffff;
-  --flow-canvas-connection: #3f718e;
-  --flow-canvas-connection-selected: #b6453c;
+  --flow-canvas-connection: var(--cv-color-action);
+  --flow-canvas-connection-selected: var(--cv-color-action-hover);
 }
 
 html[data-theme="dark"] {
@@ -253,11 +264,18 @@ html[data-theme="dark"] {
   --cv-color-brand-soft: rgba(182, 69, 60, 0.18);
   --cv-color-brand-border: rgba(182, 69, 60, 0.42);
 
-  --cv-color-industrial-blue: #75a4bf;
-  --cv-color-industrial-blue-hover: #94bad0;
-  --cv-color-canvas-line: #75a4bf;
-  --cv-color-link: #8cb8d0;
-  --cv-color-link-hover: #b4d5e7;
+  --cv-color-action: #2f6f95;
+  --cv-color-action-hover: #34779d;
+  --cv-color-action-active: #377ba2;
+  --cv-color-on-action: #ffffff;
+  --cv-color-action-text: #9ac9e3;
+  --cv-color-action-soft: rgba(117, 175, 209, 0.14);
+  --cv-color-action-border: rgba(117, 175, 209, 0.4);
+  --cv-color-industrial-blue: var(--cv-color-action);
+  --cv-color-industrial-blue-hover: var(--cv-color-action-hover);
+  --cv-color-canvas-line: #75afd1;
+  --cv-color-link: #8fc2df;
+  --cv-color-link-hover: #b4d7e9;
 
   --cv-color-status-ok: #55b59d;
   --cv-color-status-ok-strong: #78cbb5;
@@ -296,37 +314,38 @@ html[data-theme="dark"] {
   --cv-color-destructive-soft: rgba(215, 101, 117, 0.13);
   --cv-color-destructive-border: rgba(215, 101, 117, 0.34);
 
-  --cv-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.28), 0 10px 24px rgba(0, 0, 0, 0.12);
-  --cv-elevation-2: 0 12px 32px rgba(0, 0, 0, 0.34);
-  --cv-elevation-3: 0 24px 60px rgba(0, 0, 0, 0.44);
-  --cv-elevation-modal: 0 34px 88px rgba(0, 0, 0, 0.58);
+  --cv-elevation-1: 0 1px 3px rgba(0, 0, 0, 0.34), 0 4px 10px rgba(0, 0, 0, 0.16);
+  --cv-elevation-2: 0 10px 28px rgba(0, 0, 0, 0.4);
+  --cv-elevation-3: 0 20px 48px rgba(0, 0, 0, 0.5);
+  --cv-elevation-modal: 0 30px 72px rgba(0, 0, 0, 0.62);
 
-  --cv-surface-app: #0f1113;
-  --cv-surface-page: #131619;
-  --cv-surface-raised: #191d20;
-  --cv-surface-floating: #20252a;
-  --cv-surface-sunken: #0b0d0f;
-  --cv-surface-1: #191d20;
-  --cv-surface-2: #131619;
-  --cv-surface-3: #23282d;
-  --cv-surface-overlay: rgba(25, 29, 32, 0.98);
+  --cv-surface-app: #0c0f13;
+  --cv-surface-page: #12161b;
+  --cv-surface-raised: #191e24;
+  --cv-surface-floating: #20262d;
+  --cv-surface-sunken: #090c0f;
+  --cv-surface-1: #191e24;
+  --cv-surface-2: #12161b;
+  --cv-surface-3: #242a31;
+  --cv-surface-overlay: rgba(25, 30, 36, 0.98);
   --cv-surface-canvas: #0a1019;
   --cv-surface-image-canvas: #0a1019;
-  --cv-text-primary: #f0f2ef;
-  --cv-text-secondary: #bac1bc;
-  --cv-text-muted: #969f99;
-  --cv-text-inverse: #111412;
-  --cv-border-subtle: #2b312d;
-  --cv-border-default: #454e48;
-  --cv-border-strong: #69736c;
-  --cv-control-border: #6c7770;
-  --cv-control-border-hover: #8b968f;
-  --cv-interactive-hover: #232925;
-  --cv-interactive-active: #2d3430;
+  --cv-surface-tool: #151a20;
+  --cv-text-primary: #f2f5f7;
+  --cv-text-secondary: #bac2ca;
+  --cv-text-muted: #959fa9;
+  --cv-text-inverse: #101419;
+  --cv-border-subtle: #2b323a;
+  --cv-border-default: #46515c;
+  --cv-border-strong: #6b7782;
+  --cv-control-border: #707c88;
+  --cv-control-border-hover: var(--cv-color-action);
+  --cv-interactive-hover: rgba(117, 175, 209, 0.1);
+  --cv-interactive-active: rgba(117, 175, 209, 0.17);
   --cv-backdrop: rgba(3, 5, 4, 0.76);
-  --cv-focus-ring-color: #a6c7d9;
-  --cv-focus-ring: 0 0 0 2px #191d20, 0 0 0 4px #a6c7d9;
-  --cv-selection-background: #6d2a26;
+  --cv-focus-ring-color: #96c4df;
+  --cv-focus-ring: 0 0 0 2px #191e24, 0 0 0 4px #96c4df;
+  --cv-selection-background: #234d66;
   --cv-selection-text: #ffffff;
   --cv-scrollbar-track: transparent;
   --cv-scrollbar-thumb: #4c5750;
@@ -344,12 +363,12 @@ html[data-theme="dark"] {
   --flow-canvas-border: #26344a;
   --flow-canvas-minimap-background: rgba(15, 24, 36, 0.95);
   --flow-canvas-minimap-border: rgba(219, 232, 250, 0.14);
-  --flow-canvas-minimap-viewport: rgba(224, 106, 95, 0.9);
+  --flow-canvas-minimap-viewport: var(--cv-color-action);
   --flow-canvas-minimap-selected: #f2f7ff;
   --flow-canvas-minimap-disabled: #687489;
-  --flow-canvas-selection-background: rgba(117, 164, 191, 0.15);
-  --flow-canvas-selection-border: #75a4bf;
-  --flow-canvas-guide: #75a4bf;
+  --flow-canvas-selection-background: var(--cv-color-action-soft);
+  --flow-canvas-selection-border: var(--cv-color-action);
+  --flow-canvas-guide: var(--cv-color-action);
   --flow-canvas-node-background-start: rgba(30, 43, 55, 0.98);
   --flow-canvas-node-background-end: rgba(18, 29, 39, 0.99);
   --flow-canvas-node-selected-start: rgba(47, 72, 88, 0.98);
@@ -360,40 +379,40 @@ html[data-theme="dark"] {
   --flow-canvas-node-shadow: rgba(0, 0, 0, 0.38);
   --flow-canvas-node-badge-background: rgba(13, 27, 44, 0.9);
   --flow-canvas-port-outline: #f4f8ff;
-  --flow-canvas-connection: #75a4bf;
-  --flow-canvas-connection-selected: #e06a5f;
+  --flow-canvas-connection: var(--cv-color-action);
+  --flow-canvas-connection-selected: var(--cv-color-action-hover);
 }
 
 html[data-density="compact"] {
-  --cv-density-control-height: 30px;
+  --cv-density-control-height: 32px;
   --cv-density-control-height-sm: 28px;
-  --cv-density-row-height: 32px;
-  --cv-density-panel-padding: 12px;
+  --cv-density-row-height: 36px;
+  --cv-density-panel-padding: 14px;
   --cv-density-field-gap: 6px;
   --cv-density-content-gap: 12px;
   --cv-density-icon-size: 16px;
-  --cv-density-page-padding: 20px;
-  --cv-density-page-gap: 16px;
-  --cv-density-pane-header-height: 34px;
-  --cv-density-toolbar-height: 36px;
+  --cv-density-page-padding: 24px;
+  --cv-density-page-gap: 20px;
+  --cv-density-pane-header-height: 36px;
+  --cv-density-toolbar-height: 38px;
 }
 
 html[data-density="comfortable"] {
-  --cv-density-control-height: 36px;
+  --cv-density-control-height: 38px;
   --cv-density-control-height-sm: 32px;
-  --cv-density-row-height: 38px;
-  --cv-density-panel-padding: 16px;
+  --cv-density-row-height: 42px;
+  --cv-density-panel-padding: 18px;
   --cv-density-field-gap: 8px;
   --cv-density-content-gap: 16px;
   --cv-density-icon-size: 18px;
-  --cv-density-page-padding: 28px;
-  --cv-density-page-gap: 20px;
-  --cv-density-pane-header-height: 40px;
-  --cv-density-toolbar-height: 42px;
+  --cv-density-page-padding: 32px;
+  --cv-density-page-gap: 24px;
+  --cv-density-pane-header-height: 42px;
+  --cv-density-toolbar-height: 44px;
   --cv-workspace-toolbar-height: 44px;
   --cv-workspace-status-height: 24px;
   --cv-workspace-product-rail-width: 60px;
-  --cv-workspace-operator-rail-width: 56px;
+  --cv-workspace-operator-rail-width: 72px;
   --cv-workspace-topbar-height: 56px;
   --cv-product-topbar-height: 56px;
 }

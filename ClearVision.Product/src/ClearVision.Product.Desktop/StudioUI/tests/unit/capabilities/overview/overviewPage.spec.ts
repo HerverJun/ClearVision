@@ -6,6 +6,7 @@ import type { ApiGetOptions, ApiTransport } from '@/platform/api';
 import { createReadQueryClient } from '@/platform/query';
 
 const projectId = '11111111-1111-4111-8111-111111111111';
+const earlierProjectId = '22222222-2222-4222-8222-222222222222';
 
 function recentProject(): Record<string, unknown> {
   return {
@@ -17,6 +18,16 @@ function recentProject(): Record<string, unknown> {
     createdAt: '2026-07-15T01:00:00Z',
     modifiedAt: '2026-07-15T02:00:00Z',
     lastOpenedAt: '2026-07-15T03:00:00Z'
+  };
+}
+
+function earlierRecentProject(): Record<string, unknown> {
+  return {
+    ...recentProject(),
+    id: earlierProjectId,
+    name: '追溯工程',
+    description: '较早打开的工程',
+    lastOpenedAt: '2026-07-14T03:00:00Z'
   };
 }
 
@@ -61,7 +72,7 @@ describe('Overview page', () => {
     const requestedPaths: string[] = [];
     const runtime = createRuntime(apiWith(async path => {
       requestedPaths.push(path);
-      return [recentProject()];
+      return [recentProject(), earlierRecentProject()];
     }));
     const router = createRouter({
       history: createMemoryHistory(),
@@ -70,6 +81,7 @@ describe('Overview page', () => {
         { path: '/projects', component: { template: '<div />' } },
         { path: '/projects/:projectId', component: { template: '<div />' } },
         { path: '/projects/:projectId/workspace', component: { template: '<div />' } },
+        { path: '/results', component: { template: '<div />' } },
         { path: '/diagnostics', component: { template: '<div />' } },
         { path: '/about', component: { template: '<div />' } }
       ]
@@ -86,8 +98,11 @@ describe('Overview page', () => {
     expect(wrapper.text()).toContain('健康');
     expect(wrapper.text()).toContain('operator-a');
     expect(wrapper.text()).toContain('操作员');
-    expect(wrapper.text()).toContain('最近工程');
+    expect(wrapper.get('.overview-page__resume-section .cv-panel__title').text()).toBe('继续工作');
+    expect(wrapper.findAll(`a[href="/projects/${projectId}"]`).map(link => link.text())).toContain('查看详情');
     expect(wrapper.get('a[href="/projects/11111111-1111-4111-8111-111111111111/workspace"]').text()).toBe('继续配置');
+    expect(wrapper.get(`a[href="/projects/${earlierProjectId}"]`).text()).toContain('追溯工程');
+    expect(wrapper.get(`a[href="/projects/${earlierProjectId}/workspace"]`).text()).toBe('继续配置');
     expect(wrapper.findAll('a').some(link => link.text().includes('诊断'))).toBe(false);
     expect(requestedPaths).toEqual(['projects/recent?count=5']);
     expect(requestedPaths).not.toContain('/health');
@@ -104,6 +119,7 @@ describe('Overview page', () => {
       routes: [
         { path: '/overview', component: { template: '<div />' } },
         { path: '/projects', component: { template: '<div />' } },
+        { path: '/results', component: { template: '<div />' } },
         { path: '/diagnostics', component: { template: '<div />' } },
         { path: '/about', component: { template: '<div />' } }
       ]

@@ -63,6 +63,14 @@ function isVisibleNavigation(path: string): boolean {
 
 const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() => {
   const items: ProductTopNavigationItem[] = [];
+  if (isVisibleNavigation('/overview')) {
+    items.push({
+      label: '概览',
+      to: '/overview',
+      description: '最近工程与工作上下文',
+      current: route.path === '/overview'
+    });
+  }
   if (isVisibleNavigation('/projects')) {
     items.push({
       label: '工程',
@@ -84,18 +92,35 @@ const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() =>
     });
   }
   if (isVisibleNavigation('/inspection')) {
-    items.splice(1, 0, {
+    const resultIndex = items.findIndex(item => item.to === '/results');
+    items.splice(resultIndex < 0 ? items.length : resultIndex, 0, {
       label: '连续检测',
       to: '/inspection',
       description: '选择工程并运行连续检测',
       current: route.path === '/inspection' || route.path.endsWith('/inspection')
     });
   }
+  if (isVisibleNavigation('/operators')) {
+    items.push({
+      label: '算子库',
+      to: '/operators',
+      description: '查看可用算子与输入输出定义',
+      current: route.path.startsWith('/operators')
+    });
+  }
+  if (isVisibleNavigation('/stations')) {
+    items.push({
+      label: '工作站',
+      to: '/stations',
+      description: '查看现场工作站状态与结果',
+      current: route.path.startsWith('/stations')
+    });
+  }
   if (isVisibleNavigation('/ai')) {
     const boundProjectId = typeof route.params.id === 'string' ? route.params.id : null;
     const aiPath = boundProjectId ? `/projects/${encodeURIComponent(boundProjectId)}/ai` : '/ai';
     items.push({
-      label: 'AI 工程工作台',
+      label: 'AI 工程',
       to: aiPath,
       description: 'AI 工程工作台',
       current: route.path === '/ai' || route.path.endsWith('/ai')
@@ -113,7 +138,7 @@ const productTopNavigation = computed<readonly ProductTopNavigationItem[]>(() =>
 });
 const productMoreNavigation = computed<readonly Readonly<{ to: string; label: string }>[]>(() => Object.freeze(
   visibleNavigation.value
-    .filter(item => ['/overview', '/operators', '/stations', '/diagnostics', '/about'].includes(item.to))
+    .filter(item => ['/diagnostics', '/about'].includes(item.to))
     .map(item => Object.freeze({ to: item.to, label: item.label }))
 ));
 const statusTone = computed(() => {
@@ -230,8 +255,8 @@ onMounted(() => {
         <div class="product-layout__workspace-chrome">
           <RouterLink
             class="product-layout__workspace-brand"
-            to="/projects"
-            aria-label="ClearVision Studio 工程"
+            to="/overview"
+            aria-label="ClearVision Studio 概览"
           >
             <CvBrand />
           </RouterLink>
@@ -350,7 +375,7 @@ onMounted(() => {
               <template #trigger>
                 <span class="product-layout__menu-trigger-label">更多</span>
                 <CvIcon
-                  name="chevron-right"
+                  name="more-horizontal"
                   size="sm"
                 />
               </template>

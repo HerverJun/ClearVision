@@ -46,6 +46,29 @@ withDefaults(defineProps<{
       v-else-if="name === 'chevron-right'"
       d="m9 18 6-6-6-6"
     />
+    <template v-else-if="name === 'more-horizontal'">
+      <circle
+        cx="5"
+        cy="12"
+        r="1.25"
+        fill="currentColor"
+        stroke="none"
+      />
+      <circle
+        cx="12"
+        cy="12"
+        r="1.25"
+        fill="currentColor"
+        stroke="none"
+      />
+      <circle
+        cx="19"
+        cy="12"
+        r="1.25"
+        fill="currentColor"
+        stroke="none"
+      />
+    </template>
     <template v-else-if="name === 'overview'">
       <rect
         x="4"
@@ -161,6 +184,19 @@ withDefaults(defineProps<{
         rx="2"
       />
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </template>
+    <template v-else-if="name === 'eye'">
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle
+        cx="12"
+        cy="12"
+        r="2.75"
+      />
+    </template>
+    <template v-else-if="name === 'eye-off'">
+      <path d="M4.5 4.5 19.5 19.5" />
+      <path d="M10.2 6.3A10 10 0 0 1 12 6c6 0 9.5 6 9.5 6a15 15 0 0 1-2.1 2.8M14.8 17.5A10 10 0 0 1 12 18c-6 0-9.5-6-9.5-6a15 15 0 0 1 3.1-3.7" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
     </template>
     <template v-else-if="name === 'empty'">
       <path d="M4 7.5 7 4h10l3 3.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z" />

@@ -85,9 +85,6 @@ const projectCountLabel = computed(() => {
     ? `${sortedProjects.value.length} 个匹配工程`
     : `${sortedProjects.value.length} 个工程`;
 });
-const recentCountLabel = computed(() => recentState.value.data?.length
-  ? `${recentState.value.data.length} 个最近工程`
-  : '暂无最近记录');
 const sortModel = computed({
   get: () => sort.value,
   set: value => { sort.value = value as ProjectSort; }
@@ -133,11 +130,11 @@ const canSubmitImport = computed(() => Boolean(importDocument.value) && (
 ));
 const columns: readonly CvDataTableColumn<ProjectSummary>[] = Object.freeze([
   { key: 'name', label: '名称', width: '18%' },
-  { key: 'description', label: '描述', width: '26%' },
-  { key: 'version', label: '版本', width: '10%' },
-  { key: 'modifiedAt', label: '修改时间', width: '17%' },
-  { key: 'lastOpenedAt', label: '最近打开', width: '17%' },
-  { key: 'actions', label: '操作', align: 'end', width: '24%' }
+  { key: 'description', label: '描述', width: '24%' },
+  { key: 'version', label: '版本', width: '7%' },
+  { key: 'modifiedAt', label: '修改时间', width: '14%' },
+  { key: 'lastOpenedAt', label: '最近打开', width: '14%' },
+  { key: 'actions', label: '操作', align: 'end', width: '23%' }
 ]);
 
 watch([sortedProjects, sort], () => {
@@ -346,13 +343,23 @@ onBeforeUnmount(() => {
   >
     <CvPageHeader
       title="工程"
-      description="管理工程库与最近工作。"
+      description="查找、打开并管理本机工程。"
     >
       <template #meta>
         <span class="projects-page__meta">{{ projectCountLabel }}</span>
-        <span class="projects-page__meta">{{ recentCountLabel }}</span>
       </template>
       <template #actions>
+        <CvIconButton
+          size="sm"
+          label="刷新工程列表"
+          :loading="listState.isRefreshing"
+          @click="listQuery.refresh({ force: true })"
+        >
+          <CvIcon
+            name="refresh"
+            size="sm"
+          />
+        </CvIconButton>
         <CvButton
           v-if="commands"
           size="sm"
@@ -373,6 +380,7 @@ onBeforeUnmount(() => {
           v-if="commands"
           size="sm"
           variant="primary"
+          :disabled="commandBusy"
           data-testid="project-create-open"
           @click="showCreate"
         >
@@ -384,17 +392,6 @@ onBeforeUnmount(() => {
           </template>
           新建工程
         </CvButton>
-        <CvIconButton
-          size="sm"
-          label="刷新工程列表"
-          :loading="listState.isRefreshing"
-          @click="listQuery.refresh({ force: true })"
-        >
-          <CvIcon
-            name="refresh"
-            size="sm"
-          />
-        </CvIconButton>
       </template>
     </CvPageHeader>
 
@@ -455,9 +452,19 @@ onBeforeUnmount(() => {
       class="projects-page__layout"
       :class="{ 'projects-page__layout--empty': listState.phase === 'empty' && !isSearching }"
     >
+      <ProjectsRecentPanel
+        class="projects-page__recent"
+        :phase="recentState.phase"
+        :projects="recentState.data ?? null"
+        :is-refreshing="recentState.isRefreshing"
+        :can-open="Boolean(commands)"
+        :busy="commandBusy"
+        @open="openWorkspace"
+      />
+
       <CvPanel
         class="projects-page__library"
-        title="全部工程"
+        title="工程列表"
         variant="section"
         :padded="false"
       >
@@ -583,10 +590,21 @@ onBeforeUnmount(() => {
           :busy="listState.isRefreshing"
         >
           <template #cell-name="{ row }">
-            <span class="projects-page__name">{{ row.name }}</span>
+            <RouterLink
+              class="projects-page__name"
+              :to="`/projects/${row.id}`"
+              :title="row.name"
+            >
+              {{ row.name }}
+            </RouterLink>
           </template>
           <template #cell-description="{ row }">
-            {{ row.description || '—' }}
+            <span
+              class="projects-page__description"
+              :title="row.description || undefined"
+            >
+              {{ row.description || '—' }}
+            </span>
           </template>
           <template #cell-modifiedAt="{ row }">
             {{ formatProjectDateTime(row.modifiedAt) }}
@@ -597,10 +615,10 @@ onBeforeUnmount(() => {
           <template #cell-actions="{ row }">
             <span class="projects-page__actions">
               <RouterLink
+                class="projects-page__detail"
                 :to="`/projects/${row.id}`"
-                :aria-label="`查看详情：${row.name}`"
               >
-                详情
+                查看详情
               </RouterLink>
               <CvButton
                 v-if="commands"
@@ -654,16 +672,6 @@ onBeforeUnmount(() => {
           next-label="下一页"
         />
       </CvPanel>
-
-      <ProjectsRecentPanel
-        class="projects-page__recent"
-        :phase="recentState.phase"
-        :projects="recentState.data ?? null"
-        :is-refreshing="recentState.isRefreshing"
-        :can-open="Boolean(commands)"
-        :busy="commandBusy"
-        @open="openWorkspace"
-      />
     </div>
 
     <CvModal
@@ -848,33 +856,104 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.projects-page { display: grid; max-width: 1720px; gap: var(--cv-density-page-gap); min-width: 0; }
-.projects-page__meta { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); font-variant-numeric: tabular-nums lining-nums; }
-.projects-page__file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); pointer-events: none; white-space: nowrap; }
-.projects-page__meta + .projects-page__meta::before { margin-right: var(--cv-space-2); color: var(--cv-border-strong); content: '·'; }
-.projects-page__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(244px, 288px); gap: var(--cv-space-4); align-items: start; }
-.projects-page__layout--empty { grid-template-columns: minmax(0, 1fr); }
+.projects-page {
+  display: grid;
+  width: 100%;
+  max-width: 1720px;
+  min-width: 0;
+  gap: var(--cv-density-page-gap);
+}
+.projects-page__meta {
+  color: var(--cv-text-secondary);
+  font-size: var(--cv-font-size-xs);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.projects-page__file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.projects-page__layout { display: grid; min-width: 0; gap: var(--cv-space-6); align-items: start; }
 .projects-page__layout--empty .projects-page__recent { display: none; }
 .projects-page__library { background: var(--cv-surface-raised); }
-.projects-page__library-toolbar { padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); }
-.projects-page__library-toolbar :deep(.cv-toolbar__primary) { flex: 1 1 620px; }
-.projects-page__search { flex: 1 1 360px; max-width: 560px; }
-.projects-page__sort { min-width: 150px; }
-.projects-page__notice { margin-bottom: var(--cv-space-3); }
+.projects-page__library-toolbar {
+  padding: var(--cv-space-3) var(--cv-density-panel-padding);
+  border-block: 1px solid var(--cv-border-subtle);
+  background: var(--cv-surface-page);
+}
+.projects-page__library-toolbar :deep(.cv-toolbar__primary) { flex: 1 1 680px; }
+.projects-page__search { flex: 1 1 420px; max-width: 720px; }
+.projects-page__sort { min-width: 168px; }
+.projects-page__sort :deep(.cv-select__label) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.projects-page__notice { margin-block: var(--cv-space-3) 0; }
 .projects-page__inset { margin-inline: var(--cv-density-panel-padding); }
-.projects-page__state { margin: 0 var(--cv-density-panel-padding) var(--cv-density-panel-padding); }
-.projects-page__name { color: var(--cv-text-primary); font-weight: var(--cv-font-weight-semibold); }
+.projects-page__state { margin: var(--cv-space-3) var(--cv-density-panel-padding) var(--cv-density-panel-padding); }
+.projects-page__library :deep(.cv-data-table table) { table-layout: fixed; }
+.projects-page__library :deep(.cv-data-table th),
+.projects-page__library :deep(.cv-data-table td) { overflow: hidden; }
+.projects-page__library :deep(.cv-data-table tbody tr:focus-within) { background: var(--cv-interactive-hover); }
+.projects-page__name {
+  display: block;
+  overflow: hidden;
+  color: var(--cv-text-primary);
+  font-weight: var(--cv-font-weight-semibold);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.projects-page__name:hover { color: var(--cv-color-link); }
+.projects-page__name:focus-visible { border-radius: var(--cv-radius-xs); outline: none; box-shadow: var(--cv-focus-ring); }
+.projects-page__description { display: block; overflow: hidden; color: var(--cv-text-secondary); text-overflow: ellipsis; white-space: nowrap; }
 .projects-page__actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--cv-space-1); white-space: nowrap; }
-.projects-page__actions > a { flex: 0 0 auto; }
+.projects-page__detail { padding: var(--cv-space-1) var(--cv-space-2); border-radius: var(--cv-radius-sm); color: var(--cv-color-link); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-medium); text-decoration: none; }
+.projects-page__detail:hover { background: var(--cv-interactive-hover); color: var(--cv-color-link-hover); }
+.projects-page__detail:focus-visible { outline: none; box-shadow: var(--cv-focus-ring); }
 .projects-page__form { display: grid; gap: var(--cv-space-4); }
 .projects-page__import-form { display: grid; gap: var(--cv-space-4); }
 .projects-page__file-summary { display: grid; gap: var(--cv-space-1); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); background: var(--cv-surface-page); color: var(--cv-text-secondary); font-size: var(--cv-font-size-sm); }
 .projects-page__file-summary strong { overflow-wrap: anywhere; color: var(--cv-text-primary); font-weight: var(--cv-font-weight-semibold); }
 .projects-page__file-label { color: var(--cv-text-muted); font-size: var(--cv-font-size-xs); font-weight: var(--cv-font-weight-semibold); }
 .projects-page__acknowledge { display: flex; align-items: flex-start; gap: var(--cv-space-2); color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); line-height: var(--cv-line-height-normal); }
-.projects-page__acknowledge input { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; accent-color: var(--cv-color-brand-500); }
-.projects-page :deep(.projects-page__library > .cv-panel__header),
-.projects-page :deep(.projects-page__recent > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
-@media (max-width: 1040px) { .projects-page__layout { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .projects-page__actions { flex-wrap: wrap; justify-content: flex-start; } }
+.projects-page__acknowledge input { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; accent-color: var(--cv-color-action); }
+.projects-page :deep(.projects-page__library > .cv-panel__header) { padding-bottom: var(--cv-space-3); }
+
+@media (max-width: 1040px) {
+  .projects-page__library :deep(.cv-data-table th:nth-child(3)),
+  .projects-page__library :deep(.cv-data-table td:nth-child(3)) { display: none; }
+}
+
+@media (max-width: 840px) {
+  .projects-page__library :deep(.cv-data-table th:nth-child(2)),
+  .projects-page__library :deep(.cv-data-table td:nth-child(2)),
+  .projects-page__library :deep(.cv-data-table th:nth-child(4)),
+  .projects-page__library :deep(.cv-data-table td:nth-child(4)) { display: none; }
+  .projects-page__library :deep(.cv-data-table th:first-child) { width: auto !important; }
+  .projects-page__library :deep(.cv-data-table th:last-child) { width: 220px !important; }
+}
+
+@media (max-width: 700px) {
+  .projects-page__library-toolbar :deep(.cv-toolbar__primary),
+  .projects-page__library-toolbar :deep(.cv-toolbar__secondary) { width: 100%; }
+  .projects-page__library-toolbar :deep(.cv-toolbar__secondary) { margin-left: 0; }
+  .projects-page__search { max-width: none; }
+  .projects-page__sort { flex: 1 1 auto; }
+  .projects-page__library :deep(.cv-data-table th:nth-child(5)),
+  .projects-page__library :deep(.cv-data-table td:nth-child(5)) { display: none; }
+}
+
+@media (max-width: 640px) {
+  .projects-page__actions { flex-wrap: wrap; justify-content: flex-start; }
+}
 </style>

@@ -13,6 +13,7 @@ import {
 
 export interface AuthLifecycleRoot {
   readonly auth: AuthLifecycleOwner;
+  readonly preferences: UiPreferencesOwner;
   readonly productRuntime: DeepReadonly<ShallowRef<ProductRuntime | null>>;
   getProductLeaveGuard(): ProductLeaveGuardOwner | null;
   bindRouter(router: Router): void;
@@ -100,6 +101,7 @@ export function createAuthLifecycleRoot(
 
   return Object.freeze({
     auth,
+    preferences,
     productRuntime: readonly(productRuntime),
     getProductLeaveGuard(): ProductLeaveGuardOwner | null {
       return productRuntime.value?.leaveGuard ?? quarantinedRuntime?.leaveGuard ?? null;

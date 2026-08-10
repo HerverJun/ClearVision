@@ -21,6 +21,7 @@ const emit = defineEmits<{
   <CvPanel
     class="projects-recent"
     title="最近打开"
+    description="按最近打开时间排列。"
     :level="2"
     variant="section"
     :padded="false"
@@ -51,6 +52,7 @@ const emit = defineEmits<{
       compact
       kind="empty"
       title="暂无最近工程"
+      description="打开工程后会显示在这里。"
     />
     <CvPageState
       v-else-if="phase === 'unauthorized'"
@@ -78,15 +80,16 @@ const emit = defineEmits<{
         v-for="project in projects"
         :key="project.id"
       >
-        <div class="projects-recent__copy">
-          <RouterLink
-            :to="`/projects/${project.id}`"
-            :title="project.name"
-          >
-            {{ project.name }}
-          </RouterLink>
-          <span>{{ formatProjectDateTime(project.lastOpenedAt) }}</span>
-        </div>
+        <RouterLink
+          class="projects-recent__copy"
+          :to="`/projects/${project.id}`"
+          :title="project.name"
+        >
+          <strong>{{ project.name }}</strong>
+          <time :datetime="project.lastOpenedAt ?? undefined">
+            {{ formatProjectDateTime(project.lastOpenedAt) }}
+          </time>
+        </RouterLink>
         <CvButton
           v-if="canOpen"
           size="sm"
@@ -102,16 +105,77 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-.projects-recent__list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
-.projects-recent__list li { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-2); padding: var(--cv-space-3) var(--cv-density-panel-padding); border-top: 1px solid var(--cv-border-subtle); }
-.projects-recent__copy { display: grid; min-width: 0; gap: 2px; }
-.projects-recent__copy a { overflow: hidden; color: var(--cv-text-primary); font-weight: var(--cv-font-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
-.projects-recent__copy span { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
-.projects-recent :deep(.cv-panel__header) { padding-bottom: var(--cv-space-3); }
+.projects-recent {
+  display: grid;
+  grid-template-columns: minmax(168px, 204px) minmax(0, 1fr);
+  align-items: stretch;
+  border-block: 1px solid var(--cv-border-subtle);
+  background: var(--cv-surface-raised);
+}
+.projects-recent :deep(.cv-panel__header) {
+  align-items: center;
+  padding: var(--cv-space-4);
+  border-inline-end: 1px solid var(--cv-border-subtle);
+  background: var(--cv-surface-page);
+}
+.projects-recent :deep(.cv-panel__content) { min-width: 0; }
+.projects-recent__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+  min-height: 72px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.projects-recent__list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--cv-space-2);
+  min-width: 0;
+  padding: var(--cv-space-3);
+  border-inline-end: 1px solid var(--cv-border-subtle);
+  transition: background var(--cv-motion-duration-fast) var(--cv-motion-ease-standard);
+}
+.projects-recent__list li:last-child { border-inline-end: 0; }
+.projects-recent__list li:hover,
+.projects-recent__list li:focus-within { background: var(--cv-interactive-hover); }
+.projects-recent__copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--cv-space-1);
+  color: var(--cv-text-primary);
+  text-decoration: none;
+}
+.projects-recent__copy:hover strong { color: var(--cv-color-link); }
+.projects-recent__copy:focus-visible { border-radius: var(--cv-radius-xs); outline: none; box-shadow: var(--cv-focus-ring); }
+.projects-recent__copy strong {
+  overflow: hidden;
+  font-size: var(--cv-font-size-sm);
+  font-weight: var(--cv-font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.projects-recent__copy time {
+  color: var(--cv-text-secondary);
+  font-size: var(--cv-font-size-xs);
+  font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
+}
 .projects-recent :deep(.cv-inline-alert),
 .projects-recent :deep(.cv-page-state) { margin: 0 var(--cv-density-panel-padding) var(--cv-density-panel-padding); }
-@media (max-width: 1040px) {
-  .projects-recent__list { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-  .projects-recent__list li { border-right: 1px solid var(--cv-border-subtle); }
+@media (max-width: 1180px) {
+  .projects-recent { display: block; }
+  .projects-recent :deep(.cv-panel__header) {
+    padding-inline: 0;
+    border-inline-end: 0;
+    background: transparent;
+  }
+  .projects-recent__list { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); border-block-start: 1px solid var(--cv-border-subtle); }
+  .projects-recent__list li { border-block-end: 1px solid var(--cv-border-subtle); }
+}
+@media (max-width: 640px) {
+  .projects-recent__list { grid-template-columns: 1fr; }
+  .projects-recent__list li { border-inline-end: 0; }
 }
 </style>

@@ -1232,7 +1232,7 @@ onDeactivated(() => {
 .settings-ai-model__form { min-width: 0; }
 .settings-ai-model__primary-grid, .settings-ai-model__advanced-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: var(--cv-space-4); }
 .settings-ai-model__toggle { display: flex; min-height: var(--cv-density-control-height); align-items: center; gap: var(--cv-space-2); }
-.settings-ai-model__toggle input, .settings-ai-model__role input { width: 16px; height: 16px; accent-color: var(--cv-color-brand-500); }
+.settings-ai-model__toggle input, .settings-ai-model__role input { width: 16px; height: 16px; accent-color: var(--cv-color-action); }
 .settings-ai-model__toggle span { display: grid; gap: 2px; }
 .settings-ai-model__toggle strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .settings-ai-model__toggle small { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
@@ -1247,7 +1247,7 @@ onDeactivated(() => {
 .settings-ai-model__advanced-content { padding: var(--cv-space-4) 0; }
 .settings-ai-model__readonly-secrets { margin-top: var(--cv-space-4); color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); }
 .settings-ai-model__roles { display: flex; flex-wrap: wrap; align-items: center; gap: var(--cv-space-2) var(--cv-space-3); margin-top: var(--cv-space-4); padding-top: var(--cv-space-4); border-top: 1px solid var(--cv-border-subtle); }
-.settings-ai-model__eyebrow { color: var(--cv-color-brand-text); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-semibold); }
+.settings-ai-model__eyebrow { color: var(--cv-text-muted); font-size: var(--cv-font-size-2xs); font-weight: var(--cv-font-weight-semibold); }
 .settings-ai-model__role { display: inline-flex; align-items: center; gap: var(--cv-space-1); color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); }
 .settings-ai-model__reasoning { display: grid; gap: var(--cv-space-3); margin-top: var(--cv-space-4); padding-top: var(--cv-space-4); border-top: 1px solid var(--cv-border-subtle); }
 .settings-ai-model__reasoning-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--cv-space-3); }

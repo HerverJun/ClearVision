@@ -386,7 +386,7 @@ async function verifyStudioAuthLifecycle(page, userJson, password) {
   assert(beforeLogin.tokenPresent === false, 'WebView2 auth scenario started with a pre-seeded page token.');
 
   await page.getByLabel('用户名').fill(username);
-  await page.getByLabel('密码').fill(password);
+  await page.getByLabel('密码', { exact: true }).fill(password);
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await page.waitForSelector('[data-product-shell="ready"]', { state: 'visible', timeout: 45_000 });
   const authenticated = await page.evaluate(() => ({
@@ -3179,7 +3179,7 @@ async function setupAdminThroughUi(page, webPort, username, password, captureSce
   if (captureScene) await captureScene('setup');
   await page.getByLabel('管理员用户名').fill(username);
   await page.getByLabel('密码', { exact: true }).fill(password);
-  await page.getByLabel('确认密码').fill(password);
+  await page.getByLabel('确认密码', { exact: true }).fill(password);
   await page.getByRole('button', { name: '创建并进入 Studio' }).click();
   const product = await assertProductLanding(page);
   const session = await readUiSessionAuthority(page, webPort);
@@ -3199,7 +3199,7 @@ async function loginThroughUi(page, webPort, username, password, captureScene) {
   );
   if (captureScene) await captureScene('login');
   await page.getByLabel('用户名').fill(username);
-  await page.getByLabel('密码').fill(password);
+  await page.getByLabel('密码', { exact: true }).fill(password);
   await page.getByRole('button', { name: '登录', exact: true }).click();
   const product = await assertProductLanding(page);
   const session = await readUiSessionAuthority(page, webPort);

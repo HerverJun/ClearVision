@@ -27,6 +27,7 @@ const referenceResultId = '44444444-4444-4444-8444-444444444444';
 const executionSnapshotId = '55555555-5555-4555-8555-555555555555';
 const imageId = '66666666-6666-4666-8666-666666666666';
 const exportId = '77777777-7777-4777-8777-777777777777';
+const longDefectType = '冲压件外缘连续划伤并伴随局部压痕与表面残留污染';
 const canonicalCases = Object.freeze([
   ['Ok', 'Succeeded', 'Ok'],
   ['Ng', 'Succeeded', 'Ng'],
@@ -151,7 +152,7 @@ function analysisDistribution() {
     endTime: null,
     totalDefects: 6,
     items: [
-      { defectType: '划痕', count: 3, percentage: 50 },
+      { defectType: longDefectType, count: 3, percentage: 50 },
       { defectType: '脏污', count: 2, percentage: 33.3 },
       { defectType: '缺口', count: 1, percentage: 16.7 }
     ]
@@ -508,6 +509,10 @@ test('Results local view keeps query filters, dual axes, detail 404 and GET-only
   await page.getByLabel('本机工程').selectOption(projectId);
   await expect(page.getByRole('link', { name: '返回工作区' })).toBeVisible();
   await expect(page.getByText('83.3%', { exact: true })).toBeVisible();
+  const longDefectLabel = page.getByText(longDefectType, { exact: true });
+  await expect(longDefectLabel).toBeVisible();
+  await expect(longDefectLabel).toHaveCSS('white-space', 'normal');
+  await expect(longDefectLabel).toHaveCSS('overflow-wrap', 'anywhere');
   await viewTabs.getByRole('tab', { name: '调查详情' }).click();
   await expect(viewTabs.getByRole('tab', { name: '调查详情' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('cell', { name: '不适用', exact: true }).first()).toBeVisible();

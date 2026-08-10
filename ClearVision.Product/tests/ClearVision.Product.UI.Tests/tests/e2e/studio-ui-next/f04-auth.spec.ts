@@ -193,7 +193,7 @@ test('F04 auth lifecycle: setup auto-login, recovery, password invalidation, new
   }
   await page.getByLabel('管理员用户名').fill('admin');
   await page.getByLabel('密码', { exact: true }).fill('old-password');
-  await page.getByLabel('确认密码').fill('old-password');
+  await page.getByLabel('确认密码', { exact: true }).fill('old-password');
   await page.getByRole('button', { name: '创建管理员并进入工程库' }).click();
   await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
   await expect(page.locator('[data-capability="projects-read"]')).toBeVisible();
@@ -208,12 +208,12 @@ test('F04 auth lifecycle: setup auto-login, recovery, password invalidation, new
   if (hasF04VisualEvidenceTarget()) {
     await captureF04VisualEvidence(page, { scenario: 'change-password', viewport, runtimeErrors });
   }
-  await page.getByLabel('当前密码').fill('old-password');
+  await page.getByLabel('当前密码', { exact: true }).fill('old-password');
   await page.getByLabel('新密码', { exact: true }).fill('new-password');
-  await page.getByLabel('确认新密码').fill('different-password');
+  await page.getByLabel('确认新密码', { exact: true }).fill('different-password');
   await page.getByRole('button', { name: '保存新密码并重新登录' }).click();
   await expect(page.locator('[data-auth-message]')).toContainText('两次输入的新密码不一致');
-  await page.getByLabel('确认新密码').fill('new-password');
+  await page.getByLabel('确认新密码', { exact: true }).fill('new-password');
   await page.getByRole('button', { name: '保存新密码并重新登录' }).click();
   await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
   await expect(page.locator('[data-auth-message]')).toContainText('新密码重新登录');
@@ -223,10 +223,10 @@ test('F04 auth lifecycle: setup auto-login, recovery, password invalidation, new
   }
 
   await page.getByLabel('用户名').fill('admin');
-  await page.getByLabel('密码').fill('old-password');
+  await page.getByLabel('密码', { exact: true }).fill('old-password');
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await expect(page.locator('[data-auth-message]')).toContainText('用户名或密码错误');
-  await page.getByLabel('密码').fill('new-password');
+  await page.getByLabel('密码', { exact: true }).fill('new-password');
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
 
@@ -261,15 +261,13 @@ test('F04 auth guards reject role/profile and external return routes', async ({ 
 
   await page.goto('/studio/index.html#/projects');
   const navigation = page.getByRole('navigation', { name: '产品主导航' });
-  for (const path of ['/projects', '/results']) {
+  for (const path of ['/overview', '/projects', '/results', '/operators']) {
     await expect(navigation.locator(`[data-product-nav="${path}"]`)).toBeVisible();
   }
   const more = page.locator('[data-product-more]');
   await expect(more).toHaveCount(1);
   await more.locator('button[aria-haspopup="menu"]').click();
-  for (const path of ['/overview', '/operators', '/about']) {
-    await expect(page.locator(`[role="menu"] [data-product-nav="${path}"]`)).toBeVisible();
-  }
+  await expect(page.locator('[role="menu"] [data-product-nav="/about"]')).toBeVisible();
   await expect(page.locator('[data-product-nav="/diagnostics"]')).toHaveCount(0);
   await expect(page.locator('[data-product-nav="/stations"]')).toHaveCount(0);
   await openSessionMenu(page);
@@ -277,9 +275,44 @@ test('F04 auth guards reject role/profile and external return routes', async ({ 
   await page.evaluate(() => { window.location.hash = '#/login?returnTo=https://evil.example/steal'; });
   await expect(page.locator('[data-auth-page="login"]')).toBeVisible();
   await page.getByLabel('用户名').fill('operator');
-  await page.getByLabel('密码').fill('old-password');
+  await page.getByLabel('密码', { exact: true }).fill('old-password');
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await expect(page).toHaveURL(/#\/projects$/);
+});
+
+test('F04 login remembers the username only after an accepted authentication', async ({ page }) => {
+  const state = freshState({ requiresSetup: false, role: 'Engineer' });
+  await installStartup(page);
+  await installAuthFixture(page, state);
+  await page.goto('/studio/index.html#/login');
+
+  await page.getByLabel('用户名').fill('not-persisted');
+  await page.getByLabel('密码', { exact: true }).fill('wrong-password');
+  await page.getByRole('checkbox', { name: '记住账号' }).check();
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+  await expect(page.locator('[data-auth-message]')).toContainText('用户名或密码错误');
+  await page.reload();
+  await expect(page.getByLabel('用户名')).toHaveValue('');
+  await expect(page.getByRole('checkbox', { name: '记住账号' })).not.toBeChecked();
+
+  await page.getByLabel('用户名').fill('engineer');
+  await page.getByLabel('密码', { exact: true }).fill('old-password');
+  await page.getByRole('checkbox', { name: '记住账号' }).check();
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+  await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
+  await openSessionMenu(page);
+  await page.getByRole('menuitem', { name: '退出', exact: true }).click();
+  await expect(page.getByLabel('用户名')).toHaveValue('engineer');
+  await expect(page.getByRole('checkbox', { name: '记住账号' })).toBeChecked();
+
+  await page.getByLabel('密码', { exact: true }).fill('old-password');
+  await page.getByRole('checkbox', { name: '记住账号' }).uncheck();
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+  await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
+  await openSessionMenu(page);
+  await page.getByRole('menuitem', { name: '退出', exact: true }).click();
+  await expect(page.getByLabel('用户名')).toHaveValue('');
+  await expect(page.getByRole('checkbox', { name: '记住账号' })).not.toBeChecked();
 });
 
 test('F04 product shell keeps the approved navigation stable across viewport and Browser DPR matrix', async ({ browser }) => {
@@ -346,7 +379,7 @@ test('F04 auth deduplicates submit, ignores late response and collapses concurre
   await installAuthFixture(page, state);
   await page.goto('/studio/index.html#/login');
   await page.getByLabel('用户名').fill('engineer');
-  await page.getByLabel('密码').fill('old-password');
+  await page.getByLabel('密码', { exact: true }).fill('old-password');
   await page.getByRole('button', { name: '登录', exact: true }).evaluate((button: HTMLButtonElement) => {
     button.click();
     button.click();
@@ -358,7 +391,7 @@ test('F04 auth deduplicates submit, ignores late response and collapses concurre
   await page.getByRole('menuitem', { name: '退出', exact: true }).click();
   state.loginDelayMs = 300;
   await page.getByLabel('用户名').fill('engineer');
-  await page.getByLabel('密码').fill('old-password');
+  await page.getByLabel('密码', { exact: true }).fill('old-password');
   await page.getByRole('button', { name: '登录', exact: true }).click({ noWaitAfter: true });
   await page.reload();
   await page.waitForTimeout(350);
@@ -367,7 +400,7 @@ test('F04 auth deduplicates submit, ignores late response and collapses concurre
 
   state.loginDelayMs = 0;
   await page.getByLabel('用户名').fill('engineer');
-  await page.getByLabel('密码').fill('old-password');
+  await page.getByLabel('密码', { exact: true }).fill('old-password');
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await expect(page.locator('[data-product-shell="ready"]')).toBeVisible();
   state.protectedFailuresEnabled = true;

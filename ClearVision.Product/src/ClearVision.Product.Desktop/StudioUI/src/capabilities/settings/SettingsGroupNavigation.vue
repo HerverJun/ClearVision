@@ -165,9 +165,9 @@ function stateLabel(target: SettingsNavigationTarget): string | null {
 }
 
 .settings-group-navigation__item.is-active {
-  border-color: var(--cv-color-brand-border);
-  background: var(--cv-color-brand-soft);
-  color: var(--cv-color-brand-text);
+  border-color: var(--cv-color-action-border);
+  background: var(--cv-color-action-soft);
+  color: var(--cv-color-action-text);
 }
 
 .settings-group-navigation__item > strong {

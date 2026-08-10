@@ -296,7 +296,8 @@ const toggleDisabledLabel = computed(() => {
   overflow: hidden;
   border: 1px solid var(--cv-border-subtle);
   border-radius: var(--cv-radius-sm);
-  background: var(--cv-surface-raised);
+  background: var(--cv-surface-floating);
+  box-shadow: var(--cv-elevation-1);
 }
 .flow-canvas-surface__tool-group { min-width: 0; display: flex; align-items: center; gap: 2px; }
 .flow-canvas-surface__tool-group + .flow-canvas-surface__tool-group { margin-left: var(--cv-space-1); padding-left: var(--cv-space-1); border-left: 1px solid var(--cv-border-subtle); }

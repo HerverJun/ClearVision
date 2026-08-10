@@ -471,7 +471,7 @@ onDeactivated(() => {
 .settings-users__edit { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--cv-space-5); margin-bottom: 0; padding-top: var(--cv-space-4); border-top: 1px solid var(--cv-border-subtle); border-bottom: 0; }
 .settings-users__edit-actions { display: flex; flex-wrap: wrap; gap: var(--cv-space-2); }
 .settings-toggle { display: flex; min-width: 0; align-items: flex-start; gap: var(--cv-space-2); padding: var(--cv-space-2); border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); cursor: pointer; }
-.settings-toggle input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--cv-color-brand-500); }
+.settings-toggle input { width: var(--cv-control-check-size); height: var(--cv-control-check-size); flex: 0 0 auto; margin: 0; accent-color: var(--cv-color-action); }
 .settings-toggle span { display: grid; gap: var(--cv-space-1); }
 .settings-toggle strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-xs); }
 .settings-toggle small { color: var(--cv-text-secondary); font-size: var(--cv-font-size-2xs); }

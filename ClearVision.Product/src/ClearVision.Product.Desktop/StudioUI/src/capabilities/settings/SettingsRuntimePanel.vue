@@ -177,7 +177,7 @@ onBeforeUnmount(() => detachPanelState());
 <style scoped>
 .settings-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cv-space-4); }
 .settings-toggle { display: flex; min-width: 0; align-items: flex-start; gap: var(--cv-space-3); padding: var(--cv-space-3); border: 1px solid var(--cv-border-subtle); border-radius: var(--cv-radius-sm); background: var(--cv-surface-page); cursor: pointer; }
-.settings-toggle input { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 2px; accent-color: var(--cv-color-brand-500); }
+.settings-toggle input { width: var(--cv-control-check-size); height: var(--cv-control-check-size); flex: 0 0 auto; margin: 0; accent-color: var(--cv-color-action); }
 .settings-toggle span { display: grid; min-width: 0; gap: var(--cv-space-1); }
 .settings-toggle strong { color: var(--cv-text-primary); font-size: var(--cv-font-size-sm); }
 .settings-toggle small { color: var(--cv-text-secondary); font-size: var(--cv-font-size-xs); line-height: var(--cv-line-height-normal); }
