@@ -143,7 +143,7 @@ if ($requiredChecks.studioManifest) {
         }
         $manifestAssetChecks = @($manifestAssets | Sort-Object -Unique | ForEach-Object {
             $reference = [string]$_
-            $usesAssetsDirectory = $reference -match '^assets/[^/?#]+\.(?:js|css)$'
+            $usesAssetsDirectory = $reference -match '^assets/[^\\/:?#]+$'
             $resolvedAsset = Join-Path (Join-Path $publishRoot 'wwwroot/studio') (
                 $reference.Replace('/', '\'))
             [pscustomobject]@{
