@@ -26,7 +26,7 @@ F10_BROWSER_JOURNEYS=DONE
 STATION_TEST_PACKAGE=PARTIAL
 DATABASE_ADVANCED=DEFERRED
 LOCAL_SOFTWARE_EVIDENCE=DONE
-PARTIAL_EVIDENCE=PARTIAL_EXTERNAL
+PARTIAL_EVIDENCE=PARTIAL_LOCAL_BROWSER_AND_EXTERNAL
 WEBVIEW2_125=NOT_PERFORMED
 INDEPENDENT_NO_NODE=NOT_PERFORMED
 REMOTE_CI=BLOCKED_BY_ENVIRONMENT
@@ -70,13 +70,18 @@ G6_LOCAL_UI_AUDIT=PASS
 WEBVIEW2_100_LOCAL_AUTOMATED=PASS_DEBUG_AND_RELEASE
 WEBVIEW2_100_SIZE_MATRIX=PASS_DEBUG_AND_RELEASE_1920_1536_1366
 VIEW_POLISH_BASE_HEAD=9c2ba21d0060ad8d70eb7e93f1228791e96ae6b8
-VIEW_POLISH_IMPLEMENTATION_HEAD=a3e59bd552d0e7dd73be9041487843daed87caea
-VIEW_POLISH_WORKTREE_STATE=IMPLEMENTATION_COMMITTED_EVIDENCE_BOUND
+VIEW_POLISH_PREVIOUS_IMPLEMENTATION_HEAD=a3e59bd552d0e7dd73be9041487843daed87caea
+VIEW_POLISH_APPLE_REFINEMENT_BASE_HEAD=f132d999744fa6ff14a862030f0a25f888156061
+VIEW_POLISH_IMPLEMENTATION_HEAD=bf662c838c4b066362169e06486f04a38be95899
+VIEW_POLISH_EVIDENCE_HEAD=aba69626995ae65d38829b99ac9387eb7bc62111
+VIEW_POLISH_WORKTREE_STATE=IMPLEMENTATION_AND_EVIDENCE_FIX_COMMITTED_DOCUMENTATION_HEAD_SELF
+VIEW_POLISH_DIRECTION=APPLE_INSPIRED_TECH_ELEGANCE_WITH_INDUSTRIAL_QUIET_PRECISION
 VIEW_POLISH_V5_GATE=PASS_IMPLEMENTATION_COMMITTED
-VIEW_POLISH_V6_SOFTWARE=PASS_SHA_BOUND_AFTER_COMPLETE_SERIAL_RERUN
-VIEW_POLISH_PLAYWRIGHT=PASS_SHA_BOUND_175_OF_262_WITH_87_EVIDENCE_ONLY_SKIPS
-VIEW_POLISH_WEBVIEW2_100=PASS_SHA_BOUND_DEBUG_RELEASE_1920_1536_1366
-VIEW_POLISH_IN_APP_BROWSER=BLOCKED_BY_ENVIRONMENT
+VIEW_POLISH_V6_SOFTWARE=PASS_VISUAL_SHA_BOUND_930_STUDIOUI_999_UI_CONTRACTS
+VIEW_POLISH_PLAYWRIGHT=PASS_VISUAL_SHA_BOUND_178_OF_265_WITH_87_EVIDENCE_ONLY_SKIPS
+VIEW_POLISH_WEBVIEW2_100=PASS_EVIDENCE_SHA_BOUND_DEBUG_RELEASE_1920_1536_1366_NATIVE_96_DPI
+VIEW_POLISH_IN_APP_BROWSER=PARTIAL_INTERACTIVE_RECOVERED
+VIEW_POLISH_DOTNET_TESTS=NOT_RUN_THIS_REFINEMENT
 VIEW_POLISH_OWNER_SIGNOFF=NOT_PERFORMED
 FIELD_CAMERA_PLC_STATION_AI=NOT_PERFORMED
 PRODUCTION_SOAK=NOT_PERFORMED
@@ -166,12 +171,12 @@ G0_WORKTREE_STATE=IMPLEMENTATION_CLEAN_BEFORE_DOCUMENTATION_COMMIT
 | G3_DEVICE_COMMANDS | PARTIAL | Station unknown/reconcile 已有 Chromium/fixture journey。Line Sequence 本轮不执行设备写入，Apply 仅修改 canonical flow draft；未引入新 command authority。现场 Station/PLC 仍未验证。 |
 | G4_NEXT_UI_CONSUMPTION | DONE | Line Sequence 唯一 owner 挂载于 FlowWorkspace，只使用 shared `ApiTransport` 和 `FlowCanvasOwner.commands.patchNodeParameters`；Project/Results/Station/Template/Calibration 用户路径已有本轮 Chromium/fixture 证据。 |
 | G5_LOCAL_SOFTWARE_EVIDENCE | DONE | `93cc88061` 的 StudioUI、Studio UI Next Playwright、受影响 .NET、真实 WebView2 Debug/Release scale 1.0、profiles、rollback、20-cycle soak、性能、publish 和本机 no-Node 证据均通过。 |
-| G6_UX_HARDENING | DONE | G3 产品体验实现在 `a3c043e77`，evidence fixture 修正在 `1c6e61e5a`；F02 `73/73`、F03 `12/12` 方向性截图与 manifest 通过。 |
+| G6_UX_HARDENING | DONE | 历史 G3/V5 证据继续保留；当前 Apple refinement 产品与测试实现为 `bf662c838...`，StudioUI 930/930、legacy/UI contracts 999/999、Playwright 178/87/0，三路只读终审无 P0-P2。内置浏览器仅为代表性交互，单独记为 partial，不影响代码 hardening 的 DONE。 |
 | G4_LEGACY_PROFILE_ISOLATION | DONE | `1c8ad67f3` 的真实 WinForms/WebView2 Debug 100% rollback manifest 为 PASS；Next/诊断/Legacy/Next 每次只有一个 root 和一个 profile 专属 Host message owner，dispose 后订阅归零，同一 Project/PersistenceRevision/Result authority identity 保持一致。 |
-| G7_WEBVIEW2 | PARTIAL | G5 已取得真实 WebView2 Debug/Release 100% 自动证据；`35631f530` 补齐 Debug 三尺寸，`f97009fab` 又以 self-contained Release publish 补齐同一三尺寸与 light/dark、compact/comfortable 投影循环。六组 native DPI 都是 96；Windows 125% 仍为 `NOT_PERFORMED`。 |
-| G8_NO_NODE | PARTIAL | 本机 publish 静态扫描、Desktop 进程树无 Node child、sanitized-path 启动均 PASS；独立无 Node 目标机仍为 `NOT_PERFORMED`。 |
+| G7_WEBVIEW2 | PARTIAL | 当前 `aba696269...` 证据覆盖 Debug/Release 1920x1080、1536x864、1366x768：full matrix 17/17、size matrix 4/4、21 cleanup、16 PNG、PerMonitorV2/Canvas/Owner/overflow/runtime error 审计 PASS。所有 native DPI 都是 96；Windows 125% 仍为 `NOT_PERFORMED`。 |
+| G8_NO_NODE | PARTIAL | `aba696269...` 本机 publish 静态扫描、合法 Vite 图片资产、Desktop 进程树无 Node child、sanitized-path 启动均 PASS；独立无 Node 目标机仍为 `NOT_PERFORMED`。 |
 | G9_FIELD_HARDWARE | NOT_PERFORMED | 当前环境没有现场 Camera、PLC、Station 验证条件。 |
-| G10_FINAL_CI | PARTIAL | 当前 implementation SHA 本地软件 gates 通过；clean-checkout Remote CI、125% DPI、独立目标机、现场硬件、生产 soak 和产品签收未完成，不授予 production acceptance。 |
+| G10_FINAL_CI | PARTIAL | `bf662c838...` 视觉实现的软件 gates 与 `aba696269...` 本机 WebView2 100% 证据通过；本轮 .NET tests `NOT RUN`。S00-S13 Browser 全矩阵、clean-checkout Remote CI、125% DPI、独立目标机、现场硬件、生产 soak 和产品签收未完成，不授予 production acceptance。 |
 
 状态枚举：`DONE`、`PARTIAL`、`BLOCKED_BY_CONTRACT`、`BLOCKED_BY_ENVIRONMENT`、`NOT_PERFORMED`、`FAILED_RELATED`、`FAILED_UNRELATED`、`DEFERRED`。
 
@@ -368,6 +373,42 @@ implementation SHA。后续纯文档提交不改变此候选；任何产品代�
 本机可自主完成的 V5 实施、候选冻结、软件检查、Playwright、真实 WebView2 100% 与清理均已完成。V6 formal
 gate 仍因内置浏览器环境阻塞、Windows 125% 与人工签收缺失而保持 `PARTIAL`，不得写成
 `VISUAL_ENGINEERING_DONE` 或 `VISUAL_ACCEPTANCE_GRANTED`。
+
+### 苹果式科技优雅全局精修复验（2026-08-11）
+
+本节追加当前视觉候选，不改写上方 `a3e59bd...` 的历史证据。方向冻结为
+`APPLE_INSPIRED_TECH_ELEGANCE_WITH_INDUSTRIAL_QUIET_PRECISION`：采用苹果式产品的克制材质、清晰层级、
+精确排版和细节完成度，但继续以工业高信息密度、简体中文、Windows 系统字体、3-8px 圆角、语义色分离、
+Canvas/数据为主体；没有引入官网 hero、macOS 控件仿制、毛玻璃、装饰性渐变或第二套前端 authority。
+
+提交序列为 `f132d9997`（记录候选）→ `59e3f1f8e`（视觉系统精修）→ `57e04858b`（对齐 Results 宿主证据）→
+`bf662c838`（全产品视觉完成度提升）→ `aba696269`（证据审计器接受合法 Vite 图片资产）。其中
+`bf662c838c4b066362169e06486f04a38be95899` 是产品与测试实现身份；
+`aba69626995ae65d38829b99ac9387eb7bc62111` 只改一行 no-Node manifest asset path 校验，是最终 WebView2
+证据身份。后续文档提交继续使用 `DOCUMENTATION_HEAD=SELF`，不得把脚本或文档 SHA 冒充产品实现。
+
+WebView2 前置失败如实保留：`59e3f1f8e` 的 `matrix-100-r1` 在首路以“拒绝访问”失败；`matrix-100-r2`
+完成 15 路中的 14 路，`publish-results` 因 selector drift 超时失败；`57e04858b` 修正宿主 evidence 后继续
+视觉收敛。`bf662c838` 首次 17 路宿主 run 与 cleanup 全部 PASS，但总入口被旧 no-Node 审计器对新增 PNG 的
+`.js/.css` 白名单错误阻断，因此该目录只保留为 `FAILED_RELATED` 诊断，未冒充最终 PASS。修复后的
+`aba696269` 才是当前正式 100% 宿主证据。
+
+| 证据域 | 当前结果与边界 |
+| --- | --- |
+| StudioUI 软件门禁 | `PASS_VISUAL_SHA_BOUND`；`bf662c838...` 上 lint、typecheck、production build、`bundle:ci`、`bundle:verify`、Impeccable detector `[]` 与 diff check PASS；StudioUI 串行 142 files / `930/930`，legacy/UI contracts 45 files / `999/999` |
+| 完整 Playwright | `PASS_VISUAL_SHA_BOUND`；265 total，`178 passed / 87 evidence-only skipped / 0 failed`，单 worker、隔离端口 `43224` |
+| 内置浏览器 | `PARTIAL_INTERACTIVE_RECOVERED`；真实登录到工程页，6 张 1920 light/compact 与 1366 dark/comfortable 截图，console 0、overflow 0、唯一 `main`/leave guard owner PASS；S00-S13 × B0-B4 L1 全矩阵 `NOT_PERFORMED` |
+| WebView2 1920x1080 | `PASS_REAL_100_EVIDENCE_SHA_BOUND`；`.tmp/studio-ui-next/f09/matrix/visual-aba696269-w100-20260811-140415-919/`，17/17 manifests、17/17 cleanup、DPI、publish/static/runtime、local process-tree/no-Node 与外层清理 PASS |
+| WebView2 1536x864 / 1366x768 | `PASS_REAL_100_EVIDENCE_SHA_BOUND`；`.tmp/studio-ui-next/f09/view-polish-v6-aba696269/webview2-size-matrix-r1/`，Debug/Release 4/4；viewport 1520x800 / 1350x704，截图 SHA/字节、Canvas backing/pointer、theme/density、Owner、overflow、runtime error、cleanup 与 DPI report PASS |
+| V6R 完整性审计 | `PASS`；共 21 run manifests、21 cleanup JSON、16 PNG，全部绑定 `aba696269...`；matrix/no-Node、两份 DPI report 与 `studio-ui-webview2-size-audit.json` PASS；所有真实窗口 native 96 DPI / scale 1.0 |
+| .NET tests | `NOT RUN`；本轮是前端视觉与证据脚本收口，不外推既有 G5 .NET test PASS；WebView2 取证所需 Debug build 与 Release publish 已实际执行 |
+| 临时产物清理 | `PASS`；本轮尺寸 runtime、Release publish 与两个空 matrix wrapper 已按精确路径永久删除；browser fixture 中 64 files / `2,350,765` bytes 的内容已删除，空 wrapper 保留；正式 JSON/PNG 保留，用户自有 `.impeccable/` 与未归属产物未提交 |
+| 剩余 P3 | dark Auth 复用亮色工作区截图并以滤镜适配；`<=920px` Auth 单栏无正式截图矩阵；forced-colors 只有 Playwright 模拟、没有真实 Windows 高对比截图 |
+| 外部与人工门禁 | Windows 125%、独立无 Node 目标机、Remote CI、现场 Camera/PLC/Station/AI、生产 soak、产品 Owner 签收均 `NOT_PERFORMED` 或 `BLOCKED_BY_ENVIRONMENT`；production acceptance `NOT_GRANTED`，Legacy retirement `NOT_APPROVED` |
+
+本轮视觉实现未改变 Project/Flow/GlobalVariables/AgentRun/Runtime/Station/Results 权威，也未新增第二 API、
+HostBridge、Canvas、保存链、EventBus、query owner 或 write owner。G7/G8 继续为 `PARTIAL`，因为本机
+WebView2/local no-Node PASS 不能替代真实 Windows 125% 或独立无 Node 目标机；G10 继续为 `PARTIAL`。
 
 ### G3 产品体验、视觉、中文与 Vue 工程收口
 
@@ -595,4 +636,9 @@ G4 退出条件已满足并解锁 G5。该结论只批准继续收集同一 clea
 
 ## 提交
 
-当前 G5 implementation/evidence checkpoint：`93cc88061`。历史 checkpoint：G4 `1c8ad67f3`，G1/G2 `98cb8c7f5`，G0 `21105d57d`；更早 checkpoint 为 `026768cf4`、`1af7b2ec6`、`8846c52e4`、`d469a4740`。文档提交单独记录并随本分支普通推送；提交、推送和软件测试都不会自动授予生产验收。
+当前 G5 implementation/evidence checkpoint 仍为 `93cc88061`。当前视觉产品与测试实现为
+`bf662c838c4b066362169e06486f04a38be95899`，WebView2/no-Node 证据修复与最终 evidence head 为
+`aba69626995ae65d38829b99ac9387eb7bc62111`，本次台账使用 `DOCUMENTATION_HEAD=SELF` 单独提交。
+历史 checkpoint：V5 `a3e59bd55`、G4 `1c8ad67f3`、G1/G2 `98cb8c7f5`、G0 `21105d57d`；更早 checkpoint
+为 `026768cf4`、`1af7b2ec6`、`8846c52e4`、`d469a4740`。上述提交仅在本地 `studio-ui-next`，本轮未 push；
+提交、推送和软件测试都不会自动授予生产验收。

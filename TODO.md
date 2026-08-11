@@ -55,13 +55,18 @@ G6_LOCAL_UI_AUDIT=PASS
 WEBVIEW2_100_LOCAL_AUTOMATED=PASS_DEBUG_AND_RELEASE
 WEBVIEW2_100_SIZE_MATRIX=PASS_DEBUG_AND_RELEASE_1920_1536_1366
 VIEW_POLISH_BASE_HEAD=9c2ba21d0060ad8d70eb7e93f1228791e96ae6b8
-VIEW_POLISH_IMPLEMENTATION_HEAD=a3e59bd552d0e7dd73be9041487843daed87caea
-VIEW_POLISH_WORKTREE_STATE=IMPLEMENTATION_COMMITTED_EVIDENCE_BOUND
+VIEW_POLISH_PREVIOUS_IMPLEMENTATION_HEAD=a3e59bd552d0e7dd73be9041487843daed87caea
+VIEW_POLISH_APPLE_REFINEMENT_BASE_HEAD=f132d999744fa6ff14a862030f0a25f888156061
+VIEW_POLISH_IMPLEMENTATION_HEAD=bf662c838c4b066362169e06486f04a38be95899
+VIEW_POLISH_EVIDENCE_HEAD=aba69626995ae65d38829b99ac9387eb7bc62111
+VIEW_POLISH_WORKTREE_STATE=IMPLEMENTATION_AND_EVIDENCE_FIX_COMMITTED_DOCUMENTATION_HEAD_SELF
+VIEW_POLISH_DIRECTION=APPLE_INSPIRED_TECH_ELEGANCE_WITH_INDUSTRIAL_QUIET_PRECISION
 VIEW_POLISH_V5_GATE=PASS_IMPLEMENTATION_COMMITTED
-VIEW_POLISH_V6_SOFTWARE=PASS_SHA_BOUND_AFTER_COMPLETE_SERIAL_RERUN
-VIEW_POLISH_PLAYWRIGHT=PASS_SHA_BOUND_175_OF_262_WITH_87_EVIDENCE_ONLY_SKIPS
-VIEW_POLISH_WEBVIEW2_100=PASS_SHA_BOUND_DEBUG_RELEASE_1920_1536_1366
-VIEW_POLISH_IN_APP_BROWSER=BLOCKED_BY_ENVIRONMENT
+VIEW_POLISH_V6_SOFTWARE=PASS_VISUAL_SHA_BOUND_930_STUDIOUI_999_UI_CONTRACTS
+VIEW_POLISH_PLAYWRIGHT=PASS_VISUAL_SHA_BOUND_178_OF_265_WITH_87_EVIDENCE_ONLY_SKIPS
+VIEW_POLISH_WEBVIEW2_100=PASS_EVIDENCE_SHA_BOUND_DEBUG_RELEASE_1920_1536_1366_NATIVE_96_DPI
+VIEW_POLISH_IN_APP_BROWSER=PARTIAL_INTERACTIVE_RECOVERED
+VIEW_POLISH_DOTNET_TESTS=NOT_RUN_THIS_REFINEMENT
 VIEW_POLISH_OWNER_SIGNOFF=NOT_PERFORMED
 WEBVIEW2_125=NOT_PERFORMED
 INDEPENDENT_NO_NODE=NOT_PERFORMED
@@ -95,16 +100,24 @@ Studio UI Next 已是默认入口，主体业务迁移进入后期收口，但�
   production bundle gate 通过；仅文档前进后的 `f97009fab` 又以 self-contained Release publish 重跑
   1920x1080、1536x864、1366x768。Debug/Release 每组均完成主题/密度循环，六组原生 DPI 均为 96，
   不能外推为 Windows 125%。
-- `TODOView.md` 的视觉精修产品与测试实现已提交为 `a3e59bd...`。lint、typecheck、production build、bundle gates
-  全部绑定该 SHA；首次 full unit 因 `appMount.spec.ts` 首项 5 秒超时及 3 个 cleanup 级联失败而未计为初次通过，
-  定向 5/5 PASS 后的完整串行重跑为 140 files / `919/919` PASS。完整 Playwright 为
-  `175 passed / 87 evidence-only skipped / 0 failed`，真实 WebView2 100% Debug/Release 1920x1080、
-  1536x864、1366x768 复验也绑定同一 implementation SHA。内置浏览器最终绑定仍为
-  `BLOCKED_BY_ENVIRONMENT`；后续以 HTTP 200 的隔离端口 `42944` 复测时，浏览器选择和插件连接诊断仍先后
-  超时并自动重置，server/端口已清理。该阻塞不授予 `VISUAL_ENGINEERING_DONE` 或正式生产结论。
-- 视觉交接、临时服务/进程/端口及最终矩阵自有清理已完成；用户明确授权后永久删除五个保留的
-  publish/runtime 临时路径（2,194 files / `1,454,810,170` bytes）；候选复验新建的 publish/runtime 根与一个
-  空包装目录也在审计后删除（2,002 files / `1,440,353,363` bytes），逐项复核均已不存在，最终 JSON/PNG 证据保留。
+- `a3e59bd...` 继续作为上一轮完整视觉候选的历史证据。当前 Apple refinement 从 `f132d9997` 经
+  `59e3f1f8e`、`57e04858b` 收敛，产品与测试实现提交为 `bf662c838...`；`aba696269...` 只修复 no-Node
+  静态审计对合法 Vite PNG 的错误拒绝，并承载最终 WebView2 证据。视觉方向为
+  `APPLE_INSPIRED_TECH_ELEGANCE_WITH_INDUSTRIAL_QUIET_PRECISION`，不把 Studio 做成营销页或 macOS 仿制。
+- `bf662c838...` 的 lint、typecheck、production build、bundle gates 与 Impeccable detector 均 PASS；StudioUI
+  串行 Vitest 为 142 files / `930/930`，legacy/UI 合同单测为 45 files / `999/999`，完整 Playwright 为
+  265 total、`178 passed / 87 evidence-only skipped / 0 failed`。本轮没有运行新的 .NET 测试，不外推旧 G5。
+- 内置浏览器已恢复登录到工程页的 L0 真实交互：1920x1080 light/compact 与 1366x768 dark/comfortable、
+  console 0、overflow 0、唯一 `main`/leave guard owner 均通过；S00-S13 × B0-B4 的 L1 全矩阵仍
+  `NOT_PERFORMED`，因此只能记录 `PARTIAL_INTERACTIVE_RECOVERED`，不能授予 `VISUAL_ENGINEERING_DONE`。
+- `aba696269...` 的真实 WebView2 100% 证据已覆盖 Debug/Release 1920x1080、1536x864、1366x768：
+  1920 full matrix 17/17、尺寸补证 4/4、21 manifests、21 cleanup 与 16 PNG 审计 PASS；所有真实窗口均为
+  native 96 DPI / scale 1.0，不能外推为 Windows 125%。本机 publish/static/process-tree no-Node PASS，
+  独立无 Node 目标机仍 `NOT_PERFORMED`。
+- 视觉交接、临时服务/进程/端口及最终矩阵自有清理已完成；上一轮经用户授权永久删除五个旧
+  publish/runtime 临时路径（2,194 files / `1,454,810,170` bytes）及候选复验临时根。V6R 又删除本轮尺寸
+  runtime、Release publish 与两个空 matrix wrapper；browser fixture 中 64 files / `2,350,765` bytes 的内容
+  已删除，空 wrapper 保留。正式 JSON/PNG 证据保留，用户自有 `.impeccable/` 和其他未归属产物不进入提交。
 - Remote CI 当前为 `BLOCKED_BY_ENVIRONMENT`，Final Gate 为 `PARTIAL`，生产验收仍为 `NOT_GRANTED`。
 - 本机真实 WebView2 100% 自动证据已完成；Windows 125%、独立无 Node 目标机、现场 Camera/PLC/Station/AI、
   生产 soak 与产品 Owner 签收仍未完成，不能由本机证据替代。
@@ -338,14 +351,15 @@ G6 当前为 `BLOCKED_BY_ENVIRONMENT`，下列未勾选项是外部目标机、�
 验收责任，不允许用本地自动化补写 PASS：
 
 - [ ] G6.1 真实 WinForms + WebView2：Windows 100% 和 125%，Debug/Release，启动、登录、会话失效、关闭。
-  当前本机 Windows 100%/96 DPI 的 Debug/Release 自动证据与三尺寸矩阵均 PASS；
+  当前 `aba696269...` 的本机 Windows 100%/96 DPI Debug/Release 自动证据与三尺寸矩阵均 PASS；
   `WEBVIEW2_125=NOT_PERFORMED`。
 - [ ] G6.2 1920x1080、1536x864、1366x768/等效 client size；light/dark、compact/comfortable。
-  Chromium 方向性矩阵已通过；`35631f530` 的 Debug 与 `f97009fab` 的 self-contained Release 均完成
-  1920x1080、1536x864、1366x768 window，对应 1904x1016、1520x800、1350x704 viewport。每组均实际切换
-  并断言 light/dark、compact/comfortable，水平/垂直 overflow 为 0；Release 的 PerMonitorV2、Canvas
-  backing store/hit-test、截图像素、唯一 owner 与 cleanup 审计均 PASS。Windows 125% 组合仍为
-  `NOT_PERFORMED`。
+  Chromium 方向性矩阵已通过；当前正式证据为
+  `.tmp/studio-ui-next/f09/matrix/visual-aba696269-w100-20260811-140415-919/` 与
+  `.tmp/studio-ui-next/f09/view-polish-v6-aba696269/webview2-size-matrix-r1/`。Debug/Release 均完成
+  1920x1080、1536x864、1366x768 window，对应 1904x1016、1520x800、1350x704 viewport；light/dark、
+  compact/comfortable、水平/垂直 overflow、PerMonitorV2、Canvas backing/hit-test、截图像素、唯一 owner、
+  runtime error 与 cleanup 审计均 PASS。Windows 125% 组合仍为 `NOT_PERFORMED`。
 - [ ] G6.3 独立无 Node 目标机安装、启动、升级、资源加载和卸载验证。
   本机静态/进程树证据为 PASS；`INDEPENDENT_NO_NODE=NOT_PERFORMED`。
 - [ ] G6.4 Remote CI clean checkout；required jobs 和 Final Gate 全部通过，不放宽性能/质量阈值。
@@ -395,7 +409,7 @@ G6 不因 G5 完成而自动通过。当前必须保持：`PRODUCTION_ACCEPTANCE
 - [x] 文件白名单、`git diff --stat`、`git diff --check` 和临时产物检查通过。
 - [x] F10 已更新并经过复审；未由自动测试自行授予生产验收。
 
-唯一未满足的通用 DoD 是 G6 真实环境组合证据及产品 Owner 签收；该项保持未勾选，不能由本地软件门禁代替。
+未满足的通用 DoD 是 `TODOView.md` V6.4 的 S00-S13 内置浏览器全矩阵、G6 真实环境组合证据及产品 Owner 签收；这些项目保持未勾选，不能由本地软件门禁或代表性 L0 交互代替。
 
 ## 13. 停止条件
 
@@ -419,6 +433,7 @@ G6 不因 G5 完成而自动通过。当前必须保持：`PRODUCTION_ACCEPTANCE
 - [x] 完成 G4 Legacy profile 隔离、rollback 与退役准备；Legacy 源码保留，退役未获批准。
 - [x] 在 `1c8ad67f3` 之后完成 G5；全部最终本地软件证据绑定
   `93cc880619b51d68828bcbc3336b77c83ad60dcc`。
+- [ ] 在可用的内置浏览器会话补齐 `TODOView.md` V6.4 的 S00-S13 × B0-B4 L1 最终矩阵；当前只完成登录到工程页的代表交互，不外推为全矩阵。
 - [ ] 由 Release/Field Owner 在具备目标环境后完成 G6：Windows 125%、独立无 Node 机器、Remote CI、
   现场 Camera/PLC/Station/AI、生产 soak 与产品 Owner 签收。
 - [x] G1 实现未改变后端 authority、保存链、Runtime/Station、AgentRun，也未引入第二套基础设施。

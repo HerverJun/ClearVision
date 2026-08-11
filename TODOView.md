@@ -2,17 +2,20 @@
 
 ```text
 DOCUMENT_ROLE=CODEX_AUTOMATED_VISUAL_POLISH_PLAN
-DOCUMENT_STATE=V6_INTERNAL_COMPLETE_EXTERNAL_GATES_PENDING
+DOCUMENT_STATE=V6_LOCAL_BROWSER_AND_EXTERNAL_GATES_PENDING
 PLAN_DATE=2026-08-09
 PLAN_BASELINE_HEAD=9c2ba21d0060ad8d70eb7e93f1228791e96ae6b8
-CANDIDATE_IMPLEMENTATION_HEAD=a3e59bd552d0e7dd73be9041487843daed87caea
+CANDIDATE_IMPLEMENTATION_HEAD=bf662c838c4b066362169e06486f04a38be95899
+CURRENT_EVIDENCE_HEAD=aba69626995ae65d38829b99ac9387eb7bc62111
+PREVIOUS_VISUAL_IMPLEMENTATION_HEAD=a3e59bd552d0e7dd73be9041487843daed87caea
+APPLE_REFINEMENT_BASE_HEAD=f132d999744fa6ff14a862030f0a25f888156061
 BRANCH=studio-ui-next
 CURRENT_STATUS_SOURCE=docs/进行中/StudioUINext/F10_ContractAndProductionPlan.md
 PRODUCTION_EXECUTION_SOURCE=TODO.md
 PRIMARY_UI_ROOT=ClearVision.Product/src/ClearVision.Product.Desktop/StudioUI
 LEGACY_SEMANTIC_BASELINE=ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot
 QUALITY_BAR=FLAGSHIP_INDUSTRIAL_DESKTOP_TOOL
-DESIGN_DIRECTION=QUIET_PRECISION_RESTRAINED
+DESIGN_DIRECTION=APPLE_INSPIRED_TECH_ELEGANCE_WITH_INDUSTRIAL_QUIET_PRECISION
 PRIMARY_VISUAL_REVIEW=IN_APP_BROWSER
 FORMAL_BROWSER_EVIDENCE=REPOSITORY_PLAYWRIGHT_HARNESS
 FORMAL_HOST_EVIDENCE=WINFORMS_WEBVIEW2
@@ -20,9 +23,9 @@ AUTO_CONTINUE=YES_AFTER_INTERNAL_GATE
 AUTO_COMMIT=NO
 AUTO_PUSH=NO
 CURRENT_COMMIT_AUTHORIZATION=GRANTED_AND_CONSUMED
-CURRENT_VISUAL_STAGE=V6_EXTERNAL_GATES_PENDING
-NEXT_ACTION=V6.4_ENVIRONMENT_RECOVERY_OR_V6.7_REAL_125_OR_V6.8_OWNER_REVIEW
-THIS_PLAN_BROWSER_EVIDENCE=L2_PLAYWRIGHT_PASS_L0_L1_BLOCKED_BY_ENVIRONMENT
+CURRENT_VISUAL_STAGE=V6_LOCAL_BROWSER_AND_EXTERNAL_GATES_PENDING
+NEXT_ACTION=V6.4_COMPLETE_S00_S13_B0_B4_OR_V6.7_REAL_125_OR_V6.8_OWNER_REVIEW
+THIS_PLAN_BROWSER_EVIDENCE=L0_INTERACTIVE_RECOVERED_AUTH_PROJECTS_PASS_L1_S00_S13_NOT_PERFORMED_L2_PLAYWRIGHT_PASS
 THIS_PLAN_WEBVIEW2_100=PASS_DEBUG_RELEASE_1920_1536_1366_NATIVE_96_DPI
 THIS_PLAN_WEBVIEW2_125=NOT_PERFORMED
 PRODUCT_OWNER_VISUAL_SIGNOFF=NOT_GRANTED
@@ -351,10 +354,12 @@ L0/L1 明确指定 Codex 内置浏览器，执行时必须使用独立的 in-app
 
 V6 分为 Codex 可自主完成的本机软件门禁和必须等待真实环境/人工的外部门禁。前者通过不能自动勾选后者。
 
+> **历史记录（2026-08-10）**：下列 V6.1-V6.10 绑定上一候选 `a3e59bd...`；当前苹果式全局精修事实以本节下方 V6R（2026-08-11）为准。旧测试数字与 Browser 阻塞状态仅作审计留痕，不代表当前投影。
+
 - [x] **V6.1 冻结候选**：取得 commit 授权后形成 clean source SHA；任何后续产品代码变化都会使 V6 软件/截图证据失效并重新开始。**DONE：用户授权后已提交产品与测试实现，候选 implementation SHA 为 `a3e59bd552d0e7dd73be9041487843daed87caea`；提交前 `git fetch origin --prune` 成功，local 与 `origin/studio-ui-next` 基线均为 `9c2ba21d...`。**
 - [x] **V6.2 完整前端门禁**：lint、typecheck、full unit、production build、bundle gate、bundle reproducibility 全部绑定候选 SHA。**PASS_SHA_BOUND：lint、typecheck、production build、`bundle:ci` 与 `bundle:verify` 均 PASS。首次 full unit 中 `appMount.spec.ts` 首项 5 秒超时并引发 3 个 cleanup 级联失败，记为 `FAILED_THEN_PASSED_NOT_COUNTED_AS_INITIAL_PASS`；定向 5/5 PASS 后，完整串行重跑 140 files / `919/919` PASS。**
 - [x] **V6.3 完整 Playwright**：运行 `CV_UI_SCENARIO=studio-ui-next` 全量；evidence-only skip 必须有合理环境说明，不能用占位 SHA 强行通过。候选 `a3e59bd...` 结果为 262 total、`175 passed / 87 evidence-only skipped / 0 failed`，未使用占位 SHA。
-- [ ] **V6.4 内置浏览器最终巡检**：S00-S13 在 B0-B4 适用组合完成最终截图，console/page error、overflow、focus、owner 和状态清单归零。**BLOCKED_BY_ENVIRONMENT：最终绑定重试在端口 `42943` 超时；后续恢复审计在已返回 HTTP 200 的端口 `42944` 上再次发生浏览器选择超时，按插件流程执行的连接诊断也超时并自动重置。两次受控 server 均已停止、端口已释放，不以 Playwright/WebView2 替代。**
+- [ ] **V6.4 内置浏览器最终巡检**：S00-S13 在 B0-B4 适用组合完成最终截图，console/page error、overflow、focus、owner 和状态清单归零。**历史重试在端口 `42943`/`42944` 的绑定与连接诊断超时，受控 server 均已停止、端口已释放。V6R 已恢复登录到工程页的代表交互，但 S00-S13 全矩阵仍 `NOT_PERFORMED`；本项保持未勾选，不以 Playwright/WebView2 替代。**
 - [x] **V6.5 前后对比报告**：每个 surface 至少一组同状态 before/final；逐项说明层级、密度、操作效率和状态表达如何改善，不以形容词代替证据。冻结前的方向性报告见下表；候选 SHA 的 1920x1080、1536x864、1366x768 代表截图已重新目视复核。
 - [x] **V6.6 WebView2 100%**：使用现有仓库脚本采集 Debug 与 Release 的 1920x1080、1536x864、1366x768，覆盖 light/dark、compact/comfortable、Canvas backing/pointer、owner 和 cleanup。候选 `a3e59bd...` 的六组真实窗口均 PASS，native DPI 均为 96；正式证据根为 `.tmp/studio-ui-next/f09/view-polish-v6-a3e59bd/`。
 - [ ] **V6.7 Windows 125%**：在真实 120 DPI Windows 会话运行 WebView2 matrix 与 DPI audit；浏览器 viewport/DPR/force scale 只能做预检，不能勾选本项。**NOT PERFORMED：当前 Windows 会话为 96 DPI / 100%。**
@@ -362,24 +367,42 @@ V6 分为 Codex 可自主完成的本机软件门禁和必须等待真实环境/
 - [x] **V6.9 状态回写**：由主协调 Owner 将真实证据路径、SHA 和未执行项更新到 F10/根 TODO；不得授予超出证据的 production acceptance 或 Legacy retirement。**DONE：F10 与根 TODO 已写入 `a3e59bd...` 候选、SHA-bound 软件/Playwright/WebView2 100% 证据、内置浏览器阻塞、125%/Owner 未执行及 production/Legacy 未授权边界。**
 - [x] **V6.10 交接**：记录 Design System 用法、剩余 P3、已知环境债、复测命令和回滚边界；临时服务、端口、WebView2 user-data、数据库和 publish 目录全部清理。**DONE：用户授权的五个旧 publish/runtime 临时路径已永久删除（2,194 files / `1,454,810,170` bytes）；候选复验新建的 publish/runtime 根与一个空包装目录也在审计后删除（2,002 files / `1,440,353,363` bytes）。所有相关进程和端口均释放，最终 JSON/PNG 证据保留。**
 
-**V6 Gate**：本机软件、Browser 和 WebView2 100% 全部通过后才能形成 `VISUAL_ENGINEERING_DONE`；当前软件与 WebView2 100% 已完成，但 Browser 为 `BLOCKED_BY_ENVIRONMENT`，因此该结论仍未授予。只有真实 Windows 125% 与产品 Owner 通过后才能形成 `VISUAL_ACCEPTANCE_GRANTED`。生产接受、独立 no-Node、Remote CI、现场硬件、生产 soak 和 Legacy 退役继续服从 F10/根 TODO，绝不由本视觉计划自动授予。
+**V6 Gate**：本机软件、Browser 和 WebView2 100% 全部通过后才能形成 `VISUAL_ENGINEERING_DONE`；当前软件与 WebView2 100% 已完成，Browser 只恢复了登录到工程页的 L0 交互，S00-S13 × B0-B4 的 L1 全矩阵未执行，因此该结论仍未授予。只有真实 Windows 125% 与产品 Owner 通过后才能形成 `VISUAL_ACCEPTANCE_GRANTED`。生产接受、独立 no-Node、Remote CI、现场硬件、生产 soak 和 Legacy 退役继续服从 F10/根 TODO，绝不由本视觉计划自动授予。
+
+### 14.0 V6R：苹果式科技优雅全局精修复验（2026-08-11）
+
+本节追加当前候选事实，不改写上方 `a3e59bd...` 的 V5/V6 历史执行记录。视觉方向冻结为
+`APPLE_INSPIRED_TECH_ELEGANCE_WITH_INDUSTRIAL_QUIET_PRECISION`：以苹果式产品的秩序、材质克制、排版精度与细节完成度为审美标尺，同时继续服从工业高信息密度、Windows 系统字体、3-8px 圆角、语义色分离和单一 Owner 边界；不引入官网 hero、macOS 仿制、毛玻璃、装饰性渐变或消费级大卡片。
+
+- [x] **V6R.1 候选冻结**：Apple refinement 从 `f132d9997` 继续，经 `59e3f1f8e`、`57e04858b` 收敛，产品与测试实现提交为 `bf662c838c4b066362169e06486f04a38be95899`。`aba69626995ae65d38829b99ac9387eb7bc62111` 只修复 no-Node 静态审计对 Vite 图片资产的错误拒绝，未修改产品运行代码。
+- [x] **V6R.2 软件门禁**：`bf662c838...` 上 lint、typecheck、production build、`bundle:ci`、`bundle:verify`、Impeccable detector `[]` 与 `git diff --check` PASS；StudioUI 串行 Vitest 为 142 files / `930/930`，legacy/UI 合同单测为 45 files / `999/999`。本轮 .NET 测试 `NOT RUN`，不外推旧 G5 结果。
+- [x] **V6R.3 完整 Playwright**：`bf662c838...` 上 265 total，`178 passed / 87 evidence-only skipped / 0 failed`，单 worker、隔离端口 `43224`；skip 仍只表示未启用的正式 evidence phase。
+- [x] **V6R.4 内置浏览器恢复取证**：已真实完成登录并到达工程页，复核 1920x1080 light/compact 与 1366x768 dark/comfortable；console error/warn 为 0，工程页水平/垂直 overflow 为 0，唯一 `main` 与 leave guard owner 均为 1。证据口径仅为 `L0_INTERACTIVE_RECOVERED_AUTH_PROJECTS_PASS`；S00-S13 × B0-B4 的 L1 全矩阵 `NOT_PERFORMED`，不得写成 V6.4 PASS。
+- [x] **V6R.5 WebView2 1920x1080**：`bf662c838...` 首轮的 17 个宿主 run 与 cleanup 均 PASS，但总入口因旧 no-Node 审计器只接受 `.js/.css`、错误拒绝合法 PNG 而 FAIL，保留为失败诊断；`aba696269...` 修正后在 `.tmp/studio-ui-next/f09/matrix/visual-aba696269-w100-20260811-140415-919/` 重跑 17/17 PASS，publish/static/runtime、DPI、local process-tree/no-Node 与 cleanup 全部 PASS。
+- [x] **V6R.6 WebView2 三尺寸补证**：`.tmp/studio-ui-next/f09/view-polish-v6-aba696269/webview2-size-matrix-r1/` 的 Debug/Release × 1536x864/1366x768 为 4/4 PASS；viewport 分别为 1520x800 / 1350x704，截图 SHA/字节、Canvas backing/pointer、theme/density、Owner、overflow、runtime error、DPI report 与 cleanup 均 PASS。21 个 run manifest 和 21 个 cleanup JSON 全部绑定 `aba696269...`；全部真实窗口仅为 native 96 DPI / scale 1.0。
+- [x] **V6R.7 清理与交接**：本轮尺寸 runtime、Release publish 与两个空 matrix publish wrapper 已按验证后的精确路径永久删除；临时 browser fixture 中 64 files / `2,350,765` bytes 的内容已删除，空 wrapper 保留。HTTP/CDP 端口释放，正式 JSON/PNG 证据保留。用户自有 `.impeccable/` 与其他未归属产物未修改、未提交。
+- [ ] **V6R.8 外部门禁**：真实 Windows 125%、独立无 Node 目标机、Remote CI、现场 Camera/PLC/Station/AI、生产 soak、产品 Owner 签收、production acceptance 与 Legacy retirement 均未由本轮授予。
 
 ### 14.1 V6 当前证据结论
 
 | 证据域 | 当前结果 | 证据 / 边界 |
 | --- | --- | --- |
-| 前端软件门禁 | `PASS_SHA_BOUND` | `a3e59bd...`：lint、typecheck、production build、bundle gate、bundle reproducibility PASS；首次 full unit 超时并有 3 个 cleanup 级联失败，完整串行重跑 140 files / `919/919` PASS |
-| 完整 Playwright | `PASS_SHA_BOUND` | `a3e59bd...`：262 total，`175 passed / 87 evidence-only skipped / 0 failed`；skip 只来自未启用的正式 evidence phase |
-| 自动 UI 规则 | `PASS` | Impeccable detector `[]`；最新 Web Interface Guidelines 定向审计无可复现 P0/P1/P2；focus replacement、图片尺寸/alt、reduced motion、skip link 和语义交互均有代码/测试锚点 |
-| V5 截图完整性 | `PASS` | 291 个 JSON 全部可解析并有同名 PNG；另有 12 张 Inspection screenshot-only PNG；303 张 PNG 全部可解码 |
-| WebView2 1920x1080 | `PASS_REAL_100_SHA_BOUND` | `.tmp/studio-ui-next/f09/view-polish-v6-a3e59bd/matrix-100-r1/`；17/17 子运行、DPI、local no-Node、publish/static/runtime 与 cleanup 均 PASS；独立无 Node 目标机仍 `NOT_PERFORMED` |
-| WebView2 1536x864 / 1366x768 | `PASS_REAL_100_SHA_BOUND` | `.tmp/studio-ui-next/f09/view-polish-v6-a3e59bd/webview2-size-matrix-r1/`；Debug/Release 4/4，viewport 1520x800 / 1350x704，Canvas backing/pointer、owner、theme/density 与 cleanup PASS |
-| V6 JSON / PNG 完整性 | `PASS` | 21 个 run manifest 与 21 个 cleanup JSON 通过字段审计；16 张引用 PNG 的实际 SHA-256、byte length 与解码尺寸匹配；`studio-ui-webview2-candidate-audit.json`、`studio-ui-webview2-size-audit.json` 和尺寸 DPI audit 均 PASS |
-| 内置浏览器最终绑定 | `BLOCKED_BY_ENVIRONMENT` | 端口 `42943` 最终绑定超时；端口 `42944` 恢复复测确认页面 HTTP 200，但浏览器选择与插件连接诊断先后超时并自动重置；server/端口均已清理，既有方向性截图与真实 WebView2 不替代本项 |
+| 前端软件门禁 | `PASS_VISUAL_SHA_BOUND` | `bf662c838...`：lint、typecheck、production build、`bundle:ci`、`bundle:verify` PASS；StudioUI 串行 142 files / `930/930`，legacy/UI 合同单测 45 files / `999/999`；本轮 .NET tests `NOT RUN` |
+| 完整 Playwright | `PASS_VISUAL_SHA_BOUND` | `bf662c838...`：265 total，`178 passed / 87 evidence-only skipped / 0 failed`；skip 只来自未启用的正式 evidence phase |
+| 自动 UI 规则 | `PASS` | Impeccable detector `[]`；三路独立只读终审无 P0-P2；focus replacement、图片尺寸/alt、reduced motion、skip link、语义交互与架构 Owner 均有代码/测试锚点 |
+| 内置浏览器代表交互 | `PARTIAL_INTERACTIVE_RECOVERED` | `.tmp/studio-ui-next/final-visual-review/current-worktree-{login,overview,projects}-*.png` 共 6 张；登录到工程页、light/compact 与 dark/comfortable、console 0、overflow 0、唯一 `main`/leave guard owner 通过；不是 S00-S13 全矩阵 |
+| 历史 V5 截图完整性 | `PASS_HISTORICAL` | `a3e59bd...` 的 291 个配对 JSON/PNG 与 12 张 screenshot-only PNG 保留为历史方向证据，不冒充当前 V6R Browser 全矩阵 |
+| WebView2 1920x1080 | `PASS_REAL_100_EVIDENCE_SHA_BOUND` | `.tmp/studio-ui-next/f09/matrix/visual-aba696269-w100-20260811-140415-919/`；17/17 子运行、17/17 cleanup、DPI、local process-tree/no-Node、publish/static/runtime 与外层清理 PASS；独立无 Node 目标机仍 `NOT_PERFORMED` |
+| WebView2 1536x864 / 1366x768 | `PASS_REAL_100_EVIDENCE_SHA_BOUND` | `.tmp/studio-ui-next/f09/view-polish-v6-aba696269/webview2-size-matrix-r1/`；Debug/Release 4/4，viewport 1520x800 / 1350x704，Canvas backing/pointer、Owner、theme/density、overflow、runtime error 与 cleanup PASS |
+| V6R JSON / PNG 完整性 | `PASS` | 21 个 run manifest 与 21 个 cleanup JSON 绑定 `aba696269...`；16 张正式 PNG 的实际 SHA-256/byte length/像素与引用一致；matrix、no-Node、两份 DPI report 和 `studio-ui-webview2-size-audit.json` 均 PASS |
+| 内置浏览器最终矩阵 | `NOT_PERFORMED` | L0 代表交互已恢复，但 S00-S13 × B0-B4 的 L1 最终截图、focus 和状态清单没有完整执行；Playwright/WebView2 不替代本项 |
 | Windows 125% | `NOT_PERFORMED` | 所有真实窗口只观测到 native 96 DPI / scale 1；DPR/force scale 不外推 |
 | 产品 Owner / production acceptance | `NOT_PERFORMED / NOT_GRANTED` | 无人工签收；`VISUAL_ACCEPTANCE_GRANTED`、production acceptance 与 Legacy retirement 均未授予 |
 
 ### 14.2 S00-S13 前后对比报告
+
+V6R 在既有 S00-S13 对照基础上追加了当前候选的登录、总览、工程页六张代表截图，位于
+`.tmp/studio-ui-next/final-visual-review/`。它们证明 Apple refinement 已落到真实登录与工程路径、两档尺寸和两组主题/密度，但不构成新的 S00-S13 × B0-B4 全量 before/final 矩阵；下表仍保留 V5 的完整历史对照来源。
 
 | Surface | 同状态 before / final 证据根 | 可核对的改善 |
 | --- | --- | --- |
@@ -395,8 +418,8 @@ V6 分为 Codex 可自主完成的本机软件门禁和必须等待真实环境/
 ### 14.3 交接边界
 
 - Design System 继续以 `tokens -> primitives -> patterns -> capability composition` 使用；业务 owner、请求、写入口、Canvas 与 HostBridge 不进入视觉 primitive。
-- P0/P1/P2 为 0；未发现系统性重复 P3。后续局部审美调整不得改变保存、执行、AgentRun、Runtime/Station 或正式结果权威。
-- 已知环境债：内置浏览器绑定、真实 Windows 125%、产品 Owner 签收、独立 no-Node 目标机、Remote CI、现场 Camera/PLC/Station/AI 与生产 soak。
+- P0/P1/P2 为 0。剩余 P3：dark Auth 仍通过滤镜复用亮色工作区截图；`<=920px` Auth 单栏没有正式截图矩阵；forced-colors 只有 Playwright 模拟、没有真实 Windows 高对比截图。后续局部审美调整不得改变保存、执行、AgentRun、Runtime/Station 或正式结果权威。
+- 已知证据债：内置浏览器已恢复代表交互，但 S00-S13 × B0-B4 全矩阵未执行；真实 Windows 125%、产品 Owner 签收、独立 no-Node 目标机、Remote CI、现场 Camera/PLC/Station/AI 与生产 soak 仍未完成。
 - 复测入口保持第 15 节命令；任何产品代码变化必须从 V6.1 重新冻结候选并重跑软件、截图和 WebView2 证据。
 - 回滚继续使用既有 Startup Profile 与 `LEGACY_FALLBACK`；Legacy 源码未删除，`LEGACY_RETIREMENT=NOT_APPROVED`，Project/Flow/Result authority 无迁移或双写。
 
@@ -524,9 +547,13 @@ npx playwright test --reporter=list
 | V6.4 recovery retry | BLOCKED_BY_ENVIRONMENT | `a3e59bd...` / `SHA_BOUND_IMPLEMENTATION` | `COORD-EVIDENCE` / no product source edits | controlled static server returned HTTP 200; Browser selection and prescribed connection diagnostic both timed out and reset | L0/L1 NOT RUN | server terminated; port `42944` unreachable and listener count 0 | environment block independently reproduced; no fallback evidence substituted |
 | V6.7-V6.8 | IN_PROGRESS | `a3e59bd...` / `SHA_BOUND_IMPLEMENTATION` | external 120 DPI environment / Product Owner | Windows 125% and Owner signoff NOT PERFORMED | N/A | 100% evidence retained; 125%/human acceptance NOT PERFORMED | waiting for the required environment and accountable reviewer; no local substitute is valid |
 | V6.10 cleanup / handoff | DONE | `a3e59bd...` / `SHA_BOUND_IMPLEMENTATION` | `COORD-VIEW` / approved temporary roots and handoff docs | five old roots removed: 2,194 files / `1,454,810,170` bytes; candidate publish/runtime roots and empty wrapper removed: 2,002 files / `1,440,353,363` bytes | N/A | all targets rechecked absent; final JSON/PNG evidence retained | permanent deletion completed under explicit authorization; processes and ports released |
+| V6R.1-V6R.4 Apple refinement | DONE | `bf662c838...` / `VISUAL_IMPLEMENTATION_COMMITTED` | `COORD-VIEW` / global StudioUI presentation, focused legacy canvas presentation and tests | lint/typecheck/build/bundle PASS；StudioUI 930/930；legacy/UI contracts 999/999；Playwright 178 passed / 87 skipped / 0 failed；.NET tests NOT RUN | `PARTIAL_INTERACTIVE_RECOVERED`：登录到工程页、6 张 light/compact 与 dark/comfortable 截图、console/overflow/owner PASS；L1 full matrix NOT PERFORMED | L2 full Playwright PASS | Apple-inspired tech elegance landed without authority/Owner/save/Canvas/HostBridge drift；three P3 evidence gaps retained |
+| V6R.5 first WebView2 matrix | FAILED_RELATED | `bf662c838...` / `VISUAL_IMPLEMENTATION_COMMITTED` | `COORD-EVIDENCE` / no product code edits | 17/17 individual WebView2 manifests and 17/17 cleanup PASS | N/A | matrix total FAIL because the existing no-Node static audit rejected a valid Vite PNG manifest asset | failure retained under `.tmp/studio-ui-next/f09/matrix/visual-bf662c838-w100-20260811-135321-830/`; not reused as final PASS |
+| V6R.5-V6R.7 evidence and cleanup | DONE | `aba696269...` / `EVIDENCE_FIX_COMMITTED` | `COORD-EVIDENCE` / one-line manifest asset path audit fix, WebView2 evidence and temporary cleanup | PowerShell parse and diff check PASS；final matrix local no-Node/process-tree PASS | N/A | 1920 full matrix 17/17 + size matrix 4/4；21 manifests、21 cleanup、16 PNG、native 96/1.0、DPI/audit PASS | runtime/publish roots 与 two empty wrappers removed；browser fixture 的 64 个文件已删除、空 wrapper 保留；formal evidence retained；clean machine no-Node/125% remain NOT PERFORMED |
+| V6R.8 external acceptance | IN_PROGRESS | `aba696269...` / `EVIDENCE_HEAD` | external Browser full matrix / 120 DPI environment / Release, Field and Product Owners | S00-S13 Browser L1、Windows 125%、Remote CI、field hardware、production soak、Owner signoff NOT PERFORMED | L0 representative interaction only | local 100% evidence retained | no production acceptance or Legacy retirement claim |
 
 状态只使用：`LOCKED`、`READY`、`IN_PROGRESS`、`BLOCKED_BY_CONTRACT`、`BLOCKED_BY_ENVIRONMENT`、`DONE`、`DEFERRED`。任何未实际执行的 Browser、WebView2、Windows 125%、现场硬件、Remote CI 或人工签收必须写 `NOT RUN`、`NOT PERFORMED` 或 `BLOCKED`。
 
 ## 18. 下一唯一动作
 
-本机可自主执行的实现、候选冻结、软件/Playwright/WebView2 100% 证据、审计与清理已经完成。下一动作是取得任一尚缺的外部条件并关闭对应门禁：恢复可用的内置浏览器绑定环境完成 V6.4，进入真实 120 DPI Windows 会话完成 V6.7，或由产品 Owner 执行 V6.8 人工签收。三者互不替代；任何后续产品代码变化都必须从 V6.1 重新冻结并重跑候选证据。
+本机可自主执行的实现、候选冻结、软件/Playwright/WebView2 100% 证据、审计与清理已经完成。下一动作是补齐内置浏览器 S00-S13 × B0-B4 的 L1 最终矩阵，或取得任一外部条件并关闭对应门禁：进入真实 120 DPI Windows 会话完成 V6.7，或由产品 Owner 执行 V6.8 人工签收。三者互不替代；任何后续产品代码变化都必须从 V6.1 重新冻结并重跑候选证据。
